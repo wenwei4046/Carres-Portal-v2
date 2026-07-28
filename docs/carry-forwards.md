@@ -150,6 +150,73 @@
 - `warehouse-receipt-orphaned-by-a-po-relocation` — Receiving R6 (2026-07-28, PR #490), reported by the build chat rather than found later. A warehouse receipt SNAPSHOTS the warehouse it was filed at, which is right — the count happened somewhere. But the warehouse's Incoming list is built from the PO's CURRENT warehouse, so **relocating a PO to a different warehouse after a count has been filed and before Carres reviews it leaves an open receipt attached to a PO that has vanished from that warehouse's screen.** The staff member who counted the goods can no longer see the thing they counted, and the ops review panel still shows it waiting. Bounded today to the point of being unreachable: **one warehouse exists** (`Carres Klang`) and no warehouse account has ever logged in, so there is nowhere to relocate a PO to. It stops being unreachable the day a second warehouse is real — which R6's own card anticipates ("partner-warehouse SSY/EU logins after Klang proves R6"). Firm fix: the Incoming list should union the PO's current warehouse with any warehouse holding an OPEN receipt for that PO, so a filed count keeps its own screen until it is reviewed; alternatively refuse a relocation while an unreviewed receipt exists, which is the stricter and probably more honest rule — a PO whose goods somebody has physically counted is not free to move. Do NOT fix it by dropping the snapshot: the warehouse a count happened at is a fact, not a pointer.
 - `hold-resolution-is-per-claim-not-per-unit` — Receiving R4 (2026-07-27, 0299): `ops_stock_resolve_hold` moves EVERY unit still held under the claim to one outcome. A claim covering 3 damaged units where the supplier takes 2 back and lets us scrap 1 cannot be recorded as it happened — the operator must pick one word for all three. Deliberate: the units of one claim are one problem, one supplier answer and one physical decision, and the per-unit picker UI would be built for a case nobody has met (0 claims exist). Firm fix when a real split appears: the RPC already resolves by predicate, so add an optional `p_item_ids uuid[]` narrowing the same `where`, and give the panel checkboxes — no schema change, and the audit/po_history lines already name a count rather than assuming "all".
 
+- `purchasing-banned-verbs-not-applied-in-499` — **R8 (2026-07-28), and the wording for every
+  item below is ALREADY APPROVED.** Six strings on the Purchasing lane still spell an action
+  with a word COPY-STANDARD bans or with a word that is not the one the dictionary locks.
+  Each of them carries the same note: **"Approved wording exists but was not applied in
+  PR #499."** No business decision is outstanding on any of the six — the words are ruled, the
+  screens are the lag.
+
+  | Live on main after #499 | The approved word | Where |
+  |---|---|---|
+  | `Chase on WhatsApp` | `Open WhatsApp group` | To Order → the ready-date detail pane's footer button |
+  | `Chase {supplierName}` | `Call {supplier} — confirm ready date` | To Order → the same pane's header |
+  | `Chase factories` | `Confirm ready date` | To Order → the middle-list header |
+  | `items to chase` | the same action's object | To Order → the detail-empty hint |
+  | `Nothing to chase here` | `No supplier to call today. Everything on track.` | To Order → the ready-date stage's empty state |
+  | `Direct receive →` | `Check in` + the escape-hatch modifier | Purchase Orders → `ProcurementTabContent.tsx` |
+
+  **`Chase` is banned OUTRIGHT** ("never visible anywhere", COPY-STANDARD's banned-words list)
+  — five of the six are that one word, and it is on screen today. The sixth is `Receive` as a
+  verb, which the vocabulary table puts in the do-not-use column against `Check in`.
+
+  **Also in the same shape and reported with them** (`ReceivePOModal.tsx`, the check-in form
+  itself): `Receive now` · `Receive all pending` · `Mark received` · `Receive partial` ·
+  `Receive threads failed`. #499's own docs commit lists these as reported-and-not-fixed. The
+  dictionary's five strings for this action are `Check in` (queue · button) ·
+  `Check in from {supplier}` (row) · `Checked in {n} of {m}` (done) — nothing new is needed.
+
+  **Why it is a card and not a patch (Loo, 2026-07-28).** R8 shipped as #499 and a second,
+  independently-built R8 existed on branch `claude/carres-purchasing-lane-r8-4e9b60` with all
+  of the above already fixed and green. **It was NOT merged and NOT cherry-picked**, on the
+  same discipline that closed #496: *the first version to merge is the final one; the second
+  is not reconciled, not partially lifted, and not continued from.* Breaking that once to save
+  one card would leave nothing to appeal to the next time two chats collide. So: **do not open
+  that branch, do not cherry-pick from it, and do not reopen R8.** The card that picks this up
+  starts from main and applies the approved words itself.
+
+  **Scope note for whoever takes it:** these are the Purchasing lane's own screens, so the card
+  needs the lane — it may not run beside a P-card or C4. It is small (six strings plus the
+  check-in form), it carries **no migration**, and it needs **no ruling**. Related and
+  deliberately NOT part of it: `ready-stock-plan-review-has-no-ruled-words` (a different
+  business line, and its flow file comes first).
+
+- `purchasing-banned-verbs-outside-the-lane` — **R8 (2026-07-28), found by grepping the built
+  bundle rather than the lane's files, which is why #499 did not see them.** Two retired
+  Purchasing words survive on screens that belong to other lanes, so neither is R8's to fix and
+  neither should be swept by a Purchasing card:
+  - **`Send POs`** on the right-rail **Calendar** (`components/rail/CalendarPanel.tsx`) — the
+    plural of an action whose singular (`Send PO`) is locked. The Calendar is its own surface
+    and was explicitly out of scope for R8.
+  - **`Receive all pending`** in the **partner portal**'s own receive modal
+    (`pages/partner/PartnerReceiveAtWhModal.tsx`) — an EXTERNAL role's page, exactly the shape
+    of P1's `supplier-portal-still-shows-lead-time` finding. Whether an external portal speaks
+    the internal dictionary is a business question nobody has answered, and it should be
+    answered once for supplier · partner · warehouse together rather than screen by screen.
+
+  Both measured in the shipped bundle: exactly 1 occurrence each. Neither is urgent — the
+  Calendar one is a label on a filter, and the partner one is behind a partner login.
+
+- `design-standard-linter-reads-a-pr-number-as-a-colour` — **R8 (2026-07-28).** RULE A of
+  `scripts/check-design-standard.mjs` matches `#rgb` / `#rrggbb`, so a PR reference in the
+  4xx–fff range written inside a code COMMENT (`#494`, `#499`) is counted as a hard-coded hex
+  literal and fails the lint on any file whose baseline is 0. Hit for real while writing an
+  explanatory comment; worked around by writing the number without the hash, which makes the
+  comment worse. Firm fix: require the hex match to sit inside a string or a `style`/`class`
+  context, or simply exclude comment lines before counting — one small change in `hexCount()`.
+  Harmless (it over-reports, never under-reports), but it quietly teaches chats to write worse
+  comments.
+
 - `action-step-cannot-open-its-form` — Portal Core C6 (2026-07-28, PR #486): a checklist step
   NAMES the button that records it (`Confirm booking`, `Record ready date`) and cannot press
   it — the operator reads the word and then has to find that button themselves in the drawer.
