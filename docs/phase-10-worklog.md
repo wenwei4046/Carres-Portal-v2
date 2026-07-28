@@ -3286,3 +3286,123 @@ live bundle** (4,443,920 bytes, `SERVICE_ROLE` 0): the new strings are present
 (`Approve waiver` · `Waived by principal` · `Request waiver` · `Waiver requested` ·
 `pending principal approval`). The one surviving `Awaiting principal approval` is Finance
 Refunds' own >RM 1,000 line, a different feature.
+
+---
+
+## 2026-07-28 · Portal Core C6 — every action opens the steps that close it (PR #486, no migration) · DEPLOYED
+
+C2 gave the drawer a list of every OPEN action. C6 answers the next question — **what
+closes this one** — and answers it in the portal's own words, from the portal's own signals.
+Web + shared only; the api imports nothing from the action engine, so it was not redeployed.
+
+### The shape, and why it is one sentence
+
+> a checklist is **[the measured step before it, when there is one] + [the outcome THIS
+> action records]**
+
+and **every step is one of the portal's own actions**, so its label is that action's BUTTON
+word from COPY-STANDARD's dictionary. A step therefore cannot carry a verb somebody invented
+for a tick-list — a step is not allowed to be anything but an action the portal already has.
+
+| Action | Its checklist | The signal the measured step reads |
+|---|---|---|
+| `Send PO to {supplier}` | ○ `Send PO` | — |
+| `Call {supplier} — confirm ready date` | `Send PO` · ○ `Record ready date` | something has been ordered |
+| `Call … — agree new delivery date` | `Record ready date` · ○ `Record new date` | a supplier date is on file |
+| `Assign logistics` | ○ `Assign logistics` | — |
+| `Call {logistics} — confirm delivery date` | `Assign logistics` · ○ `Confirm booking` | a logistics company is picked |
+| `Deliver today` | **none — the card's own ruling** | — |
+| `Upload delivery photo` | `Mark delivered` · ○ `Upload delivery photo` | the order reached the customer |
+| `Collect RM … from {customer}` | ○ `Record payment` | — |
+
+### The last step is never ticked, and it is structural rather than a fudge
+
+The drawer renders a checklist only for an action that is OPEN, so the outcome that action
+records has by definition not been recorded. Deriving it a second time here would be
+re-running the trigger, and the only thing a second derivation can do is disagree with the
+first — the J3/C2 law: this layer renders, it never re-derives.
+
+**One invariant holds the whole feature honest:** *an open action always has at least one
+un-ticked step.* Asserted over 2⁶ × 3 × 3 signal combinations, each run through Layer 1 and
+then through its own checklist, with a counter guarding the guard (a loop that stopped
+raising actions would pass vacuously). **Negative control:** make one closing step read a
+signal instead and exactly that invariant fails. A fully-ticked list beside a live action is
+the only way this feature could lie, and it now cannot.
+
+### The no-decorative-checkbox law became structure
+
+There is no tick, no checkbox and no writer anywhere in the module or its renderer. A step's
+state is READ from the same `OrderActionSignals` object the ladder just read — passed in
+ONCE, so a step can never be measured against a different reading of the order than the
+action above it. The only control in the component is a DISCLOSURE, and a test asserts that
+expanding an action adds no `input`, no checkbox and no button inside any step.
+
+### Two words added to the code, none to the screen
+
+COPY-STANDARD locks FIVE strings per action and `order-action-words.ts` mirrored only TWO
+(queue word + row line). C6 needed the third — the **Button** — and took it verbatim from
+the dictionary table, so the mirror is now 3 of 5. Every step on screen is `Send PO` ·
+`Record ready date` · `Record new date` · `Assign logistics` · `Confirm booking` ·
+`Mark delivered` · `Upload delivery photo` · `Record payment`, which is also
+COPY-STANDARD's "What to do" step template exactly — verb first, ≤ 8 words, ≤ 4 steps
+(asserted).
+
+### Task Owner — the decision the card asked for, and it needs no store
+
+**The order's PIC (`ops_order_control.assigned_staff`) is the task owner of every action of
+that order.** True today, it is what Law 2 asks for, and it means an action carries no owner
+FIELD: printing the same name once per open action would spend height (UI-KIT §1.3)
+repeating what the owner chip beside the order already says. A step ownable separately from
+its order is a second store plus a hand-off screen nobody has asked for — a card, not an
+assumption. Closes C2 finding #5 / C3 finding #5 **by ruling, not by building.**
+
+Collapsed by default, so C6 adds **zero permanent pixels** to the drawer.
+
+### NOT BUILT — the driver / vehicle / condo migration
+
+The card carries "ONE small additive migration — the call-outcome fields on
+`ops_order_control`" and, in its own last line, "**No migration** unless a step must be
+ownable separately from its order". Those two sentences disagree. Guardrail #8 settles what
+a build chat may do: draft SQL may not enter `supabase/migrations/` before Jess approves, so
+the draft sits in the PR body and in the card, and nothing was applied. It is also not
+needed by the Done-when — every built action closes from a signal that exists today. The
+fields are what the call FILLS IN (category (b) of the law), and they need a form on the
+confirm-booking surface before they mean anything, which is why they are one decision and
+not four spare columns.
+
+### What C6 found — reported, not fixed (Law 0)
+
+1. **The card contradicts itself about the migration** (above).
+2. **`ACTION-FLOW-STANDARD.md` Law 6 still ends "NOT BUILT YET … Card C10 builds it"** — C10
+   shipped 2026-07-27 and that section's own heading already says ✅ BUILT. The stale
+   paragraph also repeats the retired ruling that the dots REPLACE the stage pill; Jess
+   re-ruled *side by side*. A chat reading only the bottom of that section builds the screen
+   C10 deliberately did not build. Same stale-paragraph failure T2 met a day earlier, in the
+   law rather than in a comment.
+3. **Two different blocks in the order drawer are both labelled `Actions`** — the left rail's
+   counterparty panel (renamed from `Chase now` by C1) and C2's dynamic checklist in the
+   full-width band. COPY-STANDARD rule 8 is "same word app-wide". Both words were ruled;
+   picking one is a wording decision, not a build chat's.
+4. **`Arrange new delivery date` (dictionary) vs `Agree new delivery date` (code), and
+   `{logistics}` vs `{customer}`** — C2 finding #3, unchanged; **C8 owns it.** C6's button
+   word is party-free, so it is correct under either ruling.
+5. **A step names the button but cannot press it.** "Where a form already collects the
+   inputs, the form IS the checklist" was read as *do not duplicate the form as ticks* — it
+   does not ask for navigation, and C2's list is deliberately control-free. Wiring each step
+   to the panel that owns it is a real improvement and a real risk in a 7,000-line file.
+6. **`send_po`'s completion rule in the card ("PO exists AND supplier ETA recorded") is not
+   how the engine works** — the moment a PO exists the action becomes `Call {supplier} —
+   confirm ready date`, which is what records the date. Built as the engine behaves, because
+   the card's own "ORDER OF EVENTS, not a gate chain" rule says the two must not be collapsed
+   into one action.
+
+### Verification
+
+Suites at baseline (shared **1859/1859** incl. +11 · api **3** pre-existing · web **16**
+pre-existing); `tsc -p tsconfig.app.json` 0 new, shared `tsc` 3 pre-existing in
+`hr-comp.test.ts` / `schemas/orders.test.ts`, `pnpm --filter @carres/web lint`
+(design-standard guard) clean, prod build clean. **Proved BOTH directions on downloaded
+bundles**: `order-action-step` · `order-action-toggle` · `order-action-steps` ·
+`Record ready date` · `Confirm booking` grep **0 in the previous live bundle**
+(`index-C18Onyrj.js`, C3's, 4,444,881 bytes) and **1** in this one (`index-7GAkvYaD.js`,
+4,451,521 bytes, `SERVICE_ROLE` 0). All 4 canonicals converged on the first poll.
