@@ -393,13 +393,22 @@ word for the same act, and the Claims queue tile has a name that is in the dicti
 chat may not rewrite it: **report it and let the PLAN chat retitle §3 in the same week**, then
 sweep whatever the code still spells. Do not rename the section yourself.
 
-**NOT in this card: `GRN`.** It is live in four places on the order drawer (column header, the
-`GRN — goods arrived` modal, `Save GRN`, the toast) and COPY-STANDARD bans it — **but the ban
-is under review**, because the law's own exemption clause ("`DO` and `PO` survive because the
-team already speaks them daily") is the same argument for `GRN`, which is what the team's
-AutoCount calls the document. **Until Jess rules, R8 leaves every `GRN` alone.** Sweeping it
-on the strength of the ban alone would rename a word the warehouse says out loud, and
-un-renaming is twice the work.
+**⑤ `GRN` — RULED 2026-07-28, and it is a SPLIT, not a rename.** `GRN` is no longer banned:
+it survives as **the name of the document**, on the same ground as `DO` and `PO`. What it may
+never be is **the act** — that is `Check in`. COPY-STANDARD carries the rule and the test.
+
+Apply the test site by site, do not sweep:
+
+| Live today | Verdict |
+|---|---|
+| `+ GRN` button | **act** → `Check in` |
+| `GRN — goods arrived` modal title | **act** → `Check in` |
+| `Save GRN` | **act** → `Check in` (and see the warehouse precedent: a button that changes whose problem something is was never a `Save`) |
+| the toast after saving | **act** → the done message from the dictionary |
+| a column or link naming the RECORD (`View GRN`, `3 GRNs on this PO`) | **document** → leave it, `GRN` is correct |
+
+**Report the count both ways in the PR** — how many became `Check in`, how many stayed `GRN`.
+A sweep that leaves zero `GRN` has misread the ruling as a ban.
 
 **LANE:** R8 now touches the Purchasing module's own pages as well as ④ R's
 (`OperationPurchase.tsx` from ⓪, `OperationSupplierClaims.tsx` from ③), so **no P-chat and no

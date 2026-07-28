@@ -37,7 +37,7 @@ Two hard beliefs behind the rules:
 | 6 | Errors give the fix | `Invalid input` | `Master row missing G column. Ask Sales to fill it before Monday.` |
 | 7 | Tooltip = WHY | button `Send` · tip `Click to send` | button `Send` · tip `Sends the PO to Ohana via WhatsApp` |
 | 8 | Same word app-wide | Orders `Confirm ready date` · Purchase `Follow up` | Both say `Confirm ready date` |
-| 9 | Zero jargon | requisition · expedite · MRP · GRN | order · call · plan · check in |
+| 9 | Zero jargon — **unless the team already says it** | requisition · expedite · MRP · `GRN` as a VERB | order · call · plan · check in · `GRN` as the DOCUMENT (see the document/act split) |
 | 10 | Cut a sentence if possible | `Please note that this order...` | `This order is 1 day late. Send now.` |
 
 ## The three "who / what / when" questions
@@ -174,8 +174,29 @@ row, follow-up preset) is written as:
 - **No abbreviations, ever.** ERP shorthand a new hire must google is banned.
   **"POD" is banned** (→ delivery photo). **"Chase" is banned** (Jess
   2026-07-27) — it names a mood, not an outcome; every former Chase label
-  becomes a Call with a named party and a measurable object. "DO" and "PO"
-  survive because the team already speaks them daily.
+  becomes a Call with a named party and a measurable object. **"DO", "PO" and
+  "GRN" survive because the team already speaks them daily** — and all three
+  survive as the NAME OF A DOCUMENT, never as a verb.
+
+### The document / act split (Loo ruled 2026-07-28)
+
+**A word may name the piece of paper, the act, or neither — never both.** `GRN` is the
+document the warehouse produces; **`Check in` is what a human does.** Same event, two words,
+and that is correct rather than a synonym problem.
+
+**The test, and it is mechanical:** replace the word with *"the piece of paper"*. If the
+sentence still means what it meant — `View GRN`, `3 GRNs on this PO`, `GRN-0012` — the word is
+right. If it does not — `+ GRN`, `Save GRN`, `GRN — goods arrived` — a human is DOING
+something, and the word is `Check in`.
+
+**Why this and not a clean ban.** The abbreviation rule above bans shorthand a new hire must
+google, and exempts `DO` and `PO` on one ground: the team already says them. **`GRN` clears
+exactly that bar** — it is what their AutoCount calls the document and what the warehouse says
+out loud. Banning it would have put a word on screen the warehouse does not use, to satisfy a
+rule whose own exemption already covered it.
+
+**This applies to every module,** and the same split settles the next argument of this shape:
+name the act with a verb from the table, name the artefact with the artefact's real name.
 - **Every label lives in ONE place** — the audit table below ("The dictionary"). There is
   no second list of approved labels anywhere.
 
@@ -510,7 +531,8 @@ doubt, grep the codebase and match what already ships.
 | Raise a purchase order to a factory | **Send** (order / PO) | Place · Raise · Push · Submit · Create |
 | Pre-due polite follow-up on an open PO | **Remind** | Notify · Ping · Alert · Nudge |
 | Post-due firm follow-up on an open PO | **Call {supplier} — confirm ready date** | Chase · Expedite · Follow up · Push · Escalate |
-| Log goods arrival | **Check in** | Receive (as a verb) · Book in · GRN · Goods receipt |
+| Log goods arrival — the ACT | **Check in** | Receive (as a verb) · Book in · Goods receipt · **GRN** (that is the document, not the act) |
+| The DOCUMENT that the act produces | **GRN** | Goods receipt note · Receiving note · Check-in record |
 | An order line's goods are secured for that order | **Ready** | Reserved — on an order line it is read as `Received`, and the two mean opposite things. `Reserved` stays correct on the Stock screens, where it describes a UNIT and sits nowhere near `Received` |
 | Customer confirmed ETA — ready for PO | **Proceed** | Confirmed · Approved · Green-lit |
 | Customer ordered but no ETA yet | **Placed** | New · Draft · Pending · Open |

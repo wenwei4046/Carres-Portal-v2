@@ -150,9 +150,11 @@ follow these six steps IN ORDER, before writing a single line of code:
 5. **PROPOSE a superior BUSINESS design if you have one.** The proposals in
    that doc are a STARTING point, not scripture — overwriting is welcome for
    flow, data model and wording. Present old vs. new side-by-side (a short
-   table or two-column ASCII sketch) and let Loo pick. Never propose more than
-   one alternative at a time (see the "no-menus, decide" feedback rule): pick
-   your single best proposal, name it decided, invite redirect only if wrong.
+   table or two-column ASCII sketch) and let Loo pick. **How to put the choice —
+   options WITH a named recommendation — is §15 "How to ask for a decision", and
+   it lives there only.** (This step used to say "never propose more than one
+   alternative"; that fought a rule of Jess's saying the opposite. Loo settled it
+   2026-07-28 and both sentences are gone.)
    **Never propose a redesign of the visual system here.** A missing component
    is a request to add it to UI-KIT, not a licence to draw one.
 
@@ -455,7 +457,33 @@ Loo prefers:
 - **Practical business / furniture analogies** over abstract theory
 - **No coding background** — explain technical concepts when relevant, but don't be condescending
 
-When you need a decision from Loo, say it once, clearly, and present the default option. Don't ping-pong.
+### How to ask for a decision (LOCKED by Loo 2026-07-28 — one rule, replacing two that fought)
+
+**Give OPTIONS, and name which one you recommend.**
+
+```
+2–3 options, one line each, each stating its cost.
+The recommendation goes FIRST and says why.
+Loo answers with a letter.
+```
+
+Two rules used to sit in two files saying opposite things: *"every proposal ends with 3
+options, I reply a letter"* (Jess, in the old order-portal spec) and *"never propose more than
+one alternative at a time — pick your single best proposal"* (§0 step 5). Both are dead; this
+is the only version.
+
+**They were never really opposed, and the reconciliation is the rule.** §0's target was a
+MENU — a list with no opinion, which pushes the thinking back onto the reader. Jess's target
+was a monologue that cannot be answered in one word. **An option list with a named
+recommendation fails neither:** the recommendation carries the opinion, the letters make it
+answerable, and the costs let a non-recommended option win on a fact you did not have.
+
+**Still true, and it is what kills ping-pong:** ask ONCE. Do not return with the same decision
+re-cut. If an answer only changes something reversible, choose it, say which way you went, and
+carry on.
+
+**Not for every sentence.** A conventional default, a fact you can measure, or a choice with
+one sane answer is not a decision — make it and move.
 
 **Jess (COO) 的工作规则 — 她的 chat 照做:**
 
