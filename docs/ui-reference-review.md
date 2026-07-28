@@ -33,7 +33,7 @@ not a licence.
 |---|---|---|---|
 | **R1** | **SAP Fiori** | Enterprise workflow | ✅ **frozen 2026-07-28** — adopt with modification; one rule (closed floorplan catalogue) |
 | **R2** | **Linear** | Operator workflow | ✅ **frozen 2026-07-28** — adopt with modification; one observation (opinionated, not configurable) |
-| R3 | Stripe Dashboard | Detail page | ⏳ |
+| **R3** | **Stripe Dashboard** | Detail page | ✅ **frozen 2026-07-28** — adopt with modification; one observation (a visible word is a contract with a stable id behind it) |
 | R4 | Vercel | Design system | ⏳ |
 | R5 | GOV.UK · NN/g · Shopify Polaris · SAP Content | Microcopy | ⏳ |
 
@@ -299,8 +299,12 @@ explains four refusals at once.
 ## Conflicts found
 
 **None between the principle and a Carres law.** But applying it surfaced three live places where
-Carres already lets the browser hold the tool's shape — reported under Law 0, **not fixed, and not
-a redesign proposal**:
+Carres already lets the browser hold the tool's shape.
+
+> **CLASSIFIED BY THE PM, 2026-07-28: these are IMPLEMENTATION OBSERVATIONS ONLY.** They are held
+> for the final consolidation. **No design work may be started from them during this phase**, and
+> they are not a defect list to be worked. The screenshot finding below is **documentation debt
+> only** — the review does not stop to fix it.
 
 | Where | Key | What persists |
 |---|---|---|
@@ -334,10 +338,15 @@ reference at all.
 **Carried to the final consolidation. Not a rule, not scheduled, and `docs/UI-KIT.md` is not
 touched** (rule 5 of this line; PM ruling 2026-07-28).
 
-> **Opinionated, not configurable.** The UI and the workflow are decided once, for everybody —
-> which columns exist, what order blocks appear in, what an action is called, which step is next.
-> **Only BUSINESS NUMBERS are settings.** A user who can rearrange the tool must be taught their
-> own version of it, and every handover then starts from zero.
+**Ratified by the PM, 2026-07-28, in these words — this wording is the accepted one:**
+
+> **UI, workflow and navigation are opinionated and consistent across the company.
+> Business parameters remain configurable.**
+
+The reasoning behind it, kept because the sentence alone does not carry it: a user who can
+rearrange the tool must be taught their own version of it, and every handover then starts from
+zero. *(The PM's wording adds **navigation** — which this entry had not named — and scopes the
+consistency to **the company**, not to the page.)*
 >
 > *Enforcement candidate for consolidation to weigh (§16 requires one):* the absence of a
 > per-user UI-preference store — no browser-persisted layout, panel or column state under
@@ -356,3 +365,124 @@ touched** (rule 5 of this line; PM ruling 2026-07-28).
 - **Not verified, and deliberately left alone:** whether the Current Action block passes through
   the collapsible panel wrapper. Answering it means reading a 7,000-line file for a code decision
   that belongs to D0.5c, and this line reviews references — it does not open code cards.
+
+---
+
+# R3 · Stripe Dashboard — the detail page
+
+**Reviewed 2026-07-28. Recommendation: ADOPT WITH MODIFICATION — one governance observation:
+the visible word is a contract, and it has a stable identifier behind it.**
+
+## Why this product is respected
+
+Stripe's dashboard is the reference for **a detail page about money that has to be believed** —
+by a merchant, by their accountant, and by a court if it comes to that.
+
+- **One object anatomy, reused for every object type.** Payment, customer, invoice, subscription,
+  dispute — all read the same way: what it is and how much · what happened to it in time order ·
+  the structured facts · what it is related to · the raw record underneath.
+- **A number never appears without its provenance.** Amount → fee → net, each traceable, nothing
+  silently rounded, currency always stated. A figure you cannot take apart is a figure you cannot
+  defend to a merchant who disagrees with it.
+- **The screen never knows something the record cannot prove.** Every dashboard page can drop to
+  the underlying object and the API request log. The UI is a *view over an auditable record*, not
+  a second source of truth.
+- **Failure reasons are specific.** Not "payment failed" but the issuer's actual decline reason
+  and what may be done about it.
+- **The vocabulary is published and versioned.** A payment's status words are part of the API
+  contract, documented, and changing one is a versioned event that breaks integrations. The screen
+  and the system speak the *same* words because they are the same words, not because two teams
+  agreed to keep them in step.
+
+## ① What do we learn?
+
+**One governance principle: a visible word is part of a contract, and behind every visible word
+there is a stable identifier that does not move when the word does.**
+
+Stripe can afford to rename a label because the label was never what anything keyed on. The *word*
+is presentation; the *identifier* is the contract. That separation is what makes a rename a
+display change instead of a data migration.
+
+**Carres has already invented exactly this — for actions, and only for actions.** Measured this
+session in `packages/shared/src/order-action-words.ts`: every action carries a `key` from the
+`OrderActionKey` union — `send_po` · `confirm_ready_date` · `issue_delivery_order` · `collect` and
+the rest — and `DISPLAY_RANK` in `order-actions.ts` is keyed by that union, never by a label. It is
+why C1 could delete the word `Chase` from the whole portal without touching a count, a filter or a
+stored row.
+
+So the principle is not new to Carres. **What Stripe adds is the scope**: it is a rule about *every*
+visible word, not a technique that happened to be applied to one module. R2 already found the
+counter-example — drawer panel state keyed by the panel's **title**, so a rename silently resets it
+— and under this principle that is not a bug to argue about case by case; it is the same rule not
+yet applied.
+
+**The second half of the principle, which is what makes it governance rather than engineering:**
+because the word is a contract, **changing one is an event with a procedure** — it goes through
+`COPY-STANDARD`, and every surface follows from the one home. It is never an edit somebody makes
+while they are in the file for another reason.
+
+## ② What do we NOT learn?
+
+| # | Stripe pattern | Why Carres refuses it |
+|---|---|---|
+| 1 | **One status word on the object** (`succeeded` · `failed` · `pending`) | **The third reference in a row, and the criterion set in R2 was applied rather than repeated:** a Stripe payment has essentially ONE track — the money — so summarising it into one word loses nothing. Carres runs three tracks that can disagree, and a delivered order that still owes money is Working, not Completed. **The test still finds no reference with three independent tracks that summarises them.** Refused again, for the same reason, not by habit. |
+| 2 | **The raw object / API log on the page** | Directly against L2: Evidence is the *second sentence* of an answer and Detail *belongs somewhere else*. It is also a live exposure shape we already carry a carry-forward for (`combo-cost-pos-bundle-exposure` — principal-only cost fields riding a bundle to the client). A record an operator can open raw is a record whose every field is published. |
+| 3 | **Test mode / Live mode as a global toggle** | Carres has no test mode. Every row today is test data and **at go-live the database starts clean** — a mode switch would be a control that lies, because there is no second environment behind it. |
+| 4 | **The free-text `metadata` bag** | The opposite of a lesson this project has paid for twice. `ops_order_control.balance` was read by a lock for months and written by nobody; Purchasing P1 found two `delivery_fee_config` lead fields editable, saved and read by nothing. **A field with no reader is the disease**, and a metadata bag is a field with no reader by design. |
+| 5 | **The developer surfaces** — webhooks, API keys, request logs, event replay | A different user entirely. Ours is described in CLAUDE.md as non-technical and low-English. |
+| 6 | **The look** | Rule 2 of this line. |
+
+## ③ Why does it fit Carres — and where it does not
+
+**It fits** on the two regions Stripe is genuinely better at than anyone: **R5 money** and
+**R6 record**. Its amount → fee → net discipline is our *one number, three depths* rule
+(`ORDER-DETAIL-INFORMATION-MODEL` §6) reached from the money side — and its timeline is R6's
+*who · when · what they did, in time order, with what was said kept verbatim*.
+
+**It does not fit** in the same way R1 did not, which is now a pattern worth naming: **Stripe's
+detail page is built for INVESTIGATION and ours is built for ACTION.** Stripe's reader is asking
+*what happened and can I prove it*; ours is asking *what do I do now*, and leaves at step ② four
+times out of five. **Two of the world's most respected detail pages are both document viewers.**
+That is not an argument that L1 is unusual — it is an argument that L1 is answering a question
+neither of them was asked.
+
+## Conflicts found
+
+**One, and it is the same one for the third time:** the single object status word, refused —
+see ②#1, where the R2 criterion was applied and the reference failed it on the merits (one track,
+not three).
+
+**No conflict on the principle itself.** The stable-identifier rule agrees with what Carres already
+does for actions; it disagrees with nothing frozen.
+
+**Not re-opened, deliberately:** R2's panel-title finding is the natural example of this principle
+and it stays an **implementation observation for the final consolidation** under the PM's ruling.
+Naming it here as the same rule is a classification, not design work.
+
+## The observation this reference contributes
+
+**Carried to the final consolidation. Not a rule, not scheduled, `docs/UI-KIT.md` untouched.**
+
+> **A visible word is a contract, and every visible word has a stable identifier behind it.**
+> Nothing may key on a label: not a count, not a filter, not a stored state, not a test. Renaming
+> is then a display change and never a data change — and because it is a contract, the change goes
+> through `COPY-STANDARD` as an event, never as an edit made in passing.
+>
+> *Enforcement candidate for consolidation to weigh (§16 requires one):* the pattern already
+> exists and is typed — `OrderActionKey` is a union and `DISPLAY_RANK` is keyed by it. The
+> candidate is therefore **generalisation, not invention**: no persisted state, query key or
+> storage key may be built from a display string. Build-Guard shaped, not Human-Review shaped.
+
+## The limits of this reading
+
+- **Read from product knowledge of the Stripe Dashboard and its published API vocabulary, held in
+  memory.** **No live Stripe dashboard was opened this session** — note that a Stripe account
+  *does* exist for this business (it carries the rental subscriptions), so this is a limit that
+  could be lifted if the PM ever wants a visual reference; rule 2 of this line means R3 does not
+  need one.
+- **Carres side read live this session, not from memory:** `packages/shared/src/order-action-words.ts`
+  (the `key` field and eleven of its values) and `order-actions.ts` (`OrderActionTrack`,
+  `OrderActionKey`, `DISPLAY_RANK`) — grepped, so the claim that Carres already keys on identifiers
+  is measured rather than recalled.
+- **Not read:** the Payments module docs and `payment-module-proposal.md`. R3 is a governance
+  reading; the money *module* is a business design question and is not this line's.
