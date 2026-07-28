@@ -4223,3 +4223,33 @@ real purchase order through it. It does not close line ④ either — **R7 remai
 Suites at baseline: shared **1949/1949** · api **3** pre-existing · web **16** pre-existing
 (2164 passed). Build + v4 guard + design-standard lint clean; `SERVICE_ROLE` greps **0** in
 every dist chunk.
+
+**2026-07-28 (same session, follow-up) · R8's sixth surface — found by the deploy grep, which is
+what that step is for** (PR #500 merge `611e7c1c`, no migration, **web only**) — `Send POs` greped
+**3 → 1** on the shipped bundle instead of 3 → 0, and the survivor was not a leftover in a file R8
+had edited. It was **`pages/operation/components/rail/CalendarPanel.tsx`**, the ops right rail,
+which renders the SAME three purchasing lenses and had been **half** fixed: C1 re-pointed `chase`
+at the dictionary in July and left `send` and `receive` as the panel's own words. So the rail
+sitting beside the To Order tab was saying **`Receive`** — a banned verb — while the tab itself
+said `Check in`, which is exactly the *"same act, two words, one screen"* defect this card exists
+to end, surviving the sweep by being in a file the card did not name. All three lenses read
+`purchasingActionQueue` now, and the two `DaySection` titles read the same map instead of
+hard-coding the words a second time.
+
+**The scan walked past it, and that is the more useful half.** The rule matched `>Receive<` and
+`Receive →` — the shapes a label takes as a CHILD. This one was a **PROP** (`title="Receive"`), so
+neither fired. The scan now also refuses a bare `"Receive"` string literal, `CalendarPanel.tsx` is
+in the lane list (6 files → 7), and the negative control fires exactly 1.
+
+**Two rail tests moved with the words**, and the second is a small proof the rename is right:
+`getByText("Send")` was an exact match and stops matching `Send PO`; and once the lens is open the
+word appears TWICE, because the tab and its day section are one action named once.
+
+**A deploy note worth keeping: the api deploy was REQUIRED and `git diff -- apps/api` said
+otherwise.** That diff was empty for #499, which is the shape a chat reads as "web only". But R8
+changes `packages/shared/supplier-claim.ts`, and `claimNextMove` is computed **server-side** by
+`apps/api/src/routes/operation/supplier-claims.ts` — the Claims row would have kept saying
+`confirm what they will do` under a tile saying `Confirm what happens next`. **Ask what the api
+IMPORTS, not only what it CONTAINS.** Same trap #435 nearly hit with `commissionReadiness`.
+Worker `0b2640bc` from tip `aa70cd45`; #500 needed none (`git diff aa70cd45..611e7c1c -- apps/api
+packages/shared supabase/migrations` is empty).
