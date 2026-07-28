@@ -633,7 +633,7 @@ Tests +39 (shared 30 · api 12 net · web 10 net); suites at baseline (shared 18
 3 pre-existing · web 16 pre-existing); typecheck 0 new, build + design guard + wrangler
 dry-run clean, `SERVICE_ROLE` 0 in the bundle.
 
-## C8b · the two delay clocks — ✅ LIVE (PR #496)
+## C8b · the two delay clocks — ✅ LIVE (PR #497)
 
 **Loo ruled TWO SLAs 2026-07-28 and then ruled where the second one starts**, which is what
 turned a law conflict into a five-line card:
@@ -664,7 +664,7 @@ carries one. **Loo chose the reading that changes no business rule**: Operations
 its two days to find out whether there is really a delay, and the moment it decides there is,
 the customer hears the same day.
 
-### What shipped (PR #496, 2026-07-28 — migration **0305**, applied and verified before the merge)
+### What shipped (PR #497, 2026-07-28 — migration **0305**, applied and verified before the merge)
 
 **The card said no migration, and half of it could not be built without one.** Clock 2 wired
 straight in — `delay_decision_at` (0304) is exactly its start. **Clock 1's start was stored
@@ -1092,6 +1092,6 @@ a tooltip and a five-word vocabulary; a half-drawn signal would not.
 | C6 | ✅ **LIVE** 2026-07-28 — every action opens the steps that close it; the order's PIC is the task owner | #486 |
 | C7 | ✅ **LIVE** 2026-07-28 — the DO issues itself, and the hard gate moves onto issuing. **No migration** | #489 |
 | C8 | ✅ **LIVE** 2026-07-28 — delay planning, and the gate before the customer. **Migration 0304** | #493 |
-| C8b | ✅ **LIVE** 2026-07-28 — the two delay clocks, on the OFFICE calendar. **Migration 0305** — the card said none, and clock 1's start was stored nowhere | #496 |
+| C8b | ✅ **LIVE** 2026-07-28 — the two delay clocks, on the OFFICE calendar. **Migration 0305** — the card said none, and clock 1's start was stored nowhere | #497 |
 | C9 | ✅ **LIVE** 2026-07-27 — storage holds the delivery; the manager releases it, in two named outcomes | #472 |
 | C10 | ✅ **LIVE** 2026-07-27 — the three dots render beside the stage pill | #471 |
