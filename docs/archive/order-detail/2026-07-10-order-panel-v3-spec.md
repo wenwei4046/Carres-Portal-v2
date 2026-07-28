@@ -1,3 +1,17 @@
+> # ⛔ ARCHIVED 2026-07-28 — HISTORICAL REFERENCE ONLY
+>
+> **This file is NOT a development source. Do not build from it. Do not quote it as a rule.**
+>
+> The Order Detail page's highest business rule is
+> [`docs/ORDER-DETAIL-INFORMATION-MODEL.md`](../../ORDER-DETAIL-INFORMATION-MODEL.md)
+> (Business Thinking Model, frozen by Loo 2026-07-28). Layout is derived from that model and
+> from nothing else.
+>
+> **This is the ONE kept historical reference** for the pre-freeze Order Detail design — the
+> other two archived files beside it are superseded in full. Kept because it is the fullest
+> record of what was actually shipped, and because a future chat asking "why is the panel like
+> this today?" needs one honest answer.
+
 # Order Detail Panel — v3 定案
 
 > 2026-07-10 · Jess (COO) 锁定 · **只有规格，还没写 code**

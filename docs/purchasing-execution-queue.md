@@ -38,7 +38,14 @@
      two editable fields on Catalog → Delivery that **no code reads**. The real gate is the
      hard-coded `DELIVERY_LEAD_DAYS`. Editing them today changes nothing;
   4. `suppliers.lead_time` — free text, and after P1 it is a second place claiming to say how
-     long a factory takes.
+     long a factory takes;
+  5. **`PO_STOCK_LEAD_DAYS` in `packages/shared/src/schemas/ops-po-duty.ts` — mattress 7 ·
+     bedframe 7 · SOFA 5.** This is the URGENT BYPASS: an order whose deadline falls inside
+     this window jumps the Mon/Wed/Fri cadence and flags red on any day. It is live on the
+     Orders control grid (`poUrgentBypass`), it is **the safety net**, and it is calibrated to
+     a sofa taking 5 working days when the flow says 14. **The net fires nine days too late.**
+     Sofa therefore has FOUR different numbers in the codebase today (10 · 5 · 14/10 · 14) and
+     P1 must leave exactly one.
 - **Only TWO suppliers can be purchased from** (live 2026-07-28): Nice Future × mattress
   (42 SKUs) and Ohana × bedframe + sofa (154 SKUs) — **three supplier × category pairs.** The
   other 8 suppliers carry ZERO SKUs. The settings matrix is DERIVED from which supplier
@@ -48,13 +55,15 @@
 - **The live migration tail is AHEAD of the repo.** 2026-07-28: the tracker holds `0301` +
   `0302` (the ④ R6 warehouse-login line) and neither file is on main. Number from the
   TRACKER, never from `ls supabase/migrations`.
-- **One warehouse exists**: `Carres Klang`. AL Sungai Buloh and HOUZS Balakong are not
-  records anywhere.
+- **One warehouse exists and one is all there will be**: `Carres Klang`. AL Sungai Buloh and
+  HOUZS Balakong are **delivery addresses on a PO, never warehouse records** (Loo 2026-07-28).
 - **`purchase_order_lines` already carries** `qty` · `received_qty` · `damaged_qty` ·
-  `wrong_item_qty`. Partial receiving is already quantity-based. **`cancelled_qty` does not
-  exist** — the one real gap in the state model (flow file §9).
-- Claims are LIVE (R2 · R3 · R4, `supplier_claims`, migrations 0288/0291/0299) but Claims
-  is **not yet a tab** — it becomes one in P2.
+  `wrong_item_qty`, and that is the whole quantity model. Partial receiving is already
+  quantity-based. **There is no `cancelled_qty` and none is coming** — purchasing does not
+  model a cancellation (flow file §9).
+- **Claims is ALREADY A TAB.** R2 added it 2026-07-27 (`PurchasingTabs.tsx` → `?tab=claims`);
+  the engine is live (R2 · R3 · R4, `supplier_claims`, migrations 0288/0291/0299). Four of the
+  five tabs exist today; Settings is the fifth and arrives with P1.
 - **Everything in the database today is TEST data.** At go-live it starts clean. Never
   write a backfill or a repair job for existing rows.
 
@@ -83,11 +92,12 @@ buckets, the Mon/Wed/Fri cadence, the working-day calendar
 4. A **Settings** tab on Purchasing, manager-only (`org_duties` key `ops_manager` — **no new
    duty key**), laid out per UI-KIT §8.3 (module-tab law) + §8.2 (interaction law). Every
    edit records who, when, and the previous value, and the previous value is ON SCREEN.
-5. **Close all FOUR doors** (Ground truth above), not just the constants: delete the
+5. **Close all FIVE doors** (Ground truth above), not just the constants: delete the
    constants with NO fallback · retire `PurchaseSettingsSheet.tsx` and its gear icon · retire
    the two dead fields on Catalog → Delivery · stop `suppliers.lead_time` claiming to answer
-   this question. A fallback is how a setting silently stops mattering; a second door is how
-   a manager edits a number and nothing happens.
+   this question · **make the urgent bypass (`PO_STOCK_LEAD_DAYS`) read the same setting**.
+   A fallback is how a setting silently stops mattering; a second door is how a manager edits
+   a number and nothing happens; and the fifth door is the safety net firing late.
 6. `DELIVERY_LEAD_DAYS` (the POS's earliest sellable date — mattress/bedframe 14, sofa 21
    CALENDAR days) becomes **one** editable number. **Seed 21** — the safe upper bound, so no
    order becomes sellable EARLIER than it is today. Jess sets 30 at go-live, on screen.
@@ -200,12 +210,18 @@ planning action by itself, and a short delivery produces exactly one balance cal
 **Goal:** a PO says where the supplier must send the goods, and prints it.
 
 **Build:**
-1. Locations: `Carres Klang` (our own) · `AL Sungai Buloh` · `HOUZS Balakong`. Only one
-   exists in the database today.
+1. Destinations: `Carres Klang` (our own warehouse) · `AL Sungai Buloh` · `HOUZS Balakong`.
+   **AL and HOUZS are DELIVERY ADDRESSES, not warehouses** (Loo 2026-07-28) — do NOT create
+   `warehouses` rows for them. Carres has exactly one warehouse and a second warehouse entity
+   would put goods we do not count into every stock rollup.
 2. The choice sits on the PO and appears on the printed PO.
 3. **Nice Future is fixed** — it does not deliver: `collected by NETS → Carres Klang` is its
    only option, and the PO says so.
 4. Default for everyone else is `Carres Klang`.
+5. **The supplier-facing PDF prints no RM value of any kind** (Loo 2026-07-28): PO number ·
+   supplier · items · quantity · delivery address · delivery instructions · dates. The
+   purchase price stays internal. Check `PoDocumentPreview.tsx` against this before adding
+   the address — the rule is about the whole document, not only the new field.
 
 **Why it matters:** an outstation order can only be delivered by AL, and AL will not collect
 in Klang. Sending the goods straight to AL saves a whole transfer.
@@ -229,13 +245,18 @@ and fix whatever breaks.
 one goes end to end.
 
 **Build / fix as found:**
-1. `cancelled_qty` — the one gap in the state model (§9). A cancelled line silently makes
-   `To order` wrong today.
-2. The two gates that have no home yet: a PO cannot be sent twice for the same customer line
+1. The two gates that have no home yet: a PO cannot be sent twice for the same customer line
    and quantity; a check-in cannot be posted twice for the same supplier delivery order
    number.
-3. Whoever is on a task shows on it (`Yu Jun is handling this · started 10:14`) — everybody
+2. Whoever is on a task shows on it (`Yu Jun is handling this · started 10:14`) — everybody
    can see everybody's work, so two people WILL open the same task.
+3. One PO document really does carry several customers' lines (§1), and one customer order
+   really does need several POs. Prove both on the real run, not on a fixture.
+
+**`cancelled_qty` is NOT in this card any more** (Loo 2026-07-28): purchasing does not model a
+cancellation at all. A customer cancellation needs management approval and belongs to the
+Orders cancellation policy; purchasing keeps processing a valid PO until Operations says stop,
+and stopping is the whole PO (`purchase_orders.status = 'cancelled'`, already built).
 
 **Migration:** likely. Draft to Jess first.
 **Done when:** one real PO has gone the whole way, including a short delivery, and every
@@ -243,9 +264,9 @@ number on screen matches what actually happened.
 
 ## Reported, not built (recorded so nobody rediscovers them late)
 
-- **PO revisions.** A sent PO that is changed is overwritten — there is no record of what the
-  supplier actually agreed to. Real gap, deliberately deferred until the first real PO needs
-  it (`docs/PURCHASING-WORKING-FLOW.md` §9).
+- **PO revisions — RULED OUT, not deferred** (Loo 2026-07-28). A sent PO is never edited: more
+  items means a NEW PO, and stopping one means cancelling the whole PO. There is no version of
+  a sent document to keep, so the gap this line used to describe does not exist.
 - **The finer quantities** (`in_transit_qty`, `ready_for_collection_qty`,
   `supplier_confirmed_qty`). Not built: a column nobody writes is worse than a missing one —
   that is exactly how `ops_order_control.balance` became a lock reading a NULL for months.
