@@ -182,7 +182,7 @@ believed it would go looking for something that is not there):
 | **To Order** | yes | **ONE live, TWO dead** — `supplierFilter` works; `attn` and `selectedDay` have state, filter logic and a clear chip, and **nothing on the page can switch them on** (their tiles were deleted 2026-07-23/24 and the state stayed). See the ruling below | ✅ done #492 |
 | **Purchase Orders** | — | — | check before building; it is a nested route, not a `?tab=` |
 | **Receiving** | **none** | **none** | a rail and tiles from scratch |
-| **Claims** | **none** | **none** | a rail and tiles from scratch |
+| **Claims** | **none** | **none** | ✅ done #494 — a rail and tiles from scratch |
 
 **Build — the UI-KIT §8.2 interaction law:** click a queue tile → the table filters · click it
 again / ✕ → it clears · two tiles → two ✕-able chips · click a row → the drawer opens on its
@@ -262,11 +262,12 @@ deployment list is what settles it.
   its negative control run (drop the cleared guard → exactly 4 fail · drop the stage guard
   → 1 · drop the restore → 1).
 
-**Still owed: Receiving and Claims.** Both need a facet rail and tiles from scratch, and
-both live in ④ R's files (`OperationReceiving.tsx` · `OperationSupplierClaims.tsx`), which
-**R6 held when this ran** — the card's own LANE paragraph says to ship the To Order half
-alone rather than edit a file another line holds. **R6 has since merged (PR #490,
-`9fe094bf`), so that block is gone** and the two remaining halves can take their own chat.
+**Still owed when the To Order half shipped: Receiving and Claims.** Both needed a facet rail
+and tiles from scratch, and both live in ④ R's files (`OperationReceiving.tsx` ·
+`OperationSupplierClaims.tsx`), which **R6 held when To Order ran** — the card's own LANE
+paragraph says to ship the To Order half alone rather than edit a file another line holds.
+**R6 has since merged (PR #490, `9fe094bf`), so that block is gone.** Claims took its own chat
+and shipped as #494, below. **Receiving is the last piece of P2.**
 
 **Reported, not fixed (Law 0):**
 
@@ -287,6 +288,88 @@ alone rather than edit a file another line holds. **R6 has since merged (PR #490
    `Receive`, where the dictionary locks `Send PO` · `Confirm ready date` · `Check in`, and
    **`Chase` is a banned word**. Same disease as the `Contact` → `Call` rename already
    carded as **R8**; worth folding in there rather than opening a third.
+
+### ✅ The CLAIMS half shipped 2026-07-28 (PR #494)
+
+**No migration. Web only. No new word anywhere on the page.**
+
+`OperationSupplierClaims.tsx` had **no facet rail and no filter state at all**, so not one line
+of §8.2 could be true on it. It now runs the Orders rail — `ListPageShell` + `SectionCard` /
+`SectionBand` + a row per facet value — copied from the sibling To Order tab rather than
+invented.
+
+| Group | Rows | Why it may exist |
+|---|---|---|
+| `Queues` | **`Confirm what happens next`** | COPY-STANDARD's PURCHASING dictionary row, verbatim. **A tile's name IS its action**; `Claims` is the TAB. Its count is the claims where `claimNextMove` says the supplier still owes an answer — which is exactly what its locked empty state says |
+| `Supplier` | one per supplier on the list | a FACT, and a filter is fact-only (UI type dictionary). The word is this table's own column header |
+| `Problem` | one per claim type | same, with the labels the Problem column already prints, from the one shared module |
+
+- **Click a tile → the table filters · click it again, or its ✕ chip → it clears.** Two picks are
+  two chips and each ✕ clears only its own.
+- **The whole ROW opens the claim**, not only the `Open` button — it opens from the top, and this
+  surface has no tabs to land deep in.
+- **Closing gives the list back**: the filters and the table's scroll position. Opening a claim
+  inserts a tall panel row and closing takes that height away, so the browser clamps `scrollTop`
+  underneath the operator; the position is snapshotted on open, restored on close and re-applied
+  after each render until it sticks (a mutation inside the panel refetches and re-lays the table
+  out a frame or two later). It fires when a FILTER takes the open claim off the list too — the
+  one case where the panel vanishes with nobody clicking is the one case that jumped.
+- **`Open / Closed / All` is a STAGE picker** (§8.2's no-empty-state shape, the rule To Order
+  added): one is always on, there is nothing to clear into, so re-clicking the active one is a
+  **no-op**; a different one is a different list and clears the picks.
+
+**The one design decision worth re-reading: each group is counted with every filter EXCEPT its
+own, and a zero row is not rendered.** That is what makes the rail honest — a visible cell above
+zero always returns at least that many rows, so **no reachable click can blank the table**. The
+one place a blank table IS reachable is the queue tile at zero, deliberately: the tile renders at
+0 because a quiet screen must mean *watched and fine*, never *nobody looked* (K1's law), and
+clicking it prints the dictionary's own sentence instead of a shrug.
+
+**Every new guard has its negative control run** — drop the stage no-op guard → exactly 1 test
+fails · the `stopPropagation` → 1 · the scroll restore → 3 · the cross-facet count exclusion → 1.
+**The `stopPropagation` test had to be rewritten to be worth anything**: with the row a click
+target, two handlers firing for one click is invisible on the panel (both toggles read the same
+render's state and agree) and **not** invisible on the scroll — the second close reads a snapshot
+the first already spent.
+
+**Reported, not fixed (Law 0):**
+
+1. **The dictionary gives Claims ONE queue word and the engine computes THREE steps.**
+   `claimNextMove` runs ask → answer → close, and only the middle one has a name
+   (`Confirm what happens next`, whose empty state pins it to *waiting for a supplier answer*).
+   So the two CARRES-side steps — decide what we want done, and settle it — have a count nowhere
+   and can get no tile without words Jess has not ruled. **Nothing was invented.** Whether they
+   deserve tiles is her call; if they do, it starts with five strings each.
+2. **The tile and the row spell one action two ways, live, right now.** The tile reads
+   `Confirm what happens next`; the row's Next move column reads R3's own sentences
+   (`Call Ohana — agree the fix` · `— confirm what they will do` · `Close SC-1001 — Ohana
+   refused`), where the dictionary's row line is `Call {supplier} — confirm what happens next`.
+   This is precisely what C1's shared word module exists to make impossible. **It is ④ R8's
+   rename** (its own done-when names the Claims queue tile) and a rename is not a click
+   behaviour, so P2 left every one of those strings alone.
+3. **`supplier-claim.ts`'s own comment is now stale and reads as an open question that is
+   closed.** It says *"`Close` is the only verb here outside COPY-STANDARD's four-verb dictionary
+   (Assign · Call · Issue · Upload) … FLAGGED for Jess rather than silently adopted."* The verb
+   table is **six** now and **`Close` is one of them** (locked 2026-07-27/28). The code is right
+   and the comment is a year of confusion waiting for the next reader. One-line fix, and it
+   belongs to whoever next opens that module for a real reason.
+4. **The facet counts describe a capped page; the tab chips describe the truth.**
+   `GET /api/operation/supplier-claims` returns `DEFAULT_LIMIT = 200` rows and computes the
+   Open/Closed/All chips from a SEPARATE unfiltered head-count — deliberately, and its comment
+   says so. The rail counts the array it was handed, so past 200 claims a facet count and its tab
+   chip stop agreeing. **Invisible today (0 claims live)** and the same shape as the
+   `principal-dealers-join-unbounded` carry-forward; the fix is server-side facet counts, not a
+   bigger cap.
+5. **A page description sits above the list and §1.1's gate would not admit it.** *"What the
+   supplier still owes us…"* is a permanent band on a page whose budget is ≤200px of fixed chrome,
+   and it explains rather than works. **P2 did not delete it** — removing copy nobody asked to
+   rule on is not a click behaviour — but it is the first thing to go when this page is measured.
+6. **Facet GROUP titles have no home in any law.** §8.4 orders the groups
+   (`SUMMARY → the module's queue names → STOCK → LOGISTICS → REGION → CATEGORY`) and
+   COPY-STANDARD's dictionary is per-ACTION, so `Queues` · `Supplier` · `Problem` are words no
+   document owns. P2 reused words already on screen (the Orders rail's, and this table's own
+   column headers) rather than invent, but the next module that builds a rail has nothing to
+   check itself against.
 
 ## P3 · The two missing supplier calls
 
@@ -396,7 +479,7 @@ number on screen matches what actually happened.
 | Card | Status | PR |
 |---|---|---|
 | P1 | ✅ the numbers become settings (migration **0303**) | #488 |
-| P2 | 🟡 PARTIALLY DONE · the interaction law is true on **To Order**; Receiving + Claims still owed (they were R6's files, now released) | #492 |
+| P2 | 🟡 PARTIALLY DONE · the interaction law is true on **To Order** (#492) and on **Claims** (#494). **Only Receiving is left** — `OperationReceiving.tsx`, a rail and tiles from scratch | #492 · #494 |
 | P3 | ⬜ after P1 · the two missing supplier calls (migration) | — |
 | P4 | ⬜ where the goods go (migration) | — |
 | P5 | ⬜ after P1-P4 · prove it with a real PO | — |
