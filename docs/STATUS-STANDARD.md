@@ -44,8 +44,9 @@ the rest.
 
 ## 3. The chase pair (every party panel's footer)
 
-> ⚠ RESKINNED 2026-07-18 per `docs/CARRES_ORDER_PORTAL_SPEC.md` §4 (the master
-> spec wins): buttons are GREY-family only — **no green buttons anywhere**.
+> ⚠ Button colour is NOT ruled here. [`docs/UI-KIT.md`](UI-KIT.md) §3.3 owns the
+> four colour jobs and §3.6 owns action tone — tone comes from a CONDITION, never
+> from which verb it is. This section describes only the two buttons' shape.
 
 Both COPY the locked WhatsApp template (`lib/wa-templates.ts`) and stamp the
 chase log. Customer templates are multi-line and never mention a delivery date.

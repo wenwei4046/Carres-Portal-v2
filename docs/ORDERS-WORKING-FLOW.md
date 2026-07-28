@@ -63,10 +63,33 @@ live 2026-07-27, and they corrected this file's earlier wording):
 Every action carries six things (the model file explains why). `{party}` is the real name
 when the system knows it, the role word only when it does not.
 
-**Ownership is two different things, and only the Task Owner is written per action:**
-**Task Owner** = assigned automatically by the module that raised the action; it may change
-hands. **Case Owner** = the one person responsible for this customer's case from start to
-finish; it never changes and is never repeated on an action.
+**Ownership is two different things, and NEITHER is stored on an action:**
+**Task Owner** = the order's PIC. C6 ruled that the PIC owns every action of that order, so an
+action carries no owner field. **Case Owner** = the one person responsible for this customer's
+case from start to finish; it never changes and is never repeated on an action.
+
+**How the PIC is decided — the whole rule** (LIVE, migrations 0232 + 0235;
+`ops_order_control.assigned_staff / assigned_by / assigned_at` + `ops_staff_settings`):
+
+- **One order, one owner, decided when the order arrives.** The system never moves an order
+  off a person mid-flight on its own.
+- **Opening an account is joining; disabling it is leaving.** An operation account joins the
+  pool on its FIRST login and is dealt a share on that same page load. Creating the account is
+  the only manual step; there is no "add to team" click and nobody is removed by hand. A
+  generic, non-person account never joins. Managers are never dealt orders.
+- **Everyone sees every order.** There is no per-owner row filter, and anyone may open any
+  order. The PIC says who is answerable, not who is allowed.
+- **Only a manager may assign by hand** (`ops_manager`; the web hides the control and the API
+  answers 403). Staff read the pool, never write it.
+- **The sweep only re-spreads what the SYSTEM handed out.** Unowned orders and orders the
+  system assigned (`assigned_by` NULL) are re-split evenly across whoever is in;
+  **an order a human assigned never moves.** The split is deterministic, so two operators
+  triggering it at the same moment produce the same plan.
+- **Absence needs no click.** The portal stamps a heartbeat while an operator has it open.
+  Before **10:00 MYT** everybody keeps their share — late is not absent. From 10:00, a member
+  with no heartbeat today counts as out and their system-assigned orders flow to whoever is
+  in; they log in later and the share flows straight back. The `away` flag is only for a
+  known long absence.
 
 ### Purchasing
 
@@ -235,6 +258,31 @@ second customer conversation: it opens **Stage 1** of the delay recovery above.
 - Checklist: upload · verify it opens · record who · record when
 - Completion: at least one photo exists
 - Due: 1 working day after the delivery
+
+### What we send — the message rules
+
+Most of these actions are performed by sending a message, so the message is part of the
+action. The literal bodies live in `apps/web/src/lib/wa-templates.ts`; the rules that shape
+them live here.
+
+- **A customer message never carries a delivery date.** Logistics agree the date and the slot
+  with the customer (Delivery, above); if a customer asks us, we give them the logistics
+  company's contact. The ONE exception is the delivery-eve reminder on an order still owing
+  money, which may say `today` / `tomorrow`.
+- **No pressure phrasing to a customer** — never "settle by", never "deliver on time".
+- **The salutation is never guessed.** Use the preferred-name field when it is set, otherwise
+  the customer's own name in Title Case. Never infer `Mr` / `Ms`.
+- **An outside party never sees the SO number.** A supplier message leads with the PO; a
+  logistics message and a customer message lead with the CR/TCF ref. They do not speak SO.
+- **Every order named in a message carries its own REF, and a question about an order is never
+  posted without one** — that is what makes a group reply traceable back to a single order.
+- **One counterparty, one message.** A bulk send produces ONE message per supplier and per
+  logistics company, never one per order: a supplier message aggregates by SKU (the same SKU
+  across orders becomes one line), a logistics message keeps each delivery as its own block,
+  because each has a different customer, address and day.
+- **Two tones per audience** — `Remind` before the date, and the firmer `Call {party} — …`
+  once it has passed. They are the two tones the actions above already carry, not a third
+  vocabulary.
 
 ## 4 · Which one shows first
 

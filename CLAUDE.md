@@ -444,7 +444,7 @@ If a task seems to require violating any of these, **stop and ask**.
 
 ---
 
-## 15. Communication protocol with Loo
+## 15. Communication protocol — Loo and Jess
 
 Loo prefers:
 - **Conclusion-first** answers, then reasoning
@@ -456,6 +456,20 @@ Loo prefers:
 - **No coding background** — explain technical concepts when relevant, but don't be condescending
 
 When you need a decision from Loo, say it once, clearly, and present the default option. Don't ping-pong.
+
+**Jess (COO) 的工作规则 — 她的 chat 照做:**
+
+- **当 COO 级的 critical advisor,不是应声虫。** 先把 solution 想清楚才开口;引国际同行的 pattern
+  当证据,但结论必须落在 Carres 的现实上。
+- **她丢一张截图 = 请你由上到下把问题全列出来**,标 🔴 / 🟡 严重度,不用等她提醒。她自己抓到的问题
+  先认下来,再给修法。
+- **她 agree 才动手写 code。** 已经拍板过的决定不翻案 —— 除非她自己重新开口。
+- **动手前先查 memory**,再查该 module 的 working-flow 档。之前拍板过的格式、词汇、数据教训都在
+  里面,别重新发明一次。
+- **提 UI 之前先数数据。** 用 SQL 量一次填充率:空字段不上桌,讲话用数字。
+- **每一个 approved change**:typecheck + lint + tests(§17.7 那批旧 fail 是基线,别追)→ 用
+  preview 截图证明它真的动了 → commit + push → 顺手更新对应的 doc 和 memory。宁可十几个小
+  commit,不要一个大的。
 
 ---
 
@@ -560,7 +574,7 @@ Don't burn an hour spinning. Surface and ask.
 - **2026-05-15** · Delivered-tab bug (0106) · per-thread + multi-DO partial pickup (0107-0111) · pre-alpha DB cleanup (Loo, manual)
 - **2026-05-17/18** · role rename logistics→operation (0121, ~250 files) · dl→so rename (0123-0126) · per-line threads (0124) · warehouse_id propagation (0127) · cascade audits (0128-0131) · principal sidebar 5 pages
 - **2026-05-20 → 06-05** · AutoCount import + per-unit stock (0132-0137) · Incoming forecast fix + Ohana rename (0148-0150) · e-sign/auto-dispatch/per-unit ID (0151-0154) · multi-leg delivery chain + 4 LPs (0155-0158, PR #9-12)
-- **2026-06-08 → 06-12** · Master-Sheet arc: Orders control grid + ops cockpit + Payments panel (0159-0166, spec [[project-orders-control-spec]]). **Ops notes/tasks tables hold Jess's REAL data — never bulk-delete as test data.** Storage rule locked: MS/BF RM150/month · SOF RM200/2-weeks (`computeStorageFee`).
+- **2026-06-08 → 06-12** · Master-Sheet arc: Orders control grid + ops cockpit + Payments panel (0159-0166, spec [[project-orders-control-spec]]). **Ops notes/tasks tables hold Jess's REAL data — never bulk-delete as test data.** Storage rule locked: the fee runs over an explicit START→END window (START = the next SAME WEEKDAY after the delivery deadline; END = the actual delivery/collection) — **MS/BF RM150 per commenced 30-day month · Sofa free for the first 14 days, then a flat ONE-TIME RM200 that never recurs** (`computeStorageFee`).
 - **2026-06-12 late** · Pending jobs P1-P3+P8 (Items qty tags · compact columns · delivery_date sort · bulk-complete tests)
 - **2026-06-14/15/16** · Catalog P&M rebuild (PR #19) · SO Maintenance (PR #21) · dealer catalog-first POS (PR #22)
 - **2026-06-20/21/23** · POS 2990s alignment P1-P4 (PR #25/#27, 0175-0177) · Sofa engine P1-P5 (PR #29-#36, 0178-0179)

@@ -459,6 +459,7 @@ doubt, grep the codebase and match what already ships.
 | Pre-due polite follow-up on an open PO | **Remind** | Notify · Ping · Alert · Nudge |
 | Post-due firm follow-up on an open PO | **Call {supplier} — confirm ready date** | Chase · Expedite · Follow up · Push · Escalate |
 | Log goods arrival | **Check in** | Receive (as a verb) · Book in · GRN · Goods receipt |
+| An order line's goods are secured for that order | **Ready** | Reserved — on an order line it is read as `Received`, and the two mean opposite things. `Reserved` stays correct on the Stock screens, where it describes a UNIT and sits nowhere near `Received` |
 | Customer confirmed ETA — ready for PO | **Proceed** | Confirmed · Approved · Green-lit |
 | Customer ordered but no ETA yet | **Placed** | New · Draft · Pending · Open |
 | Cancel an order | **Cancel** | Void · Abandon · Kill |
