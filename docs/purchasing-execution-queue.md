@@ -38,7 +38,14 @@
      two editable fields on Catalog → Delivery that **no code reads**. The real gate is the
      hard-coded `DELIVERY_LEAD_DAYS`. Editing them today changes nothing;
   4. `suppliers.lead_time` — free text, and after P1 it is a second place claiming to say how
-     long a factory takes.
+     long a factory takes;
+  5. **`PO_STOCK_LEAD_DAYS` in `packages/shared/src/schemas/ops-po-duty.ts` — mattress 7 ·
+     bedframe 7 · SOFA 5.** This is the URGENT BYPASS: an order whose deadline falls inside
+     this window jumps the Mon/Wed/Fri cadence and flags red on any day. It is live on the
+     Orders control grid (`poUrgentBypass`), it is **the safety net**, and it is calibrated to
+     a sofa taking 5 working days when the flow says 14. **The net fires nine days too late.**
+     Sofa therefore has FOUR different numbers in the codebase today (10 · 5 · 14/10 · 14) and
+     P1 must leave exactly one.
 - **Only TWO suppliers can be purchased from** (live 2026-07-28): Nice Future × mattress
   (42 SKUs) and Ohana × bedframe + sofa (154 SKUs) — **three supplier × category pairs.** The
   other 8 suppliers carry ZERO SKUs. The settings matrix is DERIVED from which supplier
@@ -85,11 +92,12 @@ buckets, the Mon/Wed/Fri cadence, the working-day calendar
 4. A **Settings** tab on Purchasing, manager-only (`org_duties` key `ops_manager` — **no new
    duty key**), laid out per UI-KIT §8.3 (module-tab law) + §8.2 (interaction law). Every
    edit records who, when, and the previous value, and the previous value is ON SCREEN.
-5. **Close all FOUR doors** (Ground truth above), not just the constants: delete the
+5. **Close all FIVE doors** (Ground truth above), not just the constants: delete the
    constants with NO fallback · retire `PurchaseSettingsSheet.tsx` and its gear icon · retire
    the two dead fields on Catalog → Delivery · stop `suppliers.lead_time` claiming to answer
-   this question. A fallback is how a setting silently stops mattering; a second door is how
-   a manager edits a number and nothing happens.
+   this question · **make the urgent bypass (`PO_STOCK_LEAD_DAYS`) read the same setting**.
+   A fallback is how a setting silently stops mattering; a second door is how a manager edits
+   a number and nothing happens; and the fifth door is the safety net firing late.
 6. `DELIVERY_LEAD_DAYS` (the POS's earliest sellable date — mattress/bedframe 14, sofa 21
    CALENDAR days) becomes **one** editable number. **Seed 21** — the safe upper bound, so no
    order becomes sellable EARLIER than it is today. Jess sets 30 at go-live, on screen.

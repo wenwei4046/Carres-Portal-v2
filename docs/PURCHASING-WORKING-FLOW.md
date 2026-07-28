@@ -141,7 +141,10 @@ goods are collected by NETS; the row says `Call NETS — collect from Nice Futur
   the line's order-by date has passed
 - **Checklist** — supplier · items · quantity · purchase price · where the goods go · send ·
   record the PO number · record the supplier's ready date
-- **Completion** — a PO exists for the line **and** it carries a ready date
+- **Completion** — a PO exists for the line. **The ready date is NOT part of this** — it is
+  the outcome of the NEXT action, and the moment a PO exists the row reads
+  `Call {supplier} — confirm ready date`. Folding the two together would leave `Send PO` open
+  with nothing left to send, which is the one thing an action may never do
 - **Due** — the order-by date (§2's formula). Red once it has passed
 - **Task owner** — the PO-duty holder (`org_duties`)
 - **Counted per** — one row per **supplier**, showing how many lines it holds. The queue
