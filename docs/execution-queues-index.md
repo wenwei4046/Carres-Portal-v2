@@ -136,8 +136,15 @@ already made and reported to Jess: **the §8.2 row-click rung** (#495 refused it
 no PO detail drawer and a form is not a record view; #496 made the whole row open the check-in
 form) and **whether the three status tabs survive beside the new rail** (#495 kept them and
 named the overlap; #496 deleted them and moved both sets onto the rail as `Check in` /
-`Fully received`, with nothing picked as the old `All`). **Both are Jess's to rule**, and #496's
-branch stays on the remote if either goes its way.
+`Fully received`, with nothing picked as the old `All`).
+
+**RULED 2026-07-28 (Loo): #495 is the final version of P2-Receiving, and NEITHER of those two
+is adopted.** #496 stays closed — **not merged, not cherry-picked, and nothing continues from
+that branch.** The reason is the rule, not the code: **P2 is finished, and both items are NEW
+product-behaviour decisions** — they are not in P2's scope and they are not in R8's (R8 is a
+rename sweep). **A page that is already live is not redesigned to make duplicated work useful.**
+A chat that finds either idea attractive is looking at a closed question; if it ever reopens it
+does so as its own card, with Jess naming the behaviour first.
 
 **What let it happen, and the cheap guard.** Nothing in a chat's own view says a card is
 already being worked on — the lane rule lives in THIS file, and a chat that read it once and

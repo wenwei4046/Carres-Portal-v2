@@ -446,8 +446,11 @@ pre-existing); typecheck 0; build + lint + v4 guard clean; `SERVICE_ROLE` 0.
    its only overlay is the Check in FORM, and a form is not a record view: opening it from a
    row click would mean a `Fully received` row opens a form with nothing to submit. The PO's
    detail lives on the Purchase Orders tab, which is a nested route, and navigating away is
-   not a drawer (closing it could not "give the list back"). **Jess rules whether Receiving
-   should get a PO drawer**; until then the `Receive →` button stays the only opener.
+   not a drawer (closing it could not "give the list back"). **RULED 2026-07-28 (Loo): NOT
+   adopted.** A parallel chat had built exactly this (row opens the check-in form) and its PR
+   (#496) is closed as superseded — **P2 is finished, and making a row open a form is a new
+   product-behaviour decision that belongs to neither P2 nor R8.** The `Receive →` button stays
+   the only opener. If a PO drawer is ever wanted it is its own card.
 3. **The empty state does not know about the new filters.** It still reads
    `No purchase orders in this tab.` — accurate but not the whole truth once a tile is on
    (the active chips are on screen beside it). A filtered-empty sentence needs words nobody
@@ -463,7 +466,11 @@ pre-existing); typecheck 0; build + lint + v4 guard clean; `SERVICE_ROLE` 0.
    RPC sets the status word, and the divergence is exactly the case §9 was written for. Two
    controls that usually agree and occasionally will not is worth Jess's word — the honest
    options are to leave both (today), or to re-derive the tabs from quantities, which changes
-   what three existing words select and is therefore not a P-card.
+   what three existing words select and is therefore not a P-card. **RULED 2026-07-28 (Loo):
+   BOTH STAY, as they ship.** The parallel chat's #496 had deleted the three tabs and moved
+   their sets onto the rail; that PR is closed and none of it is taken — **deleting three live
+   words is a product decision, not a click behaviour**, and a shipped page is not redesigned to
+   make duplicated work useful. The overlap stays on record here, unfixed, until Jess opens it.
 6. **The Claims half wrote a THIRD copy of the facet row.** #494 landed while this ran and
    hand-rolled its own row inside `OperationSupplierClaims.tsx`; this half then extracted the
    shared `components/FacetRow.tsx` per §6.1, so there are now two users of the component and

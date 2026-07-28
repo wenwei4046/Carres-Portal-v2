@@ -3964,8 +3964,14 @@ have overturned two decisions #495 had already made and reported to Jess:
   `To receive`, `Fully received` = the old `Received`, nothing picked = the old `All`), on the
   argument that two controls for one axis is two doors onto one filter.
 
-**Both are Jess's to rule, not a PR's**, and #496's branch stays on the remote if either goes
-its way. The second session also re-verified this ship independently rather than copying the
+**RULED the same day (Loo, 2026-07-28): #495 is the final version, and NEITHER item is
+adopted.** #496 stays closed — **not merged, not cherry-picked, nothing continues from that
+branch.** The reason is the rule rather than the code: P2 is finished, and both items are **new
+product-behaviour decisions** that sit in neither P2's scope nor R8's (R8 is a rename sweep).
+**A live page is not redesigned to make duplicated work useful.** If either idea is ever wanted
+it comes back as its own card, with the behaviour named first.
+
+The second session also re-verified this ship independently rather than copying the
 receipt: the tip built byte-identically (`index-Du3H-Kir.js`), and on the downloaded bundles
 `receiving-facet-checkin` · `receiving-facet-progress-` · `receiving-facet-supplier-` go from
 ABSENT to PRESENT and the retired strapline `Receive goods into Carres Klang` from PRESENT to
