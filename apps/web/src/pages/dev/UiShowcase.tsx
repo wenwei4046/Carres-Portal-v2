@@ -30,7 +30,9 @@ import Badge from "@/components/kit/Badge";
 import Button from "@/components/kit/Button";
 import Card from "@/components/kit/Card";
 import Checkbox from "@/components/kit/Checkbox";
+import DataTable, { type Column } from "@/components/kit/DataTable";
 import DatePicker from "@/components/kit/DatePicker";
+import DetailShell, { type IdentitySlot } from "@/components/kit/DetailShell";
 import Drawer from "@/components/kit/Drawer";
 import DropdownMenu from "@/components/kit/DropdownMenu";
 import EmptyState from "@/components/kit/EmptyState";
@@ -38,6 +40,7 @@ import Icon, { ICON_NAMES } from "@/components/kit/Icon";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
+import PageShell from "@/components/kit/PageShell";
 import Panel from "@/components/kit/Panel";
 import Popover from "@/components/kit/Popover";
 import SearchInput from "@/components/kit/SearchInput";
@@ -99,6 +102,78 @@ const CARRIERS = [
   { value: "gai", label: "GAI (retired)", disabled: true },
 ];
 
+/* D0.5c — the shells' demo data. Rows and words are made up on purpose: `/ui`
+ * reads no session and fetches no row (that is why it can be public). */
+interface DemoRow {
+  id: string;
+  ref: string;
+  customer: string;
+  owing: string;
+}
+
+const DEMO_ROWS: DemoRow[] = [
+  { id: "1", ref: "SO-1256", customer: "Tan Wei Ming", owing: "2,000" },
+  { id: "2", ref: "SO-1257", customer: "Lim Ah Kaw", owing: "480" },
+  { id: "3", ref: "SO-1258", customer: "Nurul Aisyah", owing: "—" },
+];
+
+const DEMO_COLUMNS: Column<DemoRow>[] = [
+  { key: "ref", label: "Order", width: 25, cell: (r) => <span className="font-mono">{r.ref}</span> },
+  { key: "customer", label: "Customer", width: 40, cell: (r) => r.customer },
+  {
+    key: "status",
+    label: "Status",
+    width: 20,
+    cell: () => (
+      <StatusPill tone="warning" icon="waiting">
+        Waiting
+      </StatusPill>
+    ),
+  },
+  { key: "owing", label: "Outstanding", width: 15, align: "right", numeric: true, cell: (r) => r.owing },
+];
+
+const ORDER_TABS = [
+  { value: "open", label: "Open", count: 55 },
+  { value: "delivered", label: "Delivered" },
+];
+
+const DEMO_IDENTITY: IdentitySlot = {
+  primary: "Tan Wei Ming",
+  /* §7② of the information model names the four, and the type caps the set:
+   * 客户名 · Ref · the promised date · outstanding. */
+  persistentFacts: [
+    { label: "Customer", value: "Tan Wei Ming" },
+    { label: "Ref", value: <span className="font-mono">SO-1256</span> },
+    { label: "Promised", value: "27 Jul 26, Sun" },
+    { label: "Outstanding", value: "RM 2,000" },
+  ],
+};
+
+const DEMO_PROGRESS = {
+  steps: [
+    { id: "placed", label: "Placed", state: "done" as const },
+    { id: "proceed", label: "Proceed", state: "done" as const },
+    { id: "book", label: "To book", state: "current" as const },
+    { id: "deliver", label: "Deliver", state: "todo" as const },
+  ],
+};
+
+const DEMO_SECTIONS = [
+  {
+    id: "items",
+    label: "Items",
+    track: "goods" as const,
+    children: <p className="text-body text-kit-slate-11">3 lines · 1 sofa · 2 mattresses</p>,
+  },
+  {
+    id: "payment",
+    label: "Payment",
+    track: "money" as const,
+    children: <p className="text-body text-kit-slate-11">RM 7,248 total · RM 5,248 collected</p>,
+  },
+];
+
 const MODULE_TABS = [
   { value: "to-order", label: "To Order", count: 4 },
   { value: "purchase-orders", label: "Purchase Orders" },
@@ -113,6 +188,7 @@ export default function UiShowcase() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [carrier, setCarrier] = useState<string | undefined>(undefined);
   const [tab, setTab] = useState("to-order");
+  const [ordersTab, setOrdersTab] = useState("open");
   const [picked, setPicked] = useState(true);
   const [some, setSome] = useState<boolean | "indeterminate">("indeterminate");
   const [date, setDate] = useState<string | null>("2026-07-19");
@@ -801,6 +877,85 @@ export default function UiShowcase() {
               </p>
             </div>
           </Card>
+        </Section>
+
+        {/* ─── 5 · The shells — structure, card D0.5c ──────────────────────── */}
+        <Section
+          id="shells"
+          title="PageShell · DataTable — §8.1 · §7"
+          note="Extracted from the Orders page, not designed fresh. The list variant has NO kpi slot and there is no extra band — an eighth band is not forbidden by a sentence, it has nowhere to go."
+        >
+          <Card padding="none">
+            <div className="h-96">
+              <PageShell
+                variant="list"
+                title="Orders"
+                toolbar={<Tabs label="Orders" tabs={ORDER_TABS} value={ordersTab} onValueChange={setOrdersTab} />}
+                toolbarRight={<SearchInput id="ui-shell-search" />}
+                chips={[{ label: "Region: KV", onClear: () => {} }]}
+                footer={<span>2 of 55 orders</span>}
+              >
+                <DataTable
+                  label="Orders"
+                  rows={DEMO_ROWS}
+                  columns={DEMO_COLUMNS}
+                  rowId={(r) => r.id}
+                  onRowOpen={() => setDrawerOpen(true)}
+                  selection={{
+                    selected: picked ? new Set(["1"]) : new Set(),
+                    onToggleRow: () => setPicked((p) => !p),
+                    onToggleAll: () => setPicked((p) => !p),
+                    label: "Select all orders",
+                  }}
+                  empty="No orders match this filter"
+                />
+              </PageShell>
+            </div>
+          </Card>
+          <p className="text-meta text-kit-slate-11">
+            The table is `table-fixed` on percentage widths, so it is always exactly the container
+            width and never scrolls sideways; rows are 40px fixed and each cell clips its own
+            overflow. Clicking a row opens its record — the drawer above.
+          </p>
+        </Section>
+
+        <Section
+          id="detail-shell"
+          title="DetailShell — §1.4 · the information model's L4"
+          note="Six ordered slots and no state prop. Working · Blocked · Waiting · Completed are produced by what the slots are given — a component that cannot be told a state cannot print one."
+        >
+          <Grid>
+            <Card padding="none">
+              <div className="h-96 overflow-hidden">
+                <DetailShell
+                  identity={DEMO_IDENTITY}
+                  currentAction={{ answer: "Call NETS — confirm delivery date", context: "Due today · Jess" }}
+                  currentIssues={[]}
+                  progress={DEMO_PROGRESS}
+                  sections={DEMO_SECTIONS}
+                />
+              </div>
+            </Card>
+            <Card padding="none">
+              <div className="h-96 overflow-hidden">
+                <DetailShell
+                  identity={DEMO_IDENTITY}
+                  currentAction={{ answer: "Collect RM 2,000 from Tan Wei Ming" }}
+                  currentIssues={[
+                    { id: "a", track: "goods", text: "2 lines have no PO" },
+                    { id: "b", track: "money", text: "RM 2,000 is holding the delivery", holding: true },
+                  ]}
+                  progress={DEMO_PROGRESS}
+                  sections={DEMO_SECTIONS}
+                />
+              </div>
+            </Card>
+          </Grid>
+          <p className="text-meta text-kit-slate-11">
+            LEFT is a calm order: Current Issues renders NOTHING — no "✓ None", no empty card, no
+            reassuring tick. RIGHT is the same order blocked. Nothing else moved, and neither card
+            was told which one it is.
+          </p>
         </Section>
 
         <Section

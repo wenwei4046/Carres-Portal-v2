@@ -69,6 +69,17 @@ describe("/ui showcase", () => {
     expect(document.querySelectorAll('[data-kit="toast"]').length).toBe(3);
   });
 
+  it("renders the three shells, and the calm record shows NO issues block", () => {
+    render(<UiShowcase />);
+    expect(document.querySelector('[data-kit="page-shell"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-kit="data-table"]')).toBeInTheDocument();
+    // Two DetailShells side by side: one calm, one blocked.
+    expect(document.querySelectorAll('[data-kit="detail-shell"]')).toHaveLength(2);
+    expect(document.querySelectorAll('[data-kit="detail-current-action"]')).toHaveLength(2);
+    // …and exactly ONE issues container between them — the calm one draws none.
+    expect(document.querySelectorAll('[data-kit="detail-current-issues"]')).toHaveLength(1);
+  });
+
   it("opens the modal it offers, and closes it again", () => {
     render(<UiShowcase />);
     fireEvent.click(screen.getByRole("button", { name: "Open a modal" }));

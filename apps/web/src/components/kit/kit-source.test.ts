@@ -52,7 +52,7 @@ const Z_LADDER_FILE = "overlay-layer.ts";
 
 describe("components/kit source rules", () => {
   it("scans every kit file (a directory rename must not silently empty this suite)", () => {
-    expect(FILES.length).toBeGreaterThanOrEqual(24);
+    expect(FILES.length).toBeGreaterThanOrEqual(27);
   });
 
   it("contains no raw hex — colour comes from a token class, always (§3.4)", () => {

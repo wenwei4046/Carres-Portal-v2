@@ -145,8 +145,8 @@ Priority inside scope: `pages/operation/**` (118 pages) — Jess's daily work.
 
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
-| No hand-rolled page shell | Component API + Build Guard G | ⏳ D0.5c | `PageShell.tsx` |
-| No hand-rolled table | Component API + Build Guard G | ⏳ D0.5c | `DataTable.tsx` |
+| No hand-rolled page shell | Component API ✅ (the shell exists) + Build Guard G ⏳ | ⏳ D1 | `PageShell.tsx` |
+| No hand-rolled table | Component API ✅ (the table exists) + Build Guard G ⏳ | ⏳ D1 | `DataTable.tsx` |
 | No hand-rolled modal/drawer | Component API ✅ (the boxes exist) + Build Guard G ⏳ (a page still CAN hand-roll one until D1 bans `fixed inset-0`) | ⏳ D1 | `Modal.tsx` · `Drawer.tsx` |
 | No inventing tokens | Build Guard A–I | ⏳ D1 | `check-design.mjs` |
 | Every chat reads the boundary | Human Review | ⏳ D0 | `CLAUDE.md` header |
@@ -273,7 +273,17 @@ Orders today cost four orders on every screen, every day.
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
 | A list page cannot exceed 200px fixed chrome | Build Guard H | ⏳ D1 | `check-design.mjs` |
-| A list page cannot add an 8th band | Type System — `list` variant has no `extraBand` / `kpi` prop | ⏳ D0.5c | `PageShell.tsx` |
+| A list page cannot add an 8th band | **Type System** — `variant="list"` has no `kpi` and no variant has an `extraBand` | ✅ **live (D0.5c)** | `PageShell.tsx` |
+
+> **⚠ REPORTED, NOT SETTLED (D0.5c): §1.3's budget and §8.1's band table
+> disagree by 8px.** §8.1 lists title 40 + toolbar 40 + chips 28 + table header
+> 40 + footer 36 + padding 24 = **208**, against this section's **200** list
+> budget. Both sentences are in this file and cannot both hold. The budget IS
+> met in the two shapes the law actually describes — 180 with no filter on (the
+> chip row is height 0) and 168 in §1.3's own D6 projection, where the toolbar
+> folds into the title band — so nothing was changed to make the sum work. A
+> test pins all three numbers (`shells.test.tsx`) so the contradiction cannot be
+> lost, and the kit decides which number moves.
 | The four questions are answered before building | Human Review | ⏳ D0 | card template in `ui-kit-execution-queue.md` |
 
 ---
@@ -385,10 +395,23 @@ Purchasing, Receiving and Service Detail without learning any of them again.
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
 | Same categories on list and detail | **Type System** — both read `OrderActionTrack` | ✅ live for the three tracks | `packages/shared/src/order-actions.ts` |
-| Current Action always visible | Component API — the slot has no `collapsible` option | ⏳ D0.5c | `DetailShell.tsx` |
-| Current Issues auto-hides when empty | Component API — the slot renders nothing for an empty list | ⏳ D0.5c | `DetailShell.tsx` |
-| Blocks cannot be reordered | Component API — named ORDERED slots, not `children` | ⏳ D0.5c | `DetailShell.tsx` |
-| Progress carries no events / KPIs / buttons | **Human Review** | ⚠ **debt** | — |
+| Current Action always visible | **Component API** — the slot has no `collapsible` and no `hidden` | ✅ **live (D0.5c)** | `DetailShell.tsx` |
+| Current Issues auto-hides when empty | **Component API** — `[]` returns null and there is no `emptyLabel` | ✅ **live (D0.5c)** | `DetailShell.tsx` |
+| Blocks cannot be reordered | **Component API** — named ORDERED slots, and the shell takes no `children` | ✅ **live (D0.5c)** | `DetailShell.tsx` |
+| Progress carries no events / KPIs / buttons | **Type System** — `ProgressSlot` has no `events` · `actor` · `timestamp` · `kpi` · `actions` | ✅ **live (D0.5c)** — *this was the chapter's only Human-Review debt* | `DetailShell.tsx` |
+| Identity carries values only, and the set is full at four | **Type System** — `persistentFacts` is a 4-tuple and there is no `onAction` | ✅ **live (D0.5c)** | `DetailShell.tsx` |
+| Detail is a route, never a render prop | **Type System** — `detailHref?: string`, and no render prop exists | ✅ **live (D0.5c)** | `DetailShell.tsx` |
+
+> **The shell never receives a state, and that is the load-bearing one.**
+> Working · Blocked · Waiting · Completed are produced entirely by what the
+> slots are given — there is no `state` prop and there may never be. That is
+> the information model's L3 (*"states are never stored and never reach the
+> screen"*) turned into a type: a component that cannot be told a state cannot
+> print one.
+>
+> **`DetailShell` is BUILT and no page renders through it yet.** The drawer
+> migration is blocked on one business decision — see the D0.5c card in
+> `ui-kit-execution-queue.md`.
 
 ---
 
@@ -1118,29 +1141,56 @@ a second host would stack two toasts in two corners.
 
 # §7 Table Dictionary
 
-> ⏳ **Written by D0.5c.** `DataTable` is **extracted from the Orders table**,
-> not designed fresh — Orders already carries `table-fixed` percentage widths, a
-> sticky head, whole-row selection, a bulk bar that replaces the header,
-> hover/selected washes, an action cell, the three dots and `+N`. A `DataTable`
-> designed in the abstract will not fit it, and D6 would rebuild it.
+> ✅ **Written by D0.5c.** `DataTable` is **extracted from the Orders table**,
+> not designed fresh — every value below is a property
+> `OperationOrdersControl` already had. A `DataTable` designed in the abstract
+> would not fit it, and D6 would rebuild it.
 
-Will specify: header · row height · density · sticky · selection · checkbox ·
-hover · sort · column alignment · money cell · date cell · quantity cell ·
-action cell · overflow / truncation · empty state · loading skeleton ·
-pagination.
+| | |
+|---|---|
+| Width | `table-fixed` + a PERCENTAGE colgroup — the table is ALWAYS exactly the container width, so it **never scrolls sideways**; long content ellipsis-truncates |
+| Row height | **40px fixed.** Content adapts to the row, never the reverse |
+| Overflow | every cell clips its own and never wraps — a wrapping cell is what makes one row taller than the rest |
+| Head | sticky, §4.4 layer 1, `slate-3` band with a `slate-5` hairline, `text-label` |
+| Header word | comes from the COLUMN DEF, and there is nowhere else to type it |
+| Selection | optional. Absent = **no checkbox column at all**; present = whole-row select + a select-all showing the indeterminate DASH on a partial tick |
+| Row click | opens the record (§8.2); the checkbox cell stops the event, so ticking never opens |
+| Hover · selected | §3.5 — one faint blue tint · the stronger `blue-3` wash. Never grey |
+| Alignment | `align` and `numeric` per column; `numeric` is tabular figures (§2.3) |
+| Empty | an `EmptyState`, never a blank body |
+| Loading | a skeleton — shape, not words |
+
+**It formats nothing.** Money is `Money` / `.t-num` and a date is `fmtDate()`
+(§2.3 · §2.4); a table that formatted them would be a second date spelling. It
+decides where a value sits and whether its figures line up, and stops.
+
+**Still not specified, and named so nobody assumes otherwise:** sort · density ·
+pagination · the action cell. Orders carries its own of each today, and each is
+a decision rather than an extraction — they land with **D6**, the card that
+re-lays that page out.
 
 Today: **26 files hand-roll a `<table>`, in 7 header shapes, in two opposite
 visual languages** (dark header + white text ×6, light grey header + grey text
-×5). One of those two dies in D0.5c.
+×5). **Neither has died yet** — D0.5c wrote the component and migrated no page;
+D6 and D7+ retire the 26.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| A list table never scrolls sideways | **Component API** — `table-fixed` + percentage widths are the component's, not the caller's | ✅ **live (D0.5c)** | `DataTable.tsx` |
+| A row is 40px and a cell never wraps | **Component API** — the height and `whitespace-nowrap` are the component's | ✅ **live (D0.5c)** | `DataTable.tsx` |
+| A header word is typed once | **Type System** — `label` lives on the column def and the `<th>` reads it | ✅ **live (D0.5c)** | `DataTable.tsx` |
+| "Some rows selected" is a real state | **Type System** — the select-all takes `boolean \| "indeterminate"` | ✅ **live (D0.5c)** | `Checkbox.tsx` · `DataTable.tsx` |
 
 ---
 
 # §8 Page Dictionary
 
-> ⏳ **Written by D0.5c** — except the slot contract below, which is already
-> decided, because §1.3 depends on it.
+> ✅ **§8.1 is BUILT (D0.5c).** The rest of this chapter — sidebar width, side
+> rail width, drawer width, max content width, minimum supported screen,
+> responsive rules and **form layout** — is still unwritten, and D0.5c did not
+> invent any of it. Form layout in particular has no home at all today.
 
-## §8.1 The `PageShell` slot contract (decided)
+## §8.1 The `PageShell` slot contract (decided · built)
 
 ```tsx
 <PageShell
@@ -1240,9 +1290,17 @@ name them.
 
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
-| One interaction model for every list page | Component API — behaviour lives in `PageShell` / `DataTable`, not in the page | ⏳ D0.5c | `PageShell.tsx` |
-| A module-tabbed page has no breadcrumb/title | Type System — `variant` decides | ⏳ D0.5c | `PageShell.tsx` |
+| One interaction model for every list page | Component API — the FRAME is `PageShell` / `DataTable`; the filter behaviour still lives in each page | ⏳ **D6** — the components exist, no page renders through them yet | `PageShell.tsx` · `DataTable.tsx` |
+| A module-tabbed page has no breadcrumb/title | **Component API** — the title band does not draw when no title is given, and there is no breadcrumb slot to pass | ✅ **live (D0.5c)** | `PageShell.tsx` |
 | Facet group order | **Human Review** | ⚠ **debt** | — |
+
+> **Reported by D0.5c:** §8.3 says that once `PageShell` lands the module-tab
+> exception *"stops being an exception at all: it is `variant`, not a rule
+> somebody has to remember."* §1.3 gives four variants — list · dashboard ·
+> detail · settings — and **none of them means "module-tabbed"**, so the shell
+> expresses it by the title being absent, which is still a thing to remember.
+> Either §1.3 gains a fifth variant or §8.3's sentence is wrong; both are the
+> kit's call, and no variant was invented here.
 
 ---
 
@@ -1444,19 +1502,41 @@ document.
   Spacing       ██▌░░░░░░░    25%     1 / 4
   Icons         ██████████   100%     4 / 4
   Components    ██████▊░░░    68%    13 / 19
-  Layout        ░░░░░░░░░░    0%      0 / 6
-  Hierarchy     ██░░░░░░░░    20%     1 / 5
+  Table         ██████████   100%     4 / 4
+  Layout        ███▍░░░░░░    33%     2 / 6
+  Hierarchy     ██████████   100%     7 / 7
   ──────────────────────────────────────────
-  TOTAL         ████▊░░░░░    48%    22 / 46
+  TOTAL         ██████▌░░░    65%    34 / 52
 ```
 
 | | Count | Meaning |
 |---|---|---|
-| Rules | **46** | design rules stated in §1–§8 |
-| **Enforced** | **22** | Type System / Component API / Build Guard / ESLint is live |
-| Scheduled | 24 | a card exists (D0.5c–D5) |
+| Rules | **52** | design rules stated in §1–§8 |
+| **Enforced** | **34** | Type System / Component API / Build Guard / ESLint is live |
+| Scheduled | 18 | a card exists (D1–D7) |
 | **Blocked on a decision** | **0** | ✅ the PENDING REGISTER is empty |
-| **Human Review debt** | 4 | `fmtDate()` · "max 2 reds per screen" · facet group order · "Progress carries no events" — nobody has found a mechanism |
+| **Human Review debt** | **3** | `fmtDate()` · "max 2 reds per screen" · facet group order. **"Progress carries no events" closed in D0.5c** — the first time this number has gone down |
+
+**The D0.5c arithmetic, shown so it can be checked:**
+
+```
+rules      46  +  6  =  52     4 new §7 Table rules + 2 new §1.4 rules that
+                               L4 carried as prose only (identity is
+                               values-only with a 4-fact cap · Detail is a
+                               route)
+enforced   22  + 12  =  34     the 6 new ones, all born enforced · §1.4's
+                               three ⏳ D0.5c rules · §1.3's 8th-band rule ·
+                               §8.3's module-tab rule · and the DEBT rule
+                               "Progress carries no events", which became a
+                               type instead of a hope
+coverage   47.83%  →  65.38%   ⬆
+debt          4    →      3    ⬇ FIRST time it has gone down
+```
+
+**One rule deliberately did NOT move to ✅:** *"one interaction model for every
+list page"* (§8.2). The components exist; no page renders through them, so the
+filter behaviour still lives in each page. It becomes true at **D6**. Counting
+it now would be counting a card, which §16 forbids.
 
 **The D0.5b arithmetic, shown so it can be checked** (health rule 1 says
 coverage may never go down, and rule 2 says the debt may never grow):
