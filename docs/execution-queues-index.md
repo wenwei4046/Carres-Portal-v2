@@ -30,11 +30,11 @@
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · **R6 ✅ #490** — R7 · **R8** (the banned-verb sweep, new 2026-07-28) left |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 + C8b | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C8 ✅ #493 (0304) · C8b ✅ #497 (0305) · C9 ✅ #472 · C10 ✅ #471** — only **C4** left |
-| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings) · **P2 🟡 PARTIALLY DONE #492 + #494** — the click law is true on To Order and on Claims; **only Receiving is left**. **P3 is the next full card** |
+| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings) · **P2 ✅ #492 + #494 + #495** — the click law is true on all three Purchasing lists (To Order · Claims · Receiving). **P3 is the next card** |
 | ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 + **D0.6** | D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3` · **D0.4 ✅ the old order-portal master spec is DELETED** · **D0.5a ✅ built 2026-07-28** — ten Foundation Components + a live `/ui`; **Q1 · Q3 · Q4 now render there and are waiting on Jess**, and no component depends on any of the three. **T3 = Jess uses the drawer for a day.** **Reference Review CLOSED 2026-07-28** — `docs/ui-reference-review.md` R1-R5 frozen (Fiori · Linear · Stripe · Vercel · GOV.UK/NNg/Polaris); five principles; that line froze **no** enforcement mechanism. **D0.6 KIT-CONSOLIDATION = planning card only, approved 2026-07-28, builds after D0.5c — it is the only card that may write the REFERENCE-REVIEW principles into `docs/UI-KIT.md`.** *(Corrected 2026-07-28: this row used to say D0.6 was the only card that may edit the kit at all, which the kit itself contradicts — §6 says each component's dictionary entry is written "when it lands on `/ui`" and §9 says "Written by D0.5a". A D-card still writes the chapter the law assigns it; D0.6 owns the review principles and the mirror's claims.)* TEMPORARY doc — delete when the line ends |
 
 **State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ **R1-R6 ✅** · ⑥ C1 · C2 · C3 · C5 · C6 · **C7** · C9 · C10 ✅ ·
-⑦ **P1 ✅ · P2 🟡 half** · ⑧ D0 + T1 + T2 + **D0.5a** ✅ (T3 **and now Q1/Q3/Q4 on `/ui`** are Jess tasks, not build cards).
+⑦ **P1 ✅ · P2 ✅** · ⑧ D0 + T1 + T2 + **D0.5a** ✅ (T3 **and now Q1/Q3/Q4 on `/ui`** are Jess tasks, not build cards).
 
 **What P2 changed so far (2026-07-28, PR #492) — the To Order half, web only, no
 migration.** UI-KIT §8.2 is now true on that tab. Three things it asks for were missing,
@@ -47,12 +47,27 @@ three, one is always on, and there is nothing to clear into); and **closing a dr
 gives the list back**, filters, selection and the facet rail's scroll, the rail being the
 scroll target because the middle list was folded into the tree on 2026-07-24. No word
 changed, nothing extracted (that is D0.5c), and `OperationPurchase.tsx` got the first test
-file it has ever had. **Receiving and Claims are still owed**: they are ④ R's files and R6
-held them while this ran — **R6 has since merged (#490), so both halves are unblocked.**
+file it has ever had.
 P2 also reports that **two of the three filters its own card names can never be switched
 on** (`attn` · `selectedDay` — their tiles were deleted in July and the state was left
 behind) and that the three stage cells are worded off-dictionary (`Chase factory` uses a
 banned word), which belongs in **R8**'s sweep rather than a third card.
+
+**P2 then finished on two more chats and its lasting contribution is a LAW, not a page**
+(Claims #494 · Receiving #495, both web-only, no migration). The five lines of §8.2 quietly
+assumed every list has an unfiltered state to clear back to; three Purchasing tabs proved
+they do not, so §8.2 gained the **stage vs queue** distinction and **the test is the empty
+state, not the shape on screen** — if "none selected" is a legal, useful view it is a tile
+and it toggles; if it shows nothing it is a stage and re-clicking is a no-op. To Order's
+three stage cells and Claims' `Open / Closed / All` are stages; **Receiving is a queue page**,
+because its `All` tab is a real view and one table serves every filter combination. Claims
+also ruled that **each facet group is counted with every filter except its own and a zero
+row is not rendered**, so no reachable click can blank a table. Receiving's rail carries
+`Today's work` → `Progress` → `Supplier`, and **only ONE of §7's six tiles is countable
+there** (`Check in`) — counted by QUANTITY per §9, not by the `status` word its own tabs
+read, which is why a PO reading `open` with nothing outstanding is correctly absent from it.
+`FacetRow` was extracted under §6.1 (**not** `PageShell`/`DataTable` — that is D0.5c), and
+two Purchasing pages stopped hand-rolling a header they were not entitled to under §8.3.
 
 **The CLAIMS half shipped 2026-07-28 (PR #494), web only, no migration, and no new word.**
 `OperationSupplierClaims.tsx` had **no facet rail and no filter state at all**, so nothing in
@@ -107,9 +122,11 @@ delivery queue is a deadline-carrying step, so the fifth tile waits on Jess ruli
 S / R / P run in parallel throughout; **C4 and ⑦ P share the Purchasing pages with ④ R —
 only ONE of those three at a time.**
 
-**Purchasing lane, 2026-07-28: FREE. R6 released it (#490); ⑦ P2 shipped its To Order half
-(#492) and its Claims half (#494) and released it each time.** P2's ONE remaining half
-(Receiving) edits ④ R's `OperationReceiving.tsx`, so whoever takes it takes the lane.
+**Purchasing lane, 2026-07-28: FREE. R6 released it (#490); ⑦ P2 is COMPLETE** — To Order
+(#492) · Claims (#494) · Receiving (#495), each releasing the lane after itself. **④ R7 and
+R8 are the next things in it**, and R8 now has a list waiting: `Chase factory` on To Order,
+`Receive →` and R6's `Send back` on Receiving, `Contact` on the claim screens, and the
+`Factory:` / `Supplier:` chip split between two tabs of one module.
 
 **The lane check that found the problem, kept because it worked:** compare the migration
 tracker tail to `supabase/migrations`. **If the tracker is ahead, somebody is holding the
