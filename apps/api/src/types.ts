@@ -25,6 +25,10 @@ export type AuthContext = {
   supplierId: string | null;
   partnerId: string | null;
   outletId: string | null;
+  /** R6 (0302) — which warehouse a `warehouse` login belongs to. Null for
+   *  every other role: the auth hook strips the claim when it is absent, and
+   *  `app_users` CHECKs that the id and the role imply each other. */
+  warehouseId: string | null;
   jwt: string;
 };
 

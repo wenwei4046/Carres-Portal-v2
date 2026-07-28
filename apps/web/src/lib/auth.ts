@@ -12,6 +12,9 @@ type AuthState = {
   supplierId: string | null;
   partnerId: string | null;
   outletId: string | null;
+  /** R6 — the warehouse a `warehouse` login belongs to. Null for every other
+   *  role: the auth hook (0302) strips the claim when there is none. */
+  warehouseId: string | null;
   loading: boolean;
   hydrated: boolean;
 };
@@ -25,6 +28,8 @@ type AuthActions = {
 const VALID_ROLES = [
   "principal", "dealer", "salesperson", "showroom",
   "operation", "supplier", "partner", "finance", "bd", "hr",
+  // R6 (0301) — the third external role: the warehouse files its own receiving.
+  "warehouse",
 ] as const;
 
 // Supabase Auth Hook (custom_access_token_hook) injects role/entity ids into
@@ -64,6 +69,7 @@ function projectSession(session: Session | null) {
     supplierId: pickEntity(appMeta, "supplier_id"),
     partnerId: pickEntity(appMeta, "partner_id"),
     outletId: pickEntity(appMeta, "outlet_id"),
+    warehouseId: pickEntity(appMeta, "warehouse_id"),
   };
 }
 
@@ -79,6 +85,7 @@ export const useAuth = create<AuthState & AuthActions>((set, get) => ({
   supplierId: null,
   partnerId: null,
   outletId: null,
+  warehouseId: null,
   loading: false,
   hydrated: false,
 

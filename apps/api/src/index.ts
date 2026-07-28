@@ -27,6 +27,9 @@ import operationPosRouter from "./routes/operation/pos";
 import operationReceiveThreadsRouter from "./routes/operation/receive-threads";
 // R2 — the supplier-claim queue (read side; claims are minted by 0288 RPCs)
 import supplierClaimsRouter from "./routes/operation/supplier-claims";
+// R6 — the ops half: review what the warehouse filed, then replay it through
+// the ONE receive engine (0302).
+import warehouseReceiptsRouter from "./routes/operation/warehouse-receipts";
 import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
 import deliveryChainRouter from "./routes/operation/delivery-chain";
@@ -67,6 +70,8 @@ import supplierMeRouter from "./routes/supplier/me";
 import supplierPosRouter from "./routes/supplier/pos";
 import supplierProductsRouter from "./routes/supplier/products";
 import supplierThreadsRouter from "./routes/supplier/threads";
+// R6 — the warehouse login's whole surface: incoming · file a count · my counts
+import warehouseReceivingRouter from "./routes/warehouse/receiving";
 import salespersonsRouter from "./routes/salespersons";
 import hrRouter from "./routes/hr";
 import hrTeamRouter from "./routes/hr-team";
@@ -226,6 +231,8 @@ api.route("/supplier/me", supplierMeRouter);
 api.route("/supplier/pos", supplierPosRouter);
 api.route("/supplier/products", supplierProductsRouter);
 api.route("/supplier/threads", supplierThreadsRouter);
+// R6 — the third external portal, beside supplier and partner.
+api.route("/warehouse", warehouseReceivingRouter);
 api.route("/storage/dos", dosRouter);
 api.route("/ops/stock", opsStockRouter);
 // K2 (0287) — the monthly ready stock plan. Mounted BELOW /ops/stock so the
@@ -239,6 +246,7 @@ api.route("/ops/service-cases", scRouter);
 api.route("/ops/notes", opsNotesRouter);
 api.route("/ops/tasks", opsTasksRouter);
 api.route("/operation/supplier-claims", supplierClaimsRouter);
+api.route("/operation/warehouse-receipts", warehouseReceiptsRouter);
 api.route("/operation/orders", annotationsRouter);
 api.route("/operation/escalations", escalationsRouter);
 api.route("/operation/activity", activityRouter);

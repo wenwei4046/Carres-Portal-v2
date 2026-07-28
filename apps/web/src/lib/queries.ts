@@ -281,6 +281,10 @@ import {
   type HrCreateTeamAccountInput,
   type HrCreateShowroomStaffInput,
   type SupplierClaimMove,
+  type WarehouseIncomingResponse,
+  type WarehouseReceiptLine,
+  type WarehouseReceiptRow,
+  type WarehouseSubmitReceiptInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
@@ -466,6 +470,11 @@ export const qk = {
      *  receive is the thing that opens claims. */
     supplierClaims: (status: string) =>
       ["operation", "supplier-claims", status] as const,
+    /** R6 — what the warehouse filed and is waiting on. Invalidated by a
+     *  check-in, because a check-in IS a receive: the PO row, the claim queue
+     *  and this queue all move together. */
+    warehouseReceipts: (status: string) =>
+      ["operation", "warehouse-receipts", status] as const,
     supplierClaimPhotos: (id: string) =>
       ["operation", "supplier-claims", "photos", id] as const,
     warehouse: () => ["operation", "warehouse"] as const,
@@ -544,6 +553,14 @@ export const qk = {
     po:       (id: string) => ["supplier", "pos", id] as const,
     products: () => ["supplier", "products"] as const,
     demand:   () => ["supplier", "products", "demand"] as const,
+  },
+  // R6 — the warehouse portal's own namespace, beside supplier and partner.
+  // Its two reads share one prefix so filing a count refreshes BOTH: the PO
+  // leaves the incoming list (it now has an open receipt) and appears in the
+  // warehouse's own list at the same moment.
+  warehousePortal: {
+    incoming: () => ["warehouse-portal", "incoming"] as const,
+    receipts: () => ["warehouse-portal", "receipts"] as const,
   },
   // 2026-05-15 (Loo) — Supplier per-thread readiness + pickup event keys.
   // Top-level (not nested under `supplier`) because thread + pickup-event
@@ -3573,6 +3590,160 @@ export function useSupplierClaimHoldResolveMutation(
       },
     },
   );
+}
+
+// ── R6 · the warehouse portal ───────────────────────────────────────────────
+//
+// Three reads and one write, all of them RPCs the database gates on
+// `app_role() = 'warehouse'`. Nothing here is scoped client-side: the warehouse
+// id rides the caller's own account, never a parameter this code could get
+// wrong.
+
+/** Open POs bound for this warehouse, with R1's four numbers per line. */
+export function useWarehouseIncoming(
+  opts?: Partial<UseQueryOptions<WarehouseIncomingResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.warehousePortal.incoming(),
+    queryFn: () =>
+      apiFetch<WarehouseIncomingResponse>("/api/warehouse/incoming"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** What this warehouse filed, and what became of it — including the claims each
+ *  check-in opened. */
+export function useWarehouseMyReceipts(
+  opts?: Partial<UseQueryOptions<{ receipts: WarehouseReceiptRow[] }>>,
+) {
+  return useQuery({
+    queryKey: qk.warehousePortal.receipts(),
+    queryFn: () =>
+      apiFetch<{ receipts: WarehouseReceiptRow[] }>("/api/warehouse/receipts"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** File a count. Goods do NOT move — ops's check-in replays it through the
+ *  receive engine, which is why both warehouse lists are refreshed and no
+ *  stock cache is touched here. */
+export function useWarehouseSubmitReceiptMutation(
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; po_id: string; status: string },
+      ApiError,
+      WarehouseSubmitReceiptInput
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { id: string; po_id: string; status: string },
+    ApiError,
+    WarehouseSubmitReceiptInput
+  >({
+    mutationFn: (body) =>
+      apiFetch<{ id: string; po_id: string; status: string }>(
+        "/api/warehouse/receipts",
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["warehouse-portal"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** The ops queue row: one filed count, with the names a human needs and the
+ *  one sentence the shared module composes. */
+export interface WarehouseReceiptQueueRow {
+  id: string;
+  po_id: string;
+  warehouse_id: string;
+  warehouse_name: string | null;
+  supplier_name: string | null;
+  do_number: string;
+  do_file_path: string;
+  note: string | null;
+  lines: WarehouseReceiptLine[];
+  status: string;
+  submitted_by_name: string | null;
+  submitted_at: string;
+  reviewed_by_name: string | null;
+  reviewed_at: string | null;
+  return_reason: string | null;
+  /** "4 good · 1 damaged" — composed by the shared module, never typed. */
+  summary: string;
+  /** True when checking this in will file supplier claims. Said BEFORE the
+   *  button is pressed. */
+  opens_claims: boolean;
+}
+
+export interface WarehouseReceiptsQueueResponse {
+  receipts: WarehouseReceiptQueueRow[];
+  counts: { waiting: number };
+}
+
+/** R6 (ops) — what the warehouse filed. Defaults to the waiting queue. */
+export function useOperationWarehouseReceipts(
+  status: "submitted" | "checked_in" | "returned" | "all" = "submitted",
+  opts?: Partial<UseQueryOptions<WarehouseReceiptsQueueResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.warehouseReceipts(status),
+    queryFn: () =>
+      apiFetch<WarehouseReceiptsQueueResponse>(
+        `/api/operation/warehouse-receipts?status=${status}`,
+      ),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/**
+ * The two ops moves: check in, or send it back.
+ *
+ * A check-in IS a receive — it books stock, advances threads and can open
+ * supplier claims — so it invalidates the PO list, the claim queue and the
+ * stock register alongside its own queue. Under-invalidating here would leave
+ * an operator looking at a PO row that still says "In transit" seconds after
+ * they booked its goods in.
+ */
+export function useWarehouseReceiptReviewMutation(
+  move: "check-in" | "send-back",
+  opts?: Partial<
+    UseMutationOptions<
+      Record<string, unknown>,
+      ApiError,
+      { receiptId: string; reason?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    Record<string, unknown>,
+    ApiError,
+    { receiptId: string; reason?: string }
+  >({
+    mutationFn: ({ receiptId, ...body }) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/operation/warehouse-receipts/${receiptId}/${move}`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] }),
+        qc.invalidateQueries({ queryKey: ["operation", "pos"] }),
+        qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] }),
+        qc.invalidateQueries({ queryKey: ["operation", "warehouse"] }),
+      ]);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
 }
 
 export function useOperationSuppliers(

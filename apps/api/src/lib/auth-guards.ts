@@ -103,3 +103,31 @@ export const requireSupplier: MiddlewareHandler<AppEnv> = async (c, next) => {
   }
   await next();
 };
+
+/**
+ * R6 (0302) — admits `warehouse` only, and only when the token carries the
+ * warehouse it belongs to.
+ *
+ * The principal is NOT admitted, unlike every internal guard above. A warehouse
+ * route answers "what is coming to MY warehouse" — for a principal the answer
+ * is a scope error, not a wider view, and the RPCs behind these routes refuse
+ * any role but `warehouse` anyway (an admitted principal would just collect a
+ * 42501 with a worse message).
+ *
+ * The `warehouseId` check mirrors the partner/supplier precedent: it turns a
+ * mis-provisioned account into a plain 403 here instead of a database error
+ * further in. The real boundary stays `app_warehouse_id()` inside each RPC —
+ * this cannot be spoofed past it, because that helper reads `app_users`, never
+ * the token.
+ */
+export const requireWarehouse: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (c.var.auth?.role !== "warehouse") {
+    throw new HTTPException(403, { message: "Warehouse only" });
+  }
+  if (!c.var.auth.warehouseId) {
+    throw new HTTPException(403, {
+      message: "This login is not bound to a warehouse",
+    });
+  }
+  await next();
+};

@@ -41,12 +41,16 @@ type Role =
   | "supplier"
   | "principal"
   | "bd"
-  | "hr";
+  | "hr"
+  | "warehouse";
 
 // Loo 2026-05-12 ~20:00 — operation dropped from the deny list (they
 // surface this on their own drawer when handing over a delivery). Partner
 // has POD and Supplier has PO, so the SO doc stays off their UIs.
-const DENIED: ReadonlySet<Role> = new Set(["partner", "supplier"]);
+// R6 (2026-07-28) — warehouse joins the deny list for the same reason and a
+// stronger one: a sales order carries the customer's name, address and prices,
+// and the card's own boundary is that a warehouse sees what it must count.
+const DENIED: ReadonlySet<Role> = new Set(["partner", "supplier", "warehouse"]);
 
 interface Props {
   orderId: string;

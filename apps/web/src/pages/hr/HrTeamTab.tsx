@@ -53,6 +53,8 @@ const ROLE_LABEL: Record<string, string> = {
   bd: "BD",
   supplier: "Supplier",
   partner: "Delivery Partner",
+  // R6 — the third external company: it counts what arrives and files it.
+  warehouse: "Warehouse",
   showroom: "Store login",
   salesperson: "Salesperson",
 };
@@ -254,11 +256,14 @@ function ShowroomStaffRow({ staff }: { staff: TeamShowroomStaff }) {
 function AddUserModal({
   positions,
   internalAccounts,
+  warehouses,
   callerIsPrincipal,
   onClose,
 }: {
   positions: OrgPosition[];
   internalAccounts: TeamAccount[];
+  /** R6 — what a `warehouse` login may be bound to. Empty on a pre-R6 server. */
+  warehouses: { id: string; name: string }[];
   callerIsPrincipal: boolean;
   onClose: () => void;
 }) {
@@ -268,6 +273,7 @@ function AddUserModal({
   const [email, setEmail] = useState("");
   const [title, setTitle] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [warehouseId, setWarehouseId] = useState("");
   const [positionId, setPositionId] = useState("");
   const [reportsTo, setReportsTo] = useState("");
   const [password, setPassword] = useState("");
@@ -276,13 +282,18 @@ function AddUserModal({
   const roles = HR_TEAM_CREATABLE_ROLES.filter(
     (r) => r !== "principal" || callerIsPrincipal,
   );
+  // R6 — a warehouse is external too, but it is the one external role that
+  // creates NO company row: the warehouse already exists as master data, so the
+  // form picks one instead of naming one.
+  const isWarehouse = role === "warehouse";
   const external = role === "supplier" || role === "partner";
   const valid =
     name.trim().length > 0 &&
     /\S+@\S+\.\S+/.test(email) &&
     password.length >= 8 &&
     password === confirmPw &&
-    (!external || companyName.trim().length > 0);
+    (!external || companyName.trim().length > 0) &&
+    (!isWarehouse || warehouseId.length > 0);
 
   const submit = () => {
     create.mutate(
@@ -294,10 +305,12 @@ function AddUserModal({
         tempPassword: password,
         ...(external
           ? { companyName: companyName.trim() }
-          : {
-              positionId: positionId === "" ? null : positionId,
-              reportsToUserId: reportsTo === "" ? null : reportsTo,
-            }),
+          : isWarehouse
+            ? { warehouseId }
+            : {
+                positionId: positionId === "" ? null : positionId,
+                reportsToUserId: reportsTo === "" ? null : reportsTo,
+              }),
       },
       {
         onSuccess: (res) => {
@@ -362,6 +375,29 @@ function AddUserModal({
                 onChange={(e) => setCompanyName(e.target.value)}
                 className={`${fieldCls} mt-1 font-normal`}
               />
+            </label>
+          ) : isWarehouse ? (
+            /* R6 — PICK a warehouse, never type one. A free-text name here
+               would mint nothing and bind nothing; the login has to point at
+               the same row the POs are bound to or it sees an empty list. */
+            <label className="col-span-2 text-[12px] font-semibold text-base-700">
+              Warehouse
+              <select
+                value={warehouseId}
+                onChange={(e) => setWarehouseId(e.target.value)}
+                className={`${fieldCls} mt-1 font-normal`}
+                data-testid="hr-team-warehouse-picker"
+              >
+                <option value="">— pick one —</option>
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+              <span className="block text-[11px] font-normal text-base-600 mt-1">
+                This login sees only what is coming to that warehouse.
+              </span>
             </label>
           ) : (
             <>
@@ -1325,6 +1361,7 @@ export default function HrTeamTab() {
         <AddUserModal
           positions={data.positions}
           internalAccounts={internalAccounts}
+          warehouses={data.warehouses ?? []}
           callerIsPrincipal={role === "principal"}
           onClose={() => setAddUserOpen(false)}
         />

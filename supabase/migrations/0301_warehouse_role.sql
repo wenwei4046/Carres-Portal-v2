@@ -1,0 +1,24 @@
+-- =============================================================================
+-- 0301_warehouse_role — add 'warehouse' to app_role (R6, 2026-07-27)
+-- =============================================================================
+-- Card R6 (docs/receiving-claim-execution-queue.md): the third-party warehouse
+-- stops reporting by WhatsApp and files its receiving itself. It is the THIRD
+-- external role, built exactly like supplier and partner — its own app_role
+-- value, scoped by an entity id, and a shell that can reach nothing else.
+--
+-- ALTER TYPE ... ADD VALUE cannot share a transaction with any statement that
+-- USES the new value, so this migration contains ONLY the enum add — the same
+-- split 0244 made for 'hr'. Everything that references 'warehouse' (the
+-- app_users column, the auth hook, the receipts table, the RPCs, the storage
+-- policy branch) lives in 0302.
+--
+-- The 0004/0267 custom_access_token_hook copies app_users.role into the JWT
+-- verbatim, so a 'warehouse' account flows into app_metadata with no hook
+-- change for the ROLE itself; 0302 adds the warehouse_id claim beside it.
+--
+-- is_internal() / is_operation() are deliberately NOT widened. A warehouse is
+-- an outside company: it reaches nothing except the explicitly-gated
+-- SECURITY DEFINER RPCs in 0302 (least privilege, the 0244 precedent).
+-- =============================================================================
+
+alter type public.app_role add value if not exists 'warehouse';

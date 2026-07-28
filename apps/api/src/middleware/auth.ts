@@ -31,6 +31,10 @@ export function _setJwksForTesting(jwks: JWTVerifyGetKey | null): void {
 const VALID_ROLES: ReadonlyArray<Role> = [
   "principal", "dealer", "salesperson", "showroom",
   "operation", "supplier", "partner", "finance", "bd", "hr",
+  // R6 (0301) — the third external role. A token minted before 0302 carries no
+  // `warehouse_id`, and every warehouse RPC scopes on `app_warehouse_id()`
+  // server-side anyway, so an unscoped token reaches nothing.
+  "warehouse",
 ];
 
 function isRole(v: unknown): v is Role {
@@ -82,6 +86,7 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
     supplierId: asNullableUuid(appMeta?.supplier_id),
     partnerId: asNullableUuid(appMeta?.partner_id),
     outletId: asNullableUuid(appMeta?.outlet_id),
+    warehouseId: asNullableUuid(appMeta?.warehouse_id),
     jwt,
   };
 

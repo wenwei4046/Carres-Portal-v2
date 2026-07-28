@@ -24,9 +24,14 @@ export type { FabricTier };
 // `Domain.FreeItemCampaign` alongside the rest of the camelCase surface.
 export type { FreeItemCampaign };
 
+// R6 (0301/0302) — `warehouse` is the THIRD external role, after supplier and
+// partner: the third-party warehouse files its own receiving instead of
+// reporting it by WhatsApp. Like them it is scoped by an entity id
+// (`app_users.warehouse_id`) and reaches nothing except its own RPCs.
 export type Role =
   | "principal" | "dealer" | "salesperson" | "showroom"
-  | "operation" | "supplier" | "partner" | "finance" | "bd" | "hr";
+  | "operation" | "supplier" | "partner" | "finance" | "bd" | "hr"
+  | "warehouse";
 
 export interface Dealer {
   id: string;
