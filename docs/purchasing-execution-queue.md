@@ -171,17 +171,41 @@ the five tabs in `docs/PURCHASING-WORKING-FLOW.md` §1 exist today and the fifth
 arrives with P1. Nothing about tabs is left to build.
 
 **ALREADY EXISTS — do not rebuild:** the claim engine and its lifecycle (R2 · R3 · R4), the
-Claims tab, the Receiving tab, the facet rail, the table.
+Claims tab, the Receiving tab, the tables.
 
-**Build — the UI-KIT §8.2 interaction law**, written and implemented nowhere:
-click a queue tile → the table filters · click it again / ✕ → it clears · two tiles → two
-✕-able chips · click a row → the drawer opens on its FIRST tab · closing keeps the filter AND
-the scroll position. Purchasing is the first module to implement it; **Orders already behaves
-this way and is the reference — copy it, do not invent it.**
+**The facet rail exists on ONE tab of four, not on all of them** (measured 2026-07-28 — the
+earlier version of this card said "the facet rail" already exists, full stop, and a chat that
+believed it would go looking for something that is not there):
+
+| Tab | Facet rail | Filter state | What P2 owes it |
+|---|---|---|---|
+| **To Order** | yes | real — `supplierFilter` · `attn` · `selectedDay`, each with an `onClear` chip | the missing half of §8.2: **clicking the same tile again clears it**, and closing the drawer keeps the filter AND the scroll |
+| **Purchase Orders** | — | — | check before building; it is a nested route, not a `?tab=` |
+| **Receiving** | **none** | **none** | a rail and tiles from scratch |
+| **Claims** | **none** | **none** | a rail and tiles from scratch |
+
+**Build — the UI-KIT §8.2 interaction law:** click a queue tile → the table filters · click it
+again / ✕ → it clears · two tiles → two ✕-able chips · click a row → the drawer opens on its
+FIRST tab · closing keeps the filter AND the scroll position. **Orders is the reference — copy
+it, do not invent it.**
+
+**Do NOT extract a shared component for this.** UI-KIT §8.2's enforcement row says the
+behaviour ends up inside `PageShell` / `DataTable`, and **that is card D0.5c on line ⑧**.
+P2 makes the behaviour true on Purchasing; D0.5c is what stops it being written a fourth time.
+A P-chat that starts building `PageShell` has taken another line's card.
+
+**The queue tiles are the six in `docs/PURCHASING-WORKING-FLOW.md` §7**, and the sixth is
+`Confirm what happens next`, NOT `Claims` — a tile's name is its action; `Claims` is the tab.
+
+**LANE — read before opening a chat.** Receiving and Claims are ④ R's files, and **R6
+(`warehouse files its own receiving`) is mid-flight**: `0301` / `0302` are applied to prod and
+neither file is on main. P1 could ship beside R6 because it touched neither. **P2 touches
+`OperationReceiving.tsx` directly.** Either wait for R6 to merge, or ship the To Order half
+alone and leave the other two tabs until it lands — but never edit that file while R6 holds it.
 
 **No migration.**
-**Done when:** every queue tile on Purchasing filters and clears, and nobody types a URL to
-reach a claim.
+**Done when:** every queue tile on Purchasing filters and clears again, and the drawer gives
+the list back exactly as it was left.
 
 ## P3 · The two missing supplier calls
 
