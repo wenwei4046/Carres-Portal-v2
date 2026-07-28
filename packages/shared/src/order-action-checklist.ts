@@ -96,12 +96,26 @@ export function orderActionChecklist(
         closes("confirm_ready_date"),
       ];
 
-    // The T3 delay radar: the supplier's date overshoots the promise, so the
-    // work is a new date. The date we already hold is what proves the overshoot.
-    case "agree_new_delivery_date":
+    // C8 · STAGE 1. The T3 delay radar fired: the supplier's date overshoots
+    // the promise. The date we already hold is what proves the overshoot, so
+    // the supplier call is the measured step before it, and what closes this
+    // action is the DECISION — not a call to anybody.
+    case "delay_planning":
       return [
         measured("confirm_ready_date", s.stockEtaIso !== null),
-        closes("agree_new_delivery_date"),
+        closes("delay_planning"),
+      ];
+
+    // C8 · STAGE 2, and the measured step before it is the GATE. This is the
+    // one place the gate becomes visible to an operator: the logistics call
+    // cannot be reached with an un-ticked `Record the delay decision` above it,
+    // which is exactly §3's "stage 2 cannot open before the decision is
+    // recorded". The step reads the same signals the engine used to open the
+    // action, so the two can never disagree.
+    case "arrange_new_delivery_date":
+      return [
+        measured("delay_planning", (s.delayDecision ?? null) !== null),
+        closes("arrange_new_delivery_date"),
       ];
 
     // An internal decision with no earlier step of its own.

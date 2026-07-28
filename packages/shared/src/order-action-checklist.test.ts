@@ -23,7 +23,8 @@ import {
 const EVERY_KEY: OrderActionKey[] = [
   "send_po",
   "confirm_ready_date",
-  "agree_new_delivery_date",
+  "delay_planning",
+  "arrange_new_delivery_date",
   "assign_logistics",
   "confirm_delivery_date",
   "issue_delivery_order",
@@ -99,15 +100,29 @@ describe("C6 · a step reads a real signal, never an assertion", () => {
 
   it("`Record ready date` ticks once a supplier date is on file", () => {
     expect(
-      orderActionChecklist("agree_new_delivery_date", sig({ stockEtaIso: null }))[0]
-        .state,
+      orderActionChecklist("delay_planning", sig({ stockEtaIso: null }))[0].state,
     ).toBe("open");
     expect(
-      orderActionChecklist(
-        "agree_new_delivery_date",
-        sig({ stockEtaIso: "2026-09-01" }),
-      )[0].state,
+      orderActionChecklist("delay_planning", sig({ stockEtaIso: "2026-09-01" }))[0]
+        .state,
     ).toBe("done");
+  });
+
+  it("C8 · `Record the delay decision` ticks once a decision exists — the GATE, on screen", () => {
+    // §3's third invariant made visible: stage 2 cannot be reached with an
+    // un-ticked decision above it.
+    expect(
+      orderActionChecklist(
+        "arrange_new_delivery_date",
+        sig({ delayDecision: null }),
+      )[0],
+    ).toEqual({ key: "delay_planning", state: "open" });
+    expect(
+      orderActionChecklist(
+        "arrange_new_delivery_date",
+        sig({ delayDecision: "new_date" }),
+      )[0],
+    ).toEqual({ key: "delay_planning", state: "done" });
   });
 
   it("`Assign logistics` ticks once a company is picked", () => {
@@ -155,8 +170,8 @@ describe("C6 · a step reads a real signal, never an assertion", () => {
 describe("C6 · the invariant — an open action is never a fully ticked list", () => {
   // A matrix over every boolean signal the checklist can read, plus the two
   // dates that decide the goods rungs, plus C7's three-way "is the delivery
-  // order issued?". 2^6 × 3 × 3 × 3 combinations, each run through LAYER 1 and
-  // then through its own checklist.
+  // order issued?", plus C8's three-way delay decision. 2^6 × 3 × 3 × 3 × 3
+  // combinations, each run through LAYER 1 and then through its own checklist.
   const BOOLS = [false, true];
   it("holds for every open action the engine can raise", () => {
     let checked = 0;
@@ -168,27 +183,37 @@ describe("C6 · the invariant — an open action is never a fully ticked list", 
               for (const moneyOwing of BOOLS)
                 for (const stockEtaIso of [null, "2026-08-01", "2026-09-30"])
                   for (const daysToDue of [24, 0, -3])
-                    for (const deliveryOrderIssued of [null, false, true]) {
-                      const s = sig({
-                        completed,
-                        goodsReady,
-                        goodsUnordered,
-                        hasLogistics,
-                        bookingConfirmed,
-                        moneyOwing,
-                        stockEtaIso,
-                        daysToDue,
-                        deliveryOrderIssued,
-                        photoOnFile: false,
-                        confirmedDateIso: bookingConfirmed ? "2026-08-20" : null,
-                      });
-                      for (const a of openOrderActions(s)) {
-                        const steps = orderActionChecklist(a.key, s);
-                        checked += 1;
-                        if (steps.length === 0) continue;
-                        expect(steps.some((st) => st.state === "open")).toBe(true);
+                    for (const deliveryOrderIssued of [null, false, true])
+                      for (const delayDecision of [
+                        null,
+                        "keep",
+                        "new_date",
+                      ] as const) {
+                        const s = sig({
+                          completed,
+                          goodsReady,
+                          goodsUnordered,
+                          hasLogistics,
+                          bookingConfirmed,
+                          moneyOwing,
+                          stockEtaIso,
+                          daysToDue,
+                          deliveryOrderIssued,
+                          delayDecision,
+                          // The decision points AT the current supplier date, so
+                          // the matrix exercises the decided branch rather than
+                          // the stale-decision one (which has its own tests).
+                          delayDecisionEtaIso: stockEtaIso,
+                          photoOnFile: false,
+                          confirmedDateIso: bookingConfirmed ? "2026-08-20" : null,
+                        });
+                        for (const a of openOrderActions(s)) {
+                          const steps = orderActionChecklist(a.key, s);
+                          checked += 1;
+                          if (steps.length === 0) continue;
+                          expect(steps.some((st) => st.state === "open")).toBe(true);
+                        }
                       }
-                    }
     // A guard on the guard: if the loop ever stops raising actions, the
     // assertion above passes vacuously and proves nothing.
     expect(checked).toBeGreaterThan(200);

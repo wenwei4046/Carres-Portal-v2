@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ORDER_ACTION_QUEUES,
   collectPillLabel,
+  orderActionButton,
   orderActionDone,
   orderActionForQueue,
   orderActionLine,
@@ -13,7 +14,8 @@ import {
 const EVERY_KEY: OrderActionKey[] = [
   "send_po",
   "confirm_ready_date",
-  "agree_new_delivery_date",
+  "delay_planning",
+  "arrange_new_delivery_date",
   "assign_logistics",
   "confirm_delivery_date",
   "issue_delivery_order",
@@ -29,7 +31,9 @@ describe("order action words — the queue word", () => {
     expect(orderActionQueue("send_po")).toBe("Send PO");
     expect(orderActionQueue("confirm_ready_date")).toBe("Confirm ready date");
     expect(orderActionQueue("confirm_delivery_date")).toBe("Confirm delivery date");
-    expect(orderActionQueue("agree_new_delivery_date")).toBe("Agree new delivery date");
+    expect(orderActionQueue("arrange_new_delivery_date")).toBe(
+      "Arrange new delivery date",
+    );
   });
 
   it("keeps the three party-less actions exactly as COPY-STANDARD leaves them", () => {
@@ -55,9 +59,9 @@ describe("order action words — the row line", () => {
     expect(orderActionLine("confirm_delivery_date", { logistics: "NETS" })).toBe(
       "Call NETS — confirm delivery date",
     );
-    expect(orderActionLine("agree_new_delivery_date", { customer: "John Tan" })).toBe(
-      "Call John Tan — agree new delivery date",
-    );
+    expect(
+      orderActionLine("arrange_new_delivery_date", { logistics: "NETS" }),
+    ).toBe("Call NETS — arrange new delivery date");
   });
 
   // C3 — the FACT that replaced `Confirm delivery with {customer}`. Two forms
@@ -92,8 +96,8 @@ describe("order action words — the row line", () => {
     expect(orderActionLine("confirm_delivery_date", { logistics: "   " })).toBe(
       "Call logistics — confirm delivery date",
     );
-    expect(orderActionLine("agree_new_delivery_date", { customer: null })).toBe(
-      "Call customer — agree new delivery date",
+    expect(orderActionLine("arrange_new_delivery_date", { logistics: null })).toBe(
+      "Call logistics — arrange new delivery date",
     );
     // No label may ever contain a double space or a dangling dash.
     for (const key of EVERY_KEY) {
@@ -121,13 +125,67 @@ describe("order action words — the row line", () => {
     // C7 adds `issue_delivery_order`: the SYSTEM produces the document, so
     // there is no outside party to name (COPY-STANDARD's action naming law
     // lists it beside `Assign logistics` and `Upload delivery photo`).
+    // C8 adds `delay_planning`: an internal decision, nobody outside involved.
     for (const key of [
       "assign_logistics",
       "issue_delivery_order",
       "deliver_today",
       "upload_delivery_photo",
+      "delay_planning",
     ] as const)
       expect(orderActionLine(key, { logistics: "NETS" })).toBe(orderActionQueue(key));
+  });
+});
+
+describe("C8 · the delay words — the dictionary won, and rung 2 lost the customer", () => {
+  it("spells both stages exactly as COPY-STANDARD's dictionary and vocabulary table", () => {
+    // Stage 1 — the vocabulary table's own phrase for "working out what to do
+    // about a delay, before anyone calls the customer".
+    expect(orderActionQueue("delay_planning")).toBe("Delay planning");
+    expect(orderActionLine("delay_planning")).toBe("Delay planning");
+    expect(orderActionButton("delay_planning")).toBe("Record the delay decision");
+    // Stage 2 — the dictionary row, verbatim.
+    expect(orderActionQueue("arrange_new_delivery_date")).toBe(
+      "Arrange new delivery date",
+    );
+    expect(
+      orderActionLine("arrange_new_delivery_date", { logistics: "NETS Logistics" }),
+    ).toBe("Call NETS Logistics — arrange new delivery date");
+    expect(orderActionButton("arrange_new_delivery_date")).toBe("Record new date");
+  });
+
+  it("NO delay word opens a call to the customer — Law 4 rung 2, as a guard", () => {
+    // `Rung 2 never names the customer. Carres does not phone a customer about
+    // a delay — logistics carries that conversation. Any surface that opens a
+    // customer call about a delay is wrong.` The customer's real name is fed in
+    // deliberately: if either line ever reads it, this fails.
+    for (const key of ["delay_planning", "arrange_new_delivery_date"] as const) {
+      const line = orderActionLine(key, {
+        customer: "John Tan",
+        logistics: "NETS",
+        supplier: "Ohana",
+      });
+      expect(line).not.toMatch(/John Tan/);
+      expect(line).not.toMatch(/\bcustomer\b/i);
+    }
+  });
+
+  it("the retired `Agree new delivery date` is gone, not merely unused", () => {
+    expect(ORDER_ACTION_QUEUES).not.toContain("Agree new delivery date");
+    expect(orderActionForQueue("Agree new delivery date")).toBeNull();
+    for (const key of EVERY_KEY) {
+      expect(orderActionQueue(key)).not.toMatch(/\bagree\b/i);
+      expect(orderActionLine(key, { customer: "A", logistics: "B" })).not.toMatch(
+        /\bagree\b/i,
+      );
+    }
+  });
+
+  it("`Recovery` — the banned word — appears nowhere (COPY-STANDARD)", () => {
+    for (const key of EVERY_KEY) {
+      expect(orderActionQueue(key)).not.toMatch(/\brecovery\b/i);
+      expect(orderActionButton(key) ?? "").not.toMatch(/\brecovery\b/i);
+    }
   });
 });
 

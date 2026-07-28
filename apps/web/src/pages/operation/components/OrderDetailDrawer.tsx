@@ -194,6 +194,7 @@ import OrderJourneyHeader, {
   deriveOrderJourney,
   type OrderJourneySignals,
 } from "./OrderJourneyHeader";
+import DelayPlanningPanel from "./DelayPlanningPanel";
 import OrderActionList from "./OrderActionList";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 
@@ -2755,6 +2756,19 @@ function DrawerBody({
             once and the old ladder showed one and hid the rest. Same computed
             list, same order, so its first row is always the strip's Next. */}
         {journey && <OrderActionList actions={journey.openActions} />}
+        {/* C8 — the form that closes `Delay planning`. It renders only while
+            the LADDER has that action open, so it can never contradict the
+            list above it, and it disappears by itself the moment the decision
+            is stored. COPY-STANDARD's rule that a FORM already collecting the
+            inputs IS the checklist — never a second row of ticks beside it. */}
+        {journey?.delay &&
+          journey.openActions.some((a) => a.key === "delay_planning") && (
+            <DelayPlanningPanel
+              orderId={order.id}
+              supplierEtaIso={journey.delay.supplierEtaIso}
+              promisedDateIso={journey.delay.promisedDateIso}
+            />
+          )}
         {/* Operator's own free-text note — full text (the header only chips it). */}
         {form.draft.action_for_logistic.trim() && (
           <div className="shrink-0 flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]">

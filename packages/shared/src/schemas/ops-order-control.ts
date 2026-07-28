@@ -91,6 +91,20 @@ export const STORAGE_WAIVER_STATUSES = [
 ] as const;
 export type StorageWaiverStatus = (typeof STORAGE_WAIVER_STATUSES)[number];
 
+/**
+ * C8 (migration 0304) — the two answers to `docs/ORDERS-WORKING-FLOW.md` §3's
+ * gate, *can we still make the promised date?*
+ *
+ *   `keep`     yes — we solved it internally, and the customer is NEVER told
+ *   `new_date` no — and only this opens the call to logistics
+ *
+ * Their words on screen live in `docs/COPY-STANDARD.md`; these are the stored
+ * values, and 0304's CHECK mirrors them so no client can invent a middle answer
+ * the engine has no branch for.
+ */
+export const DELAY_DECISIONS = ["keep", "new_date"] as const;
+export type DelayDecision = (typeof DELAY_DECISIONS)[number];
+
 /** ISO yyyy-mm-dd (no time) — matches the DB `date` column for stock_eta. */
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected yyyy-mm-dd");
 
@@ -321,6 +335,18 @@ export const opsOrderControlSchema = z.object({
    *  confirmed_time_slot. Default keeps a pre-0282 Worker response parseable
    *  (the HR-O1 degrade lesson). */
   delivery_trips: z.array(deliveryTripSchema).default([]),
+  /** C8 delay planning (migration 0304) — the answer to "can we still make the
+   *  promised date?", and the supplier date it was made ABOUT. READ-only on the
+   *  overlay: written only by /delay-decision, never the generic control PUT,
+   *  because a decision carries a decider and a moment and the generic PUT
+   *  records neither. Defaults keep a pre-0304 Worker response parseable (the
+   *  HR-O1 degrade lesson) AND reproduce the pre-C8 behaviour exactly — no
+   *  decision on file means Delay planning is open. */
+  delay_decision: z.enum(DELAY_DECISIONS).nullable().default(null),
+  delay_decision_eta: isoDate.nullable().default(null),
+  delay_decision_at: z.string().nullable().default(null),
+  delay_decision_by: z.string().uuid().nullable().default(null),
+  delay_decision_note: z.string().nullable().default(null),
   updated_at: z.string().nullable(),
   updated_by: z.string().uuid().nullable(),
 });
@@ -520,6 +546,30 @@ export type OpsOrderControlResponse = z.infer<
  *  required (invariant #1); the endpoint additionally enforces goods ready +
  *  balance ready + the Sunday rule. Re-calling on a confirmed booking updates
  *  the date/slot and re-stamps the evidence (the customer re-confirmed). */
+// ── C8 delay planning (migration 0304) ──────────────────────────────────────
+/**
+ * POST /:id/delay-decision — record the Delay planning outcome (C8 stage 1).
+ *
+ * `supplierEta` is the factory date the operator was looking at when they
+ * decided, and the server REFUSES one that is not among the dates this order
+ * actually holds. It is not decoration: a decision is a fact about ONE supplier
+ * date (S4's rule), so if the factory slips again the stored pair no longer
+ * matches the current date and Delay planning re-opens by itself. Sending a
+ * stale date therefore fails CLOSED and visibly — the decision is recorded but
+ * silences nothing — which is the safe direction for a gate that stands between
+ * a customer and a phone call they should not receive.
+ */
+export const delayDecisionInput = z
+  .object({
+    decision: z.enum(DELAY_DECISIONS),
+    supplierEta: isoDate,
+    /** Optional — what was tried (ready stock, another supplier). Never a
+     *  substitute for the decision itself. */
+    note: z.string().trim().max(500).optional(),
+  })
+  .strict();
+export type DelayDecisionInput = z.infer<typeof delayDecisionInput>;
+
 export const confirmBookingInput = z
   .object({
     confirmedDate: isoDate,

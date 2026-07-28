@@ -571,10 +571,15 @@ function bookingConfirmedOf(o: operationOrderListRow): boolean {
 // packages/shared), each carrying its own auto-overdue deadline. Assign /
 // Confirm delivery date used to sit in this list; they are the same actions,
 // just rendered in the delivery group now — no row changed queue.
+// C8 (Jess 2026-07-27) — the delay radar's one queue became TWO, because the
+// two are different work done by different people: `Delay planning` is an
+// internal DECISION, `Arrange new delivery date` is a call to logistics that
+// only exists when the decision said the promise cannot be kept.
 const STOCK_QUEUE_KEYS = [
   "send_po",
   "confirm_ready_date",
-  "agree_new_delivery_date",
+  "delay_planning",
+  "arrange_new_delivery_date",
 ] as const satisfies readonly OrderActionKey[];
 const NEXT_QUEUE_VERBS = STOCK_QUEUE_KEYS.map(orderActionQueue);
 const NEXT_QUEUE_DESC: Record<string, string> = {
@@ -582,8 +587,12 @@ const NEXT_QUEUE_DESC: Record<string, string> = {
     "Goods not ordered from any supplier yet — send the PO",
   [orderActionQueue("confirm_ready_date")]:
     "PO sent but goods not in yet — call the supplier for the ready date (red once inside the stock window)",
-  [orderActionQueue("agree_new_delivery_date")]:
-    "Stock ETA lands AFTER the promised date — call the customer now, before the window (delay radar, T3)",
+  // C8 — this tooltip used to read "call the customer now", which is the exact
+  // thing Law 4 rung 2 forbids. Carres does not phone a customer about a delay.
+  [orderActionQueue("delay_planning")]:
+    "Supplier date lands after the promised date — decide before anyone calls (Delay planning)",
+  [orderActionQueue("arrange_new_delivery_date")]:
+    "The promised date cannot be met — logistics arranges the new date with the customer",
 };
 
 /** T7 — the delivery-photo action. Its queue is the ONLY delivery queue that
@@ -904,6 +913,14 @@ export function orderActionSignalsOf(
     photoOnFile: Array.isArray(ovlOf(o)?.delivery_photos)
       ? (ovlOf(o)!.delivery_photos as unknown[]).length > 0
       : null,
+    // C8 — the recorded answer to "can we still make the promised date?", and
+    // the supplier date it was made ABOUT. Both come from the overlay in one
+    // read, so the engine can compare them against the CURRENT date: a factory
+    // that slips again is a NEW delay, and an old answer may not silence it.
+    // Absent on a pre-0304 Worker → `undefined` → the pre-C8 behaviour exactly
+    // (Delay planning opens on the overshoot, as the radar always did).
+    delayDecision: ovlOf(o)?.delay_decision ?? null,
+    delayDecisionEtaIso: ovlOf(o)?.delay_decision_eta ?? null,
     // C9 — two different questions. `owing` raises the money ACTION; `holds`
     // is the 🔒 on the delivery, and a manager's release parts them.
     moneyOwing: money.owing,
@@ -1834,6 +1851,21 @@ export default function OperationOrdersControl({ onImport }: Props) {
       // T7's three-way answer: [] is "no photo yet", undefined is UNKNOWN.
       photoOnFile: Array.isArray(photos) ? photos.length > 0 : null,
       holdAmount,
+      // C8 — the delay this order is in, when it is in one. The condition is
+      // the radar's OWN condition (`docs/ORDERS-WORKING-FLOW.md` §3, stage 1's
+      // trigger) read from the same signals object above, so the panel cannot
+      // appear for an order the ladder does not think is delayed — and the
+      // panel itself renders only when the ladder actually raised the action.
+      delay:
+        actionSignals.stockEtaIso &&
+        actionSignals.promisedDateIso &&
+        actionSignals.stockEtaIso > actionSignals.promisedDateIso
+          ? {
+              supplierEtaIso: actionSignals.stockEtaIso,
+              promisedDateIso: actionSignals.promisedDateIso,
+              decision: actionSignals.delayDecision ?? null,
+            }
+          : undefined,
       // C2 — LAYER 1: every open action, in display order. The drawer's list
       // and this row's pill are the same computation, so the count the drawer
       // shows and the headline the row shows can never contradict each other.
@@ -2891,7 +2923,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       }
                       active={nextFilter === v}
                       chip={
-                        v === orderActionQueue("agree_new_delivery_date")
+                        // C8 — both delay queues belong to the order's PIC:
+                        // §3 gives BOTH stages to Operations (the conversation
+                        // is logistics', the action in this portal is ours),
+                        // and C6 ruled the order's PIC is the task owner of
+                        // every action of that order.
+                        v === orderActionQueue("delay_planning") ||
+                        v === orderActionQueue("arrange_new_delivery_date")
                           ? picQueueChip
                           : dutyQueueChip
                       }

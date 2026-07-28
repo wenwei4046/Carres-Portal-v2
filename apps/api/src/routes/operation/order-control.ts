@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   updateOpsOrderControlInput,
   confirmBookingInput,
+  delayDecisionInput,
   signDeliveryPhotoUploadInput,
   attachDeliveryPhotoInput,
   type DeliveryPhoto,
@@ -73,7 +74,7 @@ const ORDER_ID = z.string().uuid();
 /** The full overlay column list — ONE copy for GET / PUT / booking-confirm so
  *  the three responses can never drift apart. */
 const CONTROL_COLUMNS =
-  "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_legs, line_etas, line_stock_status, line_received, called_customer, customer_confirmed, last_chased_at, assigned_staff, assigned_by, assigned_at, booking_stage, confirmed_date, confirmed_time_slot, customer_confirmed_at, customer_confirmed_by, delivery_photos, booking_groups, delivery_trips, updated_at, updated_by";
+  "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_legs, line_etas, line_stock_status, line_received, called_customer, customer_confirmed, last_chased_at, assigned_staff, assigned_by, assigned_at, booking_stage, confirmed_date, confirmed_time_slot, customer_confirmed_at, customer_confirmed_by, delivery_photos, booking_groups, delivery_trips, delay_decision, delay_decision_eta, delay_decision_at, delay_decision_by, delay_decision_note, updated_at, updated_by";
 
 function requireOperationOrPrincipal(
   role: string,
@@ -517,6 +518,137 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
   // browser simply does not read it (the same degradation rule as
   // `partnerWarnings`).
   return c.json({ control: data, partnerWarnings, gateWarnings });
+});
+
+/**
+ * POST /:id/delay-decision — C8 · record the Delay planning outcome
+ * (Jess 2026-07-27; the specification is `docs/ORDERS-WORKING-FLOW.md` §3).
+ *
+ * **This endpoint IS the gate.** The supplier named a date later than the one we
+ * sold; that is not yet a delay, because we may have the item in ready stock or
+ * another supplier may cover it. Operations answers one question — *can we still
+ * make the promised date?* — and only `new_date` opens
+ * `Call {logistics} — arrange new delivery date`. **The customer is the last to
+ * know, and only when we have tried and failed.**
+ *
+ * **THE PROMISED DATE IS NOT TOUCHED HERE, and nothing in this route can touch
+ * it.** `orders.delivery_date` stays at what was sold (§3 stage 3): every
+ * late / overdue / on-time figure measures against it, so a delay can never be
+ * tidied away by pushing the date. The route writes five columns on the OVERLAY
+ * and never opens `orders` at all — which is why `set_order_date`, the RPC that
+ * exists to correct a date typed wrong at the counter, cannot be reached from
+ * this flow even by accident.
+ *
+ * **The supplier date is validated, not trusted.** The client sends the factory
+ * date the operator was looking at; the server refuses one this order does not
+ * hold (`stock_eta` or any value in `line_etas`). A decision is a fact about ONE
+ * supplier date (S4's rule — an event names the thing it was made about), so a
+ * stale date fails CLOSED: the decision is stored, the engine sees it does not
+ * match the current date, and Delay planning stays open. That is the safe
+ * direction for a gate standing between a customer and a call they should not
+ * receive.
+ */
+orderControlRouter.post("/:id/delay-decision", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = delayDecisionInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const path = issue && issue.path.length > 0 ? issue.path.join(".") : "<root>";
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: `Invalid delay-decision input at ${path}: ${issue?.message ?? "validation failed"}`,
+      },
+      422,
+    );
+  }
+  const { decision, supplierEta, note } = parsed.data;
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data: control, error: readErr } = await sb
+    .from("ops_order_control")
+    .select("stock_eta, line_etas")
+    .eq("order_id", idCheck.data)
+    .maybeSingle();
+  if (readErr) {
+    const m = mapPgError(readErr);
+    return c.json(m.body, m.status);
+  }
+
+  // Every factory date this order actually holds. The overlay is the only place
+  // a supplier date lives (`docs/ORDERS-WORKING-FLOW.md` §2), so this set is the
+  // whole truth about what could be decided ABOUT.
+  const known = new Set<string>();
+  const stockEta = (control as { stock_eta?: string | null } | null)?.stock_eta;
+  if (stockEta) known.add(stockEta);
+  const lineEtas = (control as { line_etas?: Record<string, string> | null } | null)
+    ?.line_etas;
+  if (lineEtas && typeof lineEtas === "object")
+    for (const v of Object.values(lineEtas)) if (v) known.add(String(v));
+
+  if (!known.has(supplierEta)) {
+    return c.json(
+      {
+        error: "delay_eta_unknown",
+        code: "delay_eta_unknown",
+        message:
+          `This order has no supplier ready date of ${supplierEta}` +
+          (known.size > 0
+            ? ` — it holds ${[...known].sort().join(", ")}. Reload the order and decide again.`
+            : ` — no supplier has given a ready date yet. Record the ready date first.`),
+      },
+      422,
+    );
+  }
+
+  const { data, error } = await sb
+    .from("ops_order_control")
+    .upsert(
+      {
+        order_id: idCheck.data,
+        delay_decision: decision,
+        delay_decision_eta: supplierEta,
+        delay_decision_at: new Date().toISOString(),
+        delay_decision_by: auth.id,
+        delay_decision_note: note ?? null,
+        updated_by: auth.id,
+      },
+      { onConflict: "order_id" },
+    )
+    .select(CONTROL_COLUMNS)
+    .single();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+
+  // The decision is the one thing about this order a human will want to find
+  // again months later ("why was the customer never told?"). The 0211 trigger
+  // does not watch these columns, so the sentence is written here — FAIL-SOFT,
+  // the same door and the same rule as T4/T6/C9: an audit hiccup must never
+  // undo a decision the operator already made.
+  await sb.rpc("operation_add_annotation", {
+    p_order_id: idCheck.data,
+    p_content:
+      decision === "keep"
+        ? `Delay planning — supplier ready ${supplierEta}, we can still make the promised date${note ? ` (${note})` : ""}`
+        : `Delay planning — supplier ready ${supplierEta}, we cannot make the promised date${note ? ` (${note})` : ""}`,
+    p_tag: null,
+  });
+
+  return c.json({ control: data });
 });
 
 /**
