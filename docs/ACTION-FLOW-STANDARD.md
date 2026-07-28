@@ -216,6 +216,24 @@ reading all of it.
 to anybody. Two computations may not describe the same fixable gap — if the engine already
 raises it, the record states nothing.
 
+### A follow-up is NOT an action
+
+**Ruled by Loo, 2026-07-28.** Two different things, and the portal has always had both.
+
+| | What it is | Who makes it |
+|---|---|---|
+| **Action** | work the system computed from stored data, carrying all six of Law 2's things | **only the action engine** |
+| **Follow-up** | a reminder or an assignment one human wrote for another | a person |
+
+**They may never appear in the same list.** A list that mixes them has two kinds of row with
+two different lifecycles: one closes when the system measures it, the other closes when a
+person says so. Put them together and staff learn that some rows go away by themselves and
+some do not — after which they trust neither.
+
+This is not a restriction on follow-ups. They are how a human passes something to another
+human, which the engine cannot do and should not try to. They keep their own home, their own
+words and their own way of closing.
+
 ## What this replaces
 
 - The single next-action ladder as a business rule (it stays as Layer 2 input).
