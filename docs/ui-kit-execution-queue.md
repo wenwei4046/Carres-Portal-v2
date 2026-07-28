@@ -42,6 +42,7 @@ deliverable is Foundation Components, not a better document.
 | **T3** | **Jess uses it for one day** | ⏳ **NEXT — blocked on a deploy** |
 | **T4** | Freeze as Detail Blueprint v1 → Delivery/Payment/Purchase/Service Detail inherit | ⏳ after T3 |
 | **D0.3** | Delete the retired design docs + the `carres-design` skill | ⏳ after the new kit is proven |
+| **D0.4** | **Retire `CARRES_ORDER_PORTAL_SPEC.md` completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ⏳ **its own chat** (Loo 2026-07-28) |
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — freezes Q1/Q3/Q4 | ⏳ |
 | **D0.5b** | Foundation components, Radix | ⏳ |
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ⏳ |
@@ -53,6 +54,66 @@ deliverable is Foundation Components, not a better document.
 
 **Order is not negotiable for D0.5 → D6.** Rebuilding a page before the
 components exist means hand-rolling it twice.
+
+---
+
+## D0.4 — retire `CARRES_ORDER_PORTAL_SPEC.md`, in full
+
+**One chat, nothing else in it.** Loo ruled 2026-07-28: *"Retire it completely. Do NOT leave
+it as an archive or historical authority."*
+
+**Why it has to go.** Its third line still says it OUTRANKS the kit — *"唯一真相。冲突以本文件
+为准（UI-KIT.md / STATUS-STANDARD.md 是它的实现细则，抵触处以本文件覆盖）"* — while the project
+has frozen the opposite: UI → `UI-KIT.md` · wording → `COPY-STANDARD.md` · order flow →
+`ORDERS-WORKING-FLOW.md` · purchasing → `PURCHASING-WORKING-FLOW.md`. It teaches cream
+`#F5F1EA`, flame buttons, 44px rows, a `Chase Now` panel and the whole retired NEXT verb list
+(`Order PO` · `Chase supplier` · `Assign logistic` · `Chase logistic` · `Confirm`). A chat that
+opens it builds the wrong thing while believing it followed a locked spec. **Its purchasing
+section (§14.6) was already deleted on 2026-07-28** — it named a duty holder who never
+existed, the retired Mon/Thu cadence and a migration number that is not in the tracker.
+
+**Inbound pointers — exactly three** (measured 2026-07-28, `CLAUDE.md` does NOT reference it):
+`docs/OPS-BUILD-BRIEF.md` · `docs/STATUS-STANDARD.md` · `docs/UI-KIT.md`.
+
+**The inventory — decided BEFORE deleting, so nothing is lost by accident.** Every section is
+one of three: `RETIRED` (the current law already overwrote it — delete, move nothing),
+`MOVE` (still true, has no home yet), `CHECK` (probably already homed — prove it, then delete).
+
+| § | What it holds | Verdict |
+|---|---|---|
+| 0 | Jess's working rules (3 options · 华语 · deploy gates · check memory first) | **MOVE** → `CLAUDE.md` §15 + the index's standing laws, whatever is not already there |
+| 1–6 | cream · flame · type scale · buttons · components · page layout | **RETIRED** by UI-KIT §2–§8 |
+| 7 | no-KPI + `Chase Now` panel | **RETIRED** by UI-KIT §1.4 and C2's drawer |
+| 8 | status icon standard (dial · checklist mark) | **CHECK** → `STATUS-STANDARD.md`. Its NEXT-verb list is retired outright |
+| 9 | Items tab — six columns, `+ GRN`, and the dead words `Reserved` · `Received` · `Book in` | **MOVE** — the dead words belong in COPY-STANDARD's banned list; the tab layout is D7 |
+| 10 | Balance tab | **CHECK** → the money rules now live in `orderMoney` + C5/C9 |
+| 11 | **storage rates — LIVE BUSINESS RULES** (MS/BF RM150/month · Sofa free 14 days then RM200) | **CHECK, and this is the one that must not be lost.** They are in `computeStorageFee` and CLAUDE.md; confirm before deleting |
+| 12 | Delivery tab | **RETIRED** by the ① Delivery line (D1 · T1-T11) |
+| 13 | WhatsApp templates | **MOVE** → the module flow that sends them |
+| 14 · 14.5 | List page · staff assignment (LIVE, PR #188-194) | **MOVE** → `ORDERS-WORKING-FLOW.md` |
+| 14.6 | purchasing | **already deleted 2026-07-28** |
+| 14.7 | Master import reconciliation | **CHECK** → `docs/autocount-import-contract.md` |
+| 16 · Build order | deploy gates + a build order that is finished | **RETIRED** |
+
+**Build:**
+1. Work the table above top to bottom. A `MOVE` writes into the target file by **overwriting**
+   the section it belongs in — never appended as a second version, never annotated
+   "from the old spec".
+2. **Prove nothing was lost.** For every `CHECK` row, quote the line in the target file that
+   already carries it. A `CHECK` with no quote is a `MOVE`.
+3. `git rm docs/CARRES_ORDER_PORTAL_SPEC.md`.
+4. Kill the three pointers. **Do not replace them with "see the archive"** — there is no
+   archive; point at the real home or delete the sentence.
+5. `grep -rn "CARRES_ORDER_PORTAL_SPEC"` over the whole repo returns **0**.
+
+**No migration. No code change** (except any banned word this uncovers, which is a separate
+card, not this one).
+**Done when:** the file is gone, the grep is 0, and every storage rate and staff-assignment
+rule it held can be quoted from its new home.
+
+**The trap this card exists to avoid:** deleting it fast and losing the storage rates, or —
+worse — leaving it "as history", which is how it survived the 2026-07-27 purge in the first
+place. A document nobody dares delete keeps being read.
 
 ---
 
