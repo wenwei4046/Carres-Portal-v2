@@ -82,9 +82,25 @@ dosRouter.post("/sign-upload", async (c) => {
   // added — supplier_mark_delivered now requires the signed DO file (migration
   // 0094). Storage RLS scopes supplier writes to POs whose supplier_id matches
   // app_supplier_id(); cross-supplier uploads 403 at the RLS layer.
-  if (!["operation", "principal", "partner", "supplier"].includes(auth.role)) {
+  // R6 (0302): warehouse role added — the third-party warehouse files its own
+  // receiving, and a receiving is a DO photo plus (when something is wrong) the
+  // claim photos R2 demands. Storage RLS scopes warehouse writes to POs whose
+  // `warehouse_id` matches `app_warehouse_id()`, so a warehouse cannot upload
+  // against a PO that was never coming to them even though this gate admits
+  // them — the same shape as the partner and supplier branches above.
+  if (
+    !["operation", "principal", "partner", "supplier", "warehouse"].includes(
+      auth.role,
+    )
+  ) {
     throw new HTTPException(403, {
-      message: "operation, principal, partner, or supplier role required",
+      message:
+        "operation, principal, partner, supplier, or warehouse role required",
+    });
+  }
+  if (auth.role === "warehouse" && !auth.warehouseId) {
+    throw new HTTPException(403, {
+      message: "Warehouse role requires warehouse_id in JWT",
     });
   }
   if (auth.role === "partner" && !auth.partnerId) {

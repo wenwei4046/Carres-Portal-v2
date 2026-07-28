@@ -69,6 +69,21 @@ hrTeamRouter.get("/", requireHr, async (c) => {
     // Additive payload only — the Team page renders fine without it.
   }
 
+  // R6 — the warehouses the Add-user form picks from. Read here rather than
+  // through the ops route, which is operation/principal only: HR is the account
+  // door, so HR must be able to see the list it is binding a login to. The
+  // `warehouses_read_all` policy already admits any signed-in user, so nothing
+  // is widened — and the same additive discipline applies as the duties block
+  // above: a failure must not turn a working Team page into a 500.
+  try {
+    const whs = await sb.from("warehouses").select("id, name").order("name");
+    if (!whs.error) {
+      source.warehouses = (whs.data ?? []) as HrTeamSource["warehouses"];
+    }
+  } catch {
+    // Additive payload only.
+  }
+
   return c.json(source);
 });
 
@@ -320,9 +335,26 @@ hrTeamRouter.post("/accounts", requireHr, async (c) => {
     if (partnerId) await admin.from("delivery_partners").delete().eq("id", partnerId);
   };
 
+  // R6 — a warehouse login is bound to a warehouse that already exists, so
+  // there is no org row to create and nothing to roll back. It is verified
+  // here rather than trusted: a bad id would otherwise reach the `app_users`
+  // CHECK as a 500 after the auth user had already been created.
+  if (body.role === "warehouse") {
+    const wh = await admin
+      .from("warehouses")
+      .select("id")
+      .eq("id", body.warehouseId!)
+      .maybeSingle();
+    if (!wh.data) {
+      throw new HTTPException(422, { message: "warehouse not found" });
+    }
+  }
+
   const appMetadata: Record<string, string> = { role: body.role };
   if (supplierId) appMetadata.supplier_id = supplierId;
   if (partnerId) appMetadata.partner_id = partnerId;
+  if (body.role === "warehouse" && body.warehouseId)
+    appMetadata.warehouse_id = body.warehouseId;
 
   const created = await admin.auth.admin.createUser({
     email: body.email,
@@ -375,6 +407,7 @@ hrTeamRouter.post("/accounts", requireHr, async (c) => {
     status: "active",
     supplier_id: supplierId,
     partner_id: partnerId,
+    warehouse_id: body.role === "warehouse" ? body.warehouseId! : null,
     created_by: actor.id,
     staff_code: staffCode,
     position_id: internal ? (body.positionId ?? null) : null,

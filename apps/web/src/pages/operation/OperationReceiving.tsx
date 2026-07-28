@@ -8,6 +8,7 @@ import {
 } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import ReceivePOModal from "./components/ReceivePOModal";
+import WarehouseReceiptsPanel from "./components/WarehouseReceiptsPanel";
 import PurchasingTabs from "./PurchasingTabs";
 
 /**
@@ -235,6 +236,14 @@ export default function OperationReceiving() {
           className="w-[230px] px-3 py-2 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
         />
       </div>
+
+      {/* R6 — what the warehouse counted and Carres has not checked in yet.
+          Renders NOTHING when nothing is waiting, so it costs zero permanent
+          pixels and cannot be scrolled past out of habit. It sits above the
+          queue because a count already on file is work the operator can finish
+          in one click, while every row below still needs the goods in front of
+          them. */}
+      <WarehouseReceiptsPanel />
 
       {/* Status tabs */}
       <div

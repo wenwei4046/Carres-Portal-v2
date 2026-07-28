@@ -37,6 +37,8 @@ export const APP_ROLES = [
   "finance",
   "bd",
   "hr",
+  // R6 (0301) — the third-party warehouse files its own receiving.
+  "warehouse",
 ] as const;
 export type AppRole = (typeof APP_ROLES)[number];
 
@@ -56,6 +58,10 @@ export const CREATABLE_APP_ROLES = [
   "finance",
   "bd",
   "hr",
+  // R6 — `warehouse` is deliberately ABSENT. HR → Team is THE account door for
+  // every non-store login (Loo, 2026-07-25), and supplier + partner — the other
+  // two external roles — are already minted there. A second door for the same
+  // account is how two of them drift.
 ] as const;
 export type CreatableAppRole = (typeof CREATABLE_APP_ROLES)[number];
 

@@ -35,7 +35,10 @@ type Role =
   | "supplier"
   | "principal"
   | "bd"
-  | "hr";
+  | "hr"
+  // R6 — present so the two Role unions stay assignable; deliberately NOT in
+  // ALLOWED below. An invoice is money, and a warehouse never sees money.
+  | "warehouse";
 
 const ALLOWED: ReadonlySet<Role> = new Set([
   "operation",

@@ -104,6 +104,11 @@ export const HR_TEAM_CREATABLE_ROLES = [
   "bd",
   "supplier",
   "partner",
+  // R6 (0301) — the THIRD external role, minted at the same door as the other
+  // two. Unlike them it creates no org row: a warehouse already exists as
+  // master data, and minting one as a side effect of making a login is how a
+  // second "Klang" gets into the stock register.
+  "warehouse",
 ] as const;
 export type HrTeamCreatableRole = (typeof HR_TEAM_CREATABLE_ROLES)[number];
 
@@ -124,6 +129,8 @@ export const hrCreateTeamAccountInput = z
     /** Internal roles only — registry position set at hire. */
     positionId: z.string().uuid().optional().nullable(),
     reportsToUserId: z.string().uuid().optional().nullable(),
+    /** R6 — which EXISTING warehouse a `warehouse` login belongs to. */
+    warehouseId: z.string().uuid().optional(),
   })
   .superRefine((v, ctx) => {
     if ((v.role === "supplier" || v.role === "partner") && !v.companyName) {
@@ -133,7 +140,24 @@ export const hrCreateTeamAccountInput = z
         message: `companyName is required for role=${v.role}`,
       });
     }
-    const internal = !["supplier", "partner"].includes(v.role);
+    // The `app_users` CHECK (0302) says the warehouse id and the role imply
+    // each other. Saying it here too turns a database error into a sentence the
+    // person filling the form can act on.
+    if (v.role === "warehouse" && !v.warehouseId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["warehouseId"],
+        message: "Pick the warehouse this login belongs to",
+      });
+    }
+    if (v.role !== "warehouse" && v.warehouseId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["warehouseId"],
+        message: "Only a warehouse login belongs to a warehouse",
+      });
+    }
+    const internal = !["supplier", "partner", "warehouse"].includes(v.role);
     if (!internal && (v.positionId || v.reportsToUserId)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -232,6 +256,10 @@ export interface HrTeamSource {
    *  every gate keeps running on the legacy email fallback. */
   duties?: OrgDuty[];
   positionDuties?: { positionId: string; dutyKey: string }[];
+  /** R6 — the warehouses a `warehouse` login can be bound to. Absent on a
+   *  pre-R6 server; the form then shows an empty picker and the create is
+   *  refused with a sentence rather than binding a login to nothing. */
+  warehouses?: { id: string; name: string }[];
 }
 
 /** One grantable duty key (0260). `name` is what HR reads on the checkbox. */

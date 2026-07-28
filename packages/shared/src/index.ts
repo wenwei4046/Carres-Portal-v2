@@ -890,6 +890,36 @@ export {
   type SupplierClaimCloseProblem,
 } from "./supplier-claim";
 
+// R6 · The warehouse files its own receiving — a queued call to R1's engine
+export {
+  WAREHOUSE_RECEIPT_STATUS_LABEL,
+  WAREHOUSE_RECEIPT_PROBLEM_TEXT,
+  WAREHOUSE_DO_NUMBER_MIN,
+  warehouseReceiptStatusLabel,
+  warehouseReceiptProblems,
+  warehouseReceiptProblemText,
+  warehouseReceiptTotals,
+  warehouseReceiptSummary,
+  warehouseReceiptOpensClaims,
+  countedOnLine,
+  type WarehouseReceiptStatus,
+  type WarehouseReceiptDraft,
+  type WarehouseReceiptLineDraft,
+  type WarehouseReceiptProblem,
+  type WarehouseReceiptLine,
+  type WarehouseReceiptRow,
+  type WarehouseReceiptTotals,
+  type WarehouseIncomingLine,
+  type WarehouseIncomingPo,
+  type WarehouseIncomingResponse,
+} from "./warehouse-receipt";
+export {
+  warehouseSubmitReceiptInput,
+  warehouseReceiptReturnInput,
+  type WarehouseSubmitReceiptInput,
+  type WarehouseReceiptReturnInput,
+} from "./schemas/warehouse";
+
 // R4 · Problem stock is quarantined — on hold · returned · written off
 export {
   OPS_STOCK_STATUS_LABEL,

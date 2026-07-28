@@ -7,9 +7,14 @@ import type { DefaultFreeGift } from "./free-gift";
 import type { BundleComponent, BundleSlot } from "./product-bundle";
 import type { RuleTarget } from "./rule-target";
 
+// Mirrors the `app_role` enum. `hr` was added by 0244 and never reached this
+// list — the drift was invisible until R6 (0301) added `warehouse` and the two
+// Role types stopped assigning to each other. Both are here now, so this type
+// says what the database actually holds.
 export type Role =
   | "principal" | "dealer" | "salesperson" | "showroom"
-  | "operation" | "supplier" | "partner" | "finance" | "bd";
+  | "operation" | "supplier" | "partner" | "finance" | "bd" | "hr"
+  | "warehouse";
 
 export type OrderStatus       = "place" | "proceed_order" | "delivered" | "cancelled";
 // `in_production` and `waiting` added in migration 0028 (v3-S3).

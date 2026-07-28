@@ -14,6 +14,7 @@ import OperationApp from "@/pages/operation/OperationApp";
 import PartnerApp from "@/pages/partner/PartnerApp";
 import FinanceApp from "@/pages/finance/FinanceApp";
 import SupplierApp from "@/pages/supplier/SupplierApp";
+import WarehouseApp from "@/pages/warehouse/WarehouseApp";
 import BDApp from "@/pages/bd/BDApp";
 import HrApp from "@/pages/hr/HrApp";
 import PickupEventPrintPage from "@/pages/print/PickupEventPrintPage";
@@ -40,6 +41,9 @@ function HomeRedirect() {
   if (role === "partner") return <Navigate to="/delivery-partner" replace />;
   if (role === "finance") return <Navigate to="/finance" replace />;
   if (role === "supplier") return <Navigate to="/supplier" replace />;
+  // R6 — the third external role lands on the only thing it has: what is
+  // coming to its own warehouse.
+  if (role === "warehouse") return <Navigate to="/warehouse" replace />;
   if (role === "bd") return <Navigate to="/bd" replace />;
   if (role === "hr") return <Navigate to="/hr" replace />;
   if (role === "dealer" || role === "salesperson" || role === "showroom") return <Navigate to="/dealer" replace />;
@@ -141,6 +145,19 @@ export default function App() {
             <RequireAuth>
               <RequireRole roles={["supplier"]}>
                 <SupplierApp />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        {/* R6 — the warehouse portal. Role-gated here AND behind every RPC it
+            calls (0302 gates on app_role() = 'warehouse'), so a route guard
+            slipping is not enough to reach a single row. */}
+        <Route
+          path="/warehouse/*"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["warehouse"]}>
+                <WarehouseApp />
               </RequireRole>
             </RequireAuth>
           }
