@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { poReceivingProgress, type PoReceivingState } from "@carres/shared";
 import {
   useOperationPos,
@@ -7,6 +7,9 @@ import {
   type SupplierRow,
 } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
+import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
+import { SectionCard, SectionBand } from "@/components/SectionPanel";
+import FacetRow, { EmptyFacetHint } from "@/components/FacetRow";
 import ReceivePOModal from "./components/ReceivePOModal";
 import WarehouseReceiptsPanel from "./components/WarehouseReceiptsPanel";
 import PurchasingTabs from "./PurchasingTabs";
@@ -32,10 +35,31 @@ import PurchasingTabs from "./PurchasingTabs";
  * "Receive → / Done". A PROGRESS column reads the four per-line numbers through
  * the shared `poReceivingProgress` and says, in words, where the delivery is —
  * In transit · Partially received (8/10) · Fully received · Receiving issue —
- * with the outstanding qty underneath it ("2 units pending delivery"). The
- * point of the card: 还有 2 张没到 must be readable from this list without
- * opening anything. The supplier's own Stage pill stays — it is a different
- * fact (what the supplier says) from what we actually counted.
+ * with the outstanding qty underneath it ("2 units pending delivery").
+ *
+ * 2026-07-28 (card P2, the Receiving half): this tab gets the facet rail and
+ * the §8.2 interaction law it has never had.
+ *
+ * **Which of §8.2's two shapes is this page?** A QUEUE-TILE page, not a stage
+ * picker. The test §8.2 gives is the empty state, not the look: To Order is a
+ * stage page because clearing its stage renders a blank screen — there is no
+ * "all three at once" body. Receiving renders ONE table for every combination
+ * of filters, and "nothing selected" is the `All` tab, which is a legal and
+ * genuinely useful view (it is how an operator finds one PO). So every tile
+ * here toggles, and every pick is an ✕-able chip.
+ *
+ * The rail carries three groups, in §8.4's order — the module's own queue name
+ * first, danger first inside a group:
+ *
+ *   Today's work  ·  Check in            the ONE action of PURCHASING-WORKING-FLOW
+ *                                        §7 that lives on this tab. Counted from
+ *                                        QUANTITIES (§9), never from a status word
+ *   Progress      ·  the R1 states       facts this page already computes
+ *   Supplier      ·  per factory         the same facet the To Order tab carries
+ *
+ * No word on this page changed. `Receive →` is banned (`Receive` as a verb) and
+ * the three To Order stage cells are worded off-dictionary; both belong to R8's
+ * sweep and neither is touched here — a rename is not a click behaviour.
  */
 
 type Tab = "to_receive" | "received" | "all";
@@ -89,10 +113,82 @@ const PROGRESS_PILL: Record<PoReceivingState, string> = {
   receiving_issue: "pill-overdue",
 };
 
+/**
+ * P2 — the PROGRESS facet rows. Same four state words the row's pill already
+ * prints; the row adds `(8/10)` because it is talking about ONE PO, and a facet
+ * holds many, so it names the state bare. Nothing new is invented here — the
+ * words are `packages/shared/po-receiving.ts`'s own.
+ *
+ * Order is §8.4's: the danger group first. A receiving issue is the only one of
+ * the four where the supplier still owes good units AND something has already
+ * gone wrong, so it leads.
+ */
+const PROGRESS_FACETS: {
+  state: PoReceivingState;
+  label: string;
+  tone?: "danger";
+  title: string;
+}[] = [
+  {
+    state: "receiving_issue",
+    label: "Receiving issue",
+    tone: "danger",
+    title:
+      "Something arrived damaged or as the wrong item, and the supplier still owes good units.",
+  },
+  {
+    state: "partially_received",
+    label: "Partially received",
+    title: "Some good units are booked in and the rest are still coming.",
+  },
+  {
+    state: "in_transit",
+    label: "In transit",
+    title: "Nothing has been counted in against this PO yet.",
+  },
+  {
+    state: "fully_received",
+    label: "Fully received",
+    title: "Every unit ordered has been counted in — nothing is outstanding.",
+  },
+];
+
+function toggleInSet<T>(cur: Set<T>, v: T): Set<T> {
+  const next = new Set(cur);
+  if (next.has(v)) next.delete(v);
+  else next.add(v);
+  return next;
+}
+
+/** Everything the drawer must give back on close (§8.2, last line). */
+interface ReceivingListState {
+  tab: Tab;
+  search: string;
+  checkInOnly: boolean;
+  progressFilter: Set<PoReceivingState>;
+  supplierFilter: Set<string>;
+  facetScrollTop: number;
+}
+
 export default function OperationReceiving() {
   const [tab, setTab] = useState<Tab>("to_receive");
   const [search, setSearch] = useState("");
   const [receivePoId, setReceivePoId] = useState<string | null>(null);
+
+  // P2 — the facet rail this tab has never had.
+  const [facetOpen, setFacetOpen] = useState(true);
+  const [checkInOnly, setCheckInOnly] = useState(false);
+  const [progressFilter, setProgressFilter] = useState<Set<PoReceivingState>>(
+    () => new Set(),
+  );
+  const [supplierFilter, setSupplierFilter] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [collapsedFacet, setCollapsedFacet] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const toggleFacet = (key: string) =>
+    setCollapsedFacet((cur) => toggleInSet(cur, key));
 
   const { data, isLoading, isError, error, refetch } = useOperationPos();
   const suppliersQ = useOperationSuppliers();
@@ -150,18 +246,166 @@ export default function OperationReceiving() {
     return c;
   }, [live]);
 
+  /** Every PO's R1 progress, computed once — the facet counts and the row's
+   *  own pill read the SAME object, so a queue count and its list cannot
+   *  disagree (`docs/PURCHASING-WORKING-FLOW.md` §3). */
+  const progressById = useMemo(() => {
+    const m = new Map<string, ReturnType<typeof poReceivingProgress>>();
+    for (const p of live) m.set(p.id, poReceivingProgress(p.purchase_order_lines));
+    return m;
+  }, [live]);
+
+  /** The rows the status TAB scopes — the facet counts are taken over exactly
+   *  this set, so clicking a tile always shows the number it printed. */
+  const tabScoped = useMemo(
+    () =>
+      live.filter((p) => {
+        if (tab === "to_receive" && p.status === "received") return false;
+        if (tab === "received" && p.status !== "received") return false;
+        return true;
+      }),
+    [live, tab],
+  );
+
+  // ── Facet counts ───────────────────────────────────────────────────────────
+  //
+  // `Check in` is the one action of PURCHASING-WORKING-FLOW §7 that lives on
+  // this tab, and §9 is explicit about how it is counted: "A PO is finished by
+  // QUANTITY, never by the existence of a receiving record." So the tile counts
+  // POs that still owe units, read off `poReceivingProgress`, and NOT the
+  // `status` word the tabs read.
+  const checkInCount = useMemo(
+    () =>
+      tabScoped.filter((p) => (progressById.get(p.id)?.pendingDelivery ?? 0) > 0)
+        .length,
+    [tabScoped, progressById],
+  );
+
+  const progressCounts = useMemo(() => {
+    const m = new Map<PoReceivingState, number>();
+    for (const p of tabScoped) {
+      const st = progressById.get(p.id)?.state;
+      if (st) m.set(st, (m.get(st) ?? 0) + 1);
+    }
+    return m;
+  }, [tabScoped, progressById]);
+
+  const supplierFacets = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of tabScoped) m.set(p.supplier_id, (m.get(p.supplier_id) ?? 0) + 1);
+    return [...m.entries()]
+      .map(([id, n]) => ({ id, n, name: supplierById.get(id)?.name ?? "—" }))
+      .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+  }, [tabScoped, supplierById]);
+
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return live.filter((p) => {
-      if (tab === "to_receive" && p.status === "received") return false;
-      if (tab === "received" && p.status !== "received") return false;
+    return tabScoped.filter((p) => {
+      const progress = progressById.get(p.id);
+      if (checkInOnly && (progress?.pendingDelivery ?? 0) <= 0) return false;
+      if (progressFilter.size > 0 && (!progress || !progressFilter.has(progress.state)))
+        return false;
+      if (supplierFilter.size > 0 && !supplierFilter.has(p.supplier_id)) return false;
       if (!q) return true;
       const supName = supplierById.get(p.supplier_id)?.name ?? "";
       return (
         p.id.toLowerCase().includes(q) || supName.toLowerCase().includes(q)
       );
     });
-  }, [live, tab, search, supplierById]);
+  }, [
+    tabScoped,
+    progressById,
+    checkInOnly,
+    progressFilter,
+    supplierFilter,
+    search,
+    supplierById,
+  ]);
+
+  // ── Active-filter chips (§8.2: two tiles picked → two ✕-able chips) ────────
+  const activeChips: ActiveChip[] = [];
+  if (checkInOnly)
+    activeChips.push({ label: "Check in", onClear: () => setCheckInOnly(false) });
+  for (const f of PROGRESS_FACETS)
+    if (progressFilter.has(f.state))
+      activeChips.push({
+        label: f.label,
+        onClear: () =>
+          setProgressFilter((cur) => toggleInSet(cur, f.state)),
+      });
+  for (const id of supplierFilter)
+    activeChips.push({
+      label: `Supplier: ${supplierById.get(id)?.name ?? "—"}`,
+      onClear: () => setSupplierFilter((cur) => toggleInSet(cur, id)),
+    });
+
+  const anyFilter =
+    checkInOnly ||
+    progressFilter.size > 0 ||
+    supplierFilter.size > 0 ||
+    search.trim() !== "";
+  const resetFilters = () => {
+    setCheckInOnly(false);
+    setProgressFilter(new Set());
+    setSupplierFilter(new Set());
+    setSearch("");
+  };
+
+  // ── §8.2 · closing the drawer gives the list back ──────────────────────────
+  //
+  // The one overlay this tab opens is ReceivePOModal (the Check in form). It
+  // closes by invalidating the PO list, which re-renders the facet rail — and a
+  // shorter rail makes the browser clamp its scrollTop before React has
+  // finished. Same shape as the To Order half, written here rather than shared:
+  // the behaviour belongs in `PageShell` / `DataTable` and that is D0.5c on
+  // line ⑧, which the P2 card explicitly reserves.
+  const facetInnerRef = useRef<HTMLDivElement | null>(null);
+  const getFacetScroller = () =>
+    facetInnerRef.current?.closest<HTMLElement>(
+      '[data-testid="listshell-facet"]',
+    ) ?? null;
+  const listStateBeforeDrawer = useRef<ReceivingListState | null>(null);
+  const pendingFacetScroll = useRef<number | null>(null);
+
+  const openReceive = (poId: string) => {
+    listStateBeforeDrawer.current = {
+      tab,
+      search,
+      checkInOnly,
+      progressFilter,
+      supplierFilter,
+      facetScrollTop: getFacetScroller()?.scrollTop ?? 0,
+    };
+    setReceivePoId(poId);
+  };
+
+  const closeReceive = () => {
+    setReceivePoId(null);
+    const s = listStateBeforeDrawer.current;
+    listStateBeforeDrawer.current = null;
+    if (!s) return;
+    setTab(s.tab);
+    setSearch(s.search);
+    setCheckInOnly(s.checkInOnly);
+    setProgressFilter(s.progressFilter);
+    setSupplierFilter(s.supplierFilter);
+    pendingFacetScroll.current = s.facetScrollTop;
+  };
+
+  // Re-apply the scroll after every render until it sticks. One assignment is
+  // not enough: the refetch that runs on close lands a frame or two later and
+  // re-lays the rail out underneath it. Gives up once the rail is too short to
+  // hold the old position — a PO that was fully received is genuinely gone.
+  useLayoutEffect(() => {
+    const want = pendingFacetScroll.current;
+    if (want == null) return;
+    const el = getFacetScroller();
+    if (!el) return;
+    el.scrollTop = want;
+    if (el.scrollTop === want || el.scrollHeight - el.clientHeight <= want) {
+      pendingFacetScroll.current = null;
+    }
+  });
 
   const receivePo = receivePoId
     ? live.find((p) => p.id === receivePoId) ?? null
@@ -213,173 +457,299 @@ export default function OperationReceiving() {
     );
   }
 
+  const total = visible.length;
+
   return (
-    <>
+    <div className="h-full flex flex-col">
       <PurchasingTabs />
-      <div className="px-9 py-8 pb-14" data-testid="operation-receiving">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-[18px] flex-wrap">
-        <div>
-          <div className="kicker">HQ · Operations</div>
-          <h1 className="t-h1 font-display mt-1.5">
-            Receiving
-          </h1>
-          <div className="text-[13px] text-base-600 mt-1.5">
-            Receive goods into Carres Klang (GRN). Find the PO, book the units in.
-          </div>
-        </div>
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="PO number or supplier…"
-          className="w-[230px] px-3 py-2 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
-        />
-      </div>
-
-      {/* R6 — what the warehouse counted and Carres has not checked in yet.
-          Renders NOTHING when nothing is waiting, so it costs zero permanent
-          pixels and cannot be scrolled past out of habit. It sits above the
-          queue because a count already on file is work the operator can finish
-          in one click, while every row below still needs the goods in front of
-          them. */}
-      <WarehouseReceiptsPanel />
-
-      {/* Status tabs */}
-      <div
-        className="flex gap-1 p-1 bg-base-100 rounded mb-3.5 w-fit max-w-full overflow-auto"
-        role="tablist"
-        aria-label="Receiving status"
-      >
-        {TABS.map((t) => {
-          const active = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab(t.key)}
-              className={`px-3 py-1.5 text-[12px] rounded cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                active
-                  ? "bg-white text-base-900 font-semibold shadow-sm"
-                  : "text-base-600 font-medium hover:text-base-900"
-              }`}
+      <div className="flex-1 min-h-0">
+        {/* UI-KIT §8.3 module-tab law — the tab bar above IS the title, so the
+            shell renders no breadcrumb and no page title. The kicker + <h1>
+            this page used to draw were ~80px of a 200px list budget spent
+            repeating the word already lit in the tab bar. */}
+        <ListPageShell
+          testId="operation-receiving"
+          facetOpen={facetOpen}
+          onFacetToggle={() => setFacetOpen((v) => !v)}
+          facetToggleTitle="Show filters"
+          toolbar={
+            <div
+              className="flex gap-1 p-1 bg-base-100 rounded w-fit max-w-full overflow-auto"
+              role="tablist"
+              aria-label="Receiving status"
             >
-              <span>{t.label}</span>
-              <span
-                className={`text-[10px] font-mono px-1.5 py-px rounded-full ${
-                  active ? "bg-base-100 text-base-700" : "bg-base-200 text-base-500"
-                }`}
-              >
-                {counts[t.key]}
+              {TABS.map((t) => {
+                const active = tab === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTab(t.key)}
+                    className={`px-3 py-1.5 text-[12px] rounded cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                      active
+                        ? "bg-white text-base-900 font-semibold shadow-sm"
+                        : "text-base-600 font-medium hover:text-base-900"
+                    }`}
+                  >
+                    <span>{t.label}</span>
+                    <span
+                      className={`text-[10px] font-mono px-1.5 py-px rounded-full ${
+                        active
+                          ? "bg-base-100 text-base-700"
+                          : "bg-base-200 text-base-500"
+                      }`}
+                    >
+                      {counts[t.key]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          }
+          toolbarRight={
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="PO number or supplier…"
+              className="w-[230px] px-3 py-1.5 border border-base-200 rounded-full text-[13px] bg-white outline-none focus:border-base-700"
+            />
+          }
+          activeChips={activeChips}
+          footer={
+            <>
+              <span className="tabular-nums">
+                {total} {total === 1 ? "PO" : "POs"}
               </span>
-            </button>
-          );
-        })}
-      </div>
+              {anyFilter && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="hover:text-base-900 transition-colors"
+                >
+                  Reset filters
+                </button>
+              )}
+            </>
+          }
+          facet={
+            <div ref={facetInnerRef} className="flex flex-col gap-2 min-h-0 flex-1">
+              <SectionCard>
+                {/* TODAY'S WORK — the module's own queue name, first (§8.4).
+                    Only ONE of §7's six actions is computable on this tab:
+                    `Check in`. The other five are the To Order tab's, the
+                    Claims tab's, or P3's, and a tile for an action nothing can
+                    count would be a number nobody wrote. The band hides itself
+                    when the count is zero — on the `Received` tab there is by
+                    definition nothing to check in. */}
+                {checkInCount > 0 && (
+                  <>
+                    <SectionBand
+                      title="Today's work"
+                      strong
+                      collapsed={collapsedFacet.has("today")}
+                      onToggle={() => toggleFacet("today")}
+                    />
+                    {!collapsedFacet.has("today") && (
+                      <div>
+                        <FacetRow
+                          testId="receiving-facet-checkin"
+                          label="Check in"
+                          count={checkInCount}
+                          active={checkInOnly}
+                          title="A PO that still owes units — counted from the quantities booked in, never from a status word somebody typed."
+                          onClick={() => setCheckInOnly((v) => !v)}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
 
-      {/* Table */}
-      <div className="bg-white border border-base-200 rounded overflow-auto">
-        <table
-          className="w-full border-collapse text-[13px] [&_tbody_tr:nth-child(even)]:bg-base-100/70"
-          style={{ minWidth: 920 }}
+                {/* PROGRESS — the page's own column, as a filter. Facts, so
+                    they are multi-select: "show me the issues AND the
+                    part-deliveries" is one question, not two. */}
+                <SectionBand
+                  title="Progress"
+                  strong
+                  collapsed={collapsedFacet.has("progress")}
+                  onToggle={() => toggleFacet("progress")}
+                />
+                {!collapsedFacet.has("progress") && (
+                  <div>
+                    {PROGRESS_FACETS.every(
+                      (f) => (progressCounts.get(f.state) ?? 0) === 0,
+                    ) ? (
+                      <EmptyFacetHint text="Nothing here" />
+                    ) : (
+                      PROGRESS_FACETS.map((f) =>
+                        (progressCounts.get(f.state) ?? 0) > 0 ? (
+                          <FacetRow
+                            key={f.state}
+                            testId={`receiving-facet-progress-${f.state}`}
+                            label={f.label}
+                            count={progressCounts.get(f.state) ?? 0}
+                            tone={f.tone}
+                            title={f.title}
+                            active={progressFilter.has(f.state)}
+                            onClick={() =>
+                              setProgressFilter((cur) => toggleInSet(cur, f.state))
+                            }
+                          />
+                        ) : null,
+                      )
+                    )}
+                  </div>
+                )}
+
+                {/* SUPPLIER — the same facet the To Order tab carries, counted
+                    in POs here because a PO is this tab's row. */}
+                <SectionBand
+                  title="Supplier"
+                  strong
+                  collapsed={collapsedFacet.has("supplier")}
+                  onToggle={() => toggleFacet("supplier")}
+                />
+                {!collapsedFacet.has("supplier") && (
+                  <div>
+                    {supplierFacets.length === 0 ? (
+                      <EmptyFacetHint text="Nothing here" />
+                    ) : (
+                      supplierFacets.map((f) => (
+                        <FacetRow
+                          key={f.id}
+                          testId={`receiving-facet-supplier-${f.id}`}
+                          label={f.name}
+                          count={f.n}
+                          active={supplierFilter.has(f.id)}
+                          onClick={() =>
+                            setSupplierFilter((cur) => toggleInSet(cur, f.id))
+                          }
+                        />
+                      ))
+                    )}
+                  </div>
+                )}
+              </SectionCard>
+            </div>
+          }
         >
-          <thead className="bg-base-700 border-b-2 border-primary text-white">
-            <tr>
-              <Th>PO</Th>
-              <Th>Supplier</Th>
-              <Th>Warehouse</Th>
-              <Th>Progress</Th>
-              <Th>ETA</Th>
-              <Th>Stage</Th>
-              <Th> </Th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.length === 0 && (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="p-12 text-center text-[12px] text-base-500"
-                >
-                  No purchase orders in this tab.
-                </td>
-              </tr>
-            )}
-            {visible.map((po) => {
-              const progress = poReceivingProgress(po.purchase_order_lines);
-              const supName = supplierById.get(po.supplier_id)?.name ?? "—";
-              const whName = warehouseById.get(po.warehouse_id)?.name ?? "—";
-              const done = po.status === "received";
-              return (
-                <tr
-                  key={po.id}
-                  className="border-t border-base-100 align-top hover:bg-primary/5"
-                  data-testid="receiving-row"
-                >
-                  <td className="px-4 py-3 whitespace-nowrap font-mono font-semibold text-base-900">
-                    {po.id}
-                  </td>
-                  <td className="px-4 py-3 text-base-800">{supName}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-base-700">
-                    {whName}
-                  </td>
-                  {/* R1 — the whole point of the card: what still has to
-                      arrive is readable here, without opening anything. */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span
-                      className={`pill ${PROGRESS_PILL[progress.state]}`}
-                      data-testid={`receiving-progress-${po.id}`}
-                    >
-                      {progress.label}
-                    </span>
-                    {progress.pendingLabel && (
-                      <div className="text-[11px] text-base-600 mt-1">
-                        {progress.pendingLabel}
-                      </div>
-                    )}
-                    {progress.issueLabel && (
-                      <div className="text-[11px] text-danger mt-0.5">
-                        {progress.issueLabel}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-base-700">
-                    {po.eta_date ? (
-                      fmtDate(po.eta_date)
-                    ) : (
-                      <span className="text-base-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span
-                      className={`pill ${done ? "pill-confirmed" : supStatusPill(po.sup_status)}`}
-                    >
-                      {done ? "Received" : supStatusLabel(po.sup_status)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-right">
-                    {done ? (
-                      <span className="inline-flex items-center gap-1 text-[12px] text-success">
-                        <span className="w-[7px] h-[7px] rounded-full bg-success" />
-                        Done
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setReceivePoId(po.id)}
-                        className="btn-primary text-[11px] py-1.5 px-3"
-                        data-testid={`receive-${po.id}`}
-                      >
-                        Receive →
-                      </button>
-                    )}
-                  </td>
+          {/* R6 — what the warehouse counted and Carres has not checked in yet.
+              Renders NOTHING when nothing is waiting, so it costs zero permanent
+              pixels and cannot be scrolled past out of habit. It sits above the
+              queue because a count already on file is work the operator can
+              finish in one click, while every row below still needs the goods in
+              front of them. */}
+          <div className="shrink-0">
+            <WarehouseReceiptsPanel />
+          </div>
+
+          {/* Table */}
+          <div className="flex-1 min-h-0 bg-white border border-base-200 rounded-t-[12px] rounded-b-none shadow-sm overflow-auto">
+            <table
+              className="w-full border-collapse text-[13px] [&_tbody_tr:nth-child(even)]:bg-base-100/70"
+              style={{ minWidth: 920 }}
+            >
+              <thead className="bg-base-700 border-b-2 border-primary text-white sticky top-0 z-10">
+                <tr>
+                  <Th>PO</Th>
+                  <Th>Supplier</Th>
+                  <Th>Warehouse</Th>
+                  <Th>Progress</Th>
+                  <Th>ETA</Th>
+                  <Th>Stage</Th>
+                  <Th> </Th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {visible.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="p-12 text-center text-[12px] text-base-500"
+                    >
+                      No purchase orders in this tab.
+                    </td>
+                  </tr>
+                )}
+                {visible.map((po) => {
+                  const progress =
+                    progressById.get(po.id) ??
+                    poReceivingProgress(po.purchase_order_lines);
+                  const supName = supplierById.get(po.supplier_id)?.name ?? "—";
+                  const whName = warehouseById.get(po.warehouse_id)?.name ?? "—";
+                  const done = po.status === "received";
+                  return (
+                    <tr
+                      key={po.id}
+                      className="border-t border-base-100 align-top hover:bg-primary/5"
+                      data-testid="receiving-row"
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap font-mono font-semibold text-base-900">
+                        {po.id}
+                      </td>
+                      <td className="px-4 py-3 text-base-800">{supName}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-base-700">
+                        {whName}
+                      </td>
+                      {/* R1 — the whole point of the card: what still has to
+                          arrive is readable here, without opening anything. */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span
+                          className={`pill ${PROGRESS_PILL[progress.state]}`}
+                          data-testid={`receiving-progress-${po.id}`}
+                        >
+                          {progress.label}
+                        </span>
+                        {progress.pendingLabel && (
+                          <div className="text-[11px] text-base-600 mt-1">
+                            {progress.pendingLabel}
+                          </div>
+                        )}
+                        {progress.issueLabel && (
+                          <div className="text-[11px] text-danger mt-0.5">
+                            {progress.issueLabel}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-base-700">
+                        {po.eta_date ? (
+                          fmtDate(po.eta_date)
+                        ) : (
+                          <span className="text-base-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span
+                          className={`pill ${done ? "pill-confirmed" : supStatusPill(po.sup_status)}`}
+                        >
+                          {done ? "Received" : supStatusLabel(po.sup_status)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right">
+                        {done ? (
+                          <span className="inline-flex items-center gap-1 text-[12px] text-success">
+                            <span className="w-[7px] h-[7px] rounded-full bg-success" />
+                            Done
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openReceive(po.id)}
+                            className="btn-primary text-[11px] py-1.5 px-3"
+                            data-testid={`receive-${po.id}`}
+                          >
+                            Receive →
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </ListPageShell>
       </div>
 
       {receivePo && (
@@ -387,11 +757,10 @@ export default function OperationReceiving() {
           po={receivePo}
           supplier={supplierById.get(receivePo.supplier_id)}
           warehouse={warehouseById.get(receivePo.warehouse_id)}
-          onClose={() => setReceivePoId(null)}
+          onClose={closeReceive}
         />
       )}
-      </div>
-    </>
+    </div>
   );
 }
 

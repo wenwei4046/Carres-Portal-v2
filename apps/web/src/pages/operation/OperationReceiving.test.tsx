@@ -140,12 +140,18 @@ describe("OperationReceiving", () => {
     expect(screen.getByText("PO-2002")).toBeInTheDocument();
   });
 
+  // Scoped to the ROWS by P2: the same two names now also head the rail's
+  // Supplier facet, which is correct and makes an unscoped `getByText` ambiguous.
   it("shows the supplier name resolved from the suppliers list", async () => {
     wrap(<OperationReceiving />);
     await waitFor(() => {
       expect(screen.getAllByText("Nice Future").length).toBeGreaterThan(0);
     });
-    expect(screen.getByText("Ohana")).toBeInTheDocument();
+    const names = screen
+      .getAllByTestId("receiving-row")
+      .map((r) => r.querySelectorAll("td")[1]?.textContent);
+    expect(names).toContain("Nice Future");
+    expect(names).toContain("Ohana");
   });
 
   it("P4 — excludes POs bound for an LP-owned warehouse once one exists (GRN = own WH only)", async () => {
@@ -241,5 +247,166 @@ describe("OperationReceiving — R1 progress state", () => {
         "Fully received",
       ),
     );
+  });
+});
+
+/**
+ * P2 — the facet rail and the §8.2 interaction law, on the Receiving tab.
+ *
+ * This tab had NO facet rail and NO filter state before this card, so nothing
+ * here is a regression test: every assertion locks a behaviour that did not
+ * exist. What each one is for:
+ *
+ *  1. `Check in` is the ONE queue tile of PURCHASING-WORKING-FLOW §7 that lives
+ *     on this tab, and §9 says it is counted by QUANTITY. So a PO whose stored
+ *     `status` still reads `open` but whose lines are fully received must NOT be
+ *     in it — the tile and the `To receive` tab are deliberately two different
+ *     questions.
+ *  2. Every tile toggles (Receiving is a queue page, not a stage page: `All` is
+ *     a legal, useful "nothing selected" view, which is §8.2's own test).
+ *  3. Two tiles picked → two ✕-able chips, and one ✕ clears only its own.
+ *  4. Closing the Check in drawer gives the list back — filters and the facet
+ *     rail's scroll position.
+ */
+describe("Receiving · §8.2 the facet rail (card P2)", () => {
+  // P-1 in transit (10 owed) · P-2 partially received (2 owed) ·
+  // P-3 receiving issue (3 owed) · P-4 fully received by QUANTITY while its
+  // stored status still says `open`.
+  const P2_POS = [
+    po({ id: "P-1", supplier_id: "sup-nf", status: "open", sup_status: "in_production", lines: [{ id: "b1", sku: "MS01", qty: 10, received_qty: 0 }] }),
+    po({ id: "P-2", supplier_id: "sup-nf", status: "open", sup_status: "partially_shipped", lines: [{ id: "b2", sku: "MS02", qty: 10, received_qty: 8 }] }),
+    po({ id: "P-3", supplier_id: "sup-oh", status: "open", sup_status: "partially_shipped", lines: [{ id: "b3", sku: "SF01", qty: 6, received_qty: 3, damaged_qty: 2, wrong_item_qty: 1 }] }),
+    po({ id: "P-4", supplier_id: "sup-oh", status: "open", sup_status: "delivered", lines: [{ id: "b4", sku: "BF01", qty: 4, received_qty: 4 }] }),
+  ];
+
+  beforeEach(() => {
+    apiFetchMock.mockImplementation((path: string) => {
+      if (typeof path === "string" && path.includes("/api/operation/suppliers"))
+        return Promise.resolve({ suppliers: SUPPLIERS });
+      if (typeof path === "string" && path.includes("/api/operation/warehouse"))
+        return Promise.resolve({ warehouses: WAREHOUSES });
+      if (typeof path === "string" && path.includes("/api/operation/pos"))
+        return Promise.resolve({ pos: P2_POS });
+      return Promise.resolve({});
+    });
+  });
+
+  const rowIds = () =>
+    screen
+      .getAllByTestId("receiving-row")
+      .map((r) => r.querySelector("td")?.textContent ?? "");
+
+  async function ready() {
+    wrap(<OperationReceiving />);
+    await waitFor(() => expect(screen.getByText("P-1")).toBeInTheDocument());
+  }
+
+  it("counts Check in from the QUANTITIES, not from the PO's status word", async () => {
+    await ready();
+    const tile = screen.getByTestId("receiving-facet-checkin");
+    // 3 of the 4 still owe units. P-4's stored status says `open`; its lines
+    // say nothing is outstanding, and §9 says the quantities win.
+    expect(tile).toHaveTextContent("3");
+
+    fireEvent.click(tile);
+    await waitFor(() => expect(rowIds()).not.toContain("P-4"));
+    expect(rowIds()).toEqual(["P-1", "P-2", "P-3"]);
+  });
+
+  it("clicking the Check in tile again clears it and every PO comes back", async () => {
+    await ready();
+    const tile = screen.getByTestId("receiving-facet-checkin");
+    fireEvent.click(tile);
+    await waitFor(() => expect(tile).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByText("Check in", { selector: "button" })).toBeInTheDocument();
+
+    fireEvent.click(tile);
+    await waitFor(() => expect(tile).toHaveAttribute("aria-pressed", "false"));
+    expect(rowIds()).toEqual(["P-1", "P-2", "P-3", "P-4"]);
+  });
+
+  it("a Progress tile filters the table and clears on a second click", async () => {
+    await ready();
+    const issue = screen.getByTestId("receiving-facet-progress-receiving_issue");
+    fireEvent.click(issue);
+    await waitFor(() => expect(rowIds()).toEqual(["P-3"]));
+
+    fireEvent.click(issue);
+    await waitFor(() => expect(rowIds()).toHaveLength(4));
+  });
+
+  it("two tiles picked shows both queues and two ✕-able chips; one ✕ clears one", async () => {
+    await ready();
+    fireEvent.click(screen.getByTestId("receiving-facet-progress-receiving_issue"));
+    fireEvent.click(screen.getByTestId("receiving-facet-progress-partially_received"));
+    await waitFor(() => expect(rowIds()).toEqual(["P-2", "P-3"]));
+
+    const chips = screen.getByTestId("listshell-active-chips");
+    expect(within(chips).getAllByRole("button")).toHaveLength(2);
+
+    fireEvent.click(within(chips).getByText("Partially received"));
+    await waitFor(() => expect(rowIds()).toEqual(["P-3"]));
+    expect(
+      within(screen.getByTestId("listshell-active-chips")).getAllByRole("button"),
+    ).toHaveLength(1);
+  });
+
+  it("a Supplier tile filters to that factory and clears on a second click", async () => {
+    await ready();
+    const ohana = screen.getByTestId("receiving-facet-supplier-sup-oh");
+    fireEvent.click(ohana);
+    await waitFor(() => expect(rowIds()).toEqual(["P-3", "P-4"]));
+    expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument();
+
+    fireEvent.click(ohana);
+    await waitFor(() => expect(rowIds()).toHaveLength(4));
+    expect(screen.queryByText("Supplier: Ohana")).toBeNull();
+  });
+
+  it("hides the Check in tile on the Received tab — there is nothing to check in", async () => {
+    await ready();
+    expect(screen.getByTestId("receiving-facet-checkin")).toBeInTheDocument();
+    const tabs = await statusTabs();
+    fireEvent.click(tabs[1]); // Received — every one of these POs is `open`
+    await waitFor(() =>
+      expect(screen.queryByTestId("receiving-facet-checkin")).toBeNull(),
+    );
+  });
+
+  it("closing the Check in drawer gives the filter and the rail's scroll back", async () => {
+    await ready();
+    fireEvent.click(screen.getByTestId("receiving-facet-supplier-sup-oh"));
+    await waitFor(() =>
+      expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument(),
+    );
+
+    // jsdom has no layout, so give the rail a real scrollable box first —
+    // otherwise scrollTop can only ever be 0 and the assertion would pass
+    // without proving anything.
+    const rail = screen.getByTestId("listshell-facet");
+    Object.defineProperty(rail, "scrollHeight", { value: 900, configurable: true });
+    Object.defineProperty(rail, "clientHeight", { value: 400, configurable: true });
+    rail.scrollTop = 240;
+
+    fireEvent.click(screen.getByTestId("receive-P-3"));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+    rail.scrollTop = 0; // what a re-render / refetch does to it
+    fireEvent.click(screen.getByLabelText("Close modal"));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument();
+    expect(rowIds()).toEqual(["P-3", "P-4"]);
+    expect(rail.scrollTop).toBe(240);
+  });
+
+  it("Reset filters clears every tile at once", async () => {
+    await ready();
+    fireEvent.click(screen.getByTestId("receiving-facet-checkin"));
+    fireEvent.click(screen.getByTestId("receiving-facet-supplier-sup-oh"));
+    await waitFor(() => expect(rowIds()).toEqual(["P-3"]));
+
+    fireEvent.click(screen.getByText("Reset filters"));
+    await waitFor(() => expect(rowIds()).toHaveLength(4));
+    expect(screen.queryByTestId("listshell-active-chips")).toBeNull();
   });
 });

@@ -366,6 +366,30 @@ when C1 reaches it.
 stored, the role word is the honest answer), and its "Confirm Supplier Stock ETA" phrasing
 (our shape puts the party first: `Call Ohana — confirm ready date`).
 
+### Facet group headings (locked 2026-07-28, after P2-Claims found they had no home)
+
+The facet rail's ORDER is `docs/UI-KIT.md` §8.4; the WORDS are here. A module picks the
+headings it needs from this list and adds none.
+
+| Heading | What sits under it |
+|---|---|
+| `Queues` | the module's open actions — each row's name IS its action, from the dictionary above |
+| `Supplier` · `Logistics` · `Customer` | the outside party |
+| `Problem` | what went wrong (claim type, delay reason, issue type) |
+| `Stock` · `Region` · `Category` · `Store` | facts about the record |
+| `Due` | when it turns late |
+
+**A heading is a NOUN and never an action** — `Queues` holds actions, it is not one.
+A group with one row still gets its heading: a lone unlabelled row reads as a stray.
+
+**Only a fact may be a filter** (the UI type dictionary above), so every heading except
+`Queues` names a fact. That is also why there is no `Status` heading — status is the pill on
+the row, and a facet filtering by it would compete with the queue rows for the same job.
+
+**Need one that is not here?** It is a word, so it is a decision — ask, do not invent. This
+table exists because three headings shipped on a real screen with nothing to check them
+against.
+
 ### The verb dictionary — portal-wide (locked 2026-07-27)
 
 **SIX verbs, six meanings. Every module uses these; no module invents a seventh.**

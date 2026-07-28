@@ -18,7 +18,7 @@
 |---|---|
 | On `main` | `ba7b7798` D0 law + doors · `19cad8e4` merge · `d83ecf98` §1.4 hierarchy · **`c9966ee3` T2 drawer**. **D0.5a is built and NOT yet merged** (branch `claude/carres-portal-d0-5a-b2afe1`) |
 | Deployed to prod | ✅ **YES — corrected 2026-07-28.** `git merge-base --is-ancestor c9966ee3 10f49add` passes, and `10f49add` is the live web tip in CLAUDE.md §17.1 (`index-c7LT9aSQ.js`, PR #492). **T2 has been in front of users since that deploy.** This row previously read *"NOT YET… nobody has seen it in a browser"* — it went stale when a parallel line shipped a bundle containing it. |
-| Next thing that matters | **T3 — Jess uses the reordered drawer for one day.** **No longer blocked**: the deploy it was waiting for already happened. T3 is a Jess task, not a build card. |
+| Next thing that matters | **T3 — Jess uses the reordered drawer for one day.** **No longer blocked**: the deploy it was waiting for already happened. T3 is a Jess task, not a build card. **Deliberately scheduled AFTER the Purchasing line finishes** (Loo, 2026-07-28: P2 · C8b · R8 first). The reason is the point of T3 — it tests whether the Information Hierarchy helps, and a review run while three chats are still changing screens measures the churn instead of the hierarchy. **Do not offer T3 to a chat before R8 has merged**, and do not read the delay as T3 being optional. |
 
 **The one-sentence reason this line exists.** The kit was frozen once already
 (2026-07-16) with the same claim of being the only design document, and the
@@ -44,7 +44,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.3** | Delete the retired design docs + the `carres-design` skill | ⏳ after the new kit is proven |
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
-| **D0.5b** | Foundation components, Radix | ⏳ **GATED (PM, 2026-07-28)** — starts once Q1 · Q3 · Q4 are frozen on `/ui`. **T3 runs in parallel, not in series** |
+| **D0.5b** | Foundation components, Radix | ⏳ **GATED (PM, 2026-07-28)** — starts once Q1 · Q3 · Q4 are frozen on `/ui`. **T3 does not gate it** — the two business validations run beside each other, and T3 has a schedule of its own (see the row above: after R8) |
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ **ready to build** |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
@@ -214,10 +214,16 @@ moves whichever way they go (see D0.5a above).
 ```
 D0.5a ✅ built
    ├── Q1 · Q3 · Q4 frozen on /ui   ← business, blocks D0.5b
-   └── T3 Jess uses the drawer      ← business, runs in PARALLEL, blocks T4
-                                        (never D0.5b)
+   └── T3 Jess uses the drawer      ← business, blocks T4 and never D0.5b;
+                                        its own schedule says after R8
 D0.5b  starts once the three are frozen
 ```
+
+**Two rulings about T3 met here and both survive** — the PM's *"T3 may run in
+parallel"* is about SEQUENCING (T3 is not in front of D0.5b), and Loo's row
+above is about TIMING (do not hand T3 to a chat until the Purchasing line stops
+changing screens under Jess). Neither cancels the other: T3 does not gate the
+freeze or D0.5b, and it still waits for R8.
 
 **D0.5b is gated on the freeze and on nothing else.** Not on T3, and not on a
 migration — Radix primitives carry behaviour, and behaviour does not wait for a

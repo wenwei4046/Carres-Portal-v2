@@ -3792,3 +3792,114 @@ lands the component ("when it lands on `/ui`") and marks §9 *"Written by D0.5a"
 the index, so the index row was narrowed to what it means: **D0.6 owns the Reference-Review
 principles and the mirror's claims**, and a D-card still writes the chapter the law assigns it.
 `design-standard.ts` was **not touched** — it is D0.6's.
+
+---
+
+## 2026-07-28 · Purchasing P2 (Claims half) — the Claims tab gets the portal's ONE list behaviour · PR #494 · no migration · DEPLOYED
+
+**Merge `a7df6291`** · web `index-bGVCSQpH.js` (carres-portal `d5b1f5f5` + carres-pos `95a00cdb`,
+both `--branch=main`; `wrangler pages deployment list` names Production/main source **`a7df629`**
+the newest writer on BOTH projects) · **no api deploy** —
+`git diff 23acbebd..HEAD -- apps/api packages/shared supabase/migrations` is empty, so the Worker
+C8 shipped already matches this tip.
+
+### What was measured before building
+
+`OperationSupplierClaims.tsx` had **no facet rail and no filter state at all**. Not one line of
+`docs/UI-KIT.md` §8.2 could be true on it — there was nothing to click, nothing to clear, and no
+chip row. The card's own table said as much and it was correct.
+
+### What shipped
+
+The Orders rail, copied rather than reinvented: `ListPageShell` + `SectionCard` / `SectionBand` +
+a row per facet value, the same shape the sibling To Order tab runs.
+
+| Group | Rows | Why it may exist |
+|---|---|---|
+| `Queues` | **`Confirm what happens next`** | COPY-STANDARD's PURCHASING dictionary row, verbatim, with its locked empty state. **A tile's name IS its action**; `Claims` is the TAB, and a place and an action may not share one word |
+| `Supplier` | one per supplier on the list | a FACT, and a filter is fact-only (UI type dictionary). The word is this table's own column header |
+| `Problem` | one per claim type | same, with the labels the Problem column already prints, from the one shared module |
+
+- **Click a tile → the table filters · click it again, or its ✕ chip → it clears.** Two picks are
+  two chips and each ✕ clears only its own.
+- **The whole ROW opens the claim**, not only the `Open` button — from the top, and this surface
+  has no tabs to land deep in.
+- **Closing gives the list back**: the filters and the table's scroll position.
+- **`Open / Closed / All` is a STAGE picker** (§8.2's no-empty-state shape, the rule To Order added
+  three cards ago): one is always on, there is nothing to clear into, so re-clicking the active one
+  is a **no-op**; a different one is a different list and clears the picks.
+
+**No word on this page is new.** The queue tile and its empty state come from the dictionary; the
+two group titles are words this table's own columns already carry; `Queues` and `Reset filters` are
+the Orders rail's own. That is provable by grep, and it is the only reason the card could be built
+without stopping to ask.
+
+### The decision worth re-reading
+
+**Each facet group is counted with every filter EXCEPT its own, and a zero row is not rendered.**
+That is what makes the rail honest — a visible cell above zero always returns at least that many
+rows, so **no reachable click can blank the table**. The one blank that IS reachable is the queue
+tile at zero, and it is deliberate: the tile renders at 0 because a quiet screen must mean *watched
+and fine*, never *nobody looked* (K1's law), and clicking it prints the dictionary's own sentence
+instead of a shrug.
+
+### The test that had to be rewritten to be worth anything
+
+The first `stopPropagation` guard passed with the guard REMOVED, and finding out why is the useful
+part. With the row now a click target, the button sits inside one, so a click fires two handlers —
+and on the panel that is invisible, because both toggles read the same render's state and agree.
+It is **not** invisible on the scroll: `closeClaim` spends the snapshot it restores from, so the
+second call restores `null` and the position is silently lost. The test closes via the button and
+asserts the position comes back. **A negative control that does not fail is not a passing test, it
+is a test that was measuring nothing.**
+
+### Proof
+
+41 tests on the page's existing file (+20), every new guard negative-controlled: drop the stage
+no-op guard → exactly **1** fails · the `stopPropagation` → **1** · the scroll restore → **3** ·
+the cross-facet count exclusion → **1**. typecheck 0 · `pnpm --filter @carres/web lint` clean ·
+production build clean · full web suite at baseline (**2100 passed, 16 pre-existing**).
+
+**Both directions on downloaded bundles** (new 4,494,775 bytes, `SERVICE_ROLE` **0**; the previous
+live bundle `index-BJoKR7PC.js` fetched from its OWN deployment URL `96d90a0e`, because a
+superseded asset 404s at the apex): `Confirm what happens next` · `No claim is waiting for a
+supplier answer.` · `facet-queue-answer` · `facet-problem-` · `claims-table-scroll` each grep
+**0 → 1**, and `listshell-facet` greps **2 in both** — the shell's own testid, which correctly does
+not move. **This card RETIRES no string**, so there is no old-word-to-zero direction to show, and
+saying so is the honest full statement rather than manufacturing one.
+
+**No authenticated screenshot.** The page is behind an operation login and taking one would mean
+typing a password into a form, which this chat does not do. The bundle grep is what proves the
+strings shipped.
+
+### Reported, not fixed (Law 0) — six, and the first two matter
+
+1. **The dictionary gives Claims ONE queue word and the engine computes THREE steps.**
+   `claimNextMove` runs ask → answer → close, and only the middle one has a name in COPY-STANDARD
+   (`Confirm what happens next`, whose empty state pins it to *waiting for a supplier answer*). The
+   two CARRES-side steps — decide what we want done, and settle it — have a count nowhere and can
+   get no tile without words Jess has not ruled. **Nothing was invented.**
+2. **The tile and the row spell one action two ways on that screen today.** The tile reads
+   `Confirm what happens next`; the Next move column reads R3's own sentences (`Call Ohana — agree
+   the fix` · `— confirm what they will do` · `Close SC-1001 — Ohana refused`), where the
+   dictionary's row line is `Call {supplier} — confirm what happens next`. This is exactly what
+   C1's shared word module exists to make impossible, and it is live. **It is ④ R8's rename** —
+   its own done-when names the Claims queue tile — and a rename is not a click behaviour.
+3. **`supplier-claim.ts` carries a comment that reads as an open question and is closed.** It says
+   `Close` is "the only verb here outside COPY-STANDARD's four-verb dictionary … FLAGGED for Jess".
+   The verb table is **six** now and **`Close` is one of them**. The code is right; the comment is
+   confusion waiting for its next reader.
+4. **The facet counts describe a capped page; the tab chips describe the truth.** The API returns
+   `DEFAULT_LIMIT = 200` rows and computes Open/Closed/All from a SEPARATE unfiltered head-count,
+   deliberately and with a comment saying so. The rail counts the array it was handed, so past 200
+   claims a facet count and its tab chip stop agreeing. Invisible today (0 claims live); the fix is
+   server-side facet counts, not a bigger cap.
+5. **A page description sits above the list** (*"What the supplier still owes us…"*) on a page whose
+   budget is ≤200px of fixed chrome, and it explains rather than works. §1.1's gate would not admit
+   it. **Not deleted** — removing copy nobody asked to rule on is not a click behaviour.
+6. **Facet GROUP titles have no home in any law.** §8.4 orders the groups and COPY-STANDARD's
+   dictionary is per-ACTION, so `Queues` · `Supplier` · `Problem` are words no document owns. Words
+   already on screen were reused rather than invented, but the next module that builds a rail has
+   nothing to check itself against.
+
+**Only Receiving is left of P2.**
