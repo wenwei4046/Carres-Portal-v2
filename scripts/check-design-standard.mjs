@@ -56,7 +56,10 @@ const HEX_RE = /#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g;
 const HEX_ALLOW = [/(^|\/)index\.css$/, /design-standard/, /\/lib\/pdf\//, /\/pages\/print\//];
 // Pages that HAVE adopted the shell and must keep it (grows as pages migrate).
 const MUST_USE_SHELL = ["pages/operation/OperationOrdersControl.tsx"];
-const SHELL_IMPORT_RE = /from\s+["']@\/components\/(ListPageShell|PageHeader)["']/;
+// D0.5c — the kit shell is the successor, so a page satisfies RULE B with the
+// OLD shell or the NEW one. What the rule forbids is a list page rendering a
+// frame of its own, which is how 274 of 285 pages ended up hand-rolling one.
+const SHELL_IMPORT_RE = /from\s+["']@\/components\/(ListPageShell|PageHeader|kit\/PageShell)["']/;
 const OPT_OUT_RE = /design-standard:\s*not-a-list-page/;
 const LIST_MARKER_RE = /<table[\s>]|<DataGrid[\s/>]/;
 

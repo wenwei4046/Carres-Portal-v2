@@ -38,7 +38,7 @@ import type { OrderJourneySignals } from "./components/OrderJourneyHeader";
 import { TopBarIcons } from "./components/GlobalTopBar";
 import FollowUpForm from "./components/FollowUpForm";
 import ImportStockEtaDialog from "./components/ImportStockEtaDialog";
-import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
+import PageShell, { type ActiveChip } from "@/components/kit/PageShell";
 import { SectionBand, SectionCard } from "@/components/SectionPanel";
 import { TASKS_KEY } from "./components/rail/TasksPanel";
 import {
@@ -2706,7 +2706,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
   return (
     <>
-      <ListPageShell
+      <PageShell
+        variant="list"
         testId="operation-orders-control"
         breadcrumb={
           <>
@@ -3530,7 +3531,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           </tbody>
         </table>
           </div>
-      </ListPageShell>
+      </PageShell>
 
       {/* Consolidated Raise-PO review (Option A cards, 0236) — from the bulk
           bar's selection or the PO-day banner's waiting set. */}
