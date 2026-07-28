@@ -35,6 +35,13 @@ export const Z_LADDER: readonly ZLayer[] = [
   { layer: "toast", z: 50, owner: "sonner", card: "shipped" },
 ] as const;
 
+/**
+ * Layer 1 — the sticky table head, owned by `DataTable` (D0.5c). It rises over
+ * the rows scrolling under it and over nothing else, which is why it is the
+ * bottom of the ladder rather than a number picked to win an argument.
+ */
+export const Z_TABLE_HEAD = "z-10";
+
 /** Layer 3 — everything that floats beside the thing that opened it. */
 export const Z_FLOATING = "z-30";
 

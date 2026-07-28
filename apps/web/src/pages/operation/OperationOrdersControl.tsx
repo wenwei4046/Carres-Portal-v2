@@ -38,6 +38,7 @@ import type { OrderJourneySignals } from "./components/OrderJourneyHeader";
 import { TopBarIcons } from "./components/GlobalTopBar";
 import FollowUpForm from "./components/FollowUpForm";
 import ImportStockEtaDialog from "./components/ImportStockEtaDialog";
+import DataTable from "@/components/kit/DataTable";
 import PageShell, { type ActiveChip } from "@/components/kit/PageShell";
 import { SectionBand, SectionCard } from "@/components/SectionPanel";
 import { TASKS_KEY } from "./components/rail/TasksPanel";
@@ -1389,6 +1390,16 @@ interface OrderColDef {
  *  Customer+Region merge into two-line cells, LOGISTIC→DELIVERY (truth-ladder
  *  words). Old keys (orderId/ref/region/logistic) retired —
  *  stale hidden-column prefs for them just no-op. */
+/**
+ * The hover explanations that used to live inline in each `<th>`. They moved
+ * out with the header cells when D0.5c lifted the frame into `DataTable`;
+ * only these two columns ever had one.
+ */
+const COL_HEAD_TITLE: Record<string, string | undefined> = {
+  dots: "Where the order sits: Placed → Proceed → To book → Customer confirmed → Delivered. Beside it, three checks: goods, delivery, money.",
+  pic: "Person in charge — who's watching this order",
+};
+
 const ORDER_COL_DEFS: OrderColDef[] = [
   // Status holds TWO things since C10 (Jess 2026-07-27): the STAGE word pill
   // (Placed / Proceed / To book / Customer confirmed / Delivered) and, beside
@@ -3389,100 +3400,61 @@ export default function OperationOrdersControl({ onImport }: Props) {
       >
           {/* Listing — the ONLY scroll area (the page stays put, only the rows
               scroll). table-fixed + a colgroup → columns keep their width. */}
-      <div
-        ref={listBoxRef}
-        className="flex-1 min-h-0 bg-white border border-base-200 rounded-t-[12px] rounded-b-none shadow-sm overflow-auto"
+      {/* The list — the ONE scroll area. Since D0.5c the FRAME is the kit's
+          `DataTable` (percentage widths, the sticky head, 40px rows, the empty
+          state); the ROW is still this page's, because a row carries business
+          rendering the kit has no business owning. */}
+      <DataTable
+        scrollRef={listBoxRef}
+        ariaLabel="Orders"
+        columns={[
+          {
+            key: "select",
+            widthPct: 3,
+            head: (
+              <input
+                type="checkbox"
+                checked={allPagedSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = somePagedSelected;
+                }}
+                onChange={toggleAllPaged}
+                aria-label="Select all on this page"
+                className="cursor-pointer accent-base-900 align-middle w-[17px] h-[17px]"
+              />
+            ),
+          },
+          {
+            key: "flag",
+            widthPct: 3,
+            align: "center" as const,
+            title: "Follow-up",
+            head: <Flag size={13} strokeWidth={2} className="inline text-base-400" aria-label="Follow-up" />,
+          },
+          /* The header WORD comes from the column def the Columns popover also
+             reads, so the two cannot disagree — which is exactly how "Manage"
+             once survived in a `<th>` after the popover had been renamed. */
+          ...visibleColDefs.map((d) => ({
+            key: d.key,
+            widthPct: d.w * colScale,
+            label: d.label,
+            title: COL_HEAD_TITLE[d.key],
+          })),
+        ]}
+        empty={total === 0 ? "No orders in this tab." : undefined}
+        after={
+          <>
+              {/* Infinite-scroll sentinel — appends the next 30 as it nears view. */}  
+              {shown.length < total && (  
+                <tr ref={sentinelRef} aria-hidden>  
+                  <td colSpan={visibleColSpan} className="text-center text-[11px] text-base-400">  
+                    Loading more… ({shown.length} of {total})  
+                  </td>  
+                </tr>  
+              )}  
+            </>
+        }
       >
-        <table
-          /* SIZING LAW §3 (2026-07-18): list rows are 40px FIXED (44 deleted) —
-             content adapts to the row, never the reverse. whitespace-nowrap
-             kills the silent row-growers (text WRAPPING inside narrow fixed
-             columns); the two-line cells (Order / Customer / Stock / Delivery)
-             stack at 15px line-height, each line just ellipsises. */
-          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[40px] [&_td]:py-1 [&_td]:align-middle [&_td]:overflow-hidden [&_td]:whitespace-nowrap"
-        >
-          {/* PERCENTAGE colgroup (Loo 2026-07-09) — table-fixed + w-full + % widths
-              so the table is ALWAYS exactly the container width → it NEVER
-              horizontally scrolls on any screen; long content ellipsis-truncates.
-              Order (C rebuild §14): ☐ · ⚑ · Status dots · Order · Customer ·
-              Stock · Delivery · Deadline · Next. */}
-          <colgroup>
-            <col style={{ width: "3%" }} />
-            <col style={{ width: "3%" }} />
-            {visibleColDefs.map((d) => (
-              <col key={d.key} style={{ width: `${(d.w * colScale).toFixed(2)}%` }} />
-            ))}
-          </colgroup>
-          {/* Wireframe header band (P11) — the old solid black #221F20 band is
-              gone: a light warm surface + a 0.5px hairline, dark micro-uppercase
-              labels. When rows are selected the SAME row (same height) fills grey
-              with the bulk actions (BulkHeadRow) — Gmail-style, so the table
-              never jumps. sticky so the header stays put as the list scrolls. */}
-          <thead className="sticky top-0 z-10">
-            {/* One header row (the bulk actions live in the top bar now, so the
-                table never swaps its head). The select-all shows Gmail's
-                indeterminate dash on a partial tick. */}
-            <tr
-              className="border-b h-10"
-              /* v4 §11a cool header band (warm #F8F6F1 retired with the C rebuild).
-                 h-10 = same 40px as the data rows (SIZING LAW §3) so the header
-                 never reads thinner than the listing. */
-              style={{ backgroundColor: "#E5E7EB", borderBottomColor: "#D1D5DB" }}
-            >
-              <th className="px-2 py-1.5">
-                <input
-                  type="checkbox"
-                  checked={allPagedSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = somePagedSelected;
-                  }}
-                  onChange={toggleAllPaged}
-                  aria-label="Select all on this page"
-                  className="cursor-pointer accent-base-900 align-middle w-[17px] h-[17px]"
-                />
-              </th>
-              <th className="px-1 py-1.5 text-center" title="Follow-up">
-                <Flag size={13} strokeWidth={2} className="inline text-base-400" aria-label="Follow-up" />
-              </th>
-              {showCol("dots") && (
-                <Th>
-                  {/* The word heads the STAGE PILL only. The three dots beside
-                      it need no header of their own (Jess 2026-07-27) — each is
-                      labelled by its own icon and carries its own tooltip. */}
-                  <span title="Where the order sits: Placed → Proceed → To book → Customer confirmed → Delivered. Beside it, three checks: goods, delivery, money.">
-                    Status
-                  </span>
-                </Th>
-              )}
-              {showCol("order") && <Th>Order</Th>}
-              {showCol("customer") && <Th>Customer</Th>}
-              {showCol("deadline") && <Th>Deadline</Th>}
-              {showCol("stock") && <Th>Stock</Th>}
-              {showCol("delivery") && <Th>Delivery</Th>}
-              {showCol("pic") && (
-                <Th>
-                  <span title="Person in charge — who's watching this order">PIC</span>
-                </Th>
-              )}
-              {/* The header word lives in ORDER_COL_DEFS too (the Columns
-                  popover reads it) — take it from there so the two cannot
-                  disagree, which is exactly how "Manage" survived here. */}
-              {showCol("next") && (
-                <Th>{ORDER_COL_DEFS.find((d) => d.key === "next")!.label}</Th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {total === 0 && (
-              <tr>
-                <td
-                  colSpan={visibleColSpan}
-                  className="p-12 text-center text-[12px] text-base-500"
-                >
-                  No orders in this tab.
-                </td>
-              </tr>
-            )}
             {shown.map((o) => (
               <OrderRow
                 key={o.id}
@@ -3520,17 +3492,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 }}
               />
             ))}
-            {/* Infinite-scroll sentinel — appends the next 30 as it nears view. */}
-            {shown.length < total && (
-              <tr ref={sentinelRef} aria-hidden>
-                <td colSpan={visibleColSpan} className="text-center text-[11px] text-base-400">
-                  Loading more… ({shown.length} of {total})
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-          </div>
+      </DataTable>
       </PageShell>
 
       {/* Consolidated Raise-PO review (Option A cards, 0236) — from the bulk
@@ -4935,25 +4897,11 @@ function StockDot({
   );
 }
 
-function Th({
-  children,
-  center,
-}: {
-  children: React.ReactNode;
-  /** Center-align the header (the narrow MS / BF / Sofa count columns). */
-  center?: boolean;
-}) {
-  return (
-    <th
-      className={`px-2 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
-      /* v4 header: DARK 12/600 cool ink (warm #4A4335 retired). */
-      style={{ color: "#374151", fontSize: "12px", letterSpacing: "0.04em" }}
-    >
-      {children}
-    </th>
-  );
-}
-
+/* `Th` was DELETED with the header cells it drew (D0.5c). The kit's
+ * `DataTable` renders the head now, and it is the same 12px/600 uppercase in
+ * the same cool ink — two inline styles and a hex became token classes. A
+ * dead component left behind is the second source of truth the kit exists to
+ * end, so it went with the code it served. */
 function TableSkeleton() {
   return (
     <div data-testid="operation-orders-control-skeleton">
