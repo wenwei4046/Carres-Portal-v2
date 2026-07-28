@@ -3,13 +3,16 @@
  *
  * So these tests do not check that it looks right; they check that it still
  * shows everything the law says it must:
- *   · all three PENDING questions, because D5 is blocked until they are frozen
- *     and `/ui` is where Jess freezes them;
- *   · every icon meaning and every tone, read from the same records the
- *     components read — adding a meaning without showing it fails here;
+ *   · the FROZEN answers, because D0.5a's three questions are settled and a
+ *     page still ASKING one is how a settled question gets re-opened;
+ *   · every icon meaning, every tone, every spacing step and every z-layer, read
+ *     from the same records the components read — adding one without showing it
+ *     fails here;
  *   · the two forced hover/focus states, pinned to the components' own
  *     declarations, so a screenshot of a state is a screenshot of the REAL
- *     state and not a hand-painted lookalike.
+ *     state and not a hand-painted lookalike;
+ *   · every D0.5b box, since a Radix component that renders nowhere is a
+ *     component the screenshot gate cannot see.
  *
  * NEGATIVE CONTROL: change `hover:brightness-95` in Button.tsx to
  * `hover:brightness-90` — only the mirror test goes red.
@@ -17,9 +20,10 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { ICON_NAMES } from "@/components/kit/Icon";
-import { TONES } from "@/components/kit/tokens";
+import { Z_LADDER } from "@/components/kit/overlay-layer";
+import { SPACING_SCALE, TONES } from "@/components/kit/tokens";
 import UiShowcase from "./UiShowcase";
 
 const src = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
@@ -28,23 +32,49 @@ const BUTTON = src("../../components/kit/Button.tsx");
 const FIELD = src("../../components/kit/field-recipe.ts");
 
 describe("/ui showcase", () => {
-  it("puts the three pending decisions on the page", () => {
+  it("records all four frozen answers and asks nothing", () => {
     render(<UiShowcase />);
-    expect(screen.getByRole("heading", { name: /Q1 · Spacing scale/ })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Q3 · font-bold/ })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Q4 · Icon stroke width/ })).toBeInTheDocument();
-  });
-
-  it("renders BOTH spacing candidates — a page showing one has already decided", () => {
-    render(<UiShowcase />);
+    expect(screen.getByRole("heading", { name: "Frozen decisions" })).toBeInTheDocument();
     expect(screen.getByText(/Candidate A — 8 steps/)).toBeInTheDocument();
-    expect(screen.getByText(/Candidate B — 6 steps/)).toBeInTheDocument();
+    expect(screen.getByText("Radix slate-3")).toBeInTheDocument();
+    expect(screen.getByText("Deleted into 600")).toBeInTheDocument();
+    expect(screen.getByText(/Lucide default — 2/)).toBeInTheDocument();
+    // The register is empty, so the page no longer poses a choice.
+    expect(screen.queryByRole("heading", { name: "Pending decisions" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Candidate B/)).not.toBeInTheDocument();
+    expect(screen.queryByText("stroke 1.5")).not.toBeInTheDocument();
   });
 
-  it("renders BOTH icon strokes", () => {
+  it("shows every step of the frozen spacing scale", () => {
     render(<UiShowcase />);
-    expect(screen.getByText(/stroke 2 — Lucide default/)).toBeInTheDocument();
-    expect(screen.getByText("stroke 1.5")).toBeInTheDocument();
+    for (const s of SPACING_SCALE) expect(screen.getByText(`${s.px}px`), `${s.px}`).toBeInTheDocument();
+  });
+
+  it("shows the whole z-index ladder — five layers, and the page names no sixth", () => {
+    render(<UiShowcase />);
+    for (const l of Z_LADDER) expect(screen.getByText(`z-${l.z}`), `${l.z}`).toBeInTheDocument();
+  });
+
+  it("renders every D0.5b box, including the ones that only exist when opened", () => {
+    render(<UiShowcase />);
+    // Closed by default — a modal that renders itself open would be a bug.
+    expect(document.querySelector('[data-kit="modal"]')).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open a modal" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open a drawer" })).toBeInTheDocument();
+    // On the page without a click.
+    expect(document.querySelectorAll('[data-kit="select"]').length).toBeGreaterThanOrEqual(3);
+    expect(document.querySelectorAll('[data-kit="checkbox"]').length).toBeGreaterThanOrEqual(4);
+    expect(document.querySelectorAll('[data-kit="date-picker"]').length).toBeGreaterThanOrEqual(3);
+    expect(document.querySelectorAll('[data-kit="tab"]').length).toBeGreaterThanOrEqual(5);
+    expect(document.querySelectorAll('[data-kit="toast"]').length).toBe(3);
+  });
+
+  it("opens the modal it offers, and closes it again", () => {
+    render(<UiShowcase />);
+    fireEvent.click(screen.getByRole("button", { name: "Open a modal" }));
+    expect(screen.getByRole("dialog")).toHaveAccessibleName("Record the delay decision");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("shows every icon meaning the kit has", () => {

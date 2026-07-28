@@ -17,7 +17,7 @@
 | | |
 |---|---|
 | On `main` | `ba7b7798` D0 law + doors · `19cad8e4` merge · `d83ecf98` §1.4 hierarchy · **`c9966ee3` T2 drawer** · **`a548ddc9` D0.5a (PR #498)** |
-| **`/ui` is LIVE** | **https://erp.carresofficial.com/ui** — deployed 2026-07-28 from main tip `9c3697a9`, public, no login. Open it and answer Q1 · Q3 · Q4. It is also on `pos.carresofficial.com/ui` and both `pages.dev` apexes |
+| **`/ui` is LIVE** | **https://erp.carresofficial.com/ui** — deployed 2026-07-28 from main tip `9c3697a9`, public, no login. It is also on `pos.carresofficial.com/ui` and both `pages.dev` apexes. **It did its job: Jess answered Q1 · Q3 · Q4 there and the register is empty.** The deployed copy still shows the three as questions — D0.5b's branch turns that section into the frozen record, and the next deploy carries it |
 | Deployed to prod | ✅ **YES — corrected 2026-07-28.** `git merge-base --is-ancestor c9966ee3 10f49add` passes, and `10f49add` is the live web tip in CLAUDE.md §17.1 (`index-c7LT9aSQ.js`, PR #492). **T2 has been in front of users since that deploy.** This row previously read *"NOT YET… nobody has seen it in a browser"* — it went stale when a parallel line shipped a bundle containing it. |
 | Next thing that matters | **T3 — Jess uses the reordered drawer for one day.** **No longer blocked**: the deploy it was waiting for already happened. T3 is a Jess task, not a build card. **Deliberately scheduled AFTER the Purchasing line finishes** (Loo, 2026-07-28: P2 · C8b · R8 first). The reason is the point of T3 — it tests whether the Information Hierarchy helps, and a review run while three chats are still changing screens measures the churn instead of the hierarchy. **Re-scheduled 2026-07-28: it now runs after P5**, not after R8 — Loo ruled that R8 is a words card and does not close Purchasing, so the review waits for the module to be finished AND used (P5 puts a real PO through it). **Do not offer T3 to a chat before P5 has merged**, and do not read the delay as T3 being optional. |
 
@@ -45,7 +45,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.3** | Delete the retired design docs + the `carres-design` skill | ⏳ after the new kit is proven |
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
-| **D0.5b** | Foundation components, Radix | ⏳ **GATED (PM, 2026-07-28)** — starts once Q1 · Q3 · Q4 are frozen on `/ui`. **T3 does not gate it** — the two business validations run beside each other, and T3 has a schedule of its own (see the row above: after R8) |
+| **D0.5b** | Foundation components, Radix | ✅ **built 2026-07-28** — full card below. The gate opened: Jess froze Q1 · Q3 · Q4 |
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ **ready to build** |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
@@ -198,51 +198,137 @@ tokens anyway.
 
 ---
 
-## PENDING decisions — D5 is blocked until this is empty
+## D0.5b ✅ — the Radix half, and the register empties (2026-07-28)
 
-| # | Question | Where it gets answered |
+**Ten more Foundation Components** in `apps/web/src/components/kit/` — `Modal` ·
+`Drawer` · `Select` · `DropdownMenu` · `Tooltip` · `Popover` · `Tabs` ·
+`Checkbox` · `DatePicker` · `Toast` — plus the three internal extractions §6.6
+demanded before anything was used twice: `DialogFrame` (a modal and a drawer are
+one object placed differently), `floating-surface.ts` (five primitives, one
+white surface and one row recipe) and `overlay-layer.ts` (§4.4's ladder).
+**Eight Radix packages installed**, plus `react-day-picker` — §11 pins the
+calendar there because Radix has none.
+
+**Zero existing pages touched**, same lane rule as D0.5a: outside
+`components/kit/**` and `pages/dev/**` the diff is `tailwind.config.ts` (three
+additive keys), `src/test/setup.ts` (jsdom polyfills), the guard's file list,
+and docs.
+
+**None of it reaches the operator's bundle, and that was measured rather than
+assumed.** `/ui` is the only consumer and it is a lazy route, so the built main
+chunk greps **0** for `data-radix-popper-content-wrapper`, `DropdownMenuTrigger`
+and `rdp-`, while the showcase chunk carries all three. The behaviour half of
+the kit costs an operator nothing until a page adopts it.
+
+### The freeze, applied
+
+Q1 · Q3 · Q4 were answered by Jess the morning this card ran. Each answer became
+a mechanism rather than a sentence:
+
+| | Answer | What it changed in the code |
 |---|---|---|
-| Q1 | Spacing scale — 8-step `2 4 6 8 12 16 24 32` (~779 sites) or 6-step `4 8 12 16 24 32` (~2,225 sites) | ✅ **on `/ui` now** — waiting on Jess |
-| Q3 | `font-bold` (700, 158 uses) — delete into 600, or keep as a fourth weight | ✅ **on `/ui` now** — waiting on Jess |
-| Q4 | Icon stroke — Lucide default 2, or 1.5 | ✅ **on `/ui` now** — waiting on Jess |
+| Q1 | 8 steps | `kit-source.test.ts` stopped enforcing the two-candidate intersection and started enforcing `SPACING_SCALE` — the law's own record, read, never retyped |
+| Q3 | 700 deleted | a kit file that writes `font-bold` now fails that scan. The 158 page uses are **D2's codemod**, deliberately not touched here |
+| Q4 | stroke 2 | **`Icon` lost its `strokeWidth` prop.** D0.5a carried one so `/ui` could draw both candidates; deleting it is the enforcement |
 
-**All three are now a Jess task, not a build card** — same shape as T3. Open
-`/ui`, look at the top section, answer three questions. Nothing in the code
-moves whichever way they go (see D0.5a above).
+`/ui` stopped ASKING and started RECORDING: the "Pending decisions" section is
+now "Frozen decisions", and a test asserts the page no longer renders a
+candidate B or a 1.5 stroke. **A page still posing a settled question is how a
+settled question gets re-opened.**
 
-### The gate, ruled by the PM 2026-07-28
+### Rules that became structure, not prose
 
-```
-D0.5a ✅ built
-   ├── Q1 · Q3 · Q4 frozen on /ui   ← business, blocks D0.5b
-   └── T3 Jess uses the drawer      ← business, blocks T4 and never D0.5b;
-                                        its own schedule says after R8
-D0.5b  starts once the three are frozen
-```
+Eight new §6 rules, each arriving with its own mechanism — a modal that is
+always controlled and always titled · placement being a COMPONENT and not a prop
+· menu and listbox rows being DATA and not children · no red menu item · a tab
+bar that is §8.2's stage picker by construction · a tooltip that can only hold
+one line · a date that is ISO in, ISO out and printed by `fmtDate()` · a toast
+with three kinds and no fourth. Plus two rules that already existed as words and
+became structure: the icon stroke and §4.4's five-layer ladder.
 
-**Two rulings about T3 met here and both survive** — the PM's *"T3 may run in
-parallel"* is about SEQUENCING (T3 is not in front of D0.5b), and Loo's row
-above is about TIMING (do not hand T3 to a chat until the Purchasing line stops
-changing screens under Jess). Neither cancels the other: T3 does not gate the
-freeze or D0.5b, and it still waits for R8.
+**§16 moves 31.58% → 47.83%**, Human Review debt unchanged at 4, blocked-on-a-
+decision **3 → 0**; the arithmetic is printed in §16. Two rules deliberately did
+NOT move to ✅ even though half of each was built — *"no hand-rolled
+modal/drawer"* and the spacing/weight guards are live over the kit and not over
+the 225 pages, which is D1's job.
 
-**D0.5b is gated on the freeze and on nothing else.** Not on T3, and not on a
-migration — Radix primitives carry behaviour, and behaviour does not wait for a
-spacing step. The reason the freeze DOES gate it: D0.5b's ten boxes are modals,
-drawers and menus, which is where spacing compounds. Building them against an
-unfrozen scale is the one place the "any answer costs zero component changes"
-property from D0.5a would stop holding.
+### Three law conflicts found, reported, not settled in code
 
-**`/ui` is reachable — that blocker is closed.** Loo ruled it a business
-validation showcase rather than a feature rollout, so D0.5a was merged (PR #498)
-and deployed from the main tip: **https://erp.carresofficial.com/ui**, public,
-no login, verified in a real browser. Nothing else stands between Jess and the
-three answers.
+1. **§4.3 forbids what §3.5 assumes.** §3.5 says *"underline tab hover — darken
+   the text"*, and §4.3 says borders are *"1px only… no coloured borders"* — so
+   the usual `border-b-2 border-blue` breaks the law twice. The indicator is a
+   background bar instead, which breaks neither, and the kit should settle it.
+2. **§4.2 names its radii by USE and has no row for a popover or a tooltip.**
+   Both take the dropdown's 6 because that is what they are; the law does not
+   say so.
+3. **§3 has no scrim.** A modal backdrop is not in the colour chapter at all, so
+   it is `slate-12` at 40% — the nearest thing the law does name.
 
-Frozen: **Q2 page canvas = Radix `slate-3`** · **Q5** Current Issues is its own
-block · **Q6** the KPI boxes merge into Progress (*already true — see the lesson
-below*) · **Q7** Current Action never collapses · **Q8** it is called `Progress`,
-not `Timeline` · **Q9** issues group by goods · delivery · money.
+Two more, reported as facts rather than conflicts: **modal and drawer widths
+have no home** (§8 writes the portal's width table at D0.5c, so they are named
+config keys until then, not numbers typed into a component), and **`Button` had
+to start forwarding its ref** — every `asChild` trigger anchors on the trigger's
+DOM node, and a Button that eats the ref makes all four overlays open in the
+wrong place, silently, because React only warns.
+
+### What the test environment taught, written down so nobody re-learns it
+
+`jsdom@25` has **no `PointerEvent`**, measured (`typeof PointerEvent ===
+"undefined"`). `fireEvent.pointerDown` therefore dispatches a plain `Event` that
+React's pointer plugin ignores — so a Radix **menu**, which opens on
+pointerdown, silently stays shut and reads as a broken component. A Radix
+**popover** opens on click and is fine. The menus are opened with the KEYBOARD
+in tests, which is the better assertion anyway.
+
+Also: a source scan must strip comments first. The `font-bold` rule failed on
+`tokens.ts` — the file whose comment EXPLAINS that 700 is dead. A scan that
+punishes the explanation teaches people to delete the explanation.
+
+### Verification
+
+`tsc -p tsconfig.app.json` clean · `pnpm --filter @carres/web lint` clean · the
+web suite at baseline (**2182 passed / 16 pre-existing**, the documented four
+files, zero new) · `pnpm build` clean · and **measured in a real browser** on
+the built bundle (`vite preview`, computed styles): canvas slate-3 · Select 32
+high at radius 6 on a slate-5 hairline, 13px · Checkbox 16 square at radius 4 ·
+tab indicator blue-9, 2px · DatePicker 32 high printing `19 Jul 26, Sun` ·
+Modal max-width 512, radius 10, z-40, scrim slate-12 at 40% · **69 icons with
+exactly ONE stroke-width, 2** · **font-weight takes exactly three values, 400 ·
+500 · 600, and no 700 appears anywhere on the page.**
+
+A screenshot could not be taken — the harness reports the Browser pane not
+displayed, and the viewport reads 0×0, which is why the modal's measured WIDTH
+is 2px while its max-width is the correct 512px. For tokens the computed-style
+read is the stronger evidence anyway.
+
+---
+
+## PENDING decisions — ✅ EMPTY (2026-07-28)
+
+| # | Question | Answer |
+|---|---|---|
+| Q1 | Spacing scale — 8-step `2 4 6 8 12 16 24 32` (~779 sites) or 6-step `4 8 12 16 24 32` (~2,225 sites) | ✅ **Candidate A, the 8 steps** |
+| Q3 | `font-bold` (700, 158 uses) — delete into 600, or keep as a fourth weight | ✅ **Deleted into 600** |
+| Q4 | Icon stroke — Lucide default 2, or 1.5 | ✅ **Lucide default, 2** |
+
+Frozen earlier: **Q2 page canvas = Radix `slate-3`** · **Q5** Current Issues is
+its own block · **Q6** the KPI boxes merge into Progress · **Q7** Current Action
+never collapses · **Q8** it is called `Progress`, not `Timeline` · **Q9** issues
+group by goods · delivery · money.
+
+**The gate is open and D0.5b is built.** `D5 "Guard → Fail"` is no longer
+blocked on a decision — only on D1–D4 existing.
+
+**The one thing worth remembering from how this ran.** D0.5a shipped ten
+components while the answers were still open, by building them from the six
+spacing steps present in BOTH candidates and holding that with a source scan. It
+cost **zero component changes** when the answer arrived — the freeze re-pointed
+one test and deleted one prop. A card that had waited for the answer would have
+shipped the same ten components a week later.
+
+**T3 is untouched by any of this** and still waits for P5 (see the table at the
+top). The PM's *"T3 may run in parallel"* was about SEQUENCING and Loo's row is
+about TIMING; neither cancels the other, and T3 never gated D0.5b.
 
 ---
 

@@ -62,27 +62,39 @@ agree, changed in the same commit:
 
 ---
 
-## PENDING REGISTER
+## PENDING REGISTER — ✅ EMPTY (2026-07-28)
 
-Rules not yet frozen. **A pending rule may NOT be enforced by the Build Guard**
-(half-enforcement is worse than none), and **card D5 "Guard → Fail" is blocked
-until this register is empty.** The schedule forces the decision; nobody has to
-remember.
+**Every question this kit was holding is answered. D5 "Guard → Fail" is no
+longer blocked on a decision.**
 
-| # | Question | Decided by | Where it gets answered |
+| # | Question | Answer | Frozen |
 |---|---|---|---|
-| Q1 | Spacing scale — 8-step (2 4 6 8 12 16 24 32) or 6-step (4 8 12 16 24 32) | Jess | ✅ **live on `/ui` now** (D0.5a) — both candidates render the same row |
-| Q3 | `font-bold` (700) — delete into 600, or keep as a fourth weight | Jess | ✅ **live on `/ui` now** (D0.5a) — 600 and 700 on the same words |
-| Q4 | Icon stroke width — Lucide default 2, or 1.5 | Jess | ✅ **live on `/ui` now** (D0.5a) — both strokes at 14 / 16 / 18 |
+| Q1 | Spacing scale — 8-step or 6-step | **8 steps: `2 4 6 8 12 16 24 32`** (Candidate A) | Jess, 2026-07-28 |
+| Q2 | Page canvas | **Radix `slate-3`** | with the law, 2026-07-27 |
+| Q3 | `font-bold` (700) | **Deleted into 600.** 600 is the heavy weight | Jess, 2026-07-28 |
+| Q4 | Icon stroke width | **Lucide's default, 2** | Jess, 2026-07-28 |
 
-Frozen this round: **Q2 — page canvas = Radix `slate-3`.**
+**The freeze cost ZERO component changes, which is why it could arrive after the
+components.** D0.5a built its ten boxes from the six spacing steps common to
+both candidates, used no `font-bold`, and took Lucide's own stroke — so
+whichever way Jess answered, nothing had to be redrawn. That property was held
+by a source scan, not by anybody remembering it.
 
-**D0.5a shipped the surface; the three answers are still Jess's** — the card
-built the comparison and deliberately did not prefer one. **No component
-depends on any of the three**: the kit's ten boxes use only the six spacing
-steps common to BOTH Q1 candidates (asserted by a source scan, §4.1), never
-`font-bold`, and Lucide's own default stroke. So freezing any of the three
-costs zero component changes — and D5 stops being blocked.
+**What the freeze then bought, in D0.5b** — each one turns a sentence into a
+mechanism, which is the only thing this file counts as finished:
+
+- **Q1** — `kit-source.test.ts` stopped enforcing "the safe intersection" and
+  started enforcing the FROZEN scale, read out of `SPACING_SCALE` in
+  `components/kit/tokens.ts` so the record and the scan cannot drift.
+- **Q3** — a kit file that writes `font-bold` now fails that scan. The 158 live
+  uses across the 225 pages are **D2's codemod**, not this card's.
+- **Q4** — `Icon` no longer has a `strokeWidth` prop at all. D0.5a carried one
+  so `/ui` could draw both candidates; deleting it is the enforcement, and a
+  second stroke width no longer compiles.
+
+**A pending rule may still never be enforced by the Build Guard** (half
+enforcement is worse than none). The register is kept, empty, because the next
+open question goes here rather than into a chat.
 
 ---
 
@@ -135,7 +147,7 @@ Priority inside scope: `pages/operation/**` (118 pages) — Jess's daily work.
 |---|---|---|---|
 | No hand-rolled page shell | Component API + Build Guard G | ⏳ D0.5c | `PageShell.tsx` |
 | No hand-rolled table | Component API + Build Guard G | ⏳ D0.5c | `DataTable.tsx` |
-| No hand-rolled modal/drawer | Component API + Build Guard G | ⏳ D0.5b | `Modal.tsx` · `Drawer.tsx` |
+| No hand-rolled modal/drawer | Component API ✅ (the boxes exist) + Build Guard G ⏳ (a page still CAN hand-roll one until D1 bans `fixed inset-0`) | ⏳ D1 | `Modal.tsx` · `Drawer.tsx` |
 | No inventing tokens | Build Guard A–I | ⏳ D1 | `check-design.mjs` |
 | Every chat reads the boundary | Human Review | ⏳ D0 | `CLAUDE.md` header |
 
@@ -428,11 +440,16 @@ SO-1256   Tan Wei Ming   27 Jul 26, Sun      13  t-body
 |---|---|---|
 | 400 | body text | 33 uses |
 | 500 | labels, light emphasis | 202 uses |
-| 600 | titles, numbers | 854 uses |
-| **700** | **⚠ PENDING Q3 — proposed: delete into 600** | 158 uses |
+| 600 | titles, numbers — **the heavy weight** | 854 uses |
+| ~~700~~ | **DEAD (Q3, frozen 2026-07-28)** — `font-bold` folds into 600 | 158 uses left to migrate |
 
-`font-bold` (700) and `font-semibold` (600) are currently doing the same job.
-`/ui` shows both; Jess freezes Q3 there.
+`font-bold` (700) and `font-semibold` (600) were doing the same job at every
+size; `/ui` showed both on the same words and Jess deleted 700. **There are
+three weights, and there is no fourth.**
+
+A kit file that writes `font-bold` fails the source scan today. The **158 live
+uses across the 225 pages are D2's codemod** — a card that changes the law does
+not also rewrite the pages, or nothing can be reviewed.
 
 ## §2.3 Numbers and codes
 
@@ -456,7 +473,7 @@ column must be wide enough to hold the weekday.
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
 | Only 6 sizes exist | Build Guard D (bans `text-[Npx]` + any 7th token) | ⏳ D1 | `check-design.mjs` |
-| Only 3 weights exist | Build Guard D | ⚠ pending Q3 | — |
+| Only 3 weights exist | Build Guard D (live over `components/kit/**` since D0.5b) | ⏳ D1 for pages | `kit-source.test.ts` |
 | Dates via `fmtDate()` | **Human Review** — no rule exists | ⚠ **debt** | `lib/fmt-date.ts` |
 
 ---
@@ -580,13 +597,9 @@ and the tone is chosen by a **condition**, never by which verb it is:
 
 # §4 Spacing · Radius · Border · Z-index
 
-> ⚠️ **PENDING Q1.** `/ui` renders the same Orders row under both scales; Jess
-> freezes it there. Until frozen, the Build Guard does not enforce §4.1.
-
-## §4.1 Spacing — two candidates
+## §4.1 Spacing — ✅ FROZEN (Q1, Jess 2026-07-28): eight steps
 
 ```
-Candidate A — 8 steps (recommended)
   2   4   6   8   12   16   24   32
   │   │   │   │    │    │    │    └ between major regions
   │   │   │   │    │    │    └────── between blocks · card padding
@@ -597,24 +610,26 @@ Candidate A — 8 steps (recommended)
   │   └───────────────────────────── touching
   └───────────────────────────────── hairline nudge (pill y-padding)
 
-  Migration cost ≈ 779 sites
-
-Candidate B — 6 steps (strict 4pt)
-  4   8   12   16   24   32
-
-  Purer, but drops 2 and 6 — dense tables loosen, fewer rows per screen.
-  Migration cost ≈ 2,225 sites
+  Migration cost ≈ 779 sites  (D2–D4)
 ```
 
-Dead under both: `10 · 14 · 18 · 20 · 22 · 33` and every arbitrary
-`p-[Npx]` / `gap-[Npx]` / `m-[Npx]`.
+**Why not the strict 4pt grid.** The 6-step alternative dropped 2 and 6, which
+are what keep a dense table dense — losing them loosens every row and costs
+orders per screen, against §1.3's budget — and it cost ≈2,225 sites instead of
+≈779. Jess froze the 8 steps on `/ui`.
 
-**Every Foundation Component is built from the SIX steps present in BOTH
-candidates — 4 · 8 · 12 · 16 · 24 · 32 — so whichever way Q1 is frozen, not one
-component changes.** That is not a convention somebody has to remember: a source
-scan over `components/kit/**` fails on any other step
-(`kit-source.test.ts`, D0.5a). It is also why D0.5a could ship components while
-Q1 is still open, instead of waiting.
+Dead: `10 · 14 · 18 · 20 · 22 · 33` and every arbitrary `p-[Npx]` /
+`gap-[Npx]` / `m-[Npx]`.
+
+**The scale is a RECORD the code reads, not a list to retype** —
+`SPACING_SCALE` in `components/kit/tokens.ts` carries the eight steps with their
+Tailwind suffixes, `/ui` draws them from it, and `kit-source.test.ts` scans
+every kit file against it. A ninth step means editing that record, which is the
+friction §0.3 asks for.
+
+*(Until 2026-07-28 this scan enforced the six steps present in BOTH candidates,
+so the ten D0.5a components were Q1-proof and the answer could arrive after
+them. It cost zero component changes, as designed.)*
 
 ## §4.2 Radius — four, frozen
 
@@ -644,23 +659,25 @@ colour  slate-5  hairline (default)
 Fifteen levels exist today (`1 · 10 · 20 · 30 · 40 · 50 · 55 · 60 · 70 · 90 ·
 100 · 110 · 120`). Five survive, reachable only through components:
 
-| Layer | z | Owned by |
-|---|---|---|
-| sticky table header | 10 | `DataTable` |
-| toolbar / bulk bar | 20 | `PageShell` |
-| popover · dropdown · tooltip | 30 | Radix portal |
-| modal · drawer | 40 | Radix portal |
-| toast | 50 | Sonner |
+| Layer | z | Owned by | State |
+|---|---|---|---|
+| sticky table header | 10 | `DataTable` | ⏳ D0.5c |
+| toolbar / bulk bar | 20 | `PageShell` | ⏳ D0.5c |
+| popover · dropdown · tooltip | 30 | Radix portal | ✅ D0.5b |
+| modal · drawer | 40 | Radix portal | ✅ D0.5b |
+| toast | 50 | sonner | ✅ shipped — sonner's own, the kit never writes it |
 
-**No component may set its own z-index.** A chat needing a new layer adds it
-here first.
+**No component may set its own z-index.** The ladder lives in ONE file —
+`components/kit/overlay-layer.ts` — and `kit-source.test.ts` fails if any other
+kit file writes a `z-` class at all. A chat needing a new layer has to come
+here first, which is the whole point.
 
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
-| Only scale steps exist | Build Guard E | ⚠ pending Q1 | — |
+| Only scale steps exist | Build Guard E (live over `components/kit/**` since D0.5b) | ⏳ D1 for pages | `kit-source.test.ts` |
 | Only 4 radii | Build Guard E | ⏳ D1 | `check-design.mjs` |
 | Only 2 border colours | Build Guard E | ⏳ D1 | `check-design.mjs` |
-| Only 5 z-layers | Component API (Radix portals own 30/40) + Build Guard F | ⏳ D0.5b | `Modal.tsx` · `check-design.mjs` |
+| Only 5 z-layers | **Component API** — one file names a layer, the rest cannot; Radix portals own 30/40 | ✅ **live (D0.5b)** | `overlay-layer.ts` · `kit-source.test.ts` |
 
 ---
 
@@ -682,8 +699,8 @@ Size      Exactly three:
 Colour    Inherits text colour. At rest slate-9, hover slate-11.
           A coloured icon appears only inside a status pill.
 
-Stroke    ⚠ PENDING Q4 — Lucide's default is 2, which reads heavy at 14px.
-          /ui renders 2 and 1.5 side by side.
+Stroke    ✅ FROZEN (Q4, Jess 2026-07-28) — Lucide's default, 2.
+          `Icon` has NO strokeWidth prop; a second stroke does not compile.
 ```
 
 Twelve sizes are in use today (14 ×157 · 16 ×126 · 13 ×73 · 12 ×52 · 18 ×34 ·
@@ -735,7 +752,7 @@ BUSINESS ENTITIES
 | Only 3 sizes (14/16/18) | **Type System** — `size` is `14 \| 16 \| 18`; Build Guard C also live on kit files | ✅ **live (D0.5a)** | `components/kit/Icon.tsx` |
 | One meaning → one glyph | **Type System** — `<Icon name>` is a union; `"edit3"` fails to compile | ✅ **live (D0.5a)** | `components/kit/Icon.tsx` |
 | Lucide only, no emoji | **Component API** — one file in `components/kit/**` may import `lucide-react`, asserted by a source scan; Build Guard C widens to all pages in D1 | ✅ **live in the kit (D0.5a)** | `kit-source.test.ts` |
-| Stroke width | ⚠ **PENDING Q4** — not enforced until frozen | ⚠ | `/ui` |
+| Stroke is 2, and only 2 | **Type System** — `Icon` has no `strokeWidth` prop, so there is nothing to pass | ✅ **live (D0.5b)** | `Icon.tsx` |
 
 > **§5.2 decides a `warning` survivor that §5.3 has no row for.** `Icon` carries
 > §5.3's 40 meanings exactly, so `TriangleAlert` has no name and cannot be
@@ -748,20 +765,21 @@ BUSINESS ENTITIES
 
 # §6 Box Dictionary
 
-> ✅ **D0.5a landed — the ten no-behaviour boxes below live in
-> `apps/web/src/components/kit/` and render on `/ui`.**
-> ⏳ **D0.5b writes the Radix half.** A specification written before its
-> component exists is a specification that 285 pages each re-implement
-> differently — the exact failure this rewrite ends, which is why nothing is
-> written here until it is on `/ui`.
+> ✅ **D0.5a landed the ten no-behaviour boxes. ✅ D0.5b landed the ten Radix
+> ones.** All twenty live in `apps/web/src/components/kit/` and render on
+> `/ui`. Nothing was written in this chapter before its component existed — a
+> specification without a component is a specification 285 pages each
+> re-implement differently, which is the failure this rewrite ends.
 
 **D0.5a — no behaviour needed (structure + CSS):** ✅
 `Button` · `Input` · `Textarea` · `SearchInput` · `Card` · `Panel` · `Badge` ·
 `StatusPill` · `EmptyState` · `Loading` (+ `Icon`, §5).
 
-**D0.5b — behaviour from Radix:** ⏳
+**D0.5b — behaviour from Radix:** ✅
 `Modal` · `Drawer` · `Select` · `DropdownMenu` · `Tooltip` · `Popover` ·
 `Tabs` · `Checkbox` · `DatePicker` · `Toast`
+(+ three internal extractions §6.6 demanded: `DialogFrame`,
+`floating-surface.ts`, `overlay-layer.ts`).
 
 The pre-kit boxes stay alive until their pages migrate in D2–D7 and are **not**
 law: [`Btn.tsx`](../apps/web/src/components/Btn.tsx) ·
@@ -787,9 +805,25 @@ does not. Layout AROUND a box is the caller's wrapper.
 | A badge can never carry a status colour | **Component API** — `Badge` has no `tone` prop | ✅ **live (D0.5a)** | `Badge.tsx` |
 | There is no red control | **Type System** — `variant` has no `danger` member | ✅ **live (D0.5a)** | `Button.tsx` |
 | An error message replaces the hint | **Component API** — `FieldFrame` renders one or the other | ✅ **live (D0.5a)** | `FieldFrame.tsx` |
-| A kit component uses only Q1-safe spacing | **Build Guard** — source scan over `components/kit/**` | ✅ **live (D0.5a)** | `kit-source.test.ts` |
+| A kit component uses only the frozen §4.1 scale | **Build Guard** — source scan over `components/kit/**`, reading `SPACING_SCALE` | ✅ **live (D0.5a, re-pointed at the frozen scale in D0.5b)** | `kit-source.test.ts` |
+| A surface that takes the screen is CONTROLLED | **Component API** — `Modal` / `Drawer` have no `defaultOpen` and hold no state | ✅ **live (D0.5b)** | `Modal.tsx` · `Drawer.tsx` |
+| A surface that takes the screen must say what it is | **Type System** — `title: string` is required, and Radix makes it the accessible name | ✅ **live (D0.5b)** | `DialogFrame.tsx` |
+| Placement is a component, never a prop | **Component API** — `Modal` and `Drawer` are two boxes; no `place` / `side` / `variant` prop exists | ✅ **live (D0.5b)** | `DialogFrame.tsx` |
+| A menu row and a listbox row are DATA | **Component API** — `Select` and `DropdownMenu` take `options` / `items`, never `children` | ✅ **live (D0.5b)** | `Select.tsx` · `DropdownMenu.tsx` |
+| There is no red menu item | **Component API** — no `destructive` member; a destructive command is an ordinary word | ✅ **live (D0.5b)** | `DropdownMenu.tsx` |
+| A tab bar is a §8.2 stage picker | **Component API** — Radix fires `onValueChange` only on a CHANGE, so re-clicking the active tab is a no-op | ✅ **live (D0.5b)** | `Tabs.tsx` · `kit-behaviour.test.tsx` |
+| A tooltip holds one line of text | **Type System** — `content: string`, so JSX cannot be put where a keyboard cannot reach it | ✅ **live (D0.5b)** | `Tooltip.tsx` |
+| A date is ISO in, ISO out, and printed by `fmtDate()` | **Component API** — `DatePicker` takes and returns `YYYY-MM-DD` and renders through the one helper | ✅ **live (D0.5b)** | `DatePicker.tsx` |
+| A toast has three kinds and no fourth | **Type System** — `ToastKind` is `success \| warning \| danger` | ✅ **live (D0.5b)** | `Toast.tsx` |
 
-*(Values below are measured on `/ui` in a real browser, not read off the source.)*
+*(Values below are measured on `/ui` in a real browser, not read off the source.
+D0.5b re-measured on the built bundle, 2026-07-28: canvas `rgb(240,240,243)` =
+slate-3 · Select 32 high, radius 6, hairline `rgb(224,225,230)` = slate-5, type
+13px · Checkbox 16 square at radius 4 · tab indicator `rgb(0,144,255)` = blue-9,
+2px tall · DatePicker 32 high printing `19 Jul 26, Sun` · Toast white at radius
+10 · Modal max-width 512, radius 10, z-index 40, scrim `rgba(28,32,36,0.4)` =
+slate-12 at 40% · **69 icons, and `stroke-width` takes exactly ONE value: 2** ·
+**font-weight takes exactly three: 400 · 500 · 600 — no 700 anywhere.**)*
 
 ## §6.1 `Button`
 
@@ -902,6 +936,183 @@ decision is not a state.
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
 | Second occurrence must be extracted | Build Guard I (duplicated class string across ≥ 2 files) | ⏳ D1 | `check-design.mjs` |
+
+D0.5b obeyed it three times before using anything twice: `DialogFrame` (a modal
+and a drawer are one object placed differently), `floating-surface.ts` (five
+primitives wanted the same white surface and the same row) and
+`overlay-layer.ts` (§4.4's ladder, so no component picks a number).
+
+## §6.7 `Modal` · `Drawer` — the surfaces that take the screen
+
+Replaces the modal half of **63 files hand-rolling an overlay in 12+ shapes with
+5 different backdrop colours**. Radix Dialog supplies the behaviour and nothing
+else (§11): focus trap · escape · scroll lock · `aria-modal` · focus returned to
+whatever opened it.
+
+| | `Modal` | `Drawer` |
+|---|---|---|
+| Placement | centred | full height, right edge |
+| Size | `max-w-modal` (512) · `max-h-dialog` (85vh), body scrolls | `max-w-drawer` (560), full height |
+| Radius | `rounded-card` (10) | `rounded-l-card` — leading edge only |
+| Scrim | `slate-12` at 40%, §4.4 layer 40 | same |
+| Header | title `text-strong`, optional `text-meta` description, ✕ | same |
+| Footer | optional; one `primary`, §3.4 | same |
+
+**Both are CONTROLLED, always.** There is no `defaultOpen` and no internal
+state: a surface that owns whether it is open is one a page cannot close after a
+save succeeded, which is how a form submits twice.
+
+**`title` is required** — a surface that blocks the page must say what it is,
+and Radix uses it for `aria-labelledby`, so an untitled one is both an
+accessibility failure and an unanswerable screen.
+
+**Two components, not one with a `place` prop.** They answer different
+questions: a Modal interrupts to ask something, a Drawer opens a RECORD beside
+the list it came from — and §8.2 depends on the difference (*"close the drawer →
+the table keeps its filter AND its scroll"*). A page choosing placement from a
+prop can put a record in the middle of the screen.
+
+**ONE size each, and §8 has not ruled them.** The values are named
+`tailwind.config.ts` keys rather than numbers typed into a component, and
+`PageShell` (D0.5c) writes the portal's width table and takes them over.
+
+**What goes INSIDE a Drawer is not here** — identity · current action · current
+issues · progress · sections · activity is §1.4's ordered slots, `DetailShell`,
+card **D0.5c**.
+
+## §6.8 `Select`
+
+| | |
+|---|---|
+| Skin | `field-recipe.ts`, the same one `Input` wears — same height, hairline, focus ring, refusal red |
+| Trigger | 32 high, `rounded-control`, chevron at the right in `slate-9` |
+| List | white, `slate-5` hairline, `rounded-control`, §4.4 layer 30, as wide as the trigger |
+| Row | 8/6 padding, `text-body`, blue-3 when highlighted, a 14px tick when chosen |
+| Label · error | through `FieldFrame` — identical contract to `Input` |
+
+**Not a native `<select>`**: it renders the OS's own list on Windows, cannot
+show a tick beside the chosen row, and gives one control three appearances.
+
+**Options are DATA, never children.** A children API lets a page put a pill, an
+icon or a second line inside a row, and the appearance stops being the kit's
+within a week. A row is a word and optionally a §5.3 meaning.
+
+## §6.9 `DropdownMenu` — the ⋮ menu
+
+| | |
+|---|---|
+| Surface | the §6.8 list surface, ≥160 wide |
+| Item | word + optional 14px §5.3 glyph; `blue-3` highlight; 40% opacity when refused |
+| Separator | a `slate-5` hairline — grouping, never decoration |
+| Trigger | the caller's `Button`, handed Radix's behaviour by `asChild` |
+
+**A menu carries no colour and has no `destructive` item.** §3.3 gives red one
+job — *late · act now* — and a command is not a state; a destructive command is
+an ordinary row whose WORD says what it does. Same ruling `Button` makes about
+having no `danger` variant.
+
+## §6.10 `Popover` · `Tooltip`
+
+| | `Popover` | `Tooltip` |
+|---|---|---|
+| Surface | white, `slate-5`, `rounded-control`, 16 padding | `slate-12` fill, white ink, `text-meta` |
+| Layer | 30 | 30 |
+| Content | the caller's — a form, a list, a calendar | **one line of text, `content: string`** |
+| Opens on | click | hover **and focus** |
+
+`Popover` is §1.2's **Contextual Surface**: the answer for anything P3, because
+it holds no permanent vertical height. It does not dim the page and does not
+trap focus — if a thing must be answered before anything else can happen, that
+is a `Modal`, and the difference is which component a page reaches for.
+
+**A tooltip never carries the only copy of anything.** It is unreachable on a
+touch screen, so a rule, a deadline or a refusal that exists only in a tooltip
+is a fact half the portal's users cannot read.
+
+> **Reported, not settled here:** §4.2 names its four radii by USE, and neither
+> *popover* nor *tooltip* appears in any of the four lists. Both take the
+> dropdown's 6 because that is what they are — a small surface hanging off a
+> control — but the law does not say so, and it should.
+
+## §6.11 `Tabs` — the module tab bar
+
+| | |
+|---|---|
+| Bar | `slate-5` hairline underneath, 16 between tabs |
+| Tab | `text-body`, `slate-11` at rest, `slate-12` when active or hovered |
+| Indicator | a 2px `blue-9` BAR at the bottom of the active tab |
+| Count | a `Badge`, and only where there is something to count |
+
+**It is a STAGE picker and §8.2 already ruled what that means**: exactly one is
+on, always; clicking the one that is on does NOTHING; no ✕ chip. Radix gives
+that shape for free — a trigger fires `onValueChange` only on a real change — so
+the rule holds by construction rather than by every page remembering it.
+
+**It renders the BAR and no panels.** Every tabbed page in the portal is
+deep-linked (`?tab=…`) and the panels belong to the router; a component owning
+them would fight the URL and break every link Jess has bookmarked. §8.3's other
+half — a module-tabbed page drops its breadcrumb and big title — is
+`PageShell`'s `variant`, card D0.5c.
+
+> **Reported:** the indicator is a background bar rather than `border-b-2`
+> because §4.3 says borders are *"1px only… no coloured borders"*, while §3.5
+> assumes tabs are underlined. The two sentences disagree; this is built the way
+> that breaks neither, and the kit should settle it.
+
+## §6.12 `Checkbox`
+
+| | |
+|---|---|
+| Box | 16 square, `rounded-pill` (4 — §4.2 names a checkbox there by name) |
+| Off | white, `slate-5` hairline |
+| On | `blue-9` fill, white 14px tick |
+| Some | `blue-9` fill, white **dash** |
+| Label | part of the control — the whole row toggles |
+
+**"Some" is a different SHAPE, not a different colour**, so it survives a
+greyscale screenshot and a colour-blind reader. It is a real value
+(`"indeterminate"`), not a class a page paints on, so a select-all over a
+partial pick cannot be mistaken for "none". `DataTable` (D0.5c) is the consumer
+it exists for.
+
+## §6.13 `DatePicker`
+
+| | |
+|---|---|
+| Trigger | the `Select` shape — field skin, 32 high, calendar glyph at the right |
+| Reads | `YYYY-MM-DD`, or null |
+| Prints | **`fmtDate()`** — `19 Jul 26, Sun`, §2.4's one spelling |
+| Calendar | `react-day-picker` inside a kit `Popover`, week starts Monday |
+| Empty | the placeholder in `slate-9`, and nothing else |
+
+**`Input type="date"` is deliberately not allowed**: it opens the OS's own
+picker, which is a different control on every machine and spells the date in the
+machine's locale — the exact thing §2.4 forbids. §11 pins the calendar to
+`react-day-picker` because **Radix has no calendar primitive**.
+
+This shrinks §2.4's Human-Review debt by one control: a date field that speaks
+ISO and prints through the one helper cannot hand a date to the locale.
+
+## §6.14 `Toast`
+
+| | |
+|---|---|
+| Surface | white, `slate-5` hairline, `rounded-card`, 16/12 padding |
+| Tone | on the GLYPH only — a fully coloured card is a status pill the size of a card |
+| Kinds | `success` · `warning` · `danger`. **No `info`** |
+| Host | the ONE `<Toaster>` `App.tsx` already mounts |
+| Layer | 50 — sonner's, and the kit never writes it |
+
+§9's Success row: *"what changed; it never becomes a permanent block."* So the
+kit exports a FUNCTION (`notify`) rather than something a page mounts — a
+success a page has to render ends up as a green bar nobody dismisses.
+
+**There is deliberately no `info` toast**: a message with no consequence has not
+earned an interruption.
+
+**It reuses the existing host and changes no existing caller.** The ~40 pages
+still calling `toast.success(...)` keep sonner's own look until D2–D7 move them;
+a second host would stack two toasts in two corners.
 
 ---
 
@@ -1052,7 +1263,7 @@ and it will turn out to be one of these.
 | **Partial data** | the surface renders what it HAS and states the gap in its own words | which part is missing — **never a silent blank** |
 | **No permission** | `EmptyState`, no action | that it is not theirs to open, and who to ask |
 | **Offline** | `EmptyState` + a retry action | that the connection dropped, not that the record is gone |
-| **Success** | a toast (`sonner`, §11) — ⏳ D0.5b | what changed; it never becomes a permanent block |
+| **Success** | a toast — `notify()` (§6.14, sonner) ✅ **D0.5b** | what changed; it never becomes a permanent block |
 
 **Partial data is the one with no component, on purpose.** A box that renders
 "some of this is missing" in a generic voice is how a screen ends up saying
@@ -1146,7 +1357,9 @@ Exempt: `pages/dealer/**` (POS, Part B) and `pages/print/**`.
 | 2 | Warn + CI report; the baseline may only go down | D2–D4 |
 | 3 | **Fail the build** | D5 |
 
-**Stage 3 is blocked while the PENDING register is non-empty.**
+**Stage 3 is blocked while the PENDING register is non-empty.** ✅ It is empty
+since 2026-07-28, so D5 is no longer blocked on a DECISION — only on D1–D4
+being built.
 
 ## §13.3 Rules
 
@@ -1155,8 +1368,8 @@ Exempt: `pages/dealer/**` (POS, Part B) and `pages/print/**`.
 | A | any raw hex literal in JSX | ✅ |
 | B | the Carres flame outside the logo component | ✅ |
 | C | a Lucide `size` ∉ {14, 16, 18}; an emoji used as an icon; an icon name outside §5.3 | ✅ |
-| D | `text-[Npx]`; a typography token outside §2.1; a weight outside §2.2 | ⚠ pending Q3 |
-| E | a spacing / radius / border value outside §4 | ⚠ pending Q1 |
+| D | `text-[Npx]`; a typography token outside §2.1; a weight outside §2.2 (700 is dead) | ✅ **frozen** |
+| E | a spacing / radius / border value outside §4 (the 8-step scale) | ✅ **frozen** |
 | F | a `z-` class anywhere in `pages/**` | ✅ |
 | G | a raw `<table>`, `<input>`, `<select>`, or a `fixed inset-0` overlay in `pages/**` | ⏳ needs D0.5 |
 | H | a `PageShell` whose fixed chrome exceeds its variant's budget (§1.3) | ⏳ needs D0.5c |
@@ -1222,31 +1435,52 @@ parses the Enforcement column out of this file, checks which mechanisms
 actually exist in the repo, and rewrites the block. A hand-maintained
 percentage is prose, and prose drifts; that is the whole thesis of this
 document.
-*(The numbers below are the D0.5a hand count, valid until D1 wires the generator.)*
+*(The numbers below are the D0.5b hand count, valid until D1 wires the generator.)*
 
 ```
                          enforced / total
   Typography    ░░░░░░░░░░    0%      0 / 3
   Colour        ██████░░░░    60%     3 / 5
-  Spacing       ░░░░░░░░░░    0%      0 / 4
-  Icons         ███████▌░░    75%     3 / 4
-  Components    ████▌░░░░░    45%     5 / 11
+  Spacing       ██▌░░░░░░░    25%     1 / 4
+  Icons         ██████████   100%     4 / 4
+  Components    ██████▊░░░    68%    13 / 19
   Layout        ░░░░░░░░░░    0%      0 / 6
   Hierarchy     ██░░░░░░░░    20%     1 / 5
   ──────────────────────────────────────────
-  TOTAL         ███▏░░░░░░    32%    12 / 38
+  TOTAL         ████▊░░░░░    48%    22 / 46
 ```
 
 | | Count | Meaning |
 |---|---|---|
-| Rules | **38** | design rules stated in §1–§8 |
-| **Enforced** | **12** | Type System / Component API / Build Guard / ESLint is live |
-| Scheduled | 19 | a card exists (D0.5–D5) |
-| **Blocked on a decision** | 3 | Q1 spacing · Q3 weight · Q4 stroke — see PENDING REGISTER |
+| Rules | **46** | design rules stated in §1–§8 |
+| **Enforced** | **22** | Type System / Component API / Build Guard / ESLint is live |
+| Scheduled | 24 | a card exists (D0.5c–D5) |
+| **Blocked on a decision** | **0** | ✅ the PENDING REGISTER is empty |
 | **Human Review debt** | 4 | `fmtDate()` · "max 2 reds per screen" · facet group order · "Progress carries no events" — nobody has found a mechanism |
 
-**The D0.5a arithmetic, shown so it can be checked** (health rule 1 says
+**The D0.5b arithmetic, shown so it can be checked** (health rule 1 says
 coverage may never go down, and rule 2 says the debt may never grow):
+
+```
+rules      38  +  8  =  46     the eight new §6.7–§6.14 Component-API rules
+enforced   12  +  8  =  20     each of the eight arrives with its mechanism
+             +  2  =  22     plus TWO that were already written and became
+                             structure: the icon stroke (Q4 frozen → the prop
+                             is gone) and the five-layer ladder (§4.4 → one
+                             file may name a layer, asserted by a source scan)
+coverage   31.58%  →  47.83%   ⬆
+debt          4    →      4    unchanged — no rule was added with Human Review
+blocked       3    →      0    ⬇ Q1 · Q3 · Q4 frozen by Jess
+```
+
+**Nothing was counted because a card exists** — every ✅ in §1–§8 points at a
+file that fails today if the rule is broken. Two rules deliberately did NOT move
+to ✅ even though D0.5b built half of each: *"no hand-rolled modal/drawer"*
+(§0.1) and the spacing/weight Build Guards (§2.2 · §4.1) are live over
+`components/kit/**` and not over the 225 pages, which is **D1**'s job. Counting
+a half-built mechanism is how a coverage number stops meaning anything.
+
+**The D0.5a arithmetic, kept for the audit trail:**
 
 ```
 rules      33  +  5  =  38     the five new §6.0 Component-API rules
@@ -1254,14 +1488,7 @@ enforced    3  +  9  =  12     status-is-a-pill · action-tone-from-a-condition 
                                icon size · icon meaning · lucide-only-in-the-kit ·
                                plus the five §6.0 rules
 coverage   9.09%  →  31.58%    ⬆
-debt          4   →      4     unchanged — no rule was added with Human Review
 ```
-
-Where the nine came from: five rules were added **already enforced** (that is
-the point of a Component API — the rule and its mechanism are the same object),
-and four rules that already existed as words became structure when `Icon` and
-`StatusPill` landed. **Nothing was counted because a card exists** — every ✅ in
-§1–§8 points at a file that fails today if the rule is broken.
 
 **Two health rules:**
 
@@ -1299,15 +1526,16 @@ Taken 2026-07-27 across `apps/web/src`:
 | Lucide icons | 100 distinct, in 12 sizes, with 3 known duplicate meanings |
 | `.btn-*` uses | 343 — **consistent; the one thing that worked** |
 | `.pill` uses | 72 — largely consistent |
-| Radix packages installed | **1 since D0.5a** — `@radix-ui/colors` (the palette). The behaviour primitives land in D0.5b |
+| Radix packages installed | **8 since D0.5b** — `colors` + `react-dialog` · `react-dropdown-menu` · `react-popover` · `react-tooltip` · `react-select` · `react-checkbox` · `react-tabs`, plus `react-day-picker` (Radix has no calendar). **None of it reaches the operator's bundle**: `/ui` is the only consumer and it is a lazy route, measured — 0 Radix markers in `index-*.js`, all of them in the showcase chunk |
 | `shadcn/ui` installed | **no** — `components/ui/` does not exist |
 
-**What D0.5a changed against this table** (2026-07-28): the ten Foundation
-Components exist and `/ui` renders them, so the *shell · table · modal · input*
-row of the "Died" list is no longer entirely true — `<input>` now has a box.
-**None of the 225 pages has moved yet, on purpose**: D0.5a touches no existing
-page, and the codemods (D2–D4) plus the page cards (D6, D7+) are what burn the
-2,556 hard-coded sizes down. This appendix is re-measured by **D1**.
+**What D0.5a and D0.5b changed against this table** (2026-07-28): twenty
+Foundation Components exist and `/ui` renders them, so the *shell · table ·
+modal · input* row of the "Died" list is now only half true — `<input>` and
+`modal/drawer` both have a box; **shell and table are D0.5c**. **None of the 225
+pages has moved yet, on purpose**: neither card touches an existing page, and
+the codemods (D2–D4) plus the page cards (D6, D7+) are what burn the 2,556
+hard-coded sizes down. This appendix is re-measured by **D1**.
 
 ---
 

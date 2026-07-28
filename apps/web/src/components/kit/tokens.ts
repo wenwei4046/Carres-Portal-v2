@@ -14,11 +14,11 @@
  * used by 5 live files. Redefining it would have re-sized pages this card is
  * forbidden to touch. The mapping token → class is recorded in UI-KIT §2.1.
  *
- * **Spacing is PENDING (Q1) and this file deliberately does not answer it.**
- * Every kit component is built from the SIX steps that appear in BOTH
- * candidates — 4 · 8 · 12 · 16 · 24 · 32 — so whichever way Jess freezes Q1 on
- * `/ui`, not one component changes. `/ui` renders the two candidates side by
- * side; nothing here prefers one.
+ * **Q1 · Q3 · Q4 are FROZEN (Jess, 2026-07-28) — the PENDING REGISTER is empty.**
+ * Spacing is Candidate A's eight steps, `font-bold` (700) is dead and 600 is the
+ * heavy weight, and the icon stroke is Lucide's own 2. D0.5a built its ten boxes
+ * from the six steps common to both spacing candidates, so the freeze cost zero
+ * component changes — which is why the answer could arrive after the components.
  */
 import type { OrderActionTone } from "@carres/shared";
 
@@ -38,6 +38,13 @@ export interface TypeTokenSpec {
   lineHeight: number;
   use: string;
 }
+
+/**
+ * §2.2 — the three weights that survive Q3. 700 was deleted into 600 (Jess,
+ * 2026-07-28): the two were doing the same job at every size on `/ui`.
+ * A kit file that writes `font-bold` fails `kit-source.test.ts`.
+ */
+export const TYPE_WEIGHTS: readonly number[] = [400, 500, 600];
 
 /** UI-KIT §2.1, in the order the law states it. */
 export const TYPE_TOKENS: readonly TypeTokenSpec[] = [
@@ -85,29 +92,40 @@ export const RADII = [
 ] as const;
 
 /* ─────────────────────────────────────────────────────────────────────────
- * §4.1 Spacing — ⚠ PENDING Q1. Rendered by `/ui`, decided by Jess, enforced
- * by nobody until then (UI-KIT: "never enforce a PENDING rule").
+ * §4.1 Spacing — ✅ FROZEN Q1 = Candidate A, 8 steps (Jess, 2026-07-28).
+ *
+ * `tailwind` is the numeric class suffix, because that is the thing a source
+ * scan can check: `p-1.5` is 6px. `kit-source.test.ts` reads this record, so
+ * the scan and the law cannot drift apart.
  * ──────────────────────────────────────────────────────────────────────── */
 
-export const SPACING_CANDIDATES = {
-  A: { label: "Candidate A — 8 steps", steps: [2, 4, 6, 8, 12, 16, 24, 32], migrationSites: 779 },
-  B: { label: "Candidate B — 6 steps (strict 4pt)", steps: [4, 8, 12, 16, 24, 32], migrationSites: 2225 },
-} as const;
+export interface SpacingStep {
+  px: number;
+  /** The Tailwind numeric suffix — `p-`, `gap-`, `px-` … */
+  tailwind: string;
+  use: string;
+}
 
-/**
- * The steps present in BOTH candidates. Every kit component is built from
- * these only, which is what makes the components Q1-proof.
- */
-export const SPACING_SAFE: readonly number[] = SPACING_CANDIDATES.B.steps;
+export const SPACING_SCALE: readonly SpacingStep[] = [
+  { px: 2, tailwind: "0.5", use: "hairline nudge (pill y-padding)" },
+  { px: 4, tailwind: "1", use: "touching" },
+  { px: 6, tailwind: "1.5", use: "icon-to-text gap — most used" },
+  { px: 8, tailwind: "2", use: "inside a control" },
+  { px: 12, tailwind: "3", use: "standard gap" },
+  { px: 16, tailwind: "4", use: "dense card padding · table cell x-pad" },
+  { px: 24, tailwind: "6", use: "between blocks · card padding" },
+  { px: 32, tailwind: "8", use: "between major regions" },
+] as const;
 
 /* ─────────────────────────────────────────────────────────────────────────
- * §5.1 Icons — exactly three sizes; stroke is ⚠ PENDING Q4.
+ * §5.1 Icons — exactly three sizes; stroke ✅ FROZEN Q4 = 2.
  * ──────────────────────────────────────────────────────────────────────── */
 
 export type IconSize = 14 | 16 | 18;
 export const ICON_SIZES: readonly IconSize[] = [14, 16, 18];
 
-/** Lucide's own default. NOT a decision — Q4 is frozen by Jess on `/ui`. */
-export const ICON_STROKE_DEFAULT = 2;
-/** The two candidates `/ui` renders side by side. */
-export const ICON_STROKE_CANDIDATES = [2, 1.5] as const;
+/**
+ * Lucide's own default, and now the law (Q4, Jess 2026-07-28). `Icon` has no
+ * `strokeWidth` prop at all, so this is the only stroke the portal can draw.
+ */
+export const ICON_STROKE = 2;

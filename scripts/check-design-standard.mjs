@@ -174,9 +174,7 @@ for (const f of files) {
 // migrate it to the kit; never remove one.
 const KIT_FILES = new Set([
   // D0.5a — the Foundation Components. They are the kit by definition, so they
-  // are in scope from the day they land. (`pages/dev/UiShowcase.tsx` is
-  // deliberately NOT here: it renders BOTH pending spacing candidates on
-  // purpose, which is the one file that must be allowed to.)
+  // are in scope from the day they land.
   "apps/web/src/components/kit/Badge.tsx",
   "apps/web/src/components/kit/Button.tsx",
   "apps/web/src/components/kit/Card.tsx",
@@ -189,6 +187,22 @@ const KIT_FILES = new Set([
   "apps/web/src/components/kit/SearchInput.tsx",
   "apps/web/src/components/kit/StatusPill.tsx",
   "apps/web/src/components/kit/Textarea.tsx",
+  // D0.5b — the Radix half.
+  "apps/web/src/components/kit/Checkbox.tsx",
+  "apps/web/src/components/kit/DatePicker.tsx",
+  "apps/web/src/components/kit/DialogFrame.tsx",
+  "apps/web/src/components/kit/Drawer.tsx",
+  "apps/web/src/components/kit/DropdownMenu.tsx",
+  "apps/web/src/components/kit/Modal.tsx",
+  "apps/web/src/components/kit/Popover.tsx",
+  "apps/web/src/components/kit/Select.tsx",
+  "apps/web/src/components/kit/Tabs.tsx",
+  "apps/web/src/components/kit/Toast.tsx",
+  "apps/web/src/components/kit/Tooltip.tsx",
+  // `/ui` joins the kit at D0.5b. It was exempt while it rendered BOTH pending
+  // spacing candidates on purpose; Jess froze Q1 on 2026-07-28, the comparison
+  // is gone, and the exemption died with the code it described.
+  "apps/web/src/pages/dev/UiShowcase.tsx",
   "apps/web/src/components/SectionPanel.tsx",
   "apps/web/src/pages/operation/components/OrderDetailDrawer.tsx",
   "apps/web/src/pages/operation/components/StockPickerGrid.tsx",
