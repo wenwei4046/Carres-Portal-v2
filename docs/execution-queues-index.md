@@ -30,11 +30,29 @@
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · **R6 ✅ #490** — R7 · **R8** (the banned-verb sweep, new 2026-07-28) left |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C9 ✅ #472 · C10 ✅ #471** — C4 · C8 left |
-| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings). **P2 is the next card** |
+| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings) · **P2 🟡 PARTIALLY DONE #492** — the click law is true on To Order; Receiving + Claims still owed. **P3 is the next full card** |
 | ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 | **NEW 2026-07-28** — D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3` · **D0.4 ✅ the old order-portal master spec is DELETED** (Loo 2026-07-28 — docs only, no page touched). **T3 = Jess uses it for a day, after a deploy.** TEMPORARY doc — delete when the line ends |
 
 **State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ **R1-R6 ✅** · ⑥ C1 · C2 · C3 · C5 · C6 · **C7** · C9 · C10 ✅ ·
-⑦ **P1 ✅** · ⑧ D0 + T1 + T2 ✅ (T3 is a Jess task, not a build card).
+⑦ **P1 ✅ · P2 🟡 half** · ⑧ D0 + T1 + T2 ✅ (T3 is a Jess task, not a build card).
+
+**What P2 changed so far (2026-07-28, PR #492) — the To Order half, web only, no
+migration.** UI-KIT §8.2 is now true on that tab. Three things it asks for were missing,
+and one of them was written and then defeated one hook below: **clicking the same PO again
+never cleared it** — the row toggled `selection` to null and the auto-select effect put the
+first row straight back, so "click again to clear" silently meant *select a different
+factory's PO*; **clicking the stage you were already on threw away the supplier filter**,
+the exact opposite of the law, and is a no-op now (a stage is not a filter — there are
+three, one is always on, and there is nothing to clear into); and **closing a drawer now
+gives the list back**, filters, selection and the facet rail's scroll, the rail being the
+scroll target because the middle list was folded into the tree on 2026-07-24. No word
+changed, nothing extracted (that is D0.5c), and `OperationPurchase.tsx` got the first test
+file it has ever had. **Receiving and Claims are still owed**: they are ④ R's files and R6
+held them while this ran — **R6 has since merged (#490), so both halves are unblocked.**
+P2 also reports that **two of the three filters its own card names can never be switched
+on** (`attn` · `selectedDay` — their tiles were deleted in July and the state was left
+behind) and that the three stage cells are worded off-dictionary (`Chase factory` uses a
+banned word), which belongs in **R8**'s sweep rather than a third card.
 
 **What P1 changed (2026-07-28, PR #488, migration 0303).** Every number the ordering engine
 reads is a row a manager edits on **Purchasing → Settings** — the fifth tab, gated on the
@@ -72,7 +90,9 @@ delivery queue is a deadline-carrying step, so the fifth tile waits on Jess ruli
 S / R / P run in parallel throughout; **C4 and ⑦ P share the Purchasing pages with ④ R —
 only ONE of those three at a time.**
 
-**Purchasing lane, 2026-07-28: ⑦ P2 holds it. R6 released it (#490).**
+**Purchasing lane, 2026-07-28: FREE. R6 released it (#490); ⑦ P2 shipped its To Order half
+(#492) and released it too.** P2's remaining halves (Receiving · Claims) edit ④ R's two
+files, so whoever takes them takes the lane.
 
 **The lane check that found the problem, kept because it worked:** compare the migration
 tracker tail to `supabase/migrations`. **If the tracker is ahead, somebody is holding the

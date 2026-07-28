@@ -207,6 +207,56 @@ alone and leave the other two tabs until it lands — but never edit that file w
 **Done when:** every queue tile on Purchasing filters and clears again, and the drawer gives
 the list back exactly as it was left.
 
+### 🟡 PARTIALLY DONE — the To Order half shipped 2026-07-28 (PR #492)
+
+**Done: To Order.** No migration, no new word, no extracted component.
+
+- **Clicking the same PO again clears it.** It never did: the row already toggled
+  `selection` to null and the auto-select effect put the first row straight back on the
+  next render, so "click again to clear" silently meant **"select a different factory's
+  PO"**. `selectionCleared` tells those effects the empty selection was ASKED FOR, and it
+  covers all three stage lists so Send / Chase / Receive get one rule, not three.
+- **Clicking the stage you are already on is a no-op.** `goStage` used to re-run its whole
+  reset, so a second click on `Send POs` threw away the supplier filter the operator had
+  just picked — the exact opposite of the law it sits under. **A stage is not a filter:**
+  there are three, one is always on, and there is no cleared state to toggle into.
+- **Closing a drawer gives the list back.** `CreatePOModal` (Send PO · + New PO · Send
+  separately) and `ReceivePOModal` (Check in) snapshot the filters, the selection and the
+  facet rail's scroll on open and restore them on close. **The rail is the scroll target**
+  because the middle list was folded into the tree on 2026-07-24 — the rail IS this tab's
+  list. The scroll re-applies after each render until it sticks, because the `refetch()`
+  that runs on close re-lays the tree out a frame or two later.
+- The supplier facet cell already obeyed §8.2 and is unchanged — it now has a test.
+- `OperationPurchase.tsx` had **no test file at all**; the first one is 8 tests, each with
+  its negative control run (drop the cleared guard → exactly 4 fail · drop the stage guard
+  → 1 · drop the restore → 1).
+
+**Still owed: Receiving and Claims.** Both need a facet rail and tiles from scratch, and
+both live in ④ R's files (`OperationReceiving.tsx` · `OperationSupplierClaims.tsx`), which
+**R6 held when this ran** — the card's own LANE paragraph says to ship the To Order half
+alone rather than edit a file another line holds. **R6 has since merged (PR #490,
+`9fe094bf`), so that block is gone** and the two remaining halves can take their own chat.
+
+**Reported, not fixed (Law 0):**
+
+1. **Two of the three filters this card names are UNREACHABLE.** The table above says To
+   Order carries `supplierFilter · attn · selectedDay`, "each with an `onClear` chip".
+   Measured 2026-07-28: `attn` and `selectedDay` have state, filter logic and a clear chip,
+   and **nothing on the page can set either** — the NEEDS-ATTENTION facet section and the
+   days-to-order strip were both deleted on 2026-07-23/24 and the state was left behind. A
+   filter that can be cleared and never set is `ops_order_control.balance`'s disease in its
+   other form. Giving them tiles needs words (`Late only` · `No deadline`) that are **not in
+   COPY-STANDARD**, so nothing was invented — and nothing was deleted either, because this
+   card names them as live state. Jess rules which.
+2. **The three stage cells are queue tiles that cannot toggle.** §7 names the tiles and §8.2
+   says a tile clears on re-click; this page has no unfiltered state to clear INTO — the
+   body renders a stage-specific layout, so a cleared stage is a blank page. Making them
+   real toggles is a rebuild of the tab, not P2.
+3. **The stage cells are also worded off-dictionary** — `Send POs` · `Chase factory` ·
+   `Receive`, where the dictionary locks `Send PO` · `Confirm ready date` · `Check in`, and
+   **`Chase` is a banned word**. Same disease as the `Contact` → `Call` rename already
+   carded as **R8**; worth folding in there rather than opening a third.
+
 ## P3 · The two missing supplier calls
 
 **Goal:** build the two actions the portal has never had —
@@ -315,7 +365,7 @@ number on screen matches what actually happened.
 | Card | Status | PR |
 |---|---|---|
 | P1 | ✅ the numbers become settings (migration **0303**) | #488 |
-| P2 | ⬜ after P1 · Claims tab + the interaction law | — |
+| P2 | 🟡 PARTIALLY DONE · the interaction law is true on **To Order**; Receiving + Claims still owed (they were R6's files, now released) | #492 |
 | P3 | ⬜ after P1 · the two missing supplier calls (migration) | — |
 | P4 | ⬜ where the goods go (migration) | — |
 | P5 | ⬜ after P1-P4 · prove it with a real PO | — |

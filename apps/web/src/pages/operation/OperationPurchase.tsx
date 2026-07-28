@@ -49,8 +49,21 @@
  *
  * Design: UI-KIT v4 — token classes only (no raw hex), Lucide icons, `.pill`
  * status tones, English-only copy, `Btn` primitive, date via `fmtDate()`.
+ *
+ * P2 (2026-07-28) — the click behaviour becomes real on THIS tab, per
+ * `docs/UI-KIT.md` §8.2. No word changed; only what a click does:
+ *  - clicking the SAME row again clears it. It always set `selection` to null
+ *    and the auto-select effect put the first row straight back, so a re-click
+ *    had never once cleared anything;
+ *  - clicking the stage you are already on is a no-op. It used to re-run the
+ *    reset and silently throw away the supplier filter;
+ *  - opening a drawer (CreatePOModal · ReceivePOModal) snapshots the filters,
+ *    the selection and the facet rail's scroll, and closing it puts them back.
+ *
+ * Receiving and Claims are the other two tabs §8.2 still owes; they are ④ R's
+ * files and R6 holds them, so P2 shipped the To Order half alone.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -108,6 +121,22 @@ type Selection =
   | { kind: "chase"; poId: string }
   | { kind: "receive"; poId: string }
   | null;
+
+/**
+ * P2 — everything the To Order list is "left as" when a drawer opens, so that
+ * closing the drawer gives it back (`docs/UI-KIT.md` §8.2). The scroll target
+ * is the facet rail, because after the middle list was folded into the tree
+ * (2026-07-24) the rail IS this tab's list.
+ */
+interface ToOrderListState {
+  stage: Stage;
+  supplierFilter: string | null;
+  attn: Attn;
+  selectedDay: string | null;
+  selection: Selection;
+  selectionCleared: boolean;
+  facetScrollTop: number;
+}
 
 /** A place group split by category — each split gets a unique `groupKey` so
  *  the middle list renders one row per (supplier × category) while the facet
@@ -422,6 +451,12 @@ export default function OperationPurchase() {
   const [attn, setAttn] = useState<Attn>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
+  // P2 — "click the same cell again and it clears" (UI-KIT §8.2). The rows
+  // ALREADY toggled to null; the auto-select effects below then put the first
+  // row straight back, so a re-click has never once cleared anything. This
+  // flag is what tells those effects the empty selection was ASKED FOR. It is
+  // state, not a ref, because the effects have to re-run when it changes.
+  const [selectionCleared, setSelectionCleared] = useState(false);
   // v2 (Loo 2026-07-23): PROJECTS facet lets the operator scope to one big
   // customer whose SOs span multiple factories (Dorsett Loft = 40 rooms →
   // 3+ POs). Data lives in `PurchasePlaceGroupLine.forOrders[i].customerName`
@@ -534,12 +569,26 @@ export default function OperationPurchase() {
   );
 
   // Switching stage clears the per-stage facet filters + selection + selected day.
+  //
+  // P2 — clicking the stage you are ALREADY on is a no-op. It used to re-run
+  // the whole reset, so a second click on `Send POs` silently threw away the
+  // supplier the operator had just picked — the exact opposite of §8.2's "the
+  // table keeps its filter". A stage is not a filter: there are three and one
+  // of them is always on, so there is no "cleared" state to toggle into.
   const goStage = (s: Stage) => {
+    if (s === stage) return;
     setStage(s);
     setSupplierFilter(null);
     setAttn(null);
     setSelectedDay(null);
     setSelection(null);
+    setSelectionCleared(false);
+  };
+
+  /** Pick a row, or clear it when the same row is clicked again (§8.2). */
+  const toggleSelection = (next: NonNullable<Selection>, isSelected: boolean) => {
+    setSelection(isSelected ? null : next);
+    setSelectionCleared(isSelected);
   };
 
   // Stage counts + attention sub-counts — from SPLIT groups so a supplier with
@@ -634,8 +683,10 @@ export default function OperationPurchase() {
   );
 
   // Auto-select the first visible row per stage so the detail pane isn't empty.
+  // P2 — but never against the operator's own clear: `selectionCleared` means
+  // the empty selection is the answer, not an accident to be filled in.
   useEffect(() => {
-    if (stage !== "place") return;
+    if (stage !== "place" || selectionCleared) return;
     const stillVisible =
       selection?.kind === "place" &&
       placeShown.some((g) => g.groupKey === selection.groupKey);
@@ -643,16 +694,16 @@ export default function OperationPurchase() {
     setSelection(
       placeShown[0] ? { kind: "place", groupKey: placeShown[0].groupKey } : null,
     );
-  }, [stage, placeShown, selection]);
+  }, [stage, placeShown, selection, selectionCleared]);
   useEffect(() => {
-    if (stage !== "chase") return;
+    if (stage !== "chase" || selectionCleared) return;
     const stillVisible =
       selection?.kind === "chase" && chaseShown.some((r) => r.poId === selection.poId);
     if (stillVisible) return;
     setSelection(chaseShown[0] ? { kind: "chase", poId: chaseShown[0].poId } : null);
-  }, [stage, chaseShown, selection]);
+  }, [stage, chaseShown, selection, selectionCleared]);
   useEffect(() => {
-    if (stage !== "receive") return;
+    if (stage !== "receive" || selectionCleared) return;
     const stillVisible =
       selection?.kind === "receive" &&
       receiveShown.some((r) => r.poId === selection.poId);
@@ -660,7 +711,7 @@ export default function OperationPurchase() {
     setSelection(
       receiveShown[0] ? { kind: "receive", poId: receiveShown[0].poId } : null,
     );
-  }, [stage, receiveShown, selection]);
+  }, [stage, receiveShown, selection, selectionCleared]);
 
   // Group placeShown by category for the facet's nested tree under Send POs
   // (Jess 2026-07-24 v2 rev 4 — middle-panel-into-facet refactor).
@@ -716,8 +767,77 @@ export default function OperationPurchase() {
       onClear: () => setSelectedDay(null),
     });
 
-  const toggleSupplier = (id: string) =>
+  // P2 — the one facet cell on this tab that has always obeyed §8.2: click the
+  // same supplier again and the filter clears. Kept, and now covered by a test
+  // so it cannot quietly stop being true.
+  const toggleSupplier = (id: string) => {
     setSupplierFilter((cur) => (cur === id ? null : id));
+    // A different filter is a different list — auto-select may resume.
+    setSelectionCleared(false);
+  };
+
+  // ── P2 · closing a drawer gives the list back (UI-KIT §8.2) ────────────────
+  //
+  // The two drawers this tab opens are CreatePOModal (Send PO · + New PO ·
+  // Send separately) and ReceivePOModal (Check in). Both close by refetching
+  // the plan, which re-renders the facet tree — and a shorter tree makes the
+  // browser clamp the rail's scrollTop before React has finished. So the state
+  // is snapshotted when the drawer opens and put back when it closes.
+  const facetInnerRef = useRef<HTMLDivElement | null>(null);
+  const getFacetScroller = () =>
+    facetInnerRef.current?.closest<HTMLElement>(
+      '[data-testid="listshell-facet"]',
+    ) ?? null;
+  const listStateBeforeDrawer = useRef<ToOrderListState | null>(null);
+  const pendingFacetScroll = useRef<number | null>(null);
+
+  const captureListState = () => {
+    listStateBeforeDrawer.current = {
+      stage,
+      supplierFilter,
+      attn,
+      selectedDay,
+      selection,
+      selectionCleared,
+      facetScrollTop: getFacetScroller()?.scrollTop ?? 0,
+    };
+  };
+
+  const restoreListState = () => {
+    const s = listStateBeforeDrawer.current;
+    listStateBeforeDrawer.current = null;
+    if (!s) return;
+    setStage(s.stage);
+    setSupplierFilter(s.supplierFilter);
+    setAttn(s.attn);
+    setSelectedDay(s.selectedDay);
+    setSelection(s.selection);
+    setSelectionCleared(s.selectionCleared);
+    pendingFacetScroll.current = s.facetScrollTop;
+  };
+
+  // Re-apply the scroll after every render until it sticks. One assignment is
+  // not enough: the refetch that runs on close lands a frame or two later and
+  // re-lays the tree out underneath it. Gives up once the rail is too short to
+  // hold the old position — a group that was sent is genuinely gone.
+  useLayoutEffect(() => {
+    const want = pendingFacetScroll.current;
+    if (want == null) return;
+    const el = getFacetScroller();
+    if (!el) return;
+    el.scrollTop = want;
+    if (el.scrollTop === want || el.scrollHeight - el.clientHeight <= want) {
+      pendingFacetScroll.current = null;
+    }
+  });
+
+  /** Open a drawer — always through here, so nothing can open one without
+   *  first recording what the list looked like. */
+  const openCreatePo = (prefill: CreatePoPrefill) => {
+    captureListState();
+    posCountBeforeSend.current = posQ.data?.pos.length ?? 0;
+    setCreatePoPrefill(prefill);
+  };
 
   // ── Error state ─────────────────────────────────────────────────────────────
   if (isError) {
@@ -766,7 +886,7 @@ export default function OperationPurchase() {
           facetWidthPx={320}
           activeChips={activeChips}
           facet={
-            <div className="flex flex-col gap-2 min-h-0 flex-1">
+            <div ref={facetInnerRef} className="flex flex-col gap-2 min-h-0 flex-1">
               {/* + New PO — Gmail compose style (Jess 2026-07-23). Always
                   visible at the top; opens CreatePOModal with EMPTY prefill
                   so the operator can raise an ad-hoc PO (stockpile / runner /
@@ -775,10 +895,7 @@ export default function OperationPurchase() {
                   UI-KIT §A5). */}
               <button
                 type="button"
-                onClick={() => {
-                  posCountBeforeSend.current = posQ.data?.pos.length ?? 0;
-                  setCreatePoPrefill({ lines: [] });
-                }}
+                onClick={() => openCreatePo({ lines: [] })}
                 className="shrink-0 flex items-center justify-center gap-2 h-9 rounded-full border border-base-200 bg-white text-base-800 text-[13px] font-semibold hover:bg-hovertint transition-colors"
               >
                 <span className="text-[16px] leading-none">+</span> New PO
@@ -800,6 +917,7 @@ export default function OperationPurchase() {
               {!collapsedFacet.has("today") && (
                 <div>
                   <FacetRow
+                    testId="facet-stage-place"
                     leadingChip={poDutyChip}
                     label="Send POs"
                     count={placeCount}
@@ -863,14 +981,12 @@ export default function OperationPurchase() {
                                 <button
                                   key={g.groupKey}
                                   type="button"
+                                  data-testid={`place-row-${g.groupKey}`}
+                                  aria-pressed={isSel}
                                   onClick={() =>
-                                    setSelection(
-                                      isSel
-                                        ? null
-                                        : {
-                                            kind: "place",
-                                            groupKey: g.groupKey,
-                                          },
+                                    toggleSelection(
+                                      { kind: "place", groupKey: g.groupKey },
+                                      isSel,
                                     )
                                   }
                                   className={`w-full text-left rounded-md px-2 py-1 flex items-center gap-2 transition-colors ${
@@ -895,6 +1011,7 @@ export default function OperationPurchase() {
                   )}
 
                   <FacetRow
+                    testId="facet-stage-chase"
                     leadingChip={poDutyChip}
                     label="Chase factory"
                     count={chaseCount}
@@ -903,6 +1020,7 @@ export default function OperationPurchase() {
                     onClick={() => goStage("chase")}
                   />
                   <FacetRow
+                    testId="facet-stage-receive"
                     leadingChip={grnDutyChip}
                     label="Receive"
                     count={receiveCount}
@@ -928,6 +1046,7 @@ export default function OperationPurchase() {
                     byFactory.map((f) => (
                       <FacetRow
                         key={f.id}
+                        testId={`facet-supplier-${f.id}`}
                         label={f.name}
                         count={f.units}
                         unit="units"
@@ -1006,10 +1125,7 @@ export default function OperationPurchase() {
                     )}
                     preparedByName={dutyQ.data?.holder?.name ?? null}
                     dutyHolderName={dutyQ.data?.holder?.name ?? null}
-                    onSendPo={(prefill) => {
-                      posCountBeforeSend.current = posQ.data?.pos.length ?? 0;
-                      setCreatePoPrefill(prefill);
-                    }}
+                    onSendPo={(prefill) => openCreatePo(prefill)}
                     buildPrefill={() => buildPlacePrefill(selectedPlace)}
                     waTemplate={buildPlaceWaTemplate(
                       selectedPlace,
@@ -1039,8 +1155,7 @@ export default function OperationPurchase() {
                         // Open CreatePOModal with ONLY this SKU line.
                         const ln = selectedPlace.lines.find((l) => l.sku === sku);
                         if (!ln) return;
-                        posCountBeforeSend.current = posQ.data?.pos.length ?? 0;
-                        setCreatePoPrefill({
+                        openCreatePo({
                           supplierId: selectedPlace.supplierId,
                           lines: [{ sku: ln.sku, qty: ln.need, attrs: null }],
                           note: `Sent separately from cockpit · ${ln.sku} × ${ln.need}`,
@@ -1115,7 +1230,11 @@ export default function OperationPurchase() {
                                 selection.poId === r.poId
                               }
                               onSelect={() =>
-                                setSelection({ kind: "chase", poId: r.poId })
+                                toggleSelection(
+                                  { kind: "chase", poId: r.poId },
+                                  selection?.kind === "chase" &&
+                                    selection.poId === r.poId,
+                                )
                               }
                               testId={`chase-row-${r.poId}`}
                             />
@@ -1152,7 +1271,11 @@ export default function OperationPurchase() {
                               selection.poId === r.poId
                             }
                             onSelect={() =>
-                              setSelection({ kind: "receive", poId: r.poId })
+                              toggleSelection(
+                                { kind: "receive", poId: r.poId },
+                                selection?.kind === "receive" &&
+                                  selection.poId === r.poId,
+                              )
                             }
                             testId={`receive-row-${r.poId}`}
                           />
@@ -1174,7 +1297,10 @@ export default function OperationPurchase() {
                     <ReceiveDetail
                       row={selectedReceive}
                       supplierName={supplierName(selectedReceive.supplierId)}
-                      onCheckIn={(poId) => setCheckInPoId(poId)}
+                      onCheckIn={(poId) => {
+                        captureListState();
+                        setCheckInPoId(poId);
+                      }}
                     />
                   ) : (
                     <DetailEmpty stage={stage} />
@@ -1190,6 +1316,9 @@ export default function OperationPurchase() {
           prefill={createPoPrefill}
           onClose={async () => {
             setCreatePoPrefill(null);
+            // P2 — the list comes back exactly as it was left, BEFORE the
+            // refetch re-renders the tree underneath it.
+            restoreListState();
             void refetch();
             const before = posCountBeforeSend.current;
             const fresh = await posQ.refetch();
@@ -1218,6 +1347,7 @@ export default function OperationPurchase() {
             warehouse={warehouse}
             onClose={() => {
               setCheckInPoId(null);
+              restoreListState();
               void refetch();
               void posQ.refetch();
             }}
@@ -1583,10 +1713,13 @@ function FacetRow({
   suffix,
   active,
   onClick,
+  testId,
 }: {
   label: string;
   count: number;
   tone?: "default" | "danger" | "muted";
+  /** Stable hook for the §8.2 click-again-clears tests. */
+  testId?: string;
   /** Optional avatar/status chip rendered BEFORE the label (Jess 2026-07-23:
    *  duty owner chip on the Today's work stages — chip left, label right). */
   leadingChip?: React.ReactNode;
@@ -1601,6 +1734,7 @@ function FacetRow({
       type="button"
       onClick={onClick}
       aria-pressed={active}
+      data-testid={testId}
       className={`w-full flex items-center gap-2 rounded-full text-left px-2.5 py-1.5 transition-colors ${
         active ? "bg-hovertint" : "hover:bg-hovertint"
       }`}
