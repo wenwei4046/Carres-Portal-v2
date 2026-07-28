@@ -4130,3 +4130,76 @@ chat before R8 has merged."* Both survive and the queue now says so — the firs
 SEQUENCING (T3 is not in front of D0.5b), the second about TIMING (do not review a hierarchy while
 three chats are still changing the screens under it). Full suite re-run on the union tip: **16
 pre-existing failures, 2142 passed** — baseline held.
+
+---
+
+**2026-07-28 · ⑧ the PENDING REGISTER empties, and D0.5b lands** (branch
+`claude/carres-portal-d0-5a-b2afe1`, **no migration**, not yet merged) — two things in one
+session, and the first is what made the second cheap.
+
+**① Jess froze Q1 · Q3 · Q4 on `/ui`.** Spacing = the 8-step scale (2·4·6·8·12·16·24·32);
+`font-bold` (700) deleted into 600; icon stroke = Lucide's 2. **The freeze cost ZERO component
+changes** — the ten D0.5a boxes were built from the six steps present in BOTH candidates, never
+used `font-bold`, and took Lucide's own stroke. That was the property the card was built to have,
+and it is why the line never stalled waiting on three questions.
+
+**What DID change is that each answer became structure rather than a sentence.** `Icon` lost its
+`strokeWidth` prop entirely — one stroke, and no way to ask for another; `Loading`'s spinner reads
+the same token; the source scan over `components/kit/**` now guards the frozen eight steps and
+fails on any `font-bold`. **`/ui` lost its comparison section in the same commit**: a decision
+surface that outlives its decision tells the next reader a settled thing is still open. **D5
+"Guard → Fail" is unblocked** — an empty register was its only remaining gate.
+
+**A test caught its own documentation.** The first run of the `font-bold` rule failed on the
+sentence recording the freeze. The scan now strips comments before matching: a comment that NAMES
+a banned value while explaining the ban is the opposite of a violation.
+
+**② D0.5b — ten behaviour boxes, Radix underneath.** `Modal` · `Drawer` · `Select` ·
+`DropdownMenu` · `Tooltip` · `Popover` · `Tabs` · `Checkbox` · `DatePicker` · `Toast`, dictionary
+entries at UI-KIT §6.6–§6.10, all on `/ui`. They replace the modal half of **63 hand-rolled
+overlays in 12+ shapes with 5 backdrop colours** — each re-implementing the focus trap, Escape,
+the scroll lock and the `aria-modal` wiring, and most getting one of the four wrong.
+
+**Three decisions, recorded in the law rather than in a component**: `Modal` and `Drawer` are two
+components and not one `variant` prop (a modal INTERRUPTS, a drawer ACCOMPANIES — a business
+distinction a prop would let a page flip); items and options are **DATA, not children** (children
+let a page put a form in a menu, and Radix's keyboard model then stops describing the screen); a
+tooltip's `content` is a `string` (you cannot click into one before it closes).
+
+**The defect this card found in its own law, and closed WITHOUT changing it.** §4.4 puts popovers
+on 30 and overlays on 40 — but both Radix portals mount as siblings on `<body>`, so a `Select`
+opened inside a `Modal` paints underneath it, and *a picker inside a dialog* is the commonest form
+pattern there is. The obvious fix is to raise a number; **that is how fifteen z-levels happened
+the first time.** What shipped is structural: a dialog publishes its own content node and every
+popover-class box portals INTO it, so the ladder is untouched. **Verified in a real browser**, not
+only in jsdom — with a modal open, two listboxes exist and their portal parents read `body` (the
+standalone Select) and `modal` (the one inside the dialog), which is exactly the intended split.
+**Stated honestly: the OCCLUSION itself was reasoned from the two z-values and the portal
+structure, never measured** — the harness's browser pane reports a 0×0 viewport, so hit-testing
+there proves nothing.
+
+**jsdom has no Pointer Capture API**, and Radix's Select uses it to tell a press from a drag —
+without three one-line stubs the list opens and closes in the same tick and the test reads as *no
+options*, a missing BROWSER FEATURE presenting as a broken component. Stubbed in the test file,
+not the shared setup.
+
+**Also verified in a browser earlier in the session**: with a modal open, focus moves inside it,
+`<body>` scrolls locked, the scrim is `rgba(28,32,36,0.4)` = `slate-12` at 40% on `z-40`, the
+surface is white at radius 10, and the dialog's accessible name is its title.
+
+**§16 crosses half — 31.58% → 39.47% (the freeze) → 50.00% (D0.5b)**, 21 of 42 rules, Human
+Review debt unchanged at 4 throughout. Four rules arrived already enforced and two that had been
+waiting for D0.5b flipped: *no hand-rolled modal/drawer* and *only 5 z-layers*, the latter now a
+real ladder (`Z` in `tokens.ts`) that a source scan defends — **no kit file may write a `z-` class
+at all.**
+
+**Reported, not fixed: the main bundle grows ~57 kB raw (~21 kB gzip)** because `TooltipProvider`
+is mounted at the app root, pulling Radix's popper into the main chunk for a tooltip no page uses
+yet. Kept deliberately — the alternative is that the first page wanting a tooltip must remember a
+provider, which is the class of mistake a root provider exists to prevent. CF
+`phase-10-bundle-size-regression` covers the trend.
+
+**Gates**: `tsc` clean · build clean (v4-guard clean) · `check-design-standard` no new violations ·
+web suite **at baseline — 16 pre-existing failures, 2169 passed** (+57 kit tests). Three negative
+controls run and reverted: break the spacing scale → 1 test; break the hover mirror → 1; drop the
+portal `container` → exactly the picker-in-dialog test.
