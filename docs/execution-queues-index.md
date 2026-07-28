@@ -29,9 +29,9 @@
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · R6 ✅ #490 · **R8 ✅ #499** (the banned-verb sweep) — only **R7** left |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 + C8b | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C8 ✅ #493 (0304) · C8b ✅ #497 (0305) · C9 ✅ #472 · C10 ✅ #471** — only **C4** left |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 + C8b + **C11 · C12** | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C8 ✅ #493 (0304) · C8b ✅ #497 (0305) · C9 ✅ #472 · C10 ✅ #471** — **C4 RETIRED 2026-07-28 and re-cut as C11 + C12** (PR #484 stays open, unmerged: R8 shipped part of it, P1 deleted a file it edits, and Loo's money ruling made its own fix wrong). **C11** = a money figure is the money owed · **C12** = the last `Chase` leaves the portal |
 | ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings) · **P2 ✅ #492 + #494 + #495** — the click law is true on all three Purchasing lists (To Order · Claims · Receiving). **P3 is the next card** |
-| ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 + **D0.6** | D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3` · **D0.4 ✅ the old order-portal master spec is DELETED** · **D0.5a ✅ built 2026-07-28** — ten Foundation Components + a live `/ui`. **D0.5b ✅ built 2026-07-28** — the Radix half (`Modal` · `Drawer` · `Select` · `DropdownMenu` · `Tooltip` · `Popover` · `Tabs` · `Checkbox` · `DatePicker` · `Toast`), and **the PENDING REGISTER is now EMPTY: Jess froze Q1 = the 8-step scale · Q3 = `font-bold` deleted into 600 · Q4 = Lucide's stroke 2.** Each answer became a mechanism (a re-pointed source scan · a scan rule · a deleted prop), and the freeze cost **zero** component changes because D0.5a had built for both answers. §16 coverage 31.58% → 47.83%, blocked-on-a-decision 3 → 0, so **D5 is no longer blocked on a decision.** **T3 = Jess uses the drawer for a day** (still waiting for P5). **Reference Review CLOSED 2026-07-28** — `docs/ui-reference-review.md` R1-R5 frozen (Fiori · Linear · Stripe · Vercel · GOV.UK/NNg/Polaris); five principles; that line froze **no** enforcement mechanism. **D0.6 KIT-CONSOLIDATION = planning card only, approved 2026-07-28, builds after D0.5c — it is the only card that may write the REFERENCE-REVIEW principles into `docs/UI-KIT.md`.** *(Corrected 2026-07-28: this row used to say D0.6 was the only card that may edit the kit at all, which the kit itself contradicts — §6 says each component's dictionary entry is written "when it lands on `/ui`" and §9 says "Written by D0.5a". A D-card still writes the chapter the law assigns it; D0.6 owns the review principles and the mirror's claims.)* TEMPORARY doc — delete when the line ends |
+| ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 + **D0.6** | D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3` · **D0.4 ✅ the old order-portal master spec is DELETED** · **D0.5a ✅ built 2026-07-28** — ten Foundation Components + a live `/ui`. **D0.5b ✅ SHIPPED 2026-07-28 (PR #502 `d77bd4f6`, deployed; `/ui` now shows the frozen record, verified in a real browser)** — the Radix half (`Modal` · `Drawer` · `Select` · `DropdownMenu` · `Tooltip` · `Popover` · `Tabs` · `Checkbox` · `DatePicker` · `Toast`), and **the PENDING REGISTER is now EMPTY: Jess froze Q1 = the 8-step scale · Q3 = `font-bold` deleted into 600 · Q4 = Lucide's stroke 2.** Each answer became a mechanism (a re-pointed source scan · a scan rule · a deleted prop), and the freeze cost **zero** component changes because D0.5a had built for both answers. §16 coverage 31.58% → 47.83%, blocked-on-a-decision 3 → 0, so **D5 is no longer blocked on a decision.** **T3 = Jess uses the drawer for a day** (still waiting for P5). **Reference Review CLOSED 2026-07-28** — `docs/ui-reference-review.md` R1-R5 frozen (Fiori · Linear · Stripe · Vercel · GOV.UK/NNg/Polaris); five principles; that line froze **no** enforcement mechanism. **D0.6 KIT-CONSOLIDATION = planning card only, approved 2026-07-28, builds after D0.5c — it is the only card that may write the REFERENCE-REVIEW principles into `docs/UI-KIT.md`.** *(Corrected 2026-07-28: this row used to say D0.6 was the only card that may edit the kit at all, which the kit itself contradicts — §6 says each component's dictionary entry is written "when it lands on `/ui`" and §9 says "Written by D0.5a". A D-card still writes the chapter the law assigns it; D0.6 owns the review principles and the mirror's claims.)* TEMPORARY doc — delete when the line ends |
 
 **State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ **R1-R6 ✅** · ⑥ C1 · C2 · C3 · C5 · C6 · **C7** · C9 · C10 ✅ ·
 ⑦ **P1 ✅ · P2 ✅** · ⑧ D0 + T1 + T2 + **D0.5a + D0.5b** ✅ (**Q1/Q3/Q4 FROZEN 2026-07-28 — the PENDING REGISTER is empty**; T3 is still a Jess task, not a build card). **Next on ⑧: D0.5c** — `PageShell` + `DataTable` + `DetailShell`.
@@ -428,7 +428,7 @@ behaves, and a chat that treats it as the flow will name things on the business'
 ### ⭐ THE RUNNING ORDER (Loo, 2026-07-28) — read this before picking any card
 
 ```
-✅ P2-Receiving  #495            ✅ C8b  #497 (0305)   ✅ R8  #499
+✅ P2-Receiving  #495            ✅ C8b  #497 (0305)   ✅ R8  #499   ✅ D0.5b #502
 ▶  P3            the two supplier calls          (migration)
    P4            where the goods go              (migration)
    P5            one REAL PO, end to end
@@ -436,7 +436,21 @@ behaves, and a chat that treats it as the flow will name things on the business'
    Foundation    1. RECEIVING-WORKING-FLOW.md
                  2. SERVICE-CASES-WORKING-FLOW.md
                  3. READY-STOCK-WORKING-FLOW.md
+
+   ── carrying their own lanes, NOT in the line above ──
+   C11           a money figure is the money owed        ORDERS lane
+   C12           the last `Chase` leaves the portal      PURCHASING + ORDERS lanes
 ```
+
+**C11 and C12 replaced C4 on 2026-07-28 and neither is scheduled yet.** They sit here so the
+lane cost is visible before anything is picked: **C12 touches `OperationPurchase.tsx`, so it
+cannot run beside P3** — if P3 starts first, C12's Purchase half (5 strings, one file) is the
+piece to split off and run in a single sitting to release the lane. C11 is the ORDERS lane and
+collides with ⑧ **D0.5c**, not with P3.
+
+**C11 is the one with a live cost.** 18 orders owe RM 56,859 today and every figure is printed
+by one of its five broken call sites — the collections desk shows `Collect RM RM 1,250.00`, and
+the Orders row, its drawer and the Delivery module round the sen away.
 
 **⚠️ R8 IS A WORDS CARD. It does not mean Purchasing is finished** (Loo, 2026-07-28, in
 those words). **It shipped 2026-07-28 as #499 and the guard is now live, not hypothetical:**

@@ -4415,3 +4415,84 @@ anyway, and the artefact is recorded rather than reported as a pass.
 **Not done, on purpose:** no page migrated (D2–D7), no `PageShell` /
 `DataTable` / `DetailShell` (D0.5c — a P-chat that starts building them has
 taken another card), no codemod of the 158 `font-bold` uses (D2), and no deploy.
+
+**2026-07-28 · D0.5b is MERGED and DEPLOYED — `/ui` now shows the frozen record**
+(PR #502, merge `d77bd4f6`, web `index-DcRxJK0f.js` + `UiShowcase-B8cQuG6T.js`
+[carres-portal `289584ec` + carres-pos `385aea4d`, both `--branch=main`],
+**no api deploy**, **no migration**)
+
+`wrangler pages deployment list` names Production/main source **`d77bd4f`** the
+newest writer on both projects. Three canonicals were on the new hash on the
+first poll and the two apexes settled on the next — the documented edge-cache
+lag, resolved by polling rather than by re-deploying. Downloaded then grepped:
+main bundle 4,500,781 bytes, `SERVICE_ROLE` **0**; showcase chunk 235,889 bytes,
+`SERVICE_ROLE` **0**.
+
+**The proof lives in the SHOWCASE chunk, and that is the second time this line
+has had to say so.** `/ui` is a LAZY route, so none of its strings are in
+`index-*.js` at all — a chat grepping only the main bundle would find nothing
+and conclude the deploy failed. Against the predecessor chunk
+(`UiShowcase-OPW5MQkO.js`, 23,157 bytes, fetched from its OWN deployment URL
+`017590cc` because a superseded asset 404s at the apex):
+
+```
+retired      Pending decisions                     1 -> 0
+             Candidate B — 6 steps (strict 4pt)    1 -> 0
+installed    Frozen decisions                      0 -> 1
+             Deleted into 600                      0 -> 1
+             Lucide default —                      0 -> 1
+             Radix slate-3                         0 -> 1
+             Open a modal / Open a drawer          0 -> 1 each
+             Record the delay decision             0 -> 1
+             tab-indicator / date-picker           0 -> 1 each
+             dialog-overlay                        0 -> 1
+             dropdown-menu                         0 -> 6
+unchanged    Candidate A — 8 steps                 1 -> 1
+```
+
+**The unchanged one is a real result, not a null one.** `Candidate A — 8 steps`
+survives because the string outlived its meaning: it was one of two candidates
+and it is now the frozen answer. That is exactly why the RETIRED sibling is the
+load-bearing marker — on a card that settles a question, the proof is the
+question disappearing, not the answer appearing.
+
+**A marker deliberately not used:** `stroke 1.5`. The old page built that label
+from a template (`stroke ${stroke}`), so the literal never existed in either
+bundle — the S4 "pick markers from MOUNTED components" trap wearing a different
+coat, met before it could produce a confident false 0.
+
+**The Radix confinement claim was measured on the LIVE files, not on the local
+build**: `data-radix-popper-content-wrapper` · `DropdownMenuTrigger` · `rdp-` ·
+`radix` grep **0 · 0 · 0 · 0** in the main bundle and **1 · 2 · 4 · 64** in the
+showcase chunk. Eight Radix packages and a calendar library are in the repo and
+none of them reaches the operator.
+
+**Verified in a real browser** at `https://erp.carresofficial.com/ui` (public,
+no login, which is the whole reason `/ui` was made a public lazy route): the
+heading is `Frozen decisions`, `Pending decisions` is gone, `Candidate B` is
+absent, and all four answers render. Computed styles on the deployed page:
+canvas `rgb(240,240,243)` = slate-3 · Select 32 high at radius 6 on a
+`rgb(224,225,230)` = slate-5 hairline · Checkbox 16 square at radius 4 · tab
+indicator `rgb(0,144,255)` = blue-9, 2px · DatePicker printing `19 Jul 26, Sun`
+· Toast white · **69 icons and `stroke-width` takes exactly ONE value: 2** ·
+**font-weight takes exactly three: 400 ×178 · 500 ×104 · 600 ×39 — no 700
+anywhere on the page.** Q3 and Q4 are therefore not merely documented as frozen;
+they are measurable on the live site.
+
+**No api deploy, and it was checked rather than assumed** — the correction this
+row's D0.5a predecessor had to make on itself: `git diff aa70cd45..d77bd4f6 --
+apps/api packages/shared supabase/migrations` is empty, so R8's Worker
+`0b2640bc` already matches this tip. `GET https://api.carresofficial.com/health`
+returns 200 `{"ok":true}`. No migration in this tip; the repo tail stays `0305`.
+
+**Gates re-run on the deployed tip, all at baseline**: web **2200 passed / 16
+pre-existing** (`OperationOrders` ×7 · `OrderCustomerCard` ×4 · `OhanaSofaTab`
+×4 · `NiceFutureMattressTab` ×1) · shared **1949/1949** · api **3 pre-existing**
+· `pnpm --filter @carres/web lint` clean · `tsc -p tsconfig.app.json` clean ·
+`pnpm build` clean.
+
+**The merge itself:** R8 (#499 + #500) landed on `main` while D0.5b was
+building, so the branch merged `origin/main` first. One conflict, in
+`phase-10-worklog.md`, where both sides had appended an entry — both kept, R8's
+first. Everything else auto-merged, including the guard's `KIT_FILES` list,
+which both cards edited for different reasons.

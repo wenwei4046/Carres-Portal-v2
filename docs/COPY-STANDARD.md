@@ -406,10 +406,35 @@ never appear in a queue, and they need no verb from this table.
 
 **The CHANNEL is not the action.** `Call {supplier} — confirm what happens next` is the same
 action whether it is done by phone, by WhatsApp or in person: outward communication whose
-outcome is recorded. A button that opens the WhatsApp group or copies the message is HOW,
-not WHAT — label it `Open WhatsApp group` / `Copy message`, never as a second action.
+outcome is recorded. A button that opens WhatsApp or copies the message is HOW,
+not WHAT — never a second action.
 **`Send` stays pinned to raising a purchase order to a factory** and is never reused for
 "this message leaves our company" (rule 8).
+
+#### The WhatsApp button — the label says which door it opens (Loo, 2026-07-28)
+
+**The word follows the BEHAVIOUR, not the other way round.** There are two doors and they are
+not the same thing, so they do not share a label:
+
+| What the button actually opens | The label |
+|---|---|
+| a `wa.me/{phone}` chat with ONE named party | **`Open WhatsApp`** |
+| the supplier's saved WhatsApp GROUP link | **`Open WhatsApp group`** |
+| nothing — it puts the message on the clipboard | **`Copy message`** |
+
+**Why this needed ruling rather than reuse.** The table above used to give only
+`Open WhatsApp group`, and R8 stopped on it (2026-07-28) rather than applying it: the To Order
+button opens a **direct chat** when the factory has a contact number and only falls back to the
+group, so `group` would have been a word that is false about half the time. A label that names
+a door the click does not open is worse than a vague one — the operator learns to stop reading
+it.
+
+**This rules ONE button label and changes no other WhatsApp wording** (Loo's scope). The
+message TEMPLATES, the group-link field, `whatsapp_group_url` and every existing sentence
+about WhatsApp stay exactly as they are.
+
+**A button whose behaviour is conditional takes the label of the door it will actually open**,
+resolved at render time from what is on file — never a third blended word covering both.
 
 | Verb | Means | Completion is |
 |---|---|---|
@@ -742,6 +767,34 @@ meaning two different things.
 - **Relative time** (`today`, `2 days ago`) is allowed ONLY in headers or
   lead lines that render live — never in stored text.
 - **Currency**: `RM 1,250.00`. Never `$` or `MYR` in row text.
+
+### A money figure is never rounded to make a column tidy (Loo, 2026-07-28)
+
+**Two decimals, always, and the number on screen is the number owed.**
+
+```
+✔  Collect RM 1,250.50
+✘  Collect RM 1,251          ← rounded up: the screen now asks for 50 sen nobody owes
+✘  Collect RM 1,250          ← rounded down: the screen under-states the debt
+✘  Collect RM RM 1,250.00    ← the currency word added twice
+```
+
+**The reason is not typography.** A collections figure is what a human will say out loud to a
+customer and what a receipt must match. Rounding it makes the portal disagree with the ledger,
+and it disagrees in whichever direction is worse for whoever is reading. **Visual consistency
+with another column is never a reason to change a money figure** — if two columns must line
+up, pad them, do not re-value them.
+
+**This confirms the currency rule above rather than adding to it**, and it names the two ways
+it has actually been broken so a chat can grep for them:
+
+| The shape | What it means |
+|---|---|
+| `maximumFractionDigits: 0` on anything a human reads as money | breaks this rule |
+| passing an already-formatted `RM …` string into a helper that adds `RM ` itself | prints the word twice |
+
+**Where a helper owns the `RM `, the caller passes the bare number** — that split is the whole
+reason both failures exist, so a caller that formats first is the thing to look for.
 
 ---
 
