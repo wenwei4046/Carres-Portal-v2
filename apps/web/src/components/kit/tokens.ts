@@ -14,11 +14,10 @@
  * used by 5 live files. Redefining it would have re-sized pages this card is
  * forbidden to touch. The mapping token → class is recorded in UI-KIT §2.1.
  *
- * **Spacing is PENDING (Q1) and this file deliberately does not answer it.**
- * Every kit component is built from the SIX steps that appear in BOTH
- * candidates — 4 · 8 · 12 · 16 · 24 · 32 — so whichever way Jess freezes Q1 on
- * `/ui`, not one component changes. `/ui` renders the two candidates side by
- * side; nothing here prefers one.
+ * **The PENDING REGISTER is EMPTY since 2026-07-28** — Jess froze all three on
+ * `/ui`: spacing = the 8-step scale, `font-bold` (700) deleted into 600, icon
+ * stroke = Lucide's 2. The kit's ten boxes needed **zero changes** to absorb
+ * the answers, which was the property D0.5a was built to have.
  */
 import type { OrderActionTone } from "@carres/shared";
 
@@ -85,29 +84,43 @@ export const RADII = [
 ] as const;
 
 /* ─────────────────────────────────────────────────────────────────────────
- * §4.1 Spacing — ⚠ PENDING Q1. Rendered by `/ui`, decided by Jess, enforced
- * by nobody until then (UI-KIT: "never enforce a PENDING rule").
+ * §4.1 Spacing — FROZEN 2026-07-28 (Jess, Q1): the 8-step scale.
  * ──────────────────────────────────────────────────────────────────────── */
 
-export const SPACING_CANDIDATES = {
-  A: { label: "Candidate A — 8 steps", steps: [2, 4, 6, 8, 12, 16, 24, 32], migrationSites: 779 },
-  B: { label: "Candidate B — 6 steps (strict 4pt)", steps: [4, 8, 12, 16, 24, 32], migrationSites: 2225 },
-} as const;
+/** The eight steps, with the Tailwind class suffix each one is written as. */
+export const SPACING_SCALE = [
+  { px: 2, suffix: "0.5", use: "hairline nudge (pill y-padding)" },
+  { px: 4, suffix: "1", use: "touching" },
+  { px: 6, suffix: "1.5", use: "icon-to-text gap — the most used step" },
+  { px: 8, suffix: "2", use: "inside a control" },
+  { px: 12, suffix: "3", use: "standard gap" },
+  { px: 16, suffix: "4", use: "dense card padding · table cell x-pad" },
+  { px: 24, suffix: "6", use: "between blocks · card padding" },
+  { px: 32, suffix: "8", use: "between major regions" },
+] as const;
 
-/**
- * The steps present in BOTH candidates. Every kit component is built from
- * these only, which is what makes the components Q1-proof.
- */
-export const SPACING_SAFE: readonly number[] = SPACING_CANDIDATES.B.steps;
+/** Every legal step in px. A ninth does not exist. */
+export const SPACING_STEPS: readonly number[] = SPACING_SCALE.map((s) => s.px);
 
 /* ─────────────────────────────────────────────────────────────────────────
- * §5.1 Icons — exactly three sizes; stroke is ⚠ PENDING Q4.
+ * §2.2 Weight — FROZEN 2026-07-28 (Jess, Q3): 700 is deleted into 600.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+export const WEIGHTS = [
+  { weight: 400, className: "font-normal", use: "body text" },
+  { weight: 500, className: "font-medium", use: "labels, light emphasis" },
+  { weight: 600, className: "font-semibold", use: "titles, numbers" },
+] as const;
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * §5.1 Icons — three sizes; stroke FROZEN 2026-07-28 (Jess, Q4) at Lucide's 2.
  * ──────────────────────────────────────────────────────────────────────── */
 
 export type IconSize = 14 | 16 | 18;
 export const ICON_SIZES: readonly IconSize[] = [14, 16, 18];
 
-/** Lucide's own default. NOT a decision — Q4 is frozen by Jess on `/ui`. */
-export const ICON_STROKE_DEFAULT = 2;
-/** The two candidates `/ui` renders side by side. */
-export const ICON_STROKE_CANDIDATES = [2, 1.5] as const;
+/**
+ * The ONE stroke width. `Icon` has no prop to change it — that is the
+ * enforcement, and it is why Q4 needed no component change to freeze.
+ */
+export const ICON_STROKE = 2;

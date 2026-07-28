@@ -44,13 +44,13 @@ deliverable is Foundation Components, not a better document.
 | **T4** | Freeze as Detail Blueprint v1 → Delivery/Payment/Purchase/Service Detail inherit | ⏳ after T3 |
 | **D0.3** | Delete the retired design docs + the `carres-design` skill | ⏳ after the new kit is proven |
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
-| **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
-| **D0.5b** | Foundation components, Radix | ⏳ **GATED (PM, 2026-07-28)** — starts once Q1 · Q3 · Q4 are frozen on `/ui`. **T3 does not gate it** — the two business validations run beside each other, and T3 has a schedule of its own (see the row above: after R8) |
+| **D0.5a** | Foundation components, no behaviour + **`/ui`** | ✅ **SHIPPED 2026-07-28** (PR #498, deployed) — and Q1 · Q3 · Q4 were frozen on it the same day. Full card below |
+| **D0.5b** | Foundation components, Radix | 🔵 **UNGATED 2026-07-28** — Q1 · Q3 · Q4 are frozen, which was its only gate. **T3 never gated it** and runs on its own schedule |
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ **ready to build** |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
-| **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
+| **D5** | Guard → **Fail** | ⏳ **UNBLOCKED 2026-07-28** — the PENDING register is empty; it now waits only on D1–D4 |
 | **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ |
 | **D7+** | Delivery · Purchase · Receiving · Stock · Service · Payments · Catalog — one card each | ⏳ |
 
@@ -198,53 +198,23 @@ tokens anyway.
 
 ---
 
-## PENDING decisions — D5 is blocked until this is empty
+## PENDING decisions — ✅ **EMPTY, 2026-07-28**
 
-| # | Question | Where it gets answered |
+| # | Question | Frozen |
 |---|---|---|
-| Q1 | Spacing scale — 8-step `2 4 6 8 12 16 24 32` (~779 sites) or 6-step `4 8 12 16 24 32` (~2,225 sites) | ✅ **on `/ui` now** — waiting on Jess |
-| Q3 | `font-bold` (700, 158 uses) — delete into 600, or keep as a fourth weight | ✅ **on `/ui` now** — waiting on Jess |
-| Q4 | Icon stroke — Lucide default 2, or 1.5 | ✅ **on `/ui` now** — waiting on Jess |
+| Q1 | Spacing scale | **8 steps — 2 · 4 · 6 · 8 · 12 · 16 · 24 · 32** (the 6-step 4pt grid loses the dense rows, and cost 2,225 sites against 779) |
+| Q3 | `font-bold` (700) | **deleted into 600** — 158 uses left for D2 |
+| Q4 | Icon stroke | **2, Lucide default** — `Icon` no longer has a `strokeWidth` prop at all |
 
-**All three are now a Jess task, not a build card** — same shape as T3. Open
-`/ui`, look at the top section, answer three questions. Nothing in the code
-moves whichever way they go (see D0.5a above).
+**D5 "Guard → Fail" is UNBLOCKED** — an empty register was its only gate.
 
-### The gate, ruled by the PM 2026-07-28
-
-```
-D0.5a ✅ built
-   ├── Q1 · Q3 · Q4 frozen on /ui   ← business, blocks D0.5b
-   └── T3 Jess uses the drawer      ← business, blocks T4 and never D0.5b;
-                                        its own schedule says after R8
-D0.5b  starts once the three are frozen
-```
-
-**Two rulings about T3 met here and both survive** — the PM's *"T3 may run in
-parallel"* is about SEQUENCING (T3 is not in front of D0.5b), and Loo's row
-above is about TIMING (do not hand T3 to a chat until the Purchasing line stops
-changing screens under Jess). Neither cancels the other: T3 does not gate the
-freeze or D0.5b, and it still waits for R8.
-
-**D0.5b is gated on the freeze and on nothing else.** Not on T3, and not on a
-migration — Radix primitives carry behaviour, and behaviour does not wait for a
-spacing step. The reason the freeze DOES gate it: D0.5b's ten boxes are modals,
-drawers and menus, which is where spacing compounds. Building them against an
-unfrozen scale is the one place the "any answer costs zero component changes"
-property from D0.5a would stop holding.
-
-**`/ui` is reachable — that blocker is closed.** Loo ruled it a business
-validation showcase rather than a feature rollout, so D0.5a was merged (PR #498)
-and deployed from the main tip: **https://erp.carresofficial.com/ui**, public,
-no login, verified in a real browser. Nothing else stands between Jess and the
-three answers.
-
-Frozen: **Q2 page canvas = Radix `slate-3`** · **Q5** Current Issues is its own
-block · **Q6** the KPI boxes merge into Progress (*already true — see the lesson
-below*) · **Q7** Current Action never collapses · **Q8** it is called `Progress`,
-not `Timeline` · **Q9** issues group by goods · delivery · money.
-
----
+**The freeze cost ZERO component changes**, which was the property D0.5a was
+built to have and is the reason the line never stalled on three questions. What
+it DID change is that each answer became structure rather than a sentence: the
+stroke prop is gone, and the source scan now guards the eight steps and fails
+on `font-bold`. **`/ui` lost its comparison section in the same commit** — a
+decision surface that outlives its decision tells the next reader a settled
+thing is still open.
 
 ---
 

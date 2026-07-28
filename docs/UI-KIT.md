@@ -62,27 +62,37 @@ agree, changed in the same commit:
 
 ---
 
-## PENDING REGISTER
+## PENDING REGISTER — **EMPTY since 2026-07-28**
 
-Rules not yet frozen. **A pending rule may NOT be enforced by the Build Guard**
-(half-enforcement is worse than none), and **card D5 "Guard → Fail" is blocked
-until this register is empty.** The schedule forces the decision; nobody has to
-remember.
+```
+        ╔══════════════════════════════════════════════════════════╗
+        ║   Nothing is pending. Every value in this file is law.    ║
+        ╚══════════════════════════════════════════════════════════╝
+```
 
-| # | Question | Decided by | Where it gets answered |
+| # | Question | Frozen by | Answer |
 |---|---|---|---|
-| Q1 | Spacing scale — 8-step (2 4 6 8 12 16 24 32) or 6-step (4 8 12 16 24 32) | Jess | ✅ **live on `/ui` now** (D0.5a) — both candidates render the same row |
-| Q3 | `font-bold` (700) — delete into 600, or keep as a fourth weight | Jess | ✅ **live on `/ui` now** (D0.5a) — 600 and 700 on the same words |
-| Q4 | Icon stroke width — Lucide default 2, or 1.5 | Jess | ✅ **live on `/ui` now** (D0.5a) — both strokes at 14 / 16 / 18 |
+| Q1 | Spacing scale | Jess, 2026-07-28 | **the 8-step scale — 2 · 4 · 6 · 8 · 12 · 16 · 24 · 32** (§4.1) |
+| Q2 | Page canvas | Jess, 2026-07-27 | **Radix `slate-3`** (§3.2) |
+| Q3 | `font-bold` (700) | Jess, 2026-07-28 | **deleted — 600 is the only strong weight** (§2.2) |
+| Q4 | Icon stroke width | Jess, 2026-07-28 | **2, Lucide's own** (§5.1) |
 
-Frozen this round: **Q2 — page canvas = Radix `slate-3`.**
+**A pending rule may NOT be enforced by the Build Guard** (half-enforcement is
+worse than none) — that constraint now binds nothing, and **card D5 "Guard →
+Fail" is UNBLOCKED**: the register being empty was its only remaining gate.
 
-**D0.5a shipped the surface; the three answers are still Jess's** — the card
-built the comparison and deliberately did not prefer one. **No component
-depends on any of the three**: the kit's ten boxes use only the six spacing
-steps common to BOTH Q1 candidates (asserted by a source scan, §4.1), never
-`font-bold`, and Lucide's own default stroke. So freezing any of the three
-costs zero component changes — and D5 stops being blocked.
+**All three answers cost ZERO component changes**, which is the part worth
+keeping. The kit's ten boxes were built from the six spacing steps present in
+BOTH Q1 candidates, never used `font-bold`, and took Lucide's own stroke — so
+freezing was a documentation act, not a migration. What DID change in the code
+is that each answer became structure: `Icon` lost its `strokeWidth` prop
+entirely (one stroke, and no way to ask for another), and the source scan over
+`components/kit/**` now guards the frozen eight-step scale and fails on any
+`font-bold`.
+
+**A new question does not go here.** This register exists to hold decisions
+that the schedule forces; re-opening it means a card, a decision-maker and a
+date, never a chat's uncertainty parked in the law.
 
 ---
 
@@ -424,15 +434,19 @@ SO-1256   Tan Wei Ming   27 Jul 26, Sun      13  t-body
 
 ## §2.2 Weight
 
-| Weight | Use | Today |
-|---|---|---|
-| 400 | body text | 33 uses |
-| 500 | labels, light emphasis | 202 uses |
-| 600 | titles, numbers | 854 uses |
-| **700** | **⚠ PENDING Q3 — proposed: delete into 600** | 158 uses |
+**THREE weights. 700 is dead** (Q3, frozen by Jess on `/ui` 2026-07-28).
 
-`font-bold` (700) and `font-semibold` (600) are currently doing the same job.
-`/ui` shows both; Jess freezes Q3 there.
+| Weight | Class | Use | Today |
+|---|---|---|---|
+| 400 | `font-normal` | body text | 33 uses |
+| 500 | `font-medium` | labels, light emphasis | 202 uses |
+| 600 | `font-semibold` | titles, numbers | 854 uses |
+| ~~700~~ | ~~`font-bold`~~ | **DELETED into 600** | 158 uses to migrate — **D2** |
+
+`font-bold` and `font-semibold` were doing the same job; `/ui` put them on the
+same words and the answer was that nothing was lost. The 158 remaining uses are
+D2's codemod — **a page still carrying `font-bold` is not "an exception", it is
+unmigrated.** No kit component may write it (source scan, `kit-source.test.ts`).
 
 ## §2.3 Numbers and codes
 
@@ -456,7 +470,7 @@ column must be wide enough to hold the weekday.
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
 | Only 6 sizes exist | Build Guard D (bans `text-[Npx]` + any 7th token) | ⏳ D1 | `check-design.mjs` |
-| Only 3 weights exist | Build Guard D | ⚠ pending Q3 | — |
+| Only 3 weights exist | Build Guard D + a source scan on the kit | ⏳ D1 (kit ✅ D0.5a) | `kit-source.test.ts` |
 | Dates via `fmtDate()` | **Human Review** — no rule exists | ⚠ **debt** | `lib/fmt-date.ts` |
 
 ---
@@ -580,41 +594,34 @@ and the tone is chosen by a **condition**, never by which verb it is:
 
 # §4 Spacing · Radius · Border · Z-index
 
-> ⚠️ **PENDING Q1.** `/ui` renders the same Orders row under both scales; Jess
-> freezes it there. Until frozen, the Build Guard does not enforce §4.1.
-
-## §4.1 Spacing — two candidates
+## §4.1 Spacing — eight steps, FROZEN 2026-07-28 (Jess, Q1)
 
 ```
-Candidate A — 8 steps (recommended)
-  2   4   6   8   12   16   24   32
-  │   │   │   │    │    │    │    └ between major regions
-  │   │   │   │    │    │    └────── between blocks · card padding
-  │   │   │   │    │    └─────────── dense card padding · table cell x-pad
-  │   │   │   │    └──────────────── standard gap
-  │   │   │   └───────────────────── inside a control
-  │   │   └───────────────────────── icon-to-text gap  ⭐ most used
-  │   └───────────────────────────── touching
-  └───────────────────────────────── hairline nudge (pill y-padding)
+  2   4   6   8   12   16   24   32          Tailwind suffix
+  │   │   │   │    │    │    │    └ between major regions          -8
+  │   │   │   │    │    │    └────── between blocks · card padding -6
+  │   │   │   │    │    └─────────── dense card padding · cell x   -4
+  │   │   │   │    └──────────────── standard gap                  -3
+  │   │   │   └───────────────────── inside a control              -2
+  │   │   └───────────────────────── icon-to-text gap ⭐ most used -1.5
+  │   └───────────────────────────── touching                      -1
+  └───────────────────────────────── hairline nudge (pill y-pad)   -0.5
 
-  Migration cost ≈ 779 sites
-
-Candidate B — 6 steps (strict 4pt)
-  4   8   12   16   24   32
-
-  Purer, but drops 2 and 6 — dense tables loosen, fewer rows per screen.
-  Migration cost ≈ 2,225 sites
+  ≈ 779 sites to migrate — D4
 ```
 
-Dead under both: `10 · 14 · 18 · 20 · 22 · 33` and every arbitrary
+**Why this one, in Jess's words on `/ui`**: the 6-step strict-4pt alternative
+drops 2 and 6, which loosens every dense row and costs rows per screen — and
+§1.3 is a height budget. It also cost ~2,225 migration sites against 779.
+
+Dead: `10 · 14 · 18 · 20 · 22 · 33` and every arbitrary
 `p-[Npx]` / `gap-[Npx]` / `m-[Npx]`.
 
-**Every Foundation Component is built from the SIX steps present in BOTH
-candidates — 4 · 8 · 12 · 16 · 24 · 32 — so whichever way Q1 is frozen, not one
-component changes.** That is not a convention somebody has to remember: a source
-scan over `components/kit/**` fails on any other step
-(`kit-source.test.ts`, D0.5a). It is also why D0.5a could ship components while
-Q1 is still open, instead of waiting.
+**The Foundation Components needed no change to absorb this.** They were built
+from the six steps present in BOTH candidates, so the answer cost zero edits —
+and the source scan over `components/kit/**` now guards the frozen eight
+(`kit-source.test.ts`). That is why D0.5a could ship components while Q1 was
+still open, instead of the line waiting on a decision.
 
 ## §4.2 Radius — four, frozen
 
@@ -657,7 +664,7 @@ here first.
 
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
-| Only scale steps exist | Build Guard E | ⚠ pending Q1 | — |
+| Only scale steps exist | Build Guard E + a source scan on the kit | ⏳ D1 (kit ✅ D0.5a) | `kit-source.test.ts` |
 | Only 4 radii | Build Guard E | ⏳ D1 | `check-design.mjs` |
 | Only 2 border colours | Build Guard E | ⏳ D1 | `check-design.mjs` |
 | Only 5 z-layers | Component API (Radix portals own 30/40) + Build Guard F | ⏳ D0.5b | `Modal.tsx` · `check-design.mjs` |
@@ -682,8 +689,10 @@ Size      Exactly three:
 Colour    Inherits text colour. At rest slate-9, hover slate-11.
           A coloured icon appears only inside a status pill.
 
-Stroke    ⚠ PENDING Q4 — Lucide's default is 2, which reads heavy at 14px.
-          /ui renders 2 and 1.5 side by side.
+Stroke    2 — Lucide's own default. FROZEN 2026-07-28 (Jess, Q4), after
+          /ui showed 2 and 1.5 side by side at all three sizes.
+          `Icon` has NO prop to change it: one stroke, and no way to ask
+          for another.
 ```
 
 Twelve sizes are in use today (14 ×157 · 16 ×126 · 13 ×73 · 12 ×52 · 18 ×34 ·
@@ -735,7 +744,7 @@ BUSINESS ENTITIES
 | Only 3 sizes (14/16/18) | **Type System** — `size` is `14 \| 16 \| 18`; Build Guard C also live on kit files | ✅ **live (D0.5a)** | `components/kit/Icon.tsx` |
 | One meaning → one glyph | **Type System** — `<Icon name>` is a union; `"edit3"` fails to compile | ✅ **live (D0.5a)** | `components/kit/Icon.tsx` |
 | Lucide only, no emoji | **Component API** — one file in `components/kit/**` may import `lucide-react`, asserted by a source scan; Build Guard C widens to all pages in D1 | ✅ **live in the kit (D0.5a)** | `kit-source.test.ts` |
-| Stroke width | ⚠ **PENDING Q4** — not enforced until frozen | ⚠ | `/ui` |
+| One stroke width | **Component API** — `Icon` has no `strokeWidth` prop, and no kit file may write a stroke literal | ✅ **live (frozen 2026-07-28)** | `Icon.tsx` · `kit-source.test.ts` |
 
 > **§5.2 decides a `warning` survivor that §5.3 has no row for.** `Icon` carries
 > §5.3's 40 meanings exactly, so `TriangleAlert` has no name and cannot be
@@ -1146,7 +1155,7 @@ Exempt: `pages/dealer/**` (POS, Part B) and `pages/print/**`.
 | 2 | Warn + CI report; the baseline may only go down | D2–D4 |
 | 3 | **Fail the build** | D5 |
 
-**Stage 3 is blocked while the PENDING register is non-empty.**
+**Stage 3 was blocked while the PENDING register was non-empty — it is EMPTY since 2026-07-28, so D5 is unblocked.**
 
 ## §13.3 Rules
 
@@ -1155,8 +1164,8 @@ Exempt: `pages/dealer/**` (POS, Part B) and `pages/print/**`.
 | A | any raw hex literal in JSX | ✅ |
 | B | the Carres flame outside the logo component | ✅ |
 | C | a Lucide `size` ∉ {14, 16, 18}; an emoji used as an icon; an icon name outside §5.3 | ✅ |
-| D | `text-[Npx]`; a typography token outside §2.1; a weight outside §2.2 | ⚠ pending Q3 |
-| E | a spacing / radius / border value outside §4 | ⚠ pending Q1 |
+| D | `text-[Npx]`; a typography token outside §2.1; a weight outside §2.2 | ✅ |
+| E | a spacing / radius / border value outside §4 | ✅ |
 | F | a `z-` class anywhere in `pages/**` | ✅ |
 | G | a raw `<table>`, `<input>`, `<select>`, or a `fixed inset-0` overlay in `pages/**` | ⏳ needs D0.5 |
 | H | a `PageShell` whose fixed chrome exceeds its variant's budget (§1.3) | ⏳ needs D0.5c |
@@ -1222,46 +1231,45 @@ parses the Enforcement column out of this file, checks which mechanisms
 actually exist in the repo, and rewrites the block. A hand-maintained
 percentage is prose, and prose drifts; that is the whole thesis of this
 document.
-*(The numbers below are the D0.5a hand count, valid until D1 wires the generator.)*
+*(The numbers below are the D0.5b-eve hand count, valid until D1 wires the generator.)*
 
 ```
                          enforced / total
-  Typography    ░░░░░░░░░░    0%      0 / 3
+  Typography    ███▎░░░░░░    33%     1 / 3
   Colour        ██████░░░░    60%     3 / 5
-  Spacing       ░░░░░░░░░░    0%      0 / 4
-  Icons         ███████▌░░    75%     3 / 4
+  Spacing       ██▌░░░░░░░    25%     1 / 4
+  Icons         ██████████   100%     4 / 4
   Components    ████▌░░░░░    45%     5 / 11
-  Layout        ░░░░░░░░░░    0%      0 / 6
+  Layout        ░░░░░░░░░░     0%     0 / 6
   Hierarchy     ██░░░░░░░░    20%     1 / 5
   ──────────────────────────────────────────
-  TOTAL         ███▏░░░░░░    32%    12 / 38
+  TOTAL         ███▉░░░░░░    39%    15 / 38
 ```
 
 | | Count | Meaning |
 |---|---|---|
 | Rules | **38** | design rules stated in §1–§8 |
-| **Enforced** | **12** | Type System / Component API / Build Guard / ESLint is live |
+| **Enforced** | **15** | Type System / Component API / Build Guard / ESLint is live |
 | Scheduled | 19 | a card exists (D0.5–D5) |
-| **Blocked on a decision** | 3 | Q1 spacing · Q3 weight · Q4 stroke — see PENDING REGISTER |
+| **Blocked on a decision** | **0** | ⭐ the PENDING REGISTER is empty |
 | **Human Review debt** | 4 | `fmtDate()` · "max 2 reds per screen" · facet group order · "Progress carries no events" — nobody has found a mechanism |
 
-**The D0.5a arithmetic, shown so it can be checked** (health rule 1 says
-coverage may never go down, and rule 2 says the debt may never grow):
+**What "enforced" counts, stated so the number cannot be inflated**: a mechanism
+that FAILS TODAY, for the scope its row names. Three rules moved on 2026-07-28
+when Jess froze the register — `Only 3 weights`, `Only scale steps` and the icon
+stroke — because a frozen value can finally be guarded, and each one got a
+mechanism in the same breath (a source scan over `components/kit/**` for the
+first two, a deleted prop for the third). **Nothing counts because a card exists.**
+
+**The freeze arithmetic:**
 
 ```
-rules      33  +  5  =  38     the five new §6.0 Component-API rules
-enforced    3  +  9  =  12     status-is-a-pill · action-tone-from-a-condition ·
-                               icon size · icon meaning · lucide-only-in-the-kit ·
-                               plus the five §6.0 rules
-coverage   9.09%  →  31.58%    ⬆
-debt          4   →      4     unchanged — no rule was added with Human Review
+rules       38  →  38     no rule added; three stopped being pending
+enforced    12  →  15     weights · spacing steps · icon stroke
+blocked      3  →   0     ⭐ D5 "Guard → Fail" is unblocked
+coverage  31.58%  →  39.47%     ⬆
+debt          4  →   4     unchanged
 ```
-
-Where the nine came from: five rules were added **already enforced** (that is
-the point of a Component API — the rule and its mechanism are the same object),
-and four rules that already existed as words became structure when `Icon` and
-`StatusPill` landed. **Nothing was counted because a card exists** — every ✅ in
-§1–§8 points at a file that fails today if the rule is broken.
 
 **Two health rules:**
 

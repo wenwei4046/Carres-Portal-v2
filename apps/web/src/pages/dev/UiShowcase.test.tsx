@@ -3,13 +3,17 @@
  *
  * So these tests do not check that it looks right; they check that it still
  * shows everything the law says it must:
- *   · all three PENDING questions, because D5 is blocked until they are frozen
- *     and `/ui` is where Jess freezes them;
- *   · every icon meaning and every tone, read from the same records the
- *     components read — adding a meaning without showing it fails here;
+ *   · every token record — type, weight, spacing, radius — read from the SAME
+ *     constants the components read, so a scale cannot change without the page
+ *     changing with it;
+ *   · every icon meaning and every tone — adding a meaning without showing it
+ *     fails here;
  *   · the two forced hover/focus states, pinned to the components' own
  *     declarations, so a screenshot of a state is a screenshot of the REAL
- *     state and not a hand-painted lookalike.
+ *     state and not a hand-painted lookalike;
+ *   · **that the three frozen questions are GONE.** Q1 · Q3 · Q4 were decided
+ *     on 2026-07-28; a page still offering the choice would tell a new hire a
+ *     settled thing is open.
  *
  * NEGATIVE CONTROL: change `hover:brightness-95` in Button.tsx to
  * `hover:brightness-90` — only the mirror test goes red.
@@ -19,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ICON_NAMES } from "@/components/kit/Icon";
-import { TONES } from "@/components/kit/tokens";
+import { SPACING_SCALE, TONES, WEIGHTS } from "@/components/kit/tokens";
 import UiShowcase from "./UiShowcase";
 
 const src = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
@@ -28,23 +32,27 @@ const BUTTON = src("../../components/kit/Button.tsx");
 const FIELD = src("../../components/kit/field-recipe.ts");
 
 describe("/ui showcase", () => {
-  it("puts the three pending decisions on the page", () => {
+  it("no longer offers the three frozen questions — the decision surface came out with the decision", () => {
     render(<UiShowcase />);
-    expect(screen.getByRole("heading", { name: /Q1 · Spacing scale/ })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Q3 · font-bold/ })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Q4 · Icon stroke width/ })).toBeInTheDocument();
+    expect(screen.queryByText(/Pending decisions/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Candidate A/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Candidate B/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/stroke 1\.5/)).not.toBeInTheDocument();
+    expect(SHOWCASE).not.toContain("ICON_STROKE_CANDIDATES");
   });
 
-  it("renders BOTH spacing candidates — a page showing one has already decided", () => {
+  it("shows the frozen spacing scale, every step of it", () => {
     render(<UiShowcase />);
-    expect(screen.getByText(/Candidate A — 8 steps/)).toBeInTheDocument();
-    expect(screen.getByText(/Candidate B — 6 steps/)).toBeInTheDocument();
+    for (const s of SPACING_SCALE) {
+      expect(screen.getByText(`${s.px}px`), `${s.px}px`).toBeInTheDocument();
+    }
   });
 
-  it("renders BOTH icon strokes", () => {
+  it("shows the three surviving weights and never renders 700", () => {
     render(<UiShowcase />);
-    expect(screen.getByText(/stroke 2 — Lucide default/)).toBeInTheDocument();
-    expect(screen.getByText("stroke 1.5")).toBeInTheDocument();
+    for (const w of WEIGHTS) expect(screen.getByText(String(w.weight))).toBeInTheDocument();
+    expect(SHOWCASE).not.toContain("font-bold");
+    expect(document.querySelectorAll(".font-bold")).toHaveLength(0);
   });
 
   it("shows every icon meaning the kit has", () => {

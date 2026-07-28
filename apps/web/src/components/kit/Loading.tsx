@@ -13,7 +13,7 @@
  * NO TIMING, NO STATE. This component does not know whether anything is
  * loading; the caller does. That is what keeps D0.5a "no behaviour".
  */
-import { type IconSize } from "./tokens";
+import { ICON_STROKE, type IconSize } from "./tokens";
 
 export default function Loading({
   variant = "spinner",
@@ -62,8 +62,8 @@ export default function Loading({
         className="animate-spin"
         aria-hidden="true"
       >
-        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" opacity="0.25" />
-        <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={ICON_STROKE} opacity="0.25" />
+        <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth={ICON_STROKE} strokeLinecap="round" />
       </svg>
       <span className="sr-only">{label ?? "Loading"}</span>
     </span>

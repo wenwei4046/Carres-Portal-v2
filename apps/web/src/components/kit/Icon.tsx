@@ -14,9 +14,11 @@
  * so this component never sets one. The parent decides, and a coloured icon
  * only ever happens inside a status pill.
  *
- * STROKE is ⚠ PENDING Q4. The default is Lucide's own 2 — that is the library
- * default, NOT a decision this card made. `/ui` renders 2 and 1.5 side by side
- * and Jess freezes it there; until then nothing enforces a stroke.
+ * STROKE is FROZEN at Lucide's 2 (Jess, 2026-07-28, Q4) and there is **no prop
+ * to change it** — one stroke, enforced by the absence of a way to ask for
+ * another. It was a `strokeWidth` prop while Q4 was open, passed only by `/ui`
+ * to render the two candidates; freezing the answer deleted the prop, which is
+ * the shape every frozen value should end up in.
  */
 import {
   AlertCircle,
@@ -59,7 +61,7 @@ import {
   Warehouse,
   X,
 } from "lucide-react";
-import { ICON_STROKE_DEFAULT, type IconSize } from "./tokens";
+import { ICON_STROKE, type IconSize } from "./tokens";
 
 /**
  * UI-KIT §5.3, verbatim and complete. The keys are the MEANINGS; a meaning
@@ -122,14 +124,11 @@ export const ICON_NAMES = Object.keys(GLYPH) as IconName[];
 export default function Icon({
   name,
   size = 16,
-  strokeWidth = ICON_STROKE_DEFAULT,
   title,
 }: {
   name: IconName;
   /** 14 in a row / in a pill · 16 default · 18 page-level. */
   size?: IconSize;
-  /** ⚠ PENDING Q4 — only `/ui` passes this. */
-  strokeWidth?: number;
   /** Give an icon a title ONLY when it carries meaning no nearby word does. */
   title?: string;
 }) {
@@ -137,7 +136,7 @@ export default function Icon({
   return (
     <Glyph
       size={size}
-      strokeWidth={strokeWidth}
+      strokeWidth={ICON_STROKE}
       data-icon={name}
       aria-hidden={title ? undefined : true}
       aria-label={title}

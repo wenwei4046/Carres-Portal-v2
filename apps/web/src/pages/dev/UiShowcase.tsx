@@ -6,16 +6,19 @@
  * the real tokens, so it structurally cannot describe something the code does
  * not do — which is the one failure the first two bodies cannot rule out.
  *
- * It carries THREE jobs:
- *   1. The PENDING REGISTER. Q1 spacing · Q3 weight · Q4 icon stroke are
- *      rendered side by side. **Jess freezes them here** — this page does not
- *      prefer one, and no component depends on the answer.
- *   2. §9 UI STATES. Every component in every state, including the ugly ones —
+ * It carries TWO jobs:
+ *   1. §9 UI STATES. Every component in every state, including the ugly ones —
  *      default · hover · focus · disabled · loading · error · long text ·
  *      empty value. §13.4 screenshots this page in CI, and a screenshot that
  *      only covers the happy path proves nothing.
- *   3. The token reference — type, colour, radius, icons — rendered FROM the
- *      same records the components read.
+ *   2. The token reference — type, weight, colour, spacing, radius, icons —
+ *      rendered FROM the same records the components read.
+ *
+ * **It had a third until 2026-07-28**: the PENDING REGISTER, where Q1 spacing ·
+ * Q3 weight · Q4 icon stroke were rendered side by side for Jess to choose.
+ * She froze all three and the comparison came out — a decision surface that
+ * outlives its decision is a page telling a new hire a settled thing is still
+ * open. The answers live in `docs/UI-KIT.md`; what shows here is the result.
  *
  * Two constants below (`FORCED_*`) paint a hover/focus state that a static
  * screenshot could not otherwise capture. They mirror the components' own
@@ -33,13 +36,7 @@ import Panel from "@/components/kit/Panel";
 import SearchInput from "@/components/kit/SearchInput";
 import StatusPill from "@/components/kit/StatusPill";
 import Textarea from "@/components/kit/Textarea";
-import {
-  ICON_STROKE_CANDIDATES,
-  RADII,
-  SPACING_CANDIDATES,
-  TONES,
-  TYPE_TOKENS,
-} from "@/components/kit/tokens";
+import { ICON_STROKE, RADII, SPACING_SCALE, TONES, TYPE_TOKENS, WEIGHTS } from "@/components/kit/tokens";
 
 /* Forced states — the same declarations the components carry, applied without
  * a pointer so CI can photograph them. Pinned by the test file. */
@@ -91,91 +88,7 @@ export default function UiShowcase() {
           </p>
         </header>
 
-        {/* ─── 1 · PENDING — the reason this page shipped in D0.5a ────────── */}
-        <Section
-          id="pending"
-          title="Pending decisions"
-          note="Three values are NOT frozen. Nothing enforces them and no component depends on the answer. Jess decides here."
-        >
-          <Panel title="Q1 · Spacing scale">
-            <div className="flex flex-col gap-8">
-              {/* Candidate A uses 2 and 6; candidate B has neither. The same row
-                  is drawn twice so the difference is a row, not a table. */}
-              <Sample
-                label={`${SPACING_CANDIDATES.A.label} — ${SPACING_CANDIDATES.A.migrationSites} sites to migrate`}
-              >
-                <div className="w-full rounded-card border border-kit-slate-5 bg-white px-3 py-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <Icon name="order" size={14} />
-                    <span className="text-body font-mono">SO-1256</span>
-                    <span className="text-body text-kit-slate-11">Tan Wei Ming</span>
-                    <StatusPill tone="warning" icon="waiting">
-                      Waiting
-                    </StatusPill>
-                    <span className="text-meta text-kit-slate-11">27 Jul 26, Sun</span>
-                  </div>
-                </div>
-              </Sample>
-              <Sample
-                label={`${SPACING_CANDIDATES.B.label} — ${SPACING_CANDIDATES.B.migrationSites} sites to migrate`}
-              >
-                <div className="w-full rounded-card border border-kit-slate-5 bg-white px-4 py-2">
-                  <div className="flex items-center gap-2">
-                    <Icon name="order" size={14} />
-                    <span className="text-body font-mono">SO-1256</span>
-                    <span className="text-body text-kit-slate-11">Tan Wei Ming</span>
-                    <StatusPill tone="warning" icon="waiting">
-                      Waiting
-                    </StatusPill>
-                    <span className="text-meta text-kit-slate-11">27 Jul 26, Sun</span>
-                  </div>
-                </div>
-              </Sample>
-              <p className="text-meta text-kit-slate-11">
-                Candidate B is the stricter 4pt grid and drops 2 and 6, so dense rows loosen and fewer
-                fit on a screen. Candidate A keeps them and costs a third of the migration.
-              </p>
-            </div>
-          </Panel>
-
-          <Panel title="Q3 · font-bold (700)">
-            <div className="flex flex-col gap-4">
-              <Sample label="600 semibold — 854 uses today">
-                <span className="text-title font-semibold text-kit-slate-12">RM 56,859</span>
-                <span className="text-strong font-semibold text-kit-slate-12">Delivery this week</span>
-              </Sample>
-              <Sample label="700 bold — 158 uses today, proposed for deletion">
-                <span className="text-title font-bold text-kit-slate-12">RM 56,859</span>
-                <span className="text-strong font-bold text-kit-slate-12">Delivery this week</span>
-              </Sample>
-              <p className="text-meta text-kit-slate-11">
-                If the two read the same at these sizes, 700 is doing no work and folds into 600.
-              </p>
-            </div>
-          </Panel>
-
-          <Panel title="Q4 · Icon stroke width">
-            <div className="flex flex-col gap-4">
-              {ICON_STROKE_CANDIDATES.map((stroke) => (
-                <Sample key={stroke} label={`stroke ${stroke}${stroke === 2 ? " — Lucide default" : ""}`}>
-                  {([14, 16, 18] as const).map((size) => (
-                    <span key={size} className="flex items-center gap-2 text-kit-slate-11">
-                      <Icon name="delivery" size={size} strokeWidth={stroke} />
-                      <Icon name="money" size={size} strokeWidth={stroke} />
-                      <Icon name="goods" size={size} strokeWidth={stroke} />
-                      <span className="text-meta">{size}px</span>
-                    </span>
-                  ))}
-                </Sample>
-              ))}
-              <p className="text-meta text-kit-slate-11">
-                The 14px row is the one that decides it — that is the size inside a table row and a pill.
-              </p>
-            </div>
-          </Panel>
-        </Section>
-
-        {/* ─── 2 · Tokens ─────────────────────────────────────────────────── */}
+        {/* ─── 1 · Tokens ─────────────────────────────────────────────────── */}
         <Section id="type" title="Typography — §2.1" note="Six tokens. Nothing above 24, nothing below 11.">
           <Card>
             <div className="flex flex-col gap-4">
@@ -186,6 +99,45 @@ export default function UiShowcase() {
                   <span className="text-meta text-kit-slate-11 tabular-nums">
                     {t.px} / {t.weight} / {t.lineHeight}
                   </span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </Section>
+
+        <Section
+          id="weight"
+          title="Weight — §2.2"
+          note="Three weights. 700 was deleted into 600 (Jess, 2026-07-28) — the two were doing one job."
+        >
+          <Card>
+            <div className="flex flex-col gap-4">
+              {WEIGHTS.map((w) => (
+                <div key={w.weight} className="flex flex-wrap items-baseline gap-4">
+                  <span className="w-40 shrink-0 font-mono text-meta text-kit-slate-11">{w.className}</span>
+                  <span className={`text-strong ${w.className} text-kit-slate-12`}>RM 56,859 · Delivery this week</span>
+                  <span className="text-meta text-kit-slate-11 tabular-nums">{w.weight}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </Section>
+
+        <Section
+          id="spacing"
+          title="Spacing — §4.1"
+          note="Eight steps, frozen 2026-07-28. Dead under the scale: 10 · 14 · 18 · 20 · 22 · 33 and every arbitrary p-[Npx]."
+        >
+          <Card>
+            <div className="flex flex-col gap-4">
+              {SPACING_SCALE.map((s) => (
+                <div key={s.px} className="flex items-center gap-4">
+                  <span className="w-16 shrink-0 font-mono text-meta text-kit-slate-12 tabular-nums">{s.px}px</span>
+                  <span className="w-16 shrink-0 font-mono text-meta text-kit-slate-11">-{s.suffix}</span>
+                  {/* The bar's width IS the token — a value, not a style choice,
+                      which is why it is the one inline width on this page. */}
+                  <span className="h-4 bg-kit-blue-9" style={{ width: `${s.px}px` }} />
+                  <span className="text-meta text-kit-slate-11">{s.use}</span>
                 </div>
               ))}
             </div>
@@ -250,7 +202,7 @@ export default function UiShowcase() {
         <Section
           id="icons"
           title="Icons — §5.3"
-          note="One meaning, one glyph. The name is the MEANING, never a Lucide import — a fifth name for `edit` does not compile."
+          note={`One meaning, one glyph. The name is the MEANING, never a Lucide import — a fifth name for \`edit\` does not compile. Stroke is frozen at ${ICON_STROKE} and there is no prop to change it.`}
         >
           <Card>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-6">
