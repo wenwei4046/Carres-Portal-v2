@@ -171,8 +171,20 @@ Continue the original delivery — the customer is never told
   path records a requested new date and deliberately does not touch `orders.delivery_date`.
   The delay flow must never call the RPC that does (`set_order_date`); that RPC exists to
   correct a date typed wrong at the counter, not to rewrite history.
-- What IS recorded: the customer accepted the delay · the reason (from the shared reason
-  list) · the delay history. Those are the existing extension fields — no new store.
+- What IS recorded: the decision · the reason (from the shared reason list) · the new date,
+  which goes to the **booking**.
+- **NOT in the extension fields — that instruction was wrong and is deleted** (corrected
+  2026-07-28, found by C8 and it declined to follow it). This line used to say "those are the
+  existing extension fields — no new store". Those fields are the **customer's** one-time
+  storage extension (0196: `extension_count` is capped at 1, and a second needs the principal).
+  Writing a CARRES-CAUSED delay into them **silently spends the customer's only extension** —
+  so the day they genuinely ask to postpone, the portal refuses them for a delay that was our
+  factory's fault. Two different events, two different stores; "no new store" is a good
+  instinct and it is not a licence to reuse a counter that means something else.
+  C8 added `delay_decision_eta` (0304) instead, and the column earns itself: a decision is
+  about **one** supplier date, so if the factory slips again the pair stops matching and Delay
+  planning re-opens by itself. Without it, one decision would close every future delay on that
+  order — `ops_order_control.balance`'s disease one column over.
 
 **Who may move it on**
 

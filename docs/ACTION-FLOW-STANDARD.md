@@ -166,10 +166,21 @@ open on the same record at the same time.
      Collect RM {amount} from {customer}
 ```
 
+**`Delay planning` sits at the TOP of rung 2, immediately above the call it guards**
+(added 2026-07-28 — C8 found that Law 4 ranked it nowhere at all). It is the decision
+*"can we still make the promised date?"*, and it is deliberately not a rung of its own: it
+belongs with rung 2 because it is the same conversation one step earlier, and it may never
+rank BELOW `Arrange new delivery date`, which cannot legally open until the decision is
+recorded. **The two are never open together**, so the order between them only ever decides
+what shows against OTHER tracks — and there both answers are the same.
+
 **Rung 2 never names the customer.** Carres does not phone a customer about a delay —
 logistics carries that conversation, and the action in this portal is the call to
 logistics. Any surface that opens a customer call about a delay is wrong.
 (Jess, 2026-07-27; the flow is `docs/ORDERS-WORKING-FLOW.md` §3.)
+**This is now a GUARD, not a comment** — C8 wired three lines (both delay labels and the
+journey strip's owner row) to a test fed the customer's real name; any of them mentioning the
+customer fails. It caught C8's own first draft of the owner row.
 
 **Money displays last on purpose and this is not a demotion.** It matches the existing
 collections rule — 催钱前先看货, you do not chase a payment for goods you cannot deliver —

@@ -289,6 +289,22 @@ ways on three screens.
 | 5 | **Empty state** | what the queue says when it holds nothing (why · when it changes · what to do meanwhile) |
 
 **Five filled = designed. One missing = not designed — do not open a card for it.**
+
+**A `—` is a filled cell, not a missing one.** It means *this action has no such string, and
+here is why* — `Delay planning` has no done message because the row leaves by itself and the
+action that follows it says what happened. An EMPTY cell is the undesigned case. The
+difference matters because C8 stopped and asked on exactly this square, which is the behaviour
+the rule wants.
+
+**The two answers and the tooltip are part of the design too.** Where an action asks a
+question, the answers are locked strings like any other:
+
+| Action | The question | The answers | The queue tooltip |
+|---|---|---|---|
+| `Delay planning` | can the promised date still be met? | `We can still make the promised date` · `We cannot make the promised date` | `Supplier date lands after the promised date — decide before anyone calls (Delay planning)` |
+
+Both answers name **the promised date** rather than "yes" and "no", because the reader must
+not have to remember what was asked.
 The code mirror is `packages/shared/order-action-words.ts`; that module and this
 table are one-to-one, so a queue and a row can never spell one action two ways.
 
@@ -303,6 +319,7 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Issue delivery order` | `Issue delivery order` | `Issue delivery order` | `Delivery order issued` | `Nothing waiting for a delivery order.` |
 | `Deliver today` | `Deliver today` | `Mark delivered` | `Delivered` | `No deliveries today.` |
 | `Upload delivery photo` | `Upload delivery photo` | `Upload delivery photo` | `Delivery photo saved` | `Every delivery has its photo.` |
+| `Delay planning` | `Delay planning` | `Record the delay decision` | — (none: the row leaves by itself, and `Arrange new delivery date` says what happened) | `No supplier date lands after a promised date.` |
 | `Arrange new delivery date` | `Call {logistics} — arrange new delivery date` | `Record new date` | `New date recorded` | `No delayed order needs a new date.` |
 | `Collect RM {amount}` | `Collect RM {amount} from {customer}` | `Record payment` | `Payment recorded` | `Nothing outstanding.` |
 
@@ -501,8 +518,15 @@ it is in the wrong element.
 
 `Chase` · `POD` / `Proof of Delivery` · `Unscheduled` · `Not booked` · `need booking` ·
 `Pending` · `Processing` · `In Progress` · `At Risk` · `Attention` ·
-`Inventory` · `Movements` · `Recovery` (staff say "this order going to delay" — the word on
-screen is `Delay planning`)
+`Inventory` · `Movements` · `Recovery` **in the delay sense** (staff say "this order going to
+delay" — the word on screen is `Delay planning`)
+
+**`Recovery` is banned by MEANING, not by spelling.** Account recovery on the login page is a
+different word that happens to be spelt the same, and it stays. C8 grepped the live bundle,
+found `Recovery` nine times, and correctly changed none: eight are React internals
+(`errorRecoveryDisabledLanes`) and the ninth is `Login.tsx`'s forgot-password dialog. **A
+banned word is banned where it names the banned concept** — a chat sweeping this list by
+string match will rename the login page and call it compliance.
 
 (Filters may name a real STATE — `Placed`, `Proceed`, `Delivered`, `Owing` — but never
 one of the words above.)
