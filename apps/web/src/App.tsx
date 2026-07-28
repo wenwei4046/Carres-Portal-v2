@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -20,6 +20,11 @@ import HrApp from "@/pages/hr/HrApp";
 import PickupEventPrintPage from "@/pages/print/PickupEventPrintPage";
 import ServiceNotePrintPage from "@/pages/print/ServiceNotePrintPage";
 import { PayCancelled, PaySuccess } from "@/pages/pay/PayResult";
+
+/* `/ui` — UI-KIT's third body (card D0.5a). LAZY on purpose: it is a kit
+ * reference, not a portal page, so it must not ride the main bundle that every
+ * operator downloads (CF `phase-10-bundle-size-regression`). */
+const UiShowcase = lazy(() => import("@/pages/dev/UiShowcase"));
 
 function HomeRedirect() {
   const session = useAuth((s) => s.session);
@@ -206,6 +211,17 @@ export default function App() {
         {/* 0223 — Stripe Checkout landings. PUBLIC on purpose: the CUSTOMER's
          *  browser arrives here after paying; there is no session and nothing
          *  sensitive on the page. */}
+        {/* `/ui` — the kit showcase (UI-KIT §13.4 screenshots it in CI).
+         *  PUBLIC on purpose: it renders components and tokens, reads no
+         *  session and fetches no row, and CI has no login. */}
+        <Route
+          path="/ui"
+          element={
+            <Suspense fallback={<div className="p-8 text-body text-kit-slate-11">Loading…</div>}>
+              <UiShowcase />
+            </Suspense>
+          }
+        />
         <Route path="/pay/success" element={<PaySuccess />} />
         <Route path="/pay/cancelled" element={<PayCancelled />} />
         <Route path="/" element={<HomeRedirect />} />

@@ -16,7 +16,7 @@
 
 | | |
 |---|---|
-| On `main` | `ba7b7798` D0 law + doors · `19cad8e4` merge · `d83ecf98` §1.4 hierarchy · **`c9966ee3` T2 drawer** |
+| On `main` | `ba7b7798` D0 law + doors · `19cad8e4` merge · `d83ecf98` §1.4 hierarchy · **`c9966ee3` T2 drawer**. **D0.5a is built and NOT yet merged** (branch `claude/carres-portal-d0-5a-b2afe1`) |
 | Deployed to prod | ✅ **YES — corrected 2026-07-28.** `git merge-base --is-ancestor c9966ee3 10f49add` passes, and `10f49add` is the live web tip in CLAUDE.md §17.1 (`index-c7LT9aSQ.js`, PR #492). **T2 has been in front of users since that deploy.** This row previously read *"NOT YET… nobody has seen it in a browser"* — it went stale when a parallel line shipped a bundle containing it. |
 | Next thing that matters | **T3 — Jess uses the reordered drawer for one day.** **No longer blocked**: the deploy it was waiting for already happened. T3 is a Jess task, not a build card. |
 
@@ -43,7 +43,7 @@ deliverable is Foundation Components, not a better document.
 | **T4** | Freeze as Detail Blueprint v1 → Delivery/Payment/Purchase/Service Detail inherit | ⏳ after T3 |
 | **D0.3** | Delete the retired design docs + the `carres-design` skill | ⏳ after the new kit is proven |
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
-| **D0.5a** | Foundation components, no behaviour + **`/ui`** — freezes Q1/Q3/Q4 | ⏳ |
+| **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
 | **D0.5b** | Foundation components, Radix | ⏳ |
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ **ready to build** |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
@@ -132,13 +132,82 @@ truncates and reports a false 0).
 
 ---
 
+## D0.5a ✅ — the ten boxes exist, and `/ui` is real (2026-07-28)
+
+**Ten Foundation Components** in `apps/web/src/components/kit/` — `Button` ·
+`Input` · `Textarea` · `SearchInput` · `Card` · `Panel` · `Badge` ·
+`StatusPill` · `EmptyState` · `Loading`, plus `Icon` (§5) and two internal
+extractions §6.6 demanded (`FieldFrame`, `field-recipe`). **`/ui`** renders all
+of them in every §9 state and is routed public and lazy, so a kit reference
+never rides the operator's bundle (it built as its own 23 kB chunk).
+
+**Zero existing pages touched**, which is what the queue's lane rule requires of
+this card: `git diff --stat` outside `components/kit/**` and `pages/dev/**` is
+`tailwind.config.ts` (additive keys only), `App.tsx` (one route) and the docs.
+
+**The three decisions this card was NOT allowed to make, and did not.** Q1 · Q3
+· Q4 render side by side on `/ui` and **no component depends on any of them** —
+the kit is built from the six spacing steps present in BOTH Q1 candidates, uses
+no `font-bold`, and takes Lucide's own stroke. A source scan
+(`kit-source.test.ts`) fails if anyone edits a kit padding off that safe set, so
+the property survives the next hand. **Freezing Q1 either way costs zero
+component changes**, which is the reason components could ship before the
+answer.
+
+**The one thing that could not be built as the law words it.** §2.1's tokens are
+`t-page … t-label`; `.t-body` is ALREADY the retired v17 ramp's 14px/400 in
+`index.css`, live in 5 files. Taking the name would have re-sized pages this
+card may not touch, so the classes are `text-page … text-label` (Tailwind
+`fontSize` entries carrying size + weight + line-height in one class — a
+stronger shape than a CSS class, and `text-[Npx]` never appears). UI-KIT §2.1
+records the mapping and hands the rename question to **D2**.
+
+**Enforcement, not documentation** — every rule this card added is a type or an
+API, never a sentence: no kit component accepts `className` or `style` (11 ×
+`@ts-expect-error`), `Icon`'s `name` is §5.3's 40 meanings and `size` is 14|16|18,
+`StatusPill`'s tone is `OrderActionTone` so a page cannot invent one, `Badge`
+has no tone at all, and `Button` has no `danger` variant. §16 moves **9.09% →
+31.58%** with the Human Review debt unchanged at 4; the arithmetic is printed in
+§16.
+
+**Measured in a real browser, not asserted** (`vite preview`, `/ui`, computed
+styles): canvas `rgb(240,240,243)` = slate-3 · card border `rgb(224,225,230)` =
+slate-5 · radius 10 · primary button `rgb(0,144,255)` = blue-9 at radius 6,
+height 32 · danger pill red-3 on red-11 at radius 4 · all six type tokens exactly
+24/600/32 · 20/600/28 · 15/600/22 · 13/400/18 · 12/400/16 · 11/500/14.
+**A screenshot could not be taken** — the harness reported the Browser pane not
+displayed — so the evidence is the computed-style read, which is stronger for
+tokens anyway.
+
+**Five findings, reported not fixed** (they are the kit's to rule, not a card's):
+
+1. **§3.6 lists six tones; `OrderActionTone` has five.** No `money` member, so
+   `tone="money"` does not compile. Whether the money track gets its own colour
+   changes what the ACTION ENGINE may return — a business decision.
+2. **§5.2 picks `TriangleAlert` as the `warning` survivor and §5.3 has no row
+   for it**, so the kit has no warning glyph and cannot render one.
+3. **§3.6 names a held (🔒) condition; §5.3's STATUS group has no `lock`.**
+   `StatusPill`'s icon is narrowed to the four STATUS meanings until it does.
+4. **§13.4's screenshot gate has no CI job** — the page now exists, the image
+   diff does not. Named in §13.4 and parked on D1.
+5. **`lib/status-pill.ts` maps a status WORD to a legacy pill class** and is
+   still the live renderer for the unmigrated pages — a second status renderer
+   until D2–D7 move them. Left alive on purpose; deleting it would restyle
+   pages this card may not touch.
+
+---
+
 ## PENDING decisions — D5 is blocked until this is empty
 
 | # | Question | Where it gets answered |
 |---|---|---|
-| Q1 | Spacing scale — 8-step `2 4 6 8 12 16 24 32` (~779 sites) or 6-step `4 8 12 16 24 32` (~2,225 sites) | `/ui` renders both — D0.5a |
-| Q3 | `font-bold` (700, 158 uses) — delete into 600, or keep as a fourth weight | `/ui` v1 — D0.5a |
-| Q4 | Icon stroke — Lucide default 2, or 1.5 | `/ui` renders both — D0.5a |
+| Q1 | Spacing scale — 8-step `2 4 6 8 12 16 24 32` (~779 sites) or 6-step `4 8 12 16 24 32` (~2,225 sites) | ✅ **on `/ui` now** — waiting on Jess |
+| Q3 | `font-bold` (700, 158 uses) — delete into 600, or keep as a fourth weight | ✅ **on `/ui` now** — waiting on Jess |
+| Q4 | Icon stroke — Lucide default 2, or 1.5 | ✅ **on `/ui` now** — waiting on Jess |
+
+**All three are now a Jess task, not a build card** — same shape as T3. Open
+`/ui`, look at the top section, answer three questions. Nothing in the code
+moves whichever way they go (see D0.5a above).
 
 Frozen: **Q2 page canvas = Radix `slate-3`** · **Q5** Current Issues is its own
 block · **Q6** the KPI boxes merge into Progress (*already true — see the lesson

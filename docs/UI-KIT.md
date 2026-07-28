@@ -58,7 +58,7 @@ agree, changed in the same commit:
 |---|---|---|
 | `docs/UI-KIT.md` | this file — the law, in words | explains intent |
 | `apps/web/src/lib/design-standard.ts` | the machine mirror | code reads this |
-| **`/ui`** (`pages/dev/UiShowcase.tsx`) | the live showcase, real components | **structurally cannot go stale** |
+| **`/ui`** (`pages/dev/UiShowcase.tsx`) — ✅ **live since D0.5a** | the live showcase, real components | **structurally cannot go stale** |
 
 ---
 
@@ -71,11 +71,18 @@ remember.
 
 | # | Question | Decided by | Where it gets answered |
 |---|---|---|---|
-| Q1 | Spacing scale — 8-step (2 4 6 8 12 16 24 32) or 6-step (4 8 12 16 24 32) | Jess | `/ui` renders both — D0.5a |
-| Q3 | `font-bold` (700) — delete into 600, or keep as a fourth weight | Jess | `/ui` v1 — D0.5a |
-| Q4 | Icon stroke width — Lucide default 2, or 1.5 | Jess | `/ui` renders both — D0.5a |
+| Q1 | Spacing scale — 8-step (2 4 6 8 12 16 24 32) or 6-step (4 8 12 16 24 32) | Jess | ✅ **live on `/ui` now** (D0.5a) — both candidates render the same row |
+| Q3 | `font-bold` (700) — delete into 600, or keep as a fourth weight | Jess | ✅ **live on `/ui` now** (D0.5a) — 600 and 700 on the same words |
+| Q4 | Icon stroke width — Lucide default 2, or 1.5 | Jess | ✅ **live on `/ui` now** (D0.5a) — both strokes at 14 / 16 / 18 |
 
 Frozen this round: **Q2 — page canvas = Radix `slate-3`.**
+
+**D0.5a shipped the surface; the three answers are still Jess's** — the card
+built the comparison and deliberately did not prefer one. **No component
+depends on any of the three**: the kit's ten boxes use only the six spacing
+steps common to BOTH Q1 candidates (asserted by a source scan, §4.1), never
+`font-bold`, and Lucide's own default stroke. So freezing any of the three
+costs zero component changes — and D5 stops being blocked.
 
 ---
 
@@ -379,16 +386,28 @@ Purchasing, Receiving and Service Detail without learning any of them again.
 
 ## §2.1 The scale
 
-| Token | px | weight | line-height | Use |
-|---|---|---|---|---|
-| `t-page` | 24 | 600 | 32 | page title — **max one per page** |
-| `t-title` | 20 | 600 | 28 | section title · KPI hero number |
-| `t-strong` | 15 | 600 | 22 | card title · field-group heading |
-| **`t-body`** | **13** | **400** | **18** | **default** — table rows, prose, buttons |
-| `t-meta` | 12 | 400 | 16 | secondary info, captions, timestamps |
-| `t-label` | 11 | 500 | 14 | field labels, micro-labels, pill text |
+| Token | Class | px | weight | line-height | Use |
+|---|---|---|---|---|---|
+| `t-page` | `text-page` | 24 | 600 | 32 | page title — **max one per page** |
+| `t-title` | `text-title` | 20 | 600 | 28 | section title · KPI hero number |
+| `t-strong` | `text-strong` | 15 | 600 | 22 | card title · field-group heading |
+| **`t-body`** | **`text-body`** | **13** | **400** | **18** | **default** — table rows, prose, buttons |
+| `t-meta` | `text-meta` | 12 | 400 | 16 | secondary info, captions, timestamps |
+| `t-label` | `text-label` | 11 | 500 | 14 | field labels, micro-labels, pill text |
 
 Nothing is larger than 24. Nothing is smaller than 11.
+
+**The class carries all three values** — size, weight and line-height come from
+one `fontSize` entry in `tailwind.config.ts`, so a page cannot half-apply a
+token. A seventh size means editing that file, which is the friction this
+chapter wants. Measured on `/ui` in a real browser 2026-07-28: all six render
+exactly the px / weight / line-height above.
+
+> **Why the class is `text-page` and not `t-page`** (D0.5a, recorded so nobody
+> "fixes" it): `.t-body` already exists in `index.css` as the retired v17 ramp's
+> **14px/400** and is live in 5 files. Taking the name would have re-sized pages
+> D0.5a is forbidden to touch. The legacy `.t-*` ramp dies in **D2**, and the
+> question of whether the class then takes the law's own name is D2's.
 
 ```
 Orders                                       24  t-page
@@ -448,8 +467,16 @@ column must be wide enough to hold the weekday.
 
 ## §3.1 Source — Radix Colors, never hand-picked
 
-Install `@radix-ui/colors`. **The law names the STEP, never the hex** — so
-nobody can mistype a digit and nobody maintains a hex table.
+`@radix-ui/colors` is **installed (D0.5a)** and `tailwind.config.ts` reads the
+hexes out of it. **The law names the STEP, never the hex** — so nobody can
+mistype a digit and no file in this repo maintains a hex table.
+
+**The class is `bg-kit-<scale>-<step>`** — `bg-kit-slate-3`, `text-kit-red-11`,
+`border-kit-slate-5`. The `kit` namespace exists because Tailwind's own `blue` /
+`green` / `amber` / `red` are still live in 76 class uses across the unmigrated
+pages; overriding them would have re-coloured pages D0.5a may not touch. Only
+the steps this chapter names exist — a chat reaching for `bg-kit-slate-4` gets
+nothing, which is the point.
 
 ## §3.2 Neutral — 95% of the screen
 
@@ -459,7 +486,7 @@ nobody can mistype a digit and nobody maintains a hex table.
 | Card / panel surface | white | `#FFFFFF` |
 | Hairline (table lines, card edge) | `slate-5` | `#E0E1E6` |
 | Stronger divider (section split) | `slate-6` | `#D9D9E0` |
-| Icon at rest | `slate-9` | `#8B8D98` |
+| Icon at rest · placeholder | `slate-9` | `#8B8D98` |
 | Secondary text | `slate-11` | `#60646C` |
 | Primary text | `slate-12` | `#1C2024` |
 
@@ -537,10 +564,17 @@ and the tone is chosen by a **condition**, never by which verb it is:
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
 | No raw hex | Build Guard A (ratchet) | ✅ live | `check-design-standard.mjs` |
-| Status is always a pill | Component API — `<StatusPill>` is the only renderer | ⏳ D0.5a | `StatusPill.tsx` |
+| Status is always a pill | Component API — `<StatusPill>` is the only renderer | ✅ **live (D0.5a)** | `components/kit/StatusPill.tsx` |
 | Flame only in the logo | Build Guard B | ⏳ D1 | `check-design.mjs` |
-| Action tone comes from a condition, not a verb | Component API — the tone is computed, never passed | ⏳ D0.5a | `order-actions.ts` |
+| Action tone comes from a condition, not a verb | **Type System** — `tone: OrderActionTone`, the union the engine computes; the pill file contains no verb and no verb→tone map | ✅ **live (D0.5a)** | `StatusPill.tsx` · `order-actions.ts` |
 | Max 2 reds per screen | **Human Review** — not statically measurable | ⚠ **debt** | `/ui` screenshot |
+
+> **§3.6 lists SIX tones; `OrderActionTone` has FIVE** — there is no `money`
+> member, so `<StatusPill tone="money">` does not compile (a `@ts-expect-error`
+> test pins it). Reported by D0.5a, not invented around: adding a sixth tone
+> changes what the action engine may return, which is a business decision about
+> whether the money track gets its own colour. Today the money pill's indigo
+> lives only as the legacy `.pill-collected` class in `index.css`.
 
 ---
 
@@ -575,14 +609,24 @@ Candidate B — 6 steps (strict 4pt)
 Dead under both: `10 · 14 · 18 · 20 · 22 · 33` and every arbitrary
 `p-[Npx]` / `gap-[Npx]` / `m-[Npx]`.
 
+**Every Foundation Component is built from the SIX steps present in BOTH
+candidates — 4 · 8 · 12 · 16 · 24 · 32 — so whichever way Q1 is frozen, not one
+component changes.** That is not a convention somebody has to remember: a source
+scan over `components/kit/**` fails on any other step
+(`kit-source.test.ts`, D0.5a). It is also why D0.5a could ship components while
+Q1 is still open, instead of waiting.
+
 ## §4.2 Radius — four, frozen
 
-| px | Use |
-|---|---|
-| 4 | pill · small tag · checkbox |
-| 6 | button · input · dropdown |
-| 10 | card · panel · modal · drawer |
-| full | avatar · status dot |
+| px | Class | Use |
+|---|---|---|
+| 4 | `rounded-pill` | pill · small tag · checkbox |
+| 6 | `rounded-control` | button · input · dropdown |
+| 10 | `rounded-card` | card · panel · modal · drawer |
+| full | `rounded-full` | avatar · status dot |
+
+**Named by USE, so nobody picks a number.** A chat that wants "a slightly
+rounder card" has to change the kit, which is the friction §0.3 asks for.
 
 Dead: `sm` · `md` · `lg` · `xl` · `3px` · `5px` · `8px` · `9px` · `12px`
 (11 radii in use today).
@@ -688,40 +732,168 @@ BUSINESS ENTITIES
 
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
-| Only 3 sizes (14/16/18) | Build Guard C | ✅ live on kit files — widen to all in D1 | `check-design-standard.mjs` |
-| One meaning → one glyph | Type System — `<Icon name>` is a union; `"edit3"` fails to compile | ⏳ D0.5a | `Icon.tsx` |
-| Lucide only, no emoji | Build Guard C | ⏳ D1 | `check-design.mjs` |
+| Only 3 sizes (14/16/18) | **Type System** — `size` is `14 \| 16 \| 18`; Build Guard C also live on kit files | ✅ **live (D0.5a)** | `components/kit/Icon.tsx` |
+| One meaning → one glyph | **Type System** — `<Icon name>` is a union; `"edit3"` fails to compile | ✅ **live (D0.5a)** | `components/kit/Icon.tsx` |
+| Lucide only, no emoji | **Component API** — one file in `components/kit/**` may import `lucide-react`, asserted by a source scan; Build Guard C widens to all pages in D1 | ✅ **live in the kit (D0.5a)** | `kit-source.test.ts` |
 | Stroke width | ⚠ **PENDING Q4** — not enforced until frozen | ⚠ | `/ui` |
+
+> **§5.2 decides a `warning` survivor that §5.3 has no row for.** `Icon` carries
+> §5.3's 40 meanings exactly, so `TriangleAlert` has no name and cannot be
+> rendered. Reported by D0.5a rather than invented: a 41st meaning is a kit
+> addition, not a component's decision. Same question one line down — §3.6 names
+> a **held (🔒)** condition and §5.3's STATUS group has no `lock` row, only an
+> ACTIONS one, so `StatusPill`'s icon is narrowed to the four STATUS meanings.
 
 ---
 
 # §6 Box Dictionary
 
-> ⏳ **Written by D0.5a and D0.5b, one component at a time.** A specification
-> written before its component exists is a specification that 285 pages will
-> each re-implement differently — the exact failure this rewrite ends.
+> ✅ **D0.5a landed — the ten no-behaviour boxes below live in
+> `apps/web/src/components/kit/` and render on `/ui`.**
+> ⏳ **D0.5b writes the Radix half.** A specification written before its
+> component exists is a specification that 285 pages each re-implement
+> differently — the exact failure this rewrite ends, which is why nothing is
+> written here until it is on `/ui`.
 
-Each component gets its section here **when it lands on `/ui`**, specifying:
-height · radius · padding · font token · border · background · hover · focus ·
-disabled · selected · loading · long text · empty value.
-
-**D0.5a — no behaviour needed (structure + CSS):**
+**D0.5a — no behaviour needed (structure + CSS):** ✅
 `Button` · `Input` · `Textarea` · `SearchInput` · `Card` · `Panel` · `Badge` ·
-`StatusPill` · `EmptyState` · `Loading`
+`StatusPill` · `EmptyState` · `Loading` (+ `Icon`, §5).
 
-**D0.5b — behaviour from Radix:**
+**D0.5b — behaviour from Radix:** ⏳
 `Modal` · `Drawer` · `Select` · `DropdownMenu` · `Tooltip` · `Popover` ·
 `Tabs` · `Checkbox` · `DatePicker` · `Toast`
 
-Until a component lands, the record is the code, not this file:
-[`Btn.tsx`](../apps/web/src/components/Btn.tsx) ·
+The pre-kit boxes stay alive until their pages migrate in D2–D7 and are **not**
+law: [`Btn.tsx`](../apps/web/src/components/Btn.tsx) ·
 [`Field.tsx`](../apps/web/src/components/Field.tsx) ·
 [`Money.tsx`](../apps/web/src/components/Money.tsx) ·
 [`SectionPanel.tsx`](../apps/web/src/components/SectionPanel.tsx) ·
 [`Segmented.tsx`](../apps/web/src/components/Segmented.tsx) ·
 the `.btn-*` and `.pill*` utilities in `apps/web/src/index.css`.
 
-## §6.1 The rule that keeps this chapter closed
+## §6.0 The rule every box below obeys
+
+> **A kit component takes no `className` and no `style`.**
+
+§0.1 says a chat may not invent component styles. The only way that becomes
+true rather than remembered is for there to be **nowhere to put one** — so
+every component's props are `Omit<…HTMLAttributes, "className" | "style">`.
+Behaviour, `data-testid`, `aria-*` and `onClick` all pass through; appearance
+does not. Layout AROUND a box is the caller's wrapper.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| A component cannot be restyled by its caller | **Component API** — no `className`, no `style` prop | ✅ **live (D0.5a)** | `kit.test.tsx` (11 × `@ts-expect-error`) |
+| A badge can never carry a status colour | **Component API** — `Badge` has no `tone` prop | ✅ **live (D0.5a)** | `Badge.tsx` |
+| There is no red control | **Type System** — `variant` has no `danger` member | ✅ **live (D0.5a)** | `Button.tsx` |
+| An error message replaces the hint | **Component API** — `FieldFrame` renders one or the other | ✅ **live (D0.5a)** | `FieldFrame.tsx` |
+| A kit component uses only Q1-safe spacing | **Build Guard** — source scan over `components/kit/**` | ✅ **live (D0.5a)** | `kit-source.test.ts` |
+
+*(Values below are measured on `/ui` in a real browser, not read off the source.)*
+
+## §6.1 `Button`
+
+| | |
+|---|---|
+| Variants | `primary` blue-9 filled · `neutral` white + slate-5 hairline · `ghost` no box |
+| Height | 32 (`md`) · 24 (`sm`) |
+| Radius · Type | `rounded-control` (6) · `text-body` + `font-medium` |
+| Padding · gap | 12 / 8 x-padding · 8 / 4 gap |
+| Icon | `IconName` only — 16 (`md`) · 14 (`sm`) |
+| Hover | filled → `brightness-95` (§3.5, keeps its own colour) · unfilled → `blue-3` |
+| Focus | `ring-2 blue-9` + 1px offset, `focus-visible` only |
+| Disabled | opacity 40, `not-allowed`, hover suppressed |
+| Loading | spinner replaces the icon, `disabled` + `aria-busy` |
+| Long text | never wraps; the caller constrains the width |
+
+**There is no `danger` variant.** §3.3 gives red one job — *late · act now* —
+and §3.4 bans colour as decoration; a red button paints intent onto a control
+instead of onto the state that earned it. A destructive action is a `neutral`
+button whose WORD says what it does (COPY-STANDARD owns the word).
+
+**One `primary` per block** — §3.4 already bans two blue actions in one block.
+
+## §6.2 `Input` · `Textarea` · `SearchInput`
+
+One skin, three shapes. The recipe is `field-recipe.ts` and the label/message
+frame is `FieldFrame.tsx` — §6.6 applied: the second occurrence was extracted
+before it was used twice. Replaces **134 hand-rolled `<input>`s in 121 distinct
+class strings**.
+
+| | |
+|---|---|
+| Height | 32 single-line · natural for `Textarea` (`rows`, never a height) |
+| Radius · Type | `rounded-control` (6) · `text-body` |
+| Background · border | white · `slate-5` hairline → `red-9` when refused |
+| Placeholder | `slate-9` |
+| Focus | `ring-2 blue-9` + `border-blue-9` |
+| Disabled | `slate-3` fill, `slate-9` ink, `not-allowed` |
+| Label · message | `text-label slate-11` above · `text-meta` below |
+| Error | **replaces** the hint, `role="alert"`, `aria-invalid` |
+| Empty value | the placeholder, and nothing else |
+
+**An error replaces the hint, never stacks under it** — two lines of guidance
+under one control is how a form starts scrolling, and §1.3 is a budget.
+
+`SearchInput` is its own box rather than `<Input icon="search">`: a search box
+carries no label (§8.1 puts it in the title band, where a label would cost a
+row of the height budget), takes no error and is never required. A
+`leadingIcon` prop on `Input` would have opened all three doors on every field
+in the portal.
+
+**Form LAYOUT is not here** — one column or two, the air between fields, where
+a section heading goes. §8 says it has no home yet; **D0.5c** writes it.
+
+## §6.3 `Card` · `Panel`
+
+| | `Card` | `Panel` |
+|---|---|---|
+| Surface | white, `slate-5` hairline, `rounded-card` (10) | same |
+| Padding | 16, or `none` for a table-bodied card | same, on the body |
+| Header | — | title `text-strong`, `slate-6` divider, one `right` slot |
+| Heading level | — | a real `<h2>` |
+
+**No shadow.** The old `.card` utility carries a double drop shadow; depth used
+as decoration is banned by §3.4, and on a `slate-3` canvas a hairline already
+separates the surface.
+
+**Two components, not one `title?` prop**, so a page cannot half-title a card.
+The question "does this surface need to say what it is?" has two answers and
+each gets a box. `Panel` **does not collapse** — that is behaviour, D0.5b/D0.5c.
+
+## §6.4 `StatusPill` · `Badge`
+
+| | `StatusPill` | `Badge` |
+|---|---|---|
+| Shape | `rounded-pill` (4), 8/4 padding, `text-label` | same |
+| Colour | tone fill + same-hue ink (§3.3) | `slate-3` + `slate-11`, always |
+| Icon | the four §5.3 STATUS meanings, 14 | none |
+| Long text | truncates inside its cell | truncates |
+
+**`Badge` has no `tone`, and that is the design.** A coloured badge is a status
+wearing a different name, and §3.4 says a status is a pill — so a badge that
+could be red would be a second status renderer with none of `StatusPill`'s
+rules. There is no prop to pass.
+
+**`StatusPill` spells no word.** Every visible string comes from COPY-STANDARD
+via `order-action-words.ts`; the pill renders what it is given.
+
+## §6.5 `EmptyState` · `Loading`
+
+| | |
+|---|---|
+| `EmptyState` | centred; optional 18px `slate-9` glyph · `text-strong` title (required) · `text-meta` detail · one action slot |
+| `Loading` `spinner` | inherits `currentColor`, sized 14/16/18 to line up with an icon |
+| `Loading` `skeleton` | `slate-3` bars, last one short, `animate-pulse` |
+
+**An empty state is an ANSWER, not an apology** — §1.4 rule 2's logic applied
+to a list: the message must tell the operator something they did not know, or
+the region should not draw. No illustration slot: art is decoration.
+
+**One action, never two.** Two buttons in an empty state is a decision, and a
+decision is not a state.
+
+## §6.6 The rule that keeps this chapter closed
 
 > **If a UI element appears a second time, it stops being inline and becomes a
 > Foundation Component.** The first occurrence may be written in place. The
@@ -859,15 +1031,46 @@ being an exception at all: it is `variant`, not a rule somebody has to remember.
 
 # §9 UI States
 
-> ⏳ **Written by D0.5a.** These are UI states, not business statuses.
+> ✅ **Written by D0.5a.** These are UI states, not business statuses — a
+> business status is a `StatusPill` and its words belong to COPY-STANDARD.
 
-`Empty` · `Loading skeleton` · `Error` · `Partial data` · `No permission` ·
-`Offline` · `Success`.
+**Seven states, and they share two boxes.** A state that seems to need a new
+component is a state nobody has defined yet — say what the region should SAY,
+and it will turn out to be one of these.
 
-**`/ui` must render every component in every state**, including the ugly ones —
-default · hover · focus · selected · disabled · loading · error · **long text**
-· **empty value**. A visual-regression screenshot that only covers the happy
-path proves nothing.
+| State | Rendered by | What it must say |
+|---|---|---|
+| **Empty** | `EmptyState` | why it is empty, in the operator's terms — never "No data" |
+| **Loading** | `Loading` — `skeleton` for a region, `spinner` for a control | nothing; it shows shape, not words |
+| **Error** | `EmptyState` + a `Try again` action | what did not happen, not the exception |
+| **Partial data** | the surface renders what it HAS and states the gap in its own words | which part is missing — **never a silent blank** |
+| **No permission** | `EmptyState`, no action | that it is not theirs to open, and who to ask |
+| **Offline** | `EmptyState` + a retry action | that the connection dropped, not that the record is gone |
+| **Success** | a toast (`sonner`, §11) — ⏳ D0.5b | what changed; it never becomes a permanent block |
+
+**Partial data is the one with no component, on purpose.** A box that renders
+"some of this is missing" in a generic voice is how a screen ends up saying
+less than it knows; the surface that owns the data is the only thing that can
+name the gap. Every module doing this today (K5's coverage line, HR-P7's
+withheld ratio, S5's withheld figures) states its own — that is the pattern.
+
+**`/ui` renders every component in every state**, including the ugly ones —
+default · hover · focus · disabled · loading · error · **long text** · **empty
+value**. Hover and focus are painted in a FORCED variant beside the live one,
+because a static screenshot cannot hold a pointer; the forced classes are
+pinned to the components' own declarations by `UiShowcase.test.tsx`, so they
+can never become a hand-painted lookalike. A visual-regression screenshot that
+only covers the happy path proves nothing.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| Every state renders on `/ui`, ugly ones included | **Screenshot** (§13.4) + a test asserting the disabled / error / loading / long-text samples exist | ✅ **live (D0.5a)** | `UiShowcase.test.tsx` |
+
+> **Partial data is deliberately NOT written as a Rule row.** No mechanism can
+> tell a silent blank from a legitimately empty field, so a row would have
+> arrived carrying `Human Review` — and §16's second health rule forbids growing
+> that debt without a mechanism or a card that names one. It stays as the
+> paragraph above until somebody finds one.
 
 ---
 
@@ -951,13 +1154,21 @@ Exempt: `pages/dealer/**` (POS, Part B) and `pages/print/**`.
 | F | a `z-` class anywhere in `pages/**` | ✅ |
 | G | a raw `<table>`, `<input>`, `<select>`, or a `fixed inset-0` overlay in `pages/**` | ⏳ needs D0.5 |
 | H | a `PageShell` whose fixed chrome exceeds its variant's budget (§1.3) | ⏳ needs D0.5c |
-| I | the same class string ≥ 40 chars repeated across ≥ 2 files (§6.1) | ⏳ D1 |
+| I | the same class string ≥ 40 chars repeated across ≥ 2 files (§6.6) | ⏳ D1 |
 
 ## §13.4 The screenshot gate
 
 `/ui` is screenshotted in CI. **A changed screenshot requires a human
 signature** — which buys visual regression for the whole kit at the price of
 one page.
+
+> **Status, stated rather than implied: the PAGE exists (D0.5a), the CI
+> SCREENSHOT does not.** There is no image-diff step in the repo today, so this
+> gate is a page waiting for a job. What D0.5a did deliver is the half that a
+> screenshot cannot do anyway — `UiShowcase.test.tsx` fails if the showcase
+> stops rendering an icon meaning, a tone, or one of the three pending
+> questions. **Wiring the image diff belongs to D1**, with the rest of the
+> Build Guard.
 
 ---
 
@@ -1005,28 +1216,46 @@ parses the Enforcement column out of this file, checks which mechanisms
 actually exist in the repo, and rewrites the block. A hand-maintained
 percentage is prose, and prose drifts; that is the whole thesis of this
 document.
-*(The numbers below are the D0 hand count, valid until D1 wires the generator.)*
+*(The numbers below are the D0.5a hand count, valid until D1 wires the generator.)*
 
 ```
                          enforced / total
   Typography    ░░░░░░░░░░    0%      0 / 3
-  Colour        ██░░░░░░░░    20%     1 / 5
+  Colour        ██████░░░░    60%     3 / 5
   Spacing       ░░░░░░░░░░    0%      0 / 4
-  Icons         ██▌░░░░░░░    25%     1 / 4
-  Components    ░░░░░░░░░░    0%      0 / 6
+  Icons         ███████▌░░    75%     3 / 4
+  Components    ████▌░░░░░    45%     5 / 11
   Layout        ░░░░░░░░░░    0%      0 / 6
   Hierarchy     ██░░░░░░░░    20%     1 / 5
   ──────────────────────────────────────────
-  TOTAL         ▉░░░░░░░░░    9%      3 / 33
+  TOTAL         ███▏░░░░░░    32%    12 / 38
 ```
 
 | | Count | Meaning |
 |---|---|---|
-| Rules | **33** | design rules stated in §1–§8 |
-| **Enforced** | **3** | Type System / Component API / Build Guard / ESLint is live |
-| Scheduled | 22 | a card exists (D0.5–D5) |
+| Rules | **38** | design rules stated in §1–§8 |
+| **Enforced** | **12** | Type System / Component API / Build Guard / ESLint is live |
+| Scheduled | 19 | a card exists (D0.5–D5) |
 | **Blocked on a decision** | 3 | Q1 spacing · Q3 weight · Q4 stroke — see PENDING REGISTER |
 | **Human Review debt** | 4 | `fmtDate()` · "max 2 reds per screen" · facet group order · "Progress carries no events" — nobody has found a mechanism |
+
+**The D0.5a arithmetic, shown so it can be checked** (health rule 1 says
+coverage may never go down, and rule 2 says the debt may never grow):
+
+```
+rules      33  +  5  =  38     the five new §6.0 Component-API rules
+enforced    3  +  9  =  12     status-is-a-pill · action-tone-from-a-condition ·
+                               icon size · icon meaning · lucide-only-in-the-kit ·
+                               plus the five §6.0 rules
+coverage   9.09%  →  31.58%    ⬆
+debt          4   →      4     unchanged — no rule was added with Human Review
+```
+
+Where the nine came from: five rules were added **already enforced** (that is
+the point of a Component API — the rule and its mechanism are the same object),
+and four rules that already existed as words became structure when `Icon` and
+`StatusPill` landed. **Nothing was counted because a card exists** — every ✅ in
+§1–§8 points at a file that fails today if the rule is broken.
 
 **Two health rules:**
 
@@ -1064,8 +1293,15 @@ Taken 2026-07-27 across `apps/web/src`:
 | Lucide icons | 100 distinct, in 12 sizes, with 3 known duplicate meanings |
 | `.btn-*` uses | 343 — **consistent; the one thing that worked** |
 | `.pill` uses | 72 — largely consistent |
-| Radix packages installed | **0** |
+| Radix packages installed | **1 since D0.5a** — `@radix-ui/colors` (the palette). The behaviour primitives land in D0.5b |
 | `shadcn/ui` installed | **no** — `components/ui/` does not exist |
+
+**What D0.5a changed against this table** (2026-07-28): the ten Foundation
+Components exist and `/ui` renders them, so the *shell · table · modal · input*
+row of the "Died" list is no longer entirely true — `<input>` now has a box.
+**None of the 225 pages has moved yet, on purpose**: D0.5a touches no existing
+page, and the codemods (D2–D4) plus the page cards (D6, D7+) are what burn the
+2,556 hard-coded sizes down. This appendix is re-measured by **D1**.
 
 ---
 
