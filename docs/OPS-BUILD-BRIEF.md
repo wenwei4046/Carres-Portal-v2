@@ -13,9 +13,9 @@
 ## The business, in one model (三轨)
 Carres = furniture retailer. Dealers/showrooms SELL; the **customer pays HQ direct** (no dealer credit). The **Operation portal** is COO Jess's daily driver (single operator, ~1000 orders/mo, all outsourced). **Every order runs 3 parallel tracks:**
 
-- **货 STOCK** (supplier): No PO → `Order PO` · PO'd, waiting → `Chase supplier` · Ready ✓. Chase via each supplier's WhatsApp GROUP, REF-led (CR/TCF doc-no, NEVER the SO). Consolidated PO + monthly PO-duty rotation (SPEC §14.6).
+- **货 STOCK** (supplier): no PO → `Send PO` · PO'd, waiting → `Confirm ready date` · goods in ✓. **The words come from docs/COPY-STANDARD.md, never from here.** The call goes through each supplier's WhatsApp GROUP, REF-led (CR/TCF doc-no, NEVER the SO). Consolidated PO, the monthly PO-duty rotation and every purchasing number → **`docs/PURCHASING-WORKING-FLOW.md`**, which is the only home for them.
 - **送 DELIVERY** (logistics company): unassigned → `Assign logistics` · assigned/not confirmed → `Call {logistics} — confirm delivery date` · customer confirmed ✓. **The words come from docs/COPY-STANDARD.md, never from here.** `assign` = WE pick the carrier; `booked` = the PARTNER fixed a slot with the customer. NETS is the main partner.
-- **钱 MONEY** (customer): balance / storage owing → `Collect $` (+ `Confirm 🔒` while money-held). Storage: from ETA, MS/BF RM150/mo · SOF RM200/2wk.
+- **钱 MONEY** (customer): balance / storage owing → `Collect RM {amount}`, and the money hold rides that same action (C3 retired the bare `Confirm`). **The words come from docs/COPY-STANDARD.md, never from here.** Storage: from ETA, MS/BF RM150/mo · SOF RM200/2wk.
 
 ## State vocabulary — use THESE words only (never leak DB stage words)
 The customer/Jess-facing pipeline has exactly **5** words. The DB `operation_stage`

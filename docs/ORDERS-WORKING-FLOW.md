@@ -73,7 +73,9 @@ finish; it never changes and is never repeated on an action.
 **`Send PO to {supplier}`**
 - Trigger: a goods line needs buying and no PO covers it
 - Checklist: supplier · items · quantity · purchase price · send · record PO number · record supplier ready date
-- Completion: PO number exists AND supplier ready date exists
+- Completion: a PO exists for the line. **The ready date is NOT part of it** — that is the
+  next action's outcome, and the row becomes `Call {supplier} — confirm ready date` the moment
+  a PO exists. Folding them together leaves `Send PO` open with nothing left to send.
 - Due: the customer's date minus the supplier's lead time minus the internal buffer
 - Task Owner: the Purchasing task owner (today the PO-duty holder, `org_duties`)
 

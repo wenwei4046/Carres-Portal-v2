@@ -314,7 +314,9 @@ and the handover is recorded.
 - **Engine actions stay engine-generated.** A claim may NEVER be implemented by minting a
   task row per action. The moment an action becomes a row somebody maintains, the portal is a
   manual to-do list again and the engine stops being the single source of truth.
-- **The claim expires by itself** — on a timeout, and when the action completes.
+- **The claim expires by itself** — on a **2-hour** timeout, and when the action completes.
+  Two hours is a number, not a setting: it is not a business rule anybody tunes, and an
+  eighth number on the Settings tab that nobody ever changes is worse than a constant.
 - **If the action disappears, the claim disappears with it.** This is structural, not a
   cleanup job: a claim is only ever READ through the list of currently-open actions, so an
   action that is finished, recomputed away or no longer valid has nothing that can look its
