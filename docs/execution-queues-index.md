@@ -225,6 +225,17 @@ to be remembered.
   card that fixes this must (a) give the engine a calendar parameter, (b) name the calendar at
   every call site, and (c) prove no due date moved except the ones meant to. **Nobody may
   "just switch the default"** — that silently re-dates every deadline on the board.
+  **Measured 2026-07-28, so the card starts from facts rather than a sweep:**
+  `DEFAULT_OFF_DAYS = [0]` — Sunday only, i.e. **Mon–Sat**, which is the WAREHOUSE week.
+  Three groups today:
+  · **Purchasing passes `[0,6]` explicitly** → Office, and Law 2A says that is right;
+  · **Receiving / GRN take the default** → Warehouse, right;
+  · **Delivery (`delivery-queue.ts`) and Service Cases take the default too** → they are
+    counting Saturday as a full working day, and Law 2A puts both on **Office / Delivery,
+    Mon–Fri**. So T7's four delivery deadlines and S4's 14-working-day service deadline are
+    each ~3 calendar days TIGHTER than the business now says they should be.
+  The code was correct under the old one-week rule; the ruling is what made it wrong, which is
+  why this is a card and not a bug report.
 - **The delivery window and Saturday's capacity — ruled, NOT built, and NOT carded.** The
   words are locked (`COPY-STANDARD.md`, "delivery window words"): Landed · Retail = full-day ·
   Condo · Apartment · Office = half-day · no building type = no booking; and Saturday carries
