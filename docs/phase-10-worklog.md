@@ -3948,3 +3948,54 @@ strings shipped.
 **Deploy note added after the fact:** #497 (C8b) merged and deployed minutes after this card and its bundle CONTAINS this tip (`git merge-base --is-ancestor 646d8ee9 031051ab` passes), so `index-Du3H-Kir.js` was live and verified and is now superseded rather than rolled back.
 
 **P2 is complete.** Three tabs, one click law, and the durable output is §8.2's stage-vs-queue rule rather than any one screen.
+
+---
+
+**2026-07-28 · D0.5a is MERGED and DEPLOYED — `/ui` is live so the freeze can happen** (PR #498
+merge `a548ddc9`, deployed from main tip `9c3697a9`; web `index-ppcFiPO4.js` +
+`UiShowcase-BuHw0NNN.js` [carres-portal `9b706059` + carres-pos `73248419`] + Worker `a698fa7c`)
+— Loo's ruling: *"This is not a production feature rollout. It is a business validation
+showcase."* Without a deployed `/ui` nobody can freeze Q1 · Q3 · Q4, and those three gate D0.5b.
+
+**https://erp.carresofficial.com/ui — public, no login.** That was a deliberate choice in the
+card and it is what makes the freeze a five-minute job instead of a command Jess has to run.
+
+**Two files had to be proved, and the second one is the whole trap.** `/ui` is a LAZY route, so
+**not one showcase string is in `index-*.js`** — they ship in `assets/UiShowcase-BuHw0NNN.js`
+(23,157 bytes). A chat grepping only the main bundle would have found nothing and concluded the
+deploy failed. In the main bundle `path:"/ui"` and `UiShowcase` each grep **0 → 1** against the
+true predecessor; in the showcase chunk the ten proof strings and the four new token classes are
+all present. `SERVICE_ROLE` is **0** in both.
+
+**Two corrections made on myself, same disease both times — trust the marker last.** (1) Four
+markers first greped 0 → 0 because I had typed `·` as `.` and `—` as `-` inside a PowerShell
+literal; with the real characters every one is 1. (2) I first compared against `index-bGVCSQpH.js`
+(#494) and reported `delay_detected_at` **0 → 3** — but the TRUE predecessor is #497's
+`index-BIOm5Q5p.js`, and the honest figure is **3 → 3**. `wrangler pages deployment list` is what
+named the real previous writer. This is the sibling of the `grep -c counts LINES` correction made
+one commit earlier by another line: **when a number surprises you, suspect the measurement.**
+
+**The verification did not stop at a grep.** The live page was opened in a real browser and its
+COMPUTED styles read back: canvas `rgb(240,240,243)` = slate-3 · primary button `rgb(0,144,255)` =
+blue-9 at radius 6, height 32 · danger pill red-3 on red-11 · all six type tokens exactly
+24/600/32 · 20/600/28 · 15/600/22 · 13/400/18 · 12/400/16 · 11/500/14 · 78 icons · 17 status
+pills. A screenshot could not be taken (the harness reports the Browser pane not displayed), and
+for TOKENS a computed-style read is the stronger proof anyway.
+
+**The api was deployed, and NOT for D0.5a.** D0.5a changes no `apps/api` file. The union tip
+carried **C8b's undeployed Worker half** — its web has been live since #497 while the Worker was
+still C8's, so its screen was reading columns nothing was selecting. Migration **0305 was already
+applied** (tracker read immediately before deploying, tail = repo tail), so the api was safe to
+ship and the pair is coherent again. Wrangler echoed `PUBLIC_WEB_URL: https://pos.carresofficial.com`
++ the custom domain + the 09:00-MYT cron; `GET /health` returns 200.
+
+**The merge was not clean and the conflicts were resolved by hand, not by taking a side** —
+`origin/main` had moved ten commits (P2 Claims #494, P2 Receiving #495, C8b #497). `docs/UI-KIT.md`
+auto-merged (their addition is §8.4's group-heading rule, mine are §2/§3/§4/§5/§6/§9/§16);
+`execution-queues-index.md` and `phase-10-worklog.md` conflicted and both sides were kept.
+**One ruling had to be reconciled rather than overwritten**: this session's PM said *"T3 may run in
+parallel"*, and a commit that landed on main while D0.5a was building says *"do not offer T3 to a
+chat before R8 has merged."* Both survive and the queue now says so — the first is about
+SEQUENCING (T3 is not in front of D0.5b), the second about TIMING (do not review a hierarchy while
+three chats are still changing the screens under it). Full suite re-run on the union tip: **16
+pre-existing failures, 2142 passed** — baseline held.

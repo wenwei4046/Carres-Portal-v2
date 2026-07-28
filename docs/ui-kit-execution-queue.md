@@ -16,7 +16,8 @@
 
 | | |
 |---|---|
-| On `main` | `ba7b7798` D0 law + doors · `19cad8e4` merge · `d83ecf98` §1.4 hierarchy · **`c9966ee3` T2 drawer**. **D0.5a is built and NOT yet merged** (branch `claude/carres-portal-d0-5a-b2afe1`) |
+| On `main` | `ba7b7798` D0 law + doors · `19cad8e4` merge · `d83ecf98` §1.4 hierarchy · **`c9966ee3` T2 drawer** · **`a548ddc9` D0.5a (PR #498)** |
+| **`/ui` is LIVE** | **https://erp.carresofficial.com/ui** — deployed 2026-07-28 from main tip `9c3697a9`, public, no login. Open it and answer Q1 · Q3 · Q4. It is also on `pos.carresofficial.com/ui` and both `pages.dev` apexes |
 | Deployed to prod | ✅ **YES — corrected 2026-07-28.** `git merge-base --is-ancestor c9966ee3 10f49add` passes, and `10f49add` is the live web tip in CLAUDE.md §17.1 (`index-c7LT9aSQ.js`, PR #492). **T2 has been in front of users since that deploy.** This row previously read *"NOT YET… nobody has seen it in a browser"* — it went stale when a parallel line shipped a bundle containing it. |
 | Next thing that matters | **T3 — Jess uses the reordered drawer for one day.** **No longer blocked**: the deploy it was waiting for already happened. T3 is a Jess task, not a build card. **Deliberately scheduled AFTER the Purchasing line finishes** (Loo, 2026-07-28: P2 · C8b · R8 first). The reason is the point of T3 — it tests whether the Information Hierarchy helps, and a review run while three chats are still changing screens measures the churn instead of the hierarchy. **Do not offer T3 to a chat before R8 has merged**, and do not read the delay as T3 being optional. |
 
@@ -232,12 +233,11 @@ drawers and menus, which is where spacing compounds. Building them against an
 unfrozen scale is the one place the "any answer costs zero component changes"
 property from D0.5a would stop holding.
 
-**`/ui` has to be reachable before any of this starts.** It exists on branch
-`claude/carres-portal-d0-5a-b2afe1` and nowhere else — not on `main`, not on
-either Pages project. A freeze session needs either the branch merged and
-deployed from the main tip (CLAUDE.md's deploy law: never from a feature
-branch), or Jess running a local preview. **That is Loo's call, and until it is
-made, Q1 · Q3 · Q4 cannot be answered by anybody.**
+**`/ui` is reachable — that blocker is closed.** Loo ruled it a business
+validation showcase rather than a feature rollout, so D0.5a was merged (PR #498)
+and deployed from the main tip: **https://erp.carresofficial.com/ui**, public,
+no login, verified in a real browser. Nothing else stands between Jess and the
+three answers.
 
 Frozen: **Q2 page canvas = Radix `slate-3`** · **Q5** Current Issues is its own
 block · **Q6** the KPI boxes merge into Progress (*already true — see the lesson
