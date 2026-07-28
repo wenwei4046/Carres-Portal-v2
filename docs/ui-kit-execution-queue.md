@@ -263,6 +263,18 @@ was written from the operator's six questions and has not been checked against a
 **Watch:** the drawer is ~7,600 lines and other lines touch it (J-cards, delivery T-cards). Take
 the worktree rule seriously — one worktree, and check `origin/main` before starting.
 
+### Implementation observations — NOT acceptance criteria
+
+Recorded so the builder does not have to rediscover them. **They are observations, not rules**
+(Loo, 2026-07-28): none of them is an IA law, none reopens L1–L4, and none is a pass/fail gate.
+
+- **When the record scrolls, the header may collapse — but identity and the current action may
+  not.** L4 says `currentAction` is always visible and stops there; our detail scrolls, so
+  "always visible" needs a scroll answer. The one worth knowing: **do not pin the whole header**
+  (that spends permanent height, §1.3) — collapse it to a single line that keeps *who this is*
+  and *what can be done*. From `docs/ui-reference-review.md` R1 (SAP Fiori's Object Page), where
+  it is filed as an observation for exactly this card.
+
 ### The trap this card is most likely to fall into
 
 **Restyling while extracting.** The whole value is that structure moved and appearance did not,
