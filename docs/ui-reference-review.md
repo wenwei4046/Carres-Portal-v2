@@ -20,6 +20,15 @@
    first; the kit is updated **once, at the end**, from the frozen set. Editing the kit while
    the review runs is how five references become five half-applied styles.
 
+> **STATUS after the line closed (PM, 2026-07-28): this file is an INPUT, not a law.**
+>
+> **Reference Review is an input. UI-KIT is the only source of truth after consolidation.**
+>
+> **The observations frozen below are NOT architectural laws.** They carry no authority of their
+> own and **become authoritative only once consolidated into `docs/UI-KIT.md`** — card **D0.6**,
+> which runs **after D0.5c**. Until then, a chat that cites R1–R5 as law has cited an input. After
+> then, the kit is the source and this file is the record of where the reasoning came from.
+
 **A reference is a source of REASONING, not of authority.** Nothing in this file outranks
 `docs/UI-KIT.md`, `docs/COPY-STANDARD.md`, `docs/ACTION-FLOW-STANDARD.md`,
 `docs/execution-queues-index.md`, or the frozen

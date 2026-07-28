@@ -46,7 +46,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — freezes Q1/Q3/Q4 | ⏳ |
 | **D0.5b** | Foundation components, Radix | ⏳ |
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ **ready to build** |
-| **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. **Planning card below; not started** | ⏳ **planning card awaiting PM approval** |
+| **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
@@ -287,12 +287,8 @@ opportunity to break it.
 
 ## D0.6 · KIT-CONSOLIDATION — the PLANNING CARD
 
-> **STATUS: planning card only. Awaiting PM approval. NOTHING may be built from it yet.**
-> The PM ruled 2026-07-28: *"Create the KIT-CONSOLIDATION Planning Card only. Do not edit UI-KIT
-> yet. After the planning card is approved, only then begin the UI-KIT consolidation."*
->
-> **This section defines the work. It does not do the work.** No line of `docs/UI-KIT.md` is
-> touched by writing this card, and none may be touched until the PM approves it.
+> **STATUS: planning card APPROVED by the PM, 2026-07-28.** The work may begin **only after
+> D0.5c ships** — see Sequencing. `docs/UI-KIT.md` is still untouched today.
 
 **Why this card exists.** The Reference Review line (`docs/ui-reference-review.md`, R1–R5, closed
 2026-07-28) reviewed five international references and froze **five principles**. Rule 5 of that
@@ -387,6 +383,16 @@ disease `UI-KIT` §0.2 and Law 0A exist to prevent.
 
 ### 4 · RULES
 
+**0. The rule that governs all the others (PM, 2026-07-28):**
+
+> **Reference Review is an input.
+> UI-KIT is the only source of truth after consolidation.**
+
+**Reference Review observations are NOT architectural laws.** R1–R5 carry no authority of their
+own — they **become authoritative only once consolidated into `docs/UI-KIT.md`**, and from that
+moment the kit is the source and `docs/ui-reference-review.md` is the record of where the reasoning
+came from. A chat that cites the review file as law has cited an input.
+
 1. **`docs/UI-KIT.md` wins, and the IA stays closed.** Where a principle touches L1–L4, the kit's
    wording governs presentation and the model keeps information — neither file is edited to suit
    the other, and the model is not edited at all.
@@ -445,17 +451,20 @@ Every line is checkable by someone who did not write the card.
 
 ---
 
-### Sequencing — what this card blocks and what it does not
+### Sequencing — CONFIRMED by the PM, 2026-07-28
 
-**It should land before D1.** D1 writes the Build Guard baseline over all 225 files; a guard
-written against a law that is about to gain five principles is a guard that gets rewritten.
+```
+D0.5a  →  D0.5b  →  D0.5c  →  D0.6 KIT-CONSOLIDATION  →  D1 Build Guard
+```
 
-**It does not block D0.5a/b/c**, which implement L4 and the PENDING register — both already frozen
-and untouched by this card. **One real interaction to be aware of, not resolved here:** R1's closed
-catalogue is a statement about `PageShell`'s `variant` union, which D0.5c builds. If D0.5c ships
-first the code exists before its rule, which is normal and harmless; the card simply describes what
-was built. **If the PM wants the rule to lead the code, that is a sequencing instruction and it
-belongs to the PM, not to this card.**
+**D0.6 may NOT be moved ahead of D0.5c.** The open question this card raised — whether the closed
+catalogue rule should lead `PageShell` or describe it — **is decided: the components are built
+first, and consolidation writes down what exists.** That is consistent with Rule 0: the review is
+an input, and an input does not get to gate the build.
+
+**It still lands before D1**, which is the half of the ordering that matters downstream: D1 writes
+the Build Guard baseline over all 225 files, and a guard written against a law about to gain five
+principles is a guard that gets rewritten.
 
 ---
 
