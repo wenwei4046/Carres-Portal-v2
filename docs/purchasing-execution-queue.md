@@ -48,13 +48,15 @@
 - **The live migration tail is AHEAD of the repo.** 2026-07-28: the tracker holds `0301` +
   `0302` (the ④ R6 warehouse-login line) and neither file is on main. Number from the
   TRACKER, never from `ls supabase/migrations`.
-- **One warehouse exists**: `Carres Klang`. AL Sungai Buloh and HOUZS Balakong are not
-  records anywhere.
+- **One warehouse exists and one is all there will be**: `Carres Klang`. AL Sungai Buloh and
+  HOUZS Balakong are **delivery addresses on a PO, never warehouse records** (Loo 2026-07-28).
 - **`purchase_order_lines` already carries** `qty` · `received_qty` · `damaged_qty` ·
-  `wrong_item_qty`. Partial receiving is already quantity-based. **`cancelled_qty` does not
-  exist** — the one real gap in the state model (flow file §9).
-- Claims are LIVE (R2 · R3 · R4, `supplier_claims`, migrations 0288/0291/0299) but Claims
-  is **not yet a tab** — it becomes one in P2.
+  `wrong_item_qty`, and that is the whole quantity model. Partial receiving is already
+  quantity-based. **There is no `cancelled_qty` and none is coming** — purchasing does not
+  model a cancellation (flow file §9).
+- **Claims is ALREADY A TAB.** R2 added it 2026-07-27 (`PurchasingTabs.tsx` → `?tab=claims`);
+  the engine is live (R2 · R3 · R4, `supplier_claims`, migrations 0288/0291/0299). Four of the
+  five tabs exist today; Settings is the fifth and arrives with P1.
 - **Everything in the database today is TEST data.** At go-live it starts clean. Never
   write a backfill or a repair job for existing rows.
 
@@ -157,12 +159,18 @@ planning action by itself, and a short delivery produces exactly one balance cal
 **Goal:** a PO says where the supplier must send the goods, and prints it.
 
 **Build:**
-1. Locations: `Carres Klang` (our own) · `AL Sungai Buloh` · `HOUZS Balakong`. Only one
-   exists in the database today.
+1. Destinations: `Carres Klang` (our own warehouse) · `AL Sungai Buloh` · `HOUZS Balakong`.
+   **AL and HOUZS are DELIVERY ADDRESSES, not warehouses** (Loo 2026-07-28) — do NOT create
+   `warehouses` rows for them. Carres has exactly one warehouse and a second warehouse entity
+   would put goods we do not count into every stock rollup.
 2. The choice sits on the PO and appears on the printed PO.
 3. **Nice Future is fixed** — it does not deliver: `collected by NETS → Carres Klang` is its
    only option, and the PO says so.
 4. Default for everyone else is `Carres Klang`.
+5. **The supplier-facing PDF prints no RM value of any kind** (Loo 2026-07-28): PO number ·
+   supplier · items · quantity · delivery address · delivery instructions · dates. The
+   purchase price stays internal. Check `PoDocumentPreview.tsx` against this before adding
+   the address — the rule is about the whole document, not only the new field.
 
 **Why it matters:** an outstation order can only be delivered by AL, and AL will not collect
 in Klang. Sending the goods straight to AL saves a whole transfer.
@@ -186,13 +194,18 @@ and fix whatever breaks.
 one goes end to end.
 
 **Build / fix as found:**
-1. `cancelled_qty` — the one gap in the state model (§9). A cancelled line silently makes
-   `To order` wrong today.
-2. The two gates that have no home yet: a PO cannot be sent twice for the same customer line
+1. The two gates that have no home yet: a PO cannot be sent twice for the same customer line
    and quantity; a check-in cannot be posted twice for the same supplier delivery order
    number.
-3. Whoever is on a task shows on it (`Yu Jun is handling this · started 10:14`) — everybody
+2. Whoever is on a task shows on it (`Yu Jun is handling this · started 10:14`) — everybody
    can see everybody's work, so two people WILL open the same task.
+3. One PO document really does carry several customers' lines (§1), and one customer order
+   really does need several POs. Prove both on the real run, not on a fixture.
+
+**`cancelled_qty` is NOT in this card any more** (Loo 2026-07-28): purchasing does not model a
+cancellation at all. A customer cancellation needs management approval and belongs to the
+Orders cancellation policy; purchasing keeps processing a valid PO until Operations says stop,
+and stopping is the whole PO (`purchase_orders.status = 'cancelled'`, already built).
 
 **Migration:** likely. Draft to Jess first.
 **Done when:** one real PO has gone the whole way, including a short delivery, and every
@@ -200,9 +213,9 @@ number on screen matches what actually happened.
 
 ## Reported, not built (recorded so nobody rediscovers them late)
 
-- **PO revisions.** A sent PO that is changed is overwritten — there is no record of what the
-  supplier actually agreed to. Real gap, deliberately deferred until the first real PO needs
-  it (`docs/PURCHASING-WORKING-FLOW.md` §9).
+- **PO revisions — RULED OUT, not deferred** (Loo 2026-07-28). A sent PO is never edited: more
+  items means a NEW PO, and stopping one means cancelling the whole PO. There is no version of
+  a sent document to keep, so the gap this line used to describe does not exist.
 - **The finer quantities** (`in_transit_qty`, `ready_for_collection_qty`,
   `supplier_confirmed_qty`). Not built: a column nobody writes is worse than a missing one —
   that is exactly how `ops_order_control.balance` became a lock reading a NULL for months.

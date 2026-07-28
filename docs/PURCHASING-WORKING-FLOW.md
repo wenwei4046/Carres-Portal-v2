@@ -39,6 +39,20 @@ part-claimed and still open — one word could never say that.
 **One PO can carry several customer orders, and one customer order can need several POs.**
 Neither is the unit of work. The unit of work is the **PO line** (§9).
 
+**A PO NUMBER IS ONE SUPPLIER DOCUMENT, NEVER ONE ITEM** (Loo, 2026-07-28). The supplier
+receives ONE PDF holding MANY items; each item is a PO line:
+
+```
+PO-0001   Nice Future
+          Customer A · Queen mattress
+          Customer A · King mattress
+          Customer B · Single mattress
+```
+
+The To Order queue works at **PO-line** level; the system **groups** those lines into one
+purchase order at the moment the PO is generated. Nothing about that grouping is typed by a
+human, and a PO number is never minted per item.
+
 ## 2 · What the flow reads
 
 Every signal names the real column. A chat that cannot find its column here has found a gap
@@ -132,8 +146,8 @@ goods are collected by NETS; the row says `Call NETS — collect from Nice Futur
 - **Task owner** — the PO-duty holder (`org_duties`)
 - **Counted per** — one row per **supplier**, showing how many lines it holds. The queue
   count and the visible rows both count suppliers, and each row states its line count
-- **Re-checked when** — a customer line is added, changed, cancelled, skipped or snoozed ·
-  a PO is created · the promised date moves · a setting in §2 changes
+- **Re-checked when** — a customer line is added, changed, skipped or snoozed · a PO is
+  created · the promised date moves · a setting in §2 changes
 
 **The system suggests; a human sends.** The portal never sends a PO by itself. Today the PO
 leaves by WhatsApp; a supplier portal is a later phase and changes nothing here.
@@ -155,6 +169,24 @@ and sofas, so no supplier carries two procurable categories.)*
 Sending goods straight to AL or HOUZS saves a transfer for an outstation order. Moving goods
 we already own between locations is a **stock transfer, not purchasing** — it is not in this
 module.
+
+**AL and HOUZS are DELIVERY ADDRESSES, never warehouses** (Loo, 2026-07-28). No warehouse
+record is created for either. Carres has exactly one warehouse, `Carres Klang`; the moment AL
+became a warehouse entity every stock rollup would start counting goods we do not hold and do
+not count.
+
+**Items are ADDED to a sent PO by raising a NEW PO, never by editing the old one**
+(Loo, 2026-07-28). The document the supplier already has stays exactly as they received it.
+
+### What the supplier's PO shows
+
+The purchase price is stored and used internally — costing, the To Order card's Σ, finance's
+invoice match. **The supplier-facing PDF prints NO RM value of any kind** (Loo, 2026-07-28).
+It prints exactly:
+
+```
+PO number · supplier · items · quantity · delivery address · delivery instructions · dates
+```
 
 ### `Call {supplier} — confirm ready date`
 
@@ -217,7 +249,7 @@ for the balance turns one purchase into two and nothing reconciles afterwards.
 - **Due** — the working day after the short delivery
 - **Task owner** — the PO-duty holder
 - **Counted per** — one row per **PO line**
-- **Re-checked when** — goods are received · the balance quantity is cancelled
+- **Re-checked when** — goods are received · the PO is stopped by Operations
 
 ### `Contact {supplier} — confirm what happens next` (damaged / wrong goods)
 
@@ -336,26 +368,37 @@ po_qty           what we ordered from the supplier   purchase_order_lines.qty
 received_qty     what physically arrived good        purchase_order_lines.received_qty
 damaged_qty      arrived broken                      purchase_order_lines.damaged_qty
 wrong_item_qty   arrived, but the wrong thing        purchase_order_lines.wrong_item_qty
-cancelled_qty    we or the supplier dropped it       NOT STORED TODAY — the one real gap
 ```
 
 Everything on screen is computed from those:
 
 ```
-To order          required_qty > po_qty + cancelled_qty
+To order          required_qty > po_qty
 Ordered           po_qty > 0
-Part received     0 < received_qty < po_qty − cancelled_qty
-Fully received    received_qty >= po_qty − cancelled_qty
-Balance owed      po_qty − cancelled_qty − received_qty
+Part received     0 < received_qty < po_qty
+Fully received    received_qty >= po_qty
+Balance owed      po_qty − received_qty
 ```
+
+**There is no cancelled quantity, and purchasing does not model a cancellation**
+(Loo, 2026-07-28). A customer may not cancel an order in the normal course; a cancellation
+needs management approval and normally happens because Carres made a mistake, so it is ruled
+by the Orders cancellation policy — not here. **Purchasing keeps processing a valid PO until
+Operations explicitly says to stop**, and stopping is the whole PO
+(`purchase_orders.status = 'cancelled'`, which already exists), never a quantity typed onto a
+line. A per-line cancelled quantity would be a second way to say the same thing and would put
+a policy decision into an arithmetic column.
 
 **A quantity means exactly one thing.** No column is ever reused to mean a second thing —
 that is how a number quietly stops being true, and how a lock ends up reading a column
 nobody writes.
 
-**Deliberately not stored yet:** the finer quantities an ERP eventually grows
-(`in_transit_qty`, `ready_for_collection_qty`, `supplier_confirmed_qty`) and **PO revisions**
-— a sent PO that is changed is overwritten today, with no history of what the supplier
-actually agreed to. Both are real gaps and both are recorded here rather than built, because
-**zero purchase orders exist in the system today**: a column nobody writes is worse than a
-missing one. They are built when the first real PO needs them.
+**Deliberately not stored:** the finer quantities an ERP eventually grows
+(`in_transit_qty`, `ready_for_collection_qty`, `supplier_confirmed_qty`). **Zero purchase
+orders exist in the system today** and a column nobody writes is worse than a missing one;
+they are built when a real PO needs them.
+
+**PO revisions are not a gap any more — they are ruled out.** A sent PO is never edited: more
+items means a NEW PO (§3), and stopping one means cancelling the whole PO. So there is no
+version of a sent PO to keep, and the question "what did the supplier actually agree to?" is
+answered by the document they were sent, which never changes.
