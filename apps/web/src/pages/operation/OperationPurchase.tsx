@@ -88,6 +88,10 @@ import {
 } from "@carres/shared";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
 import { SectionCard, SectionBand } from "@/components/SectionPanel";
+// UI-KIT §6.1 — this row now renders on TWO Purchasing tabs, so it stopped
+// being inline (P2's Receiving half). Appearance only; the §8.2 behaviour
+// still lives in each page, and moving THAT is D0.5c on line ⑧.
+import FacetRow, { EmptyFacetHint } from "@/components/FacetRow";
 import Btn from "@/components/Btn";
 import PurchasingTabs from "./PurchasingTabs";
 import { TopBarIcons } from "./components/GlobalTopBar";
@@ -1701,71 +1705,4 @@ function EmptyDone({ text, sub }: { text: string; sub: string }) {
       <div className="text-[12px] text-base-500 mt-1">{sub}</div>
     </div>
   );
-}
-
-
-function FacetRow({
-  label,
-  count,
-  tone = "default",
-  leadingChip,
-  unit,
-  suffix,
-  active,
-  onClick,
-  testId,
-}: {
-  label: string;
-  count: number;
-  tone?: "default" | "danger" | "muted";
-  /** Stable hook for the §8.2 click-again-clears tests. */
-  testId?: string;
-  /** Optional avatar/status chip rendered BEFORE the label (Jess 2026-07-23:
-   *  duty owner chip on the Today's work stages — chip left, label right). */
-  leadingChip?: React.ReactNode;
-  unit?: string;
-  /** Optional inline suffix (e.g. "⚠ N late") shown between label and count. */
-  suffix?: React.ReactNode;
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      data-testid={testId}
-      className={`w-full flex items-center gap-2 rounded-full text-left px-2.5 py-1.5 transition-colors ${
-        active ? "bg-hovertint" : "hover:bg-hovertint"
-      }`}
-    >
-      {leadingChip}
-      <span
-        className={`min-w-0 truncate text-[13px] ${
-          active ? "text-base-900 font-semibold" : "text-base-700"
-        }`}
-      >
-        {label}
-      </span>
-      {suffix && (
-        <span className="text-[11px] shrink-0">{suffix}</span>
-      )}
-      <span
-        className={`ml-auto text-[12px] tabular-nums shrink-0 ${
-          tone === "danger"
-            ? "text-danger font-bold"
-            : tone === "muted"
-              ? "text-base-400"
-              : "text-base-500 font-semibold"
-        }`}
-      >
-        {count}
-        {unit ? <span className="text-base-400 font-normal"> {unit}</span> : null}
-      </span>
-    </button>
-  );
-}
-
-function EmptyFacetHint({ text }: { text: string }) {
-  return <div className="px-2.5 py-1.5 text-[12px] text-base-400">{text}</div>;
 }
