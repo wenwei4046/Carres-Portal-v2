@@ -46,7 +46,8 @@ deliverable is Foundation Components, not a better document.
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
 | **D0.5b** | Foundation components, Radix | ✅ **SHIPPED 2026-07-28, PR #502 `d77bd4f6`, deployed** — full card below. The gate opened: Jess froze Q1 · Q3 · Q4 |
-| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ **ready to build** |
+| **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ⏳ **before D0.5c** |
+| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ after D0.5b.1 |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
@@ -375,6 +376,56 @@ top). The PM's *"T3 may run in parallel"* was about SEQUENCING and Loo's row is
 about TIMING; neither cancels the other, and T3 never gated D0.5b.
 
 ---
+
+---
+
+## D0.5b.1 — a picker inside a dialog renders UNDER it (P1, scoped by the PM 2026-07-28)
+
+**The defect.** §4.4 puts popovers on **30** and dialogs on **40**. Both Radix portals mount as
+SIBLINGS on `<body>`, so a `Select`, `Popover` or `DatePicker` opened inside a `Modal` or `Drawer`
+paints underneath the dialog. *A picker inside a dialog* is the commonest form pattern there is —
+the first real form in a modal hits this.
+
+**Found by comparison, not by a bug report.** Two chats built D0.5b; the second (PR #501, closed as
+superseded) had carried a fix the merged one does not. On `main`, `container` greps **0** in
+`DialogFrame.tsx`, `Select.tsx`, `Popover.tsx` and `DatePicker.tsx`.
+
+**Not reachable on `/ui` today** — the shipped demo modal contains no picker, checked on the live
+page. Nothing is visibly broken; this is a trap, not an outage.
+
+### The fix, and why it is not a number
+
+The obvious repair is to raise the popover layer above 40. **That is how fifteen z-levels happened
+the first time**, and §4.4 is frozen. Instead: **the dialog publishes its own content node, and a
+picker portals INTO it.** Inside the dialog's stacking context, 30-above-the-dialog's-children is
+exactly right, so **the ladder is untouched**.
+
+### Scope — the PM's, verbatim, and nothing beside it
+
+```
+IN    portal container for Select · Popover · DatePicker inside a Dialog
+IN    the negative-control test
+OUT   redesign of anything
+OUT   any other D0.5b work
+```
+
+### Acceptance
+
+1. A `Select` opened inside a `Modal` is a DOM **descendant** of that dialog.
+2. The same for `Popover` and `DatePicker`.
+3. Outside a dialog all three still portal to `<body>` — the fix must not move the normal case.
+4. **`Z_LADDER` is byte-identical.** A diff that touches a z-value has missed the point.
+5. Negative control: remove the `container` from `Select`'s portal → exactly the Select test fails.
+6. Gates at baseline; no visual change (`git diff` introduces no hex, no `text-[`, no `h-[`).
+
+### Reported by the build, for the PM to rule
+
+**`DropdownMenu` and `Tooltip` have the identical defect** — same portal shape, same two layers,
+one line each to fix. They are NOT in this card's scope because the scope names three components,
+and the scope came from a report that had listed only those three. **They are left open
+deliberately and said out loud**, because this line already paid for the opposite mistake once:
+*"closing the old door is not the optional half — leaving it open while filing a CF looks
+disciplined and behaves like a trap."*
 
 ---
 
