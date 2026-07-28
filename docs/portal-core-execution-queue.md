@@ -269,14 +269,116 @@ delivery queue and still never reaches the Delivery board (asserted).
 5. **No action has a Task Owner** (C2's finding #5, unchanged). Law 2 requires one; the portal
    stores `assigned_staff` per ORDER. **C6 needs it and it is still not built.**
 
-## C4 · Purchase + Payments sweep
+## C4 · Purchase + Payments sweep — ⛔ RETIRED 2026-07-28, RE-CUT AS C11 + C12
 
-**Goal:** the remaining Chase surfaces: Purchase stages `Send · Chase · Receive` →
-`Send · Confirm ready date · Receive`; Payments `Ready-to-chase` → `Call to collect`
-(row line `Call {customer} — collect balance RM X`); WhatsApp preset texts keep their
-message bodies but their BUTTON labels follow the law.
-**Lane:** shares ④'s pages — not alongside an R-chat.
+**The card is closed as a card. PR [#484](https://github.com/wenwei4046/Carres-Portal-v2/pull/484)
+is left OPEN and untouched** — it is the only place the unshipped work exists, and it is the
+source the two new cards read from. Nothing is deleted until they land.
+
+**What it said:** Purchase stages `Send · Chase · Receive` → `Send · Confirm ready date ·
+Receive`; Payments `Ready-to-chase` → `Call to collect`; WhatsApp button labels follow the law.
 **Done when:** visible `Chase` greps 0 across the whole web bundle.
+
+**Why it was re-cut rather than rebased** (Loo, 2026-07-28). Three things happened to it:
+
+1. **R8 shipped part of it** (#499). `Chase factory` and the middle-list header now read the
+   dictionary, and R8 did all three stage cells where C4 did one. Those hunks are dead.
+2. **P1 deleted a file it edits.** `PurchaseSettingsSheet.tsx` — the read-only gear drawer —
+   is gone, so 3 of C4's hunks apply to nothing (`git merge-tree` reports it as a
+   modify/delete conflict).
+3. **Loo's money ruling made C4's own fix wrong.** C4 found the real bug — the Payments desk
+   renders `Collect RM RM 1,250.00` — and fixed it by rounding to whole ringgit to match the
+   Orders list. **Loo ruled the opposite on 2026-07-28: two decimals, always.** So the fix is
+   not "make Payments match the others", it is "four other call sites are also wrong".
+
+**And the card CANNOT simply be finished, because its scope is now two different concerns** —
+a WORD sweep and a MONEY law. One card, one concern; they are C12 and C11.
+
+**Measured 2026-07-28** by running C4's own scanner against today's `main`:
+**21 banned visible strings survive** (Purchase 5 · Payments 15 · drawer 1). C4 takes all
+three files to 0 on its own base. Nothing else in the repo is affected — `supabase/migrations`,
+`apps/api` and `packages/shared` each have **0** files in its diff.
+
+## C11 · A money figure is the money owed (Loo's ruling, 2026-07-28)
+
+**This is not a wording card.** COPY-STANDARD has said `RM 1,250.00` all along; Loo restated it
+on 2026-07-28 with the reason attached — *"收款金额必须与实际应收金额一致，不允许为了视觉统一改变
+金额显示"* — and it is now written into the money section with the two shapes that break it.
+
+**The bug, measured, not inferred** (run against the live shared module):
+
+```
+Payments pill      collectPillLabel(rm(owing))   →  Collect RM RM 1,250.00
+Payments tooltip   orderActionLine("collect",…)  →  Collect RM RM 1,250.00 from John Tan
+Orders row         amount: fmtRM(outstanding)    →  Collect RM 1,251      (1,250.50 rounded UP)
+Orders drawer      amount: fmtRM(outstanding)    →  same
+Delivery module    amount: fmtRM(outstanding)    →  same
+money dot tooltip  `RM ${fmtRM(outstanding)}`    →  same
+```
+
+**FIVE call sites, two different failures, one cause**: `order-action-words` owns the `RM `
+prefix, so a caller must pass the bare number — one caller formats first (doubles the word) and
+four use a formatter that throws the sen away.
+
+**Build:**
+- `OperationOrdersControl.fmtRM` is **exported and used for non-money too** (it is the generic
+  number formatter). Do not widen it — give money its own formatter, or pass the raw number and
+  let the shared module format. **Decide which, and say why, before touching five call sites.**
+- Fix all five. `Collect RM 1,250.50` on every surface that prints an amount owed.
+- A test that asserts the two failure shapes can never come back: no `maximumFractionDigits: 0`
+  reaching a money label, and no already-`RM`-prefixed string entering `collectPillLabel` /
+  `orderActionLine("collect")`.
+
+**NOT in scope:** every other `fmtRM` use (catalog prices, sofa builder, combo savings). This
+card is about **an amount a customer owes**, not about every number with a currency word.
+
+**Lane:** `OperationOrdersControl.tsx` + `OrderDetailDrawer.tsx` + `OperationDelivery.tsx` +
+`OperationPayments.tsx` → **the ORDERS lane.** Not alongside ⑧ D0.5c, which rebuilds the
+Orders list and drawer.
+**Live effect:** real and immediate — 18 orders owe RM 56,859 today, and every one of them
+prints its figure through one of these five sites.
+**Done when:** an owing figure with sen reads the same on the Orders row, its drawer, the
+Delivery module and the collections desk, and matches the ledger.
+
+## C12 · The last `Chase` leaves the portal (was C4's word half)
+
+**Goal:** the 21 banned strings C4 found and R8 did not reach, plus the shared scanner that
+finds them. **The words are all ruled** — the last open one, the WhatsApp button, was ruled by
+Loo on 2026-07-28 and is in COPY-STANDARD now.
+
+**① Payments — 15 strings, and R8 never entered this page.** `Ready to chase` (queue name) ·
+`Chased today / 1d ago / {n}d ago` · `Not chased yet` · `Last chased {date}` · the three queue
+descriptions · the promise-to-pay hint · the stock note ×2 · `Chase · {customer} · {phone}`
+(popover title) · the tone toggle's two labels. **The queue word is
+`orderActionQueue("collect")`, not a new one** — C4 already found that the card's proposed
+`Call to collect` would have been a second spelling of an action COPY-STANDARD had already
+locked, and reported it rather than building it. That judgement stands.
+
+**② Purchase — 5 strings, and they are R8's own reported carry-forward.** `Nothing to chase
+here` · `items to chase` · the `Chase {supplier}` pane title · the tooltip · the button.
+**The button is `Open WhatsApp`** — ruled 2026-07-28: this one opens a `wa.me/{phone}` chat with
+one named factory and only falls back to the group, so `Open WhatsApp group` would be false
+about half the time. R8 stopped here on purpose; the word exists now.
+
+**③ Drawer — 1 string.** `Last chased {date}` → the same words Payments uses.
+
+**④ The scanner, and the hole it was hiding.** C1's guard lives inside the drawer's own test
+file, so Purchase and Payments — which had no test file — were never scanned. Worse, C1's JSX
+matcher was `>([^<>{}]{2,})<`: **a text node containing an interpolation was skipped WHOLE**,
+and party-named labels are exactly the ones that carry one. That is how `Last chased {date}`
+passed a guard whose banned list already held `/chase[ds]?/`. Extract to
+`src/test/banned-words.ts`, blank interpolations before matching, point it at all three pages.
+
+**Do NOT re-do R8's work.** `Chase factory`, the middle-list header and the VOCAB comment block
+are already done and done wider (#499). A rebase of #484 that keeps them re-opens a merged card.
+
+**Lane:** `OperationPurchase.tsx` puts this in the **PURCHASING lane** — it cannot run beside
+⑦ P3. `OrderDetailDrawer.tsx` puts it in the Orders lane too. **If P3 must start first, split
+② off as its own micro-card** (5 strings, one file) — it releases the lane in one sitting.
+**Done when:** the shared scanner reports 0 banned visible strings on all three pages, and it
+runs in CI on each of them.
+
+## C5 · The money gate reads the number that exists — ✅ SHIPPED (PR #447)
 
 ## C5 · The money gate reads the number that exists — ✅ SHIPPED (PR #447)
 
@@ -1092,7 +1194,9 @@ a tooltip and a five-word vocabulary; a half-drawn signal would not.
 | C1 | ✅ LIVE 2026-07-27 | #461 |
 | C2 | ✅ **LIVE** 2026-07-27 — two layers; the drawer lists every open action | #466 |
 | C3 | ✅ **LIVE** 2026-07-27 — the `+N`, and `Confirm delivery` becomes a fact | #479 |
-| C4 | ⬜ any time, not alongside R | — |
+| C4 | ⛔ **RETIRED 2026-07-28 — re-cut as C11 + C12.** PR #484 stays OPEN and untouched; it is where the unshipped work lives | [#484](https://github.com/wenwei4046/Carres-Portal-v2/pull/484) (open, not to be merged as-is) |
+| C11 | ⬜ **a money figure is the money owed** (Loo 2026-07-28) — 5 call sites, 2 failures, 1 cause. **ORDERS lane**, not alongside ⑧ D0.5c | — |
+| C12 | ⬜ **the last `Chase` leaves the portal** — 21 strings + the shared scanner. **PURCHASING lane** (one file); split its ② off if P3 must start first | — |
 | C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
 | C6 | ✅ **LIVE** 2026-07-28 — every action opens the steps that close it; the order's PIC is the task owner | #486 |
 | C7 | ✅ **LIVE** 2026-07-28 — the DO issues itself, and the hard gate moves onto issuing. **No migration** | #489 |
