@@ -47,7 +47,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
 | **D0.5b** | Foundation components, Radix | ✅ **SHIPPED 2026-07-28, PR #502 `d77bd4f6`, deployed** — full card below. The gate opened: Jess froze Q1 · Q3 · Q4 |
 | **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ⏳ **before D0.5c** |
-| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ after D0.5b.1 |
+| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | 🟡 **PARTLY DONE 2026-07-28** — all three built and tested, Orders renders through the first two; **the drawer migration is BLOCKED on one decision** (L4 constraint 5 vs the drawer’s identity block). Card below |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
@@ -426,6 +426,55 @@ and the scope came from a report that had listed only those three. **They are le
 deliberately and said out loud**, because this line already paid for the opposite mistake once:
 *"closing the old door is not the optional half — leaving it open while filing a CF looks
 disciplined and behaves like a trap."*
+
+---
+
+## D0.5c 🟡 — two extractions shipped, the third BLOCKED on one decision (2026-07-28)
+
+**Built and merged:** `PageShell` · `DataTable` · `DetailShell`, all three extracted, all three
+tested. **Orders renders through the first two** and its own 134 tests pass untouched, which is
+the real proof the extraction is faithful.
+
+**`PageShell`** — `ListPageShell`'s frame, moved. Not a pixel designed; what is NEW is the TYPE:
+`variant="list"` has **no `kpi` prop** (§1.3's height budget) and `variant="module"` has **no
+`title` and no `breadcrumb`** (§8.3's module-tab law). Both were rules a chat had to remember.
+**Two variants ship, not §8.1's four** — only the list frame exists in the codebase to extract,
+and building `dashboard` · `detail` · `settings` from nothing is the designing this card forbids.
+
+**`DataTable`** — the Orders table's frame: percentage colgroup with `table-fixed` (so a list is
+always exactly the container width and never scrolls sideways), the sticky head on layer 1, 40px
+rows, the full-width empty state, the trailing sentinel. **The page keeps its ROW**, because a row
+carries business rendering the kit has no business owning. `Th` was deleted with the header cells
+it drew rather than left behind as a second source of truth.
+
+**`DetailShell`** — all seven of L4's constraints are types now, including the one that **closes
+UI-KIT §1.4's only Human-Review debt** (`progress` cannot take events, an actor, a timestamp, a
+KPI or a button). And there is no `state` prop: a component that cannot be told a state cannot
+print one.
+
+### ⛔ The drawer does NOT render through it yet — and the card said to stop
+
+The card's own rule: *"If a slot needs markup the drawer does not already have, **stop**: either
+the drawer is missing something (a bug, its own card) or the shell is being designed rather than
+extracted."* That is exactly what happened, on slot ①.
+
+**L4 constraint 5 makes `identity.persistentFacts` a fixed 4-tuple** — 客户名 · Ref · the promised
+date · outstanding. **The drawer has no such four nodes.** `CustomerIdentityCard` is ONE card that
+renders the customer and the SO itself; the promised date and the outstanding figure live in other
+blocks entirely. Migrating means one of two things, and both are above this card:
+
+| Option | What it costs |
+|---|---|
+| **A — the identity block absorbs them** | the promised date and the outstanding figure MOVE into R1, out of the blocks that hold them today. That is a redesign of three blocks, which this card forbids |
+| **B — weaken the tuple** | `persistentFacts` becomes an array, and constraint 5 — the defence against Header Everything — stops existing the day it was built |
+
+**The model itself is why this is a decision and not a defect.** §7② says Persistent Facts is
+**"RESERVED, NOT YET LAW … until it is, nothing here is enforceable"**, while §10's L4 freezes the
+4-tuple as a type. Both are frozen text, and they disagree about whether the set is enforceable
+today. **A chat may not settle that.**
+
+**Everything else in the shell is ready**: the other six constraints hold, and the drawer's rail
+order already matches §1.4, so the migration is a mechanical wrap the moment ① is ruled.
 
 ---
 
