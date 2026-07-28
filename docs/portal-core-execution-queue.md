@@ -498,9 +498,12 @@ columns nobody writes is the `ops_order_control.balance` disease. Nothing is pen
 2. **Two different blocks in the order drawer are both labelled `Actions`** — the left rail's
    counterparty panel (renamed from `Chase now` by C1) and C2's dynamic checklist.
    **RULED: the dynamic checklist KEEPS `Actions`** — it is literally a list of open actions
-   and the dictionary already gives that column its plural word. The left rail's panel is the
-   one that renames, from a word already in COPY-STANDARD; C6 put two candidates to Jess and
-   the rename itself belongs to whoever next opens that panel.
+   and the dictionary already gives that column its plural word — **and the left rail's panel
+   renames to `Calls`** (Jess picked it from two candidates, both drawn from that panel's own
+   locked empty state `0 calls to make · everything on track.`; `Call` is also one of the
+   five verbs, and it is the only verb this panel is made of). **SHIPPED — PR #487.** The
+   identifier went with it (`ChaseNowPanel` → `CallsPanel`): C1 renamed the label and left
+   the function, so after a second rename the name would have been two renames stale.
 3. **`send_po`'s completion rule in this card is "PO exists AND supplier ETA recorded", and
    the engine does not work that way** — the moment a PO exists the action becomes
    `Call {supplier} — confirm ready date`, which is what records the date. **RULED: the

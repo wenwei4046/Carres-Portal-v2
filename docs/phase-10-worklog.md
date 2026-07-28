@@ -3391,8 +3391,22 @@ next chat asks the same question again.
    counterparty panel (renamed from `Chase now` by C1) and C2's dynamic checklist in the
    full-width band. COPY-STANDARD rule 8 is "same word app-wide". **RULED: the dynamic
    checklist KEEPS `Actions`** (it is literally a list of open actions, and the dictionary
-   already gives that column its plural word); the left rail's panel is the one that renames,
-   from a word already in COPY-STANDARD — no new word may be invented for it.
+   already gives that column its plural word); **the left rail's panel renames to `Calls`** —
+   Jess picked it from two candidates, both drawn from that panel's own locked empty state
+   `0 calls to make · everything on track.`, and `Call` is one of COPY-STANDARD's five verbs
+   and the only verb this panel is made of. **SHIPPED the same day — PR #487, main tip
+   `fbfadbf5`, web `index-CkzR0HuS.js`** (carres-portal `5d205889` + carres-pos `dc455145`;
+   4,451,507 bytes, `SERVICE_ROLE` 0; the four canonicals took two extra polls to converge —
+   ordinary edge lag on the older bundle). **Both directions proved on downloaded files**:
+   `Calls — 0 calls to make` greps **0** in the previous live bundle (`index-7GAkvYaD.js`)
+   and **1** here, while the retired `Actions — 0 calls to make` and `No actions` grep **1**
+   there and **0** here. Three visible strings moved (heading + the two collapsed tooltips),
+   and the collapsed screen-reader line stopped inventing a second spelling ("No actions" /
+   "3 actions") in favour of the panel's own locked words. The identifier went too
+   (`ChaseNowPanel` → `CallsPanel`, `ChaseNowRow` → `CallsRow`): C1 renamed the label and
+   left the function, so after a second rename the name would have been two renames stale and
+   the next chat greps the identifier. T2's hierarchy test scans SOURCE for
+   `<ChaseNowPanel`, so the assertions moved WITH the strings.
 3. **`send_po`'s completion rule in the card ("PO exists AND supplier ETA recorded") is not
    how the engine works** — the moment a PO exists the action becomes `Call {supplier} —
    confirm ready date`, which is what records the date. **RULED: the engine is right and the
