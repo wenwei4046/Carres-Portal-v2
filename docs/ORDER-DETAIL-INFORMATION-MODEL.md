@@ -566,3 +566,63 @@ the majority case, not the exception.
    never the order.
 3. **Unknown never changes the state.** An order nobody has priced is still Working or Waiting.
    **If unknown could move an order between states, it would have become a status word.**
+
+## 10 · Layout Specification L4 — the slot contract — **FROZEN 2026-07-28**
+
+**FROZEN by Loo, 2026-07-28. With this, the Information Architecture is COMPLETE** and the
+workstream closes. What follows is implementation: card **D0.5c** in
+`docs/ui-kit-execution-queue.md`.
+
+L4 is not a layout drawing. `DetailShell.tsx` does not exist yet, and UI-KIT §1.4 intends its
+three rules to be enforced by TYPES rather than by memory. **L4 is what those types must
+satisfy.** Position, spacing, colour, type and which component paints a slot remain UI-KIT's,
+and three of its values are still PENDING.
+
+### The shell never receives a state
+
+**There is no `state` prop.** Working · Blocked · Waiting · Completed are produced entirely by
+what each slot is given:
+
+| What arrives | Which state it is |
+|---|---|
+| `currentAction` has items · `currentIssues` empty | Working |
+| `currentIssues` carries a holding item | Blocked |
+| `currentAction` says "nothing to do" | Waiting |
+| `currentAction` says "completed" | Completed |
+
+This is L3's *"states are never stored and never reach the screen"* turned into a type: **a
+component that cannot receive a state cannot print one.**
+
+### The six slots
+
+Order follows UI-KIT §1.4 — that is presentation architecture and it wins.
+
+| Slot | Answers | Region | Deepest level it renders | May be empty |
+|---|---|---|---|---|
+| `identity` | Q1 | R1 | **Answer** (Evidence on request) | no |
+| `currentAction` | Q2 | R2 | Answer + Context | no — "nothing to do" is an answer |
+| `currentIssues` | Q3 | R3 | Answer + Context | **yes — empty means the block does not exist** |
+| `progress` | **Q2, said a second way** | a view of R2 | **Answer only** | no |
+| `sections` | Q4 · Q5 · each module's own | R4 · R5 · … | **Evidence + Detail** | yes — a section that cannot exist is absent |
+| `activity` | Q6 | R6 | Answer + Context | yes |
+
+**Money's Answer is not inside the Payment section.** The figure is a persistent fact in
+`identity`; "it is holding the delivery" is an item in `currentIssues`. The Payment section
+carries only Evidence and Detail. **So the amount owed is readable without opening anything** —
+which is what step ⑤'s speaking-order ruling requires. Contents works the same way: Items is the
+default-open section, so "what was bought" needs no hunting either.
+
+### What the types must make impossible
+
+| # | The type | What it prevents |
+|---|---|---|
+| 1 | `currentAction` has no `collapsible` and no `hidden` | the reason the record was opened being hidden — the bug T2 already fixed once |
+| 2 | `currentIssues` takes `issues: Issue[]`, returns null for `[]`, and has **no** `emptyLabel` | "✓ None" / an empty card / a reassuring tick being expressible at all (UI-KIT §1.4 rule 2) |
+| 3 | slots are named and ordered — never `children` | blocks being reordered per page |
+| 4 | `progress` has no `events`, `actor`, `timestamp`, `kpi` or `actions` | Progress becoming a second timeline, or growing buttons and KPI tiles — **closes UI-KIT §1.4's one Human-Review debt** |
+| 5 | `identity` takes values only, no `onAction`; its persistent facts are a **fixed 4-tuple** | Header Everything — the set is full, so a fifth requires removing one |
+| 6 | every section declares `track: OrderActionTrack \| null` | a fourth business category — it would not compile |
+| 7 | Detail is a **route/href**, never a render prop | the page slowly absorbing the rest of the system |
+
+Rules 1–3 are UI-KIT's own ⏳ D0.5c entries. Rule 4 is its ⚠ debt. Rules 5 and 7 exist here only
+as prose today, and D0.5c is where they get teeth.

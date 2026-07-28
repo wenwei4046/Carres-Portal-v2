@@ -45,7 +45,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — freezes Q1/Q3/Q4 | ⏳ |
 | **D0.5b** | Foundation components, Radix | ⏳ |
-| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ⏳ |
+| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ **ready to build** |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
@@ -143,6 +143,132 @@ Frozen: **Q2 page canvas = Radix `slate-3`** · **Q5** Current Issues is its own
 block · **Q6** the KPI boxes merge into Progress (*already true — see the lesson
 below*) · **Q7** Current Action never collapses · **Q8** it is called `Progress`,
 not `Timeline` · **Q9** issues group by goods · delivery · money.
+
+---
+
+---
+
+## D0.5c — `DetailShell`, in full (the `PageShell` / `DataTable` halves keep their one-liners above)
+
+**Written 2026-07-28, the day the Order Detail Information Architecture closed.** Its whole
+input is [`docs/ORDER-DETAIL-INFORMATION-MODEL.md`](ORDER-DETAIL-INFORMATION-MODEL.md) §10 (L4),
+which exists because UI-KIT §1.4's rules are meant to be enforced by TYPES rather than by memory.
+**Read L4 before writing a line.** This card does not restate it; it says what to build.
+
+**The card template, answered:**
+
+```
+Who uses it?            every operator who opens an order — and, once T4 lands,
+                        every operator who opens a delivery, payment, purchase
+                        or service case
+How often?              every hour
+If removed?             NO — a detail record with no shell is 285 files each
+                        re-deciding where "what to do today" goes
+Permanent height?       0px NEW — the shell replaces the drawer's existing
+                        blocks, it does not add one
+Priority?               P1
+```
+
+### Extracted from Orders, not designed fresh
+
+`OrderDetailDrawer.tsx` already renders every one of these blocks — T2 put them in §1.4's order
+and C2/C6 built the action list. **The shell is that arrangement lifted into named slots.** If a
+slot needs markup the drawer does not already have, stop: either the drawer is missing something
+(a bug, its own card) or the shell is being designed rather than extracted.
+
+### The slot API
+
+```ts
+type Depth = "answer" | "context";          // evidence + detail are inside a slot's own content
+
+interface DetailShellProps {
+  identity:       IdentitySlot;             // required
+  currentAction:  CurrentActionSlot;        // required — no collapsible, no hidden
+  currentIssues:  Issue[];                  // [] renders NOTHING. There is no emptyLabel
+  progress:       ProgressSlot;             // required — no events, no actor, no kpi, no actions
+  sections:       DetailSection[];          // ordered; a section that cannot exist is absent
+  activity?:      ActivitySlot;             // absent renders nothing
+}
+
+interface IdentitySlot {
+  primary: ReactNode;                       // whose order — no action may be passed
+  persistentFacts: [Fact, Fact, Fact, Fact];// EXACTLY four. A fifth means removing one
+}
+
+interface DetailSection {
+  id: string;
+  label: string;
+  track: OrderActionTrack | null;           // "goods" | "delivery" | "money" | null
+  detailHref?: string;                      // Detail is a ROUTE, never a render prop
+  children: ReactNode;
+}
+```
+
+**No `state` prop, and that is the point.** Working · Blocked · Waiting · Completed are produced
+by what the slots receive (L4's table). A component that cannot be told a state cannot print one,
+which is how L3's *"states never reach the screen"* stops depending on anyone remembering it.
+
+### Type constraints — each one is a rule that currently has no enforcement
+
+| # | Constraint | Replaces | Test |
+|---|---|---|---|
+| 1 | `CurrentActionSlot` has no `collapsible` / `hidden` | UI-KIT §1.4 rule 1, ⏳ | a `@ts-expect-error` test passing either prop |
+| 2 | `currentIssues: []` renders null; no `emptyLabel` in the type | §1.4 rule 2, ⏳ | render `[]` → container absent; `@ts-expect-error` on `emptyLabel` |
+| 3 | named ordered slots, never `children` on the shell | §1.4 "blocks cannot be reordered", ⏳ | DOM order asserted against §1.4's order |
+| 4 | `ProgressSlot` has no `events` / `actor` / `timestamp` / `kpi` / `actions` | §1.4 rule 3 — **currently ⚠ Human Review debt** | `@ts-expect-error` ×5 |
+| 5 | `persistentFacts` is a 4-tuple; `IdentitySlot` has no `onAction` | model §7② (prose only today) | `@ts-expect-error` on a 5th fact and on an action |
+| 6 | `DetailSection.track` is `OrderActionTrack \| null` | §1.4 rule 4 — already a live union | `@ts-expect-error` on `"finance"` |
+| 7 | Detail is `detailHref`, not a render prop | model §8 rule ③ (prose only today) | `@ts-expect-error` on a Detail render prop |
+
+**Constraint 4 is the one that pays for this card on its own** — it turns UI-KIT's only
+Human-Review debt in §1.4 into something that does not compile.
+
+### Acceptance criteria
+
+1. `DetailShell` exists and `OrderDetailDrawer` renders **through it** — not beside it.
+2. All seven constraints hold, each with the test named above.
+3. **Zero visual change.** Colour, type, spacing and icons are provably untouched: `git diff`
+   introduces no hex, no `text-[`, no `h-[`, and `pnpm --filter @carres/web lint` reports no new
+   violations. *This card moves structure. If the page looks different, something else happened.*
+4. The web suite is at baseline — today **2029 passed / 16 pre-existing failures**. Zero new.
+5. `tsc -p tsconfig.app.json` is clean, and the seven `@ts-expect-error` tests fail if their
+   constraint is deleted.
+6. A calm order renders **no** Current Issues container at all — not an empty one.
+7. `progress` and `activity` never both claim what happened: a test asserting `ProgressSlot`
+   receives no actor and no timestamp.
+
+### Test checklist
+
+- [ ] 7 × `@ts-expect-error` — one per constraint
+- [ ] `currentIssues: []` → the container is absent from the DOM (not empty, absent)
+- [ ] slot DOM order matches §1.4: identity → currentAction → currentIssues → progress → sections → activity
+- [ ] `currentAction` renders with the rail collapsed (the T2 bug, as a regression test)
+- [ ] the four states each render correctly **without any state being passed in**
+- [ ] a section with `track: null` renders; `track: "finance"` does not compile
+- [ ] **negative control** — delete constraint 2's null-return and confirm exactly the empty-issues
+      test goes red, nothing else
+- [ ] full web suite at baseline
+
+### Migration scope
+
+**In:** `OrderDetailDrawer.tsx` only — one consumer, one PR.
+
+**Out, deliberately:** Delivery · Payment · Purchase · Receiving · Service Detail. They inherit at
+**T4** (Detail Blueprint v1), and T4 is gated on **T3** — Jess using the drawer for a day. Porting
+five pages before one has been used for a day is how a wrong shell reaches five pages.
+
+**Also out:** `PosOrderDetail.tsx`. It is the customer-facing order view, not an ops record; L4
+was written from the operator's six questions and has not been checked against a showroom's.
+
+**Watch:** the drawer is ~7,600 lines and other lines touch it (J-cards, delivery T-cards). Take
+the worktree rule seriously — one worktree, and check `origin/main` before starting.
+
+### The trap this card is most likely to fall into
+
+**Restyling while extracting.** The whole value is that structure moved and appearance did not,
+so that if the page reads better afterwards it is provably the hierarchy that did it. The line's
+own lesson list already carries this one — it is repeated here because this card is the largest
+opportunity to break it.
 
 ---
 
