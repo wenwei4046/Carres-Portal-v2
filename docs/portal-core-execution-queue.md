@@ -633,6 +633,43 @@ Tests +39 (shared 30 · api 12 net · web 10 net); suites at baseline (shared 18
 3 pre-existing · web 16 pre-existing); typecheck 0 new, build + design guard + wrangler
 dry-run clean, `SERVICE_ROLE` 0 in the bundle.
 
+## C8 follow-up · the customer-acknowledgement SLA — RULED, BLOCKED, NOT BUILT
+
+**Loo, 2026-07-28, TWO SLAs and explicitly not one timer:**
+
+| | Due | Purpose (his words) |
+|---|---|---|
+| **Delay planning** | **2 working days** | Operation confirms supplier status, the options and the final solution |
+| **Customer communication** | **Same working day** | the customer must receive an acknowledgement immediately |
+
+**The 2-day half is written into `ORDERS-WORKING-FLOW.md` §3 and is done.** The same-day half
+**cannot be built as it stands**, because §3 and Law 4 say the opposite and they are Jess's:
+*"the customer is the LAST to know"* · *"only when we have tried and failed does anyone reach
+the customer"* · *"never before the ready date is known"* — and C8 turned that into a passing
+test. Two owners, two rulings, one screen; a build chat may not pick.
+
+**Three readings, and they are genuinely different features:**
+
+1. **The clock starts when the plan CONCLUDES "we cannot make it."** Then nothing conflicts:
+   stage 1 keeps 2 working days, and `Arrange new delivery date` — the call to LOGISTICS —
+   gets `Due: same working day`. The customer hears through logistics, exactly as today.
+   Costs nothing, contradicts nobody, and gives stage 2 the Due it is missing.
+2. **The clock starts when the supplier's date overshoots.** This is the reading Loo's own
+   sentence points at (*"never wait 2 days without a response"*) and it is the one that
+   breaks §3: the customer is told before anyone knows there is a delay, in a flow whose
+   worked example is *"ready stock covers it and there was no delay"*. It needs Jess to
+   re-rule "the customer is the LAST to know", and it needs a NEW action nobody has designed
+   (an acknowledgement with no new date in it — every customer-facing string today carries a
+   date).
+3. **It is INBOUND, not outbound** — *"acknowledgement"* may mean: when a customer asks us,
+   they get an answer the same working day. That is not the delay flow at all; it is a
+   response-time promise on customer contact, and it would live in Service Cases (S-line),
+   which already owns "the customer asked and somebody must answer".
+
+**Do not build any of the three until Jess and Loo agree in the same conversation.** Reading 2
+is the only one that changes the delay law, and it is the one a chat would land on by reading
+Loo's sentence alone.
+
 ## C8 · Delay planning + the gate before the customer — ✅ LIVE (PR #493)
 
 **Build the stages exactly as `docs/ORDERS-WORKING-FLOW.md` §3 states them.** That file is

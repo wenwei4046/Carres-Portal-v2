@@ -128,7 +128,33 @@ decision is being planned.
   · check available dates with logistics · decide the best delivery date · **decide whether
   the customer needs to be told at all**
 - Completion: the delay decision is recorded
+- **Due: 2 WORKING DAYS** from the day the supplier's date first overshoots the promised date
+  (Loo, 2026-07-28). Office calendar — this is office work (Law 2A). Two days is deliberate
+  and it is not slack: Operations has to confirm the supplier's real date, check ready stock,
+  check another supplier and check dates with logistics before there is anything worth saying.
 - **The customer is not contacted in this stage.**
+
+> ⚠️ **A SECOND SLA IS RULED AND CANNOT YET BE BUILT — it contradicts this section.**
+> Loo, 2026-07-28: *"Customer Communication — Due: Same Working Day — the customer must
+> receive an acknowledgement immediately… the customer should never wait 2 days without a
+> response."* Held apart from the 2-day timer, which is right: one clock for the business's
+> plan and one for the customer's peace of mind is better design than either alone.
+>
+> **But this section, ruled by Jess 2026-07-27, says the opposite in three places:** *"the
+> customer is the LAST to know"* · *"a supplier saying 12 Aug is not yet a delay — we may have
+> the item in ready stock, or another supplier may cover it. **Only when we have tried and
+> failed does anyone reach the customer**"* · *"the customer is not contacted in this stage"*.
+> Law 4 rung 2 adds *"never before the ready date is known"*, and **C8 wired that into a test**
+> that fails on any surface naming the customer in a delay.
+>
+> **The clash is structural, not a wording nit.** If the plan may take 2 working days and the
+> customer must hear the same working day, the customer is told **before anybody knows whether
+> there is a delay at all** — and Jess's own example is the case where there is not one
+> (ready stock covers it). That would mean alarming a customer about a non-event.
+>
+> **Nothing is built until this is settled**, and the settling is a PLAN chat with both of
+> them, not a build chat picking a side. The three readings are in
+> `docs/portal-core-execution-queue.md` under C8's follow-up.
 
 **The gate — can we still make the promised date?**
 
