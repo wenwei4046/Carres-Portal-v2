@@ -342,8 +342,12 @@ every row; clicking a row opens the drawer — one behaviour for every module, a
 
 ```
 Send PO · Confirm ready date · Confirm tomorrow's delivery · Check in ·
-Confirm balance delivery date · Claims
+Confirm balance delivery date · Confirm what happens next
 ```
+
+**The last tile is `Confirm what happens next`, not `Claims`.** A tile's name IS its action
+(COPY-STANDARD); `Claims` is the TAB, which is a place, and a place and an action may not
+share one word.
 
 **The table columns:**
 
