@@ -43,13 +43,15 @@ work week · the order-by buffer · the PO days · the earliest date a store may
 working days of notice on `Confirm delivery date`. Every row states who changed it, when,
 and what it was before. **A pair nobody has set a number for says `Set a number` and gets NO
 order-by date** — there is no per-category default to fall back on, and the To Order tab
-names the pair rather than planning it on a guess (K1's law). **It closed all FOUR doors**:
+names the pair rather than planning it on a guess (K1's law). **It closed all FIVE doors**:
 the constants, the read-only gear drawer (which still said PO days were Mon + Thu), the two
-lead-day boxes in Catalog → Delivery that were editable and read by nothing, and
-`suppliers.lead_time` on the Suppliers card. **The sofa's third number was live code, not a
-stale comment** — `PO_STOCK_LEAD_DAYS.sofa = 5` drove the urgent bypass every day. **One
-behaviour change: sofa 10 → 14 working days**; the earliest-sell number collapses to 21, the
-upper of the old 14/21, so nothing becomes sellable earlier than it is today.
+lead-day boxes in Catalog → Delivery that were editable and read by nothing,
+`suppliers.lead_time` on the Suppliers card, and **`PO_STOCK_LEAD_DAYS` — the safety net**,
+which believed a sofa took 5 working days and therefore fired nine days late. It is deleted:
+`poUrgentBypass` takes a window in days now, resolved from the production working days a
+human set, and **a category with no number can never make an order urgent**. **One behaviour
+change: sofa 10 → 14 working days**; the earliest-sell number collapses to 21, the upper of
+the old 14/21, so nothing becomes sellable earlier than it is today.
 
 **⑧ obeys the Orders lane rule** — T2 edited `OrderDetailDrawer.tsx`, so a ⑧ card that
 touches the drawer may not run beside C6/C7/C8. **D0.5a and D0.5b touch NO existing page**

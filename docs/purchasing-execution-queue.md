@@ -129,7 +129,7 @@ of the plan, the To Order tab names the pair, and the Settings screen says `Set 
 (K1's rule). There is deliberately no per-category default column to fall back on, and a
 sanity block in the migration fails if one ever appears.
 
-**FOUR doors closed** — the numbers had four homes and they disagreed:
+**All FIVE doors closed:**
 - `PurchaseSettingsSheet.tsx`, the read-only gear on To Order, **deleted**. It showed
   PO days as **Mon + Thu** (four days after Jess moved to Mon/Wed/Fri) and promised the
   values would become editable "when the lead-time table ships". This is that table.
@@ -139,12 +139,17 @@ sanity block in the migration fails if one ever appears.
 - `suppliers.lead_time` — free text ("7-21 days"), empty on 8 of 10 suppliers, printed as
   a `Lead time` stat on the Suppliers card and appended to its drawer subtitle. **Both
   retired**; the column is untouched in the DB, it simply stops being shown as an answer.
+- **`PO_STOCK_LEAD_DAYS` — the urgent bypass, the fifth door — DELETED.** `poUrgentBypass`
+  now takes a window in days, and its callers resolve that window from the production
+  working days a human set (`purchasingUrgentWindowDays`, the LONGEST across the categories
+  an order is short on — the safe direction: it flags early, never late). **A category with
+  no number set gets a window of 0 and can never make an order urgent**, which is the same
+  silence `Set a number` buys everywhere else, asserted by its own test.
 - The constants themselves — **deleted, no fallback.**
 
-**The sofa's third number was live code, not a stale comment.** The card says sofa read
-10 in the engine and 5 "in a stale Orders comment"; the 5 was `PO_STOCK_LEAD_DAYS.sofa`,
-driving the urgent bypass on the Orders list every day. It now reads the same production
-working days as everything else.
+**The safety net stops firing nine days late.** Sofa carried FOUR numbers (engine 10 ·
+bypass 5 · the gear drawer 14/10 · the flow 14); the bypass now reads the same 14 as the
+plan does, so an unsecured sofa order jumps the cadence when the flow says it should.
 
 **Six of the seven numbers, plus one the card did not list.** `logistics_call_working_days`
 (§2's "days before the delivery date the logistics call is raised") IS built and IS read —
