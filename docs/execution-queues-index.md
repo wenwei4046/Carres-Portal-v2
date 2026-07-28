@@ -48,6 +48,13 @@ COPY-STANDARD now says so once.
 S / R / P run in parallel throughout; **C4 and ⑦ P share the Purchasing pages with ④ R —
 only ONE of those three at a time.**
 
+**Purchasing lane, 2026-07-28: ④ R6 HOLDS IT.** Migrations `0301_warehouse_role` and
+`0302_warehouse_files_its_own_receiving` are applied to live prod and neither file is on
+main — an R6 chat is mid-flight. **⑦ P1 waits for R6 to merge** (Loo, 2026-07-28): R6 has
+already changed the database, so stopping it half-way leaves prod carrying two migrations no
+file explains. This is also how the lane rule is checked in future — **compare the tracker
+tail to `supabase/migrations`; if the tracker is ahead, somebody is holding the lane.**
+
 **Line ⑦ exists because purchasing failed five times.** Seven documents (1,222 lines) each
 specified a different purchasing module and none was authoritative, so every build chat
 picked a different one. They are DELETED. The single owner is
@@ -188,6 +195,16 @@ to be remembered.
 
 - **Driver · vehicle · condominium registration: OUT OF SCOPE this phase.** Logistics owns
   the driver today, not Carres. Revisit only if Carres runs its own fleet.
+- **The Event Engine: PARKED until after go-live** (Loo + Jess, 2026-07-28). The proposal —
+  every business action writes ONE event, and Dashboard / Order / Purchasing / Delivery each
+  read that one table through a different filter instead of keeping their own activity log —
+  is sound, and the transparency principle behind it is already law ("everyone can see
+  everyone's work"). It is parked for one reason: it touches the Activity block on EVERY
+  page, so it cannot share a lane with Orders, Purchasing or Delivery, and go-live comes
+  first. **It gets no queue doc and no line number yet** — a card file for work nobody has
+  scheduled is the eighth purchasing document all over again. When it opens, the first step
+  is a READ-ONLY architecture review against what already exists (`order_history`,
+  `audit_log`, `AnnotationTimeline`, the 0211 auto-capture), never a build.
 - ~~**UI-KIT carries retired vocabulary and more than one version of some rules.**~~
   **DONE 2026-07-28 — this became line ⑧.** The kit was rewritten top to toe as one file
   (`ba7b7798`), the three doors that still taught the old law were shut (CLAUDE.md's own UI

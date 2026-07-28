@@ -27,8 +27,27 @@
   §2 of the flow file holds every value.
 - **`suppliers.lead_time` is free TEXT and 8 of 10 suppliers are empty** (only Ohana
   "7-21 days" and Nice Future "7-10 days"). Nothing can compute from it.
+- **THE NUMBERS ARE BEHIND FOUR DOORS, NOT ONE** (measured 2026-07-28 — P1 must close all
+  four or it has not done its job):
+  1. the hard-coded constants in `apps/api/src/routes/operation/purchase.ts`;
+  2. **`PurchaseSettingsSheet.tsx`** — a read-only "Purchase settings" drawer already live
+     behind the gear icon on the Purchasing tab bar, showing **PO days = Mon + Thu** (the
+     engine runs Mon/Wed/Fri) and **Bed frame = Mon–Fri** (Ohana works Saturday). **A manager
+     opening Settings today reads two numbers that are false;**
+  3. **`delivery_fee_config.mattress_bedframe_lead_days` (14) and `sofa_lead_days` (21)** —
+     two editable fields on Catalog → Delivery that **no code reads**. The real gate is the
+     hard-coded `DELIVERY_LEAD_DAYS`. Editing them today changes nothing;
+  4. `suppliers.lead_time` — free text, and after P1 it is a second place claiming to say how
+     long a factory takes.
+- **Only TWO suppliers can be purchased from** (live 2026-07-28): Nice Future × mattress
+  (42 SKUs) and Ohana × bedframe + sofa (154 SKUs) — **three supplier × category pairs.** The
+  other 8 suppliers carry ZERO SKUs. The settings matrix is DERIVED from which supplier
+  actually has SKUs in a category; a 10 × 3 grid of empty boxes is the wrong screen.
 - **Zero purchase orders exist.** `purchase_orders` = 0 rows. Every P-card must prove its
   path works by creating a real PO, not by reading an existing one.
+- **The live migration tail is AHEAD of the repo.** 2026-07-28: the tracker holds `0301` +
+  `0302` (the ④ R6 warehouse-login line) and neither file is on main. Number from the
+  TRACKER, never from `ls supabase/migrations`.
 - **One warehouse exists**: `Carres Klang`. AL Sungai Buloh and HOUZS Balakong are not
   records anywhere.
 - **`purchase_order_lines` already carries** `qty` · `received_qty` · `damaged_qty` ·
@@ -51,40 +70,60 @@ buckets, the Mon/Wed/Fri cadence, the working-day calendar
 (`packages/shared/working-days.ts` + `my-holidays.ts` — purchasing NEVER computes its own).
 
 **Build:**
-1. A settings store for the seven numbers in `docs/PURCHASING-WORKING-FLOW.md` §2.
-   Production time is **per supplier × per category**; the rest are single values.
+1. A settings store for the numbers in `docs/PURCHASING-WORKING-FLOW.md` §2. **They are FOUR
+   shapes, not one:** production time is per supplier × category · supplier work week is per
+   supplier · PO days is a set of weekdays · the rest are single numbers.
 2. **Sofa production time becomes 14 working days** (it is 10 in the code and 5 in a stale
-   Orders comment — three different numbers today, all wrong).
+   Orders comment — three different numbers today, all wrong). **Peak season is not a second
+   set of numbers** — it is a manager raising this one to 20 and lowering it again (§2).
 3. The supplier work week moves from being keyed by CATEGORY to being keyed by **supplier**
    (Nice Future 5-day · Ohana works Saturday). The category proxy is a known lie.
-4. A **Settings** tab on Purchasing, manager-only, laid out per UI-KIT §A9. Every edit
-   records who, when, and the previous value.
-5. The engine reads the settings; the hard-coded constants are DELETED, not left as a
-   fallback. A fallback is how a setting silently stops mattering.
+   **Sunday is never offered** — it is a non-working day for everyone (working-days law), and
+   a checkbox for it would read as though it could be switched on.
+4. A **Settings** tab on Purchasing, manager-only (`org_duties` key `ops_manager` — **no new
+   duty key**), laid out per UI-KIT §8.3 (module-tab law) + §8.2 (interaction law). Every
+   edit records who, when, and the previous value, and the previous value is ON SCREEN.
+5. **Close all FOUR doors** (Ground truth above), not just the constants: delete the
+   constants with NO fallback · retire `PurchaseSettingsSheet.tsx` and its gear icon · retire
+   the two dead fields on Catalog → Delivery · stop `suppliers.lead_time` claiming to answer
+   this question. A fallback is how a setting silently stops mattering; a second door is how
+   a manager edits a number and nothing happens.
 6. `DELIVERY_LEAD_DAYS` (the POS's earliest sellable date — mattress/bedframe 14, sofa 21
-   CALENDAR days) becomes one editable number. **Jess sets 30 at go-live.**
+   CALENDAR days) becomes **one** editable number. **Seed 21** — the safe upper bound, so no
+   order becomes sellable EARLIER than it is today. Jess sets 30 at go-live, on screen.
+7. **A supplier × category with no number set is not defaulted to 7.** The row reads
+   `Set a number` (K1's law) and that line's order-by date is not computed. A quiet screen
+   must mean *watched and fine*, never *nobody looked*.
+8. **This deploy changes exactly ONE behaviour: sofa 10 → 14.** Order-by buffer stays 7 (Jess
+   sets 10 at go-live herself). One number at a time, so a surprise is traceable.
 
-**Migration:** yes — a settings table. Draft it to Jess first (guardrail #8) and check the
-remote tracker tail immediately before applying.
+**Migration:** yes — a settings table. Draft to Jess first (guardrail #8); number from the
+TRACKER at apply time, not from the repo (the tail is ahead — Ground truth).
+**Order of operations:** apply the migration and verify it FIRST, then merge, then deploy.
+Shipping code whose table does not exist yet 500s the Purchasing page.
 **Done when:** Jess changes sofa production time on screen and the order-by date on the To
-Order tab moves the same day; no purchasing number is hard-coded anywhere.
+Order tab moves the same day; no purchasing number is hard-coded anywhere; and the gear-icon
+drawer and the two Catalog → Delivery fields are gone.
 
-## P2 · Claims becomes a tab, and Receiving is its own module inside
+## P2 · The click behaviour becomes real
 
-**Goal:** the four tabs of `docs/PURCHASING-WORKING-FLOW.md` §1 exist —
-`To Order · Purchase Orders · Receiving · Claims · Settings`.
+**This card SHRANK on 2026-07-28.** Its old goal was "Claims becomes a tab" — **Claims is
+already a tab.** R2 added it on 2026-07-27 (`PurchasingTabs.tsx` → `?tab=claims`), so four of
+the five tabs in `docs/PURCHASING-WORKING-FLOW.md` §1 exist today and the fifth (Settings)
+arrives with P1. Nothing about tabs is left to build.
 
-**ALREADY EXISTS:** the claim engine, its lifecycle, its quarantine rules (R2/R3/R4). This
-card gives it a door; it changes no claim behaviour.
+**ALREADY EXISTS — do not rebuild:** the claim engine and its lifecycle (R2 · R3 · R4), the
+Claims tab, the Receiving tab, the facet rail, the table.
 
-**Also in this card — the UI-KIT interaction law**, newly written and unimplemented
-anywhere: click a queue tile → the table filters · click again → it clears · click a row →
-the drawer opens on its FIRST tab · closing keeps the filter and scroll. Purchasing is the
-first module to implement it; Orders already behaves this way and is the reference.
+**Build — the UI-KIT §8.2 interaction law**, written and implemented nowhere:
+click a queue tile → the table filters · click it again / ✕ → it clears · two tiles → two
+✕-able chips · click a row → the drawer opens on its FIRST tab · closing keeps the filter AND
+the scroll position. Purchasing is the first module to implement it; **Orders already behaves
+this way and is the reference — copy it, do not invent it.**
 
 **No migration.**
-**Done when:** a claim is reachable without leaving Purchasing; every queue tile filters and
-clears; nobody types a URL to find a claim.
+**Done when:** every queue tile on Purchasing filters and clears, and nobody types a URL to
+reach a claim.
 
 ## P3 · The two missing supplier calls
 

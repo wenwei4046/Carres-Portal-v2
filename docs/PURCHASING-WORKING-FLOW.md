@@ -19,7 +19,7 @@
 
 ## 1 · What the module is
 
-**One continuous flow, four tabs, one door.**
+**One continuous flow, five tabs, one door.**
 
 ```
 Purchasing   [ To Order ]  [ Purchase Orders ]  [ Receiving ]  [ Claims ]  [ Settings ]
@@ -74,12 +74,28 @@ it was before.
 | Setting | Today (hard-coded) | What it must become |
 |---|---|---|
 | Production time, per supplier × category | mattress 7 · bedframe 7 · **sofa 10** working days, one number for all suppliers | per supplier × category, editable. **Sofa is 14** (Jess 2026-07-27, corrects the 10) |
-| Peak-season change | none | edited **one supplier at a time**; **a PO already sent is never re-computed** |
 | Order-by buffer | 7 working days | one editable number. **10 at go-live** — Sales fixes a 1-month customer window and a delay inside it cannot be absorbed |
 | Earliest date a store may sell | mattress/bedframe 14 · sofa 21 **calendar** days (`DELIVERY_LEAD_DAYS`) | one editable number, **30 days** at go-live |
 | Days before the delivery date the logistics call is raised | 1 working day | editable; Jess may set 5 |
 | PO days | Mon · Wed · Fri | editable. **A late line never waits for a PO day** |
 | Supplier work week | mattress 5-day · bedframe/sofa 6-day, keyed by CATEGORY | keyed by **supplier**. Nice Future works 5 days; Ohana works Saturday |
+
+**Peak season is NOT a setting** (Jess + Loo, 2026-07-28). There is no peak-season mode,
+no second set of numbers, no "is it peak season today" state and no effective-from date.
+Peak season is a manager opening this tab and raising ONE supplier's production time —
+sofa 14 → 20 — and lowering it again afterwards. **A PO already sent is never re-computed**:
+its dates were true when it was sent, and moving them would rewrite a promise the supplier
+already made. A mode with two sets of numbers is a second source of truth that nobody
+remembers to switch off.
+
+**Sofa was 10 and is now 14.** Loo's own note reads "sofa 10 normal, peak up to 14 or 20";
+Jess ruled 14 as the standing number the same day, and 14 stands — a production time written
+too LONG only makes the portal order earlier, never later. The old 10 is retired, not kept as
+an "actual" second column.
+
+**The seven settings are four shapes, not one.** Production time is per supplier × category ·
+supplier work week is per supplier · PO days is a set of weekdays · the rest are single
+numbers. A chat that reads "six single values" builds the wrong table.
 
 **The order-by date is one formula and it lives in one place:**
 
@@ -122,9 +138,12 @@ goods are collected by NETS; the row says `Call NETS — collect from Nice Futur
 **The system suggests; a human sends.** The portal never sends a PO by itself. Today the PO
 leaves by WhatsApp; a supplier portal is a later phase and changes nothing here.
 
-**Consolidation:** mattress and bed frame for the same supplier merge into **one PO**.
-**Sofa is one PO per customer order** — fabric, size and configuration make a merged sofa PO
-dangerous.
+**Consolidation is across CUSTOMER ORDERS, not across categories.** Every non-sofa line
+waiting on the same supplier merges into **one PO** — ten customers' bed frames from Ohana is
+one PO, not ten. **Sofa is one PO per customer order** — fabric, size and configuration make a
+merged sofa PO dangerous. *(Across categories is impossible and the rule must not imply it:
+measured live 2026-07-28, Nice Future supplies mattresses only and Ohana supplies bed frames
+and sofas, so no supplier carries two procurable categories.)*
 
 **Where the goods go** is chosen on the PO and printed on it:
 
