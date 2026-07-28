@@ -42,7 +42,7 @@ deliverable is Foundation Components, not a better document.
 | **T3** | **Jess uses it for one day** | ⏳ **NEXT — blocked on a deploy** |
 | **T4** | Freeze as Detail Blueprint v1 → Delivery/Payment/Purchase/Service Detail inherit | ⏳ after T3 |
 | **D0.3** | Delete the retired design docs + the `carres-design` skill | ⏳ after the new kit is proven |
-| **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #TBD |
+| **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — freezes Q1/Q3/Q4 | ⏳ |
 | **D0.5b** | Foundation components, Radix | ⏳ |
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ⏳ |
@@ -57,7 +57,7 @@ components exist means hand-rolling it twice.
 
 ---
 
-## D0.4 ✅ — the old order-portal master spec is DELETED (PR #TBD)
+## D0.4 ✅ — the old order-portal master spec is DELETED (PR #491)
 
 Loo, 2026-07-28: *"Retire it completely. Do NOT leave it as an archive or historical
 authority."* It is gone — no archive, no stub, no "historical reference" file. Its own third
