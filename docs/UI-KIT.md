@@ -849,6 +849,12 @@ being an exception at all: it is `variant`, not a rule somebody has to remember.
 `LOGISTICS` → `REGION` → `CATEGORY`. Queue names come from
 [`COPY-STANDARD.md`](COPY-STANDARD.md), never invented here.
 
+**The GROUP HEADINGS are words too, and they live in COPY-STANDARD** (added
+2026-07-28, found by P2-Claims: this section ordered the groups and no document
+owned what they are called, so `Queues` · `Supplier` · `Problem` were invented on a
+screen with nothing to check them against). This file orders them; it does not
+name them.
+
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
 | One interaction model for every list page | Component API — behaviour lives in `PageShell` / `DataTable`, not in the page | ⏳ D0.5c | `PageShell.tsx` |
