@@ -15,6 +15,9 @@ questions when it opens one order, and what counts as a satisfying answer to eac
 **FROZEN — Layout Specification L1** (§6): the six regions of responsibility those questions
 become. A region is a unit of RESPONSIBILITY, not a place.
 
+**FROZEN — Layout Specification L2** (§8): information DEPTH — Answer · Context · Evidence ·
+Detail. Still not layout.
+
 **NOT frozen, and NOT decided by this file:**
 
 - **Layout** — nothing about position, order on screen, or what is read first *visually*.
@@ -373,3 +376,71 @@ edit is the signal — not a feeling that it would be tidier.
 never stored · carries no tone, no colour and no action (Verdict and Actions both *read* it) ·
 **never rendered** — the page shows the gap in plain words, never the gap itself. Rendering it
 would create a seventh region, which is what L1's one-question-one-region rule exists to stop.
+## 8 · Layout Specification L2 — information depth — **FROZEN 2026-07-28**
+
+**FROZEN by Loo, 2026-07-28.** L1 said which region answers which question. **L2 says how deep
+an answer goes, and what sits at each depth.** It is still not layout: no position, no order on
+screen, no component.
+
+Depth is the right layer to fix before any layout, because three of the Business Thinking
+Model's assertions are depth statements, not position ones: ~80% leave at step ② · every step
+must finish the job alone · calm is worth a line and trouble earns room. **An argument about
+how big something should be is an argument about its depth.**
+
+### The four depths
+
+**Business discussions use the names. Code may keep using D0–D3.** (Loo, 2026-07-28.)
+
+| Code | **Business name** | What it is | When it appears |
+|---|---|---|---|
+| D0 | **Answer** | the sentence that answers this region's question | **always. A region may never have an empty Answer** |
+| D1 | **Context** | the facts needed to act on that answer | **opens by itself when something is wrong**; absent when all is well |
+| D2 | **Evidence** | what proves the Answer is true | only when asked |
+| D3 | **Detail** | the full list, the full history, the full breakdown | only when explicitly asked — and it belongs somewhere else |
+
+**Four rules:**
+
+1. **Every region must be able to finish the job at Answer depth alone.** This is the Business
+   Thinking Model's second assertion turned into structure.
+2. **Depth is not importance.** Evidence is not "less important" — it is **not the answer**. A
+   number can be critical and still be Evidence.
+3. **All well → Answer only. Something wrong → Answer + Context, opened by the system.** This is
+   how "trouble earns room" becomes a rule **without naming a single size.**
+4. **Context may only open on a condition the system can compute.** Never on "the operator might
+   want to see this".
+
+### The six regions by depth
+
+| Region | **Answer** | **Context** (opens on trouble) | **Evidence** (on request) | **Detail** (elsewhere) |
+|---|---|---|---|---|
+| **R1** Identification | customer · Ref · promised date · my role · **the outstanding figure** | a missing building type → handed to R2 | order number · source · created · salesperson | — |
+| **R2** Work | every open item: what · with whom · by when — **or** "nothing to do" | the door that closes it | how the due date was reached (working days, which holiday) | completed actions → R6 |
+| **R3** Explanation | three sentences: goods · delivery · money | the reason the stuck track is stuck | PO numbers · unit identifiers · how the supplier's date moved | the full goods / delivery / money record |
+| **R4** Contents | what was bought · how many | — | full specs · SKU | discounts · promotions · where each unit sits |
+| **R5** Money | one sentence: settled / owed / held | what is holding it · the due date | how storage was calculated | every payment (**cannot be built today**) |
+| **R6** Record | one sentence: has anything happened | what happened recently · what is missing | who did it, and when | the full history · all documents · all cases |
+
+### Three depth rules that cross regions
+
+**① A Persistent Fact has an Answer and nothing else.** The outstanding figure is a *value* in
+R1 — its explanation is R5's Evidence, chasing it is R2's Answer. This is §7②'s "values only"
+expressed as depth, and it is also the structural defence against Header Everything: **a thing
+that may only ever have an Answer cannot grow.**
+
+**② Detail is always a read-only door, never a writing one.** C6 set this precedent: the
+drawer's step list is a disclosure that writes nothing. **To change something you go through
+R2's Context, because that door carries its gate.** Detail only shows.
+
+**③ Detail is not this page's content — it is where to go.** The full history, every document,
+every unit: their home is elsewhere, and R6's Detail is *a way there*, not a copy. This is the
+rule that stops the page slowly swallowing the rest of the system.
+
+### Two open questions L2 closes on its way past
+
+- **The dangerous doors** (change the total · waive storage · refund · cancel) are **R2's
+  Detail**. Not a new region — the deepest level: not an answer, not context, not evidence, but
+  a capability that appears only when explicitly asked. What still needs a ruling is *who may
+  press them*, not where they live.
+- **R5's payment breakdown was already Detail**, so the unreadable ledger blocks nothing at
+  Answer, Context or Evidence depth. Fixing it is now its own card, not a dependency.
+

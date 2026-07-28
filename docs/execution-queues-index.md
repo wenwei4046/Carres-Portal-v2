@@ -27,13 +27,13 @@
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | ✅ **LINE COMPLETE** — T1-T11 shipped |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
-| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 — R6 · R7 · **R8** (`Contact`→`Call` rename, new 2026-07-28) left |
+| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · **R6 ✅ #490** — R7 · **R8** (the banned-verb sweep, new 2026-07-28) left |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C9 ✅ #472 · C10 ✅ #471** — C4 · C8 left |
 | ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings). **P2 is the next card** |
 | ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 | **NEW 2026-07-28** — D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3` · **D0.4 ✅ the old order-portal master spec is DELETED** (Loo 2026-07-28 — docs only, no page touched). **T3 = Jess uses it for a day, after a deploy.** TEMPORARY doc — delete when the line ends |
 
-**State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ R1-R5 ✅ · ⑥ C1 · C2 · C3 · C5 · C6 · **C7** · C9 · C10 ✅ ·
+**State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ **R1-R6 ✅** · ⑥ C1 · C2 · C3 · C5 · C6 · **C7** · C9 · C10 ✅ ·
 ⑦ **P1 ✅** · ⑧ D0 + T1 + T2 ✅ (T3 is a Jess task, not a build card).
 
 **What P1 changed (2026-07-28, PR #488, migration 0303).** Every number the ordering engine
@@ -72,17 +72,24 @@ delivery queue is a deadline-carrying step, so the fifth tile waits on Jess ruli
 S / R / P run in parallel throughout; **C4 and ⑦ P share the Purchasing pages with ④ R —
 only ONE of those three at a time.**
 
-**Purchasing lane, 2026-07-28: ④ R6 HOLDS IT.** Migrations `0301_warehouse_role` and
-`0302_warehouse_files_its_own_receiving` are applied to live prod and neither file is on
-main — an R6 chat is mid-flight. **⑦ P1 waits for R6 to merge** (Loo, 2026-07-28): R6 has
-already changed the database, so stopping it half-way leaves prod carrying two migrations no
-file explains. This is also how the lane rule is checked in future — **compare the tracker
-tail to `supabase/migrations`; if the tracker is ahead, somebody is holding the lane.**
-*(P1 shipped the same day on Jess's own instruction, taking **0303** from the tracker tail
-exactly as this paragraph says. The hold was honoured where it matters, and the ORDER is
-what did it: Jess applied and verified 0303 on prod FIRST, and only then was #488 merged and
-deployed — so prod was never asked to serve a page whose table did not exist, and R6's two
-numbers keep theirs.)*
+**Purchasing lane, 2026-07-28: ⑦ P2 holds it. R6 released it (#490).**
+
+**The lane check that found the problem, kept because it worked:** compare the migration
+tracker tail to `supabase/migrations`. **If the tracker is ahead, somebody is holding the
+lane** — or, as it turned out, somebody left it holding. On 2026-07-28 the tracker read
+`0302` and main carried neither file nor any R6 code: **an earlier R6 session applied SQL to
+prod and shipped nothing.** That is the worst state a lane can be in, because it is invisible
+to `git log` and only the tracker shows it.
+
+**R6 recovered it the right way** — it pulled both migrations back out of
+`supabase_migrations.schema_migrations` and into the repo VERBATIM, md5-matched against the
+stored copy, applying nothing new. **Never re-apply or re-author a migration that is already
+live; recover the exact text.**
+
+*(P1 shipped in the middle of that hold on Jess's instruction, taking `0303`. It was safe
+because of the ORDER, not the timing: 0303 was applied and verified on prod FIRST, and only
+then was #488 merged and deployed — so prod was never asked to serve a page whose table did
+not exist, and R6's two numbers kept theirs.)*
 
 **Line ⑦ exists because purchasing failed five times.** Seven documents (1,222 lines) each
 specified a different purchasing module and none was authoritative, so every build chat

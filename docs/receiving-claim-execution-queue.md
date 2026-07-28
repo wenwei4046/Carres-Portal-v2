@@ -249,6 +249,46 @@ Service-Note free-text problem. Needs a migration (role + RLS) — guardrail #8,
 Jess first.
 **Done when:** a Klang receiving lands in the system with zero ops typing — ops only
 reviews.
+**SHIPPED 2026-07-28 (PR #490, migrations 0301 + 0302).** The warehouse counts on
+R1's own form and files it; ops presses one button. Notes the next cards need:
+- **The migrations were ALREADY APPLIED when this card was built.** An earlier
+  R6 session applied 0301/0302 to prod and shipped no code, so the database was
+  ahead of the repo. Both files are recovered here **byte-for-byte** — `md5` of
+  each file equals `md5` of the statement in
+  `supabase_migrations.schema_migrations`, checked before a line of code was
+  written. **Nothing new was applied by this PR.** The lesson is the deploy
+  rule read backwards: the tracker is the authority on what the database has,
+  and a repo that does not match it is the thing to fix first.
+- **A submission is a QUEUED CALL to the receive engine, never a second
+  engine.** `warehouse_receipt_check_in` replays the stored payload through
+  `operation_receive_po_with_do`, so R1's counters, R2's claim minting and its
+  guard, R4's quarantine and the thread/stock cascade all come along unchanged.
+  A test asserts the ops router never calls the engine directly.
+- **The stored number is a DELTA** (`received_now`), not a running total: a
+  receipt can sit for hours while another DO lands, and a stored total would be
+  true when it was typed and wrong when it was replayed.
+- **The warehouse has no RLS grant at all** — every read and write is a DEFINER
+  RPC gated on `app_role() = 'warehouse'` and scoped by `app_warehouse_id()`,
+  and 0302 ASSERTS that no table policy anywhere names the role. Storage is the
+  one exception and has to be (an upload goes through a signed URL), and both
+  branches are scoped to POs bound for the caller's own warehouse.
+- **Check-in takes no body.** A count ops disagrees with goes BACK, with a
+  reason, to the only people who can look at the goods again — an ops-side edit
+  field would be "zero ops typing" quietly withdrawn, and it would make the
+  record say the warehouse counted something it never counted.
+- **The account door is HR → Team**, beside supplier and partner (Loo's
+  2026-07-25 ruling). It PICKS an existing warehouse rather than naming one;
+  the principal Accounts modal was deliberately left alone, so there is one
+  door, not two. Live there is **1 warehouse (Carres Klang) and, at ship, no
+  warehouse account yet** — R6 built the door, Jess mints the login.
+- **Two words to rule.** `Send back` reuses `Send`, which COPY-STANDARD pins to
+  raising a PO — the closest legal word, adopted and reported rather than
+  invented around. And the warehouse's own button is the form law's `Save
+  count` because the five verbs have none for "file this with Carres"; the
+  state that follows, `Waiting Carres check`, is the approved
+  "Waiting + the exact thing" shape.
+- Live at ship: **0 POs · 0 PO lines · 0 receipts**, so the queue reads empty
+  until the first PO is received — nothing was backfilled.
 
 ## R7 · GRN duty — receiving assigns itself (from PORTAL_CORE_ENGINE, 2026-07-27)
 
@@ -268,9 +308,19 @@ column) — guardrail #8.
 **Done when:** no GRN exists without exactly one owner; the PO-duty holder never
 auto-receives their own PO.
 
-## R8 · `Contact supplier` becomes `Call {supplier} — confirm what happens next`
+## R8 · The banned-verb sweep on the receiving and claim screens
 
-**A rename, nothing else.** Loo ruled 2026-07-28 that the portal has exactly FIVE verbs
+**A rename, nothing else — and it is now TWO words, not one.**
+
+**① `Receive` → `Check in`.** Found by R6 (2026-07-28) and correctly left alone by it:
+`OperationReceiving.tsx:374` still renders **`Receive →`** on its own rows while the R6 panel
+sitting beside it says `Check in` — **the same act, two words, on one screen.** COPY-STANDARD's
+vocabulary table bans `Receive` as a verb outright (`Log goods arrival` → **`Check in`**), so
+this is lag, not a decision. It is the clearest possible case of rule 8 and a new hire meets
+it on their first shift.
+
+**② `Contact supplier` → `Call {supplier} — confirm what happens next`.** Loo ruled 2026-07-28
+that the portal has exactly FIVE verbs
 (`Assign · Call · Issue · Upload · Close`) and `Contact` was a sixth for behaviour `Call`
 already covers — reach the outside party, get an answer, record the outcome. **The ruling is
 already law**: `docs/COPY-STANDARD.md` carries the five strings
@@ -279,12 +329,18 @@ already law**: `docs/COPY-STANDARD.md` carries the five strings
 `No claim is waiting for a supplier answer.`) and the exception-lifecycle row no longer lists
 `Contact supplier`. **The R2/R3 screens are the lag.**
 
-**Build:** every visible `Contact` on the claim screens reads from the shared word module,
-same as C1 did for Orders. No behaviour changes, no claim state changes, no migration.
-**Grep both directions** — `Contact supplier` at 0 proves nothing says the old word; the new
-string at 1 proves something says the new one.
-**Done when:** `Contact` appears nowhere on screen and the Claims queue tile has a name that
-is in the dictionary.
+**Build:** every visible `Receive` and `Contact` on the receiving and claim screens reads from
+the shared word module, same as C1 did for Orders. No behaviour changes, no claim state
+changes, no migration.
+**Grep both directions, for BOTH words** — the old string at 0 proves nothing says it; the new
+string at 1 proves something says it. One direction proves half.
+**Done when:** neither `Receive` (as a verb) nor `Contact` appears anywhere on screen, the two
+panels on the Receiving station say the same word for the same act, and the Claims queue tile
+has a name that is in the dictionary.
+
+**LANE:** these are ④ R's own screens, but **`OperationSupplierClaims.tsx` is also P2's** —
+P2 is building the queue tiles and the filter behaviour on the same file. Run R8 after P2
+merges, or the rename lands on a file that is being rewritten underneath it.
 
 ## LATER
 
@@ -304,6 +360,6 @@ is in the dictionary.
 | R3 | ✅ | [#428](https://github.com/wenwei4046/Carres-Portal-v2/pull/428) · 0291 |
 | R4 | ✅ | [#454](https://github.com/wenwei4046/Carres-Portal-v2/pull/454) · 0299 |
 | R5 | ✅ | [#475](https://github.com/wenwei4046/Carres-Portal-v2/pull/475) · no migration |
-| R6 | ⬜ after R1-R2 · warehouse login | — |
+| R6 | ✅ | [#490](https://github.com/wenwei4046/Carres-Portal-v2/pull/490) · 0301 + 0302 |
 | R7 | ⬜ after R1 · GRN duty auto-assign | — |
 | R8 | ⬜ any time · `Contact` → `Call` rename (words only, no migration) | — |
