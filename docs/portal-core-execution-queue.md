@@ -633,7 +633,7 @@ Tests +39 (shared 30 · api 12 net · web 10 net); suites at baseline (shared 18
 3 pre-existing · web 16 pre-existing); typecheck 0 new, build + design guard + wrangler
 dry-run clean, `SERVICE_ROLE` 0 in the bundle.
 
-## C8b · the two delay clocks — ⬜ SETTLED, small, no migration
+## C8b · the two delay clocks — ✅ LIVE (PR #496)
 
 **Loo ruled TWO SLAs 2026-07-28 and then ruled where the second one starts**, which is what
 turned a law conflict into a five-line card:
@@ -663,6 +663,93 @@ the LAST to know" and a new action carrying no date, when every customer-facing 
 carries one. **Loo chose the reading that changes no business rule**: Operations still gets
 its two days to find out whether there is really a delay, and the moment it decides there is,
 the customer hears the same day.
+
+### What shipped (PR #496, 2026-07-28 — migration **0305**, applied and verified before the merge)
+
+**The card said no migration, and half of it could not be built without one.** Clock 2 wired
+straight in — `delay_decision_at` (0304) is exactly its start. **Clock 1's start was stored
+nowhere**, and that was measured rather than assumed: `line_etas` is a plain `sku → date` map
+with no stamp · `stock_eta` carries none either · `ops_order_control.updated_at` is the row's
+last TOUCH, so a remark edit would push the deadline forward and the clock could quietly never
+turn late · the 0211 audit trigger logs `stock_eta` changes only, and both stores are empty on
+all 55 live rows, so even the audit trail could not answer it. **A Due that never fires is
+worse than no Due**, so the chat stopped and asked, and Loo ruled the stamp (2026-07-28).
+
+**0305 is a PAIR, and the pair is 0304's own discipline** (S4: an event names the thing it was
+made ABOUT). `delay_detected_at` is when the supplier's date first overshot the promise;
+`delay_detected_eta` is the supplier date that sighting was about. A factory that slips AGAIN
+is a NEW delay: the pair stops matching, the clock restarts on the new date, and one stamp can
+never date every future delay on the order.
+
+**A TRIGGER, not route code, and that is the R4 lesson applied.** `line_etas` is written by
+`PUT /:id/control`, by `POST /import-stock-eta`, and by any internal PostgREST call — the
+table carries a blanket operation/principal write policy. A stamp written by one route is a
+stamp two other doors walk around. The BEFORE trigger also makes the pair **server-owned**: a
+client may send whatever it likes for these two columns and it is overwritten, so nobody can
+move their own deadline. It mirrors `stockEtaOf` line for line, and where the two could ever
+disagree the pair simply stops matching and the clock stays silent — the safe direction for a
+deadline.
+
+**`Same working day` is ZERO working days, as the card required** — due on the day it opens,
+late once one office working day has passed. Not a second kind of deadline: it sorts, filters
+and renders exactly like the other four. §3's own sentence is a test — *"A decision recorded
+on a Friday afternoon is due that Friday; it turns late on the next working day"* — so a
+Friday decision is NOT late on Saturday and IS late on Monday.
+
+**The office calendar without touching any default.** Law 2A warns that a caller passing
+nothing gets whichever week the engine defaults to (the WAREHOUSE's six days). The shared
+module passes `[0, 6]` itself on every call and takes only the holidays from its caller, so a
+surface structurally cannot count either clock on the wrong week — and a test asserts the two
+week definitions are still DIFFERENT, which is what would break silently if somebody ever
+"tidied" the engine default. **No default was switched** (that is its own card: it re-dates
+every deadline on the board).
+
+**On screen: nothing new to read.** The two delay queues gained the same `5 · 2 late` tail the
+four delivery queues have carried since T7, from COPY-STANDARD's own `{n} to do · {n} late`
+rule. No word was added; a word that is not in the dictionary would have stopped the build.
+
+**Live effect today: NONE.** 55 control rows, 0 with a supplier date of any kind, 0 stamped
+after the migration — nothing can reach this flow. Same as C7, C8 and C9: the behaviour is
+decided before the first one appears.
+
+**Proof.** 11 assertions on live prod inside a rolled-back transaction before applying
+(stamp on first overshoot · the first sighting survives unrelated edits · a client cannot
+forge either column · a later slip restarts the clock · a pull-in clears the pair · a
+malformed date never costs the operator their edit · a line marked READY raises no clock · a
+TBD promise raises none · the INSERT path · the other 53 rows untouched · the CHECK and
+trigger exist), rollback verified (0 columns, 0 triggers, 0 functions left), and the harness
+proved it can FAIL — a deliberately wrong expectation raised on the spot. After applying, the
+function was reconciled against the FILE by `md5(prosrc)` + length: **byte-identical**
+(2,866 chars, `87f10289…`). Negative controls in code too: switch the module to the warehouse
+week → 4 shared tests fail; drop the pair guard → exactly the one stale-sighting test fails.
+Tests +20 (shared 16 · web 4); suites at baseline (shared 1949/1949 · api 3 pre-existing ·
+web 16 pre-existing); typecheck 0 new (api 4 / shared 7, both measured on the clean tree),
+build + design guard + wrangler dry-run clean, `SERVICE_ROLE` 0.
+
+### What C8b found — reported, not fixed (Law 0)
+
+1. **The card's "no migration" was wrong, and it was a design gap rather than an oversight.**
+   §3 rules a clock from a day nothing recorded. Reported before building, ruled by Loo the
+   same day. **A build chat does not edit a law** — §3 now names the stamp, which is writing
+   down what happened, not amending the rule.
+2. **`stock_eta` is a supplier date the ladder never reads.** `POST /:id/delay-decision`
+   accepts it as a date a decision may be about, but `stockEtaOf` computes the overshoot from
+   `line_etas` alone — so a decision can be recorded about a date that can never open Delay
+   planning. 0305 mirrors the ladder deliberately (a stamp the engine can never match would be
+   worse), which leaves the seam exactly where C8 left it. **Needs a ruling: is `stock_eta` a
+   supplier date or not?** Live it is NULL on all 55 rows, so nothing is broken today.
+3. **A promised date corrected while nothing writes the control row leaves the stamp stale.**
+   The trigger fires on `ops_order_control` writes; `orders.delivery_date` has its own door
+   (`set_order_date`). Pulling a promise EARLIER can therefore create an overshoot with no
+   stamp — the queue still holds the order, it simply carries no deadline until the next
+   control write. Silence, never a false alarm, and §3 says the promise never moves anyway.
+4. **Neither delay action shows its deadline on the ROW.** The lateness lives in the facet
+   count, exactly like the four delivery queues — no row in the portal prints "due Friday"
+   today. If Jess wants a date on the row it is one card for all six deadlines, not a sixth
+   spelling here.
+5. **A backfill was refused, not forgotten.** Nothing can be stamped for a sighting nobody
+   recorded; an `at` filled from `updated_at` would be an invented day presented as a
+   measurement (S5's own refusal of `closed_at`).
 
 ## C8 · Delay planning + the gate before the customer — ✅ LIVE (PR #493)
 
@@ -1005,5 +1092,6 @@ a tooltip and a five-word vocabulary; a half-drawn signal would not.
 | C6 | ✅ **LIVE** 2026-07-28 — every action opens the steps that close it; the order's PIC is the task owner | #486 |
 | C7 | ✅ **LIVE** 2026-07-28 — the DO issues itself, and the hard gate moves onto issuing. **No migration** | #489 |
 | C8 | ✅ **LIVE** 2026-07-28 — delay planning, and the gate before the customer. **Migration 0304** | #493 |
+| C8b | ✅ **LIVE** 2026-07-28 — the two delay clocks, on the OFFICE calendar. **Migration 0305** — the card said none, and clock 1's start was stored nowhere | #496 |
 | C9 | ✅ **LIVE** 2026-07-27 — storage holds the delivery; the manager releases it, in two named outcomes | #472 |
 | C10 | ✅ **LIVE** 2026-07-27 — the three dots render beside the stage pill | #471 |

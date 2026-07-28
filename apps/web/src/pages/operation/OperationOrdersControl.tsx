@@ -58,6 +58,7 @@ import {
   deliveryQueueForLabel,
   deliveryQueueLeads,
   deliveryStepOverdue,
+  orderActionOverdue,
   myHolidaySet,
   deliveryDateGapFact,
   orderActionButton,
@@ -594,6 +595,45 @@ const NEXT_QUEUE_DESC: Record<string, string> = {
   [orderActionQueue("arrange_new_delivery_date")]:
     "The promised date cannot be met — logistics arranges the new date with the customer",
 };
+
+/** A stored timestamp as the operator's OWN calendar date.
+ *
+ *  A deadline is a calendar fact, so the timezone question belongs to the
+ *  caller and not to the shared engine (`delivery-queue.ts` says the same). The
+ *  browser doing this work sits in MYT, so its local date IS the business day —
+ *  slicing the UTC string instead would read midnight-to-08:00 work as the day
+ *  before. */
+function localDateOf(ts: string | null | undefined): string | null {
+  if (!ts) return null;
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** C8b — the day one of the two delay clocks starts (`ORDERS-WORKING-FLOW` §3).
+ *
+ *  `Delay planning` counts from the day the supplier's date FIRST overshot the
+ *  promise; the logistics call counts from the moment Operations recorded that
+ *  the promise cannot be met. Both stamps are server-owned (0304 / 0305), so
+ *  nobody can move their own deadline.
+ *
+ *  The sighting NAMES the supplier date it was about, and this is where that
+ *  pays: if the stamp is no longer about the date the ladder is looking at, it
+ *  is not about this delay, and the action carries NO deadline rather than a
+ *  wrong one. Silence over a false alarm — the rule every other queue here
+ *  already follows. */
+export function delayActionAnchor(
+  o: operationOrderListRow,
+  key: OrderActionKey,
+): string | null {
+  const ovl = ovlOf(o);
+  if (key === "arrange_new_delivery_date")
+    return localDateOf(ovl?.delay_decision_at);
+  if (key !== "delay_planning") return null;
+  const detectedEta = ovl?.delay_detected_eta ?? null;
+  if (!detectedEta || detectedEta !== stockEtaOf(o).etaIso) return null;
+  return localDateOf(ovl?.delay_detected_at);
+}
 
 /** T7 — the delivery-photo action. Its queue is the ONLY delivery queue that
  *  deliberately spans CLOSED orders (same reason as Owing: the proof is still
@@ -1903,13 +1943,47 @@ export default function OperationOrdersControl({ onImport }: Props) {
     () => liveScope.filter(isSupplierLate).length,
     [liveScope],
   );
+  // ONE holiday set for the page — every deadline on this screen skips the same
+  // Malaysian public holidays (Law 2A: the calendars differ in their WEEK, never
+  // in their holidays).
+  const officeHolidays = useMemo(() => myHolidaySet(), []);
+  // C8b · THE TWO DELAY CLOCKS (Loo 2026-07-28, `ORDERS-WORKING-FLOW` §3).
+  // Delay planning gets 2 working days from the day the supplier's date first
+  // overshot the promise; the logistics call gets the SAME working day from the
+  // moment Operations recorded that the promise cannot be met. Both on the
+  // OFFICE calendar (Law 2A) — the shared module passes that week itself, so
+  // this surface cannot count either clock on the warehouse's six days.
+  // Same shape as the delivery queues: the "· N late" tail is the auto-overdue.
+  const delayQueueStats = useMemo(() => {
+    const today = todayIso();
+    const stat = new Map<string, { n: number; late: number }>();
+    for (const o of liveScope) {
+      const a = nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []);
+      if (a.key !== "delay_planning" && a.key !== "arrange_new_delivery_date")
+        continue;
+      const cur = stat.get(a.label) ?? { n: 0, late: 0 };
+      cur.n += 1;
+      if (
+        orderActionOverdue(
+          a.key,
+          delayActionAnchor(o, a.key),
+          today,
+          officeHolidays,
+        )
+      )
+        cur.late += 1;
+      stat.set(a.label, cur);
+    }
+    return stat;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveScope, availableBySku, officeHolidays]);
   // T7 · DELIVERY queues + auto-overdue (Jess 2026-07-27). Each of the four
   // delivery steps carries its own deadline (shared `delivery-queue.ts`), so a
   // queue item turns LATE by itself — nobody has to watch it. Counts still come
   // from the NEXT verb, so queue numbers equal the NEXT column by construction
   // (C-vocab). The photo queue is the one that spans CLOSED orders, for the same
   // reason Owing does: the proof is still outstanding after delivery.
-  const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
+  const holidayOpts = useMemo(() => ({ holidays: officeHolidays }), [officeHolidays]);
   // P1 — the working days of notice on `Confirm delivery date` (Jess may set
   // 5). Undefined until the settings land, which leaves the step on its seed.
   const queueLeads = useMemo(
@@ -2910,12 +2984,21 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     onClick={() => setOwingOnly((v) => !v)}
                   />
                 )}
-                {NEXT_QUEUE_VERBS.map((v) =>
-                  (nextCounts.get(v) ?? 0) > 0 ? (
+                {NEXT_QUEUE_VERBS.map((v) => {
+                  // C8b — the two delay queues carry their own deadline, so
+                  // they show the same "5 · 2 late" tail the delivery queues
+                  // do. `undefined` on every other queue leaves the row exactly
+                  // as it was.
+                  const delayStat = delayQueueStats.get(v);
+                  const delayLate = delayStat && delayStat.late > 0 ? delayStat : null;
+                  return (nextCounts.get(v) ?? 0) > 0 ? (
                     <KanbanRow
                       key={v}
                       label={v}
                       count={nextCounts.get(v) ?? 0}
+                      valueText={
+                        delayLate ? `${delayLate.n} · ${delayLate.late} late` : undefined
+                      }
                       tone={
                         v === orderActionQueue("confirm_ready_date")
                           ? "warning"
@@ -2933,11 +3016,15 @@ export default function OperationOrdersControl({ onImport }: Props) {
                           ? picQueueChip
                           : dutyQueueChip
                       }
-                      title={NEXT_QUEUE_DESC[v]}
+                      title={
+                        delayLate
+                          ? `${NEXT_QUEUE_DESC[v]}. ${delayLate.late} of ${delayLate.n} already past that deadline.`
+                          : NEXT_QUEUE_DESC[v]
+                      }
                       onClick={() => setNextFilter((f) => (f === v ? null : v))}
                     />
-                  ) : null,
-                )}
+                  ) : null;
+                })}
                 {/* Supplier-late (storage arc, merged from main): the goods ETA
                     misses the promise — the supplier is the problem. Kept as a
                     QUEUE alongside the C-vocab verbs (it's a data flag, not a

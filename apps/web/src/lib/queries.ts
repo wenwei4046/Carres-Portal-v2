@@ -2893,6 +2893,18 @@ export interface opsRemarkEmbed {
    *  (the radar fires on the overshoot, as it always did). */
   delay_decision?: "keep" | "new_date" | null;
   delay_decision_eta?: string | null;
+  /** C8b the two delay clocks (migration 0305) — the two moments the delay
+   *  deadlines count from: `delay_detected_at` = the day the supplier's date
+   *  FIRST overshot the promise (Delay planning, 2 working days),
+   *  `delay_decision_at` = the moment Operations recorded that the promise
+   *  cannot be met (the logistics call, the SAME working day). Both are
+   *  server-owned. `delay_detected_eta` says which supplier date the sighting
+   *  was about, so a stamp that has stopped being about the current date is not
+   *  trusted. Optional → absent on a pre-0305 Worker, and an action with no
+   *  anchor simply carries no deadline. */
+  delay_decision_at?: string | null;
+  delay_detected_at?: string | null;
+  delay_detected_eta?: string | null;
 }
 export interface operationOrdersListResponse {
   orders: operationOrderListRow[];
