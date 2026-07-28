@@ -322,6 +322,26 @@ not lag, it is a banned word shipped. Same fix as C1 did for Orders: read from t
 module. **The cells are a STAGE picker, not queue tiles** (UI-KIT §8.2, the no-empty-state
 rule) — R8 renames them and changes no behaviour.
 
+**⓪b Delete the two dead filters in the same visit** (Loo ruled 2026-07-28). `attn` and
+`selectedDay` in `OperationPurchase.tsx` carry state, filter logic and a clear chip that
+**nothing on the page can switch on** — their tiles were deleted 2026-07-23/24 and the state
+stayed. It is in this card because R8 is already opening that file and one visit beats two;
+deleting unreachable state is not a behaviour change **by definition** — if nothing can reach
+it, removing it cannot alter what anybody sees.
+
+**Which is exactly the thing to PROVE, not assume.** Before deleting, grep for every writer of
+each one. If ANY path outside the reset/clear handlers sets them — a keyboard shortcut, a URL
+param, a `useEffect`, a prop from the shell — **they are not dead, deleting them IS a behaviour
+change, and this card stops and reports.** P2 measured them as unreachable and I recorded it;
+neither of us is a substitute for the grep in front of you. Delete the state, its filter
+branch and its clear chip together — a chip that clears a filter nobody can set is the same
+lie one level down.
+
+**Not to be confused with a decision to drop the FEATURE.** "Only what is late" and "only this
+day" are reasonable things to want on To Order; they were never ruled out, they were ruled
+*not to sit in the code pretending to exist*. If Jess wants either back it is a card, and it
+starts by naming the words — `Late only` is in no dictionary today.
+
 
 
 **A rename, nothing else — and it is now TWO words, not one.**

@@ -195,12 +195,18 @@ written after P2 found that the law assumed every list has an "everything" view.
 are wrong (`Send POs` · `Chase factory` · `Receive`, and `Chase` is banned) and that is **R8's
 sweep, not P2's** — a rename is not a click behaviour.
 
-**The two dead filters — ruled 2026-07-28.** `attn` and `selectedDay` are state with filter
-logic and a clear chip that nothing can turn on. My own earlier version of this card called
-all three "real, each with an onClear chip" — that was read off a grep and it was wrong; P2
-measured it and reported it, which is the only reason it is not still described as live here.
-Two dead filters that a card describes as working are `ops_order_control.balance` in miniature:
-the next chat plans around a feature nobody can reach.
+**The two dead filters — ruled 2026-07-28: DELETED, and R8 does it.** `attn` and `selectedDay`
+are state with filter logic and a clear chip that nothing can turn on. Loo ruled them out of
+the code rather than back onto the screen, and the work sits in **R8 ⓪b** because R8 is already
+opening this file for the stage-cell rename — one visit, not two. **It is a deletion, not a
+decision to drop the feature:** "only what is late" and "only this day" were never ruled
+unwanted, they were ruled *not to sit in the code pretending to exist*. Either one comes back
+as a card that starts by naming its words (`Late only` is in no dictionary today).
+
+My own earlier version of this card called all three filters "real, each with an onClear chip"
+— read off a grep, and wrong. P2 measured it and reported it, which is the only reason it is
+not still described as live here. Two dead filters a card describes as working are
+`ops_order_control.balance` in miniature: the next chat plans around a feature nobody can reach.
 
 **Do NOT extract a shared component for this.** UI-KIT §8.2's enforcement row says the
 behaviour ends up inside `PageShell` / `DataTable`, and **that is card D0.5c on line ⑧**.
