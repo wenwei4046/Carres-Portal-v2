@@ -29,7 +29,7 @@
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 — R6 · R7 left |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #481 · C9 ✅ #472 · C10 ✅ #471** — C4 · C7 · C8 left |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C9 ✅ #472 · C10 ✅ #471** — C4 · C7 · C8 left |
 | ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **NEW 2026-07-27** — flow file written, seven old docs deleted. **P1 is the next card** |
 | ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 | **NEW 2026-07-28** — D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3`. **T3 = Jess uses it for a day, after a deploy.** TEMPORARY doc — delete when the line ends |
 
@@ -54,7 +54,7 @@ picked a different one. They are DELETED. The single owner is
 `docs/PURCHASING-WORKING-FLOW.md`. **The engine itself was already built** — the P-cards
 turn its hard-coded numbers into settings and add the two supplier calls nobody had built.
 
-**What C6 changed (2026-07-28, PR #481) — web only, no migration.** Clicking an open action
+**What C6 changed (2026-07-28, PR #486) — web only, no migration.** Clicking an open action
 in the drawer's checklist opens **the steps that close it**, and every step is one of the
 portal's own actions, so it is worded by that action's BUTTON string from the dictionary —
 `Assign logistics` ✓ then `Confirm booking` under `Call NETS — confirm delivery date`. The

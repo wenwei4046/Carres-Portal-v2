@@ -360,7 +360,7 @@ RM 56,859 · SO-1209 = RM 6,998 lines + RM 250 add-ons vs `orders.paid` RM 7,248
 Suites at baseline (shared 1623/1623 incl. +14 · api 3 pre-existing · web 16 pre-existing);
 typecheck 0 new, build + v4 guard + lint clean, `SERVICE_ROLE` 0 in the bundle.
 
-## C6 · Every action opens its checklist — ✅ LIVE (PR #481)
+## C6 · Every action opens its checklist — ✅ LIVE (PR #486)
 
 **Concept:** clicking an action in C2's Dynamic Checklist expands it into the steps that
 close it, and the action ticks itself when a **system-measurable** condition is true.
@@ -423,7 +423,7 @@ be ownable separately from its order.
 **Done when:** every built action closes itself from a real signal; no tick-box in the
 portal records only an assertion.
 
-### What shipped (PR #481, 2026-07-28 — **no migration**)
+### What shipped (PR #486, 2026-07-28 — **no migration**)
 
 **The shape, in one sentence:** *a checklist is [the measured step before it, when there is
 one] + [the outcome THIS action records]* — and **every step is one of the portal's own
@@ -814,7 +814,7 @@ a tooltip and a five-word vocabulary; a half-drawn signal would not.
 | C3 | ✅ **LIVE** 2026-07-27 — the `+N`, and `Confirm delivery` becomes a fact | #479 |
 | C4 | ⬜ any time, not alongside R | — |
 | C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
-| C6 | ✅ **LIVE** 2026-07-28 — every action opens the steps that close it; the order's PIC is the task owner | #481 |
+| C6 | ✅ **LIVE** 2026-07-28 — every action opens the steps that close it; the order's PIC is the task owner | #486 |
 | C7 | ⬜ after C6 · DO issues itself (migration) | — |
 | C8 | ⬜ after C2 · delay planning + the gate (migration) | — |
 | C9 | ✅ **LIVE** 2026-07-27 — storage holds the delivery; the manager releases it, in two named outcomes | #472 |
