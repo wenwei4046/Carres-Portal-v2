@@ -383,6 +383,31 @@ law says a button that merely stores what you typed is `Save` — but this one d
 store: it hands the count to Carres and the state becomes `Waiting Carres check`. A button
 that changes whose problem something is has never been a `Save`.
 
+**These four strings cover the WAREHOUSE RECEIPT and nothing else** (Loo, 2026-07-28). See the
+rule directly below — a different business line does not inherit them by looking similar.
+
+### One business, one dictionary (Loo, 2026-07-28)
+
+**A shared SHAPE is not a shared WORD.** Ready Stock's plan review also has a button that
+sends a record back to whoever produced it (`OperationStockPlan.tsx`). It is the same shape as
+the warehouse count and it does NOT get `Return count to …`, and it does not get renamed as a
+side effect of the receiving line's sweep: **a plan is not a count, and Ready Stock must
+define its own flow and its own dictionary rows first.**
+
+**This does not weaken rule 8, it says where rule 8 applies.** Rule 8 is *one business fact,
+one word, everywhere it appears* — `Confirm ready date` reads the same on Orders and on
+Purchasing because it is the same fact. It was never *"two actions that look alike must share
+a label"*, and reading it that way is how a word gets stretched over a second business until
+it means neither.
+
+**The test, in one question:** would a new hire doing BOTH jobs be surprised that the two
+screens use one word? If the objects differ — a count of goods vs a proposal about stock —
+they would, and the word is wrong however similar the click feels.
+
+**So the sequence is fixed:** the module writes its flow → the flow names its actions → those
+actions get their five strings here → only then does a screen change. A rename that arrives
+before the flow is a chat guessing on behalf of a business line that has not spoken.
+
 **Consequence of the Issue rule:** the SYSTEM writes the document; the human only presses
 the button. **`Issue delivery order` IS an action** (Jess ruled 2026-07-27): once the
 customer's date is confirmed, the operator presses one button and the document exists, ready
