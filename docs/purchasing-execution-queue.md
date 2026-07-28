@@ -257,7 +257,7 @@ number on screen matches what actually happened.
 
 | Card | Status | PR |
 |---|---|---|
-| P1 | ✅ the numbers become settings (migration **0303**) | #PR_NUMBER |
+| P1 | ✅ the numbers become settings (migration **0303**) | #488 |
 | P2 | ⬜ after P1 · Claims tab + the interaction law | — |
 | P3 | ⬜ after P1 · the two missing supplier calls (migration) | — |
 | P4 | ⬜ where the goods go (migration) | — |
