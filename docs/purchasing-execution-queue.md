@@ -181,7 +181,7 @@ believed it would go looking for something that is not there):
 |---|---|---|---|
 | **To Order** | yes | **ONE live, TWO dead** — `supplierFilter` works; `attn` and `selectedDay` have state, filter logic and a clear chip, and **nothing on the page can switch them on** (their tiles were deleted 2026-07-23/24 and the state stayed). See the ruling below | ✅ done #492 |
 | **Purchase Orders** | — | — | check before building; it is a nested route, not a `?tab=` |
-| **Receiving** | ~~none~~ **yes** | ~~none~~ **3 live, all toggling** | ✅ done #TBD — a queue page, not a stage page |
+| **Receiving** | ~~none~~ **yes** | ~~none~~ **3 live, all toggling** | ✅ done #495 — a queue page, not a stage page |
 | **Claims** | ~~none~~ **yes** | ~~none~~ **3 live** | ✅ done #494 — a rail and tiles from scratch |
 
 **Build — the UI-KIT §8.2 interaction law:** click a queue tile → the table filters · click it
@@ -267,7 +267,7 @@ and tiles from scratch, and both live in ④ R's files (`OperationReceiving.tsx`
 `OperationSupplierClaims.tsx`), which **R6 held when To Order ran** — the card's own LANE
 paragraph says to ship the To Order half alone rather than edit a file another line holds.
 **R6 has since merged (PR #490, `9fe094bf`), so that block is gone.** Claims took its own chat
-and shipped as #494; Receiving took its own and shipped as #TBD. **Both are below, and P2 is
+and shipped as #494; Receiving took its own and shipped as #495. **Both are below, and P2 is
 now complete on all three tabs that have a list.**
 
 **Reported, not fixed (Law 0):**
@@ -372,7 +372,7 @@ the first already spent.
    column headers) rather than invent, but the next module that builds a rail has nothing to
    check itself against.
 
-### ✅ The RECEIVING half shipped 2026-07-28 (PR #TBD)
+### ✅ The RECEIVING half shipped 2026-07-28 (PR #495)
 
 **Done: Receiving.** No migration, no api change, no new word, and the interaction law is
 true on the tab. What was there before: **no facet rail and no filter state at all** — the
@@ -578,7 +578,7 @@ number on screen matches what actually happened.
 | Card | Status | PR |
 |---|---|---|
 | P1 | ✅ the numbers become settings (migration **0303**) | #488 |
-| P2 | ✅ the interaction law is true on **To Order** (#492) · **Claims** (#494) · **Receiving** (#TBD). Purchase Orders is a nested route with no rail and was never in scope | #492 · #494 · #TBD |
+| P2 | ✅ the interaction law is true on **To Order** (#492) · **Claims** (#494) · **Receiving** (#495). Purchase Orders is a nested route with no rail and was never in scope | #492 · #494 · #495 |
 | P3 | ⬜ after P1 · the two missing supplier calls (migration) | — |
 | P4 | ⬜ where the goods go (migration) | — |
 | P5 | ⬜ after P1-P4 · prove it with a real PO | — |
