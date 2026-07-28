@@ -128,6 +128,31 @@ R8 are the next things in it**, and R8 now has a list waiting: `Chase factory` o
 `Receive →` and R6's `Send back` on Receiving, `Contact` on the claim screens, and the
 `Factory:` / `Supplier:` chip split between two tabs of one module.
 
+**The lane rule broke on the way out, and the receipt belongs here rather than nowhere: TWO
+chats built the Receiving half at the same time.** #495 merged and deployed; the second build
+opened **#496** and it was **closed as superseded rather than reconciled** — merging it would
+have been a second rewrite of one file, and it would have overturned two decisions #495 had
+already made and reported to Jess: **the §8.2 row-click rung** (#495 refused it — this tab has
+no PO detail drawer and a form is not a record view; #496 made the whole row open the check-in
+form) and **whether the three status tabs survive beside the new rail** (#495 kept them and
+named the overlap; #496 deleted them and moved both sets onto the rail as `Check in` /
+`Fully received`, with nothing picked as the old `All`).
+
+**RULED 2026-07-28 (Loo): #495 is the final version of P2-Receiving, and NEITHER of those two
+is adopted.** #496 stays closed — **not merged, not cherry-picked, and nothing continues from
+that branch.** The reason is the rule, not the code: **P2 is finished, and both items are NEW
+product-behaviour decisions** — they are not in P2's scope and they are not in R8's (R8 is a
+rename sweep). **A page that is already live is not redesigned to make duplicated work useful.**
+A chat that finds either idea attractive is looking at a closed question; if it ever reopens it
+does so as its own card, with Jess naming the behaviour first.
+
+**What let it happen, and the cheap guard.** Nothing in a chat's own view says a card is
+already being worked on — the lane rule lives in THIS file, and a chat that read it once and
+started building never re-reads it. So: **re-check the lane immediately before opening the PR,
+not only before starting.** That is exactly the shape of the migration guard (`list_migrations`
+twice — once before numbering, once before applying), and it is the only one of these two
+sessions' safeguards that would have caught this.
+
 **The lane check that found the problem, kept because it worked:** compare the migration
 tracker tail to `supabase/migrations`. **If the tracker is ahead, somebody is holding the
 lane** — or, as it turned out, somebody left it holding. On 2026-07-28 the tracker read
@@ -381,6 +406,59 @@ wrong with nothing to rule it right. Both were ruled the same way on 2026-07-28 
 comes first, then the words** — so neither is a bug to sweep; they are lines that have not
 written their own file yet. A queue doc says WHAT to build. It cannot say how the module
 behaves, and a chat that treats it as the flow will name things on the business's behalf.
+
+### ⭐ THE RUNNING ORDER (Loo, 2026-07-28) — read this before picking any card
+
+```
+✅ P2-Receiving  #495            ✅ C8b  #497 (0305)
+▶  R8            terminology cleanup — takes the WHOLE Purchasing lane for one PR
+   P3            the two supplier calls          (migration)
+   P4            where the goods go              (migration)
+   P5            one REAL PO, end to end
+   T3            the Purchasing guided review + Jess's drawer day
+   Foundation    1. RECEIVING-WORKING-FLOW.md
+                 2. SERVICE-CASES-WORKING-FLOW.md
+                 3. READY-STOCK-WORKING-FLOW.md
+```
+
+**⚠️ R8 IS A WORDS CARD. It does not mean Purchasing is finished** (Loo, 2026-07-28, in
+those words). It renames things and deletes two dead filters; the module still has no way to
+make the two supplier calls, no destination on a PO, and **has never had a single real
+purchase order through it.** A chat — or a person — reading "R8 ✅" as "line ⑦ done" would
+close a module that has not yet been used once.
+
+**Foundation does not interleave.** It was considered for the gap after R8 and Loo ruled it
+out: the three working-flow files come after **P5**, not between P-cards. Purchasing finishes
+as one piece.
+
+**This order is across lines and it beats any line's own "next card" pointer** — ⑦'s row
+says P3 is its next card, which is true *within* ⑦ and is not a licence to start it beside
+R8. The lane holds one chat at a time.
+
+### The three missing flows — SCHEDULED, and NOT to be started yet (Loo, 2026-07-28)
+
+Loo accepted this as a **Foundation gap, not a per-module bug** — the same hole showed up in
+two unrelated lines within two days, which is what makes it foundation work rather than
+tidying. **He also ruled it does not jump the queue.**
+
+**The schedule is the running order above.** Foundation comes after **P5 and the guided
+review** — Loo ruled 2026-07-28 that it does not interleave with the P-cards, so Purchasing
+finishes as one piece rather than being paused twice.
+
+```
+1. docs/RECEIVING-WORKING-FLOW.md
+2. docs/SERVICE-CASES-WORKING-FLOW.md
+3. docs/READY-STOCK-WORKING-FLOW.md
+```
+
+**Do NOT open a card for any of the three before Purchasing closes.** The order is his and
+it is not alphabetical: Receiving is first because it is the one with a live screen already
+asking for words it does not have.
+
+**And do not "just start the file" while waiting.** A working-flow file is written in a PLAN
+chat with the business in the room — Orders' and Purchasing's both were — because its whole
+value is that somebody with authority named the actions. A flow file drafted from the code
+would be an eighth purchasing document: fluent, plausible, and nobody's.
 
 ## The engine law (read before any C-card, and before any new module)
 

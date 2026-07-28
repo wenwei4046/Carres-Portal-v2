@@ -3949,6 +3949,131 @@ strings shipped.
 
 **P2 is complete.** Three tabs, one click law, and the durable output is §8.2's stage-vs-queue rule rather than any one screen.
 
+**Added by the second session, 2026-07-28 — the lane rule broke on this card and the receipt
+is part of the entry.** TWO chats built the Receiving half simultaneously. #495 (above) merged
+and deployed first; the second build opened **#496** and it was **closed as superseded rather
+than reconciled**, because merging it would have been a second rewrite of one file and would
+have overturned two decisions #495 had already made and reported to Jess:
+
+- **the §8.2 row-click rung** — #495's finding 2 refuses it (this tab has no PO detail drawer,
+  and the Check in FORM is not a record view); #496 made the whole row open that form, on the
+  argument that §8.2 states the rung without an exception for a settled row and the modal's own
+  gates keep it read-only;
+- **the three status tabs** — #495's finding 5 keeps them beside the new rail and names the
+  overlap for Jess; #496 deleted them and moved both sets onto the rail (`Check in` = the old
+  `To receive`, `Fully received` = the old `Received`, nothing picked = the old `All`), on the
+  argument that two controls for one axis is two doors onto one filter.
+
+**RULED the same day (Loo, 2026-07-28): #495 is the final version, and NEITHER item is
+adopted.** #496 stays closed — **not merged, not cherry-picked, nothing continues from that
+branch.** The reason is the rule rather than the code: P2 is finished, and both items are **new
+product-behaviour decisions** that sit in neither P2's scope nor R8's (R8 is a rename sweep).
+**A live page is not redesigned to make duplicated work useful.** If either idea is ever wanted
+it comes back as its own card, with the behaviour named first.
+
+The second session also re-verified this ship independently rather than copying the
+receipt: the tip built byte-identically (`index-Du3H-Kir.js`), and on the downloaded bundles
+`receiving-facet-checkin` · `receiving-facet-progress-` · `receiving-facet-supplier-` go from
+ABSENT to PRESENT and the retired strapline `Receive goods into Carres Klang` from PRESENT to
+absent — stated as presence, not as counts, which is this entry's own `grep -c` correction
+applied to itself.
+
+**What let it happen, and the guard worth adopting:** nothing in a chat's own view says a card
+is already being worked on — the lane rule lives in `docs/execution-queues-index.md`, and a
+chat that read it once and started building never re-reads it. **Re-check the lane immediately
+before opening the PR, not only before starting** — the same twice-look shape the migration
+guard already uses, and the only safeguard either session had that would have caught this.
+**2026-07-28 · Portal Core C8b — the two delay clocks** (PR #497 merge `031051ab`, migration
+**0305 applied and verified BEFORE the merge**, Worker `611ab79f` + web `index-BIOm5Q5p.js`
+[carres-portal `7a023e62` + carres-pos `bc415c9a`, 4 canonicals ✓ first poll] — DEPLOYED)
+
+`ORDERS-WORKING-FLOW.md` §3 rules two deadlines for the delay flow and the engine carried
+neither — C8 reported that and correctly invented no number:
+
+| Stage | Action | Due | Clock starts at |
+|---|---|---|---|
+| 1 | `Delay planning` | **2 working days** | the supplier's date first overshoots the promise |
+| 2 | `Call {logistics} — arrange new delivery date` | **the SAME working day** | `delay_decision_at` |
+
+**The card said NO migration, and half of it could not be built without one.** Clock 2 wired
+straight in — 0304's `delay_decision_at` is exactly its start. **Clock 1's start was stored
+nowhere**, and that was measured rather than assumed: `line_etas` is a plain `sku → date` map
+with no stamp · `stock_eta` carries none either · `ops_order_control.updated_at` is the row's
+last TOUCH, so a remark edit would push the deadline forward and the clock could quietly never
+turn late · the 0211 audit trigger logs `stock_eta` changes only, and both stores are empty on
+all 55 live rows, so even the audit trail could not have answered it. **A Due that never fires
+is worse than no Due at all** (it reads as a deadline being watched), so the chat stopped
+before building and asked. Loo ruled the stamp the same day.
+
+**0305 is a PAIR, and the pair is 0304's own discipline** (S4: an event names the thing it was
+made ABOUT). `delay_detected_at` is when the supplier's date first overshot the promise;
+`delay_detected_eta` is the supplier date that sighting was about. A factory that slips AGAIN
+is a NEW delay: the pair stops matching, the clock restarts on the new date, and one stamp can
+never date every future delay on the order — `ops_order_control.balance`'s disease one column
+over, avoided the same way C8 avoided it.
+
+**A TRIGGER rather than route code, and that is R4's lesson applied.** `line_etas` /
+`line_stock_status` are written by `PUT /:id/control`, by `POST /import-stock-eta`, and by any
+internal PostgREST call — the table carries a blanket operation/principal write policy (0159).
+A stamp written by one route is a stamp two other doors walk around: ask WHAT is being written,
+never who is writing it. The BEFORE trigger also makes the pair **server-owned** — a client may
+send whatever it likes for those two columns and it is overwritten, so **nobody can move their
+own deadline**. It mirrors `stockEtaOf` line for line, and where the two could ever disagree
+the pair simply stops matching and the clock stays silent: the safe direction for a deadline.
+`stock_eta` is deliberately NOT read by it, because the ladder does not read it either and a
+stamp about a date the engine can never compute is a stamp the engine can never match.
+
+**`Same working day` is ZERO working days, exactly as the card required** — due on the day it
+opens, late once one office working day has passed. Not a second kind of deadline: it sorts,
+filters and renders like the other four. §3's own sentence became a test — *"A decision
+recorded on a Friday afternoon is due that Friday; it turns late on the next working day"* — so
+a Friday decision is NOT late on Saturday and IS late on Monday.
+
+**The office calendar without switching any default.** Law 2A warns that a caller passing
+nothing counts on whichever week the engine defaults to, which is the WAREHOUSE's six days.
+`packages/shared/src/order-action-due.ts` passes `[0, 6]` itself on every call and takes only
+the holidays from its caller, so a surface **structurally cannot** count either clock on the
+wrong week — and a test asserts the office week and the engine default are still DIFFERENT,
+which is the thing that would break silently if somebody ever "tidied" the default. No default
+was switched; that is its own card, and it re-dates every deadline on the board.
+
+**On screen: nothing new to read.** The two delay queues gained the same `5 · 2 late` tail the
+four delivery queues have carried since T7, straight from COPY-STANDARD's `{n} to do · {n}
+late`. No word was added — a word that is not in the dictionary would have stopped the build.
+
+**Live effect today: NONE.** 55 control rows, 0 carrying a supplier date of any kind, 0 stamped
+after the migration, 53 promised dates intact. Same as C7, C8 and C9: the behaviour is decided
+before the first one appears.
+
+**Proof.** 11 assertions on live prod inside a rolled-back transaction before applying (first
+overshoot stamps the pair · the first sighting survives unrelated edits · a client cannot forge
+either column · a later slip restarts the clock · a pull-in clears the pair · a malformed date
+never costs the operator their edit · a line marked READY raises no clock · a TBD promise
+raises none · the INSERT path · the other 53 rows untouched · CHECK and trigger exist).
+Rollback verified (0 columns, 0 triggers, 0 functions left) and **the harness proved it can
+FAIL** — a deliberately wrong expectation raised on the spot, so the 11 passes mean something.
+After applying, `md5(prosrc)` + length reconciled **byte-identical to the FILE** (2,866 chars,
+`87f10289…`). Negative controls in code: switch the module to the warehouse week → 4 shared
+tests fail; drop the pair guard → exactly the one stale-sighting test fails. Tests +20
+(shared 16 · web 4); suites at baseline (shared 1949/1949 · api 3 · web 16); typecheck 0 new
+(api 4 / shared 7, both measured on the clean tree); build + design guard + wrangler dry-run
+clean; `SERVICE_ROLE` 0.
+
+**Five findings reported, not fixed (Law 0).** (1) The card's "no migration" was a design gap,
+reported before building and ruled by Loo — §3 now names the stamp, which is writing down what
+happened rather than amending a law. (2) **`stock_eta` is a supplier date the ladder never
+reads**, yet `POST /:id/delay-decision` accepts it as a date a decision may be about, so a
+decision can be recorded about a date that can never open Delay planning; 0305 mirrors the
+ladder deliberately, which leaves that seam exactly where C8 left it. NULL on all 55 rows
+today. (3) A promised date corrected while nothing writes the control row leaves the stamp
+stale — pulling a promise EARLIER can create an overshoot with no stamp, so the queue holds the
+order with no deadline until the next control write. Silence, never a false alarm, and §3 says
+the promise never moves anyway. (4) Neither delay action prints its deadline on the ROW; the
+lateness lives in the facet count, exactly like the four delivery queues — a date on the row is
+one card for all six deadlines, not a sixth spelling here. (5) A backfill was refused, not
+forgotten: an `at` filled from `updated_at` would be an invented day presented as a
+measurement.
+
 ---
 
 **2026-07-28 · D0.5a is MERGED and DEPLOYED — `/ui` is live so the freeze can happen** (PR #498
@@ -3982,11 +4107,17 @@ blue-9 at radius 6, height 32 · danger pill red-3 on red-11 · all six type tok
 pills. A screenshot could not be taken (the harness reports the Browser pane not displayed), and
 for TOKENS a computed-style read is the stronger proof anyway.
 
-**The api was deployed, and NOT for D0.5a.** D0.5a changes no `apps/api` file. The union tip
-carried **C8b's undeployed Worker half** — its web has been live since #497 while the Worker was
-still C8's, so its screen was reading columns nothing was selecting. Migration **0305 was already
-applied** (tracker read immediately before deploying, tail = repo tail), so the api was safe to
-ship and the pair is coherent again. Wrangler echoed `PUBLIC_WEB_URL: https://pos.carresofficial.com`
+**The api was deployed and it carries no D0.5a code — and the REASON I gave myself was wrong.**
+D0.5a changes no `apps/api` file; the Worker is C8b's, re-deployed from a newer tip that contains
+it, so nothing about the api behaviour moved. I deployed it believing C8b's Worker was still
+undeployed, because `git diff -- apps/api` was non-empty against the tip **CLAUDE.md §17.1 then
+named as live** — and that row was stale by minutes: C8b had already shipped Worker `611ab79f` and
+recorded it in a docs commit that landed on `main` afterwards. **The correction is a sequencing
+lesson, not a typo**: §17.1 is written AFTER the deploy it describes, so a parallel line's deploy is
+invisible there for minutes; `wrangler deployments list` is the live fact and the row is a record
+of it. Harmless in effect (same code, newer tip), taken on a premise one command would have
+refuted. Migration **0305 was already applied** — that half WAS checked properly, with the tracker
+read immediately before deploying, tail = repo tail. Wrangler echoed `PUBLIC_WEB_URL: https://pos.carresofficial.com`
 + the custom domain + the 09:00-MYT cron; `GET /health` returns 200.
 
 **The merge was not clean and the conflicts were resolved by hand, not by taking a side** —

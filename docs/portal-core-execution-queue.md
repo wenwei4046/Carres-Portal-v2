@@ -736,8 +736,13 @@ build + design guard + wrangler dry-run clean, `SERVICE_ROLE` 0.
    accepts it as a date a decision may be about, but `stockEtaOf` computes the overshoot from
    `line_etas` alone — so a decision can be recorded about a date that can never open Delay
    planning. 0305 mirrors the ladder deliberately (a stamp the engine can never match would be
-   worse), which leaves the seam exactly where C8 left it. **Needs a ruling: is `stock_eta` a
-   supplier date or not?** Live it is NULL on all 55 rows, so nothing is broken today.
+   worse), which leaves the seam exactly where C8 left it. **RULED BY LOO 2026-07-28: not
+   now, and the deferral is the ruling.** The ETA model is not fully built — P3 (Supplier
+   Calls) has not shipped and no real PO has been run — and defining a model that half-exists
+   writes the definition around whichever half happens to be there. It is a CARRY FORWARD
+   (`eta-model-stock-eta-vs-line-etas-undecided`), settled in ONE pass once P3 lands and P5
+   runs real POs. Live it is NULL on all 55 rows, so nothing is broken today, and a chat that
+   "unifies" the two stores before then has chosen a data model for a line that has not spoken.
 3. **A promised date corrected while nothing writes the control row leaves the stamp stale.**
    The trigger fires on `ops_order_control` writes; `orders.delivery_date` has its own door
    (`set_order_date`). Pulling a promise EARLIER can therefore create an overshoot with no
