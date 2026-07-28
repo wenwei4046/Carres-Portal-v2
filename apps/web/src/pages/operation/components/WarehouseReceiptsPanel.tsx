@@ -15,8 +15,15 @@ import { fmtDate } from "@/lib/fmt-date";
  * typing — ops only reviews", so this panel offers exactly two moves and
  * neither of them re-enters a number:
  *
- *   Check in   — replay the warehouse's count through the receive engine
- *   Send back  — return it with a reason, so the pallet is counted again
+ *   Check in                      — replay the count through the receive engine
+ *   Return count to {warehouse}   — send it back with a reason, to be recounted
+ *
+ * **R8 (2026-07-28) retired `Send back`.** R6 shipped it and reported it as a
+ * word with no legal source; Loo ruled the same week that `Send` is pinned to
+ * raising a purchase order to a factory and is never reused, and added `Return`
+ * as the portal's SIXTH verb with all five strings in COPY-STANDARD's
+ * "warehouse count words" table. This panel is Carres's end of that pair; the
+ * warehouse's end is `Return count to Carres` on `WarehouseCountModal`.
  *
  * **Zero permanent pixels.** The panel renders nothing at all when no count is
  * waiting: an empty band above the queue would train the operator to scroll
@@ -61,6 +68,11 @@ export default function WarehouseReceiptsPanel() {
 function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
   const [sendingBack, setSendingBack] = useState(false);
   const [reason, setReason] = useState("");
+  /** COPY-STANDARD names the party in both directions of this pair. The role
+   *  word is the honest fallback when the warehouse is not resolvable, never a
+   *  blank — same rule the shared word module applies to every party. */
+  const warehouse = r.warehouse_name?.trim() || "the warehouse";
+  const returnLabel = `Return count to ${warehouse}`;
 
   const checkIn = useWarehouseReceiptReviewMutation("check-in");
   const sendBack = useWarehouseReceiptReviewMutation("send-back");
@@ -87,14 +99,15 @@ function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
     if (reason.trim().length === 0) return;
     try {
       await sendBack.mutateAsync({ receiptId: r.id, reason: reason.trim() });
-      toast.success(`${r.po_id} sent back to ${r.warehouse_name ?? "the warehouse"}`);
+      // COPY-STANDARD's done message for this row, with the PO it is about.
+      toast.success(`Count returned to ${warehouse} · ${r.po_id}`);
       setSendingBack(false);
       setReason("");
     } catch (e: unknown) {
       toast.error(
         e instanceof ApiError || e instanceof Error
           ? e.message
-          : "Send back failed",
+          : "Returning the count failed",
       );
     }
   }
@@ -140,7 +153,7 @@ function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="What must they fix?"
-            aria-label={`Reason for sending ${r.po_id} back`}
+            aria-label={`Reason for returning the ${r.po_id} count`}
             data-testid={`warehouse-receipt-reason-${r.po_id}`}
             className="w-[230px] px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
           />
@@ -151,7 +164,7 @@ function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
             className="btn-secondary text-[11px] py-1.5 px-3 disabled:opacity-40"
             data-testid={`warehouse-receipt-confirm-send-back-${r.po_id}`}
           >
-            {sendBack.isPending ? "Sending…" : "Send back"}
+            {sendBack.isPending ? "Returning…" : returnLabel}
           </button>
           <button
             type="button"
@@ -173,7 +186,7 @@ function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
             className="btn-ghost text-[11px] py-1.5 px-2"
             data-testid={`warehouse-receipt-send-back-${r.po_id}`}
           >
-            Send back
+            {returnLabel}
           </button>
           <button
             type="button"

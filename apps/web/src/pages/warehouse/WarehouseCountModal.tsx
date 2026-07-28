@@ -43,6 +43,13 @@ import {
  * The word `Receive` does not appear as a verb anywhere on this screen —
  * COPY-STANDARD pins the arrival of goods to `Check in`, and that is ops's move,
  * not this one.
+ *
+ * **R8 (2026-07-28): the footer button is `Return count to Carres`, not
+ * `Save count`.** R6 reached for the form law ("a button that merely stores what
+ * you typed is `Save`") and reported it; Loo ruled that this one does not merely
+ * store — it hands the count to Carres and the state becomes `Waiting Carres
+ * check`. A button that changes whose problem something is has never been a
+ * `Save`. The four strings are in COPY-STANDARD's "warehouse count words".
  */
 interface Props {
   po: WarehouseIncomingPo;
@@ -160,7 +167,11 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
               : {}),
           })),
       });
-      toast.success(`${po.po_id} counted · DO ${doNumber.trim()} · waiting Carres check`);
+      // COPY-STANDARD's done message for this direction of the pair, with the
+      // PO and the DO it is about.
+      toast.success(
+        `Count returned to Carres · ${po.po_id} · DO ${doNumber.trim()}`,
+      );
       onClose();
     } catch (e: unknown) {
       if (e instanceof ApiError) toast.error(e.message || "Could not save the count");
@@ -415,7 +426,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
       <ModalActions
         onCancel={onClose}
         onPrimary={save}
-        primary="Save count"
+        primary="Return count to Carres"
         primaryDisabled={!ready}
         primaryPending={submit.isPending}
       />

@@ -346,3 +346,108 @@ export function orderActionForQueue(queue: string): OrderActionKey | null {
 
 /** Every queue word, in lifecycle order — for a banned-word guard to walk. */
 export const ORDER_ACTION_QUEUES: readonly string[] = WORDS.map((w) => w.queue);
+
+// ── PURCHASING — the dictionary's own table (R8) ──────────────────────────────
+//
+// COPY-STANDARD carries TWO dictionary tables, ORDERS + DELIVERY and PURCHASING,
+// and says of two rows: "`Send PO` and `Confirm ready date` are ONE action each,
+// shared by Orders and Purchasing — same trigger, same completion, same words."
+// So those two are NOT respelt here; they are read back out of `WORDS`.
+//
+// **Why a second table and not four more members of `OrderActionKey`.** That
+// union is the ORDER LADDER's key: `DISPLAY_RANK` is a `Record` over it, and
+// `order-action-due` and `order-action-checklist` both key off it. Adding
+// `check_in` there would force a display rank and a due rule for an action the
+// Orders row can never show — a purchasing-only word wearing the ladder's type.
+// One file (Law 0A: one home for the mirror), two tables, no duplicated string.
+//
+// Only rows with a READER in the code are here — the module's own rule above.
+// `Confirm tomorrow's delivery` and `Confirm balance delivery date` are locked
+// in COPY-STANDARD and nothing renders them yet, so they are deliberately absent.
+
+export type PurchasingActionKey =
+  | "send_po"
+  | "confirm_ready_date"
+  | "check_in"
+  | "confirm_what_happens_next";
+
+interface PurchasingWord {
+  queue: string;
+  line: (p: OrderActionParties) => string;
+  button: string;
+  /** String 5. Present only where it takes no parameter — `Check in`'s own
+   *  empty state names a supplier AND a date, and nothing reads it yet. */
+  empty: string | null;
+}
+
+const PURCHASING_ONLY: Record<
+  "check_in" | "confirm_what_happens_next",
+  PurchasingWord
+> = {
+  check_in: {
+    queue: "Check in",
+    line: (p) => `Check in from ${party(p.supplier, "supplier")}`,
+    button: "Check in",
+    empty: null,
+  },
+  confirm_what_happens_next: {
+    queue: "Confirm what happens next",
+    line: (p) =>
+      `Call ${party(p.supplier, "supplier")} — confirm what happens next`,
+    button: "Record what happens next",
+    empty: "No claim is waiting for a supplier answer.",
+  },
+};
+
+function purchasingWord(key: PurchasingActionKey): PurchasingWord {
+  if (key === "send_po" || key === "confirm_ready_date") {
+    const w = wordFor(key);
+    // `button` is non-null for both of these; the assertion is local and true.
+    return { queue: w.queue, line: w.line, button: w.button as string, empty: null };
+  }
+  return PURCHASING_ONLY[key];
+}
+
+/** The queue tile / filter chip / count word — no party (a queue holds many). */
+export function purchasingActionQueue(key: PurchasingActionKey): string {
+  return purchasingWord(key).queue;
+}
+
+/** One record's line — verb + named party + measurable object. */
+export function purchasingActionLine(
+  key: PurchasingActionKey,
+  parties: OrderActionParties = {},
+): string {
+  return purchasingWord(key).line(parties);
+}
+
+/** The button that records the outcome. */
+export function purchasingActionButton(key: PurchasingActionKey): string {
+  return purchasingWord(key).button;
+}
+
+/** What the queue says when it holds nothing. `null` = not mirrored (see above),
+ *  and the caller must then say nothing rather than invent a sentence. */
+export function purchasingActionEmpty(key: PurchasingActionKey): string | null {
+  return purchasingWord(key).empty;
+}
+
+/**
+ * `Check in`'s DONE message — the dictionary's `Checked in {n} of {m}`.
+ *
+ * It is a function rather than a table cell because it is the only string in
+ * either table whose parameters are QUANTITIES rather than parties.
+ */
+export function checkedInDone(received: number, ordered: number): string {
+  return `Checked in ${received} of ${ordered}`;
+}
+
+/** Every purchasing queue word — for a banned-word guard to walk. */
+export const PURCHASING_ACTION_QUEUES: readonly string[] = (
+  [
+    "send_po",
+    "confirm_ready_date",
+    "check_in",
+    "confirm_what_happens_next",
+  ] as const
+).map(purchasingActionQueue);

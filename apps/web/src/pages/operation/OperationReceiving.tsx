@@ -1,5 +1,10 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { poReceivingProgress, type PoReceivingState } from "@carres/shared";
+import {
+  poReceivingProgress,
+  purchasingActionButton,
+  purchasingActionQueue,
+  type PoReceivingState,
+} from "@carres/shared";
 import {
   useOperationPos,
   useOperationSuppliers,
@@ -21,7 +26,7 @@ import PurchasingTabs from "./PurchasingTabs";
  * Splits the old "Receiving"(=Procurement) menu in two: PO create/manage stays
  * on the **Purchase Order** menu (TabbedProcurementShell), and THIS page is the
  * pure **待收 queue** — open POs whose goods come into Carres Klang. The
- * operator finds the PO, hits Receive, and books the units in via the existing
+ * operator finds the PO, hits Check in, and books the units in via the existing
  * ReceivePOModal (per-line tick + DO upload + signed checkbox → the v3
  * operation_receive_po_with_do RPC; ops_stock_items incoming→free + stock_balances).
  *
@@ -57,9 +62,12 @@ import PurchasingTabs from "./PurchasingTabs";
  *   Progress      ·  the R1 states       facts this page already computes
  *   Supplier      ·  per factory         the same facet the To Order tab carries
  *
- * No word on this page changed. `Receive →` is banned (`Receive` as a verb) and
- * the three To Order stage cells are worded off-dictionary; both belong to R8's
- * sweep and neither is touched here — a rename is not a click behaviour.
+ * 2026-07-28 (card **R8**, the banned-verb sweep): the row's action button said
+ * `Receive →` while the R6 panel directly above it said `Check in` — the same
+ * act, two words, on one screen. COPY-STANDARD bans `Receive` as a verb outright
+ * ("Log goods arrival — the ACT: **Check in**"), so this was lag, not a
+ * decision. The button, the facet tile and its chip now all read
+ * `purchasingActionQueue`/`Button("check_in")`; nothing else on the page moved.
  */
 
 type Tab = "to_receive" | "received" | "all";
@@ -325,7 +333,10 @@ export default function OperationReceiving() {
   // ── Active-filter chips (§8.2: two tiles picked → two ✕-able chips) ────────
   const activeChips: ActiveChip[] = [];
   if (checkInOnly)
-    activeChips.push({ label: "Check in", onClear: () => setCheckInOnly(false) });
+    activeChips.push({
+      label: purchasingActionQueue("check_in"),
+      onClear: () => setCheckInOnly(false),
+    });
   for (const f of PROGRESS_FACETS)
     if (progressFilter.has(f.state))
       activeChips.push({
@@ -555,7 +566,7 @@ export default function OperationReceiving() {
                       <div>
                         <FacetRow
                           testId="receiving-facet-checkin"
-                          label="Check in"
+                          label={purchasingActionQueue("check_in")}
                           count={checkInCount}
                           active={checkInOnly}
                           title="A PO that still owes units — counted from the quantities booked in, never from a status word somebody typed."
@@ -739,7 +750,7 @@ export default function OperationReceiving() {
                             className="btn-primary text-[11px] py-1.5 px-3"
                             data-testid={`receive-${po.id}`}
                           >
-                            Receive →
+                            {purchasingActionButton("check_in")}
                           </button>
                         )}
                       </td>

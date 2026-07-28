@@ -204,14 +204,14 @@ describe("To Order · §8.2 click again clears (card P2)", () => {
 
     fireEvent.click(cell);
     await waitFor(() =>
-      expect(screen.getByText("Factory: Ohana")).toBeInTheDocument(),
+      expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument(),
     );
     // Only Ohana's PO survives the filter.
     expect(screen.queryByTestId(`place-row-${NICE}`)).toBeNull();
 
     fireEvent.click(cell);
     await waitFor(() =>
-      expect(screen.queryByText("Factory: Ohana")).toBeNull(),
+      expect(screen.queryByText("Supplier: Ohana")).toBeNull(),
     );
     expect(screen.getByTestId(`place-row-${NICE}`)).toBeInTheDocument();
   });
@@ -220,14 +220,14 @@ describe("To Order · §8.2 click again clears (card P2)", () => {
     renderPage();
     fireEvent.click(screen.getByTestId(`facet-supplier-${OHANA}`));
     await waitFor(() =>
-      expect(screen.getByText("Factory: Ohana")).toBeInTheDocument(),
+      expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument(),
     );
 
     // Send POs is the active stage. Clicking it used to re-run the reset and
     // drop the filter without saying so.
     fireEvent.click(screen.getByTestId("facet-stage-place"));
 
-    expect(screen.getByText("Factory: Ohana")).toBeInTheDocument();
+    expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument();
     expect(screen.queryByTestId(`place-row-${NICE}`)).toBeNull();
   });
 
@@ -235,12 +235,12 @@ describe("To Order · §8.2 click again clears (card P2)", () => {
     renderPage();
     fireEvent.click(screen.getByTestId(`facet-supplier-${OHANA}`));
     await waitFor(() =>
-      expect(screen.getByText("Factory: Ohana")).toBeInTheDocument(),
+      expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument(),
     );
 
     fireEvent.click(screen.getByTestId("facet-stage-chase"));
     await waitFor(() =>
-      expect(screen.queryByText("Factory: Ohana")).toBeNull(),
+      expect(screen.queryByText("Supplier: Ohana")).toBeNull(),
     );
   });
 
@@ -301,6 +301,40 @@ describe("To Order · §8.2 click again clears (card P2)", () => {
   });
 });
 
+describe("To Order · R8 · the three stage cells speak the dictionary", () => {
+  it("reads Send PO · Confirm ready date · Check in, and nothing else", () => {
+    renderPage();
+    // COPY-STANDARD, PURCHASING — the queue-tile string of each action, taken
+    // from `order-action-words.ts` so the cell cannot drift from the row.
+    expect(screen.getByTestId("facet-stage-place")).toHaveTextContent("Send PO");
+    expect(screen.getByTestId("facet-stage-chase")).toHaveTextContent(
+      "Confirm ready date",
+    );
+    expect(screen.getByTestId("facet-stage-receive")).toHaveTextContent(
+      "Check in",
+    );
+  });
+
+  it("says none of the three retired words anywhere on the tab", () => {
+    const { container } = renderPage();
+    // `Chase` is BANNED (it names a mood); `Receive` as a verb is banned in
+    // favour of `Check in`; `Send POs` was the plural of an action that has a
+    // locked singular. All three shipped on this cell row for months.
+    expect(container.textContent).not.toMatch(/Send POs/);
+    expect(container.textContent).not.toMatch(/Chase factory/);
+  });
+
+  it("the middle-list header repeats the CELL's word, not a second one", () => {
+    renderPage();
+    // The stage header used to say `Chase factories` while the cell beside it
+    // said `Chase factory` — one act, two spellings, one screen.
+    fireEvent.click(screen.getByTestId("facet-stage-chase"));
+    const shell = screen.getByTestId("operation-purchase");
+    expect(shell.textContent).not.toMatch(/Chase factories/);
+    expect(shell.textContent).not.toMatch(/Receive deliveries/);
+  });
+});
+
 describe("To Order · §8.2 closing the drawer gives the list back (card P2)", () => {
   it("keeps the filter, the selection and the rail's scroll across the drawer", async () => {
     renderPage();
@@ -308,7 +342,7 @@ describe("To Order · §8.2 closing the drawer gives the list back (card P2)", (
     // Leave the list in a specific state: filtered to Ohana, Ohana's PO open.
     fireEvent.click(screen.getByTestId(`facet-supplier-${OHANA}`));
     await waitFor(() =>
-      expect(screen.getByText("Factory: Ohana")).toBeInTheDocument(),
+      expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument(),
     );
     const ohana = firstPlaceRow(OHANA);
     await waitFor(() => expect(ohana).toHaveAttribute("aria-pressed", "true"));
@@ -330,7 +364,7 @@ describe("To Order · §8.2 closing the drawer gives the list back (card P2)", (
     fireEvent.click(screen.getByLabelText("Close modal"));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.getByText("Factory: Ohana")).toBeInTheDocument();
+    expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument();
     expect(firstPlaceRow(OHANA)).toHaveAttribute("aria-pressed", "true");
     expect(rail.scrollTop).toBe(260);
   });

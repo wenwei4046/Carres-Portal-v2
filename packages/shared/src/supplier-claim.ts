@@ -46,6 +46,9 @@ import {
   type CaseOption,
   type CaseProductCategory,
 } from "./service-case-intake";
+// R8 — the claim's one dictionary-backed step is worded by the mirror, never
+// here. COPY-STANDARD, PURCHASING: `Confirm what happens next`.
+import { purchasingActionLine } from "./order-action-words";
 
 // ── The claim type ───────────────────────────────────────────────────────────
 
@@ -362,12 +365,22 @@ export function claimNextMove(c: SupplierClaimMoveInput): SupplierClaimMove {
         label: `Close ${c.claim_no} — ${who} delivered the rest`,
       };
     }
+    // R8 (2026-07-28) — this step, and ONLY this step, has a dictionary row.
+    // COPY-STANDARD's PURCHASING table locks it as queue `Confirm what happens
+    // next` / row `Call {supplier} — confirm what happens next`, and the Claims
+    // tab has printed that tile since P2 while the row said two other things.
+    // Loo's ruling that retired `Contact supplier` names this exact action, so
+    // the line is taken from the mirror rather than spelt here.
+    //
+    // The `late` variant is gone deliberately: one action has ONE row line, and
+    // "the new delivery date" was a second spelling of the same ask. Reported in
+    // the PR — it is the one thing this rename makes less specific.
     return {
       key: "answer",
       owner: "supplier",
-      label: late
-        ? `Call ${who} — confirm the new delivery date`
-        : `Call ${who} — confirm what they will do`,
+      label: purchasingActionLine("confirm_what_happens_next", {
+        supplier: c.supplier_name,
+      }),
     };
   }
 
