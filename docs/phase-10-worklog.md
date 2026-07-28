@@ -3431,3 +3431,108 @@ bundles**: `order-action-step` · `order-action-toggle` · `order-action-steps` 
 `Record ready date` · `Confirm booking` grep **0 in the previous live bundle**
 (`index-C18Onyrj.js`, C3's, 4,444,881 bytes) and **1** in this one (`index-7GAkvYaD.js`,
 4,451,521 bytes, `SERVICE_ROLE` 0). All 4 canonicals converged on the first poll.
+
+## 2026-07-28 · Order Detail — the Business Thinking Model and L1 freeze, and Law 7 is born (no migration) · DEPLOYED
+
+**A design session, not a build card**, and it produced one law, one frozen model, one frozen
+layout specification, three archived documents and eleven lines of code.
+
+**The sequence matters, because Loo rejected the first answer.** Asked for the page's
+information architecture, I produced a seven-layer model (Identity · Commitment · Reality ·
+Verdict · Actions · Records · Doors) and he named it correctly: it was a BACKEND information
+model, not a business one. The system's layers are a SUPPLY structure; a human opening an order
+does not think in them. So the first thing frozen is the **Business Thinking Model** — the six
+questions a brain actually asks, in the order it asks them: ① whose order is this, does it
+concern me ② what do I have to do now ③ why ④ what did they buy ⑤ is there a money problem
+⑥ what happened. **The binding direction is the ruling:** the System Model is re-fitted to serve
+the Business Model, never the reverse.
+
+**Three business facts the model asserts**, each of which changes what a layout may do:
+~80% of openings end at step ② · every step must be able to finish the job **alone** (nothing
+may require reading all six) · the same page is entered by three different people at three
+different steps (operator 1→2 · interrupted 1→3→5→4 · taking-over 1→6→3→2). The six steps are
+therefore **an order you may enter at any point, not a path you must walk.**
+
+**One tension was ruled rather than left to layout:** money is step ⑤ when READING (催钱前先看货)
+and the FIRST SECOND when SPEAKING — the customer opens by asking what is still owed. So the
+figure travels independently of the step that explains it.
+
+**L1 — six questions become six regions of responsibility, one to one.** A Region is a unit of
+RESPONSIBILITY, not a place: L1 fixes what each region must answer, what feeds it, and **what it
+must refuse to answer**, and says nothing about position, order on screen or any component. A
+seventh region requires a seventh question first. Three things are deliberately NOT regions and
+never may be: **Evidence** (identifiers, timestamps, per-unit rows — the second sentence of an
+answer, never a home of its own), **Doors** (nobody opens an order in order to find a door), and
+**an overall status** (step ③ needs three answers; one summarising word destroys all three).
+
+**Then the architecture review, which is where the law came from.** Three questions were put to
+the architecture on a three-year maintenance horizon, and the PM ruled all three.
+
+**Q1 — would a persistent Outstanding turn R1 into Header Everything? Yes, and the reason is
+that the argument is reusable**: "you need it in the first second of a call" is equally true of
+the phone number, the promised date, how late it is, and the next action. A region that admits
+one exception on the grounds of *convenience* has no principle left to refuse the next, because
+convenience is a gradient and gradients do not hold. **Ruled: "Persistent Facts" is an
+independent concept, not a member of any region** — a region may be where such a fact surfaces;
+that is residence, never membership. A law comes later; the admission test, the cap of four and
+the values-only rule are recorded now so the reasoning is not lost. The test admits **no new
+member** today, which is the sign it is a real test.
+
+**Q2 — should Records produce work? No, and the earlier wording contradicted a law we already
+had.** An action born outside the engine has no due, no owner and no completion the system
+measures, so nothing can ever close it — **exactly the row C3 retired**, the one line in the
+drawer no button in the portal could close. **Ruled, and now `ACTION-FLOW-STANDARD` Law 7:** the
+action engine is the ONLY source of actions; every other surface produces SIGNALS. It also
+splits "missing" in two, which nothing had done before: a gap **a human can fix** becomes an
+engine action with a due and an owner; a gap **nobody can fix** (a number the database should
+have stamped) is a fact and a defect to report, never a task. *A missing list that fills with
+things nobody can do is how a worklist dies.*
+
+**Law 7 also settled a second definition: a Follow-up is NOT an Action.** One closes when the
+system measures it, the other when a person says so; a list holding both teaches staff that some
+rows leave by themselves and some do not, after which they trust neither. **Verified no live
+surface mixes them** — `OrderActionList` already takes engine actions only.
+
+**Q3 — should Gap become a first-class concept? Eventually, not now.** The decisive test was
+whether a gap has properties belonging to neither side of it, and it does: *has this already been
+acknowledged* and *whose fault is it* — both alive today and living apart (acknowledgement inside
+the extension record, fault recomputed by the supplier scorecard). **Ruled: reserve the concept,
+build nothing.** The upgrade trigger is written down so nobody re-derives it: when a third kind
+of commitment arrives and Verdict and Actions each need a separate edit to keep up.
+
+**Decision A, the only code in the session, and it is eleven lines.** `Delivery photo missing`
+was the J3 health line saying, in the voice of a problem, the exact thing `Upload delivery photo`
+already says with a due date and an owner attached — Law 7's duplicate, found by grepping for one
+the same hour the law was written. **The filter lives beside the document kinds, not in the
+health line**, because "which documents count as work" is a fact about documents; it keys on
+KIND, never on a label, so renaming a document cannot break the rule. **The Documents tab is
+deliberately untouched** and still lists the missing photo — a records surface may say what it
+lacks; what it may not do is say it a second time as work. **The kind list is short on purpose
+and a test pins that too**: invoice and delivery order are stamped by the database at dispatch
+(0098), so nobody can DO a missing one, and the record must keep saying them. **Negative
+control**: emptying the kind list fails exactly the two assertions that pin the law.
+
+**Three older layout documents archived** to `docs/archive/order-detail/` (710 lines) with a
+banner each, and the two checkpoints' "NEW CHAT: READ THIS FIRST" instructions explicitly killed
+— a dead instruction that still reads as live is how a chat builds the wrong thing while
+believing it followed the docs. The v3 spec is kept as the ONE historical reference. **A count I
+got wrong and corrected**: I had told Loo four documents described this page; the fourth
+describes the Orders LIST and was left alone.
+
+**The deploy is one a string grep structurally cannot prove, and it is recorded that way.** The
+card removes no string and changes no code-path shape — it narrows what DATA reaches an existing
+line, so `Delivery photo` correctly greps 5 in both bundles and the only new literals in the diff
+are test fixtures and a comment, neither of which survives minification. What proves it:
+`wrangler pages deployment list` names Production/main source `17fd71c` as the newest writer, all
+four canonicals converged on the first poll, and the bundle differs from its predecessor by 93
+bytes. **The predecessor had to be fetched from its own deployment URL** — a superseded asset
+404s at the apex, and greps against that 1,757-byte error page would have read as a clean "0" for
+every marker. **No api deploy and no judgement call**: `git diff b464257c..HEAD -- apps/api` is
+empty, so the live Worker already matches this tip exactly.
+
+**Live today this changes nothing on screen** — the last recorded measurement is 0 delivered
+orders, so the duplicated line has never had an order to appear on. It is a correctness fix that
+matters after go-live, and saying otherwise would be selling it.
+
+Suites at baseline (web 2029 passed / 16 pre-existing failures; this file 13 → 16), typecheck 0,
+design-standard lint clean.
