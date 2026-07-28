@@ -308,9 +308,19 @@ column) — guardrail #8.
 **Done when:** no GRN exists without exactly one owner; the PO-duty holder never
 auto-receives their own PO.
 
-## R8 · `Contact supplier` becomes `Call {supplier} — confirm what happens next`
+## R8 · The banned-verb sweep on the receiving and claim screens
 
-**A rename, nothing else.** Loo ruled 2026-07-28 that the portal has exactly FIVE verbs
+**A rename, nothing else — and it is now TWO words, not one.**
+
+**① `Receive` → `Check in`.** Found by R6 (2026-07-28) and correctly left alone by it:
+`OperationReceiving.tsx:374` still renders **`Receive →`** on its own rows while the R6 panel
+sitting beside it says `Check in` — **the same act, two words, on one screen.** COPY-STANDARD's
+vocabulary table bans `Receive` as a verb outright (`Log goods arrival` → **`Check in`**), so
+this is lag, not a decision. It is the clearest possible case of rule 8 and a new hire meets
+it on their first shift.
+
+**② `Contact supplier` → `Call {supplier} — confirm what happens next`.** Loo ruled 2026-07-28
+that the portal has exactly FIVE verbs
 (`Assign · Call · Issue · Upload · Close`) and `Contact` was a sixth for behaviour `Call`
 already covers — reach the outside party, get an answer, record the outcome. **The ruling is
 already law**: `docs/COPY-STANDARD.md` carries the five strings
@@ -319,12 +329,18 @@ already law**: `docs/COPY-STANDARD.md` carries the five strings
 `No claim is waiting for a supplier answer.`) and the exception-lifecycle row no longer lists
 `Contact supplier`. **The R2/R3 screens are the lag.**
 
-**Build:** every visible `Contact` on the claim screens reads from the shared word module,
-same as C1 did for Orders. No behaviour changes, no claim state changes, no migration.
-**Grep both directions** — `Contact supplier` at 0 proves nothing says the old word; the new
-string at 1 proves something says the new one.
-**Done when:** `Contact` appears nowhere on screen and the Claims queue tile has a name that
-is in the dictionary.
+**Build:** every visible `Receive` and `Contact` on the receiving and claim screens reads from
+the shared word module, same as C1 did for Orders. No behaviour changes, no claim state
+changes, no migration.
+**Grep both directions, for BOTH words** — the old string at 0 proves nothing says it; the new
+string at 1 proves something says it. One direction proves half.
+**Done when:** neither `Receive` (as a verb) nor `Contact` appears anywhere on screen, the two
+panels on the Receiving station say the same word for the same act, and the Claims queue tile
+has a name that is in the dictionary.
+
+**LANE:** these are ④ R's own screens, but **`OperationSupplierClaims.tsx` is also P2's** —
+P2 is building the queue tiles and the filter behaviour on the same file. Run R8 after P2
+merges, or the rename lands on a file that is being rewritten underneath it.
 
 ## LATER
 
