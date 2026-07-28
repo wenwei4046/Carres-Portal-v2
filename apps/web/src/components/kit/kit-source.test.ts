@@ -31,13 +31,27 @@ const stripComments = (src: string) =>
 
 const read = (f: string) => stripComments(readFileSync(join(DIR, f), "utf8"));
 
-/** Tailwind's numeric suffix for each of §4.1's eight frozen steps. */
-const SAFE_STEPS = new Set(["0.5", "1", "1.5", "2", "3", "4", "6", "8"]); // 2·4·6·8·12·16·24·32
+/**
+ * Tailwind's numeric suffix for each of §4.1's eight frozen steps, plus `0`.
+ * Zero is the ABSENCE of spacing, not a ninth step — `p-0` on a calendar cell
+ * says "this element has no padding", which no scale can express.
+ */
+const SAFE_STEPS = new Set(["0", "0.5", "1", "1.5", "2", "3", "4", "6", "8"]); // 2·4·6·8·12·16·24·32
 const SPACING_RE = /\b(?:p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap|gap-x|gap-y|space-x|space-y)-(\[[^\]]+\]|[\d.]+)\b/g;
 
 describe("components/kit source rules", () => {
   it("scans every kit file (a directory rename must not silently empty this suite)", () => {
-    expect(FILES.length).toBeGreaterThanOrEqual(12);
+    expect(FILES.length).toBeGreaterThanOrEqual(22);
+  });
+
+  it("lets Radix own behaviour and Carres own appearance — no hand-rolled overlay (§11)", () => {
+    for (const f of FILES) {
+      const src = read(f);
+      // `fixed inset-0` is the shape of a hand-rolled scrim; the ONE real one
+      // lives in `overlay-recipe.ts` and every overlay imports it.
+      if (f === "overlay-recipe.ts") continue;
+      expect(src, f).not.toMatch(/fixed\s+inset-0/);
+    }
   });
 
   it("contains no raw hex — colour comes from a token class, always (§3.4)", () => {
@@ -46,10 +60,20 @@ describe("components/kit source rules", () => {
     }
   });
 
-  it("sets no z-index — §4.4 gives the five layers to components that own them", () => {
+  it("writes no z-index anywhere but the ONE ladder — §4.4's five layers, and no sixth", () => {
     for (const f of FILES) {
-      expect(read(f), f).not.toMatch(/\bz-(?:\[|\d|auto)/);
+      const src = read(f);
+      if (f === "tokens.ts") continue; // the ladder itself
+      // A layer may only arrive through `Z`, so a component cannot invent one.
+      expect(src.match(/\bz-(?:\[[^\]]*\]|\d+|auto)/g) ?? [], f).toEqual([]);
     }
+  });
+
+  it("keeps the ladder at five layers", () => {
+    const src = read("tokens.ts");
+    expect(src.match(/"z-\d+"/g) ?? []).toEqual(['"z-10"', '"z-20"', '"z-30"', '"z-40"']);
+    // 50 is Sonner's own and is never written by us.
+    expect(src).not.toContain('"z-50"');
   });
 
   it("writes no arbitrary type or height — the token carries size, weight and line-height (§2.1)", () => {

@@ -45,7 +45,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.3** | Delete the retired design docs + the `carres-design` skill | ⏳ after the new kit is proven |
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** | ✅ **SHIPPED 2026-07-28** (PR #498, deployed) — and Q1 · Q3 · Q4 were frozen on it the same day. Full card below |
-| **D0.5b** | Foundation components, Radix | 🔵 **UNGATED 2026-07-28** — Q1 · Q3 · Q4 are frozen, which was its only gate. **T3 never gated it** and runs on its own schedule |
+| **D0.5b** | Foundation components, Radix | ✅ **BUILT 2026-07-28** — ten behaviour boxes, all on `/ui`. Full card below |
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ **ready to build** |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
@@ -215,6 +215,50 @@ stroke prop is gone, and the source scan now guards the eight steps and fails
 on `font-bold`. **`/ui` lost its comparison section in the same commit** — a
 decision surface that outlives its decision tells the next reader a settled
 thing is still open.
+
+---
+
+## D0.5b ✅ — the behaviour boxes (2026-07-28)
+
+**Ten components, and the whole card is one sentence: Radix owns behaviour, Carres owns
+appearance.** `Modal` · `Drawer` · `Select` · `DropdownMenu` · `Tooltip` · `Popover` · `Tabs` ·
+`Checkbox` · `DatePicker` · `Toast`, dictionary entries at UI-KIT §6.6–§6.10, all of them live
+on `/ui`.
+
+**What it replaces.** 63 files hand-roll a modal or drawer in **12+ overlay shapes with 5
+different backdrop colours** — every one of them re-implementing the focus trap, the Escape key,
+the scroll lock and the `aria-modal` wiring, and most of them getting one of the four wrong.
+None of that is written here.
+
+**Three decisions the card had to make, each recorded in the law rather than in a component:**
+
+1. **`Modal` and `Drawer` are two components, not one `variant` prop.** A modal INTERRUPTS and a
+   drawer ACCOMPANIES — that is a business distinction, and a prop would let a page flip it by
+   editing a word.
+2. **Items and options are DATA, not children.** A menu whose entries are children is a menu a
+   page can put a form inside, and then Radix's keyboard model stops describing what is on screen.
+3. **A tooltip's `content` is a `string`.** You cannot click into a tooltip before it closes, so
+   one holding a button is a `Popover` wearing the wrong name.
+
+**Two things it deliberately did NOT do.** The order drawer is not ported — that is D0.5c's
+`DetailShell`, and porting a shell before its slots exist is how a wrong shell reaches five
+pages. And no existing page was touched: the 63 overlays migrate in D2–D7.
+
+**§16 crosses half: 39.47% → 50.00% enforced** (21 of 42), debt unchanged at 4. Four rules
+arrived already enforced, and two that had been waiting for this card flipped — *no hand-rolled
+modal/drawer* and *only 5 z-layers*, the latter now a real ladder (`Z` in `tokens.ts`) that a
+source scan defends: **no kit file may write a `z-` class at all.**
+
+**A finding worth the space: jsdom has no Pointer Capture API**, and Radix's Select uses it to
+tell a press from a drag. Without three one-line stubs the list opens and closes in the same tick
+and the test reads as *no options* — a missing BROWSER FEATURE presenting as a broken component.
+Stubbed in the test file, not in the shared setup, so the blast radius is one file.
+
+**Reported, not fixed: the main bundle grew ~57 kB raw (~21 kB gzip)** because `TooltipProvider`
+is mounted at the app root, which pulls Radix's popper into the main chunk — for a tooltip no
+page uses yet. Kept deliberately: the alternative is that the first page to want a tooltip must
+remember to add a provider, which is exactly the class of mistake a root provider prevents.
+CF `phase-10-bundle-size-regression` already covers the trend.
 
 ---
 

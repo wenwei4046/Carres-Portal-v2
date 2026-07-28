@@ -28,14 +28,24 @@ import { useState, type ReactNode } from "react";
 import Badge from "@/components/kit/Badge";
 import Button from "@/components/kit/Button";
 import Card from "@/components/kit/Card";
+import Checkbox from "@/components/kit/Checkbox";
+import DatePicker from "@/components/kit/DatePicker";
+import Drawer from "@/components/kit/Drawer";
+import DropdownMenu from "@/components/kit/DropdownMenu";
 import EmptyState from "@/components/kit/EmptyState";
 import Icon, { ICON_NAMES } from "@/components/kit/Icon";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
+import Modal from "@/components/kit/Modal";
 import Panel from "@/components/kit/Panel";
+import Popover from "@/components/kit/Popover";
 import SearchInput from "@/components/kit/SearchInput";
+import Select from "@/components/kit/Select";
 import StatusPill from "@/components/kit/StatusPill";
+import Tabs, { TabPanel } from "@/components/kit/Tabs";
 import Textarea from "@/components/kit/Textarea";
+import { toast } from "@/components/kit/Toast";
+import Tooltip from "@/components/kit/Tooltip";
 import { ICON_STROKE, RADII, SPACING_SCALE, TONES, TYPE_TOKENS, WEIGHTS } from "@/components/kit/tokens";
 
 /* Forced states — the same declarations the components carry, applied without
@@ -76,6 +86,15 @@ function Grid({ children }: { children: ReactNode }) {
 
 export default function UiShowcase() {
   const [text, setText] = useState("SO-1256");
+  /* D0.5b's boxes are BEHAVIOUR, so the showcase has to drive them like a page
+   * would — open state, a chosen value, a picked date. Nothing here is a
+   * component's own state; every one of them reports to its caller. */
+  const [modalOpen, setModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [supplier, setSupplier] = useState<string | undefined>(undefined);
+  const [tab, setTab] = useState("to-order");
+  const [picked, setPicked] = useState<string | null>("2026-07-27");
+  const [rowChecked, setRowChecked] = useState(false);
 
   return (
     <main className="min-h-screen bg-kit-slate-3 p-8">
@@ -494,6 +513,189 @@ export default function UiShowcase() {
               </div>
             </Card>
           </Grid>
+        </Section>
+
+        {/* ─── 4 · The behaviour boxes — §6, card D0.5b ────────────────────── */}
+        <Section
+          id="overlays"
+          title="Modal · Drawer — §6"
+          note="Radix owns the behaviour (focus trap, Escape, scroll lock, the portal); Carres owns the surface. A modal INTERRUPTS, a drawer ACCOMPANIES — which is why they are two components and not one prop."
+        >
+          <Card>
+            <div className="flex flex-col gap-8">
+              <Sample label="open them — both are driven by the caller's state, never their own">
+                <Button variant="primary" onClick={() => setModalOpen(true)}>
+                  Open modal
+                </Button>
+                <Button onClick={() => setDrawerOpen(true)}>Open drawer</Button>
+              </Sample>
+              <p className="text-meta text-kit-slate-11">
+                Both refuse to exist without a title: a dialog with no accessible name is announced as
+                nothing. There is no `size=&quot;full&quot;` (that is a page) and no way to make one
+                undismissable (that is a trap).
+              </p>
+            </div>
+          </Card>
+          <Modal
+            open={modalOpen}
+            onOpenChange={setModalOpen}
+            title="Record the delay decision"
+            description="The supplier named a later date. Answer one question."
+            footer={
+              <>
+                <Button variant="ghost" onClick={() => setModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button variant="primary" onClick={() => setModalOpen(false)}>
+                  Save
+                </Button>
+              </>
+            }
+          >
+            <div className="flex flex-col gap-4">
+              <Select
+                id="ui-modal-select"
+                label="Supplier"
+                placeholder="Pick a supplier"
+                value={supplier}
+                onValueChange={setSupplier}
+                options={[
+                  { value: "nets", label: "NETS" },
+                  { value: "ohana", label: "Ohana" },
+                  { value: "nice-future", label: "Nice Future", disabled: true },
+                ]}
+              />
+              <Textarea id="ui-modal-note" label="Note (optional)" placeholder="What happened" />
+            </div>
+          </Modal>
+          <Drawer
+            open={drawerOpen}
+            onOpenChange={setDrawerOpen}
+            title="SO-1256 · Tan Wei Ming"
+            footer={<Button onClick={() => setDrawerOpen(false)}>Close</Button>}
+          >
+            <p className="text-body text-kit-slate-11">
+              A drawer accompanies the record — the list stays behind it. The order drawer itself is not
+              ported here; that is D0.5c&apos;s DetailShell.
+            </p>
+          </Drawer>
+        </Section>
+
+        <Section
+          id="pickers"
+          title="Select · DatePicker · Checkbox — §6"
+          note="Three controls that wear Input's skin, so a form row lines up whatever the field happens to be."
+        >
+          <Grid>
+            <Card>
+              <div className="flex flex-col gap-8">
+                <Sample label="select — empty value shows the placeholder">
+                  <div className="w-full">
+                    <Select
+                      id="ui-select"
+                      label="Supplier"
+                      hint="Options are DATA — a caller cannot put a button in the list"
+                      placeholder="Pick a supplier"
+                      value={supplier}
+                      onValueChange={setSupplier}
+                      options={[
+                        { value: "nets", label: "NETS" },
+                        { value: "ohana", label: "Ohana" },
+                        { value: "nice-future", label: "Nice Future (disabled)", disabled: true },
+                      ]}
+                    />
+                  </div>
+                </Sample>
+                <Sample label="select — error">
+                  <div className="w-full">
+                    <Select id="ui-select-error" label="Supplier" error="Pick a supplier" options={[]} />
+                  </div>
+                </Sample>
+                <Sample label="select — disabled">
+                  <div className="w-full">
+                    <Select id="ui-select-disabled" label="Supplier" disabled options={[]} />
+                  </div>
+                </Sample>
+              </div>
+            </Card>
+            <Card>
+              <div className="flex flex-col gap-8">
+                <Sample label="date — the trigger prints fmtDate(), never an ISO string">
+                  <div className="w-full">
+                    <DatePicker id="ui-date" label="Delivery date" value={picked} onChange={setPicked} />
+                  </div>
+                </Sample>
+                <Sample label="date — empty value">
+                  <div className="w-full">
+                    <DatePicker id="ui-date-empty" label="Delivery date" value={null} onChange={() => {}} />
+                  </div>
+                </Sample>
+                <Sample label="checkbox — off · on · indeterminate · disabled">
+                  <Checkbox checked={rowChecked} onCheckedChange={setRowChecked} aria-label="Select row" />
+                  <Checkbox checked onCheckedChange={() => {}} aria-label="Checked" />
+                  <Checkbox checked="indeterminate" onCheckedChange={() => {}} aria-label="Some rows" />
+                  <Checkbox checked={false} onCheckedChange={() => {}} disabled aria-label="Disabled" />
+                </Sample>
+              </div>
+            </Card>
+          </Grid>
+        </Section>
+
+        <Section
+          id="disclosure"
+          title="Tabs · DropdownMenu · Popover · Tooltip — §6"
+          note="A tab bar is a STAGE picker (§8.2): one is always on, and re-clicking it does nothing. A popover holds controls; a tooltip holds one line and cannot be clicked into."
+        >
+          <Card>
+            <div className="flex flex-col gap-8">
+              <Tabs
+                label="Purchasing"
+                value={tab}
+                onValueChange={setTab}
+                tabs={[
+                  { value: "to-order", label: "To order", count: 3 },
+                  { value: "receiving", label: "Receiving", count: 0 },
+                  { value: "claims", label: "Claims" },
+                ]}
+              >
+                <TabPanel value="to-order">
+                  <p className="text-body text-kit-slate-11">The active value is the caller&apos;s state, because on a real page it lives in the URL.</p>
+                </TabPanel>
+                <TabPanel value="receiving">
+                  <p className="text-body text-kit-slate-11">Receiving panel.</p>
+                </TabPanel>
+                <TabPanel value="claims">
+                  <p className="text-body text-kit-slate-11">Claims panel.</p>
+                </TabPanel>
+              </Tabs>
+              <Sample label="menu · popover · tooltip">
+                <DropdownMenu
+                  label="More"
+                  trigger={<Button icon="overflow" aria-label="More" />}
+                  items={[
+                    { label: "Print", icon: "print", onSelect: () => {} },
+                    { label: "Copy", icon: "copy", onSelect: () => {} },
+                    { label: "Cancel order", icon: "close", tone: "danger", separated: true, onSelect: () => {} },
+                  ]}
+                />
+                <Popover label="Filters" trigger={<Button icon="filter">Filters</Button>}>
+                  <div className="flex flex-col gap-2">
+                    <p className="text-label text-kit-slate-11">A contextual surface holds no permanent height.</p>
+                    <SearchInput id="ui-popover-search" placeholder="Search a filter" />
+                  </div>
+                </Popover>
+                <Tooltip content="Collect RM 2,000 from Tan Wei Ming">
+                  <Button>Hover me</Button>
+                </Tooltip>
+              </Sample>
+              <Sample label="toast — §9's Success, and the one state that never becomes a block">
+                <Button onClick={() => toast.success("Delivery order issued")}>Show a toast</Button>
+                <Button variant="ghost" onClick={() => toast.error("That did not save")}>
+                  Show an error
+                </Button>
+              </Sample>
+            </div>
+          </Card>
         </Section>
       </div>
     </main>

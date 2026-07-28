@@ -24,7 +24,22 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ICON_NAMES } from "@/components/kit/Icon";
 import { SPACING_SCALE, TONES, WEIGHTS } from "@/components/kit/tokens";
+import { TooltipProvider } from "@/components/kit/Tooltip";
 import UiShowcase from "./UiShowcase";
+
+/**
+ * The page mounts a kit `Tooltip`, and Radix REFUSES to render one outside its
+ * provider — which the app mounts once, in `main.tsx`. That refusal is the
+ * design (a missing provider is a runtime error, not a silently different
+ * feel), so the test supplies the app shell rather than the page growing its
+ * own provider.
+ */
+const renderShowcase = () =>
+  render(
+    <TooltipProvider>
+      <UiShowcase />
+    </TooltipProvider>,
+  );
 
 const src = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
 const SHOWCASE = src("./UiShowcase.tsx");
@@ -33,7 +48,7 @@ const FIELD = src("../../components/kit/field-recipe.ts");
 
 describe("/ui showcase", () => {
   it("no longer offers the three frozen questions — the decision surface came out with the decision", () => {
-    render(<UiShowcase />);
+    renderShowcase();
     expect(screen.queryByText(/Pending decisions/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Candidate A/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Candidate B/)).not.toBeInTheDocument();
@@ -42,21 +57,21 @@ describe("/ui showcase", () => {
   });
 
   it("shows the frozen spacing scale, every step of it", () => {
-    render(<UiShowcase />);
+    renderShowcase();
     for (const s of SPACING_SCALE) {
       expect(screen.getByText(`${s.px}px`), `${s.px}px`).toBeInTheDocument();
     }
   });
 
   it("shows the three surviving weights and never renders 700", () => {
-    render(<UiShowcase />);
+    renderShowcase();
     for (const w of WEIGHTS) expect(screen.getByText(String(w.weight))).toBeInTheDocument();
     expect(SHOWCASE).not.toContain("font-bold");
     expect(document.querySelectorAll(".font-bold")).toHaveLength(0);
   });
 
   it("shows every icon meaning the kit has", () => {
-    render(<UiShowcase />);
+    renderShowcase();
     const shown = new Set(
       Array.from(document.querySelectorAll("[data-icon]")).map((n) => n.getAttribute("data-icon")),
     );
@@ -64,7 +79,7 @@ describe("/ui showcase", () => {
   });
 
   it("shows every tone", () => {
-    render(<UiShowcase />);
+    renderShowcase();
     const shown = new Set(
       Array.from(document.querySelectorAll('[data-kit="status-pill"]')).map((n) =>
         n.getAttribute("data-tone"),
@@ -73,8 +88,26 @@ describe("/ui showcase", () => {
     for (const tone of TONES) expect(shown.has(tone), tone).toBe(true);
   });
 
+  it("shows the D0.5b behaviour boxes — a component not on `/ui` is a component nobody can check", () => {
+    renderShowcase();
+    // The overlays are closed at rest (they cost zero pixels until opened)…
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // …and every other behaviour box is on the page.
+    expect(screen.getByRole("button", { name: "Open modal" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open drawer" })).toBeInTheDocument();
+    expect(screen.getAllByRole("combobox").length).toBeGreaterThanOrEqual(3); // Select ×3
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(4); // off · on · indeterminate · disabled
+    expect(screen.getByRole("button", { name: "More" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Filters/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hover me" })).toBeInTheDocument();
+    // The date trigger prints fmtDate(), never the ISO string it holds.
+    expect(screen.getByText("27 Jul 26, Mon")).toBeInTheDocument();
+    expect(screen.queryByText("2026-07-27")).not.toBeInTheDocument();
+  });
+
   it("renders each component in its ugly states, not only its happy one", () => {
-    render(<UiShowcase />);
+    renderShowcase();
     expect(screen.getAllByRole("alert").length).toBeGreaterThanOrEqual(2); // input + textarea errors
     expect(document.querySelectorAll("button[disabled]").length).toBeGreaterThanOrEqual(2);
     expect(document.querySelectorAll('[data-testid="kit-loading-skeleton"]').length).toBe(1);

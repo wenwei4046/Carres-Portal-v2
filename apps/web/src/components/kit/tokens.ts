@@ -113,6 +113,28 @@ export const WEIGHTS = [
 ] as const;
 
 /* ─────────────────────────────────────────────────────────────────────────
+ * §4.4 Z-index — ONE ladder, five layers, and no component may invent a sixth.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * The five surviving layers (fifteen were in use before the kit). A component
+ * may use the ONE that §4.4 assigns it and no other; a source scan over
+ * `components/kit/**` fails on a `z-` class written any other way.
+ *
+ * The toast layer (50) is Sonner's own and is not written by us.
+ */
+export const Z = {
+  /** sticky table header — `DataTable` (D0.5c) */
+  tableHeader: "z-10",
+  /** toolbar / bulk bar — `PageShell` (D0.5c) */
+  toolbar: "z-20",
+  /** popover · dropdown · tooltip · select — Radix portals (D0.5b) */
+  popover: "z-30",
+  /** modal · drawer — Radix portals (D0.5b) */
+  overlay: "z-40",
+} as const;
+
+/* ─────────────────────────────────────────────────────────────────────────
  * §5.1 Icons — three sizes; stroke FROZEN 2026-07-28 (Jess, Q4) at Lucide's 2.
  * ──────────────────────────────────────────────────────────────────────── */
 

@@ -145,7 +145,7 @@ Priority inside scope: `pages/operation/**` (118 pages) — Jess's daily work.
 |---|---|---|---|
 | No hand-rolled page shell | Component API + Build Guard G | ⏳ D0.5c | `PageShell.tsx` |
 | No hand-rolled table | Component API + Build Guard G | ⏳ D0.5c | `DataTable.tsx` |
-| No hand-rolled modal/drawer | Component API + Build Guard G | ⏳ D0.5b | `Modal.tsx` · `Drawer.tsx` |
+| No hand-rolled modal/drawer | **Component API** — `Modal` / `Drawer` are the only overlays and the ONE scrim lives in `overlay-recipe.ts`; a source scan fails on a hand-rolled `fixed inset-0`. Build Guard G widens it to pages in D1 | ✅ **live in the kit (D0.5b)** | `Modal.tsx` · `Drawer.tsx` · `kit-source.test.ts` |
 | No inventing tokens | Build Guard A–I | ⏳ D1 | `check-design.mjs` |
 | Every chat reads the boundary | Human Review | ⏳ D0 | `CLAUDE.md` header |
 
@@ -667,7 +667,7 @@ here first.
 | Only scale steps exist | Build Guard E + a source scan on the kit | ⏳ D1 (kit ✅ D0.5a) | `kit-source.test.ts` |
 | Only 4 radii | Build Guard E | ⏳ D1 | `check-design.mjs` |
 | Only 2 border colours | Build Guard E | ⏳ D1 | `check-design.mjs` |
-| Only 5 z-layers | Component API (Radix portals own 30/40) + Build Guard F | ⏳ D0.5b | `Modal.tsx` · `check-design.mjs` |
+| Only 5 z-layers | **Component API** — the ladder is `Z` in `tokens.ts`, Radix portals own 30/40, and a source scan fails on any `z-` class written anywhere else in the kit | ✅ **live (D0.5b)** | `tokens.ts` · `kit-source.test.ts` |
 
 ---
 
@@ -759,7 +759,7 @@ BUSINESS ENTITIES
 
 > ✅ **D0.5a landed — the ten no-behaviour boxes below live in
 > `apps/web/src/components/kit/` and render on `/ui`.**
-> ⏳ **D0.5b writes the Radix half.** A specification written before its
+> ✅ **D0.5b landed — the Radix half is §6.6–§6.10 below.** A specification written before its
 > component exists is a specification that 285 pages each re-implement
 > differently — the exact failure this rewrite ends, which is why nothing is
 > written here until it is on `/ui`.
@@ -768,7 +768,7 @@ BUSINESS ENTITIES
 `Button` · `Input` · `Textarea` · `SearchInput` · `Card` · `Panel` · `Badge` ·
 `StatusPill` · `EmptyState` · `Loading` (+ `Icon`, §5).
 
-**D0.5b — behaviour from Radix:** ⏳
+**D0.5b — behaviour from Radix:** ✅ **landed 2026-07-28**
 `Modal` · `Drawer` · `Select` · `DropdownMenu` · `Tooltip` · `Popover` ·
 `Tabs` · `Checkbox` · `DatePicker` · `Toast`
 
@@ -825,7 +825,7 @@ button whose WORD says what it does (COPY-STANDARD owns the word).
 ## §6.2 `Input` · `Textarea` · `SearchInput`
 
 One skin, three shapes. The recipe is `field-recipe.ts` and the label/message
-frame is `FieldFrame.tsx` — §6.6 applied: the second occurrence was extracted
+frame is `FieldFrame.tsx` — §6.11 applied: the second occurrence was extracted
 before it was used twice. Replaces **134 hand-rolled `<input>`s in 121 distinct
 class strings**.
 
@@ -902,7 +902,104 @@ the region should not draw. No illustration slot: art is decoration.
 **One action, never two.** Two buttons in an empty state is a decision, and a
 decision is not a state.
 
-## §6.6 The rule that keeps this chapter closed
+## §6.6 `Modal` · `Drawer`
+
+Replace **63 hand-rolled overlays in 12+ shapes with 5 backdrop colours**. Radix
+`Dialog` supplies every behaviour that made those 63 subtly different — focus
+trap, focus return, Escape, scroll lock, `aria-modal`, the portal — and none of
+it is re-implemented.
+
+| | `Modal` | `Drawer` |
+|---|---|---|
+| Purpose | **INTERRUPTS** — answer it and the page comes back | **ACCOMPANIES** — the record stays behind it |
+| Position · size | centred, `max-w` sm/md/lg | docked RIGHT, full height, `max-w` md/lg/xl |
+| Surface | white, `slate-5` hairline, `rounded-card` | same, square on the docked edge |
+| Scrim | the ONE scrim — `slate-12/40`, `z-40` | same |
+| Header | required `title` as a real `<h2>` + close | same |
+| Footer | optional; the caller's Buttons, no verb of its own | same |
+
+**Two components, not a `variant` prop.** The choice between them is a business
+one, and a prop would let a page flip the meaning by editing a word.
+
+**There is no `size="full"`** (that is a page — D0.5c's `PageShell`) and **no
+way to make one undismissable** (that is a trap; a destructive confirm asks a
+question whose answer is a Button, it does not remove the exit). **Right edge
+only** — a left drawer fights the sidebar and a bottom sheet is a phone pattern
+with no card.
+
+## §6.7 `Select` · `DatePicker` · `Checkbox`
+
+All three wear `Input`'s skin — 32px, `slate-5` hairline, `rounded-control`,
+the same focus ring and the same error contract — so a form row lines up
+whatever the field happens to be.
+
+| | |
+|---|---|
+| `Select` | options are **DATA, not children**, so a caller cannot put a heading or a button in the list; Radix gives type-ahead, arrows, Home/End, Escape |
+| `DatePicker` | `react-day-picker` inside the kit's `Popover` (**Radix has no calendar**, §11). Its stylesheet is NOT imported — every part is dressed with kit tokens |
+| `Checkbox` | 4px radius, `blue-9` when checked (§3.3's "selected"); `indeterminate` is a real third state, drawn as a DASH — "some" is not "partly done" |
+
+**The date value is an ISO `YYYY-MM-DD` string, never a `Date`**, and the
+trigger prints `fmtDate()` — §2.4's one human date. A picker showing
+`2026-07-19` would be the 21st spelling of a date in this codebase.
+
+**`Checkbox` has no `label` prop**: in a table row the ROW is the label, and in
+a form the label belongs to `FieldFrame`'s layout.
+
+## §6.8 `DropdownMenu` · `Popover` · `Tooltip`
+
+The three contextual surfaces (§1.2), and the difference between them is what
+they may hold:
+
+| | Holds | Opens on | Layer |
+|---|---|---|---|
+| `DropdownMenu` | a list of ACTIONS, as data | click | 30 |
+| `Popover` | CONTROLS — a filter panel, a column picker | click | 30 |
+| `Tooltip` | ONE line of text, and it may only repeat or expand what is already on screen | hover / focus | 30 |
+
+**A tooltip's `content` is a `string`, not a node.** You cannot click your way
+into a tooltip before it closes, so a tooltip holding a button is a `Popover`
+wearing the wrong name. And **if a fact exists ONLY in a tooltip it is
+invisible** — there is no hover on a touch screen.
+
+**Menu items carry their own `onSelect` and a `tone: "danger"` is ink only** —
+the one place red is allowed on a control, because a destructive item must be
+findable among five neutral ones.
+
+## §6.9 `Tabs`
+
+A tab bar is a **STAGE PICKER**, and §8.2 already ruled what that means: one is
+always on, clicking the active one does nothing, and there is no ✕ chip because
+there is nothing to clear into. Radix has exactly that behaviour — which is the
+reason not to hand-roll it, after Purchasing's To Order tab shipped a re-click
+that threw away the supplier filter.
+
+Underline, never a filled pill: §3.5 says hover darkens the TEXT. A filled tab
+would be a second selection language beside the blue wash. The count is a
+`Badge`, so it structurally cannot become a status colour.
+
+**The active value is the CALLER's state**, because on most pages it lives in
+the URL (`?tab=`) and every deep link must keep working.
+
+## §6.10 `Toast`
+
+§11 pins the renderer to **`sonner`**, mounted once in `App.tsx`, so the kit
+ships a door rather than a component: `toast.success` · `toast.error` ·
+`toast.info`.
+
+**The door is narrow on purpose — no `duration`, no `action`, no `id`.** §9
+gives Success one home and says it never becomes a permanent block; the reverse
+is the rule that matters here: **a toast may not carry a state the page should
+be showing.** A fact that disappears was never really told.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| A dialog cannot exist without an accessible name | **Component API** — `title` is required and renders as `Dialog.Title` | ✅ **live (D0.5b)** | `Modal.tsx` · `Drawer.tsx` |
+| An overlay cannot paint its own scrim | **Component API** — one `SCRIM`, and a source scan fails on a hand-rolled `fixed inset-0` | ✅ **live (D0.5b)** | `overlay-recipe.ts` · `kit-source.test.ts` |
+| Menu and select entries are data, not children | **Type System** — `items` / `options` are typed arrays; children do not compile | ✅ **live (D0.5b)** | `DropdownMenu.tsx` · `Select.tsx` |
+| A tooltip cannot hold something clickable | **Type System** — `content` is a `string` | ✅ **live (D0.5b)** | `Tooltip.tsx` |
+
+## §6.11 The rule that keeps this chapter closed
 
 > **If a UI element appears a second time, it stops being inline and becomes a
 > Foundation Component.** The first occurrence may be written in place. The
@@ -1061,7 +1158,7 @@ and it will turn out to be one of these.
 | **Partial data** | the surface renders what it HAS and states the gap in its own words | which part is missing — **never a silent blank** |
 | **No permission** | `EmptyState`, no action | that it is not theirs to open, and who to ask |
 | **Offline** | `EmptyState` + a retry action | that the connection dropped, not that the record is gone |
-| **Success** | a toast (`sonner`, §11) — ⏳ D0.5b | what changed; it never becomes a permanent block |
+| **Success** | a toast — `toast.success` (§6.10, `sonner`) | what changed; it never becomes a permanent block |
 
 **Partial data is the one with no component, on purpose.** A box that renders
 "some of this is missing" in a generic voice is how a screen ends up saying
@@ -1105,17 +1202,17 @@ Two columns, because "looks like Linear" is not something code can read.
 |---|---|---|
 | Page layout · Table · Sidebar | `docs/ui-reference/linear-*.png` | Carres `PageShell` / `DataTable` |
 | Status pill · density | `docs/ui-reference/linear-list.png` | Carres `StatusPill` |
-| Modal · Drawer | — | `@radix-ui/react-dialog` |
-| Dropdown · ⋮ menu | — | `@radix-ui/react-dropdown-menu` |
-| Popover · filter panel | — | `@radix-ui/react-popover` |
-| Tooltip | — | `@radix-ui/react-tooltip` |
-| Select | — | `@radix-ui/react-select` |
-| Checkbox | — | `@radix-ui/react-checkbox` |
-| Tabs | — | `@radix-ui/react-tabs` |
-| Date picker | — | `react-day-picker` (**Radix has no calendar primitive**) |
-| Colour scales | — | `@radix-ui/colors` |
+| Modal · Drawer | — | `@radix-ui/react-dialog` ✅ installed |
+| Dropdown · ⋮ menu | — | `@radix-ui/react-dropdown-menu` ✅ installed |
+| Popover · filter panel | — | `@radix-ui/react-popover` ✅ installed |
+| Tooltip | — | `@radix-ui/react-tooltip` ✅ installed |
+| Select | — | `@radix-ui/react-select` ✅ installed |
+| Checkbox | — | `@radix-ui/react-checkbox` ✅ installed |
+| Tabs | — | `@radix-ui/react-tabs` ✅ installed |
+| Date picker | — | `react-day-picker` ✅ installed (**Radix has no calendar primitive**) |
+| Colour scales | — | `@radix-ui/colors` ✅ installed |
 | Icons | [lucide.dev](https://lucide.dev) | `lucide-react` |
-| Toast | — | `sonner` |
+| Toast | — | `sonner` ✅ installed, mounted once in `App.tsx` |
 | Empty state | `docs/ui-reference/primer-blankslate.png` | Carres `EmptyState` |
 
 **Screenshots live in the repo** (`docs/ui-reference/`). An external URL is not
@@ -1167,9 +1264,9 @@ Exempt: `pages/dealer/**` (POS, Part B) and `pages/print/**`.
 | D | `text-[Npx]`; a typography token outside §2.1; a weight outside §2.2 | ✅ |
 | E | a spacing / radius / border value outside §4 | ✅ |
 | F | a `z-` class anywhere in `pages/**` | ✅ |
-| G | a raw `<table>`, `<input>`, `<select>`, or a `fixed inset-0` overlay in `pages/**` | ⏳ needs D0.5 |
+| G | a raw `<table>`, `<input>`, `<select>`, or a `fixed inset-0` overlay in `pages/**` | ⏳ D1 — every box it needs now exists (D0.5a + D0.5b) |
 | H | a `PageShell` whose fixed chrome exceeds its variant's budget (§1.3) | ⏳ needs D0.5c |
-| I | the same class string ≥ 40 chars repeated across ≥ 2 files (§6.6) | ⏳ D1 |
+| I | the same class string ≥ 40 chars repeated across ≥ 2 files (§6.11) | ⏳ D1 |
 
 ## §13.4 The screenshot gate
 
@@ -1231,45 +1328,48 @@ parses the Enforcement column out of this file, checks which mechanisms
 actually exist in the repo, and rewrites the block. A hand-maintained
 percentage is prose, and prose drifts; that is the whole thesis of this
 document.
-*(The numbers below are the D0.5b-eve hand count, valid until D1 wires the generator.)*
+*(The numbers below are the D0.5b hand count, valid until D1 wires the generator.)*
 
 ```
                          enforced / total
   Typography    ███▎░░░░░░    33%     1 / 3
   Colour        ██████░░░░    60%     3 / 5
-  Spacing       ██▌░░░░░░░    25%     1 / 4
+  Spacing       █████░░░░░    50%     2 / 4
   Icons         ██████████   100%     4 / 4
-  Components    ████▌░░░░░    45%     5 / 11
+  Components    ██████▋░░░    67%    10 / 15
   Layout        ░░░░░░░░░░     0%     0 / 6
   Hierarchy     ██░░░░░░░░    20%     1 / 5
   ──────────────────────────────────────────
-  TOTAL         ███▉░░░░░░    39%    15 / 38
+  TOTAL         █████░░░░░    50%    21 / 42
 ```
 
 | | Count | Meaning |
 |---|---|---|
-| Rules | **38** | design rules stated in §1–§8 |
-| **Enforced** | **15** | Type System / Component API / Build Guard / ESLint is live |
-| Scheduled | 19 | a card exists (D0.5–D5) |
-| **Blocked on a decision** | **0** | ⭐ the PENDING REGISTER is empty |
+| Rules | **42** | design rules stated in §1–§8 |
+| **Enforced** | **21** | Type System / Component API / Build Guard / ESLint is live |
+| Scheduled | 17 | a card exists (D0.5c–D5) |
+| **Blocked on a decision** | **0** | the PENDING REGISTER is empty |
 | **Human Review debt** | 4 | `fmtDate()` · "max 2 reds per screen" · facet group order · "Progress carries no events" — nobody has found a mechanism |
 
 **What "enforced" counts, stated so the number cannot be inflated**: a mechanism
-that FAILS TODAY, for the scope its row names. Three rules moved on 2026-07-28
-when Jess froze the register — `Only 3 weights`, `Only scale steps` and the icon
-stroke — because a frozen value can finally be guarded, and each one got a
-mechanism in the same breath (a source scan over `components/kit/**` for the
-first two, a deleted prop for the third). **Nothing counts because a card exists.**
+that FAILS TODAY, for the scope its row names. **Nothing counts because a card
+exists.**
 
-**The freeze arithmetic:**
+**The D0.5b arithmetic:**
 
 ```
-rules       38  →  38     no rule added; three stopped being pending
-enforced    12  →  15     weights · spacing steps · icon stroke
-blocked      3  →   0     ⭐ D5 "Guard → Fail" is unblocked
-coverage  31.58%  →  39.47%     ⬆
-debt          4  →   4     unchanged
+rules       38  +  4  =  42     four new §6.10 Component-API / Type-System rules
+enforced    15  +  6  =  21     the four new ones, PLUS two that had been waiting
+                                for this card — "no hand-rolled modal/drawer"
+                                and "only 5 z-layers"
+coverage  39.47%  →  50.00%     ⬆
+debt          4  →   4          unchanged
 ```
+
+Every rule this card added arrived **already enforced** — which is what a
+Component API is: the rule and its mechanism are one object. Half the kit's
+stated rules now fail the build when broken; what is left is Layout (D0.5c) and
+the four Human-Review debts.
 
 **Two health rules:**
 
@@ -1307,7 +1407,7 @@ Taken 2026-07-27 across `apps/web/src`:
 | Lucide icons | 100 distinct, in 12 sizes, with 3 known duplicate meanings |
 | `.btn-*` uses | 343 — **consistent; the one thing that worked** |
 | `.pill` uses | 72 — largely consistent |
-| Radix packages installed | **1 since D0.5a** — `@radix-ui/colors` (the palette). The behaviour primitives land in D0.5b |
+| Radix packages installed | **8 since D0.5b** — `colors` · `react-dialog` · `react-dropdown-menu` · `react-popover` · `react-tooltip` · `react-select` · `react-checkbox` · `react-tabs`, plus `react-day-picker` (Radix has no calendar) |
 | `shadcn/ui` installed | **no** — `components/ui/` does not exist |
 
 **What D0.5a changed against this table** (2026-07-28): the ten Foundation
