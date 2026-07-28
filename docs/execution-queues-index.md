@@ -356,6 +356,15 @@ Only the business content differs — the document structure never changes.** Or
 (`docs/ORDERS-WORKING-FLOW.md`) is the template; each further module gets
 `docs/<MODULE>-WORKING-FLOW.md` when its line starts.
 
+**TWO exist. Three modules are running without one** (measured 2026-07-28) — ④ Receiving &
+Supplier Claim, ⑤ Ready Stock and ③ Service Cases each have a queue doc and no flow. **The
+cost is visible, not theoretical:** the claim lifecycle computes three steps and only the
+middle one has a name, and Ready Stock's plan review has a button (`Send back`) whose word is
+wrong with nothing to rule it right. Both were ruled the same way on 2026-07-28 — **the flow
+comes first, then the words** — so neither is a bug to sweep; they are lines that have not
+written their own file yet. A queue doc says WHAT to build. It cannot say how the module
+behaves, and a chat that treats it as the flow will name things on the business's behalf.
+
 ## The engine law (read before any C-card, and before any new module)
 
 `docs/ACTION-FLOW-STANDARD.md` — two layers (compute every track · display picks one),

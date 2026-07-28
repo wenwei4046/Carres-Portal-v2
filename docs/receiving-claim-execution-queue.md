@@ -410,10 +410,36 @@ Apply the test site by site, do not sweep:
 **Report the count both ways in the PR** — how many became `Check in`, how many stayed `GRN`.
 A sweep that leaves zero `GRN` has misread the ruling as a ban.
 
+**⑥ Delete the explainer above the Claims list** (Loo ruled 2026-07-28). The paragraph
+*"What the supplier still owes us…"* spends a permanent horizontal band on a list page whose
+fixed-chrome budget is 200px (UI-KIT §1.3), and it **explains rather than works** — §1.1's
+third question ("if it were removed, could today's work still be finished?") answers YES, so
+the gate does not admit it. One band back is roughly one more visible row, every day.
+**This is a deletion Loo ruled, not R8 tidying** — R8 does not delete other copy on its own
+initiative, and it reports anything else it thinks should go.
+
 **LANE:** R8 now touches the Purchasing module's own pages as well as ④ R's
 (`OperationPurchase.tsx` from ⓪, `OperationSupplierClaims.tsx` from ③), so **no P-chat and no
 C4 chat may run beside it** — the whole Purchasing lane is R8's for one PR. That is the price
 of doing the sweep once, and it is cheaper than three cards each waiting for the same lane.
+
+## ⚠️ This line has NO working-flow file, and that is why its words are half-written
+
+**Law 3: every module owns ONE working-flow file.** Two exist —
+`ORDERS-WORKING-FLOW.md` and `PURCHASING-WORKING-FLOW.md`. **Receiving & Supplier Claim has a
+queue doc and no flow**, and P2-Claims showed exactly what that costs: `claimNextMove`
+computes THREE steps — ask → answer → close — and **only the middle one has a name**
+(`Confirm what happens next`). The two Carres-side steps (deciding what to ask for, and
+closing) are counted nowhere, can carry no queue tile, and have no strings.
+
+**Loo ruled 2026-07-28: do NOT name them now.** Same sequence as Ready Stock — **the flow
+comes first, then the words.** Inventing three tiles for a lifecycle with **0 live claims**
+would be a queue chat naming a business that has not spoken.
+
+**When this line writes `docs/RECEIVING-WORKING-FLOW.md`**, it names those two steps there
+first, they get their five strings in COPY-STANDARD, and only then does a tile appear.
+Until then the single named step is correct and complete on its own — one action with a
+queue, not a flow with two holes in it.
 
 ## LATER
 
