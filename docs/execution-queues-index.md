@@ -31,7 +31,7 @@
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C9 ✅ #472 · C10 ✅ #471** — C4 · C8 left |
 | ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings). **P2 is the next card** |
-| ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 | **NEW 2026-07-28** — D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3`. **T3 = Jess uses it for a day, after a deploy.** **D0.4 = retire `CARRES_ORDER_PORTAL_SPEC.md` completely (Loo 2026-07-28) — its own chat, safe beside anything, touches no page.** TEMPORARY doc — delete when the line ends |
+| ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 | **NEW 2026-07-28** — D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3` · **D0.4 ✅ the old order-portal master spec is DELETED** (Loo 2026-07-28 — docs only, no page touched). **T3 = Jess uses it for a day, after a deploy.** TEMPORARY doc — delete when the line ends |
 
 **State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ **R1-R6 ✅** · ⑥ C1 · C2 · C3 · C5 · C6 · **C7** · C9 · C10 ✅ ·
 ⑦ **P1 ✅** · ⑧ D0 + T1 + T2 ✅ (T3 is a Jess task, not a build card).

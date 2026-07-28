@@ -6,8 +6,8 @@
 > (Payments next) is an EXPANSION that copies its shape. Do NOT reinvent.
 
 ## Read, in order, before building
-1. **[`docs/UI-KIT.md` §A0](UI-KIT.md)** — the golden reference + date law + Manage/pill tone table + the top-to-toe **new-panel checklist**. This file WINS over any older doc or memory. Gates: `pnpm --filter @carres/web check:v4` + `lint`.
-2. **[`docs/CARRES_ORDER_PORTAL_SPEC.md` §0](CARRES_ORDER_PORTAL_SPEC.md)** — Jess's working rules: design-first · 3-option mocks · she picks a letter · preview in chat / paste the erp link · tech limits UPFRONT · 华语 + English tech terms · 已拍板不翻案 · small commits.
+1. **[`docs/UI-KIT.md`](UI-KIT.md)** — the ONE UI law: the §1.1 gate, the §1.3 height budget, the §1.4 Information Hierarchy, the §3.6 action-tone table, the date law. This file WINS over any older doc or memory. Gate: `pnpm --filter @carres/web lint`.
+2. **[`CLAUDE.md` §15](../CLAUDE.md)** — Jess's working rules: think the solution through first · a screenshot means list every problem top to toe · she agrees before any code · check memory first · count the data before proposing UI · small commits, each one proved in a preview.
 3. **`apps/web/src/pages/operation/OperationOrdersControl.tsx`** — THE reference implementation. Copy its `ListPageShell` header, facet rail, column + pill + date anatomy for any new list/panel.
 
 ## The business, in one model (三轨)
@@ -15,7 +15,7 @@ Carres = furniture retailer. Dealers/showrooms SELL; the **customer pays HQ dire
 
 - **货 STOCK** (supplier): no PO → `Send PO` · PO'd, waiting → `Confirm ready date` · goods in ✓. **The words come from docs/COPY-STANDARD.md, never from here.** The call goes through each supplier's WhatsApp GROUP, REF-led (CR/TCF doc-no, NEVER the SO). Consolidated PO, the monthly PO-duty rotation and every purchasing number → **`docs/PURCHASING-WORKING-FLOW.md`**, which is the only home for them.
 - **送 DELIVERY** (logistics company): unassigned → `Assign logistics` · assigned/not confirmed → `Call {logistics} — confirm delivery date` · customer confirmed ✓. **The words come from docs/COPY-STANDARD.md, never from here.** `assign` = WE pick the carrier; `booked` = the PARTNER fixed a slot with the customer. NETS is the main partner.
-- **钱 MONEY** (customer): balance / storage owing → `Collect RM {amount}`, and the money hold rides that same action (C3 retired the bare `Confirm`). **The words come from docs/COPY-STANDARD.md, never from here.** Storage: from ETA, MS/BF RM150/mo · SOF RM200/2wk.
+- **钱 MONEY** (customer): balance / storage owing → `Collect RM {amount}`, and the money hold rides that same action (C3 retired the bare `Confirm`). **The words come from docs/COPY-STANDARD.md, never from here.** Storage: MS/BF RM150 per commenced 30-day month · Sofa free 14 days then a one-time RM200 (`computeStorageFee`).
 
 ## State vocabulary — use THESE words only (never leak DB stage words)
 The customer/Jess-facing pipeline has exactly **5** words. The DB `operation_stage`

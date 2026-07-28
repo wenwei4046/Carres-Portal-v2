@@ -244,9 +244,22 @@ both source refs on the order (array) and not collapse them.
 - **Input:** parsed rows (client parses xlsx → JSON array; the endpoint validates
   with a zod schema in `packages/shared` so both sides share one validator).
 - **Grouping:** rows → orders keyed by `Ref.` set; lines preserve order.
-- **Idempotency:** re-importing the same AutoCount `Ref.` + `PO Doc No.` set must
-  upsert, not duplicate. Natural key = `(source_system, source_ref)` (see §1.5 —
-  needs the new columns). Define the conflict key explicitly in the migration/RPC.
+- **Re-import is CREATE-ONLY (migration 0214, locked).** Natural key =
+  `(source_system, source_ref)`. A Ref the portal already holds is SKIPPED, never updated and
+  never duplicated. An import may not silently rewrite an order somebody has since worked on:
+  a value keyed in the portal beats a re-exported sheet, always.
+- **One door exists for a line the sheet has and the portal does not** (migration 0237). The
+  import result lists those lines as a tick-list; the operator ticks and Appends, and the
+  append runs through `append_autocount_order_lines` — operation/principal only, AutoCount
+  orders only, raw SKU, unit price 0, the row's own source PO, and the RPC writes
+  `order_history` + `audit_log` itself. There is no other way to add a line to an imported
+  order, and no way at all to change one.
+- **What may be ticked by default — the `clean` test.** A candidate is `clean` only when every
+  portal line on that order still has its PO present in the sheet; then the sheet is genuinely
+  adding goods. If the order carries a line the sheet does NOT have — a changed model, a
+  re-opened PO, a line that lost its PO — nothing is ticked by default and the portal's own
+  line is shown beside it. That order is a STALE SHEET, and the fix belongs in the sheet, not
+  in the portal.
 - **Preserve verbatim:** AutoCount Ref + PO numbers stored as-is in
   `orders.source_ref[]` / `order_lines.source_po`. `orders.so` remains the
   server-generated internal id (auto-increment int, NOT the AutoCount number);

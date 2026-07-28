@@ -251,7 +251,7 @@ for (const f of files) {
       const n = Number(m[1]);
       if (!TEXT_SIZES.has(n)) {
         errors.push(
-          `RULE D · text size — ${f}:${lineOf(src, m.index)} text-[${m[1]}px]; inline sizes are 11 micro / 12 caption / 13 body (+18 money hero) — SIZING LAW, docs/CARRES_ORDER_PORTAL_SPEC.md §3.`,
+          `RULE D · text size — ${f}:${lineOf(src, m.index)} text-[${m[1]}px]; inline sizes are 11 micro / 12 caption / 13 body (+18 money hero) — typography law, docs/UI-KIT.md §2.1.`,
         );
       }
     }
@@ -267,7 +267,7 @@ for (const f of files) {
       const n = Number(m[1]);
       if (!ROW_HEIGHTS.has(n)) {
         errors.push(
-          `RULE F · row height — ${f}:${lineOf(src, m.index)} h-[${n}px]; rows are 36 panel/KV · 40 list · 52 product-line only — SIZING LAW, docs/CARRES_ORDER_PORTAL_SPEC.md §3.`,
+          `RULE F · row height — ${f}:${lineOf(src, m.index)} h-[${n}px]; rows are 36 panel/KV · 40 list · 52 product-line only — table law, docs/UI-KIT.md §7 (row height is written there by card D0.5c).`,
         );
       }
     }

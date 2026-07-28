@@ -144,8 +144,9 @@ two versions side by side. Deleted into this file on 2026-07-27:
 
 `docs/DESIGN-STANDARD.md` · `docs/LIST-TEMPLATE-SPEC.md` ·
 `CARRES_*_UI_KIT_CURRENT.md` · the design sections of
-`CARRES_SYSTEM_MASTERPLAN.md` and `CARRES_ORDER_PORTAL_SPEC.md` ·
-`CHECKPOINT-order-detail-v4` · `BACKLOG_DESIGN.md` · **`CLAUDE.md §10`**
+`CARRES_SYSTEM_MASTERPLAN.md` and of the old order-portal master spec (**that
+file was then deleted whole on 2026-07-28, card D0.4** — it claimed to outrank
+this one) · `CHECKPOINT-order-detail-v4` · `BACKLOG_DESIGN.md` · **`CLAUDE.md §10`**
 (now deliberately empty — its v17 tokens were how a chat could follow CLAUDE.md
 faithfully and still build the wrong thing) · the `.claude/skills/carres-design/`
 skill (marked SUPERSEDED, `user-invocable: false`, kept only as an asset store).
