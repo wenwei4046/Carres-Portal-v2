@@ -17,7 +17,7 @@
 | | |
 |---|---|
 | On `main` | `ba7b7798` D0 law + doors · `19cad8e4` merge · `d83ecf98` §1.4 hierarchy · **`c9966ee3` T2 drawer** · **`a548ddc9` D0.5a (PR #498)** |
-| **`/ui` is LIVE** | **https://erp.carresofficial.com/ui** — deployed 2026-07-28 from main tip `9c3697a9`, public, no login. It is also on `pos.carresofficial.com/ui` and both `pages.dev` apexes. **It did its job: Jess answered Q1 · Q3 · Q4 there and the register is empty.** The deployed copy still shows the three as questions — D0.5b's branch turns that section into the frozen record, and the next deploy carries it |
+| **`/ui` is LIVE** | **https://erp.carresofficial.com/ui** — public, no login, also on `pos.carresofficial.com/ui` and both `pages.dev` apexes. **Deployed from main tip `d77bd4f6` (PR #502, D0.5b) and it now shows the FROZEN RECORD, verified in a real browser**: the heading is `Frozen decisions`, `Pending decisions` is gone, `Candidate B` is absent, and all four answers render. It did its job — Jess answered Q1 · Q3 · Q4 there, and the page is now the record rather than the question |
 | Deployed to prod | ✅ **YES — corrected 2026-07-28.** `git merge-base --is-ancestor c9966ee3 10f49add` passes, and `10f49add` is the live web tip in CLAUDE.md §17.1 (`index-c7LT9aSQ.js`, PR #492). **T2 has been in front of users since that deploy.** This row previously read *"NOT YET… nobody has seen it in a browser"* — it went stale when a parallel line shipped a bundle containing it. |
 | Next thing that matters | **T3 — Jess uses the reordered drawer for one day.** **No longer blocked**: the deploy it was waiting for already happened. T3 is a Jess task, not a build card. **Deliberately scheduled AFTER the Purchasing line finishes** (Loo, 2026-07-28: P2 · C8b · R8 first). The reason is the point of T3 — it tests whether the Information Hierarchy helps, and a review run while three chats are still changing screens measures the churn instead of the hierarchy. **Re-scheduled 2026-07-28: it now runs after P5**, not after R8 — Loo ruled that R8 is a words card and does not close Purchasing, so the review waits for the module to be finished AND used (P5 puts a real PO through it). **Do not offer T3 to a chat before P5 has merged**, and do not read the delay as T3 being optional. |
 
@@ -45,7 +45,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.3** | Delete the retired design docs + the `carres-design` skill | ⏳ after the new kit is proven |
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
-| **D0.5b** | Foundation components, Radix | ✅ **built 2026-07-28** — full card below. The gate opened: Jess froze Q1 · Q3 · Q4 |
+| **D0.5b** | Foundation components, Radix | ✅ **SHIPPED 2026-07-28, PR #502 `d77bd4f6`, deployed** — full card below. The gate opened: Jess froze Q1 · Q3 · Q4 |
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ **ready to build** |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
@@ -198,7 +198,7 @@ tokens anyway.
 
 ---
 
-## D0.5b ✅ — the Radix half, and the register empties (2026-07-28)
+## D0.5b ✅ — the Radix half, and the register empties (2026-07-28, PR #502, DEPLOYED)
 
 **Ten more Foundation Components** in `apps/web/src/components/kit/` — `Modal` ·
 `Drawer` · `Select` · `DropdownMenu` · `Tooltip` · `Popover` · `Tabs` ·
@@ -300,6 +300,50 @@ A screenshot could not be taken — the harness reports the Browser pane not
 displayed, and the viewport reads 0×0, which is why the modal's measured WIDTH
 is 2px while its max-width is the correct 512px. For tokens the computed-style
 read is the stronger evidence anyway.
+
+### The deploy receipt
+
+**PR #502, merge `d77bd4f6`, web `index-DcRxJK0f.js` + `UiShowcase-B8cQuG6T.js`**
+(carres-portal `289584ec` + carres-pos `385aea4d`, both `--branch=main`;
+`wrangler pages deployment list` names Production/main source `d77bd4f` the
+newest writer; all four canonicals converged after one poll cycle).
+`SERVICE_ROLE` **0** in both files.
+
+**The proof lives in the SHOWCASE chunk, not the main bundle** — `/ui` is lazy,
+so none of its strings are in `index-*.js` at all. Against the predecessor chunk
+(`UiShowcase-OPW5MQkO.js`, fetched from its own deployment URL because a
+superseded asset 404s at the apex): `Pending decisions` **1 → 0** ·
+`Candidate B — 6 steps (strict 4pt)` **1 → 0**; `Frozen decisions` ·
+`Deleted into 600` · `Lucide default —` · `Radix slate-3` · `Open a modal` ·
+`Open a drawer` · `Record the delay decision` · `tab-indicator` · `date-picker`
+· `dialog-overlay` each **0 → 1**; `dropdown-menu` **0 → 6**.
+
+**`Candidate A — 8 steps` greps 1 in BOTH, and that is correct rather than a
+null result** — the string survived while its meaning changed from *one of two
+candidates* to *the frozen answer*, which is exactly why the retired sibling is
+the load-bearing marker. **A marker deliberately not used:** `stroke 1.5` was
+built from a template (`stroke ${stroke}`), so that literal never existed in
+either bundle.
+
+**Radix confinement measured on the live files**:
+`data-radix-popper-content-wrapper` · `DropdownMenuTrigger` · `rdp-` · `radix`
+grep **0 · 0 · 0 · 0** in the main bundle and **1 · 2 · 4 · 64** in the showcase
+chunk.
+
+**Verified in a real browser** at `https://erp.carresofficial.com/ui`: the
+heading is `Frozen decisions`, `Pending decisions` is gone, `Candidate B` is
+absent, all four answers render, and the computed styles match §6 — **69 icons
+with exactly one `stroke-width` (2)** and **font-weight taking exactly 400 ·
+500 · 600, no 700 anywhere.**
+
+**No api deploy, checked not assumed**: `git diff aa70cd45..d77bd4f6 --
+apps/api packages/shared supabase/migrations` is empty, so R8's Worker
+`0b2640bc` already matches this tip; `GET /health` returns 200. No migration —
+the repo tail stays `0305`.
+
+**Gates at baseline on the deployed tip**: web **2200 passed / 16 pre-existing**
+(the four documented files) · shared **1949/1949** · api **3 pre-existing** ·
+lint clean · `tsc` clean · build clean.
 
 ---
 
