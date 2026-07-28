@@ -208,27 +208,13 @@ function DeliveryTripFeeSection({
             An order pays the base fee only if it has a line in one of these categories.
           </p>
         </div>
+        {/* P1 (2026-07-28) — the two lead-day boxes that used to sit here are
+            RETIRED. They were editable, they were saved, and nothing on earth
+            read them: the real floor was a constant in the code. The one
+            number now lives on Purchasing → Settings as `Earliest date a store
+            may sell`, and the POS + the server-side gate both read it. The
+            columns stay in the table (nothing is dropped) with no writer. */}
         <div className="flex flex-wrap gap-5 items-end">
-          <label className="block">
-            <span className="label block mb-1">Mattress / bedframe lead (days)</span>
-            <input
-              type="number" min={0} step="1" value={mbLead}
-              disabled={!isPrincipal}
-              onChange={(e) => setMbLead(e.target.value)}
-              className={`${INPUT_CLS} w-32 disabled:opacity-60`}
-              data-testid="delivery-mb-lead"
-            />
-          </label>
-          <label className="block">
-            <span className="label block mb-1">Sofa lead (days)</span>
-            <input
-              type="number" min={0} step="1" value={sofaLead}
-              disabled={!isPrincipal}
-              onChange={(e) => setSofaLead(e.target.value)}
-              className={`${INPUT_CLS} w-32 disabled:opacity-60`}
-              data-testid="delivery-sofa-lead"
-            />
-          </label>
           {isPrincipal && (
             <button
               type="button"

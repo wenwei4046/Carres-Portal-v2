@@ -4,37 +4,37 @@
 // only the upper bound is policy-locked.
 export const MAX_DELIVERY_FLOOR = 3 as const;
 
-// 2026-05-22 (Loo) — minimum days between Today and the dealer-picked
-// delivery date, by SKU category. Mattress + Bedframe both need 14 days of
-// production / consolidation lead time; sofa needs 21 because per-fabric
-// production is slower. When a cart spans multiple categories the longest
-// lead time wins (the wizard's Step 3 date picker enforces this).
+// The earliest delivery date a store may sell.
 //
-// Same constants drive the Operation-side soft-lock on accept-proceed:
-// if the dealer's date is >= today + lead days, the request lands in the
-// standard "Awaiting Operation Action" lane; if it's beyond that horizon
-// the operator has to override (warns "still N days from standard
-// lead-time, are you sure?").
-export const DELIVERY_LEAD_DAYS = {
-  mattress: 14,
-  bedframe: 14,
-  sofa: 21,
-} as const;
-export type DeliveryLeadCategory = keyof typeof DELIVERY_LEAD_DAYS;
+// P1 (2026-07-28) collapsed this to ONE number, editable on
+// Purchasing → Settings (`purchasing_settings.earliest_sell_days`). It was a
+// per-category constant here — mattress/bedframe 14, sofa 21 — which meant
+// Jess could not move it, and it was ALSO sitting as two editable columns in
+// `delivery_fee_config` that nothing read. Both are gone.
+//
+// The number is CALENDAR days and the caller supplies it, so the POS date
+// picker, the accept-proceed soft-lock and the server-side create gate all
+// read the same row rather than three copies of a literal.
+
+/** Categories that carry a production lead at all. A pure accessory or
+ *  service cart has no factory behind it and is sellable for any future
+ *  date — which is why this is a SET, not a flat "applies to everything". */
+export const EARLIEST_SELL_GATED_CATEGORIES = ["mattress", "bedframe", "sofa"] as const;
 
 /**
- * Returns the longest lead-time required by the given category list, or 0
- * when nothing in the list is gated. Unknown category strings are ignored —
+ * The lead the cart must respect: `earliestSellDays` when any line is a made
+ * item, otherwise 0 (no floor). Unknown category strings are ignored —
  * callers may pass arbitrary `product_models.category` values without
  * pre-filtering.
  */
-export function maxLeadDaysFor(categories: readonly string[]): number {
-  let max = 0;
-  for (const c of categories) {
-    const lead = DELIVERY_LEAD_DAYS[c as DeliveryLeadCategory];
-    if (lead && lead > max) max = lead;
-  }
-  return max;
+export function maxLeadDaysFor(
+  categories: readonly string[],
+  earliestSellDays: number,
+): number {
+  const gated = categories.some((c) =>
+    (EARLIEST_SELL_GATED_CATEGORIES as readonly string[]).includes(c),
+  );
+  return gated ? Math.max(0, Math.trunc(earliestSellDays)) : 0;
 }
 
 /** Formats `today + n days` as an ISO yyyy-mm-dd string. Used by the wizard

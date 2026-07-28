@@ -2,7 +2,7 @@ export const SHARED_VERSION = "0.0.0" as const;
 
 export {
   MAX_DELIVERY_FLOOR,
-  DELIVERY_LEAD_DAYS,
+  EARLIEST_SELL_GATED_CATEGORIES,
   maxLeadDaysFor,
   minDeliveryDateISO,
   // 0169-0173 — Product & Maintenance rebuild.
@@ -14,8 +14,43 @@ export {
   SUPPLIERLESS_CATEGORIES,
   SIZELESS_CATEGORIES,
   categoryHasSizeAxis,
-  type DeliveryLeadCategory,
 } from "./constants";
+
+// P1 (0303) — the purchasing numbers become settings. One home for every
+// number the ordering engine reads.
+export {
+  PURCHASING_CATEGORIES,
+  PURCHASING_NUMBER_KEYS,
+  PURCHASING_NUMBER_RANGE,
+  PRODUCTION_WORKING_DAYS_RANGE,
+  WEEKDAYS,
+  SUNDAY,
+  isPurchasingCategory,
+  isPurchasingNumberKey,
+  productionWorkingDaysFor,
+  workWeekOffDaysFor,
+  purchasingUrgentWindowDays,
+  unratedPairs,
+  lastChangeFor,
+  workWeekLabel,
+  purchasingCategorySchema,
+  purchasingSettingsResponseSchema,
+  purchasingSetNumberInput,
+  purchasingSetPoDaysInput,
+  purchasingSetProductionDaysInput,
+  purchasingSetWorkWeekInput,
+  type PurchasingCategory,
+  type PurchasingNumberKey,
+  type PurchasingProductionDays,
+  type PurchasingSupplierRow,
+  type PurchasingSettingChange,
+  type PurchasingSettings,
+  type PurchasingSettingsResponse,
+  type PurchasingSetNumberInput,
+  type PurchasingSetPoDaysInput,
+  type PurchasingSetProductionDaysInput,
+  type PurchasingSetWorkWeekInput,
+} from "./purchasing-settings";
 
 // Sub-path imports also work, e.g.:
 //   import type { DealerRow } from "@carres/shared/db-types";
@@ -833,6 +868,8 @@ export {
   deliveryQueueForLabel,
   deliveryStepDueIso,
   deliveryStepOverdue,
+  deliveryQueueLeads,
+  type DeliveryQueueLeads,
   type DeliveryQueueDef,
   type DeliveryQueueKey,
   type DeliveryQueueAnchor,
@@ -989,10 +1026,6 @@ export {
 export {
   monthKeyMYT,
   isPoDayMYT,
-  PO_DUTY_DAYS_MYT,
-  PO_STOCK_LEAD_DAYS,
-  PO_STOCK_LEAD_DEFAULT_DAYS,
-  poStockLeadDaysFor,
   poUrgentBypass,
   opsPoDutySchema,
   opsPoDutyResponseSchema,

@@ -90,6 +90,14 @@ export function buildRaisePoPlan(
   suppliers: { id: string; cat_covered: string[] }[],
   supplierOverride: Map<string, string>,
   now: Date = new Date(),
+  /**
+   * P1 — the urgent-bypass window per category, in days, resolved from the
+   * purchasing settings by the caller (`purchasingUrgentWindowDays`). A
+   * category with no number gets no window and is therefore never urgent:
+   * nobody has told the portal how long that factory takes, so the portal
+   * does not get to say the order is late.
+   */
+  urgentWindowByCategory: Partial<Record<string, number>> = {},
 ): RaisePoPlan {
   // Free stock pool, allocated earliest-SO-first below.
   const remaining = new Map<string, number>();
@@ -128,7 +136,11 @@ export function buildRaisePoPlan(
       if (short <= 0) continue;
 
       const key = `${l.sku}|${canonAttrs(l.attrs)}`;
-      const urgent = poUrgentBypass(o.deliveryDate, [cat], now);
+      const urgent = poUrgentBypass(
+        o.deliveryDate,
+        urgentWindowByCategory[cat] ?? 0,
+        now,
+      );
       const cur = agg.get(key);
       if (cur) {
         cur.qty += short;

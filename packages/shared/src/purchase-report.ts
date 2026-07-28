@@ -253,6 +253,22 @@ export const purchaseTodayResponseSchema = z.object({
   /** ③ Receive list — open POs with goods ready / arriving to book in. */
   receive: z.array(purchaseReceiveSchema),
   summary: purchaseSummarySchema,
+  /**
+   * P1 (0303) — supplier × category pairs that HAVE demand today and no
+   * production working days set. They are held out of the plan rather than
+   * planned on a guessed number, and named here so the To Order tab can say
+   * so out loud. Additive + OPTIONAL: a browser on an older bundle simply
+   * does not render them.
+   */
+  unrated: z
+    .array(
+      z.object({
+        supplierId: z.string(),
+        supplierName: z.string().nullable(),
+        category: z.string(),
+      }),
+    )
+    .optional(),
 });
 export type PurchaseTodayResponse = z.infer<typeof purchaseTodayResponseSchema>;
 

@@ -4,13 +4,14 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Check, PackagePlus, X } from "lucide-react";
 import { toast } from "sonner";
-import { orderActionQueue } from "@carres/shared";
+import { orderActionQueue, PURCHASING_CATEGORIES, purchasingUrgentWindowDays } from "@carres/shared";
 import { apiFetch, type ApiError } from "@/lib/api";
 import {
   useCatalog,
   useDeliveryPartners,
   useOperationSuppliers,
   useOperationWarehouse,
+  usePurchasingSettings,
   type SupplierRow,
 } from "@/lib/queries";
 import {
@@ -87,9 +88,28 @@ export default function RaisePoReview({
 
   // The operator's supplier picks for unresolved SKUs (sku → supplierId).
   const [overrides, setOverrides] = useState<Map<string, string>>(new Map());
+  // P1 — the urgent window per category comes from the production working
+  // days a human set (Purchasing → Settings), never from a constant.
+  const purchasingSettingsQ = usePurchasingSettings();
+  const urgentWindowByCategory = useMemo(() => {
+    const s = purchasingSettingsQ.data;
+    if (!s) return {};
+    return Object.fromEntries(
+      PURCHASING_CATEGORIES.map((c) => [c, purchasingUrgentWindowDays(s, [c])]),
+    );
+  }, [purchasingSettingsQ.data]);
   const plan = useMemo(
-    () => buildRaisePoPlan(orders, availableBySku, skuMeta, suppliers, overrides),
-    [orders, availableBySku, skuMeta, suppliers, overrides],
+    () =>
+      buildRaisePoPlan(
+        orders,
+        availableBySku,
+        skuMeta,
+        suppliers,
+        overrides,
+        new Date(),
+        urgentWindowByCategory,
+      ),
+    [orders, availableBySku, skuMeta, suppliers, overrides, urgentWindowByCategory],
   );
 
   // Default warehouse: the single one, else the Klang HQ.

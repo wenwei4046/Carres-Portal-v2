@@ -220,7 +220,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR, fabricMasterR, entryConfigR, bundlesR, guaranteeTermsR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR, fabricMasterR, entryConfigR, bundlesR, guaranteeTermsR, purchasingSettingsR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -289,6 +289,10 @@ catalogRouter.get("/", async (c) => {
     // UNFILTERED so the maintenance view sees retired terms; the active-only
     // filter is applied client-side below (mirrors the special-addons branch).
     sb.from(GUARANTEE_TERMS).select("*"),
+    // 0303 (P1) — the earliest date a store may sell. One editable number,
+    // read here so the POS date picker and the server-side create gate read
+    // the same row instead of two copies of a literal.
+    sb.from("purchasing_settings").select("earliest_sell_days").eq("id", 1).maybeSingle(),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -528,6 +532,16 @@ catalogRouter.get("/", async (c) => {
           : null,
       }))
       .sort((a, b) => a.guaranteeSku.localeCompare(b.guaranteeSku)),
+    // 0303 (P1) — the earliest date a store may sell. Absent (an older DB, a
+    // read error) means the POS applies no floor, exactly as it does for a
+    // cart with no made item: the server-side gate in lead-time.ts is the
+    // one that refuses, and it reads the same row.
+    earliestSellDays:
+      purchasingSettingsR && !purchasingSettingsR.error && purchasingSettingsR.data
+        ? Number(
+            (purchasingSettingsR.data as { earliest_sell_days?: number }).earliest_sell_days ?? 0,
+          )
+        : undefined,
   });
   // EXPOSURE NOTE (0186): unlike `cost`, the PWP discounted reward price
   // (product_skus.pwp_price → sku.pwpPrice / sofa_combo_pricing.pwp_prices_by_height

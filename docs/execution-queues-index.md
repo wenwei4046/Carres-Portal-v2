@@ -30,11 +30,28 @@
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 — R6 · R7 · **R8** (`Contact`→`Call` rename, new 2026-07-28) left |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C9 ✅ #472 · C10 ✅ #471** — C4 · C7 · C8 left |
-| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **NEW 2026-07-27** — flow file written, seven old docs deleted. **P1 is the next card** |
+| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings). **P2 is the next card** |
 | ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 | **NEW 2026-07-28** — D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3`. **T3 = Jess uses it for a day, after a deploy.** **D0.4 = retire `CARRES_ORDER_PORTAL_SPEC.md` completely (Loo 2026-07-28) — its own chat, safe beside anything, touches no page.** TEMPORARY doc — delete when the line ends |
 
 **State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ R1-R5 ✅ · ⑥ C1 · C2 · C3 · C5 · C6 · C9 · C10 ✅ ·
-⑦ opened, nothing built yet · ⑧ D0 + T1 + T2 ✅ (T3 is a Jess task, not a build card).
+⑦ **P1 ✅** · ⑧ D0 + T1 + T2 ✅ (T3 is a Jess task, not a build card).
+
+**What P1 changed (2026-07-28, PR #488, migration 0303).** Every number the ordering engine
+reads is a row a manager edits on **Purchasing → Settings** — the fifth tab, gated on the
+existing `ops_manager` duty: production working days per supplier × category · the supplier
+work week · the order-by buffer · the PO days · the earliest date a store may sell · the
+working days of notice on `Confirm delivery date`. Every row states who changed it, when,
+and what it was before. **A pair nobody has set a number for says `Set a number` and gets NO
+order-by date** — there is no per-category default to fall back on, and the To Order tab
+names the pair rather than planning it on a guess (K1's law). **It closed all FIVE doors**:
+the constants, the read-only gear drawer (which still said PO days were Mon + Thu), the two
+lead-day boxes in Catalog → Delivery that were editable and read by nothing,
+`suppliers.lead_time` on the Suppliers card, and **`PO_STOCK_LEAD_DAYS` — the safety net**,
+which believed a sofa took 5 working days and therefore fired nine days late. It is deleted:
+`poUrgentBypass` takes a window in days now, resolved from the production working days a
+human set, and **a category with no number can never make an order urgent**. **One behaviour
+change: sofa 10 → 14 working days**; the earliest-sell number collapses to 21, the upper of
+the old 14/21, so nothing becomes sellable earlier than it is today.
 
 **⑧ obeys the Orders lane rule** — T2 edited `OrderDetailDrawer.tsx`, so a ⑧ card that
 touches the drawer may not run beside C6/C7/C8. **D0.5a and D0.5b touch NO existing page**
@@ -54,6 +71,11 @@ main — an R6 chat is mid-flight. **⑦ P1 waits for R6 to merge** (Loo, 2026-0
 already changed the database, so stopping it half-way leaves prod carrying two migrations no
 file explains. This is also how the lane rule is checked in future — **compare the tracker
 tail to `supabase/migrations`; if the tracker is ahead, somebody is holding the lane.**
+*(P1 shipped the same day on Jess's own instruction, taking **0303** from the tracker tail
+exactly as this paragraph says. The hold was honoured where it matters, and the ORDER is
+what did it: Jess applied and verified 0303 on prod FIRST, and only then was #488 merged and
+deployed — so prod was never asked to serve a page whose table did not exist, and R6's two
+numbers keep theirs.)*
 
 **Line ⑦ exists because purchasing failed five times.** Seven documents (1,222 lines) each
 specified a different purchasing module and none was authoritative, so every build chat

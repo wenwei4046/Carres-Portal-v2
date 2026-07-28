@@ -63,7 +63,6 @@ import {
   MessageCircle,
   PackageCheck,
   RefreshCw,
-  SlidersHorizontal,
   Truck,
   UserRound,
 } from "lucide-react";
@@ -83,7 +82,6 @@ import CreatePOModal, { type CreatePoPrefill } from "./components/CreatePOModal"
 import ReceivePOModal from "./components/ReceivePOModal";
 import { PurchaseListRow } from "./components/PurchaseListRow";
 import { PoDocumentPreview } from "./components/PoDocumentPreview";
-import { PurchaseSettingsSheet } from "./components/PurchaseSettingsSheet";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { buildSupplierChase } from "@/lib/wa-templates";
 import { avatarColor, personInitials } from "@/lib/staff-avatar";
@@ -431,7 +429,6 @@ export default function OperationPurchase() {
   // v2 (Loo 2026-07-23): Purchase settings side sheet — replaces the small
   // LeadTimesButton modal. Section 1 = Lead times · 2 = Arrival buffer · 3 =
   // PO days · 4 = Duty rotation indicator (edit stays on the Team card).
-  const [settingsOpen, setSettingsOpen] = useState(false);
   // Section collapse — one Set for all bands; default all expanded.
   const [collapsedFacet, setCollapsedFacet] = useState<Set<string>>(
     () => new Set(),
@@ -747,18 +744,14 @@ export default function OperationPurchase() {
 
   return (
     <div className="h-full flex flex-col">
+      {/* P1 — the gear that opened a READ-ONLY settings sheet is gone. It
+          carried its own copies of the numbers (PO days as Mon + Thu, months
+          after Jess moved to Mon/Wed/Fri) and a promise that they would become
+          editable "when the lead-time table ships". This is that table: the
+          Settings tab beside Claims. */}
       <PurchasingTabs
         right={
           <>
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              title="Purchase settings — lead times, buffer, PO days, duty"
-              aria-label="Open Purchase settings"
-              className="p-1 rounded hover:text-base-900 hover:bg-hovertint transition-colors text-base-500"
-            >
-              <SlidersHorizontal size={14} strokeWidth={2} />
-            </button>
             <PoDutyTabChip />
             <TodayRefresh today={today} onRefresh={() => void refetch()} />
           </>
@@ -969,6 +962,26 @@ export default function OperationPurchase() {
                       <>{missingSoLabels.slice(0, 4).join(", ")}: </>
                     )}
                     Purchase can&rsquo;t plan the PO until Sales sets one.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* ── P1 guard — a factory with no production working days. The
+                line is held OUT of the plan rather than planned on a guessed
+                number, and named here so it cannot be missed. Live it should
+                never appear: the migration seeds every pair that owns a SKU. */}
+            {stage === "place" && (data?.unrated?.length ?? 0) > 0 && (
+              <div className="rounded-[12px] border border-warning bg-warning-soft px-4 py-2.5 flex items-start gap-2.5 shrink-0" data-testid="purchase-unrated-guard">
+                <AlertTriangle size={16} className="text-warning shrink-0 mt-0.5" />
+                <div className="min-w-0 text-[12px]">
+                  <span className="font-semibold text-warning">Set a number</span>{" "}
+                  <span className="text-base-600">
+                    {(data?.unrated ?? [])
+                      .map((u) => `${u.supplierName ?? "This factory"} · ${u.category}`)
+                      .join(", ")}
+                    {" "}has no production working days, so no order-by date is
+                    computed. Set it on the Settings tab.
                   </span>
                 </div>
               </div>
@@ -1211,50 +1224,6 @@ export default function OperationPurchase() {
           />
         );
       })()}
-      <PurchaseSettingsSheet
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        dutyHolderName={dutyQ.data?.holder?.name ?? null}
-        dutyUntilLabel={
-          dutyQ.data?.month
-            ? (() => {
-                const y = Number(dutyQ.data.month.slice(0, 4));
-                const m = Number(dutyQ.data.month.slice(5, 7));
-                const eom = new Date(Date.UTC(y, m, 0));
-                const iso = eom.toISOString().slice(0, 10);
-                return fmtDateShort(iso);
-              })()
-            : null
-        }
-        rotationRows={(() => {
-          // PO + GRN rotation, offset-1 (Jess 2026-07-23): GRN = next month's
-          // PO holder. Roster from the po-duty API. Show up to 4 months so
-          // the operator sees the wheel turning.
-          const roster = dutyQ.data?.roster ?? [];
-          const cur = dutyQ.data?.month ?? "";
-          const sorted = [...roster].sort((a, b) => a.month.localeCompare(b.month));
-          const rows: {
-            month: string;
-            poHolderName: string | null;
-            grnHolderName: string | null;
-          }[] = [];
-          for (let i = 0; i < sorted.length; i++) {
-            const r = sorted[i]!;
-            // Only include the current month and forward.
-            if (cur && r.month < cur) continue;
-            const monthLabel = new Date(`${r.month}-01T00:00:00Z`)
-              .toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
-            const grn = sorted[i + 1] ?? null;
-            rows.push({
-              month: monthLabel,
-              poHolderName: r.name ?? r.email ?? null,
-              grnHolderName: grn ? (grn.name ?? grn.email ?? null) : null,
-            });
-            if (rows.length >= 4) break;
-          }
-          return rows;
-        })()}
-      />
     </div>
   );
 }

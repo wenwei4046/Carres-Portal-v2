@@ -4,7 +4,10 @@ import {
   buildPurchaseChaseReceive,
   myHolidaySet,
   nextPoDayMYT,
+  productionWorkingDaysFor,
   purchaseTodayResponseSchema,
+  PURCHASING_CATEGORIES,
+  workWeekOffDaysFor,
   type DemandLine,
   type ProductCategory,
   type PurchaseChase,
@@ -13,6 +16,10 @@ import {
   type PurchaseReceive,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
+import {
+  loadPurchasingNumbers,
+  loadPurchasingSettings,
+} from "../../lib/purchasing-settings";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -34,42 +41,14 @@ import type { AppEnv } from "../../types";
  */
 const purchaseRouter = new Hono<AppEnv>();
 
-// Effective lead time (WORKING days) per procurable category — Jess's normal
-// (non-peak) leads (corrected 2026-07-23: mattress + bedframe are 5–7 wd, sofa
-// 14 official / ~10 actual). Peak is OFF for now (the engine never auto-pads).
-// This SINGLE number drives raise-by (when to order) so we use the SAFE upper
-// bound (order early enough, never late); the shorter ACTUAL/promise number
-// (mattress/bedframe 5, sofa 10) lands as a second column with the Settings
-// table (migration 0243, pending Jess) so the principal can tune + promise the
-// shorter credible date without under-buffering the order.
-const DEFAULT_LEAD_DAYS: Record<string, number> = {
-  sofa: 10, // Jess 2026-07-23: make + deliver ≈ 10 working days (14 is the padded max)
-  bedframe: 7, // Jess: 5–7 working days
-  mattress: 7, // Jess: 5–7 working days
-};
-
-// Supplier work week per category (Jess 2026-07-23): Nice Future (mattress) = 5-day
-// (Sat + Sun off); Ohana (bedframe + sofa) = 6-day (works Saturday). Drives ONLY the
-// make+deliver LEAD leg; the arrival buffer + urgency use the Carres 5-day week
-// (options.offDays below). One-supplier-per-category proxy until 0243 lands a real
-// per-supplier work_week. (Corrects daf06588, which forced the whole engine to 5-day.)
-const SUPPLIER_OFF_DAYS: Record<string, readonly number[]> = {
-  mattress: [0, 6], // Nice Future — no Saturday
-  bedframe: [0], // Ohana — works Saturday
-  sofa: [0], // Ohana — works Saturday
-};
-
-// Stock must ARRIVE this many working days before the customer deadline (Jess: the
-// editable arrival buffer — leaves time to arrange delivery / assign logistic).
-// Counted on the Carres/delivery-side week (options.offDays). Editable via 0243 later.
-const ARRIVAL_BUFFER_WORKING_DAYS = 7;
-
-const PROCURABLE: ReadonlyArray<ProductCategory> = ["sofa", "bedframe", "mattress"];
-
-// Default per-supplier review cadence = Mon / Wed / Fri.
-// TODO: make configurable per supplier (a supplier_review_days config), instead
-// of one hardcoded cadence for everyone.
-const DEFAULT_REVIEW_DAYS: readonly number[] = [1, 3, 5];
+// P1 (0303) — every number this route used to hard-code is a SETTING now:
+// production working days per supplier × category, the supplier work week,
+// the order-by buffer and the PO days all come from `purchasing_settings`
+// (Purchasing → Settings, manager-only). The constants that used to sit here
+// are DELETED rather than kept as a fallback — a fallback is how a setting
+// silently stops mattering, and this file is where the sofa's third
+// contradictory number (10) lived.
+const PROCURABLE: ReadonlyArray<ProductCategory> = [...PURCHASING_CATEGORIES];
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -182,6 +161,22 @@ async function loadChaseReceive(
 purchaseRouter.get("/today", requireOperation, async (c) => {
   const auth = c.var.auth;
   const sb = userClient(c.env, auth.jwt);
+
+  // ── 0a. The numbers. Loaded FIRST and never defaulted: a plan built on
+  // invented production times is a plan that looks exactly like a real one.
+  let settings;
+  try {
+    settings = await loadPurchasingSettings(sb);
+  } catch (e) {
+    return c.json(
+      {
+        error: "settings_unavailable",
+        code: "settings_unavailable",
+        message: (e as Error).message,
+      },
+      500,
+    );
+  }
 
   // ── 0. ②③ Chase / Receive — over the OPEN POs, independent of ① demand. ────
   const cr = await loadChaseReceive(sb);
@@ -309,6 +304,10 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
   const modelNameBySku: Record<string, string | null> = {};
 
   const demand: DemandLine[] = [];
+  // Supplier × category pairs that have real demand and NO production time.
+  // They are named on screen instead of being planned on a guessed number —
+  // there is no per-category default to fall back on, by design (P1).
+  const unratedKeys = new Set<string>();
   for (const l of lines) {
     const cat = catBySku.get(l.sku as string);
     const category = cat?.category;
@@ -337,6 +336,15 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
       (order.created_at as string | null) ??
       todayIso()) as string;
 
+    // NO SILENT DEFAULT. A pair nobody has set a number for is held out of
+    // the plan and reported by name — an order-by date computed from a
+    // guessed production time looks exactly like one the factory agreed to.
+    const leadDays = productionWorkingDaysFor(settings, supplierId, category);
+    if (leadDays == null) {
+      unratedKeys.add(`${supplierId}::${category}`);
+      continue;
+    }
+
     demand.push({
       lineId: l.id as string,
       orderId: l.order_id as string,
@@ -345,8 +353,8 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
       supplierId,
       qty: Number(l.qty ?? 0),
       deadline: deadline ? deadline.slice(0, 10) : null,
-      leadDays: DEFAULT_LEAD_DAYS[category] ?? 7,
-      offDays: SUPPLIER_OFF_DAYS[category] ?? [0],
+      leadDays,
+      offDays: workWeekOffDaysFor(settings, supplierId),
       placedAt: placedAt.slice(0, 10),
       committed: order.status === "proceed_order",
     });
@@ -416,10 +424,12 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     }
   }
 
-  // Every distinct demand supplier reviews on the default Mon/Wed/Fri cadence.
+  // Every supplier is reviewed on the configured PO days (Purchasing →
+  // Settings). Per-supplier cadences are not a thing Jess asked for; when
+  // they are, this is the one line that changes.
   const reviewDaysBySupplier: Record<string, readonly number[]> = {};
   for (const supplierId of new Set(demand.map((d) => d.supplierId))) {
-    reviewDaysBySupplier[supplierId] = DEFAULT_REVIEW_DAYS;
+    reviewDaysBySupplier[supplierId] = settings.poDays;
   }
 
   // ── 4. Run the engine + shape the response. ───────────────────────────────
@@ -431,13 +441,15 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
       holidays: myHolidaySet(),
       // options.offDays = the CARRES / delivery-side week (Mon–Fri, 5-day). It
       // drives the arrival buffer + the urgency buckets (we can't SEND a PO on a
-      // Carres off-day). The per-line make+deliver LEAD instead uses each line's
-      // own supplier week (DemandLine.offDays, set from SUPPLIER_OFF_DAYS) — so
-      // Ohana's Saturday counts toward its lead while Nice Future's does not.
+      // Carres off-day). The per-line make+deliver LEAD instead uses each
+      // line's own supplier week (DemandLine.offDays, now the per-supplier
+      // setting) — so Ohana's Saturday counts toward its lead while Nice
+      // Future's does not. NOT a §2 setting: this is Carres's own week, and
+      // §2 lists only the SUPPLIER work week.
       offDays: [0, 6],
-      // Stock must land 7 working days before the deadline (leaves time to
-      // arrange delivery). Editable via the 0243 lead-time config later.
-      arrivalBufferDays: ARRIVAL_BUFFER_WORKING_DAYS,
+      // Stock must land this many working days before the deadline, to leave
+      // time to arrange the delivery — the order-by buffer, from Settings.
+      arrivalBufferDays: settings.orderByBufferDays,
       // consumeFreeStock stays OFF (default) — free stock is advisory only.
       reviewDaysBySupplier,
     },
@@ -481,7 +493,18 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     );
   }
 
-  return c.json(purchaseTodayResponseSchema.parse(report));
+  // P1 — the pairs nobody has set a number for. Named, never guessed.
+  const supplierNameById = new Map(settings.suppliers.map((s) => [s.id, s.name]));
+  const unrated = [...unratedKeys].map((k) => {
+    const [supplierId, category] = k.split("::");
+    return {
+      supplierId,
+      supplierName: supplierNameById.get(supplierId) ?? null,
+      category,
+    };
+  });
+
+  return c.json(purchaseTodayResponseSchema.parse({ ...report, unrated }));
 });
 
 // Purchase §6 · POST /line/skip · body: { lineIds: string[] }
@@ -541,7 +564,23 @@ purchaseRouter.post("/line/push-next", requireOperation, async (c) => {
   if (untilRaw) {
     untilIso = untilRaw;
   } else {
-    const dateOnly = nextPoDayMYT(new Date());
+    let poDays: number[];
+    try {
+      poDays = (await loadPurchasingNumbers(sb)).poDays;
+    } catch (e) {
+      return c.json(
+        {
+          error: "settings_unavailable",
+          code: "settings_unavailable",
+          message: (e as Error).message,
+        },
+        500,
+      );
+    }
+    const dateOnly = nextPoDayMYT(new Date(), poDays);
+    if (!dateOnly) {
+      return c.json({ error: "no_po_day_configured", code: "invalid_param" }, 422);
+    }
     untilIso = `${dateOnly}T00:00:00+08:00`;
   }
   const { error } = await sb

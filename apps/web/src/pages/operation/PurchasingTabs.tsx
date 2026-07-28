@@ -5,8 +5,10 @@ import {
   ShoppingCart,
   PackageCheck,
   AlertTriangle,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
+import { usePurchasingSettings } from "@/lib/queries";
 
 /**
  * PurchasingTabs — the shared top tab bar for the merged Purchasing module
@@ -39,7 +41,12 @@ import {
  * UI-KIT v4: token classes only (no raw hex), Lucide icons, English copy.
  */
 
-type PurchasingTab = "to-order" | "purchase-orders" | "receiving" | "claims";
+type PurchasingTab =
+  | "to-order"
+  | "purchase-orders"
+  | "receiving"
+  | "claims"
+  | "purchasing-settings";
 
 interface TabDef {
   key: PurchasingTab;
@@ -53,10 +60,15 @@ const TABS: TabDef[] = [
   { key: "purchase-orders", label: "Purchase Orders", to: "/operation/procurement", icon: ShoppingCart },
   { key: "receiving", label: "Receiving", to: "/operation?tab=receiving", icon: PackageCheck },
   { key: "claims", label: "Claims", to: "/operation?tab=claims", icon: AlertTriangle },
+  // P1 — the fifth tab of the working flow's §1. Manager-only, so it renders
+  // only for a caller the server says may edit; the RPC gate is what actually
+  // protects the numbers.
+  { key: "purchasing-settings", label: "Settings", to: "/operation?tab=purchasing-settings", icon: Settings },
 ];
 
 export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
   const location = useLocation();
+  const settingsQ = usePurchasingSettings();
   const onProcurement = location.pathname.startsWith("/operation/procurement");
   const tabParam = new URLSearchParams(location.search).get("tab");
   const active: PurchasingTab = onProcurement
@@ -65,7 +77,11 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
       ? "receiving"
       : tabParam === "claims"
         ? "claims"
-        : "to-order";
+        : tabParam === "purchasing-settings"
+          ? "purchasing-settings"
+          : "to-order";
+  const canEditSettings = settingsQ.data?.canEdit ?? false;
+  const tabs = TABS.filter((t) => t.key !== "purchasing-settings" || canEditSettings);
 
   return (
     <div
@@ -76,7 +92,7 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex gap-1">
-          {TABS.map((t) => {
+          {tabs.map((t) => {
             const isActive = t.key === active;
             return (
               <Link

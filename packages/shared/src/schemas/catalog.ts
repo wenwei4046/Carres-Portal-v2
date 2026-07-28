@@ -999,6 +999,13 @@ export const catalogResponseSchema = z.object({
   // from an accessory, nor which cart lines a guarantee may attach to.
   // Pre-0262 clients that don't read this key are wholly unaffected.
   guaranteeTerms: z.array(guaranteeTermSchema).optional(),
+  // 0303 (P1) — the earliest delivery date a store may sell, in CALENDAR
+  // days, from `purchasing_settings`. It rides the catalog bundle because
+  // every surface that needs it (the POS date picker, the edit-order modal,
+  // the accept-proceed dialog) already loads the catalog in the same
+  // round-trip — a second fetch would be a second chance to disagree.
+  // Additive + OPTIONAL: a browser on an older bundle ignores the key.
+  earliestSellDays: z.number().int().nonnegative().optional(),
 });
 export type CatalogResponse = z.infer<typeof catalogResponseSchema>;
 

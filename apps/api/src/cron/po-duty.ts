@@ -1,10 +1,11 @@
 import { isPoDayMYT, monthKeyMYT } from "@carres/shared";
+import { loadPurchasingNumbers } from "../lib/purchasing-settings";
 import { adminClient } from "../lib/supabase";
 import { resolveCurrentPoDuty } from "../routes/operation/po-duty";
 import type { Bindings } from "../types";
 
 /**
- * PO-day reminder cron (0236, Jess 2026-07-18): every Monday + Thursday
+ * PO-day reminder cron (0236, Jess 2026-07-18): on every configured PO day
  * (MYT) drop ONE ops_task on the month's PO duty holder — "PO day — N orders
  * waiting stock". Runs inside the existing daily 09:00-MYT cron; non-PO days
  * and dormant DBs (pre-0236) exit quietly. Idempotent: skips if today's
@@ -17,9 +18,19 @@ import type { Bindings } from "../types";
  */
 export async function runPoDutyCron(env: Bindings): Promise<number> {
   const now = new Date();
-  if (!isPoDayMYT(now)) return 0;
-
   const sb = adminClient(env);
+
+  // P1 — the PO days are a setting. A settings read that fails skips the
+  // reminder rather than guessing a cadence: a reminder on the wrong day
+  // teaches the duty holder to ignore it.
+  let poDays: number[];
+  try {
+    poDays = (await loadPurchasingNumbers(sb)).poDays;
+  } catch (e) {
+    console.error("po-duty cron: settings unreadable:", (e as Error).message);
+    return 0;
+  }
+  if (!isPoDayMYT(now, poDays)) return 0;
   const duty = await resolveCurrentPoDuty(sb);
   if (!duty) {
     console.log("po-duty cron: dormant (no duty holder)");
@@ -87,7 +98,7 @@ export async function runPoDutyCron(env: Bindings): Promise<number> {
   const { error } = await sb.from("ops_tasks").insert({
     title: `PO day — ${waiting} order${waiting === 1 ? "" : "s"} short of stock`,
     detail:
-      "Mon/Thu PO batching: open Orders → the Order PO / Chase supplier queues, select, Raise PO. Urgent (red) rows must not wait for PO day.",
+      "PO day: open Orders → the Send PO / Confirm ready date queues, select, Send PO. Urgent (red) rows must not wait for a PO day.",
     created_by: duty.user_id,
     assigned_to: duty.user_id,
     priority: "normal",

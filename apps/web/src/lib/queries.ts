@@ -220,6 +220,12 @@ import {
   type StoreChannel,
   // Purchase / Procurement MRP cockpit — GET /api/operation/purchase/today.
   type PurchaseTodayResponse,
+  // P1 (0303) — Purchasing → Settings.
+  type PurchasingSettingsResponse,
+  type PurchasingSetNumberInput,
+  type PurchasingSetPoDaysInput,
+  type PurchasingSetProductionDaysInput,
+  type PurchasingSetWorkWeekInput,
   // 0244/0245 — HR commission portal (GET /api/hr/report + config writes).
   type CommissionReport,
   type CommissionStaff,
@@ -494,6 +500,8 @@ export const qk = {
      *  (GET /api/operation/purchase/today). Nested under `operation` so a blunt
      *  invalidate on `["operation"]` after a PO mutation refreshes it too. */
     purchaseToday: () => ["operation", "purchase", "today"] as const,
+    /** P1 (0303) — the purchasing numbers (GET /api/operation/purchasing/settings). */
+    purchasingSettings: () => ["operation", "purchasing", "settings"] as const,
   },
   // Phase 5 — HQ Finance namespace. Same nested-key strategy as `principal`
   // and `operation` so mutations can blast `["finance"]` (e.g. topup-approve
@@ -3631,6 +3639,64 @@ export function usePurchasePushLines() {
       void qc.invalidateQueries({ queryKey: qk.operation.purchaseToday() });
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// P1 (0303) — Purchasing → Settings. The numbers the ordering engine reads.
+// ---------------------------------------------------------------------------
+
+/**
+ * usePurchasingSettings — GET /api/operation/purchasing/settings.
+ *
+ * ONE query for every purchasing number, read by the Settings tab AND by the
+ * surfaces that used to hold a copy of a literal (the Orders list's PO-day
+ * banner and urgent bypass, the delivery queue deadlines, the right-rail
+ * team card). A number with one home is the whole point of P1.
+ */
+export function usePurchasingSettings(
+  opts?: Partial<UseQueryOptions<PurchasingSettingsResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.purchasingSettings(),
+    queryFn: () =>
+      apiFetch<PurchasingSettingsResponse>("/api/operation/purchasing/settings"),
+    // Settings change a few times a year; re-reading them every minute would
+    // be noise. They are invalidated on write.
+    staleTime: 5 * 60_000,
+    ...opts,
+  });
+}
+
+/** Every settings write returns the whole settings object and blows the
+ *  purchase plan away with it — a changed production time moves an order-by
+ *  date, which is the card's own Done-when. */
+function usePurchasingSettingsMutation<TInput>(path: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: TInput) =>
+      apiFetch<PurchasingSettingsResponse>(`/api/operation/purchasing/settings${path}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(qk.operation.purchasingSettings(), data);
+      void qc.invalidateQueries({ queryKey: qk.operation.purchaseToday() });
+      void qc.invalidateQueries({ queryKey: qk.catalog() });
+    },
+  });
+}
+
+export function useSetPurchasingNumber() {
+  return usePurchasingSettingsMutation<PurchasingSetNumberInput>("/number");
+}
+export function useSetPurchasingPoDays() {
+  return usePurchasingSettingsMutation<PurchasingSetPoDaysInput>("/po-days");
+}
+export function useSetProductionDays() {
+  return usePurchasingSettingsMutation<PurchasingSetProductionDaysInput>("/production-days");
+}
+export function useSetSupplierWorkWeek() {
+  return usePurchasingSettingsMutation<PurchasingSetWorkWeekInput>("/work-week");
 }
 
 /** Purchase §6 · Snooze PO — defer a whole supplier's PO planning until
