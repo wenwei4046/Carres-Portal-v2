@@ -16,6 +16,8 @@ import {
   supplierClaimRequestLabel,
   supplierClaimResponseLabel,
   claimMoveOwnerLabel,
+  purchasingActionEmpty,
+  purchasingActionQueue,
   SUPPLIER_CLAIM_LATE,
 } from "@carres/shared";
 import {
@@ -26,6 +28,10 @@ import {
 import { fmtDate } from "@/lib/fmt-date";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
 import { SectionCard, SectionBand } from "@/components/SectionPanel";
+// R8 — UI-KIT §6.1: P2's Receiving half already extracted this row, and this
+// page shipped a third hand-written copy of it one import away from the
+// component. Second occurrence is a full stop; this is the third.
+import FacetRow from "@/components/FacetRow";
 import PurchasingTabs from "./PurchasingTabs";
 import SupplierClaimPanel from "./components/SupplierClaimPanel";
 
@@ -73,9 +79,25 @@ import SupplierClaimPanel from "./components/SupplierClaimPanel";
  * share one word. The two group titles are the words this table's own columns
  * already carry (`Supplier` · `Problem`), and `Queues` is the Orders rail's.
  *
- * NOT touched, on purpose: the `Contact` wording and R3's own next-move
- * sentences. Those are ④ R8's rename sweep, and a rename is not a click
- * behaviour.
+ * ── R8 · the sweep P2 handed over (2026-07-28) ──────────────────────────────
+ *
+ *  - The tile and the row spelt ONE action two ways on this very screen: the
+ *    tile printed the dictionary's `Confirm what happens next` while the Next
+ *    move column printed R3's `Call {supplier} — confirm what they will do`.
+ *    `claimNextMove` now reads the mirror, so the two cannot part again.
+ *  - The two tile strings stop being hand-copied constants and come from
+ *    `order-action-words.ts` — the same module the To Order tab reads.
+ *  - The explanatory paragraph above the list is DELETED (Loo, 2026-07-28). It
+ *    spent a permanent horizontal band on a page whose fixed-chrome budget is
+ *    200px (UI-KIT §1.3) and it EXPLAINED rather than worked: §1.1's third
+ *    question — "if it were removed, could today's work still be finished?" —
+ *    answers YES, so the gate does not admit it. One band back is roughly one
+ *    more visible row, every day.
+ *  - The local `FacetRow` copy is gone; the page imports the shared component.
+ *
+ * Measured while doing it: the word `Contact` appears in ZERO visible strings on
+ * this screen. R3 already shipped `Call`; what was left was the two spellings
+ * above, which is what Loo's ruling was really about.
  */
 
 type Tab = "open" | "closed" | "all";
@@ -86,12 +108,13 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "all", label: "All" },
 ];
 
-/** COPY-STANDARD, PURCHASING dictionary — the five strings of this action, and
- *  the two of them a list page shows. Copied nowhere else; a queue tile's name
- *  IS its action, so it must read the same word the row line will read once R8
- *  lands the `Contact` → `Call` sweep on the R2/R3 screens. */
-const QUEUE_TILE = "Confirm what happens next";
-const QUEUE_EMPTY = "No claim is waiting for a supplier answer.";
+/** COPY-STANDARD, PURCHASING dictionary — the two of this action's five strings
+ *  a list page shows. R8 stopped hand-copying them: a queue tile's name IS its
+ *  action, and `claimNextMove` now builds the row line from the same mirror, so
+ *  the tile and the row structurally cannot spell one action two ways. */
+const QUEUE_TILE = purchasingActionQueue("confirm_what_happens_next");
+const QUEUE_EMPTY =
+  purchasingActionEmpty("confirm_what_happens_next") ?? "";
 
 /** Claim type → v17 pill. A late delivery is amber (waiting on somebody), an
  *  arrived-but-wrong unit is red (something is already broken). Colour lives
@@ -303,12 +326,9 @@ export default function OperationSupplierClaims() {
   return (
     <div className="h-full flex flex-col">
       <PurchasingTabs />
-      {/* One line of what the page is for, then straight into the work. No big
-          title: the active Purchasing tab already says "Claims" (§8.3). */}
-      <div className="shrink-0 px-6 pt-3 text-[13px] text-base-600">
-        What the supplier still owes us. Opened by receiving — damaged or wrong
-        items — and by an ETA that passed with goods still pending delivery.
-      </div>
+      {/* R8 — the explainer that used to sit here is DELETED (Loo, 2026-07-28).
+          Straight from the tab bar into the work: the tab already says "Claims"
+          (§8.3), and a paragraph describing the page is not the page. */}
 
       <div className="flex-1 min-h-0">
         <ListPageShell
@@ -670,54 +690,10 @@ function Th({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** One facet cell — copied from the sibling To Order tab so the two halves of
- *  Purchasing read identically. The shared component is ⑧ D0.5c's job. */
-function FacetRow({
-  label,
-  count,
-  tone = "default",
-  active,
-  onClick,
-  title,
-  testId,
-}: {
-  label: string;
-  count: number;
-  tone?: "default" | "danger" | "muted";
-  active?: boolean;
-  onClick?: () => void;
-  title?: string;
-  testId?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-pressed={active}
-      data-testid={testId}
-      className={`w-full flex items-center gap-2 rounded-full text-left px-2.5 py-1.5 transition-colors ${
-        active ? "bg-hovertint" : "hover:bg-hovertint"
-      }`}
-    >
-      <span
-        className={`min-w-0 truncate text-[13px] ${
-          active ? "text-base-900 font-semibold" : "text-base-700"
-        }`}
-      >
-        {label}
-      </span>
-      <span
-        className={`ml-auto text-[12px] tabular-nums shrink-0 ${
-          tone === "danger"
-            ? "text-danger font-bold"
-            : tone === "muted"
-              ? "text-base-400"
-              : "text-base-500 font-semibold"
-        }`}
-      >
-        {count}
-      </span>
-    </button>
-  );
-}
+// R8 — the local `FacetRow` copy that used to sit here is DELETED. It was a
+// third hand-written copy of a component that already exists at
+// `@/components/FacetRow` (extracted by P2's Receiving half under UI-KIT §6.1),
+// one import away, with an identical API and an identical rendered button.
+// Deleting it is not the D0.5c extraction P2 reserves: that one is
+// `PageShell`/`DataTable` and owns the BEHAVIOUR — the filtering, the clearing,
+// the scroll restore, all of which stay in this file.

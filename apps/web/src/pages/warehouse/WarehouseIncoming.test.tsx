@@ -113,7 +113,9 @@ describe("the count form", () => {
 
   it("refuses to save until the count is complete, and says what is missing", async () => {
     await openForm();
-    const save = screen.getByRole("button", { name: "Save count" });
+    // R8 — `Save count` is retired: this button hands the count to Carres and
+    // the state becomes `Waiting Carres check`, so it is the `Return` verb.
+    const save = screen.getByRole("button", { name: "Return count to Carres" });
     expect(save).toBeDisabled();
     expect(screen.getByTestId("warehouse-count-problems")).toHaveTextContent(
       "Type the DO number",
