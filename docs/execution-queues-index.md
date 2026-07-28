@@ -36,24 +36,26 @@
 **State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ R1-R5 ✅ · ⑥ C1 · C2 · C3 · C5 · C6 · C9 · C10 ✅ ·
 ⑦ **P1 ✅** · ⑧ D0 + T1 + T2 ✅ (T3 is a Jess task, not a build card).
 
-**What P1 changed (2026-07-28, migration 0303).** Every number the ordering engine reads is
-a setting on **Purchasing → Settings** (manager-only, the fifth tab): production working
-days per supplier × category · the supplier work week · the order-by buffer · the PO days ·
-the earliest date a store may sell · the working days of notice on `Confirm delivery date`.
-Each row states who changed it, when, and what it was before. **A pair nobody has set a
-number for says `Set a number` and gets NO order-by date** — there is no per-category
-default to fall back on, and the To Order tab names the pair rather than planning it on a
-guess. It closed three doors, not one: the read-only settings sheet on To Order (which
-still said PO days were Mon + Thu), the two lead-day boxes in Catalog → Delivery that were
-editable and read by nothing, and the constants themselves. **One behaviour change: sofa
-production time 10 → 14 working days.** The earliest-sell number collapsed to 21 (the upper
-of the old 14/21, so nothing becomes sellable earlier than it is today).
+**What P1 changed (2026-07-28, PR #488, migration 0303).** Every number the ordering engine
+reads is a row a manager edits on **Purchasing → Settings** — the fifth tab, gated on the
+existing `ops_manager` duty: production working days per supplier × category · the supplier
+work week · the order-by buffer · the PO days · the earliest date a store may sell · the
+working days of notice on `Confirm delivery date`. Every row states who changed it, when,
+and what it was before. **A pair nobody has set a number for says `Set a number` and gets NO
+order-by date** — there is no per-category default to fall back on, and the To Order tab
+names the pair rather than planning it on a guess (K1's law). **It closed all FOUR doors**:
+the constants, the read-only gear drawer (which still said PO days were Mon + Thu), the two
+lead-day boxes in Catalog → Delivery that were editable and read by nothing, and
+`suppliers.lead_time` on the Suppliers card. **The sofa's third number was live code, not a
+stale comment** — `PO_STOCK_LEAD_DAYS.sofa = 5` drove the urgent bypass every day. **One
+behaviour change: sofa 10 → 14 working days**; the earliest-sell number collapses to 21, the
+upper of the old 14/21, so nothing becomes sellable earlier than it is today.
 
 **⑧ obeys the Orders lane rule** — T2 edited `OrderDetailDrawer.tsx`, so a ⑧ card that
 touches the drawer may not run beside C6/C7/C8. **D0.5a and D0.5b touch NO existing page**
 (new components + a new `/ui` route only) and are safe beside anything; **D0.5c and D6 touch
 the Orders list and drawer** and are not.
-**Orders lane, in this order:** C6 → C7 → C8 (C4 any time a Purchasing slot is free).
+**Orders lane, in this order:** C7 → C8 (C4 any time a Purchasing slot is free).
 **C7 is BLOCKED no longer** — the law conflict C3 found (COPY-STANDARD saying both that
 `Issue delivery order` IS and is NOT an action) was ruled by Jess on 2026-07-27:
 **it IS an action**, the system produces the document and the operator presses one button.
@@ -61,11 +63,40 @@ COPY-STANDARD now says so once.
 S / R / P run in parallel throughout; **C4 and ⑦ P share the Purchasing pages with ④ R —
 only ONE of those three at a time.**
 
+**Purchasing lane, 2026-07-28: ④ R6 HOLDS IT.** Migrations `0301_warehouse_role` and
+`0302_warehouse_files_its_own_receiving` are applied to live prod and neither file is on
+main — an R6 chat is mid-flight. **⑦ P1 waits for R6 to merge** (Loo, 2026-07-28): R6 has
+already changed the database, so stopping it half-way leaves prod carrying two migrations no
+file explains. This is also how the lane rule is checked in future — **compare the tracker
+tail to `supabase/migrations`; if the tracker is ahead, somebody is holding the lane.**
+*(P1 was built and PR'd on 2026-07-28 anyway, on Jess's own instruction, and it took
+**0303** from the tracker tail exactly as this paragraph says. It does not merge until she
+has applied that migration — so the hold is honoured where it matters: prod is never asked
+to serve a page whose table is missing, and R6's two numbers keep theirs.)*
+
 **Line ⑦ exists because purchasing failed five times.** Seven documents (1,222 lines) each
 specified a different purchasing module and none was authoritative, so every build chat
 picked a different one. They are DELETED. The single owner is
 `docs/PURCHASING-WORKING-FLOW.md`. **The engine itself was already built** — the P-cards
 turn its hard-coded numbers into settings and add the two supplier calls nobody had built.
+
+**What C6 changed (2026-07-28, PR #486) — web only, no migration.** Clicking an open action
+in the drawer's checklist opens **the steps that close it**, and every step is one of the
+portal's own actions, so it is worded by that action's BUTTON string from the dictionary —
+`Assign logistics` ✓ then `Confirm booking` under `Call NETS — confirm delivery date`. The
+steps are measured from the SAME signals object the ladder just read, and the last step is
+the action's own outcome, never ticked while the action is open: **an open action can never
+show a fully ticked list**, asserted over the whole signal matrix with a negative control.
+Nothing on that screen can write — no tick, no checkbox, no button inside a step — so the
+no-decorative-checkbox law is structure rather than a comment. **The Task Owner question
+C2 and C3 both left open is RULED, not built: the order's PIC is the task owner of every
+action of that order**, so an action carries no owner field and needs no store. Collapsed by
+default, so it adds zero permanent height. **NO MIGRATION, and Jess CLOSED that question
+2026-07-28 rather than deferring it**: the card made one conditional on a step needing its
+own owner and the PIC ruling means the condition never opened; the frozen rulings below
+already put driver · vehicle · condominium registration out of scope this phase; and four
+columns nobody writes is `ops_order_control.balance`'s disease. If ever wanted, the first
+half is a confirm-booking form — its own card.
 
 **What C10 changed (2026-07-27, PR #471) — web only, no migration.** The three dots Law 6
 describes finally exist: goods · delivery · money render BESIDE the stage pill in the Status
@@ -183,6 +214,16 @@ to be remembered.
 
 - **Driver · vehicle · condominium registration: OUT OF SCOPE this phase.** Logistics owns
   the driver today, not Carres. Revisit only if Carres runs its own fleet.
+- **The Event Engine: PARKED until after go-live** (Loo + Jess, 2026-07-28). The proposal —
+  every business action writes ONE event, and Dashboard / Order / Purchasing / Delivery each
+  read that one table through a different filter instead of keeping their own activity log —
+  is sound, and the transparency principle behind it is already law ("everyone can see
+  everyone's work"). It is parked for one reason: it touches the Activity block on EVERY
+  page, so it cannot share a lane with Orders, Purchasing or Delivery, and go-live comes
+  first. **It gets no queue doc and no line number yet** — a card file for work nobody has
+  scheduled is the eighth purchasing document all over again. When it opens, the first step
+  is a READ-ONLY architecture review against what already exists (`order_history`,
+  `audit_log`, `AnnotationTimeline`, the 0211 auto-capture), never a build.
 - ~~**UI-KIT carries retired vocabulary and more than one version of some rules.**~~
   **DONE 2026-07-28 — this became line ⑧.** The kit was rewritten top to toe as one file
   (`ba7b7798`), the three doors that still taught the old law were shut (CLAUDE.md's own UI
