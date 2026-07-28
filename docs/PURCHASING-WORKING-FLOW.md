@@ -337,10 +337,15 @@ human or the system wrote it.
 
 ## 7 · What is on screen
 
-The frame — header, toolbar, bulk bar, facet panel, 44px table rows, footer — is
-`docs/UI-KIT.md` §A9, and the canonical example is the Orders list. **Purchasing copies it;
-it does not invent a layout.** Clicking a queue tile filters the table; clearing returns
-every row; clicking a row opens the drawer — one behaviour for every module, also UI-KIT.
+The frame — title, toolbar, filter chips, table header, footer — is `docs/UI-KIT.md` **§8.3**
+(module-tab law: a tabbed page renders no breadcrumb and no big title, because the tab IS the
+title) with the **§1.3** height budget, and the canonical example is the Orders list.
+**Purchasing copies it; it does not invent a layout.** **This file states no pixel** — the row
+height, the band heights and the budget all live in UI-KIT, and the one number this paragraph
+used to carry was already wrong (it said 44px; the Orders list ships 40px, measured by C10).
+The click behaviour is **§8.2**: a queue tile filters, clicking it again clears, a row opens
+the drawer on its FIRST tab, and closing keeps the filter and the scroll — one behaviour for
+every module.
 
 **The queue tiles** (each is a count of open actions, and its name IS the action):
 
