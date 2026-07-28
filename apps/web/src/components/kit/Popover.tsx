@@ -14,6 +14,7 @@
  */
 import * as RadixPopover from "@radix-ui/react-popover";
 import type { ReactNode } from "react";
+import { useOverlayContainer } from "./overlay-container";
 import { POPOVER_SURFACE } from "./overlay-recipe";
 
 export default function Popover({
@@ -28,10 +29,11 @@ export default function Popover({
   align?: "start" | "center" | "end";
   children: ReactNode;
 }) {
+  const container = useOverlayContainer();
   return (
     <RadixPopover.Root>
       <RadixPopover.Trigger asChild>{trigger}</RadixPopover.Trigger>
-      <RadixPopover.Portal>
+      <RadixPopover.Portal container={container}>
         <RadixPopover.Content
           data-kit="popover"
           aria-label={label}

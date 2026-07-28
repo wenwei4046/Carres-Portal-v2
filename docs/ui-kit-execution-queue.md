@@ -249,6 +249,17 @@ arrived already enforced, and two that had been waiting for this card flipped �
 modal/drawer* and *only 5 z-layers*, the latter now a real ladder (`Z` in `tokens.ts`) that a
 source scan defends: **no kit file may write a `z-` class at all.**
 
+**The defect this card found in its own law, and closed without changing it.** §4.4 puts popovers
+on 30 and overlays on 40 — but both Radix portals mount as siblings on `<body>`, so a `Select`
+opened INSIDE a `Modal` paints underneath it, and *a picker inside a dialog* is the commonest form
+pattern there is. The obvious fix is to raise a number; that is how fifteen z-levels happened the
+first time. **What shipped instead is structural**: a dialog publishes its own content node and
+every popover-class box portals INTO it, so the ladder is untouched and the case cannot regress —
+a test asserts the listbox is a DESCENDANT of the dialog, and removing the one `container` prop
+fails exactly that test and nothing else. **Stated honestly: the occlusion was reasoned from the
+two z-values and the portal structure, not measured** — the harness's browser pane reports a 0×0
+viewport, so hit-testing there proves nothing.
+
 **A finding worth the space: jsdom has no Pointer Capture API**, and Radix's Select uses it to
 tell a press from a drag. Without three one-line stubs the list opens and closes in the same tick
 and the test reads as *no options* — a missing BROWSER FEATURE presenting as a broken component.

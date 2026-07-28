@@ -660,7 +660,19 @@ Fifteen levels exist today (`1 · 10 · 20 · 30 · 40 · 50 · 55 · 60 · 70 �
 | toast | 50 | Sonner |
 
 **No component may set its own z-index.** A chat needing a new layer adds it
-here first.
+here first — and in the kit that is enforced, not asked: the ladder is `Z` in
+`components/kit/tokens.ts` and a source scan fails on a `z-` class written
+anywhere else under `components/kit/**`.
+
+> **A picker inside a dialog does NOT need a sixth layer** (found by D0.5b, and
+> written down because the next person will hit it). A `Select` at 30 opened
+> inside a `Modal` at 40 would paint underneath it, since both Radix portals
+> mount as siblings on `<body>` — and "a picker inside a dialog" is the
+> commonest form pattern there is. **The fix is structural, not numeric**: the
+> dialog publishes its own content node and every popover-class box portals
+> INTO it, so 30-above-the-dialog's-children is exactly right and this ladder
+> never changes. Raising a number to fix a component is how fifteen levels
+> happened the first time.
 
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|

@@ -19,6 +19,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
 import Icon from "./Icon";
+import { OverlayContainerProvider } from "./overlay-container";
 import { OVERLAY_SURFACE, SCRIM } from "./overlay-recipe";
 
 type Size = "sm" | "md" | "lg";
@@ -54,7 +55,12 @@ export default function Modal({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className={SCRIM} />
+        {/* Publishing the content node is what lets a Select or DatePicker
+         *  opened INSIDE this modal render above it — see overlay-container. */}
+        <OverlayContainerProvider>
+          {(setContainer) => (
         <Dialog.Content
+          ref={setContainer}
           data-kit="modal"
           className={`${OVERLAY_SURFACE} left-1/2 top-1/2 w-[calc(100%-32px)] ${SIZE[size]} -translate-x-1/2 -translate-y-1/2 flex flex-col max-h-[calc(100vh-64px)]`}
         >
@@ -81,6 +87,8 @@ export default function Modal({
             <div className="flex items-center justify-end gap-2 border-t border-kit-slate-6 px-4 py-3">{footer}</div>
           )}
         </Dialog.Content>
+          )}
+        </OverlayContainerProvider>
       </Dialog.Portal>
     </Dialog.Root>
   );

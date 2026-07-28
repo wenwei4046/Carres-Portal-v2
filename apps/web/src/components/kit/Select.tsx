@@ -18,6 +18,7 @@ import * as RadixSelect from "@radix-ui/react-select";
 import FieldFrame from "./FieldFrame";
 import Icon from "./Icon";
 import { controlClass } from "./field-recipe";
+import { useOverlayContainer } from "./overlay-container";
 import { MENU_ITEM, POPOVER_SURFACE } from "./overlay-recipe";
 
 export interface SelectOption {
@@ -49,6 +50,7 @@ export default function Select({
   onValueChange?: (value: string) => void;
   disabled?: boolean;
 }) {
+  const container = useOverlayContainer();
   return (
     <FieldFrame id={id} label={label} hint={hint} error={error} required={required}>
       <RadixSelect.Root value={value} onValueChange={onValueChange} disabled={disabled}>
@@ -66,7 +68,7 @@ export default function Select({
             <Icon name="expand" size={14} />
           </RadixSelect.Icon>
         </RadixSelect.Trigger>
-        <RadixSelect.Portal>
+        <RadixSelect.Portal container={container}>
           <RadixSelect.Content
             position="popper"
             sideOffset={4}

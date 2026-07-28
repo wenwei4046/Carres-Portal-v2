@@ -118,6 +118,33 @@ describe("Modal", () => {
   });
 });
 
+describe("a picker inside a dialog", () => {
+  /**
+   * §4.4 puts popovers on 30 and overlays on 40, and both Radix portals mount
+   * as siblings on `<body>` — so a Select opened inside a Modal would paint
+   * UNDER it. The fix is structural: the dialog publishes its content node and
+   * the picker portals INTO it, so the z-ladder never has to change.
+   *
+   * NEGATIVE CONTROL: drop `container={container}` from `Select`'s Portal —
+   * this one test fails and nothing else does.
+   */
+  it("renders INSIDE the dialog, not as a sibling of it", async () => {
+    render(
+      <Modal open onOpenChange={() => {}} title="Record the delay decision">
+        <Select
+          id="supplier"
+          label="Supplier"
+          options={[{ value: "nets", label: "NETS" }]}
+        />
+      </Modal>,
+    );
+    await userEvent.click(screen.getByRole("combobox", { name: /Supplier/ }));
+    const list = await screen.findByRole("listbox");
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.contains(list)).toBe(true);
+  });
+});
+
 describe("Drawer", () => {
   it("is a dialog with a name, docked right", () => {
     const { baseElement } = render(

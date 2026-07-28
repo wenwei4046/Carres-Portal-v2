@@ -23,6 +23,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import FieldFrame from "./FieldFrame";
 import Icon from "./Icon";
 import { controlClass } from "./field-recipe";
+import { useOverlayContainer } from "./overlay-container";
 import { POPOVER_SURFACE } from "./overlay-recipe";
 import * as RadixPopover from "@radix-ui/react-popover";
 
@@ -81,6 +82,7 @@ export default function DatePicker({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const container = useOverlayContainer();
   const selected = value ? new Date(`${value}T00:00:00`) : undefined;
 
   return (
@@ -99,7 +101,7 @@ export default function DatePicker({
             <Icon name="date" size={14} />
           </span>
         </RadixPopover.Trigger>
-        <RadixPopover.Portal>
+        <RadixPopover.Portal container={container}>
           <RadixPopover.Content align="start" sideOffset={4} aria-label={label ?? "Pick a date"} className={POPOVER_SURFACE}>
             <DayPicker
               mode="single"

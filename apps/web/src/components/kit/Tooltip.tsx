@@ -15,6 +15,7 @@
  */
 import * as RadixTooltip from "@radix-ui/react-tooltip";
 import type { ReactNode } from "react";
+import { useOverlayContainer } from "./overlay-container";
 import { TOOLTIP_SURFACE } from "./overlay-recipe";
 
 export default function Tooltip({
@@ -27,10 +28,11 @@ export default function Tooltip({
   side?: "top" | "right" | "bottom" | "left";
   children: ReactNode;
 }) {
+  const container = useOverlayContainer();
   return (
     <RadixTooltip.Root>
       <RadixTooltip.Trigger asChild>{children}</RadixTooltip.Trigger>
-      <RadixTooltip.Portal>
+      <RadixTooltip.Portal container={container}>
         <RadixTooltip.Content data-kit="tooltip" side={side} sideOffset={4} className={TOOLTIP_SURFACE}>
           {content}
         </RadixTooltip.Content>

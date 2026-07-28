@@ -16,6 +16,7 @@
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import type { ReactNode } from "react";
 import Icon, { type IconName } from "./Icon";
+import { useOverlayContainer } from "./overlay-container";
 import { MENU_ITEM, POPOVER_SURFACE } from "./overlay-recipe";
 
 export interface MenuItem {
@@ -42,12 +43,13 @@ export default function DropdownMenu({
   /** Accessible name for the menu itself. */
   label?: string;
 }) {
+  const container = useOverlayContainer();
   return (
     <Menu.Root>
       <Menu.Trigger asChild aria-label={label}>
         {trigger}
       </Menu.Trigger>
-      <Menu.Portal>
+      <Menu.Portal container={container}>
         <Menu.Content data-kit="dropdown-menu" align={align} sideOffset={4} className={`${POPOVER_SURFACE} min-w-48`}>
           {items.map((item) => (
             <div key={item.label}>

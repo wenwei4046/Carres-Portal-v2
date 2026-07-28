@@ -19,6 +19,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
 import Icon from "./Icon";
+import { OverlayContainerProvider } from "./overlay-container";
 import { OVERLAY_SURFACE, SCRIM } from "./overlay-recipe";
 
 type Width = "md" | "lg" | "xl";
@@ -49,7 +50,12 @@ export default function Drawer({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className={SCRIM} />
+        {/* Same as `Modal`: publishing the node keeps a picker opened inside
+         *  the drawer above it — see overlay-container. */}
+        <OverlayContainerProvider>
+          {(setContainer) => (
         <Dialog.Content
+          ref={setContainer}
           data-kit="drawer"
           /* Docked right, full height, square on the docked edge — a floating
            * rounded panel would read as a modal that missed the middle. */
@@ -70,6 +76,8 @@ export default function Drawer({
             <div className="flex items-center justify-end gap-2 border-t border-kit-slate-6 px-4 py-3">{footer}</div>
           )}
         </Dialog.Content>
+          )}
+        </OverlayContainerProvider>
       </Dialog.Portal>
     </Dialog.Root>
   );
