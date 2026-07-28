@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { claimNextMove } from "@carres/shared";
@@ -89,6 +89,15 @@ function row(over: Partial<SupplierClaimListRow> = {}): SupplierClaimListRow {
 }
 
 const DAMAGED = row();
+const WRONG = row({
+  id: "c3",
+  claim_no: "SC-1003",
+  supplier_id: "s2",
+  supplier_name: "Nice Future",
+  claim_type: "wrong_sku",
+  qty: 1,
+  photo_count: 1,
+});
 const LATE = row({
   id: "c2",
   claim_no: "SC-1002",
@@ -454,6 +463,283 @@ describe("R3 — the close keeps both sides", () => {
     expect(screen.queryByTestId("claim-send-ask")).not.toBeInTheDocument();
     expect(screen.queryByTestId("claim-save-answer")).not.toBeInTheDocument();
     expect(screen.getByText("New unit delivered 30 Jul")).toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P2 — the click behaviour (docs/UI-KIT.md §8.2)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Before this card the page had NO facet rail and NO filter state, so not one
+// line of the interaction law could be true here. Every test below locks a
+// behaviour a screenshot cannot prove.
+
+describe("Claims · §8.2 the queue tile (card P2)", () => {
+  function renderAll() {
+    claimsQuery.mockReturnValue(
+      ok({
+        claims: [DAMAGED, LATE, WRONG],
+        counts: { open: 3, closed: 0, all: 3 },
+      }),
+    );
+    return render(wrap(<OperationSupplierClaims />));
+  }
+
+  it("takes the tile's name and its empty state VERBATIM from the dictionary", () => {
+    // A tile's name IS its action, and `Claims` is the TAB — a place and an
+    // action may not share one word (COPY-STANDARD).
+    renderAll();
+    expect(screen.getByTestId("facet-queue-answer")).toHaveTextContent(
+      "Confirm what happens next",
+    );
+    expect(screen.queryByTestId("facet-queue-claims")).toBeNull();
+  });
+
+  it("filters to the claims the supplier still owes an answer on", () => {
+    renderAll();
+    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(3);
+
+    fireEvent.click(screen.getByTestId("facet-queue-answer"));
+
+    // Only the late claim has been asked and not answered.
+    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(1);
+    expect(screen.getByText("SC-1002")).toBeInTheDocument();
+    expect(screen.queryByText("SC-1001")).toBeNull();
+  });
+
+  it("clicking it again clears it, and so does its ✕ chip", () => {
+    renderAll();
+    fireEvent.click(screen.getByTestId("facet-queue-answer"));
+    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(1);
+
+    fireEvent.click(screen.getByTestId("facet-queue-answer"));
+    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(3);
+
+    // …and the chip does the same job.
+    fireEvent.click(screen.getByTestId("facet-queue-answer"));
+    const chips = screen.getByTestId("listshell-active-chips");
+    expect(chips).toHaveTextContent("Confirm what happens next");
+    // Scoped to the chip row: the tile in the rail carries the same word, which
+    // is the point — a queue and its chip may not spell one action two ways.
+    fireEvent.click(
+      within(chips).getByRole("button", { name: /Confirm what happens next/ }),
+    );
+    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(3);
+  });
+
+  it("an empty queue says the dictionary's sentence, not a shrug", () => {
+    claimsQuery.mockReturnValue(
+      ok({ claims: [DAMAGED], counts: { open: 1, closed: 0, all: 1 } }),
+    );
+    render(wrap(<OperationSupplierClaims />));
+    // Nobody is waiting on a supplier — the tile still renders (a quiet screen
+    // must mean watched and fine, never nobody looked).
+    expect(screen.getByTestId("facet-queue-answer")).toHaveTextContent("0");
+    fireEvent.click(screen.getByTestId("facet-queue-answer"));
+    expect(
+      screen.getByText("No claim is waiting for a supplier answer."),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("Claims · §8.2 two picks, two ✕-able chips (card P2)", () => {
+  function renderAll() {
+    claimsQuery.mockReturnValue(
+      ok({
+        claims: [DAMAGED, LATE, WRONG],
+        counts: { open: 3, closed: 0, all: 3 },
+      }),
+    );
+    return render(wrap(<OperationSupplierClaims />));
+  }
+
+  it("clicking the same supplier again clears it", () => {
+    renderAll();
+    const cell = screen.getByTestId("facet-supplier-s2");
+
+    fireEvent.click(cell);
+    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(1);
+    expect(screen.getByTestId("listshell-active-chips")).toHaveTextContent(
+      "Supplier: Nice Future",
+    );
+
+    fireEvent.click(cell);
+    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(3);
+    expect(screen.queryByTestId("listshell-active-chips")).toBeNull();
+  });
+
+  it("two picks show two chips, and each ✕ clears only its own", () => {
+    renderAll();
+    fireEvent.click(screen.getByTestId("facet-supplier-s1"));
+    fireEvent.click(screen.getByTestId("facet-problem-damaged"));
+
+    const chips = screen.getByTestId("listshell-active-chips");
+    expect(chips).toHaveTextContent("Supplier: Ohana");
+    expect(chips).toHaveTextContent("Problem: Damaged");
+    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(1);
+    expect(screen.getByText("SC-1001")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Problem: Damaged/ }));
+    expect(screen.getByTestId("listshell-active-chips")).toHaveTextContent(
+      "Supplier: Ohana",
+    );
+    expect(
+      screen.queryByRole("button", { name: /Problem: Damaged/ }),
+    ).toBeNull();
+    // Ohana's two claims are back; Nice Future's is still filtered out.
+    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(2);
+  });
+
+  it("never offers a pick that would empty the table", () => {
+    renderAll();
+    // Every group is counted with every filter EXCEPT its own, and a zero row
+    // is not rendered — so a visible cell always returns rows.
+    expect(screen.getByTestId("facet-problem-wrong_sku")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("facet-supplier-s1"));
+    // Ohana has no wrong-SKU claim, so the cell that would blank the table is
+    // gone rather than sitting there reading 0.
+    expect(screen.queryByTestId("facet-problem-wrong_sku")).toBeNull();
+    expect(screen.getByTestId("facet-problem-damaged")).toBeInTheDocument();
+    expect(screen.getByTestId("facet-problem-late_delivery")).toBeInTheDocument();
+  });
+
+  it("Reset filters clears every pick at once", () => {
+    renderAll();
+    fireEvent.click(screen.getByTestId("facet-queue-answer"));
+    fireEvent.click(screen.getByTestId("facet-supplier-s1"));
+    expect(screen.getByTestId("listshell-active-chips")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
+    expect(screen.queryByTestId("listshell-active-chips")).toBeNull();
+    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(3);
+  });
+});
+
+describe("Claims · §8.2 the status tabs are a STAGE picker (card P2)", () => {
+  function renderAll() {
+    claimsQuery.mockReturnValue(
+      ok({
+        claims: [DAMAGED, LATE, WRONG],
+        counts: { open: 3, closed: 0, all: 3 },
+      }),
+    );
+    return render(wrap(<OperationSupplierClaims />));
+  }
+
+  it("re-clicking the tab you are already on is a NO-OP, filters included", () => {
+    renderAll();
+    fireEvent.click(screen.getByTestId("facet-supplier-s1"));
+    expect(screen.getByTestId("listshell-active-chips")).toHaveTextContent(
+      "Supplier: Ohana",
+    );
+
+    // One of the three is always on and there is nothing to clear into, so a
+    // second click must not run a reset (UI-KIT §8.2's no-empty-state shape).
+    fireEvent.click(screen.getByRole("tab", { name: /Open/ }));
+
+    expect(screen.getByTestId("listshell-active-chips")).toHaveTextContent(
+      "Supplier: Ohana",
+    );
+    expect(claimsQuery).toHaveBeenLastCalledWith("open");
+  });
+
+  it("a DIFFERENT tab is a different list, so it clears the picks", () => {
+    renderAll();
+    fireEvent.click(screen.getByTestId("facet-supplier-s1"));
+    expect(screen.getByTestId("listshell-active-chips")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Closed/ }));
+
+    expect(screen.queryByTestId("listshell-active-chips")).toBeNull();
+    expect(claimsQuery).toHaveBeenLastCalledWith("closed");
+  });
+});
+
+describe("Claims · §8.2 the row opens it, and closing gives the list back (card P2)", () => {
+  function renderAll() {
+    claimsQuery.mockReturnValue(
+      ok({
+        claims: [DAMAGED, LATE, WRONG],
+        counts: { open: 3, closed: 0, all: 3 },
+      }),
+    );
+    return render(wrap(<OperationSupplierClaims />));
+  }
+
+  it("clicking the ROW opens the claim — not only the button", () => {
+    renderAll();
+    expect(screen.queryByTestId("claim-panel-SC-1001")).toBeNull();
+
+    fireEvent.click(screen.getAllByTestId("supplier-claim-row")[0]);
+    expect(screen.getByTestId("claim-panel-SC-1001")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByTestId("supplier-claim-row")[0]);
+    expect(screen.queryByTestId("claim-panel-SC-1001")).toBeNull();
+  });
+
+  it("the Open/Hide button fires ONCE — the row click underneath must not fire too", () => {
+    // The whole row became a click target, so the button now sits inside one.
+    // Two handlers for one click is invisible on the panel (both toggles read
+    // the same render's state and agree) and NOT invisible on the scroll: the
+    // second close reads a snapshot the first one has already spent, and the
+    // position is silently lost.
+    renderAll();
+    const box = screen.getByTestId("claims-table-scroll");
+    Object.defineProperty(box, "scrollHeight", { value: 900, configurable: true });
+    Object.defineProperty(box, "clientHeight", { value: 400, configurable: true });
+    box.scrollTop = 310;
+
+    fireEvent.click(screen.getByTestId("claim-open-SC-1001"));
+    expect(screen.getByTestId("claim-panel-SC-1001")).toBeInTheDocument();
+    box.scrollTop = 0;
+
+    fireEvent.click(screen.getByTestId("claim-open-SC-1001"));
+    expect(screen.queryByTestId("claim-panel-SC-1001")).toBeNull();
+    expect(box.scrollTop).toBe(310);
+  });
+
+  it("closing keeps the filter AND the table's scroll position", () => {
+    renderAll();
+    fireEvent.click(screen.getByTestId("facet-supplier-s1"));
+    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(2);
+
+    // jsdom has no layout, so give the box a real scrollable geometry first —
+    // otherwise scrollTop can only ever be 0 and the assertion proves nothing.
+    const box = screen.getByTestId("claims-table-scroll");
+    Object.defineProperty(box, "scrollHeight", { value: 900, configurable: true });
+    Object.defineProperty(box, "clientHeight", { value: 400, configurable: true });
+    box.scrollTop = 240;
+
+    fireEvent.click(screen.getAllByTestId("supplier-claim-row")[0]);
+    expect(screen.getByTestId("claim-panel-SC-1001")).toBeInTheDocument();
+    box.scrollTop = 0; // what losing the panel's height does to it
+
+    fireEvent.click(screen.getAllByTestId("supplier-claim-row")[0]);
+
+    expect(screen.queryByTestId("claim-panel-SC-1001")).toBeNull();
+    expect(screen.getByTestId("listshell-active-chips")).toHaveTextContent(
+      "Supplier: Ohana",
+    );
+    expect(box.scrollTop).toBe(240);
+  });
+
+  it("gives the scroll back when a filter takes the open claim off the list", () => {
+    renderAll();
+    const box = screen.getByTestId("claims-table-scroll");
+    Object.defineProperty(box, "scrollHeight", { value: 900, configurable: true });
+    Object.defineProperty(box, "clientHeight", { value: 400, configurable: true });
+    box.scrollTop = 120;
+
+    fireEvent.click(screen.getAllByTestId("supplier-claim-row")[0]);
+    expect(screen.getByTestId("claim-panel-SC-1001")).toBeInTheDocument();
+    box.scrollTop = 0;
+
+    // Nobody clicked the panel shut — the filter took it away.
+    fireEvent.click(screen.getByTestId("facet-supplier-s2"));
+
+    expect(screen.queryByTestId("claim-panel-SC-1001")).toBeNull();
+    expect(box.scrollTop).toBe(120);
   });
 });
 

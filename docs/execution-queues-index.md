@@ -30,7 +30,7 @@
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · **R6 ✅ #490** — R7 · **R8** (the banned-verb sweep, new 2026-07-28) left |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 + C8b | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C8 ✅ #493 (0304) · C9 ✅ #472 · C10 ✅ #471** — **C4** and **C8b** (the two delay clocks, small, no migration) left |
-| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings) · **P2 🟡 PARTIALLY DONE #492** — the click law is true on To Order; Receiving + Claims still owed. **P3 is the next full card** |
+| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings) · **P2 🟡 PARTIALLY DONE #492 + #494** — the click law is true on To Order and on Claims; **only Receiving is left**. **P3 is the next full card** |
 | ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 + **D0.6** | D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3` · **D0.4 ✅ the old order-portal master spec is DELETED**. **T3 = Jess uses it for a day, after a deploy.** **Reference Review CLOSED 2026-07-28** — `docs/ui-reference-review.md` R1-R5 frozen (Fiori · Linear · Stripe · Vercel · GOV.UK/NNg/Polaris); five principles; that line froze **no** enforcement mechanism. **D0.6 KIT-CONSOLIDATION = planning card only, awaiting PM approval — the ONLY card that may edit `docs/UI-KIT.md`, and nothing may be built from it yet.** TEMPORARY doc — delete when the line ends |
 
 **State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ **R1-R6 ✅** · ⑥ C1 · C2 · C3 · C5 · C6 · **C7** · C9 · C10 ✅ ·
@@ -53,6 +53,23 @@ P2 also reports that **two of the three filters its own card names can never be 
 on** (`attn` · `selectedDay` — their tiles were deleted in July and the state was left
 behind) and that the three stage cells are worded off-dictionary (`Chase factory` uses a
 banned word), which belongs in **R8**'s sweep rather than a third card.
+
+**The CLAIMS half shipped 2026-07-28 (PR #494), web only, no migration, and no new word.**
+`OperationSupplierClaims.tsx` had **no facet rail and no filter state at all**, so nothing in
+§8.2 could be true on it; it runs the Orders rail now. One queue tile —
+**`Confirm what happens next`**, the dictionary row verbatim, because a tile's name IS its
+action and `Claims` is the TAB — plus two fact facets (`Supplier` · `Problem`) whose words are
+this table's own column headers. **Each group is counted with every filter EXCEPT its own and a
+zero row is not rendered**, so no reachable click can blank the table; the one blank that IS
+reachable is the queue tile at zero, which is deliberate — it renders at 0 because a quiet
+screen must mean *watched and fine*, and clicking it prints the dictionary's own empty state.
+The whole ROW opens the claim now, closing gives back the filters and the scroll, and
+`Open / Closed / All` is a STAGE picker, so re-clicking the active one does nothing. **Only
+Receiving is left of P2.** It reports six things, the two sharpest being that **the dictionary
+gives Claims ONE queue word while `claimNextMove` computes THREE steps** (the two Carres-side
+ones can get no tile without words Jess has not ruled — nothing was invented), and that **the
+tile and the row spell one action two ways on that screen today**, which is ④ R8's rename and
+not a click behaviour.
 
 **What P1 changed (2026-07-28, PR #488, migration 0303).** Every number the ordering engine
 reads is a row a manager edits on **Purchasing → Settings** — the fifth tab, gated on the
@@ -91,8 +108,8 @@ S / R / P run in parallel throughout; **C4 and ⑦ P share the Purchasing pages 
 only ONE of those three at a time.**
 
 **Purchasing lane, 2026-07-28: FREE. R6 released it (#490); ⑦ P2 shipped its To Order half
-(#492) and released it too.** P2's remaining halves (Receiving · Claims) edit ④ R's two
-files, so whoever takes them takes the lane.
+(#492) and its Claims half (#494) and released it each time.** P2's ONE remaining half
+(Receiving) edits ④ R's `OperationReceiving.tsx`, so whoever takes it takes the lane.
 
 **The lane check that found the problem, kept because it worked:** compare the migration
 tracker tail to `supabase/migrations`. **If the tracker is ahead, somebody is holding the
