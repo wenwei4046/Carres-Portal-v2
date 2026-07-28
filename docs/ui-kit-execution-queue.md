@@ -17,8 +17,8 @@
 | | |
 |---|---|
 | On `main` | `ba7b7798` D0 law + doors · `19cad8e4` merge · `d83ecf98` §1.4 hierarchy · **`c9966ee3` T2 drawer** |
-| Deployed to prod | ❌ **NOT YET.** T2 is on main and has never been built to Pages. Nobody has seen it in a browser. |
-| Next thing that matters | **T3 — Jess uses the reordered drawer for one day** |
+| Deployed to prod | ✅ **YES — corrected 2026-07-28.** `git merge-base --is-ancestor c9966ee3 10f49add` passes, and `10f49add` is the live web tip in CLAUDE.md §17.1 (`index-c7LT9aSQ.js`, PR #492). **T2 has been in front of users since that deploy.** This row previously read *"NOT YET… nobody has seen it in a browser"* — it went stale when a parallel line shipped a bundle containing it. |
+| Next thing that matters | **T3 — Jess uses the reordered drawer for one day.** **No longer blocked**: the deploy it was waiting for already happened. T3 is a Jess task, not a build card. |
 
 **The one-sentence reason this line exists.** The kit was frozen once already
 (2026-07-16) with the same claim of being the only design document, and the
@@ -39,7 +39,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.2** | This file | ✅ |
 | **T1** | Freeze the Order Panel information hierarchy | ✅ `d83ecf98` (UI-KIT §1.4) |
 | **T2** | Apply it to the order drawer — reorder + Current Issues | ✅ `c9966ee3` |
-| **T3** | **Jess uses it for one day** | ⏳ **NEXT — blocked on a deploy** |
+| **T3** | **Jess uses it for one day** | ⏳ **UNBLOCKED 2026-07-28** — the deploy already happened (T2 rode PR #492's bundle). Waiting on Jess, not on code |
 | **T4** | Freeze as Detail Blueprint v1 → Delivery/Payment/Purchase/Service Detail inherit | ⏳ after T3 |
 | **D0.3** | Delete the retired design docs + the `carres-design` skill | ⏳ after the new kit is proven |
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
