@@ -23,7 +23,7 @@
 | # | Panel | Status | Full spec file to attach |
 |---|---|---|---|
 | 1 | Orders — **List** redesign | 🟡 in progress | `ORDERS_LIST_SPEC.md` |
-| 2 | Orders — **Detail** panel/drawer | 🟡 in progress | `docs/superpowers/plans/2026-07-10-order-panel-v3-spec.md` + `docs/CHECKPOINT-order-detail-v4-2026-07-16.md` |
+| 2 | Orders — **Detail** panel/drawer | 🟡 in progress | `docs/ORDER-DETAIL-INFORMATION-MODEL.md` (frozen 2026-07-28 — the highest business rule for this page) |
 | 3 | **Purchasing / Procurement** | ✅ flow locked 2026-07-27 | `docs/PURCHASING-WORKING-FLOW.md` |
 | 4 | **Payments / Collections** desk | 🟢 shipped, extensions pending | `docs/master-sheet-operating-model.md` |
 | 5 | **Catalog** (Product & Maintenance, 9-tab) | 🟢 shipped | `docs/superpowers/plans/2026-06-25-2990s-products-9tab-parity-roadmap.md` |
@@ -73,7 +73,9 @@ A dense, AutoCount-style table (not cards), driven by the operations "Master She
 
 ## 2. Orders — Detail Panel / Drawer  🟡
 
-**Full spec:** `docs/superpowers/plans/2026-07-10-order-panel-v3-spec.md` + latest checkpoint `docs/CHECKPOINT-order-detail-v4-2026-07-16.md`. Truth for the shipped state = SPEC §11/§12.
+**Full spec:** `docs/ORDER-DETAIL-INFORMATION-MODEL.md` — the **Business Thinking Model**, frozen by Loo 2026-07-28 and the highest business rule for this page. Layout derives from it and from nothing else.
+
+> **The three older layout documents were ARCHIVED 2026-07-28** to `docs/archive/order-detail/` and are **not a development source**. One (`2026-07-10-order-panel-v3-spec.md`) is kept as the single historical reference for what was shipped before the freeze; the two checkpoints are superseded in full. The summary below is likewise pre-freeze context, not a rule.
 
 ### Business problem
 The order detail is the **hub** — every other module (stock, payments, procurement, service) cross-links back to it. It must let an inexperienced operator see the whole story of one order and take the next step, without leaking internal DB stage words.

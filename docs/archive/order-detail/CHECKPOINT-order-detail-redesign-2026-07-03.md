@@ -1,3 +1,13 @@
+> # ⛔ ARCHIVED 2026-07-28 — SUPERSEDED IN FULL
+>
+> **This file is NOT a development source. Do not build from it. Do not quote it as a rule.**
+> Its "NEW CHAT: READ THIS FIRST" instruction is dead — obey
+> [`docs/ORDER-DETAIL-INFORMATION-MODEL.md`](../../ORDER-DETAIL-INFORMATION-MODEL.md) instead
+> (Business Thinking Model, frozen by Loo 2026-07-28).
+>
+> The one kept historical reference for this page is
+> [`2026-07-10-order-panel-v3-spec.md`](2026-07-10-order-panel-v3-spec.md) beside this file.
+
 # CHECKPOINT — Operation Order Detail whole-page redesign (2026-07-03)
 
 > **NEW CHAT: READ THIS FIRST, THEN THE 3 MEMORIES BELOW.** This is the single

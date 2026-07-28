@@ -1,3 +1,13 @@
+> # ⛔ ARCHIVED 2026-07-28 — SUPERSEDED IN FULL
+>
+> **This file is NOT a development source. Do not build from it. Do not quote it as a rule.**
+> Its "read this first" instruction is dead — obey
+> [`docs/ORDER-DETAIL-INFORMATION-MODEL.md`](../../ORDER-DETAIL-INFORMATION-MODEL.md) instead
+> (Business Thinking Model, frozen by Loo 2026-07-28).
+>
+> The one kept historical reference for this page is
+> [`2026-07-10-order-panel-v3-spec.md`](2026-07-10-order-panel-v3-spec.md) beside this file.
+
 # CHECKPOINT — Order Detail v4 rebuild · 2026-07-16
 
 > **New-session handoff.** Read this + `docs/CARRES_SYSTEM_MASTERPLAN.md` +
