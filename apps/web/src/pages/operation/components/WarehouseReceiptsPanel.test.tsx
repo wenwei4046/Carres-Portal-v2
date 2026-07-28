@@ -168,4 +168,32 @@ describe("WarehouseReceiptsPanel", () => {
       });
     });
   });
+
+  // ── R8 · `Send back` is retired for the sixth verb, `Return` ───────────────
+  it("names the warehouse on the return button, in both of its states", async () => {
+    mockQueue([RECEIPT]);
+    const { container } = wrap(<WarehouseReceiptsPanel />);
+    const open = await screen.findByTestId("warehouse-receipt-send-back-PO-2001");
+    // COPY-STANDARD's "warehouse count words": one verb, two directions, and
+    // the party is ALWAYS named. `Send` is pinned to raising a PO to a factory
+    // and is never reused (rule 8) — which is exactly what R6 reported.
+    expect(open).toHaveTextContent("Return count to Carres Klang");
+    expect(container.textContent).not.toMatch(/Send back/);
+
+    fireEvent.click(open);
+    expect(
+      await screen.findByTestId("warehouse-receipt-confirm-send-back-PO-2001"),
+    ).toHaveTextContent("Return count to Carres Klang");
+    expect(container.textContent).not.toMatch(/Send back/);
+  });
+
+  it("falls back to the role word when the warehouse has no name", async () => {
+    mockQueue([{ ...RECEIPT, warehouse_name: null }]);
+    wrap(<WarehouseReceiptsPanel />);
+    // Never a blank slot: the same rule the shared word module applies to every
+    // party. `Return count to ` with nothing after it is worse than the role.
+    expect(
+      await screen.findByTestId("warehouse-receipt-send-back-PO-2001"),
+    ).toHaveTextContent("Return count to the warehouse");
+  });
 });

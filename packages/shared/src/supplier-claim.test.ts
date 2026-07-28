@@ -324,14 +324,16 @@ describe("claimNextMove — who owes the next move", () => {
   });
 
   it("once we have asked, the SUPPLIER owes the answer", () => {
+    // R8 — the ONE step of this lifecycle with a dictionary row, so its line is
+    // COPY-STANDARD's verbatim (PURCHASING: `Confirm what happens next`).
     expect(claimNextMove(move({ requested_action: "replace" }))).toEqual({
       key: "answer",
       owner: "supplier",
-      label: "Call Ohana — confirm what they will do",
+      label: "Call Ohana — confirm what happens next",
     });
   });
 
-  it("a late claim asks for a DATE, not for a decision about goods", () => {
+  it("a late claim reads the SAME line — one action has one row line", () => {
     expect(
       claimNextMove(
         move({
@@ -342,7 +344,9 @@ describe("claimNextMove — who owes the next move", () => {
     ).toEqual({
       key: "answer",
       owner: "supplier",
-      label: "Call Ohana — confirm the new delivery date",
+      // R8 — this branch used to read `confirm the new delivery date`. One
+      // action has ONE row line; the specificity loss is reported in the PR.
+      label: "Call Ohana — confirm what happens next",
     });
   });
 

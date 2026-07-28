@@ -830,6 +830,8 @@ export {
 // (party named). The ONE code home for COPY-STANDARD's action dictionary.
 export {
   ORDER_ACTION_QUEUES,
+  PURCHASING_ACTION_QUEUES,
+  checkedInDone,
   collectPillLabel,
   deliveryDateGapFact,
   orderActionButton,
@@ -837,8 +839,13 @@ export {
   orderActionForQueue,
   orderActionLine,
   orderActionQueue,
+  purchasingActionButton,
+  purchasingActionEmpty,
+  purchasingActionLine,
+  purchasingActionQueue,
   type OrderActionKey,
   type OrderActionParties,
+  type PurchasingActionKey,
 } from "./order-action-words";
 
 // C6 · What closes one action — the steps, each of them one of the portal's own

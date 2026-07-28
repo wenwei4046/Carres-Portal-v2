@@ -105,7 +105,7 @@ describe("OperationReceiving", () => {
     expect(within(tabs[2]).getByText("3")).toBeInTheDocument();
   });
 
-  it("defaults to 'To receive' and shows a Receive button per open PO", async () => {
+  it("defaults to 'To receive' and shows a Check in button per open PO", async () => {
     wrap(<OperationReceiving />);
     await waitFor(() => {
       expect(screen.getByText("PO-2001")).toBeInTheDocument();
@@ -115,6 +115,26 @@ describe("OperationReceiving", () => {
     // received + cancelled POs are not in the default queue
     expect(screen.queryByText("PO-2003")).not.toBeInTheDocument();
     expect(screen.queryByText("PO-2004")).not.toBeInTheDocument();
+  });
+
+  // ── R8 · the row and the panel above it say ONE word for ONE act ───────────
+  it("the row's action button says `Check in`, never `Receive →`", async () => {
+    wrap(<OperationReceiving />);
+    const btn = await screen.findByTestId("receive-PO-2001");
+    // COPY-STANDARD: "Log goods arrival — the ACT: **Check in**"; `Receive` as
+    // a verb is in the do-not-use column. This button said `Receive →` while
+    // the R6 warehouse-receipt panel directly above it said `Check in`.
+    expect(btn).toHaveTextContent("Check in");
+    expect(btn.textContent).not.toMatch(/Receive/);
+  });
+
+  it("renders no `Receive` verb anywhere on the tab", async () => {
+    const { container } = wrap(<OperationReceiving />);
+    await waitFor(() => expect(screen.getByText("PO-2001")).toBeInTheDocument());
+    // `Received` (the status tab and the pill) is a FACT and stays — the ban is
+    // on the verb. Assert the verb shapes, not the stem.
+    expect(container.textContent).not.toMatch(/Receive →/);
+    expect(container.textContent).not.toMatch(/\bReceive\b(?!d)/);
   });
 
   it("'Received' tab shows received POs as Done (no Receive button)", async () => {
@@ -318,7 +338,13 @@ describe("Receiving · §8.2 the facet rail (card P2)", () => {
     const tile = screen.getByTestId("receiving-facet-checkin");
     fireEvent.click(tile);
     await waitFor(() => expect(tile).toHaveAttribute("aria-pressed", "true"));
-    expect(screen.getByText("Check in", { selector: "button" })).toBeInTheDocument();
+    // R8 narrowed this: since the row buttons say `Check in` too (the same
+    // dictionary word for the same act — which is the point of the card), a
+    // bare text query now matches several buttons. The chip is what this test
+    // is about, so it asks the chip row.
+    expect(
+      within(screen.getByTestId("listshell-active-chips")).getByText("Check in"),
+    ).toBeInTheDocument();
 
     fireEvent.click(tile);
     await waitFor(() => expect(tile).toHaveAttribute("aria-pressed", "false"));

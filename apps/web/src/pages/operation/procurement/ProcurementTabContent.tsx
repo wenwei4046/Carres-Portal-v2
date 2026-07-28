@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useProcurementTab, useCatalog, useOperationSuppliers, useOperationWarehouse } from "@/lib/queries";
 import type { operationPoListRow, SupplierRow } from "@/lib/queries";
+import { purchasingActionButton } from "@carres/shared";
 import type { ProcurementTabSlug } from "@carres/shared";
 import type { ProductSkuDto } from "@carres/shared";
 import AssignPickupDialog from "../components/AssignPickupDialog";
@@ -581,7 +582,12 @@ function ActionCell({
     );
   }
   // Default (sup_status='delivered' = partner already pressed Arrived at WH,
-  // OR any other unhandled state): full primary Receive button.
+  // OR any other unhandled state): the full primary check-in button.
+  //
+  // R8 (2026-07-28) — it said `Receive →`. This is the SAME act, opening the
+  // SAME `ReceivePOModal`, as the button one tab over on Receiving, and
+  // COPY-STANDARD bans `Receive` as a verb. Renamed with that sibling rather
+  // than left as the last screen in the module spelling it the old way.
   return (
     <button
       type="button"
@@ -593,7 +599,7 @@ function ActionCell({
       }}
       data-testid={`receive-po-${po.id}`}
     >
-      Receive →
+      {purchasingActionButton("check_in")}
     </button>
   );
 }

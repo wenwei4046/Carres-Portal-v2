@@ -27,7 +27,7 @@
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | ✅ **LINE COMPLETE** — T1-T11 shipped |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
-| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · **R6 ✅ #490** — R7 · **R8** (the banned-verb sweep, new 2026-07-28) left |
+| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · R6 ✅ #490 · **R8 ✅ #499** (the banned-verb sweep) — only **R7** left |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 + C8b | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C8 ✅ #493 (0304) · C8b ✅ #497 (0305) · C9 ✅ #472 · C10 ✅ #471** — only **C4** left |
 | ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings) · **P2 ✅ #492 + #494 + #495** — the click law is true on all three Purchasing lists (To Order · Claims · Receiving). **P3 is the next card** |
@@ -123,10 +123,28 @@ S / R / P run in parallel throughout; **C4 and ⑦ P share the Purchasing pages 
 only ONE of those three at a time.**
 
 **Purchasing lane, 2026-07-28: FREE. R6 released it (#490); ⑦ P2 is COMPLETE** — To Order
-(#492) · Claims (#494) · Receiving (#495), each releasing the lane after itself. **④ R7 and
-R8 are the next things in it**, and R8 now has a list waiting: `Chase factory` on To Order,
-`Receive →` and R6's `Send back` on Receiving, `Contact` on the claim screens, and the
-`Factory:` / `Supplier:` chip split between two tabs of one module.
+(#492) · Claims (#494) · Receiving (#495), each releasing the lane after itself. **④ R8 then
+took the whole lane for one PR and released it (#499).** **P3 is the next thing in it.**
+
+**What R8 changed (2026-07-28, PR #499, web + shared, no migration).** Every banned word on
+the Purchasing lane is gone: `Chase factory` and `Send POs` on To Order, `Receive →` on
+Receiving **and on Purchase Orders** (the same button, one tab over — the card named one and
+there were two), `Send back` and `Save count` on the warehouse-count pair, and `GRN` wherever
+it was the ACT. The words come out of `order-action-words.ts`, which gained a **second table**
+for the PURCHASING dictionary rather than four more members of `OrderActionKey` — that union
+is the Orders ladder's key, and `check_in` in it would need a display rank and a due rule for
+an action the Orders row can never show. **GRN is a SPLIT, not a ban: 4 sites became `Check
+in`, 5 stayed `GRN`** — the column header and the tooltips name the paper and are right.
+**The two dead filters are gone whole** (`attn` · `selectedDay`: state, filter branches, clear
+chips and the four date helpers that served only the chip), proved unreachable by grep first.
+And the Claims tab stopped spelling ONE action two ways on ONE screen — the tile read the
+dictionary while the row read R3's own sentence.
+
+**R8 leaves a banned word on screen and says so rather than sweeping it.** `Chase on WhatsApp`
++ `Chase {supplier}` on To Order's ② detail pane are a CHANNEL button, and COPY-STANDARD's
+answer (`Open WhatsApp group`) is not literally true of its direct-phone branch. Same for
+`ReceivePOModal`'s five `Receive` strings — it is the check-in FORM, and only its title has a
+dictionary answer. **Both need a word ruled, which is not a BUILD chat's to invent.**
 
 **The lane rule broke on the way out, and the receipt belongs here rather than nowhere: TWO
 chats built the Receiving half at the same time.** #495 merged and deployed; the second build
@@ -410,9 +428,8 @@ behaves, and a chat that treats it as the flow will name things on the business'
 ### ⭐ THE RUNNING ORDER (Loo, 2026-07-28) — read this before picking any card
 
 ```
-✅ P2-Receiving  #495            ✅ C8b  #497 (0305)
-▶  R8            terminology cleanup — takes the WHOLE Purchasing lane for one PR
-   P3            the two supplier calls          (migration)
+✅ P2-Receiving  #495            ✅ C8b  #497 (0305)   ✅ R8  #499
+▶  P3            the two supplier calls          (migration)
    P4            where the goods go              (migration)
    P5            one REAL PO, end to end
    T3            the Purchasing guided review + Jess's drawer day
@@ -422,10 +439,12 @@ behaves, and a chat that treats it as the flow will name things on the business'
 ```
 
 **⚠️ R8 IS A WORDS CARD. It does not mean Purchasing is finished** (Loo, 2026-07-28, in
-those words). It renames things and deletes two dead filters; the module still has no way to
-make the two supplier calls, no destination on a PO, and **has never had a single real
-purchase order through it.** A chat — or a person — reading "R8 ✅" as "line ⑦ done" would
-close a module that has not yet been used once.
+those words). **It shipped 2026-07-28 as #499 and the guard is now live, not hypothetical:**
+it renamed things and deleted two dead filters; the module still has no way to make the two
+supplier calls, no destination on a PO, and **has never had a single real purchase order
+through it.** A chat — or a person — reading "R8 ✅" as "line ⑦ done" would close a module
+that has not yet been used once. ④'s row also still carries **R7**, so R8 does not close its
+own line either.
 
 **Foundation does not interleave.** It was considered for the gap after R8 and Loo ruled it
 out: the three working-flow files come after **P5**, not between P-cards. Purchasing finishes

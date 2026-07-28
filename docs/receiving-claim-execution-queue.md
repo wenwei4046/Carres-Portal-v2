@@ -423,6 +423,74 @@ initiative, and it reports anything else it thinks should go.
 C4 chat may run beside it** — the whole Purchasing lane is R8's for one PR. That is the price
 of doing the sweep once, and it is cheaper than three cards each waiting for the same lane.
 
+**SHIPPED 2026-07-28 (PR #499, NO migration, web + shared only).** Notes the next
+cards need:
+
+- **The mirror grew a SECOND table rather than four more ladder keys.**
+  `order-action-words.ts` now holds `PURCHASING_ONLY` beside `WORDS`, because
+  `OrderActionKey` is the ORDER ladder's key — `DISPLAY_RANK` is a `Record` over
+  it, and `order-action-due` and `order-action-checklist` both key off it. Adding
+  `check_in` there would have forced a display rank and a due rule for an action
+  the Orders row can never show. One file (Law 0A), two tables, and **`Send PO` /
+  `Confirm ready date` are read back out of the order table**, never respelt —
+  COPY-STANDARD says they are ONE action shared by both flows.
+- **The rename reached SIX visible sites the card named five of.** The card
+  pointed at `OperationReceiving`'s `Receive →`; the identical button, opening
+  the identical modal, was also live on **Purchase Orders**
+  (`ProcurementTabContent.tsx`) — one tab over, same module. Renamed with its
+  sibling, because leaving it would have made the module's LAST screen the only
+  one still saying the banned word.
+- **The stage cell and the middle-list header are ONE label rendered twice.**
+  `STAGE_LABEL` is read by both. Renaming only the cell would have produced
+  `Confirm ready date` above a panel headed `Chase factories` — the exact defect
+  this card exists to end, created by the card that ends it.
+- **The dead filters were proved before being deleted, and the proof is the
+  point.** Every writer of `attn` and `selectedDay` set `null`; there is no URL
+  param, no keyboard handler, no effect and no prop. State, filter branches,
+  clear chips and the four date helpers that served only the chip went together.
+- **GRN: 4 sites became `Check in`, 5 stayed `GRN`.** The act sites were all in
+  `OrderDetailDrawer.tsx` (`+ GRN`, the modal title, `Save GRN`, the toast) plus
+  the linked-PO footer's `Receive (GRN)` — a fifth the card's table implies and
+  does not list, carrying BOTH errors at once. The document sites — the column
+  header, two tooltips and the error line — are correct and were left.
+- **`Contact` appears in ZERO visible strings on the claim screens, measured.**
+  R3 already shipped `Call`. What Loo's ruling actually still bought was the ROW
+  LINE: `claimNextMove`'s answer step said `confirm what they will do` while the
+  tile above it said the dictionary's `Confirm what happens next`. **The `late`
+  variant (`confirm the new delivery date`) is gone with it** — one action has
+  one row line — and that is the single thing this card makes LESS specific.
+- **A source scan, not a render test, is what guards a rename.** A render test
+  only sees the branches its fixture reaches; the banned words are true of the
+  whole lane or not at all (`purchasing-words.test.ts`). Its two knowing
+  exceptions are named in the file rather than regexed around: `Chase on
+  WhatsApp` and `Direct receive →`.
+- Live at ship: **0 POs · 0 PO lines · 0 claims · 0 warehouse receipts** — every
+  screen this card renames is still empty, so nothing on it moved for anybody.
+
+**Reported, NOT fixed** (each needs a word Jess or Loo has not ruled):
+- **`Chase on WhatsApp`**, its tooltip and the `Chase {supplier}` pane title on
+  To Order's ② detail pane. COPY-STANDARD offers `Open WhatsApp group` for a
+  channel button — but this one opens a direct `wa.me/{phone}` link when the
+  supplier has a contact and only falls back to the group, so that label is not
+  literally true. **A banned word is still on screen** and this is the loudest
+  thing R8 leaves behind.
+- `Nothing to chase here` / `items to chase` — the same word in an empty state
+  and a hint on that pane.
+- **`ReceivePOModal` spells the act five ways** (`Receive {po} · attach Supplier
+  DO` · `Receive now` · `Receive all pending` · `Receive partial` · `Mark
+  received`). It is the check-in FORM, opened from three tabs. Only the title has
+  a dictionary answer; the four form-internal labels have none, and renaming the
+  title alone would leave one form spelling one act two ways.
+- `Direct receive →` on Purchase Orders — the escape hatch out of the pickup
+  flight. "Direct" is a modifier with no dictionary row.
+- **`Record what happens next`** — the dictionary's BUTTON for this action; the
+  claim panel says `Save {supplier}'s answer`. **Two laws disagree**: the verb
+  dictionary exempts form buttons ("a button inside a form that stores what you
+  just typed is `Save`"), and the PURCHASING table locks the button word. A BUILD
+  chat reports a law conflict rather than picking a side.
+- `STATUS-STANDARD.md` §3, "the chase pair" — ④'s item ④, still a LAW file and
+  still a PLAN chat's to retitle.
+
 ## ⚠️ This line has NO working-flow file, and that is why its words are half-written
 
 **Law 3: every module owns ONE working-flow file.** Two exist —
@@ -461,4 +529,4 @@ queue, not a flow with two holes in it.
 | R5 | ✅ | [#475](https://github.com/wenwei4046/Carres-Portal-v2/pull/475) · no migration |
 | R6 | ✅ | [#490](https://github.com/wenwei4046/Carres-Portal-v2/pull/490) · 0301 + 0302 |
 | R7 | ⬜ after R1 · GRN duty auto-assign | — |
-| R8 | ⬜ any time · `Contact` → `Call` rename (words only, no migration) | — |
+| R8 | ✅ | [#499](https://github.com/wenwei4046/Carres-Portal-v2/pull/499) · no migration |
