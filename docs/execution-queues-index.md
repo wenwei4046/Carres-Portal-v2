@@ -128,6 +128,24 @@ R8 are the next things in it**, and R8 now has a list waiting: `Chase factory` o
 `Receive →` and R6's `Send back` on Receiving, `Contact` on the claim screens, and the
 `Factory:` / `Supplier:` chip split between two tabs of one module.
 
+**The lane rule broke on the way out, and the receipt belongs here rather than nowhere: TWO
+chats built the Receiving half at the same time.** #495 merged and deployed; the second build
+opened **#496** and it was **closed as superseded rather than reconciled** — merging it would
+have been a second rewrite of one file, and it would have overturned two decisions #495 had
+already made and reported to Jess: **the §8.2 row-click rung** (#495 refused it — this tab has
+no PO detail drawer and a form is not a record view; #496 made the whole row open the check-in
+form) and **whether the three status tabs survive beside the new rail** (#495 kept them and
+named the overlap; #496 deleted them and moved both sets onto the rail as `Check in` /
+`Fully received`, with nothing picked as the old `All`). **Both are Jess's to rule**, and #496's
+branch stays on the remote if either goes its way.
+
+**What let it happen, and the cheap guard.** Nothing in a chat's own view says a card is
+already being worked on — the lane rule lives in THIS file, and a chat that read it once and
+started building never re-reads it. So: **re-check the lane immediately before opening the PR,
+not only before starting.** That is exactly the shape of the migration guard (`list_migrations`
+twice — once before numbering, once before applying), and it is the only one of these two
+sessions' safeguards that would have caught this.
+
 **The lane check that found the problem, kept because it worked:** compare the migration
 tracker tail to `supabase/migrations`. **If the tracker is ahead, somebody is holding the
 lane** — or, as it turned out, somebody left it holding. On 2026-07-28 the tracker read

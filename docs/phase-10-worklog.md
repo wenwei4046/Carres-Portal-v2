@@ -3948,3 +3948,32 @@ strings shipped.
 **Deploy note added after the fact:** #497 (C8b) merged and deployed minutes after this card and its bundle CONTAINS this tip (`git merge-base --is-ancestor 646d8ee9 031051ab` passes), so `index-Du3H-Kir.js` was live and verified and is now superseded rather than rolled back.
 
 **P2 is complete.** Three tabs, one click law, and the durable output is §8.2's stage-vs-queue rule rather than any one screen.
+
+**Added by the second session, 2026-07-28 — the lane rule broke on this card and the receipt
+is part of the entry.** TWO chats built the Receiving half simultaneously. #495 (above) merged
+and deployed first; the second build opened **#496** and it was **closed as superseded rather
+than reconciled**, because merging it would have been a second rewrite of one file and would
+have overturned two decisions #495 had already made and reported to Jess:
+
+- **the §8.2 row-click rung** — #495's finding 2 refuses it (this tab has no PO detail drawer,
+  and the Check in FORM is not a record view); #496 made the whole row open that form, on the
+  argument that §8.2 states the rung without an exception for a settled row and the modal's own
+  gates keep it read-only;
+- **the three status tabs** — #495's finding 5 keeps them beside the new rail and names the
+  overlap for Jess; #496 deleted them and moved both sets onto the rail (`Check in` = the old
+  `To receive`, `Fully received` = the old `Received`, nothing picked = the old `All`), on the
+  argument that two controls for one axis is two doors onto one filter.
+
+**Both are Jess's to rule, not a PR's**, and #496's branch stays on the remote if either goes
+its way. The second session also re-verified this ship independently rather than copying the
+receipt: the tip built byte-identically (`index-Du3H-Kir.js`), and on the downloaded bundles
+`receiving-facet-checkin` · `receiving-facet-progress-` · `receiving-facet-supplier-` go from
+ABSENT to PRESENT and the retired strapline `Receive goods into Carres Klang` from PRESENT to
+absent — stated as presence, not as counts, which is this entry's own `grep -c` correction
+applied to itself.
+
+**What let it happen, and the guard worth adopting:** nothing in a chat's own view says a card
+is already being worked on — the lane rule lives in `docs/execution-queues-index.md`, and a
+chat that read it once and started building never re-reads it. **Re-check the lane immediately
+before opening the PR, not only before starting** — the same twice-look shape the migration
+guard already uses, and the only safeguard either session had that would have caught this.
