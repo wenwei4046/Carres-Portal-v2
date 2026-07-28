@@ -400,6 +400,28 @@ comes first, then the words** — so neither is a bug to sweep; they are lines t
 written their own file yet. A queue doc says WHAT to build. It cannot say how the module
 behaves, and a chat that treats it as the flow will name things on the business's behalf.
 
+### The three missing flows — SCHEDULED, and NOT to be started yet (Loo, 2026-07-28)
+
+Loo accepted this as a **Foundation gap, not a per-module bug** — the same hole showed up in
+two unrelated lines within two days, which is what makes it foundation work rather than
+tidying. **He also ruled it does not jump the queue.**
+
+```
+FINISH FIRST     P2-Receiving  →  C8b  →  R8  →  T3 review
+THEN, in order   1. docs/RECEIVING-WORKING-FLOW.md
+                 2. docs/SERVICE-CASES-WORKING-FLOW.md
+                 3. docs/READY-STOCK-WORKING-FLOW.md
+```
+
+**Do NOT open a card for any of the three before the Purchasing line closes.** The order is
+his and it is not alphabetical: Receiving is first because it is the one with a live screen
+already asking for words it does not have.
+
+**And do not "just start the file" while waiting.** A working-flow file is written in a PLAN
+chat with the business in the room — Orders' and Purchasing's both were — because its whole
+value is that somebody with authority named the actions. A flow file drafted from the code
+would be an eighth purchasing document: fluent, plausible, and nobody's.
+
 ## The engine law (read before any C-card, and before any new module)
 
 `docs/ACTION-FLOW-STANDARD.md` — two layers (compute every track · display picks one),
