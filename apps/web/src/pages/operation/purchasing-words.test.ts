@@ -38,6 +38,10 @@ const LANE = [
   "pages/operation/components/WarehouseReceiptsPanel.tsx",
   "pages/operation/procurement/ProcurementTabContent.tsx",
   "pages/warehouse/WarehouseCountModal.tsx",
+  // Added AFTER the first deploy, by the deploy grep itself: the ops right-rail
+  // calendar renders the same three purchasing lenses, and C1 had re-pointed
+  // only `chase`. The rail beside the To Order tab was still saying `Receive`.
+  "pages/operation/components/rail/CalendarPanel.tsx",
 ];
 
 const read = (rel: string) => readFileSync(join(WEB_SRC, rel), "utf8");
@@ -57,7 +61,7 @@ function visibleSource(rel: string): string {
 
 describe("R8 · the Purchasing lane speaks the dictionary", () => {
   it("scans every lane file (a rename must not silently empty this suite)", () => {
-    expect(LANE.length).toBe(6);
+    expect(LANE.length).toBe(7);
     for (const f of LANE) expect(read(f).length, f).toBeGreaterThan(500);
   });
 
@@ -90,6 +94,12 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
         .replace(/Direct receive →/g, " ");
       expect(src, `${f} renders a Receive verb`).not.toMatch(/receive\s*→/i);
       expect(src, `${f} renders a Receive verb`).not.toMatch(/>\s*Receive[\s<]/);
+      // …and as a bare STRING LITERAL, which is the shape the ops right-rail
+      // calendar was hiding in: `title="Receive"` is a prop, not a child, so
+      // the two rules above walked straight past it. Found by the deploy grep.
+      expect(src, `${f} passes "Receive" as a label`).not.toMatch(
+        /["'`]Receive["'`]/,
+      );
     }
   });
 

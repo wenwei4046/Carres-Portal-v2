@@ -9,6 +9,7 @@ import {
   DELIVERY_RANGE_KEYS,
   inRange,
   partnerDeliveryRules,
+  purchasingActionQueue,
   type CarrierDayLoad,
   type DayBooking,
   type DeliveryRangeKey,
@@ -57,11 +58,16 @@ type CalTab = "all" | "send" | "chase" | "receive" | "deliveries";
 // second stage, whose word is `Confirm ready date` — the same one the Orders
 // queue rail uses, so the two never spell one action differently. The tab KEY
 // stays `chase` (internal, and it is in the URL nowhere).
+// R8 (2026-07-28) finished what C1 started on this map, and the DEPLOY GREP is
+// what found it: `send` and `receive` were still the panel's own words while
+// `chase` had already been re-pointed at the dictionary. `Receive` as a verb is
+// banned outright, so the rail beside the To Order tab was saying `Receive`
+// while the tab itself said `Check in`. All three lenses read the mirror now.
 const TAB_LABEL: Record<CalTab, string> = {
   all: "All",
-  send: "Send",
-  chase: "Confirm ready date",
-  receive: "Receive",
+  send: purchasingActionQueue("send_po"),
+  chase: purchasingActionQueue("confirm_ready_date"),
+  receive: purchasingActionQueue("check_in"),
   deliveries: "Deliveries",
 };
 const TAB_TONE: Record<CalTab, string> = {
@@ -473,7 +479,7 @@ export default function CalendarPanel() {
 
               {(tab === "all" || tab === "send") && (
                 <DaySection
-                  title="Send POs"
+                  title={TAB_LABEL.send}
                   tone="text-danger"
                   empty="No POs to send this day."
                   items={daySend.map((s) => ({
@@ -497,7 +503,7 @@ export default function CalendarPanel() {
               )}
               {(tab === "all" || tab === "receive") && (
                 <DaySection
-                  title="Receive"
+                  title={TAB_LABEL.receive}
                   tone="text-success"
                   empty="Nothing arriving this day."
                   items={dayReceive.map((r) => ({
