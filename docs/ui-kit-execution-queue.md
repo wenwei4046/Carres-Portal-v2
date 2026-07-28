@@ -44,7 +44,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.3** | Delete the retired design docs + the `carres-design` skill | ⏳ after the new kit is proven |
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
-| **D0.5b** | Foundation components, Radix | ⏳ |
+| **D0.5b** | Foundation components, Radix | ⏳ **GATED (PM, 2026-07-28)** — starts once Q1 · Q3 · Q4 are frozen on `/ui`. **T3 runs in parallel, not in series** |
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ **ready to build** |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
@@ -208,6 +208,30 @@ tokens anyway.
 **All three are now a Jess task, not a build card** — same shape as T3. Open
 `/ui`, look at the top section, answer three questions. Nothing in the code
 moves whichever way they go (see D0.5a above).
+
+### The gate, ruled by the PM 2026-07-28
+
+```
+D0.5a ✅ built
+   ├── Q1 · Q3 · Q4 frozen on /ui   ← business, blocks D0.5b
+   └── T3 Jess uses the drawer      ← business, runs in PARALLEL, blocks T4
+                                        (never D0.5b)
+D0.5b  starts once the three are frozen
+```
+
+**D0.5b is gated on the freeze and on nothing else.** Not on T3, and not on a
+migration — Radix primitives carry behaviour, and behaviour does not wait for a
+spacing step. The reason the freeze DOES gate it: D0.5b's ten boxes are modals,
+drawers and menus, which is where spacing compounds. Building them against an
+unfrozen scale is the one place the "any answer costs zero component changes"
+property from D0.5a would stop holding.
+
+**`/ui` has to be reachable before any of this starts.** It exists on branch
+`claude/carres-portal-d0-5a-b2afe1` and nowhere else — not on `main`, not on
+either Pages project. A freeze session needs either the branch merged and
+deployed from the main tip (CLAUDE.md's deploy law: never from a feature
+branch), or Jess running a local preview. **That is Loo's call, and until it is
+made, Q1 · Q3 · Q4 cannot be answered by anybody.**
 
 Frozen: **Q2 page canvas = Radix `slate-3`** · **Q5** Current Issues is its own
 block · **Q6** the KPI boxes merge into Progress (*already true — see the lesson
