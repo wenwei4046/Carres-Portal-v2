@@ -126,7 +126,7 @@
   design. The PATTERN already exists — `ChaseNowRow.onOpen` opens "the tab where this is
   worked" — so the firm fix is one `onOpen` per step key mapped to the panel that owns it
   (supplier → Items · logistics → Delivery · money → Balance · photo → Documents), passed
-  down from `OrderDetailDrawer` exactly as `ChaseNowPanel` receives its own. It stays a
+  down from `OrderDetailDrawer` exactly as `CallsPanel` receives its own. It stays a
   disclosure, never a writer. Left for whoever next opens `OrderDetailDrawer.tsx` (7,000
   lines) for its own reason — a navigation pass through that file is not a side effect worth
   taking on its own.
