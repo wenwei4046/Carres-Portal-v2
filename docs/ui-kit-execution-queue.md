@@ -193,8 +193,9 @@ with the code it describes.**
 
 **Grep the component tree, not the attributes.** An early report said the drawer
 had neither "what to do today" nor "why it's stuck". Half wrong — `title=` was
-grepped, which returns tooltips. `ChaseNowPanel` existed all along; only Current
-Issues was genuinely missing.
+grepped, which returns tooltips. The counterparty panel existed all along
+(`ChaseNowPanel` then, **`CallsPanel` since PR #487**); only Current Issues was
+genuinely missing.
 
 **The design guard works on the author too.** T2's count badges arrived as
 `text-[10px]` / `h-[15px]` — two new typography values in the card that forbids

@@ -481,6 +481,7 @@ doubt, grep the codebase and match what already ships.
 | Where the supplier must send the goods | **where the goods go** | Ship-to · Destination · Drop point |
 | What is still owed after a short delivery | **balance** | Outstanding qty · Back-order · Shortfall |
 | Goods moved between our own locations | **stock transfer** | Relocation · Internal shipment · Redeployment |
+| The drawer panel listing who to ring, one row per outside party | **Calls** | Chase Now · Actions · Follow-ups · Contacts — `Actions` is the ROW's open-action list and one word may not head two blocks (Jess 2026-07-28, PR #487); the panel's own empty state has read `0 calls to make · everything on track.` since C1, so the title is that sentence's noun, not a new word |
 
 ## The delivery calendar words (T10, locked with Jess 2026-07-27)
 
