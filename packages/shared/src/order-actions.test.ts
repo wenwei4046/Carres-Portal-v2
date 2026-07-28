@@ -97,10 +97,13 @@ describe("goods track", () => {
     expect(keys(sig({ ...waiting, goodsUnordered: true }))).toContain("send_po");
   });
 
-  it("ready date overshoots the promise → agree a new date, not another supplier call", () => {
+  it("ready date overshoots the promise → DELAY PLANNING, not another supplier call", () => {
+    // C8 — and emphatically not a call to anybody yet. Before this card the
+    // radar opened a customer call on the spot.
     const s = sig({ ...waiting, stockEtaIso: "2026-08-21" });
-    expect(keys(s)).toContain("agree_new_delivery_date");
+    expect(keys(s)).toContain("delay_planning");
     expect(keys(s)).not.toContain("confirm_ready_date");
+    expect(keys(s)).not.toContain("arrange_new_delivery_date");
   });
 
   it("a ready date landing exactly ON the promise is not a delay", () => {
@@ -377,16 +380,25 @@ describe("displayOrderAction — Law 4's priority, and only that", () => {
     expect(first(s)).toBe("deliver_today");
   });
 
-  it("the customer-must-be-told call outranks goods and money", () => {
-    const s = sig({
+  it("the delay rung outranks goods and money — before AND after the decision", () => {
+    const base = {
       goodsReady: false,
       stockEtaIso: "2026-08-21",
       bookingConfirmed: false,
       confirmedDateIso: null,
       hasLogistics: false,
       moneyOwing: true,
-    });
-    expect(first(s)).toBe("agree_new_delivery_date");
+    } as const;
+    expect(first(sig(base))).toBe("delay_planning");
+    expect(
+      first(
+        sig({
+          ...base,
+          delayDecision: "new_date",
+          delayDecisionEtaIso: "2026-08-21",
+        }),
+      ),
+    ).toBe("arrange_new_delivery_date");
   });
 
   it("goods outrank delivery preparation", () => {
@@ -466,5 +478,144 @@ describe("orderActionsInDisplayOrder — the drawer's list", () => {
     expect(new Set(orderActionsInDisplayOrder(s).map((a) => a.key))).toEqual(
       new Set(keys(s)),
     );
+  });
+});
+
+// ── C8 · Delay planning, and the gate before the customer ────────────────────
+
+describe("C8 · the delay gate — the customer is the LAST to know", () => {
+  /** A delayed order: goods still coming, the factory's date overshoots the day
+   *  we sold. Every test names only the signal it is about. */
+  const delayed = (o: Partial<OrderActionSignals> = {}): OrderActionSignals =>
+    sig({
+      goodsReady: false,
+      goodsUnordered: false,
+      stockEtaIso: "2026-08-30",
+      promisedDateIso: "2026-08-20",
+      bookingConfirmed: false,
+      confirmedDateIso: null,
+      ...o,
+    });
+
+  it("STAGE 1 opens by itself, and it is a DECISION — no call to anybody", () => {
+    expect(keys(delayed())).toContain("delay_planning");
+    expect(keys(delayed())).not.toContain("arrange_new_delivery_date");
+  });
+
+  it("STAGE 2 cannot open before the decision is recorded (§3 invariant 3)", () => {
+    // The card: "Stage 2 cannot open before the decision is recorded, and never
+    // opens at all when the answer is YES."
+    expect(keys(delayed({ delayDecision: null }))).not.toContain(
+      "arrange_new_delivery_date",
+    );
+  });
+
+  it("YES — we can still make it — never reaches the customer, ever", () => {
+    const s = delayed({
+      delayDecision: "keep",
+      delayDecisionEtaIso: "2026-08-30",
+    });
+    expect(keys(s)).not.toContain("arrange_new_delivery_date");
+    expect(keys(s)).not.toContain("delay_planning");
+    // The goods are still not in, so the ordinary supplier call carries on —
+    // which is the truth about this order, and the only honest thing to show.
+    expect(keys(s)).toContain("confirm_ready_date");
+  });
+
+  it("NO opens EXACTLY ONE logistics action, and it names logistics", () => {
+    const s = delayed({
+      delayDecision: "new_date",
+      delayDecisionEtaIso: "2026-08-30",
+    });
+    const goods = openOrderActions(s).filter((a) => a.track === "goods");
+    expect(goods.map((a) => a.key)).toEqual(["arrange_new_delivery_date"]);
+  });
+
+  it("a decision made about an OLDER supplier date does not silence a NEW delay", () => {
+    // The factory slipped again. The old answer was about 30 Aug; this is a
+    // different delay and it gets its own decision (S4's rule: an event names
+    // the thing it was made about).
+    const s = delayed({
+      stockEtaIso: "2026-09-15",
+      delayDecision: "keep",
+      delayDecisionEtaIso: "2026-08-30",
+    });
+    expect(keys(s)).toContain("delay_planning");
+  });
+
+  it("STAGE 2 closes when a customer-confirmed date the goods can make is on file", () => {
+    const open = delayed({
+      delayDecision: "new_date",
+      delayDecisionEtaIso: "2026-08-30",
+      bookingConfirmed: true,
+      // A booking made BEFORE the slip — earlier than the goods can arrive, so
+      // nothing has actually been arranged and the action stays open.
+      confirmedDateIso: "2026-08-20",
+    });
+    expect(keys(open)).toContain("arrange_new_delivery_date");
+
+    const closed = delayed({
+      delayDecision: "new_date",
+      delayDecisionEtaIso: "2026-08-30",
+      bookingConfirmed: true,
+      confirmedDateIso: "2026-09-02",
+    });
+    expect(keys(closed)).not.toContain("arrange_new_delivery_date");
+    expect(keys(closed)).toContain("confirm_ready_date");
+  });
+
+  it("THE PROMISED DATE IS THE YARDSTICK — a new booking never becomes the new promise", () => {
+    // Invariant 1, as behaviour rather than as a comment. The customer accepted
+    // 2 Sep, so a naive implementation would start measuring delays against
+    // THAT. It must not: `orders.delivery_date` stays at what was sold, so a
+    // factory date of 25 Aug — comfortably before the arranged booking, and
+    // after the promise — is still a delay and still needs its own decision.
+    const arranged = {
+      delayDecision: "new_date",
+      delayDecisionEtaIso: "2026-08-30",
+      bookingConfirmed: true,
+      confirmedDateIso: "2026-09-02",
+      hasLogistics: true,
+    } as const;
+    expect(
+      keys(delayed({ ...arranged, stockEtaIso: "2026-08-25" })),
+    ).toContain("delay_planning");
+    expect(
+      keys(delayed({ ...arranged, stockEtaIso: "2026-09-20" })),
+    ).toContain("delay_planning");
+    // And the day it was SOLD is what the overdue escalation counts on: the
+    // promise passed, nobody has confirmed, so the commitment reads broken —
+    // with a rearranged date on file it would not.
+    const overdue = delayed({
+      delayDecision: "new_date",
+      delayDecisionEtaIso: "2026-08-30",
+      hasLogistics: true,
+      daysToDue: -5,
+    });
+    expect(openOrderActions(overdue).some((a) => a.broken === true)).toBe(true);
+  });
+
+  it("no decision recorded reproduces the pre-C8 trigger exactly", () => {
+    // An older Worker that does not select the two columns: the radar still
+    // fires on the same condition it always did, and it opens stage 1.
+    const s = delayed({ delayDecision: undefined, delayDecisionEtaIso: undefined });
+    expect(keys(s)).toContain("delay_planning");
+  });
+
+  it("the delay flow raises at most ONE goods action, whatever the combination", () => {
+    for (const delayDecision of [null, "keep", "new_date"] as const)
+      for (const etaIso of ["2026-08-30", "2026-09-15"])
+        for (const bookingConfirmed of [false, true]) {
+          const s = delayed({
+            stockEtaIso: etaIso,
+            delayDecision,
+            delayDecisionEtaIso: "2026-08-30",
+            bookingConfirmed,
+            confirmedDateIso: bookingConfirmed ? "2026-09-02" : null,
+          });
+          expect(
+            openOrderActions(s).filter((a) => a.track === "goods"),
+          ).toHaveLength(1);
+        }
   });
 });

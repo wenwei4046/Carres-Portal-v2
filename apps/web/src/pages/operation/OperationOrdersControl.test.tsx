@@ -795,8 +795,10 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     };
     wrap(<OperationOrdersControl />);
     fireEvent.click(statusGroup().getByRole("button", { name: /All\s*2/ }));
+    // C8 — the tooltip used to end "call the customer now", which is the one
+    // thing Law 4 rung 2 forbids. The queue is the DECISION now.
     const row = screen.getByTitle(
-      "Stock ETA lands AFTER the promised date — call the customer now, before the window (delay radar, T3)",
+      "Supplier date lands after the promised date — decide before anyone calls (Delay planning)",
     );
     expect(Number((row.textContent ?? "").replace(/[^0-9]/g, ""))).toBe(1);
     fireEvent.click(row);
@@ -1277,7 +1279,7 @@ describe("nextActionOf (C2)", () => {
   });
 
   // ── T3 · Delay Radar — catch the miss BEFORE the window ──
-  it("stock ETA overshoots the customer date (date still future) → Call customer (stock delay) (red)", () => {
+  it("stock ETA overshoots the customer date (date still future) → Delay planning (red)", () => {
     const o = makeRow({
       id: "x",
       so: 1,
@@ -1287,12 +1289,56 @@ describe("nextActionOf (C2)", () => {
         line_etas: { "mattress:MAT-1": inDays(14) },
       },
     });
-    // Without the radar this would be "Chase supplier" (amber) — the radar
-    // outranks it: chasing the supplier can no longer save the date.
+    // Without the radar this would be the supplier call (amber) — the radar
+    // outranks it: calling the supplier can no longer save the date.
+    //
+    // C8 — and what it opens is a DECISION, not a call. Nobody is phoned until
+    // Operations has answered "can we still make the promised date?"; before
+    // this card the radar opened `Call {customer} — agree new delivery date`
+    // on the spot, which Law 4 rung 2 forbids twice over.
     expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
-      label: "Agree new delivery date",
+      label: "Delay planning",
       tone: "danger",
     });
+  });
+
+  it("C8 · the decision is what opens the logistics call — and only the NO answer", () => {
+    const withDecision = (decision: "keep" | "new_date" | null) =>
+      makeRow({
+        id: "x",
+        so: 1,
+        delivery_date: inDays(10),
+        ops_order_control: {
+          line_stock_status: { "mattress:MAT-1": "waiting" },
+          line_etas: { "mattress:MAT-1": inDays(14) },
+          ...(decision
+            ? { delay_decision: decision, delay_decision_eta: inDays(14) }
+            : {}),
+        },
+      });
+    // YES — solved internally. The customer is never told, and the goods track
+    // carries on with the ordinary supplier call, which is the truth.
+    expect(
+      nextActionOf(withDecision("keep"), { state: "awaiting" }, MS).label,
+    ).toBe("Confirm ready date");
+    // NO — and the row names LOGISTICS, never the customer.
+    const no = nextActionOf(withDecision("new_date"), { state: "awaiting" }, MS);
+    expect(no.label).toBe("Arrange new delivery date");
+    // A decision taken about an OLDER supplier date silences nothing.
+    const slippedAgain = makeRow({
+      id: "x",
+      so: 1,
+      delivery_date: inDays(10),
+      ops_order_control: {
+        line_stock_status: { "mattress:MAT-1": "waiting" },
+        line_etas: { "mattress:MAT-1": inDays(20) },
+        delay_decision: "keep",
+        delay_decision_eta: inDays(14),
+      },
+    });
+    expect(nextActionOf(slippedAgain, { state: "awaiting" }, MS).label).toBe(
+      "Delay planning",
+    );
   });
 
   it("stock ETA still makes the date (even inside the buffer) → stays Chase supplier, radar silent", () => {

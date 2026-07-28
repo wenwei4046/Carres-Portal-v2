@@ -52,8 +52,11 @@ describe("deriveOrderJourney — the stage strip agrees with the ladder", () => 
   const MATRIX: [string, Partial<OrderJourneySignals>, string][] = [
     ["Send PO", { hasPo: false, goodsReady: false }, "Purchase"],
     ["Confirm ready date", { hasPo: true, goodsReady: false }, "Goods"],
+    // C8 — the delay radar's one rung became TWO: an internal DECISION first,
+    // and only its NO answer opens the call to logistics. Both sit on Goods.
+    ["Delay planning", { hasPo: true, goodsReady: false }, "Goods"],
     [
-      "Agree new delivery date",
+      "Arrange new delivery date",
       { hasPo: true, goodsReady: false },
       "Goods",
     ],
@@ -223,7 +226,8 @@ describe("deriveOrderJourney — owner", () => {
     const verbs = [
       "Send PO",
       "Confirm ready date",
-      "Agree new delivery date",
+      "Delay planning",
+      "Arrange new delivery date",
       "Assign logistics",
       "Confirm delivery date",
       "Deliver today",
@@ -295,14 +299,27 @@ describe("deriveOrderJourney — health", () => {
   });
 
   it("raises the delay radar from the ladder's own verb, not a second ETA read", () => {
-    const j = deriveOrderJourney(
-      input({
-        signals: sig({
-          next: { label: "Agree new delivery date", tone: "danger" },
-        }),
-      }),
-    );
-    expect(j.health.map((h) => h.key)).toContain("stock_delay");
+    // C8 — BOTH delay stages raise it. The stock fact does not stop being true
+    // when the decision is taken; what changes is the action beside it.
+    for (const label of ["Delay planning", "Arrange new delivery date"]) {
+      const j = deriveOrderJourney(
+        input({ signals: sig({ next: { label, tone: "danger" } }) }),
+      );
+      expect(j.health.map((h) => h.key)).toContain("stock_delay");
+    }
+  });
+
+  it("C8 · no delay rung's owner line opens a call to the CUSTOMER (Law 4 rung 2)", () => {
+    // `Carres does not phone a customer about a delay — logistics carries that
+    // conversation.` The owner line is exactly where that rule was being
+    // broken: it read "Operations — agree a new date with the customer".
+    for (const label of ["Delay planning", "Arrange new delivery date"]) {
+      const j = deriveOrderJourney(
+        input({ signals: sig({ next: { label, tone: "danger" } }) }),
+      );
+      expect(j.owner).not.toMatch(/with the customer/i);
+      expect(j.owner).not.toMatch(/\bagree\b/i);
+    }
   });
 
   it("reports uncollected ledger money as a fact, never as a hold", () => {
@@ -416,7 +433,8 @@ describe("OrderJourneyHeader — the strip", () => {
     for (const label of [
       "Send PO",
       "Confirm ready date",
-      "Agree new delivery date",
+      "Delay planning",
+      "Arrange new delivery date",
       "Assign logistics",
       "Confirm delivery date",
       "Deliver today",

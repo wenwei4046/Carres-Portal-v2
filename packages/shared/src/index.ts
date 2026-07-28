@@ -793,6 +793,11 @@ export {
   deliveryGroupKeySchema,
   deliveryTripSchema,
   type DeliveryTrip,
+  // C8 delay planning (migration 0304)
+  DELAY_DECISIONS,
+  delayDecisionInput,
+  type DelayDecision,
+  type DelayDecisionInput,
   type OpsOrderControl,
   type UpdateOpsOrderControlInput,
   type OpsOrderControlResponse,

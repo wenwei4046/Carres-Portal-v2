@@ -110,6 +110,22 @@ export interface OrderJourneySignals {
    *  balance is not on file (the live case on every order today), which is why
    *  the health line must never read this as "settled". */
   holdAmount: number | null;
+  /**
+   * C8 — the delay this order is in, when it is in one. Absent means the
+   * supplier's date does not overshoot the promise, and there is nothing to
+   * decide.
+   *
+   * Resolved by the CALLER from the same overlay read the ladder used, so the
+   * panel and the action above it can never be about two different supplier
+   * dates. It is NOT a second computation of "is this order delayed?" — the
+   * ladder still owns that, and the panel renders only when the ladder has
+   * raised `Delay planning`.
+   */
+  delay?: {
+    supplierEtaIso: string;
+    promisedDateIso: string | null;
+    decision: "keep" | "new_date" | null;
+  };
 }
 
 /** The action → stage map. This is the ONE place the two surfaces are joined:
@@ -121,7 +137,10 @@ export interface OrderJourneySignals {
 const VERB_STAGE: Record<string, JourneyStage> = {
   [orderActionQueue("send_po")]: "Purchase",
   [orderActionQueue("confirm_ready_date")]: "Goods",
-  [orderActionQueue("agree_new_delivery_date")]: "Goods",
+  // C8 — both delay stages sit on the Goods step: the promise is at risk
+  // because the goods are, and neither stage moves the order forward a stage.
+  [orderActionQueue("delay_planning")]: "Goods",
+  [orderActionQueue("arrange_new_delivery_date")]: "Goods",
   [orderActionQueue("assign_logistics")]: "Booking",
   [orderActionQueue("confirm_delivery_date")]: "Booking",
   // C7 — the paper for a booked trip. Booking is finished (the customer said
@@ -142,8 +161,13 @@ const VERB_STAGE: Record<string, JourneyStage> = {
 const VERB_OWNER: Record<string, string> = {
   [orderActionQueue("send_po")]: "Operations — send the purchase order",
   [orderActionQueue("confirm_ready_date")]: "Supplier — goods not in yet",
-  [orderActionQueue("agree_new_delivery_date")]:
-    "Operations — agree a new date with the customer",
+  // C8 — this line used to read "agree a new date with the customer", which is
+  // exactly what Law 4 rung 2 forbids. Stage 1 is a decision nobody outside is
+  // part of; stage 2 is a call to LOGISTICS, who carry the conversation.
+  [orderActionQueue("delay_planning")]:
+    "Operations — decide before anyone calls",
+  [orderActionQueue("arrange_new_delivery_date")]:
+    "Operations — give logistics the new date to arrange",
   [orderActionQueue("assign_logistics")]: "Operations — pick the logistics company",
   [orderActionQueue("confirm_delivery_date")]:
     "Logistics — customer has not confirmed a date",
@@ -249,7 +273,15 @@ export function deriveOrderJourney(input: OrderJourneyInput): OrderJourney {
         : "Delivery on hold — balance not collected",
     });
   }
-  if (verb === orderActionQueue("agree_new_delivery_date")) {
+  // C8 — one health line for both delay stages. It is a FACT about the goods
+  // (`Stock arrives after the promised date`), and it stays a fact through the
+  // decision: what changes is the ACTION beside it, not the truth about the
+  // stock. Law 7 — a records surface states what it has; it never phrases the
+  // gap as a second instruction.
+  if (
+    verb === orderActionQueue("delay_planning") ||
+    verb === orderActionQueue("arrange_new_delivery_date")
+  ) {
     health.push({
       key: "stock_delay",
       tone: "danger",

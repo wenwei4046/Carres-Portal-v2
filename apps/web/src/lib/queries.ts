@@ -196,6 +196,7 @@ import {
   type PatchDeliveryStopInput,
   type OpsOrderControl,
   type ConfirmBookingInput,
+  type DelayDecisionInput,
   // T9 (0283) — logistic partner delivery rules + the date pre-check.
   type PartnerBookingCheckResponse,
   type PartnerBookingWarningWire,
@@ -2884,6 +2885,14 @@ export interface opsRemarkEmbed {
    *  there is nothing to backfill); T11's detail pane reads it to name the
    *  second trip. Optional: a pre-T11 Worker simply doesn't select it. */
   booking_groups?: string[] | null;
+  /** C8 delay planning (migration 0304) — the recorded answer to "can we still
+   *  make the promised date?", and the supplier date it was made ABOUT. The
+   *  ladder reads BOTH: a decision only silences the delay it was taken about,
+   *  so a factory that slips again re-opens Delay planning by itself. Optional
+   *  → `undefined` on a pre-0304 Worker, which reproduces the pre-C8 behaviour
+   *  (the radar fires on the overshoot, as it always did). */
+  delay_decision?: "keep" | "new_date" | null;
+  delay_decision_eta?: string | null;
 }
 export interface operationOrdersListResponse {
   orders: operationOrderListRow[];
@@ -4354,6 +4363,40 @@ export function useIssueDeliveryOrder(
       apiFetch<IssueDeliveryOrderResult>(
         `/api/operation/orders/${orderId}/delivery-order`,
         { method: "POST", body: "{}" },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** C8 — record the Delay planning decision (Jess 2026-07-27, migration 0304).
+ *
+ *  The supplier named a date later than the one we sold. Operations answers one
+ *  question — *can we still make the promised date?* — and only `new_date`
+ *  opens `Call {logistics} — arrange new delivery date`. `keep` means we solved
+ *  it internally and **the customer is never told**.
+ *
+ *  `supplierEta` is the factory date the operator was looking at. The server
+ *  refuses one this order does not hold, and the engine only treats a decision
+ *  as current while it still points at the CURRENT date — so a factory that
+ *  slips again re-opens Delay planning by itself, rather than being silenced by
+ *  an answer given about a different date. */
+export function useRecordDelayDecision(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<{ control: unknown }, ApiError, DelayDecisionInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ control: unknown }, ApiError, DelayDecisionInput>({
+    mutationFn: (input) =>
+      apiFetch<{ control: unknown }>(
+        `/api/operation/orders/${orderId}/delay-decision`,
+        { method: "POST", body: JSON.stringify(input) },
       ),
     ...opts,
     onSuccess: async (...args) => {

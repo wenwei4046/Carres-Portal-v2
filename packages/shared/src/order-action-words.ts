@@ -28,7 +28,8 @@
 export type OrderActionKey =
   | "send_po"
   | "confirm_ready_date"
-  | "agree_new_delivery_date"
+  | "delay_planning"
+  | "arrange_new_delivery_date"
   | "assign_logistics"
   | "confirm_delivery_date"
   | "issue_delivery_order"
@@ -111,14 +112,50 @@ const WORDS: readonly OrderActionWord[] = [
     done: null,
   },
   {
-    key: "agree_new_delivery_date",
-    queue: "Agree new delivery date",
+    // C8 · STAGE 1 of the delay flow (`docs/ORDERS-WORKING-FLOW.md` §3).
+    //
+    // A supplier naming a later date is NOT yet a delay — we may have the item
+    // in ready stock, or another supplier may cover it. So the work is a
+    // DECISION, taken by Operations, and the customer is not contacted in this
+    // stage at all.
+    //
+    // NO PARTY, and it is the same reason `Assign logistics` carries none:
+    // nobody outside is involved (COPY-STANDARD's action naming law names the
+    // party-free actions explicitly). Naming one here would be exactly the
+    // error this card exists to fix.
+    //
+    // The word is Jess's own: COPY-STANDARD's vocabulary table gives
+    // `Delay planning` as the canonical phrase for "working out what to do
+    // about a delay, before anyone calls the customer", and bans `Recovery`
+    // outright — staff say "this order going to delay".
+    key: "delay_planning",
+    queue: "Delay planning",
+    line: () => "Delay planning",
+    button: "Record the delay decision",
+    done: null,
+  },
+  {
+    // C8 · STAGE 2, and it opens ONLY when the decision says the promised date
+    // cannot be met.
+    //
+    // **THE DICTIONARY WINS, and the party changes with it.** This shipped as
+    // `Agree new delivery date` / `Call {customer} — agree new delivery date`
+    // (C2 finding #3, assigned to C8). Three laws said otherwise and agreed
+    // with each other: COPY-STANDARD's dictionary row (`Arrange new delivery
+    // date` / `Call {logistics} — arrange new delivery date`), its vocabulary
+    // table, and ACTION-FLOW Law 4 rung 2 — *"Rung 2 never names the customer.
+    // Carres does not phone a customer about a delay — logistics carries that
+    // conversation, and the action in this portal is the call to logistics.
+    // Any surface that opens a customer call about a delay is wrong."*
+    //
+    // Operations still OWNS the task (§3: eight logistics companies are in use,
+    // only NETS has a login, and the partner portal has no appointment screen —
+    // a task owned by "Logistics" would be one nobody can see or close). The
+    // CONVERSATION is logistics'; the ACTION in this portal is ours.
+    key: "arrange_new_delivery_date",
+    queue: "Arrange new delivery date",
     line: (p) =>
-      `Call ${party(p.customer, "customer")} — agree new delivery date`,
-    // COPY-STANDARD's dictionary row is `Arrange new delivery date`; the shipped
-    // QUEUE + LINE spell it `agree` and name the customer. C2 finding #3 — the
-    // two laws name different parties for this one rung and **C8 owns it**. The
-    // button word is party-free, so it is the same under either ruling.
+      `Call ${party(p.logistics, "logistics")} — arrange new delivery date`,
     button: "Record new date",
     done: null,
   },

@@ -128,6 +128,32 @@ export interface OrderActionSignals {
    *  money is not owing — a number nobody knows may not stand between a
    *  customer and their goods. This raises the money ACTION. */
   moneyOwing: boolean;
+  /**
+   * C8 — the recorded answer to "can we still make the promised date?"
+   * (`ops_order_control.delay_decision`, migration 0304).
+   *
+   *   `null`       nobody has decided yet — Delay planning is open
+   *   `"keep"`     we can still make it; the customer is NEVER told, and the
+   *                goods track carries on with the ordinary ready-date call
+   *   `"new_date"` we cannot; the logistics call opens (stage 2)
+   *
+   * Absent reproduces the pre-C8 behaviour for a surface that does not select
+   * the column — see `delayDecisionEtaIso`.
+   */
+  delayDecision?: "keep" | "new_date" | null;
+  /**
+   * C8 — the supplier date that decision was made ABOUT
+   * (`ops_order_control.delay_decision_eta`, 0304, NOT NULL whenever a decision
+   * exists).
+   *
+   * **A decision is only about one supplier date.** If the factory slips again,
+   * the old answer may not silence the new delay — so the engine compares this
+   * snapshot with the CURRENT `stockEtaIso` and re-opens Delay planning when
+   * they differ. This is S4's rule (every event names the deadline it was made
+   * about) applied to a delay, and without it one decision would close every
+   * future delay on the order forever.
+   */
+  delayDecisionEtaIso?: string | null;
   /** C9 — money still HOLDS the delivery (`orderMoney.holds`). Normally the
    *  same answer as `moneyOwing`; they part company on one order, and that
    *  order is the whole point of the card: a manager has released a delivery
@@ -147,6 +173,20 @@ function action(
 }
 
 /**
+ * C8 · Has somebody decided about THIS supplier date?
+ *
+ * A decision is a fact about one supplier date, not about the order forever.
+ * The pair is stored together (0304 refuses half of it), and a later, worse
+ * date from the factory is a NEW delay that the old answer may not silence.
+ */
+function delayDecided(s: OrderActionSignals): boolean {
+  return (
+    (s.delayDecision ?? null) !== null &&
+    (s.delayDecisionEtaIso ?? null) === s.stockEtaIso
+  );
+}
+
+/**
  * GOODS — open until the goods are secured. At most one, because the rungs are
  * states of the same question ("where are these goods?"), not parallel work.
  */
@@ -154,19 +194,56 @@ function goodsAction(s: OrderActionSignals): OrderOpenAction | null {
   // Guardrail #2: a delivered order never alarms about goods.
   if (s.completed || s.goodsReady) return null;
   if (s.goodsUnordered) return action("send_po", "goods", "danger");
-  // T3 DELAY RADAR: once the latest ready date OVERSHOOTS the promised date the
-  // miss is certain, so calling the supplier can no longer save it — the work
-  // becomes agreeing a new date. Strict overshoot: landing ON the date is not a
-  // delay.
+  // T3 DELAY RADAR: the latest ready date OVERSHOOTS the promised date, so
+  // calling the supplier can no longer save the promise. Strict overshoot:
+  // landing ON the date is not a delay.
+  //
+  // C8 · WHAT HAPPENS NEXT IS A DECISION, NOT A PHONE CALL. Before this card
+  // the radar opened `Call {customer} — agree new delivery date` on the spot,
+  // which broke Jess's own rule twice over: a supplier naming a later date is
+  // not yet a delay (we may have ready stock, or another supplier may cover
+  // it), and even when it IS one, logistics carries the customer conversation.
+  // `docs/ORDERS-WORKING-FLOW.md` §3 puts a GATE here — **the customer is the
+  // last to know, and only when we have tried and failed.**
   if (
     s.stockEtaIso &&
     s.promisedDateIso &&
     s.stockEtaIso > s.promisedDateIso
-  )
-    return action("agree_new_delivery_date", "goods", "danger");
+  ) {
+    // STAGE 1 — nobody has decided about this supplier date yet.
+    if (!delayDecided(s)) return action("delay_planning", "goods", "danger");
+    // STAGE 2 — and it opens ONLY on NO. `keep` means we solved it internally,
+    // so nothing here ever reaches the customer: the track falls through to the
+    // ordinary ready-date call, which is the truth (the goods are still not in).
+    if (s.delayDecision === "new_date" && !newDateArranged(s))
+      return action("arrange_new_delivery_date", "goods", "danger");
+  }
   // Red once inside the arrival window and the date still has not landed.
   const inWindow = s.daysToDue !== null && s.daysToDue < s.stockWindowDays;
   return action("confirm_ready_date", "goods", inWindow ? "danger" : "warning");
+}
+
+/**
+ * C8 · STAGE 2's completion, measured — §3: *"a customer-confirmed date AND a
+ * time slot are recorded"*, plus the one condition that makes it about THIS
+ * delay.
+ *
+ * The booking alone is not enough, and the reason is a real order rather than a
+ * hypothetical: an order can already carry a confirmed booking made BEFORE the
+ * factory slipped, and reading `bookingConfirmed` on its own would close stage 2
+ * the instant it opened — the action would appear and vanish in the same render,
+ * having arranged nothing. So the confirmed day must be one the goods can
+ * actually make: **on or after the supplier's ready date.** That is not an
+ * invented rule, it is the only thing "a new delivery date" can mean when the
+ * old one is unreachable, and it is measured from signals that already exist —
+ * no timestamp column, nothing for a future chat to keep in step.
+ *
+ * 0277's CHECK makes the slot ride the date, so a confirmed booking carries
+ * both; `bookingConfirmed` is exactly "date + slot on file".
+ */
+function newDateArranged(s: OrderActionSignals): boolean {
+  if (!s.bookingConfirmed || !s.confirmedDateIso) return false;
+  return !!s.stockEtaIso && s.confirmedDateIso >= s.stockEtaIso;
 }
 
 /**
@@ -349,8 +426,16 @@ const DISPLAY_RANK: Record<OrderActionKey, number> = {
   // 1 · broken commitment or today's run
   deliver_today: 10,
   upload_delivery_photo: 11,
-  // 2 · the customer must be told something
-  agree_new_delivery_date: 20,
+  // 2 · the customer must be told something — and C8 puts the DECISION that
+  // gates it immediately above the call it gates. Law 4 does not name
+  // `Delay planning` at all (reported, not invented): it is not "the customer
+  // must be told", because the whole point is that they are not told yet — but
+  // it cannot rank below the call it must precede, and a promise that is about
+  // to break outranks routine goods, delivery and money work. The two can never
+  // both be open (one goods track, one action), so this rank only decides them
+  // against the OTHER tracks, where the answer is the same for both.
+  delay_planning: 19,
+  arrange_new_delivery_date: 20,
   // 3 · goods are not secured
   send_po: 30,
   confirm_ready_date: 31,
