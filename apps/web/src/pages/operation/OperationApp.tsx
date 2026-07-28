@@ -33,6 +33,7 @@ import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
 import OperationReceiving from "./OperationReceiving";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
+import OperationPurchasingSettings from "./OperationPurchasingSettings";
 // 0226 — the operation-facing COSTING catalog (SKU Master / Modular / Fabric).
 import OperationCatalogPage from "@/pages/catalog/OperationCatalogPage";
 import { CATALOG_TAB_PARAM } from "@/pages/catalog/catalog-tabs";
@@ -251,7 +252,8 @@ export default function OperationApp() {
           !isProcurementUrl &&
           tab !== "purchase" &&
           tab !== "receiving" &&
-          tab !== "claims" && <GlobalTopBar />}
+          tab !== "claims" &&
+          tab !== "purchasing-settings" && <GlobalTopBar />}
         <div className="flex-1 min-h-0 overflow-auto">
         {isUrlDriven ? (
           // Nested route table for the URL-driven sections.
@@ -325,6 +327,10 @@ export default function OperationApp() {
                 what an unkept ETA turned into. Fourth Purchasing tab, no new
                 sidebar entry. */}
             {tab === "claims" && <OperationSupplierClaims />}
+            {/* P1 — Purchasing → Settings: the numbers the ordering engine
+                reads. Manager-only; the tab is hidden for everyone else and
+                the RPCs refuse the write regardless. */}
+            {tab === "purchasing-settings" && <OperationPurchasingSettings />}
             {/* T11 — Delivery: the 3-pane module (queues · calendar · detail).
                 Read-only by design; every write stays behind the order drawer. */}
             {tab === "delivery" && <OperationDelivery />}

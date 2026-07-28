@@ -10,6 +10,7 @@ import {
   deliveryGroupLabel,
   deliveryRange,
   deliveryQueueForLabel,
+  deliveryQueueLeads,
   deliveryScopeSentence,
   deliveryStepDueIso,
   deliveryStepOverdue,
@@ -31,6 +32,7 @@ import {
   useDeliveryPartners,
   useOperationOrders,
   useOperationStock,
+  usePurchasingSettings,
   type operationOrderListRow,
 } from "@/lib/queries";
 import { orderBookingDay, orderControlOf } from "@/lib/order-booking";
@@ -183,6 +185,15 @@ export default function OperationDelivery() {
   }, [stockQ.data]);
 
   const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
+  // P1 — the working days of notice on `Confirm delivery date` is a setting
+  // (Purchasing → Settings). Read here so this module and the Orders list can
+  // never call the same step late on different days.
+  const purchasingSettingsQ = usePurchasingSettings();
+  const queueLeads = useMemo(
+    () =>
+      purchasingSettingsQ.data ? deliveryQueueLeads(purchasingSettingsQ.data) : undefined,
+    [purchasingSettingsQ.data],
+  );
   const today = todayIso();
 
   /**
@@ -235,7 +246,7 @@ export default function OperationDelivery() {
       });
     }
     return sortDeliveryRows(out);
-  }, [orders, availableBySku, partnerNameById, holidayOpts, today]);
+  }, [orders, availableBySku, partnerNameById, holidayOpts, today, queueLeads]);
 
   /** The board itself — the queue-carrying rows, in delivery-risk order. */
   const board = useMemo(

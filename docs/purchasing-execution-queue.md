@@ -105,6 +105,49 @@ Shipping code whose table does not exist yet 500s the Purchasing page.
 Order tab moves the same day; no purchasing number is hard-coded anywhere; and the gear-icon
 drawer and the two Catalog → Delivery fields are gone.
 
+### ✅ SHIPPED — what actually landed (2026-07-28)
+
+Migration **0303** · four tables (`purchasing_settings` singleton ·
+`purchasing_supplier_settings` · `purchasing_production_days` ·
+`purchasing_setting_changes`) · four audited DEFINER RPCs, manager-gated on the existing
+`ops_manager` duty — **no new duty key**. No table carries a write policy, so the
+gate cannot be walked around over PostgREST.
+
+**The rule that shaped the build (Jess 2026-07-28): a supplier × category with no number
+does NOT fall back to 7.** `productionWorkingDaysFor` returns `null`, the line is held out
+of the plan, the To Order tab names the pair, and the Settings screen says `Set a number`
+(K1's rule). There is deliberately no per-category default column to fall back on, and a
+sanity block in the migration fails if one ever appears.
+
+**FOUR doors closed** — the numbers had four homes and they disagreed:
+- `PurchaseSettingsSheet.tsx`, the read-only gear on To Order, **deleted**. It showed
+  PO days as **Mon + Thu** (four days after Jess moved to Mon/Wed/Fri) and promised the
+  values would become editable "when the lead-time table ships". This is that table.
+- `delivery_fee_config.mattress_bedframe_lead_days` / `sofa_lead_days` — **editable in
+  Catalog → Delivery, saved on every click, and read by nothing.** The inputs are retired;
+  the columns stay (nothing is dropped) with no writer.
+- `suppliers.lead_time` — free text ("7-21 days"), empty on 8 of 10 suppliers, printed as
+  a `Lead time` stat on the Suppliers card and appended to its drawer subtitle. **Both
+  retired**; the column is untouched in the DB, it simply stops being shown as an answer.
+- The constants themselves — **deleted, no fallback.**
+
+**The sofa's third number was live code, not a stale comment.** The card says sofa read
+10 in the engine and 5 "in a stale Orders comment"; the 5 was `PO_STOCK_LEAD_DAYS.sofa`,
+driving the urgent bypass on the Orders list every day. It now reads the same production
+working days as everything else.
+
+**Six of the seven numbers, plus one the card did not list.** `logistics_call_working_days`
+(§2's "days before the delivery date the logistics call is raised") IS built and IS read —
+Jess ruled on 2026-07-28 that a column with no reader is `ops_order_control.balance`'s
+disease, so the two Orders-lane readers were wired in the same PR, changing nothing else.
+Its label on screen is the action it raises (`Confirm delivery date`), because no word for
+the setting itself exists in COPY-STANDARD.
+
+**One behaviour change only** (Jess): sofa production time 10 → 14 working days. The
+order-by buffer stays at today's 7 and the earliest-sell number collapses to **21** — the
+upper of today's 14/21, so nothing becomes sellable EARLIER than it is today (a mattress
+cart tightens from 14 to 21; Jess sets 30 at go-live).
+
 ## P2 · The click behaviour becomes real
 
 **This card SHRANK on 2026-07-28.** Its old goal was "Claims becomes a tab" — **Claims is
@@ -214,7 +257,7 @@ number on screen matches what actually happened.
 
 | Card | Status | PR |
 |---|---|---|
-| P1 | ⬜ the numbers become settings (migration) | — |
+| P1 | ✅ the numbers become settings (migration **0303**) | #PR_NUMBER |
 | P2 | ⬜ after P1 · Claims tab + the interaction law | — |
 | P3 | ⬜ after P1 · the two missing supplier calls (migration) | — |
 | P4 | ⬜ where the goods go (migration) | — |

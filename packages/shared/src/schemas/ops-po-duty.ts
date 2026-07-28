@@ -9,11 +9,11 @@ import { z } from "zod";
  * (Jul Shasha → Aug Yu Jun → Sep Khor Yee → …). Management (isOpsManager)
  * can always raise POs and can override the month's holder.
  *
- * Cadence: PO days are Monday, Wednesday, Friday (MYT · Jess 2026-07-24
- * correction — was Mon+Thu before). The daily cron drops a reminder task on
- * the duty holder each PO-day morning. URGENT BYPASS: any order whose
- * deadline falls inside the stock lead window (MS/BF 7d, sofa 5d) flags red
- * on ANY day and must not wait for PO day.
+ * Cadence: the PO days and the urgent-bypass window are both SETTINGS since
+ * P1 (`purchasing_settings`, Purchasing → Settings). The daily cron drops a
+ * reminder task on the duty holder each PO-day morning. URGENT BYPASS: any
+ * order whose deadline falls inside the production window for goods that are
+ * not secured flags red on ANY day and must not wait for a PO day.
  */
 
 /** Month key in MYT (UTC+8, no DST): '2026-07'. The duty calendar is a
@@ -25,66 +25,63 @@ export function monthKeyMYT(now: Date = new Date()): string {
   return `${y}-${m}`;
 }
 
-/** PO days (MYT weekday): Monday + Wednesday + Friday — the Mon/Wed/Fri
- *  batching cadence (Jess 2026-07-24 correction, was Mon+Thu = [1, 4] before). */
-export const PO_DUTY_DAYS_MYT: readonly number[] = [1, 3, 5]; // getUTCDay() on MYT-shifted date
-export function isPoDayMYT(now: Date = new Date()): boolean {
+/**
+ * PO days (MYT weekday). **P1 (2026-07-28): the days are a SETTING now** —
+ * `purchasing_settings.po_days`, edited on Purchasing → Settings. There is
+ * deliberately no default parameter: a caller that cannot supply the setting
+ * would otherwise quietly go on using a literal, and the whole point of P1 is
+ * that a screen and the engine can never hold different cadences.
+ * (The constant that used to live here read Mon+Thu for months after Jess
+ * moved to Mon/Wed/Fri — that is what a second home costs.)
+ */
+export function isPoDayMYT(now: Date, poDays: readonly number[]): boolean {
   const myt = new Date(now.getTime() + 8 * 3_600_000);
-  return PO_DUTY_DAYS_MYT.includes(myt.getUTCDay());
+  return poDays.includes(myt.getUTCDay());
 }
 
-/** Stock lead window per category (days the supplier needs to produce +
- *  deliver goods to us). Distinct from DELIVERY_LEAD_DAYS (customer-promise
- *  lead): this one drives the URGENT BYPASS — once an order's deadline is
- *  inside this window and its stock isn't secured, waiting for the next PO
- *  day risks missing the delivery. MS/BF 7 · sofa 5 (Jess 2026-07-18). */
-export const PO_STOCK_LEAD_DAYS: Record<string, number> = {
-  mattress: 7,
-  bedframe: 7,
-  sofa: 5,
-};
-export const PO_STOCK_LEAD_DEFAULT_DAYS = 7;
-export function poStockLeadDaysFor(category: string | null | undefined): number {
-  if (!category) return PO_STOCK_LEAD_DEFAULT_DAYS;
-  return PO_STOCK_LEAD_DAYS[category.toLowerCase()] ?? PO_STOCK_LEAD_DEFAULT_DAYS;
-}
-
-/** Urgent bypass — deadline sits inside the stock lead window (or is already
- *  past) for ANY of the given categories. `categories` should be the
- *  categories that are actually short on stock for the order; pass [] /
- *  unknown categories and the default window applies. No deadline = never
- *  urgent (nothing to miss). Date-only compare in MYT. */
+/**
+ * Urgent bypass — the deadline sits inside the production window (or has
+ * passed) for goods that are not secured yet, so waiting for the next PO day
+ * risks missing the delivery.
+ *
+ * `windowDays` is the production working days for the categories that are
+ * actually short — resolved from the settings by the caller
+ * (`purchasingUrgentWindowDays`). It used to be a per-category constant here
+ * (mattress 7 · bedframe 7 · **sofa 5**), which was the THIRD live copy of the
+ * sofa number and the one Jess's card calls out as wrong.
+ *
+ * `windowDays` 0 or below = nothing to compare against, never urgent. No
+ * deadline = never urgent (nothing to miss). Date-only compare in MYT.
+ */
 export function poUrgentBypass(
   deliveryDateIso: string | null | undefined,
-  categories: readonly (string | null | undefined)[],
+  windowDays: number,
   now: Date = new Date(),
 ): boolean {
   if (!deliveryDateIso) return false;
+  if (!Number.isFinite(windowDays) || windowDays <= 0) return false;
   const deadline = new Date(`${deliveryDateIso.slice(0, 10)}T00:00:00+08:00`);
   if (Number.isNaN(deadline.getTime())) return false;
   const dayMYT = (d: Date) => Math.floor((d.getTime() + 8 * 3_600_000) / 86_400_000);
   const daysLeft = dayMYT(deadline) - dayMYT(now);
-  const windows =
-    categories.length === 0
-      ? [PO_STOCK_LEAD_DEFAULT_DAYS]
-      : categories.map((c) => poStockLeadDaysFor(c));
-  return windows.some((w) => daysLeft <= w);
+  return daysLeft <= windowDays;
 }
 
-/** Next PO day (Mon/Thu MYT) as an ISO date — TODAY if today is one. Feeds
- *  the DUTY board footer ("next: Thu 23 Jul 26"). */
-export function nextPoDayMYT(now: Date = new Date()): string {
+/** Next PO day as an ISO date — TODAY if today is one. Feeds the DUTY board
+ *  footer ("next: Fri 24 Jul 26"). Returns "" when no day is configured. */
+export function nextPoDayMYT(now: Date, poDays: readonly number[]): string {
+  if (poDays.length === 0) return "";
   const myt = new Date(now.getTime() + 8 * 3_600_000);
   for (let i = 0; i < 7; i += 1) {
     const d = new Date(myt.getTime() + i * 86_400_000);
-    if (PO_DUTY_DAYS_MYT.includes(d.getUTCDay())) {
+    if (poDays.includes(d.getUTCDay())) {
       const y = d.getUTCFullYear();
       const m = String(d.getUTCMonth() + 1).padStart(2, "0");
       const day = String(d.getUTCDate()).padStart(2, "0");
       return `${y}-${m}-${day}`;
     }
   }
-  return ""; // unreachable — 7 consecutive days always contain a Mon
+  return ""; // unreachable while at least one weekday is configured
 }
 
 /** One month's duty row. assigned_by null = auto-rotation picked it. */

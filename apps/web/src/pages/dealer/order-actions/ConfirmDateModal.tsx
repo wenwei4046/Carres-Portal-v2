@@ -38,7 +38,7 @@ export default function ConfirmDateModal({ order, onClose }: Props) {
       const model = catalogQ.data.models.find((m) => m.id === sku.modelId);
       if (model) cats.add(model.category);
     }
-    return maxLeadDaysFor([...cats]);
+    return maxLeadDaysFor([...cats], catalogQ.data.earliestSellDays ?? 0);
   }, [catalogQ.data, order.lines]);
   const minPickable = useMemo(() => {
     const d = new Date(today);

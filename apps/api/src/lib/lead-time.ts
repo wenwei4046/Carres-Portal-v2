@@ -1,5 +1,6 @@
 import { maxLeadDaysFor } from "@carres/shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadPurchasingNumbers } from "./purchasing-settings";
 
 export interface LeadTimeViolation {
   code: "lead_time_violation";
@@ -9,21 +10,29 @@ export interface LeadTimeViolation {
 }
 
 /**
- * Resolve the max production lead-time required by a set of SKUs.
+ * Resolve the earliest-sell floor for a set of SKUs.
  *
  * Joins product_skus → product_models.category, then runs the shared
- * `maxLeadDaysFor` against the unique category set. Returns 0 when no SKU
- * is gated (e.g. pure addon-only orders) — caller treats 0 as "no floor".
+ * `maxLeadDaysFor` against the unique category set and the ONE editable
+ * number (`purchasing_settings.earliest_sell_days`, P1 — it used to be a
+ * per-category constant Jess could not move). Returns 0 when no SKU is gated
+ * (e.g. pure addon-only orders) — caller treats 0 as "no floor".
  *
- * Fails open (returns 0) on catalog read errors so a transient DB hiccup
- * doesn't 500 the order create. The client-side gate is the primary UX;
- * this is defence in depth.
+ * Fails open (returns 0) on catalog / settings read errors so a transient DB
+ * hiccup doesn't 500 the order create. The client-side gate is the primary
+ * UX; this is defence in depth.
  */
 export async function maxLeadDaysForSkus(
   sb: SupabaseClient,
   skus: readonly string[],
 ): Promise<number> {
   if (skus.length === 0) return 0;
+  let earliestSellDays: number;
+  try {
+    earliestSellDays = (await loadPurchasingNumbers(sb)).earliestSellDays;
+  } catch {
+    return 0;
+  }
   const { data, error } = await sb
     .from("product_skus")
     .select("sku, product_models(category)")
@@ -42,7 +51,7 @@ export async function maxLeadDaysForSkus(
       cats.add(pm.category);
     }
   }
-  return maxLeadDaysFor([...cats]);
+  return maxLeadDaysFor([...cats], earliestSellDays);
 }
 
 /**
@@ -73,7 +82,7 @@ export async function validateDeliveryLeadTime(
   if (date < minDate) {
     return {
       code: "lead_time_violation",
-      message: `Earliest delivery date is ${minDate} (${leadDays}-day production lead time for this category)`,
+      message: `Earliest delivery date is ${minDate} (${leadDays} days — the earliest date a store may sell)`,
       minDate,
       leadDays,
     };

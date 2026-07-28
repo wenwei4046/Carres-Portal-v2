@@ -101,6 +101,37 @@ afterAll(() => _setJwksForTesting(null));
 
 const URL = "http://t/api/operation/purchase/today";
 
+/** P1 (0303) — every /today call reads the purchasing numbers first. The
+ *  seeded shape: sofa 14 working days, bed frame + mattress 7, Nice Future on
+ *  a 5-day week. A route that cannot read these refuses to plan rather than
+ *  inventing a lead, so every assembly test has to supply them. */
+const PURCHASING_TABLES = {
+  purchasing_settings: {
+    data: {
+      order_by_buffer_days: 7,
+      earliest_sell_days: 21,
+      logistics_call_working_days: 1,
+      po_days: [1, 3, 5],
+    },
+    error: null,
+  },
+  purchasing_production_days: {
+    data: [
+      { supplier_id: "sup-1", category: "mattress", working_days: 7 },
+      { supplier_id: "sup-1", category: "bedframe", working_days: 7 },
+      { supplier_id: "sup-1", category: "sofa", working_days: 14 },
+    ],
+    error: null,
+  },
+  purchasing_supplier_settings: {
+    data: [{ supplier_id: "sup-1", off_days: [0, 6] }],
+    error: null,
+  },
+  purchasing_setting_changes: { data: [], error: null },
+  suppliers: { data: [{ id: "sup-1", name: "Nice Future" }], error: null },
+};
+
+
 // =====================================================================
 // Auth
 // =====================================================================
@@ -134,7 +165,7 @@ describe("GET /api/operation/purchase/today — auth", () => {
 // =====================================================================
 describe("GET /api/operation/purchase/today — assembly", () => {
   it("200 with an empty list when there are no live orders", async () => {
-    const sb = makeSb({ orders: { data: [], error: null } });
+    const sb = makeSb({ ...PURCHASING_TABLES, orders: { data: [], error: null } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const jwt = await makeJwt("operation");
@@ -213,6 +244,7 @@ describe("GET /api/operation/purchase/today — assembly", () => {
       },
     ];
     const sb = makeSb({
+      ...PURCHASING_TABLES,
       orders: { data: orders, error: null },
       order_lines: { data: lines, error: null },
       product_skus: { data: skuCatalog, error: null },
@@ -332,6 +364,7 @@ describe("GET /api/operation/purchase/today — assembly", () => {
     ];
 
     const sb = makeSb({
+      ...PURCHASING_TABLES,
       orders: { data: orders, error: null },
       order_lines: { data: [], error: null },
       purchase_orders: { data: purchase_orders, error: null },

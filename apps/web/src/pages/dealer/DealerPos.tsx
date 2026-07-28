@@ -452,7 +452,7 @@ export default function DealerPos({
       const model = catalogQ.data.models.find((m) => m.id === sku.modelId);
       if (model) cats.add(model.category);
     }
-    return maxLeadDaysFor([...cats]);
+    return maxLeadDaysFor([...cats], catalogQ.data.earliestSellDays ?? 0);
   }, [draft.lines, catalogQ.data]);
 
   // ASAP deposit hard-gate — when ASAP is on we auto-proceed after create, and

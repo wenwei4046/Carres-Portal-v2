@@ -156,6 +156,16 @@ function buildSb(
  * Like buildSb but also stubs `.rpc('create_order', { payload })` so POST tests
  * can assert on what was sent and on rpc-returned errors. Use for POST flow.
  */
+/** P1 (0303) — the seeded settings singleton. `earliest_sell_days` is the ONE
+ *  number the sell-date floor reads; it replaced mattress 14 / sofa 21 with
+ *  the upper of the two, so a mattress cart is now gated at 21 as well. */
+const PURCHASING_SETTINGS_ROW = {
+  order_by_buffer_days: 7,
+  earliest_sell_days: 21,
+  logistics_call_working_days: 1,
+  po_days: [1, 3, 5],
+};
+
 function buildSbForCreate(opts: {
   rpcResult?: { id: string; so: number; placed_at: string };
   rpcError?: { code?: string; message?: string; details?: string };
@@ -163,11 +173,14 @@ function buildSbForCreate(opts: {
   /** Category rows returned by the product_skus.in() lookup used by the
    *  server-side lead-time validator. Defaults to empty (fail-open). Pass
    *  e.g. `[{ product_models: { category: "mattress" } }]` to make the
-   *  validator reject any date < today + 14d. */
+   *  validator reject any date closer than the earliest-sell number. */
   productSkuCategoryRows?: Array<{ product_models: { category: string } | null }>;
+  /** P1 (0303) — `purchasing_settings` row 1; `null` exercises fail-open. */
+  purchasingSettingsRow?: unknown;
 }) {
   const rpcCalls: Array<{ name: string; payload: unknown }> = [];
   const eqs: Array<[string, unknown]> = [];
+  let currentTable: string | null = null;
   const chain = {
     eq(col: string, val: unknown) {
       eqs.push([col, val]);
@@ -175,12 +188,27 @@ function buildSbForCreate(opts: {
     },
     in: async () => ({ data: opts.productSkuCategoryRows ?? [], error: null }),
     order: async () => ({ data: [], error: null }),
-    maybeSingle: async () => ({ data: opts.fetchedRow ?? null, error: null }),
+    maybeSingle: async () => {
+      // P1 — the earliest-sell floor is a setting, not a constant.
+      if (currentTable === "purchasing_settings") {
+        return {
+          data:
+            opts.purchasingSettingsRow !== undefined
+              ? opts.purchasingSettingsRow
+              : PURCHASING_SETTINGS_ROW,
+          error: null,
+        };
+      }
+      return { data: opts.fetchedRow ?? null, error: null };
+    },
   };
   const storage = buildStorageMock();
   return Object.assign(
     {
-      from: () => ({ select: () => chain }),
+      from: (table: string) => {
+        currentTable = table;
+        return { select: () => chain };
+      },
       rpc: async (name: string, args: { payload: unknown }) => {
         rpcCalls.push({ name, payload: args.payload });
         if (opts.rpcError) {
@@ -1195,11 +1223,15 @@ describe("POST /api/orders", () => {
       env,
     );
     expect(res.status).toBe(403);
-    // RPC was attempted; no follow-up ORDER fetch happened. (The single eq
-    // recorded is the 0219 order_entry_config singleton read — pre-create
-    // payment-method validation, not a follow-up fetch.)
+    // RPC was attempted; no follow-up ORDER fetch happened. The two eqs
+    // recorded are both PRE-create singleton reads, not a follow-up fetch:
+    // the 0219 order_entry_config row (payment-method validation) and, since
+    // P1 (0303), the purchasing_settings row the earliest-sell floor reads.
     expect(sb._rpcCalls).toHaveLength(1);
-    expect(sb._eqs).toEqual([["id", true]]);
+    expect(sb._eqs).toEqual([
+      ["id", true],
+      ["id", 1],
+    ]);
   });
 
   it("maps RPC 22023 (validation in PL/pgSQL) to HTTP 400", async () => {
@@ -1792,7 +1824,12 @@ describe("POST /api/orders", () => {
   // DELIVERY_LEAD_DAYS). The wizard gates this client-side; these tests
   // verify the curl/devtools bypass is shut.
   describe("lead-time validation", () => {
-    it("rejects 422 lead_time_violation when mattress order has delivery.date < today + 14d", async () => {
+    // P1 (0303): ONE number for every made item — `earliest_sell_days`, 21.
+    // It used to be mattress/bedframe 14 · sofa 21, hard-coded where Jess
+    // could not reach it. The upper bound was taken deliberately: nothing
+    // becomes sellable EARLIER than it was, and a sofa's door does not widen
+    // by a week to something the factory cannot make.
+    it("rejects 422 lead_time_violation when a mattress order is sold closer than the number", async () => {
       const today = new Date();
       const tooSoon = new Date(today);
       tooSoon.setDate(tooSoon.getDate() + 5);
@@ -1816,12 +1853,12 @@ describe("POST /api/orders", () => {
       expect(res.status).toBe(422);
       const body = (await res.json()) as { code?: string; leadDays?: number };
       expect(body.code).toBe("lead_time_violation");
-      expect(body.leadDays).toBe(14);
+      expect(body.leadDays).toBe(21);
       // Critically: RPC was NOT called — server bailed before DB write
       expect(sb._rpcCalls).toHaveLength(0);
     });
 
-    it("rejects 422 with leadDays=21 when sofa order has delivery.date < today + 21d", async () => {
+    it("rejects 422 with the same number for a sofa — one floor, not two", async () => {
       const today = new Date();
       const tooSoon = new Date(today);
       tooSoon.setDate(tooSoon.getDate() + 15);
@@ -1848,7 +1885,7 @@ describe("POST /api/orders", () => {
       expect(body.leadDays).toBe(21);
     });
 
-    it("accepts 201 when mattress order's delivery.date >= today + 14d", async () => {
+    it("accepts 201 when the date clears the number", async () => {
       const today = new Date();
       const okDate = new Date(today);
       okDate.setDate(okDate.getDate() + 30);
@@ -1945,6 +1982,10 @@ function buildSbForProceed(opts: {
    *  order_supplier_threads), so they stop aliasing the product_skus read.
    *  Falls back to productSkuCategoryRows when the table isn't listed. */
   inTables?: Record<string, unknown[]>;
+  /** P1 (0303) — the earliest-sell gate reads `purchasing_settings` row 1.
+   *  `null` makes the read come back empty, which is how the validator's
+   *  fail-open branch is exercised. */
+  purchasingSettingsRow?: unknown;
 }) {
   const rpcCalls: Array<{ name: string; args: unknown }> = [];
   const eqs: Array<[string, unknown]> = [];
@@ -1973,13 +2014,27 @@ function buildSbForProceed(opts: {
       error: null,
     }),
     order: async () => ({ data: opts.orderedRows ?? [], error: null }),
-    maybeSingle: async () => ({
-      data:
-        currentTable && opts.tables?.[currentTable]?.single !== undefined
-          ? opts.tables[currentTable].single
-          : (opts.fetchedRow ?? null),
-      error: null,
-    }),
+    maybeSingle: async () => {
+      // P1 (0303) — the earliest-sell floor is one editable number, read from
+      // `purchasing_settings`. Without this branch every lead-time gate
+      // fails OPEN and the tests below would pass for the wrong reason.
+      if (currentTable === "purchasing_settings") {
+        return {
+          data:
+            opts.purchasingSettingsRow !== undefined
+              ? opts.purchasingSettingsRow
+              : PURCHASING_SETTINGS_ROW,
+          error: null,
+        };
+      }
+      return {
+        data:
+          currentTable && opts.tables?.[currentTable]?.single !== undefined
+            ? opts.tables[currentTable].single
+            : (opts.fetchedRow ?? null),
+        error: null,
+      };
+    },
   };
   const storage = buildStorageMock();
   return Object.assign(
@@ -3664,7 +3719,7 @@ describe("POST /api/orders/:id/date", () => {
     expect(res.status).toBe(400);
   });
 
-  it("422 lead_time_violation when confirmed date is < today + 14d for a mattress order", async () => {
+  it("422 lead_time_violation when the confirmed date is closer than the number", async () => {
     const today = new Date();
     const tooSoon = new Date(today);
     tooSoon.setDate(tooSoon.getDate() + 5);
@@ -3687,7 +3742,7 @@ describe("POST /api/orders/:id/date", () => {
     expect(res.status).toBe(422);
     const body = (await res.json()) as { code?: string; leadDays?: number };
     expect(body.code).toBe("lead_time_violation");
-    expect(body.leadDays).toBe(14);
+    expect(body.leadDays).toBe(21);
     // Critically: set_order_date RPC was NOT called — server bailed first
     expect(sb._rpcCalls.some((c: { name: string }) => c.name === "set_order_date")).toBe(false);
   });
@@ -3838,7 +3893,7 @@ describe("PATCH /api/orders/:id", () => {
   // 2026-05-22 (Loo) — lead-time floor also enforced on edit. The wizard
   // bakes the gate into Step 3, but a curl PATCH would otherwise bypass it
   // because dealers can edit Place orders freely.
-  it("422 lead_time_violation when patching delivery.date to < today + 14d on a mattress order", async () => {
+  it("422 lead_time_violation when patching delivery.date closer than the number", async () => {
     const today = new Date();
     const tooSoon = new Date(today);
     tooSoon.setDate(tooSoon.getDate() + 3);
@@ -3861,11 +3916,11 @@ describe("PATCH /api/orders/:id", () => {
     expect(res.status).toBe(422);
     const body = (await res.json()) as { code?: string; leadDays?: number };
     expect(body.code).toBe("lead_time_violation");
-    expect(body.leadDays).toBe(14);
+    expect(body.leadDays).toBe(21);
     expect(sb._rpcCalls.some((c: { name: string }) => c.name === "update_order")).toBe(false);
   });
 
-  it("200 when patching delivery.date to a date >= today + 14d on a mattress order", async () => {
+  it("200 when the patched delivery.date clears the number", async () => {
     const today = new Date();
     const okDate = new Date(today);
     okDate.setDate(okDate.getDate() + 30);

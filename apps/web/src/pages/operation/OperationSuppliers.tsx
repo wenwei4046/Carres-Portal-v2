@@ -133,10 +133,17 @@ export default function OperationSuppliers() {
               </div>
               <KindChip kind={s.kind} />
             </div>
-            <div className="grid grid-cols-3 gap-2.5 mt-3.5">
+            {/* P1 (2026-07-28) — the `Lead time` stat is RETIRED. It printed
+                `suppliers.lead_time`, free text ("7-21 days") that no engine
+                could compute from and that 8 of 10 suppliers left empty. How
+                long a factory takes is now a number a human sets, per supplier
+                × category, on Purchasing → Settings — and two places claiming
+                to answer one question is how the sofa ended up with three
+                different production times. The column is untouched in the DB;
+                it simply stops being shown as an answer. */}
+            <div className="grid grid-cols-2 gap-2.5 mt-3.5">
               <Stat label="Open POs" v={s.openPos} />
               <Stat label="Received" v={s.receivedPos} />
-              <Stat label="Lead time" v={s.leadTime ?? "—"} />
             </div>
             <div className="mt-3 text-[11px] text-base-500">
               Covers · {s.catCovered.length ? s.catCovered.join(" · ") : "—"}
@@ -222,8 +229,9 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
               {supplier.name}
             </h2>
             <div className="text-[12px] text-base-600 mt-1">
+              {/* P1 — the free-text lead time is not appended here either;
+                  see the card above. */}
               {supplier.contactEmail ?? supplier.contact ?? "—"}
-              {supplier.leadTime ? ` · ${supplier.leadTime}` : ""}
             </div>
           </div>
           <button

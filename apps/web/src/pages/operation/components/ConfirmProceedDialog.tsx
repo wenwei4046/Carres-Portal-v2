@@ -106,7 +106,7 @@ export default function ConfirmProceedDialog({
       const model = catalogQ.data.models.find((m) => m.id === sku.modelId);
       if (model) cats.add(model.category);
     }
-    return maxLeadDaysFor([...cats]);
+    return maxLeadDaysFor([...cats], catalogQ.data.earliestSellDays ?? 0);
   }, [catalogQ.data, lines]);
   const leadGap = useMemo(() => {
     if (leadDays === 0 || !order.delivery_date || order.delivery_date_tbd) return null;

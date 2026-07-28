@@ -149,12 +149,12 @@ describe("buildRaisePoPlan", () => {
     expect(plan.cards[0].lines).toHaveLength(1);
   });
 
-  it("flags urgency when the deadline sits inside the stock lead window", () => {
+  it("flags urgency when the deadline sits inside the production window", () => {
     const plan = buildRaisePoPlan(
       [
         order({
           so: 1001,
-          deliveryDate: "2026-07-24", // 4 days out — inside MS/BF 7d
+          deliveryDate: "2026-07-24", // 4 days out — inside the 7-day window
           lines: [{ sku: "Breeze FirmCare-B1201F-Q", qty: 1 }],
         }),
         order({
@@ -168,10 +168,34 @@ describe("buildRaisePoPlan", () => {
       SUPPLIERS,
       NO_OVERRIDE,
       NOW,
+      // P1 (0303): the window is the production working days a human SET, not
+      // a constant. It arrives from the purchasing settings.
+      { mattress: 7, bedframe: 7, sofa: 14 },
     );
     const bySku = new Map(plan.cards[0].lines.map((l) => [l.sku, l]));
     expect(bySku.get("Breeze FirmCare-B1201F-Q")?.urgent).toBe(true);
     expect(bySku.get("Breeze FirmCare-B1201F-K")?.urgent).toBe(false);
+  });
+
+  it("no number set for the category → nothing is called urgent", () => {
+    // The K1 rule, applied to urgency: nobody told the portal how long this
+    // factory takes, so the portal does not get to say the order is late.
+    const plan = buildRaisePoPlan(
+      [
+        order({
+          so: 1001,
+          deliveryDate: "2026-07-24",
+          lines: [{ sku: "Breeze FirmCare-B1201F-Q", qty: 1 }],
+        }),
+      ],
+      undefined,
+      NO_META,
+      SUPPLIERS,
+      NO_OVERRIDE,
+      NOW,
+      {},
+    );
+    expect(plan.cards[0].lines[0].urgent).toBe(false);
   });
 
   it("keeps same SKU with different attrs as separate lines", () => {

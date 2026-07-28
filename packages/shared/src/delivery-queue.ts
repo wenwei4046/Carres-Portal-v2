@@ -78,9 +78,13 @@ export const DELIVERY_QUEUES: readonly DeliveryQueueDef[] = [
     actionKey: "confirm_delivery_date",
     label: orderActionQueue("confirm_delivery_date"),
     anchor: "delivery_date",
+    // P1: this ONE step's lead is a setting (`logistics_call_working_days`,
+    // Purchasing → Settings — Jess may set 5). The number here is the seed the
+    // migration wrote, used only where no settings row is supplied (tests).
+    // The three other steps are not settings: they are the shape of the work.
     leadWorkingDays: 1,
     description:
-      "Logistics assigned but the customer has not confirmed a date + slot — late once the promised date is 1 working day away",
+      "Logistics assigned but the customer has not confirmed a date + slot — late once the promised date is the configured number of working days away",
   },
   {
     key: "deliver_today",
@@ -129,6 +133,31 @@ export function deliveryQueueByKey(key: DeliveryQueueKey): DeliveryQueueDef {
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
+ * The step leads a SETTING may move. Only `chase` is one (P1 §2: "days before
+ * the delivery date the logistics call is raised"); the other three steps are
+ * the shape of the work, not a policy number.
+ */
+export interface DeliveryQueueLeads {
+  chase: number;
+}
+
+/** Build the leads from the purchasing settings row. One helper, so the Orders
+ *  list and the Delivery module cannot read the setting two different ways. */
+export function deliveryQueueLeads(settings: {
+  logisticsCallWorkingDays: number;
+}): DeliveryQueueLeads {
+  return { chase: Math.max(0, Math.trunc(settings.logisticsCallWorkingDays)) };
+}
+
+function stepLeadWorkingDays(
+  step: DeliveryQueueKey,
+  leads: DeliveryQueueLeads | undefined,
+): number {
+  if (step === "chase" && leads) return leads.chase;
+  return deliveryQueueByKey(step).leadWorkingDays;
+}
+
+/**
  * The step's OWN deadline — the last day it can be done without being late.
  *
  * `anchorIso` may be a date or a timestamp (`delivered_at` is a timestamp); only
@@ -141,11 +170,12 @@ export function deliveryStepDueIso(
   step: DeliveryQueueKey,
   anchorIso: string | null | undefined,
   opts: WorkingDayOptions = {},
+  leads?: DeliveryQueueLeads,
 ): IsoDate | null {
   if (!anchorIso) return null;
   const anchor = anchorIso.slice(0, 10);
   if (!ISO_DATE.test(anchor)) return null;
-  const { leadWorkingDays } = deliveryQueueByKey(step);
+  const leadWorkingDays = stepLeadWorkingDays(step, leads);
   if (leadWorkingDays === 0) return anchor;
   return leadWorkingDays > 0
     ? subtractWorkingDays(anchor, leadWorkingDays, opts)
@@ -161,8 +191,9 @@ export function deliveryStepOverdue(
   anchorIso: string | null | undefined,
   todayIso: string,
   opts: WorkingDayOptions = {},
+  leads?: DeliveryQueueLeads,
 ): boolean {
-  const due = deliveryStepDueIso(step, anchorIso, opts);
+  const due = deliveryStepDueIso(step, anchorIso, opts, leads);
   if (!due || !todayIso) return false;
   return todayIso.slice(0, 10) > due;
 }

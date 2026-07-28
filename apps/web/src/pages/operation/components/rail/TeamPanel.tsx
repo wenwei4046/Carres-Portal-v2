@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
   useOperationPoDuty,
   useOperationStaff,
+  usePurchasingSettings,
   useUpdatePoDuty,
 } from "@/lib/queries";
 import {
@@ -137,10 +138,17 @@ export default function TeamPanel() {
     return fmtDateShort(ymd(new Date(y, m, 0)));
   }, [currentMonth]);
 
-  // Two-week strip from this week's Sunday; Mon/Thu are PO days, the next
-  // one is green (matches the title-row chip's date).
-  const nextPoIso = nextPoDayMYT();
-  const nextPoLabel = `${new Date(`${nextPoIso}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" })} ${fmtDateShort(nextPoIso)}`;
+  // Two-week strip from this week's Sunday; the configured PO days are
+  // marked and the next one is green (matches the title-row chip's date).
+  // P1: the days are a SETTING (Purchasing → Settings), so this panel and the
+  // ordering engine cannot hold different cadences — which they did, for
+  // months, while a constant here still read Mon + Thu.
+  const purchasingSettingsQ = usePurchasingSettings();
+  const poDays = purchasingSettingsQ.data?.poDays ?? [];
+  const nextPoIso = nextPoDayMYT(new Date(), poDays);
+  const nextPoLabel = nextPoIso
+    ? `${new Date(`${nextPoIso}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" })} ${fmtDateShort(nextPoIso)}`
+    : "—";
   const cells = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -152,11 +160,13 @@ export default function TeamPanel() {
       return {
         key: ymd(d),
         day: d.getDate(),
-        poDay: d.getDay() === 1 || d.getDay() === 4,
+        // Was `d.getDay() === 1 || d.getDay() === 4` — a second Mon+Thu literal
+        // living two lines under the label that named the real cadence.
+        poDay: poDays.includes(d.getDay()),
         past: d < today,
       };
     });
-  }, []);
+  }, [poDays]);
 
   if (!holder) {
     return (

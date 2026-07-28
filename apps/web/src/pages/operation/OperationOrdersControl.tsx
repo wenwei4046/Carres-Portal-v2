@@ -8,6 +8,7 @@ import {
   useOperationStock,
   useDeliveryPartners,
   useOperationStaff,
+  usePurchasingSettings,
   useOperationPoDuty,
   useUpdateStaffSetting,
   useAssignOrderStaff,
@@ -51,9 +52,11 @@ import {
   isPoDayMYT,
   nextPoDayMYT,
   poUrgentBypass,
+  purchasingUrgentWindowDays,
   DELIVERY_QUEUES,
   deliveryQueueByKey,
   deliveryQueueForLabel,
+  deliveryQueueLeads,
   deliveryStepOverdue,
   myHolidaySet,
   deliveryDateGapFact,
@@ -1552,6 +1555,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const staffQ = useOperationStaff();
   const myDuties = staffQ.data?.myDuties;
   const isManager = isOpsManager(authRole, authEmail, myDuties);
+  // P1 (0303) — the PO days, the urgent-bypass window and the working days of
+  // notice on `Confirm delivery date` are SETTINGS now (Purchasing →
+  // Settings). This page used to hold its own copies: PO days as a constant
+  // that read Mon+Thu for months after Jess moved to Mon/Wed/Fri, and a sofa
+  // window of 5 days against a production time of 14. Nothing else about this
+  // page changes.
+  const purchasingSettingsQ = usePurchasingSettings();
+  const purchasingSettings = purchasingSettingsQ.data ?? null;
   // PO duty (0236, Jess 人分单货合买): this month's PO controller — gates the
   // bulk-bar Raise PO (holder + management only), badges the TEAM row, and
   // powers the Mon/Thu PO-day banner. Fails soft: old Worker / pre-0236 DB →
@@ -1861,6 +1872,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // (C-vocab). The photo queue is the one that spans CLOSED orders, for the same
   // reason Owing does: the proof is still outstanding after delivery.
   const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
+  // P1 — the working days of notice on `Confirm delivery date` (Jess may set
+  // 5). Undefined until the settings land, which leaves the step on its seed.
+  const queueLeads = useMemo(
+    () => (purchasingSettings ? deliveryQueueLeads(purchasingSettings) : undefined),
+    [purchasingSettings],
+  );
   const deliveryQueueStats = useMemo(() => {
     const today = todayIso();
     const stat = new Map<string, { n: number; late: number }>();
@@ -1875,13 +1892,22 @@ export default function OperationOrdersControl({ onImport }: Props) {
       const def = deliveryQueueForLabel(label);
       if (!def) return;
       if (only ? def.key !== only : def.key === "photo") return;
-      bump(label, deliveryStepOverdue(def.key, deliveryStepAnchor(o, def.key), today, holidayOpts));
+      bump(
+        label,
+        deliveryStepOverdue(
+          def.key,
+          deliveryStepAnchor(o, def.key),
+          today,
+          holidayOpts,
+          queueLeads,
+        ),
+      );
     };
     for (const o of liveScope) tally(o);
     for (const o of orders) tally(o, "photo");
     return stat;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveScope, orders, availableBySku, holidayOpts]);
+  }, [liveScope, orders, availableBySku, holidayOpts, queueLeads]);
   const dueEntries = useMemo(() => {
     const m = new Map<DueBucket, number>();
     for (const o of liveScope) {
@@ -1921,16 +1947,23 @@ export default function OperationOrdersControl({ onImport }: Props) {
   }, [liveScope, availableBySku]);
 
   // URGENT BYPASS (PO duty spec, Jess 2026-07-18): open orders whose deadline
-  // sits inside the stock lead window (MS/BF 7d · sofa 5d) with stock NOT
-  // secured — flagged red ANY day, must not wait for the Mon/Thu PO day.
+  // sits inside the production window with stock NOT secured — flagged red
+  // ANY day, must not wait for a PO day. The window is the configured
+  // production working days (P1); with no settings loaded, or no number set
+  // for those categories, nothing is called urgent — an unrated category may
+  // not claim to know better.
   const urgentPoCount = useMemo(
     () =>
       liveScope.filter((o) => {
         if (stockBucketOf(o, availableBySku) === "Ready") return false;
+        if (!purchasingSettings) return false;
         const cats = CORE_ORDER.filter((c) => orderHasCore(o, c));
-        return poUrgentBypass(o.delivery_date_tbd ? null : o.delivery_date, cats);
+        return poUrgentBypass(
+          o.delivery_date_tbd ? null : o.delivery_date,
+          purchasingUrgentWindowDays(purchasingSettings, cats),
+        );
       }).length,
-    [liveScope, availableBySku],
+    [liveScope, availableBySku, purchasingSettings],
   );
 
   // No-logistics queue (Jess 2026-07-19): open orders with NO logistics company
@@ -2464,9 +2497,15 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Quiet chip = every day (whole team, zero clicks): holder avatar + next PO
   // day. Hot state = Mon/Thu, urgent, or ?poday preview: the SAME slot grows
   // the action chip (+ Raise PO for holder/management). One announce home.
-  const poHot = poDayPreview || isPoDayMYT() || urgentPoCount > 0;
-  const nextPoIso = nextPoDayMYT();
-  const nextPoLabel = `${new Date(`${nextPoIso}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" })} ${fmtDateShort(nextPoIso)}`;
+  const poDays = purchasingSettings?.poDays ?? [];
+  const isPoDayToday = poDays.length > 0 && isPoDayMYT(new Date(), poDays);
+  const poHot = poDayPreview || isPoDayToday || urgentPoCount > 0;
+  const nextPoIso = nextPoDayMYT(new Date(), poDays);
+  // No PO day configured (or the settings have not landed yet) → no date to
+  // print. Better a blank than a made-up "next Monday".
+  const nextPoLabel = nextPoIso
+    ? `${new Date(`${nextPoIso}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" })} ${fmtDateShort(nextPoIso)}`
+    : "—";
   // Queue-row owner adornments (B+C): goods queues carry the duty holder's
   // avatar, PIC queues a grey tag. Every QUEUES/TEAM row gets the SAME
   // fixed-width leading slot — mixed chip widths broke label alignment
@@ -2518,17 +2557,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
       {poHot && (
         <span
           className={`inline-flex items-center gap-1 h-[26px] rounded-full px-2 text-[11px] font-semibold whitespace-nowrap ${
-            urgentPoCount > 0 && !(poDayPreview || isPoDayMYT())
+            urgentPoCount > 0 && !(poDayPreview || isPoDayToday)
               ? "bg-destructive/10 text-destructive"
               : "bg-warning-soft text-warning"
           }`}
           data-testid="po-day-chip"
         >
           <PackagePlus size={14} strokeWidth={2} />
-          {poDayPreview || isPoDayMYT()
+          {poDayPreview || isPoDayToday
             ? `PO day — ${orderActionQueue("send_po")} ${orderPoCount} · ${orderActionQueue("confirm_ready_date")} ${chaseSupplierCount}`
             : `${urgentPoCount} urgent — inside the stock window`}
-          {(poDayPreview || isPoDayMYT()) && urgentPoCount > 0 && (
+          {(poDayPreview || isPoDayToday) && urgentPoCount > 0 && (
             <span className="text-destructive">· {urgentPoCount} urgent</span>
           )}
         </span>

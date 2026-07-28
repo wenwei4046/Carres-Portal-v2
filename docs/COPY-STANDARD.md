@@ -467,6 +467,8 @@ doubt, grep the codebase and match what already ships.
 | A date logistics are closed | **not running on** | Blackout · Unavailable · Out of service |
 | Most drops logistics take in a day | **deliveries a day** | Capacity · Max load · Slots |
 | How long a factory takes to make an item | **production working days** | Lead time · Manufacturing lead · Turnaround |
+| The days a factory is open | **Supplier work week** | working days · Work-week · Factory calendar · Shift pattern |
+| The earliest delivery date a store may sell | **Earliest date a store may sell** | Lead time · Minimum lead · Sell-from date · Earliest available |
 | The last day we may send the PO and still be safe | **order-by date** | Raise-by · Trigger date · Reorder date |
 | The days of the week we send POs | **PO days** | Cycle · Review day · Batch day |
 | Days kept back for arranging the delivery | **order-by buffer** | Safety stock days · Slack · Padding |

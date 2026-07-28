@@ -714,7 +714,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
       const model = catalog.models.find((m) => m.id === sku.modelId);
       if (model) cats.add(model.category);
     }
-    return maxLeadDaysFor([...cats]);
+    return maxLeadDaysFor([...cats], catalog.earliestSellDays ?? 0);
   }, [catalog, order?.lines]);
   const minDate = useMemo(() => minDeliveryDateISO(minLeadDays), [minLeadDays]);
 
