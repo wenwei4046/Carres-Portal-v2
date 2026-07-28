@@ -129,7 +129,10 @@ decision is being planned.
   the customer needs to be told at all**
 - Completion: the delay decision is recorded
 - **Due: 2 WORKING DAYS** from the day the supplier's date first overshoots the promised date
-  (Loo, 2026-07-28). Office calendar — this is office work (Law 2A). Two days is deliberate
+  (Loo, 2026-07-28; built by C8b, which found that day was stored nowhere and Loo ruled the
+  stamp — `delay_detected_at` + the supplier date it is about, `delay_detected_eta`, 0305,
+  maintained by the database itself so no door can forget it and nobody can move their own
+  deadline). Office calendar — this is office work (Law 2A). Two days is deliberate
   and it is not slack: Operations has to confirm the supplier's real date, check ready stock,
   check another supplier and check dates with logistics before there is anything worth saying.
 - **The customer is not contacted in this stage.**

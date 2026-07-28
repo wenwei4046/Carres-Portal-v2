@@ -347,6 +347,15 @@ export const opsOrderControlSchema = z.object({
   delay_decision_at: z.string().nullable().default(null),
   delay_decision_by: z.string().uuid().nullable().default(null),
   delay_decision_note: z.string().nullable().default(null),
+  /** C8b delay clocks (migration 0305) — WHEN the supplier date first overshot
+   *  the promised date, and WHICH supplier date that sighting was about. The
+   *  start of `Delay planning`'s 2-working-day clock. SERVER-OWNED: a BEFORE
+   *  trigger maintains the pair on every write, so a client cannot move its own
+   *  deadline and no door can forget to stamp it. Defaults keep a pre-0305
+   *  Worker response parseable, and null reproduces the pre-C8b behaviour — no
+   *  anchor, no deadline, and an action with no deadline is never late. */
+  delay_detected_at: z.string().nullable().default(null),
+  delay_detected_eta: isoDate.nullable().default(null),
   updated_at: z.string().nullable(),
   updated_by: z.string().uuid().nullable(),
 });
@@ -525,6 +534,10 @@ export const updateOpsOrderControlInput = z
     // T8 (0282): booking_groups / delivery_trips are absent for the same
     // reason — a trip's scope is part of the confirmation, not a field an
     // operator may edit afterwards (a DB CHECK backstops it either way).
+    // C8b (0305): delay_detected_at / delay_detected_eta are absent because
+    // nobody may set their own deadline. `.strict()` rejects them here, and the
+    // BEFORE trigger overwrites them on every write anyway — the schema states
+    // the rule, the database enforces it against every other door too.
   })
   .partial()
   .strict();

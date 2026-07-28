@@ -866,6 +866,19 @@ export {
   type OrderOpenAction,
 } from "./order-actions";
 
+// C8b · The two delay clocks — Delay planning gets 2 working days, the
+// logistics call the SAME working day, both on Law 2A's OFFICE calendar.
+export {
+  OFFICE_OFF_DAYS,
+  ORDER_ACTION_DUES,
+  orderActionDueDef,
+  orderActionDueIso,
+  orderActionOverdue,
+  type OfficeHolidays,
+  type OrderActionDueAnchor,
+  type OrderActionDueDef,
+} from "./order-action-due";
+
 // T7 · Delivery queues + auto-overdue (each step carries its own deadline)
 export {
   DELIVERY_QUEUES,

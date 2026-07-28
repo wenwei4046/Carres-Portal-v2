@@ -805,6 +805,105 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(rowsBySo()).toEqual(["1301"]);
   });
 
+  // ── C8b · the two delay clocks (Loo 2026-07-28) ────────────────────────────
+  // `Delay planning` gets 2 working days from the day the supplier's date first
+  // overshot the promise; the logistics call gets the SAME working day from the
+  // moment Operations recorded that the promise cannot be met. Both on the
+  // OFFICE calendar. The facet says so the same way every other deadline on
+  // this page does: the "· N late" tail.
+  const delayOvershoot = (
+    id: string,
+    so: number,
+    control: Record<string, unknown>,
+  ) =>
+    makeRow({
+      id,
+      so,
+      delivery_date: relISO(10),
+      order_lines: [{ sku: "mattress:MAT-1", qty: 1, source_po: "PO/1" }],
+      ops_order_control: {
+        line_stock_status: { "mattress:MAT-1": "waiting" },
+        line_etas: { "mattress:MAT-1": relISO(14) },
+        ...control,
+      },
+    });
+
+  it("Delay planning past its 2 working days reads '· N late' by itself", () => {
+    listHookState.data = {
+      orders: [
+        // Sighted a fortnight ago — two office working days are long gone.
+        delayOvershoot("dp-late", 1501, {
+          delay_detected_at: `${relISO(-14)}T09:00:00+08:00`,
+          delay_detected_eta: relISO(14),
+        }),
+        // Sighted TODAY: due today, and an action due today is never late today.
+        delayOvershoot("dp-fresh", 1502, {
+          delay_detected_at: `${relISO(0)}T09:00:00+08:00`,
+          delay_detected_eta: relISO(14),
+        }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(statusGroup().getByRole("button", { name: /All\s*2/ }));
+    const row = screen.getByTitle(/decide before anyone calls/);
+    expect(row.textContent).toContain("2 · 1 late");
+    expect(row.getAttribute("title")).toContain("1 of 2 already past that deadline");
+  });
+
+  it("a sighting about a DIFFERENT supplier date carries no deadline at all", () => {
+    listHookState.data = {
+      orders: [
+        // The factory slipped AGAIN: the stamp names the date it was made about
+        // (0305's pair), and that is no longer the date the ladder is reading.
+        // Silence beats dating this delay from a sighting of the last one.
+        delayOvershoot("dp-stale", 1511, {
+          delay_detected_at: `${relISO(-14)}T09:00:00+08:00`,
+          delay_detected_eta: relISO(12),
+        }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(statusGroup().getByRole("button", { name: /All\s*1/ }));
+    const row = screen.getByTitle(/decide before anyone calls/);
+    expect(row.textContent).not.toContain("late");
+  });
+
+  it("the logistics call is late the working day after the decision, not before", () => {
+    listHookState.data = {
+      orders: [
+        delayOvershoot("an-late", 1521, {
+          delay_decision: "new_date",
+          delay_decision_eta: relISO(14),
+          delay_decision_at: `${relISO(-14)}T16:30:00+08:00`,
+        }),
+        // Decided today — due TODAY, which is not late today.
+        delayOvershoot("an-fresh", 1522, {
+          delay_decision: "new_date",
+          delay_decision_eta: relISO(14),
+          delay_decision_at: `${relISO(0)}T16:30:00+08:00`,
+        }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(statusGroup().getByRole("button", { name: /All\s*2/ }));
+    const row = screen.getByTitle(/logistics arranges the new date/);
+    expect(row.textContent).toContain("2 · 1 late");
+  });
+
+  it("no stamp, no deadline — the delay queues stay quiet instead of crying wolf", () => {
+    listHookState.data = {
+      orders: [
+        // A pre-0305 Worker selects neither stamp. The queue still holds the
+        // order; what it may not do is call it late on no evidence.
+        delayOvershoot("dp-nostamp", 1531, {}),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(statusGroup().getByRole("button", { name: /All\s*1/ }));
+    const row = screen.getByTitle(/decide before anyone calls/);
+    expect(row.textContent).not.toContain("late");
+  });
+
   // ── T7 · DELIVERY queues + auto-overdue ────────────────────────────────────
   // The delivery lifecycle is its own facet group, each row carrying its own
   // deadline so an item turns late by itself.
