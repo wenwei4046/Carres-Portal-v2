@@ -63,7 +63,7 @@ Items recorded once, here, so no entry repeats them.
 
 | Item | What it is | Ruling |
 |---|---|---|
-| **KIT-CONSOLIDATION** | The single card that updates `docs/UI-KIT.md` from the frozen set once every reference is reviewed. It has no number in `docs/execution-queues-index.md` today. | **Parked by the PM, 2026-07-28.** Recorded once. **No future reference review repeats it**, and no chat opens it early — rule 5 of this line. |
+| **KIT-CONSOLIDATION** | The single card that updates `docs/UI-KIT.md` from the frozen set. | **Carded 2026-07-28 as D0.6** in [`docs/ui-kit-execution-queue.md`](ui-kit-execution-queue.md) — **planning card only, awaiting PM approval. Nothing may be built from it yet.** |
 | **Worklist floorplan** | R1's finding: Fiori would call `ACTION-FLOW-STANDARD`'s "Open My Work" a Worklist, and that page does not exist. | **Parked by the PM, 2026-07-28.** Noted only. **No design discussion may be started from it.** |
 | **Implementation observations** | R2's three `localStorage` sites; R4's stale machine mirror. | **Classified by the PM, 2026-07-28** as implementation observations held for KIT-CONSOLIDATION. Not design work, not a defect list to be worked during this phase. |
 | **Documentation debt** | `docs/ui-reference/` does not exist while `UI-KIT` §11 cites screenshots in it. | **Classified by the PM, 2026-07-28** as documentation debt. **The review does not stop to fix it.** |

@@ -46,6 +46,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — freezes Q1/Q3/Q4 | ⏳ |
 | **D0.5b** | Foundation components, Radix | ⏳ |
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ **ready to build** |
+| **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. **Planning card below; not started** | ⏳ **planning card awaiting PM approval** |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
@@ -281,6 +282,180 @@ Recorded so the builder does not have to rediscover them. **They are observation
 so that if the page reads better afterwards it is provably the hierarchy that did it. The line's
 own lesson list already carries this one — it is repeated here because this card is the largest
 opportunity to break it.
+
+---
+
+## D0.6 · KIT-CONSOLIDATION — the PLANNING CARD
+
+> **STATUS: planning card only. Awaiting PM approval. NOTHING may be built from it yet.**
+> The PM ruled 2026-07-28: *"Create the KIT-CONSOLIDATION Planning Card only. Do not edit UI-KIT
+> yet. After the planning card is approved, only then begin the UI-KIT consolidation."*
+>
+> **This section defines the work. It does not do the work.** No line of `docs/UI-KIT.md` is
+> touched by writing this card, and none may be touched until the PM approves it.
+
+**Why this card exists.** The Reference Review line (`docs/ui-reference-review.md`, R1–R5, closed
+2026-07-28) reviewed five international references and froze **five principles**. Rule 5 of that
+line was that **the kit is updated ONCE, at the end, from the frozen set** — *"editing the kit
+while the review runs is how five references become five half-applied styles."* This is that once.
+
+---
+
+### 1 · SCOPE
+
+**In scope — the law and its own bodies, nothing else:**
+
+| # | What | Why it is in |
+|---|---|---|
+| 1 | `docs/UI-KIT.md` | The five frozen principles are written here, and nowhere else (Law 0A). |
+| 2 | `docs/UI-KIT.md` §16 | The health count is recomputed. Adding rules moves it, and §16 governs which direction. |
+| 3 | `apps/web/src/lib/design-standard.ts` — **the claims it makes**, not the values it exports | R4's principle. It is 12 days behind the law, cites sections that no longer exist, and declares *"where any older doc, code comment, or token conflicts with UI-KIT v4, v4 wins"* while the law's first line says the law wins. **Two bodies of one kit each claiming to outrank the other is the finding, and it is a correction of a RECORD** — CLAUDE.md: the mirror is *"a record of the kit, never a place to drive a change from."* |
+| 4 | The five stale kit citations listed in `ui-reference-review.md` R4 | *"All version inconsistencies remain under KIT-CONSOLIDATION"* (PM, 2026-07-28). |
+
+**OUT of scope — named so the card cannot creep:**
+
+| What | Where it belongs |
+|---|---|
+| **The Information Architecture** — Business Thinking Model · L1 · L2 · L3 · L4 · Law 7 | **CLOSED.** This card may not reopen, restate or "align" any of it. Where the kit and the model touch, **UI-KIT wins** — that is already ruled and needs no new sentence. |
+| Any page, component or test under `apps/web/src/**` | D0.5a/b/c and D2–D7 |
+| **The token VALUES the mirror exports** (canvas hex, flame placement) | **D2/D3 codemods.** See the measurement below — correcting a *value* is a visual change and this card makes none. |
+| `/ui` showcase | D0.5a |
+| Q1 · Q3 · Q4 (the PENDING register) | `/ui`, D0.5a. **This card may not freeze a pending value**, and may not add a sixth pending question. |
+| Choosing HOW a principle is enforced | **This card decides it** — see Rules #4. It is out of scope for the *review line*, not for this one. |
+| `docs/ui-reference/` (missing screenshots) | Documentation debt, parked. **Not this card**, and not a blocker. |
+
+**A measurement that shapes the scope, taken 2026-07-28 rather than assumed:**
+
+```
+apps/web/src/lib/design-standard.ts
+  real importers ....... 1   (staff-avatar.ts, for AVATAR_COLORS)
+  files that only NAME it in a comment .......... 25
+  read by scripts/check-design-standard.mjs? ... NO — it is hex-ALLOW-LISTED, never parsed
+```
+
+**So the mirror's stale values are consumed by almost nothing, and correcting its *claims* carries
+no visual risk at all.** It also means UI-KIT's own description of the mirror as the body that
+*"code reads"* **is not true today** — and that is an input this card must carry to the PM, not a
+thing this card decides. The three-bodies model may be correct and unimplemented, or the mirror may
+have no job left. **Both are decisions above this card's pay grade.**
+
+---
+
+### 2 · INPUTS
+
+Everything this card is allowed to read *as a source*. Nothing else may become law here.
+
+| Input | What it supplies |
+|---|---|
+| `docs/ui-reference-review.md` **R1–R5**, the five frozen principles **only** | The substance. The PM's exact ratified wording is used verbatim where one exists. |
+| `docs/UI-KIT.md` as it stands | The target, its chapter structure, and §16's two health rules. |
+| `apps/web/src/lib/design-standard.ts` | The stale-citation evidence (R4), with line numbers already recorded. |
+| The **parking lot** in `ui-reference-review.md` | Implementation observations classified by the PM — read as context, **never pasted in as law.** |
+| `docs/execution-queues-index.md` | Where this card is indexed and which lane owns which file. |
+
+**The five frozen principles, listed here so the builder does not have to reconstruct them:**
+
+| From | Principle (PM-ratified wording where one exists) |
+|---|---|
+| **R1** SAP Fiori | Closed Pattern Library — *accepted as an observation for consolidation* |
+| **R2** Linear | *"UI, workflow and navigation are opinionated and consistent across the company. Business parameters remain configurable."* |
+| **R3** Stripe | *"Stable ID is the contract. Visible labels are presentation attached to the Stable ID."* |
+| **R4** Vercel | *"Every kit artifact must declare the kit version it follows."* |
+| **R5** GOV.UK · NN/g · Polaris | *"Words are delivered by the system, not remembered from a document."* |
+
+**NOT an input:** any reference not in R1–R5, any observation the PM did not approve, and any
+design idea this card's author has. **The review line is closed; consolidation writes it down, it
+does not extend it.**
+
+---
+
+### 3 · OUTPUTS
+
+Exactly four artefacts. A fifth means the card grew.
+
+| # | Output | Shape |
+|---|---|---|
+| 1 | **`docs/UI-KIT.md` carries the five principles**, each in the chapter that owns its concern — never a new "Principles" chapter bolted on the end. Each gets the standard **Rule · Enforcement · Status · Evidence** row the file already uses for every rule. | Edit |
+| 2 | **§16 recomputed** — rule count, enforced count, coverage, and the Human Review debt line, with the arithmetic shown. | Edit |
+| 3 | **The mirror declares its version and drops its claim of authority** — its header states which kit edition it follows, and the dead section citations (`v4 §11a`, `v4 §9`) are corrected or removed. **Exported values are untouched.** | Edit |
+| 4 | **A findings note back to the PM** — the mirror-has-one-importer measurement, and any principle that could not be written without a decision the PM has not made. | Report |
+
+**Explicitly NOT an output:** a new document. Five principles landing in a sixth file is the exact
+disease `UI-KIT` §0.2 and Law 0A exist to prevent.
+
+---
+
+### 4 · RULES
+
+1. **`docs/UI-KIT.md` wins, and the IA stays closed.** Where a principle touches L1–L4, the kit's
+   wording governs presentation and the model keeps information — neither file is edited to suit
+   the other, and the model is not edited at all.
+2. **One concern, one file.** A principle is written in exactly one chapter. If it seems to belong
+   in two, it has been stated too broadly — narrow it until it has one home.
+3. **The PM's wording is used verbatim** where a ratified sentence exists (R2 · R3 · R4 · R5). The
+   *reasoning* may be summarised; the *sentence* may not be improved.
+4. **Every principle written into the law arrives with an Enforcement**, because §16 forbids adding
+   a rule enforced only by a human without a mechanism in the same PR **or a card that names one**.
+   Naming the card is the expected route here — this card writes law, not code. **Choosing the
+   mechanism is this card's job** (the review line was forbidden from freezing one; that
+   prohibition ends here).
+5. **§16 coverage may not go down and the Human Review debt may not grow.** Both are measured
+   before and after, and the arithmetic is printed in the PR. If a principle cannot be added
+   without breaking this, it is deferred with its reason stated — **not smuggled in as prose.**
+6. **No visual change and no behaviour change.** Zero token values altered, zero components
+   touched. `pnpm --filter @carres/web lint` reports no new violations and the web suite stays at
+   baseline. *This card changes what the law says, not what the screen does.*
+7. **A pending question stays pending.** Q1 · Q3 · Q4 are frozen on `/ui` by Jess, not here, and no
+   sixth pending question may be created — a principle that needs a new decision is deferred, not
+   parked in the register.
+8. **Report, never unilaterally change** (Law 0). If a frozen principle contradicts the live code
+   or the law, the card SAYS SO with evidence and the PM decides. **The mirror's claim of authority
+   is corrected because the PM already ruled it in scope; anything discovered beyond that is
+   reported, not fixed.**
+
+---
+
+### 5 · EXIT CRITERIA
+
+Every line is checkable by someone who did not write the card.
+
+- [ ] **All five principles appear in `docs/UI-KIT.md`**, each in exactly one chapter, each with a
+      `Rule · Enforcement · Status · Evidence` row.
+- [ ] **A `grep` for each PM-ratified sentence returns exactly one hit** in the whole repo outside
+      `ui-reference-review.md` — proving one home, not two.
+- [ ] **§16's block is recomputed and the arithmetic is shown in the PR.** Coverage is **not lower**
+      than the 3 / 33 = 9.09% it reads today, and the Human Review debt is **not higher** than 4.
+- [ ] **Every principle names its Enforcement**, and any that is `⏳` names the card that will
+      deliver it. **No principle is added with `Human Review` and no card.**
+- [ ] **`design-standard.ts` declares the kit edition it follows**, no longer claims to outrank the
+      law, and cites no section that does not exist. **`git diff` on that file changes no exported
+      value** — provable by grepping the diff for `#` and for `hex:`.
+- [ ] **The five stale citations from R4 are each either corrected or listed with a reason for
+      being left**, so KIT-CONSOLIDATION closes them rather than passing them on.
+- [ ] **Zero visual change, proved not asserted:** `git diff` introduces no hex, no `text-[`, no
+      `h-[`; `pnpm --filter @carres/web lint` clean; web suite at baseline (today **2029 passed /
+      16 pre-existing**), `tsc -p tsconfig.app.json` clean.
+- [ ] **The IA files are untouched** — `git diff --name-only` contains neither
+      `ORDER-DETAIL-INFORMATION-MODEL.md` nor `ACTION-FLOW-STANDARD.md`.
+- [ ] **No new document was created.**
+- [ ] **`docs/ui-reference-review.md`'s parking lot is updated** — KIT-CONSOLIDATION marked done,
+      with the observations that were carried and the ones deliberately not.
+- [ ] **The four review questions are answered**, including the mirror-has-one-importer finding
+      handed back to the PM as a decision, not silently acted on.
+
+---
+
+### Sequencing — what this card blocks and what it does not
+
+**It should land before D1.** D1 writes the Build Guard baseline over all 225 files; a guard
+written against a law that is about to gain five principles is a guard that gets rewritten.
+
+**It does not block D0.5a/b/c**, which implement L4 and the PENDING register — both already frozen
+and untouched by this card. **One real interaction to be aware of, not resolved here:** R1's closed
+catalogue is a statement about `PageShell`'s `variant` union, which D0.5c builds. If D0.5c ships
+first the code exists before its rule, which is normal and harmless; the card simply describes what
+was built. **If the PM wants the rule to lead the code, that is a sequencing instruction and it
+belongs to the PM, not to this card.**
 
 ---
 
