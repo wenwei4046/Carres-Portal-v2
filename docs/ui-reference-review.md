@@ -32,7 +32,7 @@ not a licence.
 | # | Reference | What it is being read for | State |
 |---|---|---|---|
 | **R1** | **SAP Fiori** | Enterprise workflow | ✅ **frozen 2026-07-28** — adopt with modification; one rule (closed floorplan catalogue) |
-| R2 | Linear | Operator workflow | ⏳ |
+| **R2** | **Linear** | Operator workflow | ✅ **frozen 2026-07-28** — adopt with modification; one observation (opinionated, not configurable) |
 | R3 | Stripe Dashboard | Detail page | ⏳ |
 | R4 | Vercel | Design system | ⏳ |
 | R5 | GOV.UK · NN/g · Shopify Polaris · SAP Content | Microcopy | ⏳ |
@@ -151,8 +151,11 @@ in two type systems.
 
 **One finding reported, not built** (Law 0; it is a PM decision, not an architecture one): Fiori
 would call `ACTION-FLOW-STANDARD`'s *"1. Open My Work"* a **Worklist floorplan**, and that page does
-not exist — today the Orders list is asked to be both the worklist and the browse surface. Recorded
-here so the observation is not lost; it belongs to a PM queue, not to this line.
+not exist — today the Orders list is asked to be both the worklist and the browse surface.
+
+> **PARKING LOT — ruled by the PM, 2026-07-28.** Noted only. **No design discussion may be started
+> from it**, in this line or in a later one, until the PM takes it off the lot. A chat that opens a
+> Worklist design because it read this paragraph has broken the ruling, not followed the finding.
 
 ## The rule this reference freezes
 
@@ -174,7 +177,13 @@ at the end, from the frozen set.
 > | Every page declares one floorplan from a closed set | **Type System** — `variant` is a closed union; `"custom"` does not compile | ⏳ D0.5c | `PageShell.tsx` |
 > | A page component that renders no `PageShell` fails the build | Build Guard G | ⏳ D0.5c | `check-design.mjs` |
 
-**When it lands, and why the timing is not a detail.** `UI-KIT` §16 carries two health rules:
+**Narrowed by the PM, 2026-07-28 — read this before the paragraph below.** The closed-catalogue
+principle is accepted as an **OBSERVATION carried to the final consolidation**, not as a rule
+scheduled onto a build card. It is not attached to D0.5c and no card changes because of it. The
+arithmetic that follows is kept because it still decides *how* the observation may eventually be
+written — never *when* this line writes it.
+
+**Why it cannot land alone, whenever it lands.** `UI-KIT` §16 carries two health rules:
 coverage may never go down, and Human Review debt may never grow. Today the count is **3 enforced
 / 33 rules = 9.09%**, where *enforced* means the mechanism is live, not scheduled. Writing this
 rule into the kit on its own would make it **3 / 34 = 8.82%** — denominator up, numerator flat, the
@@ -198,3 +207,152 @@ without a mechanism is a rule that has not been finished, and finishing one cost
   [`docs/UI-KIT.md`](UI-KIT.md) §0–§2 and §5–§16.
 - **Not read, and not needed for this entry:** `COPY-STANDARD.md` (Fiori's wording contributions
   belong to R5, not here) and the module working-flow files.
+
+---
+
+# R2 · Linear — operator workflow
+
+**Reviewed 2026-07-28. Recommendation: ADOPT WITH MODIFICATION — one observation, and it is
+about GOVERNANCE (who decides), not about speed, keyboards or looks.**
+
+## Why this product is respected
+
+Linear is the reference for *software built for the person who is in it all day*.
+
+- **It made speed a design principle instead of a performance target.** A local-first sync engine,
+  optimistic writes and no full-page spinners — interactions land in tens of milliseconds. Nobody
+  had argued before that latency is a *design* decision made at the architecture layer, not a
+  polish task at the end.
+- **It published its philosophy.** *The Linear Method* is a written product doctrine — build for
+  the people doing the work, opinionated workflow, no busywork, aim for clarity. Design systems
+  are common; a design *doctrine* a company will refuse features over is rare.
+- **It refuses configurability.** Very few settings, no per-user layouts, no custom field zoo. The
+  product decides, and that is stated as a feature rather than apologised for.
+- **Visual restraint.** A neutral grey field, one accent, tiny monochrome icons, status carried by
+  a small glyph rather than a coloured band. Quiet enough to look at for eight hours.
+- **Keyboard-first, with a command menu** as the single door to every capability.
+
+## ① What do we learn?
+
+**One thing: *opinionated, not configurable* — and where exactly that line falls for Carres.**
+
+Linear's real discipline is not "few settings". It is that **the product's own shape is not the
+user's business.** How the list is arranged, which columns exist, what the workflow steps are —
+decided once, for everybody, by the people who own the product. A user who can rearrange the tool
+has to be *taught their own version of it*, and every handover starts from zero.
+
+That is directly ours: `ACTION-FLOW-STANDARD` opens with *"The system leads; the staff follow"*
+and prices a new hire's whole training at four lines. Four lines only works if the tool is the
+same tool for everybody.
+
+**The refinement Carres needs — and Linear does not have to make, because it has no factories.**
+Two things wear the word *settings* and they are opposites:
+
+| | Configurable? | Why |
+|---|---|---|
+| **Business numbers** — production days per supplier, work weeks, reorder points, reserve levels, commission rates | **Yes, and it is compulsory** | Purchasing P1 made seven of these editable precisely because a constant in code was a number nobody could correct. A business number that only a developer can change is a defect. |
+| **The UI and the workflow** — which columns exist, what order blocks appear in, which panels are open, what an action is called, which step comes next | **No, ever** | This is the tool's shape. Two operators seeing two shapes is how a handover fails, and `ORDERS-WORKING-FLOW`'s multi-operator handover is a live business fact, not a hypothetical. |
+
+**A second thing, adopted with a hard limit** (the limit is in ②): *speed is decided at the
+architecture layer, not at the polish stage.* An operator making forty calls a day pays for every
+spinner forty times.
+
+## ② What do we NOT learn?
+
+| # | Linear pattern | Why Carres refuses it |
+|---|---|---|
+| 1 | **Optimistic UI on writes** | Linear can be optimistic because an issue's status has **no server-side business gate that can refuse it**. Ours do: confirm-booking, issue-delivery-order and proceed-order all refuse on goods, money, Sunday or a public holiday — C7 moved the hard gate *onto* issuing the document. An optimistic "issued" that the server then refuses is **worse than a spinner**, because by then the operator has told the customer. Optimism is safe for reads, navigation and filtering; it is banned on a gated write. |
+| 2 | **⌘K command palette as the primary door** | Against `ACTION-FLOW-STANDARD`'s one sentence — *staff never decide what is next*. A palette is built for a user who already knows what they want to do. Ours is described in CLAUDE.md §1 as a **non-technical, low-English operator**, on a shared login, with a phone in the other hand. |
+| 3 | **Keyboard-first as an assumption** | Linear assumes one person, one machine, all day. Carres operations is several people through one shared login with mid-order handovers. Shortcuts as an *accelerator* are a future question; keyboard-first as the *model* imports the wrong user. |
+| 4 | **The anti-friction instinct applied to records** | Linear deliberately keeps an issue thin — fewer required fields, less ceremony. Carres's Service Case **refuses to be filed without the photos its issue type demands** (S2), and Rental refuses an unsigned agreement. Removing friction is right for a to-do and wrong for a claim; a claim's friction *is* the product. |
+| 5 | **One status field on the object** | Same refusal as Fiori's `ObjectStatus`. See the pattern note below. |
+| 6 | **The look** — dark default, the purple accent, their type and icon set | §3 is Radix, §5 is Lucide, §2 is six type levels — and rule 2 of this line already forbids reading a reference for its look. |
+| 7 | **Cycles · projects · roadmap** | Product-management concepts. Not our business model. |
+
+### The pattern worth naming now, before a third reference triggers it
+
+**Two references in a row have put ONE status word on the object, and we have refused both times**
+— Fiori's `ObjectStatus`, Linear's single status field. Stripe (R3) will almost certainly make it
+three, because nearly every product outside logistics has one.
+
+Recorded here so that the argument from consensus — *"every serious product does this, our rule
+must be wrong"* — has something to meet. The reason we refuse is **not** taste and is not
+contrarianism: Carres runs **three tracks that can disagree** (goods · delivery · money), and a
+delivered order that still owes money is Working, not Completed. Products with one status word are
+products whose object has one track. **When a reference does have three independent tracks and
+still summarises them into one word, that will be a genuine finding worth re-opening.** None so far
+does.
+
+## ③ Why does it fit Carres — and where it does not
+
+**It fits** because the two users are the same *kind*: somebody inside the tool all day, whose
+minutes are the product's real cost, and who is measured on throughput rather than on exploring
+features. Linear's governance answer — the product's shape is not up for negotiation — is the same
+answer `ACTION-FLOW-STANDARD` and `COPY-STANDARD` already give, reached from the tooling side.
+
+**It does not fit** wherever Linear assumes its user *chose the tool and is technical*. That single
+assumption produces the palette, the shortcuts, the thin records and the anti-friction instinct —
+and every one of them inverts for an operator who did not choose the portal and cannot type an
+English command. **Linear's user opted in. Ours was assigned.** That is the sentence to keep; it
+explains four refusals at once.
+
+## Conflicts found
+
+**None between the principle and a Carres law.** But applying it surfaced three live places where
+Carres already lets the browser hold the tool's shape — reported under Law 0, **not fixed, and not
+a redesign proposal**:
+
+| Where | Key | What persists |
+|---|---|---|
+| `OperationOrdersControl.tsx:1389` | `carres.orders.hiddenCols` | which columns the Orders table shows — **per browser** |
+| `OrderDetailDrawer.tsx:662` | `ops-drawer-panel-v4:{title}` | every drawer panel's open/closed state, **across orders**, keyed by the panel's TITLE |
+| `OrderDetailDrawer.tsx:2010` | `ops-drawer-rail` | the drawer rail's collapsed state |
+
+Three things about the middle one are worth having on record:
+
+1. **Its comment cites "UI-KIT v4 §9"** as the authority for panels defaulting collapsed. UI-KIT v4
+   was overwritten on 2026-07-27; today's §9 is *UI States*. The code is carrying a rule from a
+   law that no longer exists.
+2. **L4 rule 1 says `currentAction` has no `collapsible` and no `hidden`**, and §1.4 rule 1 says
+   Current Action is always visible and survives a collapsed rail. Whether today's Current Action
+   block is one of the five panels rendered through that collapsible wrapper **was not verified
+   this session** — it is a code question for D0.5c, and this line does not touch code.
+3. **The store is keyed by the panel's title**, so renaming a panel silently resets every user's
+   state for it. C1/PR #487 renamed that rail's panel from `Actions` to `Calls`; whether that
+   panel goes through this wrapper was likewise not verified.
+
+**A second finding, on this reference specifically:** `UI-KIT` §11 cites
+`docs/ui-reference/linear-*.png` and `docs/ui-reference/primer-blankslate.png` as the visual
+references for page layout, table, sidebar, status pill and empty state — and **`docs/ui-reference/`
+does not exist.** §11's own rule is *"Screenshots live in the repo. An external URL is not a
+reference — it changes without telling us."* The Reference Library currently points at nothing.
+No screenshot was added by this entry, because rule 2 of this line means R2 contributes no visual
+reference at all.
+
+## The observation this reference contributes
+
+**Carried to the final consolidation. Not a rule, not scheduled, and `docs/UI-KIT.md` is not
+touched** (rule 5 of this line; PM ruling 2026-07-28).
+
+> **Opinionated, not configurable.** The UI and the workflow are decided once, for everybody —
+> which columns exist, what order blocks appear in, what an action is called, which step is next.
+> **Only BUSINESS NUMBERS are settings.** A user who can rearrange the tool must be taught their
+> own version of it, and every handover then starts from zero.
+>
+> *Enforcement candidate for consolidation to weigh (§16 requires one):* the absence of a
+> per-user UI-preference store — no browser-persisted layout, panel or column state under
+> `pages/**`. That is Build-Guard shaped rather than Human-Review shaped, which matters because
+> §16 forbids growing the Human Review debt. **Its cost is not zero:** three live behaviours listed
+> above would come off, and one of them (`hiddenCols`) is a feature somebody asked for. That is a
+> consolidation decision, not this entry's.
+
+## The limits of this reading
+
+- **Read from *The Linear Method* and from product knowledge held in memory.** **No live Linear
+  workspace was opened this session**, no screenshot was taken, and nothing was added to
+  `docs/ui-reference/` — which, as recorded above, does not exist.
+- **Carres side read live this session, not from memory:** the three `localStorage` sites above
+  (grepped and opened), `UI-KIT` §11 and §16, and the frozen L1/L2/L4 text quoted.
+- **Not verified, and deliberately left alone:** whether the Current Action block passes through
+  the collapsible panel wrapper. Answering it means reading a 7,000-line file for a code decision
+  that belongs to D0.5c, and this line reviews references — it does not open code cards.
