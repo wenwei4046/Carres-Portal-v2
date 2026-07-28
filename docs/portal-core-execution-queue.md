@@ -633,7 +633,7 @@ Tests +39 (shared 30 · api 12 net · web 10 net); suites at baseline (shared 18
 3 pre-existing · web 16 pre-existing); typecheck 0 new, build + design guard + wrangler
 dry-run clean, `SERVICE_ROLE` 0 in the bundle.
 
-## C8 · Delay planning + the gate before the customer (Jess rulings 2026-07-27)
+## C8 · Delay planning + the gate before the customer — ✅ LIVE (PR #493)
 
 **Build the stages exactly as `docs/ORDERS-WORKING-FLOW.md` §3 states them.** That file is
 the specification; this card is the work. The word on screen is **`Delay planning`** —
@@ -663,6 +663,95 @@ check the tracker tail immediately before applying. **Depends on C2.**
 **Done when:** an order whose delay we solve internally never reaches the customer and never
 loses its original promised date; one that cannot be solved opens exactly one logistics
 action.
+
+### What shipped (PR #493, 2026-07-28 — migration **0304**, applied before the merge)
+
+**The two pre-checks first, because one of them was wider than C2 reported.**
+
+**The dictionary won, and FOUR surfaces were spelling the customer version**, not the one
+C2 finding #3 named:
+
+| Where | Was | Now |
+|---|---|---|
+| `order-action-words.ts` queue | `Agree new delivery date` | `Arrange new delivery date` |
+| its row line | `Call {customer} — agree new delivery date` | `Call {logistics} — arrange new delivery date` |
+| the Orders queue tooltip | "… — **call the customer now**, before the window" | "Supplier date lands after the promised date — decide before anyone calls" |
+| the journey strip's owner line | "Operations — agree a new date **with the customer**" | "Operations — give logistics the new date to arrange" |
+
+Three laws agreed with each other against the code: COPY-STANDARD's dictionary row, its
+vocabulary table, and Law 4 rung 2. **The WhatsApp templates were checked and are clean** —
+`wa-templates.ts` already routes booking requests through logistics and has no customer
+delay template. **Law 4 rung 2 is now a GUARD rather than a comment**: the customer's real
+name is fed into both delay lines and into the owner line, and the tests fail if any of the
+three reads it — which is how the first draft of the new owner line was caught and rewritten.
+
+**The gate, built as §3 states it.** `Delay planning` (stage 1) is an internal DECISION with
+no party — nobody outside is involved, the same reason `Assign logistics` carries none. Only
+`We cannot make the promised date` opens stage 2. `keep` means we solved it internally, so
+the goods track falls back to the ordinary supplier call, which is the truth about that
+order. **The gate is visible on screen too**: C6's checklist for stage 2 reads
+`Record the delay decision` ✓ then `Record new date`, so the logistics call structurally
+cannot be reached with an un-ticked decision above it.
+
+**`delay_decision_eta` is the load-bearing column, and it is S4's discipline** — an event
+names the thing it was made ABOUT. A decision is about ONE supplier date; if the factory
+slips again the pair stops matching and Delay planning re-opens by itself. Without it, one
+decision would close every future delay on that order forever, which is
+`ops_order_control.balance`'s disease one column over.
+
+**THE PROMISED DATE NEVER MOVES, and it is structure rather than a comment.** The route
+never opens the `orders` table at all (asserted), so `set_order_date` cannot be reached from
+this flow even by accident; the panel prints the promised date as a FACT and has no date
+input (asserted). And the yardstick itself is tested: a booking arranged for 2 Sep does not
+become the new promise, so a factory date of 25 Aug — before the booking, after the promise —
+is still a delay and still needs its own decision.
+
+**Stage 2's completion needed no new column.** `bookingConfirmed` alone would close the
+action the instant it opened on an order that already carried a booking made BEFORE the
+slip — having arranged nothing. So the confirmed day must be one the goods can make: on or
+after the supplier's ready date. That is the only thing "a new delivery date" can mean when
+the old one is unreachable, and it reads signals that already exist.
+
+**Live effect today: NONE.** 0 of 55 control rows carry a supplier ready date (`stock_eta`
+NULL ×55, `line_etas` empty ×55) — nothing can reach this flow. C8 decides the behaviour
+before the first one appears, exactly as C7 and C9 did.
+
+**Negative control:** remove the gate and 6 tests fail on the spot. Suites at baseline
+(shared 1933/1933 incl. +35 · api 3 pre-existing · web 16 pre-existing); typecheck 0 new,
+build + design guard + wrangler dry-run clean, `SERVICE_ROLE` 0. Both directions proved on
+the bundle: the four new strings present, the retired `Agree new delivery date` **0**.
+
+### What C8 found — reported, not fixed (Law 0)
+
+1. **`Delay planning` has no row in COPY-STANDARD's five-string dictionary**, and that
+   table's own rule is *"Five filled = designed. One missing = not designed — do not open a
+   card for it."* The vocabulary table gives the WORD, so the queue and row line were
+   derivable; the **Button**, the **Done message** and the **Empty state** were not. **The
+   chat stopped and asked before building**, and Jess ruled the Button
+   (`Record the delay decision`), the two decision answers and the queue tooltip on
+   2026-07-28. **A PLAN chat should add the row** — a build chat does not edit a law.
+2. **Law 4 ranks `Delay planning` nowhere.** It is not rung 2 ("the customer must be told") —
+   the whole point is that they are not told yet — but it cannot rank below the call it
+   gates. Shipped at 19, immediately above `Arrange new delivery date`; the two can never
+   both be open, so the rank only decides them against the OTHER tracks, where the answer is
+   the same for both. Needs Jess's word in the law.
+3. **The dictionary has no entry for a free-text note field.** The optional note reuses
+   `Note (optional)`, the label this same drawer already ships (rule 8: same word app-wide),
+   rather than inventing a twelfth phrasing.
+4. **§3 stage 1's checklist has five items and only one is measurable.** "check ready stock
+   or another supplier · check available dates with logistics · decide the best delivery
+   date" are things a human does, not signals the system stores — so the panel asks for the
+   OUTCOME and nothing tick-boxes the rest (the no-decorative-checkbox law). If any of them
+   should be recorded, that is a form, and its own card.
+5. **The delay flow does NOT touch the extension fields, against the card's own
+   instruction.** Both the card and §3 say to reuse them for "customer accepted the delay".
+   They are the **one-time CUSTOMER-initiated storage extension** (0196: `extension_count`
+   capped at 1, a second one principal-gated) — a Carres-side delay writing them would
+   silently spend the customer's one extension. The new date goes to the BOOKING, which is
+   where §3 stage 3 puts it anyway. **Needs Jess.**
+6. **Neither delay stage has a Due, so neither can turn late.** Law 2 requires one on every
+   action; §3 gives `Assign logistics` 3 working days and `Confirm delivery date` a settable
+   number, and gives these two nothing. Not invented here.
 
 ## C9 · Storage fee holds the delivery, and only the manager can release it — ✅ LIVE (PR #472)
 
@@ -884,6 +973,6 @@ a tooltip and a five-word vocabulary; a half-drawn signal would not.
 | C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
 | C6 | ✅ **LIVE** 2026-07-28 — every action opens the steps that close it; the order's PIC is the task owner | #486 |
 | C7 | ✅ **LIVE** 2026-07-28 — the DO issues itself, and the hard gate moves onto issuing. **No migration** | #489 |
-| C8 | ⬜ after C2 · delay planning + the gate (migration) | — |
+| C8 | ✅ **LIVE** 2026-07-28 — delay planning, and the gate before the customer. **Migration 0304** | #493 |
 | C9 | ✅ **LIVE** 2026-07-27 — storage holds the delivery; the manager releases it, in two named outcomes | #472 |
 | C10 | ✅ **LIVE** 2026-07-27 — the three dots render beside the stage pill | #471 |
