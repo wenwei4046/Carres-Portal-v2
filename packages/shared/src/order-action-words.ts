@@ -56,6 +56,15 @@ interface OrderActionWord {
   key: OrderActionKey;
   queue: string;
   line: (p: OrderActionParties) => string;
+  /**
+   * C6 — string 3 of the five COPY-STANDARD locks per action: the BUTTON that
+   * records it. It is the word C6's checklist prints for a step, so a step can
+   * never invent a verb of its own: `Record ready date`, not "get the date".
+   *
+   * `null` for the two FACTS (`delivering`, `done`) — nothing records a fact,
+   * and a button word for one would be a button nobody can press.
+   */
+  button: string | null;
 }
 
 /** Trim to a real name, else the role word — never an empty slot. */
@@ -76,17 +85,24 @@ const WORDS: readonly OrderActionWord[] = [
     key: "send_po",
     queue: "Send PO",
     line: (p) => `Send PO to ${party(p.supplier, "supplier")}`,
+    button: "Send PO",
   },
   {
     key: "confirm_ready_date",
     queue: "Confirm ready date",
     line: (p) => `Call ${party(p.supplier, "supplier")} — confirm ready date`,
+    button: "Record ready date",
   },
   {
     key: "agree_new_delivery_date",
     queue: "Agree new delivery date",
     line: (p) =>
       `Call ${party(p.customer, "customer")} — agree new delivery date`,
+    // COPY-STANDARD's dictionary row is `Arrange new delivery date`; the shipped
+    // QUEUE + LINE spell it `agree` and name the customer. C2 finding #3 — the
+    // two laws name different parties for this one rung and **C8 owns it**. The
+    // button word is party-free, so it is the same under either ruling.
+    button: "Record new date",
   },
   {
     // Nobody outside is involved — the party is what you are choosing, so it
@@ -94,22 +110,26 @@ const WORDS: readonly OrderActionWord[] = [
     key: "assign_logistics",
     queue: "Assign logistics",
     line: () => "Assign logistics",
+    button: "Assign logistics",
   },
   {
     key: "confirm_delivery_date",
     queue: "Confirm delivery date",
     line: (p) =>
       `Call ${party(p.logistics, "logistics")} — confirm delivery date`,
+    button: "Confirm booking",
   },
   {
     key: "deliver_today",
     queue: "Deliver today",
     line: () => "Deliver today",
+    button: "Mark delivered",
   },
   {
     key: "upload_delivery_photo",
     queue: "Upload delivery photo",
     line: () => "Upload delivery photo",
+    button: "Upload delivery photo",
   },
   {
     // C3 (Jess 2026-07-27) — a FACT, not an action. `Confirm delivery with
@@ -134,6 +154,7 @@ const WORDS: readonly OrderActionWord[] = [
       if (!date) return "Delivering";
       return slot ? `Delivering ${date} · ${slot}` : `Delivering ${date}`;
     },
+    button: null,
   },
   {
     key: "collect",
@@ -143,6 +164,7 @@ const WORDS: readonly OrderActionWord[] = [
       const who = party(p.customer, "customer");
       return money ? `${money} from ${who}` : `Collect from ${who}`;
     },
+    button: "Record payment",
   },
   {
     // Terminal FACT, not an action — it lives here so the ladder has one place
@@ -150,6 +172,7 @@ const WORDS: readonly OrderActionWord[] = [
     key: "done",
     queue: "Done",
     line: () => "Done",
+    button: null,
   },
 ];
 
@@ -196,6 +219,20 @@ export function orderActionLine(
 export function collectPillLabel(amount: string | null | undefined): string {
   const money = amountBit({ amount });
   return money ? `Collect ${money}` : "Collect";
+}
+
+/**
+ * C6 — the BUTTON word: what the operator presses to RECORD this action's
+ * outcome. `null` for the two facts (`delivering`, `done`), which nothing
+ * records.
+ *
+ * It is the word a checklist step prints, and that is the point: a step is one
+ * of the portal's own actions, so it can never carry a verb somebody invented
+ * for a tick-list ("get the ETA", "chase them"). Verb-first and ≤ 8 words, which
+ * is COPY-STANDARD's "What to do" step template exactly.
+ */
+export function orderActionButton(key: OrderActionKey): string | null {
+  return wordFor(key).button;
 }
 
 /**

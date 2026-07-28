@@ -29,18 +29,18 @@
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 — R6 · R7 left |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C9 ✅ #472 · C10 ✅ #471** — C4 · C6 · C7 · C8 left |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #481 · C9 ✅ #472 · C10 ✅ #471** — C4 · C7 · C8 left |
 | ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **NEW 2026-07-27** — flow file written, seven old docs deleted. **P1 is the next card** |
 | ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 | **NEW 2026-07-28** — D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3`. **T3 = Jess uses it for a day, after a deploy.** TEMPORARY doc — delete when the line ends |
 
-**State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ R1-R5 ✅ · ⑥ C1 · C2 · C3 · C5 · C9 · C10 ✅ ·
+**State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ R1-R5 ✅ · ⑥ C1 · C2 · C3 · C5 · C6 · C9 · C10 ✅ ·
 ⑦ opened, nothing built yet · ⑧ D0 + T1 + T2 ✅ (T3 is a Jess task, not a build card).
 
 **⑧ obeys the Orders lane rule** — T2 edited `OrderDetailDrawer.tsx`, so a ⑧ card that
 touches the drawer may not run beside C6/C7/C8. **D0.5a and D0.5b touch NO existing page**
 (new components + a new `/ui` route only) and are safe beside anything; **D0.5c and D6 touch
 the Orders list and drawer** and are not.
-**Orders lane, in this order:** C6 → C7 → C8 (C4 any time a Purchasing slot is free).
+**Orders lane, in this order:** C7 → C8 (C4 any time a Purchasing slot is free).
 **C7 is BLOCKED no longer** — the law conflict C3 found (COPY-STANDARD saying both that
 `Issue delivery order` IS and is NOT an action) was ruled by Jess on 2026-07-27:
 **it IS an action**, the system produces the document and the operator presses one button.
@@ -53,6 +53,20 @@ specified a different purchasing module and none was authoritative, so every bui
 picked a different one. They are DELETED. The single owner is
 `docs/PURCHASING-WORKING-FLOW.md`. **The engine itself was already built** — the P-cards
 turn its hard-coded numbers into settings and add the two supplier calls nobody had built.
+
+**What C6 changed (2026-07-28, PR #481) — web only, no migration.** Clicking an open action
+in the drawer's checklist opens **the steps that close it**, and every step is one of the
+portal's own actions, so it is worded by that action's BUTTON string from the dictionary —
+`Assign logistics` ✓ then `Confirm booking` under `Call NETS — confirm delivery date`. The
+steps are measured from the SAME signals object the ladder just read, and the last step is
+the action's own outcome, never ticked while the action is open: **an open action can never
+show a fully ticked list**, asserted over the whole signal matrix with a negative control.
+Nothing on that screen can write — no tick, no checkbox, no button inside a step — so the
+no-decorative-checkbox law is structure rather than a comment. **The Task Owner question
+C2 and C3 both left open is RULED, not built: the order's PIC is the task owner of every
+action of that order**, so an action carries no owner field and needs no store. Collapsed by
+default, so it adds zero permanent height. **The driver / vehicle / condo migration the card
+also names is NOT applied** — guardrail #8, the draft is in the PR for Jess.
 
 **What C10 changed (2026-07-27, PR #471) — web only, no migration.** The three dots Law 6
 describes finally exist: goods · delivery · money render BESIDE the stage pill in the Status

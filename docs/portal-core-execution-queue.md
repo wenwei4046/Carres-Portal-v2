@@ -360,7 +360,7 @@ RM 56,859 · SO-1209 = RM 6,998 lines + RM 250 add-ons vs `orders.paid` RM 7,248
 Suites at baseline (shared 1623/1623 incl. +14 · api 3 pre-existing · web 16 pre-existing);
 typecheck 0 new, build + v4 guard + lint clean, `SERVICE_ROLE` 0 in the bundle.
 
-## C6 · Every action opens its checklist (from Jess's ChatGPT ACTION FLOW, 2026-07-27)
+## C6 · Every action opens its checklist — ✅ LIVE (PR #481)
 
 **Concept:** clicking an action in C2's Dynamic Checklist expands it into the steps that
 close it, and the action ticks itself when a **system-measurable** condition is true.
@@ -422,6 +422,120 @@ order (cheapest, and true today) or whether a step can be handed to someone else
 be ownable separately from its order.
 **Done when:** every built action closes itself from a real signal; no tick-box in the
 portal records only an assertion.
+
+### What shipped (PR #481, 2026-07-28 — **no migration**)
+
+**The shape, in one sentence:** *a checklist is [the measured step before it, when there is
+one] + [the outcome THIS action records]* — and **every step is one of the portal's own
+actions**, so its label is that action's BUTTON word from the dictionary. A step cannot
+carry a verb somebody invented for a tick-list, because a step is not allowed to be
+anything but an action the portal already has.
+
+| Action | Its checklist | The signal each measured step reads |
+|---|---|---|
+| `Send PO to {supplier}` | ○ `Send PO` | — |
+| `Call {supplier} — confirm ready date` | `Send PO` · ○ `Record ready date` | something has been ordered |
+| `Call … — agree new delivery date` | `Record ready date` · ○ `Record new date` | a supplier date is on file |
+| `Assign logistics` | ○ `Assign logistics` | — |
+| `Call {logistics} — confirm delivery date` | `Assign logistics` · ○ `Confirm booking` | a logistics company is picked |
+| `Deliver today` | **none — ruled** | — |
+| `Upload delivery photo` | `Mark delivered` · ○ `Upload delivery photo` | the order reached the customer |
+| `Collect RM … from {customer}` | ○ `Record payment` | — |
+
+**The last step is never ticked, and that is a structural claim rather than a fudge.** The
+drawer renders a checklist only for an action that is OPEN, so the outcome that action
+records has by definition not been recorded. Deriving it a second time here would be
+re-running the trigger, and the only thing a second derivation can do is disagree with the
+first (the J3/C2 law: this layer renders, it never re-derives). **One invariant holds the
+whole feature honest** — *an open action always has at least one un-ticked step* — asserted
+over 2⁶ × 3 × 3 signal combinations run through Layer 1 and then through their own
+checklists, with a negative control: make one closing step read a signal instead and the
+invariant fails on the spot. A fully-ticked list beside a live action is the only way this
+feature could lie, and it now cannot.
+
+**The no-decorative-checkbox law became structure, not a comment.** There is no tick, no
+checkbox and no writer anywhere in the module or its renderer; a step's state is READ from
+the same `OrderActionSignals` object the ladder just read, passed in once so a step can
+never be measured against a different reading of the order than the action above it. The
+only control in the component is a DISCLOSURE, and a test asserts that expanding an action
+adds no `input`, no checkbox and no button inside any step.
+
+**Two words were added to the code and none to the screen.** COPY-STANDARD locks FIVE
+strings per action and `order-action-words.ts` mirrored only TWO (queue + row line); C6
+needed the third — the **Button** — and took it verbatim from the dictionary table, so the
+mirror is now 3 of 5. Nothing here invents vocabulary: every step on screen is
+`Send PO` · `Record ready date` · `Record new date` · `Assign logistics` ·
+`Confirm booking` · `Mark delivered` · `Upload delivery photo` · `Record payment`, which is
+also COPY-STANDARD's "What to do" step template exactly — verb first, ≤ 8 words, ≤ 4 steps
+(asserted).
+
+**TASK OWNER — the decision the card asked for, and it needs no store.** *The order's PIC
+(`ops_order_control.assigned_staff`) is the task owner of every action of that order.* It is
+true today, it is what Law 2 asks for, and it means an action carries no owner FIELD:
+printing the same name once per open action would spend height (§1.3) repeating what the
+owner chip beside the order already says. A step that can be handed to a different person
+than the order is a second store and a hand-off screen nobody has asked for; when a real
+case appears it is a card, not an assumption. **This closes C2 finding #5 / C3 finding #5 by
+ruling, not by building.**
+
+**Collapsed by default** — §1.3 is a height budget and the row's line already says what to
+do; the click is the affordance the card asks for, so C6 adds ZERO permanent pixels to the
+drawer.
+
+**NOT BUILT, and it is the half of the card that needs Jess: the driver / vehicle / condo
+migration.** The card carries "ONE small additive migration — the call-outcome fields on
+`ops_order_control`" and, in its own last line, "**No migration** unless a step must be
+ownable separately from its order". Those two sentences disagree. Guardrail #8 settles what
+a build chat may do about it: **draft SQL may not be written into `supabase/migrations/`
+before Jess approves**, so the draft is in the PR body and nothing was applied. It is also
+not needed by the Done-when — every built action closes from a signal that exists today.
+The draft, for her ruling:
+
+```sql
+-- DRAFT — NOT APPLIED. C6, the carrier call's recorded outcome.
+alter table public.ops_order_control
+  add column if not exists driver_name        text,
+  add column if not exists driver_phone       text,
+  add column if not exists vehicle_no         text,
+  add column if not exists condo_registered_at timestamptz;
+```
+
+All nullable, none of them a gate, none of them a tick — they are what the call FILLS IN,
+which is category (b) of the no-decorative-checkbox law. They need a form on the
+confirm-booking surface (the form IS the checklist) before they mean anything, which is why
+they are one decision and not a spare column.
+
+### What C6 found — reported, not fixed (Law 0)
+
+1. **The card contradicts itself about the migration** (above). One of the two sentences has
+   to go, or the next chat to read this card builds a different thing again.
+2. **`ACTION-FLOW-STANDARD.md` Law 6 still ends with "NOT BUILT YET — this is a
+   specification, not a description of the screen … Card C10 builds it."** C10 shipped on
+   2026-07-27 and the law's own heading already says ✅ BUILT. The paragraph also repeats the
+   retired ruling that the dots REPLACE the stage pill — Jess re-ruled *side by side*. A chat
+   reading the bottom of that section builds the screen C10 deliberately did not build. It is
+   the same stale-paragraph failure T2 met one day earlier, in the law rather than in a
+   comment.
+3. **Two different blocks in the order drawer are both labelled `Actions`** — the left rail's
+   counterparty panel (renamed from `Chase now` by C1) and C2's dynamic checklist in the
+   full-width band. COPY-STANDARD rule 8 is "same word app-wide", and this is the same word
+   for two different lists on one screen. C6 did not rename either: both words were ruled,
+   and picking one is a wording decision.
+4. **The dictionary's `Arrange new delivery date` and the code's `Agree new delivery date`
+   still disagree, and so do their parties** (`{logistics}` vs `{customer}`) — C2 finding #3,
+   unchanged; **C8 owns it.** C6's button word (`Record new date`) is party-free, so it is
+   correct under either ruling.
+5. **A checklist step names the button but cannot press it.** "Where a form already collects
+   the inputs, the form IS the checklist" was read as *do not duplicate the form as ticks* —
+   it does not ask for navigation, and C2's list is deliberately control-free. The operator
+   reads `Confirm booking` and still has to find that button in the drawer. Wiring each step
+   to the panel that owns it is a real improvement and a real risk in a 7,000-line file; it
+   belongs to whoever next opens the drawer for its own reason.
+6. **`send_po`'s completion rule in this card is "PO exists AND supplier ETA recorded", and
+   the engine does not work that way** — the moment a PO exists the action becomes
+   `Call {supplier} — confirm ready date`, which is what records the date. Built as the
+   engine behaves (one step), because the card's own "ORDER OF EVENTS, not a gate chain"
+   rule says the two must not be collapsed into one action.
 
 ## C7 · The delivery order prints itself (Jess ruling 2026-07-27)
 
@@ -700,7 +814,7 @@ a tooltip and a five-word vocabulary; a half-drawn signal would not.
 | C3 | ✅ **LIVE** 2026-07-27 — the `+N`, and `Confirm delivery` becomes a fact | #479 |
 | C4 | ⬜ any time, not alongside R | — |
 | C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
-| C6 | ⬜ after C2 + C5 · action checklists | — |
+| C6 | ✅ **LIVE** 2026-07-28 — every action opens the steps that close it; the order's PIC is the task owner | #481 |
 | C7 | ⬜ after C6 · DO issues itself (migration) | — |
 | C8 | ⬜ after C2 · delay planning + the gate (migration) | — |
 | C9 | ✅ **LIVE** 2026-07-27 — storage holds the delivery; the manager releases it, in two named outcomes | #472 |
