@@ -34,10 +34,28 @@ not a licence.
 | **R1** | **SAP Fiori** | Enterprise workflow | ✅ **frozen 2026-07-28** — adopt with modification; one rule (closed floorplan catalogue) |
 | **R2** | **Linear** | Operator workflow | ✅ **frozen 2026-07-28** — adopt with modification; one observation (opinionated, not configurable) |
 | **R3** | **Stripe Dashboard** | Detail page | ✅ **frozen 2026-07-28** — adopt with modification; one observation (a visible word is a contract with a stable id behind it) |
-| R4 | Vercel | Design system | ⏳ |
+| **R4** | **Vercel (Geist)** | Design system | ✅ **frozen 2026-07-28** — adopt with modification; one observation (the kit is a dependency, not a document) |
 | R5 | GOV.UK · NN/g · Shopify Polaris · SAP Content | Microcopy | ⏳ |
 
 **Then, and only then:** one card that updates `docs/UI-KIT.md` from the frozen set.
+
+## How later entries handle a repeat (PM, 2026-07-28)
+
+**From R4 onwards, a reference that repeats an already-rejected concept is not re-argued.** It
+cites R1–R3 and moves on. The single-status-word refusal in particular is settled: the reasoning
+lives in R2's pattern note and R3's ②#1, and a later entry states only whether the reference met
+the criterion or not.
+
+## Parking lot
+
+Items recorded once, here, so no entry repeats them.
+
+| Item | What it is | Ruling |
+|---|---|---|
+| **KIT-CONSOLIDATION** | The single card that updates `docs/UI-KIT.md` from the frozen set once every reference is reviewed. It has no number in `docs/execution-queues-index.md` today. | **Parked by the PM, 2026-07-28.** Recorded once. **No future reference review repeats it**, and no chat opens it early — rule 5 of this line. |
+| **Worklist floorplan** | R1's finding: Fiori would call `ACTION-FLOW-STANDARD`'s "Open My Work" a Worklist, and that page does not exist. | **Parked by the PM, 2026-07-28.** Noted only. **No design discussion may be started from it.** |
+| **Implementation observations** | R2's three `localStorage` sites; R4's stale machine mirror. | **Classified by the PM, 2026-07-28** as implementation observations held for KIT-CONSOLIDATION. Not design work, not a defect list to be worked during this phase. |
+| **Documentation debt** | `docs/ui-reference/` does not exist while `UI-KIT` §11 cites screenshots in it. | **Classified by the PM, 2026-07-28** as documentation debt. **The review does not stop to fix it.** |
 
 ## What each entry must record when it freezes
 
@@ -463,10 +481,20 @@ Naming it here as the same rule is a classification, not design work.
 
 **Carried to the final consolidation. Not a rule, not scheduled, `docs/UI-KIT.md` untouched.**
 
-> **A visible word is a contract, and every visible word has a stable identifier behind it.**
-> Nothing may key on a label: not a count, not a filter, not a stored state, not a test. Renaming
-> is then a display change and never a data change — and because it is a contract, the change goes
-> through `COPY-STANDARD` as an event, never as an edit made in passing.
+**Frozen by the PM, 2026-07-28, in these words:**
+
+> **Stable ID is the contract.
+> Visible labels are presentation attached to the Stable ID.**
+
+**The PM's correction, recorded so it is not re-introduced:** this entry first wrote *"a visible
+word is a contract"*, which reads as though the label itself carried the contract — the exact
+confusion the principle exists to end. **The label carries nothing.** The ID is the contract; the
+label hangs off it and may be replaced without the contract moving.
+
+What follows from it: nothing may key on a label — not a count, not a filter, not a stored state,
+not a test. Renaming is then a display change and never a data change. And because the *word* is
+still governed even though it is not the contract, changing one goes through `COPY-STANDARD` as an
+event, never as an edit made in passing.
 >
 > *Enforcement candidate for consolidation to weigh (§16 requires one):* the pattern already
 > exists and is typed — `OrderActionKey` is a union and `DISPLAY_RANK` is keyed by it. The
@@ -486,3 +514,136 @@ Naming it here as the same rule is a classification, not design work.
   is measured rather than recalled.
 - **Not read:** the Payments module docs and `payment-module-proposal.md`. R3 is a governance
   reading; the money *module* is a business design question and is not this line's.
+
+---
+
+# R4 · Vercel (Geist) — the component system
+
+**Reviewed 2026-07-28. Recommendation: ADOPT WITH MODIFICATION — one governance observation:
+the kit is a DEPENDENCY, not a document. It is consumed, versioned, and migrated.**
+
+## Why this product is respected
+
+Geist is respected less for how it looks than for **what it is structurally**: a design system
+shipped as a package that other people's builds depend on.
+
+- **It is consumed, not read.** Vercel's dashboard, docs and marketing all install the same system.
+  Nobody re-implements a button from a specification — they import one. That single fact is what
+  keeps a system honest at scale, and it is why "a document cannot say tables look like this" is
+  true everywhere and not only here.
+- **Its documentation is the live component.** The system's docs site renders the real components
+  in every state. Documentation that *is* the artefact **cannot go stale** — there is no second
+  copy to drift.
+- **Tokens are a closed, named, numbered set** with semantic aliases on top. The same family as
+  Radix Colors, which Carres already chose.
+- **Because it is a package, its API is a contract.** Adding a prop is cheap; removing one is a
+  breaking change with a version and a migration path. Versioning is not bureaucracy here — it is
+  the only way a consumer knows which rules they are on.
+- **Dark mode and accessibility live in the token layer**, not as a theme bolted on afterwards.
+
+## ① What do we learn?
+
+**The kit is a DEPENDENCY, not a document — and a dependency has a version.**
+
+Carres already believes half of this. `UI-KIT.md` opens by stating the kit has **three bodies that
+must always agree, changed in the same commit** — the law, the machine mirror
+(`apps/web/src/lib/design-standard.ts`) and the live `/ui` showcase, whose stated reason for
+existing is that it *"structurally cannot go stale"*. Vercel corroborates that thesis completely.
+
+**What Vercel adds is the part Carres has not built: a version, and the discipline that a version
+buys.** A dependency tells you which rules you are on. A document does not — so code written
+against an old version keeps citing it, confidently, forever, and nothing catches it.
+
+**This is not theoretical. It is live today, and it was measured this session, not recalled:**
+
+| Where | What it says | Against |
+|---|---|---|
+| `design-standard.ts:4` | *"⭐ v4 — rewritten 2026-07-15 from `docs/UI-KIT.md`"* | The kit was **rewritten on 2026-07-27**. The mirror is 12 days behind the law it mirrors. |
+| `design-standard.ts:7` | *"Where any older doc, code comment, or token conflicts with **UI-KIT v4, v4 wins**"* | The current kit's first line: *"This file OVERWRITES every earlier design text… **this file wins**."* **Two bodies of one kit each claim to outrank the other.** |
+| `design-standard.ts:38` | page canvas `#F3F4F6`, commented *"v4 §11a COOL neutral"* | The kit froze **Q2 — page canvas = Radix `slate-3` ≈ `#F0F0F3`** (§3.2), and §3.1 says *the law names the STEP, never the hex*. The cited **§11a does not exist** in the current kit. |
+| `design-standard.ts:11–18` | *"Flame appears ONLY on a clickable primary action + a checked checkbox"* | §3.4 bans **the Carres flame outside the logo**, and §13.3 rule B **fails the build** on it. *"The Carres flame `#C44D2B` survives in exactly one place: the logo."* |
+| `OrderDetailDrawer.tsx:651` (found in R2) | *"UI-KIT v4 §9: panels default COLLAPSED"* | Today's §9 is **UI States**. The rule is cited from a law that no longer exists. |
+
+**The pattern, which is the actual lesson:** every one of those is a *confident citation of a dead
+version*. Not one of them looks wrong when you read it — they each name a file, a section and an
+authority. **A law with no version number produces code that cites it correctly and obeys the wrong
+edition.** A dependency makes that impossible, because the version is in the import.
+
+**Two secondary things Vercel corroborates**, recorded so they are not mistaken for new imports:
+
+- **Executable documentation.** `/ui` is already this idea, already scheduled (D0.5a/b/c), and
+  already carries the right justification in the kit's own words.
+- **Props are the rules.** UI-KIT's `Component API` enforcement tier and L4's *"what the types must
+  make impossible"* are the same instinct: a rule that cannot be expressed as the presence or
+  absence of a prop is a rule nobody is enforcing. Vercel's corollary is worth having in view at
+  consolidation — **a component that keeps gaining props is a component quietly becoming
+  configurable**, which is where this reference meets R2's ratified principle.
+
+## ② What do we NOT learn?
+
+| # | Vercel / Geist pattern | Why Carres refuses it |
+|---|---|---|
+| 1 | **Publishing the kit as a public package** | The cost is real (API stability, release notes, semver on every change) and the consumer count is one. Carries none of the benefit and all of the ceremony. The *internal* version is the part worth taking. |
+| 2 | **Dark mode as a first-class token dimension** | Doubles every token decision for an audience of zero — this is a warehouse and office tool on shared machines. If it is ever wanted, it is a kit card, never a side effect. |
+| 3 | **Marketing-grade motion and polish** | Geist serves a developer-marketing surface as well as a product. Carres has no marketing surface in this codebase, and §1.3 prices every permanent pixel in orders-per-screen. |
+| 4 | **Adopting Geist's components themselves** | Settled and unchanged: **Radix = behaviour, Carres = appearance** (`UI-KIT` §11). Taking a third party's appearance means later unwinding it. |
+| 5 | **The look** | Rule 2 of this line. |
+
+**No already-rejected concept recurred in this reference.** Per the PM's instruction, nothing from
+R1–R3 is re-argued here; Geist carries no object-status concept to refuse.
+
+## ③ Why does it fit Carres — and where it does not
+
+**It fits** because Carres has already independently reached Vercel's central claim — that a design
+system which exists only as prose loses to a design system that exists as code. The kit's own
+rewrite was triggered by measuring 2,556 hard-coded font sizes and concluding *"things expressible
+as a CSS class survived; things needing structure died."* Vercel is the same conclusion with a
+decade of operating evidence behind it.
+
+**It does not fit** where Vercel's system serves a public audience it must never break, and ours
+serves one application it must be free to correct quickly. That difference is why the *package* is
+refused and the *version* is taken: we want the discipline of knowing which edition a piece of code
+was written against, without the ceremony of promising strangers we will not change it.
+
+## Conflicts found
+
+**None between the principle and a Carres law** — it strengthens `UI-KIT`'s own three-bodies rule
+rather than competing with it.
+
+**One conflict found INSIDE the kit, and it is the material fact of this entry:** the law and its
+machine mirror currently **contradict each other on the page canvas and on the flame**, and each
+declares itself the winner. The kit's rule is that the three bodies change in the same commit; on
+2026-07-27 the law was rewritten and the mirror was not.
+
+> **CLASSIFIED: implementation observation, held for KIT-CONSOLIDATION** (PM, 2026-07-28). Not
+> design work, not fixed here. It is recorded with line numbers so the consolidation card does not
+> have to re-find it. **Note for whoever picks it up:** the mirror is described in CLAUDE.md as
+> *"a record of the kit, never a place to drive a change from"* — so this is a correction of a
+> record, not a design decision.
+
+## The observation this reference contributes
+
+**Carried to the final consolidation. Not a rule, not scheduled, `docs/UI-KIT.md` untouched.**
+
+> **The kit is a dependency, not a document. It is consumed, versioned, and migrated.**
+> Every body of the kit states the version it is on, and any code or comment that cites a kit rule
+> cites the version it was written against. A citation without a version cannot be wrong on its
+> face, which is exactly how it survives.
+>
+> *Enforcement candidate for consolidation to weigh (§16 requires one):* a version constant in the
+> machine mirror that the Build Guard compares against the law's own version, failing when they
+> diverge — the same shape as the existing three-bodies rule, but measurable. That would also
+> catch, mechanically, every one of the five stale citations listed above. Build-Guard shaped,
+> not Human-Review shaped.
+
+## The limits of this reading
+
+- **Read from knowledge of Geist and Vercel's product surfaces held in memory.** **No live Vercel
+  dashboard or Geist documentation site was opened this session**, and nothing was added to
+  `docs/ui-reference/` (documentation debt, parked).
+- **Carres side read live this session, not from memory:** `apps/web/src/lib/design-standard.ts`
+  (header and the colour block, opened), `UI-KIT` §3.1–§3.4, §11, §13.3 and §16, and the
+  `OrderDetailDrawer.tsx:651` comment carried over from R2. Every contradiction in the table above
+  is quoted from a file read this session — **none of it is recalled.**
+- **Not verified:** how many of the 225 in-scope pages actually import from the stale mirror. That
+  is a code question and belongs to KIT-CONSOLIDATION, not to a reference review.
