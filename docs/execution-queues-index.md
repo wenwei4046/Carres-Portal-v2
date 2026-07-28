@@ -27,7 +27,7 @@
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | ✅ **LINE COMPLETE** — T1-T11 shipped |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
-| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R7 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 — R6 · R7 left |
+| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 — R6 · R7 · **R8** (`Contact`→`Call` rename, new 2026-07-28) left |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C9 ✅ #472 · C10 ✅ #471** — C4 · C7 · C8 left |
 | ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **NEW 2026-07-27** — flow file written, seven old docs deleted. **P1 is the next card** |
