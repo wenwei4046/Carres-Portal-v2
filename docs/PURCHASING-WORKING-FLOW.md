@@ -71,7 +71,7 @@ and must report it, not invent a store.
 | a receiving problem | `supplier_claims` (`po_id`, `po_line_id`, `sku`, `qty`, `claim_type`, `do_number`, `photos`, `supplier_response`, `closed_at`) |
 | held units | `ops_stock_items.status='on_hold'` + `hold_claim_id` (0299) |
 | who owns purchasing today | `org_duties` — the PO-duty holder |
-| working days | `packages/shared/working-days.ts` + `my-holidays.ts` — **the ONE calendar every module uses.** Purchasing never computes its own |
+| working days | `packages/shared/working-days.ts` + `my-holidays.ts` — the ONE engine; purchasing never writes its own. **Purchasing counts on the OFFICE calendar, Mon–Fri** (`docs/ACTION-FLOW-STANDARD.md` Law 2A). Receiving counts on the WAREHOUSE calendar, Mon–Sat — the two legs of one PO are not on the same week |
 
 **The engine already exists.** `buildPurchaseTodayReport` (`packages/shared/purchase-report.ts`)
 computes the net requirement, the order-by date and the urgency buckets, and
@@ -110,6 +110,13 @@ an "actual" second column.
 **The seven settings are four shapes, not one.** Production time is per supplier × category ·
 supplier work week is per supplier · PO days is a set of weekdays · the rest are single
 numbers. A chat that reads "six single values" builds the wrong table.
+
+**The supplier work week is a FOURTH calendar and is meant to be.** Law 2A's three calendars
+are ours; a factory's week is theirs, and it is neither (Ohana works Saturday, Nice Future
+does not). The make-and-deliver leg counts on the SUPPLIER's week; the arrival buffer and the
+urgency buckets count on the **Office** calendar, because arranging a delivery is office work.
+*(That second one used to look like a hard-coded `[0,6]` contradicting the old
+"Mon–Sat everywhere" rule. It was the Office calendar the whole time — ruled 2026-07-28.)*
 
 **The order-by date is one formula and it lives in one place:**
 

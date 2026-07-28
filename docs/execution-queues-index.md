@@ -217,6 +217,24 @@ to be remembered.
 
 - **Driver · vehicle · condominium registration: OUT OF SCOPE this phase.** Logistics owns
   the driver today, not Carres. Revisit only if Carres runs its own fleet.
+- **THREE calendars (Loo 2026-07-28) — ruled, NOT built.** Office Mon–Fri · Warehouse Mon–Sat
+  · Delivery Mon–Fri with a reduced Saturday. Full text: `docs/ACTION-FLOW-STANDARD.md`
+  Law 2A. **The code still has one week.** `packages/shared/working-days.ts` is the single
+  engine and takes no calendar argument, so every caller today counts on whichever week it
+  was handed — which is right for purchasing by accident and unproven everywhere else. The
+  card that fixes this must (a) give the engine a calendar parameter, (b) name the calendar at
+  every call site, and (c) prove no due date moved except the ones meant to. **Nobody may
+  "just switch the default"** — that silently re-dates every deadline on the board.
+- **The delivery window and Saturday's capacity — ruled, NOT built, and NOT carded.** The
+  words are locked (`COPY-STANDARD.md`, "delivery window words"): Landed · Retail = full-day ·
+  Condo · Apartment · Office = half-day · no building type = no booking; and Saturday carries
+  `Landed = 1 · Condo = 0.5`. **Measured 2026-07-28: nothing in the portal reads the building
+  type for any purpose** — it is collected by the POS, stored in
+  `entry_data.fields.building_type`, and printed in two drawers. There is no branch, no map,
+  no gate. Line ① Delivery is complete, so this needs its own card when Jess wants it, and
+  that card owns two things nobody has settled: what `Landed = 1 · Condo = 0.5` counts
+  AGAINST, and the fact that the value is free text with no CHECK (a rule may not do
+  `=== "Condo"`).
 - **The Event Engine: PARKED until after go-live** (Loo + Jess, 2026-07-28). The proposal —
   every business action writes ONE event, and Dashboard / Order / Purchasing / Delivery each
   read that one table through a different filter instead of keeping their own activity log —

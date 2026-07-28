@@ -95,10 +95,37 @@ finished — do not build it.
 **Case Owner** is separate and is never written on an action: one person owns the customer's
 case from start to finish and never changes, while task owners come and go.
 
-**Working days, one definition for every module:** Monday–Saturday · Sunday excluded ·
-Malaysian public holidays excluded (the live calendar is the Selangor observance set, since
-the warehouse is in Selangor) · a due date landing on a non-working day moves automatically
-to the next working day.
+## Law 2A — THREE calendars, and every action names which one it counts on
+
+**Locked by Loo, 2026-07-28. This replaces "working days, one definition for every module",
+which was wrong in a way nobody had noticed: it described the WAREHOUSE week and every other
+module quietly inherited it.**
+
+| Calendar | Working days | Who counts on it |
+|---|---|---|
+| **Office** | **Monday–Friday** | Purchasing · Operation · Finance · Customer Service · Admin |
+| **Warehouse** | **Monday–Saturday** | Receiving · GRN · Warehouse · supplier delivery |
+| **Delivery** | **Monday–Friday**; **Saturday** runs at reduced capacity (`Landed = 1 · Condo = 0.5`); **Sunday closed** | delivery capacity · booking · route planning |
+
+**Common to all three:** Malaysian public holidays are excluded (the live set is the Selangor
+observance — the warehouse is in Selangor), and a due date landing on a non-working day moves
+automatically to the next working day OF ITS OWN CALENDAR.
+
+**An action that does not name its calendar is not finished.** Two examples of why, both
+real: a supplier's own production week is neither of the three (Ohana works Saturday, Nice
+Future does not — `docs/PURCHASING-WORKING-FLOW.md` §2 keeps it per supplier); and the
+purchasing engine's arrival buffer has always counted on Monday–Friday, which looked like a
+hard-coded contradiction of the old one-definition rule and is in fact the **Office
+Calendar**, correct all along.
+
+**`packages/shared/working-days.ts` is still the ONE engine — no module writes its own** —
+but it now has to be TOLD which calendar. Until it is, a caller that passes nothing is
+counting on whichever week the engine defaults to, and that is a silent answer, not a chosen
+one.
+
+**Saturday's delivery capacity is RECORDED, not built.** `Landed = 1 · Condo = 0.5` is a
+capacity weight, and nothing in the portal reads a building type for any purpose today
+(measured 2026-07-28: it is collected, stored and displayed, and no rule branches on it).
 
 **The no-decorative-checkbox law:** a tick-box that only records an assertion is banned.
 Where a FORM already collects the inputs, that form IS the checklist — never a second row

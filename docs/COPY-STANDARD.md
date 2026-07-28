@@ -396,11 +396,16 @@ all** — `0 ÷ 0` shown as `0%` reads "this supplier never delivers on time" an
 **"nobody has set a number yet" is its own visible state**, never a reassuring green
 (K1's `Set a number`). A quiet screen must mean *watched and fine*, never *nobody looked*.
 
-### Working days — one definition everywhere
+### Working days — THREE calendars, and this file does not define them
 
-Monday–Saturday · Sunday excluded · Malaysian public holidays excluded (the live calendar
-is the Selangor observance set — the warehouse is in Selangor) · a due date landing on a
-non-working day moves automatically to the next working day.
+**Office Mon–Fri · Warehouse Mon–Sat · Delivery Mon–Fri + a reduced Saturday** (Loo
+2026-07-28). The definition lives in **`docs/ACTION-FLOW-STANDARD.md` Law 2A** and nowhere
+else — this file owns WORDS, not the engine.
+
+*(Until 2026-07-28 the full definition sat here AND in Law 2, both saying "Monday–Saturday,
+one definition for every module". Two homes for one rule, and the rule itself was the
+warehouse's week wearing everybody's name. Deleted here rather than corrected in two
+places — Law 0A.)*
 
 ### UI type dictionary (locked 2026-07-27)
 
@@ -521,7 +526,26 @@ printed in the drawer and no rule uses it.
 |---|---|---|
 | `Landed` · `Retail` | **Full-day delivery** | the truck drives up to the door |
 | `Condo` · `Apartment` · `Office` | **Half-day delivery** | the lift must be booked and the driver must report in |
-| `Other` / not filled | **Full-day delivery**, and the booking is refused until it is filled | measured 2026-07-27: **40 of 56 live orders have it blank.** A rule read from a blank field is a rule that does not exist |
+| `Other` / not filled | **Full-day delivery**, and the booking is refused until it is filled | see the ruling below — the refusal STANDS |
+
+**Building type is MANDATORY at go-live, and the blanks are not a reason to soften it**
+(Loo, 2026-07-28). Measured live 2026-07-28, and the split matters:
+
+```
+37 AutoCount import rows   37 blank   0 filled   ← test data, gone at go-live
+19 portal orders            3 blank  16 filled   ← the POS does NOT require the field TODAY
+```
+
+Those **3** are the real finding, not the 37. They are portal orders, and they are blank
+because the POS writes the field only when it is non-empty — so "mandatory" is a change the
+POS still has to make, not a state it is already in. The 37 disappear by themselves when the
+database starts clean.
+
+**Therefore the rule is not softened to fit them.** "No building type → no booking" stands as
+written. This is CLAUDE.md's standing law made concrete: *test data is evidence about whether
+CODE WORKS, never a reason to change what the business does.* A chat that meets those 40
+blanks must not propose a default, a grandfather clause or a "legacy" branch — it must check
+whether the row is an import, and the answer is that all 40 are.
 
 Fixed phrasings — reuse, never invent a variant:
 
