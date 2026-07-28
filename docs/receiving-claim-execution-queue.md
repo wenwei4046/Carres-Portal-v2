@@ -308,6 +308,20 @@ column) — guardrail #8.
 **Done when:** no GRN exists without exactly one owner; the PO-duty holder never
 auto-receives their own PO.
 
+**SCHEDULED 2026-07-28 (Loo): R7 runs BETWEEN P4 AND P5**, not "any time". P5 puts one REAL
+purchase order through the module end to end, and a real PO must be received by whoever the
+SYSTEM says owns that GRN — validating with the owner still a human roster rule would
+validate a different flow from the one that goes live. The running order is
+`P3 → P4 → R7 → P5 → T3 → Foundation` (`docs/execution-queues-index.md`).
+
+**Smart Cover is NOT part of this card, and the reason is a missing dependency.** Loo's
+scheduling note says P5 must include "the completed GRN duty assignment and Smart Cover
+flow". The first is R7. The second is in this doc's LATER list and cannot be built: it needs
+staff-leave data, and **HR-P8 (roster / presence / leave) was dropped by Loo on 2026-07-26**
+at the design stage. **Do not widen R7 to cover it** — a round-robin that skips people is
+a different concept from a round-robin that assigns them, and it reads a store that does not
+exist. It is reported in the index with the three ways out; the choice is Loo's.
+
 ## R8 · The banned-verb sweep across the Purchasing lane
 
 **Three screens, one sweep, one PR.** Every word below is already ruled; none of this is a
@@ -528,5 +542,5 @@ queue, not a flow with two holes in it.
 | R4 | ✅ | [#454](https://github.com/wenwei4046/Carres-Portal-v2/pull/454) · 0299 |
 | R5 | ✅ | [#475](https://github.com/wenwei4046/Carres-Portal-v2/pull/475) · no migration |
 | R6 | ✅ | [#490](https://github.com/wenwei4046/Carres-Portal-v2/pull/490) · 0301 + 0302 |
-| R7 | ⬜ after R1 · GRN duty auto-assign | — |
+| R7 | ⬜ **scheduled: between P4 and P5** (Loo 2026-07-28) · GRN duty auto-assign. Smart Cover is NOT in it — its leave data was dropped | — |
 | R8 | ✅ | [#499](https://github.com/wenwei4046/Carres-Portal-v2/pull/499) · no migration |

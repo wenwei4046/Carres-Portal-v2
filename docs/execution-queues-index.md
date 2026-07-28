@@ -431,6 +431,7 @@ behaves, and a chat that treats it as the flow will name things on the business'
 ✅ P2-Receiving  #495            ✅ C8b  #497 (0305)   ✅ R8  #499   ✅ D0.5b #502
 ▶  P3            the two supplier calls          (migration)
    P4            where the goods go              (migration)
+   R7            GRN duty — receiving assigns itself   (migration)
    P5            one REAL PO, end to end
    T3            the Purchasing guided review + Jess's drawer day
    Foundation    1. RECEIVING-WORKING-FLOW.md
@@ -441,6 +442,29 @@ behaves, and a chat that treats it as the flow will name things on the business'
    C11           a money figure is the money owed        ORDERS lane
    C12           the last `Chase` leaves the portal      PURCHASING + ORDERS lanes
 ```
+
+**R7 moved INTO the line on 2026-07-28 (Loo), between P4 and P5, and the reason is the
+reason it cannot be skipped:** P5 is the card that puts one REAL purchase order through the
+module end to end, and **a real PO must be received by whoever the system says owns that
+GRN.** Validating the flow with the owner still a human roster rule would validate a
+different flow from the one that goes live. R7 was previously loose in ④ with "any time";
+it now has a place, and ④'s own row still lists it because it is still ④'s card.
+
+**⚠️ Loo's reason names TWO things and only one of them exists as a card.** He wrote *"real
+PO validation must include the completed GRN duty assignment **and Smart Cover flow**"*.
+GRN duty assignment IS R7. **Smart Cover is not** — it sits in ④'s LATER list, and its own
+entry says why: *"staff on leave stop receiving NEW assignments automatically — needs leave
+data, which nothing tracks yet"*. **Leave tracking was DROPPED**: HR-P8 (roster / presence /
+leave) was dropped by Loo on 2026-07-26 at the design stage, never started. So today Smart
+Cover has no data to read and no card to build it in.
+
+**This is reported, not resolved, and R7's scope is NOT widened on a chat's own initiative.**
+Three ways out, and it is Loo's to pick: (a) P5 proceeds with R7 alone and Smart Cover is
+explicitly out of the go-live scope; (b) Smart Cover becomes its own card and something must
+first re-open leave data — which re-opens a decision Loo already made; (c) a manual stand-in
+(a manager marks somebody unavailable) is carded, which is a smaller thing than leave
+tracking and needs its own words. **Nobody may fold Smart Cover into R7 as "part of GRN
+duty" — it is a different concept with a dependency that does not exist.**
 
 **C11 and C12 replaced C4 on 2026-07-28 and neither is scheduled yet.** They sit here so the
 lane cost is visible before anything is picked: **C12 touches `OperationPurchase.tsx`, so it
