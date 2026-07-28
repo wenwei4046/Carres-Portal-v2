@@ -403,19 +403,30 @@ behaves, and a chat that treats it as the flow will name things on the business'
 ### ⭐ THE RUNNING ORDER (Loo, 2026-07-28) — read this before picking any card
 
 ```
-✅ P2-Receiving   #495          ✅ C8b  #497 (0305)
-▶  R8             the Purchasing lane's terminology cleanup — NEXT, and it takes the
-                  whole lane: no P-chat, no C4, no R7 beside it
-   T3             Jess uses the drawer for a day, against the settled UI
-   Foundation     1. RECEIVING-WORKING-FLOW.md
-                  2. SERVICE-CASES-WORKING-FLOW.md
-                  3. READY-STOCK-WORKING-FLOW.md
+✅ P2-Receiving  #495            ✅ C8b  #497 (0305)
+▶  R8            terminology cleanup — takes the WHOLE Purchasing lane for one PR
+   P3            the two supplier calls          (migration)
+   P4            where the goods go              (migration)
+   P5            one REAL PO, end to end
+   T3            the Purchasing guided review + Jess's drawer day
+   Foundation    1. RECEIVING-WORKING-FLOW.md
+                 2. SERVICE-CASES-WORKING-FLOW.md
+                 3. READY-STOCK-WORKING-FLOW.md
 ```
 
-**This order is across lines and it beats any line's own "next card" pointer.** ⑦'s row says
-P3 is its next card, and that is true *within* ⑦ — it is not a licence to start P3 before R8.
-**R8 is deliberately the last thing that touches those pages before Jess reviews them**, so
-she reads a screen whose words have stopped moving.
+**⚠️ R8 IS A WORDS CARD. It does not mean Purchasing is finished** (Loo, 2026-07-28, in
+those words). It renames things and deletes two dead filters; the module still has no way to
+make the two supplier calls, no destination on a PO, and **has never had a single real
+purchase order through it.** A chat — or a person — reading "R8 ✅" as "line ⑦ done" would
+close a module that has not yet been used once.
+
+**Foundation does not interleave.** It was considered for the gap after R8 and Loo ruled it
+out: the three working-flow files come after **P5**, not between P-cards. Purchasing finishes
+as one piece.
+
+**This order is across lines and it beats any line's own "next card" pointer** — ⑦'s row
+says P3 is its next card, which is true *within* ⑦ and is not a licence to start it beside
+R8. The lane holds one chat at a time.
 
 ### The three missing flows — SCHEDULED, and NOT to be started yet (Loo, 2026-07-28)
 
@@ -423,16 +434,19 @@ Loo accepted this as a **Foundation gap, not a per-module bug** — the same hol
 two unrelated lines within two days, which is what makes it foundation work rather than
 tidying. **He also ruled it does not jump the queue.**
 
+**The schedule is the running order above.** Foundation comes after **P5 and the guided
+review** — Loo ruled 2026-07-28 that it does not interleave with the P-cards, so Purchasing
+finishes as one piece rather than being paused twice.
+
 ```
-FINISH FIRST     P2-Receiving  →  C8b  →  R8  →  T3 review
-THEN, in order   1. docs/RECEIVING-WORKING-FLOW.md
-                 2. docs/SERVICE-CASES-WORKING-FLOW.md
-                 3. docs/READY-STOCK-WORKING-FLOW.md
+1. docs/RECEIVING-WORKING-FLOW.md
+2. docs/SERVICE-CASES-WORKING-FLOW.md
+3. docs/READY-STOCK-WORKING-FLOW.md
 ```
 
-**Do NOT open a card for any of the three before the Purchasing line closes.** The order is
-his and it is not alphabetical: Receiving is first because it is the one with a live screen
-already asking for words it does not have.
+**Do NOT open a card for any of the three before Purchasing closes.** The order is his and
+it is not alphabetical: Receiving is first because it is the one with a live screen already
+asking for words it does not have.
 
 **And do not "just start the file" while waiting.** A working-flow file is written in a PLAN
 chat with the business in the room — Orders' and Purchasing's both were — because its whole
