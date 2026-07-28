@@ -134,27 +134,9 @@ decision is being planned.
   check another supplier and check dates with logistics before there is anything worth saying.
 - **The customer is not contacted in this stage.**
 
-> ⚠️ **A SECOND SLA IS RULED AND CANNOT YET BE BUILT — it contradicts this section.**
-> Loo, 2026-07-28: *"Customer Communication — Due: Same Working Day — the customer must
-> receive an acknowledgement immediately… the customer should never wait 2 days without a
-> response."* Held apart from the 2-day timer, which is right: one clock for the business's
-> plan and one for the customer's peace of mind is better design than either alone.
->
-> **But this section, ruled by Jess 2026-07-27, says the opposite in three places:** *"the
-> customer is the LAST to know"* · *"a supplier saying 12 Aug is not yet a delay — we may have
-> the item in ready stock, or another supplier may cover it. **Only when we have tried and
-> failed does anyone reach the customer**"* · *"the customer is not contacted in this stage"*.
-> Law 4 rung 2 adds *"never before the ready date is known"*, and **C8 wired that into a test**
-> that fails on any surface naming the customer in a delay.
->
-> **The clash is structural, not a wording nit.** If the plan may take 2 working days and the
-> customer must hear the same working day, the customer is told **before anybody knows whether
-> there is a delay at all** — and Jess's own example is the case where there is not one
-> (ready stock covers it). That would mean alarming a customer about a non-event.
->
-> **Nothing is built until this is settled**, and the settling is a PLAN chat with both of
-> them, not a build chat picking a side. The three readings are in
-> `docs/portal-core-execution-queue.md` under C8's follow-up.
+> **There is a second clock and it belongs to stage 2, not to this one** (Loo, 2026-07-28) —
+> the customer must hear the SAME WORKING DAY the decision is recorded. It cannot start
+> earlier without breaking this stage's whole point, so it does not. See stage 2.
 
 **The gate — can we still make the promised date?**
 
@@ -183,6 +165,21 @@ Continue the original delivery — the customer is never told
 - Checklist: give logistics the decided date · logistics contacts the customer · record the
   date the customer agreed · record the time slot · record the response
 - Completion: a customer-confirmed date AND a time slot are recorded
+- **Due: the SAME WORKING DAY the decision was recorded** (Loo, 2026-07-28) — the clock starts
+  at `delay_decision_at`, not at the supplier's slip. Office calendar (Law 2A). A decision
+  recorded on a Friday afternoon is due that Friday; it turns late on the next working day.
+
+**This is the customer-communication SLA, and it is the whole of it.** Loo ruled TWO clocks —
+2 working days for the plan, same working day for telling the customer — and ruled the second
+one to start **when Operations records that the promised date cannot be met.** So the two
+never overlap: Operations gets its two days to find out whether there is really a delay, and
+the moment it decides there is, the customer hears the same day.
+
+**Nothing about Jess's rule changes, and that is why this reading was chosen.** The customer
+is still the LAST to know · still not contacted in stage 1 · still never told before the ready
+date is known. **No new action, no new workflow, no migration** — `delay_decision_at` (0304)
+already stamps the moment the clock starts. What was missing was a Due on an action that had
+none, which is exactly what Law 2 requires and what C8 reported.
 
 > **Why Operations owns it.** Eight logistics companies are in use; **only NETS has a
 > login**, and the partner portal has no screen for arranging an appointment. A task owned

@@ -633,42 +633,36 @@ Tests +39 (shared 30 · api 12 net · web 10 net); suites at baseline (shared 18
 3 pre-existing · web 16 pre-existing); typecheck 0 new, build + design guard + wrangler
 dry-run clean, `SERVICE_ROLE` 0 in the bundle.
 
-## C8 follow-up · the customer-acknowledgement SLA — RULED, BLOCKED, NOT BUILT
+## C8b · the two delay clocks — ⬜ SETTLED, small, no migration
 
-**Loo, 2026-07-28, TWO SLAs and explicitly not one timer:**
+**Loo ruled TWO SLAs 2026-07-28 and then ruled where the second one starts**, which is what
+turned a law conflict into a five-line card:
 
-| | Due | Purpose (his words) |
-|---|---|---|
-| **Delay planning** | **2 working days** | Operation confirms supplier status, the options and the final solution |
-| **Customer communication** | **Same working day** | the customer must receive an acknowledgement immediately |
+| Stage | Action | Due | Clock starts at |
+|---|---|---|---|
+| 1 | `Delay planning` | **2 working days** | the supplier's date first overshoots the promised date |
+| 2 | `Call {logistics} — arrange new delivery date` | **the SAME working day** | **`delay_decision_at`** — the moment Operations records "we cannot make it" |
 
-**The 2-day half is written into `ORDERS-WORKING-FLOW.md` §3 and is done.** The same-day half
-**cannot be built as it stands**, because §3 and Law 4 say the opposite and they are Jess's:
-*"the customer is the LAST to know"* · *"only when we have tried and failed does anyone reach
-the customer"* · *"never before the ready date is known"* — and C8 turned that into a passing
-test. Two owners, two rulings, one screen; a build chat may not pick.
+**Both are written into `ORDERS-WORKING-FLOW.md` §3.** Neither exists in the engine yet:
+C8 reported that both delay actions have no Due and correctly invented no number.
 
-**Three readings, and they are genuinely different features:**
+**Build:** give the two actions their Due and their lateness, on the **Office** calendar
+(Law 2A). Nothing else. **No migration** — `delay_decision_at` (0304) already stamps the
+second clock's start.
 
-1. **The clock starts when the plan CONCLUDES "we cannot make it."** Then nothing conflicts:
-   stage 1 keeps 2 working days, and `Arrange new delivery date` — the call to LOGISTICS —
-   gets `Due: same working day`. The customer hears through logistics, exactly as today.
-   Costs nothing, contradicts nobody, and gives stage 2 the Due it is missing.
-2. **The clock starts when the supplier's date overshoots.** This is the reading Loo's own
-   sentence points at (*"never wait 2 days without a response"*) and it is the one that
-   breaks §3: the customer is told before anyone knows there is a delay, in a flow whose
-   worked example is *"ready stock covers it and there was no delay"*. It needs Jess to
-   re-rule "the customer is the LAST to know", and it needs a NEW action nobody has designed
-   (an acknowledgement with no new date in it — every customer-facing string today carries a
-   date).
-3. **It is INBOUND, not outbound** — *"acknowledgement"* may mean: when a customer asks us,
-   they get an answer the same working day. That is not the delay flow at all; it is a
-   response-time promise on customer contact, and it would live in Service Cases (S-line),
-   which already owns "the customer asked and somebody must answer".
+**`Same working day` is a Due SHAPE the engine has never had.** Every existing Due is
+"N working days"; this one is **due on the day it opens** and turns late on the NEXT working
+day. Express it as zero working days rather than adding a second kind of deadline — a Due that
+is a special case is a Due somebody will forget to sort by.
 
-**Do not build any of the three until Jess and Loo agree in the same conversation.** Reading 2
-is the only one that changes the delay law, and it is the one a chat would land on by reading
-Loo's sentence alone.
+**Why this reading and not the other two** (recorded so nobody re-opens it): the alternative
+was starting the clock when the supplier slips, and that would have told the customer before
+anybody knew whether there was a delay — in a flow whose worked example is *"ready stock
+covers it and there was no delay."* It would also have needed Jess to re-rule "the customer is
+the LAST to know" and a new action carrying no date, when every customer-facing string today
+carries one. **Loo chose the reading that changes no business rule**: Operations still gets
+its two days to find out whether there is really a delay, and the moment it decides there is,
+the customer hears the same day.
 
 ## C8 · Delay planning + the gate before the customer — ✅ LIVE (PR #493)
 
