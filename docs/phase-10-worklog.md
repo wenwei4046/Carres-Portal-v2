@@ -3536,3 +3536,126 @@ matters after go-live, and saying otherwise would be selling it.
 
 Suites at baseline (web 2029 passed / 16 pre-existing failures; this file 13 → 16), typecheck 0,
 design-standard lint clean.
+
+---
+
+## 2026-07-28 · Purchasing P1 — the numbers become settings, and five doors close · PR #488 · migration 0303 · DEPLOYED
+
+**Card:** `docs/purchasing-execution-queue.md` § P1. **Merge** `a1e9a452` · **web**
+`index-BIcG3rOJ.js` (carres-portal `a9b175a4` + carres-pos `2350adfd`, all 4 canonicals
+converged on the first poll) · **api** Worker version `85e6e7ff`.
+
+### What shipped
+
+Seven numbers stop being constants and become rows a manager edits on **Purchasing →
+Settings**, the fifth tab: production working days per supplier × category · the supplier
+work week · the order-by buffer · the earliest date a store may sell · the working days of
+notice on `Confirm delivery date` · the PO days. Every row states **who changed it, when,
+and what it was before**.
+
+Migration 0303: four tables (`purchasing_settings` singleton · `purchasing_supplier_settings`
+· `purchasing_production_days` · `purchasing_setting_changes`) and four audited SECURITY
+DEFINER RPCs. **No table carries a write policy at all**, so PostgREST cannot walk around the
+`ops_manager` gate — 0279's lesson, applied before it could bite. The seed is DERIVED from
+which supplier owns which SKUs: live that is Nice Future × mattress, Ohana × bedframe, Ohana
+× sofa, and nothing for the eight suppliers with no SKU.
+
+### The rule that shaped the build
+
+**A supplier × category with no number is not defaulted to 7.**
+`productionWorkingDaysFor` returns `null`; the line is held OUT of the plan, the To Order tab
+names the pair out loud, and the Settings screen says `Set a number` (K1's law: a quiet
+screen must mean *watched and fine*, never *nobody looked*). There is deliberately no
+per-category default column, and a sanity block in the migration **fails if one ever
+appears** — the rule is a property of the schema, not a comment.
+
+### Five doors, not one
+
+1. the constants in `purchase.ts` — **deleted, no fallback**;
+2. `PurchaseSettingsSheet.tsx` — **deleted.** It was live behind a gear icon showing **PO
+   days = Mon + Thu**, four days after the engine moved to Mon/Wed/Fri, under a promise that
+   the values would become editable "when the lead-time table ships";
+3. `delivery_fee_config.mattress_bedframe_lead_days` / `sofa_lead_days` — editable on Catalog
+   → Delivery, saved on every click, **read by nothing**. Inputs retired; columns untouched;
+4. `suppliers.lead_time` — free text, printed as a `Lead time` stat on the Suppliers card and
+   appended to its drawer subtitle. Both retired as answers;
+5. **`PO_STOCK_LEAD_DAYS` — the urgent bypass, the safety net.** It believed a sofa took 5
+   working days against a flow that says 14, so it **fired nine days late**. Deleted:
+   `poUrgentBypass` takes a window in days, and its callers resolve that window from the
+   production working days a human set (`purchasingUrgentWindowDays` — the LONGEST across the
+   short categories, which flags early rather than late). **A category with no number gets a
+   window of 0 and can never make an order urgent.**
+
+### What was NOT obvious
+
+- **The sofa's third number was live code, not a stale comment.** The card described it as "5
+  in a stale Orders comment"; it was `PO_STOCK_LEAD_DAYS.sofa`, running on the Orders control
+  grid and the raise-PO plan every day. A parallel PLAN chat measured the same thing hours
+  later and made it door 5 — the two arrived independently.
+- **The earliest-sell number had a dead editable twin.** `delivery_fee_config` has carried
+  `mattress_bedframe_lead_days` = 14 and `sofa_lead_days` = 21 since 0184, wired to a form, an
+  adapter, a PATCH route and tests — and **no reader anywhere**. The real gate was the
+  hard-coded `DELIVERY_LEAD_DAYS`. That is the `ops_order_control.balance` disease in its
+  other form: not a column nobody writes, but a column nobody reads.
+- **`isPoDayMYT`/`nextPoDayMYT` lost their default parameter on purpose.** Giving them a
+  fallback would have let a caller that cannot reach the setting keep using a literal — which
+  is exactly how the constant in that file read Mon+Thu for months after Jess re-ruled it.
+  Every caller now supplies the days; with none configured the banner prints `—` rather than
+  a guessed "next Monday".
+- **`maxLeadDaysFor` keeps a GATED SET rather than becoming flat.** One number applied to
+  every category would have gated accessory-only carts too, which have no factory behind them.
+- The number rides the **catalog bundle** to the POS: every surface that needed it
+  (`DealerPos`, `PosOrderDetail`, `EditOrderModal`, `ConfirmDateModal`, `ConfirmProceedDialog`)
+  already calls `useCatalog`, so it is one round-trip and one source, not a second fetch that
+  can disagree.
+
+### Ordering, and why it mattered
+
+The session's Supabase MCP was **authorised to a different account** and could not read
+`kfprgpjpaffedghytstl` at all. So the migration was drafted, pasted to Jess in full, **applied
+and verified by her**, and only then was #488 merged and deployed. That is the order the card
+itself asks for, and it is what kept prod from serving a Purchasing page whose tables did not
+exist. `0301`/`0302` (④ R6) were applied by a parallel line with their files still off main —
+**the tracker being ahead of `supabase/migrations` is how you spot somebody holding a lane**,
+and P1 numbered 0303 off the tracker rather than off `ls`.
+
+### Proof
+
+Downloaded the live bundle (4,457,488 bytes) and grepped **both directions**: present —
+`Production working days` · `Supplier work week` · `Earliest date a store may sell` ·
+`Order-by buffer` · `PO days` · `Set a number` ×4 · `purchasing/settings`; retired and now
+**0** — `Purchase settings`, `Mattress / bedframe lead`, `Sofa lead (days)`,
+`delivery-mb-lead`, `delivery-sofa-lead`. `SERVICE_ROLE` 0.
+
+**A method correction, measured this session**: the receipt convention "the new route answers
+401 unauthenticated, not 404, which proves it is on the live Worker" is **wrong**. The auth
+middleware runs before routing, so `/api/operation/purchasing/nonsense` answers 401 too. An
+unauthenticated 401 proves nothing about a route's existence; wrangler's version id plus the
+bindings it echoes back, against a source tip git can show contains the route, is the proof.
+
+Suites at baseline (shared 1876/1876 · api 3 pre-existing · web 16 pre-existing); web tsc 0,
+build + design-standard lint clean.
+
+### Reported, not fixed
+
+- **A sixth door, found in the live bundle after deploy**: `Lead time` still greps 1, in the
+  SUPPLIER PORTAL's own dashboard (`SupplierDashboard.tsx`), which shows a factory the
+  free-text `suppliers.lead_time` we hold about it. The card counted five doors and all five
+  are shut; this one is on an external role's page, and whether we show a factory our own note
+  about its lead time at all is a business decision, not a build fix.
+  CF `supplier-portal-still-shows-lead-time`.
+- **`offDays: [0, 6]` for the CARRES side of the arithmetic survives** in `purchase.ts` — the
+  week the order-by buffer and the urgency buckets are counted on. Reported as a suspected
+  contradiction of the portal-wide Mon–Sat definition, and **left alone rather than tidied**
+  because changing it moves every order-by date on the board. **Loo ruled the same day and the
+  answer was the opposite of the suspicion: it is the OFFICE calendar and has been correct all
+  along** — arranging a delivery is office work, and there are THREE calendars, not one
+  (Law 2A: Office Mon–Fri · Warehouse Mon–Sat · Delivery Mon–Fri plus a reduced Saturday).
+  The supplier's own week is a fourth and is meant to be, which is why P1 moved it
+  per-supplier. **Reporting it instead of "fixing" it is what kept a correct number correct** —
+  a build chat that tidied the literal to match a doc would have moved every date on the board
+  and called it consistency.
+- **The `logistics_call_working_days` setting has no word of its own** in COPY-STANDARD, so it
+  is labelled by the action it raises (`Confirm delivery date`). `working days notice` was
+  refused: it already means the notice a LOGISTICS COMPANY requires (T9, per-partner), and one
+  word for two meanings is rule 8's failure.

@@ -33,16 +33,29 @@
   delivery · money per Law 6. The original entry, for the record:
 - `row-dots-of-is-dead-code` — **C5 (2026-07-27), found by grepping the shipped bundle.** `rowDotsOf` in `OperationOrdersControl.tsx` computes the three-dot row signal (money · goods · delivery) and is exported and unit-tested, but **nothing renders it**: the `dots` column shows a stage-word pill instead (`ORDER_COL_DEFS`, "not the old anonymous dots", Jess 2026-07-19). Proof: none of its title strings — `Money — settled`, `Stock — all in`, `Delivery — delivered` — appear anywhere in the live bundle. C5 updated its money branch for consistency and it changes nothing on screen. **Not deleted**: removing an exported function plus its tests is Jess's call (red line #5), and ACTION-FLOW-STANDARD Law 6 wants a three-dot column WITH per-dot icons, so this may be the skeleton C1 revives rather than dead weight. **Decide at C1** (which re-specifies that column): revive it with the icons, or delete it and its tests in one pass. Until then it is a function whose tests pass and whose output nobody sees.
 - `order-money-keyed-balance-unreachable` — **C5 (2026-07-27).** The `keyed` branch of `orderMoney` (imported rows with no line prices falling back to `ops_order_control.balance`) has **zero live rows to exercise it**: `balance` is NULL on all 55 control rows, and all 19 priced orders take the `lines` branch. It is unit-tested and its semantics are argued from 0165's own wording, but it has never run against real data. Two judgement calls inside it that a first real row should be checked against: `paid` is NOT netted out of the keyed figure (nothing re-writes `balance` after a payment, so the human who keyed it maintains it — the Payments page's editable field is that door), and the order's Total is reported as `paid + balance`. If either reads wrong on the first imported order that carries a keyed balance, fix it in the ONE function.
-- `purchasing-carres-work-week-still-hard-coded` — **P1 (2026-07-28).** §2 of the purchasing
-  flow lists the SUPPLIER work week as a setting and P1 built it, but the route also passes
-  `offDays: [0, 6]` for the CARRES side of the maths — the week the order-by buffer and the
-  urgency buckets are counted on. That literal survives, and it disagrees with the
-  portal-wide working-day definition every other module uses (COPY-STANDARD: Mon–Sat, Sunday
-  excluded), which is why it was left alone rather than "tidied": changing it moves every
-  order-by date on the board, and nobody has ruled which of the two is right. **It is a
-  business question for a PLAN chat, not a build fix**: does Carres itself work Saturdays for
-  the purpose of arranging a delivery? Answer that and the number becomes either the shared
-  definition (delete the literal) or an eighth setting.
+- `supplier-portal-still-shows-lead-time` — **P1 (2026-07-28), found in the LIVE bundle after
+  the deploy, not in the source.** The card counted five doors holding a "how long does this
+  factory take" number and P1 shut all five, but `Lead time` still greps **1**: the survivor is
+  the SUPPLIER PORTAL's own dashboard (`apps/web/src/pages/supplier/SupplierDashboard.tsx`),
+  which shows a factory the free-text `suppliers.lead_time` we hold about it. It is read-only
+  there, it feeds no engine, and no internal screen reads it any more — so it is not the
+  "manager edits a number and nothing happens" trap. It is a different question: **do we show
+  a factory our own private note about its lead time at all**, now that the number we actually
+  plan on lives elsewhere and may not match it? That is Jess's call, not a build fix. Also
+  worth knowing when it is answered: `Lead time` is a COPY-STANDARD do-not-use word, so
+  whatever survives should not be spelt that way.
+- ~~`purchasing-carres-work-week-still-hard-coded`~~ — **CLOSED the same day it was opened
+  (Loo, 2026-07-28), and the answer was the opposite of the suspicion.** P1 reported the
+  route's `offDays: [0, 6]` as a hard-coded literal contradicting "Mon–Sat everywhere" and
+  left it alone rather than tidying it, because changing it moves every order-by date on the
+  board. Loo ruled: **it is the OFFICE calendar and it has been correct all along** —
+  arranging a delivery is office work, and there are THREE calendars, not one (Law 2A in
+  `docs/ACTION-FLOW-STANDARD.md`: Office Mon–Fri · Warehouse Mon–Sat · Delivery Mon–Fri plus
+  a reduced Saturday). The supplier's own week is a fourth and is meant to be, which is
+  exactly why P1 moved it per-supplier. **What remains open is a different, larger thing and
+  it has its own record in the index**: `working-days.ts` takes no calendar argument, so every
+  caller counts on whichever week it was handed. Naming the calendar at every call site is a
+  card, and nobody may "just switch the default".
 - `purchasing-settings-changes-table-never-pruned` — **P1 (2026-07-28).**
   `purchasing_setting_changes` grows one row per edit forever and the loader reads the most
   recent 400 to find the last change per row. At a few edits a year that is a century of
