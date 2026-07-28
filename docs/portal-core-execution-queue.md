@@ -520,7 +520,7 @@ columns nobody writes is the `ops_order_control.balance` disease. Nothing is pen
    now** — carry-forward `action-step-cannot-open-its-form`, for whoever next opens the
    7,000-line drawer for its own reason.
 
-## C7 · The delivery order prints itself (Jess ruling 2026-07-27)
+## C7 · The delivery order prints itself (Jess ruling 2026-07-27) — ✅ LIVE (PR #489)
 
 **Today, by hand:** logistics phones to say they are delivering tomorrow, and an operator
 has to produce a delivery order and send it to them. Jess: the system should do that —
@@ -547,6 +547,91 @@ duty key rather than a role.
 document exists for this trip (and, once logistics have their own portal, has been sent).
 **Done when:** an operator never types a DO again; the document is available the moment the
 customer's date is confirmed.
+
+### What shipped (PR #489, 2026-07-28 — **no migration**)
+
+**NO MIGRATION, and it was checked rather than assumed.** The card made one likely because
+0098 stamps `do_number` on the DISPATCH transition — but that trigger only fills the column
+**when it is NULL**, so minting earlier passes through it untouched. Dispatch keeps working
+for orders that never take this path, which is exactly the condition the card set, and the
+trigger stays as the backstop for them. Touching it would have been work that bought nothing.
+
+**The gate moved, and §5 is now built as written** (closes C9 finding #1, which named this
+card as its owner):
+
+| | Refuses | Warns |
+|---|---|---|
+| `POST /booking/confirm` | date **and** slot both · Sunday | goods not reserved · money outstanding |
+| `POST /:id/delivery-order` | goods reserved · money collected · Sunday · public holiday | — |
+
+Both ask the SAME `bookingConfirmGate`, through ONE extracted loader, so the warning an
+operator reads when agreeing the date and the refusal they meet at the paper are the same
+sentence about the same numbers. That is structure, not tidiness: **C5 and C9 each found one
+number being read two ways by two surfaces, one card apart, and both times the two
+disagreed on a live order.** The money answer is `holds`, not `owing`, so C9's release
+passes the gate — which is what a release is.
+
+**An arranged order stops sitting in NO queue at all.** C3 ruled "everything ready, the day
+has not come" a FACT because there was nothing for a human to do. There was one thing, and
+this is it: `issue_delivery_order` fires exactly where the `Delivering` fact used to and
+hands it straight back the moment the document exists. On the day itself `Deliver today`
+still leads — Law 4 rung 1 beats rung 4 — and the delivery act carries the paper anyway.
+**UNKNOWN reproduces the pre-C7 behaviour byte for byte** (an older Worker that does not
+select the column), the same three-way discipline `photoOnFile` uses.
+
+**An operator never types a DO again** — the card's own done-when, and the half of this card
+that lives outside the action engine. `DOAttachModal` handed them a **random** `DO-98xx` to
+edit, over a paper the customer signs. The number is now the locked `DO-DDMMYY-NNNN` scheme
+seeded on the ORDER id, so a reprint matches the signed original — which is the entire
+reason that scheme derives its tail from a stable seed rather than a counter. It also closed
+two printers in one file disagreeing: the Delivery card recomputed its own number
+client-side and the kebab's printer did not.
+
+### What C7 found — reported, not hidden (Law 0)
+
+1. **`print-do-data` refuses EVERY live order.** `do_number` is NULL on all 56, so the
+   drawer's 🖨 DO button has never once worked, and its 422 read *"DO is only printable
+   after dispatch"* — which named the wrong moment as well as the wrong screen. It now names
+   the button to press. This is the card's "a printable delivery-order PDF the drawer can
+   already render" measured: it renders one only AFTER dispatch, and nothing has ever
+   reached dispatch.
+2. **C3 finding #3's proposed rename is wrong, and was not made.** The kebab's
+   `Confirm delivery` opens the modal that attaches the CUSTOMER'S SIGNED DO and flips the
+   order to delivered — its own primary button already says `Mark delivered`, which is the
+   dictionary's BUTTON word for `Deliver today`. Renaming it to `Issue delivery order` would
+   have put one word on two different acts, the exact error C6 finding #2 fixed one card
+   ago. It is `Mark delivered`, read from the dictionary mirror.
+3. **`COPY-STANDARD.md` closes the delivery queue list at four and then gives this action a
+   fifth queue tile AND an empty state.** *"The list is closed; a new chat does not add a
+   fifth"* sits a few lines above the dictionary row `Issue delivery order · … · Nothing
+   waiting for a delivery order.` **No tile was added**, and the deciding reason is not the
+   contradiction: **§3 gives `Issue delivery order` no DUE**, and every delivery queue is a
+   deadline-carrying step, so a fifth tile would need a working-day number nobody has set —
+   which a build chat may not invent. The action ships in the row, the drawer and the
+   ladder; the tile is one line away the moment Jess rules its Due.
+4. **The manager who releases a storage hold stays the `principal` ROLE** — C9 finding #3,
+   which this card was asked to decide. **Decided: not a duty key, and the reason is the
+   duty key's own definition.** `finance_approver` reads *"Narrows money approvals. NEVER
+   replaces the principal/hr role gate"*, so a duty key can only ADD a condition on top of
+   `principal` — it structurally cannot deliver the non-principal "manager" Jess's word
+   means. Making it deliver that is a permission WIDENING on a money decision, which is her
+   call and not a side effect of this card. Live: `finance_approver` is mapped to 2
+   positions.
+5. **§5's missing-building-type refusal is still not built.** §5 lists it beside Sunday as
+   what agreement refuses; 40 of 56 live orders have `building_type` blank, so building it
+   would refuse most bookings on the day it shipped. It is its own ruling, not C7's.
+6. **The delivery order has no `sent` state.** The card's completion is "the document exists
+   for this trip (and, once logistics have their own portal, has been sent)" — only the
+   first half is measurable today, so only the first half was built. Nothing records that
+   the paper reached NETS.
+
+**Live effect today: none.** 0 confirmed bookings · 0 orders with a DO number · 0 dispatched
+· 0 delivered (measured 2026-07-28). C7 decides the behaviour before the first one appears,
+exactly as C9 did.
+
+Tests +39 (shared 30 · api 12 net · web 10 net); suites at baseline (shared 1898/1898 · api
+3 pre-existing · web 16 pre-existing); typecheck 0 new, build + design guard + wrangler
+dry-run clean, `SERVICE_ROLE` 0 in the bundle.
 
 ## C8 · Delay planning + the gate before the customer (Jess rulings 2026-07-27)
 
@@ -798,7 +883,7 @@ a tooltip and a five-word vocabulary; a half-drawn signal would not.
 | C4 | ⬜ any time, not alongside R | — |
 | C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
 | C6 | ✅ **LIVE** 2026-07-28 — every action opens the steps that close it; the order's PIC is the task owner | #486 |
-| C7 | ⬜ after C6 · DO issues itself (migration) | — |
+| C7 | ✅ **LIVE** 2026-07-28 — the DO issues itself, and the hard gate moves onto issuing. **No migration** | #489 |
 | C8 | ⬜ after C2 · delay planning + the gate (migration) | — |
 | C9 | ✅ **LIVE** 2026-07-27 — storage holds the delivery; the manager releases it, in two named outcomes | #472 |
 | C10 | ✅ **LIVE** 2026-07-27 — the three dots render beside the stage pill | #471 |
