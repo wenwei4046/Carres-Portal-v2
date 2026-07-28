@@ -26,6 +26,7 @@ const EVERY_KEY: OrderActionKey[] = [
   "agree_new_delivery_date",
   "assign_logistics",
   "confirm_delivery_date",
+  "issue_delivery_order",
   "deliver_today",
   "upload_delivery_photo",
   "delivering",
@@ -119,6 +120,21 @@ describe("C6 · a step reads a real signal, never an assertion", () => {
     ).toEqual({ key: "assign_logistics", state: "done" });
   });
 
+  it("`Confirm booking` ticks once the customer confirmed — C7's one measured step", () => {
+    expect(
+      orderActionChecklist(
+        "issue_delivery_order",
+        sig({ bookingConfirmed: false }),
+      )[0],
+    ).toEqual({ key: "confirm_delivery_date", state: "open" });
+    expect(
+      orderActionChecklist(
+        "issue_delivery_order",
+        sig({ bookingConfirmed: true }),
+      )[0],
+    ).toEqual({ key: "confirm_delivery_date", state: "done" });
+  });
+
   it("`Mark delivered` ticks once the order reached the customer", () => {
     expect(
       orderActionChecklist("upload_delivery_photo", sig({ completed: true }))[0],
@@ -138,8 +154,9 @@ describe("C6 · a step reads a real signal, never an assertion", () => {
 
 describe("C6 · the invariant — an open action is never a fully ticked list", () => {
   // A matrix over every boolean signal the checklist can read, plus the two
-  // dates that decide the goods rungs. 2^6 × 3 combinations, each run through
-  // LAYER 1 and then through its own checklist.
+  // dates that decide the goods rungs, plus C7's three-way "is the delivery
+  // order issued?". 2^6 × 3 × 3 × 3 combinations, each run through LAYER 1 and
+  // then through its own checklist.
   const BOOLS = [false, true];
   it("holds for every open action the engine can raise", () => {
     let checked = 0;
@@ -150,26 +167,28 @@ describe("C6 · the invariant — an open action is never a fully ticked list", 
             for (const bookingConfirmed of BOOLS)
               for (const moneyOwing of BOOLS)
                 for (const stockEtaIso of [null, "2026-08-01", "2026-09-30"])
-                  for (const daysToDue of [24, 0, -3]) {
-                    const s = sig({
-                      completed,
-                      goodsReady,
-                      goodsUnordered,
-                      hasLogistics,
-                      bookingConfirmed,
-                      moneyOwing,
-                      stockEtaIso,
-                      daysToDue,
-                      photoOnFile: false,
-                      confirmedDateIso: bookingConfirmed ? "2026-08-20" : null,
-                    });
-                    for (const a of openOrderActions(s)) {
-                      const steps = orderActionChecklist(a.key, s);
-                      checked += 1;
-                      if (steps.length === 0) continue;
-                      expect(steps.some((st) => st.state === "open")).toBe(true);
+                  for (const daysToDue of [24, 0, -3])
+                    for (const deliveryOrderIssued of [null, false, true]) {
+                      const s = sig({
+                        completed,
+                        goodsReady,
+                        goodsUnordered,
+                        hasLogistics,
+                        bookingConfirmed,
+                        moneyOwing,
+                        stockEtaIso,
+                        daysToDue,
+                        deliveryOrderIssued,
+                        photoOnFile: false,
+                        confirmedDateIso: bookingConfirmed ? "2026-08-20" : null,
+                      });
+                      for (const a of openOrderActions(s)) {
+                        const steps = orderActionChecklist(a.key, s);
+                        checked += 1;
+                        if (steps.length === 0) continue;
+                        expect(steps.some((st) => st.state === "open")).toBe(true);
+                      }
                     }
-                  }
     // A guard on the guard: if the loop ever stops raising actions, the
     // assertion above passes vacuously and proves nothing.
     expect(checked).toBeGreaterThan(200);

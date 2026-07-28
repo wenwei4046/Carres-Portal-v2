@@ -171,7 +171,7 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     expect(body.code).toBe("booking_sunday");
   });
 
-  it("422 when a core line is not reserved — names the sku", async () => {
+  it("C7 — goods not reserved WARNS, it no longer refuses the confirmation", async () => {
     const sb = makeSb(
       happyTables({
         ops_order_control: tableMock(
@@ -183,13 +183,15 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const res = await post(await makeJwt("operation"), OK_BODY);
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { code: string; message: string };
-    expect(body.code).toBe("booking_gate");
-    expect(body.message).toContain(MATTRESS);
+    // §5: "AGREEING a date is softer than ISSUING the document." The date the
+    // customer said yes to is recorded; the goods sentence rides the response.
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { gateWarnings: string[] };
+    expect(body.gateWarnings.join(" ")).toContain(MATTRESS);
+    expect(body.gateWarnings.join(" ")).toContain("delivery order cannot be issued");
   });
 
-  it("422 when the balance is outstanding — reports the RM figure", async () => {
+  it("C7 — an outstanding balance WARNS with its RM figure, it no longer refuses", async () => {
     // RM 2,500 of lines, RM 1,000 paid ⇒ RM 1,500 still owed.
     const sb = makeSb(
       happyTables({
@@ -202,10 +204,9 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const res = await post(await makeJwt("operation"), OK_BODY);
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { code: string; message: string };
-    expect(body.code).toBe("booking_gate");
-    expect(body.message).toContain("1500.00");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { gateWarnings: string[] };
+    expect(body.gateWarnings.join(" ")).toContain("1500.00");
   });
 
   it("the reserved-units ledger (SO-ref) satisfies goods ready without line_received", async () => {
@@ -332,15 +333,14 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     });
   }
 
-  it("422 without a scope when the sofa is short — the system never splits by itself", async () => {
+  it("C7 — a short sofa with no scope WARNS; the system still never splits by itself", async () => {
     const sb = makeSb(mixedTables());
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const res = await post(await makeJwt("operation"), OK_BODY);
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { code: string; message: string };
-    expect(body.code).toBe("booking_gate");
-    expect(body.message).toContain(SOFA);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { gateWarnings: string[] };
+    expect(body.gateWarnings.join(" ")).toContain(SOFA);
   });
 
   it("200 with deliverGroups:['bed'] — the customer said deliver the bed set now", async () => {
@@ -367,7 +367,7 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     );
   });
 
-  it("422 for deliverGroups:['sofa'] when the sofa is the unready half", async () => {
+  it("C7 — deliverGroups:['sofa'] on the unready half WARNS about the sofa", async () => {
     const sb = makeSb(mixedTables());
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
@@ -375,12 +375,12 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
       ...OK_BODY,
       deliverGroups: ["sofa"],
     });
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { code: string };
-    expect(body.code).toBe("booking_gate");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { gateWarnings: string[] };
+    expect(body.gateWarnings.join(" ")).toContain(SOFA);
   });
 
-  it("HARD rule: no scope can send the mattress without its bed frame", async () => {
+  it("HARD rule: no scope can send the mattress without its bed frame (now as the warning)", async () => {
     const sb = makeSb(
       mixedTables({
         ops_order_control: tableMock(
@@ -401,9 +401,11 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
       ...OK_BODY,
       deliverGroups: ["bed"],
     });
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { message: string };
-    expect(body.message).toContain(BEDFRAME);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { gateWarnings: string[] };
+    // The bed set is ONE atom either way — the sentence names the frame, and
+    // the delivery order is what refuses to exist until it is reserved.
+    expect(body.gateWarnings.join(" ")).toContain(BEDFRAME);
   });
 
   it("422 booking_scope when the scope names a group this order does not have", async () => {

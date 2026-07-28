@@ -425,9 +425,20 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
   // the blank customer-DO at dispatch time and the customer signs it on
   // arrival. Only do_number is required; status may be 'place'/'proceed_order'/'received'
   // depending on which lifecycle column the kanban reads (operation_stage is the truth).
+  // C7 (2026-07-27) — the message named the wrong moment, and that mattered:
+  // 0098 stamps the number at DISPATCH, so this endpoint refused EVERY live
+  // order (0 of 56 carry a `do_number`) and the drawer's 🖨 DO button could
+  // never once have worked. The document is now produced by pressing
+  // `Issue delivery order` once the customer's date is confirmed, which is what
+  // this sentence says.
   if (!order.do_number) {
     return c.json(
-      { error: "rule_violation", code: "do_missing", message: "DO is only printable after dispatch (no DO number assigned yet)" },
+      {
+        error: "rule_violation",
+        code: "do_missing",
+        message:
+          "No delivery order for this trip yet — press Issue delivery order first.",
+      },
       422,
     );
   }

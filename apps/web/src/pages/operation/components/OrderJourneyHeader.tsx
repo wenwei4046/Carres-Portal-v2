@@ -124,6 +124,10 @@ const VERB_STAGE: Record<string, JourneyStage> = {
   [orderActionQueue("agree_new_delivery_date")]: "Goods",
   [orderActionQueue("assign_logistics")]: "Booking",
   [orderActionQueue("confirm_delivery_date")]: "Booking",
+  // C7 — the paper for a booked trip. Booking is finished (the customer said
+  // yes); the delivery has not happened, so the ● sits exactly where the
+  // `Delivering` fact sits.
+  [orderActionQueue("issue_delivery_order")]: "Delivery",
   [orderActionQueue("deliver_today")]: "Delivery",
   // C3 — the FACT that replaced `Confirm delivery`. It is not an action, but it
   // IS what the ladder returns for an order waiting for its booked day, so the
@@ -143,6 +147,10 @@ const VERB_OWNER: Record<string, string> = {
   [orderActionQueue("assign_logistics")]: "Operations — pick the logistics company",
   [orderActionQueue("confirm_delivery_date")]:
     "Logistics — customer has not confirmed a date",
+  // C7 — one press, and it is ours: the SYSTEM writes the document, nobody
+  // outside is waiting on anything.
+  [orderActionQueue("issue_delivery_order")]:
+    "Operations — issue the delivery order",
   [orderActionQueue("deliver_today")]: "Logistics — delivering today",
   // C3 — nobody acts before the day, and saying so is the point of retiring the
   // old `Confirm delivery`: this line used to read "everything ready, confirm"

@@ -286,6 +286,65 @@ describe("delivery track", () => {
   it("delivered with an UNKNOWN photo ledger accuses nobody", () => {
     expect(keys(sig({ completed: true, photoOnFile: null }))).toEqual([]);
   });
+
+  // ── C7 · the delivery order ───────────────────────────────────────────────
+  // Jess 2026-07-27: logistics ring to say they are delivering tomorrow and an
+  // operator has to produce the paper by hand. Once the customer's date is
+  // confirmed, the SYSTEM produces it and the operator presses one button.
+
+  it("arranged, paid, and no delivery order yet → Issue delivery order, not the quiet fact", () => {
+    const s = sig({ deliveryOrderIssued: false });
+    expect(keys(s)).toEqual(["issue_delivery_order"]);
+    // The fact means "nothing for a human to do". Issuing IS something to do.
+    expect(orderIsDelivering(s)).toBe(false);
+  });
+
+  it("issued → back to the quiet fact, exactly as before C7", () => {
+    const s = sig({ deliveryOrderIssued: true });
+    expect(keys(s)).toEqual([]);
+    expect(orderIsDelivering(s)).toBe(true);
+  });
+
+  it("UNKNOWN never accuses — an older Worker behaves byte-for-byte as pre-C7", () => {
+    const s = sig({ deliveryOrderIssued: null });
+    expect(keys(s)).toEqual([]);
+    expect(orderIsDelivering(s)).toBe(true);
+    // And the default (the signal simply absent) is the same answer.
+    expect(sig().deliveryOrderIssued).toBeUndefined();
+    expect(keys(sig())).toEqual([]);
+  });
+
+  it("goods still out → the goods call, never a delivery order for goods we do not have", () => {
+    // §3's trigger names FOUR conditions and "core goods ready" is one of them.
+    const s = sig({ goodsReady: false, deliveryOrderIssued: false });
+    expect(keys(s)).toEqual(["confirm_ready_date"]);
+  });
+
+  it("money still holds → no delivery order, and the 🔒 stays on the money", () => {
+    const s = sig({ moneyOwing: true, deliveryOrderIssued: false });
+    expect(keys(s)).toEqual(["collect"]);
+    expect(openOrderActions(s)[0]).toMatchObject({ key: "collect", locked: true });
+  });
+
+  it("a manager's release lets the document be issued — that is what a release IS", () => {
+    const s = sig({ moneyOwing: true, moneyHolds: false, deliveryOrderIssued: false });
+    expect(keys(s)).toEqual(["issue_delivery_order", "collect"]);
+    // Money still displays last (Law 4), so the row leads with the document.
+    expect(first(s)).toBe("issue_delivery_order");
+  });
+
+  it("on the day itself `Deliver today` leads — rung 1 beats rung 4", () => {
+    const s = sig({ confirmedDateIso: "2026-07-27", deliveryOrderIssued: false });
+    expect(keys(s)).toEqual(["deliver_today"]);
+  });
+
+  it("no confirmed date on a confirmed booking (a pre-0277 row) issues nothing — and still reads as delivering", () => {
+    // A row with no date cannot have a trip to paper. The FACT must survive it:
+    // refusing both would print `Done` on an order that is nothing of the sort.
+    const s = sig({ confirmedDateIso: null, deliveryOrderIssued: false });
+    expect(keys(s)).toEqual([]);
+    expect(orderIsDelivering(s)).toBe(true);
+  });
 });
 
 // ── LAYER 1 · the money track ────────────────────────────────────────────────

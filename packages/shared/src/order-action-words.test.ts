@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ORDER_ACTION_QUEUES,
   collectPillLabel,
+  orderActionDone,
   orderActionForQueue,
   orderActionLine,
   orderActionQueue,
@@ -15,6 +16,7 @@ const EVERY_KEY: OrderActionKey[] = [
   "agree_new_delivery_date",
   "assign_logistics",
   "confirm_delivery_date",
+  "issue_delivery_order",
   "deliver_today",
   "upload_delivery_photo",
   "delivering",
@@ -115,9 +117,33 @@ describe("order action words — the row line", () => {
     expect(collectPillLabel("2,455")).not.toMatch(/from/);
   });
 
-  it("the party-less three read the same as their queue word", () => {
-    for (const key of ["assign_logistics", "deliver_today", "upload_delivery_photo"] as const)
+  it("the party-less four read the same as their queue word", () => {
+    // C7 adds `issue_delivery_order`: the SYSTEM produces the document, so
+    // there is no outside party to name (COPY-STANDARD's action naming law
+    // lists it beside `Assign logistics` and `Upload delivery photo`).
+    for (const key of [
+      "assign_logistics",
+      "issue_delivery_order",
+      "deliver_today",
+      "upload_delivery_photo",
+    ] as const)
       expect(orderActionLine(key, { logistics: "NETS" })).toBe(orderActionQueue(key));
+  });
+});
+
+describe("C7 · the delivery order's own words", () => {
+  it("spells all three mirrored strings exactly as COPY-STANDARD's dictionary", () => {
+    expect(orderActionQueue("issue_delivery_order")).toBe("Issue delivery order");
+    expect(orderActionLine("issue_delivery_order")).toBe("Issue delivery order");
+    expect(orderActionDone("issue_delivery_order")).toBe("Delivery order issued");
+  });
+
+  it("mirrors a DONE message only where a surface reads one", () => {
+    // The other eight are locked in the dictionary and deliberately not copied
+    // here: a mirrored string nothing renders is the dead code C10 spent a card
+    // resurrecting. `null` means "not mirrored yet", never "records nothing".
+    const mirrored = EVERY_KEY.filter((k) => orderActionDone(k) !== null);
+    expect(mirrored).toEqual(["issue_delivery_order"]);
   });
 });
 
