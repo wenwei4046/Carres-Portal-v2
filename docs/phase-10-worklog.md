@@ -3659,3 +3659,53 @@ build + design-standard lint clean.
   is labelled by the action it raises (`Confirm delivery date`). `working days notice` was
   refused: it already means the notice a LOGISTICS COMPANY requires (T9, per-partner), and one
   word for two meanings is rule 8's failure.
+
+### Addendum, same day — L2 · L3 · L4 froze too, and the workstream closed
+
+The session did not stop at L1. **L2 = information DEPTH** (Answer · Context · Evidence · Detail;
+code keeps D0–D3) — the right layer before layout because *an argument about how big something
+should be is an argument about its depth*. Its load-bearing rule: **all well → Answer only;
+something wrong → Context opens by itself**, which states "trouble earns room" without naming a
+single size. It also closed two open questions on the way past: the dangerous doors are R2's
+**Detail** (so what needs a ruling is who may press them, not where they live), and R5's payment
+breakdown was always Detail, so the unreadable ledger blocks nothing shallower and became its own
+card instead of a dependency.
+
+**L3 = STATES.** Listing the obvious five is what proved there are **two**: there is work, or
+there is not — Working · Blocked · Waiting · Completed. **"New" is not a state**; a fresh order
+always has work, so it is Working with an empty record. **Completed was ruled as NO OPEN ACTIONS,
+not delivered**, which is the working flow's own "delivered is not paid" arriving on its own.
+**Unknown is an attribute, not a state** — if it could move an order between states it would have
+become the status word §1 forbids. And the page does not become another page when an order ends:
+it collapses to Answer depth. *Completed is not a new design, it is the shallowest state of the
+same one.*
+
+**Then L4 stopped, and reporting the reason was the most valuable thing in the session.** Reading
+UI-KIT before proposing any layout found that **Jess had frozen an Information Hierarchy in §1.4
+the same day** (`d83ecf98`) — seven blocks for the same page. Five mapped one to one, and both
+files had independently arrived at `goods · delivery · money`, which is the strongest available
+evidence they describe the same business. Three things genuinely disagreed and Loo ruled all
+three: **Current Issues follows UI-KIT and draws only when something is wrong** · **Progress gets
+NO region — it is another VIEW of "what do I have to do now"**, because two regions answering one
+question drift the first time either is edited · **both documents are kept and reference each
+other**, UI-KIT owning presentation architecture and this one information architecture.
+
+**What made accepting the hide safe** was the depth work already done: the person it appeared to
+cost — the one interrupted by a phone call — still gets all three facts they are asked for, the
+goods from the progress view, the delivery day from the action's own answer, the amount owed from
+the persistent fact in Identity. **Nothing was lost but height spent saying nothing.**
+
+**L4 = the `DetailShell` slot contract**, and its sharpest property is a negative one: **the shell
+receives no state.** Working/Blocked/Waiting/Completed are produced entirely by what each slot is
+given, so L3's "states never reach the screen" stops depending on anyone remembering it. Seven type
+constraints, each replacing a rule that has no enforcement today — **constraint 4 pays for the card
+alone**, turning §1.4's only Human-Review debt (Progress carries no events/KPIs/buttons) into
+something that does not compile.
+
+**Card D0.5c is written in full** in `docs/ui-kit-execution-queue.md`: slot API, the seven
+constraints with a test each, acceptance criteria including **zero visual change**, a test checklist
+with a negative control, and a migration scope of exactly one consumer — the other five detail pages
+inherit at T4, which is gated on Jess using the drawer for a day. *Porting five pages before one has
+been used for a day is how a wrong shell reaches five pages.*
+
+The Order Detail Information Architecture is complete and this workstream is closed.
