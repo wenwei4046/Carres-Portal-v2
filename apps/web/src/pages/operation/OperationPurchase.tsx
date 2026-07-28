@@ -39,9 +39,13 @@
  *    `(soon)` marker + popup top note stating the options record intent but
  *    don't act yet. Will be un-marked when the escape-hatch write path lands.
  *
- * VOCAB: ① Send · ② Chase · ③ Receive. Internal stage key stays `"place"` to
- *        preserve URL param + wire compat; all user-facing labels say Send. See
- *        COPY-STANDARD §Vocabulary for why Send ≠ Place.
+ * VOCAB (rewritten by card **R8**, 2026-07-28): the three stage cells read
+ *        `Send PO` · `Confirm ready date` · `Check in`, straight out of
+ *        `order-action-words.ts`. They used to say `Send POs` · `Chase factory`
+ *        · `Receive` — and `Chase` is a BANNED word (COPY-STANDARD), while
+ *        `Receive` as a verb is banned outright in favour of `Check in`. The
+ *        internal stage keys stay `"place" | "chase" | "receive"` to preserve
+ *        URL-param and wire compat; nothing user-facing says them.
  *
  * Read-only: every write affordance (Send PO / Chase on WhatsApp / Check-in /
  * Something wrong) is a STUB. Actually raising a PO / booking a GRN is a later
@@ -62,6 +66,14 @@
  *
  * Receiving and Claims are the other two tabs §8.2 still owes; they are ④ R's
  * files and R6 holds them, so P2 shipped the To Order half alone.
+ *
+ * R8 (2026-07-28) also DELETED the `attn` and `selectedDay` filters. Their tiles
+ * were removed on 2026-07-23/24 and the state, the filter branches and the clear
+ * chips stayed behind — every writer of both set `null`, so nothing on the page
+ * could ever switch either on. Proved by grep before deleting, per the card:
+ * unreachable state is not a behaviour change, but only after you have shown it
+ * is unreachable. The FEATURES ("only what is late", "only this day") were not
+ * ruled out — they were ruled not to sit in the code pretending to exist.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -80,6 +92,9 @@ import {
   UserRound,
 } from "lucide-react";
 import {
+  purchasingActionButton,
+  purchasingActionLine,
+  purchasingActionQueue,
   type ProductCategory,
   type PurchaseChase,
   type PurchasePlaceGroup,
@@ -118,7 +133,18 @@ import {
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type Stage = "place" | "chase" | "receive";
-type Attn = "overdue" | "missing" | null;
+
+/** R8 — the three stage cells, worded by the dictionary and nowhere else. The
+ *  KEY stays the old internal word (URL param + wire compat); the LABEL is the
+ *  shared module's, so this page structurally cannot spell one action its own
+ *  way. `MiddleListHeader` reads the same map, which is the point: the cell and
+ *  the list header are ONE label rendered twice, and that is exactly where "the
+ *  same act, two words, on one screen" came from in the first place. */
+const STAGE_LABEL: Record<Stage, string> = {
+  place: purchasingActionQueue("send_po"),
+  chase: purchasingActionQueue("confirm_ready_date"),
+  receive: purchasingActionQueue("check_in"),
+};
 
 type Selection =
   | { kind: "place"; groupKey: string }
@@ -135,8 +161,6 @@ type Selection =
 interface ToOrderListState {
   stage: Stage;
   supplierFilter: string | null;
-  attn: Attn;
-  selectedDay: string | null;
   selection: Selection;
   selectionCleared: boolean;
   facetScrollTop: number;
@@ -164,22 +188,8 @@ function daysBetween(fromIso: string | null, toIso: string | null): number | nul
   return Math.round((b.getTime() - a.getTime()) / 86_400_000);
 }
 
-/** 0 = Sun · 1 = Mon · ... · 6 = Sat (UTC-consistent). */
-function dayOfWeek(iso: string): number {
-  return new Date(`${iso.slice(0, 10)}T00:00:00Z`).getUTCDay();
-}
-
-/** Short weekday name: "Mon"/"Tue"/etc. */
-const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-function dayName(iso: string): string {
-  return DOW[dayOfWeek(iso)];
-}
-
-/** Short in-cell day label: "22 Jul" (UTC-consistent — see addDaysIso). */
-function dayLabelShort(iso: string): string {
-  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
-  return `${d.getUTCDate()} ${d.toLocaleString("en-GB", { month: "short", timeZone: "UTC" })}`;
-}
+// R8 — `dayOfWeek` / `DOW` / `dayName` / `dayLabelShort` deleted with the
+// `selectedDay` filter: their only caller was that filter's clear chip.
 
 /** Phone → wa.me base link (MY-aware). Local copy of OperationPayments.waLink so
  *  this page doesn't pull in the payments module. */
@@ -452,8 +462,6 @@ export default function OperationPurchase() {
   const [facetOpen, setFacetOpen] = useState(true);
   const [stage, setStage] = useState<Stage>("place");
   const [supplierFilter, setSupplierFilter] = useState<string | null>(null);
-  const [attn, setAttn] = useState<Attn>(null);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   // P2 — "click the same cell again and it clears" (UI-KIT §8.2). The rows
   // ALREADY toggled to null; the auto-select effects below then put the first
@@ -572,7 +580,7 @@ export default function OperationPurchase() {
     [placeGroups, data?.today],
   );
 
-  // Switching stage clears the per-stage facet filters + selection + selected day.
+  // Switching stage clears the per-stage facet filter + selection.
   //
   // P2 — clicking the stage you are ALREADY on is a no-op. It used to re-run
   // the whole reset, so a second click on `Send POs` silently threw away the
@@ -583,8 +591,6 @@ export default function OperationPurchase() {
     if (s === stage) return;
     setStage(s);
     setSupplierFilter(null);
-    setAttn(null);
-    setSelectedDay(null);
     setSelection(null);
     setSelectionCleared(false);
   };
@@ -639,51 +645,18 @@ export default function OperationPurchase() {
   // ── Filtered lists per stage.
   const placeShown = useMemo(
     () =>
-      splitPlaceGroups.filter((g) => {
-        if (supplierFilter && g.supplierId !== supplierFilter) return false;
-        if (attn === "overdue" && g.urgency !== "late") return false;
-        if (attn === "missing" && g.urgency !== "no_deadline") return false;
-        if (selectedDay) {
-          // Overdue groups collapse into the "today" cell in the strip; keep
-          // them visible when today is selected so the numbers match.
-          if (selectedDay === today) {
-            if (
-              g.urgency !== "late" &&
-              g.earliestOrderBy !== selectedDay
-            )
-              return false;
-          } else if (g.earliestOrderBy !== selectedDay) return false;
-        }
-        return true;
-      }),
-    [splitPlaceGroups, supplierFilter, attn, selectedDay, today],
+      splitPlaceGroups.filter(
+        (g) => !supplierFilter || g.supplierId === supplierFilter,
+      ),
+    [splitPlaceGroups, supplierFilter],
   );
   const chaseShown = useMemo(
-    () =>
-      chase.filter((r) => {
-        if (supplierFilter && r.supplierId !== supplierFilter) return false;
-        if (selectedDay) {
-          if (selectedDay === today) {
-            if (r.daysLate <= 0 && r.expectedReadyDate !== selectedDay) return false;
-          } else if (r.expectedReadyDate !== selectedDay) return false;
-        }
-        return true;
-      }),
-    [chase, supplierFilter, selectedDay, today],
+    () => chase.filter((r) => !supplierFilter || r.supplierId === supplierFilter),
+    [chase, supplierFilter],
   );
   const receiveShown = useMemo(
-    () =>
-      receive.filter((r) => {
-        if (supplierFilter && r.supplierId !== supplierFilter) return false;
-        if (selectedDay) {
-          const key = r.etaDate ?? r.expectedReadyDate;
-          if (selectedDay === today) {
-            if (!key || key > selectedDay) return false;
-          } else if (key !== selectedDay) return false;
-        }
-        return true;
-      }),
-    [receive, supplierFilter, selectedDay, today],
+    () => receive.filter((r) => !supplierFilter || r.supplierId === supplierFilter),
+    [receive, supplierFilter],
   );
 
   // Auto-select the first visible row per stage so the detail pane isn't empty.
@@ -754,21 +727,18 @@ export default function OperationPurchase() {
     return [...seen];
   }, [placeGroups]);
 
-  // Active-filter chips per §5.3 — one X-able chip per active filter.
+  // Active-filter chips per §5.3 — one X-able chip per active filter. There is
+  // exactly ONE filter on this tab (R8 deleted the two that nothing could set).
+  //
+  // R8 — the word is `Supplier`, not `Factory`. The band above this chip has
+  // said `Supplier` since 2026-07-24, both sibling Purchasing tabs say
+  // `Supplier: {name}`, and COPY-STANDARD's facet-heading table lists `Supplier`
+  // and no `Factory`. One facet, one word, across the whole module.
   const activeChips: ActiveChip[] = [];
-  if (attn === "overdue")
-    activeChips.push({ label: "Late only", onClear: () => setAttn(null) });
-  if (attn === "missing")
-    activeChips.push({ label: "No deadline", onClear: () => setAttn(null) });
   if (supplierFilter)
     activeChips.push({
-      label: `Factory: ${supplierName(supplierFilter)}`,
+      label: `Supplier: ${supplierName(supplierFilter)}`,
       onClear: () => setSupplierFilter(null),
-    });
-  if (selectedDay)
-    activeChips.push({
-      label: `Day: ${dayName(selectedDay)} ${dayLabelShort(selectedDay)}`,
-      onClear: () => setSelectedDay(null),
     });
 
   // P2 — the one facet cell on this tab that has always obeyed §8.2: click the
@@ -799,8 +769,6 @@ export default function OperationPurchase() {
     listStateBeforeDrawer.current = {
       stage,
       supplierFilter,
-      attn,
-      selectedDay,
       selection,
       selectionCleared,
       facetScrollTop: getFacetScroller()?.scrollTop ?? 0,
@@ -813,8 +781,6 @@ export default function OperationPurchase() {
     if (!s) return;
     setStage(s.stage);
     setSupplierFilter(s.supplierFilter);
-    setAttn(s.attn);
-    setSelectedDay(s.selectedDay);
     setSelection(s.selection);
     setSelectionCleared(s.selectionCleared);
     pendingFacetScroll.current = s.facetScrollTop;
@@ -923,7 +889,7 @@ export default function OperationPurchase() {
                   <FacetRow
                     testId="facet-stage-place"
                     leadingChip={poDutyChip}
-                    label="Send POs"
+                    label={STAGE_LABEL.place}
                     count={placeCount}
                     suffix={
                       placeOverdue > 0 ? (
@@ -1017,7 +983,7 @@ export default function OperationPurchase() {
                   <FacetRow
                     testId="facet-stage-chase"
                     leadingChip={poDutyChip}
-                    label="Chase factory"
+                    label={STAGE_LABEL.chase}
                     count={chaseCount}
                     tone={chaseCount > 0 ? "danger" : "muted"}
                     active={stage === "chase"}
@@ -1026,7 +992,7 @@ export default function OperationPurchase() {
                   <FacetRow
                     testId="facet-stage-receive"
                     leadingChip={grnDutyChip}
-                    label="Receive"
+                    label={STAGE_LABEL.receive}
                     count={receiveCount}
                     active={stage === "receive"}
                     onClick={() => goStage("receive")}
@@ -1413,12 +1379,9 @@ function MiddleListHeader({
   shownCount: number;
   totalCount: number;
 }) {
-  const title =
-    stage === "place"
-      ? "Send POs"
-      : stage === "chase"
-        ? "Chase factories"
-        : "Receive deliveries";
+  // R8 — the SAME label the facet cell above renders, from the same map. Two
+  // spellings of one act on one screen is the defect this card exists to end.
+  const title = STAGE_LABEL[stage];
   const badge =
     shownCount === totalCount
       ? `${shownCount}`
@@ -1601,7 +1564,9 @@ function ReceiveDetail({
       <div className="shrink-0 border-b border-base-200 px-4 py-3 bg-base-50">
         <div className="flex items-center gap-1.5 text-[15px] font-bold text-base-900">
           <Truck size={18} className="text-base-500 shrink-0" />
-          <span className="truncate">Check in from {supplierName}</span>
+          <span className="truncate">
+            {purchasingActionLine("check_in", { supplier: supplierName })}
+          </span>
           <span className="pill pill-sent shrink-0 ml-auto">
             <PackageCheck />
             {total} to check in
@@ -1655,7 +1620,7 @@ function ReceiveDetail({
           title={`Open the check-in form for ${row.poId}.`}
           onClick={() => onCheckIn(row.poId)}
         >
-          Check in
+          {purchasingActionButton("check_in")}
         </Btn>
       </div>
     </div>

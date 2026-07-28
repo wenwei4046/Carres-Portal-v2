@@ -237,8 +237,10 @@ describe("R3 — who owes the next move", () => {
     );
     render(wrap(<OperationSupplierClaims />));
     expect(screen.getByTestId("claim-owner-SC-1002")).toHaveTextContent("Ohana");
+    // R8 — the row now prints the dictionary's own line, which is the SAME
+    // string the queue tile above it prints the action-less form of.
     expect(screen.getByTestId("claim-next-move-SC-1002")).toHaveTextContent(
-      "Call Ohana — confirm the new delivery date",
+      "Call Ohana — confirm what happens next",
     );
   });
 
@@ -493,6 +495,29 @@ describe("Claims · §8.2 the queue tile (card P2)", () => {
       "Confirm what happens next",
     );
     expect(screen.queryByTestId("facet-queue-claims")).toBeNull();
+  });
+
+  // ── R8 · the tile and the row stop spelling one action two ways ────────────
+  it("the row line is the tile's own action, party named", () => {
+    renderAll();
+    // P2 shipped the tile from the dictionary and left the row on R3's own
+    // sentence, so this ONE screen said `Confirm what happens next` at the top
+    // and `confirm what they will do` in the column. Both now come out of
+    // `order-action-words.ts`.
+    const tile = screen.getByTestId("facet-queue-answer").textContent ?? "";
+    const row = screen.getByTestId("claim-next-move-SC-1002").textContent ?? "";
+    expect(tile).toContain("Confirm what happens next");
+    expect(row).toBe("Call Ohana — confirm what happens next");
+    // The queue word carries no party (a queue holds many); the row does.
+    expect(tile).not.toContain("Ohana");
+  });
+
+  it("renders no explanatory paragraph above the list (Loo, 2026-07-28)", () => {
+    const { container } = renderAll();
+    // UI-KIT §1.1 question 3 — if it were removed, could today's work still be
+    // finished? YES, so the gate does not admit it, and §1.3's budget is 200px.
+    expect(container.textContent).not.toMatch(/What the supplier still owes us/);
+    expect(container.textContent).not.toMatch(/Opened by receiving/);
   });
 
   it("filters to the claims the supplier still owes an answer on", () => {

@@ -50,6 +50,8 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  checkedInDone,
+  purchasingActionButton,
   computeStorageFee,
   defaultStorageStart,
   normalizeSkuKey,
@@ -3441,9 +3443,13 @@ function DrawerBody({
                                     {lineReceivedOf(l.sku)}/{l.qty}
                                   </span>
                                   {lineReceivedOf(l.sku) < l.qty && (
-                                    /* "+ GRN" — Jess's own AutoCount word for
-                                       a goods-received entry ("+ Arrived"
-                                       read as a state, not an action). */
+                                    /* R8 (2026-07-28) — the GRN document/act
+                                       split. `GRN` is still the name of the
+                                       PAPER (the column header above keeps it),
+                                       but this is a human DOING something, and
+                                       the act is `Check in`. COPY-STANDARD's
+                                       mechanical test: "+ the piece of paper"
+                                       does not mean what "+ GRN" meant. */
                                     <Btn
                                       size="sm"
                                       onClick={(e) => {
@@ -3454,9 +3460,9 @@ function DrawerBody({
                                           received: lineReceivedOf(l.sku),
                                         });
                                       }}
-                                      title="Goods arrived at the warehouse — record a GRN"
+                                      title="Goods arrived at the warehouse — records a GRN against this line"
                                     >
-                                      + GRN
+                                      {purchasingActionButton("check_in")}
                                     </Btn>
                                   )}
                                 </span>
@@ -4608,20 +4614,22 @@ function ReceiveLineModal({
       },
       {
         onSuccess: (r) => {
+          // R8 — the dictionary's own done message for `Check in`.
           toast.success(
-            `GRN saved — ${r.lineReceived}/${r.lineQty} arrived${r.ready ? " · Ready" : ""}`,
+            `${checkedInDone(r.lineReceived, r.lineQty)}${r.ready ? " · Ready" : ""}`,
           );
           onClose();
         },
-        onError: (e) => toast.error(`Couldn't save the GRN — ${e.message}`),
+        onError: (e) => toast.error(`Couldn't record the GRN — ${e.message}`),
       },
     );
   }
 
   return (
-    /* rev19b — GRN is Jess's OWN word (the AutoCount doc her team lives in);
-       "Book in" (UK warehouse slang) is dead. */
-    <Modal title="GRN — goods arrived" onClose={onClose}>
+    /* R8 — the TITLE is the act, so it is `Check in`. `GRN` survives as the name
+       of the document Jess's team already says (the AutoCount doc), and it keeps
+       the column header and the error line below; it may never be the verb. */
+    <Modal title={purchasingActionButton("check_in")} onClose={onClose}>
       <div className="space-y-3">
         <div className="text-[12px] text-base-600">
           <span className="font-semibold text-[12px] text-[#1A1A1A]">{sku}</span>
@@ -4688,7 +4696,7 @@ function ReceiveLineModal({
           </Btn>
           {/* The modal's own hero (a modal is its own surface — v4 §2). */}
           <Btn variant="hero" onClick={submit} disabled={!valid || receive.isPending}>
-            {receive.isPending ? "Saving…" : "Save GRN"}
+            {receive.isPending ? "Checking in…" : purchasingActionButton("check_in")}
           </Btn>
         </div>
       </div>
@@ -7662,9 +7670,9 @@ function PoRow({
             size="sm"
             icon={PackagePlus}
             onClick={() => onReceive(po)}
-            title="Receive this PO's goods (GRN) — books them in as ready stock"
+            title="Goods arrived from this PO — books them in as ready stock and records the GRN"
           >
-            Receive (GRN)
+            {purchasingActionButton("check_in")}
           </Btn>
         )}
       </div>

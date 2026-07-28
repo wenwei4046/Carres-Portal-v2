@@ -4133,6 +4133,129 @@ pre-existing failures, 2142 passed** — baseline held.
 
 ---
 
+**2026-07-28 · Receiving & Supplier Claim R8 — the banned-verb sweep across the Purchasing
+lane** (PR #499, **no migration**, web + `packages/shared` only) — every word Loo and Jess had
+already ruled, finally on the screens. Nothing here was a design decision; the whole card is lag.
+
+**What came off, and why each was illegal rather than merely old.** `Chase factory` on To Order
+— **banned outright** by COPY-STANDARD, because it names a mood and not an outcome, and it had
+been live on a facet cell for months. `Send POs` — the plural of an action whose singular is
+locked. `Receive` as a VERB — the vocabulary table's own row reads *"Log goods arrival — the
+ACT: **Check in**"*, with `Receive (as a verb)` in the do-not-use column. `Send back` — `Send`
+is pinned to raising a PO to a factory and is never reused (rule 8), which is exactly what R6
+reported when it shipped the word. `Save count` — that button does not merely store what you
+typed; it hands the count to Carres and the state becomes `Waiting Carres check`, and a button
+that changes whose problem something is has never been a `Save`.
+
+**The card named five sites for `Receive →` and there were six.** `OperationReceiving`'s row
+button is the one R6 found; the IDENTICAL button, opening the IDENTICAL `ReceivePOModal`, is
+also live one tab over on **Purchase Orders** (`ProcurementTabContent.tsx`). Renamed with its
+sibling — leaving it would have made the module's last screen the only one still saying the
+banned word, which is the failure this card exists to end rather than a smaller version of it.
+
+**The mirror grew a SECOND table, not four more ladder keys.** `order-action-words.ts` now
+carries `PURCHASING_ONLY` beside `WORDS`. `OrderActionKey` is the ORDER ladder's key —
+`DISPLAY_RANK` is a `Record` over it and `order-action-due` / `order-action-checklist` both key
+off it — so putting `check_in` in that union would have forced a display rank and a due rule for
+an action the Orders row can never show. One file (Law 0A: one home for the mirror), two tables,
+and **no string spelt twice**: `Send PO` and `Confirm ready date` are read back out of the order
+table, because COPY-STANDARD says they are ONE action shared by both flows.
+
+**The stage cell and the middle-list header are ONE label rendered twice**, and finding that out
+is what stopped this card creating the defect it was fixing. Renaming only the facet cell would
+have produced `Confirm ready date` sitting above a panel headed `Chase factories`. Both read
+`STAGE_LABEL` now.
+
+**GRN is a SPLIT and the counts are reported both ways: 4 sites became `Check in`, 5 stayed
+`GRN`.** The act sites were `+ GRN`, the `GRN — goods arrived` modal title, `Save GRN` and the
+save toast (now the dictionary's `Checked in {n} of {m}`), plus a fifth the card's table implies
+and does not list — the linked-PO footer's **`Receive (GRN)`**, which carried BOTH errors in one
+button. The document sites — the column header, two tooltips and the error line — name the piece
+of paper, pass COPY-STANDARD's mechanical test, and were left. **A sweep that leaves zero `GRN`
+has misread the ruling as a ban.**
+
+**The two dead filters went whole, and the proof came before the delete.** `attn` and
+`selectedDay` carried state, filter branches and clear chips that nothing on the page could
+switch on — their tiles were deleted 2026-07-23/24 and the rest stayed. Grepped every writer
+first: all of them set `null`, there is no URL param, no keyboard handler, no effect and no prop.
+State, filter branches, clear chips and the four date helpers that served only the chip went in
+one move — **a chip that clears a filter nobody can set is the same lie one level down.** The
+FEATURES were never ruled out, only ruled not to sit in the code pretending to exist.
+
+**`Contact` appears in ZERO visible strings on the claim screens, measured rather than assumed.**
+R3 had already shipped `Call`. What Loo's ruling actually still bought was the ROW LINE:
+`claimNextMove`'s answer step said `Call {supplier} — confirm what they will do` while the queue
+tile directly above it said the dictionary's `Confirm what happens next` — one screen, two
+spellings of one action, which is P2-Claims' own finding #2. Both come out of the mirror now.
+**The `late` variant is gone with it** (`confirm the new delivery date`): one action has one row
+line, and that is the single thing this card makes less specific.
+
+**A source scan is what guards a rename, not a render test** — `purchasing-words.test.ts` walks
+six files, because a render test only sees the branches its fixture reaches and the banned words
+are true of the whole lane or not at all. Its exclusions are named in the file rather than
+regexed around, and the regex is deliberately CASE-INSENSITIVE: the one survivor, `Direct
+receive →`, is lower-cased and a case-sensitive rule would have let it through unnoticed.
+
+**Five negative controls, each fired exactly what it should**: restore the three old stage words
+→ 3 fail · `Receive →` back on Receiving → 3 · `Send back` back → 3 · the Claims explainer back
+→ 2 · `attn`/`selectedDay` back → 1.
+
+**A banned word is still on screen, and R8 says so instead of sweeping it.** To Order's ② detail
+pane has `Chase on WhatsApp`, its tooltip and a `Chase {supplier}` title. COPY-STANDARD's answer
+for a channel button is `Open WhatsApp group` — but this one opens a direct `wa.me/{phone}` link
+when the supplier has a contact and only falls back to the group, so that label is not literally
+true, and picking a word is not a BUILD chat's job. Same shape on `ReceivePOModal`: it spells the
+act five ways and only its TITLE has a dictionary answer, so renaming the title alone would have
+left one form spelling one act two ways. Also reported: `Direct receive →`, and a genuine LAW
+CONFLICT on the claim panel's `Save {supplier}'s answer` — the verb dictionary exempts form
+buttons, the PURCHASING table locks the button word as `Record what happens next`, and the two
+disagree.
+
+**Live effect today: none, and that is the honest statement.** 0 POs · 0 PO lines · 0 claims ·
+0 warehouse receipts — every screen this card renames is empty, so no row moved for anybody.
+R8 decides the words before the first real PO arrives, exactly as C7, C8 and C9 decided their
+behaviours before the first real order reached them.
+
+**R8 does NOT close Purchasing** (Loo's guard, added to the index the same day): the module
+still has no way to make either supplier call, no destination on a PO, and has never had one
+real purchase order through it. It does not close line ④ either — **R7 remains**.
+
+Suites at baseline: shared **1949/1949** · api **3** pre-existing · web **16** pre-existing
+(2164 passed). Build + v4 guard + design-standard lint clean; `SERVICE_ROLE` greps **0** in
+every dist chunk.
+
+**2026-07-28 (same session, follow-up) · R8's sixth surface — found by the deploy grep, which is
+what that step is for** (PR #500 merge `611e7c1c`, no migration, **web only**) — `Send POs` greped
+**3 → 1** on the shipped bundle instead of 3 → 0, and the survivor was not a leftover in a file R8
+had edited. It was **`pages/operation/components/rail/CalendarPanel.tsx`**, the ops right rail,
+which renders the SAME three purchasing lenses and had been **half** fixed: C1 re-pointed `chase`
+at the dictionary in July and left `send` and `receive` as the panel's own words. So the rail
+sitting beside the To Order tab was saying **`Receive`** — a banned verb — while the tab itself
+said `Check in`, which is exactly the *"same act, two words, one screen"* defect this card exists
+to end, surviving the sweep by being in a file the card did not name. All three lenses read
+`purchasingActionQueue` now, and the two `DaySection` titles read the same map instead of
+hard-coding the words a second time.
+
+**The scan walked past it, and that is the more useful half.** The rule matched `>Receive<` and
+`Receive →` — the shapes a label takes as a CHILD. This one was a **PROP** (`title="Receive"`), so
+neither fired. The scan now also refuses a bare `"Receive"` string literal, `CalendarPanel.tsx` is
+in the lane list (6 files → 7), and the negative control fires exactly 1.
+
+**Two rail tests moved with the words**, and the second is a small proof the rename is right:
+`getByText("Send")` was an exact match and stops matching `Send PO`; and once the lens is open the
+word appears TWICE, because the tab and its day section are one action named once.
+
+**A deploy note worth keeping: the api deploy was REQUIRED and `git diff -- apps/api` said
+otherwise.** That diff was empty for #499, which is the shape a chat reads as "web only". But R8
+changes `packages/shared/supplier-claim.ts`, and `claimNextMove` is computed **server-side** by
+`apps/api/src/routes/operation/supplier-claims.ts` — the Claims row would have kept saying
+`confirm what they will do` under a tile saying `Confirm what happens next`. **Ask what the api
+IMPORTS, not only what it CONTAINS.** Same trap #435 nearly hit with `commissionReadiness`.
+Worker `0b2640bc` from tip `aa70cd45`; #500 needed none (`git diff aa70cd45..611e7c1c -- apps/api
+packages/shared supabase/migrations` is empty).
+
+---
+
 **2026-07-28 · ⑧ D0.5b — the Radix half, and the PENDING REGISTER empties**
 (branch `claude/carres-portal-d0-5b-7d848e`, **no migration**, **built and
 verified, NOT merged and NOT deployed** — the card is a build card and the
