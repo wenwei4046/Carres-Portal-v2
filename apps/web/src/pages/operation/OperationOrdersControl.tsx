@@ -57,6 +57,8 @@ import {
   deliveryStepOverdue,
   myHolidaySet,
   deliveryDateGapFact,
+  orderActionButton,
+  orderActionChecklist,
   orderActionLine,
   orderActionQueue,
   orderActionsInDisplayOrder,
@@ -1774,6 +1776,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const money = moneyOf(o);
     const holdAmount = money.known ? money.outstanding : null;
     const na = nextActionOf(o, stock, o.order_lines ?? []);
+    // ONE signals object for the whole strip: the open actions AND their C6
+    // checklists read it, so a step can never be measured against a different
+    // reading of the order than the action it belongs to.
+    const actionSignals = orderActionSignalsOf(o, stock, o.order_lines ?? []);
     const sid = primarySupplierId(o, skuMeta, suppliers);
     // C3 — the drawer is the ONE surface that prints the delivering FACT in
     // full (`Delivering 27 Jul · 12pm–3pm`). The Orders row and the Delivery
@@ -1815,11 +1821,23 @@ export default function OperationOrdersControl({ onImport }: Props) {
       // and this row's pill are the same computation, so the count the drawer
       // shows and the headline the row shows can never contradict each other.
       // The party names are resolved ONCE, here, where the maps live.
-      openActions: openActionsOf(o, stock, o.order_lines ?? []).map((a) => ({
+      //
+      // C6 — each action also carries the STEPS that close it, measured against
+      // the SAME signals object the ladder just read. Building them here (and
+      // not in the component) is the J3/C2 law: the drawer renders, it never
+      // re-derives, so a step and the action above it cannot come from two
+      // different readings of the order. The step's word is the dictionary's
+      // BUTTON string — this file spells no verb.
+      openActions: orderActionsInDisplayOrder(actionSignals).map((a) => ({
         key: a.key,
         line: orderActionLine(a.key, actionParties),
         tone: a.tone,
         locked: a.locked,
+        steps: orderActionChecklist(a.key, actionSignals).map((st) => ({
+          key: st.key,
+          label: orderActionButton(st.key) ?? orderActionQueue(st.key),
+          done: st.state === "done",
+        })),
       })),
     };
   };

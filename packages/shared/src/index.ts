@@ -792,12 +792,21 @@ export {
   ORDER_ACTION_QUEUES,
   collectPillLabel,
   deliveryDateGapFact,
+  orderActionButton,
   orderActionForQueue,
   orderActionLine,
   orderActionQueue,
   type OrderActionKey,
   type OrderActionParties,
 } from "./order-action-words";
+
+// C6 · What closes one action — the steps, each of them one of the portal's own
+// actions, each measured from the signals the ladder already reads.
+export {
+  orderActionChecklist,
+  type OrderActionStep,
+  type OrderActionStepState,
+} from "./order-action-checklist";
 
 // C2 · The order action engine — two layers (compute every track · display
 // picks one). One track may never suppress another's action.
