@@ -6,6 +6,14 @@
 > It does not repeat: the action MODEL → `docs/ACTION-FLOW-STANDARD.md` · the WORDS →
 > `docs/COPY-STANDARD.md` · the SHELL → `docs/UI-KIT.md` · the module's actions →
 > `docs/ORDERS-WORKING-FLOW.md`.
+>
+> **The boundary with UI-KIT (Loo, 2026-07-28).** Both files exist and each names the other.
+> **`docs/UI-KIT.md` owns PRESENTATION ARCHITECTURE** — §1.4 fixes what meets the eye and in
+> what order, and that hierarchy is shared by every detail page in the portal, not just this
+> one. **This file owns INFORMATION ARCHITECTURE** — which question each region answers, how
+> deep an answer goes (L2), and what it says in each state (L3). UI-KIT has no L2 and no L3;
+> this file has no say over presentation. **Where they touch, UI-KIT wins** (CLAUDE.md), and
+> §1.4's blocks map onto this file's regions in §6.
 
 ## 0 · What is frozen, and what is not
 
@@ -84,8 +92,9 @@ The brain splits it three ways and wants three separate answers, never one summa
 **goods** (ordered? factory's date? how many arrived?) · **delivery** (who carries it? has
 the customer agreed a date?) · **money** (how much is in?).
 
-- **Satisfying answer:** three sentences, one per track. A track that is fine says one calm
-  thing and explains nothing. **Only the stuck track owes a reason.**
+- **Satisfying answer:** one sentence per track that has something wrong. **Only a stuck track
+  owes a reason** — and an order with nothing wrong is never asked "why" at all, so the
+  question simply does not arise (Loo, 2026-07-28).
 - **Then they:** either accept it and go back to step 2, or — if it does not add up — carry
   on to steps 4 and 6.
 - **Skipped when:** the instruction is self-evident (*upload the delivery photo*).
@@ -263,7 +272,7 @@ named, that region is another region's content that has set up on its own.
 | **Fed by** | **Commitment ⟷ Reality**, subtracted per track · **Verdict** (each track's tone) |
 | **Does NOT answer** | **it never tells anybody to do anything** (R2) · it does not lay out evidence — PO numbers, unit identifiers, working-day arithmetic are the *second sentence*, not the answer · it does not tell history (R6) · **a track that is fine does not explain itself** |
 | **When unknown** | unknown is an answer ("the factory has not given a date") |
-| **Absent when** | never — but when all is well it is worth one line |
+| **Absent when** | **nothing is wrong on any track — then it does not draw at all** (Loo, 2026-07-28, following `docs/UI-KIT.md` §1.4 rule 2: a block that says "nothing is wrong" spends height to say nothing). A calm order therefore has no explanation region. The three facts a caller asks for are still answered — goods by R2's progress view, the delivery day by R2's own answer, the money by R1's persistent fact — so nothing was lost by removing the calm case, only repeated height |
 
 ### R4 · Contents
 
@@ -296,6 +305,45 @@ named, that region is another region's content that has set up on its own.
 | **Does NOT answer** | **what to do now** — it produces a signal and stops; the engine decides whether that signal is work · why it is stuck (R3) · the system's own bookkeeping — it records what a *person* did |
 | **Documents have three states** | exists · cannot exist yet (**renders nothing**) · should exist by now (says "missing") |
 | **When empty** | a new order is almost entirely empty. **What is empty does not appear at all** |
+
+### Progress is a VIEW of R2, not a region
+
+**Ruled by Loo, 2026-07-28.** `docs/UI-KIT.md` §1.4 carries a **④ Progress** block — how far the
+order has got and what is next. It is **not a seventh business question and gets no region:**
+*"Progress is another view of Q2, not an independent responsibility."*
+
+**Two regions answering one question is the failure this rule prevents.** They would drift the
+first time either was edited, and then the page would say how far the order has got in two
+places with two different answers.
+
+Progress therefore renders R2's own material in a second form — the fixed business steps and
+their state — and inherits R2's refusals. §1.4 adds its own: **Progress never says who did
+something, when they did it, or what they wrote.** Those are R6's, and one word for two blocks
+is how a reader stops trusting either.
+
+**This is also what makes the calm order safe.** With R3 absent when nothing is wrong, the
+person interrupted by a phone call still gets all three facts they are asked for: **where the
+goods are** from the progress view, **the delivery day** from R2's own answer
+(*"delivering 27 Jul, 9–11 AM"*), and **the amount owed** from R1's persistent fact. Nothing was
+lost by dropping the calm explanation — only height spent saying nothing.
+
+### How this maps onto UI-KIT §1.4
+
+Presentation architecture and information architecture, side by side (Loo, 2026-07-28 — both
+documents are kept and each names the other).
+
+| UI-KIT §1.4 block | This file |
+|---|---|
+| ① Identity | **R1** |
+| ② Current Action | **R2** |
+| ③ Current Issues | **R3** — and §1.4 rule 2 governs when it draws |
+| ④ Progress | **a view of R2**, not a region |
+| ⑤⑥ Business Sections | **R4** (Items) · **R5** (Payment) · and the module sections beside them |
+| ⑦ Activity | **R6** |
+
+**Five of the seven map one to one, and the two files reached `goods · delivery · money`
+independently** — which is the strongest evidence available that both describe the same
+business. Where they touch, UI-KIT wins.
 
 ### Three things that are NOT regions
 
@@ -415,7 +463,7 @@ how big something should be is an argument about its depth.**
 |---|---|---|---|---|
 | **R1** Identification | customer · Ref · promised date · my role · **the outstanding figure** | a missing building type → handed to R2 | order number · source · created · salesperson | — |
 | **R2** Work | every open item: what · with whom · by when — **or** "nothing to do" | the door that closes it | how the due date was reached (working days, which holiday) | completed actions → R6 |
-| **R3** Explanation | three sentences: goods · delivery · money | the reason the stuck track is stuck | PO numbers · unit identifiers · how the supplier's date moved | the full goods / delivery / money record |
+| **R3** Explanation | one sentence per track **that has something wrong** — and nothing at all when none has | the reason the stuck track is stuck | PO numbers · unit identifiers · how the supplier's date moved | the full goods / delivery / money record |
 | **R4** Contents | what was bought · how many | — | full specs · SKU | discounts · promotions · where each unit sits |
 | **R5** Money | one sentence: settled / owed / held | what is holding it · the due date | how storage was calculated | every payment (**cannot be built today**) |
 | **R6** Record | one sentence: has anything happened | what happened recently · what is missing | who did it, and when | the full history · all documents · all cases |
@@ -483,7 +531,7 @@ back into the status word §1 forbids.
 | **R1** Identification | ← **identical in all four** → | | | |
 | **R4** Contents | ← **identical in all four** → | | | |
 | **R2** Work | every open item | the item, plus **what is holding it** and the door that lifts it | *"delivering 27 Jul, 9–11 AM — nothing to do"*, stated with certainty | "completed" |
-| **R3** Explanation | the stuck track gives its reason, the others one line each | the money track says it is holding the delivery | three calm lines | three finished lines — **money may still be owed** |
+| **R3** Explanation | the stuck track gives its reason; a track with nothing wrong says nothing | the money track says it is holding the delivery | **absent — nothing is wrong** | **absent**, unless money is still owed, in which case the order is Working |
 | **R5** Money | collected / owed | held, with the reason and the due date | usually settled (the booking gate demands it) | settled **or** owed |
 | **R6** Record | what has happened — a new order is empty, and **empty renders nothing** | the release request and the decision live here | present | fullest; **"what is missing" is most likely to fire here** (the photo) |
 

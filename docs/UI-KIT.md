@@ -349,6 +349,20 @@ A user learns the order once — *whose order · what to do · what is wrong · 
 far · the detail · the record* — and it is then true of Delivery, Payment,
 Purchasing, Receiving and Service Detail without learning any of them again.
 
+> **The boundary with the information model (Loo, 2026-07-28).** This section owns
+> **PRESENTATION architecture** — what meets the eye and in what order, shared by
+> every detail page. **[`ORDER-DETAIL-INFORMATION-MODEL.md`](ORDER-DETAIL-INFORMATION-MODEL.md)
+> owns INFORMATION architecture** — which business question each block answers, how
+> deep an answer goes (Answer · Context · Evidence · Detail) and what it says in each
+> state (Working · Blocked · Waiting · Completed). Neither repeats the other; that file
+> carries the block-by-block mapping, and **where the two touch, this file wins.**
+>
+> Two rulings made there that this section depends on: **④ Progress is another VIEW of
+> ② Current Action, never a second responsibility** — two blocks answering one question
+> drift the first time either is edited; and the frozen depth model is what lets rule 2
+> hide ③ safely, because the three facts a phone call asks for are answered by ④, by ②
+> and by ① even when ③ is absent.
+
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
 | Same categories on list and detail | **Type System** — both read `OrderActionTrack` | ✅ live for the three tracks | `packages/shared/src/order-actions.ts` |
