@@ -1,32 +1,58 @@
 /**
- * A SOURCE SCAN over `components/kit/**` (card D0.5a).
+ * A SOURCE SCAN over `components/kit/**` (D0.5a, extended by D0.5b).
  *
  * The lesson this line already paid for: *"a source scan beats a render test
  * for this file — a render test only sees the branches its fixture reaches."*
- * These four rules are true of the whole directory or they are not true at
- * all, so they are asserted against the text, not against a tree.
+ * These rules are true of the whole directory or they are not true at all, so
+ * they are asserted against the text, not against a tree.
  *
- * The most load-bearing one is SPACING. Q1 is PENDING, so every kit component
- * is built from the six steps present in BOTH candidates — 4 · 8 · 12 · 16 ·
- * 24 · 32. Whichever way Jess freezes Q1 on `/ui`, not one component changes.
- * This test is what keeps that true after the next person edits a padding.
+ * **What D0.5b changed here, and why it is not a loosening.** D0.5a's spacing
+ * rule was *"only the six steps present in BOTH Q1 candidates"* — a safety
+ * property that existed because Q1 was open. Q1 is frozen (Candidate A, Jess
+ * 2026-07-28), so the rule is now *"only the eight steps of the frozen scale"*,
+ * read from `SPACING_SCALE` in `tokens.ts` so the law's record and the scan
+ * cannot drift apart. Two of the eight (2 and 6) are new, and both were already
+ * legal under Candidate A.
+ *
+ * Three rules are new: no `font-bold` (Q3 deleted 700 into 600), the z-index
+ * ladder lives in exactly one file (§4.4), and there is exactly one calendar.
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { SPACING_SCALE } from "./tokens";
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 const FILES = readdirSync(DIR).filter((f) => /\.tsx?$/.test(f) && !f.includes(".test."));
-const read = (f: string) => readFileSync(join(DIR, f), "utf8");
 
-/** Tailwind's numeric scale → px, for the steps a kit file may use. */
-const SAFE_STEPS = new Set(["1", "2", "3", "4", "6", "8"]); // 4 · 8 · 12 · 16 · 24 · 32
+/**
+ * The scan is about CODE, so the comments come out first. Without this, a file
+ * that EXPLAINS a banned value — "`font-bold` is dead", "the old `#F5F1EA`" —
+ * fails the rule it is documenting, and the fix people reach for is to stop
+ * writing the explanation.
+ */
+const read = (f: string) =>
+  readFileSync(join(DIR, f), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+/**
+ * §4.1's frozen scale, as Tailwind numeric suffixes. Read from `tokens.ts`,
+ * never retyped, so the law's record and this scan cannot drift.
+ *
+ * `0` is added here and is not a step: it is the ABSENCE of spacing (`p-0` on a
+ * table cell), which no scale needs to name.
+ */
+const SAFE_STEPS = new Set(["0", ...SPACING_SCALE.map((s) => s.tailwind)]);
 const SPACING_RE = /\b(?:p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap|gap-x|gap-y|space-x|space-y)-(\[[^\]]+\]|[\d.]+)\b/g;
+
+/** §4.4 — the ONE file allowed to name a layer. */
+const Z_LADDER_FILE = "overlay-layer.ts";
 
 describe("components/kit source rules", () => {
   it("scans every kit file (a directory rename must not silently empty this suite)", () => {
-    expect(FILES.length).toBeGreaterThanOrEqual(12);
+    expect(FILES.length).toBeGreaterThanOrEqual(24);
   });
 
   it("contains no raw hex — colour comes from a token class, always (§3.4)", () => {
@@ -35,10 +61,13 @@ describe("components/kit source rules", () => {
     }
   });
 
-  it("sets no z-index — §4.4 gives the five layers to components that own them", () => {
+  it("names a z-index in ONE file, and that file declares the whole §4.4 ladder", () => {
     for (const f of FILES) {
+      if (f === Z_LADDER_FILE) continue;
       expect(read(f), f).not.toMatch(/\bz-(?:\[|\d|auto)/);
     }
+    const ladder = read(Z_LADDER_FILE);
+    for (const z of [10, 20, 30, 40, 50]) expect(ladder, `layer ${z}`).toContain(`z: ${z}`);
   });
 
   it("writes no arbitrary type or height — the token carries size, weight and line-height (§2.1)", () => {
@@ -49,7 +78,13 @@ describe("components/kit source rules", () => {
     }
   });
 
-  it("uses only the spacing steps present in BOTH Q1 candidates — so the pending answer cannot break a component", () => {
+  it("writes no font-bold — Q3 deleted 700 into 600 (§2.2, frozen 2026-07-28)", () => {
+    for (const f of FILES) {
+      expect(read(f), f).not.toMatch(/\bfont-(?:bold|extrabold|black)\b/);
+    }
+  });
+
+  it("uses only the eight steps of the frozen §4.1 scale", () => {
     const offenders: string[] = [];
     for (const f of FILES) {
       const src = read(f);
@@ -63,5 +98,21 @@ describe("components/kit source rules", () => {
   it("imports lucide-react in exactly ONE file — one meaning, one glyph (§5)", () => {
     const importers = FILES.filter((f) => read(f).includes('from "lucide-react"'));
     expect(importers).toEqual(["Icon.tsx"]);
+  });
+
+  it("has exactly ONE calendar — §11 pins it to react-day-picker", () => {
+    const importers = FILES.filter((f) => read(f).includes('from "react-day-picker"'));
+    expect(importers).toEqual(["DatePicker.tsx"]);
+  });
+
+  it("takes no className and no style anywhere in the kit (§6.0)", () => {
+    for (const f of FILES) {
+      // The components write their OWN className; what they may not do is
+      // accept one. Every public box spreads a props type, so the ban is
+      // checked at the type level in kit.test.tsx — here we only assert that
+      // no file re-opens the door by spreading a raw HTML attribute bag.
+      expect(read(f), f).not.toMatch(/className\?:\s*string/);
+      expect(read(f), f).not.toMatch(/style\?:\s*(?:React\.)?CSSProperties/);
+    }
   });
 });

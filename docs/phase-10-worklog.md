@@ -4130,3 +4130,165 @@ chat before R8 has merged."* Both survive and the queue now says so — the firs
 SEQUENCING (T3 is not in front of D0.5b), the second about TIMING (do not review a hierarchy while
 three chats are still changing the screens under it). Full suite re-run on the union tip: **16
 pre-existing failures, 2142 passed** — baseline held.
+
+---
+
+**2026-07-28 · ⑧ D0.5b — the Radix half, and the PENDING REGISTER empties**
+(branch `claude/carres-portal-d0-5b-7d848e`, **no migration**, **built and
+verified, NOT merged and NOT deployed** — the card is a build card and the
+merge/deploy is Loo's call)
+
+**Ten more Foundation Components** — `Modal` · `Drawer` · `Select` ·
+`DropdownMenu` · `Tooltip` · `Popover` · `Tabs` · `Checkbox` · `DatePicker` ·
+`Toast`. Eight Radix packages installed plus `react-day-picker`, because §11
+already ruled that **Radix has no calendar primitive** and `Input type="date"`
+opens the OS's own picker, which spells the date in the machine's locale — the
+one thing §2.4 forbids.
+
+**Three internal extractions, made BEFORE anything was used twice**, which is
+§6.6's own rule applied to its author: `DialogFrame` (a modal and a drawer are
+one object placed differently — backdrop, focus trap, escape, scroll lock,
+title, close, footer), `floating-surface.ts` (five primitives wanted the same
+white surface and the same row) and `overlay-layer.ts` (§4.4's five-layer
+ladder, so no component picks a number).
+
+**Zero existing pages touched.** Outside `components/kit/**` and `pages/dev/**`
+the diff is three additive `tailwind.config.ts` keys, the jsdom polyfills in
+`src/test/setup.ts`, the guard's file list and the docs.
+
+**None of it reaches the operator's bundle, and that was measured rather than
+assumed.** `/ui` is the only consumer and it is a lazy route, so the built main
+chunk greps **0** for `data-radix-popper-content-wrapper`, `DropdownMenuTrigger`
+and `rdp-`, while `UiShowcase-*.js` carries all three. The behaviour half of the
+kit costs an operator nothing until a page adopts it.
+
+## The freeze, and what each answer became
+
+Jess froze Q1 · Q3 · Q4 the morning this card ran. None of the three was written
+into the law as a sentence; each became a mechanism, which is the only thing
+this kit counts as finished:
+
+| | Answer | The mechanism |
+|---|---|---|
+| Q1 | 8 steps `2 4 6 8 12 16 24 32` | `kit-source.test.ts` stopped enforcing the two-candidate intersection and now enforces `SPACING_SCALE` from `tokens.ts` — the law's own record, READ, never retyped, so the scan and the law cannot drift |
+| Q3 | `font-bold` deleted into 600 | a kit file that writes `font-bold` fails that scan. **The 158 live page uses are D2's codemod and were deliberately not touched** — a card that changes the law does not also rewrite 225 pages, or nothing can be reviewed |
+| Q4 | Lucide's stroke, 2 | **`Icon` lost its `strokeWidth` prop.** D0.5a carried one *only* so `/ui` could draw both candidates; the moment the answer arrived that prop was the one way to draw a stroke the law does not have. Deleting it IS the enforcement |
+
+`/ui` stopped ASKING and started RECORDING — "Pending decisions" is now "Frozen
+decisions", carrying each answer with what it cost, and a test asserts the page
+no longer renders a candidate B or a 1.5 stroke. **A page still posing a settled
+question is how a settled question gets re-opened.**
+
+**The freeze cost ZERO component changes**, which is exactly the property D0.5a
+built for: ten components had already been written from the six steps common to
+both candidates, with no `font-bold` and Lucide's own stroke, held by a source
+scan rather than by anyone remembering. The whole application of the answer was
+one re-pointed test, one new scan rule and one deleted prop. A card that had
+WAITED for the answer would have shipped the same ten components a week later.
+
+## Eight new rules, each arriving with its mechanism
+
+A modal that is always CONTROLLED (no `defaultOpen`, no internal state — a
+surface that owns whether it is open is one a page cannot close after a save
+succeeded, which is how a form submits twice) · always TITLED (`title: string`
+required, and Radix makes it the accessible name) · **placement is a COMPONENT,
+never a prop** (a page choosing placement from a prop can put a record in the
+middle of the screen, and §8.2's list law depends on the difference) · menu and
+listbox rows are DATA and not children (a children API lets a page put a pill or
+a second line in a row, and the appearance stops being the kit's within a week)
+· no red menu item (§3.3 gives red one job, and a command is not a state — the
+same ruling `Button` makes about having no `danger` variant) · a tab bar is
+§8.2's STAGE picker by construction (Radix fires `onValueChange` only on a real
+change, so re-clicking the active tab is a no-op without any page remembering
+it) · a tooltip holds one line of text (`content: string`, so JSX cannot be put
+where a keyboard cannot reach it) · a toast has three kinds and no fourth
+(**there is deliberately no `info`** — a message with no consequence has not
+earned an interruption).
+
+Plus **two rules that already existed as words and became structure**: the icon
+stroke (above) and §4.4's ladder — `overlay-layer.ts` is the only kit file
+allowed to write a `z-` class, asserted by the source scan, and it declares all
+five layers.
+
+**§16: 31.58% → 47.83%**, Human Review debt unchanged at 4, blocked-on-a-decision
+**3 → 0**, arithmetic printed in the file. **Two rules deliberately did NOT move
+to ✅** even though D0.5b built half of each — *"no hand-rolled modal/drawer"*
+and the spacing/weight Build Guards are live over `components/kit/**` and not
+over the 225 pages, which is D1's job. Counting a half-built mechanism is how a
+coverage number stops meaning anything.
+
+## Three law conflicts, reported and not settled in code
+
+1. **§4.3 forbids what §3.5 assumes.** §3.5 says *"underline tab hover — darken
+   the text"*; §4.3 says borders are *"1px only… no coloured borders"*. The
+   usual `border-b-2 border-blue-9` breaks the law twice over. The tab indicator
+   is a background bar instead, which breaks neither — but the two sentences
+   disagree and the kit should settle it.
+2. **§4.2 names its four radii by USE, and neither a popover nor a tooltip is in
+   any of the four lists.** Both take the dropdown's 6 because that is what they
+   are; the law does not say so.
+3. **§3 has no scrim.** A modal backdrop is not in the colour chapter at all, so
+   it is `slate-12` at 40% — the nearest thing the law does name.
+
+Two more, reported as facts rather than conflicts: **modal and drawer widths
+have no home** — §8 writes the portal's width table at D0.5c, so they are named
+`tailwind.config.ts` keys (`max-w-modal` 512, `max-w-drawer` 560,
+`max-h-dialog` 85vh) rather than numbers typed into a component, and D0.5c takes
+them over; and **`Button` had to start forwarding its ref**, which is
+load-bearing rather than tidiness — `Modal`, `DropdownMenu`, `Popover` and
+`Tooltip` all take a Button as their trigger and hand it Radix's behaviour
+through `asChild`, which anchors the overlay on the trigger's own DOM node. A
+Button that eats the ref makes all four open in the wrong place, silently,
+because React only warns.
+
+## What the test environment taught
+
+**`jsdom@25` has no `PointerEvent`** — measured, not guessed
+(`typeof PointerEvent === "undefined"`). `fireEvent.pointerDown` therefore
+dispatches a plain `Event` that React's pointer plugin ignores, so a Radix
+**menu**, which opens on pointerdown, silently never opens and reads as a broken
+component; a Radix **popover** opens on click and is fine. The menus are opened
+with the KEYBOARD in the tests, which is the better assertion anyway — keyboard
+access is one of the four things §11 says Radix is here to supply.
+
+**A source scan must strip comments first.** The new `font-bold` rule failed on
+`tokens.ts` — the file whose comment EXPLAINS that 700 is dead. A scan that
+punishes the explanation teaches people to delete the explanation, so `read()`
+now strips block and line comments before every rule runs.
+
+**Two of my own assumptions were wrong and Radix was right**, both corrected in
+the tests rather than worked around: a Radix popover's content DOES carry
+`role="dialog"` (it is a labelled surface — the thing that distinguishes it from
+a modal is the scrim and the focus trap, so that is what the test asserts now),
+and a date field's accessible NAME is its `<label for>` rather than the date
+printed inside it, because a `<button>` is a labelable element. The second one
+is the right answer for a screen reader and worth knowing before D0.5c writes
+form layout.
+
+## Verification
+
+`tsc -p tsconfig.app.json` clean · `pnpm --filter @carres/web lint` clean ·
+`pnpm build` clean · web suite **at baseline: 2182 passed, 16 pre-existing
+failures** in the four documented files (`OperationOrders` ×7 ·
+`OrderCustomerCard` ×4 · `OhanaSofaTab` ×4 · `NiceFutureMattressTab` ×1), **zero
+new**. 61 kit tests plus the showcase suite are new or extended.
+
+**Measured in a real browser on the BUILT bundle** (`vite preview`, computed
+styles): canvas `rgb(240,240,243)` = slate-3 · Select 32 high, radius 6,
+hairline `rgb(224,225,230)` = slate-5, type 13px · Checkbox 16 square at radius
+4 · tab indicator `rgb(0,144,255)` = blue-9, 2px tall · DatePicker 32 high
+printing `19 Jul 26, Sun` · Toast white at radius 10 · Modal max-width 512,
+radius 10, z-index 40, scrim `rgba(28,32,36,0.4)` = slate-12 at 40% · **69
+icons, and `stroke-width` takes exactly ONE value: 2** · **font-weight takes
+exactly three: 400 (×178) · 500 (×104) · 600 (×39) — no 700 anywhere on the
+page.**
+
+**No screenshot** — the harness reports the Browser pane not displayed, and the
+viewport reads 0×0. That is also why the modal's measured WIDTH is 2px against a
+correctly resolved 512px max-width: `w-full` and `85vh` are both zero in a
+zero-sized viewport. For tokens the computed-style read is the stronger evidence
+anyway, and the artefact is recorded rather than reported as a pass.
+
+**Not done, on purpose:** no page migrated (D2–D7), no `PageShell` /
+`DataTable` / `DetailShell` (D0.5c — a P-chat that starts building them has
+taken another card), no codemod of the 158 `font-bold` uses (D2), and no deploy.

@@ -167,6 +167,19 @@ export default {
         // font-stretch in CSS. Falls back to Inter / system-ui.
         price: ["Archivo", "Inter", "system-ui", "sans-serif"],
       },
+      /* ⭐ THE OVERLAY SIZES (card D0.5b) — ONE modal width, ONE drawer width,
+       * ONE dialog height cap. They are named config keys rather than
+       * `max-w-lg` / `max-h-[85vh]` in a component for the same reason the type
+       * scale is: a number typed into a component is a number the next
+       * component types differently. §8 has not written the portal's width
+       * table yet — `PageShell` (D0.5c) does, and takes these over. */
+      maxWidth: {
+        modal: "512px", // a question, an answer, and two buttons
+        drawer: "560px", // a record read beside the list it came from
+      },
+      maxHeight: {
+        dialog: "85vh", // the surface never outgrows the screen; the body scrolls
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

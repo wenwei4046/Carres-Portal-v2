@@ -21,7 +21,7 @@
  * darkens (`brightness-95`); an uncoloured one takes the single faint blue tint
  * — never grey, which is the RULE I ratchet in `check-design-standard.mjs`.
  */
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import Icon, { type IconName } from "./Icon";
 import Loading from "./Loading";
 
@@ -43,16 +43,7 @@ const SIZE: Record<Size, string> = {
 
 const ICON_SIZE: Record<Size, 14 | 16> = { md: 16, sm: 14 };
 
-export default function Button({
-  variant = "neutral",
-  size = "md",
-  icon,
-  loading = false,
-  disabled = false,
-  type = "button",
-  children,
-  ...rest
-}: {
+export type ButtonProps = {
   variant?: Variant;
   size?: Size;
   /** A §5.3 meaning, never a Lucide import — one meaning, one glyph. */
@@ -60,9 +51,32 @@ export default function Button({
   /** Busy: the spinner replaces the icon and the button stops accepting input. */
   loading?: boolean;
   children?: ReactNode;
-} & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className" | "style">) {
+} & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className" | "style">;
+
+/**
+ * **It forwards its ref, and that is load-bearing rather than tidiness**
+ * (added by D0.5b). `Modal`, `DropdownMenu`, `Popover` and `Tooltip` take a
+ * Button as their trigger and hand it Radix's behaviour through `asChild`,
+ * which anchors the overlay on the trigger's own DOM node. A Button that eats
+ * the ref makes every one of those open in the wrong place — silently, because
+ * React only warns.
+ */
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  {
+    variant = "neutral",
+    size = "md",
+    icon,
+    loading = false,
+    disabled = false,
+    type = "button",
+    children,
+    ...rest
+  },
+  ref,
+) {
   return (
     <button
+      ref={ref}
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
@@ -84,4 +98,6 @@ export default function Button({
       {children}
     </button>
   );
-}
+});
+
+export default Button;
