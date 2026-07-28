@@ -388,6 +388,19 @@ rather than "fixing" the count to look clean.
 receiving, warehouse and claim screens, the two panels on the Receiving station say the same
 word for the same act, and the Claims queue tile has a name that is in the dictionary.
 
+**④ `STATUS-STANDARD.md` §3 is called "the chase pair"** and describes a button labelled
+`Chase` — found by D0.4 2026-07-28. `Chase` is banned outright. It is a LAW file, so a BUILD
+chat may not rewrite it: **report it and let the PLAN chat retitle §3 in the same week**, then
+sweep whatever the code still spells. Do not rename the section yourself.
+
+**NOT in this card: `GRN`.** It is live in four places on the order drawer (column header, the
+`GRN — goods arrived` modal, `Save GRN`, the toast) and COPY-STANDARD bans it — **but the ban
+is under review**, because the law's own exemption clause ("`DO` and `PO` survive because the
+team already speaks them daily") is the same argument for `GRN`, which is what the team's
+AutoCount calls the document. **Until Jess rules, R8 leaves every `GRN` alone.** Sweeping it
+on the strength of the ban alone would rename a word the warehouse says out loud, and
+un-renaming is twice the work.
+
 **LANE:** R8 now touches the Purchasing module's own pages as well as ④ R's
 (`OperationPurchase.tsx` from ⓪, `OperationSupplierClaims.tsx` from ③), so **no P-chat and no
 C4 chat may run beside it** — the whole Purchasing lane is R8's for one PR. That is the price

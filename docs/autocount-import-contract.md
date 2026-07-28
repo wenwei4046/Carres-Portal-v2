@@ -8,7 +8,12 @@
 > **Owner of this door:** wenwei (this repo). The import endpoint lives in
 > `apps/api`. Jess does NOT build a parallel importer.
 >
-> **⚠️ One open DECISION blocks the build — see §1.5. Everything else is locked.**
+> **Nothing here blocks a build** (corrected 2026-07-28, found by D0.4). This line used to
+> say *"one open DECISION blocks the build — see §1.5"*; that decision was taken and its
+> columns have been live for months, so the banner was stopping chats on a question already
+> answered. §1.5 and §9 still describe the door as it was written in May and have not been
+> re-read against the live code — treat them as history until somebody does; **§7 is current**
+> (rewritten by D0.4 to match 0214's create-only rule and the 0237 append door).
 
 ---
 

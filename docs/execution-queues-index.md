@@ -251,6 +251,16 @@ to be remembered.
 
 - **Driver · vehicle · condominium registration: OUT OF SCOPE this phase.** Logistics owns
   the driver today, not Carres. Revisit only if Carres runs its own fleet.
+- **The transfer-route master data went with the old master spec (D0.4, 2026-07-28) and is
+  NOT lost by accident.** The deleted §12 held a rule set nobody had built: per-supplier
+  inbound rules + per-carrier outbound rules, combined into an automatic route ("AL will not
+  collect in Klang", so a Klang-bound AL order needs a leg). It was marked "its own chat" in
+  that file, zero lines of code exist, and D0.4's job was to delete the file — so nothing
+  regressed. **What IS true is that the rules now live nowhere in the repo.** If the AL
+  transfer engine is ever built, its card starts by stating them again from Jess, not by
+  digging them out of git history — a rule recovered from a deleted file is a rule nobody
+  re-confirmed. Related and already ruled: moving goods we own between locations is a **stock
+  transfer, not purchasing** (`PURCHASING-WORKING-FLOW.md` §8), so the card belongs to Stock.
 - **THREE calendars (Loo 2026-07-28) — ruled, NOT built.** Office Mon–Fri · Warehouse Mon–Sat
   · Delivery Mon–Fri with a reduced Saturday. Full text: `docs/ACTION-FLOW-STANDARD.md`
   Law 2A. **The code still has one week.** `packages/shared/working-days.ts` is the single

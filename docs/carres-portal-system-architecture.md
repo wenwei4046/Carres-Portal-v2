@@ -187,7 +187,16 @@ Same 4 widgets · content adapts to LEFT context.
 - **Samantha** — RESIGNED (remove from all UI).
 - ~~Li Ching · Joy · Manly (曼丽)~~ — **DO NOT EXIST · never did.** Delete any references in seed data, migrations, dropdowns, docs. (Manly was my mishearing 2026-07-24 morning — Jess corrected: Shasha = July PO duty per yesterday's checkpoint.)
 
-Use these actual names in test data. Do NOT invent staff. **Whole operation team shares ONE login: `operation@carresofficial.com`** — no per-user auth; PIC identity is a soft in-app tag on `orders.pic`, not tied to `auth.users`.
+Use these actual names in test data. Do NOT invent staff.
+
+**The shared-login era is OVER** (corrected 2026-07-28, found by D0.4). This paragraph used to
+read *"the whole operation team shares ONE login `operation@carresofficial.com`; PIC is a soft
+in-app tag on `orders.pic`, not tied to `auth.users`"* — every clause of that is now false.
+**0232 gave each person a real account and 0254 gave them a CRnnn staff code**, the PIC is
+`ops_order_control.assigned_staff` and it IS tied to a real user, and 0235 added per-person
+presence (a heartbeat decides who is available to be assigned). A chat reading the old
+sentence would have built an auditless soft tag on a column the assignment engine does not
+read. The one true half is kept above: **do not invent staff.**
 
 ### 3.16 · PO / GRN duty concept (LOCKED · Jess 2026-07-24)
 
