@@ -35,9 +35,20 @@ not a licence.
 | **R2** | **Linear** | Operator workflow | ✅ **frozen 2026-07-28** — adopt with modification; one observation (opinionated, not configurable) |
 | **R3** | **Stripe Dashboard** | Detail page | ✅ **frozen 2026-07-28** — adopt with modification; one observation (a visible word is a contract with a stable id behind it) |
 | **R4** | **Vercel (Geist)** | Design system | ✅ **frozen 2026-07-28** — adopt with modification; one observation (the kit is a dependency, not a document) |
-| R5 | GOV.UK · NN/g · Shopify Polaris · SAP Content | Microcopy | ⏳ |
+| **R5** | **GOV.UK · NN/g · Shopify Polaris** *(SAP Content not covered — PM named three)* | Operational microcopy · language governance | ✅ **frozen 2026-07-28** — adopt with modification; one observation (words are delivered, not remembered) |
 
 **Then, and only then:** one card that updates `docs/UI-KIT.md` from the frozen set.
+
+## This line never freezes an enforcement mechanism (PM, 2026-07-28)
+
+**Ruled on R4 and applied to the whole line.** A frozen observation states the *principle*. Whether
+it is implemented through a Build Guard, CI, a script or any other tooling **belongs to
+implementation** and is decided at KIT-CONSOLIDATION.
+
+*Recorded by this chat as line-wide rather than R4-only, because R2's and R3's entries had each
+proposed an "enforcement candidate" and leaving those standing would make two entries binding on
+implementation while a third is not. **Those candidates are hereby non-binding notes.** If the PM
+meant the ruling to apply to R4 alone, this paragraph is the thing to correct.*
 
 ## How later entries handle a repeat (PM, 2026-07-28)
 
@@ -625,16 +636,16 @@ declares itself the winner. The kit's rule is that the three bodies change in th
 
 **Carried to the final consolidation. Not a rule, not scheduled, `docs/UI-KIT.md` untouched.**
 
-> **The kit is a dependency, not a document. It is consumed, versioned, and migrated.**
-> Every body of the kit states the version it is on, and any code or comment that cites a kit rule
-> cites the version it was written against. A citation without a version cannot be wrong on its
-> face, which is exactly how it survives.
->
-> *Enforcement candidate for consolidation to weigh (§16 requires one):* a version constant in the
-> machine mirror that the Build Guard compares against the law's own version, failing when they
-> diverge — the same shape as the existing three-bodies rule, but measurable. That would also
-> catch, mechanically, every one of the five stale citations listed above. Build-Guard shaped,
-> not Human-Review shaped.
+**Frozen by the PM, 2026-07-28, in these words:**
+
+> **Every kit artifact must declare the kit version it follows.**
+
+The reasoning, kept because the sentence alone does not carry it: **a citation without a version
+cannot be wrong on its face, which is exactly how it survives.** All five stale citations above are
+correct-looking references to a dead edition.
+
+**No enforcement mechanism is frozen** (PM, 2026-07-28 — Build Guard, CI, scripts or other tooling
+is an implementation choice). **All version inconsistencies remain under KIT-CONSOLIDATION.**
 
 ## The limits of this reading
 
@@ -647,3 +658,145 @@ declares itself the winner. The kit's rule is that the three bodies change in th
   is quoted from a file read this session — **none of it is recalled.**
 - **Not verified:** how many of the 225 in-scope pages actually import from the stale mirror. That
   is a code question and belongs to KIT-CONSOLIDATION, not to a reference review.
+
+---
+
+# R5 · GOV.UK · NN/g · Shopify Polaris — operational microcopy and language governance
+
+**Reviewed 2026-07-28. Recommendation: ADOPT WITH MODIFICATION — one governance observation:
+the words are DELIVERED by the system, not remembered from a document.**
+
+**Scope, as instructed by the PM:** operational microcopy and **language governance** only.
+**Branding, tone of voice and marketing are excluded** — which removes a large part of what all
+three publish, and all of what makes them famous outside operations.
+
+**Read as ONE reference on one subject, not compared against each other** (rule 1 of this line).
+They are grouped because each holds a different third of the same question: GOV.UK owns *how a
+word is decided*, NN/g owns *why one word per concept is not taste*, Polaris owns *where the word
+lives*.
+
+**One thing flagged, not silently dropped:** the order table in this file grouped R5 as
+*GOV.UK · NN/g · Shopify Polaris · **SAP Content***. The PM's instruction names three. **SAP's
+content guidance is therefore not covered by this entry.** If it is wanted it is a line item, not
+an omission to be quietly filled in later.
+
+## Why these are respected
+
+**GOV.UK** writes for people who have no choice, often under stress, often with low literacy, and
+who cannot go elsewhere if the words fail them. That is the closest published match to a Carres
+operator that exists. Its content design manual is enforced across every department: plain English,
+short sentences, active voice, one thing per page, a published **words-to-avoid list**, and —
+the part that matters most here — **words are decided by testing what real users say, not by what
+is technically correct.**
+
+**NN/g** is the evidence base. Thirty years of usability research supplying the *reasons*: users
+scan rather than read, so meaning goes at the front of a label; an error must say what happened,
+why, and what to do, without blame; a button names the **outcome**, not the mechanism; and
+**synonyms measurably increase error rates** — one concept, two words, and people hesitate.
+
+**Polaris** is the only one of the three that solved *delivery*. Its content rules do not live in a
+style guide beside the design system — **they live inside each component's own documentation**, so
+you cannot pick up the component and miss its words. Content is treated as a design material, not
+as a layer applied afterwards.
+
+## ① What do we learn?
+
+**Words are DELIVERED by the system, not remembered from a document.**
+
+This is the one third Carres does not already have — and the measurement that shows it also shows
+how much of the rest is already in place.
+
+**What COPY-STANDARD already is, read live this session:** GOV.UK's model, independently. It has a
+central dictionary and states there is **no second list** — *"Every label lives in ONE place — the
+audit table below. There is no second list of approved labels anywhere."* It has a banned list with
+reasons (`Chase` names a mood not an outcome; `POD` → delivery photo). It has NN/g's label doctrine
+— *"the label names the business outcome"*, and a tooltip that answers **why** rather than
+repeating the button.
+
+**And it independently reached GOV.UK's most-quoted rule, with GOV.UK's own justification.** This
+entry set out to report a law-vs-law contradiction — *"no abbreviations, ever"* against
+`ACTION-FLOW-STANDARD` Law 4's own `Send PO to {supplier}`. **The evidence refuted it before it
+shipped:** COPY-STANDARD line 177 reads
+
+> **"DO" and "PO" survive because the team already speaks them daily.**
+
+That is *use the words your users actually use*, not the ones that are technically correct —
+reached from Malaysian showroom floor practice rather than from a research programme, and the
+exception is stated with its reason rather than left as an inconsistency.
+
+**So GOV.UK and NN/g are corroboration. Polaris is the gap.** Today the words live in a 699-line
+document that a chat must remember to open. The one place they are delivered is actions:
+`packages/shared/src/order-action-words.ts` holds them per action, keyed by `OrderActionKey`, and
+its own comment names the limit — *"string 3 of the five COPY-STANDARD locks per action"*. **Three
+of five, for one module.** Every other module's words, and the other two strings, are recall.
+
+**Why this is governance and not tidiness:** a rule that must be remembered is enforced by whoever
+happens to be reading. The evidence that this is the failing mechanism and not a hypothetical is in
+this project's own history — `Chase` survived a week in the drawer after being banned, and it was
+caught by a source scan, not by anybody remembering. **A word that ships with the thing that
+renders it cannot be forgotten by a chat that never read the document.**
+
+## ② What do we NOT learn?
+
+| # | Pattern | Why Carres refuses it |
+|---|---|---|
+| 1 | **GOV.UK's words-to-avoid list itself** | Adopt the *mechanism* — a banned list with a reason per word — never the *contents*. Theirs is written for citizens meeting government once; ours is an operational vocabulary for people who use it hourly, and it correctly keeps trade words its own users speak. COPY-STANDARD's `PO` exception would fail GOV.UK's list and is right. |
+| 2 | **GOV.UK's reading-age target and general-public framing** | Ours is a trained reader in a known domain, not a stranger. Simplifying to a general-public reading age would strip precision the job needs. |
+| 3 | **NN/g's reduce-friction guidance applied to gates** | Already settled — see **R2 ②#4**. Not re-argued. |
+| 4 | **Polaris's merchant vocabulary** (`fulfillment` and the rest) | Shopify's business, not ours. `COPY-STANDARD` owns our words and there is no second list. |
+| 5 | **Tone of voice, brand voice, personality guidelines** | **Excluded by the PM's instruction**, and most of what the three publish under "content" is exactly this. |
+| 6 | **Localisation and multi-language content models** | The portal UI is English-only by a shipped ruling (PR #209). Not in scope, and not this line's to reopen. |
+
+## ③ Why does it fit Carres — and where it does not
+
+**It fits** because Carres's reader is GOV.UK's reader wearing a warehouse uniform: someone who did
+not choose the words, cannot look them up, and pays immediately when they are wrong. Jess's own
+ruling on `logistic` vs `logistics` — recorded in COPY-STANDARD with her reason, *"our english
+bad"* — is a content-design decision made on exactly GOV.UK's grounds.
+
+**It does not fit** where GOV.UK's reader meets the service once and ours meets it four hundred
+times a month. GOV.UK optimises for a stranger's first read; we can and must optimise for a
+regular's hundredth — which is why our vocabulary keeps `PO` and theirs would not, and why
+precision beats simplification whenever the two disagree.
+
+**No already-rejected concept recurred**, other than #3 above, which is cited rather than
+re-argued per the PM's instruction.
+
+## Conflicts found
+
+**None.** This is the first entry in the line to find no conflict with a Carres law, and the
+reason is worth recording: **`COPY-STANDARD` was written to the same doctrine these three publish,
+so there was nothing to disagree with.** The gap it has is a delivery gap, not a doctrinal one.
+
+**One hypothesis raised and refuted by evidence, recorded because a later chat will raise it
+again:** *"no abbreviations, ever"* looks like it contradicts `Send PO to {supplier}`. It does not
+— the rule carries its own stated exception (line 177), and the exception is grounded in what the
+team says daily. **A chat that greps only the rule and not the paragraph under it will file this as
+a contradiction.** It is not one.
+
+## The observation this reference contributes
+
+**Carried to the final consolidation. Not a rule, not scheduled, `docs/UI-KIT.md` untouched. No
+enforcement mechanism is frozen** (PM, 2026-07-28).
+
+> **Words are delivered by the system, not remembered from a document.**
+> One dictionary with one word per concept and a reason for every banned word — which
+> `COPY-STANDARD` already is — **plus the words travelling with the thing that renders them**, so a
+> surface cannot be built without them. A rule that must be remembered is enforced by whoever
+> happens to be reading.
+
+## The limits of this reading
+
+- **Read from knowledge of the GOV.UK content design manual and style guide, NN/g's published
+  usability research, and Shopify Polaris's content guidelines, held in memory.** **None of the
+  three sites was opened this session**, and nothing was added to `docs/ui-reference/`
+  (documentation debt, parked).
+- **Carres side read live this session, not from memory:** `docs/COPY-STANDARD.md` lines 38, 65–66,
+  136, 150, 169–180 and 640–642 (the abbreviation rule and its `PO` exception, the one-place rule,
+  the tooltip rule, the Logistics ruling), and `packages/shared/src/order-action-words.ts` (the
+  `OrderActionWord` shape and its "three of five" comment). **The refuted contradiction above was
+  refuted by reading the file, not by reasoning about it.**
+- **Not covered:** SAP's content guidance, per the PM's naming — flagged above rather than dropped.
+- **Not counted:** how many of COPY-STANDARD's locked strings across all modules are delivered in
+  code versus held only in the document. Three-of-five is measured for actions only; the
+  portfolio-wide count is a code question and belongs to KIT-CONSOLIDATION.
