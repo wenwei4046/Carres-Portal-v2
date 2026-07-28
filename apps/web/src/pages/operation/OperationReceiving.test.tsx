@@ -2,12 +2,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { poReceivingProgress } from "@carres/shared";
 import OperationReceiving from "./OperationReceiving";
 
 /**
- * OperationReceiving — the GRN 待收 queue (P3). Mocks apiFetch so the three
+ * OperationReceiving — the check-in station. Mocks apiFetch so the three
  * underlying hooks (pos / suppliers / warehouse) return fixtures; asserts the
- * status tabs, counts, and per-row Receive affordance.
+ * facet rail, the counts, R1's progress words and — new with ⑦ P2 — the UI-KIT
+ * §8.2 interaction law on this tab: a pick filters, the same pick again clears,
+ * two picks are two ✕-able chips, a ROW opens the drawer, and closing the
+ * drawer gives the list back.
  */
 
 const apiFetchMock = vi.fn();
@@ -63,8 +67,8 @@ const POS = [
 
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  // The page now renders the shared PurchasingTabs bar (uses router hooks), so
-  // it must mount inside a Router.
+  // The page renders the shared PurchasingTabs bar (uses router hooks), so it
+  // must mount inside a Router.
   return render(
     <MemoryRouter initialEntries={["/operation?tab=receiving"]}>
       <QueryClientProvider client={qc}>{node}</QueryClientProvider>
@@ -72,11 +76,13 @@ function wrap(node: React.ReactNode) {
   );
 }
 
-/** The page's own status tabs (To receive / Received / All) — scoped away from
- *  the module-level PurchasingTabs bar, which is also a tablist. */
-async function statusTabs() {
-  const list = await screen.findByRole("tablist", { name: "Receiving status" });
-  return within(list).getAllByRole("tab");
+/** The rail's three queue rows, in the order they render. */
+const CHECK_IN = "facet-queue-check-in";
+const ISSUE = "facet-queue-receiving-issue";
+const FULLY = "facet-queue-fully-received";
+
+function chips() {
+  return screen.queryByTestId("listshell-active-chips");
 }
 
 beforeEach(() => {
@@ -93,39 +99,139 @@ beforeEach(() => {
 });
 
 describe("OperationReceiving", () => {
-  it("renders 3 status tabs with counts (cancelled excluded)", async () => {
+  it("renders the three queue rows with counts (cancelled excluded)", async () => {
     wrap(<OperationReceiving />);
-    const tabs = await statusTabs();
-    expect(tabs).toHaveLength(3);
-    // To receive = 2 open, Received = 1, All = 3 (cancelled PO-2004 excluded).
-    await waitFor(() => {
-      expect(within(tabs[0]).getByText("2")).toBeInTheDocument();
-    });
-    expect(within(tabs[1]).getByText("1")).toBeInTheDocument();
-    expect(within(tabs[2]).getByText("3")).toBeInTheDocument();
+    // Check in = 2 not-fully-received · Receiving issue = 0 · Fully received =
+    // 1. The cancelled PO-2004 is in none of them.
+    await waitFor(() =>
+      expect(screen.getByTestId(CHECK_IN)).toHaveTextContent("2"),
+    );
+    expect(screen.getByTestId(ISSUE)).toHaveTextContent("0");
+    expect(screen.getByTestId(FULLY)).toHaveTextContent("1");
   });
 
-  it("defaults to 'To receive' and shows a Receive button per open PO", async () => {
+  it("a zero queue keeps its row — a named 0 says watched and fine", async () => {
     wrap(<OperationReceiving />);
-    await waitFor(() => {
-      expect(screen.getByText("PO-2001")).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByTestId(ISSUE)).toBeInTheDocument());
+  });
+
+  it("the two state rows are spelt by the shared module, never retyped", async () => {
+    wrap(<OperationReceiving />);
+    const issueLabel = poReceivingProgress([
+      { qty: 1, received_qty: 0, damaged_qty: 1 },
+    ]).label;
+    const fullyLabel = poReceivingProgress([{ qty: 1, received_qty: 1 }]).label;
+    await waitFor(() =>
+      expect(screen.getByTestId(ISSUE)).toHaveTextContent(issueLabel),
+    );
+    expect(screen.getByTestId(FULLY)).toHaveTextContent(fullyLabel);
+    // And the row's own Progress column reads the same words.
+    expect(screen.getByTestId(CHECK_IN)).toHaveTextContent("Check in");
+  });
+
+  it("opens on Check in — the received PO is out, and the chip says why", async () => {
+    wrap(<OperationReceiving />);
+    await waitFor(() => expect(screen.getByText("PO-2001")).toBeInTheDocument());
     expect(screen.getByText("PO-2002")).toBeInTheDocument();
-    expect(screen.getByTestId("receive-PO-2001")).toBeInTheDocument();
-    // received + cancelled POs are not in the default queue
     expect(screen.queryByText("PO-2003")).not.toBeInTheDocument();
     expect(screen.queryByText("PO-2004")).not.toBeInTheDocument();
+    expect(within(chips()!).getByText("Check in")).toBeInTheDocument();
   });
 
-  it("'Received' tab shows received POs as Done (no Receive button)", async () => {
+  it("§8.2 — clicking the picked queue again clears it and every row comes back", async () => {
     wrap(<OperationReceiving />);
-    const tabs = await statusTabs();
-    fireEvent.click(tabs[1]); // Received
-    await waitFor(() => {
-      expect(screen.getByText("PO-2003")).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByText("PO-2001")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId(CHECK_IN));
+    await waitFor(() => expect(screen.getByText("PO-2003")).toBeInTheDocument());
+    expect(screen.getByText("PO-2001")).toBeInTheDocument();
+    // Cleared means "everything live", never "everything ever": a cancelled PO
+    // is still not part of a receive queue.
+    expect(screen.queryByText("PO-2004")).not.toBeInTheDocument();
+    expect(chips()).not.toBeInTheDocument();
+  });
+
+  it("§8.2 — two picks are two chips, and each ✕ clears only its own", async () => {
+    wrap(<OperationReceiving />);
+    await waitFor(() => expect(screen.getByText("PO-2002")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("facet-supplier-sup-oh"));
+    await waitFor(() =>
+      expect(screen.queryByText("PO-2001")).not.toBeInTheDocument(),
+    );
+    const row = chips()!;
+    expect(within(row).getByText("Check in")).toBeInTheDocument();
+    expect(within(row).getByText("Supplier: Ohana")).toBeInTheDocument();
+    // ✕ the supplier chip — the queue pick survives.
+    fireEvent.click(within(row).getByText("Supplier: Ohana"));
+    await waitFor(() => expect(screen.getByText("PO-2001")).toBeInTheDocument());
+    expect(within(chips()!).getByText("Check in")).toBeInTheDocument();
+    expect(screen.queryByText("PO-2003")).not.toBeInTheDocument();
+  });
+
+  it("§8.2 — clicking the same supplier again clears the supplier filter", async () => {
+    wrap(<OperationReceiving />);
+    await waitFor(() => expect(screen.getByText("PO-2002")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("facet-supplier-sup-oh"));
+    await waitFor(() =>
+      expect(screen.queryByText("PO-2001")).not.toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId("facet-supplier-sup-oh"));
+    await waitFor(() => expect(screen.getByText("PO-2001")).toBeInTheDocument());
+  });
+
+  it("the Fully received row shows the settled PO with no Receive affordance", async () => {
+    wrap(<OperationReceiving />);
+    await waitFor(() => expect(screen.getByTestId(FULLY)).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId(CHECK_IN)); // clear the default pick
+    fireEvent.click(screen.getByTestId(FULLY));
+    await waitFor(() => expect(screen.getByText("PO-2003")).toBeInTheDocument());
     expect(screen.queryByTestId("receive-PO-2003")).not.toBeInTheDocument();
     expect(screen.queryByText("PO-2001")).not.toBeInTheDocument();
+  });
+
+  it("§8.2 — clicking the ROW opens the drawer, not only the button", async () => {
+    wrap(<OperationReceiving />);
+    await waitFor(() => expect(screen.getByText("PO-2001")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("PO-2001"));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveAttribute(
+      "aria-label",
+      expect.stringContaining("PO-2001"),
+    );
+  });
+
+  it("§8.2 — closing the drawer gives the filters and the search back", async () => {
+    wrap(<OperationReceiving />);
+    await waitFor(() => expect(screen.getByText("PO-2002")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("facet-supplier-sup-oh"));
+    fireEvent.change(screen.getByPlaceholderText("PO number or supplier…"), {
+      target: { value: "2002" },
+    });
+    await waitFor(() =>
+      expect(screen.queryByText("PO-2001")).not.toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId("receive-PO-2002"));
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByLabelText("Close modal"));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    // The list is exactly as it was left: same two chips, same search text,
+    // same one visible row.
+    const row = chips()!;
+    expect(within(row).getByText("Check in")).toBeInTheDocument();
+    expect(within(row).getByText("Supplier: Ohana")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("PO number or supplier…")).toHaveValue(
+      "2002",
+    );
+    expect(screen.getByText("PO-2002")).toBeInTheDocument();
+    expect(screen.queryByText("PO-2001")).not.toBeInTheDocument();
+  });
+
+  it("§8.3 — a module-tab page renders no page title of its own", async () => {
+    wrap(<OperationReceiving />);
+    await waitFor(() => expect(screen.getByText("PO-2001")).toBeInTheDocument());
+    expect(screen.queryByRole("heading", { name: "Receiving" })).toBeNull();
+    expect(screen.queryByText("HQ · Operations")).toBeNull();
   });
 
   it("search filters by PO id", async () => {
@@ -145,7 +251,7 @@ describe("OperationReceiving", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Nice Future").length).toBeGreaterThan(0);
     });
-    expect(screen.getByText("Ohana")).toBeInTheDocument();
+    expect(screen.getAllByText("Ohana").length).toBeGreaterThan(0);
   });
 
   it("P4 — excludes POs bound for an LP-owned warehouse once one exists (GRN = own WH only)", async () => {
@@ -232,10 +338,21 @@ describe("OperationReceiving — R1 progress state", () => {
     );
   });
 
+  it("the Receiving issue queue holds exactly the PO a human must act on", async () => {
+    wrap(<OperationReceiving />);
+    await waitFor(() => expect(screen.getByTestId(ISSUE)).toHaveTextContent("1"));
+    fireEvent.click(screen.getByTestId(CHECK_IN)); // clear the default pick
+    fireEvent.click(screen.getByTestId(ISSUE));
+    await waitFor(() => expect(screen.getByText("PO-4003")).toBeInTheDocument());
+    expect(screen.queryByText("PO-4001")).not.toBeInTheDocument();
+    expect(screen.queryByText("PO-4002")).not.toBeInTheDocument();
+  });
+
   it("a settled PO reads Fully received with nothing outstanding", async () => {
     wrap(<OperationReceiving />);
-    const tabs = await statusTabs();
-    fireEvent.click(tabs[1]); // Received
+    await waitFor(() => expect(screen.getByTestId(FULLY)).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId(CHECK_IN)); // clear the default pick
+    fireEvent.click(screen.getByTestId(FULLY));
     await waitFor(() =>
       expect(screen.getByTestId("receiving-progress-PO-4004")).toHaveTextContent(
         "Fully received",
