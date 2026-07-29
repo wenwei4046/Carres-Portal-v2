@@ -18,6 +18,7 @@ const setNumber = vi.fn();
 const setPoDays = vi.fn();
 const setProduction = vi.fn();
 const setWorkWeek = vi.fn();
+const setAddress = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -32,6 +33,10 @@ vi.mock("@/lib/queries", async () => {
     useSetPurchasingPoDays: () => mutation(setPoDays),
     useSetProductionDays: () => mutation(setProduction),
     useSetSupplierWorkWeek: () => mutation(setWorkWeek),
+    useSetDestinationAddress: () => mutation(setAddress),
+    // P4 — the partner NAME for the collection sentence. The rule stores an
+    // id (facts, not the sentence), so the name has to come from somewhere.
+    useDeliveryPartners: () => ({ data: { partners: [{ id: NETS, name: "NETS" }] } }),
   };
 });
 
@@ -46,6 +51,11 @@ function wrap(node: React.ReactNode) {
 
 const NICE = "11111111-0000-0000-0000-000000000001";
 const OHANA = "22222222-0000-0000-0000-000000000002";
+// P4 (0307) — the three destinations, exactly the three locked names.
+const KLANG = "33333333-0000-0000-0000-000000000003";
+const AL = "44444444-0000-0000-0000-000000000004";
+const HOUZS = "55555555-0000-0000-0000-000000000005";
+const NETS = "66666666-0000-0000-0000-000000000006";
 
 function settings(over: Partial<PurchasingSettingsResponse> = {}): PurchasingSettingsResponse {
   return {
@@ -62,6 +72,20 @@ function settings(over: Partial<PurchasingSettingsResponse> = {}): PurchasingSet
       { supplierId: OHANA, category: "bedframe", workingDays: 7 },
       { supplierId: OHANA, category: "sofa", workingDays: 14 },
     ],
+    destinations: [
+      {
+        id: KLANG,
+        name: "Carres Klang",
+        // Linked to the own warehouse, so its address comes from that record
+        // and is never blank — `Address not set` must never show against it.
+        address: "NETS-managed facility (Klang)",
+        linkedToWarehouse: true,
+        isDefault: true,
+      },
+      { id: AL, name: "AL Sungai Buloh", address: null, linkedToWarehouse: false, isDefault: false },
+      { id: HOUZS, name: "HOUZS", address: null, linkedToWarehouse: false, isDefault: false },
+    ],
+    supplierCollection: [],
     lastChanges: [
       {
         settingKey: "production_days",
@@ -188,5 +212,92 @@ describe("Purchasing → Settings", () => {
     expect(text).toContain("PO days");
     expect(text).toContain("Supplier work week");
     expect(text).toContain("Earliest date a store may sell");
+  });
+
+  // ── P4 · Where the goods go (migration 0307) ──────────────────────────────
+
+  it("lists the three destinations under the locked heading, spelt exactly", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Where the goods go");
+    expect(text).toContain("Carres Klang");
+    expect(text).toContain("AL Sungai Buloh");
+    expect(text).toContain("HOUZS");
+    // `HOUZS` is deliberately shorter than "HOUZS Balakong" — do not complete it.
+    expect(text).not.toContain("HOUZS Balakong");
+    // The three words COPY-STANDARD refuses for this field.
+    expect(text).not.toMatch(/Ship-to|Drop point/);
+  });
+
+  it("an external destination with no address says `Address not set`", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    expect(screen.getByTestId(`destination-unset-${AL}`).textContent).toBe("Address not set");
+    expect(screen.getByTestId(`destination-unset-${HOUZS}`).textContent).toBe("Address not set");
+    // NEVER against Carres Klang — its address comes from the warehouse record,
+    // which is exactly what 0307's one-address constraint exists to guarantee.
+    expect(screen.queryByTestId(`destination-unset-${KLANG}`)).toBeNull();
+  });
+
+  it("Carres Klang shows its warehouse address and offers no field to edit it", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    expect(screen.getByTestId(`destination-row-${KLANG}`).textContent).toContain(
+      "NETS-managed facility (Klang)",
+    );
+    // One address, one source: a second input here is a second place for it to
+    // drift from the warehouse record.
+    expect(screen.queryByTestId(`destination-address-${KLANG}`)).toBeNull();
+    expect(screen.queryByTestId(`destination-save-${KLANG}`)).toBeNull();
+    expect(screen.getByTestId(`destination-address-${AL}`)).toBeTruthy();
+  });
+
+  it("saves an external destination address, and only when it really changed", async () => {
+    setAddress.mockResolvedValue(settings());
+    render(wrap(<OperationPurchasingSettings />));
+    const save = screen.getByTestId(`destination-save-${AL}`);
+    expect(save).toBeDisabled();
+    fireEvent.change(screen.getByTestId(`destination-address-${AL}`), {
+      target: { value: "12 Jalan Test, Sungai Buloh" },
+    });
+    expect(save).not.toBeDisabled();
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(setAddress).toHaveBeenCalledWith({
+        destinationId: AL,
+        address: "12 Jalan Test, Sungai Buloh",
+      }),
+    );
+  });
+
+  it("a supplier that does not deliver reads as the ONE locked sentence", () => {
+    settingsQuery.mockReturnValue({
+      data: settings({
+        supplierCollection: [
+          { supplierId: NICE, fixedDestinationId: KLANG, collectedByPartnerId: NETS },
+        ],
+      }),
+      isLoading: false,
+      error: null,
+    });
+    render(wrap(<OperationPurchasingSettings />));
+    expect(screen.getByTestId(`supplier-collection-${NICE}`).textContent).toContain(
+      "NETS collects from Nice Future and delivers to Carres Klang.",
+    );
+  });
+
+  it("no collection rule means no section at all — never a row saying nobody collects", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    expect(screen.queryByText("Suppliers that do not deliver")).toBeNull();
+    expect(screen.queryByTestId(`supplier-collection-${NICE}`)).toBeNull();
+  });
+
+  it("a reader who may not edit sees the addresses and no Save", () => {
+    settingsQuery.mockReturnValue({
+      data: settings({ canEdit: false }),
+      isLoading: false,
+      error: null,
+    });
+    render(wrap(<OperationPurchasingSettings />));
+    expect(screen.getByTestId(`destination-address-${AL}`)).toBeDisabled();
+    expect(screen.queryByTestId(`destination-save-${AL}`)).toBeNull();
   });
 });

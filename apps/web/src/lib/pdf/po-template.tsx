@@ -84,12 +84,13 @@ const styles = StyleSheet.create({
     fontSize: 9,
     padding: 6,
   },
-  colSku: { width: "18%" },
-  colDesc: { width: "36%" },
-  colQty: { width: "10%", textAlign: "right" },
-  colUnit: { width: "8%", textAlign: "left" },
-  colUnitPrice: { width: "14%", textAlign: "right" },
-  colTotal: { width: "14%", textAlign: "right" },
+  // P4 — the Unit Price (14%) and Line Total (14%) columns are gone; their
+  // 28% is given to SKU and Description rather than left as white space, so a
+  // long variant name stops wrapping.
+  colSku: { width: "22%" },
+  colDesc: { width: "52%" },
+  colQty: { width: "14%", textAlign: "right" },
+  colUnit: { width: "12%", textAlign: "left" },
   // 0076 / 0077 — variant suffix line (color + gap or fabric) shown under
   // the description in slightly muted weight so the supplier knows which
   // version to make. Empty for mattress lines (no extras).
@@ -99,21 +100,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: 700,
   },
-  totalsRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginBottom: 14,
-  },
-  totalsLabel: {
-    fontSize: 11,
-    fontWeight: 700,
-    marginRight: 12,
-  },
-  totalsValue: {
-    fontSize: 11,
-    fontWeight: 700,
-    color: ACCENT,
-  },
+  // The totals row is deliberately absent — see the PoTemplateData note. A
+  // leftover `totalsValue` style is an invitation to print a total again.
   termsBlock: {
     borderTopWidth: 1,
     borderTopColor: BORDER,
@@ -134,16 +122,18 @@ const styles = StyleSheet.create({
   },
 });
 
-function formatMoney(value: number, currency: string): string {
-  return `${currency} ${value.toFixed(2)}`;
-}
-
 /**
  * 0076 / 0077 — flatten attrs into a one-line variant suffix the supplier
  * can read at a glance. Bedframe shows "{color} · gap {gap}", sofa shows
- * "{fabric_name}" with optional "+RM {surcharge}" suffix, mattress returns
- * empty (template hides the row when label is empty). Mirrors the
- * PoDetailModal display logic so the on-screen + PDF descriptions match.
+ * "{fabric_name}", mattress returns empty (template hides the row when the
+ * label is empty).
+ *
+ * P4 (Loo 2026-07-29) — this used to append "(+RM {fabric_surcharge})", which
+ * is how a purchase price survived on a supplier's document after every named
+ * money field had been removed. `fabric_surcharge` is stripped by the
+ * `purchasing_po_document` allowlist and is not read here either: a template
+ * that still ASKS for it would print money again the moment somebody widened
+ * the payload.
  */
 function variantLabel(attrs: Record<string, unknown> | null | undefined): string {
   if (!attrs) return "";
@@ -152,28 +142,26 @@ function variantLabel(attrs: Record<string, unknown> | null | undefined): string
     color?: string;
     gap?: string;
     fabric_name?: string;
-    fabric_surcharge?: number;
   };
   if (a.color) parts.push(a.color);
   if (a.gap) parts.push(`gap ${a.gap}`);
-  if (a.fabric_name) {
-    parts.push(
-      a.fabric_surcharge && a.fabric_surcharge > 0
-        ? `${a.fabric_name} (+RM ${a.fabric_surcharge})`
-        : a.fabric_name,
-    );
-  }
+  if (a.fabric_name) parts.push(a.fabric_name);
   return parts.join(" · ");
 }
 
 export function PoTemplate(data: PoTemplateData) {
-  const { po_number, issue_date, supplier, buyer, lines, grand_total, currency, terms } = data;
+  const { po_number, issue_date, supplier, destination, delivery_instructions, eta_date, lines, terms } =
+    data;
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <DocHeader
           docTitle="PURCHASE ORDER"
-          docMetaRows={[po_number, `Date: ${issue_date}`]}
+          docMetaRows={[
+            po_number,
+            `Date: ${issue_date}`,
+            ...(eta_date ? [`Expected: ${eta_date}`] : []),
+          ]}
         />
 
         <View style={styles.partyRow}>
@@ -183,10 +171,15 @@ export function PoTemplate(data: PoTemplateData) {
             {supplier.address ? <Text style={styles.partyLine}>{supplier.address}</Text> : null}
             {supplier.contact ? <Text style={styles.partyLine}>{supplier.contact}</Text> : null}
           </View>
+          {/* P4 — this block used to be "Buyer" filled with the receiving
+              warehouse. A factory does not need to know where we book our
+              inventory; it needs to know where to drive. The heading is the
+              locked field label and the name is the SAVED destination, never
+              `Ship-to` / `Destination` / `Drop point` (COPY-STANDARD). */}
           <View style={styles.party}>
-            <Text style={styles.partyLabel}>Buyer</Text>
-            <Text style={styles.partyName}>{buyer.name}</Text>
-            {buyer.contact ? <Text style={styles.partyLine}>{buyer.contact}</Text> : null}
+            <Text style={styles.partyLabel}>Where the goods go</Text>
+            <Text style={styles.partyName}>{destination.name}</Text>
+            <Text style={styles.partyLine}>{destination.address}</Text>
           </View>
         </View>
 
@@ -196,8 +189,6 @@ export function PoTemplate(data: PoTemplateData) {
             <Text style={[styles.th, styles.colDesc]}>Description</Text>
             <Text style={[styles.th, styles.colQty]}>Qty</Text>
             <Text style={[styles.th, styles.colUnit]}>Unit</Text>
-            <Text style={[styles.th, styles.colUnitPrice]}>Unit Price</Text>
-            <Text style={[styles.th, styles.colTotal]}>Line Total</Text>
           </View>
           {lines.map((line, idx) => {
             const isLast = idx === lines.length - 1;
@@ -211,17 +202,17 @@ export function PoTemplate(data: PoTemplateData) {
                 </View>
                 <Text style={[styles.td, styles.colQty]}>{line.qty}</Text>
                 <Text style={[styles.td, styles.colUnit]}>{line.unit}</Text>
-                <Text style={[styles.td, styles.colUnitPrice]}>{formatMoney(line.unit_price, currency)}</Text>
-                <Text style={[styles.td, styles.colTotal]}>{formatMoney(line.line_total, currency)}</Text>
               </View>
             );
           })}
         </View>
 
-        <View style={styles.totalsRow}>
-          <Text style={styles.totalsLabel}>Total</Text>
-          <Text style={styles.totalsValue}>{formatMoney(grand_total, currency)}</Text>
-        </View>
+        {delivery_instructions ? (
+          <View style={styles.termsBlock}>
+            <Text style={styles.termsLabel}>Delivery instructions</Text>
+            <Text style={styles.termsText}>{delivery_instructions}</Text>
+          </View>
+        ) : null}
 
         {terms ? (
           <View style={styles.termsBlock}>

@@ -209,6 +209,18 @@ export type SalesOrderTemplateData = {
   signed: boolean;
 };
 
+/**
+ * The EXTERNAL purchase order document. Mirrors
+ * `apps/web/src/lib/pdf/types.ts` — see that file's note for the full P4
+ * ruling. In short (Loo 2026-07-29): no purchase price and no RM amount leaves
+ * the portal on this document for ANY external recipient, so `unit_price`,
+ * `line_total`, `grand_total` and `currency` are gone and must never return;
+ * `buyer` (the receiving warehouse) is replaced by `destination` (where the
+ * supplier actually sends the goods).
+ *
+ * Filled ONLY by the `purchasing_po_document` RPC (migration 0307). The money
+ * is absent from the PAYLOAD, not merely hidden by a template.
+ */
 export type PoTemplateData = {
   /** Purchase Order document number, e.g. "PO-2026-00007". */
   po_number: string;
@@ -224,11 +236,19 @@ export type PoTemplateData = {
     contact: string | null;
   };
 
-  /** Buyer block — Carres HQ side. */
-  buyer: {
+  /** Where the goods go — the SAVED destination name and its address. The RPC
+   *  refuses to export a PO whose destination has no address on file, so
+   *  `address` is never blank here. */
+  destination: {
     name: string;
-    contact: string | null;
+    address: string;
   };
+
+  /** Free text a manager typed for this PO; null when none. */
+  delivery_instructions: string | null;
+
+  /** Expected arrival, ISO 8601 yyyy-mm-dd; null when not set. */
+  eta_date: string | null;
 
   /** Line items being procured. */
   lines: Array<{
@@ -236,27 +256,18 @@ export type PoTemplateData = {
     description: string;
     qty: number;
     unit: string;
-    /** Unit cost in MYR major units (excluding tax). */
-    unit_price: number;
-    /** Line subtotal in MYR major units (qty * unit_price). */
-    line_total: number;
     /**
      * 0076 / 0077 (Loo 2026-05-10): cascade picker payload mirrored from
-     * `purchase_order_lines.attrs`. Bedframe = `{color, gap}`, sofa =
-     * `{fabric_id, fabric_name, fabric_surcharge}`, mattress = NULL.
-     * Template renders this under the description so the supplier knows
-     * exactly which version to make — without it a "BF-001 King ×2" PO
-     * could be Walnut, Natural Oak, or Black and the supplier would have
-     * to guess.
+     * `purchase_order_lines.attrs`, so the supplier knows exactly which
+     * version to make — without it a "BF-001 King ×2" PO could be Walnut,
+     * Natural Oak, or Black and the supplier would have to guess.
+     *
+     * 0307 ALLOWLISTS this to `color · gap · fabric_name`. `fabric_surcharge`
+     * is an RM amount and is stripped in the database, which is why removing
+     * the named money fields alone would not have removed the money.
      */
     attrs?: Record<string, unknown> | null;
   }>;
-
-  /** Order grand total in MYR major units (sum of line_total). */
-  grand_total: number;
-
-  /** Currency display code, default "MYR". */
-  currency: string;
 
   /** Optional payment / delivery terms paragraph. */
   terms: string | null;

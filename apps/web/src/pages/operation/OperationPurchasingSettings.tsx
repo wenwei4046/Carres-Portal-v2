@@ -11,12 +11,16 @@ import {
   WEEKDAYS,
   lastChangeFor,
   workWeekLabel,
+  supplierCollectionSentence,
+  DESTINATION_ADDRESS_UNSET,
   type PurchasingCategory,
   type PurchasingNumberKey,
   type PurchasingSettingsResponse,
 } from "@carres/shared";
 import {
+  useDeliveryPartners,
   usePurchasingSettings,
+  useSetDestinationAddress,
   useSetProductionDays,
   useSetPurchasingNumber,
   useSetPurchasingPoDays,
@@ -202,12 +206,36 @@ export default function OperationPurchasingSettings() {
   const setPoDays = useSetPurchasingPoDays();
   const setProduction = useSetProductionDays();
   const setWorkWeek = useSetSupplierWorkWeek();
+  const setAddress = useSetDestinationAddress();
+  // The partner NAME for the collection sentence. The rule stores an id (Q3 —
+  // facts, never the sentence), and a uuid is not something a human reads.
+  const partnersQ = useDeliveryPartners();
 
   const [poDraft, setPoDraft] = useState<number[] | null>(null);
   const [weekDraft, setWeekDraft] = useState<Record<string, number[]>>({});
   const [prodDraft, setProdDraft] = useState<Record<string, string>>({});
+  const [addressDraft, setAddressDraft] = useState<Record<string, string>>({});
 
   const canEdit = data?.canEdit ?? false;
+
+  /** P4 — the collection rules, each already turned into its one locked
+   *  sentence. A rule whose facts are incomplete composes to null and is not
+   *  listed: half a sentence about who collects our goods is worse than none. */
+  const collectionSentences = useMemo(() => {
+    if (!data) return [];
+    return data.supplierCollection
+      .map((rule) => ({
+        supplierId: rule.supplierId,
+        sentence: supplierCollectionSentence({
+          partnerName: partnersQ.data?.partners.find(
+            (p) => p.id === rule.collectedByPartnerId,
+          )?.name,
+          supplierName: data.suppliers.find((s) => s.id === rule.supplierId)?.name,
+          destinationName: data.destinations.find((d) => d.id === rule.fixedDestinationId)?.name,
+        }),
+      }))
+      .filter((c): c is { supplierId: string; sentence: string } => c.sentence !== null);
+  }, [data, partnersQ.data]);
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -447,6 +475,126 @@ export default function OperationPurchasingSettings() {
               );
             })}
           </div>
+        </section>
+
+        {/* ── Where the goods go ───────────────────────────────────────────── */}
+        {/* P4 (migration 0307, Loo 2026-07-29). The three names are the SAVED
+            destination names and are rendered verbatim — `HOUZS` is
+            deliberately shorter than "HOUZS Balakong" and must not be
+            "completed". `Address not set` lives HERE and nowhere else: it may
+            never reach a PO, the external document, or an error a store
+            reads. */}
+        <section className="mb-8 max-w-[860px]">
+          <h2 className="text-strong font-semibold text-base-900 mb-1">
+            Where the goods go
+          </h2>
+          <p className="text-meta text-base-500 mb-3">
+            The addresses a supplier drives to. A purchase order cannot be sent
+            until the address it names is on file.
+          </p>
+          <div className="bg-white border border-base-200 rounded-[10px] px-4">
+            {data.destinations.map((d) => {
+              const draft = addressDraft[d.id];
+              const current = d.address ?? "";
+              const dirty = draft !== undefined && draft.trim() !== current;
+              return (
+                <div
+                  key={d.id}
+                  className="py-3 border-b border-base-100 last:border-b-0 flex items-start justify-between gap-4 flex-wrap"
+                  data-testid={`destination-row-${d.id}`}
+                >
+                  <div className="min-w-[200px]">
+                    <div className="text-body text-base-900">{d.name}</div>
+                    {/* A destination linked to one of our own warehouses takes
+                        its address from that record — one address, one source.
+                        It is shown, not editable, so the two can never drift. */}
+                    {d.linkedToWarehouse ? (
+                      <div className="text-meta text-base-500 mt-0.5">
+                        {d.address}
+                      </div>
+                    ) : !d.address ? (
+                      <div
+                        className="text-meta text-danger mt-0.5"
+                        data-testid={`destination-unset-${d.id}`}
+                      >
+                        {DESTINATION_ADDRESS_UNSET}
+                      </div>
+                    ) : null}
+                    <ChangeLine settings={data} settingKey="destination_address" />
+                  </div>
+                  {!d.linkedToWarehouse && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <input
+                        type="text"
+                        value={draft ?? current}
+                        maxLength={500}
+                        disabled={!canEdit}
+                        onChange={(e) =>
+                          setAddressDraft((m) => ({ ...m, [d.id]: e.target.value }))
+                        }
+                        aria-label={`Address for ${d.name}`}
+                        data-testid={`destination-address-${d.id}`}
+                        className={INPUT_CLS}
+                      />
+                      {canEdit && (
+                        <button
+                          type="button"
+                          disabled={!dirty || !(draft ?? "").trim() || setAddress.isPending}
+                          onClick={() =>
+                            setAddress
+                              .mutateAsync({
+                                destinationId: d.id,
+                                address: (draft ?? "").trim(),
+                              })
+                              .then(() => {
+                                setAddressDraft((m) => {
+                                  const next = { ...m };
+                                  delete next[d.id];
+                                  return next;
+                                });
+                                toast.success("Saved");
+                              })
+                              .catch(fail)
+                          }
+                          className="btn-primary text-meta disabled:opacity-40"
+                          data-testid={`destination-save-${d.id}`}
+                        >
+                          Save
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {/* The collection rule, stored as FACTS and composed into the one
+              locked sentence. Only suppliers that actually carry a rule are
+              listed — a row saying "collected by nobody" would read as a rule
+              somebody made. */}
+          {collectionSentences.length > 0 && (
+            <div className="mt-3">
+              <h3 className="text-body font-semibold text-base-900 mb-1">
+                Suppliers that do not deliver
+              </h3>
+              <div className="bg-white border border-base-200 rounded-[10px] px-4">
+                {collectionSentences.map((c) => (
+                  <div
+                    key={c.supplierId}
+                    className="py-3 border-b border-base-100 last:border-b-0"
+                    data-testid={`supplier-collection-${c.supplierId}`}
+                  >
+                    <div className="text-body text-base-900">{c.sentence}</div>
+                    <ChangeLine
+                      settings={data}
+                      settingKey="supplier_collection"
+                      supplierId={c.supplierId}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* ── The single numbers ───────────────────────────────────────────── */}

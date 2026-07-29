@@ -80,6 +80,67 @@ export interface PurchasingSupplierRow {
   offDays: readonly number[] | null;
 }
 
+/**
+ * Where the goods go — card P4 (migration 0307, Loo 2026-07-29).
+ *
+ * A destination is NOT a warehouse. `purchase_orders.warehouse_id` answers
+ * *where Carres records inventory*; this answers *where the supplier
+ * physically sends the goods*, and the two are different questions with
+ * different answers. `AL Sungai Buloh` and `HOUZS` are DELIVERY ADDRESSES and
+ * are never `warehouses` rows — Carres has exactly one warehouse, and a second
+ * warehouse entity would put goods we do not count into every stock rollup.
+ */
+export interface PurchasingDestination {
+  id: string;
+  /** The SAVED name, printed verbatim on the PO and the external document.
+   *  `HOUZS` is deliberately shorter than "HOUZS Balakong" — do not
+   *  "complete" it (COPY-STANDARD). */
+  name: string;
+  /** Null when nobody has set one. A destination linked to one of our own
+   *  warehouses derives its address from that warehouse record and can never
+   *  carry its own — that is a DB constraint, not a convention. */
+  address: string | null;
+  /** True when this destination is one of our own warehouses. Only these
+   *  produce Carres inventory records; the others deliberately produce none. */
+  linkedToWarehouse: boolean;
+  isDefault: boolean;
+}
+
+/** A supplier that does not deliver: someone collects for it, and the PO can
+ *  only ever say one thing. Stored as FACTS (0307 §Q3) — never as a sentence,
+ *  which would give a locked word a second home. */
+export interface PurchasingSupplierCollection {
+  supplierId: string;
+  fixedDestinationId: string | null;
+  collectedByPartnerId: string | null;
+}
+
+/**
+ * The locked sentence, composed from the three facts.
+ *
+ * COPY-STANDARD (Loo 2026-07-29) rules it exactly:
+ *   `NETS collects from Nice Future and delivers to Carres Klang.`
+ *
+ * Composed rather than stored, and composed HERE rather than in each screen,
+ * so the PO, the external document and Settings cannot spell it three ways.
+ * Returns null when the facts are incomplete — a half-sentence about who
+ * collects our goods is worse than none.
+ */
+export function supplierCollectionSentence(facts: {
+  partnerName: string | null | undefined;
+  supplierName: string | null | undefined;
+  destinationName: string | null | undefined;
+}): string | null {
+  const { partnerName, supplierName, destinationName } = facts;
+  if (!partnerName || !supplierName || !destinationName) return null;
+  return `${partnerName} collects from ${supplierName} and delivers to ${destinationName}.`;
+}
+
+/** Settings' own word for a destination nobody has given an address. It
+ *  appears in manager Settings ONLY and must never reach a PO, the external
+ *  document, or an error a store reads (handoff §7). */
+export const DESTINATION_ADDRESS_UNSET = "Address not set";
+
 /** One edit: who, when, and what it was before. */
 export interface PurchasingSettingChange {
   settingKey: string;
@@ -98,6 +159,10 @@ export interface PurchasingSettings {
   poDays: readonly number[];
   suppliers: readonly PurchasingSupplierRow[];
   productionDays: readonly PurchasingProductionDays[];
+  /** P4 — the three destinations a PO may name. */
+  destinations: readonly PurchasingDestination[];
+  /** P4 — the suppliers that do not deliver. Empty for everyone else. */
+  supplierCollection: readonly PurchasingSupplierCollection[];
   /** The most recent change per setting — the line under each row. */
   lastChanges: readonly PurchasingSettingChange[];
   /** May THIS caller edit? Hiding a control is a courtesy; the RPC gate
@@ -234,6 +299,22 @@ export const purchasingSettingsResponseSchema = z.object({
       workingDays: z.number().int(),
     }),
   ),
+  destinations: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      address: z.string().nullable(),
+      linkedToWarehouse: z.boolean(),
+      isDefault: z.boolean(),
+    }),
+  ),
+  supplierCollection: z.array(
+    z.object({
+      supplierId: z.string(),
+      fixedDestinationId: z.string().nullable(),
+      collectedByPartnerId: z.string().nullable(),
+    }),
+  ),
   lastChanges: z.array(
     z.object({
       settingKey: z.string(),
@@ -248,6 +329,33 @@ export const purchasingSettingsResponseSchema = z.object({
   canEdit: z.boolean(),
 });
 export type PurchasingSettingsResponse = z.infer<typeof purchasingSettingsResponseSchema>;
+
+/** P4 — a manager gives an external destination its address. Only the two
+ *  external destinations are editable; the RPC refuses one linked to a
+ *  warehouse (`address_comes_from_the_warehouse`). */
+export const purchasingSetDestinationAddressInput = z
+  .object({
+    destinationId: z.string().uuid(),
+    address: z.string().trim().min(1).max(500),
+  })
+  .strict();
+export type PurchasingSetDestinationAddressInput = z.infer<
+  typeof purchasingSetDestinationAddressInput
+>;
+
+/** P4 — a manager records that a supplier does not deliver: who collects, and
+ *  the ONE destination its POs may name. Both nullable so the rule can be
+ *  cleared as well as set. */
+export const purchasingSetSupplierCollectionInput = z
+  .object({
+    supplierId: z.string().uuid(),
+    destinationId: z.string().uuid().nullable(),
+    partnerId: z.string().uuid().nullable(),
+  })
+  .strict();
+export type PurchasingSetSupplierCollectionInput = z.infer<
+  typeof purchasingSetSupplierCollectionInput
+>;
 
 export const purchasingSetNumberInput = z
   .object({

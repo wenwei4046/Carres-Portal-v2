@@ -104,6 +104,9 @@ vi.mock("@/lib/queries", async () => {
     }),
     useAwaitingStockShortage: () => shortageHookState,
     useStockAlerts: () => alertsHookState,
+    // P4 (0307) — the destinations and the collection rules come from the ONE
+    // purchasing-settings read.
+    usePurchasingSettings: () => purchasingSettingsHookState,
   };
 });
 
@@ -152,7 +155,40 @@ const PARTNER_A = {
   zones: "Klang Valley",
 };
 
+// P4 (0307) — the three destinations, under the three locked names.
+const DEST_KLANG = "44444444-4444-4444-4444-000000000001";
+const DEST_AL = "44444444-4444-4444-4444-000000000002";
+const DEST_HOUZS = "44444444-4444-4444-4444-000000000003";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let purchasingSettingsHookState: any;
+function purchasingSettings(over: Record<string, unknown> = {}) {
+  return {
+    data: {
+      destinations: [
+        {
+          id: DEST_KLANG,
+          name: "Carres Klang",
+          address: "NETS-managed facility (Klang)",
+          linkedToWarehouse: true,
+          isDefault: true,
+        },
+        {
+          id: DEST_AL,
+          name: "AL Sungai Buloh",
+          address: "12 Jalan Test",
+          linkedToWarehouse: false,
+          isDefault: false,
+        },
+        { id: DEST_HOUZS, name: "HOUZS", address: null, linkedToWarehouse: false, isDefault: false },
+      ],
+      supplierCollection: [],
+      ...over,
+    },
+  };
+}
+
 function setLoaded() {
+  purchasingSettingsHookState = purchasingSettings();
   suppliersHookState = { data: { suppliers: [SUPPLIER_A, SUPPLIER_B] } };
   warehouseHookState = {
     data: {
@@ -824,6 +860,106 @@ describe("CreatePOModal — base modal flows (migrated from operationProcurement
     expect(callArg.lines[0].costSource).toBe("catalog");
     // 0083 — etaDate forwarded.
     expect(callArg.etaDate).toBe(ETA_FIXTURE);
+  });
+
+  // ── P4 · Where the goods go (migration 0307) ──────────────────────────────
+
+  it("offers the three destinations under the locked label, and defaults to Carres Klang", () => {
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    const picker = screen.getByTestId(`po-destination-${SUPPLIER_A.id}`) as HTMLSelectElement;
+    expect(screen.getAllByText("Where the goods go").length).toBeGreaterThan(0);
+    expect([...picker.options].map((o) => o.textContent)).toEqual([
+      "Carres Klang",
+      "AL Sungai Buloh",
+      "HOUZS",
+    ]);
+    // Item 4 — the default is the default DESTINATION ROW, not a constant.
+    expect(picker.value).toBe(DEST_KLANG);
+  });
+
+  it("sends the chosen destination and the delivery instructions", async () => {
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
+    fillEta();
+    fireEvent.change(screen.getByTestId(`po-destination-${SUPPLIER_A.id}`), {
+      target: { value: DEST_AL },
+    });
+    fireEvent.change(screen.getByTestId(`po-delivery-instructions-${SUPPLIER_A.id}`), {
+      target: { value: "  Call the guard house on arrival.  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Issue PO/ }));
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalledTimes(1));
+    const callArg = createMutateAsync.mock.calls[0][0] as {
+      warehouseId: string;
+      destinationId?: string;
+      deliveryInstructions?: string;
+    };
+    expect(callArg.destinationId).toBe(DEST_AL);
+    expect(callArg.deliveryInstructions).toBe("Call the guard house on arrival.");
+    // The two answer DIFFERENT questions and both are kept: the warehouse is
+    // where Carres records inventory, the destination is where the lorry goes.
+    expect(callArg.warehouseId).toBe(WAREHOUSE_KL.id);
+  });
+
+  it("omits the instructions entirely when the operator typed none", async () => {
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
+    fillEta();
+    fireEvent.click(screen.getByRole("button", { name: /Issue PO/ }));
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalledTimes(1));
+    const callArg = createMutateAsync.mock.calls[0][0] as Record<string, unknown>;
+    expect(callArg).not.toHaveProperty("deliveryInstructions");
+  });
+
+  it("a supplier that does not deliver gets the locked sentence and NO picker", async () => {
+    // The fixed destination is deliberately NOT the default one. With both set
+    // to `Carres Klang` this test passes even when the fixed rule is ignored
+    // entirely — the default produces the same id, so the assertion measures
+    // nothing. Found by a negative control that refused to fail.
+    purchasingSettingsHookState = purchasingSettings({
+      supplierCollection: [
+        {
+          supplierId: SUPPLIER_A.id,
+          fixedDestinationId: DEST_AL,
+          collectedByPartnerId: PARTNER_A.id,
+        },
+      ],
+    });
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    expect(screen.getByTestId(`po-destination-fixed-${SUPPLIER_A.id}`).textContent).toBe(
+      "GD Express collects from Carres Manufacturing and delivers to AL Sungai Buloh.",
+    );
+    // The PO can only ever say one thing — so there is nothing to pick.
+    expect(screen.queryByTestId(`po-destination-${SUPPLIER_A.id}`)).toBeNull();
+
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
+    fillEta();
+    fireEvent.click(screen.getByRole("button", { name: /Issue PO/ }));
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalledTimes(1));
+    const callArg = createMutateAsync.mock.calls[0][0] as { destinationId?: string };
+    expect(callArg.destinationId).toBe(DEST_AL);
+    expect(callArg.destinationId).not.toBe(DEST_KLANG);
+  });
+
+  it("sends no destination at all when settings have not loaded — the DB default stands", async () => {
+    purchasingSettingsHookState = { data: undefined };
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
+    fillEta();
+    fireEvent.click(screen.getByRole("button", { name: /Issue PO/ }));
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalledTimes(1));
+    const callArg = createMutateAsync.mock.calls[0][0] as Record<string, unknown>;
+    // A blank would be the browser inventing a value; saying nothing lets the
+    // NOT NULL column's own DEFAULT answer, which is a row a manager owns.
+    expect(callArg).not.toHaveProperty("destinationId");
   });
 
   it("changing variant on a line re-pulls cost from the new SKU (0074)", () => {

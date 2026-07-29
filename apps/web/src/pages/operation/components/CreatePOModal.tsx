@@ -6,7 +6,11 @@ import type {
   ProductSkuDto,
   SofaFabricDto,
 } from "@carres/shared";
-import { SUPPLIERLESS_CATEGORIES, resolveFabricDelta } from "@carres/shared";
+import {
+  SUPPLIERLESS_CATEGORIES,
+  resolveFabricDelta,
+  supplierCollectionSentence,
+} from "@carres/shared";
 import { AlertTriangle } from "lucide-react";
 
 // T42-C1 — Form state uses `ManualCostSource` (3-value, no `auto_issued`)
@@ -26,6 +30,7 @@ import {
   useDeliveryPartners,
   useOperationSuppliers,
   useOperationWarehouse,
+  usePurchasingSettings,
   useStockAlerts,
   type SupplierRow,
 } from "@/lib/queries";
@@ -446,6 +451,25 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     Record<string, string>
   >({});
 
+  // P4 (0307) — where the goods go, and anything the driver needs told. Both
+  // are per-PO columns, so both live per supplier GROUP rather than once at the
+  // bottom: two suppliers can send to two different places, and a single global
+  // field would quietly claim they do not.
+  const [destinationBySupplier, setDestinationBySupplier] = useState<
+    Record<string, string>
+  >({});
+  const [instructionsBySupplier, setInstructionsBySupplier] = useState<
+    Record<string, string>
+  >({});
+
+  // The destinations and the collection rules come from the ONE purchasing
+  // settings read — the same query the numbers come from. A second endpoint
+  // would be a second place for `Carres Klang` to be spelt.
+  const purchasingSettingsQ = usePurchasingSettings();
+  const destinations = purchasingSettingsQ.data?.destinations ?? [];
+  const supplierCollection = purchasingSettingsQ.data?.supplierCollection ?? [];
+  const defaultDestinationId = destinations.find((d) => d.isDefault)?.id ?? "";
+
   // ---- Group lines by their auto-detected supplier ----
   const groups = useMemo(() => {
     const g = new Map<string, { supplier: SupplierRow; lines: DraftLine[] }>();
@@ -733,6 +757,71 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     return warehouseBySupplier[sup.id] ?? prefill.warehouseId ?? "";
   }
 
+  // ---- P4 (migration 0307) — WHERE THE GOODS GO ----------------------------
+  //
+  // A destination is NOT the warehouse beside it. The warehouse answers "where
+  // do we record inventory"; this answers "where does the lorry drive". They
+  // are usually the same and sometimes deliberately are not — an outstation
+  // order can only be delivered by AL, and AL will not collect in Klang, so
+  // sending the goods straight there saves a whole transfer.
+  //
+  // `destination_id` is NOT NULL with a DB DEFAULT, so an untouched picker is
+  // still correct: the default is a row a manager can see, not a constant.
+  function setDestinationForSupplier(supplierId: string, destinationId: string) {
+    setDestinationBySupplier((m) => ({ ...m, [supplierId]: destinationId }));
+  }
+
+  /** The collection rule for this supplier, when it has one. Nice Future does
+   *  not deliver — its POs may name exactly one destination, and Q3 keeps that
+   *  in manager settings rather than in a hard-coded slug (P1 spent a card
+   *  deleting that habit). */
+  function collectionFor(sup: SupplierRow) {
+    return supplierCollection.find((s) => s.supplierId === sup.id) ?? null;
+  }
+
+  function destinationFor(sup: SupplierRow): string {
+    const fixed = collectionFor(sup)?.fixedDestinationId;
+    if (fixed) return fixed;
+    return destinationBySupplier[sup.id] ?? defaultDestinationId;
+  }
+
+  /** `NETS collects from Nice Future and delivers to Carres Klang.` —
+   *  composed from the three facts by the ONE shared composer, never stored
+   *  and never re-spelt on a screen. */
+  function collectionSentenceFor(sup: SupplierRow): string | null {
+    const rule = collectionFor(sup);
+    if (!rule) return null;
+    return supplierCollectionSentence({
+      partnerName: partners.find((p) => p.id === rule.collectedByPartnerId)?.name ?? null,
+      supplierName: sup.name,
+      destinationName: destinations.find((d) => d.id === rule.fixedDestinationId)?.name ?? null,
+    });
+  }
+
+  function setDeliveryInstructionsForSupplier(supplierId: string, text: string) {
+    setInstructionsBySupplier((m) => ({ ...m, [supplierId]: text }));
+  }
+  function deliveryInstructionsFor(sup: SupplierRow): string {
+    return instructionsBySupplier[sup.id] ?? "";
+  }
+
+  /**
+   * What the create call sends for this PO's destination.
+   *
+   * An EMPTY `destinationId` is omitted rather than sent as "": the column is
+   * NOT NULL with a database DEFAULT, so saying nothing yields `Carres Klang`
+   * from a row a manager owns. Sending a blank would be the browser inventing
+   * a value the settings screen cannot show.
+   */
+  function poDestinationPayload(sup: SupplierRow) {
+    const destinationId = destinationFor(sup);
+    const instructions = deliveryInstructionsFor(sup).trim();
+    return {
+      ...(destinationId ? { destinationId } : {}),
+      ...(instructions ? { deliveryInstructions: instructions } : {}),
+    };
+  }
+
   // ---- Validation ----
   // T29: each line MUST carry cost (non-null, non-negative) AND costSource
   // before submit. The shared zod `createPoInput.lines[]` requires both;
@@ -895,6 +984,10 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           })),
           ...soPayload,
           etaDate: eta,
+          // P4 (0307) — where the goods go. `destinationFor` returns the
+          // supplier's fixed destination when it has one, so a collected
+          // supplier cannot be sent anywhere else even from a stale form.
+          ...poDestinationPayload(g.supplier),
         });
         toast.success(
           `PO issued · ${lines.length} line${lines.length === 1 ? "" : "s"} · ${totalUnits} units`,
@@ -942,6 +1035,8 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
               })),
               ...soPayload,
               etaDate: eta,
+              // P4 (0307) — same per-group destination as the single-PO branch.
+              ...poDestinationPayload(g.supplier),
             };
           }),
         });
@@ -1486,6 +1581,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           const needsPartner = g.supplier.kind === "factory_pickup";
           const groupUnits = g.lines.reduce((s, l) => s + (l.qty || 0), 0);
           const supWarehouseId = warehouseFor(g.supplier);
+          const collectionSentence = collectionSentenceFor(g.supplier);
           return (
             <div
               key={g.supplier.id}
@@ -1575,6 +1671,56 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                     </select>
                   </div>
                 )}
+              </div>
+
+              {/* P4 (0307) — Where the goods go. The label and the three option
+                  names are LOCKED (COPY-STANDARD, Loo 2026-07-29); the options
+                  are the SAVED destination names and are never re-worded here.
+                  A supplier that does not deliver gets no picker at all — the
+                  rule is a fact about that factory, not a choice this operator
+                  makes today. */}
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div>
+                  <div className="label mb-1.5">Where the goods go</div>
+                  {collectionSentence ? (
+                    <div
+                      className="text-label text-base-600 font-body py-1.5"
+                      data-testid={`po-destination-fixed-${g.supplier.id}`}
+                    >
+                      {collectionSentence}
+                    </div>
+                  ) : (
+                    <select
+                      value={destinationFor(g.supplier)}
+                      onChange={(e) =>
+                        setDestinationForSupplier(g.supplier.id, e.target.value)
+                      }
+                      aria-label={`Where the goods go for ${g.supplier.name}`}
+                      data-testid={`po-destination-${g.supplier.id}`}
+                      className={INPUT_CLS}
+                    >
+                      {destinations.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <div>
+                  <div className="label mb-1.5">Delivery instructions</div>
+                  <input
+                    type="text"
+                    value={deliveryInstructionsFor(g.supplier)}
+                    onChange={(e) =>
+                      setDeliveryInstructionsForSupplier(g.supplier.id, e.target.value)
+                    }
+                    maxLength={500}
+                    aria-label={`Delivery instructions for ${g.supplier.name}`}
+                    data-testid={`po-delivery-instructions-${g.supplier.id}`}
+                    className={INPUT_CLS}
+                  />
+                </div>
               </div>
             </div>
           );

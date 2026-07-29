@@ -1,9 +1,11 @@
 import { Hono, type Context } from "hono";
 import {
   isOpsManager,
+  purchasingSetDestinationAddressInput,
   purchasingSetNumberInput,
   purchasingSetPoDaysInput,
   purchasingSetProductionDaysInput,
+  purchasingSetSupplierCollectionInput,
   purchasingSetWorkWeekInput,
   purchasingSettingsResponseSchema,
 } from "@carres/shared";
@@ -122,6 +124,52 @@ purchasingSettingsRouter.put("/work-week", requireOperationOrPrincipal, async (c
   const { error } = await sb.rpc("purchasing_set_supplier_work_week", {
     p_supplier_id: parsed.data.supplierId,
     p_off_days: parsed.data.offDays,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return respondWithSettings(c);
+});
+
+/**
+ * P4 (migration 0307) — the destination address.
+ *
+ * Only the two EXTERNAL destinations have one to set: `Carres Klang` derives
+ * its address from the warehouse record and the RPC refuses to write one
+ * (`address_comes_from_the_warehouse`), which is what keeps a single address
+ * from having two sources.
+ */
+purchasingSettingsRouter.put("/destination-address", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseJsonBody(c, purchasingSetDestinationAddressInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("purchasing_set_destination_address", {
+    p_destination_id: parsed.data.destinationId,
+    p_address: parsed.data.address,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return respondWithSettings(c);
+});
+
+/**
+ * P4 (migration 0307) — a supplier that does not deliver.
+ *
+ * Q3's ruling: the Nice Future collection rule lives in these manager-only
+ * settings with audit history, NOT as a hard-coded slug (P1 spent a whole card
+ * deleting that habit) and not as a new `suppliers` boolean.
+ */
+purchasingSettingsRouter.put("/supplier-collection", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseJsonBody(c, purchasingSetSupplierCollectionInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("purchasing_set_supplier_collection", {
+    p_supplier_id: parsed.data.supplierId,
+    p_destination_id: parsed.data.destinationId,
+    p_partner_id: parsed.data.partnerId,
   });
   if (error) {
     const m = mapPgError(error);

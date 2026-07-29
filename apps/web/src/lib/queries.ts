@@ -227,6 +227,8 @@ import {
   type PurchasingSetPoDaysInput,
   type PurchasingSetProductionDaysInput,
   type PurchasingSetWorkWeekInput,
+  type PurchasingSetDestinationAddressInput,
+  type PurchasingSetSupplierCollectionInput,
   // 0244/0245 — HR commission portal (GET /api/hr/report + config writes).
   type CommissionReport,
   type CommissionStaff,
@@ -3903,6 +3905,17 @@ export function useSetProductionDays() {
 }
 export function useSetSupplierWorkWeek() {
   return usePurchasingSettingsMutation<PurchasingSetWorkWeekInput>("/work-week");
+}
+/** P4 (0307) — the address a supplier drives to. Only the two external
+ *  destinations have one; `Carres Klang` derives its address from the
+ *  warehouse record and the RPC refuses to write one. */
+export function useSetDestinationAddress() {
+  return usePurchasingSettingsMutation<PurchasingSetDestinationAddressInput>("/destination-address");
+}
+/** P4 (0307) — a supplier that does not deliver: who collects, and the ONE
+ *  destination its POs may name. */
+export function useSetSupplierCollection() {
+  return usePurchasingSettingsMutation<PurchasingSetSupplierCollectionInput>("/supplier-collection");
 }
 
 /** Purchase §6 · Snooze PO — defer a whole supplier's PO planning until

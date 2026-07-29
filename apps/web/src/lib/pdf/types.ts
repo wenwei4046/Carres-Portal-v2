@@ -106,23 +106,47 @@ export type InvoiceTemplateData = {
   }>;
 };
 
+/**
+ * The EXTERNAL purchase order document — what a supplier or a pickup partner
+ * holds. Filled ONLY by `purchasing_po_document` (migration 0307) through
+ * `/api/operation/pos/:id/print-data`.
+ *
+ * P4, Loo 2026-07-29: no purchase price and no RM amount of any kind leaves the
+ * portal on this document, for ANY external recipient, and the template is NOT
+ * split to keep prices for one of them. So there is no `unit_price`, no
+ * `line_total`, no `grand_total` and no `currency` — and there must never be.
+ * `attrs` is ALLOWLISTED at the database (`color · gap · fabric_name`) because
+ * `fabric_surcharge` is an RM amount that rides inside it; a payload passing
+ * `attrs` through would leak a price after every named money field was gone.
+ *
+ * `buyer` is gone with them. It carried the receiving WAREHOUSE, which answers
+ * "where do we record inventory" — the wrong question for a document whose job
+ * is telling a factory where to send the goods. `destination` answers that one,
+ * and it is the SAVED destination name, never `Ship-to` / `Destination` /
+ * `Drop point` (COPY-STANDARD).
+ *
+ * Internal portal screens keep reading internal price data through their own
+ * authorised paths. This shape is about EXTERNAL documents only.
+ */
 export type PoTemplateData = {
   po_number: string;
   issue_date: string;
   po_id: string;
   supplier: { name: string; address: string | null; contact: string | null };
-  buyer: { name: string; contact: string | null };
+  /** Where the goods go. `address` is never blank — the RPC refuses to export
+   *  a PO bound for an address nobody set. */
+  destination: { name: string; address: string };
+  /** Free text a manager typed for this PO; null when none. */
+  delivery_instructions: string | null;
+  /** The date the goods are expected, ISO yyyy-mm-dd; null when not set. */
+  eta_date: string | null;
   lines: Array<{
     sku: string;
     description: string;
     qty: number;
     unit: string;
-    unit_price: number;
-    line_total: number;
     attrs?: Record<string, unknown> | null;
   }>;
-  grand_total: number;
-  currency: string;
   terms: string | null;
 };
 

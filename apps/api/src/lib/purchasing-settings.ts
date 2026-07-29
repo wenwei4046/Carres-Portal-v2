@@ -2,9 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   isPurchasingCategory,
   type PurchasingCategory,
+  type PurchasingDestination,
   type PurchasingProductionDays,
   type PurchasingSettingChange,
   type PurchasingSettings,
+  type PurchasingSupplierCollection,
   type PurchasingSupplierRow,
 } from "@carres/shared";
 
@@ -77,21 +79,36 @@ export async function loadPurchasingSettings(
 ): Promise<LoadedPurchasingSettings> {
   const numbers = await loadPurchasingNumbers(sb);
 
-  const [skusR, suppliersR, prodR, weekR, changesR] = await Promise.all([
+  const [skusR, suppliersR, prodR, weekR, destR, changesR] = await Promise.all([
     sb
       .from("product_skus")
       .select("supplier_id, product_models!inner(category)")
       .not("supplier_id", "is", null),
     sb.from("suppliers").select("id, name"),
     sb.from("purchasing_production_days").select("supplier_id, category, working_days"),
-    sb.from("purchasing_supplier_settings").select("supplier_id, off_days"),
+    // P4 (0307) — the collection rule rides on the SAME row as the work week,
+    // so it costs no extra round trip. `off_days` and `fixed_destination_id`
+    // are two facts about one supplier, not two tables.
+    sb
+      .from("purchasing_supplier_settings")
+      .select("supplier_id, off_days, fixed_destination_id, collected_by_partner_id"),
+    // `warehouses(address)` is embedded, not joined by hand: a destination
+    // linked to one of our own warehouses carries NO address of its own (a DB
+    // CHECK forbids it) and derives one from the warehouse record. Reading
+    // only the destination's own column would show `Address not set` against
+    // `Carres Klang`, which 0307 exists to make impossible.
+    sb
+      .from("purchasing_destinations")
+      .select("id, name, address, warehouse_id, is_default, warehouses(address)")
+      .eq("active", true)
+      .order("sort_order", { ascending: true }),
     sb
       .from("purchasing_setting_changes")
       .select("setting_key, supplier_id, category, old_value, new_value, changed_at, changed_by")
       .order("changed_at", { ascending: false })
       .limit(400),
   ]);
-  for (const r of [skusR, suppliersR, prodR, weekR, changesR]) {
+  for (const r of [skusR, suppliersR, prodR, weekR, destR, changesR]) {
     if (r.error) throw new Error(`purchasing settings: ${r.error.message}`);
   }
 
@@ -112,11 +129,40 @@ export async function loadPurchasingSettings(
   }
 
   const offDaysBySupplier = new Map<string, number[]>();
+  const supplierCollection: PurchasingSupplierCollection[] = [];
   for (const row of (weekR.data ?? []) as Array<Record<string, unknown>>) {
     offDaysBySupplier.set(
       row.supplier_id as string,
       ((row.off_days as number[] | null) ?? []).map(Number),
     );
+    // Only suppliers that actually carry a rule. A row exists for every
+    // supplier whose work week was ever set, and listing those as "collected
+    // by nobody, delivering nowhere" would read as a rule somebody made.
+    const fixedDestinationId = (row.fixed_destination_id as string | null) ?? null;
+    const collectedByPartnerId = (row.collected_by_partner_id as string | null) ?? null;
+    if (fixedDestinationId || collectedByPartnerId) {
+      supplierCollection.push({
+        supplierId: row.supplier_id as string,
+        fixedDestinationId,
+        collectedByPartnerId,
+      });
+    }
+  }
+
+  const destinations: PurchasingDestination[] = [];
+  for (const row of (destR.data ?? []) as Array<Record<string, unknown>>) {
+    const linkedToWarehouse = (row.warehouse_id as string | null) != null;
+    // PostgREST returns an embedded to-one as either an object or a
+    // single-element array depending on how it resolves the relationship.
+    const wh = row.warehouses as { address?: string | null } | { address?: string | null }[] | null;
+    const whAddress = (Array.isArray(wh) ? wh[0] : wh)?.address ?? null;
+    destinations.push({
+      id: row.id as string,
+      name: (row.name as string | null) ?? "",
+      address: linkedToWarehouse ? whAddress : ((row.address as string | null) ?? null),
+      linkedToWarehouse,
+      isDefault: Boolean(row.is_default),
+    });
   }
 
   const nameById = new Map<string, string>();
@@ -180,5 +226,5 @@ export async function loadPurchasingSettings(
     }
   }
 
-  return { ...numbers, suppliers, productionDays, lastChanges };
+  return { ...numbers, suppliers, productionDays, destinations, supplierCollection, lastChanges };
 }

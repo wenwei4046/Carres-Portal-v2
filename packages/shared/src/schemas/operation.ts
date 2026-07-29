@@ -245,6 +245,22 @@ export const createPoInput = z.object({
   // closed). Supplier/Finance AP-aging both read `purchase_orders.eta_date`;
   // null was silently corrupting both surfaces.
   etaDate: z.string().date(),
+  // P4 (migration 0307, Loo 2026-07-29) — WHERE THE GOODS GO. Optional on the
+  // wire on purpose: `purchase_orders.destination_id` is NOT NULL with a
+  // database DEFAULT of the single active default destination, so a caller
+  // that says nothing gets `Carres Klang` from the database rather than from a
+  // constant in TypeScript. That is the card's own item 4, not the kind of
+  // silent fallback P1 spent a card deleting — the default is a row a manager
+  // can see and change.
+  //
+  // Threaded by a post-RPC UPDATE, exactly like `etaDate` above: adding a
+  // parameter to the create doors would mean DROP+CREATE on five live
+  // inventory functions (~35,000 characters), and the destination trigger
+  // reconciles the incoming units whichever door created the PO.
+  destinationId: z.string().uuid().optional(),
+  // Free text for the factory ("call the guard house on arrival"). Printed on
+  // the external document; null / absent prints nothing.
+  deliveryInstructions: z.string().trim().max(500).nullable().optional(),
 }).strict();
 export type CreatePoInput = z.infer<typeof createPoInput>;
 

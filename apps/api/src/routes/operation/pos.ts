@@ -591,148 +591,75 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
   return c.json(response);
 });
 
-// ----- GET /:id/print -----
-// Server-side PO PDF (spec §18.4 F6). Mirrors GET /orders/:id/print-do.
-// Printable for any non-cancelled PO (open or received). The PDF is what
-// operation hands to the supplier as the procurement document.
+// ----- GET /:id/print-data -----
+// The external PO document. This is what operation hands to the supplier, and
+// to a pickup partner — every consumer of `renderPoPdf` comes through here.
 //
-// Note: the schema's `purchase_order_lines` table only stores (po_id, sku,
-// qty, received_qty) — there is no per-line cost. Unit price comes from
-// product_skus.price (our reference price, not supplier COGS). Same query
-// also supplies the SKU description (variant text). When a line's SKU isn't
-// found in product_skus (legacy PO), unit_price falls back to 0 and the SKU
-// itself is used as the description — the PDF still renders.
-// 2026-05-12 (Loo): renamed `/print` → `/print-data`. Returns JSON;
-// browser renders @react-pdf locally (Workers WASM ban — see render.ts
-// note in apps/web/src/lib/pdf/).
+// 2026-05-12 (Loo): renamed `/print` → `/print-data`. Returns JSON; browser
+// renders @react-pdf locally (Workers WASM ban — see render.ts note in
+// apps/web/src/lib/pdf/).
+//
+// P4 (migration 0307, Loo 2026-07-29) — this route no longer ASSEMBLES the
+// document. `purchasing_po_document` is the ONE database source for external PO
+// documents, and no second direct-table export path is allowed. That is not
+// tidying: the route used to read `product_skus.price` and compute a grand
+// total, so the purchase price left the portal on a document a factory keeps.
+// The money is not removed from a template — it is ABSENT FROM THE PAYLOAD, so
+// no client can print what it never receives. The RPC also owns the internal
+// role gate, the cancelled-PO refusal, the address resolution and the `attrs`
+// allowlist (`fabric_surcharge` is an RM amount and rides in `attrs`).
+//
+// The route's whole remaining job is turning three raised conditions into the
+// sentence a human reads. Those sentences are LOCKED (Loo, 2026-07-29) — do not
+// reword them, and never let Settings' own `Address not set` leak into one.
+
+/**
+ * The three export refusals, in the words Loo locked on 2026-07-29.
+ *
+ * `mapPgError` already routes these to the right STATUS and the right CODE
+ * (P0001 → 422 with `detail` as the code, 42501 → 403, 42P01 → 404). What it
+ * cannot do is speak: it forwards the RPC's own message, and the RPC says
+ * `no address on file for AL Sungai Buloh` — accurate to a developer, and not
+ * a sentence anyone was asked to rule. So the status and code come from the
+ * shared mapper and only the MESSAGE is overridden here.
+ *
+ * `Address not set` is deliberately NOT one of these strings. It is manager
+ * Settings' own word and may never reach a store (handoff §7).
+ */
+const PO_DOCUMENT_MESSAGES: Record<string, string> = {
+  destination_address_missing:
+    "Set the destination address in Purchasing Settings before exporting the purchase order.",
+  po_not_printable: "This purchase order cannot be exported in its current status.",
+  forbidden: "You do not have permission to export this purchase order.",
+  not_found: "This purchase order no longer exists.",
+};
+
+function poDocumentError(error: { code?: string; message?: string; details?: string }) {
+  const m = mapPgError(error);
+  const locked = PO_DOCUMENT_MESSAGES[m.body.code];
+  return locked ? { status: m.status, body: { ...m.body, message: locked } } : m;
+}
+
 operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
   const poId = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  // Fetch PO + supplier + warehouse via embedded resources. supplier and
-  // warehouse are FK'd from purchase_orders so PostgREST auto-detects the
-  // join. purchase_order_lines is FK'd by po_id, also auto-detected.
-  // suppliers has no `address` column (0001_init.sql:89-97), only contact.
-  const { data: po, error: e1 } = await sb
-    .from("purchase_orders")
-    .select(
-      "id, status, sup_status, so, so_refs, eta_date, placed_at, supplier_id, warehouse_id, suppliers(name, contact), warehouses(name, address)",
-    )
-    .eq("id", poId)
-    .maybeSingle();
-  if (e1) {
-    const m = mapPgError(e1);
+  const { data, error } = await sb.rpc("purchasing_po_document", { p_po_id: poId });
+  if (error) {
+    const m = poDocumentError(error);
     return c.json(m.body, m.status);
   }
-  if (!po) {
-    return c.json({ error: "not_found", code: "not_found", message: "PO not found" }, 404);
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const poRow: any = po;
-  // Status gate: only cancelled POs are unprintable. open + received are both
-  // valid procurement records the supplier may want a PDF for. (po_status
-  // enum is 'open' | 'received' | 'cancelled' — see 0001_init.sql:29.)
-  if (poRow.status === "cancelled") {
+  // A DEFINER function returning nothing is a shape change, not a missing PO —
+  // the RPC raises 42P01 for that. Say so rather than serving `null` as a
+  // document.
+  if (!data) {
     return c.json(
-      { error: "rule_violation", code: "po_not_printable", message: "Cancelled POs cannot be printed" },
-      422,
+      { error: "rpc_failed", code: "rpc_failed", message: "The purchase order document could not be built." },
+      500,
     );
   }
 
-  // Lines.
-  const { data: lines, error: e2 } = await sb
-    .from("purchase_order_lines")
-    .select("sku, qty, received_qty, attrs")
-    .eq("po_id", poId);
-  if (e2) {
-    const m = mapPgError(e2);
-    return c.json(m.body, m.status);
-  }
-  const lineRows = lines ?? [];
-
-  // SKU descriptions + reference prices. Same pattern as orders' /print-do —
-  // purchase_order_lines.sku has no FK to product_skus, so a separate lookup.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const skus: string[] = lineRows.map((l: any) => l.sku);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const skuMetaBySku: Record<string, { variant: string; price: number }> = {};
-  if (skus.length > 0) {
-    const { data: skuRows, error: e3 } = await sb
-      .from("product_skus")
-      .select("sku, variant, price")
-      .in("sku", skus);
-    if (e3) {
-      const m = mapPgError(e3);
-      return c.json(m.body, m.status);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const r of skuRows ?? []) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const row = r as any;
-      skuMetaBySku[row.sku] = { variant: row.variant, price: Number(row.price) };
-    }
-  }
-
-  // Build PoTemplateData. po.id IS the po_number (text PK like 'PO-2031');
-  // there is no separate po_number column. issue_date prefers placed_at
-  // (when the PO was issued) and falls back to today. ISO yyyy-mm-dd.
-  const issueIso = poRow.placed_at ?? new Date().toISOString();
-  const issueDate = String(issueIso).slice(0, 10);
-
-  const supplierRow = poRow.suppliers ?? null;
-  const warehouseRow = poRow.warehouses ?? null;
-
-  const pdfLines = lineRows.map(
-    (l: { sku: string; qty: number; received_qty: number; attrs?: Record<string, unknown> | null }) => {
-      const meta = skuMetaBySku[l.sku];
-      const qty = Number(l.qty);
-      const unitPrice = meta?.price ?? 0;
-      return {
-        sku: String(l.sku),
-        description: meta?.variant ?? String(l.sku),
-        qty,
-        unit: "pc",
-        unit_price: unitPrice,
-        line_total: qty * unitPrice,
-        // 0076 / 0077: thread the cascade picker payload into the PDF so the
-        // supplier sees "Walnut · gap 14"" right under the description and
-        // doesn't have to guess which variant.
-        attrs: l.attrs ?? null,
-      };
-    },
-  );
-  const grandTotal = pdfLines.reduce((s, ln) => s + ln.line_total, 0);
-
-  const templateData: PoTemplateData = {
-    // po.id is already in the canonical 'PO-NNNN' format, so it doubles as
-    // the doc number on the PDF.
-    po_number: String(poRow.id),
-    issue_date: issueDate,
-    po_id: String(poRow.id),
-    supplier: {
-      name: supplierRow?.name ?? "Supplier",
-      // suppliers.address column does not exist in the schema; suppliers
-      // ship from a known factory and we don't track that physical address
-      // here. Pass null so the template hides the line.
-      address: null,
-      contact: supplierRow?.contact ?? null,
-    },
-    buyer: {
-      // Buyer = Carres HQ side. Use the receiving warehouse name + address
-      // as the ship-to block, so the supplier knows where to send the goods.
-      name: warehouseRow?.name ?? "Carres HQ",
-      contact: warehouseRow?.address ?? null,
-    },
-    lines: pdfLines,
-    grand_total: grandTotal,
-    currency: "MYR",
-    // No `terms` column on purchase_orders — pass null. The template hides
-    // the block when null.
-    terms: null,
-  };
-
-  return c.json(templateData);
+  return c.json(data as PoTemplateData);
 });
 
 // ----- GET /:id/source-orders -----
@@ -838,7 +765,7 @@ operationPosRouter.post("/", requireOperation, async (c) => {
   if (poId) {
     const { error: etaErr } = await sb
       .from("purchase_orders")
-      .update({ eta_date: parsed.data.etaDate })
+      .update({ eta_date: parsed.data.etaDate, ...poDestinationPatch(parsed.data) })
       .eq("id", poId);
     if (etaErr) {
       const m = mapPgError(etaErr);
@@ -847,6 +774,27 @@ operationPosRouter.post("/", requireOperation, async (c) => {
   }
   return c.json({ po: data });
 });
+
+/**
+ * P4 — the destination half of the post-RPC UPDATE (migration 0307).
+ *
+ * Returns ONLY the columns the caller actually chose. An absent `destinationId`
+ * must leave the column alone so the database's own DEFAULT stands; writing
+ * `null` over it would violate NOT NULL, and writing a TypeScript constant
+ * would put the default in two places.
+ *
+ * The trigger `trg_po_units_follow_destination` runs off this UPDATE and
+ * reconciles the `incoming` units, which is why an AL-bound PO created through
+ * any door ends up with none — no route has to remember to do it.
+ */
+function poDestinationPatch(input: { destinationId?: string; deliveryInstructions?: string | null }) {
+  const patch: { destination_id?: string; delivery_instructions?: string | null } = {};
+  if (input.destinationId) patch.destination_id = input.destinationId;
+  if (input.deliveryInstructions !== undefined) {
+    patch.delivery_instructions = input.deliveryInstructions || null;
+  }
+  return patch;
+}
 
 // ----- POST /batch create -----
 // C5.2: per-PO warehouse picker. When the modal's supplier-grouping yields >1
@@ -937,7 +885,25 @@ operationPosRouter.post("/batch", requireOperation, async (c) => {
   // RPC returns { po_ids: ['PO-2031', ...] } — adapt to camelCase poIds for
   // wire consistency with the rest of the route surface.
   const out = data as { po_ids?: string[] } | null;
-  return c.json({ poIds: out?.po_ids ?? [] });
+  const poIds = out?.po_ids ?? [];
+
+  // P4 — the destination, per PO, by the same post-RPC UPDATE the single-create
+  // door uses. `po_ids` comes back in input order (0055b builds it by
+  // appending inside the same loop that reads `p_pos`), so index i belongs to
+  // pos[i]. Wiring only the single-create door would have left every
+  // multi-supplier PO silently defaulted to `Carres Klang` — the exact
+  // known-wrong posting Q2 refuses to defer.
+  for (let i = 0; i < poIds.length; i += 1) {
+    const patch = poDestinationPatch(parsed.data.pos[i] ?? {});
+    if (Object.keys(patch).length === 0) continue;
+    const { error: destErr } = await sb.from("purchase_orders").update(patch).eq("id", poIds[i]);
+    if (destErr) {
+      const m = mapPgError(destErr);
+      return c.json(m.body, m.status);
+    }
+  }
+
+  return c.json({ poIds });
 });
 
 // ----- POST /:id/receive -----
