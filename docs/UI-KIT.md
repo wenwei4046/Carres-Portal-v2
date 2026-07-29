@@ -217,8 +217,8 @@ of them looks wrong when read on its own.
 
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
-| Every kit artifact declares the kit edition it follows | Build Guard — a header scan for the edition string in `components/kit/**`, `lib/design-standard.ts` and `index.css` | ⏳ **D1** | `check-design.mjs` |
-| No artifact claims to outrank this file | Build Guard — the same scan refuses a second authority claim | ⏳ **D1** | `check-design.mjs` |
+| Every kit artifact declares the kit edition it follows | Build Guard — a header scan for the edition string in `components/kit/**`, `lib/design-standard.ts` and `index.css` | ✅ **live (D1)** | `check-design.mjs` rule J |
+| No artifact claims to outrank this file | Build Guard — the same scan refuses a second authority claim | ✅ **live (D1)** | `check-design.mjs` rule K |
 
 *(Both land with the Build Guard, which is D1's whole job. Naming the card is
 what §16 requires of a rule this file cannot enforce on the day it is written.)*
@@ -246,7 +246,7 @@ this section owns the principle.
 
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
-| No per-user store of UI shape — no browser-persisted layout, panel or column state under `pages/**` | Build Guard — a scan for `localStorage` keyed to layout in `pages/**` | ⏳ **D1** | `check-design.mjs` |
+| No per-user store of UI shape — no browser-persisted layout, panel or column state under `pages/**` | Build Guard — a scan for `localStorage` keyed to layout in `pages/**` | ✅ **live (D1)** | `check-design.mjs` rule L |
 
 > **Its cost is not zero, and it is stated rather than discovered later.** Three
 > live behaviours fail this rule today (measured by R2, 2026-07-28):
@@ -283,7 +283,7 @@ edit somebody makes while they are in the file for another reason.
 
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
-| No persisted state, query key or storage key is built from a display string | Build Guard — a scan for a `localStorage` / query key composed from a label | ⏳ **D1** | `check-design.mjs` |
+| No persisted state, query key or storage key is built from a display string | Build Guard — a scan for a `localStorage` / query key composed from a label | ✅ **live (D1)** | `check-design.mjs` rule M |
 
 ---
 
@@ -1529,7 +1529,7 @@ arrives with its component — and `COPY-STANDARD` owns which string it is.
 
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
-| A component may not spell a business word; it receives one from the dictionary module | Build Guard — a scan for a COPY-STANDARD label literal inside `components/**` | ⏳ **D1** | `check-design.mjs` |
+| A component may not spell a business word; it receives one from the dictionary module | Build Guard — a scan for a COPY-STANDARD label literal inside `components/**` | ✅ **live (D1)** | `check-design.mjs` rule N |
 
 *(Two components already hold this by construction and are the shape the scan
 generalises: `StatusPill` spells no word, and `Icon` carries §5.3's meanings
@@ -1589,11 +1589,21 @@ Exempt: `pages/dealer/**` (POS, Part B) and `pages/print/**`.
 
 ## §13.2 Ratchet
 
-| Stage | Behaviour | Card |
-|---|---|---|
-| 1 | Warn only; write the baseline count | D1 |
-| 2 | Warn + CI report; the baseline may only go down | D2–D4 |
-| 3 | **Fail the build** | D5 |
+| Stage | Behaviour | Card | State |
+|---|---|---|---|
+| 1 | Warn only; write the baseline count | D1 | ✅ **live** — `scripts/check-design.mjs`, baseline in `scripts/design-guard-baseline.json` |
+| 2 | Warn + CI report; the baseline may only go down | D2–D4 | ⏳ — built, switched on by `--strict` |
+| 3 | **Fail the build** | D5 | ⏳ — `--strict` becomes the default |
+
+**Stage 1 counts and never fails.** That is the point: the baseline is the
+measurement the codemods (D2–D4) are scored against, and a guard that failed on
+day one would have had to be switched off on day one.
+
+**The guard reads the token records; it retypes nothing.** The eight spacing
+steps, four radii, six type tokens, three weights, three icon sizes and forty
+icon meanings come out of `components/kit/tokens.ts` and `components/kit/Icon.tsx`
+at runtime — so a ninth step is picked up by editing the record, and the scan
+cannot drift from the law the way the §16 percentage did.
 
 **Stage 3 is blocked while the PENDING register is non-empty.** ✅ It is empty
 since 2026-07-28, so D5 is no longer blocked on a DECISION — only on D1–D4
@@ -1609,9 +1619,41 @@ being built.
 | D | `text-[Npx]`; a typography token outside §2.1; a weight outside §2.2 (700 is dead) | ✅ **frozen** |
 | E | a spacing / radius / border value outside §4 (the 8-step scale) | ✅ **frozen** |
 | F | a `z-` class anywhere in `pages/**` | ✅ |
-| G | a raw `<table>`, `<input>`, `<select>`, or a `fixed inset-0` overlay in `pages/**` | ⏳ D1 — **its blocker is gone**: D0.5a/b/b.1/c all shipped, so every box a page would hand-roll now exists |
-| H | a `PageShell` whose fixed chrome exceeds its variant's budget (§1.3) | ⏳ D1 — **its blocker is gone**: `PageShell` shipped in D0.5c |
-| I | the same class string ≥ 40 chars repeated across ≥ 2 files (§6.6) | ⏳ D1 |
+| G | a raw `<table>`, `<input>`, `<select>`, or a `fixed inset-0` overlay in `pages/**` | ✅ **frozen** |
+| H | a `PageShell` whose fixed chrome exceeds its variant's budget (§1.3) | ✅ **frozen** |
+| I | the same class string ≥ 40 chars repeated across ≥ 2 files (§6.6) | ✅ **frozen** |
+| J | a kit artifact that declares no kit edition (§0.3) | ✅ **frozen** |
+| K | an artifact claiming to outrank this file (§0.3) | ✅ **frozen** |
+| L | a browser-persisted UI-shape key under `pages/**` (§0.4) | ✅ **frozen** |
+| M | a persisted / query / storage key built from a display string (§0.5) | ✅ **frozen** |
+| N | a component spelling a COPY-STANDARD business word (§10.1) | ✅ **frozen** |
+
+**All fourteen are implemented and measured (D1).** J–N are the five mechanisms
+card D0.6 wrote into §0.3 · §0.4 · §0.5 · §10.1 and scheduled here.
+
+### The baseline D1 froze, on 348 files
+
+```
+  A   442  a raw hex literal              I   294  a repeated class string
+  B     8  the flame outside the logo     J     3  no kit edition declared
+  C   146  an icon outside §5             K     0  an authority claim
+  D  6081  a type value outside §2        L     8  a persisted UI shape
+  E  1765  a §4 value                     M     2  a key built from a label
+  F    78  a `z-` class in pages/**       N     0  a component spelling a word
+  G   684  a hand-rolled box              H     0  a PageShell over budget
+                                          ─────────────────────────────────
+                                          9,511 findings
+```
+
+**Twelve of the fourteen are proved able to FIRE**, by
+`scripts/check-design.selftest.mjs`: it writes one file per rule that breaks
+exactly that rule, re-runs the guard and asserts the count went up. **A rule
+reporting 0 is either clean or broken, and from the outside those look
+identical** — the first draft of L and M reported ZERO on the three sites R2 had
+already found by hand, because the key was a `const` two lines above the call.
+J is proved instead by its 3 live hits. **H is the one rule with no proof of
+life**, said out loud rather than left looking clean: provoking it means editing
+`PageShell.tsx`, which belongs to another card.
 
 ## §13.4 The screenshot gate
 
@@ -1673,63 +1715,48 @@ parses the Enforcement column out of this file, checks which mechanisms
 actually exist in the repo, and rewrites the block. A hand-maintained
 percentage is prose, and prose drifts; that is the whole thesis of this
 document.
-*(The numbers below are D0.6's count, valid until D1 wires the generator. **They
-were COUNTED off the tables by a script, not typed** — see the correction under
-the arithmetic.)*
+*(Regenerated by `node scripts/check-design.mjs --report`. **Do not hand-edit
+the block below** — three cards did, each adding to the figure in front of it,
+and by D0.6 the published number was nine points adrift of its own tables.)*
+
+<!-- UI-HEALTH:START — generated by scripts/check-design.mjs --report. Do not hand-edit. -->
 
 ```
                          enforced / total
-  Typography    ░░░░░░░░░░    0%      0 / 3
+  Typography    ░░░░░░░░░░     0%     0 / 3
   Colour        ██████░░░░    60%     3 / 5
-  Spacing       ██▌░░░░░░░    25%     1 / 4
+  Spacing       ███░░░░░░░    25%     1 / 4
   Icons         ██████████   100%     4 / 4
-  Components    █████████▎   93%    14 / 15
+  Components    █████████░    93%    14 / 15
   Table         ██████████   100%     4 / 4
   Layout        █████░░░░░    50%     3 / 6
   Hierarchy     ██████████   100%     7 / 7
   ──────────────────────────────────────────
-  TOTAL         ███████▌░░    75%    36 / 48
+  TOTAL         ████████░░    75%    36 / 48
 ```
 
 | | Count | Meaning |
 |---|---|---|
-| Rules | **48** | design rules stated in §1–§8 — every row of a `Rule · Enforcement · Status · Evidence` table in those chapters, and nothing else |
+| Rules | **48** | design rules stated in §1–§8 |
 | **Enforced** | **36** | Type System / Component API / Build Guard / ESLint is live |
-| Scheduled | 9 | a card exists (D1–D7) |
+| Scheduled | 9 | a card exists |
 | **Blocked on a decision** | **0** | ✅ the PENDING REGISTER is empty |
-| **Human Review debt** | **3** | `fmtDate()` · "max 2 reds per screen" · facet group order. **"Progress carries no events" closed in D0.5c** — the first time this number has gone down |
+| **Human Review debt** | **3** | nobody has found a mechanism |
 
-**The D0.5c arithmetic, shown so it can be checked:**
+36 + 9 + 3 = 48.
 
-```
-rules      46  +  6  =  52     4 new §7 Table rules + 2 new §1.4 rules that
-                               L4 carried as prose only (identity is
-                               values-only with a 4-fact cap · Detail is a
-                               route)
-enforced   22  + 12  =  34     the 6 new ones, all born enforced · §1.4's
-                               three ⏳ D0.5c rules · §1.3's 8th-band rule ·
-                               §8.3's module-tab rule · and the DEBT rule
-                               "Progress carries no events", which became a
-                               type instead of a hope
-coverage   47.83%  →  65.38%   ⬆
-debt          4    →      3    ⬇ FIRST time it has gone down
-```
+**Coverage — 36 / 48 = 75.00%.** Counted from the Enforcement
+column of every rule table in §1–§8, by `check-design.mjs --report`. **No card may
+add to this figure by hand** — three cards did, and by D0.6 the published number
+was nine points adrift of the tables it claimed to summarise.
 
-**One rule deliberately did NOT move to ✅:** *"one interaction model for every
-list page"* (§8.2). The components exist; no page renders through them, so the
-filter behaviour still lives in each page. It becomes true at **D6**. Counting
-it now would be counting a card, which §16 forbids.
+**Governance and copy rules are outside this count**, as they always have been:
+§0 and §10 carry **10** more rule rows. Widening the denominator would read
+36 / 58 = 62.07% on a day nothing got worse, so it is stated, not taken.
 
-36 + 9 + 3 = 48. The three add up, which the previous block's did not.
+**Every ✅ points at a file that exists in the repo** — checked, not asserted.
 
-**Governance and copy rules are NOT in this number, and never have been.** The
-count is *design* rules — §1–§8. §0 and §10 carry **10** more rule rows (§0.1's
-five, plus §0.3's two, §0.4's one and §0.5's one added by D0.6, plus §10.1's
-one), every one of them ⏳ **D1**. They are stated here rather than folded in
-because widening the denominator is a change to what this number MEANS, and
-that is §16's own decision, not a consolidation card's. **Reported, not
-taken:** widening it would read 36 / 58 = 62.07% on the same day nothing about
-the kit got worse.
+<!-- UI-HEALTH:END -->
 
 **The D0.6 arithmetic, shown so it can be checked:**
 
@@ -1810,8 +1837,8 @@ coverage   9.09%  →  31.58%    ⬆
 
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
-| Coverage never decreases | Build Guard (report mode, ratchet) | ⏳ D1 | `check-design.mjs --report` |
-| Human Review debt never grows | Build Guard (report mode, ratchet) | ⏳ D1 | `check-design.mjs --report` |
+| Coverage never decreases | Build Guard (report mode, ratchet) | ✅ **live (D1)** | `check-design.mjs --report` |
+| Human Review debt never grows | Build Guard (report mode, ratchet) | ✅ **live (D1)** | `check-design.mjs --report` |
 
 ---
 
@@ -1824,6 +1851,7 @@ Taken 2026-07-27 across `apps/web/src`:
 | Pages | 285 (225 in scope; `operation/` = 118) |
 | Shared components | 19 |
 | Pages using `ListPageShell` / `PageHeader` | 10 / 1 — **274 hand-roll a shell** |
+| **Re-measured by D1's guard, 2026-07-29** | **348 files in scope · 9,511 findings** — A 442 hex · B 8 flame · C 146 icon · D 6,081 type · E 1,765 §4 · F 78 `z-` · G 684 hand-rolled box · I 294 repeated class string · J 3 no edition · L 8 persisted UI shape · M 2 key-from-a-label. **D is larger than the 2,556 below because it also counts Tailwind's own ramp and the dead weights**, which §2.1 and §2.2 both forbid; the row below counted `text-[Npx]` only |
 | Files hand-rolling `<table>` | 26, in 7 header shapes, 2 opposite visual languages |
 | Files hand-rolling a modal/drawer | 63, in 12+ overlay shapes, 5 backdrop colours |
 | Files hand-rolling `<input>` | 134, in 121 distinct class strings |

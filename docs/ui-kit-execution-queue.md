@@ -49,7 +49,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ✅ **shipped on main** (`2d5aaddb`) |
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ✅ **CLOSED as components-only** (PM, 2026-07-29), merged as PR #505 `929fa746`. The drawer is NOT migrated; real-page adoption is D6 |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **CLOSED 2026-07-29** — §8.0 · §0.3 · §0.4 · §0.5 · §10.1, the mirror re-based, §16 counted. Findings below, all Reported Only |
-| **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
+| **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ✅ **BUILT 2026-07-29** — `scripts/check-design.mjs`, 348 files, 14 rules, 9,511 findings frozen. §16 is generated. Card below |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
 | **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ |
@@ -711,6 +711,93 @@ Recorded so the builder does not have to rediscover them. **They are observation
 so that if the page reads better afterwards it is provably the hierarchy that did it. The line's
 own lesson list already carries this one — it is repeated here because this card is the largest
 opportunity to break it.
+
+---
+
+## D1 ✅ THE BUILD GUARD — BUILT 2026-07-29
+
+**`scripts/check-design.mjs`.** §13.1's real scope — **all of `apps/web/src`, 348 files**, not a
+hand-maintained list. The previous guard read a 30-file allow-list and checked colour only, which
+is why 225 files drifted while it reported clean.
+
+**§13.2 stage 1: it counts and never fails.** That is the design, not a compromise — the baseline
+is the measurement D2–D4 are scored against, and a guard that failed on day one would have been
+switched off on day one. `--strict` is built and is what D5 switches on.
+
+### The fourteen rules, and the baseline they froze
+
+```
+  A   442  a raw hex literal              I   294  a repeated class string
+  B     8  the flame outside the logo     J     3  no kit edition declared
+  C   146  an icon outside §5             K     0  an authority claim
+  D  6081  a type value outside §2        L     8  a persisted UI shape
+  E  1765  a §4 value                     M     2  a key built from a label
+  F    78  a `z-` class in pages/**       N     0  a component spelling a word
+  G   684  a hand-rolled box              H     0  a PageShell over budget
+                                          ─────────────────────────────────
+                                          9,511 findings, 348 files
+```
+
+**J–N are the five mechanisms D0.6 wrote into §0.3 · §0.4 · §0.5 · §10.1** — all five were `⏳ D1`
+and are now `✅ live`, which is the whole reason D0.6 was allowed to write them with a named card
+instead of a mechanism.
+
+### Nothing in the guard retypes a token
+
+The eight spacing steps, four radii, six type tokens, three weights, three icon sizes and forty
+icon meanings are READ at runtime out of `components/kit/tokens.ts` and `components/kit/Icon.tsx`.
+A ninth step is picked up by editing the record. **This is the direct answer to the §16 disease:**
+the percentage drifted for three cards because it was retyped; the guard cannot drift because it
+never holds a copy.
+
+### §16 is GENERATED, and its two health rules are now a ratchet
+
+`--report` parses the Enforcement column of every rule table in §1–§8, rewrites the block between
+`<!-- UI-HEALTH:START -->` markers, and **fails** if coverage drops or the Human Review debt grows.
+Proved by negative control: downgrade one ✅ and it exits 1 with
+*"coverage 72.92% is BELOW the baseline 75.00%"*.
+
+**It also caught a bug in its own first draft.** The generator read **33/48** where the tables said
+**36/48**, because three Enforcement cells contain an ESCAPED pipe — ``​`size` is `14 \| 16 \| 18`​``
+— and a naive `split("|")` reads the Status column out of the middle of the Enforcement cell. **The
+generator was wrong and the hand count was right**, which is the opposite of what I expected and the
+reason the two were compared at all.
+
+### Twelve of fourteen rules are PROVED able to fire
+
+`scripts/check-design.selftest.mjs` writes one file per rule that breaks exactly that rule, re-runs
+the guard, and asserts the count went up. **A rule reporting 0 is either clean or broken, and from
+the outside those are identical.** That is not hypothetical: the first draft of **L and M reported
+ZERO** on the three `localStorage` sites reference R2 had already found by hand, because the key is
+a `const` two lines above the call rather than a literal at it. Resolving the expression first took
+L from 2 → 8 and M from 0 → 2, and M now names the exact `ops-drawer-panel-v4:${title}` key R3
+called out.
+
+**J is proved by its 3 live hits. H is the one rule with no proof of life** — provoking it means
+editing `PageShell.tsx`, another card's file — and that is stated rather than left looking clean.
+
+### Findings, all Reported Only
+
+1. **The two guards' rule LETTERS mean different things.** The legacy `check-design-standard.mjs`
+   calls hex `A`, the shell `B`, icons `C`, KPI fill `E`, row height `F`, section chrome `G`, hand
+   -rolled selection `H`, grey hover `I` — while §13.3 calls those letters flame, spacing, `z-`,
+   hand-rolled boxes, PageShell budget, duplicate class strings. **Two files, one letter, two
+   meanings.** D1 did not renumber the legacy script: it is the live hard gate on `main` and
+   changing what it fails on is not a warn-only card's business. `lint` now runs both. **D5 folds
+   them into one.**
+2. **`B` reports 8 flame sites and the top two are the definition itself** — `index.css` sets
+   `--primary` to the flame, so the portal's PRIMARY ACTION colour *is* the flame, while §3.3 gives
+   that job to blue and §3.4 keeps the flame in the logo alone. **There is no logo component in
+   `apps/web/src`.** This is a real contradiction between the law and the running stylesheet, and it
+   is D3's to resolve, not a guard's.
+3. **`J` reports 3 kit artifacts with no edition** — `DialogFrame.tsx`, `dialog-container.tsx`,
+   `index.css`. One line each; not fixed here because D1 measures and D2–D7 edit.
+4. **`D` = 6,081 is bigger than the appendix's 2,556** because it also counts Tailwind's own type
+   ramp (`text-xs` …) and every dead weight, which §2.1 and §2.2 both forbid. The appendix counted
+   `text-[Npx]` only. **The appendix is not wrong, it is narrower** — re-measuring it is D1's own
+   listed job and is done here.
+5. **`I` = 294 duplicated class strings** is §6.6's "extract it" rule, and it is the single clearest
+   map of what D2–D4 should extract first.
 
 ---
 
