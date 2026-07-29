@@ -40,7 +40,7 @@
  *    don't act yet. Will be un-marked when the escape-hatch write path lands.
  *
  * VOCAB (rewritten by card **R8**, 2026-07-28): the three stage cells read
- *        `Prepare PO` · `Confirm ready date` · `Check in`, straight out of
+ *        `Issue PO` · `Confirm ready date` · `Check in`, straight out of
  *        `order-action-words.ts`. They used to say `Send POs` · `Chase factory`
  *        · `Receive` — and `Chase` is a BANNED word (COPY-STANDARD), while
  *        `Receive` as a verb is banned outright in favour of `Check in`. The
@@ -141,9 +141,10 @@ type Stage = "place" | "chase" | "receive";
  *  the list header are ONE label rendered twice, and that is exactly where "the
  *  same act, two words, on one screen" came from in the first place. */
 const STAGE_LABEL: Record<Stage, string> = {
-  // P7A — the To Order tab's first stage reads `Prepare PO`. `Send PO` is
-  // retired; the stage itself is not re-cut here (that is a purchasing card).
-  place: purchasingActionQueue("prepare_po"),
+  // The To Order tab's first stage reads `Issue PO` — the one act that creates
+  // a purchase order (Loo, 2026-07-30 — the Purchasing clean restart). `Send PO`
+  // is retired; the stage itself is not re-cut here (that is a purchasing card).
+  place: purchasingActionQueue("issue_po"),
   chase: purchasingActionQueue("confirm_ready_date"),
   receive: purchasingActionQueue("check_in"),
 };

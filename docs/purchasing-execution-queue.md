@@ -1117,6 +1117,13 @@ six things each.
 
 ### ✅ SHIPPED — what actually landed (2026-07-29)
 
+> **⚠️ PARTLY SUPERSEDED 2026-07-30 — the Purchasing clean restart (Loo).** `Draft PO` is
+> permanently removed, and with it slots 1 · 3 · 5 · 6 below (`Prepare PO`, the `Draft PO`
+> noun, `Demand no longer required`, `Covered by {count} Draft POs`). Raising a purchase
+> order is ONE act, `Issue PO`. The Operation Status list is FIVE labels, not six — `Draft` is
+> gone. `docs/COPY-STANDARD.md` is still the canonical home and is already corrected; this
+> card is the record of what was ruled on the day, not a live word list.
+
 **All eight slots ruled by Loo in one session. Documentation only — no schema, no migration,
 no API, no React.** `docs/COPY-STANDARD.md` is the canonical home for every word below and
 the four other documents reference it.
@@ -1189,10 +1196,8 @@ Every one was measured on 2026-07-29. **They are facts, not estimates.**
 | **G1** | **Demand whose supplier cannot be resolved is silently discarded.** The planning read drops any line whose item resolves to no supplier and produces no output anywhere. **Silent discard is not permitted** — it must appear under Missing configuration stating the customer order, the item, the category, the quantity and why resolution failed | `apps/api/src/routes/operation/purchase.ts` |
 | **G2** | **Supplier resolution runs by TWO different rules in one module.** Planning resolves by the item's own supplier alone; PO creation additionally falls back to which categories a supplier covers. A requirement invisible to one and buyable in the other is one requirement with two truths. **One rule, shared** | `purchase.ts` + `CreatePOModal.tsx` |
 | **G3** | **Intentionally held demand produces no output at all.** Deliberately excluded, time-boxed and snoozed demand is dropped with nothing on screen. It must state **what · who · why · until when**, and it may **never share a status or an empty state** with Missing configuration | `purchase.ts` |
-| **G4** | **There is no Draft PO anywhere in the system** — no store, no route, no schema, no screen. `DraftLine` in `CreatePOModal.tsx` is a form-row type, not a persisted object; do not mistake it for one | whole stack |
 | **G5** | **`Check in` must leave To Order, and no information may leave with it.** To Order's receiving stage states the **customer name / SO number** per entry; the Receiving tab does not carry that fact. **The To Order implementation is not removed until Receiving carries: PO · supplier · customer name · SO number · warehouse · ETA · quantity still to receive** | `OperationPurchase.tsx` → `OperationReceiving.tsx` |
 | **G6** | **`Confirm ready date` cannot be closed.** No route in the portal writes `purchase_orders.expected_ready_date`; the only supplier-facing write inserts one audit sentence and touches no date. The queue can only grow. **This is P5's finding and P5 still owns the fix** — P6 must not ship a To Order whose second queue is permanently red without saying so on screen | `apps/api` |
-| **G7** | **A draft's risk date is computed at read time, never stamped** (model §6.4), and **a draft whose covered demand has disappeared must be able to say so** (§6.5). Both are model rules, not optional polish | new work |
 
 ### Order of operations
 
@@ -1203,18 +1208,17 @@ Every one was measured on 2026-07-29. **They are facts, not estimates.**
    leave To Order. Doing it in the other order deletes information.
 3. Everything blocked on a word waits for Jess. Report it; do not name it.
 
-**Migration:** likely — a Draft PO is a stored business object and it is **not** a row of
-`purchase_orders` (it has no PO number and produces no external document, and that absence is
-what makes "a Draft is not a PO" structural). **Draft to Jess first (guardrail #8); number
-from the TRACKER at apply time, never from `ls`. Apply and verify BEFORE merging.**
+**Migration:** none expected — To Order stores no work-in-progress object (Loo, 2026-07-30 —
+the Purchasing clean restart). If one is ever needed: **draft to Jess first (guardrail #8);
+number from the TRACKER at apply time, never from `ls`. Apply and verify BEFORE merging.**
 
 **P7 runs AFTER P6, which is ✅ DONE.** **P4 is FROZEN and this card may unfreeze it
 only where the new architecture requires it**
 (Loo, 2026-07-29) — no unrelated refactoring of 0307's objects.
 
 **Done when:** no real procurable demand can leave the purchasing workload silently, held
-demand states who held it and until when, a Draft PO exists as its own business object inside
-To Order, and `Check in` has left To Order without a single fact being lost.
+demand states who held it and until when, and `Check in` has left To Order without a single
+fact being lost.
 
 ## Reported, not built (recorded so nobody rediscovers them late)
 
@@ -1237,5 +1241,5 @@ To Order, and `Check in` has left To Order without a single fact being lost.
 | P3 | ✅ the two missing supplier calls (migration **0306**) — and a balance date enters Delay planning too (Loo, 2026-07-29) | #506 |
 | P4 | ✅ where the goods go — migration **0307 applied, verified and merged** 2026-07-29 · **P4 FROZEN**; the application-code half is NOT P4 and starts as its own execution card (§10) | #513 |
 | P5 | ⬜ after P1-P4 · prove it with a real PO | — |
-| P6 | ✅ **Purchasing terminology freeze** (2026-07-29) — all eight slots ruled and written into `docs/COPY-STANDARD.md`. `Prepare PO` + `Issue PO` replace `Send PO`, which is retired along with the verb `Send`; the verb dictionary goes 6 → 7 with `Prepare`. Docs only | — |
+| P6 | ✅ **Purchasing terminology freeze** (2026-07-29), **partly superseded 2026-07-30 by the Purchasing clean restart**: `Draft PO` is permanently removed, raising a PO is ONE act (`Issue PO`), Operation Status is FIVE labels, and the verb dictionary went 6 → 7 (`Prepare`) and back to 6. Docs only | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |

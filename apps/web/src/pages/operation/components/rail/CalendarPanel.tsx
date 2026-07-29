@@ -65,10 +65,10 @@ type CalTab = "all" | "send" | "chase" | "receive" | "deliveries";
 // while the tab itself said `Check in`. All three lenses read the mirror now.
 const TAB_LABEL: Record<CalTab, string> = {
   all: "All",
-  // P7A — the lens is the To Order tab's FIRST stage, and its word is
-  // `Prepare PO` now (`Send PO` is retired, and the verb `Send` with it). The
-  // tab KEY stays `send` — internal, and it is in the URL nowhere.
-  send: purchasingActionQueue("prepare_po"),
+  // The lens is the To Order tab's FIRST stage, and its word is `Issue PO`
+  // (`Send PO` is retired, and the verb `Send` with it). The tab KEY stays
+  // `send` — internal, and it is in the URL nowhere.
+  send: purchasingActionQueue("issue_po"),
   chase: purchasingActionQueue("confirm_ready_date"),
   receive: purchasingActionQueue("check_in"),
   deliveries: "Deliveries",

@@ -73,7 +73,7 @@ function closes(key: OrderActionKey): OrderActionStep {
 /**
  * The steps that close `key`, measured against this order.
  *
- * The ORDER OF EVENTS the card names (Prepare PO → Issue PO → Call supplier →
+ * The ORDER OF EVENTS the card names (Issue PO → Call supplier →
  * Collect → Assign logistics → Call logistics → Deliver → Upload photo) is what
  * decides which step comes before which — it is **not** a gate chain and **not** the
  * display order. An action is never hidden until the one before it closes
@@ -84,24 +84,15 @@ export function orderActionChecklist(
   s: OrderActionSignals,
 ): OrderActionStep[] {
   switch (key) {
-    // P7A · ACT ONE. Nothing has been ordered from anybody and no draft covers
-    // it. There is no earlier step — this is where the goods track starts.
-    case "prepare_po":
-      return [closes("prepare_po")];
-
-    // P7A · ACT TWO. A Draft PO exists, which is the measured step before it —
-    // and it is measured from the same signal that opened this action, so the
-    // two can never disagree.
+    // Nothing has been ordered from anybody. There is no earlier step — this is
+    // where the goods track starts, and issuing is the single act that secures
+    // the goods (Loo, 2026-07-30 — the Purchasing clean restart).
     case "issue_po":
-      return [
-        measured("prepare_po", s.draftPoExists === true),
-        closes("issue_po"),
-      ];
+      return [closes("issue_po")];
 
     // The goods are on order and the supplier's date is what is outstanding.
     // The step before is `Issue PO`, because issuing is what makes a formal PO
-    // exist — preparing one does not, and `!goodsUnordered` is exactly "a PO
-    // covers these goods".
+    // exist, and `!goodsUnordered` is exactly "a PO covers these goods".
     case "confirm_ready_date":
       return [
         measured("issue_po", !s.goodsUnordered),

@@ -26,12 +26,10 @@
  */
 
 export type OrderActionKey =
-  // P7A (Loo, 2026-07-29) — `send_po` is RETIRED and replaced by the two acts
-  // it used to describe at once. `Prepare PO` produces a Draft PO that has left
-  // our company in no way; `Issue PO` creates the formal Purchase Order. The
-  // verb `Send` is retired with it and stays banned from reuse
-  // (`docs/COPY-STANDARD.md`, `docs/ACTION-FLOW-STANDARD.md` Law 4 rung 3).
-  | "prepare_po"
+  // `send_po` is RETIRED and the verb `Send` with it, and it stays banned from
+  // reuse. Raising a purchase order is ONE act — `Issue PO` — which creates the
+  // formal Purchase Order (Loo, 2026-07-30: the Purchasing clean restart; there
+  // is no preparation act and no Draft PO business object).
   | "issue_po"
   | "confirm_ready_date"
   | "delay_planning"
@@ -104,31 +102,17 @@ function amountBit(p: OrderActionParties): string | null {
 
 const WORDS: readonly OrderActionWord[] = [
   {
-    // P7A · ACT ONE. It gathers demand into a Draft PO and **nothing leaves our
-    // company** — no PO number, no document, no message to the factory
-    // (`docs/PURCHASING-WORKING-FLOW.md` §3).
-    //
-    // The DONE message COPY-STANDARD locks for it is `Draft PO prepared for
-    // {supplier}` — parameterised by the supplier, which this table's `done`
-    // field (a plain string) cannot hold. It stays `null` rather than being
-    // respelt without its party; nothing renders it yet either, which is this
-    // module's own rule for when the mirror grows.
-    key: "prepare_po",
-    queue: "Prepare PO",
-    line: (p) => `Prepare PO for ${party(p.supplier, "supplier")}`,
-    button: "Prepare PO",
-    done: null,
-  },
-  {
-    // P7A · ACT TWO, and **the only one that creates a formal Purchase Order.**
+    // **The only business action that creates a formal Purchase Order.**
     // It mints the PO number, produces the external document and opens the
-    // communication channels; a Draft PO can do none of those.
+    // communication channels. Nothing precedes it: demand goes from the plan
+    // straight to the document (Loo, 2026-07-30 — the Purchasing clean restart).
     //
     // `Issue` is the dictionary's own verb — the SYSTEM produces a formal
     // document, completion = the document exists — the same sense
     // `Issue delivery order` carries. Its locked done message
-    // (`PO issued to {supplier}`) names a party, so it is `null` here for the
-    // reason given on `prepare_po`.
+    // (`PO issued to {supplier}`) names a party, which this table's `done` field
+    // (a plain string) cannot hold, so it stays `null` rather than being respelt
+    // without its party.
     key: "issue_po",
     queue: "Issue PO",
     line: (p) => `Issue PO to ${party(p.supplier, "supplier")}`,
@@ -381,11 +365,11 @@ export const ORDER_ACTION_QUEUES: readonly string[] = WORDS.map((w) => w.queue);
 // ── PURCHASING — the dictionary's own table (R8) ──────────────────────────────
 //
 // COPY-STANDARD carries TWO dictionary tables, ORDERS + DELIVERY and PURCHASING.
-// **The PURCHASING table is the canonical home for `Prepare PO`, `Issue PO` and
-// `Confirm ready date`** (Loo, 2026-07-29): the Orders ladder DISPLAYS those
-// three, it does not respell them, and the ORDERS table points at this one.
-// So they are NOT respelt here either — they are read back out of `WORDS`, which
-// is the code's single home for the string.
+// **The PURCHASING table is the canonical home for `Issue PO` and
+// `Confirm ready date`**: the Orders ladder DISPLAYS those two, it does not
+// respell them, and the ORDERS table points at this one. So they are NOT
+// respelt here either — they are read back out of `WORDS`, which is the code's
+// single home for the string.
 //
 // *(That replaces the old rule — "`Send PO` and `Confirm ready date` are ONE
 // action each … listed twice" — which required both flows to carry an identical
@@ -410,7 +394,6 @@ export const ORDER_ACTION_QUEUES: readonly string[] = WORDS.map((w) => w.queue);
 // off COPY-STANDARD's PURCHASING table; P3 invented no word.
 
 export type PurchasingActionKey =
-  | "prepare_po"
   | "issue_po"
   | "confirm_ready_date"
   | "confirm_tomorrows_delivery"
@@ -480,7 +463,7 @@ const PURCHASING_ONLY: Record<
 };
 
 function purchasingWord(key: PurchasingActionKey): PurchasingWord {
-  if (key === "prepare_po" || key === "issue_po" || key === "confirm_ready_date") {
+  if (key === "issue_po" || key === "confirm_ready_date") {
     const w = wordFor(key);
     // `button` is non-null for both of these; the assertion is local and true.
     return {
@@ -562,7 +545,6 @@ export function tomorrowDeliveryAnswerLabel(
  *  guard to walk, and for a test to assert the table is complete. */
 export const PURCHASING_ACTION_QUEUES: readonly string[] = (
   [
-    "prepare_po",
     "issue_po",
     "confirm_ready_date",
     "confirm_tomorrows_delivery",

@@ -225,11 +225,8 @@ export default function TeamPanel() {
           )}
         </div>
         <div className="flex gap-1.5 mt-2">
-          {/* P7A — one duty, two acts (`Send PO` is retired): the holder both
-              prepares the consolidated PO and issues it. */}
-          <span className={VERB_CHIP} title="Prepares every consolidated PO — the one voice to suppliers">
-            {orderActionQueue("prepare_po")}
-          </span>
+          {/* One duty, one act (`Send PO` is retired): the holder issues every
+              consolidated PO. */}
           <span className={VERB_CHIP} title="Issues every consolidated PO — the one voice to suppliers">
             {orderActionQueue("issue_po")}
           </span>

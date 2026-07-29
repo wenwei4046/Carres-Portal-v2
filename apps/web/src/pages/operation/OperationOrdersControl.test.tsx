@@ -1342,14 +1342,14 @@ describe("nextActionOf (C2)", () => {
   it("past deadline + partner + No PO → Order PO (RUNG 1 not leapfrogged by the overdue escalation — SO-1104)", () => {
     const o = makeRow({ id: "x", so: 1, delivery_date: inDays(-2), ops_assigned_logistic: "p1" });
     // stock.state 'unknown' = No PO → the real unblock is Order PO, not Chase logistic.
-    expect(nextActionOf(o, { state: "unknown" }, MS).label).toBe("Prepare PO");
+    expect(nextActionOf(o, { state: "unknown" }, MS).label).toBe("Issue PO");
   });
 
   // ── STOCK TRACK — leads until goods are secured ──
   it("no PO (unknown stock) → Order PO (red)", () => {
     const o = makeRow({ id: "x", so: 1 });
     expect(nextActionOf(o, { state: "unknown" }, [])).toMatchObject({
-      label: "Prepare PO",
+      label: "Issue PO",
       tone: "danger",
     });
   });
@@ -1519,7 +1519,7 @@ describe("nextActionOf (C2)", () => {
         line_etas: { "mattress:MAT-1": inDays(14) },
       },
     });
-    expect(nextActionOf(o, { state: "unknown" }, MS).label).toBe("Prepare PO");
+    expect(nextActionOf(o, { state: "unknown" }, MS).label).toBe("Issue PO");
   });
 
   it("TBD delivery date → radar silent (no date to overshoot)", () => {
@@ -1919,7 +1919,7 @@ describe("nextActionOf (C2)", () => {
         paid: 2000,
       });
       expect(openActionsOf(o, { state: "unknown" }, MS).map((a) => a.key)).toEqual([
-        "prepare_po",
+        "issue_po",
         "assign_logistics",
         "collect",
       ]);
@@ -2495,7 +2495,7 @@ describe("Actions column · +N and the delivering FACT (C3)", () => {
   it("an order with three open actions leads with one and counts the rest", () => {
     wrap(<OperationOrdersControl />);
     const cell = row(3001);
-    expect(within(cell).getByText("Prepare PO for supplier")).toBeInTheDocument();
+    expect(within(cell).getByText("Issue PO to supplier")).toBeInTheDocument();
     expect(within(cell).getByTestId("next-more")).toHaveTextContent("+2");
   });
 

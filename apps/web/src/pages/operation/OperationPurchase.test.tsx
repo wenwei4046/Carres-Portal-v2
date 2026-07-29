@@ -302,11 +302,11 @@ describe("To Order · §8.2 click again clears (card P2)", () => {
 });
 
 describe("To Order · R8 · the three stage cells speak the dictionary", () => {
-  it("reads Prepare PO · Confirm ready date · Check in, and nothing else", () => {
+  it("reads Issue PO · Confirm ready date · Check in, and nothing else", () => {
     renderPage();
     // COPY-STANDARD, PURCHASING — the queue-tile string of each action, taken
     // from `order-action-words.ts` so the cell cannot drift from the row.
-    expect(screen.getByTestId("facet-stage-place")).toHaveTextContent("Prepare PO");
+    expect(screen.getByTestId("facet-stage-place")).toHaveTextContent("Issue PO");
     // P7A — the retired word is gone from the tab, both directions proved.
     expect(screen.getByTestId("facet-stage-place")).not.toHaveTextContent(
       "Send PO",

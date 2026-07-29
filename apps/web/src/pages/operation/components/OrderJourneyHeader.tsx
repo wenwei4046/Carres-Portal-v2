@@ -135,9 +135,6 @@ export interface OrderJourneySignals {
  *  to "the first stage that is not finished", so the strip degrades instead of
  *  pointing nowhere. */
 const VERB_STAGE: Record<string, JourneyStage> = {
-  // P7A — both purchasing acts sit on the Purchase step: neither has secured
-  // the goods, and a Draft PO moves the order forward no stage at all.
-  [orderActionQueue("prepare_po")]: "Purchase",
   [orderActionQueue("issue_po")]: "Purchase",
   [orderActionQueue("confirm_ready_date")]: "Goods",
   // C8 — both delay stages sit on the Goods step: the promise is at risk
@@ -162,10 +159,8 @@ const VERB_STAGE: Record<string, JourneyStage> = {
  *  party named (COPY-STANDARD rules 1/8/9): a new operator must read one line
  *  and know whether to pick up the phone, and to whom. */
 const VERB_OWNER: Record<string, string> = {
-  // P7A — the verb `Send` is retired, and the two acts have two owners' lines
-  // because they are two different jobs: gathering the demand, then issuing the
+  // The verb `Send` is retired; issuing is the one act that produces the
   // document the factory receives.
-  [orderActionQueue("prepare_po")]: "Operations — prepare the purchase order",
   [orderActionQueue("issue_po")]: "Operations — issue the purchase order",
   [orderActionQueue("confirm_ready_date")]: "Supplier — goods not in yet",
   // C8 — this line used to read "agree a new date with the customer", which is
