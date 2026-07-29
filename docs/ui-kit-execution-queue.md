@@ -611,32 +611,39 @@ value; it is neutralised by a comment immediately above it that names §3.2 and 
    parses it** — it is hex-ALLOW-LISTED. Every export except `AVATAR_COLORS` has no reader. The
    three-bodies model may be correct and unimplemented, or the mirror may have no job left. **Both
    are above this card**, so the law's sentence was NOT edited.
-2. **§16 coverage went DOWN, 47.83% → 46.81%, and the card's own two rules cannot both hold.** Rule
+2. **§16 coverage went DOWN, 54.76% → 53.49%, and the card's own two rules cannot both hold.** Rule
    4 says a principle may arrive `⏳` with a named card *because "this card writes law, not code"*;
    Rule 5 says coverage may never go down. A law-only card satisfies both only if every principle
    already has a live mechanism. R1's mechanism is `PageShell.tsx` — **the reference review's own
    arithmetic said the rule "lands in the same PR as `PageShell.tsx`"**, and it did not. The dip
-   lasts exactly as long as that split: **23 / 47 = 48.94% the day D0.5c merges.** Human Review debt
+   lasts exactly as long as that split: **24 / 43 = 55.81% the day D0.5c merges.** Human Review debt
    unchanged at 4; blocked-on-a-decision unchanged at 0.
-3. **The exit criterion and §16's health rule disagree about what "coverage" is measured against.**
+3. **§16's own published percentage had drifted, and D0.6 had to COUNT before it could recompute.**
+   The block read **22 / 46 = 47.83%**; counted off the tables by script, `main` actually carried
+   **23 / 42 = 54.76%**. The entire gap is one section — §16 credited **Components 13 / 19** where
+   §6 has **14 / 15**. D0.5a and D0.5b each ADDED to the previous figure instead of re-counting, so
+   the error compounded silently across two cards. §16's own opening line predicted exactly this
+   (*"a hand-maintained percentage is prose, and prose drifts"*). **D1's `--report` generator is not
+   a nicety — it is the only thing that makes this number true.**
+4. **The exit criterion and §16's health rule disagree about what "coverage" is measured against.**
    The criterion pins an absolute floor — *"not lower than the 3 / 33 = 9.09% it reads today"* — a
-   figure that went stale when D0.5a/b raised it to 47.83%. §16 rule 1 states a DIRECTION. Read as
-   an absolute the card passes; read as a direction it does not. **A number written into an exit
+   figure that went stale the moment D0.5a shipped. §16 rule 1 states a DIRECTION. Read as an
+   absolute the card passes; read as a direction it does not. **A number written into an exit
    criterion goes stale; a direction does not.**
-4. **Governance and copy rules have no home in the health number.** §16 counts §1–§8, so §0.1's
+5. **Governance and copy rules have no home in the health number.** §16 counts §1–§8, so §0.1's
    five existing rules — and the four this card added to §0 and §10 — are outside it. Widening the
    denominator would read **22 / 57 = 38.6%** on a day nothing got worse, so it is reported and not
    taken. §16 now states the exclusion out loud instead of leaving it to be inferred.
-5. **The closed catalogue already has a member the law does not name.** §8.1 names four variants —
+6. **The closed catalogue already has a member the law does not name.** §8.1 names four variants —
    `list · dashboard · detail · settings`. `PageShell.tsx` on the D0.5c branch ships
    `variant: "list" | "module"`: **`module` is in no catalogue**, and three of the four named
    variants do not exist. §8.0 makes a fifth floorplan a governance event, so this needs a ruling —
    either `module` joins §8.1's list with its user task named (§8.3's module-tab law is the
    obvious one), or the variant is renamed. **Not fixed here: it is a code file on another card.**
-6. **D0.5c did not update the law it satisfies.** Its branch changes `docs/ui-kit-execution-queue.md`
+7. **D0.5c did not update the law it satisfies.** Its branch changes `docs/ui-kit-execution-queue.md`
    and no line of `docs/UI-KIT.md`, so seven rule rows still read `⏳ D0.5c` while their mechanisms
    exist on that branch. That is what makes finding 2 look like a regression instead of a split.
-7. **The stale-citation sprawl is far wider than R4's five.** `grep "UI-KIT v4|v4 §"` over
+8. **The stale-citation sprawl is far wider than R4's five.** `grep "UI-KIT v4|v4 §"` over
    `apps/web/src` returns **28 citations across 12 files**, naming `§8b · §11a · §11c · §11e · §A0 ·
    §A1 · §A5 · §A6 · §A8` — **lettered sections this law has never had.** The five R4 recorded are
    closed by this card; the rest are page files, which this card may not touch, and they are D1–D7's.

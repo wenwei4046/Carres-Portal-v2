@@ -1612,7 +1612,9 @@ parses the Enforcement column out of this file, checks which mechanisms
 actually exist in the repo, and rewrites the block. A hand-maintained
 percentage is prose, and prose drifts; that is the whole thesis of this
 document.
-*(The numbers below are the D0.6 hand count, valid until D1 wires the generator.)*
+*(The numbers below are D0.6's count, valid until D1 wires the generator. **They
+were COUNTED off the tables by a script, not typed** — see the correction under
+the arithmetic.)*
 
 ```
                          enforced / total
@@ -1620,20 +1622,31 @@ document.
   Colour        ██████░░░░    60%     3 / 5
   Spacing       ██▌░░░░░░░    25%     1 / 4
   Icons         ██████████   100%     4 / 4
-  Components    ██████▊░░░    68%    13 / 19
+  Components    █████████▎   93%    14 / 15
   Layout        ░░░░░░░░░░    0%      0 / 7
   Hierarchy     ██░░░░░░░░    20%     1 / 5
   ──────────────────────────────────────────
-  TOTAL         ████▋░░░░░    47%    22 / 47
+  TOTAL         █████▎░░░░    53%    23 / 43
 ```
 
 | | Count | Meaning |
 |---|---|---|
-| Rules | **47** | design rules stated in §1–§8 |
-| **Enforced** | **22** | Type System / Component API / Build Guard / ESLint is live |
-| Scheduled | 25 | a card exists (D0.5c–D5) |
+| Rules | **43** | design rules stated in §1–§8 — every row of a `Rule · Enforcement · Status · Evidence` table in those chapters, and nothing else |
+| **Enforced** | **23** | Type System / Component API / Build Guard / ESLint is live |
+| Scheduled | 16 | a card exists (D0.5c–D5) |
 | **Blocked on a decision** | **0** | ✅ the PENDING REGISTER is empty |
 | **Human Review debt** | 4 | `fmtDate()` · "max 2 reds per screen" · facet group order · "Progress carries no events" — nobody has found a mechanism |
+
+23 + 16 + 4 = 43. The three add up, which the previous block's did not.
+
+**Governance and copy rules are NOT in this number, and never have been.** The
+count is *design* rules — §1–§8. §0 and §10 carry **10** more rule rows (§0.1's
+five, plus §0.3's two, §0.4's one and §0.5's one added by D0.6, plus §10.1's
+one), every one of them ⏳ **D1**. They are stated here rather than folded in
+because widening the denominator is a change to what this number MEANS, and
+that is §16's own decision, not a consolidation card's. **Reported, not
+taken:** widening it would read 23 / 53 = 43.40% on the same day nothing about
+the kit got worse.
 
 **Governance and copy rules are NOT in this number, and never have been.** The
 count is *design* rules — §1–§8. §0 and §10 carry **10** more rule rows (§0.1's
@@ -1648,16 +1661,30 @@ the kit got worse.
 reported rather than dressed up:**
 
 ```
-rules      46  +  1  =  47     §8.0's cap. The other four principles landed in
+rules      42  +  1  =  43     §8.0's cap. The other four principles landed in
                                §0.3 · §0.4 · §0.5 · §10.1 — governance and copy,
                                outside this count by its own definition
-enforced   22  +  0  =  22     §8.0's mechanism is `PageShell.tsx`, and on the
+enforced   23  +  0  =  23     §8.0's mechanism is `PageShell.tsx`, and on the
                                tip this was written against that file does not
                                exist yet
-coverage   47.83%  →  46.81%   ⬇  −1.02
+coverage   54.76%  →  53.49%   ⬇  −1.27
 debt          4    →      4    unchanged — no rule was added with Human Review
 blocked       0    →      0    unchanged
 ```
+
+**The baseline it starts from is NOT the one this block used to print, and the
+difference is a finding.** The published figure was **22 / 46 = 47.83%**. Counted
+off the tables — every row of a `Rule · Enforcement · Status · Evidence` table in
+§1–§8, by script — `main` actually carried **23 / 42 = 54.76%**. The whole gap is
+in one section: §16 credited **Components 13 / 19** where §6 has **14 / 15**.
+D0.5a's and D0.5b's arithmetic each added a number to the previous number instead
+of re-counting, so the drift compounded quietly across two cards.
+
+**This block's own opening sentence predicted it** — *"a hand-maintained
+percentage is prose, and prose drifts; that is the whole thesis of this
+document."* It had drifted. **D1's generator is not a nicety; it is the only
+thing that makes this number true**, and until it lands every card that touches
+§16 must COUNT rather than add.
 
 **Why it dipped, and why the dip is a SPLIT rather than a regression.** The
 reference review's own arithmetic said this rule *"lands in the same PR as
@@ -1665,7 +1692,7 @@ reference review's own arithmetic said this rule *"lands in the same PR as
 component was built on its own card and **did not write the rule**; this card
 writes the rule and does not build components. The pair is therefore split
 across two PRs, and the number is down for exactly as long as that split lasts:
-**the day `PageShell.tsx` reaches this branch it reads 23 / 47 = 48.94%**, above
+**the day `PageShell.tsx` reaches this branch it reads 24 / 43 = 55.81%**, above
 where it started.
 
 **This is a real conflict between two rules of the consolidation card**, not an
