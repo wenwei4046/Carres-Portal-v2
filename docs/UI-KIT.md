@@ -559,7 +559,7 @@ exactly the px / weight / line-height above.
 > touch it, and taking its NAMES would do the same thing one step later. The six
 > classes keep the `text-*` spelling; the question is closed, not deferred.
 
-**After D2** (measured 2026-07-29): the six tokens are used **3,970** times in
+**After D2** (measured 2026-07-29): the six tokens are used **3,971** times in
 scope, and `text-[Npx]`, `font-bold` and the `.t-*` ramp appear in exactly ONE
 in-scope file — `index.css`, holding the definitions Part B still needs.
 
