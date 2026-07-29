@@ -199,6 +199,10 @@ const KIT_FILES = new Set([
   "apps/web/src/components/kit/Tabs.tsx",
   "apps/web/src/components/kit/Toast.tsx",
   "apps/web/src/components/kit/Tooltip.tsx",
+  // D0.5c — the three shells.
+  "apps/web/src/components/kit/DataTable.tsx",
+  "apps/web/src/components/kit/DetailShell.tsx",
+  "apps/web/src/components/kit/PageShell.tsx",
   // `/ui` joins the kit at D0.5b. It was exempt while it rendered BOTH pending
   // spacing candidates on purpose; Jess froze Q1 on 2026-07-28, the comparison
   // is gone, and the exemption died with the code it described.

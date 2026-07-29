@@ -17,6 +17,7 @@
  */
 import type { ReactNode } from "react";
 import * as RadixPopover from "@radix-ui/react-popover";
+import { useDialogContainer } from "./dialog-container";
 import { FLOATING_SURFACE } from "./floating-surface";
 
 export default function Popover({
@@ -38,10 +39,14 @@ export default function Popover({
   onOpenChange?: (open: boolean) => void;
   children: ReactNode;
 }) {
+  /* D0.5b.1 — null outside a dialog, which is Radix's own "use <body>", so the
+   * ordinary case does not move. `DatePicker` renders through this component,
+   * so fixing the popover fixes the date picker with it. */
+  const dialogContainer = useDialogContainer();
   return (
     <RadixPopover.Root open={open} onOpenChange={onOpenChange}>
       <RadixPopover.Trigger asChild>{trigger}</RadixPopover.Trigger>
-      <RadixPopover.Portal>
+      <RadixPopover.Portal container={dialogContainer}>
         <RadixPopover.Content
           align={align}
           sideOffset={4}
