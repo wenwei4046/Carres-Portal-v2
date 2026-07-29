@@ -180,6 +180,111 @@ To change the look: edit the token source, then update **this file + the
 machine mirror + `/ui`** in the same commit. A page conforms to the kit; the
 kit does not bend to a page. See §14.
 
+### The kit has an EDITION, and every artifact declares the one it follows
+
+> **Every kit artifact must declare the kit version it follows.**
+
+**The edition is the date this law was last rewritten — `UI-KIT 2026-07-27`.**
+A date rather than a semver: the kit has one consumer and no strangers to
+promise anything to, so a release number would buy ceremony and nothing else.
+The rewrite date is already the first thing this file states; declaring it is
+free.
+
+A **kit artifact** is anything that carries a rule of this kit outside this
+file — the machine mirror, a component, a block of `index.css`, a comment that
+cites a section. It writes the edition string, and a citation then has
+something to be checked against.
+
+**Why an undeclared citation is the dangerous shape: it cannot be wrong on its
+face, which is exactly how it survives.** Every one of these names a file, a
+section and an authority, and every one of them is a confident reference to a
+dead edition — measured 2026-07-28, not recalled:
+
+| Where | What it says | What is true |
+|---|---|---|
+| `design-standard.ts:4` | *"v4 — rewritten 2026-07-15"* | this law was rewritten **2026-07-27**; the mirror is 12 days behind |
+| `design-standard.ts:7` | *"where any older doc… conflicts with UI-KIT v4, **v4 wins**"* | this file's own first line says **this file wins**. Two bodies of one kit each claiming to outrank the other |
+| `design-standard.ts:38` | the canvas hex, *"v4 §11a COOL neutral"* | §3.2 froze the canvas at Radix `slate-3`, and **§11a does not exist** — `grep "11a"` over this file returns 0 |
+| `design-standard.ts:11–18` | *"Flame appears ONLY on a clickable primary action + a checked checkbox"* | §3.4: the flame survives in **exactly one place, the logo**, and §13.3 rule B fails the build on it |
+| `OrderDetailDrawer.tsx:653` | *"UI-KIT v4 §9: panels default COLLAPSED"* | today's §9 is **UI States**. The rule is cited out of a law that no longer exists |
+
+**The sprawl is wider than those five, and the width is the argument.** A
+`grep` for `UI-KIT v4` / `v4 §` across `apps/web/src` on 2026-07-28 returns
+**28 citations in 12 files**, naming `v4 §1` · `§2` · `§3` · `§4` · `§5` ·
+`§6` · `§8` · `§8b` · `§9` · `§10` · `§11a` · `§11c` · `§11e` · `§A0` · `§A1` ·
+`§A5` · `§A6` · `§A8` — **lettered sections this file has never had.** Not one
+of them looks wrong when read on its own.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| Every kit artifact declares the kit edition it follows | Build Guard — a header scan for the edition string in `components/kit/**`, `lib/design-standard.ts` and `index.css` | ✅ **live (D1)** | `check-design.mjs` rule J |
+| No artifact claims to outrank this file | Build Guard — the same scan refuses a second authority claim | ✅ **live (D1)** | `check-design.mjs` rule K |
+
+*(Both land with the Build Guard, which is D1's whole job. Naming the card is
+what §16 requires of a rule this file cannot enforce on the day it is written.)*
+
+## §0.4 What is configurable, and what never is
+
+> **UI, workflow and navigation are opinionated and consistent across the company.
+> Business parameters remain configurable.**
+
+A user who can rearrange the tool must be taught **their own version of it**,
+and every handover then starts from zero. `ACTION-FLOW-STANDARD` prices a new
+hire's whole training at four lines; four lines only works if it is the same
+tool for everybody.
+
+Two things wear the word *settings* and they are opposites:
+
+| | Configurable? | Why |
+|---|---|---|
+| **Business numbers** — production days per supplier, work weeks, reorder points, reserve levels, commission rates | **Yes, and it is compulsory** | a business number only a developer can change is a defect. Purchasing P1 made seven of them editable for exactly this reason |
+| **The UI, the workflow and the navigation** — which columns exist, what order blocks appear in, which panels are open, what an action is called, which step comes next | **No, ever** | this is the tool's shape, and two operators seeing two shapes is how a handover fails |
+
+**This is the same sentence §8.2 already says about list pages**, stated once
+for the whole company instead of once per page type. §8.2 narrows it to clicks;
+this section owns the principle.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| No per-user store of UI shape — no browser-persisted layout, panel or column state under `pages/**` | Build Guard — a scan for `localStorage` keyed to layout in `pages/**` | ✅ **live (D1)** | `check-design.mjs` rule L |
+
+> **Its cost is not zero, and it is stated rather than discovered later.** Three
+> live behaviours fail this rule today (measured by R2, 2026-07-28):
+> `carres.orders.hiddenCols` — which columns the Orders table shows, per browser
+> · `ops-drawer-panel-v4:{title}` — every drawer panel's open/closed state,
+> across orders · `ops-drawer-rail` — the rail's collapsed state. **One of them
+> is a feature somebody asked for.** D1 writes the scan; whether those three come
+> off, and in which card, is Jess's, not the guard's.
+
+## §0.5 A label is presentation; the identifier is the contract
+
+> **Stable ID is the contract. Visible labels are presentation attached to the Stable ID.**
+
+**The label carries nothing.** The ID is the contract; the label hangs off it
+and may be replaced without the contract moving. What follows: **nothing may
+key on a label** — not a count, not a filter, not a stored state, not a test.
+Renaming is then a display change and never a data change.
+
+Carres already built this, for one module: every action carries a `key` from
+the `OrderActionKey` union and `DISPLAY_RANK` is keyed by that union, never by
+a word. It is why C1 could delete `Chase` from the whole portal without
+touching a count, a filter or a stored row. **What this section adds is the
+scope** — it is a rule about every visible word, not a technique that happened
+to be applied once.
+
+**The counter-example is live and is the same rule not yet applied:** the
+drawer's panel state is keyed by the panel's **title** (`ops-drawer-panel-v4:{title}`),
+so renaming a panel silently resets every user's state for it — and C1 renamed
+that rail's panel from `Actions` to `Calls`.
+
+**The word is still governed even though it is not the contract.** Changing one
+is an event that goes through [`COPY-STANDARD.md`](COPY-STANDARD.md), never an
+edit somebody makes while they are in the file for another reason.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| No persisted state, query key or storage key is built from a display string | Build Guard — a scan for a `localStorage` / query key composed from a label | ✅ **live (D1)** | `check-design.mjs` rule M |
+
 ---
 
 # §1 Decision Process & Information Hierarchy
@@ -687,8 +792,8 @@ Fifteen levels exist today (`1 · 10 · 20 · 30 · 40 · 50 · 55 · 60 · 70 �
 
 | Layer | z | Owned by | State |
 |---|---|---|---|
-| sticky table header | 10 | `DataTable` | ⏳ D0.5c |
-| toolbar / bulk bar | 20 | `PageShell` | ⏳ D0.5c |
+| sticky table header | 10 | `DataTable` | ✅ D0.5c |
+| toolbar / bulk bar | 20 | `PageShell` | ⏳ D6 — `PageShell` shipped, but no bulk bar renders through it yet, so layer 20 still has no class string |
 | popover · dropdown · tooltip | 30 | Radix portal | ✅ D0.5b |
 | modal · drawer | 40 | Radix portal | ✅ D0.5b |
 | toast | 50 | sonner | ✅ shipped — sonner's own, the kit never writes it |
@@ -1203,6 +1308,38 @@ D6 and D7+ retire the 26.
 > responsive rules and **form layout** — is still unwritten, and D0.5c did not
 > invent any of it. Form layout in particular has no home at all today.
 
+## §8.0 The floorplan catalogue is CLOSED
+
+Every in-scope page renders **exactly one `PageShell`** and declares **one
+`variant`** from a closed set. There is no `custom`, no free-form page, and no
+in-scope page that renders no shell.
+
+**The catalogue is full at four** — `list · dashboard · detail · settings`.
+Adding a fifth is a **governance event** under the same discipline
+`ORDER-DETAIL-INFORMATION-MODEL` §7② applies to persistent facts: it requires
+naming the **user task** that no existing floorplan can serve. *"This page is a
+bit different"* is not a task and is not an argument.
+
+**The closure is the feature, not a side effect of having four.** A page that
+fits none of them means either the task was misunderstood or a real gap was
+found — and finding a gap is something the kit decides, never a licence to
+draw. A catalogue big enough to hold every page is the same as no catalogue.
+
+**The floorplan is chosen by the user's TASK, not by the data's shape.** Two
+pages over identical rows can be two floorplans, because the two readers arrive
+with different questions — which is the Business Thinking Model's *same page,
+three people, three entry questions* reached from the page side.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| Every page declares one floorplan from a closed set, and the set is full at four | **Type System** — `variant` is a closed union of exactly the four; `"custom"` does not compile | ✅ **live (D0.5c)** | `PageShell.tsx` |
+
+*(The second half of this principle — **a page component that renders no
+`PageShell` fails the build** — is already law as §0.1's "No hand-rolled page
+shell", and §1.3's "a list page cannot add an 8th band" already carries the
+variant's type consequence. Only the CAP was missing, so only the cap is added:
+one concern, one row.)*
+
 ## §8.1 The `PageShell` slot contract (decided · built)
 
 ```tsx
@@ -1368,6 +1505,36 @@ UI wording is owned by [`COPY-STANDARD.md`](COPY-STANDARD.md).
 **No word is copied into this file.** Two files holding the same words will
 drift — the failure this rewrite exists to end.
 
+## §10.1 How a word reaches a screen
+
+> **Words are delivered by the system, not remembered from a document.**
+
+One dictionary, one word per concept, a reason for every banned word — which
+`COPY-STANDARD` already is — **plus the words travelling with the thing that
+renders them**, so a surface cannot be built without them.
+
+**A rule that must be remembered is enforced by whoever happens to be reading.**
+That is not a hypothetical here: `Chase` was banned and still shipped, survived
+a week in the drawer, and was caught by a **source scan** — not by anybody
+remembering the document. A word that ships with the component that renders it
+cannot be forgotten by a chat that never opened the document.
+
+**Measured 2026-07-28, so the size of the gap is on the record:**
+`packages/shared/src/order-action-words.ts` delivers **three of the five
+COPY-STANDARD strings, for one module.** Every other module's words, and the
+other two strings, are recall.
+
+**This chapter still copies no word.** It owns the DELIVERY — that a string
+arrives with its component — and `COPY-STANDARD` owns which string it is.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| A component may not spell a business word; it receives one from the dictionary module | Build Guard — a scan for a COPY-STANDARD label literal inside `components/**` | ✅ **live (D1)** | `check-design.mjs` rule N |
+
+*(Two components already hold this by construction and are the shape the scan
+generalises: `StatusPill` spells no word, and `Icon` carries §5.3's meanings
+rather than any label.)*
+
 ---
 
 # §11 Reference Library
@@ -1422,11 +1589,21 @@ Exempt: `pages/dealer/**` (POS, Part B) and `pages/print/**`.
 
 ## §13.2 Ratchet
 
-| Stage | Behaviour | Card |
-|---|---|---|
-| 1 | Warn only; write the baseline count | D1 |
-| 2 | Warn + CI report; the baseline may only go down | D2–D4 |
-| 3 | **Fail the build** | D5 |
+| Stage | Behaviour | Card | State |
+|---|---|---|---|
+| 1 | Warn only; write the baseline count | D1 | ✅ **live** — `scripts/check-design.mjs`, baseline in `scripts/design-guard-baseline.json` |
+| 2 | Warn + CI report; the baseline may only go down | D2–D4 | ⏳ — built, switched on by `--strict` |
+| 3 | **Fail the build** | D5 | ⏳ — `--strict` becomes the default |
+
+**Stage 1 counts and never fails.** That is the point: the baseline is the
+measurement the codemods (D2–D4) are scored against, and a guard that failed on
+day one would have had to be switched off on day one.
+
+**The guard reads the token records; it retypes nothing.** The eight spacing
+steps, four radii, six type tokens, three weights, three icon sizes and forty
+icon meanings come out of `components/kit/tokens.ts` and `components/kit/Icon.tsx`
+at runtime — so a ninth step is picked up by editing the record, and the scan
+cannot drift from the law the way the §16 percentage did.
 
 **Stage 3 is blocked while the PENDING register is non-empty.** ✅ It is empty
 since 2026-07-28, so D5 is no longer blocked on a DECISION — only on D1–D4
@@ -1442,9 +1619,41 @@ being built.
 | D | `text-[Npx]`; a typography token outside §2.1; a weight outside §2.2 (700 is dead) | ✅ **frozen** |
 | E | a spacing / radius / border value outside §4 (the 8-step scale) | ✅ **frozen** |
 | F | a `z-` class anywhere in `pages/**` | ✅ |
-| G | a raw `<table>`, `<input>`, `<select>`, or a `fixed inset-0` overlay in `pages/**` | ⏳ needs D0.5 |
-| H | a `PageShell` whose fixed chrome exceeds its variant's budget (§1.3) | ⏳ needs D0.5c |
-| I | the same class string ≥ 40 chars repeated across ≥ 2 files (§6.6) | ⏳ D1 |
+| G | a raw `<table>`, `<input>`, `<select>`, or a `fixed inset-0` overlay in `pages/**` | ✅ **frozen** |
+| H | a `PageShell` whose fixed chrome exceeds its variant's budget (§1.3) | ✅ **frozen** |
+| I | the same class string ≥ 40 chars repeated across ≥ 2 files (§6.6) | ✅ **frozen** |
+| J | a kit artifact that declares no kit edition (§0.3) | ✅ **frozen** |
+| K | an artifact claiming to outrank this file (§0.3) | ✅ **frozen** |
+| L | a browser-persisted UI-shape key under `pages/**` (§0.4) | ✅ **frozen** |
+| M | a persisted / query / storage key built from a display string (§0.5) | ✅ **frozen** |
+| N | a component spelling a COPY-STANDARD business word (§10.1) | ✅ **frozen** |
+
+**All fourteen are implemented and measured (D1).** J–N are the five mechanisms
+card D0.6 wrote into §0.3 · §0.4 · §0.5 · §10.1 and scheduled here.
+
+### The baseline D1 froze, on 348 files
+
+```
+  A   442  a raw hex literal              I   294  a repeated class string
+  B     8  the flame outside the logo     J     3  no kit edition declared
+  C   146  an icon outside §5             K     0  an authority claim
+  D  6081  a type value outside §2        L     8  a persisted UI shape
+  E  1765  a §4 value                     M     2  a key built from a label
+  F    78  a `z-` class in pages/**       N     0  a component spelling a word
+  G   684  a hand-rolled box              H     0  a PageShell over budget
+                                          ─────────────────────────────────
+                                          9,511 findings
+```
+
+**Twelve of the fourteen are proved able to FIRE**, by
+`scripts/check-design.selftest.mjs`: it writes one file per rule that breaks
+exactly that rule, re-runs the guard and asserts the count went up. **A rule
+reporting 0 is either clean or broken, and from the outside those look
+identical** — the first draft of L and M reported ZERO on the three sites R2 had
+already found by hand, because the key was a `const` two lines above the call.
+J is proved instead by its 3 live hits. **H is the one rule with no proof of
+life**, said out loud rather than left looking clean: provoking it means editing
+`PageShell.tsx`, which belongs to another card.
 
 ## §13.4 The screenshot gate
 
@@ -1506,50 +1715,86 @@ parses the Enforcement column out of this file, checks which mechanisms
 actually exist in the repo, and rewrites the block. A hand-maintained
 percentage is prose, and prose drifts; that is the whole thesis of this
 document.
-*(The numbers below are the D0.5b hand count, valid until D1 wires the generator.)*
+*(Regenerated by `node scripts/check-design.mjs --report`. **Do not hand-edit
+the block below** — three cards did, each adding to the figure in front of it,
+and by D0.6 the published number was nine points adrift of its own tables.)*
+
+<!-- UI-HEALTH:START — generated by scripts/check-design.mjs --report. Do not hand-edit. -->
 
 ```
                          enforced / total
-  Typography    ░░░░░░░░░░    0%      0 / 3
+  Typography    ░░░░░░░░░░     0%     0 / 3
   Colour        ██████░░░░    60%     3 / 5
-  Spacing       ██▌░░░░░░░    25%     1 / 4
+  Spacing       ███░░░░░░░    25%     1 / 4
   Icons         ██████████   100%     4 / 4
-  Components    ██████▊░░░    68%    13 / 19
+  Components    █████████░    93%    14 / 15
   Table         ██████████   100%     4 / 4
-  Layout        ███▍░░░░░░    33%     2 / 6
+  Layout        █████░░░░░    50%     3 / 6
   Hierarchy     ██████████   100%     7 / 7
   ──────────────────────────────────────────
-  TOTAL         ██████▌░░░    65%    34 / 52
+  TOTAL         ████████░░    75%    36 / 48
 ```
 
 | | Count | Meaning |
 |---|---|---|
-| Rules | **52** | design rules stated in §1–§8 |
-| **Enforced** | **34** | Type System / Component API / Build Guard / ESLint is live |
-| Scheduled | 18 | a card exists (D1–D7) |
+| Rules | **48** | design rules stated in §1–§8 |
+| **Enforced** | **36** | Type System / Component API / Build Guard / ESLint is live |
+| Scheduled | 9 | a card exists |
 | **Blocked on a decision** | **0** | ✅ the PENDING REGISTER is empty |
-| **Human Review debt** | **3** | `fmtDate()` · "max 2 reds per screen" · facet group order. **"Progress carries no events" closed in D0.5c** — the first time this number has gone down |
+| **Human Review debt** | **3** | nobody has found a mechanism |
 
-**The D0.5c arithmetic, shown so it can be checked:**
+36 + 9 + 3 = 48.
+
+**Coverage — 36 / 48 = 75.00%.** Counted from the Enforcement
+column of every rule table in §1–§8, by `check-design.mjs --report`. **No card may
+add to this figure by hand** — three cards did, and by D0.6 the published number
+was nine points adrift of the tables it claimed to summarise.
+
+**Governance and copy rules are outside this count**, as they always have been:
+§0 and §10 carry **10** more rule rows. Widening the denominator would read
+36 / 58 = 62.07% on a day nothing got worse, so it is stated, not taken.
+
+**Every ✅ points at a file that exists in the repo** — checked, not asserted.
+
+<!-- UI-HEALTH:END -->
+
+**The D0.6 arithmetic, shown so it can be checked:**
 
 ```
-rules      46  +  6  =  52     4 new §7 Table rules + 2 new §1.4 rules that
-                               L4 carried as prose only (identity is
-                               values-only with a 4-fact cap · Detail is a
-                               route)
-enforced   22  + 12  =  34     the 6 new ones, all born enforced · §1.4's
-                               three ⏳ D0.5c rules · §1.3's 8th-band rule ·
-                               §8.3's module-tab rule · and the DEBT rule
-                               "Progress carries no events", which became a
-                               type instead of a hope
-coverage   47.83%  →  65.38%   ⬆
-debt          4    →      3    ⬇ FIRST time it has gone down
+rules      47  +  1  =  48     §8.0's cap. The other four principles landed in
+                               §0.3 · §0.4 · §0.5 · §10.1 — governance and copy,
+                               outside this count by its own definition
+enforced   35  +  1  =  36     §8.0 is born enforced: `PageShell.tsx` ships the
+                               variant union as a closed set of exactly the four
+                               §8.1 names, so a fifth floorplan does not compile
+coverage   74.47%  →  75.00%   ⬆  +0.53
+debt          3    →      3    unchanged — no rule was added with Human Review
+blocked       0    →      0    unchanged
 ```
 
-**One rule deliberately did NOT move to ✅:** *"one interaction model for every
-list page"* (§8.2). The components exist; no page renders through them, so the
-filter behaviour still lives in each page. It becomes true at **D6**. Counting
-it now would be counting a card, which §16 forbids.
+**The baseline it starts from is NOT the one this block used to print, and that
+is the finding this card carries.** The published figure was **34 / 52 =
+65.38%**. Counted off the tables by script — every row of a
+`Rule · Enforcement · Status · Evidence` table in §1–§8, and nothing else —
+`main` actually carried **35 / 47 = 74.47%**. The whole gap is one section: §16
+credited **Components 13 / 19** where §6 has **14 / 15**. D0.5a, D0.5b and D0.5c
+each ADDED to the figure in front of them instead of re-counting, so one wrong
+number propagated silently through three cards.
+
+**This block's own opening sentence predicted it** — *"a hand-maintained
+percentage is prose, and prose drifts; that is the whole thesis of this
+document."* It had drifted. **D1's `--report` generator is not a nicety; it is
+the only thing that makes this number true**, and until it lands every card that
+touches §16 must COUNT rather than add.
+
+**Why §8.0 is born enforced, which is the whole reason the number went up.** The
+reference review's own arithmetic said this rule *"lands in the same PR as
+`PageShell.tsx`"* — rule and mechanism together — and warned that landing it
+alone would tick the number down. D0.5c shipped `PageShell.tsx` first with the
+variant union closed at exactly §8.1's four, so by the time the rule was
+written its mechanism was already live. **The order the PM fixed —
+`D0.5c → D0.6 → D1` — is what bought that**, and it is the concrete case for
+*"the components are built first, and consolidation writes down what exists."*
 
 **The D0.5b arithmetic, shown so it can be checked** (health rule 1 says
 coverage may never go down, and rule 2 says the debt may never grow):
@@ -1592,8 +1837,8 @@ coverage   9.09%  →  31.58%    ⬆
 
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|
-| Coverage never decreases | Build Guard (report mode, ratchet) | ⏳ D1 | `check-design.mjs --report` |
-| Human Review debt never grows | Build Guard (report mode, ratchet) | ⏳ D1 | `check-design.mjs --report` |
+| Coverage never decreases | Build Guard (report mode, ratchet) | ✅ **live (D1)** | `check-design.mjs --report` |
+| Human Review debt never grows | Build Guard (report mode, ratchet) | ✅ **live (D1)** | `check-design.mjs --report` |
 
 ---
 
@@ -1606,6 +1851,7 @@ Taken 2026-07-27 across `apps/web/src`:
 | Pages | 285 (225 in scope; `operation/` = 118) |
 | Shared components | 19 |
 | Pages using `ListPageShell` / `PageHeader` | 10 / 1 — **274 hand-roll a shell** |
+| **Re-measured by D1's guard, 2026-07-29** | **348 files in scope · 9,511 findings** — A 442 hex · B 8 flame · C 146 icon · D 6,081 type · E 1,765 §4 · F 78 `z-` · G 684 hand-rolled box · I 294 repeated class string · J 3 no edition · L 8 persisted UI shape · M 2 key-from-a-label. **D is larger than the 2,556 below because it also counts Tailwind's own ramp and the dead weights**, which §2.1 and §2.2 both forbid; the row below counted `text-[Npx]` only |
 | Files hand-rolling `<table>` | 26, in 7 header shapes, 2 opposite visual languages |
 | Files hand-rolling a modal/drawer | 63, in 12+ overlay shapes, 5 backdrop colours |
 | Files hand-rolling `<input>` | 134, in 121 distinct class strings |

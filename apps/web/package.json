@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "check:v4": "node scripts/v4-guard.mjs",
-    "lint": "node ../../scripts/check-design-standard.mjs",
+    "lint": "node ../../scripts/check-design-standard.mjs && node ../../scripts/check-design.mjs",
+    "lint:guard": "node ../../scripts/check-design.mjs --list",
+    "lint:report": "node ../../scripts/check-design.mjs --report",
     "lint:baseline": "node ../../scripts/check-design-standard.mjs --update-baseline",
     "test": "vitest run"
   },
