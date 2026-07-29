@@ -54,10 +54,10 @@ export default function OperationStock() {
     <div className="px-9 py-8 pb-14">
       <div className="mb-[22px]">
         <div className="kicker">HQ · Operations</div>
-        <h1 className="t-h1 font-display mt-1.5">
+        <h1 className="text-page font-display mt-1.5">
           Stock across the network
         </h1>
-        <div className="text-[13px] text-base-600 mt-1.5">
+        <div className="text-body text-base-600 mt-1.5">
           {payload?.summary.lowStockCount ?? 0} SKUs low · {warehouses.length} warehouse{warehouses.length !== 1 ? "s" : ""} ·{" "}
           {payload?.summary.openPos ?? 0} POs in flight
         </div>
@@ -73,7 +73,7 @@ export default function OperationStock() {
           <button
             key={o.k}
             onClick={() => setView(o.k)}
-            className={`px-3.5 py-1.5 text-[12px] rounded cursor-pointer ${
+            className={`px-3.5 py-1.5 text-meta rounded cursor-pointer ${
               view === o.k
                 ? "bg-white text-base-900 font-semibold"
                 : "text-base-600 font-medium"
@@ -85,7 +85,7 @@ export default function OperationStock() {
       </div>
 
       <div className="bg-white border border-base-200 rounded overflow-auto">
-        <table className="w-full border-collapse text-[13px]" style={{ minWidth: 720 }}>
+        <table className="w-full border-collapse text-body" style={{ minWidth: 720 }}>
           <thead>
             <tr className="bg-base-50 border-b border-base-200">
               <Th>SKU</Th>
@@ -100,14 +100,14 @@ export default function OperationStock() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={warehouses.length + 4} className="p-10 text-center text-[12px] text-base-500">
+                <td colSpan={warehouses.length + 4} className="p-10 text-center text-meta text-base-500">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && list.length === 0 && (
               <tr>
-                <td colSpan={warehouses.length + 4} className="p-10 text-center text-[12px] text-base-500">
+                <td colSpan={warehouses.length + 4} className="p-10 text-center text-meta text-base-500">
                   {view === "low" ? "Everything is healthy — no low-stock SKUs." : "No SKUs."}
                 </td>
               </tr>
@@ -118,7 +118,7 @@ export default function OperationStock() {
                 <tr key={s.sku} className="border-t border-base-100">
                   <td className="px-4 py-2.5">
                     <div className="font-semibold">{s.name}</div>
-                    <div className="text-[10.5px] text-base-400 font-mono">{s.sku}</div>
+                    <div className="text-label text-base-400 font-mono">{s.sku}</div>
                   </td>
                   {warehouses.map((w) => {
                     const b = s.perWarehouse[w.id] ?? { qty: 0, reserved: 0 };
@@ -149,7 +149,7 @@ export default function OperationStock() {
 
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
   return (
-    <th className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-base-500 ${right ? "text-right" : "text-left"}`}>
+    <th className={`px-4 py-2.5 text-label font-semibold uppercase tracking-[0.05em] text-base-500 ${right ? "text-right" : "text-left"}`}>
       {children}
     </th>
   );

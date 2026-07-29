@@ -97,13 +97,13 @@ export default function SupplierDashboard() {
   return (
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="mb-7">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+        <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
           Workspace
         </div>
-        <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
+        <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
           Dashboard
         </h1>
-        <div className="text-[13px] text-muted-foreground">
+        <div className="text-body text-muted-foreground">
           Production pipeline · live from Supabase
         </div>
       </header>
@@ -121,25 +121,25 @@ export default function SupplierDashboard() {
           }`}
         >
           <div
-            className={`text-[10px] uppercase tracking-[0.06em] ${
+            className={`text-label uppercase tracking-[0.06em] ${
               totalDemand > 0 ? "text-primary" : "text-muted-foreground"
             }`}
           >
             Total demand
           </div>
           <div className="flex items-baseline gap-3 mt-2">
-            <div className="font-display text-[44px] leading-none">
+            <div className="font-display text-page leading-none">
               {totalDemand}
             </div>
             {totalDemand > 0 && (
-              <div className="text-[12px] text-muted-foreground leading-snug">
+              <div className="text-meta text-muted-foreground leading-snug">
                 = <span className="font-mono">{totalCommitted}</span> committed
                 {" + "}
                 <span className="font-mono">{totalPending}</span> pending
               </div>
             )}
           </div>
-          <div className="text-[11px] text-muted-foreground mt-2">
+          <div className="text-label text-muted-foreground mt-2">
             Across {demandRows.length} SKU{demandRows.length === 1 ? "" : "s"}
           </div>
         </div>
@@ -184,7 +184,7 @@ export default function SupplierDashboard() {
 
       {/* Pipeline summary */}
       <div className="border border-border rounded-md p-5 mb-5 bg-card">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-4">
+        <div className="text-label uppercase tracking-[0.12em] text-muted-foreground mb-4">
           Pipeline overview
         </div>
         <div className="grid grid-cols-[1fr_24px_1fr_24px_1fr] items-stretch">
@@ -219,42 +219,42 @@ export default function SupplierDashboard() {
           className="border border-border rounded-md p-5 mb-5 bg-card"
           data-testid="supplier-coverage-callout"
         >
-          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-3">
+          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground mb-3">
             Coverage
           </div>
           <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-5 items-start">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground mb-1">
+              <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mb-1">
                 Categories
               </div>
-              <div className="text-[13px] font-semibold text-foreground">
+              <div className="text-body font-semibold text-foreground">
                 {me.data.cat_covered.length > 0
                   ? me.data.cat_covered.join(" · ")
                   : "—"}
               </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground mb-1">
+              <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mb-1">
                 Lead time
               </div>
-              <div className="text-[13px] font-semibold text-foreground">
+              <div className="text-body font-semibold text-foreground">
                 {me.data.lead_time ?? "—"}
               </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground mb-1">
+              <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mb-1">
                 Contact
               </div>
-              <div className="text-[13px] text-foreground truncate">
+              <div className="text-body text-foreground truncate">
                 {me.data.contact_email ?? me.data.contact ?? "—"}
               </div>
             </div>
             <div className="text-right">
-              <div className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground mb-1">
+              <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mb-1">
                 Workflow
               </div>
               <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-label font-semibold ${
                   me.data.kind === "factory_pickup"
                     ? "bg-blue-100 text-blue-800"
                     : "bg-primary/10 text-primary"
@@ -275,13 +275,13 @@ export default function SupplierDashboard() {
         className="border border-border rounded-md p-5 mb-5 bg-card"
         data-testid="supplier-recent-activity"
       >
-        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-3">
+        <div className="text-label uppercase tracking-[0.12em] text-muted-foreground mb-3">
           Recent activity
         </div>
         {activity.isLoading ? (
-          <div className="text-[13px] text-muted-foreground py-2">Loading…</div>
+          <div className="text-body text-muted-foreground py-2">Loading…</div>
         ) : (activity.data ?? []).length === 0 ? (
-          <div className="text-[13px] text-muted-foreground py-2">
+          <div className="text-body text-muted-foreground py-2">
             No recent activity yet.
           </div>
         ) : (
@@ -292,14 +292,14 @@ export default function SupplierDashboard() {
                 className="flex items-baseline justify-between py-1 border-b border-dashed border-border last:border-0"
               >
                 <div className="min-w-0 mr-3">
-                  <span className="font-mono text-[12px] text-foreground mr-2">
+                  <span className="font-mono text-meta text-foreground mr-2">
                     {a.po_id}
                   </span>
-                  <span className="text-[12.5px] text-muted-foreground">
+                  <span className="text-meta text-muted-foreground">
                     {a.text}
                   </span>
                 </div>
-                <span className="text-[10.5px] text-muted-foreground font-mono whitespace-nowrap">
+                <span className="text-label text-muted-foreground font-mono whitespace-nowrap">
                   {formatRelative(a.occurred_at)}
                 </span>
               </div>
@@ -310,13 +310,13 @@ export default function SupplierDashboard() {
 
       {/* Top SKUs */}
       <div className="border border-border rounded-md p-5 bg-card">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-4">
+        <div className="text-label uppercase tracking-[0.12em] text-muted-foreground mb-4">
           Top demand · committed + pending
         </div>
         {isLoading ? (
-          <div className="text-[13px] text-muted-foreground py-6">Loading…</div>
+          <div className="text-body text-muted-foreground py-6">Loading…</div>
         ) : topDemand.length === 0 ? (
-          <div className="text-[13px] text-muted-foreground py-6">
+          <div className="text-body text-muted-foreground py-6">
             No demand right now.
           </div>
         ) : (
@@ -329,10 +329,10 @@ export default function SupplierDashboard() {
                   className="grid grid-cols-[1fr_auto] gap-3 items-center"
                 >
                   <div className="min-w-0">
-                    <div className="text-[13px] font-semibold truncate">
+                    <div className="text-body font-semibold truncate">
                       {d.sku}
                     </div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                    <div className="text-label text-muted-foreground mt-0.5">
                       Across {d.poCount} PO{d.poCount === 1 ? "" : "s"}
                       {pendingCount > 0 && (
                         <>
@@ -351,7 +351,7 @@ export default function SupplierDashboard() {
                       />
                     </div>
                   </div>
-                  <div className="font-mono text-[18px] font-bold min-w-[42px] text-right">
+                  <div className="font-mono text-strong font-semibold min-w-[42px] text-right">
                     {d.total}
                   </div>
                 </div>
@@ -382,17 +382,17 @@ function Kpi({
       }`}
     >
       <div
-        className={`text-[10px] uppercase tracking-[0.06em] ${
+        className={`text-label uppercase tracking-[0.06em] ${
           accent ? "text-primary" : "text-muted-foreground"
         }`}
       >
         {label}
       </div>
-      <div className="font-display text-[28px] mt-1.5 leading-none">
+      <div className="font-display text-page mt-1.5 leading-none">
         {value}
       </div>
       {hint && (
-        <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>
+        <div className="text-label text-muted-foreground mt-1.5">{hint}</div>
       )}
     </div>
   );
@@ -417,20 +417,20 @@ function PipelineCell({
         : "text-success";
   return (
     <div className="text-center px-1">
-      <div className={`text-[10px] uppercase tracking-[0.12em] ${toneClass}`}>
+      <div className={`text-label uppercase tracking-[0.12em] ${toneClass}`}>
         {title}
       </div>
-      <div className="font-display text-[32px] mt-1 leading-none text-foreground">
+      <div className="font-display text-page mt-1 leading-none text-foreground">
         {count}
       </div>
-      <div className="text-[11px] text-muted-foreground mt-1">{subtitle}</div>
+      <div className="text-label text-muted-foreground mt-1">{subtitle}</div>
     </div>
   );
 }
 
 function PipelineArrow() {
   return (
-    <div className="grid place-items-center text-muted-foreground text-[20px]">
+    <div className="grid place-items-center text-muted-foreground text-title">
       →
     </div>
   );

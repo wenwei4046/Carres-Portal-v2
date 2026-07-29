@@ -83,7 +83,7 @@ export default function DelayPlanningPanel({
             key={value}
             data-testid="delay-decision-choice"
             data-decision={value}
-            className="flex items-center gap-2 text-[13px] text-base-900 cursor-pointer"
+            className="flex items-center gap-2 text-body text-base-900 cursor-pointer"
           >
             <input
               type="radio"
@@ -97,11 +97,11 @@ export default function DelayPlanningPanel({
         ))}
       </div>
       <label className="block">
-        <span className="t-tiny text-base-500">Note (optional)</span>
+        <span className="text-meta text-base-500">Note (optional)</span>
         <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="w-full rounded-[4px] border border-base-200 px-2 py-1 text-[13px]"
+          className="w-full rounded-[4px] border border-base-200 px-2 py-1 text-body"
         />
       </label>
       {record.isError && (
@@ -113,7 +113,7 @@ export default function DelayPlanningPanel({
         <button
           type="button"
           data-testid="delay-decision-submit"
-          className="btn-primary py-1.5 text-[13px] disabled:opacity-40"
+          className="btn-primary py-1.5 text-body disabled:opacity-40"
           disabled={decision === null || record.isPending}
           onClick={() =>
             decision &&

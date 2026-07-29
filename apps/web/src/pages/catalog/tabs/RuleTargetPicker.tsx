@@ -108,7 +108,7 @@ function Chip({
       type="button"
       aria-pressed={on}
       onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-[4px] border px-2 py-0.5 text-[12px] transition-colors ${
+      className={`inline-flex items-center gap-1 rounded-[4px] border px-2 py-0.5 text-meta transition-colors ${
         on
           ? "border-base-900 bg-base-900 text-white"
           : "border-base-300 bg-white text-base-600 hover:border-base-500"
@@ -150,7 +150,7 @@ export function RuleTargetRefinementRow({
     const picked = value.scope === "variant" ? (value.sizeCodes ?? []) : [];
     return (
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="t-tiny text-base-400">Sizes:</span>
+        <span className="text-meta text-base-400">Sizes:</span>
         {sizes.map((size) => {
           const code = size.toUpperCase();
           const on = picked.includes(code);
@@ -167,7 +167,7 @@ export function RuleTargetRefinementRow({
             </Chip>
           );
         })}
-        {picked.length === 0 && <span className="t-tiny text-base-400">(any variant)</span>}
+        {picked.length === 0 && <span className="text-meta text-base-400">(any variant)</span>}
       </div>
     );
   }
@@ -192,7 +192,7 @@ export function RuleTargetRefinementRow({
                   : { scope: "model" },
             );
           }}
-          className="border border-base-300 rounded-[4px] text-[12px] px-1.5 py-1 bg-white"
+          className="border border-base-300 rounded-[4px] text-meta px-1.5 py-1 bg-white"
         >
           <option value="model">Any build</option>
           {combos.length > 0 && <option value="combo">By combo</option>}
@@ -290,7 +290,7 @@ export default function RuleTargetPicker({
           const id = e.target.value;
           if (id) upsert(id, { modelId: id, scope: "model" });
         }}
-        className="w-full border border-base-300 rounded-[4px] text-[13px] px-2 py-1.5 bg-white disabled:opacity-50"
+        className="w-full border border-base-300 rounded-[4px] text-body px-2 py-1.5 bg-white disabled:opacity-50"
         data-testid="rtp-add-model"
       >
         <option value="">
@@ -325,7 +325,7 @@ export default function RuleTargetPicker({
             className="flex flex-wrap items-center gap-2 px-1 py-1"
             data-testid={`rtp-model-${entry.modelId}`}
           >
-            <span className="flex-1 min-w-[160px] text-[13px] font-medium">
+            <span className="flex-1 min-w-[160px] text-body font-medium">
               {m ? modelLabel(m) : entry.modelId}
             </span>
             {m && (

@@ -121,7 +121,7 @@ export default function TransferReadyDialog({
 
   return (
     <Modal title={`Transfer to ready · #${order.so}`} onClose={onClose}>
-      <div className="text-[12px] text-base-600 mb-3.5 font-body">
+      <div className="text-meta text-base-600 mb-3.5 font-body">
         Use this when stock is already on-hand (not via a tracked PO receipt).
         We&rsquo;ll reserve stock at the chosen warehouse and flip the order to{" "}
         <strong>Ready to dispatch</strong>. If any line is short, the RPC will
@@ -133,22 +133,22 @@ export default function TransferReadyDialog({
         style={{ background: "var(--base-50)" }}
       >
         <div className="label mb-1.5">Order lines</div>
-        <div className="font-mono text-[11px] text-base-600">
+        <div className="font-mono text-label text-base-600">
           {lines.map((l) => `${l.sku} ×${l.qty}`).join(" · ") || "—"}
         </div>
       </div>
 
       <div className="label mb-1.5">Source warehouse *</div>
       {warehousesQ.isLoading ? (
-        <div className="text-[12px] text-base-500 mb-3.5">
+        <div className="text-meta text-base-500 mb-3.5">
           Loading warehouses…
         </div>
       ) : warehousesQ.isError ? (
-        <div className="text-[12px] text-destructive mb-3.5">
+        <div className="text-meta text-destructive mb-3.5">
           Couldn&rsquo;t load warehouses — try again later.
         </div>
       ) : allWarehouses.length === 0 ? (
-        <div className="text-[12px] text-warning mb-3.5">
+        <div className="text-meta text-warning mb-3.5">
           No warehouses on file.
         </div>
       ) : (
@@ -168,14 +168,14 @@ export default function TransferReadyDialog({
 
       {selectedWh && (
         <div
-          className="text-[12px] text-base-600 px-3 py-2.5 rounded-[4px] mb-3.5 font-body"
+          className="text-meta text-base-600 px-3 py-2.5 rounded-[4px] mb-3.5 font-body"
           style={{ background: "var(--base-50)" }}
         >
           <div>
             <strong>{selectedWh.name}</strong>
           </div>
           {selectedWh.address && (
-            <div className="font-mono text-[11px] mt-1">
+            <div className="font-mono text-label mt-1">
               {selectedWh.address}
             </div>
           )}
@@ -185,7 +185,7 @@ export default function TransferReadyDialog({
       {preflight && (
         <div
           data-testid="transfer-ready-preflight"
-          className={`text-[12px] px-3 py-2.5 rounded-[4px] mb-3.5 font-body ${
+          className={`text-meta px-3 py-2.5 rounded-[4px] mb-3.5 font-body ${
             preflight.sufficient
               ? "text-success border border-success/30 bg-success/5"
               : "text-warning border border-warning/30 bg-warning/5"
@@ -201,7 +201,7 @@ export default function TransferReadyDialog({
               <strong><AlertTriangle size={13} strokeWidth={2} className="inline -mt-px mr-1" />Some lines short</strong> — RPC will reject with{" "}
               <code className="font-mono">insufficient_stock_for_reserve</code>.
               Use <strong>Issue POs</strong> instead.
-              <div className="font-mono text-[11px] mt-1">
+              <div className="font-mono text-label mt-1">
                 {preflight.shortages
                   .map((s) => `${s.sku}: need ${s.need}, have ${s.have}`)
                   .join(" · ")}

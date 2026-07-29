@@ -74,7 +74,7 @@ function ChangeLine({
   const change = lastChangeFor(settings, settingKey, supplierId, category);
   if (!change) return null;
   return (
-    <div className="text-[11px] text-base-500 mt-1" data-testid="setting-change-line">
+    <div className="text-label text-base-500 mt-1" data-testid="setting-change-line">
       {change.changedBy ?? "—"} · {fmtDate(change.changedAt)}
       {change.oldValue ? ` · was ${change.oldValue}` : ""}
     </div>
@@ -116,8 +116,8 @@ function NumberRow({
     <div className="py-3 border-b border-base-100 last:border-b-0">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-[240px]">
-          <div className="text-[13px] text-base-900">{label}</div>
-          <div className="text-[12px] text-base-500 mt-0.5">{hint}</div>
+          <div className="text-body text-base-900">{label}</div>
+          <div className="text-meta text-base-500 mt-0.5">{hint}</div>
           {children}
         </div>
         <div className="flex items-center gap-2">
@@ -132,13 +132,13 @@ function NumberRow({
             className={`${INPUT_CLS} w-24 disabled:opacity-60`}
             data-testid={testId}
           />
-          <span className="text-[12px] text-base-500 w-[86px]">{unit}</span>
+          <span className="text-meta text-base-500 w-[86px]">{unit}</span>
           {canEdit && (
             <button
               type="button"
               disabled={!dirty || pending}
               onClick={() => onSave(n)}
-              className="btn-primary text-[12px] disabled:opacity-40"
+              className="btn-primary text-meta disabled:opacity-40"
               data-testid={`${testId}-save`}
             >
               Save
@@ -181,7 +181,7 @@ function DayPicker({
               )
             }
             className={[
-              "inline-flex items-center justify-center w-11 h-7 rounded-md text-[12px] font-semibold border transition-colors disabled:opacity-60",
+              "inline-flex items-center justify-center w-11 h-7 rounded-md text-meta font-semibold border transition-colors disabled:opacity-60",
               on
                 ? "border-base-900 bg-base-900 text-white"
                 : "border-base-200 bg-white text-base-500 hover:border-base-500",
@@ -233,7 +233,7 @@ export default function OperationPurchasingSettings() {
     return (
       <div className="h-full flex flex-col">
         <PurchasingTabs />
-        <div className="px-9 py-8 text-[13px] text-base-500">Loading the numbers…</div>
+        <div className="px-9 py-8 text-body text-base-500">Loading the numbers…</div>
       </div>
     );
   }
@@ -244,10 +244,10 @@ export default function OperationPurchasingSettings() {
         <PurchasingTabs />
         <div className="px-9 py-8">
           <div className="max-w-[560px] rounded-[10px] border border-danger bg-error-soft p-4">
-            <div className="text-[13px] font-semibold text-danger mb-1">
+            <div className="text-body font-semibold text-danger mb-1">
               Couldn&rsquo;t load the numbers.
             </div>
-            <div className="text-[12px] text-base-600">
+            <div className="text-meta text-base-600">
               {(error as Error | undefined)?.message ??
                 "Try again. If it keeps failing, ask a developer to check the API."}
             </div>
@@ -266,7 +266,7 @@ export default function OperationPurchasingSettings() {
     <div className="h-full flex flex-col">
       <PurchasingTabs />
       <div className="px-9 py-8 pb-14 overflow-auto" data-testid="purchasing-settings">
-        <div className="text-[13px] text-base-600 mb-[18px] max-w-[720px]">
+        <div className="text-body text-base-600 mb-[18px] max-w-[720px]">
           The numbers the ordering engine reads. Change one here and the
           order-by date on To Order moves the same day.
           {!canEdit && " Manager only — read-only for your role."}
@@ -274,16 +274,16 @@ export default function OperationPurchasingSettings() {
 
         {/* ── Production working days, per supplier × category ─────────────── */}
         <section className="mb-8 max-w-[860px]">
-          <h2 className="text-[15px] font-semibold text-base-900 mb-1">
+          <h2 className="text-strong font-semibold text-base-900 mb-1">
             Production working days
           </h2>
-          <p className="text-[12px] text-base-500 mb-3">
+          <p className="text-meta text-base-500 mb-3">
             How long each factory takes to make an item. Only the factories that
             have SKUs appear here.
           </p>
           <div className="bg-white border border-base-200 rounded-[10px] px-4">
             {rows.length === 0 && (
-              <div className="py-4 text-[13px] text-base-600">
+              <div className="py-4 text-body text-base-600">
                 No factory has SKUs yet. Add SKUs in Operation Catalog and the
                 factory appears here.
               </div>
@@ -305,11 +305,11 @@ export default function OperationPurchasingSettings() {
                   data-testid={`production-row-${category}`}
                 >
                   <div className="min-w-[240px]">
-                    <div className="text-[13px] text-base-900">
+                    <div className="text-body text-base-900">
                       {supplier.name} · {CATEGORY_LABEL[category]}
                     </div>
                     {workingDays == null && (
-                      <div className="text-[12px] text-warning mt-0.5" data-testid="set-a-number">
+                      <div className="text-meta text-warning mt-0.5" data-testid="set-a-number">
                         Set a number
                       </div>
                     )}
@@ -334,7 +334,7 @@ export default function OperationPurchasingSettings() {
                       className={`${INPUT_CLS} w-24 disabled:opacity-60`}
                       data-testid={`production-days-${category}`}
                     />
-                    <span className="text-[12px] text-base-500 w-[86px]">working days</span>
+                    <span className="text-meta text-base-500 w-[86px]">working days</span>
                     {canEdit && (
                       <button
                         type="button"
@@ -352,7 +352,7 @@ export default function OperationPurchasingSettings() {
                             })
                             .catch(fail)
                         }
-                        className="btn-primary text-[12px] disabled:opacity-40"
+                        className="btn-primary text-meta disabled:opacity-40"
                         data-testid={`production-save-${category}`}
                       >
                         Save
@@ -363,7 +363,7 @@ export default function OperationPurchasingSettings() {
               );
             })}
           </div>
-          <p className="text-[11px] text-base-500 mt-2">
+          <p className="text-label text-base-500 mt-2">
             One factory at a time — a PO already sent keeps the date it was sent
             with.
           </p>
@@ -371,10 +371,10 @@ export default function OperationPurchasingSettings() {
 
         {/* ── Supplier work week ───────────────────────────────────────────── */}
         <section className="mb-8 max-w-[860px]">
-          <h2 className="text-[15px] font-semibold text-base-900 mb-1">
+          <h2 className="text-strong font-semibold text-base-900 mb-1">
             Supplier work week
           </h2>
-          <p className="text-[12px] text-base-500 mb-3">
+          <p className="text-meta text-base-500 mb-3">
             The days each factory works. Pick the days it is open.
           </p>
           <div className="bg-white border border-base-200 rounded-[10px] px-4">
@@ -390,8 +390,8 @@ export default function OperationPurchasingSettings() {
                   className="py-3 border-b border-base-100 last:border-b-0 flex items-start justify-between gap-4 flex-wrap"
                 >
                   <div className="min-w-[200px]">
-                    <div className="text-[13px] text-base-900">{s.name}</div>
-                    <div className="text-[12px] text-base-500 mt-0.5">
+                    <div className="text-body text-base-900">{s.name}</div>
+                    <div className="text-meta text-base-500 mt-0.5">
                       {workWeekLabel(off)}
                     </div>
                     <ChangeLine
@@ -436,7 +436,7 @@ export default function OperationPurchasingSettings() {
                             })
                             .catch(fail)
                         }
-                        className="btn-primary text-[12px] disabled:opacity-40"
+                        className="btn-primary text-meta disabled:opacity-40"
                         data-testid={`work-week-save-${s.id}`}
                       >
                         Save
@@ -451,7 +451,7 @@ export default function OperationPurchasingSettings() {
 
         {/* ── The single numbers ───────────────────────────────────────────── */}
         <section className="mb-8 max-w-[860px]">
-          <h2 className="text-[15px] font-semibold text-base-900 mb-3">
+          <h2 className="text-strong font-semibold text-base-900 mb-3">
             The other numbers
           </h2>
           <div className="bg-white border border-base-200 rounded-[10px] px-4">
@@ -503,8 +503,8 @@ export default function OperationPurchasingSettings() {
             <div className="py-3 border-b border-base-100 last:border-b-0">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="min-w-[240px]">
-                  <div className="text-[13px] text-base-900">PO days</div>
-                  <div className="text-[12px] text-base-500 mt-0.5">
+                  <div className="text-body text-base-900">PO days</div>
+                  <div className="text-meta text-base-500 mt-0.5">
                     The days POs are sent. A late line never waits for one.
                   </div>
                   <ChangeLine settings={data} settingKey="po_days" />
@@ -529,7 +529,7 @@ export default function OperationPurchasingSettings() {
                           })
                           .catch(fail)
                       }
-                      className="btn-primary text-[12px] disabled:opacity-40"
+                      className="btn-primary text-meta disabled:opacity-40"
                       data-testid="po-days-save"
                     >
                       Save

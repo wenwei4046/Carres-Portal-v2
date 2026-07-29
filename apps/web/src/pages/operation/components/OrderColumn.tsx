@@ -118,15 +118,15 @@ export default function OrderColumn({
       >
         <div className="flex items-baseline justify-between">
           <div
-            className={`text-[11px] uppercase tracking-[0.14em] font-bold ${accentText}`}
+            className={`text-label uppercase tracking-[0.14em] font-semibold ${accentText}`}
           >
             {label}
           </div>
-          <span className="font-mono text-[13px] font-semibold text-base-900">
+          <span className="font-mono text-body font-semibold text-base-900">
             {orders.length}
           </span>
         </div>
-        <div className="text-[11px] text-base-500 mt-0.5">{hint}</div>
+        <div className="text-label text-base-500 mt-0.5">{hint}</div>
         {selectable && orders.length > 0 && (
           // Wrap as a label INSIDE the header button — but stop click
           // propagation so toggling the checkbox doesn't fire the column
@@ -136,7 +136,7 @@ export default function OrderColumn({
             onKeyDown={(e) => {
               if (e.key === " " || e.key === "Enter") e.stopPropagation();
             }}
-            className="flex items-center gap-1.5 mt-2 cursor-pointer text-[11px] text-base-700"
+            className="flex items-center gap-1.5 mt-2 cursor-pointer text-label text-base-700"
           >
             <input
               type="checkbox"
@@ -155,7 +155,7 @@ export default function OrderColumn({
       </button>
       <div className="p-2">
         {orders.length === 0 ? (
-          <div className="text-center text-base-400 text-[11px] py-6">—</div>
+          <div className="text-center text-base-400 text-label py-6">—</div>
         ) : (
           orders.map((o) => (
             <OrderCard

@@ -335,7 +335,7 @@ export default function OperationDelivery() {
         title={
           <span className="inline-flex items-baseline gap-3">
             <span>Delivery</span>
-            <span className="inline-flex items-center gap-1.5 text-[12px] font-normal text-base-400">
+            <span className="inline-flex items-center gap-1.5 text-meta font-normal text-base-400">
               <span className="tabular-nums">Today {fmtDate(today)}</span>
               <button
                 type="button"
@@ -441,7 +441,7 @@ export default function OperationDelivery() {
                 role="tab"
                 aria-selected={view === v}
                 onClick={() => setView(v)}
-                className={`px-3 py-1.5 text-[12px] rounded whitespace-nowrap ${
+                className={`px-3 py-1.5 text-meta rounded whitespace-nowrap ${
                   view === v
                     ? "bg-white text-base-900 font-semibold shadow-sm"
                     : "text-base-600 font-medium hover:text-base-900"
@@ -453,7 +453,7 @@ export default function OperationDelivery() {
           </div>
         }
         toolbarRight={
-          <span className="text-[12px] text-base-500 tabular-nums">
+          <span className="text-meta text-base-500 tabular-nums">
             {filtered.length} to do
             {lateCount > 0 && <span className="text-danger font-semibold"> · {lateCount} late</span>}
           </span>
@@ -498,7 +498,7 @@ export default function OperationDelivery() {
               <div className="flex-1 grid place-items-center p-8 text-center">
                 <div className="max-w-[280px]">
                   <Truck size={18} className="mx-auto mb-2 text-base-300" aria-hidden />
-                  <div className="text-[13px] text-base-600">
+                  <div className="text-body text-base-600">
                     Pick a row on the left to see the delivery, who is carrying it, and
                     what is still missing.
                   </div>
@@ -544,14 +544,14 @@ function FacetRow({
       }`}
     >
       <span
-        className={`flex-1 min-w-0 truncate text-[13px] ${
-          active ? "font-bold text-base-900" : "text-base-700"
+        className={`flex-1 min-w-0 truncate text-body ${
+          active ? "font-semibold text-base-900" : "text-base-700"
         }`}
       >
         {label}
       </span>
       <span
-        className={`text-[13px] tabular-nums shrink-0 ${
+        className={`text-body tabular-nums shrink-0 ${
           tone === "danger" ? "text-danger font-semibold" : "text-base-500"
         }`}
       >
@@ -599,7 +599,7 @@ function QueueList({
       <div className="flex-1 grid place-items-center p-8 text-center">
         {/* An empty state that teaches (COPY-STANDARD rule 5): it says what the
             list means, not "no results". */}
-        <div className="max-w-[300px] text-[13px] text-base-600">
+        <div className="max-w-[300px] text-body text-base-600">
           Nothing to do here. An order joins this board the moment its goods are in
           and a delivery step is the next thing someone must do.
         </div>
@@ -642,7 +642,7 @@ function QueueRow({
       }`}
     >
       <div className="flex items-center gap-2">
-        <span className="font-mono text-[13px] font-semibold text-base-900">SO-{o.so}</span>
+        <span className="font-mono text-body font-semibold text-base-900">SO-{o.so}</span>
         <span
           className={`ml-auto pill ${PILL_CLASS[row.tone]} shrink-0 max-w-[60%] truncate`}
           title={row.line}
@@ -651,10 +651,10 @@ function QueueRow({
           {row.line}
         </span>
       </div>
-      <div className={`mt-0.5 text-[13px] text-base-700 truncate ${cjkClassName(o.customer_name)}`}>
+      <div className={`mt-0.5 text-body text-base-700 truncate ${cjkClassName(o.customer_name)}`}>
         {o.customer_name || "—"}
       </div>
-      <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-base-500">
+      <div className="mt-0.5 flex items-center gap-1.5 text-meta text-base-500">
         <span className="truncate">{row.logisticsName?.trim() || NO_LOGISTICS_LABEL}</span>
         {row.bookingIso && (
           <>
@@ -780,7 +780,7 @@ function CalendarPane({
               key={key}
               type="button"
               onClick={() => onRange(key)}
-              className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-meta font-semibold transition-colors ${
                 range === key
                   ? "bg-base-900 text-white"
                   : "bg-white text-base-500 border border-base-200 hover:bg-hovertint"
@@ -795,7 +795,7 @@ function CalendarPane({
 
       <div className="flex-1 overflow-y-auto p-2 space-y-4">
         {days.length > 1 && !anything && (
-          <div className="text-[13px] text-base-500 text-center py-6">
+          <div className="text-body text-base-500 text-center py-6">
             No deliveries booked these days.
           </div>
         )}
@@ -809,11 +809,11 @@ function CalendarPane({
           const loads = carrierDayLoads(deliveries, day, rulesByPartner);
           return (
             <div key={day} data-testid={`delivery-day-${day}`}>
-              <div className="t-micro text-base-500 mb-2">
+              <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-2">
                 {word ? `${word} · ${fmtDate(day)}` : fmtDate(day)}
               </div>
               {deliveries.length === 0 ? (
-                <div className="text-[12px] text-base-400 text-center py-3">
+                <div className="text-meta text-base-400 text-center py-3">
                   No deliveries booked this day.
                 </div>
               ) : (
@@ -834,11 +834,11 @@ function CalendarPane({
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono text-[12px] font-semibold text-base-900">
+                          <span className="font-mono text-meta font-semibold text-base-900">
                             SO-{d.so}
                           </span>
                           <span
-                            className={`text-[11px] font-semibold shrink-0 ${
+                            className={`text-label font-semibold shrink-0 ${
                               d.kind === "confirmed" ? "text-success" : "text-warning"
                             }`}
                           >
@@ -850,11 +850,11 @@ function CalendarPane({
                           </span>
                         </div>
                         <div
-                          className={`text-[12px] text-base-700 truncate ${cjkClassName(d.customer)}`}
+                          className={`text-meta text-base-700 truncate ${cjkClassName(d.customer)}`}
                         >
                           {d.customer || "—"}
                         </div>
-                        <div className="text-[11px] text-base-500 truncate">
+                        <div className="text-label text-base-500 truncate">
                           {d.partnerName?.trim() || NO_LOGISTICS_LABEL}
                           {locationForAddress(d.address).label
                             ? ` · ${locationForAddress(d.address).label}`
@@ -870,7 +870,7 @@ function CalendarPane({
                 return (
                   <div key={l.partnerId ?? "none"} className="px-2 pt-1.5">
                     <div
-                      className={`flex items-center justify-between gap-2 text-[11px] ${
+                      className={`flex items-center justify-between gap-2 text-label ${
                         !l.runs || l.atLimit ? "text-warning font-semibold" : "text-base-500"
                       }`}
                     >
@@ -881,13 +881,13 @@ function CalendarPane({
                           : `${l.confirmed + l.provisional}`}
                       </span>
                     </div>
-                    {note && <div className="text-[11px] text-warning mt-0.5">{note}</div>}
+                    {note && <div className="text-label text-warning mt-0.5">{note}</div>}
                   </div>
                 );
               })}
               {promised.length > 0 && (
                 <div className="pt-2 space-y-1.5">
-                  <div className="t-micro text-warning">Promised this day, no date yet</div>
+                  <div className="text-label uppercase tracking-[0.05em] text-warning">Promised this day, no date yet</div>
                   {promised.map((o) => (
                     <button
                       key={o.id}
@@ -899,10 +899,10 @@ function CalendarPane({
                     >
                       <span className="w-1 rounded-full bg-warning shrink-0" />
                       <div className="min-w-0 flex-1">
-                        <div className="font-mono text-[12px] font-semibold text-base-900">
+                        <div className="font-mono text-meta font-semibold text-base-900">
                           SO-{o.so}
                         </div>
-                        <div className="text-[11px] text-base-500 truncate">
+                        <div className="text-label text-base-500 truncate">
                           Call {o.customer_name?.trim() || "the customer"} — book delivery date
                         </div>
                       </div>
@@ -973,18 +973,18 @@ function DeliveryDetail({
     <div className="flex flex-col" data-testid="delivery-detail">
       <div className="flex items-start gap-3 px-4 py-3 border-b border-base-100">
         <div className="min-w-0">
-          <div className="font-mono text-[15px] font-semibold text-base-900">SO-{o.so}</div>
-          <div className={`text-[13px] text-base-700 truncate ${cjkClassName(o.customer_name)}`}>
+          <div className="font-mono text-strong font-semibold text-base-900">SO-{o.so}</div>
+          <div className={`text-body text-base-700 truncate ${cjkClassName(o.customer_name)}`}>
             {o.customer_name || "—"}
           </div>
           {o.customer_address && (
-            <div className="text-[12px] text-base-500 mt-0.5">{o.customer_address}</div>
+            <div className="text-meta text-base-500 mt-0.5">{o.customer_address}</div>
           )}
         </div>
         <button
           type="button"
           onClick={onOpenOrder}
-          className="ml-auto shrink-0 btn-secondary text-[12px] py-1.5 px-3"
+          className="ml-auto shrink-0 btn-secondary text-meta py-1.5 px-3"
           title="Open the order to book the date, record a reason or upload the delivery photo"
         >
           Open order
@@ -1001,7 +1001,7 @@ function DeliveryDetail({
           </span>
           {due !== "none" && row.dueIso && (
             <span
-              className={`text-[12px] tabular-nums ${
+              className={`text-meta tabular-nums ${
                 due === "late" ? "text-danger font-semibold" : "text-base-500"
               }`}
             >
@@ -1015,24 +1015,24 @@ function DeliveryDetail({
 
       {/* The booking, as a FACT (T1's vocabulary): confirmed is the only green. */}
       <div className="px-4 py-3 border-b border-base-100">
-        <div className="t-micro text-base-500 mb-1.5">Delivery date</div>
+        <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-1.5">Delivery date</div>
         {booking.kind === "confirmed" && booking.date ? (
-          <div className="text-[13px] text-success font-semibold">
+          <div className="text-body text-success font-semibold">
             {row.logisticsName?.trim() || NO_LOGISTICS_LABEL} · confirmed {fmtDate(booking.date)}
             {booking.slot ? ` · ${shortSlot(booking.slot)}` : ""}
           </div>
         ) : booking.kind === "provisional" && booking.date ? (
-          <div className="text-[13px] text-warning font-semibold">
+          <div className="text-body text-warning font-semibold">
             {row.logisticsName?.trim() || NO_LOGISTICS_LABEL} · logistics&rsquo; date{" "}
             {fmtDate(booking.date)}
           </div>
         ) : (
-          <div className="text-[13px] text-base-600">
+          <div className="text-body text-base-600">
             {row.logisticsName?.trim() || NO_LOGISTICS_LABEL}
           </div>
         )}
         {row.promisedIso && (
-          <div className="text-[12px] text-base-500 mt-1 tabular-nums">
+          <div className="text-meta text-base-500 mt-1 tabular-nums">
             Promised to the customer: {fmtDate(row.promisedIso)}
           </div>
         )}
@@ -1053,12 +1053,12 @@ function DeliveryDetail({
       {/* T8 — what this trip carries, and what is still owed. */}
       {allGroups.length > 0 && (
         <div className="px-4 py-3 border-t border-base-100">
-          <div className="t-micro text-base-500 mb-1.5">This trip</div>
-          <div className="text-[13px] text-base-800">
+          <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-1.5">This trip</div>
+          <div className="text-body text-base-800">
             {scope.map(deliveryGroupLabel).join(" + ") || "—"}
           </div>
           {secondTrip && (
-            <div className="text-[12px] text-warning mt-1">Second trip — {secondTrip}</div>
+            <div className="text-meta text-warning mt-1">Second trip — {secondTrip}</div>
           )}
         </div>
       )}
@@ -1067,17 +1067,17 @@ function DeliveryDetail({
           crosses. These WARN and never block (T9's law): the Confirm button
           never reads them, and this page never writes. */}
       <div className="px-4 py-3 border-t border-base-100">
-        <div className="t-micro text-base-500 mb-1.5">Delivery rules</div>
+        <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-1.5">Delivery rules</div>
         {!row.logisticsName ? (
-          <div className="text-[12px] text-base-500">
+          <div className="text-meta text-base-500">
             No logistics picked — the rules appear once a company is chosen.
           </div>
         ) : !rules || isBareRules(rules) ? (
-          <div className="text-[12px] text-base-500">
+          <div className="text-meta text-base-500">
             No delivery rules recorded for {row.logisticsName}.
           </div>
         ) : (
-          <div className="text-[12px] text-base-700 space-y-0.5">
+          <div className="text-meta text-base-700 space-y-0.5">
             {rules.bookingLeadDays > 0 && (
               <div>
                 {rules.bookingLeadDays} working day{rules.bookingLeadDays === 1 ? "" : "s"} notice
@@ -1090,7 +1090,7 @@ function DeliveryDetail({
           </div>
         )}
         {warnings.map((w) => (
-          <div key={w.key} className="text-[12px] text-warning mt-1.5">
+          <div key={w.key} className="text-meta text-warning mt-1.5">
             {w.message}
           </div>
         ))}
@@ -1100,19 +1100,19 @@ function DeliveryDetail({
           (an older Worker that does not select the column): it stays silent
           rather than demanding proof it cannot substantiate. */}
       <div className="px-4 py-3 border-t border-base-100">
-        <div className="t-micro text-base-500 mb-1.5">Delivery photo</div>
+        <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-1.5">Delivery photo</div>
         {!Array.isArray(photos) ? (
-          <div className="text-[12px] text-base-500">Open the order to see the delivery photo.</div>
+          <div className="text-meta text-base-500">Open the order to see the delivery photo.</div>
         ) : photos.length > 0 ? (
-          <div className="text-[12px] text-base-700 tabular-nums">
+          <div className="text-meta text-base-700 tabular-nums">
             {photos.length} delivery photo{photos.length === 1 ? "" : "s"} on file
           </div>
         ) : delivered ? (
-          <div className="text-[12px] text-warning">
+          <div className="text-meta text-warning">
             No delivery photo yet — open the order to upload it.
           </div>
         ) : (
-          <div className="text-[12px] text-base-500">Uploaded after the delivery.</div>
+          <div className="text-meta text-base-500">Uploaded after the delivery.</div>
         )}
       </div>
     </div>

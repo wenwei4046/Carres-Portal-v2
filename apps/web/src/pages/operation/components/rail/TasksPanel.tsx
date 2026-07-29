@@ -106,7 +106,7 @@ export default function TasksPanel() {
             key={s}
             type="button"
             onClick={() => setScope(s)}
-            className={`text-[11px] font-medium px-2.5 py-1 rounded-full ${
+            className={`text-label font-medium px-2.5 py-1 rounded-full ${
               scope === s ? "bg-base-900 text-white" : "text-base-500 hover:bg-base-100"
             }`}
           >
@@ -119,7 +119,7 @@ export default function TasksPanel() {
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="flex items-center gap-2 px-1 py-2 text-[13px] text-primary font-medium hover:bg-base-50 rounded mb-1"
+          className="flex items-center gap-2 px-1 py-2 text-body text-primary font-medium hover:bg-base-50 rounded mb-1"
         >
           <Plus size={16} /> Add a task
         </button>
@@ -131,13 +131,13 @@ export default function TasksPanel() {
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && submit()}
             placeholder="Task title…"
-            className="w-full text-[13px] focus:outline-none"
+            className="w-full text-body focus:outline-none"
           />
           <div className="flex items-center gap-1.5">
             <select
               value={assignTo}
               onChange={(e) => setAssignTo(e.target.value)}
-              className="flex-1 text-[11px] px-1.5 py-1 border border-base-200 rounded bg-white"
+              className="flex-1 text-label px-1.5 py-1 border border-base-200 rounded bg-white"
             >
               <option value="">Anyone</option>
               {members.map((m) => (
@@ -147,16 +147,16 @@ export default function TasksPanel() {
             <button
               type="button"
               onClick={() => setUrgent((u) => !u)}
-              className={`text-[10px] font-semibold uppercase px-2 py-1 rounded border ${urgent ? "border-danger text-danger bg-error-soft" : "border-base-200 text-base-500"}`}
+              className={`text-label font-semibold uppercase px-2 py-1 rounded border ${urgent ? "border-danger text-danger bg-error-soft" : "border-base-200 text-base-500"}`}
             >
               Urgent
             </button>
-            <button type="button" onClick={() => { setAdding(false); setTitle(""); }} className="text-[12px] text-base-500 px-1.5 py-1">Cancel</button>
+            <button type="button" onClick={() => { setAdding(false); setTitle(""); }} className="text-meta text-base-500 px-1.5 py-1">Cancel</button>
             <button
               type="button"
               disabled={!title.trim() || createMut.isPending}
               onClick={submit}
-              className="text-[12px] font-semibold text-primary px-2 py-1 rounded hover:bg-primary/5 disabled:opacity-40"
+              className="text-meta font-semibold text-primary px-2 py-1 rounded hover:bg-primary/5 disabled:opacity-40"
             >
               Add
             </button>
@@ -167,9 +167,9 @@ export default function TasksPanel() {
       {/* Active tasks */}
       <div className="flex-1 overflow-auto">
         {isLoading ? (
-          <div className="text-[12px] text-base-400 text-center py-6">Loading…</div>
+          <div className="text-meta text-base-400 text-center py-6">Loading…</div>
         ) : active.length === 0 ? (
-          <div className="text-[12px] text-base-400 text-center py-6">No tasks. Nice.</div>
+          <div className="text-meta text-base-400 text-center py-6">No tasks. Nice.</div>
         ) : (
           active.map((t) => (
             <TaskRow key={t.id} t={t} myId={myId} onAct={act} onDelete={() => deleteMut.mutate(t.id)} />
@@ -182,7 +182,7 @@ export default function TasksPanel() {
             <button
               type="button"
               onClick={() => setShowDone((s) => !s)}
-              className="flex items-center gap-1 text-[12px] font-medium text-base-600 px-1 py-1.5 hover:bg-base-50 rounded w-full"
+              className="flex items-center gap-1 text-meta font-medium text-base-600 px-1 py-1.5 hover:bg-base-50 rounded w-full"
             >
               {showDone ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               Completed ({completed.length})
@@ -225,12 +225,12 @@ function TaskRow({
         )}
       </button>
       <div className="min-w-0 flex-1">
-        <div className={`text-[13px] leading-snug ${done ? "line-through text-base-400" : "text-base-900"}`}>
-          {t.priority === "urgent" && !done && <span className="text-danger font-bold">! </span>}
+        <div className={`text-body leading-snug ${done ? "line-through text-base-400" : "text-base-900"}`}>
+          {t.priority === "urgent" && !done && <span className="text-danger font-semibold">! </span>}
           {t.title}
         </div>
         {!done && (
-          <div className="text-[11px] text-base-500 flex items-center gap-2 flex-wrap mt-0.5">
+          <div className="text-label text-base-500 flex items-center gap-2 flex-wrap mt-0.5">
             {t.overdue && (
               <span className="inline-flex items-center gap-0.5 text-danger font-semibold">
                 <Clock size={11} /> overdue
@@ -256,7 +256,7 @@ function TaskRow({
         )}
         {/* Completed-row report: who finished it + when (the COO's "done" signal). */}
         {done && (
-          <div className="text-[11px] text-base-400 flex items-center gap-1 flex-wrap mt-0.5">
+          <div className="text-label text-base-400 flex items-center gap-1 flex-wrap mt-0.5">
             {t.status === "cancelled" ? (
               <span className="font-medium">Cancelled</span>
             ) : (

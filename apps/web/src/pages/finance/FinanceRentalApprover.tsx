@@ -45,7 +45,7 @@ function SignatureLink({ path }: { path: string }) {
       onClick={open}
       disabled={busy}
       data-testid="view-signature"
-      className="text-[11.5px] font-medium text-primary underline underline-offset-2 disabled:opacity-50"
+      className="text-label font-medium text-primary underline underline-offset-2 disabled:opacity-50"
     >
       {busy ? "Opening…" : "View signature"}
     </button>
@@ -88,13 +88,13 @@ export default function FinanceRentalApprover() {
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="flex items-end justify-between gap-4 flex-wrap mb-7">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
             Finance · Rental
           </div>
-          <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
+          <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
             Rental Approver
           </h1>
-          <div className="text-[13px] text-muted-foreground">
+          <div className="text-body text-muted-foreground">
             Credit assessment for rent-to-own · nothing is billed, allocated or charged until
             you approve
           </div>
@@ -113,11 +113,11 @@ export default function FinanceRentalApprover() {
       </div>
 
       {approvalsQ.isLoading ? (
-        <div className="bg-card rounded-md border border-border p-12 text-center text-[12.5px] text-muted-foreground">
+        <div className="bg-card rounded-md border border-border p-12 text-center text-meta text-muted-foreground">
           Loading…
         </div>
       ) : approvalsQ.error ? (
-        <div className="p-3 text-[12px] rounded-md bg-destructive/5 text-destructive border border-destructive/30">
+        <div className="p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
           Failed to load the approval queue: {String(approvalsQ.error)}
         </div>
       ) : rows.length === 0 ? (
@@ -125,8 +125,8 @@ export default function FinanceRentalApprover() {
           className="bg-card rounded-md border border-border p-12 text-center"
           data-testid="approver-empty"
         >
-          <div className="text-[15px] font-semibold text-foreground">Nothing waiting</div>
-          <div className="text-[12.5px] text-muted-foreground mt-1">
+          <div className="text-strong font-semibold text-foreground">Nothing waiting</div>
+          <div className="text-meta text-muted-foreground mt-1">
             Every rental application has been decided. New ones land here the moment a store
             signs one.
           </div>
@@ -139,7 +139,7 @@ export default function FinanceRentalApprover() {
         </div>
       )}
 
-      <div className="mt-3.5 px-4 py-3 bg-muted/30 rounded-md text-[11.5px] text-muted-foreground">
+      <div className="mt-3.5 px-4 py-3 bg-muted/30 rounded-md text-label text-muted-foreground">
         <b>Approve</b> puts the contract live: the monthly schedule is written, the unit is
         allocated, and the store can collect the first month by card.{" "}
         <b>Reject</b> fails the application and leaves no money behind — the reason you type is
@@ -180,7 +180,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
       <div className="flex items-start justify-between gap-4 flex-wrap px-4 py-3.5 border-b border-border">
         <div className="min-w-0">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <span className="font-mono text-[14px] font-semibold text-foreground">
+            <span className="font-mono text-body font-semibold text-foreground">
               {r.agreementNo}
             </span>
             {/* 0279 — the signature is real now, so the pill states a fact
@@ -189,7 +189,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
                 amber branch only ever describes a pre-0279 application. */}
             {r.signedAt ? (
               <span
-                className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                className="px-2 py-0.5 rounded-full text-label font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
                 title={`Signed ${new Date(r.signedAt).toLocaleString()}`}
               >
                 Signed by {r.signedName ?? "customer"}
@@ -197,7 +197,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
               </span>
             ) : (
               <span
-                className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200"
+                className="px-2 py-0.5 rounded-full text-label font-semibold bg-amber-50 text-amber-800 border border-amber-200"
                 title="This application predates signature capture — no signature is on file, and approval is now refused without one."
               >
                 Not signed yet
@@ -205,7 +205,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
             )}
             {r.signaturePath ? <SignatureLink path={r.signaturePath} /> : null}
           </div>
-          <div className="text-[12.5px] text-muted-foreground mt-1">
+          <div className="text-meta text-muted-foreground mt-1">
             {r.customer.name}
             {r.customer.phone ? ` · ${r.customer.phone}` : ""}
             {r.dealer ? ` · ${r.dealer.name}` : " · HQ direct"}
@@ -213,10 +213,10 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
           </div>
         </div>
         <div className="text-right shrink-0">
-          <div className="font-mono text-[18px] font-semibold text-foreground tabular-nums">
+          <div className="font-mono text-strong font-semibold text-foreground tabular-nums">
             {rm(r.termTotal)}
           </div>
-          <div className="text-[11.5px] text-muted-foreground">
+          <div className="text-label text-muted-foreground">
             {rm(r.monthlyFee)} / mo × {r.termMonths} months
           </div>
         </div>
@@ -235,7 +235,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
 
       {/* The CBM check is planned, not built (Loo 2026-07-26) — the page says
           that plainly instead of showing a button that does nothing. */}
-      <div className="px-4 pb-2 text-[11.5px] text-muted-foreground">
+      <div className="px-4 pb-2 text-label text-muted-foreground">
         {r.creditReference
           ? `Credit bureau: ${r.creditReference}`
           : "Credit bureau (CBM) check is not wired yet — assess this one by hand."}
@@ -243,11 +243,11 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
 
       {rejecting ? (
         <div className="px-4 py-3.5 border-t border-border bg-muted/20">
-          <label className="block text-[11px] uppercase tracking-[0.06em] font-bold text-muted-foreground mb-1.5">
+          <label className="block text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1.5">
             Why is this rejected?
           </label>
           <textarea
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-[13px]"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-body"
             rows={2}
             value={reason}
             autoFocus
@@ -260,7 +260,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
               type="button"
               disabled={busy || reason.trim().length === 0}
               onClick={() => run(false, reason.trim())}
-              className="px-3 py-2 rounded-md bg-destructive text-destructive-foreground text-[12px] font-semibold disabled:opacity-40"
+              className="px-3 py-2 rounded-md bg-destructive text-destructive-foreground text-meta font-semibold disabled:opacity-40"
               data-testid="approver-reject-confirm"
             >
               {busy ? "Rejecting…" : "Reject application"}
@@ -272,11 +272,11 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
                 setRejecting(false);
                 setReason("");
               }}
-              className="px-3 py-2 rounded-md border border-border text-[12px] font-semibold"
+              className="px-3 py-2 rounded-md border border-border text-meta font-semibold"
             >
               Cancel
             </button>
-            <span className="text-[11.5px] text-muted-foreground ml-1">
+            <span className="text-label text-muted-foreground ml-1">
               The reason is required and is kept on the record.
             </span>
           </div>
@@ -287,7 +287,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
             type="button"
             disabled={busy}
             onClick={() => run(true)}
-            className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-[12px] font-semibold disabled:opacity-40"
+            className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-meta font-semibold disabled:opacity-40"
             data-testid="approver-approve"
           >
             {busy ? "Working…" : "Approve"}
@@ -296,7 +296,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
             type="button"
             disabled={busy}
             onClick={() => setRejecting(true)}
-            className="px-3 py-2 rounded-md border border-border text-[12px] font-semibold text-destructive disabled:opacity-40"
+            className="px-3 py-2 rounded-md border border-border text-meta font-semibold text-destructive disabled:opacity-40"
             data-testid="approver-reject"
           >
             Reject
@@ -310,10 +310,10 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
 function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="min-w-0">
-      <div className="text-[10px] uppercase tracking-[0.06em] font-bold text-muted-foreground">
+      <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground">
         {label}
       </div>
-      <div className={`text-[13px] text-foreground break-words ${mono ? "font-mono" : ""}`}>
+      <div className={`text-body text-foreground break-words ${mono ? "font-mono" : ""}`}>
         {value}
       </div>
     </div>
@@ -335,13 +335,13 @@ function Kpi({
     <div
       className={`bg-card rounded-md border p-4 ${accent ? "border-primary/40" : "border-border"}`}
     >
-      <div className="text-[10px] uppercase tracking-[0.06em] font-bold text-muted-foreground">
+      <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground">
         {label}
       </div>
-      <div className="font-mono text-[24px] font-semibold text-foreground tabular-nums mt-1">
+      <div className="font-mono text-page font-semibold text-foreground tabular-nums mt-1">
         {value}
       </div>
-      <div className="text-[11.5px] text-muted-foreground mt-0.5">{hint}</div>
+      <div className="text-label text-muted-foreground mt-0.5">{hint}</div>
     </div>
   );
 }

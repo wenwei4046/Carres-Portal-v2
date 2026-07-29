@@ -56,8 +56,8 @@ export default function FabricTierDeltasCard({
 
   return (
     <section>
-      <div className="t-h4 font-display mb-1">Fabric tier deltas</div>
-      <p className="t-tiny text-base-500 mb-3">
+      <div className="text-strong font-display mb-1">Fabric tier deltas</div>
+      <p className="text-meta text-base-500 mb-3">
         Global RM premium added to the base sofa price for P2 (mid) and P3 (premium) fabrics.
         P1 fabrics always carry zero delta. Per-model overrides in the Modular tab take precedence.
         {!isPrincipal && " Principal only — read-only for your role."}
@@ -94,7 +94,7 @@ export default function FabricTierDeltasCard({
             type="button"
             onClick={save}
             disabled={!valid || !dirty || patch.isPending}
-            className="btn-primary text-[12px] disabled:opacity-40"
+            className="btn-primary text-meta disabled:opacity-40"
             data-testid="global-tier-save"
           >
             {patch.isPending ? "Saving…" : "Save"}
@@ -102,7 +102,7 @@ export default function FabricTierDeltasCard({
         )}
       </div>
       {/* Summary pill */}
-      <p className="t-tiny text-base-500 mt-2" data-testid="fabric-tier-summary">
+      <p className="text-meta text-base-500 mt-2" data-testid="fabric-tier-summary">
         P2 adds <span className="font-semibold text-base-800">RM {(cfg?.sofaTier2Delta ?? 0).toFixed(2)}</span>
         &nbsp;&middot;&nbsp;
         P3 adds <span className="font-semibold text-base-800">RM {(cfg?.sofaTier3Delta ?? 0).toFixed(2)}</span>

@@ -45,8 +45,8 @@ export default function CaseFollowUps({
   return (
     <div className="rounded border border-base-200 bg-base-50 p-3">
       <div className="flex items-center justify-between">
-        <p className="t-tiny uppercase tracking-wider text-base-500">What happens next</p>
-        <p className="t-tiny text-base-500">
+        <p className="text-meta uppercase tracking-wider text-base-500">What happens next</p>
+        <p className="text-meta text-base-500">
           {doneCount} of {rows.length} done
         </p>
       </div>
@@ -65,17 +65,17 @@ export default function CaseFollowUps({
 
               <span className="min-w-0 flex-1">
                 <span
-                  className={`block text-sm ${r.entry ? "text-base-600" : "text-base-900 font-medium"}`}
+                  className={`block text-body ${r.entry ? "text-base-600" : "text-base-900 font-medium"}`}
                 >
                   {r.label}
                 </span>
                 {r.entry ? (
-                  <span className="t-tiny block text-base-500">
+                  <span className="text-meta block text-base-500">
                     {fmtDate(r.entry.on)} · recorded by {r.entry.byRole || "unknown"}
                     {r.entry.note ? ` · ${r.entry.note}` : ""}
                   </span>
                 ) : (
-                  <span className="t-tiny block text-base-500">{r.step?.why}</span>
+                  <span className="text-meta block text-base-500">{r.step?.why}</span>
                 )}
               </span>
 
@@ -83,7 +83,7 @@ export default function CaseFollowUps({
                 <button
                   type="button"
                   onClick={() => setOpenStep(openStep === r.key ? null : r.key)}
-                  className="btn-secondary shrink-0 py-1 text-[12px]"
+                  className="btn-secondary shrink-0 py-1 text-meta"
                 >
                   Record
                 </button>
@@ -106,7 +106,7 @@ export default function CaseFollowUps({
 
       {/* The close rule, stated where the work is — not discovered by pressing
           Save and being refused. */}
-      <p className="t-tiny mt-2 text-base-600">
+      <p className="text-meta mt-2 text-base-600">
         {canClose
           ? "Everything is done. Set the status to Resolved to close this case."
           : "This case can only be closed once every step above has a date on it."}
@@ -146,39 +146,39 @@ function RecordStepForm({
   return (
     <div className="mt-2 space-y-2 border-t border-base-200 pt-2">
       <div className="flex flex-wrap items-end gap-2">
-        <label className="t-tiny text-base-500">
+        <label className="text-meta text-base-500">
           {step.dateLabel}
           <input
             type="date"
             value={on}
             onChange={(e) => setOn(e.target.value)}
-            className="mt-1 block rounded border border-base-300 px-2 py-1 text-sm"
+            className="mt-1 block rounded border border-base-300 px-2 py-1 text-body"
           />
         </label>
         <button
           type="button"
           onClick={() => saveMut.mutate()}
           disabled={!ready || saveMut.isPending}
-          className="btn-primary py-1.5 text-[13px] disabled:opacity-40"
+          className="btn-primary py-1.5 text-body disabled:opacity-40"
         >
           {saveMut.isPending ? "Saving…" : "Save"}
         </button>
       </div>
 
       <div>
-        <label className="t-tiny text-base-500">
+        <label className="text-meta text-base-500">
           {step.noteRequired ? "What did you find?" : "Anything to add? (optional)"}
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder={step.noteRequired ? "Left corner seam open, 4 inches" : ""}
-            className="mt-1 w-full rounded border border-base-300 px-2 py-1 text-sm"
+            className="mt-1 w-full rounded border border-base-300 px-2 py-1 text-body"
           />
         </label>
       </div>
 
       {saveMut.isError && (
-        <p className="t-tiny break-words text-error-700">
+        <p className="text-meta break-words text-error-700">
           Could not save: {(saveMut.error as Error)?.message ?? "unknown error"}
         </p>
       )}

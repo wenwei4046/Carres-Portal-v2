@@ -118,7 +118,7 @@ export default function OrderActionList({
                   className="flex flex-col min-w-0"
                 >
                   {steps.length === 0 ? (
-                    <div className="flex items-center gap-2 min-w-0 text-[13px] font-medium text-base-900">
+                    <div className="flex items-center gap-2 min-w-0 text-body font-medium text-base-900">
                       {head}
                     </div>
                   ) : (
@@ -129,7 +129,7 @@ export default function OrderActionList({
                       onClick={() =>
                         setOpen((o) => ({ ...o, [a.key]: !o[a.key] }))
                       }
-                      className="flex items-center gap-2 min-w-0 w-full text-left text-[13px] font-medium text-base-900 rounded-[4px] -mx-1 px-1 hover:bg-hovertint"
+                      className="flex items-center gap-2 min-w-0 w-full text-left text-body font-medium text-base-900 rounded-[4px] -mx-1 px-1 hover:bg-hovertint"
                     >
                       {head}
                       {expanded ? (
@@ -158,7 +158,7 @@ export default function OrderActionList({
                           data-testid="order-action-step"
                           data-step={st.key}
                           data-state={st.done ? "done" : "open"}
-                          className={`flex items-center gap-2 min-w-0 text-[12px] ${
+                          className={`flex items-center gap-2 min-w-0 text-meta ${
                             st.done
                               ? "font-normal text-base-500"
                               : "font-medium text-base-900"

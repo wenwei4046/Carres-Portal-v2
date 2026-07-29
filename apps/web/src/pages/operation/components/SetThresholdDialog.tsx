@@ -146,7 +146,7 @@ export default function SetThresholdDialog({
       title={`Set thresholds — ${sku} @ ${warehouseName}`}
       onClose={handleCancel}
     >
-      <div className="text-[12px] text-base-600 mb-3.5 font-body">
+      <div className="text-meta text-base-600 mb-3.5 font-body">
         Leave blank to clear; high must be ≥ low when both set.
       </div>
 
@@ -196,7 +196,7 @@ export default function SetThresholdDialog({
         <div
           role="alert"
           data-testid="set-threshold-error"
-          className="text-[11px] font-body mb-3.5 px-2.5 py-1.5 rounded-[4px]"
+          className="text-label font-body mb-3.5 px-2.5 py-1.5 rounded-[4px]"
           style={{
             color: "var(--destructive)",
             background: "var(--error-soft)",

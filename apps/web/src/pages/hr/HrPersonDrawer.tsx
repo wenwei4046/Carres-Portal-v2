@@ -73,8 +73,8 @@ function Panel({
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-2 px-[18px] py-3 text-left hover:bg-hovertint"
       >
-        <span className="t-h4 flex-1 font-semibold">{title}</span>
-        {tag && <span className="t-tiny text-base-400">{tag}</span>}
+        <span className="text-strong flex-1 font-semibold">{title}</span>
+        {tag && <span className="text-meta text-base-400">{tag}</span>}
         <ChevronDown
           size={16}
           className={`text-base-400 transition-transform ${open ? "" : "-rotate-90"}`}
@@ -89,8 +89,8 @@ function Panel({
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex min-h-[36px] items-center gap-3 border-t border-base-100 py-2 first:border-t-0">
-      <span className="t-tiny w-[132px] shrink-0 text-base-400">{label}</span>
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-[13.5px] text-base-900">
+      <span className="text-meta w-[132px] shrink-0 text-base-400">{label}</span>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-body text-base-900">
         {children}
       </div>
     </div>
@@ -101,7 +101,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
  *  said in one chip so HR knows where to go to change it. */
 function TeamChip() {
   return (
-    <span className="t-micro inline-flex items-center gap-1 rounded bg-base-100 px-1.5 py-0.5 font-semibold text-base-500">
+    <span className="text-label uppercase tracking-[0.05em] inline-flex items-center gap-1 rounded bg-base-100 px-1.5 py-0.5 font-semibold text-base-500">
       <Lock size={11} />
       Team
     </span>
@@ -125,7 +125,7 @@ function EditableText({
     return (
       <button
         type="button"
-        className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-primary hover:underline"
+        className="inline-flex items-center gap-1 text-meta font-semibold text-primary hover:underline"
         onClick={() => setEditing(true)}
       >
         <Plus size={12} />
@@ -137,7 +137,7 @@ function EditableText({
     return (
       <button
         type="button"
-        className="text-left text-[13.5px] hover:underline"
+        className="text-left text-body hover:underline"
         onClick={() => setEditing(true)}
       >
         {value}
@@ -148,7 +148,7 @@ function EditableText({
     <input
       autoFocus
       type={type}
-      className={`${fieldCls} h-8 max-w-[260px] text-[13px]`}
+      className={`${fieldCls} h-8 max-w-[260px] text-body`}
       placeholder={placeholder}
       defaultValue={value ?? ""}
       onBlur={(e) => {
@@ -180,15 +180,15 @@ function MaskedField({
   const reveal = useHrRevealField(employeeId);
 
   if (!present) return <span className="text-base-400">Not on file</span>;
-  if (shown) return <span className="font-mono text-[13px] tabular-nums">{shown}</span>;
+  if (shown) return <span className="font-mono text-body tabular-nums">{shown}</span>;
 
   return (
     <>
-      <span className="font-mono text-[13px] tracking-wider">{mask}</span>
+      <span className="font-mono text-body tracking-wider">{mask}</span>
       <button
         type="button"
         disabled={reveal.isPending}
-        className="inline-flex items-center gap-1 rounded border border-base-300 px-2 py-[3px] text-[11.5px] font-semibold text-base-600 hover:bg-hovertint disabled:opacity-50"
+        className="inline-flex items-center gap-1 rounded border border-base-300 px-2 py-[3px] text-label font-semibold text-base-600 hover:bg-hovertint disabled:opacity-50"
         onClick={() =>
           reveal.mutate(
             { field },
@@ -232,12 +232,12 @@ function DisableLoginDialog({
             <ShieldOff size={19} />
           </div>
           <div>
-            <h3 className="t-h3 mb-1 font-semibold">
+            <h3 className="text-strong mb-1 font-semibold">
               {disabling
                 ? `Disable ${person.name}'s login?`
                 : `Give ${person.name} their login back?`}
             </h3>
-            <p className="t-small text-base-500">
+            <p className="text-body text-base-500">
               {disabling
                 ? "They lose the Carres portal straight away — not whenever their session happens to expire."
                 : "They will be able to sign in again with their existing password."}
@@ -247,17 +247,17 @@ function DisableLoginDialog({
 
         {disabling && (
           <ul className="mx-6 mt-4 rounded-lg border border-base-200 bg-base-50 px-3.5 py-3">
-            <li className="t-small py-1 text-base-900">Their login stops working immediately</li>
-            <li className="t-small py-1 text-base-900">
+            <li className="text-body py-1 text-base-900">Their login stops working immediately</li>
+            <li className="text-body py-1 text-base-900">
               They are signed out of every device they are on right now
             </li>
-            <li className="t-small py-1 text-base-500">
+            <li className="text-body py-1 text-base-500">
               Their orders, commission and records stay exactly as they are
             </li>
           </ul>
         )}
 
-        <p className="t-tiny mx-6 mt-3 leading-relaxed text-base-400">
+        <p className="text-meta mx-6 mt-3 leading-relaxed text-base-400">
           You can change this back at any time. It is recorded in the audit log.
         </p>
 
@@ -324,7 +324,7 @@ function ExitBlock({
       <Row label="Last working day">
         <input
           type="date"
-          className={`${fieldCls} h-8 max-w-[170px] text-[13px]`}
+          className={`${fieldCls} h-8 max-w-[170px] text-body`}
           value={exitDate}
           onChange={(e) => setExitDate(e.target.value)}
         />
@@ -336,7 +336,7 @@ function ExitBlock({
               key={r}
               type="button"
               onClick={() => setReason(r)}
-              className={`rounded-md px-3 py-1.5 text-[12px] font-semibold ${
+              className={`rounded-md px-3 py-1.5 text-meta font-semibold ${
                 reason === r ? "bg-card text-base-900 shadow-sm" : "text-base-600"
               }`}
             >
@@ -347,7 +347,7 @@ function ExitBlock({
       </Row>
       <Row label="Note">
         <input
-          className={`${fieldCls} h-8 text-[13px]`}
+          className={`${fieldCls} h-8 text-body`}
           placeholder="Optional"
           value={note}
           onChange={(e) => setNote(e.target.value)}
@@ -371,15 +371,15 @@ function ExitBlock({
         >
           {done ? "Update exit" : "Save exit"}
         </Btn>
-        <span className="t-tiny text-base-400">
+        <span className="text-meta text-base-400">
           Recording an exit does not cut access — that is the separate step above.
         </span>
       </div>
 
       <div className="mt-4 border-t border-base-100 pt-3">
-        <div className="t-micro mb-2 text-base-400">Access revocation</div>
+        <div className="text-label uppercase tracking-[0.05em] mb-2 text-base-400">Access revocation</div>
         <ul className="flex flex-col gap-2">
-          <li className="t-small flex gap-2">
+          <li className="text-body flex gap-2">
             <span className={person.access === "disabled" ? "text-success" : "text-base-300"}>
               {person.access === "disabled" ? "✓" : "○"}
             </span>
@@ -387,7 +387,7 @@ function ExitBlock({
               {isHq ? "Portal login disabled" : "Store PIN switched off"}
             </span>
           </li>
-          <li className="t-small flex gap-2">
+          <li className="text-body flex gap-2">
             <span className={person.access === "disabled" && isHq ? "text-success" : "text-base-300"}>
               {person.access === "disabled" && isHq ? "✓" : "—"}
             </span>
@@ -470,15 +470,15 @@ export default function HrPersonDrawer({
         {/* header */}
         <div className="border-b border-base-200 px-[18px] py-4">
           <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-base-100 text-[13px] font-semibold text-base-700">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-base-100 text-body font-semibold text-base-700">
               {person.name.slice(0, 2).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="t-h3 truncate font-semibold">{person.name}</div>
-              {subtitle && <div className="t-tiny truncate text-base-500">{subtitle}</div>}
+              <div className="text-strong truncate font-semibold">{person.name}</div>
+              {subtitle && <div className="text-meta truncate text-base-500">{subtitle}</div>}
             </div>
             {person.staffCode && (
-              <span className="font-mono text-[12.5px] font-semibold text-base-500">
+              <span className="font-mono text-meta font-semibold text-base-500">
                 {person.staffCode}
               </span>
             )}
@@ -498,7 +498,7 @@ export default function HrPersonDrawer({
           {/* the join-don't-copy rule, said out loud */}
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-base-200 bg-base-50 px-3 py-2.5">
             <Lock size={14} className="mt-0.5 shrink-0 text-base-400" />
-            <p className="t-tiny leading-relaxed text-base-500">
+            <p className="text-meta leading-relaxed text-base-500">
               Name, seat, manager and login live in <b>Team</b> — this page reads them.
               Change them once there and every screen agrees.
             </p>
@@ -507,7 +507,7 @@ export default function HrPersonDrawer({
           {/* access control — the door Loo approved */}
           {person.kind === "hq" && (
             <div className="mt-2 flex items-center gap-2">
-              <span className="t-tiny text-base-400">Portal access</span>
+              <span className="text-meta text-base-400">Portal access</span>
               <span
                 className={
                   person.access === "disabled" ? "pill pill-overdue" : "pill pill-confirmed"
@@ -527,13 +527,13 @@ export default function HrPersonDrawer({
         </div>
 
         {isLoading || !detail ? (
-          <div className="t-small flex-1 py-12 text-center text-base-500">Loading record…</div>
+          <div className="text-body flex-1 py-12 text-center text-base-500">Loading record…</div>
         ) : (
           <>
             {needsExit && (
               <div className="mx-[18px] mt-3.5 flex gap-2.5 rounded-lg border border-danger/30 bg-danger-soft px-3.5 py-3">
                 <TriangleAlert size={16} className="mt-0.5 shrink-0 text-danger" />
-                <p className="t-tiny leading-relaxed text-danger">
+                <p className="text-meta leading-relaxed text-danger">
                   <b>Their login is cut, but the register never learned why.</b> Write the
                   exit down so the people list, the commission run and the handover
                   checklist all say the same thing.
@@ -549,8 +549,8 @@ export default function HrPersonDrawer({
                 ["Type", detail.employmentType?.replace("_", " ") ?? "—"],
               ].map(([k, v]) => (
                 <div key={k} className="bg-card px-3.5 py-2.5">
-                  <div className="t-micro mb-1 text-base-400">{k}</div>
-                  <div className="text-[13.5px] font-semibold capitalize">{v}</div>
+                  <div className="text-label uppercase tracking-[0.05em] mb-1 text-base-400">{k}</div>
+                  <div className="text-body font-semibold capitalize">{v}</div>
                 </div>
               ))}
             </div>
@@ -568,7 +568,7 @@ export default function HrPersonDrawer({
                 </Row>
 
                 <div className="my-3 flex items-center gap-2">
-                  <span className="t-micro whitespace-nowrap text-base-400">HR only</span>
+                  <span className="text-label uppercase tracking-[0.05em] whitespace-nowrap text-base-400">HR only</span>
                   <span className="h-px flex-1 bg-base-200" />
                 </div>
 
@@ -589,7 +589,7 @@ export default function HrPersonDrawer({
                 </Row>
                 <Row label="Marital status">
                   <select
-                    className={`${fieldCls} h-8 max-w-[160px] text-[13px]`}
+                    className={`${fieldCls} h-8 max-w-[160px] text-body`}
                     value={val("maritalStatus", "marital_status") ?? ""}
                     onChange={(e) => set("marital_status", e.target.value || null)}
                   >
@@ -600,7 +600,7 @@ export default function HrPersonDrawer({
                     <option value="widowed">Widowed</option>
                   </select>
                 </Row>
-                <p className="t-tiny mt-2.5 leading-relaxed text-base-400">
+                <p className="text-meta mt-2.5 leading-relaxed text-base-400">
                   Revealing the IC asks the server for it and writes an audit line at the
                   same moment — the number is never in the list.
                 </p>
@@ -608,7 +608,7 @@ export default function HrPersonDrawer({
 
               <Panel title="Contact" defaultOpen>
                 <Row label="Work email">
-                  <span className="font-mono text-[12.5px]">{person.workEmail ?? "—"}</span>
+                  <span className="font-mono text-meta">{person.workEmail ?? "—"}</span>
                   {person.workEmail && <TeamChip />}
                 </Row>
                 <Row label="Personal email">
@@ -680,7 +680,7 @@ export default function HrPersonDrawer({
                     onChange={(v) => set("tax_no", v)}
                   />
                 </Row>
-                <p className="t-tiny mt-2.5 leading-relaxed text-base-400">
+                <p className="text-meta mt-2.5 leading-relaxed text-base-400">
                   Reference numbers only. Carres never calculates EPF, SOCSO, EIS or PCB —
                   these ride the monthly export to the payroll service and nothing else.
                 </p>
@@ -690,7 +690,7 @@ export default function HrPersonDrawer({
                 <Row label="Join date">
                   <input
                     type="date"
-                    className={`${fieldCls} h-8 max-w-[170px] text-[13px]`}
+                    className={`${fieldCls} h-8 max-w-[170px] text-body`}
                     value={val("joinDate", "join_date") ?? ""}
                     onChange={(e) => set("join_date", e.target.value || null)}
                   />
@@ -698,14 +698,14 @@ export default function HrPersonDrawer({
                 <Row label="Confirmed on">
                   <input
                     type="date"
-                    className={`${fieldCls} h-8 max-w-[170px] text-[13px]`}
+                    className={`${fieldCls} h-8 max-w-[170px] text-body`}
                     value={val("confirmDate", "confirm_date") ?? ""}
                     onChange={(e) => set("confirm_date", e.target.value || null)}
                   />
                 </Row>
                 <Row label="Type">
                   <select
-                    className={`${fieldCls} h-8 max-w-[170px] text-[13px]`}
+                    className={`${fieldCls} h-8 max-w-[170px] text-body`}
                     value={val("employmentType", "employment_type") ?? ""}
                     onChange={(e) => set("employment_type", e.target.value || null)}
                   >
@@ -730,7 +730,7 @@ export default function HrPersonDrawer({
                     const on = ticked.has(`${checklistKind}:${item.key}`);
                     return (
                       <li key={item.key} className="border-t border-base-100 first:border-t-0">
-                        <label className="flex min-h-[36px] cursor-pointer items-center gap-2.5 py-2 text-[13px]">
+                        <label className="flex min-h-[36px] cursor-pointer items-center gap-2.5 py-2 text-body">
                           <input
                             type="checkbox"
                             className="h-[17px] w-[17px] shrink-0 accent-primary"
@@ -752,7 +752,7 @@ export default function HrPersonDrawer({
                     );
                   })}
                 </ul>
-                <p className="t-tiny mt-2.5 leading-relaxed text-base-400">
+                <p className="text-meta mt-2.5 leading-relaxed text-base-400">
                   The same list for everyone — tell us what Carres actually hands over and
                   it changes for the whole company.
                 </p>
@@ -760,19 +760,19 @@ export default function HrPersonDrawer({
 
               <Panel title="History" tag={`${detail.events.length} events`}>
                 {detail.events.length === 0 ? (
-                  <p className="t-small py-2 text-base-400">Nothing recorded yet.</p>
+                  <p className="text-body py-2 text-base-400">Nothing recorded yet.</p>
                 ) : (
                   <ul className="flex flex-col">
                     {detail.events.map((ev, i) => (
                       <li
                         key={`${ev.kind}-${ev.effectiveDate}-${i}`}
-                        className="flex min-h-[36px] items-center gap-3 border-t border-base-100 py-2 text-[13px] first:border-t-0"
+                        className="flex min-h-[36px] items-center gap-3 border-t border-base-100 py-2 text-body first:border-t-0"
                       >
                         <span className="w-[92px] shrink-0 text-base-400">
                           {fmtDate(ev.effectiveDate)}
                         </span>
                         <span className="flex-1 capitalize">{ev.kind}</span>
-                        <span className="t-tiny truncate text-base-400">{ev.note ?? ""}</span>
+                        <span className="text-meta truncate text-base-400">{ev.note ?? ""}</span>
                       </li>
                     ))}
                   </ul>
@@ -781,7 +781,7 @@ export default function HrPersonDrawer({
             </div>
 
             <div className="flex items-center gap-2 border-t border-base-200 bg-base-50 px-[18px] py-3">
-              <span className="t-tiny text-base-400">
+              <span className="text-meta text-base-400">
                 {dirty ? "Unsaved changes" : "All changes saved"}
               </span>
               <span className="flex-1" />

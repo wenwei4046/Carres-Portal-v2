@@ -45,7 +45,7 @@ import {
  */
 
 const SEL_CLS =
-  "w-full rounded-md border border-base-300 bg-white px-2.5 py-1.5 t-small outline-none focus:border-primary";
+  "w-full rounded-md border border-base-300 bg-white px-2.5 py-1.5 text-body outline-none focus:border-primary";
 
 export default function RawLineOptions({
   line,
@@ -231,7 +231,7 @@ export default function RawLineOptions({
       className="mt-2 border-t border-base-100 pt-2.5"
       data-testid={`raw-options-${line.localId}`}
     >
-      <p className="t-micro text-base-400 mb-1.5">
+      <p className="text-label uppercase tracking-[0.05em] text-base-400 mb-1.5">
         {isSofa ? "Sofa variants" : isBed ? "Bed frame variants" : "Options"}
         <span className="normal-case tracking-normal"> · optional — KIV if not confirmed</span>
       </p>
@@ -361,7 +361,7 @@ export default function RawLineOptions({
       )}
       {offered.length > 0 && (
         <details className="mt-2" data-testid={`raw-specials-${line.localId}`}>
-          <summary className="t-small text-base-600 cursor-pointer select-none">
+          <summary className="text-body text-base-600 cursor-pointer select-none">
             Special orders ({picks.length} selected)
           </summary>
           <div className="mt-2">
@@ -407,7 +407,7 @@ function RawSpecialsPicker({
         const on = !!pick;
         return (
           <div key={def.code} className="border border-base-200 rounded-md p-2.5">
-            <label className="flex items-center gap-2 t-small cursor-pointer">
+            <label className="flex items-center gap-2 text-body cursor-pointer">
               <input
                 type="checkbox"
                 checked={on}
@@ -419,7 +419,7 @@ function RawSpecialsPicker({
             {on &&
               def.optionGroups.map((g, gi) => (
                 <div key={gi} className="mt-2 ml-6">
-                  <span className="t-tiny text-base-500 block mb-0.5">{g.label}</span>
+                  <span className="text-meta text-base-500 block mb-0.5">{g.label}</span>
                   <select
                     value={pick!.choiceLabels[gi] ?? ""}
                     onChange={(e) => setChoice(def.code, gi, e.target.value)}
@@ -445,7 +445,7 @@ function RawSpecialsPicker({
 function MiniField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="t-micro text-base-400">{label}</span>
+      <span className="text-label uppercase tracking-[0.05em] text-base-400">{label}</span>
       <div className="mt-0.5">{children}</div>
     </label>
   );

@@ -129,9 +129,9 @@ export default function OperationGuarantees() {
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <div className="mb-6">
-        <p className="text-xs uppercase tracking-wider text-base-500 mb-1">Operation</p>
-        <h1 className="t-h1 text-base-900">Guarantees</h1>
-        <p className="text-sm text-base-600 mt-2">
+        <p className="text-meta uppercase tracking-wider text-base-500 mb-1">Operation</p>
+        <h1 className="text-page text-base-900">Guarantees</h1>
+        <p className="text-body text-base-600 mt-2">
           Every guarantee sold, newest first. Narrow by ID, Sales Order, customer name, phone or
           customer ID — then swap the item and record the claim.
         </p>
@@ -150,10 +150,10 @@ export default function OperationGuarantees() {
             onChange={(e) => setRawSearch(e.target.value)}
             placeholder="Narrow by guarantee ID (ABCD123456), SO number, customer name, phone…"
             aria-label="Search guarantees"
-            className="w-full rounded border border-base-300 bg-white pl-9 pr-3 py-2 t-body focus:border-base-500 outline-none"
+            className="w-full rounded border border-base-300 bg-white pl-9 pr-3 py-2 text-body focus:border-base-500 outline-none"
           />
         </div>
-        <div className="flex rounded border border-base-200 overflow-hidden text-sm">
+        <div className="flex rounded border border-base-200 overflow-hidden text-body">
           {FILTERS.map((f) => (
             <button
               key={f.key || "all"}
@@ -171,17 +171,17 @@ export default function OperationGuarantees() {
         </div>
       </div>
 
-      {listQ.isPending && <p className="t-body text-base-600">Loading…</p>}
+      {listQ.isPending && <p className="text-body text-base-600">Loading…</p>}
       {listQ.isError && (
-        <p className="t-body text-danger">Couldn't load guarantees — {listQ.error.message}</p>
+        <p className="text-body text-danger">Couldn't load guarantees — {listQ.error.message}</p>
       )}
       {!listQ.isPending && !listQ.isError && rows.length === 0 && (
         <div className="rounded border border-dashed border-base-300 bg-white p-10 text-center">
           <ShieldCheck size={28} strokeWidth={1.5} className="mx-auto text-base-300 mb-3" />
           {filtered ? (
             <>
-              <p className="t-body text-base-700">No guarantee matches that search.</p>
-              <p className="t-small text-base-500 mt-1">
+              <p className="text-body text-base-700">No guarantee matches that search.</p>
+              <p className="text-body text-base-500 mt-1">
                 Try the guarantee ID off their Sales Order (
                 <span className="font-mono">ABCD123456</span>), the SO number, or the customer's
                 name.
@@ -189,8 +189,8 @@ export default function OperationGuarantees() {
             </>
           ) : (
             <>
-              <p className="t-body text-base-700">No guarantees sold yet.</p>
-              <p className="t-small text-base-500 mt-1">
+              <p className="text-body text-base-700">No guarantees sold yet.</p>
+              <p className="text-body text-base-500 mt-1">
                 One appears here the moment a Sales Order with a guarantee is created.
               </p>
             </>
@@ -200,18 +200,18 @@ export default function OperationGuarantees() {
 
       {rows.length > 0 && (
         <div className="rounded border border-base-200 bg-white overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-body">
             <thead>
               <tr className="border-b border-base-200 text-left">
-                <th className="px-4 py-3 t-tiny uppercase tracking-wide text-base-500">
+                <th className="px-4 py-3 text-meta uppercase tracking-wide text-base-500">
                   Guarantee ID
                 </th>
-                <th className="px-4 py-3 t-tiny uppercase tracking-wide text-base-500">Status</th>
-                <th className="px-4 py-3 t-tiny uppercase tracking-wide text-base-500">Customer</th>
-                <th className="px-4 py-3 t-tiny uppercase tracking-wide text-base-500">Order</th>
-                <th className="px-4 py-3 t-tiny uppercase tracking-wide text-base-500">Covers</th>
-                <th className="px-4 py-3 t-tiny uppercase tracking-wide text-base-500">Cover ends</th>
-                <th className="px-4 py-3 t-tiny uppercase tracking-wide text-base-500 text-right">
+                <th className="px-4 py-3 text-meta uppercase tracking-wide text-base-500">Status</th>
+                <th className="px-4 py-3 text-meta uppercase tracking-wide text-base-500">Customer</th>
+                <th className="px-4 py-3 text-meta uppercase tracking-wide text-base-500">Order</th>
+                <th className="px-4 py-3 text-meta uppercase tracking-wide text-base-500">Covers</th>
+                <th className="px-4 py-3 text-meta uppercase tracking-wide text-base-500">Cover ends</th>
+                <th className="px-4 py-3 text-meta uppercase tracking-wide text-base-500 text-right">
                   Action
                 </th>
               </tr>
@@ -227,7 +227,7 @@ export default function OperationGuarantees() {
                         here even though it is no longer a live guarantee. */}
                     <td className="px-4 py-3">
                       <span
-                        className={`font-mono text-[12px] ${
+                        className={`font-mono text-meta ${
                           g.guaranteeId ? "text-base-900" : "text-base-400 line-through"
                         }`}
                       >
@@ -240,10 +240,10 @@ export default function OperationGuarantees() {
                     <td className="px-4 py-3">
                       <div className="text-base-900">{g.customerName || "—"}</div>
                       {g.customerPhone && (
-                        <div className="font-mono text-[11px] text-base-500">{g.customerPhone}</div>
+                        <div className="font-mono text-label text-base-500">{g.customerPhone}</div>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-mono text-[12px] text-base-700">
+                    <td className="px-4 py-3 font-mono text-meta text-base-700">
                       {g.so != null ? `SO-${g.so}` : "—"}
                     </td>
                     <td className="px-4 py-3">
@@ -252,7 +252,7 @@ export default function OperationGuarantees() {
                           <span className="text-warning">Not attached to an item</span>
                         )}
                       </div>
-                      <div className="t-tiny text-base-500">
+                      <div className="text-meta text-base-500">
                         {g.guaranteeLabel ?? g.guaranteeSku}
                         {g.unitNo > 1 ? ` · unit ${g.unitNo}` : ""}
                       </div>
@@ -270,12 +270,12 @@ export default function OperationGuarantees() {
                           Claim
                         </button>
                       ) : g.effectiveStatus === "claimed" ? (
-                        <span className="t-tiny text-base-500">
+                        <span className="text-meta text-base-500">
                           Used {g.claimedAt?.slice(0, 10) ?? ""}
                           {g.claimCaseNo ? ` · ${g.claimCaseNo}` : ""}
                         </span>
                       ) : (
-                        <span className="t-tiny text-base-500">—</span>
+                        <span className="text-meta text-base-500">—</span>
                       )}
                     </td>
                   </tr>
@@ -287,7 +287,7 @@ export default function OperationGuarantees() {
       )}
 
       {listQ.data?.truncated && (
-        <p className="t-small text-base-500 mt-3">
+        <p className="text-body text-base-500 mt-3">
           Showing the first 100 matches — narrow the search to see the rest.
         </p>
       )}

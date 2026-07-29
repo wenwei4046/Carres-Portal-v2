@@ -976,7 +976,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       {/* v3-S4.5 — Stockpile PO toggle. Disabled when caller pre-pinned an
           order ref (single so or bundle soRefs); the prefill there dictates
           the lines and dropping it would lose the link. */}
-      <div className="mb-3 flex items-center gap-2 text-[12px] font-body">
+      <div className="mb-3 flex items-center gap-2 text-meta font-body">
         <input
           id="stockpile-po-toggle"
           data-testid="stockpile-po-toggle"
@@ -1002,7 +1002,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         {stockpile && (
           <span
             data-testid="stockpile-mode-badge"
-            className="px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
+            className="px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
             style={{
               fontSize: "9.5px",
               background: "rgba(58,89,131,.12)",
@@ -1016,7 +1016,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         )}
       </div>
 
-      <div className="text-[12px] text-base-600 mb-3 font-body">
+      <div className="text-meta text-base-600 mb-3 font-body">
         {stockpile ? (
           <>
             <strong>Stockpile mode:</strong> this PO is for inventory
@@ -1046,11 +1046,11 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           fetch is still pending. */}
       {prefill.soRefs && prefill.soRefs.length > 0 && (
         <div className="mb-3 px-3 py-2 rounded-[4px] border border-base-200 bg-base-50 font-body">
-          <div className="text-[11px] uppercase tracking-wide text-base-500 mb-1.5">
+          <div className="text-label uppercase tracking-wide text-base-500 mb-1.5">
             Source orders ({prefill.soRefs.length})
           </div>
           {shortageQ.data?.orders && shortageQ.data.orders.length > 0 ? (
-            <ul className="space-y-0.5 text-[12px] text-base-700">
+            <ul className="space-y-0.5 text-meta text-base-700">
               {shortageQ.data.orders.map((o) => (
                 <li key={o.so} className="flex items-center gap-2">
                   <span className="font-mono font-semibold">#{o.so}</span>
@@ -1066,7 +1066,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
               ))}
             </ul>
           ) : (
-            <div className="text-[12px] text-base-500 font-mono">
+            <div className="text-meta text-base-500 font-mono">
               {prefill.soRefs.map((d) => `#${d}`).join(", ")}
             </div>
           )}
@@ -1075,7 +1075,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
 
       {prefill.note && (
         <div
-          className="text-[11px] px-2.5 py-2 rounded-[4px] mb-3 font-body text-base-700"
+          className="text-label px-2.5 py-2 rounded-[4px] mb-3 font-body text-base-700"
           style={{
             background: "var(--signature-50, #fef3eb)",
             border: "1px solid var(--brand-signature)",
@@ -1099,7 +1099,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
               onClick={autoFillFromShortage}
               disabled={autoFillDisabled}
               data-testid="auto-fill-shortage-button"
-              className="btn-ghost text-[12px] py-1.5 px-3"
+              className="btn-ghost text-meta py-1.5 px-3"
               style={{ opacity: autoFillDisabled ? 0.45 : 1 }}
             >
               {shortageQ.isFetching
@@ -1115,7 +1115,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
               onClick={suggestFromAlerts}
               disabled={suggestAlertsDisabled}
               data-testid="suggest-from-alerts-button"
-              className="btn-ghost text-[12px] py-1.5 px-3"
+              className="btn-ghost text-meta py-1.5 px-3"
               style={{ opacity: suggestAlertsDisabled ? 0.45 : 1 }}
             >
               {alertsQ.isFetching
@@ -1179,7 +1179,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                   value={l.modelId}
                   onChange={(e) => setLineModel(i, e.target.value)}
                   aria-label={`Line ${i + 1} model`}
-                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta bg-white outline-none focus:border-base-500"
                 >
                   <option value="">— pick model —</option>
                   <optgroup label="Mattress">
@@ -1211,7 +1211,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                   </optgroup>
                 </select>
                 <div
-                  className="text-[11px] leading-[1.3] font-medium"
+                  className="text-label leading-[1.3] font-medium"
                   style={{
                     color: sup ? "var(--base-700)" : "var(--brand-signature)",
                   }}
@@ -1234,7 +1234,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                       </div>
                     </>
                   ) : (
-                    <span className="text-[10.5px]">
+                    <span className="text-label">
                       {l.modelId
                         ? "pick variant first"
                         : "pick a model"}
@@ -1251,14 +1251,14 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                     })
                   }
                   aria-label={`Line ${i + 1} qty`}
-                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] text-right bg-white outline-none focus:border-base-500"
+                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
                 />
                 <button
                   type="button"
                   onClick={() => removeLine(i)}
                   disabled={lines.length === 1}
                   aria-label={`Remove line ${i + 1}`}
-                  className="btn-ghost text-[14px]"
+                  className="btn-ghost text-body"
                   style={{ opacity: lines.length === 1 ? 0.3 : 1 }}
                 >
                   ×
@@ -1290,7 +1290,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                       });
                     }}
                     aria-label={`Line ${i + 1} variant`}
-                    className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+                    className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta bg-white outline-none focus:border-base-500"
                   >
                     <option value="">
                       — pick {model.category === "sofa" ? "component" : "size"} —
@@ -1314,7 +1314,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                           })
                         }
                         aria-label={`Line ${i + 1} color`}
-                        className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+                        className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta bg-white outline-none focus:border-base-500"
                       >
                         <option value="">— color —</option>
                         {(model.colors ?? []).map((c) => (
@@ -1334,7 +1334,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                           })
                         }
                         aria-label={`Line ${i + 1} gap`}
-                        className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+                        className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta bg-white outline-none focus:border-base-500"
                       >
                         <option value="">— gap —</option>
                         {(model.gaps ?? []).map((g) => (
@@ -1372,7 +1372,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                         });
                       }}
                       aria-label={`Line ${i + 1} fabric`}
-                      className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+                      className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta bg-white outline-none focus:border-base-500"
                     >
                       <option value="">— fabric —</option>
                       {fabrics.map((f) => (
@@ -1390,7 +1390,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                   the operator a one-glance "this row is incomplete" cue. */}
               {model && attrsMissing && (
                 <div
-                  className="text-[10.5px] font-body"
+                  className="text-label font-body"
                   style={{ color: "var(--brand-signature)" }}
                   data-testid={`po-line-attrs-missing-${i}`}
                 >
@@ -1405,7 +1405,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                   read-only and flag SKUs whose cost hasn't been set yet. */}
               {l.sku && (
                 <div
-                  className="text-[10.5px] font-body flex items-center gap-2"
+                  className="text-label font-body flex items-center gap-2"
                   data-testid={`po-line-cost-${i}`}
                 >
                   {l.cost != null ? (
@@ -1440,11 +1440,11 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           <button
             type="button"
             onClick={addLine}
-            className="btn-ghost text-[11px] py-0.5 px-2"
+            className="btn-ghost text-label py-0.5 px-2"
           >
             + Add SKU
           </button>
-          <div className="font-mono text-[11px] font-semibold">
+          <div className="font-mono text-label font-semibold">
             Σ {totalUnits} unit{totalUnits === 1 ? "" : "s"} · {lines.length}{" "}
             line{lines.length === 1 ? "" : "s"}
           </div>
@@ -1452,7 +1452,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       </div>
 
       {dup && (
-        <div className="text-[11px] text-warning mb-2.5 font-body">
+        <div className="text-label text-warning mb-2.5 font-body">
           Duplicate SKUs — they&rsquo;ll be sent to the supplier as separate
           lines.
         </div>
@@ -1460,7 +1460,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
 
       {willSplit && (
         <div
-          className="text-[11.5px] px-3 py-2.5 rounded-[4px] mb-3 leading-[1.5] font-body"
+          className="text-label px-3 py-2.5 rounded-[4px] mb-3 leading-[1.5] font-body"
           style={{
             background: "rgba(58,89,131,.06)",
             border: "1px solid rgba(58,89,131,.25)",
@@ -1502,10 +1502,10 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             >
               <div className="flex justify-between items-start gap-3 mb-2.5">
                 <div>
-                  <div className="font-ui text-[13px] font-semibold">
+                  <div className="font-ui text-body font-semibold">
                     {g.supplier.name}
                   </div>
-                  <div className="text-[10.5px] text-base-600 mt-0.5 font-body">
+                  <div className="text-label text-base-600 mt-0.5 font-body">
                     {g.lines.length} line{g.lines.length === 1 ? "" : "s"} ·{" "}
                     {groupUnits} unit{groupUnits === 1 ? "" : "s"} ·{" "}
                     {needsPartner
@@ -1514,7 +1514,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                   </div>
                 </div>
                 <div
-                  className="px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
+                  className="px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
                   style={{
                     fontSize: "9.5px",
                     background: needsPartner
@@ -1598,7 +1598,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             className={INPUT_CLS}
           />
           {!eta && (
-            <div className="text-[11px] text-base-600 mt-1 font-body">
+            <div className="text-label text-base-600 mt-1 font-body">
               Pick an ETA — supplier + Finance AP both rely on it.
             </div>
           )}
@@ -1606,7 +1606,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       </div>
 
       {!warehousesOk && groups.groups.length > 0 && (
-        <div className="text-[11px] text-base-600 mb-2 font-body">
+        <div className="text-label text-base-600 mb-2 font-body">
           Pick a warehouse for each PO.
         </div>
       )}
@@ -1618,7 +1618,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           path injected one by SKU code, bypassing the category-filtered dropdown). */}
       {groups.orphans.length > 0 && (
         <div
-          className="text-[11.5px] px-3 py-2.5 rounded-[4px] mb-2.5 leading-[1.5] font-body"
+          className="text-label px-3 py-2.5 rounded-[4px] mb-2.5 leading-[1.5] font-body"
           style={{
             background: "rgba(220,38,38,.06)",
             border: "1px solid rgba(220,38,38,.28)",

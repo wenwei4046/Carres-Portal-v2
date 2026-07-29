@@ -145,8 +145,8 @@ function DeliveryTripFeeSection({
 
   return (
     <section>
-      <div className="t-h4 font-display mb-1">Delivery trip fee</div>
-      <p className="t-tiny text-base-500 mb-3">
+      <div className="text-strong font-display mb-1">Delivery trip fee</div>
+      <p className="text-meta text-base-500 mb-3">
         A flat trip fee charged once per order that contains a charged-category
         line, plus a reduced cross-order follow-up rate on a second SO that
         completes a sofa + mattress/bedframe purchase across two orders. Leave
@@ -176,7 +176,7 @@ function DeliveryTripFeeSection({
             />
           </label>
         </div>
-        <p className="t-tiny text-base-400 -mt-1">
+        <p className="text-meta text-base-400 -mt-1">
           Reduced delivery rate on a follow-up SO that completes a cross-category
           purchase (sofa + mattress/bedframe across two orders).
         </p>
@@ -192,7 +192,7 @@ function DeliveryTripFeeSection({
                   aria-pressed={on}
                   disabled={!isPrincipal}
                   onClick={() => toggleCat(cat)}
-                  className={`rounded-[4px] border px-2.5 py-1 text-[12px] capitalize transition-colors disabled:opacity-60 ${
+                  className={`rounded-[4px] border px-2.5 py-1 text-meta capitalize transition-colors disabled:opacity-60 ${
                     on
                       ? "border-base-900 bg-base-900 text-white"
                       : "border-base-300 bg-white text-base-600 hover:border-base-500"
@@ -204,7 +204,7 @@ function DeliveryTripFeeSection({
               );
             })}
           </div>
-          <p className="t-tiny text-base-400 mt-1.5">
+          <p className="text-meta text-base-400 mt-1.5">
             An order pays the base fee only if it has a line in one of these categories.
           </p>
         </div>
@@ -220,7 +220,7 @@ function DeliveryTripFeeSection({
               type="button"
               onClick={save}
               disabled={!valid || !dirty || patch.isPending}
-              className="btn-primary text-[12px] disabled:opacity-40"
+              className="btn-primary text-meta disabled:opacity-40"
               data-testid="delivery-fee-save"
             >
               {patch.isPending ? "Saving…" : "Save"}
@@ -269,14 +269,14 @@ function SpecialDeliveryRulesSection({
   return (
     <section>
       <div className="flex items-center justify-between mb-1">
-        <div className="t-h4 font-display">Special delivery rules</div>
+        <div className="text-strong font-display">Special delivery rules</div>
         {isPrincipal && (
-          <button type="button" onClick={() => setAdding((v) => !v)} className="btn-ghost text-[12px]">
+          <button type="button" onClick={() => setAdding((v) => !v)} className="btn-ghost text-meta">
             {adding ? "Close" : "+ Add rule"}
           </button>
         )}
       </div>
-      <p className="t-tiny text-base-500 mb-3">
+      <p className="text-meta text-base-500 mb-3">
         Override the base trip fee for specific models / sizes / sofa combos /
         compartments (e.g. a bulky model that needs a special transport rate).
         {!isPrincipal && " Principal only — read-only for your role."}
@@ -297,7 +297,7 @@ function SpecialDeliveryRulesSection({
           <div className="label text-right">Actions</div>
         </div>
         {rules.length === 0 && (
-          <div className="t-small text-base-500 px-3 py-4">No special delivery rules.</div>
+          <div className="text-body text-base-500 px-3 py-4">No special delivery rules.</div>
         )}
         {rules.map((rule) => (
           <SpecialDeliveryRuleRow key={rule.id} rule={rule} catalog={catalog} isPrincipal={isPrincipal} />
@@ -342,21 +342,21 @@ function SpecialDeliveryRuleRow({
       data-testid={`delivery-rule-row-${rule.id}`}
     >
       <div className="min-w-0">
-        <div className="text-[13px] truncate">{rule.label || summarizeTargets(rule.target, catalog)}</div>
+        <div className="text-body truncate">{rule.label || summarizeTargets(rule.target, catalog)}</div>
         {rule.label && (
-          <div className="t-tiny text-base-400 truncate">{summarizeTargets(rule.target, catalog)}</div>
+          <div className="text-meta text-base-400 truncate">{summarizeTargets(rule.target, catalog)}</div>
         )}
         {!rule.active && <span className="pill pill-neutral mt-0.5">inactive</span>}
       </div>
-      <div className="text-right t-num text-[12px]">{rule.standaloneFee.toFixed(2)}</div>
-      <div className="text-right t-num text-[12px]">{rule.crossCategoryFollowupFee.toFixed(2)}</div>
+      <div className="text-right t-num text-meta">{rule.standaloneFee.toFixed(2)}</div>
+      <div className="text-right t-num text-meta">{rule.crossCategoryFollowupFee.toFixed(2)}</div>
       <div className="text-right flex justify-end gap-1.5">
         {isPrincipal && (
           <>
-            <button type="button" onClick={() => setEditing(true)} className="btn-ghost text-[11px]">
+            <button type="button" onClick={() => setEditing(true)} className="btn-ghost text-label">
               Edit
             </button>
-            <button type="button" onClick={remove} disabled={del.isPending} className="btn-danger text-[11px]">
+            <button type="button" onClick={remove} disabled={del.isPending} className="btn-danger text-label">
               Delete
             </button>
           </>
@@ -421,7 +421,7 @@ function RuleForm({
       <div>
         <span className="label block mb-1.5">Applies to</span>
         <RuleTargetPicker catalog={catalog} value={target} onChange={setTarget} />
-        <p className="t-tiny text-base-400 mt-1.5">Tick at least one model. Sizes / combos / compartments narrow within a model.</p>
+        <p className="text-meta text-base-400 mt-1.5">Tick at least one model. Sizes / combos / compartments narrow within a model.</p>
       </div>
       <div className="flex flex-wrap gap-4 items-end">
         <label className="block">
@@ -454,17 +454,17 @@ function RuleForm({
         </label>
       </div>
       <div className="flex items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-[13px] cursor-pointer">
+        <label className="flex items-center gap-2 text-body cursor-pointer">
           <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="w-4 h-4" />
           Active
         </label>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={onDone} className="btn-ghost text-[12px]">Cancel</button>
+          <button type="button" onClick={onDone} className="btn-ghost text-meta">Cancel</button>
           <button
             type="button"
             onClick={submit}
             disabled={!valid || busy}
-            className="btn-primary text-[12px] disabled:opacity-40"
+            className="btn-primary text-meta disabled:opacity-40"
             data-testid="rule-save"
           >
             {busy ? "Saving…" : rule ? "Save" : "Add rule"}

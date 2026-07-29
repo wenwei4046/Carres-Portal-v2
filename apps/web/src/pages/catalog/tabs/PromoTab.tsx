@@ -79,7 +79,7 @@ export default function PromoTab({
   return (
     <div className="flex flex-col gap-8 max-w-[1120px]">
       <section className="flex items-start justify-between gap-4">
-        <p className="t-tiny text-base-500 max-w-[440px]">
+        <p className="text-meta text-base-500 max-w-[440px]">
           Each rule lets a customer who buys a qualifying <b>Trigger</b> redeem a{" "}
           <b>Reward</b>, at the chosen ratio. A <b>PWP</b> redeems at the reward&rsquo;s PWP
           price (set in the SKU Master &ldquo;PWP Price&rdquo; column); a <b>Promo</b> works
@@ -90,7 +90,7 @@ export default function PromoTab({
             <button
               type="button"
               onClick={() => setNewRuleKind("pwp")}
-              className="btn-primary text-[12px]"
+              className="btn-primary text-meta"
               data-testid="pwp-add"
             >
               + New PWP
@@ -98,7 +98,7 @@ export default function PromoTab({
             <button
               type="button"
               onClick={() => setNewRuleKind("promo")}
-              className="btn-ghost text-[12px]"
+              className="btn-ghost text-meta"
               data-testid="promo-add"
             >
               + New Promo
@@ -106,7 +106,7 @@ export default function PromoTab({
             <button
               type="button"
               onClick={() => setGwpOpen(true)}
-              className="btn-ghost text-[12px]"
+              className="btn-ghost text-meta"
               data-testid="gwp-add"
             >
               + New GWP
@@ -114,7 +114,7 @@ export default function PromoTab({
             <button
               type="button"
               onClick={() => setCampaignOpen(true)}
-              className="btn-ghost text-[12px]"
+              className="btn-ghost text-meta"
               data-testid="campaign-add"
             >
               + New Free Item
@@ -122,7 +122,7 @@ export default function PromoTab({
             <button
               type="button"
               onClick={() => setBundleOpen(true)}
-              className="btn-ghost text-[12px]"
+              className="btn-ghost text-meta"
               data-testid="bundle-add"
             >
               + New Bundle
@@ -270,12 +270,12 @@ function DefaultGiftsSection({
   return (
     <section className="card p-5">
       <div className="flex items-center justify-between mb-1">
-        <div className="t-h4 font-display flex items-center gap-2">
+        <div className="text-strong font-display flex items-center gap-2">
           <Gift size={16} strokeWidth={1.75} className="text-primary" />
           GWP — per Model
         </div>
       </div>
-      <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
+      <p className="text-meta text-base-500 mb-4 pb-3 border-b border-base-100">
         A GWP (Gift With Purchase): an accessory auto-added at RM 0 when this Model is placed on an
         order. Applies to every SKU of the Model; a complete sofa of the Model grants its gift once.
         Changes apply to new orders only. Use &ldquo;+ New GWP&rdquo; above to add one gift to many
@@ -293,7 +293,7 @@ function DefaultGiftsSection({
       )}
 
       {accSkus.length === 0 && isPrincipal && (
-        <p className="t-tiny text-warning mb-3">
+        <p className="text-meta text-warning mb-3">
           No accessory SKUs exist yet — add an accessory in the SKU Master / Modular tabs before
           configuring a GWP.
         </p>
@@ -302,7 +302,7 @@ function DefaultGiftsSection({
       {/* Existing per-model gift configs */}
       <div className="flex flex-col gap-3">
         {configs.length === 0 && editingModelId === null && (
-          <div className="t-small text-base-500 bg-base-50 border border-base-200 rounded-[4px] px-3 py-4">
+          <div className="text-body text-base-500 bg-base-50 border border-base-200 rounded-[4px] px-3 py-4">
             No GWP configured.
           </div>
         )}
@@ -317,10 +317,10 @@ function DefaultGiftsSection({
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="t-small font-medium text-base-900 truncate">
+                  <div className="text-body font-medium text-base-900 truncate">
                     {model ? modelLabel(model) : cfg.modelId}
                   </div>
-                  <div className="t-tiny text-base-500">
+                  <div className="text-meta text-base-500">
                     {cfg.gifts.length} gift{cfg.gifts.length === 1 ? "" : "s"}
                     {" · "}
                     {cfg.gifts
@@ -338,7 +338,7 @@ function DefaultGiftsSection({
                   <button
                     type="button"
                     onClick={() => setEditingModelId(cfg.modelId)}
-                    className="btn-ghost text-[11px]"
+                    className="btn-ghost text-label"
                     data-testid={`gift-edit-${cfg.modelId}`}
                   >
                     Edit
@@ -442,7 +442,7 @@ function ModelGiftsEditor({
           onRemove={() => removeRow(i)}
         />
       ))}
-      <button type="button" onClick={addRow} className="btn-ghost text-[12px] self-start" data-testid="gift-add-row">
+      <button type="button" onClick={addRow} className="btn-ghost text-meta self-start" data-testid="gift-add-row">
         + Add another gift
       </button>
       <div className="flex items-center justify-between gap-2 pt-1">
@@ -450,20 +450,20 @@ function ModelGiftsEditor({
           type="button"
           onClick={removeAll}
           disabled={busy || initialGifts.length === 0}
-          className="btn-danger text-[11px] disabled:opacity-40"
+          className="btn-danger text-label disabled:opacity-40"
           data-testid="gift-remove-all"
         >
           Remove all
         </button>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={onDone} className="btn-ghost text-[12px]">
+          <button type="button" onClick={onDone} className="btn-ghost text-meta">
             Cancel
           </button>
           <button
             type="button"
             onClick={save}
             disabled={!valid || busy}
-            className="btn-primary text-[12px] disabled:opacity-40"
+            className="btn-primary text-meta disabled:opacity-40"
             data-testid="gift-save"
           >
             {busy ? "Saving…" : "Save gifts"}
@@ -547,7 +547,7 @@ function GiftRow({
 
       {/* Optional P6 refinement: only fire the gift for some sizes / sofa builds. */}
       <div className="flex flex-col gap-1.5">
-        <label className="flex items-center gap-2 t-tiny text-base-600 cursor-pointer">
+        <label className="flex items-center gap-2 text-meta text-base-600 cursor-pointer">
           <input
             type="checkbox"
             checked={hasCondition}
@@ -678,7 +678,7 @@ function BulkGwpModal({
 
   return (
     <Modal title="New GWP — add to Models" onClose={onClose} size="lg">
-      <p className="t-tiny text-base-500 mb-3">
+      <p className="text-meta text-base-500 mb-3">
         Pick the Models, choose the gift, then Add. The gift is appended — a Model can hold several
         (e.g. 2 pillows + a protector). 🎁 marks Models that already have a gift.
       </p>
@@ -689,11 +689,11 @@ function BulkGwpModal({
         return (
           <div key={cat} className="mb-3">
             <div className="flex items-center gap-2 mb-1">
-              <span className="t-micro text-base-400 uppercase tracking-[0.14em]">{cat}</span>
+              <span className="text-label uppercase tracking-[0.05em] text-base-400 uppercase tracking-[0.14em]">{cat}</span>
               <button
                 type="button"
                 onClick={() => toggleCategory(cat)}
-                className="t-tiny text-primary"
+                className="text-meta text-primary"
                 data-testid={`gwp-select-all-${cat}`}
               >
                 {allOn ? "clear" : "select all"}
@@ -709,7 +709,7 @@ function BulkGwpModal({
                     type="button"
                     aria-pressed={on}
                     onClick={() => toggleModel(m.id)}
-                    className={`rounded-full border px-3 py-1 text-[12px] transition-colors ${
+                    className={`rounded-full border px-3 py-1 text-meta transition-colors ${
                       on
                         ? "border-primary bg-primary/10 text-primary"
                         : "border-base-300 bg-white text-base-700 hover:border-base-500"
@@ -781,7 +781,7 @@ function BulkGwpModal({
         <button
           type="button"
           onClick={() => setDraft((cur) => [...cur, { giftSku: "", qty: 1 }])}
-          className="btn-ghost text-[12px] self-start"
+          className="btn-ghost text-meta self-start"
           data-testid="gwp-add-row"
         >
           + Add gift
@@ -790,7 +790,7 @@ function BulkGwpModal({
 
       {sizeOptions.length > 0 && (
         <div className="mt-3">
-          <div className="t-tiny text-base-500 mb-1.5">
+          <div className="text-meta text-base-500 mb-1.5">
             Only for these sizes (optional — mattress / bed frame; none = any size)
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -804,7 +804,7 @@ function BulkGwpModal({
                   onClick={() =>
                     setSizeCodes((cur) => (cur.includes(code) ? cur.filter((x) => x !== code) : [...cur, code]))
                   }
-                  className={`rounded-full border px-3 py-1 text-[12px] transition-colors ${
+                  className={`rounded-full border px-3 py-1 text-meta transition-colors ${
                     on
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-base-300 bg-white text-base-700 hover:border-base-500"
@@ -820,25 +820,25 @@ function BulkGwpModal({
       )}
 
       {error && (
-        <div role="alert" className="t-tiny text-danger mt-2">
+        <div role="alert" className="text-meta text-danger mt-2">
           {error}
         </div>
       )}
 
       <div className="flex items-center justify-end gap-2 mt-4">
         {selected.length > 0 && (
-          <button type="button" onClick={() => setSelected([])} className="btn-ghost text-[12px]">
+          <button type="button" onClick={() => setSelected([])} className="btn-ghost text-meta">
             Clear selection
           </button>
         )}
-        <button type="button" onClick={onClose} className="btn-ghost text-[12px]">
+        <button type="button" onClick={onClose} className="btn-ghost text-meta">
           Cancel
         </button>
         <button
           type="button"
           onClick={apply}
           disabled={busy || selected.length === 0}
-          className="btn-primary text-[12px] disabled:opacity-40"
+          className="btn-primary text-meta disabled:opacity-40"
           data-testid="gwp-apply"
         >
           {busy ? "Adding…" : `Add to ${selected.length} Model${selected.length === 1 ? "" : "s"}`}
@@ -868,12 +868,12 @@ function FreeItemCampaignsSection({
   return (
     <section className="card p-5">
       <div className="flex items-center justify-between mb-1">
-        <div className="t-h4 font-display flex items-center gap-2">
+        <div className="text-strong font-display flex items-center gap-2">
           <Tag size={16} strokeWidth={1.75} className="text-primary" />
           Free Item Campaigns
         </div>
       </div>
-      <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
+      <p className="text-meta text-base-500 mb-4 pb-3 border-b border-base-100">
         A giveaway a salesperson can apply to an eligible cart line ("Make free") — the line books at
         RM0. Set which models / sizes / sofa builds qualify and how many units ONE order can get free
         (counted across all its lines). A campaign is
@@ -897,7 +897,7 @@ function FreeItemCampaignsSection({
           <div className="label text-right">Actions</div>
         </div>
         {campaigns.length === 0 && (
-          <div className="t-small text-base-500 px-3 py-4">No free item campaigns.</div>
+          <div className="text-body text-base-500 px-3 py-4">No free item campaigns.</div>
         )}
         {campaigns.map((c) => (
           <CampaignRow key={c.id} campaign={c} catalog={catalog} isPrincipal={isPrincipal} />
@@ -942,20 +942,20 @@ function CampaignRow({
       data-testid={`campaign-row-${campaign.id}`}
     >
       <div className="min-w-0">
-        <div className="text-[13px] truncate flex items-center gap-2">
+        <div className="text-body truncate flex items-center gap-2">
           {campaign.name}
           {!campaign.active && <span className="pill pill-neutral">inactive</span>}
         </div>
-        <div className="t-tiny text-base-400 truncate">{summarizeTargets(campaign.eligible, catalog)}</div>
+        <div className="text-meta text-base-400 truncate">{summarizeTargets(campaign.eligible, catalog)}</div>
       </div>
-      <div className="text-right t-num text-[12px]">{campaign.maxFreeQty}</div>
+      <div className="text-right t-num text-meta">{campaign.maxFreeQty}</div>
       <div className="text-right flex justify-end gap-1.5">
         {isPrincipal && (
           <>
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="btn-ghost text-[11px]"
+              className="btn-ghost text-label"
               data-testid={`campaign-edit-${campaign.id}`}
             >
               Edit
@@ -964,7 +964,7 @@ function CampaignRow({
               type="button"
               onClick={remove}
               disabled={del.isPending}
-              className="btn-danger text-[11px]"
+              className="btn-danger text-label"
               data-testid={`campaign-delete-${campaign.id}`}
             >
               Delete
@@ -1050,7 +1050,7 @@ function CampaignForm({
             data-testid="campaign-maxqty"
           />
         </label>
-        <label className="flex items-center gap-2 text-[13px] cursor-pointer pb-2">
+        <label className="flex items-center gap-2 text-body cursor-pointer pb-2">
           <input
             type="checkbox"
             checked={active}
@@ -1064,20 +1064,20 @@ function CampaignForm({
       <div>
         <span className="label block mb-1.5">Eligible products</span>
         <RuleTargetPicker catalog={catalog} value={eligible} onChange={setEligible} />
-        <p className="t-tiny text-base-400 mt-1.5">
+        <p className="text-meta text-base-400 mt-1.5">
           Tick at least one model. Sizes / combos / compartments narrow within a model. A salesperson
           can "Make free" any cart line that matches.
         </p>
       </div>
       <div className="flex items-center justify-end gap-2">
-        <button type="button" onClick={onDone} className="btn-ghost text-[12px]">
+        <button type="button" onClick={onDone} className="btn-ghost text-meta">
           Cancel
         </button>
         <button
           type="button"
           onClick={submit}
           disabled={!valid || busy}
-          className="btn-primary text-[12px] disabled:opacity-40"
+          className="btn-primary text-meta disabled:opacity-40"
           data-testid="campaign-save"
         >
           {busy ? "Saving…" : campaign ? "Save" : "Create campaign"}
@@ -1114,12 +1114,12 @@ function PwpRulesSection({
   return (
     <section className="card p-5">
       <div className="flex items-center justify-between mb-1">
-        <div className="t-h4 font-display flex items-center gap-2">
+        <div className="text-strong font-display flex items-center gap-2">
           <BadgePercent size={16} strokeWidth={1.75} className="text-primary" />
           PWP / Promo rules
         </div>
       </div>
-      <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
+      <p className="text-meta text-base-500 mb-4 pb-3 border-b border-base-100">
         Pair a trigger product with a reward product. Buying the trigger unlocks the reward up to a
         set count per trigger — sold at the reward SKU's PWP price (set in SKU Master); a Promo may
         redeem free (RM 0). Use &ldquo;+ New PWP&rdquo; / &ldquo;+ New Promo&rdquo; above to create
@@ -1147,7 +1147,7 @@ function PwpRulesSection({
           <div className="label text-right">Actions</div>
         </div>
         {rules.length === 0 && (
-          <div className="t-small text-base-500 px-3 py-4">No PWP / promo rules.</div>
+          <div className="text-body text-base-500 px-3 py-4">No PWP / promo rules.</div>
         )}
         {[
           ["pwp", pwpRules] as const,
@@ -1155,7 +1155,7 @@ function PwpRulesSection({
         ].map(([kind, list]) =>
           list.length === 0 ? null : (
             <div key={kind} data-testid={`pwp-group-${kind}`}>
-              <div className="t-micro text-base-500 px-3 pt-2 pb-1 bg-base-100/60">
+              <div className="text-label uppercase tracking-[0.05em] text-base-500 px-3 pt-2 pb-1 bg-base-100/60">
                 {KIND_LABEL[kind]}
               </div>
               {list.map((r) => (
@@ -1213,22 +1213,22 @@ function PwpRuleRow({
       data-testid={`pwp-row-${rule.id}`}
     >
       <div className="min-w-0">
-        <div className="text-[13px] truncate flex items-center gap-2">
+        <div className="text-body truncate flex items-center gap-2">
           <span className="pill pill-neutral uppercase">{rule.type}</span>
           {!rule.active && <span className="pill pill-neutral">inactive</span>}
         </div>
-        <div className="t-tiny text-base-400 truncate">
+        <div className="text-meta text-base-400 truncate">
           {triggerLabel} <span className="text-base-300">→</span> {rewardLabel}
         </div>
       </div>
-      <div className="text-right t-num text-[12px]">{rule.qtyPerTrigger}</div>
+      <div className="text-right t-num text-meta">{rule.qtyPerTrigger}</div>
       <div className="text-right flex justify-end gap-1.5">
         {isPrincipal && (
           <>
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="btn-ghost text-[11px]"
+              className="btn-ghost text-label"
               data-testid={`pwp-edit-${rule.id}`}
             >
               Edit
@@ -1237,7 +1237,7 @@ function PwpRuleRow({
               type="button"
               onClick={remove}
               disabled={del.isPending}
-              className="btn-danger text-[11px]"
+              className="btn-danger text-label"
               data-testid={`pwp-delete-${rule.id}`}
             >
               Delete
@@ -1355,7 +1355,7 @@ function PwpRuleForm({
                 type="button"
                 aria-pressed={type === v}
                 onClick={() => setType(v)}
-                className={`rounded-full border px-3 py-1 text-[12px] transition-colors ${
+                className={`rounded-full border px-3 py-1 text-meta transition-colors ${
                   type === v
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-base-300 bg-white text-base-600 hover:border-base-500"
@@ -1379,7 +1379,7 @@ function PwpRuleForm({
             data-testid="pwp-qty"
           />
         </label>
-        <label className="flex items-center gap-2 text-[13px] cursor-pointer pb-2">
+        <label className="flex items-center gap-2 text-body cursor-pointer pb-2">
           <input
             type="checkbox"
             checked={active}
@@ -1389,7 +1389,7 @@ function PwpRuleForm({
           />
           Active
         </label>
-        <label className="flex items-center gap-2 text-[13px] cursor-pointer pb-2">
+        <label className="flex items-center gap-2 text-body cursor-pointer pb-2">
           <input
             type="checkbox"
             checked={carryForward}
@@ -1418,7 +1418,7 @@ function PwpRuleForm({
       {/* Trigger */}
       <div className="flex flex-col gap-1.5">
         <span className="label block">Trigger product</span>
-        <label className="flex items-center gap-2 t-tiny text-base-600">
+        <label className="flex items-center gap-2 text-meta text-base-600">
           Category
           <select
             value={triggerCategory}
@@ -1439,7 +1439,7 @@ function PwpRuleForm({
           onChange={setTriggerTargets}
           categories={[triggerCategory]}
         />
-        <p className={`t-tiny ${sofaTriggerInvalid ? "text-danger" : "text-base-400"}`}>
+        <p className={`text-meta ${sofaTriggerInvalid ? "text-danger" : "text-base-400"}`}>
           {triggerCategory === "sofa"
             ? "Pick at least one sofa model / combo — “any sofa” has no meaning as a trigger."
             : `Add the models that qualify as the trigger. None added = any ${triggerCategory}.`}
@@ -1449,7 +1449,7 @@ function PwpRuleForm({
       {/* Reward */}
       <div className="flex flex-col gap-1.5">
         <span className="label block">Reward product</span>
-        <label className="flex items-center gap-2 t-tiny text-base-600">
+        <label className="flex items-center gap-2 text-meta text-base-600">
           Category
           <select
             value={rewardCategory}
@@ -1470,7 +1470,7 @@ function PwpRuleForm({
           onChange={setRewardTargets}
           categories={[rewardCategory]}
         />
-        <p className={`t-tiny ${sofaRewardInvalid ? "text-danger" : "text-base-400"}`}>
+        <p className={`text-meta ${sofaRewardInvalid ? "text-danger" : "text-base-400"}`}>
           {rewardCategory === "sofa"
             ? "Pick at least one reward combo for a sofa reward."
             : `The reward is sold at each reward SKU's PWP price (set in SKU Master)${
@@ -1480,14 +1480,14 @@ function PwpRuleForm({
       </div>
 
       <div className="flex items-center justify-end gap-2">
-        <button type="button" onClick={onDone} className="btn-ghost text-[12px]">
+        <button type="button" onClick={onDone} className="btn-ghost text-meta">
           Cancel
         </button>
         <button
           type="button"
           onClick={submit}
           disabled={!valid || busy}
-          className="btn-primary text-[12px] disabled:opacity-40"
+          className="btn-primary text-meta disabled:opacity-40"
           data-testid="pwp-save"
         >
           {busy ? "Saving…" : rule ? "Save" : "Create rule"}
@@ -1536,12 +1536,12 @@ function BundlesSection({
   return (
     <section className="card p-5">
       <div className="flex items-center justify-between mb-1">
-        <div className="t-h4 font-display flex items-center gap-2">
+        <div className="text-strong font-display flex items-center gap-2">
           <Boxes size={16} strokeWidth={1.75} className="text-primary" />
           Bundles
         </div>
       </div>
-      <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
+      <p className="text-meta text-base-500 mb-4 pb-3 border-b border-base-100">
         Several products sold together at ONE bundle price (e.g. 2 mattresses + a bed frame, King
         each, at RM 2,500). The POS shows a bundle card; adding it books every item at a
         proportional share of the bundle price — the lines always total EXACTLY the bundle price.
@@ -1566,7 +1566,7 @@ function BundlesSection({
           <div className="label text-right">Actions</div>
         </div>
         {bundles.length === 0 && (
-          <div className="t-small text-base-500 px-3 py-4">No bundles.</div>
+          <div className="text-body text-base-500 px-3 py-4">No bundles.</div>
         )}
         {bundles.map((b) => (
           <BundleRow key={b.id} bundle={b} catalog={catalog} isPrincipal={isPrincipal} />
@@ -1611,11 +1611,11 @@ function BundleRow({
       data-testid={`bundle-row-${bundle.id}`}
     >
       <div className="min-w-0">
-        <div className="text-[13px] truncate flex items-center gap-2">
+        <div className="text-body truncate flex items-center gap-2">
           {bundle.name}
           {!bundle.active && <span className="pill pill-neutral">inactive</span>}
         </div>
-        <div className="t-tiny text-base-400 truncate">
+        <div className="text-meta text-base-400 truncate">
           {bundle.kind === "custom"
             ? bundle.slots
                 .map((s, i) => {
@@ -1629,14 +1629,14 @@ function BundleRow({
             : summarizeBundleComponents(bundle.components, catalog)}
         </div>
       </div>
-      <div className="text-right t-num text-[12px]">{rm(bundle.price)}</div>
+      <div className="text-right t-num text-meta">{rm(bundle.price)}</div>
       <div className="text-right flex justify-end gap-1.5">
         {isPrincipal && (
           <>
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="btn-ghost text-[11px]"
+              className="btn-ghost text-label"
               data-testid={`bundle-edit-${bundle.id}`}
             >
               Edit
@@ -1645,7 +1645,7 @@ function BundleRow({
               type="button"
               onClick={remove}
               disabled={del.isPending}
-              className="btn-danger text-[11px]"
+              className="btn-danger text-label"
               data-testid={`bundle-delete-${bundle.id}`}
             >
               Delete
@@ -1890,7 +1890,7 @@ function BundleForm({
             data-testid="bundle-price"
           />
         </label>
-        <label className="flex items-center gap-2 text-[13px] cursor-pointer pb-2">
+        <label className="flex items-center gap-2 text-body cursor-pointer pb-2">
           <input
             type="checkbox"
             checked={active}
@@ -1916,7 +1916,7 @@ function BundleForm({
             type="button"
             aria-pressed={kind === v}
             onClick={() => setKind(v)}
-            className={`rounded-full border px-3 py-1 text-[12px] transition-colors ${
+            className={`rounded-full border px-3 py-1 text-meta transition-colors ${
               kind === v
                 ? "border-primary bg-primary/10 text-primary"
                 : "border-base-300 bg-white text-base-600 hover:border-base-500"
@@ -1982,7 +1982,7 @@ function BundleForm({
                             sku: "",
                           })
                         }
-                        className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                        className={`rounded-full border px-2.5 py-1 text-label transition-colors ${
                           r.variant === v
                             ? "border-primary bg-primary/10 text-primary"
                             : "border-base-300 bg-white text-base-600 hover:border-base-500"
@@ -2082,7 +2082,7 @@ function BundleForm({
                       return (
                         <span
                           key={mid}
-                          className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 text-primary px-2.5 py-1 text-[11px]"
+                          className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 text-primary px-2.5 py-1 text-label"
                           data-testid={`bundle-slot-picked-${i}-${mid}`}
                         >
                           {m ? modelLabel(m) : mid}
@@ -2133,12 +2133,12 @@ function BundleForm({
                 { label: "", qty: 1, modelIds: [], variant: "any", sku: "", cat: "mattress" },
               ])
             }
-            className="btn-ghost text-[12px] self-start"
+            className="btn-ghost text-meta self-start"
             data-testid="bundle-slot-add"
           >
             + Add another item slot
           </button>
-          <p className="t-tiny text-base-400">
+          <p className="text-meta text-base-400">
             The customer picks one product per slot (Any variant = they choose the size too), then
             its specs — the bundle price covers the set; spec surcharges add on top. Modular sofas
             can&rsquo;t join a bundle.
@@ -2220,7 +2220,7 @@ function BundleForm({
         <button
           type="button"
           onClick={() => setRows((cur) => [...cur, { modelId: "", sku: "", qty: 1 }])}
-          className="btn-ghost text-[12px] self-start"
+          className="btn-ghost text-meta self-start"
           data-testid="bundle-add-row"
         >
           + Add another item
@@ -2229,18 +2229,18 @@ function BundleForm({
       )}
 
       {mutexConflict && (
-        <p role="alert" className="t-tiny text-danger" data-testid="bundle-mutex-warning">
+        <p role="alert" className="text-meta text-danger" data-testid="bundle-mutex-warning">
           A sofa can&rsquo;t share an order with a mattress / bed frame, so this mix could never be
           added at the POS. Keep the bundle to one family to save.
         </p>
       )}
       {goneSkus.length > 0 && (
-        <p role="alert" className="t-tiny text-danger" data-testid="bundle-gone-warning">
+        <p role="alert" className="text-meta text-danger" data-testid="bundle-gone-warning">
           No longer in the catalog: {goneSkus.join(", ")} — replace or remove those rows to save.
         </p>
       )}
       {(offPosSkus.length > 0 || offPosModels.length > 0) && (
-        <p className="t-tiny text-warning" data-testid="bundle-offpos-warning">
+        <p className="text-meta text-warning" data-testid="bundle-offpos-warning">
           Not sellable at the POS right now: {[...offPosSkus, ...offPosModels].join(", ")} — the
           bundle card will stay greyed out until every item has an ACTIVE SKU (switch it on in the
           Modular tab).
@@ -2248,7 +2248,7 @@ function BundleForm({
       )}
 
       {kind === "fixed" && priceValid && !preview && (pendingRows.length > 0 || components.length < 2) && (
-        <p className="t-tiny text-base-400" data-testid="bundle-preview-pending">
+        <p className="text-meta text-base-400" data-testid="bundle-preview-pending">
           Pick a size for every item — the live split shows once all items are complete.
         </p>
       )}
@@ -2264,7 +2264,7 @@ function BundleForm({
             const model = sku ? modelById.get(sku.modelId) : undefined;
             const label = model ? `${modelLabel(model)}${sku?.variant?.trim() ? ` · ${sku.variant}` : ""}` : l.sku;
             return (
-              <div key={`${l.slot}`} className="flex items-center justify-between gap-3 t-tiny">
+              <div key={`${l.slot}`} className="flex items-center justify-between gap-3 text-meta">
                 <span className="text-base-600 truncate">
                   {l.qty > 1 ? `${l.qty}× ` : ""}
                   {label}
@@ -2278,7 +2278,7 @@ function BundleForm({
               </div>
             );
           })}
-          <div className="flex items-center justify-between gap-3 t-tiny border-t border-base-100 pt-1 mt-0.5">
+          <div className="flex items-center justify-between gap-3 text-meta border-t border-base-100 pt-1 mt-0.5">
             <span className="text-base-600">
               Bundle total
               {preview.catalogTotal > priceNum && (
@@ -2291,14 +2291,14 @@ function BundleForm({
       )}
 
       <div className="flex items-center justify-end gap-2">
-        <button type="button" onClick={onDone} className="btn-ghost text-[12px]">
+        <button type="button" onClick={onDone} className="btn-ghost text-meta">
           Cancel
         </button>
         <button
           type="button"
           onClick={submit}
           disabled={!valid || busy}
-          className="btn-primary text-[12px] disabled:opacity-40"
+          className="btn-primary text-meta disabled:opacity-40"
           data-testid="bundle-save"
         >
           {busy ? "Saving…" : bundle ? "Save" : "Create bundle"}

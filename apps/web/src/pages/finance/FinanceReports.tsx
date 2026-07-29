@@ -76,13 +76,13 @@ export default function FinanceReports() {
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="flex items-end justify-between gap-4 flex-wrap mb-7">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
             Finance · Reports
           </div>
-          <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
+          <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
             Reports
           </h1>
-          <div className="text-[13px] text-muted-foreground">
+          <div className="text-body text-muted-foreground">
             Monthly P&amp;L · revenue trend · top SKUs
           </div>
         </div>
@@ -91,7 +91,7 @@ export default function FinanceReports() {
             aria-label="Period"
             value={period}
             onChange={(e) => setPeriod(e.target.value as PeriodChoice)}
-            className="px-2.5 py-1.5 border border-border rounded text-[12px] bg-background"
+            className="px-2.5 py-1.5 border border-border rounded text-meta bg-background"
           >
             {(Object.keys(PERIOD_LABEL) as PeriodChoice[]).map((k) => (
               <option key={k} value={k}>{PERIOD_LABEL[k]}</option>
@@ -100,7 +100,7 @@ export default function FinanceReports() {
           <button
             type="button"
             onClick={handleExport}
-            className="px-3 py-2 rounded-md border border-border bg-background text-[12px] font-semibold"
+            className="px-3 py-2 rounded-md border border-border bg-background text-meta font-semibold"
           >
             Export PDF
           </button>
@@ -136,11 +136,11 @@ export default function FinanceReports() {
       {/* P&L table */}
       <div className="bg-card rounded-md border border-border mb-6 overflow-auto">
         <div className="px-5 py-3.5 border-b border-border">
-          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Profit &amp; Loss</div>
-          <div className="text-[14px] font-semibold mt-0.5">{PERIOD_LABEL[period]}</div>
+          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Profit &amp; Loss</div>
+          <div className="text-body font-semibold mt-0.5">{PERIOD_LABEL[period]}</div>
         </div>
         <div
-          className="grid items-center px-5 py-2.5 bg-muted/40 border-b border-border text-[10px] uppercase tracking-[0.06em] font-bold text-muted-foreground"
+          className="grid items-center px-5 py-2.5 bg-muted/40 border-b border-border text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground"
           style={{ gridTemplateColumns: "120px repeat(5, 1fr)", minWidth: 720 }}
         >
           <span>Month</span>
@@ -151,9 +151,9 @@ export default function FinanceReports() {
           <span className="text-right">Net</span>
         </div>
         {pl.isLoading ? (
-          <div className="p-12 text-center text-[12.5px] text-muted-foreground">Loading…</div>
+          <div className="p-12 text-center text-meta text-muted-foreground">Loading…</div>
         ) : rows.length === 0 ? (
-          <div className="p-12 text-center text-[12.5px] text-muted-foreground">No revenue in this period.</div>
+          <div className="p-12 text-center text-meta text-muted-foreground">No revenue in this period.</div>
         ) : (
           rows.map((m) => <PlTableRow key={m.m} m={m} />)
         )}
@@ -162,24 +162,24 @@ export default function FinanceReports() {
       {/* Revenue trend + Top SKUs */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-3.5">
         <div className="bg-card rounded-md border border-border px-5 py-4">
-          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Revenue trend</div>
-          <div className="text-[14px] font-semibold mt-0.5 mb-3">Monthly revenue</div>
+          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Revenue trend</div>
+          <div className="text-body font-semibold mt-0.5 mb-3">Monthly revenue</div>
           {rows.length > 0 ? (
             <RevenueTrend rows={rows} />
           ) : (
-            <div className="p-8 text-center text-[12px] text-muted-foreground">No data</div>
+            <div className="p-8 text-center text-meta text-muted-foreground">No data</div>
           )}
         </div>
 
         <div className="bg-card rounded-md border border-border">
           <div className="px-5 py-3.5 border-b border-border">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Top SKUs</div>
-            <div className="text-[14px] font-semibold mt-0.5">Revenue by SKU</div>
+            <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Top SKUs</div>
+            <div className="text-body font-semibold mt-0.5">Revenue by SKU</div>
           </div>
           {topSkus.isLoading ? (
-            <div className="p-8 text-center text-[12px] text-muted-foreground">Loading…</div>
+            <div className="p-8 text-center text-meta text-muted-foreground">Loading…</div>
           ) : skus.length === 0 ? (
-            <div className="p-8 text-center text-[12px] text-muted-foreground">No SKU data.</div>
+            <div className="p-8 text-center text-meta text-muted-foreground">No SKU data.</div>
           ) : (
             skus.map((s) => <TopSkuRow key={s.sku} s={s} max={skus[0].revenue} />)
           )}
@@ -187,7 +187,7 @@ export default function FinanceReports() {
       </div>
 
       {pl.error && (
-        <div className="mt-5 p-3 text-[12px] rounded-md bg-destructive/5 text-destructive border border-destructive/30">
+        <div className="mt-5 p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
           Failed to load P&amp;L: {String(pl.error)}
         </div>
       )}
@@ -199,7 +199,7 @@ function PlTableRow({ m }: { m: FinanceMonthlyPlRow }) {
   const gp = m.revenue - m.cogs;
   return (
     <div
-      className="grid items-center px-5 py-2.5 border-b border-border text-[12.5px] last:border-0"
+      className="grid items-center px-5 py-2.5 border-b border-border text-meta last:border-0"
       style={{ gridTemplateColumns: "120px repeat(5, 1fr)", minWidth: 720 }}
     >
       <span className="font-semibold">{m.m}</span>
@@ -207,7 +207,7 @@ function PlTableRow({ m }: { m: FinanceMonthlyPlRow }) {
       <span className="font-mono text-right text-muted-foreground">{rm(m.cogs)}</span>
       <span className="font-mono text-right text-success">{rm(gp)}</span>
       <span className="font-mono text-right text-muted-foreground">{rm(m.opex)}</span>
-      <span className="font-mono text-right font-bold">{rm(m.net)}</span>
+      <span className="font-mono text-right font-semibold">{rm(m.net)}</span>
     </div>
   );
 }
@@ -268,9 +268,9 @@ function TopSkuRow({ s, max }: { s: FinanceTopSkuRow; max: number }) {
   const pct = max > 0 ? (s.revenue / max) * 100 : 0;
   return (
     <div className="px-5 py-2.5 border-b border-border last:border-0">
-      <div className="flex items-baseline justify-between mb-1.5 text-[12px]">
+      <div className="flex items-baseline justify-between mb-1.5 text-meta">
         <span className="font-semibold truncate">{s.name}</span>
-        <span className="font-mono text-[11.5px]">{rm(s.revenue)}</span>
+        <span className="font-mono text-label">{rm(s.revenue)}</span>
       </div>
       <div className="h-1 rounded bg-muted overflow-hidden">
         <div
@@ -278,7 +278,7 @@ function TopSkuRow({ s, max }: { s: FinanceTopSkuRow; max: number }) {
           style={{ width: `${pct}%` }}
         />
       </div>
-      <div className="text-[10px] text-muted-foreground mt-1">{s.qty} units sold</div>
+      <div className="text-label text-muted-foreground mt-1">{s.qty} units sold</div>
     </div>
   );
 }
@@ -295,13 +295,13 @@ function Kpi({
   const valueTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
   return (
     <div className={`bg-card rounded-md border ${accent ? "border-primary" : "border-border"} px-5 py-[18px]`}>
-      <div className={`text-[10px] uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
+      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
         {label}
       </div>
-      <div className={`font-display text-[26px] mt-1.5 leading-none tabular-nums ${valueTone}`}>
+      <div className={`font-display text-page mt-1.5 leading-none tabular-nums ${valueTone}`}>
         {value}
       </div>
-      {hint && <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>}
+      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
     </div>
   );
 }

@@ -46,13 +46,13 @@ export default function WarehouseReceiptsPanel() {
       data-testid="warehouse-receipts-panel"
     >
       <div className="px-4 py-2.5 border-b border-base-100 bg-base-50 flex items-center gap-2">
-        <h2 className="text-[11px] font-bold uppercase tracking-[0.02em] text-base-700">
+        <h2 className="text-label font-semibold uppercase tracking-[0.02em] text-base-700">
           Counted by the warehouse
         </h2>
-        <span className="font-mono text-[10px] px-1.5 py-px rounded-full bg-base-200 text-base-700">
+        <span className="font-mono text-label px-1.5 py-px rounded-full bg-base-200 text-base-700">
           {receipts.length}
         </span>
-        <span className="text-[11px] text-base-600">
+        <span className="text-label text-base-600">
           Nothing has moved yet — check one in to book the goods.
         </span>
       </div>
@@ -119,7 +119,7 @@ function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
     >
       <div className="min-w-[150px]">
         <div className="font-mono font-semibold text-base-900">{r.po_id}</div>
-        <div className="text-[11px] text-base-600 mt-0.5">
+        <div className="text-label text-base-600 mt-0.5">
           {r.supplier_name ?? "—"} → {r.warehouse_name ?? "—"}
         </div>
       </div>
@@ -127,19 +127,19 @@ function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
       <div className="flex-1 min-w-[220px]">
         {/* Composed by the shared module — the warehouse's own list says the
             same sentence about the same receipt. */}
-        <div className="text-[12.5px] text-base-800">{r.summary}</div>
-        <div className="text-[11px] text-base-600 mt-0.5">
+        <div className="text-meta text-base-800">{r.summary}</div>
+        <div className="text-label text-base-600 mt-0.5">
           DO {r.do_number} · counted by {r.submitted_by_name ?? "the warehouse"}{" "}
           · {fmtDate(r.submitted_at)}
         </div>
         {r.note && (
-          <div className="text-[11px] text-base-600 mt-1 italic">{r.note}</div>
+          <div className="text-label text-base-600 mt-1 italic">{r.note}</div>
         )}
         {/* Said BEFORE the button is pressed: a check-in with an issue files a
             case against a supplier, and somebody then has to chase it. */}
         {r.opens_claims && (
           <div
-            className="text-[11px] text-danger mt-1"
+            className="text-label text-danger mt-1"
             data-testid={`warehouse-receipt-claims-${r.po_id}`}
           >
             Checking this in opens a supplier claim.
@@ -155,13 +155,13 @@ function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
             placeholder="What must they fix?"
             aria-label={`Reason for returning the ${r.po_id} count`}
             data-testid={`warehouse-receipt-reason-${r.po_id}`}
-            className="w-[230px] px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+            className="w-[230px] px-2 py-1.5 border border-base-300 rounded-[4px] text-meta bg-white outline-none focus:border-base-500"
           />
           <button
             type="button"
             onClick={doSendBack}
             disabled={reason.trim().length === 0 || busy}
-            className="btn-secondary text-[11px] py-1.5 px-3 disabled:opacity-40"
+            className="btn-secondary text-label py-1.5 px-3 disabled:opacity-40"
             data-testid={`warehouse-receipt-confirm-send-back-${r.po_id}`}
           >
             {sendBack.isPending ? "Returning…" : returnLabel}
@@ -172,7 +172,7 @@ function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
               setSendingBack(false);
               setReason("");
             }}
-            className="btn-ghost text-[11px] py-1.5 px-2"
+            className="btn-ghost text-label py-1.5 px-2"
           >
             Cancel
           </button>
@@ -183,7 +183,7 @@ function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
             type="button"
             onClick={() => setSendingBack(true)}
             disabled={busy}
-            className="btn-ghost text-[11px] py-1.5 px-2"
+            className="btn-ghost text-label py-1.5 px-2"
             data-testid={`warehouse-receipt-send-back-${r.po_id}`}
           >
             {returnLabel}
@@ -192,7 +192,7 @@ function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
             type="button"
             onClick={doCheckIn}
             disabled={busy}
-            className="btn-primary text-[11px] py-1.5 px-3 disabled:opacity-40"
+            className="btn-primary text-label py-1.5 px-3 disabled:opacity-40"
             data-testid={`warehouse-receipt-check-in-${r.po_id}`}
           >
             {checkIn.isPending ? "Checking in…" : "Check in"}

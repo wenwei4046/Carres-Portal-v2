@@ -29,7 +29,7 @@ export default function CarresLockup({ showPortal = false, size = 26 }: Props) {
         style={{ height: Math.round(size * 0.62) }}
       />
       {showPortal && (
-        <span className="font-medium text-base-500 text-[13px]">Portal</span>
+        <span className="font-medium text-base-500 text-body">Portal</span>
       )}
     </span>
   );

@@ -32,11 +32,11 @@ export default function PartnerIncoming() {
   return (
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-6">
-        <p className="text-xs uppercase tracking-wider text-base-500 mb-1">
+        <p className="text-meta uppercase tracking-wider text-base-500 mb-1">
           Partner
         </p>
-        <h1 className="text-2xl font-semibold">Incoming</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <h1 className="text-page font-semibold">Incoming</h1>
+        <p className="text-body text-muted-foreground mt-1">
           Orders Operation has just assigned to you. Accept to confirm
           you&rsquo;ll handle the delivery, or reject with a reason and the
           order goes back to Operation to pick another LP.
@@ -44,11 +44,11 @@ export default function PartnerIncoming() {
       </div>
 
       {incomingQ.isLoading ? (
-        <div className="rounded border border-dashed border-base-200 bg-card py-16 text-center text-[12px] text-base-500">
+        <div className="rounded border border-dashed border-base-200 bg-card py-16 text-center text-meta text-base-500">
           Loading…
         </div>
       ) : incomingQ.isError ? (
-        <div className="rounded border border-destructive/30 bg-destructive/5 p-4 text-[12px] text-destructive">
+        <div className="rounded border border-destructive/30 bg-destructive/5 p-4 text-meta text-destructive">
           Couldn&rsquo;t load incoming orders.
           <button
             type="button"
@@ -60,10 +60,10 @@ export default function PartnerIncoming() {
         </div>
       ) : orders.length === 0 ? (
         <div className="rounded border border-dashed border-base-200 bg-card py-16 text-center">
-          <div className="text-[12px] text-base-500 uppercase tracking-[0.14em] mb-2">
+          <div className="text-meta text-base-500 uppercase tracking-[0.14em] mb-2">
             Empty
           </div>
-          <div className="text-[14px] text-base-700">
+          <div className="text-body text-base-700">
             No incoming orders right now.
           </div>
         </div>
@@ -138,27 +138,27 @@ function IncomingRow({ order, onReject }: IncomingRowProps) {
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 mb-1">
-          <span className="font-mono text-[13px] font-semibold text-base-900">
+          <span className="font-mono text-body font-semibold text-base-900">
             #{order.so}
           </span>
-          <span className="text-[10px] text-base-500 font-mono">
+          <span className="text-label text-base-500 font-mono">
             assigned {requestedAt}
           </span>
         </div>
-        <div className="text-[14px] font-medium text-foreground">
+        <div className="text-body font-medium text-foreground">
           {order.customer_name}
         </div>
         {order.customer_phone && (
-          <div className="text-[11px] text-muted-foreground font-mono mt-0.5">
+          <div className="text-label text-muted-foreground font-mono mt-0.5">
             {order.customer_phone}
           </div>
         )}
         {order.customer_address && (
-          <div className="text-[12px] text-muted-foreground mt-1 line-clamp-2">
+          <div className="text-meta text-muted-foreground mt-1 line-clamp-2">
             {order.customer_address}
           </div>
         )}
-        <div className="text-[11px] text-base-700 mt-2">
+        <div className="text-label text-base-700 mt-2">
           <span className="font-semibold uppercase tracking-[0.08em] text-base-500 mr-2">
             Delivery
           </span>
@@ -174,7 +174,7 @@ function IncomingRow({ order, onReject }: IncomingRowProps) {
           )}
         </div>
         {order.dealers?.name && (
-          <div className="text-[11px] text-muted-foreground mt-1">
+          <div className="text-label text-muted-foreground mt-1">
             Dealer: {order.dealers.name}
           </div>
         )}
@@ -185,7 +185,7 @@ function IncomingRow({ order, onReject }: IncomingRowProps) {
           type="button"
           onClick={handleAccept}
           disabled={accept.isPending}
-          className="text-[12px] px-3 py-1.5 rounded bg-primary text-primary-foreground font-semibold disabled:opacity-40 min-w-[90px]"
+          className="text-meta px-3 py-1.5 rounded bg-primary text-primary-foreground font-semibold disabled:opacity-40 min-w-[90px]"
           data-testid={`incoming-accept-${order.so}`}
         >
           {accept.isPending ? "Accepting…" : "Accept"}
@@ -193,7 +193,7 @@ function IncomingRow({ order, onReject }: IncomingRowProps) {
         <button
           type="button"
           onClick={onReject}
-          className="text-[12px] px-3 py-1.5 rounded border border-destructive/40 text-destructive font-semibold hover:bg-destructive/5 min-w-[90px]"
+          className="text-meta px-3 py-1.5 rounded border border-destructive/40 text-destructive font-semibold hover:bg-destructive/5 min-w-[90px]"
           data-testid={`incoming-reject-${order.so}`}
         >
           Reject

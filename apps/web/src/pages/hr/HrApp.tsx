@@ -75,7 +75,7 @@ function MonthStepper({
       >
         <ChevronLeft size={16} aria-hidden="true" />
       </button>
-      <span className="px-1.5 text-[12px] font-semibold tabular-nums text-base-900 min-w-[92px] text-center whitespace-nowrap">
+      <span className="px-1.5 text-meta font-semibold tabular-nums text-base-900 min-w-[92px] text-center whitespace-nowrap">
         {MONTH_NAMES[value.month - 1].slice(0, 3)} {value.year}
       </span>
       <button

@@ -113,7 +113,7 @@ export default function CreateLpAccountForm({
       />
       {error && (
         <p
-          className="text-[12px] text-red-600"
+          className="text-meta text-red-600"
           role="alert"
         >
           {error}
@@ -154,12 +154,12 @@ function Field({
   textarea,
 }: FieldProps) {
   const inputClass =
-    "w-full px-3 py-2.5 border border-base-200 rounded text-[13px] outline-none box-border";
+    "w-full px-3 py-2.5 border border-base-200 rounded text-body outline-none box-border";
   return (
     <div>
       <label
         htmlFor={id}
-        className="block text-[9.5px] uppercase tracking-wider text-base-500 font-semibold mb-1"
+        className="block text-label uppercase tracking-wider text-base-500 font-semibold mb-1"
       >
         {label}
       </label>

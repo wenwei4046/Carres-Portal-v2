@@ -228,17 +228,17 @@ export default function OperationWarehouse({
   if (warehouseQ.isError) {
     return (
       <div className="px-9 py-8 pb-14">
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-2">
             Couldn&rsquo;t load warehouse
           </div>
-          <div className="text-[12px] text-base-700 mb-3">
+          <div className="text-meta text-base-700 mb-3">
             {(warehouseQ.error as Error | undefined)?.message ?? "Unknown error"}
           </div>
           <button
             type="button"
             onClick={() => void warehouseQ.refetch()}
-            className="btn-secondary text-[11px] py-1.5 px-3"
+            className="btn-secondary text-label py-1.5 px-3"
           >
             Retry
           </button>
@@ -255,10 +255,10 @@ export default function OperationWarehouse({
       <div className="flex justify-between items-start mb-[22px] gap-4">
         <div>
           <div className="kicker">Warehouse</div>
-          <h1 className="t-h1 font-display mt-1.5 text-base-900">
+          <h1 className="text-page font-display mt-1.5 text-base-900">
             Stock balance
           </h1>
-          <div className="font-body text-[13px] text-base-600 mt-1 max-w-[680px]">
+          <div className="font-body text-body text-base-600 mt-1 max-w-[680px]">
             Auto-deducted on delivery, auto-incremented when supplier DO is
             received. Use <strong>Adjust</strong> for damage / loss / one-off
             corrections — every change writes to the movement log.
@@ -271,11 +271,11 @@ export default function OperationWarehouse({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search SKU…"
             aria-label="Search SKU"
-            className="px-3.5 py-2 border border-base-300 rounded-[4px] text-[13px] bg-white outline-none focus:border-base-500 min-w-[220px]"
+            className="px-3.5 py-2 border border-base-300 rounded-[4px] text-body bg-white outline-none focus:border-base-500 min-w-[220px]"
           />
           <button
             type="button"
-            className="btn-secondary text-[12px] py-2 px-3 whitespace-nowrap"
+            className="btn-secondary text-meta py-2 px-3 whitespace-nowrap"
             onClick={() => {
               // Prefer the prefilled jump (scopes to this warehouse) when the
               // shell wired it; fall back to plain tab switch otherwise so
@@ -318,19 +318,19 @@ export default function OperationWarehouse({
                 background: isActive ? "var(--signature-50)" : "#fff",
               }}
             >
-              <div className="font-ui text-[14px] font-semibold text-base-900">
+              <div className="font-ui text-body font-semibold text-base-900">
                 {t.warehouse.name}
               </div>
-              <div className="font-body text-[11px] text-base-500 mt-0.5">
+              <div className="font-body text-label text-base-500 mt-0.5">
                 {t.warehouse.address ?? "—"}
               </div>
               <div className="flex gap-[22px] mt-3">
                 <div>
-                  <div className="font-mono text-[26px] font-semibold leading-none text-base-900">
+                  <div className="font-mono text-page font-semibold leading-none text-base-900">
                     {t.units}
                   </div>
                   <div
-                    className="font-body text-[10px] text-base-500 mt-0.5"
+                    className="font-body text-label text-base-500 mt-0.5"
                     style={{
                       textTransform: "uppercase",
                       letterSpacing: "0.1em",
@@ -340,11 +340,11 @@ export default function OperationWarehouse({
                   </div>
                 </div>
                 <div>
-                  <div className="font-mono text-[26px] font-semibold leading-none text-base-900">
+                  <div className="font-mono text-page font-semibold leading-none text-base-900">
                     {t.skuCount}
                   </div>
                   <div
-                    className="font-body text-[10px] text-base-500 mt-0.5"
+                    className="font-body text-label text-base-500 mt-0.5"
                     style={{
                       textTransform: "uppercase",
                       letterSpacing: "0.1em",
@@ -358,7 +358,7 @@ export default function OperationWarehouse({
           );
         })}
         {warehouses.length === 0 && (
-          <div className="rounded-[6px] border border-base-200 bg-white p-6 text-center text-[13px] text-base-500">
+          <div className="rounded-[6px] border border-base-200 bg-white p-6 text-center text-body text-base-500">
             No warehouses configured yet.
           </div>
         )}
@@ -381,7 +381,7 @@ export default function OperationWarehouse({
               onClick={() => setActiveCat(c.key)}
               data-testid={`warehouse-cat-${c.key}`}
               className={[
-                "px-3.5 py-2 rounded-[4px] text-[12px] transition-colors border flex gap-2 items-center",
+                "px-3.5 py-2 rounded-[4px] text-meta transition-colors border flex gap-2 items-center",
                 active
                   ? "bg-base-900 text-white border-base-900 font-semibold"
                   : "bg-white text-base-700 border-base-200 font-medium hover:border-base-400",
@@ -405,7 +405,7 @@ export default function OperationWarehouse({
           onClick={() => setActiveCat("alerts")}
           data-testid="warehouse-cat-alerts"
           className={[
-            "px-3.5 py-2 rounded-[4px] text-[12px] transition-colors border flex gap-2 items-center",
+            "px-3.5 py-2 rounded-[4px] text-meta transition-colors border flex gap-2 items-center",
             activeCat === "alerts"
               ? "bg-base-900 text-white border-base-900 font-semibold"
               : "bg-white text-danger border-danger font-medium hover:bg-base-50",
@@ -424,7 +424,7 @@ export default function OperationWarehouse({
           onClick={() => setActiveCat("reserved")}
           data-testid="warehouse-cat-reserved"
           className={[
-            "px-3.5 py-2 rounded-[4px] text-[12px] transition-colors border flex gap-2 items-center",
+            "px-3.5 py-2 rounded-[4px] text-meta transition-colors border flex gap-2 items-center",
             activeCat === "reserved"
               ? "bg-base-900 text-white border-base-900 font-semibold"
               : "bg-white text-warning border-warning font-medium hover:bg-warning-soft",
@@ -450,12 +450,12 @@ export default function OperationWarehouse({
             <div className="label text-right" />
           </div>
           {!activeWarehouse ? (
-            <div className="p-9 text-center text-base-500 text-[13px]">
+            <div className="p-9 text-center text-base-500 text-body">
               Pick a warehouse to view reserved stock.
             </div>
           ) : filteredRows.length === 0 ? (
             <div
-              className="p-9 text-center text-base-500 text-[13px]"
+              className="p-9 text-center text-base-500 text-body"
               data-testid="warehouse-reserved-empty"
             >
               {search
@@ -482,20 +482,20 @@ export default function OperationWarehouse({
                   }}
                 >
                   <div className="min-w-0">
-                    <div className="font-body text-[13px] truncate">
+                    <div className="font-body text-body truncate">
                       {friendly}
                     </div>
                   </div>
-                  <div className="font-mono text-[13px] text-right font-semibold">
+                  <div className="font-mono text-body text-right font-semibold">
                     {row.reserved}
                   </div>
-                  <div className="font-mono text-[13px] text-right text-base-600">
+                  <div className="font-mono text-body text-right text-base-600">
                     {totalAllReserved}
                   </div>
                   <div className="text-right">
                     <button
                       type="button"
-                      className="btn-secondary text-[11px] py-1 px-2.5"
+                      className="btn-secondary text-label py-1 px-2.5"
                       onClick={() =>
                         setDrilldownTarget({
                           sku: row.sku,
@@ -534,12 +534,12 @@ export default function OperationWarehouse({
           </div>
 
           {!activeWarehouse ? (
-            <div className="p-9 text-center text-base-500 text-[13px]">
+            <div className="p-9 text-center text-base-500 text-body">
               Pick a warehouse to view stock.
             </div>
           ) : filteredRows.length === 0 ? (
             <div
-              className="p-9 text-center text-base-500 text-[13px]"
+              className="p-9 text-center text-base-500 text-body"
               data-testid="warehouse-empty"
             >
               {activeCat === "alerts"
@@ -584,24 +584,24 @@ export default function OperationWarehouse({
                         data-testid={`warehouse-row-link-${row.sku}`}
                         title="View movement log for this SKU"
                       >
-                        <span className="block font-body text-[13px] truncate">
+                        <span className="block font-body text-body truncate">
                           {friendly}
                         </span>
                         <span
-                          className="block text-[10px] text-base-400 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="block text-label text-base-400 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                           aria-hidden="true"
                         >
                           view log →
                         </span>
                       </button>
                     ) : (
-                      <div className="font-body text-[13px] truncate">{friendly}</div>
+                      <div className="font-body text-body truncate">{friendly}</div>
                     )}
                   </div>
-                  <div className="font-mono text-[13px] text-right font-semibold">
+                  <div className="font-mono text-body text-right font-semibold">
                     {row.qty}
                   </div>
-                  <div className="font-mono text-[13px] text-right text-base-600">
+                  <div className="font-mono text-body text-right text-base-600">
                     {totalAll}
                   </div>
                   <div className="text-right">
@@ -618,7 +618,7 @@ export default function OperationWarehouse({
                         renders empty inputs only when both are NULL). */}
                     <button
                       type="button"
-                      className="btn-secondary text-[11px] py-1 px-2.5"
+                      className="btn-secondary text-label py-1 px-2.5"
                       onClick={() =>
                         setThresholdTarget({
                           sku: row.sku,
@@ -639,7 +639,7 @@ export default function OperationWarehouse({
                     </button>
                     <button
                       type="button"
-                      className="btn-secondary text-[11px] py-1 px-2.5"
+                      className="btn-secondary text-label py-1 px-2.5"
                       onClick={() =>
                         setAdjustTarget({
                           sku: row.sku,

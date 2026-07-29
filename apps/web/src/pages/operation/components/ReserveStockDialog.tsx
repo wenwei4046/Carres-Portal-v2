@@ -259,8 +259,8 @@ export default function ReserveStockDialog({
         >
           <GripVertical className="w-4 h-4 text-base-300 mt-0.5 shrink-0" />
           <div className="min-w-0 flex-1">
-            <div className="t-micro text-base-400">Reserve ready stock → {soRef}</div>
-            <div className="t-h4 font-display mt-0.5 truncate">{sku}</div>
+            <div className="text-label uppercase tracking-[0.05em] text-base-400">Reserve ready stock → {soRef}</div>
+            <div className="text-strong font-display mt-0.5 truncate">{sku}</div>
           </div>
           {!exact && (
             <span className="pill pill-warning shrink-0 mt-0.5">No exact match</span>
@@ -305,7 +305,7 @@ export default function ReserveStockDialog({
               ).map(([label]) => (
                 <div
                   key={label}
-                  className="px-2.5 py-2 text-[11px] font-bold uppercase tracking-[0.02em] truncate"
+                  className="px-2.5 py-2 text-label font-semibold uppercase tracking-[0.02em] truncate"
                 >
                   {label}
                 </div>
@@ -353,23 +353,23 @@ export default function ReserveStockDialog({
                       className="accent-primary w-3.5 h-3.5"
                     />
                   </div>
-                  <div className="px-2.5 py-1.5 t-tiny text-base-500 truncate">
+                  <div className="px-2.5 py-1.5 text-meta text-base-500 truncate">
                     {r.dateLabel || "—"}
                   </div>
-                  <div className="px-2.5 py-1.5 t-tiny text-base-600 truncate">{r.cat}</div>
+                  <div className="px-2.5 py-1.5 text-meta text-base-600 truncate">{r.cat}</div>
                   <div
-                    className="px-2.5 py-1.5 font-mono text-[12px] text-base-900 truncate"
+                    className="px-2.5 py-1.5 font-mono text-meta text-base-900 truncate"
                     title={r.sku}
                   >
                     {r.sku}
                   </div>
-                  <div className="px-2.5 py-1.5 t-tiny text-base-600">
+                  <div className="px-2.5 py-1.5 text-meta text-base-600">
                     {r.size === "Other" ? "—" : r.size}
                   </div>
-                  <div className="px-2.5 py-1.5 t-tiny font-mono text-base-600 truncate" title={r.poNo ?? ""}>
+                  <div className="px-2.5 py-1.5 text-meta font-mono text-base-600 truncate" title={r.poNo ?? ""}>
                     {r.poNo ?? "—"}
                   </div>
-                  <div className="px-2.5 py-1.5 t-tiny font-mono text-base-500 truncate" title={r.sourceRef ?? ""}>
+                  <div className="px-2.5 py-1.5 text-meta font-mono text-base-500 truncate" title={r.sourceRef ?? ""}>
                     {r.sourceRef ?? "—"}
                   </div>
                   <div className="px-2.5 py-1.5">
@@ -383,7 +383,7 @@ export default function ReserveStockDialog({
               );
             })}
             {view.length === 0 && (
-              <div className="px-3 py-10 text-center t-small text-base-400">
+              <div className="px-3 py-10 text-center text-body text-base-400">
                 {rows.length === 0
                   ? "No free stock in the warehouse right now."
                   : "No units match these filters."}
@@ -396,7 +396,7 @@ export default function ReserveStockDialog({
         <div className="px-4 py-2.5 border-t border-base-200 bg-base-50/50 flex flex-col gap-2">
           <PoolReasonPicker state={draw} warnings={warnings} />
           <div className="flex items-center justify-between gap-3">
-            <span className="t-tiny text-base-500">
+            <span className="text-meta text-base-500">
               {view.length} of {rows.length} shown · {checked.size} selected
               {draw.problem && checked.size > 0 ? (
                 <span className="ml-2 text-base-600" data-testid="reserve-stock-problem">
@@ -405,14 +405,14 @@ export default function ReserveStockDialog({
               ) : null}
             </span>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={onClose} className="btn-ghost t-tiny py-1.5 px-3">
+              <button type="button" onClick={onClose} className="btn-ghost text-meta py-1.5 px-3">
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={reserve}
                 disabled={submitting || checked.size === 0 || !!draw.problem}
-                className="btn-primary t-tiny py-1.5 px-4 disabled:opacity-40"
+                className="btn-primary text-meta py-1.5 px-4 disabled:opacity-40"
                 data-testid="reserve-stock-confirm"
               >
                 {submitting ? "Reserving…" : `Reserve ${checked.size} to ${soRef}`}
@@ -440,7 +440,7 @@ function FilterText({
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-1.5 py-1 t-tiny border border-base-200 rounded bg-white outline-none focus:border-primary"
+        className="w-full px-1.5 py-1 text-meta border border-base-200 rounded bg-white outline-none focus:border-primary"
       />
     </div>
   );
@@ -460,7 +460,7 @@ function FilterSelect({
       <select
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-1 py-1 t-tiny border border-base-200 rounded bg-white outline-none focus:border-primary"
+        className="w-full px-1 py-1 text-meta border border-base-200 rounded bg-white outline-none focus:border-primary"
       >
         <option value="">All</option>
         {options.map((o) => (

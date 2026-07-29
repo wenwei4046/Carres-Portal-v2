@@ -82,15 +82,15 @@ function Tile({
 }) {
   return (
     <div className="flex-1 min-w-[160px] rounded-lg border border-base-200 bg-card px-4 py-3">
-      <div className="t-micro text-base-500">{label}</div>
+      <div className="text-label uppercase tracking-[0.05em] text-base-500">{label}</div>
       <div
-        className={`t-num text-[24px] leading-8 font-semibold ${
+        className={`t-num text-page leading-8 font-semibold ${
           muted ? "text-base-400" : "text-base-900"
         }`}
       >
         {value}
       </div>
-      <div className="t-tiny text-base-500">{sub}</div>
+      <div className="text-meta text-base-500">{sub}</div>
     </div>
   );
 }
@@ -129,17 +129,17 @@ function ScoreRow({
       } ${row.kind === "store" ? "bg-base-50" : ""}`}
     >
       <div className="w-[168px] shrink-0 min-w-0 flex items-baseline gap-1.5">
-        <span className="text-[15px] font-medium truncate">{row.name}</span>
-        {row.staffCode && <span className="t-tiny text-base-400 t-num">{row.staffCode}</span>}
+        <span className="text-strong font-medium truncate">{row.name}</span>
+        {row.staffCode && <span className="text-meta text-base-400 t-num">{row.staffCode}</span>}
       </div>
       <Bar row={row} />
-      <div className="w-[200px] shrink-0 text-right text-[14px] t-num">
+      <div className="w-[200px] shrink-0 text-right text-body t-num">
         <span className="font-semibold">{fmt(kpiKey, row.actual)}</span>
         {row.target !== null && (
           <span className="text-base-500"> of {fmt(kpiKey, row.target)}</span>
         )}
       </div>
-      <div className="w-[52px] shrink-0 text-right text-[15px] font-semibold t-num">
+      <div className="w-[52px] shrink-0 text-right text-strong font-semibold t-num">
         {row.pct === null ? <span className="text-base-400">—</span> : `${row.pct}%`}
       </div>
       <div className="w-[86px] shrink-0 text-right">
@@ -222,18 +222,18 @@ function TargetDialog({
         className="bg-white rounded w-full max-w-[440px] overflow-hidden"
       >
         <div className="px-6 pt-5 pb-4 border-b border-base-100">
-          <div className="kicker text-[9px]">HR · Performance</div>
-          <h2 className="font-display text-[20px] mt-1 tracking-[-0.02em] font-semibold">
+          <div className="kicker text-label">HR · Performance</div>
+          <h2 className="font-display text-title mt-1 tracking-[-0.02em] font-semibold">
             {edit.targetId ? "Edit target" : "Set a target"}
           </h2>
-          <div className="text-[12px] text-base-600 mt-1 leading-relaxed">
+          <div className="text-meta text-base-600 mt-1 leading-relaxed">
             {edit.name} · {metric.label}. Saving against the same start date
             corrects this target; pick a later date to change it from then on and
             leave earlier months as they were judged.
           </div>
         </div>
         <div className="p-6 grid gap-3">
-          <label className="text-[12px] font-semibold text-base-700">
+          <label className="text-meta font-semibold text-base-700">
             Monthly target {metric.unit === "rm" ? "(RM)" : "(quantity)"}
             <input
               autoFocus
@@ -243,7 +243,7 @@ function TargetDialog({
               className={`${fieldCls} mt-1 font-normal t-num`}
             />
           </label>
-          <label className="text-[12px] font-semibold text-base-700">
+          <label className="text-meta font-semibold text-base-700">
             Applies from
             <input
               type="date"
@@ -294,20 +294,20 @@ function ManagerCard({ source }: { source: KpiSource }) {
   return (
     <SectionCard>
       <div className="flex items-center gap-2 h-10 px-3 border-b border-base-200">
-        <span className="t-h4 text-base-900">Manager view</span>
+        <span className="text-strong text-base-900">Manager view</span>
         <span className="flex-1" />
         <span className={ready ? PILL.ready : PILL.neutral}>{ready ? "On" : "Off"}</span>
       </div>
       <div className="p-3 flex flex-col gap-3">
         {ready ? (
-          <div className="flex items-center gap-2 text-[13px] text-base-700">
+          <div className="flex items-center gap-2 text-body text-base-700">
             <Check size={16} className="text-success shrink-0" aria-hidden="true" />
             Every store has an owner, so each manager's number is the sum of their
             people.
           </div>
         ) : (
           <>
-            <p className="text-[13px] text-base-700">
+            <p className="text-body text-base-700">
               A manager's number is the sum of the people under them. Right now the
               org chart cannot answer who is under whom:
             </p>
@@ -316,11 +316,11 @@ function ManagerCard({ source }: { source: KpiSource }) {
                 <div className="flex items-start gap-2">
                   <TriangleAlert size={14} className="text-warning shrink-0 mt-0.5" aria-hidden="true" />
                   <div>
-                    <div className="text-[14px] text-base-900">
+                    <div className="text-body text-base-900">
                       {c.hqTotal - c.hqWithManager} of {c.hqTotal} HQ staff have no
                       manager set
                     </div>
-                    <div className="t-tiny text-base-500">
+                    <div className="text-meta text-base-500">
                       Set it on the Team tab — it climbs the chart on its own.
                     </div>
                   </div>
@@ -329,10 +329,10 @@ function ManagerCard({ source }: { source: KpiSource }) {
               <div className="flex items-start gap-2">
                 <TriangleAlert size={14} className="text-warning shrink-0 mt-0.5" aria-hidden="true" />
                 <div>
-                  <div className="text-[14px] text-base-900">
+                  <div className="text-body text-base-900">
                     Showroom staff have no manager field at all
                   </div>
-                  <div className="t-tiny text-base-500">
+                  <div className="text-meta text-base-500">
                     The people who actually sell sit outside the HQ chart, so a store
                     needs an owner instead.
                   </div>
@@ -346,10 +346,10 @@ function ManagerCard({ source }: { source: KpiSource }) {
         <div className="flex flex-col gap-1.5 border-t border-base-200 pt-2">
           {source.stores.map((s) => (
             <div key={s.dealerId} className="flex items-center gap-2 h-9">
-              <span className="text-[14px] text-base-900 flex-1 min-w-0 truncate">
+              <span className="text-body text-base-900 flex-1 min-w-0 truncate">
                 {s.name}
               </span>
-              <span className="t-tiny text-base-500 shrink-0">this store's number belongs to</span>
+              <span className="text-meta text-base-500 shrink-0">this store's number belongs to</span>
               <select
                 value={s.managerUserId ?? ""}
                 onChange={(e) =>
@@ -361,7 +361,7 @@ function ManagerCard({ source }: { source: KpiSource }) {
                     },
                   )
                 }
-                className={`${fieldCls} !h-7 !w-[190px] shrink-0 text-[12px]`}
+                className={`${fieldCls} !h-7 !w-[190px] shrink-0 text-meta`}
                 aria-label={`Owner of ${s.name}`}
               >
                 <option value="">Nobody yet</option>
@@ -377,7 +377,7 @@ function ManagerCard({ source }: { source: KpiSource }) {
         </div>
 
         {!ready && (
-          <p className="t-tiny text-base-500 border-t border-base-200 pt-2">
+          <p className="text-meta text-base-500 border-t border-base-200 pt-2">
             Until a store has an owner this stays <b>Off</b> rather than showing a
             manager RM 0 while their store sold something.
           </p>
@@ -391,9 +391,9 @@ function DepartmentStrip({ s, kpiKey }: { s: Scorecards; kpiKey: KpiKey }) {
   return (
     <SectionCard>
       <div className="flex items-center gap-2 h-10 px-3 border-b border-base-200">
-        <span className="t-h4 text-base-900">Department chart</span>
+        <span className="text-strong text-base-900">Department chart</span>
         <span className="flex-1" />
-        <span className="t-tiny text-base-500">also shown on the Team tab</span>
+        <span className="text-meta text-base-500">also shown on the Team tab</span>
       </div>
       <div className="p-3">
         <div className="flex gap-2.5 flex-wrap">
@@ -407,9 +407,9 @@ function DepartmentStrip({ s, kpiKey }: { s: Scorecards; kpiKey: KpiKey }) {
                   className={`w-2 h-2 rounded-full shrink-0 ${BAR[kpiTone(d.state)]}`}
                   aria-hidden="true"
                 />
-                <span className="t-h4 text-base-900 truncate">{d.name}</span>
+                <span className="text-strong text-base-900 truncate">{d.name}</span>
               </div>
-              <div className="t-tiny text-base-500">
+              <div className="text-meta text-base-500">
                 {d.headcount} {d.headcount === 1 ? "person" : "people"}
                 {d.sells
                   ? d.pct === null
@@ -421,7 +421,7 @@ function DepartmentStrip({ s, kpiKey }: { s: Scorecards; kpiKey: KpiKey }) {
             </div>
           ))}
         </div>
-        <p className="t-tiny text-base-500 border-t border-base-200 mt-2 pt-2">
+        <p className="text-meta text-base-500 border-t border-base-200 mt-2 pt-2">
           A grey dot means “this department does not sell”, not “this department is
           failing”. Departments with no revenue of their own show a dash rather than
           a fake 0%.
@@ -461,7 +461,7 @@ export default function HrPerformanceTab({
   }, [data, kpiKey]);
 
   if (isLoading || !data) {
-    return <div className="py-12 text-[13px] text-base-500">Loading performance…</div>;
+    return <div className="py-12 text-body text-base-500">Loading performance…</div>;
   }
 
   const s = data.scorecards;
@@ -517,14 +517,14 @@ export default function HrPerformanceTab({
 
       <SectionCard>
         <div className="flex items-center gap-2 h-10 px-3 border-b border-base-200">
-          <span className="t-h4 text-base-900">This month</span>
+          <span className="text-strong text-base-900">This month</span>
           <span className="flex-1" />
-          <span className="t-tiny text-base-500">
+          <span className="text-meta text-base-500">
             On track ≥ 100% · Behind under · No target = nothing set yet
           </span>
         </div>
         {s.stores.length === 0 ? (
-          <div className="px-3 py-6 text-[13px] text-base-500">
+          <div className="px-3 py-6 text-body text-base-500">
             No showroom is set up for scoring yet. A store appears here once it has
             its first staff member with a CR code.
           </div>
@@ -547,13 +547,13 @@ export default function HrPerformanceTab({
           ))
         )}
         <div className="px-3 py-2 flex flex-col gap-1.5">
-          <p className="t-tiny text-base-500">
+          <p className="text-meta text-base-500">
             Sold is the attributed line value of native orders placed this month, the
             same figure the Overview tab reports. This page shows no commission, so it
             can never disagree with a frozen statement.
           </p>
           {s.unscoredSold > 0 && (
-            <p className="t-tiny text-base-500 border-t border-base-200 pt-1.5">
+            <p className="text-meta text-base-500 border-t border-base-200 pt-1.5">
               {rm(s.unscoredSold)} of the store total was sold by somebody with no
               staff code yet, so it is counted for the store but has no row of its own.
               Give them a CR code on the Team tab.
@@ -564,12 +564,12 @@ export default function HrPerformanceTab({
 
       <SectionCard>
         <div className="flex items-center gap-2 h-10 px-3 border-b border-base-200">
-          <span className="t-h4 text-base-900">Targets</span>
+          <span className="text-strong text-base-900">Targets</span>
           <span className="pill pill-neutral">{targetRows.length} set</span>
           <span className="flex-1" />
         </div>
         {targetRows.length === 0 ? (
-          <div className="px-3 py-6 text-[13px] text-base-500">
+          <div className="px-3 py-6 text-body text-base-500">
             No {metric.label.toLowerCase()} target yet. Use the ✏ on any row above to
             set one.
           </div>
@@ -581,7 +581,7 @@ export default function HrPerformanceTab({
                   {["Who", "Kind", "Monthly target", "From", "Set by"].map((h, i) => (
                     <th
                       key={h}
-                      className={`t-micro text-base-500 font-medium px-2.5 py-2 border-b border-base-200 whitespace-nowrap ${
+                      className={`text-label uppercase tracking-[0.05em] text-base-500 font-medium px-2.5 py-2 border-b border-base-200 whitespace-nowrap ${
                         i === 2 ? "text-right" : "text-left"
                       }`}
                     >
@@ -593,20 +593,20 @@ export default function HrPerformanceTab({
               <tbody>
                 {targetRows.map((t) => (
                   <tr key={t.id} className="hover:bg-hovertint">
-                    <td className="px-2.5 h-11 text-[14px]">
+                    <td className="px-2.5 h-11 text-body">
                       {t.subjectName ?? "—"}
                       {t.staffCode && (
-                        <span className="t-tiny text-base-400 t-num"> {t.staffCode}</span>
+                        <span className="text-meta text-base-400 t-num"> {t.staffCode}</span>
                       )}
                     </td>
-                    <td className="px-2.5 h-11 text-[14px] text-base-500">
+                    <td className="px-2.5 h-11 text-body text-base-500">
                       {t.scopeKind === "store" ? "Store" : "Person"}
                     </td>
-                    <td className="px-2.5 h-11 text-[14px] text-right t-num font-medium">
+                    <td className="px-2.5 h-11 text-body text-right t-num font-medium">
                       {fmt(kpiKey, t.targetValue)}
                     </td>
-                    <td className="px-2.5 h-11 text-[14px] t-num">{t.effectiveFrom}</td>
-                    <td className="px-2.5 h-11 text-[14px] text-base-500">
+                    <td className="px-2.5 h-11 text-body t-num">{t.effectiveFrom}</td>
+                    <td className="px-2.5 h-11 text-body text-base-500">
                       {t.setByName ?? "—"}
                     </td>
                   </tr>
@@ -615,7 +615,7 @@ export default function HrPerformanceTab({
             </table>
           </div>
         )}
-        <p className="t-tiny text-base-500 px-3 py-2 border-t border-base-200">
+        <p className="text-meta text-base-500 px-3 py-2 border-t border-base-200">
           A target is never edited in place — changing it writes a new row from a date
           you choose, so last month keeps the number it was actually judged on. A
           person's own target wins over their store's; with no personal target the

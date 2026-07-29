@@ -47,7 +47,7 @@ export default function PageHeader({
     >
       <div className="min-w-0">
         {kicker && <div className="kicker">{kicker}</div>}
-        <h1 className="t-h2 font-display truncate">{title}</h1>
+        <h1 className="text-page font-display truncate">{title}</h1>
       </div>
       {actions && (
         <div className="flex items-center gap-2.5 shrink-0">{actions}</div>

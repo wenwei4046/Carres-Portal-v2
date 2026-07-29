@@ -78,8 +78,8 @@ export default function OperationStockPlan() {
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <div className="kicker">HQ · Operations · Carres Klang</div>
-            <h1 className="t-h1 font-display mt-1.5">Ready stock</h1>
-            <div className="text-[13px] text-base-600 mt-1.5">
+            <h1 className="text-page font-display mt-1.5">Ready stock</h1>
+            <div className="text-body text-base-600 mt-1.5">
               How much to keep on the floor next month. Everyone asks, the
               manager cuts, the COO approves — then Operations orders it.
             </div>
@@ -88,7 +88,7 @@ export default function OperationStockPlan() {
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              className="rounded border border-base-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+              className="rounded border border-base-300 px-3 py-2 text-body focus:border-primary focus:outline-none"
               aria-label="Plan month"
               data-testid="plan-period"
             >
@@ -118,13 +118,13 @@ export default function OperationStockPlan() {
         <StockHealthPanel />
 
         {isLoading ? (
-          <p className="text-sm text-base-500">Loading…</p>
+          <p className="text-body text-base-500">Loading…</p>
         ) : isError ? (
-          <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+          <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
             <div className="text-destructive font-semibold mb-1">
               Couldn&rsquo;t load the plan
             </div>
-            <div className="text-[12px] text-base-700">
+            <div className="text-meta text-base-700">
               {(error as Error | undefined)?.message ?? "Unknown error"}
             </div>
           </div>
@@ -182,10 +182,10 @@ function NoPlanYet({
       data-testid="plan-empty"
     >
       <ClipboardList size={18} strokeWidth={2} className="mx-auto text-base-300" />
-      <div className="t-h4 text-base-900 mt-2">
+      <div className="text-strong text-base-900 mt-2">
         No plan for {fmtMonth(period)} yet
       </div>
-      <div className="text-[13px] text-base-600 mt-1 max-w-md mx-auto">
+      <div className="text-body text-base-600 mt-1 max-w-md mx-auto">
         Open the month and the team can start asking for what they want on the
         floor. One plan per month — opening it twice lands on the same one.
       </div>
@@ -199,7 +199,7 @@ function NoPlanYet({
         {pending ? "Opening…" : `Open ${fmtMonth(period)}`}
       </button>
       {failed ? (
-        <div className="text-[12px] text-danger mt-2" data-testid="plan-open-error">
+        <div className="text-meta text-danger mt-2" data-testid="plan-open-error">
           Couldn&rsquo;t open the month.
         </div>
       ) : null}
@@ -228,7 +228,7 @@ function PlanTrail({
       data-testid="plan-trail"
     >
       {steps.map((s) => (
-        <div key={s.label} className="text-[12px]">
+        <div key={s.label} className="text-meta">
           <span className="text-base-500">{s.label}: </span>
           <span className={s.who ? "text-base-900" : "text-base-400"}>
             {s.who ?? "—"}
@@ -236,7 +236,7 @@ function PlanTrail({
         </div>
       ))}
       {plan.decisionRemark ? (
-        <div className="text-[12px] text-base-700 basis-full">
+        <div className="text-meta text-base-700 basis-full">
           <span className="text-base-500">Remark: </span>
           {plan.decisionRemark}
         </div>
@@ -258,7 +258,7 @@ function CoverageNote({
   if (coverage.canSuggest && coverage.archiveLinesExcluded === 0) return null;
   return (
     <div
-      className="rounded border border-base-200 bg-base-50 px-4 py-2.5 mb-3 text-[12px] text-base-700"
+      className="rounded border border-base-200 bg-base-50 px-4 py-2.5 mb-3 text-meta text-base-700"
       data-testid="plan-coverage"
     >
       {coverage.canSuggest ? (
@@ -297,7 +297,7 @@ function PlanGrid({
   return (
     <div className="rounded border border-base-200 bg-white" data-testid="plan-grid">
       <div
-        className="grid items-center gap-3 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.03em] text-base-400 border-b border-base-100"
+        className="grid items-center gap-3 px-4 py-2 text-label font-semibold uppercase tracking-[0.03em] text-base-400 border-b border-base-100"
         style={{ gridTemplateColumns: GRID }}
       >
         <span>Item</span>
@@ -313,7 +313,7 @@ function PlanGrid({
       </div>
 
       {data.rows.length === 0 ? (
-        <div className="px-4 py-8 text-center text-[13px] text-base-500">
+        <div className="px-4 py-8 text-center text-body text-base-500">
           Nobody has asked for anything yet.
         </div>
       ) : (
@@ -361,10 +361,10 @@ function PlanRow({
           aria-expanded={open}
           data-testid={`plan-row-toggle-${row.sku}`}
         >
-          <div className="text-[13px] text-base-900 truncate" title={row.sku}>
+          <div className="text-body text-base-900 truncate" title={row.sku}>
             {row.sku}
           </div>
-          <div className="text-[11px] text-base-500">
+          <div className="text-label text-base-500">
             {row.proposerCount === 0
               ? "added by the manager"
               : `${row.proposerCount} ${row.proposerCount === 1 ? "person" : "people"} asked`}
@@ -381,10 +381,10 @@ function PlanRow({
         <Num v={row.incoming} dim={row.incoming === 0} />
         <Num v={row.sold30} dim={row.sold30 === 0} />
         <Num v={row.sold90} dim={row.sold90 === 0} />
-        <span className="text-right font-mono text-[13px] text-base-500">
+        <span className="text-right font-mono text-body text-base-500">
           {row.weekendShare == null ? "—" : `${Math.round(row.weekendShare * 100)}%`}
         </span>
-        <span className="text-right font-mono text-[13px] text-base-700">
+        <span className="text-right font-mono text-body text-base-700">
           {row.suggestedQty == null ? "—" : row.suggestedQty}
         </span>
         <Num v={row.proposedQty} strong />
@@ -412,14 +412,14 @@ function PlanRow({
       {open ? (
         <div className="px-4 pb-2.5 -mt-1" data-testid={`plan-asks-${row.sku}`}>
           {row.proposals.length === 0 ? (
-            <div className="text-[12px] text-base-500">
+            <div className="text-meta text-base-500">
               No individual asks — this line was added at consolidation.
             </div>
           ) : (
             row.proposals.map((p) => (
               <div
                 key={`${p.proposedBy}`}
-                className="text-[12px] text-base-700 flex items-baseline gap-2"
+                className="text-meta text-base-700 flex items-baseline gap-2"
               >
                 <span className="text-base-900">{p.proposedByName ?? "Someone"}</span>
                 <span className="font-mono">{p.qty}</span>
@@ -436,7 +436,7 @@ function PlanRow({
 function Num({ v, dim, strong }: { v: number; dim?: boolean; strong?: boolean }) {
   return (
     <span
-      className={`text-right font-mono text-[13px] ${
+      className={`text-right font-mono text-body ${
         dim ? "text-base-400" : strong ? "text-base-900 font-semibold" : "text-base-900"
       }`}
     >
@@ -470,7 +470,7 @@ function QtyCell({
   if (!editable) {
     return (
       <span
-        className="text-right font-mono text-[13px] text-base-700"
+        className="text-right font-mono text-body text-base-700"
         data-testid={`plan-${kind}-${sku}`}
       >
         {value == null ? "—" : value}
@@ -486,7 +486,7 @@ function QtyCell({
           setDraft(String(value ?? fallback));
           setEditing(true);
         }}
-        className="text-right font-mono text-[13px] text-base-900 hover:text-primary"
+        className="text-right font-mono text-body text-base-900 hover:text-primary"
         data-testid={`plan-${kind}-edit-${sku}`}
       >
         {value == null ? "set" : value}
@@ -512,7 +512,7 @@ function QtyCell({
           if (e.key === "Enter") save();
           if (e.key === "Escape") setEditing(false);
         }}
-        className="w-[46px] rounded border border-base-300 px-1 py-0.5 text-[13px] font-mono text-right focus:border-primary focus:outline-none"
+        className="w-[46px] rounded border border-base-300 px-1 py-0.5 text-body font-mono text-right focus:border-primary focus:outline-none"
         aria-label={`${kind === "consolidate" ? "Consolidated" : "Final"} quantity for ${sku}`}
         data-testid={`plan-${kind}-input-${sku}`}
       />
@@ -573,7 +573,7 @@ function ProposeRow({ planId, skus }: { planId: string; skus: string[] }) {
         onChange={(e) => setSku(e.target.value)}
         list="ready-stock-skus"
         placeholder="Item / SKU"
-        className="flex-1 min-w-0 rounded border border-base-300 px-2 py-1 text-[13px] focus:border-primary focus:outline-none"
+        className="flex-1 min-w-0 rounded border border-base-300 px-2 py-1 text-body focus:border-primary focus:outline-none"
         aria-label="Item to ask for"
         data-testid="plan-propose-sku"
       />
@@ -590,7 +590,7 @@ function ProposeRow({ planId, skus }: { planId: string; skus: string[] }) {
           if (e.key === "Enter") submit();
         }}
         placeholder="Qty"
-        className="w-[70px] rounded border border-base-300 px-2 py-1 text-[13px] font-mono text-right focus:border-primary focus:outline-none"
+        className="w-[70px] rounded border border-base-300 px-2 py-1 text-body font-mono text-right focus:border-primary focus:outline-none"
         aria-label="Quantity wanted"
         data-testid="plan-propose-qty"
       />
@@ -601,7 +601,7 @@ function ProposeRow({ planId, skus }: { planId: string; skus: string[] }) {
           if (e.key === "Enter") submit();
         }}
         placeholder="Why (optional)"
-        className="w-[200px] rounded border border-base-300 px-2 py-1 text-[13px] focus:border-primary focus:outline-none"
+        className="w-[200px] rounded border border-base-300 px-2 py-1 text-body focus:border-primary focus:outline-none"
         aria-label="Why you want it"
         data-testid="plan-propose-note"
       />
@@ -609,13 +609,13 @@ function ProposeRow({ planId, skus }: { planId: string; skus: string[] }) {
         type="button"
         onClick={submit}
         disabled={!valid || propose.isPending}
-        className="btn-secondary text-[12px] py-1 disabled:opacity-50"
+        className="btn-secondary text-meta py-1 disabled:opacity-50"
         data-testid="plan-propose-save"
       >
         {propose.isPending ? "Adding…" : "Add"}
       </button>
       {propose.isError ? (
-        <span className="text-[11px] text-danger" data-testid="plan-propose-error">
+        <span className="text-label text-danger" data-testid="plan-propose-error">
           Not saved
         </span>
       ) : null}
@@ -638,7 +638,7 @@ function DecisionBar({
   if (!canApprove) {
     return (
       <div
-        className="mt-3 text-[12px] text-base-500"
+        className="mt-3 text-meta text-base-500"
         data-testid="plan-awaiting-coo"
       >
         Waiting for the COO to approve.
@@ -655,7 +655,7 @@ function DecisionBar({
         value={remark}
         onChange={(e) => setRemark(e.target.value)}
         placeholder="Remark (required to send back)"
-        className="flex-1 min-w-[220px] rounded border border-base-300 px-2 py-1.5 text-[13px] focus:border-primary focus:outline-none"
+        className="flex-1 min-w-[220px] rounded border border-base-300 px-2 py-1.5 text-body focus:border-primary focus:outline-none"
         aria-label="Decision remark"
         data-testid="plan-decide-remark"
       />
@@ -665,7 +665,7 @@ function DecisionBar({
           decide.mutate({ decision: "approve", remark: remark.trim() || null })
         }
         disabled={decide.isPending}
-        className="btn-primary text-[13px] py-1.5 disabled:opacity-50"
+        className="btn-primary text-body py-1.5 disabled:opacity-50"
         data-testid="plan-approve"
       >
         Approve plan
@@ -674,14 +674,14 @@ function DecisionBar({
         type="button"
         onClick={() => decide.mutate({ decision: "reject", remark: remark.trim() })}
         disabled={decide.isPending || remark.trim() === ""}
-        className="btn-danger text-[13px] py-1.5 disabled:opacity-40"
+        className="btn-danger text-body py-1.5 disabled:opacity-40"
         title={remark.trim() === "" ? "Say why before sending it back" : undefined}
         data-testid="plan-reject"
       >
         Send back
       </button>
       {decide.isError ? (
-        <span className="text-[12px] text-danger" data-testid="plan-decide-error">
+        <span className="text-meta text-danger" data-testid="plan-decide-error">
           {(decide.error as Error | undefined)?.message ?? "Not saved"}
         </span>
       ) : null}
@@ -705,8 +705,8 @@ function PoList({ rows }: { rows: { sku: string; qty: number }[] }) {
     >
       <header className="px-4 py-3 border-b border-base-100 flex items-center justify-between gap-3">
         <div>
-          <div className="t-h4 text-base-900">Order this</div>
-          <div className="text-[12px] text-base-600 mt-0.5">
+          <div className="text-strong text-base-900">Order this</div>
+          <div className="text-meta text-base-600 mt-0.5">
             Approved quantities. Raise the purchase orders from this list.
           </div>
         </div>
@@ -714,7 +714,7 @@ function PoList({ rows }: { rows: { sku: string; qty: number }[] }) {
           <button
             type="button"
             onClick={() => void navigator.clipboard?.writeText(copy)}
-            className="btn-secondary text-[12px] py-1.5 shrink-0"
+            className="btn-secondary text-meta py-1.5 shrink-0"
             data-testid="plan-po-copy"
           >
             Copy list
@@ -722,7 +722,7 @@ function PoList({ rows }: { rows: { sku: string; qty: number }[] }) {
         ) : null}
       </header>
       {rows.length === 0 ? (
-        <div className="px-4 py-6 text-center text-[13px] text-base-500">
+        <div className="px-4 py-6 text-center text-body text-base-500">
           Every line was cut to zero — nothing to order.
         </div>
       ) : (
@@ -732,10 +732,10 @@ function PoList({ rows }: { rows: { sku: string; qty: number }[] }) {
             className="px-4 py-2 border-t border-base-100 flex items-center justify-between gap-3"
             data-testid={`plan-po-${r.sku}`}
           >
-            <span className="text-[13px] text-base-900 truncate" title={r.sku}>
+            <span className="text-body text-base-900 truncate" title={r.sku}>
               {r.sku}
             </span>
-            <span className="font-mono text-[13px] text-base-900 font-semibold shrink-0">
+            <span className="font-mono text-body text-base-900 font-semibold shrink-0">
               {r.qty}
             </span>
           </div>

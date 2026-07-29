@@ -248,7 +248,7 @@ export default function ServiceCaseWizard({
                   <ArrowLeft size={18} />
                 </button>
               )}
-              <h2 className="t-h3 text-base-900">New Case</h2>
+              <h2 className="text-strong text-base-900">New Case</h2>
             </div>
             <button type="button" onClick={onClose} className="text-base-400 hover:text-base-700" aria-label="Close">
               <X size={18} />
@@ -265,13 +265,13 @@ export default function ServiceCaseWizard({
               />
             ))}
           </div>
-          <p className="t-tiny mt-2 text-base-500">
+          <p className="text-meta mt-2 text-base-500">
             Step {step} of {LAST_STEP}
           </p>
         </div>
 
         <div className="px-6 py-5">
-          <h3 className="t-h4 mb-4 text-base-900">{STEP_TITLE[step]}</h3>
+          <h3 className="text-strong mb-4 text-base-900">{STEP_TITLE[step]}</h3>
 
           {/* ── 1 · who found it ─────────────────────────────────────────── */}
           {step === 1 && (
@@ -291,7 +291,7 @@ export default function ServiceCaseWizard({
           {step === 2 && (
             <div className="space-y-4">
               <div className="rounded border border-base-200 bg-base-50 p-3">
-                <label htmlFor="sc-lookup" className="t-tiny uppercase tracking-wider text-base-500">
+                <label htmlFor="sc-lookup" className="text-meta uppercase tracking-wider text-base-500">
                   Sales order number or Ref No
                 </label>
                 <div className="mt-1.5 flex gap-2">
@@ -301,27 +301,27 @@ export default function ServiceCaseWizard({
                     onChange={(e) => setLookupTerm(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") lookupMut.mutate(lookupTerm); }}
                     placeholder="SO-1147  or  CR0418"
-                    className="flex-1 rounded border border-base-300 px-2.5 py-1.5 text-sm"
+                    className="flex-1 rounded border border-base-300 px-2.5 py-1.5 text-body"
                   />
                   <button
                     type="button"
                     onClick={() => lookupMut.mutate(lookupTerm)}
                     disabled={!lookupTerm.trim() || lookupMut.isPending}
-                    className="btn-primary flex items-center gap-1 py-1.5 text-[13px] disabled:opacity-40"
+                    className="btn-primary flex items-center gap-1 py-1.5 text-body disabled:opacity-40"
                   >
                     <Search size={14} /> Find
                   </button>
                 </div>
-                {lookupMsg && <p className="mt-1.5 text-xs text-base-600">{lookupMsg}</p>}
+                {lookupMsg && <p className="mt-1.5 text-meta text-base-600">{lookupMsg}</p>}
               </div>
 
               {order && (
                 <div>
-                  <p className="t-tiny mb-2 uppercase tracking-wider text-base-500">
+                  <p className="text-meta mb-2 uppercase tracking-wider text-base-500">
                     {order.so} · {order.customerName} — tap the item with the problem
                   </p>
                   {order.lines.length === 0 ? (
-                    <p className="text-sm text-base-500">
+                    <p className="text-body text-base-500">
                       This sales order has no items on file. Continue without a sales order below.
                     </p>
                   ) : (
@@ -340,8 +340,8 @@ export default function ServiceCaseWizard({
                             }`}
                           >
                             <span className="flex-1">
-                              <span className="block font-mono text-[13px] text-base-900">{l.sku}</span>
-                              <span className="t-tiny text-base-500">
+                              <span className="block font-mono text-body text-base-900">{l.sku}</span>
+                              <span className="text-meta text-base-500">
                                 {caseProductCategoryLabel(cat)} · qty {l.qty}
                               </span>
                             </span>
@@ -358,7 +358,7 @@ export default function ServiceCaseWizard({
                 <button
                   type="button"
                   onClick={() => { setNoOrder(true); setOrder(null); pickLine(null, null); }}
-                  className="text-[13px] text-base-600 underline underline-offset-2 hover:text-base-900"
+                  className="text-body text-base-600 underline underline-offset-2 hover:text-base-900"
                 >
                   No sales order for this
                 </button>
@@ -367,7 +367,7 @@ export default function ServiceCaseWizard({
               {noOrder && (
                 <div className="space-y-3 rounded border border-base-200 p-3">
                   <div>
-                    <label className="t-tiny uppercase tracking-wider text-base-500">
+                    <label className="text-meta uppercase tracking-wider text-base-500">
                       What kind of product?
                     </label>
                     <div className="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -382,14 +382,14 @@ export default function ServiceCaseWizard({
                     </div>
                   </div>
                   <div>
-                    <label htmlFor="sc-customer-name" className="t-tiny uppercase tracking-wider text-base-500">
+                    <label htmlFor="sc-customer-name" className="text-meta uppercase tracking-wider text-base-500">
                       Customer name
                     </label>
                     <input
                       id="sc-customer-name"
                       value={manualName}
                       onChange={(e) => setManualName(e.target.value)}
-                      className="mt-1.5 w-full rounded border border-base-300 px-2.5 py-1.5 text-sm"
+                      className="mt-1.5 w-full rounded border border-base-300 px-2.5 py-1.5 text-body"
                     />
                   </div>
                 </div>
@@ -400,7 +400,7 @@ export default function ServiceCaseWizard({
           {/* ── 3 · what is wrong ────────────────────────────────────────── */}
           {step === 3 && (
             <div>
-              <p className="t-tiny mb-2 text-base-500">
+              <p className="text-meta mb-2 text-base-500">
                 {category ? caseProductCategoryLabel(category) : "Product"}
                 {line ? ` · ${line.sku}` : ""}
               </p>
@@ -432,13 +432,13 @@ export default function ServiceCaseWizard({
                   }`}
                 >
                   <span className="flex-1">
-                    <span className="block text-sm font-medium text-base-900">{o.label}</span>
-                    <span className="t-tiny text-base-500">{o.hint}</span>
+                    <span className="block text-body font-medium text-base-900">{o.label}</span>
+                    <span className="text-meta text-base-500">{o.hint}</span>
                   </span>
                   {usable === o.key && <Check size={16} className="text-primary" />}
                 </button>
               ))}
-              <p className="t-tiny pt-1 text-base-500">
+              <p className="text-meta pt-1 text-base-500">
                 The system sets how urgent this is from your answer. You never pick it.
               </p>
             </div>
@@ -457,7 +457,7 @@ export default function ServiceCaseWizard({
                       onClick={() =>
                         setWants(on ? wants.filter((x) => x !== w.key) : [...wants, w.key])
                       }
-                      className={`rounded-full border px-3 py-1.5 text-[13px] ${
+                      className={`rounded-full border px-3 py-1.5 text-body ${
                         on
                           ? "border-primary bg-primary text-white"
                           : "border-base-300 bg-white text-base-700 hover:bg-hovertint"
@@ -468,10 +468,10 @@ export default function ServiceCaseWizard({
                   );
                 })}
               </div>
-              <p className="t-tiny text-base-500">Pick every one that applies.</p>
+              <p className="text-meta text-base-500">Pick every one that applies.</p>
 
               <div>
-                <label htmlFor="sc-note" className="t-tiny uppercase tracking-wider text-base-500">
+                <label htmlFor="sc-note" className="text-meta uppercase tracking-wider text-base-500">
                   Anything else? (optional)
                 </label>
                 <textarea
@@ -480,7 +480,7 @@ export default function ServiceCaseWizard({
                   onChange={(e) => setNote(e.target.value)}
                   rows={2}
                   placeholder="Leave empty if the answers above say it all"
-                  className="mt-1.5 w-full rounded border border-base-300 px-2.5 py-1.5 text-sm"
+                  className="mt-1.5 w-full rounded border border-base-300 px-2.5 py-1.5 text-body"
                 />
               </div>
             </div>
@@ -489,7 +489,7 @@ export default function ServiceCaseWizard({
           {/* ── 6 · the evidence + confirm ───────────────────────────────── */}
           {step === 6 && (
             <div className="space-y-4">
-              <p className="t-tiny text-base-500">
+              <p className="text-meta text-base-500">
                 A case cannot be opened without these. Take them now, while you have the item.
               </p>
 
@@ -503,8 +503,8 @@ export default function ServiceCaseWizard({
 
               {/* What is about to be filed, in the words it will be filed in. */}
               <div className="rounded border border-base-200 bg-base-50 p-3">
-                <p className="t-tiny mb-1 uppercase tracking-wider text-base-500">This case will say</p>
-                <p className="text-sm text-base-800">{composeCaseSummary(answers)}</p>
+                <p className="text-meta mb-1 uppercase tracking-wider text-base-500">This case will say</p>
+                <p className="text-body text-base-800">{composeCaseSummary(answers)}</p>
 
                 {/* S3 — the follow-ups this case starts. Shown BEFORE it is
                     filed so the answers on the last screen are visibly the
@@ -514,12 +514,12 @@ export default function ServiceCaseWizard({
                     supplier" here and by name from then on. */}
                 {followUps.length > 0 && (
                   <div className="mt-2 border-t border-base-200 pt-2">
-                    <p className="t-tiny mb-1 uppercase tracking-wider text-base-500">
+                    <p className="text-meta mb-1 uppercase tracking-wider text-base-500">
                       And starts these
                     </p>
                     <ol className="space-y-0.5">
                       {followUps.map((s) => (
-                        <li key={s.key} className="text-[13px] text-base-700">
+                        <li key={s.key} className="text-body text-base-700">
                           · {s.label}
                         </li>
                       ))}
@@ -532,7 +532,7 @@ export default function ServiceCaseWizard({
                       {priority === "high" ? "Urgent" : priority === "normal" ? "Normal" : "Low"}
                     </span>
                     {caseNeedsManager(priority) && (
-                      <span className="t-tiny ml-2 text-base-700">Tell the manager about this one.</span>
+                      <span className="text-meta ml-2 text-base-700">Tell the manager about this one.</span>
                     )}
                   </p>
                 )}
@@ -542,13 +542,13 @@ export default function ServiceCaseWizard({
                   ACTION that closes the gap, not as a to-do word dressed up as a
                   fact ("still needed") — COPY-STANDARD dictionary, 2026-07-27. */}
               {evidenceGaps.length > 0 && (
-                <p className="t-tiny text-base-700">
+                <p className="text-meta text-base-700">
                   Take these first: {caseEvidenceGapMessage(evidenceGaps)}
                 </p>
               )}
 
               {saveMut.isError && (
-                <p className="break-words text-xs text-error-700">
+                <p className="break-words text-meta text-error-700">
                   Could not save: {(saveMut.error as Error)?.message ?? "unknown error"}
                 </p>
               )}
@@ -558,7 +558,7 @@ export default function ServiceCaseWizard({
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-base-200 px-6 py-4">
-          <button type="button" onClick={onClose} className="btn-secondary py-1.5 text-[13px]">
+          <button type="button" onClick={onClose} className="btn-secondary py-1.5 text-body">
             Cancel
           </button>
           {step < LAST_STEP ? (
@@ -566,7 +566,7 @@ export default function ServiceCaseWizard({
               type="button"
               onClick={goNext}
               disabled={!canAdvance[step]}
-              className="btn-primary py-1.5 text-[13px] disabled:opacity-40"
+              className="btn-primary py-1.5 text-body disabled:opacity-40"
             >
               Next
             </button>
@@ -575,7 +575,7 @@ export default function ServiceCaseWizard({
               type="button"
               onClick={() => saveMut.mutate()}
               disabled={!canAdvance[LAST_STEP] || saveMut.isPending}
-              className="btn-hero py-1.5 text-[13px] disabled:opacity-40"
+              className="btn-hero py-1.5 text-body disabled:opacity-40"
             >
               {saveMut.isPending ? "Saving…" : "Create Case"}
             </button>
@@ -599,7 +599,7 @@ function ChoiceButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded border px-3 py-2.5 text-sm font-medium ${
+      className={`rounded border px-3 py-2.5 text-body font-medium ${
         selected
           ? "border-primary bg-primary/5 text-base-900"
           : "border-base-200 bg-white text-base-700 hover:bg-hovertint"

@@ -154,16 +154,16 @@ export function PoDocumentPreview({
              already knows the price from their own quote). */}
       <div className="shrink-0 flex items-start justify-between gap-4 rounded-[8px] border border-base-200 bg-base-50 px-3 py-2.5 mb-3">
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-semibold text-base-900">
+          <div className="text-body font-semibold text-base-900">
             Send PO to {supplierName} ({cats})
           </div>
-          <div className="text-[12px] text-base-600 mt-0.5">
+          <div className="text-meta text-base-600 mt-0.5">
             {group.totalUnits} units · for {group.orderCount}{" "}
             {group.orderCount === 1 ? "SO" : "SOs"} · deliver to {stockToLabel}
             {preparedByName && <> · prepared by {preparedByName}</>}
           </div>
           {isLate && earliestCustomerDeadline && (
-            <div className="text-[11px] text-base-500 mt-1">
+            <div className="text-label text-base-500 mt-1">
               Earliest customer deadline in this PO:{" "}
               <span className="font-semibold text-base-800">
                 {fmtDate(earliestCustomerDeadline)}
@@ -172,14 +172,14 @@ export function PoDocumentPreview({
           )}
         </div>
         <div className="shrink-0 text-right">
-          <div className="text-[10px] uppercase tracking-[0.05em] text-base-500">
+          <div className="text-label uppercase tracking-[0.05em] text-base-500">
             Send by
           </div>
-          <div className="text-[13px] font-semibold text-base-900 tabular-nums mt-0.5">
+          <div className="text-body font-semibold text-base-900 tabular-nums mt-0.5">
             {group.earliestOrderBy ? fmtDate(group.earliestOrderBy) : "—"}
           </div>
           {isLate && daysLate != null && daysLate > 0 && (
-            <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-danger">
+            <div className="mt-1 inline-flex items-center gap-1 text-label font-semibold text-danger">
               <AlertCircle size={12} strokeWidth={2} />
               {daysLate}d late
             </div>
@@ -194,7 +194,7 @@ export function PoDocumentPreview({
              ref is null (e.g. native POS orders with no imported ref). */}
       <div className="shrink-0 rounded-[8px] border border-base-200 bg-white mb-3 overflow-hidden">
         <div
-          className="grid gap-x-2 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.04em] text-base-500 border-b border-base-200 bg-base-50"
+          className="grid gap-x-2 px-3 py-1.5 text-label font-semibold uppercase tracking-[0.04em] text-base-500 border-b border-base-200 bg-base-50"
           style={{
             gridTemplateColumns: PREVIEW_TABLE_COLS,
           }}
@@ -222,7 +222,7 @@ export function PoDocumentPreview({
       {/* 4. WhatsApp preview zone */}
       <div className="shrink-0 rounded-[8px] border border-base-200 bg-base-50 px-3 py-2 mb-3">
         <div className="flex items-center justify-between mb-1.5">
-          <div className="text-[11px] uppercase tracking-[0.05em] text-base-500">
+          <div className="text-label uppercase tracking-[0.05em] text-base-500">
             Message to {supplierName} · WhatsApp
           </div>
           <button
@@ -241,7 +241,7 @@ export function PoDocumentPreview({
           value={waText}
           onChange={(e) => setWaText(e.target.value)}
           rows={6}
-          className="w-full resize-y text-[12.5px] font-mono text-base-900 bg-white border border-base-200 rounded-[6px] px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/40"
+          className="w-full resize-y text-meta font-mono text-base-900 bg-white border border-base-200 rounded-[6px] px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/40"
         />
       </div>
 
@@ -251,7 +251,7 @@ export function PoDocumentPreview({
       <div className="shrink-0 flex items-center justify-end gap-2 pt-1">
         {dutyHolderName && (
           <span
-            className="text-[11px] text-base-500"
+            className="text-label text-base-500"
             title="PO duty this month — the one voice to suppliers"
           >
             {dutyHolderName} on PO duty
@@ -407,7 +407,7 @@ function SkuRow({
   const orderText = orderColText(line.forOrders);
   return (
     <div
-      className="grid gap-x-2 px-3 py-1.5 text-[12.5px] border-b border-base-50 last:border-b-0 items-center hover:bg-hovertint transition-colors"
+      className="grid gap-x-2 px-3 py-1.5 text-meta border-b border-base-50 last:border-b-0 items-center hover:bg-hovertint transition-colors"
       style={{ gridTemplateColumns: PREVIEW_TABLE_COLS }}
       ref={wrapRef}
     >
@@ -417,10 +417,10 @@ function SkuRow({
       <span className="text-base-700 truncate" title={line.modelName ?? undefined}>
         {line.modelName ?? "—"}
       </span>
-      <span className="font-mono font-bold text-base-800 text-right">
+      <span className="font-mono font-semibold text-base-800 text-right">
         {sizeCode ?? "—"}
       </span>
-      <span className="font-mono font-bold tabular-nums text-base-900 text-right">
+      <span className="font-mono font-semibold tabular-nums text-base-900 text-right">
         {line.need}
       </span>
       <span className="font-mono tabular-nums text-right text-base-500">
@@ -494,13 +494,13 @@ function MenuItem({
       className="w-full text-left px-3 py-2 hover:bg-hovertint transition-colors"
     >
       <div
-        className={`text-[13px] font-medium ${
+        className={`text-body font-medium ${
           danger ? "text-danger" : "text-base-900"
         }`}
       >
         {label}
       </div>
-      <div className="text-[11px] text-base-500">{hint}</div>
+      <div className="text-label text-base-500">{hint}</div>
     </button>
   );
 }
@@ -583,7 +583,7 @@ function SnoozeButton({
           role="menu"
           className="absolute right-0 bottom-full mb-1 w-[190px] rounded-[8px] border border-base-200 bg-white shadow-lg py-1 z-10"
         >
-          <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.05em] text-base-500">
+          <div className="px-3 py-1.5 text-label uppercase tracking-[0.05em] text-base-500">
             Snooze until
           </div>
           <MenuItem
@@ -646,16 +646,16 @@ function SalesOrdersCovered({ lines }: { lines: PoPreviewGroup["lines"] }) {
     });
   return (
     <div className="shrink-0 rounded-[8px] border border-base-200 bg-white px-3 py-2 mb-3">
-      <div className="text-[11px] uppercase tracking-[0.05em] text-base-500 mb-1">
+      <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-1">
         Sales orders this PO covers ({rows.length})
       </div>
-      <div className="grid grid-cols-[110px_60px_1fr_auto] gap-x-3 gap-y-0.5 text-[12.5px]">
+      <div className="grid grid-cols-[110px_60px_1fr_auto] gap-x-3 gap-y-0.5 text-meta">
         {rows.map((r) => (
           <div key={r.so} className="contents">
             <span className="font-mono text-base-900 font-semibold truncate" title={r.ref ?? undefined}>
               {r.ref ?? `SO-${r.so}`}
             </span>
-            <span className="font-mono tabular-nums text-base-500 text-[11px]">
+            <span className="font-mono tabular-nums text-base-500 text-label">
               {r.ref ? `SO-${r.so}` : ""}
             </span>
             <span className="text-base-800 truncate">

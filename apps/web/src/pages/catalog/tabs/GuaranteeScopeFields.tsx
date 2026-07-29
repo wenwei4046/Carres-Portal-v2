@@ -210,7 +210,7 @@ export default function GuaranteeScopeFields({
                 ))}
               </select>
               {combos.length === 0 && (
-                <p className="t-tiny text-base-500 mt-1">
+                <p className="text-meta text-base-500 mt-1">
                   No combos authored yet — add one under Sofa Combos first.
                 </p>
               )}
@@ -310,7 +310,7 @@ function ModelPicker({
         ))}
       </select>
       {required && !value && (
-        <p className="t-tiny text-base-500 mt-1">Pick the model this guarantee covers.</p>
+        <p className="text-meta text-base-500 mt-1">Pick the model this guarantee covers.</p>
       )}
     </label>
   );
@@ -336,7 +336,7 @@ function VariantChips({
   onAny: () => void;
 }) {
   const chip = (on: boolean) =>
-    `t-tiny px-2.5 py-1 rounded-full border transition-colors ${
+    `text-meta px-2.5 py-1 rounded-full border transition-colors ${
       on
         ? "bg-base-900 text-white border-base-900"
         : "bg-white text-base-700 border-base-300 hover:border-base-500"
@@ -365,7 +365,7 @@ function VariantChips({
           </button>
         ))}
       </div>
-      <p className="t-tiny text-base-500 mt-1">{noneHint}</p>
+      <p className="text-meta text-base-500 mt-1">{noneHint}</p>
     </div>
   );
 }

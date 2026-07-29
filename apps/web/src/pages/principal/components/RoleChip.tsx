@@ -26,7 +26,7 @@ export default function RoleChip({ role }: Props) {
   const cls = ROLE_TEXT[role] ?? "text-base-500";
   return (
     <span
-      className={`px-[7px] py-px bg-base-100 rounded text-[9.5px] font-bold uppercase tracking-wider ${cls}`}
+      className={`px-[7px] py-px bg-base-100 rounded text-label font-semibold uppercase tracking-wider ${cls}`}
     >
       {role}
     </span>

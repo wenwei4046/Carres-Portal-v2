@@ -343,22 +343,22 @@ export default function RentalOfferEditor({
             </div>
           )}
           <div className="min-w-0">
-            <div className="t-h4 font-display truncate">{model.name}</div>
-            <div className="t-tiny text-base-500 truncate">
+            <div className="text-strong font-display truncate">{model.name}</div>
+            <div className="text-meta text-base-500 truncate">
               {model.category} · {model.modelKey} · {targets.length} rentable target
               {targets.length === 1 ? "" : "s"}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={onClose} className="btn-ghost text-[12px]">
+          <button type="button" onClick={onClose} className="btn-ghost text-meta">
             Cancel
           </button>
           <button
             type="button"
             onClick={save}
             disabled={saving || !splitValid}
-            className="btn-primary text-[12px] disabled:opacity-40"
+            className="btn-primary text-meta disabled:opacity-40"
             data-testid="offer-save"
           >
             {saving ? "Saving…" : "Save offer"}
@@ -369,7 +369,7 @@ export default function RentalOfferEditor({
       {/* 1 · lanes + pricing mode */}
       <Section step={nextStep()} label="Lanes">
         <div className="flex flex-wrap items-center gap-4">
-          <label className="flex items-center gap-2 t-small">
+          <label className="flex items-center gap-2 text-body">
             <input
               type="checkbox"
               checked={rentEnabled}
@@ -378,7 +378,7 @@ export default function RentalOfferEditor({
             />
             Rent monthly
           </label>
-          <label className="flex items-center gap-2 t-small">
+          <label className="flex items-center gap-2 text-body">
             <input
               type="checkbox"
               checked={buyEnabled}
@@ -389,7 +389,7 @@ export default function RentalOfferEditor({
           </label>
           {isSofa && (
             <div className="flex items-center gap-2 ml-auto">
-              <span className="t-tiny text-base-500">Sofa price by</span>
+              <span className="text-meta text-base-500">Sofa price by</span>
               {(
                 [
                   ["compartment", "Compartment"],
@@ -401,7 +401,7 @@ export default function RentalOfferEditor({
                   key={mode}
                   type="button"
                   onClick={() => setPricingMode(mode)}
-                  className={`${pricingMode === mode ? "btn-primary" : "btn-ghost"} text-[11px]`}
+                  className={`${pricingMode === mode ? "btn-primary" : "btn-ghost"} text-label`}
                   data-testid={`offer-mode-${mode}`}
                 >
                   {label}
@@ -410,7 +410,7 @@ export default function RentalOfferEditor({
             </div>
           )}
         </div>
-        <p className="t-tiny text-base-400 mt-2">
+        <p className="text-meta text-base-400 mt-2">
           {isSofa
             ? "By compartment: the customer builds the sofa and the parts add up. By combo: a fixed monthly for a set shape."
             : "Each size is priced on its own — a king rents for more than a single."}
@@ -427,7 +427,7 @@ export default function RentalOfferEditor({
           }
         >
           {targets.length === 0 ? (
-            <p className="t-small text-base-500" data-testid="offer-no-targets">
+            <p className="text-body text-base-500" data-testid="offer-no-targets">
               Nothing to price yet — this model has no live SKUs
               {isSofa ? " / compartments / combos" : ""}. Author them in SKU Master or Modular first.
             </p>
@@ -454,10 +454,10 @@ export default function RentalOfferEditor({
                   data-testid={`rent-row-${t.key}`}
                 >
                   <div className="min-w-0">
-                    <div className="text-[13px] truncate">{t.label}</div>
-                    <div className="t-tiny text-base-400 truncate">{t.sub}</div>
+                    <div className="text-body truncate">{t.label}</div>
+                    <div className="text-meta text-base-400 truncate">{t.sub}</div>
                   </div>
-                  <div className="text-right t-num text-[12px] text-base-500">
+                  <div className="text-right t-num text-meta text-base-500">
                     {t.listPrice == null ? "—" : rm(t.listPrice)}
                   </div>
                   {terms.map((term) => (
@@ -497,7 +497,7 @@ export default function RentalOfferEditor({
               ))}
             </div>
           )}
-          <p className="t-tiny text-base-400 mt-2">
+          <p className="text-meta text-base-400 mt-2">
             Leave a cell blank and that term is not offered. Each monthly price is its own Stripe
             recurring price; agreements already signed keep the fee they were signed at.
           </p>
@@ -528,10 +528,10 @@ export default function RentalOfferEditor({
                   data-testid={`buy-row-${t.key}`}
                 >
                   <div className="min-w-0">
-                    <div className="text-[13px] truncate">{t.label}</div>
-                    <div className="t-tiny text-base-400 truncate">{t.sub}</div>
+                    <div className="text-body truncate">{t.label}</div>
+                    <div className="text-meta text-base-400 truncate">{t.sub}</div>
                   </div>
-                  <div className="text-right t-num text-[12px] text-base-500">
+                  <div className="text-right t-num text-meta text-base-500">
                     {t.listPrice == null ? "—" : rm(t.listPrice)}
                   </div>
                   <div className="text-right">
@@ -569,7 +569,7 @@ export default function RentalOfferEditor({
               );
             })}
           </div>
-          <p className="t-tiny text-base-400 mt-2">
+          <p className="text-meta text-base-400 mt-2">
             Blank price = sell at whatever SKU Master says. Cleaning and care are not part of the
             purchase — they are service plans below.
           </p>
@@ -582,7 +582,7 @@ export default function RentalOfferEditor({
           step={nextStep()}
           label="Options the customer may choose"
           right={
-            <span className="t-tiny text-base-400">
+            <span className="text-meta text-base-400">
               Every option can carry its own price — once, or every month
             </span>
           }
@@ -604,7 +604,7 @@ export default function RentalOfferEditor({
                       key={String(req)}
                       type="button"
                       onClick={() => setOverlay((o) => setGroupRequired(o, g.key, req as boolean))}
-                      className={`${groupOf(overlay, g.key).required === req ? "btn-primary" : "btn-ghost"} text-[11px]`}
+                      className={`${groupOf(overlay, g.key).required === req ? "btn-primary" : "btn-ghost"} text-label`}
                       data-testid={`option-required-${g.key}-${String(req)}`}
                     >
                       {lbl as string}
@@ -633,7 +633,7 @@ export default function RentalOfferEditor({
                       style={{ gridTemplateColumns: OPTION_COLS }}
                       data-testid={`option-row-${g.key}-${v.value}`}
                     >
-                      <div className="text-[13px] truncate">{v.label}</div>
+                      <div className="text-body truncate">{v.label}</div>
                       <div>
                         <input
                           type="checkbox"
@@ -655,7 +655,7 @@ export default function RentalOfferEditor({
                         onChange={(n) => setOverlay((o) => setValue(o, g.key, v.value, { monthly: n }))}
                         testid={`option-monthly-${g.key}-${v.value}`}
                       />
-                      <div className="text-right t-num text-[12px] text-base-500">
+                      <div className="text-right t-num text-meta text-base-500">
                         {termLine(val.oneTime, val.monthly, longest)}
                       </div>
                     </div>
@@ -670,7 +670,7 @@ export default function RentalOfferEditor({
               <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
                 <div>
                   <div className="label">Fabric &amp; colour</div>
-                  <div className="t-tiny text-base-400">
+                  <div className="text-meta text-base-400">
                     Pick the series, then tick the exact colours a customer may have
                   </div>
                 </div>
@@ -683,7 +683,7 @@ export default function RentalOfferEditor({
                       key={String(req)}
                       type="button"
                       onClick={() => setOverlay((o) => setGroupRequired(o, "fabrics", req as boolean))}
-                      className={`${groupOf(overlay, "fabrics").required === req ? "btn-primary" : "btn-ghost"} text-[11px]`}
+                      className={`${groupOf(overlay, "fabrics").required === req ? "btn-primary" : "btn-ghost"} text-label`}
                       data-testid={`option-required-fabrics-${String(req)}`}
                     >
                       {lbl as string}
@@ -710,10 +710,10 @@ export default function RentalOfferEditor({
       <Section
         step={nextStep()}
         label="Surcharges"
-        right={<span className="t-tiny text-base-400">Anything not tied to an option</span>}
+        right={<span className="text-meta text-base-400">Anything not tied to an option</span>}
       >
         {surcharges.length === 0 && (
-          <p className="t-small text-base-500 mb-2" data-testid="surcharges-empty">
+          <p className="text-body text-base-500 mb-2" data-testid="surcharges-empty">
             No surcharges — add one for delivery, installation, a care upgrade, anything.
           </p>
         )}
@@ -734,7 +734,7 @@ export default function RentalOfferEditor({
               placeholder="What is it called"
               data-testid={`surcharge-label-${i}`}
             />
-            <span className="t-tiny text-base-500">once</span>
+            <span className="text-meta text-base-500">once</span>
             <input
               className={`${INPUT_CLS} w-24 text-right`}
               type="number"
@@ -748,7 +748,7 @@ export default function RentalOfferEditor({
               }
               data-testid={`surcharge-once-${i}`}
             />
-            <span className="t-tiny text-base-500">/ month</span>
+            <span className="text-meta text-base-500">/ month</span>
             <input
               className={`${INPUT_CLS} w-24 text-right`}
               type="number"
@@ -769,7 +769,7 @@ export default function RentalOfferEditor({
                   list.map((x, j) => (j === i ? { ...x, required: !x.required } : x)),
                 )
               }
-              className={`${s.required ? "btn-primary" : "btn-ghost"} text-[11px]`}
+              className={`${s.required ? "btn-primary" : "btn-ghost"} text-label`}
               data-testid={`surcharge-required-${i}`}
             >
               {s.required ? "Always" : "Optional"}
@@ -777,7 +777,7 @@ export default function RentalOfferEditor({
             <button
               type="button"
               onClick={() => setSurcharges((list) => list.filter((_, j) => j !== i))}
-              className="btn-danger text-[11px] ml-auto"
+              className="btn-danger text-label ml-auto"
               data-testid={`surcharge-remove-${i}`}
             >
               Remove
@@ -798,12 +798,12 @@ export default function RentalOfferEditor({
               },
             ])
           }
-          className="btn-secondary text-[12px] mt-2"
+          className="btn-secondary text-meta mt-2"
           data-testid="surcharge-add"
         >
           Add surcharge
         </button>
-        <p className="t-tiny text-base-400 mt-2">
+        <p className="text-meta text-base-400 mt-2">
           <b>Always</b> is charged on every agreement; <b>optional</b> is a tick the store can add.
           A store can never type its own amount — every ringgit collected is authored here.
         </p>
@@ -814,11 +814,11 @@ export default function RentalOfferEditor({
         step={nextStep()}
         label="Service plans"
         right={
-          <span className="t-tiny text-base-400">One plan = one SKU (duration × visits a year)</span>
+          <span className="text-meta text-base-400">One plan = one SKU (duration × visits a year)</span>
         }
       >
         {attachablePackages.length === 0 ? (
-          <p className="t-small text-base-500" data-testid="offer-services-empty">
+          <p className="text-body text-base-500" data-testid="offer-services-empty">
             No service package for this product family yet — create one below and it appears here.
           </p>
         ) : (
@@ -853,9 +853,9 @@ export default function RentalOfferEditor({
                   style={{ gridTemplateColumns: SERVICE_COLS }}
                   data-testid={`offer-service-${p.id}`}
                 >
-                  <div className="text-[13px] truncate">{p.name}</div>
-                  <div className="t-tiny text-base-500 truncate">{p.sku ?? "—"}</div>
-                  <div className="t-tiny text-base-600">
+                  <div className="text-body truncate">{p.name}</div>
+                  <div className="text-meta text-base-500 truncate">{p.sku ?? "—"}</div>
+                  <div className="text-meta text-base-600">
                     {p.visitsPerYear} / yr ·{" "}
                     <b>{serviceVisitsTotal(p.durationMonths, p.visitsPerYear)} total</b>
                   </div>
@@ -922,7 +922,7 @@ export default function RentalOfferEditor({
             })}
           </div>
         )}
-        <p className="t-tiny text-base-400 mt-2">
+        <p className="text-meta text-base-400 mt-2">
           <b>Free with</b> decides which lane gets the plan for nothing and <b>free visits</b> says
           how many are on us — the rest stay billable. Attach nothing and the product is
           self-service.
@@ -960,14 +960,14 @@ export default function RentalOfferEditor({
           </div>
         </div>
         {!splitValid && (
-          <p className="t-tiny text-danger mt-2" data-testid="offer-split-error">
+          <p className="text-meta text-danger mt-2" data-testid="offer-split-error">
             Supplier + commission cannot exceed 100% — a collected month would pay out more than it
             collects.
           </p>
         )}
         {splitValid && (
           <div
-            className="t-tiny text-base-600 bg-base-50 border border-base-200 rounded-[4px] px-3 py-2 mt-3"
+            className="text-meta text-base-600 bg-base-50 border border-base-200 rounded-[4px] px-3 py-2 mt-3"
             data-testid="offer-split-preview"
           >
             Of every RM 100 collected: supplier {rm(split.supplierShare)} · store{" "}
@@ -975,7 +975,7 @@ export default function RentalOfferEditor({
             percentages.
           </div>
         )}
-        <label className="flex items-center gap-2 t-small mt-3">
+        <label className="flex items-center gap-2 text-body mt-3">
           <input
             type="checkbox"
             checked={active}
@@ -1012,7 +1012,7 @@ function Section({
   return (
     <div className="px-5 py-4 border-b border-base-200 last:border-b-0">
       <div className="flex items-baseline gap-2 mb-3 flex-wrap">
-        <span className="inline-grid place-items-center w-5 h-5 rounded-[5px] bg-base-100 text-base-600 text-[11px] font-bold">
+        <span className="inline-grid place-items-center w-5 h-5 rounded-[5px] bg-base-100 text-base-600 text-label font-semibold">
           {step}
         </span>
         <span className="label">{label}</span>
@@ -1030,13 +1030,13 @@ function TermChips({ terms, onChange }: { terms: number[]; onChange: (t: number[
     onChange(terms.includes(t) ? terms.filter((x) => x !== t) : [...terms, t].sort((a, b) => a - b));
   return (
     <span className="flex items-center gap-1.5 flex-wrap">
-      <span className="t-tiny text-base-500">Terms</span>
+      <span className="text-meta text-base-500">Terms</span>
       {[60, 84].map((t) => (
         <button
           key={t}
           type="button"
           onClick={() => toggle(t)}
-          className={`${terms.includes(t) ? "btn-primary" : "btn-ghost"} text-[11px]`}
+          className={`${terms.includes(t) ? "btn-primary" : "btn-ghost"} text-label`}
           data-testid={`offer-term-${t}`}
         >
           {t / 12} years
@@ -1060,7 +1060,7 @@ function TermChips({ terms, onChange }: { terms: number[]; onChange: (t: number[
             setCustom("");
           }
         }}
-        className="btn-ghost text-[11px]"
+        className="btn-ghost text-label"
         data-testid="offer-term-add"
       >
         Add term
@@ -1128,13 +1128,13 @@ function FabricSeriesRow({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="btn-ghost text-[12px]"
+          className="btn-ghost text-meta"
           aria-expanded={open}
           data-testid={`fabric-toggle-${series}`}
         >
           {open ? "▾" : "▸"} {series}
         </button>
-        <span className="t-tiny text-base-500">
+        <span className="text-meta text-base-500">
           {colors.length} colour{colors.length === 1 ? "" : "s"} ·{" "}
           {onCount > 0 ? <b>{onCount} on offer</b> : "none on offer"}
         </span>
@@ -1146,13 +1146,13 @@ function FabricSeriesRow({
             aria-label={`${series} series on offer`}
             data-testid={`fabric-series-on-${series}`}
           />
-          <span className="t-tiny text-base-500">once</span>
+          <span className="text-meta text-base-500">once</span>
           <PriceCell
             value={s.oneTime}
             onChange={(n) => onOverlay((o) => setSeries(o, series, { oneTime: n }))}
             testid={`fabric-series-once-${series}`}
           />
-          <span className="t-tiny text-base-500">/ mo</span>
+          <span className="text-meta text-base-500">/ mo</span>
           <PriceCell
             value={s.monthly}
             onChange={(n) => onOverlay((o) => setSeries(o, series, { monthly: n }))}
@@ -1163,7 +1163,7 @@ function FabricSeriesRow({
             onClick={() =>
               onOverlay((o) => setSeriesColorsBulk(o, series, colors.map((c) => c.code), true))
             }
-            className="btn-ghost text-[11px]"
+            className="btn-ghost text-label"
             data-testid={`fabric-all-on-${series}`}
           >
             All on
@@ -1173,7 +1173,7 @@ function FabricSeriesRow({
             onClick={() =>
               onOverlay((o) => setSeriesColorsBulk(o, series, colors.map((c) => c.code), false))
             }
-            className="btn-ghost text-[11px]"
+            className="btn-ghost text-label"
           >
             All off
           </button>
@@ -1190,8 +1190,8 @@ function FabricSeriesRow({
                 style={{ gridTemplateColumns: OPTION_COLS }}
                 data-testid={`fabric-color-${c.code}`}
               >
-                <div className="text-[13px] truncate">
-                  <span className="t-tiny text-base-400 mr-1.5">{c.code}</span>
+                <div className="text-body truncate">
+                  <span className="text-meta text-base-400 mr-1.5">{c.code}</span>
                   {c.label}
                 </div>
                 <div>
@@ -1215,13 +1215,13 @@ function FabricSeriesRow({
                   onChange={(n) => onOverlay((o) => setColor(o, series, c.code, { monthly: n }))}
                   testid={`fabric-color-monthly-${c.code}`}
                 />
-                <div className="text-right t-num text-[12px] text-base-500">
+                <div className="text-right t-num text-meta text-base-500">
                   {termLine(cv.oneTime ?? s.oneTime, cv.monthly ?? s.monthly, longestTerm)}
                 </div>
               </div>
             );
           })}
-          <p className="t-tiny text-base-400 px-3 py-2">
+          <p className="text-meta text-base-400 px-3 py-2">
             The series price covers every colour under it; a colour row overrides only itself (blank
             = follow the series).
           </p>
@@ -1300,7 +1300,7 @@ function GiftCell({
               setSku("");
               setAdding(false);
             }}
-            className="btn-ghost text-[11px]"
+            className="btn-ghost text-label"
             data-testid={`${testid}-confirm`}
           >
             Add
@@ -1310,7 +1310,7 @@ function GiftCell({
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="btn-ghost text-[11px]"
+          className="btn-ghost text-label"
           data-testid={`${testid}-add`}
         >
           + Gift

@@ -135,19 +135,19 @@ export default function PrincipalAccounts() {
       <div className="flex items-end justify-between gap-6 mb-[22px] flex-wrap">
         <div>
           <div className="kicker">HQ · Admin</div>
-          <h1 className="font-display text-[30px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-semibold">
+          <h1 className="font-display text-page leading-[1.05] mt-1.5 tracking-[-0.025em] font-semibold">
             Accounts
           </h1>
-          <div className="text-[13px] text-base-600 mt-1.5">
+          <div className="text-body text-base-600 mt-1.5">
             Provision portal access for every role. {total} accounts · {active} active
             · {invited} pending invite{disabled ? ` · ${disabled} disabled` : ""}.
           </div>
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="px-[18px] py-[10px] bg-base-900 text-white text-[13px] font-semibold rounded inline-flex items-center gap-2 hover:bg-base-800 cursor-pointer"
+          className="px-[18px] py-[10px] bg-base-900 text-white text-body font-semibold rounded inline-flex items-center gap-2 hover:bg-base-800 cursor-pointer"
         >
-          <span className="text-[14px]">+</span> New account
+          <span className="text-body">+</span> New account
         </button>
       </div>
 
@@ -169,12 +169,12 @@ export default function PrincipalAccounts() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search name, email, title…"
-          className="flex-1 min-w-[220px] px-3 py-2 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+          className="flex-1 min-w-[220px] px-3 py-2 border border-base-200 rounded text-body bg-white outline-none focus:border-base-700"
         />
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value as "all" | AppRole)}
-          className="px-3 py-2 border border-base-200 rounded text-[13px] bg-white"
+          className="px-3 py-2 border border-base-200 rounded text-body bg-white"
         >
           <option value="all">All roles</option>
           {ROLE_OPTIONS.map((r) => (
@@ -186,7 +186,7 @@ export default function PrincipalAccounts() {
             <button
               key={k}
               onClick={() => setStatusFilter(k)}
-              className={`px-3 py-1.5 text-[12px] rounded cursor-pointer ${
+              className={`px-3 py-1.5 text-meta rounded cursor-pointer ${
                 statusFilter === k
                   ? "bg-white text-base-900 font-semibold"
                   : "text-base-600 font-medium"
@@ -200,7 +200,7 @@ export default function PrincipalAccounts() {
 
       {/* Table */}
       <div className="card p-0 overflow-auto bg-white border border-base-200 rounded">
-        <table className="w-full border-collapse text-[13px]" style={{ minWidth: 820 }}>
+        <table className="w-full border-collapse text-body" style={{ minWidth: 820 }}>
           <thead>
             <tr className="bg-base-50 border-b border-base-200">
               <Th>User</Th>
@@ -215,14 +215,14 @@ export default function PrincipalAccounts() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={7} className="p-10 text-center text-[12px] text-base-500">
+                <td colSpan={7} className="p-10 text-center text-meta text-base-500">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="p-10 text-center text-[12px] text-base-500">
+                <td colSpan={7} className="p-10 text-center text-meta text-base-500">
                   No accounts match those filters.
                 </td>
               </tr>
@@ -295,7 +295,7 @@ export function EmailChangeRequestsPanel() {
       className="rounded-md border border-warning/40 bg-warning-soft/40 p-5 mb-[22px]"
       data-testid="email-change-panel"
     >
-      <h2 className="text-xs uppercase tracking-[0.16em] text-base-700 font-semibold mb-3">
+      <h2 className="text-meta uppercase tracking-[0.16em] text-base-700 font-semibold mb-3">
         Store email change requests ({pending.length})
       </h2>
       <ul className="divide-y divide-border">
@@ -305,10 +305,10 @@ export function EmailChangeRequestsPanel() {
             className="py-2.5 flex items-center justify-between gap-3 flex-wrap"
             data-testid={`email-change-row-${r.id}`}
           >
-            <div className="min-w-0 text-sm">
+            <div className="min-w-0 text-body">
               <div className="font-medium">
                 {r.dealerName ?? "—"}
-                <span className="ml-2 text-[11px] text-muted-foreground font-normal">
+                <span className="ml-2 text-label text-muted-foreground font-normal">
                   by {r.requestedByName ?? "Store owner"} ·{" "}
                   {new Date(r.createdAt).toLocaleDateString("en-MY", {
                     day: "numeric",
@@ -316,7 +316,7 @@ export function EmailChangeRequestsPanel() {
                   })}
                 </span>
               </div>
-              <div className="text-[12.5px] text-muted-foreground font-mono mt-0.5">
+              <div className="text-meta text-muted-foreground font-mono mt-0.5">
                 {r.currentEmail} → <span className="text-foreground">{r.requestedEmail}</span>
               </div>
             </div>
@@ -326,7 +326,7 @@ export function EmailChangeRequestsPanel() {
                 onClick={() => approve(r)}
                 disabled={decide.isPending}
                 data-testid={`email-change-approve-${r.id}`}
-                className="text-[12px] font-semibold text-white bg-base-900 hover:bg-base-800 rounded px-3 py-1.5 disabled:opacity-50"
+                className="text-meta font-semibold text-white bg-base-900 hover:bg-base-800 rounded px-3 py-1.5 disabled:opacity-50"
               >
                 Approve
               </button>
@@ -335,7 +335,7 @@ export function EmailChangeRequestsPanel() {
                 onClick={() => reject(r)}
                 disabled={decide.isPending}
                 data-testid={`email-change-reject-${r.id}`}
-                className="text-[12px] font-semibold text-destructive hover:bg-base-100 rounded px-3 py-1.5 disabled:opacity-50"
+                className="text-meta font-semibold text-destructive hover:bg-base-100 rounded px-3 py-1.5 disabled:opacity-50"
               >
                 Reject
               </button>
@@ -349,7 +349,7 @@ export function EmailChangeRequestsPanel() {
 
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
   return (
-    <th className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-base-500 ${right ? "text-right" : "text-left"}`}>
+    <th className={`px-4 py-2.5 text-label font-semibold uppercase tracking-[0.05em] text-base-500 ${right ? "text-right" : "text-left"}`}>
       {children}
     </th>
   );
@@ -362,11 +362,11 @@ function KpiTile({ label, value, sub, tone }: { label: string; value: number; su
     "text-base-900";
   return (
     <div className="bg-white border border-base-200 rounded p-4">
-      <div className="kicker text-[9px]">{label}</div>
-      <div className={`font-display text-[28px] font-semibold mt-1.5 tracking-[-0.02em] ${valueClass}`}>
+      <div className="kicker text-label">{label}</div>
+      <div className={`font-display text-page font-semibold mt-1.5 tracking-[-0.02em] ${valueClass}`}>
         {value}
       </div>
-      <div className="text-[11px] text-base-500 mt-0.5">{sub}</div>
+      <div className="text-label text-base-500 mt-0.5">{sub}</div>
     </div>
   );
 }
@@ -399,34 +399,34 @@ function UserRow({ user }: { user: AccountRow }) {
       <td className="px-4 py-2.5">
         <div className="flex items-center gap-2.5">
           <div
-            className="w-[30px] h-[30px] rounded-full text-white grid place-items-center text-[10.5px] font-semibold flex-shrink-0"
+            className="w-[30px] h-[30px] rounded-full text-white grid place-items-center text-label font-semibold flex-shrink-0"
             style={{ background: roleColor }}
           >
             {initials}
           </div>
           <div className="min-w-0">
             <div className="font-semibold text-base-900">{user.name}</div>
-            <div className="text-[11px] text-base-500">{user.email}</div>
+            <div className="text-label text-base-500">{user.email}</div>
           </div>
         </div>
       </td>
       <td className="px-4 py-2.5">
         <div
-          className="inline-block px-2.5 py-[2px] rounded bg-base-100 text-[10.5px] font-semibold uppercase tracking-[0.05em]"
+          className="inline-block px-2.5 py-[2px] rounded bg-base-100 text-label font-semibold uppercase tracking-[0.05em]"
           style={{ color: roleColor }}
         >
           {roleLabel}
         </div>
         {user.orgName && (
-          <div className="text-[10.5px] text-base-500 mt-[3px]">{user.orgName}</div>
+          <div className="text-label text-base-500 mt-[3px]">{user.orgName}</div>
         )}
       </td>
       <td className="px-4 py-2.5 text-base-700">{user.title || "—"}</td>
       <td className="px-4 py-2.5"><StatusPill status={user.status} /></td>
-      <td className="px-4 py-2.5 font-mono text-[11.5px] text-base-600">
+      <td className="px-4 py-2.5 font-mono text-label text-base-600">
         {user.createdAt?.slice(0, 10) ?? "—"}
       </td>
-      <td className="px-4 py-2.5 text-[11.5px] text-base-500">
+      <td className="px-4 py-2.5 text-label text-base-500">
         {user.lastSeenAt ? user.lastSeenAt.slice(0, 10) : "—"}
       </td>
       <td className="px-4 py-2.5 text-right whitespace-nowrap">
@@ -481,7 +481,7 @@ function RowAction({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`ml-0.5 px-2.5 py-[5px] text-[11.5px] font-semibold rounded hover:bg-base-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${colorClass}`}
+      className={`ml-0.5 px-2.5 py-[5px] text-label font-semibold rounded hover:bg-base-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${colorClass}`}
     >
       {children}
     </button>
@@ -496,7 +496,7 @@ function StatusPill({ status }: { status: AccountRow["status"] }) {
   } as const;
   const m = map[status];
   return (
-    <span className={`inline-block px-2.5 py-[2px] rounded text-[10.5px] font-semibold uppercase tracking-[0.05em] ${m.bg} ${m.c}`}>
+    <span className={`inline-block px-2.5 py-[2px] rounded text-label font-semibold uppercase tracking-[0.05em] ${m.bg} ${m.c}`}>
       {m.label}
     </span>
   );
@@ -526,12 +526,12 @@ function ResetPasswordModal({ user, onClose }: { user: AccountRow; onClose: () =
         className="bg-white rounded w-full max-w-[460px] overflow-hidden"
       >
         <div className="px-6 pt-5 pb-4 border-b border-base-100">
-          <div className="kicker text-[9px]">HQ · Admin</div>
-          <h2 className="font-display text-[20px] mt-1 tracking-[-0.02em] font-semibold">
+          <div className="kicker text-label">HQ · Admin</div>
+          <h2 className="font-display text-title mt-1 tracking-[-0.02em] font-semibold">
             Reset password
           </h2>
           {/* min-w-0 + break-words: long emails must wrap, never clip/overlap. */}
-          <div className="text-[12px] text-base-600 mt-1 min-w-0 break-words leading-relaxed">
+          <div className="text-meta text-base-600 mt-1 min-w-0 break-words leading-relaxed">
             {user.name} (<span className="break-all">{user.email}</span>) — type the new
             password, then give it to them directly. We don&apos;t email it.
           </div>
@@ -544,10 +544,10 @@ function ResetPasswordModal({ user, onClose }: { user: AccountRow; onClose: () =
             <Input type="password" value={confirmPw} onChange={setConfirmPw} />
           </Field>
           {confirmPw.length > 0 && password !== confirmPw && (
-            <div className="text-[12px] text-destructive">Passwords don&apos;t match.</div>
+            <div className="text-meta text-destructive">Passwords don&apos;t match.</div>
           )}
           {reset.isError && (
-            <div className="text-[12px] text-primary">
+            <div className="text-meta text-primary">
               {reset.error?.message ?? "Reset failed"}
             </div>
           )}
@@ -556,14 +556,14 @@ function ResetPasswordModal({ user, onClose }: { user: AccountRow; onClose: () =
           <button
             onClick={onClose}
             disabled={reset.isPending}
-            className="px-4 py-[9px] text-[13px] font-semibold text-base-600 rounded hover:bg-base-100 cursor-pointer disabled:opacity-50"
+            className="px-4 py-[9px] text-body font-semibold text-base-600 rounded hover:bg-base-100 cursor-pointer disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={() => reset.mutate({ tempPassword: password })}
             disabled={!valid || reset.isPending}
-            className="px-[18px] py-[9px] bg-base-900 text-white text-[13px] font-semibold rounded hover:bg-base-800 cursor-pointer disabled:opacity-50"
+            className="px-[18px] py-[9px] bg-base-900 text-white text-body font-semibold rounded hover:bg-base-800 cursor-pointer disabled:opacity-50"
           >
             {reset.isPending ? "Rotating…" : "Confirm reset"}
           </button>
@@ -869,11 +869,11 @@ function CreateAccountModal({
         style={{ maxWidth: 560, maxHeight: "90vh" }}
       >
         <div className="px-6 pt-5 pb-4 border-b border-base-100">
-          <div className="kicker text-[9px]">HQ · Admin</div>
-          <h2 className="font-display text-[22px] mt-1 tracking-[-0.02em] font-semibold">
+          <div className="kicker text-label">HQ · Admin</div>
+          <h2 className="font-display text-title mt-1 tracking-[-0.02em] font-semibold">
             New account
           </h2>
-          <div className="text-[12px] text-base-600 mt-1">
+          <div className="text-meta text-base-600 mt-1">
             Store credentials only — dealers and our showrooms. Every other
             user (staff, supplier, partner) is added in HR → Team.
           </div>
@@ -899,12 +899,12 @@ function CreateAccountModal({
                     } : undefined}
                   >
                     <div
-                      className="text-[12.5px] font-semibold"
+                      className="text-meta font-semibold"
                       style={{ color: isActive ? ROLE_COLORS[r.value] : undefined }}
                     >
                       {r.label}
                     </div>
-                    <div className="text-[10.5px] text-base-500">{r.hint}</div>
+                    <div className="text-label text-base-500">{r.hint}</div>
                   </button>
                 );
               })}
@@ -922,7 +922,7 @@ function CreateAccountModal({
                   type="button"
                   onClick={() => setOrgMode(m)}
                   data-testid={`acct-orgmode-${m}`}
-                  className={`px-3 py-2 rounded border-[1.5px] text-[12px] font-semibold cursor-pointer transition-colors ${
+                  className={`px-3 py-2 rounded border-[1.5px] text-meta font-semibold cursor-pointer transition-colors ${
                     orgMode === m
                       ? "border-base-900 bg-base-900 text-white"
                       : "border-base-200 bg-white text-base-600 hover:bg-base-50"
@@ -936,7 +936,7 @@ function CreateAccountModal({
 
           {existingMode && (
             <div className="p-3.5 bg-base-50 border border-base-200 rounded flex flex-col gap-3">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
+              <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-700">
                 Existing organisation
               </div>
               <Field
@@ -948,7 +948,7 @@ function CreateAccountModal({
                   value={existingDealerId}
                   onChange={(e) => setExistingDealerId(e.target.value)}
                   data-testid="acct-existing-store"
-                  className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white cursor-pointer"
+                  className="w-full px-3 py-2.5 border border-base-200 rounded text-body bg-white cursor-pointer"
                 >
                   <option value="">— pick a store —</option>
                   {/* Grouped so our own showrooms never read as dealerships
@@ -976,7 +976,7 @@ function CreateAccountModal({
                 </select>
               </Field>
               {existingDealerId && existingStaffQ.data && (
-                <div className="text-[11px] text-base-500">
+                <div className="text-label text-base-500">
                   {existingStaffQ.data.storeKind === "showroom" ? "Showroom" : "Dealer"} ·{" "}
                   {existingStaffQ.data.staff.filter((s) => s.active).length} existing staff
                 </div>
@@ -1021,7 +1021,7 @@ function CreateAccountModal({
 
           {needsOrg && !existingMode && (
             <div className="p-3.5 bg-base-50 border border-base-200 rounded flex flex-col gap-3">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
+              <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-700">
                 {/* 2026-07-19 (Loo) — a showroom is Carres' own store, not an
                     external organisation: one name field, no SSM/PIC. */}
                 {draft.role === "showroom"
@@ -1107,10 +1107,10 @@ function CreateAccountModal({
               {dealerLike && (
                 <>
                   <div>
-                    <div className="text-[9.5px] uppercase tracking-wider text-base-500 font-semibold mb-1">
+                    <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1">
                       Business address
                     </div>
-                    <div className="text-[10px] text-base-500 mb-2 leading-snug">
+                    <div className="text-label text-base-500 mb-2 leading-snug">
                       Required · prints on Sales Order PDFs when no outlet is attached
                     </div>
                     <MYAddressFields
@@ -1127,7 +1127,7 @@ function CreateAccountModal({
                       errors.addressState ||
                       errors.addressCity ||
                       errors.addressPostcode) && (
-                      <div className="text-[11px] text-destructive mt-1.5">
+                      <div className="text-label text-destructive mt-1.5">
                         {errors.addressLine1 ||
                           errors.addressState ||
                           errors.addressCity ||
@@ -1137,7 +1137,7 @@ function CreateAccountModal({
                   </div>
                 </>
               )}
-              <div className="text-[11px] text-base-500 leading-relaxed">
+              <div className="text-label text-base-500 leading-relaxed">
                 {isShowroom
                   ? "Carres' own store — no company registration or contact person needed. The email above becomes its login."
                   : `A new ${draft.role} record will be created and this user will be the owner.`}
@@ -1152,7 +1152,7 @@ function CreateAccountModal({
               that's Carres itself). */}
           {dealerLike && (
             <div className="p-3.5 bg-base-50 border border-base-200 rounded flex flex-col gap-3">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
+              <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-700">
                 {existingMode ? "New staff · PIN sign-in" : "First staff · PIN sign-in"}
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -1167,7 +1167,7 @@ function CreateAccountModal({
                   <select
                     value={draft.staffRole}
                     onChange={(e) => set("staffRole", e.target.value as StaffTierDto)}
-                    className="w-full px-3 py-2 border border-base-200 rounded text-[13px] bg-white cursor-pointer"
+                    className="w-full px-3 py-2 border border-base-200 rounded text-body bg-white cursor-pointer"
                     data-testid="acct-staff-tier"
                   >
                     {(staffKind === "showroom"
@@ -1213,7 +1213,7 @@ function CreateAccountModal({
                     value={draft.staffGender}
                     onChange={(e) => set("staffGender", e.target.value as StaffGenderDto | "")}
                     data-testid="acct-staff-gender"
-                    className="w-full px-3 py-2 border border-base-200 rounded text-[13px] bg-white cursor-pointer"
+                    className="w-full px-3 py-2 border border-base-200 rounded text-body bg-white cursor-pointer"
                   >
                     <option value="">— select —</option>
                     <option value="male">Male</option>
@@ -1252,7 +1252,7 @@ function CreateAccountModal({
                 </Field>
               </div>
               {draft.staffPinConfirm.length === 6 && draft.staffPin !== draft.staffPinConfirm && (
-                <div className="text-[11px] text-destructive -mt-1.5">PINs don't match.</div>
+                <div className="text-label text-destructive -mt-1.5">PINs don't match.</div>
               )}
             </div>
           )}
@@ -1287,7 +1287,7 @@ function CreateAccountModal({
           )}
 
           {!existingMode && create.isError && (
-            <div className="text-[12px] text-primary">
+            <div className="text-meta text-primary">
               {create.error?.message ?? "Account creation failed"}
             </div>
           )}
@@ -1297,14 +1297,14 @@ function CreateAccountModal({
           <button
             onClick={onClose}
             disabled={create.isPending || createStaff.isPending}
-            className="px-4 py-[9px] text-[13px] font-semibold text-base-600 rounded hover:bg-base-100 cursor-pointer disabled:opacity-50"
+            className="px-4 py-[9px] text-body font-semibold text-base-600 rounded hover:bg-base-100 cursor-pointer disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={submit}
             disabled={create.isPending || createStaff.isPending}
-            className="px-[18px] py-[9px] bg-base-900 text-white text-[13px] font-semibold rounded hover:bg-base-800 cursor-pointer disabled:opacity-50"
+            className="px-[18px] py-[9px] bg-base-900 text-white text-body font-semibold rounded hover:bg-base-800 cursor-pointer disabled:opacity-50"
           >
             {existingMode
               ? createStaff.isPending
@@ -1325,17 +1325,17 @@ function Field({ label, hint, error, children }: { label: string; hint?: string;
     <div>
       <div className="flex items-baseline justify-between mb-1.5">
         <FieldLabel>{label}</FieldLabel>
-        {error && <span className="text-[11px] text-primary">{error}</span>}
+        {error && <span className="text-label text-primary">{error}</span>}
       </div>
       {children}
-      {hint && !error && <div className="text-[11px] text-base-500 mt-1">{hint}</div>}
+      {hint && !error && <div className="text-label text-base-500 mt-1">{hint}</div>}
     </div>
   );
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
+    <label className="text-label font-semibold uppercase tracking-[0.08em] text-base-700">
       {children}
     </label>
   );
@@ -1348,7 +1348,7 @@ function Input({ value, onChange, type = "text", placeholder }: { value: string;
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+      className="w-full px-3 py-2.5 border border-base-200 rounded text-body bg-white outline-none focus:border-base-700"
     />
   );
 }

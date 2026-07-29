@@ -29,7 +29,7 @@ export default function MaintenanceSidebar<K extends string>({
     <aside className="w-[250px] shrink-0 bg-white border border-base-200 rounded-[4px] p-3">
       {groups.map((g) => (
         <div key={g.title} className="mb-3 last:mb-0">
-          <div className="t-micro text-base-400 uppercase tracking-[0.18em] px-2 pt-1.5 pb-1.5">
+          <div className="text-label uppercase tracking-[0.05em] text-base-400 uppercase tracking-[0.18em] px-2 pt-1.5 pb-1.5">
             {g.title}
           </div>
           <div className="flex flex-col gap-0.5">
@@ -41,7 +41,7 @@ export default function MaintenanceSidebar<K extends string>({
                   type="button"
                   onClick={() => onChange(it.key)}
                   aria-current={isActive ? "true" : undefined}
-                  className={`flex items-center justify-between w-full text-left px-3 py-2 rounded-[4px] text-[13px] transition-colors ${
+                  className={`flex items-center justify-between w-full text-left px-3 py-2 rounded-[4px] text-body transition-colors ${
                     isActive
                       ? "bg-base-900 text-white font-medium"
                       : "text-base-700 hover:bg-base-100"
@@ -51,7 +51,7 @@ export default function MaintenanceSidebar<K extends string>({
                   <span className="truncate">{it.label}</span>
                   {it.count != null && (
                     <span
-                      className={`t-tiny tabular-nums ml-2 shrink-0 ${
+                      className={`text-meta tabular-nums ml-2 shrink-0 ${
                         isActive ? "text-white/70" : "text-base-400"
                       }`}
                     >

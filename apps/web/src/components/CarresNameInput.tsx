@@ -22,7 +22,7 @@ export default function CarresNameInput({
 }) {
   return (
     <div className="flex items-stretch w-full border border-base-200 rounded bg-white overflow-hidden focus-within:border-base-700">
-      <span className="flex items-center px-3 text-[13px] font-semibold text-base-500 bg-base-50 border-r border-base-200 select-none">
+      <span className="flex items-center px-3 text-body font-semibold text-base-500 bg-base-50 border-r border-base-200 select-none">
         {CARRES_NAME_PREFIX}
       </span>
       <input
@@ -32,7 +32,7 @@ export default function CarresNameInput({
         placeholder={placeholder}
         autoFocus={autoFocus}
         data-testid={testId}
-        className="flex-1 min-w-0 px-3 py-2.5 text-[13px] bg-transparent outline-none"
+        className="flex-1 min-w-0 px-3 py-2.5 text-body bg-transparent outline-none"
       />
     </div>
   );

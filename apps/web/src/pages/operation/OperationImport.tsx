@@ -118,13 +118,13 @@ export default function OperationImport() {
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <div className="mb-6">
-        <p className="text-xs uppercase tracking-wider text-base-500 mb-1">
+        <p className="text-meta uppercase tracking-wider text-base-500 mb-1">
           Operation · AutoCount
         </p>
-        <h1 className="t-h1 text-base-900">
+        <h1 className="text-page text-base-900">
           Import listing
         </h1>
-        <p className="text-sm text-base-600 mt-2">
+        <p className="text-body text-base-600 mt-2">
           Drop the AutoCount listing CSV here. The portal will create any new
           orders. Orders already in the portal are left untouched — once a sale
           is imported, the portal is the source of truth.
@@ -133,7 +133,7 @@ export default function OperationImport() {
 
       {/* Step 1: file pick */}
       <section className="rounded border border-base-200 bg-white p-6 mb-4">
-        <h2 className="text-sm font-semibold text-base-900 mb-3">
+        <h2 className="text-body font-semibold text-base-900 mb-3">
           1. Pick the CSV file
         </h2>
         <div className="flex items-center gap-3">
@@ -142,12 +142,12 @@ export default function OperationImport() {
             type="file"
             accept=".csv,text/csv"
             onChange={onFile}
-            className="block text-sm text-base-700"
+            className="block text-body text-base-700"
           />
           {fileName ? (
             <button
               type="button"
-              className="rounded border border-base-300 px-3 py-1 text-xs text-base-600 hover:bg-base-100"
+              className="rounded border border-base-300 px-3 py-1 text-meta text-base-600 hover:bg-base-100"
               onClick={clearFile}
             >
               Clear
@@ -155,14 +155,14 @@ export default function OperationImport() {
           ) : null}
         </div>
         {fileName ? (
-          <p className="mt-2 text-xs text-base-500">Loaded: {fileName}</p>
+          <p className="mt-2 text-meta text-base-500">Loaded: {fileName}</p>
         ) : null}
       </section>
 
       {/* Step 3: preview */}
       {csvText ? (
         <section className="rounded border border-base-200 bg-white p-6 mb-4">
-          <h2 className="text-sm font-semibold text-base-900 mb-3">
+          <h2 className="text-body font-semibold text-base-900 mb-3">
             2. Preview
           </h2>
           <div className="grid grid-cols-3 gap-4 mb-4">
@@ -179,7 +179,7 @@ export default function OperationImport() {
             />
           </div>
           {skippedRowCount > 0 ? (
-            <div className="mb-4 rounded border border-warning-200 bg-warning-50 p-3 text-xs text-warning-800">
+            <div className="mb-4 rounded border border-warning-200 bg-warning-50 p-3 text-meta text-warning-800">
               <div className="font-semibold mb-1">
                 Skipped rows ({skippedRowCount})
               </div>
@@ -192,14 +192,14 @@ export default function OperationImport() {
                   ),
                 )}
               </ul>
-              <p className="mt-2 text-[11px] text-warning-700">
+              <p className="mt-2 text-label text-warning-700">
                 These rows are silently dropped — the import will only create / update the {usableRows.length} usable row(s).
                 Fix the cell in AutoCount and re-export if you want them included.
               </p>
             </div>
           ) : null}
           {parseErrors.length > 0 ? (
-            <div className="mb-4 rounded border border-warning-200 bg-warning-50 p-3 text-xs text-warning-800">
+            <div className="mb-4 rounded border border-warning-200 bg-warning-50 p-3 text-meta text-warning-800">
               <div className="font-semibold mb-1">
                 CSV parse warnings ({parseErrors.length})
               </div>
@@ -214,7 +214,7 @@ export default function OperationImport() {
           ) : null}
           {previewRows.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full text-meta">
                 <thead className="bg-base-50 text-base-500">
                   <tr>
                     <th className="text-left px-2 py-1 font-medium">Ref.</th>
@@ -239,7 +239,7 @@ export default function OperationImport() {
                 </tbody>
               </table>
               {usableRows.length > previewRows.length ? (
-                <p className="mt-2 text-xs text-base-500">
+                <p className="mt-2 text-meta text-base-500">
                   …and {usableRows.length - previewRows.length} more rows.
                 </p>
               ) : null}
@@ -251,7 +251,7 @@ export default function OperationImport() {
       {/* Step 4: submit */}
       {csvText ? (
         <section className="rounded border border-base-200 bg-white p-6 mb-4">
-          <h2 className="text-sm font-semibold text-base-900 mb-3">
+          <h2 className="text-body font-semibold text-base-900 mb-3">
             3. Submit
           </h2>
           <button
@@ -268,7 +268,7 @@ export default function OperationImport() {
       {/* Result */}
       {submitMut.isSuccess && submitMut.data ? (
         <section className="rounded border border-success-200 bg-success-50 p-6">
-          <h2 className="text-sm font-semibold text-success-800 mb-3">
+          <h2 className="text-body font-semibold text-success-800 mb-3">
             Import complete
           </h2>
           <div className="grid grid-cols-3 gap-4 mb-4">
@@ -279,13 +279,13 @@ export default function OperationImport() {
               value={submitMut.data.skippedLocked + submitMut.data.updated}
             />
           </div>
-          <p className="text-xs text-base-600 mb-4">
+          <p className="text-meta text-base-600 mb-4">
             AutoCount only <strong>creates</strong> new orders. Any order already
             in the portal is left untouched — the portal is the source of truth
             once a sale is imported.
           </p>
           {submitMut.data.errored > 0 ? (
-            <div className="rounded border border-error-300 bg-error-50 p-3 text-xs text-error-800 mb-3">
+            <div className="rounded border border-error-300 bg-error-50 p-3 text-meta text-error-800 mb-3">
               <div className="font-semibold mb-1">
                 {submitMut.data.errored} order(s) failed
               </div>
@@ -304,7 +304,7 @@ export default function OperationImport() {
           {submitMut.data.results.some(
             (r) => r.unmatchedDescriptions.length > 0,
           ) ? (
-            <div className="rounded border border-warning-300 bg-warning-50 p-3 text-xs text-warning-800">
+            <div className="rounded border border-warning-300 bg-warning-50 p-3 text-meta text-warning-800">
               <div className="font-semibold mb-1">Unmatched SKUs</div>
               <p className="mb-2">
                 These core items (mattress / bedframe / sofa) didn&apos;t match a
@@ -328,8 +328,8 @@ export default function OperationImport() {
 
       {submitMut.isError ? (
         <section className="rounded border border-error-300 bg-error-50 p-6">
-          <p className="text-sm font-semibold text-error-800">Import failed</p>
-          <p className="text-xs text-error-700 mt-1">
+          <p className="text-body font-semibold text-error-800">Import failed</p>
+          <p className="text-meta text-error-700 mt-1">
             {(submitMut.error as { message?: string })?.message ?? "unknown error"}
           </p>
         </section>
@@ -357,10 +357,10 @@ function Stat({
           : "text-base-900";
   return (
     <div className="rounded border border-base-200 bg-base-50 p-3">
-      <div className="text-[10px] uppercase tracking-wider text-base-500">
+      <div className="text-label uppercase tracking-wider text-base-500">
         {label}
       </div>
-      <div className={`text-2xl font-semibold mt-1 ${color}`}>{value}</div>
+      <div className={`text-page font-semibold mt-1 ${color}`}>{value}</div>
     </div>
   );
 }

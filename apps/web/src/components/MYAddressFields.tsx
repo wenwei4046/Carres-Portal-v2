@@ -123,9 +123,9 @@ export default function MYAddressFields({ data, onChange }: Props) {
 //                   prerequisite above". Disabled selects use this so the
 //                   sequence is visually obvious without reading labels.
 const ACTIVE_CLASS =
-  "w-full px-3 py-2.5 border border-base-300 rounded bg-white text-sm outline-none focus:border-primary";
+  "w-full px-3 py-2.5 border border-base-300 rounded bg-white text-body outline-none focus:border-primary";
 const LOCKED_CLASS =
-  "w-full px-3 py-2.5 border border-base-300 rounded bg-base-50 text-base-500 text-sm cursor-not-allowed";
+  "w-full px-3 py-2.5 border border-base-300 rounded bg-base-50 text-base-500 text-body cursor-not-allowed";
 
 function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
   return (

@@ -215,7 +215,7 @@ export default function UiShowcase() {
               {[
                 ["Q1 · Spacing scale", "Candidate A — 8 steps (2 4 6 8 12 16 24 32)", "Keeps 2 and 6, so dense rows stay dense. ~779 sites to migrate — a third of the strict-4pt alternative."],
                 ["Q2 · Page canvas", "Radix slate-3", "Frozen with the law on 2026-07-27."],
-                ["Q3 · font-bold (700)", "Deleted into 600", "The two were doing one job. 600 is the heavy weight; 158 uses fold in at D2."],
+                ["Q3 · font-semibold (700)", "Deleted into 600", "The two were doing one job. 600 is the heavy weight; 158 uses fold in at D2."],
                 ["Q4 · Icon stroke", `Lucide default — ${ICON_STROKE}`, "Icon has no strokeWidth prop, so a second stroke no longer compiles."],
               ].map(([q, answer, cost]) => (
                 <div key={q} className="flex flex-col gap-1 border-b border-kit-slate-5 pb-4 last:border-0 last:pb-0">

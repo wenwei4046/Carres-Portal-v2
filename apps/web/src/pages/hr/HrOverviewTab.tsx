@@ -33,15 +33,15 @@ function StatTile({
 }) {
   return (
     <div className="flex-1 min-w-[160px] rounded-lg border border-base-200 bg-card px-4 py-3">
-      <div className="t-micro text-base-500">{label}</div>
+      <div className="text-label uppercase tracking-[0.05em] text-base-500">{label}</div>
       <div
-        className={`t-num text-[24px] leading-8 font-semibold ${
+        className={`t-num text-page leading-8 font-semibold ${
           muted ? "text-base-400" : "text-base-900"
         }`}
       >
         {value}
       </div>
-      <div className="t-tiny text-base-500">{sub}</div>
+      <div className="text-meta text-base-500">{sub}</div>
     </div>
   );
 }
@@ -51,11 +51,11 @@ function TodoRow({ text, to }: { text: string; to: string }) {
   return (
     <Link
       to={to}
-      className="flex items-center gap-2 h-9 px-2 rounded hover:bg-hovertint text-[13px] text-base-900"
+      className="flex items-center gap-2 h-9 px-2 rounded hover:bg-hovertint text-body text-base-900"
     >
       <AlertTriangle size={14} className="text-warning shrink-0" />
       <span className="flex-1 min-w-0 truncate">{text}</span>
-      <span className="t-tiny text-base-500 shrink-0">Open →</span>
+      <span className="text-meta text-base-500 shrink-0">Open →</span>
     </Link>
   );
 }
@@ -70,7 +70,7 @@ export default function HrOverviewTab({
   const { data, isLoading } = useHrReport(year, month);
 
   if (isLoading || !data) {
-    return <div className="py-12 text-[13px] text-base-500">Loading overview…</div>;
+    return <div className="py-12 text-body text-base-500">Loading overview…</div>;
   }
 
   const { report, bdReport, staff, config } = data;
@@ -132,14 +132,14 @@ export default function HrOverviewTab({
         {/* Deliberately NOT a SectionBand: that one collapses, and the whole
             point of this card is that it is always in your face. */}
         <div className="flex items-center gap-2 h-10 px-3 border-b border-base-200">
-          <span className="t-h4 text-base-900">Needs a human</span>
+          <span className="text-strong text-base-900">Needs a human</span>
           {todos.length > 0 && (
             <span className="pill pill-overdue">{todos.length}</span>
           )}
         </div>
         <div className="p-2">
           {todos.length === 0 ? (
-            <div className="flex items-center gap-2 px-2 py-3 text-[13px] text-base-700">
+            <div className="flex items-center gap-2 px-2 py-3 text-body text-base-700">
               <Check size={16} className="text-success shrink-0" />
               Nothing needs you today.
             </div>
@@ -156,7 +156,7 @@ export default function HrOverviewTab({
               file, 19 counted). It states a fact, asks for nothing, and
               disappears by itself the day the imported rows are deleted. */}
           {legacyUnattributed > 0 && (
-            <p className="t-tiny text-base-500 px-2 pt-2 border-t border-base-200 mt-2">
+            <p className="text-meta text-base-500 px-2 pt-2 border-t border-base-200 mt-2">
               {legacyUnattributed} imported archive order
               {legacyUnattributed === 1 ? " is" : "s are"} not counted here — they
               came from the old system, before the portal recorded sales.

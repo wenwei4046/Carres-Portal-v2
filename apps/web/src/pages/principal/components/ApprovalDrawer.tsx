@@ -115,7 +115,7 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
         <div className="flex justify-between items-start mb-[18px]">
           <div>
             <div className="kicker">{approval.id.slice(0, 8)}</div>
-            <h2 className="font-display text-[22px] leading-tight mt-1 tracking-tight font-semibold">
+            <h2 className="font-display text-title leading-tight mt-1 tracking-tight font-semibold">
               {approval.title}
             </h2>
           </div>
@@ -123,45 +123,45 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="text-base-500 text-lg bg-transparent border-0 cursor-pointer leading-none px-1"
+            className="text-base-500 text-strong bg-transparent border-0 cursor-pointer leading-none px-1"
           >
             ×
           </button>
         </div>
 
         <div
-          className="grid gap-x-4 gap-y-2.5 text-[13px] py-4 border-y border-base-100 mb-[18px]"
+          className="grid gap-x-4 gap-y-2.5 text-body py-4 border-y border-base-100 mb-[18px]"
           style={{ gridTemplateColumns: "auto 1fr" }}
         >
-          <div className="text-base-500 text-[11.5px]">Type</div>
+          <div className="text-base-500 text-label">Type</div>
           <div>
             <ApprovalKindBadge kind={approval.kind} />
           </div>
-          <div className="text-base-500 text-[11.5px]">Status</div>
+          <div className="text-base-500 text-label">Status</div>
           <div>
             <ApprovalStatusPill status={approval.status} />
           </div>
-          <div className="text-base-500 text-[11.5px]">By</div>
+          <div className="text-base-500 text-label">By</div>
           <div>{approval.actor ?? "—"}</div>
-          <div className="text-base-500 text-[11.5px]">When</div>
+          <div className="text-base-500 text-label">When</div>
           <div>{new Date(approval.created_at).toLocaleString()}</div>
           {approval.refers_to && (
             <>
-              <div className="text-base-500 text-[11.5px]">Ref</div>
-              <div className="font-mono text-[12px]">{approval.refers_to}</div>
+              <div className="text-base-500 text-label">Ref</div>
+              <div className="font-mono text-meta">{approval.refers_to}</div>
             </>
           )}
           {approval.amount != null && (
             <>
-              <div className="text-base-500 text-[11.5px]">Amount</div>
-              <div className="font-mono font-bold">
+              <div className="text-base-500 text-label">Amount</div>
+              <div className="font-mono font-semibold">
                 RM {Number(approval.amount).toLocaleString()}
               </div>
             </>
           )}
           {approval.reason && (
             <>
-              <div className="text-base-500 text-[11.5px]">Reason</div>
+              <div className="text-base-500 text-label">Reason</div>
               <div>{approval.reason}</div>
             </>
           )}
@@ -169,15 +169,15 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
 
         {!isPending && approval.decided_at && (
           <div className="mb-[18px] p-3.5 bg-base-50 rounded-md">
-            <div className="text-[10px] uppercase tracking-wider text-base-500 font-semibold mb-1.5">
+            <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1.5">
               Decision
             </div>
-            <div className="text-[13px]">
+            <div className="text-body">
               <strong>{approval.decided_by ?? "—"}</strong> ·{" "}
               {new Date(approval.decided_at).toLocaleString()}
             </div>
             {approval.decision_note && (
-              <div className="text-[12px] text-base-600 mt-1">{approval.decision_note}</div>
+              <div className="text-meta text-base-600 mt-1">{approval.decision_note}</div>
             )}
           </div>
         )}
@@ -188,14 +188,14 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
           <div className="pt-[18px] border-t border-base-100">
             {isTopup && (
               <>
-                <div className="text-[10px] uppercase tracking-wider text-base-500 font-semibold mb-1.5">
+                <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1.5">
                   Method (required to approve)
                 </div>
                 <select
                   value={method}
                   onChange={(e) => setMethod(e.target.value as TopupMethod)}
                   data-testid="topup-method"
-                  className="w-full px-2.5 py-2 border border-base-200 rounded text-[12px] outline-none mb-3 font-sans bg-white"
+                  className="w-full px-2.5 py-2 border border-base-200 rounded text-meta outline-none mb-3 font-sans bg-white"
                 >
                   {TOPUP_METHODS.map((m) => (
                     <option key={m} value={m}>
@@ -203,7 +203,7 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
                     </option>
                   ))}
                 </select>
-                <div className="text-[10px] uppercase tracking-wider text-base-500 font-semibold mb-1.5">
+                <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1.5">
                   Reference (optional)
                 </div>
                 <input
@@ -212,18 +212,18 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
                   onChange={(e) => setReference(e.target.value)}
                   placeholder="Bank slip / cheque no / txn ID…"
                   data-testid="topup-reference"
-                  className="w-full px-2.5 py-2 border border-base-200 rounded text-[12px] outline-none mb-3 font-sans"
+                  className="w-full px-2.5 py-2 border border-base-200 rounded text-meta outline-none mb-3 font-sans"
                 />
               </>
             )}
-            <div className="text-[10px] uppercase tracking-wider text-base-500 font-semibold mb-1.5">
+            <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1.5">
               {isTopup ? "Reject reason (optional)" : "Note (optional)"}
             </div>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={isTopup ? "Why rejecting?" : "Reason or condition…"}
-              className="w-full px-2.5 py-2 border border-base-200 rounded text-[12px] resize-y outline-none mb-3 font-sans"
+              className="w-full px-2.5 py-2 border border-base-200 rounded text-meta resize-y outline-none mb-3 font-sans"
               style={{ minHeight: 60 }}
             />
             <div className="flex gap-2">

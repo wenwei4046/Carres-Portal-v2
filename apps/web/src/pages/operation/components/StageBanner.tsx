@@ -60,24 +60,24 @@ export default function StageBanner({
     >
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <span className="px-2 py-0.5 rounded-full bg-card text-base-700 text-[10px] font-mono tabular-nums border border-base-200">
+          <span className="px-2 py-0.5 rounded-full bg-card text-base-700 text-label font-mono tabular-nums border border-base-200">
             {num}
           </span>
-          <h2 className="font-display text-[20px] font-bold text-base-900 leading-tight">
+          <h2 className="font-display text-title font-semibold text-base-900 leading-tight">
             {label}
           </h2>
         </div>
-        <div className="text-[12px] text-base-600 font-body">{description}</div>
+        <div className="text-meta text-base-600 font-body">{description}</div>
       </div>
       <div className="text-right">
         <div
-          className="font-display font-bold text-primary tabular-nums leading-none"
+          className="font-display font-semibold text-primary tabular-nums leading-none"
           style={{ fontSize: "32px" }}
           data-testid={`stage-banner-count-${stage}`}
         >
           {count}
         </div>
-        <div className="text-[10px] uppercase tracking-[0.14em] text-base-600 font-body mt-1">
+        <div className="text-label uppercase tracking-[0.14em] text-base-600 font-body mt-1">
           Orders
         </div>
       </div>

@@ -57,7 +57,7 @@ function stepIndexOf(
 function LifecycleStepper({ index, cancelled }: { index: number; cancelled: boolean }) {
   if (cancelled) {
     return (
-      <div className="flex items-center gap-2 px-1 py-1.5 text-[12px] text-red-700">
+      <div className="flex items-center gap-2 px-1 py-1.5 text-meta text-red-700">
         <AlertTriangle size={14} /> Order cancelled
       </div>
     );
@@ -90,7 +90,7 @@ function LifecycleStepper({ index, cancelled }: { index: number; cancelled: bool
               {done && <Check size={11} strokeWidth={3} />}
             </div>
             <div
-              className="text-[10px] mt-1"
+              className="text-label mt-1"
               style={{ color: current ? "#185FA5" : "#8A8378", fontWeight: current ? 500 : 400 }}
             >
               {label}
@@ -118,7 +118,7 @@ const TAG_CLASS: Record<AnnotationTag, string> = {
 function TagBadge({ tag }: { tag: AnnotationTag }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${TAG_CLASS[tag]}`}
+      className={`inline-flex items-center gap-1 text-label font-medium px-1.5 py-0.5 rounded ${TAG_CLASS[tag]}`}
     >
       {TAG_LABEL[tag]}
     </span>
@@ -142,7 +142,7 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <span className="text-[12px] font-medium text-base-800 leading-snug">
+          <span className="text-meta font-medium text-base-800 leading-snug">
             {title}
             {isNote && entry.tag && (
               <span className="ml-1.5 align-middle">
@@ -150,16 +150,16 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
               </span>
             )}
           </span>
-          <span className="font-mono text-[10px] text-base-400 whitespace-nowrap mt-0.5">
+          <span className="font-mono text-label text-base-400 whitespace-nowrap mt-0.5">
             {time}
           </span>
         </div>
         {body ? (
-          <p className="text-[12px] text-base-700 leading-relaxed whitespace-pre-wrap break-words mt-0.5">
+          <p className="text-meta text-base-700 leading-relaxed whitespace-pre-wrap break-words mt-0.5">
             {body}
           </p>
         ) : (
-          <div className="text-[11px] text-base-500 mt-0.5">{entry.actor_name ?? "System"}</div>
+          <div className="text-label text-base-500 mt-0.5">{entry.actor_name ?? "System"}</div>
         )}
       </div>
     </div>
@@ -189,10 +189,10 @@ function ImportGroupRow({ run }: { run: TimelineEntry[] }) {
           <FileInput size={15} strokeWidth={2} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[12px] text-base-600">
+          <div className="text-meta text-base-600">
             Imported from AutoCount <span className="text-base-400">· {run.length} times</span>
           </div>
-          <div className="text-[11px] text-base-400">{range}</div>
+          <div className="text-label text-base-400">{range}</div>
         </div>
         {open ? (
           <ChevronDown size={14} className="text-base-400" />
@@ -205,10 +205,10 @@ function ImportGroupRow({ run }: { run: TimelineEntry[] }) {
           {run.map((e) => (
             <div
               key={e.id}
-              className="flex items-center justify-between py-1 text-[11px] text-base-500"
+              className="flex items-center justify-between py-1 text-label text-base-500"
             >
               <span>{e.actor_name ?? "System"}</span>
-              <span className="font-mono text-[10px] text-base-400">
+              <span className="font-mono text-label text-base-400">
                 {fmtDate(e.occurred_at, { time: true })}
               </span>
             </div>
@@ -249,13 +249,13 @@ function AddAnnotationForm({ orderId }: { orderId: string }) {
         onChange={(e) => setContent(e.target.value)}
         placeholder="Write a note…"
         rows={2}
-        className="w-full text-[12px] px-2.5 py-2 border border-base-200 rounded-[8px] resize-none focus:outline-none focus:ring-1 focus:ring-accent placeholder-base-400 font-body"
+        className="w-full text-meta px-2.5 py-2 border border-base-200 rounded-[8px] resize-none focus:outline-none focus:ring-1 focus:ring-accent placeholder-base-400 font-body"
       />
       <div className="flex items-center gap-2">
         <select
           value={tag}
           onChange={(e) => setTag(e.target.value as AnnotationTag | "")}
-          className="text-[11px] border border-base-200 rounded-[8px] px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-accent"
+          className="text-label border border-base-200 rounded-[8px] px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-accent"
         >
           <option value="">General note · no action</option>
           <option value="follow_up">Follow up</option>
@@ -265,7 +265,7 @@ function AddAnnotationForm({ orderId }: { orderId: string }) {
         <button
           type="submit"
           disabled={!content.trim() || mutation.isPending}
-          className="ml-auto text-[11px] font-medium px-3 py-1 rounded-[8px] bg-base-900 text-white disabled:opacity-40 hover:bg-base-800 transition-colors"
+          className="ml-auto text-label font-medium px-3 py-1 rounded-[8px] bg-base-900 text-white disabled:opacity-40 hover:bg-base-800 transition-colors"
         >
           {mutation.isPending ? "Saving…" : "Save note"}
         </button>
@@ -347,7 +347,7 @@ export default function AnnotationTimeline({ orderId }: Props) {
       <button
         type="button"
         onClick={() => setActiveOrder(null)}
-        className="inline-flex items-center gap-1 text-[11px] text-base-500 hover:text-base-900 mb-2"
+        className="inline-flex items-center gap-1 text-label text-base-500 hover:text-base-900 mb-2"
       >
         <ChevronLeft size={13} /> All activity
       </button>
@@ -359,9 +359,9 @@ export default function AnnotationTimeline({ orderId }: Props) {
       )}
 
       {isLoading ? (
-        <div className="text-[12px] text-base-400 py-2">Loading…</div>
+        <div className="text-meta text-base-400 py-2">Loading…</div>
       ) : entries.length === 0 ? (
-        <div className="text-[12px] text-base-500 py-2">No notes or activity yet.</div>
+        <div className="text-meta text-base-500 py-2">No notes or activity yet.</div>
       ) : (
         <>
           {presentCategories.length > 1 && (
@@ -387,7 +387,7 @@ export default function AnnotationTimeline({ orderId }: Props) {
           <div className="bg-white border border-base-200 rounded-[8px] px-4 py-2 mb-3">
             {today.length > 0 && (
               <>
-                <div className="text-[10px] uppercase tracking-[0.05em] text-base-400 pb-1">
+                <div className="text-label uppercase tracking-[0.05em] text-base-400 pb-1">
                   Today
                 </div>
                 {today.map(renderItem)}
@@ -396,7 +396,7 @@ export default function AnnotationTimeline({ orderId }: Props) {
             {earlier.length > 0 && (
               <>
                 <div
-                  className={`text-[10px] uppercase tracking-[0.05em] text-base-400 pb-1 ${
+                  className={`text-label uppercase tracking-[0.05em] text-base-400 pb-1 ${
                     today.length > 0 ? "pt-3" : ""
                   }`}
                 >
@@ -406,7 +406,7 @@ export default function AnnotationTimeline({ orderId }: Props) {
               </>
             )}
             {items.length === 0 && (
-              <div className="text-[12px] text-base-400 py-2">Nothing in this filter.</div>
+              <div className="text-meta text-base-400 py-2">Nothing in this filter.</div>
             )}
           </div>
         </>
@@ -431,7 +431,7 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border transition-colors"
+      className="inline-flex items-center gap-1 text-label px-2 py-0.5 rounded-full border transition-colors"
       style={{
         color: active ? "#FFFFFF" : "#4B5563",
         background: active ? "#221F20" : "#FFFFFF",

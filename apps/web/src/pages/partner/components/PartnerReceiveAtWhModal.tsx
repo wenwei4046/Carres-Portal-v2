@@ -126,7 +126,7 @@ export default function PartnerReceiveAtWhModal({ po, onClose }: Props) {
       onClose={onClose}
       size="lg"
     >
-      <div className="text-[12px] text-base-600 mb-3.5 font-body">
+      <div className="text-meta text-base-600 mb-3.5 font-body">
         You&rsquo;re delivering{" "}
         <strong>{po.suppliers?.name ?? "supplier"}</strong>&rsquo;s goods to{" "}
         <strong>{po.warehouses?.name ?? "warehouse"}</strong>. Upload the signed
@@ -177,17 +177,17 @@ export default function PartnerReceiveAtWhModal({ po, onClose }: Props) {
                 aria-label={`Tick ${l.sku} to receive`}
               />
               <div>
-                <div className="text-[12px] font-body">{l.sku}</div>
+                <div className="text-meta font-body">{l.sku}</div>
                 {variantLabel && (
-                  <div className="text-[10.5px] text-base-700 font-body">
+                  <div className="text-label text-base-700 font-body">
                     {variantLabel}
                   </div>
                 )}
-                <div className="font-mono text-[10px] text-base-500 mt-0.5">
+                <div className="font-mono text-label text-base-500 mt-0.5">
                   Ordered {l.qty} · already received {l.received_qty ?? 0}
                 </div>
               </div>
-              <div className="font-mono text-[12px] text-right font-semibold">
+              <div className="font-mono text-meta text-right font-semibold">
                 {pending}
               </div>
               <input
@@ -200,7 +200,7 @@ export default function PartnerReceiveAtWhModal({ po, onClose }: Props) {
                   setLine(l.id, parseInt(e.target.value, 10) || 0, pending)
                 }
                 aria-label={`Receive qty for ${l.sku}`}
-                className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] text-right bg-white outline-none focus:border-base-500"
+                className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
               />
             </label>
           );
@@ -210,19 +210,19 @@ export default function PartnerReceiveAtWhModal({ po, onClose }: Props) {
             <button
               type="button"
               onClick={receiveAllPending}
-              className="btn-ghost text-[11px] py-0.5 px-2"
+              className="btn-ghost text-label py-0.5 px-2"
             >
               Receive all pending
             </button>
             <button
               type="button"
               onClick={clearAll}
-              className="btn-ghost text-[11px] py-0.5 px-2"
+              className="btn-ghost text-label py-0.5 px-2"
             >
               Clear
             </button>
           </div>
-          <div className="font-mono text-[11px] font-semibold">
+          <div className="font-mono text-label font-semibold">
             Σ {totalReceiving} unit{totalReceiving === 1 ? "" : "s"} this DO
           </div>
         </div>
@@ -239,7 +239,7 @@ export default function PartnerReceiveAtWhModal({ po, onClose }: Props) {
             onChange={(e) => setDoNumber(e.target.value)}
             className={INPUT_CLS}
           />
-          <div className="text-[10px] text-base-500 mt-1 font-body">
+          <div className="text-label text-base-500 mt-1 font-body">
             From the signed delivery order accompanying the goods.
           </div>
         </div>
@@ -257,7 +257,7 @@ export default function PartnerReceiveAtWhModal({ po, onClose }: Props) {
           />
         </div>
         <div className="px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] bg-white">
-          <div className="text-[11px] text-base-600 mb-2 font-body">
+          <div className="text-label text-base-600 mb-2 font-body">
             Attach signed DO file{" "}
             <span className="text-base-400">(PDF/JPG/PNG · ≤10 MB)</span>
           </div>
@@ -274,7 +274,7 @@ export default function PartnerReceiveAtWhModal({ po, onClose }: Props) {
             onChange={(e) => setSigned(e.target.checked)}
             className="accent-primary"
           />
-          <span className="text-[12px] font-body">
+          <span className="text-meta font-body">
             Goods delivered + DO signed by warehouse staff
           </span>
         </label>

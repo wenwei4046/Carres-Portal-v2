@@ -88,14 +88,14 @@ export function Modal({ title, onClose, children, size = "default" }: ModalProps
         }}
       >
         <div className="px-6 pt-4 pb-3 border-b border-base-100 flex justify-between items-center">
-          <div className="t-h3 font-display">
+          <div className="text-strong font-display">
             {title}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close modal"
-            className="p-1 text-[18px] text-base-700 hover:text-base-900 leading-none"
+            className="p-1 text-strong text-base-700 hover:text-base-900 leading-none"
           >
             ×
           </button>
@@ -127,14 +127,14 @@ export function ModalActions({
 }: ModalActionsProps) {
   return (
     <div className="flex justify-end gap-2 mt-1">
-      <button type="button" onClick={onCancel} className="btn-ghost text-[12px]">
+      <button type="button" onClick={onCancel} className="btn-ghost text-meta">
         Cancel
       </button>
       <button
         type="button"
         onClick={onPrimary}
         disabled={primaryDisabled || primaryPending}
-        className={`${danger ? "btn-danger" : "btn-primary"} text-[12px] disabled:opacity-40`}
+        className={`${danger ? "btn-danger" : "btn-primary"} text-meta disabled:opacity-40`}
       >
         {primaryPending ? "Working…" : primary}
       </button>
@@ -148,7 +148,7 @@ export function ModalActions({
  * v2 consistency.
  */
 export const INPUT_CLS =
-  "w-full px-3 py-2 border border-base-300 rounded-[4px] text-[13px] bg-white outline-none focus:border-base-500";
+  "w-full px-3 py-2 border border-base-300 rounded-[4px] text-body bg-white outline-none focus:border-base-500";
 
 /** Section heading used inside the OrderDetailDrawer body. */
 export function SectionHead({ children }: { children: React.ReactNode }) {

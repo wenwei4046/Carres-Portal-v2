@@ -48,14 +48,14 @@ export default function GuaranteeCoverStrip({ orderId }: { orderId: string }) {
     <div className="mt-2 rounded border border-primary/30 bg-primary/5 px-2.5 py-2">
       <div className="flex items-center gap-1.5 mb-1.5">
         <ShieldCheck size={14} strokeWidth={2} className="text-primary" />
-        <span className="t-tiny font-semibold uppercase tracking-wide text-primary">
+        <span className="text-meta font-semibold uppercase tracking-wide text-primary">
           Guarantee
         </span>
       </div>
       <ul className="flex flex-col gap-1.5">
         {items.map((g) => (
           <li key={g.id} className="flex items-start justify-between gap-2">
-            <span className="min-w-0 text-[12px] text-base-800">
+            <span className="min-w-0 text-meta text-base-800">
               {/* The ID leads: it is what the customer quotes at claim time. */}
               <span
                 className={`font-mono ${

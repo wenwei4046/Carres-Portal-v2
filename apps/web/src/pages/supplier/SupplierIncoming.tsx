@@ -45,13 +45,13 @@ export default function SupplierIncoming() {
   return (
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="mb-7">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+        <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
           Forecast
         </div>
-        <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
+        <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
           Incoming Demand
         </h1>
-        <div className="text-[13px] text-muted-foreground">
+        <div className="text-body text-muted-foreground">
           Two demand buckets: <strong>committed</strong> (issued POs) and{" "}
           <strong>pending</strong> (sales orders not yet POed). Aggregated only —
           no customer-level detail.
@@ -69,25 +69,25 @@ export default function SupplierIncoming() {
           }`}
         >
           <div
-            className={`text-[10px] uppercase tracking-[0.06em] ${
+            className={`text-label uppercase tracking-[0.06em] ${
               totalUnits > 0 ? "text-primary" : "text-muted-foreground"
             }`}
           >
             Total demand
           </div>
           <div className="flex items-baseline gap-3 mt-2">
-            <div className="font-display text-[44px] leading-none">
+            <div className="font-display text-page leading-none">
               {totalUnits}
             </div>
             {totalUnits > 0 && (
-              <div className="text-[12px] text-muted-foreground leading-snug">
+              <div className="text-meta text-muted-foreground leading-snug">
                 = <span className="font-mono">{totalOpenUnits}</span> committed
                 {" + "}
                 <span className="font-mono">{totalPendingUnits}</span> pending
               </div>
             )}
           </div>
-          <div className="text-[11px] text-muted-foreground mt-2">
+          <div className="text-label text-muted-foreground mt-2">
             Across {relevant.length} SKU{relevant.length === 1 ? "" : "s"}
           </div>
         </div>
@@ -106,10 +106,10 @@ export default function SupplierIncoming() {
 
       {relevant.length === 0 ? (
         <div className="border border-border rounded-md p-10 text-center bg-card">
-          <div className="text-[14px] text-muted-foreground">
+          <div className="text-body text-muted-foreground">
             No incoming demand right now.
           </div>
-          <div className="text-[12px] text-muted-foreground mt-1.5">
+          <div className="text-meta text-muted-foreground mt-1.5">
             New sales orders + POs from Carres will appear here as they land.
           </div>
         </div>
@@ -121,10 +121,10 @@ export default function SupplierIncoming() {
             data-testid={`incoming-cat-${cat}`}
           >
             <div className="px-5 py-3.5 border-b border-border flex items-baseline justify-between bg-secondary/30">
-              <div className="text-[10px] uppercase tracking-[0.12em] font-semibold">
+              <div className="text-label uppercase tracking-[0.12em] font-semibold">
                 {cat.charAt(0).toUpperCase() + cat.slice(1)}
               </div>
-              <div className="font-mono text-[11px] text-muted-foreground">
+              <div className="font-mono text-label text-muted-foreground">
                 {/* Total = committed + pending, matching the hero KPI math —
                     committed-only here understated categories whose demand is
                     mostly un-POed sales orders (Loo 2026-06-04). */}
@@ -142,10 +142,10 @@ export default function SupplierIncoming() {
                   }`}
                 >
                   <div className="min-w-0">
-                    <div className="text-[14px] font-semibold truncate">
+                    <div className="text-body font-semibold truncate">
                       {it.sku}
                     </div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                    <div className="text-label text-muted-foreground mt-0.5">
                       {it.poCount} PO{it.poCount === 1 ? "" : "s"}
                       {it.pendingOrderCount > 0 && (
                         <>
@@ -157,22 +157,22 @@ export default function SupplierIncoming() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="font-mono text-[18px] font-bold">
+                    <span className="font-mono text-strong font-semibold">
                       {it.openQty}
                     </span>
-                    <span className="text-[9px] uppercase tracking-[0.06em] text-muted-foreground ml-1.5">
+                    <span className="text-label uppercase tracking-[0.06em] text-muted-foreground ml-1.5">
                       committed
                     </span>
                   </div>
                   <div className="text-right">
                     <span
-                      className={`font-mono text-[18px] font-bold ${
+                      className={`font-mono text-strong font-semibold ${
                         it.pendingQty > 0 ? "text-primary" : "text-muted-foreground"
                       }`}
                     >
                       {it.pendingQty ?? 0}
                     </span>
-                    <span className="text-[9px] uppercase tracking-[0.06em] text-muted-foreground ml-1.5">
+                    <span className="text-label uppercase tracking-[0.06em] text-muted-foreground ml-1.5">
                       pending
                     </span>
                   </div>
@@ -183,7 +183,7 @@ export default function SupplierIncoming() {
         ))
       )}
 
-      <div className="text-[11px] text-muted-foreground leading-snug mt-5">
+      <div className="text-label text-muted-foreground leading-snug mt-5">
         Demand shown is aggregated only. A formal Purchase Order is issued by
         Carres Procurement before any production commitment.
       </div>
@@ -209,17 +209,17 @@ function Kpi({
       }`}
     >
       <div
-        className={`text-[10px] uppercase tracking-[0.06em] ${
+        className={`text-label uppercase tracking-[0.06em] ${
           accent ? "text-primary" : "text-muted-foreground"
         }`}
       >
         {label}
       </div>
-      <div className="font-display text-[28px] mt-1.5 leading-none">
+      <div className="font-display text-page mt-1.5 leading-none">
         {value}
       </div>
       {hint && (
-        <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>
+        <div className="text-label text-muted-foreground mt-1.5">{hint}</div>
       )}
     </div>
   );

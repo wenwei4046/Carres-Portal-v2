@@ -31,7 +31,7 @@ export default function ApprovalKindBadge({ kind }: Props) {
   const label = KIND_LABEL[kind] ?? "Other";
   return (
     <span
-      className={`px-2 py-px rounded-full text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${cls}`}
+      className={`px-2 py-px rounded-full text-label font-semibold uppercase tracking-wider whitespace-nowrap ${cls}`}
     >
       {label}
     </span>

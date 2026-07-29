@@ -66,10 +66,10 @@ export default function InviteDealerModal({ onClose }: Props) {
       />
       <div className="relative w-[440px] p-6 bg-white border border-base-200 rounded-md">
         <div className="kicker">Network</div>
-        <div className="font-display text-[20px] mt-1 mb-1.5 font-semibold">
+        <div className="font-display text-title mt-1 mb-1.5 font-semibold">
           Invite a new dealer
         </div>
-        <div className="text-[12px] text-base-600 mb-[18px]">
+        <div className="text-meta text-base-600 mb-[18px]">
           They&apos;ll appear with status <strong>Pending</strong> until approved.
         </div>
         <div className="grid gap-3 mb-[18px]">
@@ -123,14 +123,14 @@ function Field({
 }) {
   return (
     <div>
-      <div className="text-[9.5px] uppercase tracking-wider text-base-500 font-semibold mb-1">
+      <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1">
         {label}
       </div>
       <input
         value={v}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2.5 border border-base-200 rounded text-[13px] outline-none box-border"
+        className="w-full px-3 py-2.5 border border-base-200 rounded text-body outline-none box-border"
       />
     </div>
   );

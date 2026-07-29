@@ -206,7 +206,7 @@ export default function PODUploadDialog({
   return (
     <Modal title={`Delivery photo · ${titleRef}`} onClose={onClose}>
       <div
-        className="text-[12px] text-base-600 mb-3.5 font-body"
+        className="text-meta text-base-600 mb-3.5 font-body"
         data-testid="pod-upload-dialog"
       >
         Drop off at <strong>{row.customer_name}</strong>
@@ -250,7 +250,7 @@ export default function PODUploadDialog({
         </div>
 
         <div className="px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] bg-white">
-          <div className="text-[11px] text-base-600 mb-2 font-body">
+          <div className="text-label text-base-600 mb-2 font-body">
             Attach delivery photo *{" "}
             <span className="text-base-400">(JPG/PNG/PDF · ≤10 MB)</span>
           </div>
@@ -263,7 +263,7 @@ export default function PODUploadDialog({
               onChange={handleChange}
               disabled={uploading || attach.isPending}
               aria-label="Delivery photo file"
-              className="block w-full text-[12px]"
+              className="block w-full text-meta"
               data-testid="pod-file-input"
             />
           ) : (
@@ -277,20 +277,20 @@ export default function PODUploadDialog({
                 />
               ) : (
                 <div className="flex items-center gap-3 py-3 px-1">
-                  <div className="w-10 h-12 bg-base-100 border border-base-200 rounded-sm flex items-center justify-center font-mono text-[10px] text-base-700">
+                  <div className="w-10 h-12 bg-base-100 border border-base-200 rounded-sm flex items-center justify-center font-mono text-label text-base-700">
                     PDF
                   </div>
-                  <div className="font-body text-[12.5px] text-base-800 truncate">
+                  <div className="font-body text-meta text-base-800 truncate">
                     {pickedName}
                   </div>
                 </div>
               )}
               <div className="flex justify-between items-center mt-2.5 pt-2.5 border-t border-base-100">
-                <div className="font-mono text-[11px] text-base-600 truncate pr-2">
+                <div className="font-mono text-label text-base-600 truncate pr-2">
                   {pickedName}
                   {sizeMb && <span className="text-base-400"> · {sizeMb} MB</span>}
                 </div>
-                <div className="text-[11px] font-body">
+                <div className="text-label font-body">
                   {uploading ? (
                     <span className="text-base-500">Uploading…</span>
                   ) : uploadedPath ? (
@@ -302,7 +302,7 @@ export default function PODUploadDialog({
                 type="button"
                 onClick={handleRepick}
                 disabled={uploading || attach.isPending}
-                className="mt-2 text-[11px] underline text-base-600 disabled:opacity-50"
+                className="mt-2 text-label underline text-base-600 disabled:opacity-50"
                 data-testid="pod-repick"
               >
                 Choose a different file
@@ -322,7 +322,7 @@ export default function PODUploadDialog({
 
           {error && (
             <p
-              className="text-[11px] text-destructive mt-1.5"
+              className="text-label text-destructive mt-1.5"
               data-testid="pod-error"
             >
               {error}
@@ -342,7 +342,7 @@ export default function PODUploadDialog({
             className={INPUT_CLS}
             data-testid="pod-signer-name"
           />
-          <div className="text-[11px] text-base-600 mt-2.5 mb-1.5 font-body">
+          <div className="text-label text-base-600 mt-2.5 mb-1.5 font-body">
             Customer signature *
           </div>
           <SignaturePad

@@ -72,9 +72,9 @@ export default function StockHealthPanel() {
       <header className="px-4 py-3 border-b border-base-100">
         <div className="flex items-center gap-1.5">
           <Activity size={16} strokeWidth={2} className="text-base-400" />
-          <span className="t-h4 text-base-900">Stock health</span>
+          <span className="text-strong text-base-900">Stock health</span>
         </div>
-        <div className="text-[13px] text-base-900 mt-1" data-testid="health-headline">
+        <div className="text-body text-base-900 mt-1" data-testid="health-headline">
           {data.headline}
         </div>
       </header>
@@ -100,14 +100,14 @@ export default function StockHealthPanel() {
       {openRung ? (
         <div className="px-4 pb-3" data-testid={`health-rows-${openRung}`}>
           {rows.length === 0 ? (
-            <div className="text-[12px] text-base-500 py-1">
+            <div className="text-meta text-base-500 py-1">
               No item is {STOCK_HEALTH_LABEL[openRung].toLowerCase()}.
             </div>
           ) : (
             rows.map((r) => (
               <div
                 key={r.sku}
-                className="flex items-baseline justify-between gap-3 text-[12px] py-1 border-t border-base-100 first:border-t-0"
+                className="flex items-baseline justify-between gap-3 text-meta py-1 border-t border-base-100 first:border-t-0"
                 data-testid={`health-row-${r.sku}`}
               >
                 <span className="text-base-900 truncate" title={r.sku}>
@@ -142,7 +142,7 @@ export default function StockHealthPanel() {
             ))
           )}
           {openRung === "unrated" && rows.length > 0 ? (
-            <div className="text-[12px] text-base-600 pt-2">
+            <div className="text-meta text-base-600 pt-2">
               Set when to buy on the Reorder card under On hand, and how low it
               may go under &ldquo;How low it may go&rdquo; below.
             </div>
@@ -173,9 +173,9 @@ function NotSelling({ data }: { data: OpsStockHealthResponse }) {
   return (
     <div className="px-4 py-3 border-t border-base-100" data-testid="not-selling">
       <div className="flex items-baseline justify-between gap-3">
-        <div className="t-micro text-base-400">Not selling</div>
+        <div className="text-label uppercase tracking-[0.05em] text-base-400">Not selling</div>
         {windows.some((w) => w.ready) ? (
-          <div className="text-[12px] text-base-600">
+          <div className="text-meta text-base-600">
             {windows
               .filter((w) => w.ready)
               .map((w) => `${w.count} over ${w.days} days`)
@@ -185,11 +185,11 @@ function NotSelling({ data }: { data: OpsStockHealthResponse }) {
       </div>
 
       {data.slowWithheldReason ? (
-        <div className="text-[12px] text-base-600 mt-1" data-testid="not-selling-withheld">
+        <div className="text-meta text-base-600 mt-1" data-testid="not-selling-withheld">
           {data.slowWithheldReason}
         </div>
       ) : rows.length === 0 ? (
-        <div className="text-[12px] text-base-600 mt-1">
+        <div className="text-meta text-base-600 mt-1">
           Everything on the floor has sold recently.
         </div>
       ) : (
@@ -197,7 +197,7 @@ function NotSelling({ data }: { data: OpsStockHealthResponse }) {
           {rows.slice(0, 8).map((r) => (
             <div
               key={r.sku}
-              className="flex items-baseline justify-between gap-3 text-[12px] py-1 border-t border-base-100 first:border-t-0"
+              className="flex items-baseline justify-between gap-3 text-meta py-1 border-t border-base-100 first:border-t-0"
               data-testid={`not-selling-${r.sku}`}
             >
               <span className="text-base-900 truncate" title={r.sku}>
@@ -213,7 +213,7 @@ function NotSelling({ data }: { data: OpsStockHealthResponse }) {
             </div>
           ))}
           {rows.length > 8 ? (
-            <div className="text-[12px] text-base-500 pt-1">
+            <div className="text-meta text-base-500 pt-1">
               and {rows.length - 8} more
             </div>
           ) : null}
@@ -237,9 +237,9 @@ function NotSelling({ data }: { data: OpsStockHealthResponse }) {
 function PlanAccuracy({ months }: { months: OpsMonthAccuracy[] }) {
   return (
     <div className="px-4 py-3 border-t border-base-100" data-testid="plan-accuracy">
-      <div className="t-micro text-base-400">Did the plan work?</div>
+      <div className="text-label uppercase tracking-[0.05em] text-base-400">Did the plan work?</div>
       {months.length === 0 ? (
-        <div className="text-[12px] text-base-600 mt-1" data-testid="accuracy-empty">
+        <div className="text-meta text-base-600 mt-1" data-testid="accuracy-empty">
           No month has been approved yet. Once one is, this compares what was
           asked for against what actually sold.
         </div>
@@ -247,7 +247,7 @@ function PlanAccuracy({ months }: { months: OpsMonthAccuracy[] }) {
         months.slice(0, 6).map((m) => (
           <div
             key={m.period}
-            className="text-[12px] py-1.5 border-t border-base-100 first:border-t-0"
+            className="text-meta py-1.5 border-t border-base-100 first:border-t-0"
             data-testid={`accuracy-${m.period}`}
           >
             <div className="flex items-baseline justify-between gap-3">

@@ -54,8 +54,8 @@ export default function StairCarryFeeSection({
 
   return (
     <section data-testid="stair-carry-section">
-      <div className="t-h4 font-display mb-1">Stair-carry fee</div>
-      <p className="t-tiny text-base-500 mb-3">
+      <div className="text-strong font-display mb-1">Stair-carry fee</div>
+      <p className="text-meta text-base-500 mb-3">
         Free up to a floor, then a per-floor-per-item charge. Carres does not
         stair-carry above floor {MAX_DELIVERY_FLOOR}. Separate from the delivery
         trip fee — both fold into the order total.
@@ -91,7 +91,7 @@ export default function StairCarryFeeSection({
             type="button"
             onClick={save}
             disabled={!valid || !dirty || patch.isPending}
-            className="btn-primary text-[12px] disabled:opacity-40"
+            className="btn-primary text-meta disabled:opacity-40"
           >
             {patch.isPending ? "Saving…" : "Save"}
           </button>

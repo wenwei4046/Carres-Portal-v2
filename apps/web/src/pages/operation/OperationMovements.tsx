@@ -281,17 +281,17 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
   if (movementsQ.isError) {
     return (
       <div className="px-9 py-7 pb-14">
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-2">
             Couldn&rsquo;t load movements
           </div>
-          <div className="text-[12px] text-base-700 mb-3">
+          <div className="text-meta text-base-700 mb-3">
             {(movementsQ.error as Error | undefined)?.message ?? "Unknown error"}
           </div>
           <button
             type="button"
             onClick={() => void movementsQ.refetch()}
-            className="btn-secondary text-[11px] py-1.5 px-3"
+            className="btn-secondary text-label py-1.5 px-3"
           >
             Retry
           </button>
@@ -320,11 +320,11 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
             <span className="mx-1.5 text-base-300">/</span>
             <span>Movement log</span>
           </div>
-          <h1 className="t-h1 font-display mt-1.5 text-base-900">
+          <h1 className="text-page font-display mt-1.5 text-base-900">
             Stock in &amp; out history
           </h1>
           <div
-            className="font-body text-[13px] text-base-600 mt-1"
+            className="font-body text-body text-base-600 mt-1"
             data-testid="movements-summary"
           >
             Showing <strong>{rows.length}</strong> movement
@@ -339,7 +339,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
             type="button"
             onClick={exportCSV}
             disabled={rows.length === 0}
-            className="btn-secondary text-[12px] py-2 px-3.5"
+            className="btn-secondary text-meta py-2 px-3.5"
             data-testid="movements-export-csv"
           >
             <Download size={14} strokeWidth={2} className="inline -mt-px mr-1.5" />Export CSV
@@ -347,7 +347,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
           <button
             type="button"
             onClick={clearAll}
-            className="btn-ghost text-[12px] py-2 px-3.5"
+            className="btn-ghost text-meta py-2 px-3.5"
             data-testid="movements-clear-filters"
           >
             Clear filters
@@ -366,10 +366,10 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
           data-testid="movements-kpi-count"
         >
           <div className="label">Movements</div>
-          <div className="font-mono text-[28px] font-semibold mt-0.5 leading-none text-base-900">
+          <div className="font-mono text-page font-semibold mt-0.5 leading-none text-base-900">
             {rows.length}
           </div>
-          <div className="font-body text-[11px] text-base-500 mt-1.5">
+          <div className="font-body text-label text-base-500 mt-1.5">
             in this period
           </div>
         </div>
@@ -382,12 +382,12 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
             <ArrowUp size={12} strokeWidth={2.5} /> Stock in
           </div>
           <div
-            className="font-mono text-[28px] font-semibold mt-0.5 leading-none"
+            className="font-mono text-page font-semibold mt-0.5 leading-none"
             style={{ color: "var(--success)" }}
           >
             +{inUnits}
           </div>
-          <div className="font-body text-[11px] text-base-500 mt-1.5">
+          <div className="font-body text-label text-base-500 mt-1.5">
             units received
           </div>
         </div>
@@ -400,12 +400,12 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
             <ArrowDown size={12} strokeWidth={2.5} /> Stock out
           </div>
           <div
-            className="font-mono text-[28px] font-semibold mt-0.5 leading-none"
+            className="font-mono text-page font-semibold mt-0.5 leading-none"
             style={{ color: "var(--terracotta)" }}
           >
             −{outUnits}
           </div>
-          <div className="font-body text-[11px] text-base-500 mt-1.5">
+          <div className="font-body text-label text-base-500 mt-1.5">
             units delivered
           </div>
         </div>
@@ -415,7 +415,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
         >
           <div className="label">Net change</div>
           <div
-            className="font-mono text-[28px] font-semibold mt-0.5 leading-none"
+            className="font-mono text-page font-semibold mt-0.5 leading-none"
             style={{
               color: netUnits >= 0 ? "var(--success)" : "var(--danger)",
             }}
@@ -423,7 +423,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
             {netUnits >= 0 ? "+" : ""}
             {netUnits}
           </div>
-          <div className="font-body text-[11px] text-base-500 mt-1.5">
+          <div className="font-body text-label text-base-500 mt-1.5">
             balance delta
           </div>
         </div>
@@ -445,7 +445,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
                   type="button"
                   onClick={() => setPeriod(p.key)}
                   data-testid={`movements-period-${p.key}`}
-                  className="rounded-[4px] text-[12px] transition-colors"
+                  className="rounded-[4px] text-meta transition-colors"
                   style={{
                     all: "unset",
                     cursor: "pointer",
@@ -507,7 +507,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
               aria-label="From date"
-              className="border border-base-300 rounded-[4px] py-1.5 px-2.5 text-[12px] bg-white outline-none focus:border-base-500"
+              className="border border-base-300 rounded-[4px] py-1.5 px-2.5 text-meta bg-white outline-none focus:border-base-500"
               style={{ width: 160 }}
               data-testid="movements-custom-from"
             />
@@ -517,13 +517,13 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
               aria-label="To date"
-              className="border border-base-300 rounded-[4px] py-1.5 px-2.5 text-[12px] bg-white outline-none focus:border-base-500"
+              className="border border-base-300 rounded-[4px] py-1.5 px-2.5 text-meta bg-white outline-none focus:border-base-500"
               style={{ width: 160 }}
               data-testid="movements-custom-to"
             />
             {customMissingDates && (
               <span
-                className="text-[11px] text-base-500 ml-2"
+                className="text-label text-base-500 ml-2"
                 data-testid="movements-custom-hint"
               >
                 Pick both from and to dates.
@@ -545,7 +545,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
           value={warehouseId ?? ""}
           onChange={(e) => setWarehouseId(e.target.value || undefined)}
           aria-label="Warehouse"
-          className="border border-base-300 rounded-[4px] py-2 px-2.5 text-[12px] bg-white outline-none focus:border-base-500"
+          className="border border-base-300 rounded-[4px] py-2 px-2.5 text-meta bg-white outline-none focus:border-base-500"
           data-testid="movements-filter-warehouse"
         >
           <option value="">All warehouses</option>
@@ -562,7 +562,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
             setSku(undefined);
           }}
           aria-label="Category"
-          className="border border-base-300 rounded-[4px] py-2 px-2.5 text-[12px] bg-white outline-none focus:border-base-500"
+          className="border border-base-300 rounded-[4px] py-2 px-2.5 text-meta bg-white outline-none focus:border-base-500"
           data-testid="movements-filter-category"
         >
           {CATEGORY_OPTIONS.map((c) => (
@@ -575,7 +575,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
           value={sku ?? ""}
           onChange={(e) => setSku(e.target.value || undefined)}
           aria-label="SKU"
-          className="border border-base-300 rounded-[4px] py-2 px-2.5 text-[12px] bg-white outline-none focus:border-base-500"
+          className="border border-base-300 rounded-[4px] py-2 px-2.5 text-meta bg-white outline-none focus:border-base-500"
           data-testid="movements-filter-sku"
         >
           <option value="">All SKUs</option>
@@ -589,7 +589,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
           value={kind}
           onChange={(e) => setKind(e.target.value as NonNullable<MovementsFilters["kind"]>)}
           aria-label="Kind"
-          className="border border-base-300 rounded-[4px] py-2 px-2.5 text-[12px] bg-white outline-none focus:border-base-500"
+          className="border border-base-300 rounded-[4px] py-2 px-2.5 text-meta bg-white outline-none focus:border-base-500"
           data-testid="movements-filter-kind"
         >
           <option value="all">In + Out</option>
@@ -602,7 +602,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search ref / note…"
           aria-label="Search ref or note"
-          className="border border-base-300 rounded-[4px] py-2 px-2.5 text-[12px] bg-white outline-none focus:border-base-500"
+          className="border border-base-300 rounded-[4px] py-2 px-2.5 text-meta bg-white outline-none focus:border-base-500"
           data-testid="movements-filter-search"
         />
       </div>
@@ -610,7 +610,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
       {/* Body */}
       {customMissingDates ? (
         <div
-          className="bg-white border border-base-200 rounded-md p-12 text-center text-base-500 text-[13px]"
+          className="bg-white border border-base-200 rounded-md p-12 text-center text-base-500 text-body"
           data-testid="movements-empty"
         >
           Pick a custom date range above to see movements.
@@ -620,7 +620,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
           <MovementTableHeader />
           {rows.length === 0 ? (
             <div
-              className="p-12 text-center text-base-500 text-[13px]"
+              className="p-12 text-center text-base-500 text-body"
               data-testid="movements-empty"
             >
               No movements match these filters.
@@ -640,7 +640,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
         <div className="flex flex-col gap-3.5" data-testid="movements-by-month">
           {byMonth.length === 0 ? (
             <div
-              className="bg-white border border-base-200 rounded-md p-12 text-center text-base-500 text-[13px]"
+              className="bg-white border border-base-200 rounded-md p-12 text-center text-base-500 text-body"
               data-testid="movements-empty"
             >
               No movements match these filters.
@@ -654,10 +654,10 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
               >
                 <div className="flex justify-between items-center px-5 py-3.5 border-b border-base-100 bg-base-50">
                   <div>
-                    <div className="t-h3 font-display">
+                    <div className="text-strong font-display">
                       {g.label}
                     </div>
-                    <div className="font-body text-[11px] text-base-500 mt-0.5">
+                    <div className="font-body text-label text-base-500 mt-0.5">
                       {g.items.length} movement{g.items.length === 1 ? "" : "s"}
                     </div>
                   </div>
@@ -667,7 +667,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
                         <ArrowUp size={11} strokeWidth={2.5} /> in
                       </div>
                       <div
-                        className="font-mono text-[18px] font-semibold"
+                        className="font-mono text-strong font-semibold"
                         style={{ color: "var(--success)" }}
                       >
                         +{g.inUnits}
@@ -678,7 +678,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
                         <ArrowDown size={11} strokeWidth={2.5} /> out
                       </div>
                       <div
-                        className="font-mono text-[18px] font-semibold"
+                        className="font-mono text-strong font-semibold"
                         style={{ color: "var(--terracotta)" }}
                       >
                         −{g.outUnits}
@@ -687,7 +687,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
                     <div className="text-right">
                       <div className="label">net</div>
                       <div
-                        className="font-mono text-[18px] font-semibold"
+                        className="font-mono text-strong font-semibold"
                         style={{
                           color:
                             g.inUnits - g.outUnits >= 0
@@ -722,7 +722,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
           users know there might be older rows hidden. */}
       {rows.length === limit && (
         <div
-          className="text-[11px] text-base-500 mt-3 text-center"
+          className="text-label text-base-500 mt-3 text-center"
           data-testid="movements-limit-hint"
         >
           Showing the most recent {limit} movements. Tighten filters to see
@@ -737,7 +737,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
 const ROW_GRID = "120px 70px 1.6fr 1fr 90px 1.6fr 100px";
 
 function MovementTableHeader() {
-  const h = "text-[11px] font-bold uppercase tracking-[0.02em] text-white";
+  const h = "text-label font-semibold uppercase tracking-[0.02em] text-white";
   return (
     <div
       className="grid items-center px-[18px] py-2.5 bg-base-700 border-b-2 border-primary gap-2.5"
@@ -796,16 +796,16 @@ function MovementTableRow({
   return (
     <div
       data-testid={`movements-row-${row.id}`}
-      className="grid items-center px-[18px] py-3 border-t border-base-100 gap-2.5 text-[12.5px]"
+      className="grid items-center px-[18px] py-3 border-t border-base-100 gap-2.5 text-meta"
       style={{ gridTemplateColumns: ROW_GRID }}
     >
       <div className="font-body text-base-700 leading-snug">
         <div className="font-medium">{datePretty}</div>
-        <div className="text-[10.5px] text-base-500">{timePretty}</div>
+        <div className="text-label text-base-500">{timePretty}</div>
       </div>
       <div>
         <span
-          className="font-ui font-bold uppercase rounded-[3px] inline-block"
+          className="font-ui font-semibold uppercase rounded-[3px] inline-block"
           style={{
             fontSize: 9.5,
             letterSpacing: "0.08em",
@@ -833,15 +833,15 @@ function MovementTableRow({
       <div className="font-body text-base-700 leading-snug min-w-0">
         {row.ref ? <div className="font-medium truncate">{row.ref}</div> : null}
         {row.note ? (
-          <div className="text-[10.5px] text-base-500 mt-0.5 truncate">
+          <div className="text-label text-base-500 mt-0.5 truncate">
             {row.note}
           </div>
         ) : null}
         {!row.ref && !row.note ? (
-          <div className="text-[10.5px] text-base-400">—</div>
+          <div className="text-label text-base-400">—</div>
         ) : null}
       </div>
-      <div className="font-body text-[10.5px] text-base-500 capitalize truncate">
+      <div className="font-body text-label text-base-500 capitalize truncate">
         {row.by_role ?? "—"}
       </div>
     </div>

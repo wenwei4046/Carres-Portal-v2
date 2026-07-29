@@ -105,8 +105,8 @@ export default function FollowUpForm({
   }
 
   const fieldCls =
-    "w-full text-[13px] px-2 py-1.5 border border-base-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary/40";
-  const labelCls = "block t-micro text-base-500 mb-1";
+    "w-full text-body px-2 py-1.5 border border-base-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary/40";
+  const labelCls = "block text-label uppercase tracking-[0.05em] text-base-500 mb-1";
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex justify-end" onClick={onClose}>
@@ -118,9 +118,9 @@ export default function FollowUpForm({
         <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-base-100">
           <div className="flex items-center gap-2">
             <Flag size={16} className="text-primary" />
-            <h2 className="t-h4">New follow-up</h2>
+            <h2 className="text-strong">New follow-up</h2>
             {so && (
-              <span className="t-tiny font-mono text-base-500">
+              <span className="text-meta font-mono text-base-500">
                 SO-{so}
                 {refNo ? ` · ${refNo}` : ""}
               </span>
@@ -189,7 +189,7 @@ export default function FollowUpForm({
             <button
               type="button"
               onClick={() => setUrgent((u) => !u)}
-              className={`shrink-0 t-micro px-2.5 py-2 rounded-md border ${
+              className={`shrink-0 text-label uppercase tracking-[0.05em] px-2.5 py-2 rounded-md border ${
                 urgent ? "border-danger text-danger bg-error-soft" : "border-base-200 text-base-500"
               }`}
             >
@@ -210,7 +210,7 @@ export default function FollowUpForm({
           </div>
 
           {createMut.isError && (
-            <div className="flex items-center gap-1.5 t-tiny text-danger">
+            <div className="flex items-center gap-1.5 text-meta text-danger">
               <AlertTriangle size={13} /> Couldn’t save — try again.
             </div>
           )}

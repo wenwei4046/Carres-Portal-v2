@@ -184,7 +184,7 @@ export default function CogsLineEditor({
           aria-label={`Cost for ${sku}`}
           data-testid={`cogs-cost-input-${sku}`}
           placeholder="0.00"
-          className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] text-right bg-white outline-none focus:border-base-500"
+          className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
         />
         <select
           value={costSource ?? ""}
@@ -196,7 +196,7 @@ export default function CogsLineEditor({
           disabled={disabled}
           aria-label={`Cost source for ${sku}`}
           data-testid={`cogs-source-select-${sku}`}
-          className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+          className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta bg-white outline-none focus:border-base-500"
         >
           <option value="" disabled>
             — pick source —
@@ -209,7 +209,7 @@ export default function CogsLineEditor({
 
       {recentCostQ.isFetching && isHeuristic && (
         <div
-          className="text-[10.5px] text-base-600 font-body"
+          className="text-label text-base-600 font-body"
           data-testid={`cogs-loading-${sku}`}
         >
           Loading recent cost…
@@ -220,7 +220,7 @@ export default function CogsLineEditor({
         <div
           role="status"
           data-testid={`cogs-no-history-${sku}`}
-          className="text-[10.5px] font-body"
+          className="text-label font-body"
           style={{ color: "var(--brand-signature)" }}
         >
           No historical data — please hand-enter.
@@ -231,7 +231,7 @@ export default function CogsLineEditor({
         <div
           role="alert"
           data-testid={`cogs-fetch-error-${sku}`}
-          className="text-[10.5px] font-body"
+          className="text-label font-body"
           style={{ color: "var(--destructive)" }}
         >
           {recentCostQ.error instanceof ApiError && recentCostQ.error.message
@@ -244,7 +244,7 @@ export default function CogsLineEditor({
         <div
           role="alert"
           data-testid={`cogs-hint-error-${sku}`}
-          className="text-[10.5px] font-body"
+          className="text-label font-body"
           style={{ color: "var(--destructive)" }}
         >
           {hintError}
