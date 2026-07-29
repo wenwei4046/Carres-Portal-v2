@@ -714,7 +714,12 @@ opportunity to break it.
 
 ---
 
-## D0.6 ✅ KIT-CONSOLIDATION — BUILT 2026-07-29
+## D0.6 ✅ KIT-CONSOLIDATION — CLOSED 2026-07-29
+
+> **PM review 2026-07-29: consolidation accepted; closed after the status
+> synchronisation below.** Every milestone merged into `main` — D0.5a · D0.5b · D0.5b.1 · D0.5c —
+> reads its real state in `docs/UI-KIT.md`, verified against the live repository. All findings
+> stay **Reported Only**. **D1 is not started.**
 
 **The five frozen principles are law.** Each landed in exactly one chapter, each with a
 `Rule · Enforcement · Status · Evidence` row, and a grep for each PM-ratified sentence returns
