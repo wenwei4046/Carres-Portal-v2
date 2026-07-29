@@ -93,3 +93,40 @@ if (dead.length) {
   process.exit(1);
 }
 console.log("\n✓ every provoked rule fires.\n");
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * THE COMMENT STRIPPER — its own control (PM review, 2026-07-29)
+ *
+ * D2 shipped the stripper as a regex that could not see a string, so `//` in a
+ * URL and `/*` in `accept="image/*"` opened comments that never closed, and
+ * every value after them on the line stopped being counted. It failed in the
+ * direction that looks like success: a smaller number. These two files put a
+ * real violation BEHIND each of those two shapes; under the old regex the count
+ * does not move, and that is the whole point of writing them down.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+const STRIPPER = [
+  ['export const X = () => <a href="https://carresofficial.com" className="text-[19px]">hi</a>;', "s1.tsx"],
+  // The trailing comment is load-bearing: the `/*` inside `image/*` only does
+  // damage once something LATER in the file supplies the `*/` that closes it.
+  // Without it the old regex finds no pair, blanks nothing, and the control
+  // passes for the wrong reason — a control that cannot fail proves nothing.
+  ['export const Y = () => <p title="image/*" className="text-[19px]">hi</p>;\n/* a later comment */', "s2.tsx"],
+];
+
+clean();
+const sBefore = counts();
+mkdirSync(LAB, { recursive: true });
+for (const [body, name] of STRIPPER) writeFileSync(join(LAB, name), body + "\n");
+let sAfter;
+try {
+  sAfter = counts();
+} finally {
+  clean();
+}
+const dD = (sAfter.D ?? 0) - (sBefore.D ?? 0);
+console.log(`Comment stripper — a value hidden behind a URL and behind \`image/*\``);
+console.log(`  D  ${sBefore.D} → ${sAfter.D}  ${dD === 2 ? "✓ both counted (+2)" : `✗ expected +2, got +${dD}`}\n`);
+if (dD !== 2) {
+  console.error("✗ the stripper is blanking code it should not — see scripts/lib/source-segments.mjs\n");
+  process.exit(1);
+}

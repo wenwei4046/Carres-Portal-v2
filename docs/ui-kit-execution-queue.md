@@ -50,7 +50,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ✅ **CLOSED as components-only** (PM, 2026-07-29), merged as PR #505 `929fa746`. The drawer is NOT migrated; real-page adoption is D6 |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **CLOSED 2026-07-29** — §8.0 · §0.3 · §0.4 · §0.5 · §10.1, the mirror re-based, §16 counted. Findings below, all Reported Only |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ✅ **BUILT 2026-07-29** — `scripts/check-design.mjs`, 348 files, 14 rules, 9,511 findings frozen. §16 is generated. Card below |
-| **D2** | codemod **typography** | ✅ **BUILT 2026-07-29** — 4,047 conversions in 235 files; guard rule D **3,239 → 33**, and all 33 are `index.css`. Card below |
+| **D2** | codemod **typography** | ✅ **BUILT 2026-07-29 · accepted with revisions at PM review the same day** — 4,052 conversions in 236 files; guard rule D **3,239 → 33**, and all 33 are `index.css`. Card below |
 | **D3 / D4** | codemod colour / spacing | ⏳ — the guard has them baselined at A 442 · B 8 and E 1,727 |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
 | **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ |
@@ -717,17 +717,26 @@ opportunity to break it.
 
 ## D2 ✅ THE TYPOGRAPHY CODEMOD — BUILT 2026-07-29
 
-**`scripts/codemod-d2-typography.mjs`** — mechanical, re-runnable, idempotent. **4,047 conversions
-across 235 files**, and guard rule **D falls 3,239 → 33**.
+**`scripts/codemod-d2-typography.mjs`** — mechanical, re-runnable, idempotent. **4,052 conversions
+across 236 files**, and guard rule **D falls 3,239 → 33**.
 
 ```
-  text-[Npx] → a §2.1 token ........ 2,731
+  text-[Npx] → a §2.1 token ........ 2,735
   Tailwind's own ramp → a token .....  309
-  the retired .t-* ramp → a token ...  843
+  the retired .t-* ramp → a token ...  844
   a dead weight → a §2.2 weight .....  164   (font-bold · font-black · font-extrabold)
                                      ─────
-                                     4,047 conversions in 235 files
+                                     4,052 conversions in 236 files
 ```
+
+> **These are the figures against `origin/main`, re-measured at the PM's review on 2026-07-29.**
+> They were taken on `e0a3c7a7`; main then moved to `cb3385eb` mid-review and the branch was
+> rebased again — **those three commits touch `docs/` only and no file under `apps/web/src`,
+> `scripts/` or `docs/UI-KIT.md`, checked rather than assumed**, so not one figure below moves.
+> The first run scored 4,047 in 235 files against an OLDER main; the branch was then
+> rebased, and the rebase brought in two Purchasing-P3 files the codemod had never seen. Re-running
+> it converted 19 more sites and the tally is stated against the tree being merged, not against the
+> tree the card started on. `--dry` now reports 0 — the run has converged.
 
 **All 33 survivors are `index.css`** — the class DEFINITIONS — and they survive on purpose:
 **110 uses of the `.t-*` ramp and 154 `text-[Npx]` live under `pages/dealer/**` and
@@ -807,6 +816,78 @@ either side of the block: byte-identical.
    `.t-*` / `.pos-proto` ramp for the POS. That is what §15 asks for, but the shipped CSS still
    emits `font-weight: 700` 114 times for Part B, so *"there is no 700 anywhere"* is true of the
    portal and NOT of the bundle. Worth knowing before anyone greps the CSS as proof.
+
+### PM REVIEW — accepted with revisions (2026-07-29). What the review changed
+
+**1 · The rebase was already done and the re-run was not.** `origin/main` is `e0a3c7a7` and the
+branch sits directly on it, so there was nothing to rebase — but the rebase had brought in two
+Purchasing-P3 files (`OperationReceiving.tsx`, `RecordSupplierAnswerModal.tsx`) that the codemod
+never saw, and **the guard was reading D at 51 against a baseline of 33**. Re-running converted 19
+sites; D is 33 again and `--dry` reports 0.
+
+**2 · The comment stripper could not see a string, and it failed in the flattering direction.**
+Both readers — D1's guard and D2's own codemod — asked *"where are the comments?"* with the same
+regex. `//` inside `href="https://…"` opened a line comment; `/*` inside `accept="image/*"` opened
+a block comment that ran until the next `*/` anywhere below. Everything in between stopped being
+counted and stopped being converted, **silently, and always as a smaller number.**
+
+The question is answered once now, in **`scripts/lib/source-segments.mjs`**, by a scanner that
+knows a string, a template's every `${…}`, and a regex literal from a comment. Measured across all
+644 files of `apps/web/src`: **3,763 characters the regex wrongly blanked are now visible, and the
+scanner blanks nothing extra** — a strictly one-directional change, so no comment became code.
+It found a real hit the guard had been missing: a hand-rolled `<input>` at
+`OrderDetailDrawer.tsx:6327`, hidden behind an `image/*` earlier in the file.
+
+**Both shapes now have a negative control** in `check-design.selftest.mjs`, and each was proved to
+FAIL under the old regex first — the `image/*` case needs a later `*/` in the same file or the old
+regex finds no pair, blanks nothing, and the control passes for the wrong reason.
+
+**3 · Baseline re-frozen** — `files 348 → 349 · E 1,725 → 1,727 · G 679 → 683`, D unchanged at 33.
+**The two rises are named rather than absorbed:** +2 E and +3 G arrived with main's own P3 files
+(measured on the rebased tree before anything in this review was touched), and the last +1 G is the
+`<input>` the stripper fix revealed. `takenAt` now reads `D2`, because a baseline labelled `D1`
+that D2 rewrote is exactly the stale fact this queue exists to prevent.
+
+**4 · Two figures in the law corrected**, as instructed — `848 → 844` (§2.1) and `169 → 164`
+(§2.2 ×2). **The PM's `843` is reported as `844` and the one-count difference is the point of the
+re-run:** 843 was the pre-rebase figure and `RecordSupplierAnswerModal.tsx` contributes one more
+`.t-tiny`. `164` matched exactly. Both were re-measured on `origin/main` with the fixed scanner,
+not carried over.
+
+**5 · Visual sanity check — what was and was not possible.** Order List, Order Detail and Dashboard
+all sit behind an operation login, and reaching them means typing a password into a form, which is
+not something a build chat does. What was checked instead, and it is the risk itself rather than a
+proxy: **every one of the 4,052 conversions was classified by size delta**, because only text that
+gets BIGGER can overflow or truncate.
+
+| Surface | Conversions | Same size | Smaller | Weight-only 700→600 | **Bigger** |
+|---|---|---|---|---|---|
+| Order List | 128 | 94 | 7 | 10 | **17** |
+| Order Detail | 309 | 277 | 4 | 19 | **9** |
+| Dashboard | 72 | 56 | 7 | 2 | **7** |
+
+**Every single "bigger" on all three surfaces is the sub-11px promotion the PM has already ruled
+Reported Only** — 9px / 9.5px / 10px / 10.5px → 11px, a floor §2.1 states outright. There is no
+other growth anywhere on the three pages. Of those 33 sites, **five sit on an element that can clip**
+(`line-clamp-1` ×1, `whitespace-nowrap` ×3, a fixed 16px badge ×1); the badge is provably unaffected
+and the other four widen a short label by 1–2px inside a flex row.
+
+Measured in a real browser on the built bundle (`vite preview`, computed styles): the six tokens
+render **24/600/32 · 20/600/28 · 15/600/22 · 13/400/18 · 12/400/16 · 11/500/14** exactly;
+`font-weight` takes **three values only — 400 · 500 · 600, no 700**; and **an explicit utility still
+wins over the token**, now proved for line-height as well as weight (`text-label leading-[16px]`
+computes 11px/500/**16px**, so the right-rail badge keeps its 16px line box). `/login` and `/ui`
+render with **zero document overflow and zero unintended truncation** — the only clipping on `/ui`
+is the showcase's own deliberate truncation demo, and `/login`'s 2px `.scroll-cue` overflow is
+pre-existing (D2 touches neither `Login.tsx` nor `Login.css`).
+
+**Re-verified after all of the above:** `tsc` clean · lint clean · guard all fourteen rules `=`
+against the re-frozen baseline · self-test fires on all twelve provoked rules plus the two stripper
+controls · `pnpm build` clean · **web suite 2,240 passed / 16 pre-existing** in the same four
+documented files, zero new · §16 regenerated byte-identically (75.00%, debt 3).
+
+**One figure NOT corrected, because the PM named two.** §2.1's *"the six tokens are used **3,970**
+times in scope"* measures **3,971** today. Left as it stands and reported instead of quietly edited.
 
 ---
 

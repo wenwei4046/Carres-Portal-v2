@@ -552,7 +552,7 @@ exactly the px / weight / line-height above.
 > touch.
 >
 > **D2 answered the rename question with a NO, and the reason is Part B**
-> (2026-07-29). The legacy `.t-*` ramp is gone from every in-scope file — 848
+> (2026-07-29). The legacy `.t-*` ramp is gone from every in-scope file — 844
 > uses converted — but **its definitions stay in `index.css`, because 110 uses
 > survive under `pages/dealer/**` and `pages/print/**`**, which §15 and §13.1 put
 > out of scope. Deleting the ramp would restyle the POS from a card that may not
@@ -583,14 +583,14 @@ SO-1256   Tan Wei Ming   27 Jul 26, Sun      13  t-body
 | 400 | body text | 33 uses |
 | 500 | labels, light emphasis | 202 uses |
 | 600 | titles, numbers — **the heavy weight** | 854 uses |
-| ~~700~~ | **DEAD (Q3, frozen 2026-07-28)** — `font-bold` folds into 600 | ✅ **0 left in scope (D2)** — 169 converted |
+| ~~700~~ | **DEAD (Q3, frozen 2026-07-28)** — `font-bold` folds into 600 | ✅ **0 left in scope (D2)** — 164 converted |
 
 `font-bold` (700) and `font-semibold` (600) were doing the same job at every
 size; `/ui` showed both on the same words and Jess deleted 700. **There are
 three weights, and there is no fourth.**
 
 A kit file that writes `font-bold` fails the source scan today, and **D2 converted
-the 169 live uses across the pages** (2026-07-29). The only `font-bold` left in
+the 164 live uses across the pages** (2026-07-29). The only `font-bold` left in
 `apps/web/src` is inside `index.css`'s retired `.t-h1` / `.t-h2` definitions,
 which survive because Part B still uses them — see §2.1.
 

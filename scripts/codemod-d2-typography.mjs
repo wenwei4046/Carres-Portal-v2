@@ -26,6 +26,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { codeSegments } from "./lib/source-segments.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DRY = process.argv.includes("--dry");
@@ -102,11 +103,17 @@ const files = execSync('git ls-files "apps/web/src/**"', { cwd: ROOT, encoding: 
  * FALSE. D0.5b had already written this lesson down for the kit's source scan
  * ("a scan that punishes the explanation teaches people to delete the
  * explanation") and a codemod can commit the same error in the other direction.
+ *
+ * **The split was done by a regex and the regex could not see a string** (fixed
+ * at the PM's review, 2026-07-29): the `//` in `href="https://…"` opened a
+ * comment that never closed until the newline, so classes AFTER a URL on the
+ * same line were skipped. `codeSegments` is the shared scanner.
  */
 function codeOnly(src, apply) {
-  // Split into alternating code / comment segments and transform only the code.
-  const parts = src.split(/(\/\*[\s\S]*?\*\/|\/\/[^\n]*)/g);
-  return parts.map((seg, i) => (i % 2 === 1 ? seg : apply(seg))).join("");
+  // Alternating code / comment segments — transform only the code.
+  return codeSegments(src)
+    .map((seg, i) => (i % 2 === 1 ? seg : apply(seg)))
+    .join("");
 }
 
 const tally = { px: 0, ramp: 0, legacy: 0, weight: 0 };

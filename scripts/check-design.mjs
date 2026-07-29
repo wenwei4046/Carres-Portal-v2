@@ -48,6 +48,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { blankComments } from "./lib/source-segments.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LAW = join(ROOT, "docs/UI-KIT.md");
@@ -176,8 +177,14 @@ function scan(files, rec, words) {
      * punishes the explanation teaches people to delete the explanation.**
      * Comments are blanked, not removed, so every reported line number is
      * still the real one.
+     *
+     * **The regex that did this shipped in D2 and was wrong** (fixed at the
+     * PM's review, 2026-07-29): it could not see a string, so the `//` in
+     * `href="https://…"` blanked the rest of the line and the value rules
+     * stopped counting real values. `blankComments` is a scanner that knows a
+     * string, a template's every `${…}`, and a regex literal from a comment.
      */
-    const src = full.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (c) => c.replace(/[^\n]/g, " "));
+    const src = blankComments(full);
 
     /* A — a raw hex literal ------------------------------------------------ */
     if (!HEX_OK.some((re) => re.test(f))) {
@@ -529,7 +536,9 @@ if (UPDATE) {
   const health = { coverage: (enf / rows.length) * 100, debt: rows.filter((r) => r.debt).length };
   writeFileSync(
     BASELINE_PATH,
-    JSON.stringify({ edition: EDITION, takenAt: "D1", files: files.length, counts, health }, null, 2) + "\n",
+    // `takenAt` names the CARD that last froze this file — whoever re-freezes
+    // edits it, exactly as D2 did at the PM's review on 2026-07-29.
+    JSON.stringify({ edition: EDITION, takenAt: "D2", files: files.length, counts, health }, null, 2) + "\n",
   );
   console.log(`✓ baseline written — ${files.length} files in scope.`);
   for (const r of RULES) console.log(`   ${r.id}  ${String(counts[r.id]).padStart(5)}  ${r.what}`);
