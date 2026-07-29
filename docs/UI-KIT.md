@@ -1566,35 +1566,81 @@ never a side effect of a portal change.
 > **The kit is never "done" — it has a coverage number.** A rule that exists
 > only as words counts as *not yet built*, and this is where that shows.
 
-**This block is GENERATED**, not hand-typed — `check-design.mjs --report`
+**This block is GENERATED**, not hand-typed — `node scripts/check-design-standard.mjs --report`
 parses the Enforcement column out of this file, checks which mechanisms
-actually exist in the repo, and rewrites the block. A hand-maintained
+actually exist in the repo, and prints the block. A hand-maintained
 percentage is prose, and prose drifts; that is the whole thesis of this
 document.
-*(The numbers below are the D0.5b hand count, valid until D1 wires the generator.)*
+
+> **The generator is the MEASUREMENT AUTHORITY** (PM, 2026-07-29, card D0.6.1).
+> Where this block and `--report` disagree, **the generator is right and this
+> block is what gets corrected.** It counts rows in the `Rule · Enforcement ·
+> Status · Evidence` tables of §1–§8 — which is what "a rule" means here.
 
 ```
                          enforced / total
-  Typography    ░░░░░░░░░░    0%      0 / 3
-  Colour        ██████░░░░    60%     3 / 5
-  Spacing       ██▌░░░░░░░    25%     1 / 4
-  Icons         ██████████   100%     4 / 4
-  Components    ██████▊░░░    68%    13 / 19
-  Layout        █▍░░░░░░░░    14%     1 / 7
-  Hierarchy     ██░░░░░░░░    20%     1 / 5
+  §1 Hierarchy  █▎░░░░░░░░    13%     1 / 8
+  §2 Typography ░░░░░░░░░░     0%     0 / 3
+  §3 Colour     ██████░░░░    60%     3 / 5
+  §4 Spacing    ██▌░░░░░░░    25%     1 / 4
+  §5 Icons      ██████████   100%     4 / 4
+  §6 Components █████████▎   93%    14 / 15
+  §7 Table      ░░░░░░░░░░     —      0 / 0
+  §8 Page       ██▌░░░░░░░    25%     1 / 4
   ──────────────────────────────────────────
-  TOTAL         ████▉░░░░░    49%    23 / 47
+  TOTAL         █████▌░░░░    56%    24 / 43
 ```
 
 | | Count | Meaning |
 |---|---|---|
-| Rules | **47** | design rules stated in §1–§8 |
-| **Enforced** | **23** | Type System / Component API / Build Guard / ESLint is live |
-| Scheduled | 24 | a card exists (D1–D7) |
+| Rules | **43** | rule-table rows in §1–§8 |
+| **Enforced** | **24** | Type System / Component API / Build Guard / ESLint is live |
+| Scheduled | 14 | a card exists (D2–D7) |
 | **Blocked on a decision** | **0** | ✅ the PENDING REGISTER is empty |
-| **Human Review debt** | 4 | `fmtDate()` · "max 2 reds per screen" · facet group order · "Progress carries no events" — nobody has found a mechanism |
+| **Human Review debt** | 5 | `fmtDate()` (§2.4) · "max 2 reds per screen" (§3.6) · facet group order (§8.4) · "Progress carries no events" (§1.4) · **"the four questions are answered before building" (§1.3)** — nobody has found a mechanism |
 
-**The D0.6 arithmetic, shown so it can be checked:**
+**The debt did NOT grow from 4 to 5 — the count was wrong.** §1.3's gate has
+carried `Human Review` since the rewrite and was never in the named list. Health
+rule 2 forbids *adding* a rule enforced only by a human; it does not forbid
+discovering that one was always there. **No rule was added, changed or removed by
+D0.6.1.**
+
+**The D0.6.1 reconciliation (2026-07-29) — every difference, explained.** D1 wired
+the generator and it disagreed with the hand count: **43 / 24 / debt 5** against
+**47 / 23 / debt 4**. All three differences are accounted for, and only one of
+them was an error.
+
+**① Hierarchy and Layout were not wrong — they were bucketed differently.** The
+hand count grouped by CONCERN: `Hierarchy` held §1.4's five, and `Layout` held
+§8's four **plus §1.3's three** (fixed chrome, the 8th band, the §1.1 gate — all
+layout questions). The generator groups strictly by CHAPTER. **Both add to the
+same 12 rules and 2 enforced**, so neither total was ever affected:
+
+```
+hand        Hierarchy 1/5  +  Layout 1/7   =  2 / 12
+generator   §1        1/8  +  §8     1/4   =  2 / 12   ✓ identical
+```
+
+The chart above now groups by chapter, because the generator does and the
+generator is the authority — **not because the old grouping was a mistake.**
+
+**② The whole −4 / +1 comes from §6 Components: the law holds 15 rule rows, 14
+enforced; the hand count claimed 19 / 13.** D0.5a and D0.5b each incremented the
+total by the number of rules they *intended* (5, then 8), and both then wrote
+them into §6.0's ONE table, which today has 14 rows (+1 in §6.6). The intent was
+counted; the rows are what exists. **This is the drift §16 predicted about
+itself** — *"a hand-maintained percentage is prose, and prose drifts."*
+
+**③ The debt was 5, not 4** — see the note above the arithmetic. §1.3's gate was
+always `Human Review` and was never listed.
+
+**Nothing in §1–§8 was edited to make these agree.** No rule was added, reworded,
+removed or re-graded; only this block changed. If a rule is believed to exist and
+the generator cannot see it, it has no rule-table row — and giving it one is a
+card, not a tidy-up.
+
+**The D0.6 arithmetic, kept for the audit trail** *(its figures are pre-
+reconciliation and read against the hand count of the day):*
 
 ```
 rules      46  +  1  =  47     §8.0, the closed floorplan catalogue (R1)

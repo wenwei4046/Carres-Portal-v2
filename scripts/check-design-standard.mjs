@@ -467,9 +467,11 @@ if (REPORT) {
   const enforced = rows.filter((r) => r.enforced).length;
   const debt = rows.filter((r) => /Human Review/i.test(r.enforcement)).length;
   const pct = ((enforced / total) * 100).toFixed(2);
-  // The hand count §16 carries today, so the generator can disagree out loud.
-  // D1 may not edit §16 to make them agree — that is the law, and D0.6 closed it.
-  const HAND = { total: 47, enforced: 23, debt: 4 };
+  // What §16 currently prints, so the generator can disagree OUT LOUD rather
+  // than being quietly believed. Reconciled to the generator by card D0.6.1
+  // (2026-07-29), which also made the generator the measurement authority: if
+  // these diverge again, §16 is what gets corrected, never this constant.
+  const HAND = { total: 43, enforced: 24, debt: 5 };
   console.log(`§16 UI Health — parsed from docs/UI-KIT.md §1–§8\n`);
   const cmp = (label, got, hand) =>
     console.log(`  ${label.padEnd(9)} ${String(got).padStart(3)}   §16 says ${String(hand).padStart(3)}` +

@@ -51,7 +51,8 @@ deliverable is Foundation Components, not a better document.
 | **D0.5c.1** | **DECISION card** — §7② and §10 disagreed about whether the Persistent Facts cap is law. No code | ✅ **RULED 2026-07-29 — A: §10 (L4) is the authoritative law.** Card below |
 | **D0.5c.2** | **`OrderDetailDrawer` renders through `DetailShell`** — the four `identity` nodes have to exist first. Own card, not yet written | ⏳ **after D0.5c.1** |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **DONE 2026-07-29.** R1 → §8.0 · R2 → §14.1 · R3 → §10.1 · R4 → §0.3 · R5 → §10.2. §16 **47.83% → 48.94% ⬆**, debt 4 → 4. The kit is now the source; the review file is the record |
-| **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ✅ **BUILT 2026-07-29.** C · D · F widened off `KIT_FILES`; kit scope DERIVED from `components/kit/**`; **860 violations across 151 files frozen**, guard exits 0. New RULE J (floorplan) · K (UI preference) · L (kit edition). `--report` generates §16 — **and disagrees with its hand count; reported, not fixed** |
+| **D0.6.1** | **§16 REPORT RECONCILIATION** — the generator disagreed with §16's hand count. Documentation only. Card below | ✅ **DONE 2026-07-29.** §16 = **43 / 24 / 55.81% / debt 5**, generator agrees exactly. Every difference explained; **no rule added, reworded, removed or re-graded** |
+| **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ✅ **CLOSED 2026-07-29.** C · D · F widened off `KIT_FILES`; kit scope DERIVED from `components/kit/**`; **860 violations across 151 files frozen**, guard exits 0. New RULE J (floorplan) · K (UI preference) · L (kit edition). `--report` generates §16 and is the measurement authority |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
 | **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ |
@@ -1188,3 +1189,82 @@ D0.5c.2 (the drawer) runs beside these and blocks nothing.
 a drawer; they touch no common file. **D5 is what D1 unlocks** — and D5 cannot start until the
 codemods have walked the baseline down, because turning the guard red over a frozen debt fails
 every build in the repo.
+
+---
+
+## D0.6.1 · §16 REPORT RECONCILIATION — ✅ DONE 2026-07-29
+
+> **A very small card, opened and closed the same day.** D1 wired the §16
+> generator and it disagreed with the hand count the block carried. The PM ruled
+> that this is **not a D1 implementation bug** — it is documentation
+> reconciliation — and made the generator the **measurement authority**.
+
+**Scope, exactly as given:** compare the generator output with `UI-KIT` §16 ·
+explain every difference · update §16 only if required · **no rule changes, no
+build-guard changes, no code changes, no new mechanisms.**
+
+### The disagreement
+
+```
+                 generator     §16 hand count
+  Rules              43              47          −4
+  Enforced           24              23          +1
+  Human Review        5               4          +1
+```
+
+### Every difference, explained
+
+**① Hierarchy and Layout were NOT wrong — they were bucketed differently, and
+they net out identically.** The hand count grouped by CONCERN: `Hierarchy` held
+§1.4's five rules, and `Layout` held §8's four **plus §1.3's three** (fixed
+chrome, the 8th band, the §1.1 gate — all layout questions). The generator groups
+strictly by CHAPTER.
+
+```
+hand        Hierarchy 1/5  +  Layout 1/7   =  2 / 12
+generator   §1        1/8  +  §8     1/4   =  2 / 12    ✓ identical
+```
+
+**Neither total was ever affected by this**, which is why the chart was re-grouped
+by chapter to match the authority rather than "corrected".
+
+**② The whole −4 / +1 is §6 Components, and this one WAS an error.** The law holds
+**15 rule rows, 14 enforced**; the hand count claimed **19 / 13**. D0.5a and
+D0.5b each incremented the total by the number of rules they *intended* (5, then
+8) and both wrote them into §6.0's ONE table, which today has 14 rows (+1 in
+§6.6). **The intent was counted; the rows are what exists.** This is precisely
+the drift §16 predicted about itself — *"a hand-maintained percentage is prose,
+and prose drifts."*
+
+**③ The debt was 5, not 4.** §16 named four (`fmtDate()` · max-2-reds · facet
+group order · Progress-carries-no-events). The fifth is **§1.3's "the four
+questions are answered before building"**, which has carried `Human Review` since
+the rewrite and was never in the list.
+
+**The debt did not GROW.** Health rule 2 forbids adding a rule enforced only by a
+human; it does not forbid discovering that one was always there. Coverage moved
+**48.94% → 55.81% ⬆**, so health rule 1 is satisfied too — and it moved because
+the denominator was wrong, not because anything was enforced today.
+
+### What was changed
+
+**Only the §16 block, and one stale citation.** §16 now prints 43 / 24 / 55.81%
+/ debt 5, grouped by chapter, with the reconciliation recorded inside it so
+nobody re-derives it; the generator's own reference constant was updated to
+match. The block also stopped citing `check-design.mjs`, which does not exist —
+the file is `check-design-standard.mjs` (D1 finding ②, closed here).
+
+**What was NOT changed, deliberately:** no rule was added, reworded, removed or
+re-graded, and no rule-table row was created. **If a rule is believed to exist and
+the generator cannot see it, it has no rule-table row — and giving it one is a
+card, not a tidy-up.** That is the standing answer for §6's missing four.
+
+### Exit criteria — all met
+
+- [x] `--report` and §16 agree on all four figures; the generator's disagreement
+      warning no longer prints.
+- [x] Every difference explained above and inside §16 itself.
+- [x] No rule added, reworded, removed or re-graded — `git diff` on §1–§8 is
+      **empty**.
+- [x] No build-guard rule changed; the only script edit is the reference constant.
+- [x] Guard still exits 0; web suite still at baseline.
