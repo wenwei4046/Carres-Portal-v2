@@ -620,9 +620,67 @@ mattress protectors from Klang to AL). That is a **stock transfer** and belongs 
 line — putting it here would mix "buying" and "moving" in one place and neither would
 reconcile.
 
-**Migration:** yes — locations + the PO's destination. Draft to Jess first.
-**Done when:** a printed PO tells the supplier exactly where to send the goods, and Nice
-Future's PO can only say one thing.
+### ⭐ SCOPE, RULED BY LOO 2026-07-29 — read this before the numbered list above
+
+The pre-flight found that the card as written could not be built without deciding three
+things it does not decide. Loo ruled all three, and **one of them makes this card bigger than
+its own Build list**:
+
+**Q1 → A · the destination is its own field, and it is NOT a warehouse foreign key.** The two
+have different meanings and both are kept: `purchase_orders.warehouse_id` = *where Carres
+inventory is recorded* · the new destination = *where the supplier physically sends the goods*.
+**AL and HOUZS are still never `warehouses` rows.** (This is the same split C9 made between
+`holds` and `owing`: two columns answering two different questions is not a second model.)
+
+**Q2 → B · TRUTHFUL RECEIVING IS PART OF P4, NOT P5.** Loo, in his own words: *"Do not
+knowingly post goods delivered to AL or HOUZS into Carres Klang inventory … Do not defer a
+known-wrong inventory posting to P5. P5 will validate the completed behaviour using a real PO.
+It must not be the card that first fixes a known architecture error."*
+
+For an AL or HOUZS destination, receiving **may** update the PO line received quantity and the
+receipt evidence, and **must not** create a Klang `stock_balances` row, a Klang
+`stock_movements` row or a Klang `ops_stock_items` unit.
+
+**Measured 2026-07-29, and this is why the card grew: the wrong posting has more than one
+door.**
+
+| Door | What it does today | What P4 owes it |
+|---|---|---|
+| `_operation_create_po_inner` | mints one `incoming` unit per piece at `warehouse_id` **at PO-open** | an AL-bound PO must mint none — the register would otherwise lie from the moment the PO exists, before anyone receives anything |
+| `operation_receive_po_with_do` | posts balances + movements + units, then advances the customer thread and **reserves** Klang stock | skip the three postings; the thread still advances, without a reserve there is no stock to make |
+| `operation_receive_po_line` · `po_receive` | **0 live call sites**, but both are `execute`-granted and both write `stock_balances` | a gated front door with an open side door is worse than no gate (standing law) — they are either gated or revoked, and that is a question for Loo |
+
+**Q3 → A · the Nice Future collection rule lives in the existing manager-only Purchasing
+supplier settings, with audit history.** Not a hard-coded slug (P1 spent a card deleting that
+habit) and not a new `suppliers` boolean unless the settings model cannot represent it — it
+can.
+
+**The external document ruling is wider than this card's item 5, and item 5 also names the
+wrong file.** `PoDocumentPreview.tsx` already carries no RM (Jess removed it 2026-07-24). The
+document that breaks the rule is **`apps/web/src/lib/pdf/po-template.tsx`**, which prints
+`Unit Price`, `Line Total`, `Total` and `+RM {surcharge}` — and it is rendered for the pickup
+partner too (`AssignPickupDialog.tsx`), not only for the factory. **Loo, 2026-07-29: remove
+every purchase price and RM amount from every PDF the external PO template generates —
+suppliers, NETS or another pickup partner, any party outside the portal — and do NOT split the
+template to keep prices for one external recipient.** So `PoTemplateData`'s `unit_price` /
+`line_total` / `grand_total` and the api payload that fills them come out with it.
+
+**The words are locked** (COPY-STANDARD, Loo 2026-07-29): the field label is
+`Where the goods go`; the three options are `Carres Klang` · `AL Sungai Buloh` · `HOUZS`; the
+Nice Future line is `NETS collects from Nice Future and delivers to Carres Klang.`; the
+optional field is `Delivery instructions`. **The PO and the external document print the actual
+SAVED destination name**, never `Ship-to` · `Destination` · `Drop point`.
+
+**Reported, not resolved, and it belongs to a PLAN chat:** `docs/PURCHASING-WORKING-FLOW.md`
+§3's *"Where the goods go"* table and §9 do not yet say what receiving does when the goods
+never reach a Carres warehouse. Q2's ruling is the flow's rule, and the flow file is where it
+has to live — a BUILD chat implements standards, it does not write them.
+
+**Migration:** yes — the destination list, the PO's destination, the supplier collection rule,
+and the two stock-posting RPCs. Draft to Loo first.
+**Done when:** a printed PO tells the supplier exactly where to send the goods, Nice Future's
+PO can only say one thing, **no Klang stock record is created for goods delivered to AL or
+HOUZS**, and no external PO document carries an RM figure.
 
 ## P5 · Prove it with a real PO
 

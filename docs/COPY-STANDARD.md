@@ -378,6 +378,27 @@ when C1 reaches it.
 stored, the role word is the honest answer), and its "Confirm Supplier Stock ETA" phrasing
 (our shape puts the party first: `Call Ohana — confirm ready date`).
 
+### Where the goods go — the PO destination words (locked by Loo, 2026-07-29)
+
+The concept is already in the vocabulary table below (`where the goods go`, with `Ship-to` ·
+`Destination` · `Drop point` banned). These are the STRINGS.
+
+| What | The word |
+|---|---|
+| The field label, on the PO form and the external document | **`Where the goods go`** |
+| The three options | **`Carres Klang`** · **`AL Sungai Buloh`** · **`HOUZS`** |
+| Nice Future, which does not deliver | **`NETS collects from Nice Future and delivers to Carres Klang.`** |
+| The optional free-text field beside it | **`Delivery instructions`** |
+
+**The PO and the external document print the SAVED destination name**, never a re-derived one
+and never one of the banned nouns. That is why the name is stored rather than mapped from a
+code in the UI: a document a supplier holds must still read the same after somebody renames a
+destination on screen.
+
+**`HOUZS` is the option word and it is deliberately shorter than the place.** The warehouse the
+business says out loud is "HOUZS Balakong"; Loo ruled the option `HOUZS`. Do not "complete" it
+— a chat that helpfully expands it has invented a fourth string.
+
 ### Facet group headings (locked 2026-07-28, after P2-Claims found they had no home)
 
 The facet rail's ORDER is `docs/UI-KIT.md` §8.4; the WORDS are here. A module picks the
