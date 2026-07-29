@@ -383,14 +383,20 @@ does not flow into the work — the engine reads the same stored signal and rais
 with a due and an owner, or it is not work at all. The six regions therefore have **zero**
 cross-region channels, not one.
 
-### ② RESERVED, NOT YET LAW — "Persistent Facts" is its own concept
+### ② NOW LAW — "Persistent Facts" is its own concept, and §10 (L4) enforces it
 
 **Ruled:** a small set of facts must stay available no matter which question is being asked.
 It is **an independent concept, not a member of any region.** A region may be where such a
 fact surfaces; that is residence, never membership.
 
-**A law will be written later.** Until it is, nothing here is enforceable. What it is expected
-to carry, recorded now so the reasoning is not lost:
+**The law this passage said "will be written later" IS §10 (L4), constraint 5** — ruled by the
+PM 2026-07-29, card D0.5c.1. `identity` takes values only and its persistent facts are a
+**fixed 4-tuple**, enforced by the type in `DetailShell.tsx` rather than by memory. **§10 is the
+enforceable rule; what follows below is the historical design intent that produced it** — the
+reasoning, kept because it is what the admission test stands on. Where the two are ever read
+against each other, **§10 wins.**
+
+What that intent carries, recorded so the reasoning is not lost:
 
 - **The admission test** — a fact qualifies only when staff are asked it in **outward**
   communication, **answering it wrongly would create a wrong outward commitment** (an amount,

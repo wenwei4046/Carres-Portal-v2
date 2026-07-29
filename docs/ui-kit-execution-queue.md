@@ -47,8 +47,9 @@ deliverable is Foundation Components, not a better document.
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
 | **D0.5b** | Foundation components, Radix | ✅ **SHIPPED 2026-07-28, PR #502 `d77bd4f6`, deployed** — full card below. The gate opened: Jess froze Q1 · Q3 · Q4 |
 | **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ⏳ **before D0.5c** |
-| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | 🟡 **PARTLY DONE 2026-07-28** — all three built and tested, Orders renders through the first two. The drawer wrap resumes **after D0.5c.1** |
-| **D0.5c.1** | **DECISION card** — §7② and §10 disagree about whether the Persistent Facts cap is law. No code. Card below | ⏳ **blocks the last step of D0.5c** |
+| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ✅ **COMPLETE 2026-07-29** — all three built and tested, Orders renders through the first two. **Scope is component EXTRACTION; the drawer migration was never in it** (PM, 2026-07-29) — card below |
+| **D0.5c.1** | **DECISION card** — §7② and §10 disagreed about whether the Persistent Facts cap is law. No code | ✅ **RULED 2026-07-29 — A: §10 (L4) is the authoritative law.** Card below |
+| **D0.5c.2** | **`OrderDetailDrawer` renders through `DetailShell`** — the four `identity` nodes have to exist first. Own card, not yet written | ⏳ **after D0.5c.1** |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
@@ -430,13 +431,28 @@ disciplined and behaves like a trap."*
 
 ---
 
-## D0.5c.1 — resolve the Persistent Facts law conflict (DECISION card, 2026-07-29)
+## D0.5c.1 ✅ RULED — the Persistent Facts law conflict is settled (DECISION card, 2026-07-29)
 
-**This card writes no code.** It exists because **two frozen passages of the same document
-disagree**, and D0.5c's last step cannot be taken until one of them is authoritative. Nothing is
-implemented here and nothing is redesigned — the output is a ruling and one edited paragraph.
+> ## ✅ THE RULING — PM, 2026-07-29
+>
+> **A. §10 (L4) is the authoritative law.** §7② explicitly says *"A law will be written later"* —
+> **L4 is that law.**
+>
+> - **§7② remains historical design intent.** It is not deleted; it is the reasoning that
+>   produced the rule, and the admission test still stands on it.
+> - **§10 is the enforceable rule.** Where the two are read against each other, §10 wins.
+> - **Do not weaken the 4-tuple constraint.** `DetailShell` is untouched.
+>
+> **And a second ruling the card did not ask for, which unblocks the queue:**
+> **D0.5c's scope is component EXTRACTION, not `OrderDetailDrawer` migration. D0.5c is
+> COMPLETE.** The drawer migration becomes its own follow-up card (**D0.5c.2**). The drawer is
+> not to be redesigned inside D0.5c.
 
-### The two passages, verbatim
+**This card wrote no code.** It existed because **two frozen passages of the same document
+disagreed**, and a chat may not settle that. Everything below is the record of the decision as it
+was put — kept verbatim so the ruling can be audited, **not** an open question.
+
+### The two passages, verbatim — as they read BEFORE the ruling
 
 > **`ORDER-DETAIL-INFORMATION-MODEL.md` §7② — "RESERVED, NOT YET LAW"**
 > *"**A law will be written later.** Until it is, nothing here is enforceable."*
@@ -445,8 +461,11 @@ implemented here and nothing is redesigned — the output is a ruling and one ed
 > **`ORDER-DETAIL-INFORMATION-MODEL.md` §10 (L4), FROZEN, constraint 5**
 > *"`identity` takes values only, no `onAction`; its persistent facts are a **fixed 4-tuple**"*
 
-§7② says the concept is **not yet enforceable**. §10 **enforces it as a type**. Both are dated
-2026-07-28 and both are marked frozen.
+§7② said the concept was **not yet enforceable**. §10 **enforces it as a type**. Both are dated
+2026-07-28 and both were marked frozen. **§7② has since been corrected** — its heading now reads
+*"② NOW LAW — Persistent Facts is its own concept, and §10 (L4) enforces it"*, and the sentence
+that claimed unenforceability names §10 as the law it was waiting for. **There is no longer a
+sentence anywhere saying the cap is unenforceable.**
 
 ### What it costs today, in one line
 
@@ -462,12 +481,21 @@ business content or weakening the type — and the PM has ruled out both.
 
 | | Ruling | What follows |
 |---|---|---|
-| **A** *(recommended)* | **§10 (L4) is authoritative.** §7②'s "not yet enforceable" is superseded — L4 froze the cap into a type the same day, which IS the law §7② said would be written later. | §7②'s sentence is corrected to point at L4. `DetailShell` is untouched. The wrap then needs the four nodes to EXIST, which becomes its own small card — **not this one** |
-| **B** | **§7② is authoritative.** The cap is not law yet, so a shell may not enforce it. | Constraint 5 loses the tuple — which the PM has already forbidden ("do not weaken existing constraints"), so this option exists only to be ruled out on the record |
+| **A** ✅ **CHOSEN, PM 2026-07-29** | **§10 (L4) is authoritative.** §7②'s "not yet enforceable" is superseded — L4 froze the cap into a type the same day, which IS the law §7② said would be written later. | §7②'s sentence is corrected to point at L4. `DetailShell` is untouched. The wrap then needs the four nodes to EXIST, which becomes its own small card — **D0.5c.2** |
+| **B** | **§7② is authoritative.** The cap is not law yet, so a shell may not enforce it. | Constraint 5 loses the tuple — which the PM has already forbidden ("do not weaken existing constraints"), so this option exists only to be ruled out on the record. **Not chosen** |
 
-**Recommendation: A.** §7②'s own words are *"a law will be written later"*, and L4 is later on the
-same day and in the same file. Reading it as still-unwritten leaves the document saying a rule
-both is and is not enforceable, which is the state that stopped the build.
+**Ruled A.** §7②'s own words are *"a law will be written later"*, and L4 is later on the same day
+and in the same file. Reading it as still-unwritten left the document saying a rule both is and
+is not enforceable, which is the state that stopped the build.
+
+**A third frozen passage agrees, and it was found during the review rather than cited by this
+card**: **L1 (§6), frozen the same day**, already treats persistent facts as operative and places
+all four in R1 — R1's *Fed by* row names the promised date and *"the outstanding figure — a
+persistent fact, §7②, resident here but not a member"*, and R3's *Absent when* row **spends** that
+ruling, deleting the calm-order explanation region because *"the money [is answered] by R1's
+persistent fact — so nothing was lost"*. Under B, that justification would have collapsed too.
+**So the shell matches frozen L1; it is the drawer that does not** — which is what D0.5c.2 is for,
+and why it is a smaller job than "redesign three blocks".
 
 ### Scope — the PM's, and nothing beside it
 
@@ -480,19 +508,26 @@ OUT   moving any business content (the promised date, the outstanding figure)
 OUT   weakening any existing constraint
 ```
 
-### Exit criteria
+### Exit criteria — all met 2026-07-29
 
-- [ ] One of the two passages is marked as superseded, in ONE edit, naming the ruling and its date.
-- [ ] `grep` finds no remaining sentence saying the cap is unenforceable — *one concern, one file*.
-- [ ] `DetailShell.tsx` and its test are **byte-identical** — `git diff` on both is empty.
-- [ ] No `apps/web` file changes at all. This card ships documentation only.
-- [ ] The queue records what the wrap still needs, so D0.5c resumes without re-deriving it.
-
-**After the ruling**, D0.5c's remaining step is the mechanical drawer wrap and nothing more.
+- [x] One of the two passages is marked as superseded, in ONE edit, naming the ruling and its date.
+      **§7② is the one edited**; its heading and its second paragraph now name §10 as the law.
+- [x] `grep` finds no remaining sentence saying the cap is unenforceable — *one concern, one file*.
+      The only surviving occurrences are inside THIS card, as the quoted record of a settled
+      decision, and are labelled as such.
+- [x] `DetailShell.tsx` and its test are **byte-identical** — `git diff` on both is empty.
+- [x] No `apps/web` file changes at all. This card shipped documentation only.
+- [x] The queue records what the wrap still needs — **D0.5c.2**, below.
 
 ---
 
-## D0.5c 🟡 — two extractions shipped, the third BLOCKED on one decision (2026-07-28)
+## D0.5c ✅ COMPLETE — the three shells are extracted (2026-07-28, closed 2026-07-29)
+
+> **✅ CLOSED by the PM, 2026-07-29.** *"The scope of D0.5c is component extraction, not
+> `OrderDetailDrawer` migration."* All three shells are built, tested and extracted, so the card
+> is **done**. The drawer migration is **D0.5c.2**, its own follow-up card — and the drawer is
+> **not** to be redesigned inside D0.5c. The section below, written while the card still believed
+> the migration was its last step, is kept as the record of why that step is a separate card.
 
 **Built and merged:** `PageShell` · `DataTable` · `DetailShell`, all three extracted, all three
 tested. **Orders renders through the first two** and its own 134 tests pass untouched, which is
@@ -515,7 +550,7 @@ UI-KIT §1.4's only Human-Review debt** (`progress` cannot take events, an actor
 KPI or a button). And there is no `state` prop: a component that cannot be told a state cannot
 print one.
 
-### ⛔ The drawer does NOT render through it yet — and the card said to stop
+### The drawer does NOT render through it — and that is D0.5c.2, not a defect in this card
 
 The card's own rule: *"If a slot needs markup the drawer does not already have, **stop**: either
 the drawer is missing something (a bug, its own card) or the shell is being designed rather than
@@ -524,20 +559,49 @@ extracted."* That is exactly what happened, on slot ①.
 **L4 constraint 5 makes `identity.persistentFacts` a fixed 4-tuple** — 客户名 · Ref · the promised
 date · outstanding. **The drawer has no such four nodes.** `CustomerIdentityCard` is ONE card that
 renders the customer and the SO itself; the promised date and the outstanding figure live in other
-blocks entirely. Migrating means one of two things, and both are above this card:
+blocks entirely. Migrating means one of two things:
 
 | Option | What it costs |
 |---|---|
-| **A — the identity block absorbs them** | the promised date and the outstanding figure MOVE into R1, out of the blocks that hold them today. That is a redesign of three blocks, which this card forbids |
-| **B — weaken the tuple** | `persistentFacts` becomes an array, and constraint 5 — the defence against Header Everything — stops existing the day it was built |
+| **A — the identity block absorbs them** | the promised date and the outstanding figure MOVE into R1, out of the blocks that hold them today. **This is the one that survives the ruling**, and L1 already requires it — see D0.5c.2 |
+| **B — weaken the tuple** | `persistentFacts` becomes an array, and constraint 5 — the defence against Header Everything — stops existing the day it was built. **Ruled out, PM 2026-07-29** |
 
-**The model itself is why this is a decision and not a defect.** §7② says Persistent Facts is
-**"RESERVED, NOT YET LAW … until it is, nothing here is enforceable"**, while §10's L4 freezes the
-4-tuple as a type. Both are frozen text, and they disagree about whether the set is enforceable
-today. **A chat may not settle that.**
+**This was a decision and not a defect**, which is why the card stopped: §7② and §10 disagreed
+about whether the set was enforceable, and a chat may not settle that. **Settled 2026-07-29 —
+§10 is the law** (D0.5c.1). **The migration itself was never in this card's scope**, so D0.5c
+closes here rather than waiting on it.
 
 **Everything else in the shell is ready**: the other six constraints hold, and the drawer's rail
-order already matches §1.4, so the migration is a mechanical wrap the moment ① is ruled.
+order already matches §1.4.
+
+---
+
+## D0.5c.2 — `OrderDetailDrawer` renders through `DetailShell` (⏳ card not yet written)
+
+**Not started. Recorded now so D0.5c.2 does not re-derive what D0.5c already measured.**
+
+**The one thing standing in the way**: `identity.persistentFacts` is a fixed 4-tuple — 客户名 ·
+Ref · the promised date · outstanding — and the drawer has no such four nodes.
+`CustomerIdentityCard` (`OrderDetailDrawer.tsx`, *"identity ONLY"*) renders the customer and the
+SO as ONE card; the outstanding figure lives in the money blocks and the promised date elsewhere
+again.
+
+**It is smaller than "a redesign of three blocks", and the reason is that the model already ruled
+it.** **L1 (§6), frozen 2026-07-28**, places all four in R1 on its own: R1's *Fed by* row names
+the promised date and *"the outstanding figure — a persistent fact, §7②, resident here but not a
+member"*, R5 refuses the figure because *"that is a persistent fact resident in R1"*, and R3's
+*Absent when* row spends the ruling — it deletes the calm-order explanation region **because**
+the money is answerable from R1's persistent fact. **So the shell matches frozen L1 and the
+drawer does not.** The work is bringing the drawer into line with a law that already exists, not
+inventing a new arrangement.
+
+**Out of scope, permanently**: weakening the tuple (ruled out 2026-07-29) and redesigning
+`DetailShell`.
+
+**Not ruled, and the card must not assume it**: whether the drawer's *existing* blocks keep a
+copy of the figure once R1 carries it, or give it up entirely. That is a layout question for
+whoever writes this card with Loo — L2's depth table says the Payment section carries *"only
+Evidence and Detail"*, which points at giving it up, but pointing is not a ruling.
 
 ---
 
@@ -609,7 +673,7 @@ which is how L3's *"states never reach the screen"* stops depending on anyone re
 | 2 | `currentIssues: []` renders null; no `emptyLabel` in the type | §1.4 rule 2, ⏳ | render `[]` → container absent; `@ts-expect-error` on `emptyLabel` |
 | 3 | named ordered slots, never `children` on the shell | §1.4 "blocks cannot be reordered", ⏳ | DOM order asserted against §1.4's order |
 | 4 | `ProgressSlot` has no `events` / `actor` / `timestamp` / `kpi` / `actions` | §1.4 rule 3 — **currently ⚠ Human Review debt** | `@ts-expect-error` ×5 |
-| 5 | `persistentFacts` is a 4-tuple; `IdentitySlot` has no `onAction` | model §7② (prose only today) | `@ts-expect-error` on a 5th fact and on an action |
+| 5 | `persistentFacts` is a 4-tuple; `IdentitySlot` has no `onAction` | model **§10 (L4) constraint 5** — the law; §7② is the intent behind it (ruled 2026-07-29) | `@ts-expect-error` on a 5th fact and on an action |
 | 6 | `DetailSection.track` is `OrderActionTrack \| null` | §1.4 rule 4 — already a live union | `@ts-expect-error` on `"finance"` |
 | 7 | Detail is `detailHref`, not a render prop | model §8 rule ③ (prose only today) | `@ts-expect-error` on a Detail render prop |
 
