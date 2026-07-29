@@ -443,7 +443,7 @@ function PoDutyTabChip() {
     : "";
   return (
     <span
-      className="flex items-center gap-1.5 rounded-full border border-base-200 bg-base-50 px-2.5 py-1 text-[12px] text-base-600"
+      className="flex items-center gap-1.5 rounded-full border border-base-200 bg-base-50 px-2.5 py-1 text-meta text-base-600"
       title="PO duty — one person controls company-wide POs each month (urgent orders bypass)"
       data-testid="po-duty-chip"
     >
@@ -525,7 +525,7 @@ export default function OperationPurchase() {
     (dutyQ.data?.roster ?? []).find((r) => r.month > currentMonth) ?? null;
   const poDutyChip = poDutyHolder ? (
     <span
-      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+      className="w-5 h-5 rounded-full flex items-center justify-center text-label font-semibold shrink-0"
       style={{
         background: avatarColor(poDutyHolder.userId).bg,
         color: avatarColor(poDutyHolder.userId).fg,
@@ -537,7 +537,7 @@ export default function OperationPurchase() {
   ) : null;
   const grnDutyChip = grnDutyHolder ? (
     <span
-      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+      className="w-5 h-5 rounded-full flex items-center justify-center text-label font-semibold shrink-0"
       style={{
         background: avatarColor(grnDutyHolder.userId).bg,
         color: avatarColor(grnDutyHolder.userId).fg,
@@ -816,10 +816,10 @@ export default function OperationPurchase() {
         <PurchasingTabs />
         <div className="px-6 py-8">
           <div className="max-w-[560px] rounded-[12px] border border-danger bg-error-soft p-4">
-            <div className="text-[13px] font-semibold text-danger mb-1">
+            <div className="text-body font-semibold text-danger mb-1">
               Couldn&rsquo;t load the purchase plan.
             </div>
-            <div className="text-[12px] text-base-600 mb-3">
+            <div className="text-meta text-base-600 mb-3">
               {(error as Error | undefined)?.message ??
                 "Try again. If it keeps failing, ask a developer to check the API."}
             </div>
@@ -866,9 +866,9 @@ export default function OperationPurchase() {
               <button
                 type="button"
                 onClick={() => openCreatePo({ lines: [] })}
-                className="shrink-0 flex items-center justify-center gap-2 h-9 rounded-full border border-base-200 bg-white text-base-800 text-[13px] font-semibold hover:bg-hovertint transition-colors"
+                className="shrink-0 flex items-center justify-center gap-2 h-9 rounded-full border border-base-200 bg-white text-base-800 text-body font-semibold hover:bg-hovertint transition-colors"
               >
-                <span className="text-[16px] leading-none">+</span> New PO
+                <span className="text-strong leading-none">+</span> New PO
               </button>
 
               <SectionCard>
@@ -931,7 +931,7 @@ export default function OperationPurchase() {
                                 halved per category, ~24px saved per row × N
                                 categories = big scroll win once real data
                                 lands. */}
-                            <div className="flex items-baseline gap-1.5 py-1 pb-1 text-[11px] uppercase tracking-[0.05em] text-base-600">
+                            <div className="flex items-baseline gap-1.5 py-1 pb-1 text-label uppercase tracking-[0.05em] text-base-600">
                               <span className="font-semibold">{cat}</span>
                               <span className="tabular-nums font-normal text-base-500">
                                 · {groups.length} PO · {totalUnits} units
@@ -965,10 +965,10 @@ export default function OperationPurchase() {
                                       : "hover:bg-hovertint"
                                   }`}
                                 >
-                                  <span className="text-[12.5px] font-medium text-base-900 truncate">
+                                  <span className="text-meta font-medium text-base-900 truncate">
                                     {g.supplierName ?? "the factory"}
                                   </span>
-                                  <span className="ml-auto shrink-0 text-[11px] tabular-nums text-base-500">
+                                  <span className="ml-auto shrink-0 text-label tabular-nums text-base-500">
                                     {g.totalUnits} units
                                   </span>
                                 </button>
@@ -1042,7 +1042,7 @@ export default function OperationPurchase() {
             {stage === "place" && missingCount > 0 && (
               <div className="rounded-[12px] border border-danger bg-error-soft px-4 py-2.5 flex items-start gap-2.5 shrink-0">
                 <AlertTriangle size={16} className="text-danger shrink-0 mt-0.5" />
-                <div className="min-w-0 text-[12px]">
+                <div className="min-w-0 text-meta">
                   <span className="font-semibold text-danger">
                     {missingCount} {missingCount === 1 ? "SO" : "SOs"} missing a delivery deadline.
                   </span>{" "}
@@ -1063,7 +1063,7 @@ export default function OperationPurchase() {
             {stage === "place" && (data?.unrated?.length ?? 0) > 0 && (
               <div className="rounded-[12px] border border-warning bg-warning-soft px-4 py-2.5 flex items-start gap-2.5 shrink-0" data-testid="purchase-unrated-guard">
                 <AlertTriangle size={16} className="text-warning shrink-0 mt-0.5" />
-                <div className="min-w-0 text-[12px]">
+                <div className="min-w-0 text-meta">
                   <span className="font-semibold text-warning">Set a number</span>{" "}
                   <span className="text-base-600">
                     {(data?.unrated ?? [])
@@ -1343,7 +1343,7 @@ function TodayRefresh({
   // Purchasing-page operator reaches those affordances.
   return (
     <>
-      <span className="text-[12px] text-base-500 tabular-nums">
+      <span className="text-meta text-base-500 tabular-nums">
         {today ? `Today · ${fmtDate(today)}` : "—"}
       </span>
       <button
@@ -1388,10 +1388,10 @@ function MiddleListHeader({
       : `${shownCount} of ${totalCount}`;
   return (
     <div className="shrink-0 px-3 py-2 border-b border-base-200 bg-base-50 flex items-center justify-between">
-      <span className="text-[13px] font-semibold text-base-900 truncate">
+      <span className="text-body font-semibold text-base-900 truncate">
         {title}
       </span>
-      <span className="text-[11px] font-semibold text-base-500 tabular-nums shrink-0">
+      <span className="text-label font-semibold text-base-500 tabular-nums shrink-0">
         {badge}
       </span>
     </div>
@@ -1416,7 +1416,7 @@ function DetailEmpty({ stage }: { stage: Stage }) {
         <div className="mx-auto mb-2.5 grid place-items-center w-9 h-9 rounded-full bg-base-100 text-base-500">
           <Info size={18} />
         </div>
-        <div className="text-[13px] text-base-600">{hint}</div>
+        <div className="text-body text-base-600">{hint}</div>
       </div>
     </div>
   );
@@ -1466,7 +1466,7 @@ function ChaseDetail({
     <div className="flex-1 min-h-0 flex flex-col">
       {/* header */}
       <div className="shrink-0 border-b border-base-200 px-4 py-3 bg-base-50">
-        <div className="flex items-center gap-1.5 text-[15px] font-bold text-base-900">
+        <div className="flex items-center gap-1.5 text-strong font-semibold text-base-900">
           <Factory size={18} className="text-base-500 shrink-0" />
           <span className="truncate">Chase {supplierName}</span>
           <span className="pill pill-overdue shrink-0 ml-auto">
@@ -1474,7 +1474,7 @@ function ChaseDetail({
             {row.daysLate}d late
           </span>
         </div>
-        <div className="text-[12px] text-base-600 mt-1">
+        <div className="text-meta text-base-600 mt-1">
           {customers.length > 0 ? (
             <span className="truncate">for {customers.slice(0, 3).join(", ")}</span>
           ) : (
@@ -1500,10 +1500,10 @@ function ChaseDetail({
             key={it.sku}
             className="flex items-center justify-between gap-3 py-2.5 border-b border-base-100"
           >
-            <div className="text-[13px] font-bold font-mono text-base-900">{it.sku}</div>
-            <div className="text-[12px] text-base-500">
+            <div className="text-body font-semibold font-mono text-base-900">{it.sku}</div>
+            <div className="text-meta text-base-500">
               still waiting{" "}
-              <span className="font-bold font-mono text-base-900 tabular-nums">
+              <span className="font-semibold font-mono text-base-900 tabular-nums">
                 {it.outstanding}
               </span>
             </div>
@@ -1562,7 +1562,7 @@ function ReceiveDetail({
     <div className="flex-1 min-h-0 flex flex-col">
       {/* header */}
       <div className="shrink-0 border-b border-base-200 px-4 py-3 bg-base-50">
-        <div className="flex items-center gap-1.5 text-[15px] font-bold text-base-900">
+        <div className="flex items-center gap-1.5 text-strong font-semibold text-base-900">
           <Truck size={18} className="text-base-500 shrink-0" />
           <span className="truncate">
             {purchasingActionLine("check_in", { supplier: supplierName })}
@@ -1572,7 +1572,7 @@ function ReceiveDetail({
             {total} to check in
           </span>
         </div>
-        <div className="text-[12px] text-base-600 mt-1">
+        <div className="text-meta text-base-600 mt-1">
           {customers.length > 0 ? (
             <span className="truncate">for {customers.slice(0, 3).join(", ")}</span>
           ) : (
@@ -1594,8 +1594,8 @@ function ReceiveDetail({
             key={it.sku}
             className="flex items-center justify-between gap-3 py-2.5 border-b border-base-100"
           >
-            <div className="text-[13px] font-bold font-mono text-base-900">{it.sku}</div>
-            <div className="text-[13px] font-bold font-mono text-base-900 tabular-nums">
+            <div className="text-body font-semibold font-mono text-base-900">{it.sku}</div>
+            <div className="text-body font-semibold font-mono text-base-900 tabular-nums">
               {it.outstanding}
             </div>
           </div>
@@ -1632,13 +1632,13 @@ function ReceiveDetail({
 function WhatToDo({ steps }: { steps: string[] }) {
   return (
     <div className="shrink-0 mx-4 mb-2 mt-2 rounded-[10px] border border-dashed border-base-200 bg-base-50/70 px-3 py-2">
-      <div className="flex items-center gap-2 flex-wrap text-[12px] text-base-700">
-        <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-base-500 shrink-0">
+      <div className="flex items-center gap-2 flex-wrap text-meta text-base-700">
+        <span className="text-label font-semibold uppercase tracking-[0.05em] text-base-500 shrink-0">
           What to do
         </span>
         {steps.map((s, i) => (
           <span key={i} className="flex items-center gap-1 shrink-0">
-            <span className="grid place-items-center w-4 h-4 rounded-full bg-base-200 text-base-700 text-[10px] font-bold font-mono">
+            <span className="grid place-items-center w-4 h-4 rounded-full bg-base-200 text-base-700 text-label font-semibold font-mono">
               {i + 1}
             </span>
             <span>{s}</span>
@@ -1656,7 +1656,7 @@ function WhatToDo({ steps }: { steps: string[] }) {
 
 function PanelHint({ text }: { text: string }) {
   return (
-    <div className="px-4 py-8 text-center text-[12px] text-base-500">{text}</div>
+    <div className="px-4 py-8 text-center text-meta text-base-500">{text}</div>
   );
 }
 
@@ -1666,8 +1666,8 @@ function EmptyDone({ text, sub }: { text: string; sub: string }) {
       <div className="mx-auto mb-2 grid place-items-center w-9 h-9 rounded-full bg-success-soft">
         <Check size={18} className="text-success" />
       </div>
-      <div className="text-[13px] font-semibold text-base-900">{text}</div>
-      <div className="text-[12px] text-base-500 mt-1">{sub}</div>
+      <div className="text-body font-semibold text-base-900">{text}</div>
+      <div className="text-meta text-base-500 mt-1">{sub}</div>
     </div>
   );
 }

@@ -35,7 +35,7 @@ export function PillTabs<K extends string>({
             aria-selected={isActive}
             data-testid={`pm-tab-${t.key}`}
             onClick={() => onChange(t.key)}
-            className={`t-small font-semibold px-4 py-1.5 rounded-full transition-colors ${
+            className={`text-body font-semibold px-4 py-1.5 rounded-full transition-colors ${
               isActive
                 ? "bg-white text-base-900 shadow-sm"
                 : "text-base-600 hover:text-base-900"

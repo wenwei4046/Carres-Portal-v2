@@ -40,10 +40,10 @@ export default function CrossOrderBundleSheet({
       aria-label="Bulk-select action bar"
     >
       <div className="flex flex-col gap-0.5">
-        <div className="text-[12px] font-semibold">
+        <div className="text-meta font-semibold">
           {count} order{count === 1 ? "" : "s"} selected
         </div>
-        <div className="text-[11px] text-base-300 font-body">
+        <div className="text-label text-base-300 font-body">
           Combine shortages into a single PO
         </div>
       </div>
@@ -51,14 +51,14 @@ export default function CrossOrderBundleSheet({
         <button
           type="button"
           onClick={onClear}
-          className="text-[12px] text-base-300 hover:text-white px-3 py-1.5 transition-colors"
+          className="text-meta text-base-300 hover:text-white px-3 py-1.5 transition-colors"
         >
           Clear
         </button>
         <button
           type="button"
           onClick={() => onBundleClick(selectedOrderIds)}
-          className="bg-primary text-primary-foreground hover:bg-signature-700 px-3.5 py-1.5 rounded text-[12px] font-semibold transition-colors"
+          className="bg-primary text-primary-foreground hover:bg-signature-700 px-3.5 py-1.5 rounded text-meta font-semibold transition-colors"
         >
           + Create combined PO &rarr;
         </button>

@@ -119,11 +119,11 @@ export default function OperationRental() {
   if (loadError) {
     return (
       <div className="px-9 py-8 pb-14">
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-2">
             Couldn&rsquo;t load rental data
           </div>
-          <div className="text-[12px] text-base-700">
+          <div className="text-meta text-base-700">
             {(loadError as Error | undefined)?.message ?? "Unknown error"}
           </div>
         </div>
@@ -136,8 +136,8 @@ export default function OperationRental() {
       {/* Header */}
       <div className="mb-[18px]">
         <div className="kicker">Operations</div>
-        <h1 className="t-h1 font-display mt-1.5">Rental</h1>
-        <div className="text-[13px] text-base-600 mt-1.5">
+        <h1 className="text-page font-display mt-1.5">Rental</h1>
+        <div className="text-body text-base-600 mt-1.5">
           Rent-to-own agreements and the deployed units Carres still owns.
         </div>
       </div>
@@ -152,12 +152,12 @@ export default function OperationRental() {
       {/* AGREEMENTS */}
       <section className="mb-8" data-testid="rental-agreements-section">
         <div className="flex items-baseline gap-2 mb-2.5">
-          <h2 className="t-h3">Agreements</h2>
-          <span className="text-[12px] text-base-500">{agreements.length}</span>
+          <h2 className="text-strong">Agreements</h2>
+          <span className="text-meta text-base-500">{agreements.length}</span>
         </div>
         <div className="bg-white border border-base-200 rounded overflow-auto">
           <table
-            className="w-full border-collapse text-[13px]"
+            className="w-full border-collapse text-body"
             style={{ minWidth: 880 }}
           >
             <thead className="bg-base-700 border-b-2 border-primary text-white">
@@ -176,7 +176,7 @@ export default function OperationRental() {
                 <tr>
                   <td
                     colSpan={7}
-                    className="p-12 text-center text-[12px] text-base-500"
+                    className="p-12 text-center text-meta text-base-500"
                   >
                     No rental agreements yet — the POS rental lane ships next.
                   </td>
@@ -198,7 +198,7 @@ export default function OperationRental() {
                         {a.customerName ?? <span className="text-base-400">—</span>}
                       </div>
                       {a.customerPhone && (
-                        <div className="text-[12px] font-mono text-base-500 mt-0.5">
+                        <div className="text-meta font-mono text-base-500 mt-0.5">
                           {a.customerPhone}
                         </div>
                       )}
@@ -225,7 +225,7 @@ export default function OperationRental() {
                             type="button"
                             onClick={() => setCollectionsFor(a.id)}
                             data-testid="open-collections"
-                            className="text-[12px] font-medium text-primary underline underline-offset-2"
+                            className="text-meta font-medium text-primary underline underline-offset-2"
                           >
                             Collections
                           </button>
@@ -235,7 +235,7 @@ export default function OperationRental() {
                               print a reassuring zero. */}
                           {(a.openDeclines ?? 0) > 0 ? (
                             <div
-                              className="text-[12px] text-danger font-semibold mt-1 whitespace-nowrap"
+                              className="text-meta text-danger font-semibold mt-1 whitespace-nowrap"
                               data-testid="agreement-card-declined"
                             >
                               {a.openDeclines === 1
@@ -266,12 +266,12 @@ export default function OperationRental() {
       {/* UNITS */}
       <section data-testid="rental-units-section">
         <div className="flex items-baseline gap-2 mb-2.5">
-          <h2 className="t-h3">Units</h2>
-          <span className="text-[12px] text-base-500">{units.length}</span>
+          <h2 className="text-strong">Units</h2>
+          <span className="text-meta text-base-500">{units.length}</span>
         </div>
         <div className="bg-white border border-base-200 rounded overflow-auto">
           <table
-            className="w-full border-collapse text-[13px]"
+            className="w-full border-collapse text-body"
             style={{ minWidth: 880 }}
           >
             <thead className="bg-base-700 border-b-2 border-primary text-white">
@@ -289,7 +289,7 @@ export default function OperationRental() {
                 <tr>
                   <td
                     colSpan={6}
-                    className="p-12 text-center text-[12px] text-base-500"
+                    className="p-12 text-center text-meta text-base-500"
                   >
                     No rental units yet — units are registered here when the
                     first agreement deploys.
@@ -340,7 +340,7 @@ function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="kpi-box" data-testid={`rental-tile-${label}`}>
       <div className="label text-base-500">{label}</div>
-      <div className="text-[18px] font-bold t-num text-base-900 mt-1">
+      <div className="text-strong font-semibold t-num text-base-900 mt-1">
         {value}
       </div>
     </div>
@@ -349,7 +349,7 @@ function StatTile({ label, value }: { label: string; value: string }) {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.02em] text-white text-left">
+    <th className="px-4 py-2.5 text-label font-semibold uppercase tracking-[0.02em] text-white text-left">
       {children}
     </th>
   );

@@ -99,7 +99,7 @@ export default function DownloadSalesOrderButton({
         type="button"
         onClick={onClick}
         disabled={busy}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 disabled:opacity-40 text-base-900"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left text-meta hover:bg-base-50 disabled:opacity-40 text-base-900"
         data-testid={`download-sales-order-${so}`}
       >
         <span className="text-base-500 shrink-0">
@@ -138,7 +138,7 @@ export default function DownloadSalesOrderButton({
       type="button"
       onClick={onClick}
       disabled={busy}
-      className={`px-3.5 py-2 rounded-md text-[12.5px] disabled:opacity-50 transition-colors ${baseCls} ${className ?? ""}`}
+      className={`px-3.5 py-2 rounded-md text-meta disabled:opacity-50 transition-colors ${baseCls} ${className ?? ""}`}
       data-testid={`download-sales-order-${so}`}
     >
       {busy ? "Opening…" : "Download Sales Order PDF"}

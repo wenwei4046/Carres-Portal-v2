@@ -67,15 +67,15 @@ export default function LpRejectDialog({ orderId, so, onClose }: Props) {
         role="dialog"
         aria-label={`Reject delivery #${so}`}
       >
-        <div className="text-[14px] font-semibold mb-2">
+        <div className="text-body font-semibold mb-2">
           Reject delivery · #{so}
         </div>
-        <p className="text-[12px] text-muted-foreground mb-3">
+        <p className="text-meta text-muted-foreground mb-3">
           Tell Operation why you can&rsquo;t take this delivery. They&rsquo;ll
           see your reason and pick a different LP.
         </p>
 
-        <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <label className="text-label font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Reason *
         </label>
         <textarea
@@ -84,10 +84,10 @@ export default function LpRejectDialog({ orderId, so, onClose }: Props) {
           onChange={(e) => setReason(e.target.value)}
           placeholder="e.g. out of capacity for that zone this week"
           rows={4}
-          className="w-full mt-1 mb-1 px-2 py-1.5 border border-border rounded text-[12px] font-body focus:outline-none focus:border-primary"
+          className="w-full mt-1 mb-1 px-2 py-1.5 border border-border rounded text-meta font-body focus:outline-none focus:border-primary"
           aria-label="Reject reason"
         />
-        <div className="text-[10px] text-muted-foreground mb-3 flex justify-between">
+        <div className="text-label text-muted-foreground mb-3 flex justify-between">
           <span>Required</span>
           <span className={tooLong ? "text-destructive font-semibold" : ""}>
             {trimmed.length}/500
@@ -98,7 +98,7 @@ export default function LpRejectDialog({ orderId, so, onClose }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="text-[12px] px-3 py-1.5 rounded border border-border hover:bg-accent/40"
+            className="text-meta px-3 py-1.5 rounded border border-border hover:bg-accent/40"
             disabled={reject.isPending}
           >
             Cancel
@@ -106,7 +106,7 @@ export default function LpRejectDialog({ orderId, so, onClose }: Props) {
           <button
             type="button"
             onClick={submit}
-            className="text-[12px] px-3 py-1.5 rounded bg-destructive text-destructive-foreground font-semibold disabled:opacity-40"
+            className="text-meta px-3 py-1.5 rounded bg-destructive text-destructive-foreground font-semibold disabled:opacity-40"
             disabled={!valid}
           >
             {reject.isPending ? "Rejecting…" : "Reject"}

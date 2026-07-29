@@ -106,7 +106,7 @@ export default function AdjustStockModal({
 
   return (
     <Modal title={`Adjust stock · ${sku}`} onClose={onClose}>
-      <div className="text-[12px] text-base-600 mb-3.5 font-body">
+      <div className="text-meta text-base-600 mb-3.5 font-body">
         Manually correct stock at <strong>{warehouseName}</strong>. Use a
         positive number for ad-hoc inbound (e.g. transfer-in, found goods) and
         a negative number for damage / loss / shrinkage. Every adjustment
@@ -119,16 +119,16 @@ export default function AdjustStockModal({
         data-testid="adjust-stock-context"
       >
         <div className="label mb-1.5">Adjusting</div>
-        <div className="text-[12px] font-body">
+        <div className="text-meta font-body">
           <strong>{skuLabel ?? sku}</strong>
           {skuLabel ? (
-            <span className="font-mono text-[10px] text-base-500 ml-1.5">{sku}</span>
+            <span className="font-mono text-label text-base-500 ml-1.5">{sku}</span>
           ) : null}
         </div>
-        <div className="text-[12px] font-body mt-0.5">
+        <div className="text-meta font-body mt-0.5">
           at <strong>{warehouseName}</strong>
         </div>
-        <div className="font-mono text-[11px] text-base-500 mt-1.5">
+        <div className="font-mono text-label text-base-500 mt-1.5">
           Current {currentQty} · reserved {reservedQty} · available{" "}
           {Math.max(0, currentQty - reservedQty)}
         </div>
@@ -149,7 +149,7 @@ export default function AdjustStockModal({
           className={INPUT_CLS}
           data-testid="adjust-delta-input"
         />
-        <div className="text-[10px] text-base-500 mt-1 font-body">
+        <div className="text-label text-base-500 mt-1 font-body">
           Projected after adjust:{" "}
           <span className="font-mono">
             {delta !== null ? projected : currentQty}
@@ -164,7 +164,7 @@ export default function AdjustStockModal({
         </div>
         {wouldGoNegative ? (
           <div
-            className="text-[11px] font-body mt-2 px-2.5 py-1.5 rounded-[4px]"
+            className="text-label font-body mt-2 px-2.5 py-1.5 rounded-[4px]"
             style={{
               color: "var(--destructive)",
               background: "var(--error-soft)",
@@ -175,7 +175,7 @@ export default function AdjustStockModal({
           </div>
         ) : wouldGoBelowReserved ? (
           <div
-            className="text-[11px] font-body mt-2 px-2.5 py-1.5 rounded-[4px]"
+            className="text-label font-body mt-2 px-2.5 py-1.5 rounded-[4px]"
             style={{
               color: "var(--destructive)",
               background: "var(--error-soft)",
@@ -201,7 +201,7 @@ export default function AdjustStockModal({
           className={`${INPUT_CLS} resize-y`}
           data-testid="adjust-reason-input"
         />
-        <div className="text-[10px] text-base-500 mt-1 font-body">
+        <div className="text-label text-base-500 mt-1 font-body">
           Surfaces in the audit log + movement note — keep it brief but
           specific.
         </div>

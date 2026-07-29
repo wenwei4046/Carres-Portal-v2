@@ -91,21 +91,21 @@ export function PurchaseListRow({
       <Icon size={14} strokeWidth={2} className="text-base-500 shrink-0" />
       <span
         className={[
-          "text-[13px] font-semibold text-base-900 truncate shrink-0 max-w-[45%]",
+          "text-body font-semibold text-base-900 truncate shrink-0 max-w-[45%]",
           titleMono ? "font-mono tabular-nums" : "",
         ].join(" ")}
       >
         {title}
       </span>
       {subtitle && (
-        <span className="text-[12px] text-base-500 truncate min-w-0">
+        <span className="text-meta text-base-500 truncate min-w-0">
           {subtitle}
         </span>
       )}
 
       {/* Col 2 · Send-by / ETA / promised date */}
       {dateIso && (
-        <span className="ml-auto shrink-0 text-[12px] text-base-500 tabular-nums">
+        <span className="ml-auto shrink-0 text-meta text-base-500 tabular-nums">
           {dateLabel}{" "}
           <span className="text-base-800 font-medium">{fmtDate(dateIso)}</span>
         </span>

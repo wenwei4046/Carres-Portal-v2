@@ -100,11 +100,11 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
     });
 
   if (configQ.isPending || catalogQ.isPending) {
-    return <div className="t-small text-base-500">Loading rental config…</div>;
+    return <div className="text-body text-base-500">Loading rental config…</div>;
   }
   if (configQ.error) {
     return (
-      <div className="t-small text-danger">
+      <div className="text-body text-danger">
         Failed to load the rental config. Try refreshing — your session may have expired.
       </div>
     );
@@ -143,8 +143,8 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
       <div className="flex justify-between items-end gap-4 flex-wrap">
         <div>
           <div className="kicker">Rental</div>
-          <h1 className="t-h1 font-display mt-1.5 text-base-900">Rental</h1>
-          <p className="t-small text-base-600 mt-1 max-w-[560px]">
+          <h1 className="text-page font-display mt-1.5 text-base-900">Rental</h1>
+          <p className="text-body text-base-600 mt-1 max-w-[560px]">
             What each rental product is sold as at the POS — rent monthly or buy outright, which
             options and colours the customer may pick, and which care plan rides along.
           </p>
@@ -161,7 +161,7 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
       </div>
 
       <section className="flex items-start justify-between gap-4">
-        <p className="t-tiny text-base-500 max-w-[520px]">
+        <p className="text-meta text-base-500 max-w-[520px]">
           An <b>offer</b> says which model is on offer, in which variants, with which options and
           gifts — then prices it two ways: monthly to rent, or once to own. A <b>service package</b>{" "}
           is a care plan (visits over a duration) an offer can give away free or sell. Nothing
@@ -181,7 +181,7 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
               <button
                 type="button"
                 onClick={() => setPickerOpen(true)}
-                className="btn-primary text-[12px]"
+                className="btn-primary text-meta"
                 data-testid="offer-add"
               >
                 + New offer
@@ -238,10 +238,10 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
             className="rounded-md border border-border bg-muted/30 px-4 py-3 mb-3.5"
             data-testid="service-legacy-notice"
           >
-            <div className="text-[13px] font-semibold text-foreground">
+            <div className="text-body font-semibold text-foreground">
               Care plans are authored in SKU Master now
             </div>
-            <div className="text-[12px] text-muted-foreground mt-1 leading-relaxed">
+            <div className="text-meta text-muted-foreground mt-1 leading-relaxed">
               Product &amp; Maintenance → SKU Master → <b>+ New SKU</b> → category{" "}
               <b>Guarantee &amp; Service Package</b> → <b>Recurring</b>. One place for both a
               guarantee and a care plan, because they are the same thing with a different number
@@ -314,18 +314,18 @@ function OffersSection({
 }) {
   return (
     <section className="card p-5">
-      <div className="t-h4 font-display flex items-center gap-2 mb-1">
+      <div className="text-strong font-display flex items-center gap-2 mb-1">
         <Repeat size={16} strokeWidth={1.75} className="text-primary" />
         {SECTION_LABEL[section]} offers
         <span className="pill pill-neutral">{offers.length}</span>
       </div>
-      <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
+      <p className="text-meta text-base-500 mb-4 pb-3 border-b border-base-100">
         One offer per model. Each offer can open the rent lane, the buy lane, or both.
         {!isPrincipal && " Principal only — read-only for your role."}
       </p>
 
       {offers.length === 0 && (
-        <div className="t-small text-base-500 py-4" data-testid="offers-empty">
+        <div className="text-body text-base-500 py-4" data-testid="offers-empty">
           No {SECTION_LABEL[section].toLowerCase()} offer yet — pick a model to author the first
           rent-to-own or outright offer.
         </div>
@@ -434,11 +434,11 @@ function OfferRow({
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <div className="text-[15px] font-semibold truncate">
+        <div className="text-strong font-semibold truncate">
           {model?.name ?? "Unknown model"}
-          <span className="t-tiny text-base-400 ml-2">{model?.modelKey}</span>
+          <span className="text-meta text-base-400 ml-2">{model?.modelKey}</span>
         </div>
-        <div className="t-tiny text-base-500 truncate">
+        <div className="text-meta text-base-500 truncate">
           {model?.category ?? "—"}
           {offer.rentEnabled && ` · Rent ${feeLabel}`}
           {offer.rentEnabled && plans.length > 0 && (
@@ -465,14 +465,14 @@ function OfferRow({
           type="button"
           onClick={syncStripe}
           disabled={sync.isPending}
-          className="btn-ghost text-[11px]"
+          className="btn-ghost text-label"
           data-testid={`offer-sync-${offer.id}`}
         >
           {sync.isPending ? "Syncing…" : "Sync"}
         </button>
       )}
       {isPrincipal ? (
-        <label className="flex items-center gap-1.5 t-tiny text-base-500">
+        <label className="flex items-center gap-1.5 text-meta text-base-500">
           <input
             type="checkbox"
             checked={offer.active}
@@ -491,7 +491,7 @@ function OfferRow({
       <button
         type="button"
         onClick={onEdit}
-        className="btn-secondary text-[11px]"
+        className="btn-secondary text-label"
         data-testid={`offer-edit-${offer.id}`}
       >
         {isPrincipal ? "Edit" : "View"}
@@ -501,7 +501,7 @@ function OfferRow({
           type="button"
           onClick={remove}
           disabled={del.isPending}
-          className="btn-danger text-[11px]"
+          className="btn-danger text-label"
           data-testid={`offer-delete-${offer.id}`}
         >
           Delete
@@ -585,7 +585,7 @@ function ModelPickerModal({
           />
         </div>
         {models.length === 0 && (
-          <p className="t-small text-base-500" data-testid="offer-model-empty">
+          <p className="text-body text-base-500" data-testid="offer-model-empty">
             No model matches — every other model already has an offer.
           </p>
         )}
@@ -610,8 +610,8 @@ function ModelPickerModal({
                 </div>
               )}
               <span className="min-w-0">
-                <span className="block t-small font-semibold truncate">{m.name}</span>
-                <span className="block t-tiny text-base-500 truncate">
+                <span className="block text-body font-semibold truncate">{m.name}</span>
+                <span className="block text-meta text-base-500 truncate">
                   {m.category} · {m.modelKey}
                 </span>
               </span>
@@ -642,11 +642,11 @@ function ServicePackagesSection({
 }) {
   return (
     <section className="card p-5">
-      <div className="t-h4 font-display flex items-center gap-2 mb-1">
+      <div className="text-strong font-display flex items-center gap-2 mb-1">
         <Sparkles size={16} strokeWidth={1.75} className="text-primary" />
         Service packages
       </div>
-      <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
+      <p className="text-meta text-base-500 mb-4 pb-3 border-b border-base-100">
         A care plan: N visits a year over the duration (e.g. 2 years × 2 visits/yr = 4 visits). Each
         plan is its own SKU — <span className="t-num">SVC-MAT-CLEAN-1Y2</span> — so it can be sold,
         gifted and invoiced like any other product.
@@ -675,7 +675,7 @@ function ServicePackagesSection({
           <div className="label text-right">Manage</div>
         </div>
         {packages.length === 0 && (
-          <div className="t-small text-base-500 px-3 py-4" data-testid="packages-empty">
+          <div className="text-body text-base-500 px-3 py-4" data-testid="packages-empty">
             No service packages yet — author one to sell cleaning care standalone or bundle it free
             with an offer.
           </div>
@@ -725,15 +725,15 @@ function PackageRow({ pkg, isPrincipal }: { pkg: ServicePackage; isPrincipal: bo
       style={{ gridTemplateColumns: PKG_GRID }}
       data-testid={`pkg-row-${pkg.id}`}
     >
-      <div className="text-[13px] truncate">{pkg.name}</div>
-      <div className="t-tiny text-base-500 capitalize">{pkg.category ?? "any"}</div>
-      <div className="t-tiny text-base-500 capitalize">{pkg.serviceType}</div>
-      <div className="text-right t-num text-[12px]">{pkg.durationMonths} mo</div>
-      <div className="text-right t-num text-[12px]">
+      <div className="text-body truncate">{pkg.name}</div>
+      <div className="text-meta text-base-500 capitalize">{pkg.category ?? "any"}</div>
+      <div className="text-meta text-base-500 capitalize">{pkg.serviceType}</div>
+      <div className="text-right t-num text-meta">{pkg.durationMonths} mo</div>
+      <div className="text-right t-num text-meta">
         {pkg.visitsPerYear} / yr · {serviceVisitsTotal(pkg.durationMonths, pkg.visitsPerYear)} total
       </div>
-      <div className="text-right t-num text-[12px]">{rm(pkg.price)}</div>
-      <div className="t-tiny text-base-500 truncate">{pkg.sku ?? "—"}</div>
+      <div className="text-right t-num text-meta">{rm(pkg.price)}</div>
+      <div className="text-meta text-base-500 truncate">{pkg.sku ?? "—"}</div>
       <div>
         {isPrincipal ? (
           <input
@@ -756,7 +756,7 @@ function PackageRow({ pkg, isPrincipal }: { pkg: ServicePackage; isPrincipal: bo
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="btn-ghost text-[11px]"
+              className="btn-ghost text-label"
               data-testid={`pkg-edit-${pkg.id}`}
             >
               Edit
@@ -765,7 +765,7 @@ function PackageRow({ pkg, isPrincipal }: { pkg: ServicePackage; isPrincipal: bo
               type="button"
               onClick={remove}
               disabled={del.isPending}
-              className="btn-danger text-[11px]"
+              className="btn-danger text-label"
               data-testid={`pkg-delete-${pkg.id}`}
             >
               Delete
@@ -877,7 +877,7 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
               key={c.value}
               type="button"
               onClick={() => setCategory(c.value)}
-              className={`${category === c.value ? "btn-primary" : "btn-ghost"} text-[11px]`}
+              className={`${category === c.value ? "btn-primary" : "btn-ghost"} text-label`}
               data-testid={`pkg-category-${c.value}`}
             >
               {c.label} <span className="t-num ml-1 opacity-70">{c.token}</span>
@@ -920,7 +920,7 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
               key={p.months}
               type="button"
               onClick={() => setDuration(String(p.months))}
-              className={`${durationNum === p.months ? "btn-primary" : "btn-ghost"} text-[11px]`}
+              className={`${durationNum === p.months ? "btn-primary" : "btn-ghost"} text-label`}
               data-testid={`pkg-duration-${p.months}`}
             >
               {p.label}
@@ -950,7 +950,7 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
             data-testid="pkg-visits"
           />
           {visitsValid && durationValid && (
-            <span className="t-tiny text-base-500">
+            <span className="text-meta text-base-500">
               {serviceVisitsTotal(durationNum, visitsNum)} visits total · {intervalLabel(visitsNum)}
             </span>
           )}
@@ -958,7 +958,7 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
       </div>
       {previewSku && !pkg && (
         <div
-          className="t-tiny text-base-600 bg-base-50 border border-base-200 rounded-[4px] px-3 py-2"
+          className="text-meta text-base-600 bg-base-50 border border-base-200 rounded-[4px] px-3 py-2"
           data-testid="pkg-sku-preview"
         >
           Service SKU <b className="t-num">{previewSku}</b> — built from category × type × duration ×
@@ -966,12 +966,12 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
         </div>
       )}
       {pkg?.sku && (
-        <div className="t-tiny text-base-500">
+        <div className="text-meta text-base-500">
           SKU <b className="t-num">{pkg.sku}</b> — a minted code is permanent; a different duration
           or visit count wants a new package.
         </div>
       )}
-      <label className="flex items-center gap-2 t-small">
+      <label className="flex items-center gap-2 text-body">
         <input
           type="checkbox"
           checked={active}

@@ -73,9 +73,9 @@ function rawEmptyDraft(): WizardDraft {
 }
 
 const INPUT_CLASS =
-  "w-full rounded-md border border-base-300 bg-white px-3 py-2 t-body outline-none focus:border-primary";
+  "w-full rounded-md border border-base-300 bg-white px-3 py-2 text-body outline-none focus:border-primary";
 const INPUT_DISABLED =
-  "w-full rounded-md border border-base-200 bg-base-50 text-base-400 px-3 py-2 t-body cursor-not-allowed";
+  "w-full rounded-md border border-base-200 bg-base-50 text-base-400 px-3 py-2 text-body cursor-not-allowed";
 
 export default function PrincipalNewOrder() {
   const navigate = useNavigate();
@@ -404,9 +404,9 @@ export default function PrincipalNewOrder() {
     return (
       <div className="min-h-full grid place-items-center p-8">
         <div className="w-full max-w-md bg-card border border-base-200 rounded-lg shadow-sm p-7 text-center">
-          <p className="t-micro text-base-400">Maintain · New order</p>
-          <h1 className="t-h2 mt-1">Order SO-{submitted.so} created</h1>
-          <p className="t-small text-base-500 mt-2">
+          <p className="text-label uppercase tracking-[0.05em] text-base-400">Maintain · New order</p>
+          <h1 className="text-page mt-1">Order SO-{submitted.so} created</h1>
+          <p className="text-body text-base-500 mt-2">
             {submitted.customer.name} · {submitted.lines?.length ?? 0} line
             {(submitted.lines?.length ?? 0) === 1 ? "" : "s"} · saved exactly as entered.
           </p>
@@ -479,9 +479,9 @@ export default function PrincipalNewOrder() {
   return (
     <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-6">
       <header>
-        <p className="t-micro text-base-400">Maintain · New order</p>
-        <h1 className="t-h2 mt-1">New Sales Order</h1>
-        <p className="t-small text-base-500 mt-1">
+        <p className="text-label uppercase tracking-[0.05em] text-base-400">Maintain · New order</p>
+        <h1 className="text-page mt-1">New Sales Order</h1>
+        <p className="text-body text-base-500 mt-1">
           Raw creation — no POS gates. Every line, price and date is saved exactly as you
           enter it.
         </p>
@@ -680,7 +680,7 @@ export default function PrincipalNewOrder() {
           </Field>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Has lift">
-              <label className="inline-flex items-center gap-2 py-2.5 cursor-pointer t-body">
+              <label className="inline-flex items-center gap-2 py-2.5 cursor-pointer text-body">
                 <input
                   type="checkbox"
                   checked={draft.delivery.hasLift}
@@ -818,8 +818,8 @@ export default function PrincipalNewOrder() {
             className="mt-0.5 w-4 h-4"
           />
           <span>
-            <span className="t-body font-semibold block">Fill in address later</span>
-            <span className="t-tiny text-base-500">
+            <span className="text-body font-semibold block">Fill in address later</span>
+            <span className="text-meta text-base-500">
               Customer hasn't confirmed the delivery address yet.
             </span>
           </span>
@@ -843,14 +843,14 @@ export default function PrincipalNewOrder() {
             onChange={(e) => setC({ billingSame: e.target.checked })}
             className="mt-0.5 w-4 h-4"
           />
-          <span className="t-body">Billing address same as delivery</span>
+          <span className="text-body">Billing address same as delivery</span>
         </label>
         {/* Billing keys in with the SAME MY cascade as delivery (Loo
             2026-07-18) — a second MYAddressFields mapped onto the billing*
             fields; composed into the single billing string at submit. */}
         {!c.billingSame && (
           <div className="mt-3" data-testid="raw-billing-fields">
-            <p className="t-tiny uppercase tracking-wide text-base-500 mb-2">Billing address</p>
+            <p className="text-meta uppercase tracking-wide text-base-500 mb-2">Billing address</p>
             <MYAddressFields
               data={{
                 addressLine1: c.billingLine1,
@@ -883,11 +883,11 @@ export default function PrincipalNewOrder() {
         <div className="flex flex-col gap-2">
           <div className="hidden sm:grid grid-cols-[24px_1fr_180px_70px_110px_100px_64px] gap-2 px-1">
             <span />
-            <span className="t-micro text-base-400">Product — pick or type</span>
-            <span className="t-micro text-base-400">Remarks</span>
-            <span className="t-micro text-base-400">Qty</span>
-            <span className="t-micro text-base-400">Unit price</span>
-            <span className="t-micro text-base-400 text-right">Total</span>
+            <span className="text-label uppercase tracking-[0.05em] text-base-400">Product — pick or type</span>
+            <span className="text-label uppercase tracking-[0.05em] text-base-400">Remarks</span>
+            <span className="text-label uppercase tracking-[0.05em] text-base-400">Qty</span>
+            <span className="text-label uppercase tracking-[0.05em] text-base-400">Unit price</span>
+            <span className="text-label uppercase tracking-[0.05em] text-base-400 text-right">Total</span>
             <span />
           </div>
           {draft.lines.map((l, i) => {
@@ -905,7 +905,7 @@ export default function PrincipalNewOrder() {
                 className="border border-base-200 rounded-md p-2 bg-white"
               >
               <div className="grid sm:grid-cols-[24px_1fr_180px_70px_110px_100px_64px] grid-cols-2 gap-2 items-start">
-                <span className="t-tiny text-base-400 pt-2.5 text-center">{i + 1}</span>
+                <span className="text-meta text-base-400 pt-2.5 text-center">{i + 1}</span>
                 <div className="min-w-0">
                   <RowSkuPicker
                     line={l}
@@ -923,10 +923,10 @@ export default function PrincipalNewOrder() {
                     onPick={(sku) => pickSkuForRow(l.localId, sku)}
                   />
                   {l.label && (
-                    <p className="t-tiny text-base-500 mt-1 px-1 truncate">{l.label}</p>
+                    <p className="text-meta text-base-500 mt-1 px-1 truncate">{l.label}</p>
                   )}
                   {!isCatalogLine && l.sku.trim().length > 0 && (
-                    <span className="t-micro text-warning px-1">OTHERS · custom line</span>
+                    <span className="text-label uppercase tracking-[0.05em] text-warning px-1">OTHERS · custom line</span>
                   )}
                 </div>
                 <input
@@ -943,7 +943,7 @@ export default function PrincipalNewOrder() {
                       attrs: Object.keys(next).length > 0 ? next : null,
                     });
                   }}
-                  className="rounded-md border border-base-300 bg-white px-2.5 py-1.5 t-small outline-none focus:border-primary"
+                  className="rounded-md border border-base-300 bg-white px-2.5 py-1.5 text-body outline-none focus:border-primary"
                 />
                 <input
                   type="number"
@@ -955,7 +955,7 @@ export default function PrincipalNewOrder() {
                       qty: Math.max(1, Math.floor(Number(e.target.value) || 1)),
                     })
                   }
-                  className="rounded-md border border-base-300 bg-white px-2.5 py-1.5 t-body outline-none focus:border-primary"
+                  className="rounded-md border border-base-300 bg-white px-2.5 py-1.5 text-body outline-none focus:border-primary"
                 />
                 <input
                   type="number"
@@ -975,9 +975,9 @@ export default function PrincipalNewOrder() {
                       return rest;
                     })
                   }
-                  className="rounded-md border border-base-300 bg-white px-2.5 py-1.5 font-mono text-[13px] outline-none focus:border-primary"
+                  className="rounded-md border border-base-300 bg-white px-2.5 py-1.5 font-mono text-body outline-none focus:border-primary"
                 />
-                <span className="font-mono text-[13px] text-right pt-2">
+                <span className="font-mono text-body text-right pt-2">
                   {rm(l.unitPrice * l.qty)}
                 </span>
                 <span className="flex gap-1 pt-1">
@@ -1022,12 +1022,12 @@ export default function PrincipalNewOrder() {
             type="button"
             onClick={addEmptyLine}
             data-testid="raw-add-line"
-            className="border border-dashed border-base-300 rounded-md py-2.5 t-small text-primary hover:bg-base-50 inline-flex items-center justify-center gap-1.5"
+            className="border border-dashed border-base-300 rounded-md py-2.5 text-body text-primary hover:bg-base-50 inline-flex items-center justify-center gap-1.5"
           >
             <Plus size={14} strokeWidth={1.75} />
             Add line item
           </button>
-          <p className="text-right t-body">
+          <p className="text-right text-body">
             Subtotal <span className="font-mono font-semibold">{rm(subtotal)}</span>
           </p>
         </div>
@@ -1138,13 +1138,13 @@ export default function PrincipalNewOrder() {
             ))}
         </div>
         {draft.paid > 0 && subtotal > 0 && !isStripe && (
-          <p className="t-small text-base-600 mt-3">
+          <p className="text-body text-base-600 mt-3">
             Deposit {paidPct}% · Balance{" "}
             <span className="font-mono">{rm(Math.max(0, subtotal - draft.paid))}</span>
           </p>
         )}
         {isStripe && (
-          <p className="t-small text-base-600 mt-3" data-testid="raw-stripe-note">
+          <p className="text-body text-base-600 mt-3" data-testid="raw-stripe-note">
             No slip or reference code needed — the payment records itself with a Stripe
             receipt once the customer pays (QR at the counter, or a WhatsApp link).
           </p>
@@ -1154,17 +1154,17 @@ export default function PrincipalNewOrder() {
       {/* ── Footer ── */}
       {submitError && (
         <p
-          className="text-xs text-destructive bg-destructive/5 border border-destructive/30 rounded px-3 py-2"
+          className="text-meta text-destructive bg-destructive/5 border border-destructive/30 rounded px-3 py-2"
           data-testid="raw-submit-error"
         >
           {submitError}
         </p>
       )}
       <div className="flex items-center justify-between pb-10">
-        <span className="t-body text-base-700">
+        <span className="text-body text-base-700">
           Total <span className="font-mono font-semibold text-base-900">{rm(subtotal)}</span>
           {draft.paid > 0 && (
-            <span className="t-small text-base-500 ml-3">
+            <span className="text-body text-base-500 ml-3">
               Paid {rm(draft.paid)}
               {subtotal > 0 && ` · ${paidPct}%`}
             </span>
@@ -1256,7 +1256,7 @@ function RowSkuPicker({
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         autoComplete="off"
-        className="w-full rounded-md border border-base-300 bg-white px-2.5 py-1.5 font-mono text-[12px] outline-none focus:border-primary"
+        className="w-full rounded-md border border-base-300 bg-white px-2.5 py-1.5 font-mono text-meta outline-none focus:border-primary"
       />
       {results.length > 0 && (
         <ul className="absolute z-10 mt-1 w-full min-w-[320px] bg-white border border-base-200 rounded-lg shadow-md overflow-hidden">
@@ -1275,14 +1275,14 @@ function RowSkuPicker({
                   }}
                   className="w-full flex items-baseline gap-2.5 px-3 py-2 text-left hover:bg-base-50"
                 >
-                  <span className="font-mono text-[12px] shrink-0">{s.sku}</span>
-                  <span className="t-tiny text-base-500 truncate flex-1">
+                  <span className="font-mono text-meta shrink-0">{s.sku}</span>
+                  <span className="text-meta text-base-500 truncate flex-1">
                     {[model?.name, s.variant].filter(Boolean).join(" · ")}
                   </span>
                   {s.posActive === false && (
-                    <span className="t-micro text-warning shrink-0">POS off</span>
+                    <span className="text-label uppercase tracking-[0.05em] text-warning shrink-0">POS off</span>
                   )}
-                  <span className="font-mono text-[12px] text-base-600 shrink-0">
+                  <span className="font-mono text-meta text-base-600 shrink-0">
                     {rm(s.price ?? 0)}
                   </span>
                 </button>
@@ -1311,8 +1311,8 @@ function Section({
   return (
     <section className="bg-card border border-base-200 rounded-lg shadow-sm p-6">
       <div className="flex items-baseline justify-between mb-4 gap-4">
-        <h2 className="t-h4">{title}</h2>
-        {hint && <p className="t-tiny text-base-500 text-right">{hint}</p>}
+        <h2 className="text-strong">{title}</h2>
+        {hint && <p className="text-meta text-base-500 text-right">{hint}</p>}
       </div>
       {children}
     </section>
@@ -1330,9 +1330,9 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="t-tiny uppercase tracking-wide text-base-500">{label}</span>
+      <span className="text-meta uppercase tracking-wide text-base-500">{label}</span>
       <div className="mt-1">{children}</div>
-      {hint && <span className="t-tiny text-base-400 mt-1 block">{hint}</span>}
+      {hint && <span className="text-meta text-base-400 mt-1 block">{hint}</span>}
     </label>
   );
 }

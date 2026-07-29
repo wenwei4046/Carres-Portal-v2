@@ -46,8 +46,8 @@ export default function OperationFabricCostTab({ catalog }: { catalog: CatalogRe
     <section data-testid="opcost-fabrics-panel">
       <div className="flex items-start justify-between gap-4 mb-4">
         <div>
-          <div className="t-h4 font-display text-base-900">Fabric costing</div>
-          <p className="t-tiny text-base-500 mt-0.5 max-w-[560px]">
+          <div className="text-strong font-display text-base-900">Fabric costing</div>
+          <p className="text-meta text-base-500 mt-0.5 max-w-[560px]">
             The buying add-on (RM) each specific fabric adds. Recorded by operation;
             isolated from POS selling prices. Fabric codes and tiers are managed in
             Product &amp; Maintenance.
@@ -56,7 +56,7 @@ export default function OperationFabricCostTab({ catalog }: { catalog: CatalogRe
         <button
           type="button"
           onClick={() => setEditMode((v) => !v)}
-          className={`${editMode ? "btn-secondary" : "btn-primary"} text-[12px] shrink-0`}
+          className={`${editMode ? "btn-secondary" : "btn-primary"} text-meta shrink-0`}
           data-testid="opcost-fabric-edit"
         >
           {editMode ? "Done editing" : "Edit Costs"}
@@ -73,7 +73,7 @@ export default function OperationFabricCostTab({ catalog }: { catalog: CatalogRe
           data-testid="opcost-fabric-search"
           className={`${INPUT_CLS} w-72`}
         />
-        <span className="t-micro text-base-400">
+        <span className="text-label uppercase tracking-[0.05em] text-base-400">
           {visible.length} of {fabrics.length} fabrics
         </span>
       </div>
@@ -90,7 +90,7 @@ export default function OperationFabricCostTab({ catalog }: { catalog: CatalogRe
           <div className="label text-right">Cost add-on</div>
         </div>
         {visible.length === 0 && (
-          <div className="t-small text-base-500 px-3 py-6 text-center">
+          <div className="text-body text-base-500 px-3 py-6 text-center">
             {fabrics.length === 0
               ? "No fabrics yet — the principal adds them in Product & Maintenance."
               : "No fabrics match the search."}
@@ -135,13 +135,13 @@ function FabricCostRow({ fabric, editMode }: { fabric: CatalogFabricDto; editMod
       <div>
         <CodeChip>{fabric.fabricCode}</CodeChip>
       </div>
-      <div className="t-small text-base-700 truncate">
+      <div className="text-body text-base-700 truncate">
         {fabric.series || <span className="text-base-300">—</span>}
       </div>
-      <div className="t-small text-base-800 truncate" title={fabric.description ?? ""}>
+      <div className="text-body text-base-800 truncate" title={fabric.description ?? ""}>
         {fabric.description || <span className="text-base-300">—</span>}
       </div>
-      <div className="t-small text-base-700 truncate">
+      <div className="text-body text-base-700 truncate">
         {fabric.supplierCode || <span className="text-base-300">—</span>}
       </div>
       <div className="text-right" data-testid={`opcost-fabric-cost-${fabric.fabricCode}`}>
@@ -157,12 +157,12 @@ function FabricCostRow({ fabric, editMode }: { fabric: CatalogFabricDto; editMod
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
             aria-label={`${fabric.fabricCode} cost add-on`}
-            className={`${INPUT_CLS} text-right t-num text-[12px]`}
+            className={`${INPUT_CLS} text-right t-num text-meta`}
           />
         ) : fabric.cost == null ? (
-          <span className="t-tiny text-base-400 italic">not set</span>
+          <span className="text-meta text-base-400 italic">not set</span>
         ) : (
-          <span className="t-num text-[12px] text-base-800">{fmtRm(fabric.cost)}</span>
+          <span className="t-num text-meta text-base-800">{fmtRm(fabric.cost)}</span>
         )}
       </div>
     </div>

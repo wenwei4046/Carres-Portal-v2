@@ -79,7 +79,7 @@ function ChipLink({
       role="tab"
       aria-selected={active}
       className={
-        "px-3.5 py-1.5 rounded-full text-[12px] font-body transition-colors border " +
+        "px-3.5 py-1.5 rounded-full text-meta font-body transition-colors border " +
         (active
           ? "bg-primary text-primary-foreground border-primary"
           : "bg-card text-base-700 border-base-200 hover:border-base-300")
@@ -108,7 +108,7 @@ function SubFilterChip({
       onClick={onClick}
       aria-pressed={active}
       className={
-        "px-3 py-1 rounded-full text-[12px] font-body transition-colors border " +
+        "px-3 py-1 rounded-full text-meta font-body transition-colors border " +
         (active
           ? "bg-base-900 text-white border-base-900"
           : "bg-card text-base-700 border-base-200 hover:border-base-300")
@@ -143,10 +143,10 @@ export default function PipelineHeader({
       {/* Title strap + right-side action buttons (V2 placeholders). */}
       <div className="flex justify-between items-start mb-[18px] gap-4 flex-wrap">
         <div>
-          <h1 className="t-h1 font-display text-base-900">
+          <h1 className="text-page font-display text-base-900">
             Orders
           </h1>
-          <div className="font-body text-[12px] text-base-600 mt-1">
+          <div className="font-body text-meta text-base-600 mt-1">
             {String(receivedCount).padStart(2, "0")} received → {String(deliveredCount).padStart(2, "0")} delivered
           </div>
         </div>
@@ -157,7 +157,7 @@ export default function PipelineHeader({
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Order ID, customer, SKU…"
             aria-label="Search by order ID, customer, or SKU"
-            className="px-3.5 py-2 border border-base-200 rounded-full text-[13px] min-w-[260px] outline-none focus:border-base-500 bg-card"
+            className="px-3.5 py-2 border border-base-200 rounded-full text-body min-w-[260px] outline-none focus:border-base-500 bg-card"
           />
           {/* V2 placeholders — visible but inert. See top docstring. */}
           <button
@@ -165,7 +165,7 @@ export default function PipelineHeader({
             disabled
             data-testid="pipeline-quick-action"
             title="Quick action — coming soon"
-            className="px-3 py-2 rounded-full text-[12px] border border-base-200 bg-card text-base-700 opacity-60 cursor-not-allowed"
+            className="px-3 py-2 rounded-full text-meta border border-base-200 bg-card text-base-700 opacity-60 cursor-not-allowed"
           >
             + Quick action
           </button>
@@ -174,7 +174,7 @@ export default function PipelineHeader({
             disabled
             data-testid="pipeline-alerts"
             title="Alerts — coming soon"
-            className="px-3 py-2 rounded-full text-[12px] border border-base-200 bg-card text-base-700 opacity-60 cursor-not-allowed"
+            className="px-3 py-2 rounded-full text-meta border border-base-200 bg-card text-base-700 opacity-60 cursor-not-allowed"
           >
             <Bell size={13} className="inline -mt-px mr-1" />Alerts
           </button>
@@ -183,7 +183,7 @@ export default function PipelineHeader({
             disabled
             data-testid="pipeline-help"
             title="Help — coming soon"
-            className="px-3 py-2 rounded-full text-[12px] border border-base-200 bg-card text-base-700 opacity-60 cursor-not-allowed"
+            className="px-3 py-2 rounded-full text-meta border border-base-200 bg-card text-base-700 opacity-60 cursor-not-allowed"
           >
             ? Help
           </button>
@@ -201,7 +201,7 @@ export default function PipelineHeader({
           active={activeStage === null}
           testid="pipeline-chip-overall"
         >
-          <LayoutGrid size={13} className="inline -mt-px mr-1" />Overall <span className="ml-1.5 inline-block min-w-[18px] text-center text-[11px] tabular-nums opacity-80">{totalIncoming}</span>
+          <LayoutGrid size={13} className="inline -mt-px mr-1" />Overall <span className="ml-1.5 inline-block min-w-[18px] text-center text-label tabular-nums opacity-80">{totalIncoming}</span>
         </ChipLink>
         {STAGE_LABELS.map((s) => (
           <ChipLink
@@ -210,9 +210,9 @@ export default function PipelineHeader({
             active={activeStage === s.slug}
             testid={`pipeline-chip-${s.slug}`}
           >
-            <span className="font-mono text-[11px] mr-1 opacity-80">{s.num}</span>
+            <span className="font-mono text-label mr-1 opacity-80">{s.num}</span>
             {s.label}
-            <span className="ml-1.5 inline-block min-w-[18px] text-center text-[11px] tabular-nums opacity-80">
+            <span className="ml-1.5 inline-block min-w-[18px] text-center text-label tabular-nums opacity-80">
               {stageCounts[s.slug]}
             </span>
           </ChipLink>
@@ -247,7 +247,7 @@ export default function PipelineHeader({
             disabled
             data-testid="pipeline-filter-button"
             title="Multi-criteria filter — coming soon"
-            className="px-3 py-1.5 rounded-full text-[12px] border border-base-200 bg-card text-base-700 opacity-60 cursor-not-allowed"
+            className="px-3 py-1.5 rounded-full text-meta border border-base-200 bg-card text-base-700 opacity-60 cursor-not-allowed"
           >
             <Filter size={13} className="inline -mt-px mr-1" />Filter
           </button>
@@ -256,7 +256,7 @@ export default function PipelineHeader({
             disabled
             data-testid="pipeline-export-button"
             title="Export CSV — coming soon"
-            className="px-3 py-1.5 rounded-full text-[12px] border border-base-200 bg-card text-base-700 opacity-60 cursor-not-allowed"
+            className="px-3 py-1.5 rounded-full text-meta border border-base-200 bg-card text-base-700 opacity-60 cursor-not-allowed"
           >
             <Download size={13} className="inline -mt-px mr-1" />Export
           </button>

@@ -234,13 +234,13 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
     <Modal title="Import from Master sheet" onClose={onClose}>
       {stage === "pick" && (
         <div className="flex flex-col gap-3">
-          <p className="t-small text-base-600">
+          <p className="text-body text-base-600">
             Upload your <span className="font-semibold">Master</span> file (.xlsx). One click:{" "}
             <span className="font-semibold">creates any missing orders</span> from the sheet, then
             sets each line's <span className="font-semibold">Stock ETA + status</span> (Received →
             Ready · Pending → Waiting · No Stock → No PO).
           </p>
-          <p className="t-tiny text-base-500">
+          <p className="text-meta text-base-500">
             Orders are matched by Ref (idempotent — existing orders are updated, not duplicated).
             Discount / service-charge lines are skipped. You'll see the counts before anything is
             written.
@@ -248,7 +248,7 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
           <div>
             <button
               type="button"
-              className="btn-primary text-[12px]"
+              className="btn-primary text-meta"
               onClick={() => fileInput.current?.click()}
               data-testid="eta-import-pick"
             >
@@ -267,9 +267,9 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
               e.target.value = "";
             }}
           />
-          {importEta.isPending && <p className="t-tiny text-base-500">Reading + matching…</p>}
+          {importEta.isPending && <p className="text-meta text-base-500">Reading + matching…</p>}
           {parseError && (
-            <p className="t-small text-red-600" data-testid="eta-import-error">
+            <p className="text-body text-red-600" data-testid="eta-import-error">
               {parseError}
             </p>
           )}
@@ -278,8 +278,8 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
 
       {stage === "preview" && preview && (
         <div className="flex flex-col gap-3">
-          <div className="t-small text-base-700">
-            <span className="font-mono t-tiny">{fileName}</span> ·{" "}
+          <div className="text-body text-base-700">
+            <span className="font-mono text-meta">{fileName}</span> ·{" "}
             <span className="font-semibold text-base-900">{parsed.orderRows.length}</span> order lines ·{" "}
             <span className="font-semibold text-base-900">{parsed.stockRows.length}</span> stock rows
             {parsed.storageFees.length > 0 && (
@@ -300,20 +300,20 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
 
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-[6px] bg-base-50 px-3 py-2">
-              <div className="t-h4 text-green-700">{preview.matched}</div>
-              <div className="t-micro text-base-500">stock match now</div>
+              <div className="text-strong text-green-700">{preview.matched}</div>
+              <div className="text-label uppercase tracking-[0.05em] text-base-500">stock match now</div>
             </div>
             <div className="rounded-[6px] bg-base-50 px-3 py-2">
-              <div className="t-h4 text-base-900">{preview.orders}</div>
-              <div className="t-micro text-base-500">orders</div>
+              <div className="text-strong text-base-900">{preview.orders}</div>
+              <div className="text-label uppercase tracking-[0.05em] text-base-500">orders</div>
             </div>
             <div className="rounded-[6px] bg-base-50 px-3 py-2">
-              <div className="t-h4 text-primary">{parsed.orderRows.length}</div>
-              <div className="t-micro text-base-500">order lines in</div>
+              <div className="text-strong text-primary">{parsed.orderRows.length}</div>
+              <div className="text-label uppercase tracking-[0.05em] text-base-500">order lines in</div>
             </div>
           </div>
 
-          <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2 t-tiny text-base-600">
+          <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2 text-meta text-base-600">
             On import: any order the sheet has but the portal is missing gets{" "}
             <span className="font-semibold">created first</span>, then the stock match climbs above
             the {preview.matched} shown (which only counts orders already in the portal).
@@ -344,14 +344,14 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
           </div>
 
           <div className="flex justify-end gap-2 mt-1">
-            <button type="button" onClick={() => setStage("pick")} className="btn-ghost text-[12px]" disabled={busy}>
+            <button type="button" onClick={() => setStage("pick")} className="btn-ghost text-meta" disabled={busy}>
               Back
             </button>
             <button
               type="button"
               onClick={confirm}
               disabled={busy}
-              className="btn-primary text-[12px] disabled:opacity-40"
+              className="btn-primary text-meta disabled:opacity-40"
               data-testid="eta-import-confirm"
             >
               {busy ? "Working…" : "Create orders + set stock"}
@@ -364,13 +364,13 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
         <div className="flex flex-col gap-3" data-testid="eta-import-result">
           <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2.5">
             {ordersResult && (
-              <div className="t-small text-base-700 mb-1">
+              <div className="text-body text-base-700 mb-1">
                 Orders — <span className="font-semibold text-green-700">{ordersResult.created} created</span>{" "}
                 · {ordersResult.updated} updated
               </div>
             )}
-            <div className="t-h4 text-base-900">{stockResult.written} stock line(s) set</div>
-            <div className="t-small text-base-600 mt-0.5">
+            <div className="text-strong text-base-900">{stockResult.written} stock line(s) set</div>
+            <div className="text-body text-base-600 mt-0.5">
               across {stockResult.orders} order{stockResult.orders === 1 ? "" : "s"}
               {stockResult.unmatched > 0 && (
                 <>
@@ -379,7 +379,7 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
               )}
             </div>
             {stockResult.storageWritten > 0 && (
-              <div className="t-small text-base-700 mt-1 pt-1 border-t border-base-200">
+              <div className="text-body text-base-700 mt-1 pt-1 border-t border-base-200">
                 <span className="font-semibold text-green-700">
                   {stockResult.storageWritten}
                 </span>{" "}
@@ -393,7 +393,7 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
               </div>
             )}
             {stockResult.balanceWritten > 0 && (
-              <div className="t-small text-base-700 mt-1 pt-1 border-t border-base-200">
+              <div className="text-body text-base-700 mt-1 pt-1 border-t border-base-200">
                 <span className="font-semibold text-green-700">
                   {stockResult.balanceWritten}
                 </span>{" "}
@@ -408,7 +408,7 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
             )}
           </div>
           {stockResult.unmatched > 0 && stockResult.sampleUnmatched.length > 0 && (
-            <details className="t-tiny text-base-600">
+            <details className="text-meta text-base-600">
               <summary className="cursor-pointer text-amber-700">
                 {stockResult.unmatched} unmatched — why (first {stockResult.sampleUnmatched.length})
               </summary>
@@ -427,12 +427,12 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
               className="rounded-[4px] border border-base-200 px-3 py-2.5"
               data-testid="append-missing-section"
             >
-              <div className="t-small font-semibold text-base-900 mb-1">
+              <div className="text-body font-semibold text-base-900 mb-1">
                 Sheet has it — portal doesn't ({candidates.length})
               </div>
               {appendedCount === null ? (
                 <>
-                  <p className="t-tiny text-base-500 mb-2">
+                  <p className="text-meta text-base-500 mb-2">
                     These sheet lines carry a PO that exists on no line of their order.
                     Ticked = safe to append. Unticked rows: the order also holds a line
                     the sheet doesn't have (model changed / PO re-raised?) — check before
@@ -442,7 +442,7 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
                     {candidates.map((cand) => {
                       const key = candKey(cand);
                       return (
-                        <li key={key} className="t-tiny text-base-700">
+                        <li key={key} className="text-meta text-base-700">
                           <label className="flex items-start gap-2 cursor-pointer">
                             <input
                               type="checkbox"
@@ -481,7 +481,7 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
                   <div className="flex justify-end mt-2">
                     <button
                       type="button"
-                      className="btn-primary text-[12px] disabled:opacity-40"
+                      className="btn-primary text-meta disabled:opacity-40"
                       disabled={appendLines.isPending || ticked.size === 0}
                       onClick={() => void doAppend()}
                       data-testid="append-missing-confirm"
@@ -493,14 +493,14 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
                   </div>
                 </>
               ) : (
-                <p className="t-small text-green-700" data-testid="append-missing-done">
+                <p className="text-body text-green-700" data-testid="append-missing-done">
                   {appendedCount} line(s) appended — the orders now match the Master.
                 </p>
               )}
             </div>
           )}
           <div className="flex justify-end">
-            <button type="button" className="btn-primary text-[12px]" onClick={onClose} data-testid="eta-import-done">
+            <button type="button" className="btn-primary text-meta" onClick={onClose} data-testid="eta-import-done">
               Done
             </button>
           </div>

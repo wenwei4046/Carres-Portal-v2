@@ -17,17 +17,17 @@ interface Props {
 export default function RecentActivityTile({ rows }: Props) {
   return (
     <div className="bg-white border border-base-200 rounded-md">
-      <div className="px-[18px] py-3.5 border-b border-base-100 font-display text-base font-semibold">
+      <div className="px-[18px] py-3.5 border-b border-base-100 font-display text-strong font-semibold">
         Recent activity
       </div>
       {rows.length === 0 ? (
-        <div className="p-7 text-center text-[12px] text-base-500">No activity yet.</div>
+        <div className="p-7 text-center text-meta text-base-500">No activity yet.</div>
       ) : (
         <div>
           {rows.map((e) => (
             <div
               key={e.id}
-              className="px-[18px] py-2.5 border-t border-base-100 grid items-center gap-2.5 text-[12px]"
+              className="px-[18px] py-2.5 border-t border-base-100 grid items-center gap-2.5 text-meta"
               style={{ gridTemplateColumns: "auto 1fr auto" }}
             >
               <RoleChip role={e.role} />
@@ -35,7 +35,7 @@ export default function RecentActivityTile({ rows }: Props) {
                 <span className="text-base-900">{e.action}</span>
                 <span className="text-base-500"> &middot; {e.actor_text}</span>
               </div>
-              <div className="font-mono text-[10.5px] text-base-400 whitespace-nowrap">
+              <div className="font-mono text-label text-base-400 whitespace-nowrap">
                 {new Date(e.occurred_at).toLocaleDateString()}
               </div>
             </div>

@@ -28,16 +28,16 @@ export default function OrderAddonsSection({
   return (
     <section>
       <div className="flex items-center justify-between mb-1">
-        <div className="t-h4 font-display">Order Add-ons</div>
+        <div className="text-strong font-display">Order Add-ons</div>
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
-          className="btn-ghost text-[12px]"
+          className="btn-ghost text-meta"
         >
           {adding ? "Close" : "+ Add add-on"}
         </button>
       </div>
-      <p className="t-tiny text-base-500 mb-3">
+      <p className="text-meta text-base-500 mb-3">
         Optional services offered at checkout (e.g. disposal). Each charges
         through its linked Service SKU. Give an add-on Sizes (comma-separated)
         and the POS will require one size per item at checkout; leave blank
@@ -59,7 +59,7 @@ export default function OrderAddonsSection({
           <div className="label text-right">Actions</div>
         </div>
         {addons.length === 0 && (
-          <div className="t-small text-base-500 px-3 py-4">No add-ons configured.</div>
+          <div className="text-body text-base-500 px-3 py-4">No add-ons configured.</div>
         )}
         {addons.map((a) => (
           <AddonRow
@@ -169,10 +169,10 @@ function AddonRow({
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
         aria-label={`${addon.key} name`}
-        className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-[13px] outline-none bg-transparent"
+        className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-body outline-none bg-transparent"
       />
       {description === null ? (
-        <span className="t-tiny text-base-400">—</span>
+        <span className="text-meta text-base-400">—</span>
       ) : (
         <input
           key={`${addon.key}-desc-${description}`}
@@ -183,7 +183,7 @@ function AddonRow({
             if (e.key === "Enter") (e.target as HTMLInputElement).blur();
           }}
           aria-label={`${addon.key} description`}
-          className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-[12.5px] text-base-600 outline-none bg-transparent"
+          className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-meta text-base-600 outline-none bg-transparent"
         />
       )}
       <input
@@ -196,7 +196,7 @@ function AddonRow({
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
         aria-label={`${addon.key} price`}
-        className={`${INPUT_CLS} text-right t-num text-[12px]`}
+        className={`${INPUT_CLS} text-right t-num text-meta`}
       />
       <input
         key={`${addon.key}-sizes-${(addon.sizeOptions ?? []).join(",")}`}
@@ -208,16 +208,16 @@ function AddonRow({
         }}
         aria-label={`${addon.key} sizes`}
         title="Comma-separated sizes offered at checkout (one pick per item). Blank = this add-on needs no size."
-        className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-[12.5px] text-base-600 outline-none bg-transparent"
+        className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-meta text-base-600 outline-none bg-transparent"
         data-testid={`addon-sizes-${addon.key}`}
       />
-      <div>{addon.serviceSku ? <CodeChip>{addon.serviceSku}</CodeChip> : <span className="t-tiny text-base-400">—</span>}</div>
+      <div>{addon.serviceSku ? <CodeChip>{addon.serviceSku}</CodeChip> : <span className="text-meta text-base-400">—</span>}</div>
       <div className="text-right">
         <button
           type="button"
           onClick={remove}
           disabled={del.isPending}
-          className="btn-danger text-[11px]"
+          className="btn-danger text-label"
         >
           Disable
         </button>
@@ -352,11 +352,11 @@ function AddonAddForm({ onDone }: { onDone: () => void }) {
         type="button"
         onClick={submit}
         disabled={!valid || busy}
-        className="btn-primary text-[12px] disabled:opacity-40"
+        className="btn-primary text-meta disabled:opacity-40"
       >
         {busy ? "Saving…" : "Add"}
       </button>
-      <p className="t-tiny text-base-400 basis-full" data-testid="addon-auto-preview">
+      <p className="text-meta text-base-400 basis-full" data-testid="addon-auto-preview">
         {name.trim().length >= 2 && keyValid ? (
           <>
             Auto-generated — key: <span className="font-mono">{key}</span> · Service SKU:{" "}

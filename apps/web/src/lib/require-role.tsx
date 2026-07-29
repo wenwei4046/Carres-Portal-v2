@@ -12,7 +12,7 @@ export function RequireRole({ roles, children }: { roles: ReadonlyArray<Role>; c
   if (!hydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <p className="text-body text-muted-foreground">Loading…</p>
       </div>
     );
   }

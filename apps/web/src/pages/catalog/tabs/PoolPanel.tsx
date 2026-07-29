@@ -139,13 +139,13 @@ export default function PoolPanel({
       {/* header */}
       <div className="flex items-start justify-between gap-4 mb-4">
         <div>
-          <div className="t-h4 font-display text-base-900">{title}</div>
-          <p className="t-tiny text-base-500 mt-0.5 max-w-[520px]">
+          <div className="text-strong font-display text-base-900">{title}</div>
+          <p className="text-meta text-base-500 mt-0.5 max-w-[520px]">
             {description}
             {!isPrincipal && " Principal only — read-only for your role."}
           </p>
           {effectiveFrom && (
-            <p className="t-tiny text-base-400 mt-1" data-testid={`pool-effective-${pool}`}>
+            <p className="text-meta text-base-400 mt-1" data-testid={`pool-effective-${pool}`}>
               Effective from {effectiveFrom}
             </p>
           )}
@@ -153,14 +153,14 @@ export default function PoolPanel({
         <div className="flex items-center gap-2 shrink-0">
           {editing ? (
             <>
-              <button type="button" onClick={() => setDraft(null)} className="btn-ghost text-[12px]">
+              <button type="button" onClick={() => setDraft(null)} className="btn-ghost text-meta">
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={submit}
                 disabled={!canSave || save.isPending}
-                className="btn-primary text-[12px] disabled:opacity-40"
+                className="btn-primary text-meta disabled:opacity-40"
                 data-testid={`pool-save-${pool}`}
               >
                 {save.isPending ? "Saving…" : "Save"}
@@ -171,7 +171,7 @@ export default function PoolPanel({
               <button
                 type="button"
                 onClick={() => setDraft(toDraft(rows))}
-                className="btn-ghost text-[12px] inline-flex items-center gap-1.5"
+                className="btn-ghost text-meta inline-flex items-center gap-1.5"
                 data-testid={`pool-edit-${pool}`}
               >
                 <Edit3 size={13} strokeWidth={2} /> Edit
@@ -181,7 +181,7 @@ export default function PoolPanel({
           <button
             type="button"
             onClick={() => setShowHistory(true)}
-            className="btn-ghost text-[12px] inline-flex items-center gap-1.5"
+            className="btn-ghost text-meta inline-flex items-center gap-1.5"
             data-testid={`pool-history-${pool}`}
           >
             <History size={13} strokeWidth={2} /> History
@@ -193,7 +193,7 @@ export default function PoolPanel({
       {!editing ? (
         <div className="flex flex-col gap-2.5">
           {rows.length === 0 && (
-            <div className="t-small text-base-500 bg-white border border-base-200 rounded-[4px] px-4 py-5">
+            <div className="text-body text-base-500 bg-white border border-base-200 rounded-[4px] px-4 py-5">
               No entries configured{isPrincipal ? " — press Edit to add some." : "."}
             </div>
           )}
@@ -205,20 +205,20 @@ export default function PoolPanel({
               }`}
               data-testid={`pool-row-${pool}-${e.value}`}
             >
-              <span className="t-tiny text-base-400 w-6 text-center tabular-nums shrink-0">
+              <span className="text-meta text-base-400 w-6 text-center tabular-nums shrink-0">
                 {i + 1}
               </span>
-              <span className="text-[15px] font-semibold text-base-900 min-w-0 truncate">
+              <span className="text-strong font-semibold text-base-900 min-w-0 truncate">
                 {e.value}
                 {variant === "size" && e.label ? ` · ${e.label}` : ""}
                 {variant === "size" && e.dimensions ? ` · ${e.dimensions}` : ""}
               </span>
               {!e.active && <span className="pill pill-neutral shrink-0">OFF</span>}
               {variant === "priced" && (
-                <span className="ml-auto t-num text-[13px] text-base-900 shrink-0">
+                <span className="ml-auto t-num text-body text-base-900 shrink-0">
                   {e.surcharge != null ? (
                     <>
-                      <span className="t-tiny text-base-400 mr-1.5">RM</span>
+                      <span className="text-meta text-base-400 mr-1.5">RM</span>
                       {fmtRm(e.surcharge)}
                     </>
                   ) : (
@@ -250,7 +250,7 @@ export default function PoolPanel({
               className="grid items-center gap-2 bg-white border border-base-200 rounded-[4px] px-3 py-2"
               style={{ gridTemplateColumns: editCols }}
             >
-              <span className="t-tiny text-base-400 text-center tabular-nums">{i + 1}</span>
+              <span className="text-meta text-base-400 text-center tabular-nums">{i + 1}</span>
               <input
                 value={r.value}
                 onChange={(e) => patchRow(i, { value: e.target.value })}
@@ -272,7 +272,7 @@ export default function PoolPanel({
                   value={r.dimensions}
                   onChange={(e) => patchRow(i, { dimensions: e.target.value })}
                   placeholder="183X190CM"
-                  className={`${INPUT_CLS} font-mono text-[12px]`}
+                  className={`${INPUT_CLS} font-mono text-meta`}
                   aria-label={`row ${i + 1} dimensions`}
                 />
               )}
@@ -283,7 +283,7 @@ export default function PoolPanel({
                   value={r.surcharge}
                   onChange={(e) => patchRow(i, { surcharge: e.target.value })}
                   placeholder="—"
-                  className={`${INPUT_CLS} text-right t-num text-[12px]`}
+                  className={`${INPUT_CLS} text-right t-num text-meta`}
                   aria-label={`row ${i + 1} surcharge`}
                 />
               )}
@@ -329,16 +329,16 @@ export default function PoolPanel({
           <button
             type="button"
             onClick={addRow}
-            className="btn-ghost text-[12px] self-start inline-flex items-center gap-1.5"
+            className="btn-ghost text-meta self-start inline-flex items-center gap-1.5"
             data-testid={`pool-add-row-${pool}`}
           >
             <Plus size={13} strokeWidth={2} /> Add row
           </button>
           {hasDuplicates && (
-            <p className="t-tiny text-danger">Duplicate values — each value must be unique.</p>
+            <p className="text-meta text-danger">Duplicate values — each value must be unique.</p>
           )}
           {!surchargesValid && (
-            <p className="t-tiny text-danger">Surcharge must be a number (or left empty).</p>
+            <p className="text-meta text-danger">Surcharge must be a number (or left empty).</p>
           )}
         </div>
       )}
@@ -347,24 +347,24 @@ export default function PoolPanel({
       {showHistory && (
         <Modal title={`History — ${title}`} onClose={() => setShowHistory(false)}>
           <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-1">
-            {historyQ.isLoading && <p className="t-small text-base-500">Loading history…</p>}
+            {historyQ.isLoading && <p className="text-body text-base-500">Loading history…</p>}
             {!historyQ.isLoading && history.length === 0 && (
-              <p className="t-small text-base-500">No history yet — the first Edit save writes one.</p>
+              <p className="text-body text-base-500">No history yet — the first Edit save writes one.</p>
             )}
             {history.map((h) => (
               <div key={h.id} className="border border-base-200 rounded-[4px] p-3 bg-base-50">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="t-small font-medium text-base-900">
+                  <div className="text-body font-medium text-base-900">
                     Effective from {h.effectiveFrom}
                   </div>
-                  <div className="t-tiny text-base-400">
+                  <div className="text-meta text-base-400">
                     saved {new Date(h.createdAt).toLocaleString("en-MY")}
                   </div>
                 </div>
-                {h.notes && <p className="t-tiny text-base-500 mt-1">{h.notes}</p>}
+                {h.notes && <p className="text-meta text-base-500 mt-1">{h.notes}</p>}
                 <div className="mt-2 flex flex-col gap-1">
                   {h.entries.map((e, i) => (
-                    <div key={i} className="flex items-center gap-2 t-tiny text-base-700">
+                    <div key={i} className="flex items-center gap-2 text-meta text-base-700">
                       <span className="text-base-400 w-5 text-center tabular-nums">{i + 1}</span>
                       <span className={e.active ? "" : "line-through text-base-400"}>
                         {e.value}
@@ -377,7 +377,7 @@ export default function PoolPanel({
                     </div>
                   ))}
                   {h.entries.length === 0 && (
-                    <p className="t-tiny text-base-400 italic">empty</p>
+                    <p className="text-meta text-base-400 italic">empty</p>
                   )}
                 </div>
               </div>

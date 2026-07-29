@@ -207,20 +207,20 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
         {/* Modal header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-base-200">
           <div>
-            <h2 className="t-h3 text-base-900">
+            <h2 className="text-strong text-base-900">
               {mode === "create" ? "New Case / Service Note" : `Edit ${detailQ.data?.snNo ?? "…"}`}
             </h2>
-            <p className="text-xs text-base-500 mt-0.5">
+            <p className="text-meta text-base-500 mt-0.5">
               {mode === "create" ? "SN number auto-assigned on save" : ""}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="text-base-400 hover:text-base-700 text-xl leading-none">×</button>
+          <button type="button" onClick={onClose} className="text-base-400 hover:text-base-700 text-title leading-none">×</button>
         </div>
 
         <div className="px-6 py-5 space-y-6">
           {/* ── Customer / Header ───────────────────────────────────────────── */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-base-500 mb-3">Customer</h3>
+            <h3 className="text-meta font-semibold uppercase tracking-wider text-base-500 mb-3">Customer</h3>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Customer Name *">
                 <input className={inp} value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Lek Jia Beng" />
@@ -237,13 +237,13 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
                     placeholder="SO-1001"
                   />
                   {lookupStatus === "loading" && (
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-base-400">searching…</span>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-meta text-base-400">searching…</span>
                   )}
                   {lookupStatus === "found" && (
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-success-600">✓ auto-filled</span>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-meta text-success-600">✓ auto-filled</span>
                   )}
                   {lookupStatus === "not-found" && (
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-error-600">not found</span>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-meta text-error-600">not found</span>
                   )}
                 </div>
               </Field>
@@ -260,7 +260,7 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
 
           {/* ── Classification ──────────────────────────────────────────────── */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-base-500 mb-3">Classification</h3>
+            <h3 className="text-meta font-semibold uppercase tracking-wider text-base-500 mb-3">Classification</h3>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Category">
                 <select className={inp} value={category} onChange={e => setCategory(e.target.value)}>
@@ -303,12 +303,12 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
           {orderLines.length > 0 && (
             <section className="rounded border border-base-200 bg-base-50 p-3">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-base-500">
+                <h3 className="text-meta font-semibold uppercase tracking-wider text-base-500">
                   Products in this order — tick to add to Items
                 </h3>
                 <button
                   type="button"
-                  className="text-xs text-primary hover:underline"
+                  className="text-meta text-primary hover:underline"
                   onClick={() => {
                     const newItems: SnItem[] = orderLines
                       .filter(l => selectedLineIds.has(l.id))
@@ -338,14 +338,14 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
                       }}
                       className="rounded border-base-300"
                     />
-                    <span className="font-mono text-xs text-base-900">{l.sku}</span>
+                    <span className="font-mono text-meta text-base-900">{l.sku}</span>
                     {Object.keys(l.attrs).length > 0 && (
-                      <span className="text-xs text-base-500">
+                      <span className="text-meta text-base-500">
                         {Object.entries(l.attrs).map(([k, v]) => `${k}: ${v}`).join(" · ")}
                       </span>
                     )}
-                    <span className="ml-auto text-xs text-base-500">Qty {l.qty}</span>
-                    {l.sourcePo && <span className="text-xs text-base-400 font-mono">{l.sourcePo}</span>}
+                    <span className="ml-auto text-meta text-base-500">Qty {l.qty}</span>
+                    {l.sourcePo && <span className="text-meta text-base-400 font-mono">{l.sourcePo}</span>}
                   </label>
                 ))}
               </div>
@@ -355,12 +355,12 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
           {/* ── Items ───────────────────────────────────────────────────────── */}
           <section>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-base-500">Items</h3>
-              <button type="button" onClick={addItem} className="text-xs text-primary hover:underline">+ Add row</button>
+              <h3 className="text-meta font-semibold uppercase tracking-wider text-base-500">Items</h3>
+              <button type="button" onClick={addItem} className="text-meta text-primary hover:underline">+ Add row</button>
             </div>
             <div className="rounded border border-base-200 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-base-50 text-xs text-base-500">
+              <table className="w-full text-body">
+                <thead className="bg-base-50 text-meta text-base-500">
                   <tr>
                     <th className="text-left px-2 py-1.5 w-8">#</th>
                     <th className="text-left px-2 py-1.5">Item / SKU</th>
@@ -373,10 +373,10 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
                 <tbody>
                   {items.map((it, idx) => (
                     <tr key={idx} className="border-t border-base-100">
-                      <td className="px-2 py-1 text-base-500 text-xs">{it.no}</td>
+                      <td className="px-2 py-1 text-base-500 text-meta">{it.no}</td>
                       <td className="px-2 py-1">
                         <input
-                          className="w-full rounded border border-base-200 px-1.5 py-1 text-xs focus:border-primary focus:outline-none"
+                          className="w-full rounded border border-base-200 px-1.5 py-1 text-meta focus:border-primary focus:outline-none"
                           value={it.item}
                           onChange={e => updateItem(idx, { item: e.target.value })}
                           placeholder="SF03-HK5535 1 Pce"
@@ -384,7 +384,7 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
                       </td>
                       <td className="px-2 py-1">
                         <input
-                          className="w-full rounded border border-base-200 px-1.5 py-1 text-xs font-mono focus:border-primary focus:outline-none"
+                          className="w-full rounded border border-base-200 px-1.5 py-1 text-meta font-mono focus:border-primary focus:outline-none"
                           value={it.poNo ?? ""}
                           onChange={e => updateItem(idx, { poNo: e.target.value || null })}
                           placeholder="PO23062-035"
@@ -394,14 +394,14 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
                         <input
                           type="number"
                           min={1}
-                          className="w-full rounded border border-base-200 px-1.5 py-1 text-xs focus:border-primary focus:outline-none"
+                          className="w-full rounded border border-base-200 px-1.5 py-1 text-meta focus:border-primary focus:outline-none"
                           value={it.qty}
                           onChange={e => updateItem(idx, { qty: parseInt(e.target.value) || 1 })}
                         />
                       </td>
                       <td className="px-2 py-1">
                         <input
-                          className="w-full rounded border border-base-200 px-1.5 py-1 text-xs focus:border-primary focus:outline-none"
+                          className="w-full rounded border border-base-200 px-1.5 py-1 text-meta focus:border-primary focus:outline-none"
                           value={it.remark ?? ""}
                           onChange={e => updateItem(idx, { remark: e.target.value || null })}
                           placeholder="Optional"
@@ -409,7 +409,7 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
                       </td>
                       <td className="px-2 py-1">
                         {items.length > 1 && (
-                          <button type="button" onClick={() => removeItem(idx)} className="text-base-400 hover:text-error-600 text-xs">×</button>
+                          <button type="button" onClick={() => removeItem(idx)} className="text-base-400 hover:text-error-600 text-meta">×</button>
                         )}
                       </td>
                     </tr>
@@ -508,7 +508,7 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
 
           {/* Error */}
           {saveMut.isError && (
-            <p className="text-xs text-error-700">
+            <p className="text-meta text-error-700">
               {(saveMut.error as { message?: string })?.message ?? "Save failed"}
             </p>
           )}
@@ -516,14 +516,14 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-base-200 bg-base-50">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-base-600 hover:text-base-900">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-body text-base-600 hover:text-base-900">
             Cancel
           </button>
           <button
             type="button"
             disabled={!canSave || isBusy}
             onClick={() => saveMut.mutate(buildPayload())}
-            className="rounded bg-base-900 px-5 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-base-800"
+            className="rounded bg-base-900 px-5 py-2 text-body font-medium text-white disabled:opacity-50 hover:bg-base-800"
           >
             {isBusy ? "Saving…" : mode === "create" ? "Create Case" : "Save Changes"}
           </button>
@@ -547,7 +547,7 @@ function formatLineLabel(l: OrderLine): string {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-xs text-base-500 mb-1">{label}</span>
+      <span className="block text-meta text-base-500 mb-1">{label}</span>
       {children}
     </label>
   );
@@ -570,20 +570,20 @@ function SectionToggle({
   return (
     <section className={`rounded border p-3 ${colors[color]}`}>
       <button type="button" onClick={onToggle} className="flex items-center gap-2 w-full text-left">
-        <span className={`w-4 h-4 rounded flex items-center justify-center text-xs border ${
+        <span className={`w-4 h-4 rounded flex items-center justify-center text-meta border ${
           enabled ? "bg-base-900 border-base-900 text-white" : "bg-white border-base-300"
         }`}>
           {enabled ? "✓" : ""}
         </span>
-        <span className="text-xs font-semibold">{label}</span>
-        <span className="ml-auto text-xs opacity-60">{enabled ? "included in print" : "click to add"}</span>
+        <span className="text-meta font-semibold">{label}</span>
+        <span className="ml-auto text-meta opacity-60">{enabled ? "included in print" : "click to add"}</span>
       </button>
       {children}
     </section>
   );
 }
 
-const inp = "w-full rounded border border-base-300 bg-white px-2.5 py-1.5 text-sm text-base-900 focus:border-primary focus:outline-none";
+const inp = "w-full rounded border border-base-300 bg-white px-2.5 py-1.5 text-body text-base-900 focus:border-primary focus:outline-none";
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);

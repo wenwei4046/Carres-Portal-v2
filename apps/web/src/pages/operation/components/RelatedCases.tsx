@@ -174,27 +174,27 @@ export default function RelatedCases({
           className="px-3 py-2 border-b border-base-100 last:border-b-0 flex items-start justify-between gap-x-3 gap-y-1 flex-wrap"
         >
           <span className="min-w-0">
-            <span className="block text-[13px] font-semibold text-base-900 truncate">
+            <span className="block text-body font-semibold text-base-900 truncate">
               {r.ref}
             </span>
-            <span className="block text-[12px] text-base-600 truncate">
+            <span className="block text-meta text-base-600 truncate">
               {r.title}
             </span>
             {r.guaranteeNote && (
-              <span className="block text-[12px] text-base-500 truncate">
+              <span className="block text-meta text-base-500 truncate">
                 {r.guaranteeNote}
               </span>
             )}
           </span>
           <span className="shrink-0 flex items-center gap-2.5">
-            <span className="text-[12px] text-base-500">{r.dateLabel}</span>
+            <span className="text-meta text-base-500">{r.dateLabel}</span>
             <span className={`pill ${r.settled ? "pill-confirmed" : "pill-neutral"}`}>
               {r.status}
             </span>
             <button
               type="button"
               onClick={() => onOpen(r)}
-              className="inline-flex items-center gap-1 text-[12px] text-info hover:underline"
+              className="inline-flex items-center gap-1 text-meta text-info hover:underline"
             >
               Open
               <ExternalLink size={12} aria-hidden />

@@ -67,7 +67,7 @@ export default function OperationRightRail() {
       {active && (
         <div className="w-[320px] flex flex-col border-l border-base-200 bg-white">
           <div className="flex items-center justify-between px-3.5 h-12 border-b border-base-100 shrink-0">
-            <div className="t-h4 text-base-900 flex items-center gap-2">
+            <div className="text-strong text-base-900 flex items-center gap-2">
               {(() => {
                 const Icon = TABS.find((t) => t.key === active)?.icon;
                 return Icon ? <Icon size={18} className="text-base-500" /> : null;
@@ -116,7 +116,7 @@ export default function OperationRightRail() {
               <t.icon size={18} strokeWidth={2} />
               {badge && (
                 <span
-                  className={`absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full ${badge.tone} text-white text-[10px] font-bold leading-[16px] text-center`}
+                  className={`absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full ${badge.tone} text-white text-label font-semibold leading-[16px] text-center`}
                 >
                   {badge.n > 99 ? "99+" : badge.n}
                 </span>

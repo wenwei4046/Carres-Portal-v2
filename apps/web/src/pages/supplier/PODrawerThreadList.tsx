@@ -23,13 +23,13 @@ export default function PODrawerThreadList({ poId }: { poId: string }) {
 
   if (threadsQ.isPending) {
     return (
-      <div className="text-[13px] text-muted-foreground">Loading threads…</div>
+      <div className="text-body text-muted-foreground">Loading threads…</div>
     );
   }
   const threads = threadsQ.data ?? [];
   if (threads.length === 0) {
     return (
-      <div className="text-[13px] text-muted-foreground">
+      <div className="text-body text-muted-foreground">
         No linked sales orders (stockpile PO).
       </div>
     );
@@ -63,10 +63,10 @@ export default function PODrawerThreadList({ poId }: { poId: string }) {
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono font-semibold text-sm">
+                  <span className="font-mono font-semibold text-body">
                     SO-{t.order_dl}
                   </span>
-                  <span className="text-[12px] text-muted-foreground truncate">
+                  <span className="text-meta text-muted-foreground truncate">
                     {t.customer_name}
                   </span>
                   <StatePill picked={isPicked} ready={isReady} />
@@ -75,9 +75,9 @@ export default function PODrawerThreadList({ poId }: { poId: string }) {
                     only real deadline; it deserves real estate. Bumped from
                     11px muted to 13px foreground with an inline calendar
                     icon so it pops on the thread row. */}
-                <div className="text-[13px] text-foreground mt-1 flex items-center gap-1.5">
+                <div className="text-body text-foreground mt-1 flex items-center gap-1.5">
                   <span aria-hidden="true">📅</span>
-                  <span className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                  <span className="text-label uppercase tracking-[0.08em] text-muted-foreground">
                     Customer ETA
                   </span>
                   <span className="font-mono font-semibold">
@@ -85,7 +85,7 @@ export default function PODrawerThreadList({ poId }: { poId: string }) {
                   </span>
                 </div>
                 {(t.sku_lines ?? []).length > 0 && (
-                  <div className="text-[11px] text-muted-foreground mt-1">
+                  <div className="text-label text-muted-foreground mt-1">
                     {(t.sku_lines ?? [])
                       .map((l) => `${l.sku} × ${l.qty}`)
                       .join(" · ")}
@@ -103,20 +103,20 @@ export default function PODrawerThreadList({ poId }: { poId: string }) {
 function StatePill({ picked, ready }: { picked: boolean; ready: boolean }) {
   if (picked) {
     return (
-      <span className="text-[10px] uppercase tracking-[0.06em] font-semibold text-success">
+      <span className="text-label uppercase tracking-[0.06em] font-semibold text-success">
         🚚 Picked
       </span>
     );
   }
   if (ready) {
     return (
-      <span className="text-[10px] uppercase tracking-[0.06em] font-semibold text-primary">
+      <span className="text-label uppercase tracking-[0.06em] font-semibold text-primary">
         ✅ Ready
       </span>
     );
   }
   return (
-    <span className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground">
+    <span className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground">
       🛠 Producing
     </span>
   );

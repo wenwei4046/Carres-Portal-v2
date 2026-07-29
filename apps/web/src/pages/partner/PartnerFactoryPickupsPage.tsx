@@ -358,7 +358,7 @@ export default function PartnerFactoryPickupsPage() {
 
   if (isLoading) {
     return (
-      <div className="px-9 py-8 pb-14 text-[13px] text-base-600">Loading…</div>
+      <div className="px-9 py-8 pb-14 text-body text-base-600">Loading…</div>
     );
   }
 
@@ -367,10 +367,10 @@ export default function PartnerFactoryPickupsPage() {
       <header className="flex justify-between items-end gap-4 flex-wrap">
         <div>
           <div className="kicker">Factory pickups</div>
-          <h1 className="font-display text-[32px] mt-1.5 leading-[1.05] tracking-[-0.025em] font-bold text-base-900">
+          <h1 className="font-display text-page mt-1.5 leading-[1.05] tracking-[-0.025em] font-semibold text-base-900">
             Supplier collections
           </h1>
-          <div className="font-body text-[13px] text-base-600 mt-1">
+          <div className="font-body text-body text-base-600 mt-1">
             {totalAll} job{totalAll === 1 ? "" : "s"} · {totalAwait} awaiting accept
           </div>
         </div>
@@ -379,12 +379,12 @@ export default function PartnerFactoryPickupsPage() {
           placeholder="Search PO / SKU / supplier…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="px-3.5 py-2 border border-base-300 rounded-[4px] text-[13px] min-w-[240px] outline-none focus:border-primary"
+          className="px-3.5 py-2 border border-base-300 rounded-[4px] text-body min-w-[240px] outline-none focus:border-primary"
         />
       </header>
 
       {totalAll === 0 ? (
-        <div className="bg-white border border-base-200 rounded-md p-15 text-center text-[13px] text-base-500">
+        <div className="bg-white border border-base-200 rounded-md p-15 text-center text-body text-base-500">
           No factory pickups assigned to you yet.
         </div>
       ) : (
@@ -438,7 +438,7 @@ export default function PartnerFactoryPickupsPage() {
                           type="button"
                           disabled={confirmReceive.isPending || rejectReceive.isPending}
                           onClick={() => confirmReceive.mutate(po.id)}
-                          className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                          className="w-full px-3 py-1.5 bg-primary text-white rounded text-meta font-semibold disabled:opacity-50"
                           data-testid={`confirm-receive-${po.id}`}
                         >
                           ✓ Accept · Confirm receive
@@ -454,7 +454,7 @@ export default function PartnerFactoryPickupsPage() {
                             if (reason === null) return;
                             rejectReceive.mutate({ poId: po.id, reason });
                           }}
-                          className="w-full px-3 py-1.5 bg-white border border-warning text-warning rounded text-[12px] font-semibold disabled:opacity-50"
+                          className="w-full px-3 py-1.5 bg-white border border-warning text-warning rounded text-meta font-semibold disabled:opacity-50"
                           data-testid={`reject-receive-${po.id}`}
                         >
                           ✗ Reject · Relocate
@@ -483,13 +483,13 @@ export default function PartnerFactoryPickupsPage() {
                           className="border border-base-200 rounded-[4px] bg-base-50 p-2 space-y-1"
                           data-testid={`ready-threads-${po.id}`}
                         >
-                          <div className="text-[10px] uppercase tracking-[0.06em] text-base-600 font-semibold">
+                          <div className="text-label uppercase tracking-[0.06em] text-base-600 font-semibold">
                             Ready threads ({ready.length})
                           </div>
                           {ready.map((t) => (
                             <label
                               key={t.id}
-                              className="flex items-center gap-2 cursor-pointer text-[11px] font-body"
+                              className="flex items-center gap-2 cursor-pointer text-label font-body"
                             >
                               <input
                                 type="checkbox"
@@ -517,7 +517,7 @@ export default function PartnerFactoryPickupsPage() {
                               threadIds: Array.from(selSet),
                             })
                           }
-                          className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                          className="w-full px-3 py-1.5 bg-primary text-white rounded text-meta font-semibold disabled:opacity-50"
                           data-testid={`pickup-selected-${po.id}`}
                         >
                           🚚 Pickup selected ({selectedCount})
@@ -542,7 +542,7 @@ export default function PartnerFactoryPickupsPage() {
                             ),
                         })
                       }
-                      className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                      className="w-full px-3 py-1.5 bg-primary text-white rounded text-meta font-semibold disabled:opacity-50"
                     >
                       ✓ Accept pickup
                     </button>
@@ -572,7 +572,7 @@ export default function PartnerFactoryPickupsPage() {
                       type="button"
                       disabled={markPickupCollected.isPending}
                       onClick={() => markAllUnDepartedCollected(po)}
-                      className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                      className="w-full px-3 py-1.5 bg-primary text-white rounded text-meta font-semibold disabled:opacity-50"
                       data-testid={`mark-collected-${po.id}`}
                     >
                       📦 Mark collected{undeparted.length > 1 ? ` (${undeparted.length})` : ""}
@@ -591,7 +591,7 @@ export default function PartnerFactoryPickupsPage() {
                             ),
                         })
                       }
-                      className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                      className="w-full px-3 py-1.5 bg-primary text-white rounded text-meta font-semibold disabled:opacity-50"
                     >
                       📦 Mark collected
                     </button>
@@ -629,7 +629,7 @@ export default function PartnerFactoryPickupsPage() {
                     <button
                       type="button"
                       onClick={() => setReceivingPoId(po.id)}
-                      className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold"
+                      className="w-full px-3 py-1.5 bg-primary text-white rounded text-meta font-semibold"
                       data-testid={`receive-at-wh-${po.id}`}
                     >
                       🏢 Arrived at WH · Receive
@@ -644,13 +644,13 @@ export default function PartnerFactoryPickupsPage() {
           {buckets.delivered.length > 0 && (
             <section className="space-y-2 mt-2">
               <div className="flex items-baseline gap-2.5">
-                <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-success">
+                <span className="text-label font-semibold uppercase tracking-[0.14em] text-success">
                   Delivered to WH
                 </span>
-                <span className="font-mono text-[12px] font-semibold text-base-700 px-2 py-0.5 rounded-full bg-base-100">
+                <span className="font-mono text-meta font-semibold text-base-700 px-2 py-0.5 rounded-full bg-base-100">
                   {buckets.delivered.length}
                 </span>
-                <span className="font-body text-[11px] text-base-500">
+                <span className="font-body text-label text-base-500">
                   Awaiting warehouse receive
                 </span>
               </div>
@@ -779,19 +779,19 @@ function PipelineColumn({
       <div className="px-4 py-3.5 border-b border-base-100">
         <div className="flex justify-between items-baseline">
           <div
-            className={`text-[11px] font-bold uppercase tracking-[0.14em] ${accentCls}`}
+            className={`text-label font-semibold uppercase tracking-[0.14em] ${accentCls}`}
           >
             {label}
           </div>
-          <span className="font-mono text-[13px] font-semibold">
+          <span className="font-mono text-body font-semibold">
             {items.length}
           </span>
         </div>
-        <div className="font-body text-[11px] text-base-500 mt-0.5">{hint}</div>
+        <div className="font-body text-label text-base-500 mt-0.5">{hint}</div>
       </div>
       <div className="p-2.5 min-h-[220px] flex flex-col gap-2">
         {items.length === 0 ? (
-          <div className="text-center text-base-400 text-[11px] py-6">—</div>
+          <div className="text-center text-base-400 text-label py-6">—</div>
         ) : (
           items.map((p) => (
             <PipelineCard
@@ -824,20 +824,20 @@ function PipelineCard({
   return (
     <div className="bg-white border border-base-100 rounded-[4px] p-3 hover:border-primary transition-colors">
       <div className="flex justify-between items-baseline mb-1">
-        <span className="font-mono text-[11px] font-semibold">{po.id}</span>
-        <span className="font-mono text-[11px] text-base-500">×{totalQty}</span>
+        <span className="font-mono text-label font-semibold">{po.id}</span>
+        <span className="font-mono text-label text-base-500">×{totalQty}</span>
       </div>
-      <div className="font-display text-[13px] font-semibold leading-[1.25] tracking-[-0.01em] mb-1.5 break-words">
+      <div className="font-display text-body font-semibold leading-[1.25] tracking-[-0.01em] mb-1.5 break-words">
         {summary}
       </div>
-      <div className="font-body text-[11px] text-base-600 leading-[1.5]">
+      <div className="font-body text-label text-base-600 leading-[1.5]">
         🏭 {po.suppliers?.name ?? "—"}
       </div>
-      <div className="font-body text-[11px] text-base-600 leading-[1.5]">
+      <div className="font-body text-label text-base-600 leading-[1.5]">
         🏢 → {po.warehouses?.name ?? "—"}
       </div>
       {!hideCalendarLine && (
-        <div className="font-mono text-[10px] text-base-500 mt-1">
+        <div className="font-mono text-label text-base-500 mt-1">
           📅 {po.eta_date ? `Pickup ${po.eta_date}` : "Pickup TBD"}
         </div>
       )}
@@ -846,7 +846,7 @@ function PipelineCard({
         <button
           type="button"
           onClick={onOpen}
-          className="text-[11px] py-1 px-2 text-base-600 hover:text-base-900 text-left"
+          className="text-label py-1 px-2 text-base-600 hover:text-base-900 text-left"
         >
           Details ›
         </button>
@@ -883,10 +883,10 @@ function DateBadge({
         : { border: "border-base-300", bg: "bg-base-50", label: "text-base-500" };
   return (
     <div className={`rounded-[4px] border ${cls.border} ${cls.bg} px-3 py-2 text-center`}>
-      <div className={`font-mono text-[9px] uppercase tracking-[0.14em] font-bold ${cls.label}`}>
+      <div className={`font-mono text-label uppercase tracking-[0.14em] font-semibold ${cls.label}`}>
         {label}
       </div>
-      <div className="font-mono text-[14px] font-semibold text-base-900 leading-tight mt-0.5">
+      <div className="font-mono text-body font-semibold text-base-900 leading-tight mt-0.5">
         {date ?? "TBD"}
       </div>
     </div>
@@ -908,14 +908,14 @@ function DeliveredRow({
       onClick={() => onOpen(po.id)}
       className="bg-white border border-base-100 rounded-md px-4 py-3 grid grid-cols-[auto_1fr_auto] gap-4 items-center cursor-pointer hover:border-primary transition-colors text-left"
     >
-      <span className="font-mono text-[12px] font-semibold">{po.id}</span>
+      <span className="font-mono text-meta font-semibold">{po.id}</span>
       <div>
-        <div className="font-body text-[12px]">{summary}</div>
-        <div className="font-body text-[11px] text-base-500 mt-0.5">
+        <div className="font-body text-meta">{summary}</div>
+        <div className="font-body text-label text-base-500 mt-0.5">
           {po.suppliers?.name ?? "—"} → {po.warehouses?.name ?? "—"} · ×{totalQty}
         </div>
       </div>
-      <span className="font-mono text-[10px] text-success uppercase tracking-[0.1em] font-bold">
+      <span className="font-mono text-label text-success uppercase tracking-[0.1em] font-semibold">
         Awaiting receive
       </span>
     </button>
@@ -989,11 +989,11 @@ function PickupDrawer({
       >
         <div className="px-6 py-5 border-b border-base-100 flex justify-between items-start gap-3">
           <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-base-500">
+            <div className="text-label uppercase tracking-[0.12em] text-base-500">
               Pickup brief
             </div>
-            <div className="font-mono text-[14px] font-semibold mt-1">{po.id}</div>
-            <div className="text-[12px] text-base-600 mt-1">
+            <div className="font-mono text-body font-semibold mt-1">{po.id}</div>
+            <div className="text-meta text-base-600 mt-1">
               {po.lines.length} line{po.lines.length === 1 ? "" : "s"} ·{" "}
               <strong>{totalQty}</strong> unit{totalQty === 1 ? "" : "s"}
             </div>
@@ -1001,7 +1001,7 @@ function PickupDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="text-[22px] text-base-500 hover:text-base-900"
+            className="text-title text-base-500 hover:text-base-900"
             aria-label="Close drawer"
           >
             ×
@@ -1010,15 +1010,15 @@ function PickupDrawer({
 
         <div className="px-6 py-5 space-y-5">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] text-base-500 mb-2">
+            <div className="text-label uppercase tracking-[0.12em] text-base-500 mb-2">
               From
             </div>
             <div className="bg-white border border-base-100 rounded-md px-3.5 py-2.5">
-              <div className="text-[13px] font-semibold">
+              <div className="text-body font-semibold">
                 {po.suppliers?.name ?? "Supplier"}
               </div>
               {po.suppliers?.contact && (
-                <div className="text-[11px] text-base-600 mt-0.5">
+                <div className="text-label text-base-600 mt-0.5">
                   {po.suppliers.contact}
                 </div>
               )}
@@ -1026,15 +1026,15 @@ function PickupDrawer({
           </div>
 
           <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] text-base-500 mb-2">
+            <div className="text-label uppercase tracking-[0.12em] text-base-500 mb-2">
               To
             </div>
             <div className="bg-white border border-base-100 rounded-md px-3.5 py-2.5">
-              <div className="text-[13px] font-semibold">
+              <div className="text-body font-semibold">
                 {po.warehouses?.name ?? "Carres warehouse"}
               </div>
               {po.warehouses?.address && (
-                <div className="text-[11px] text-base-600 mt-0.5">
+                <div className="text-label text-base-600 mt-0.5">
                   {po.warehouses.address}
                 </div>
               )}
@@ -1063,10 +1063,10 @@ function PickupDrawer({
               {hasReadyThreads && (
                 <div>
                   <div className="flex items-baseline justify-between mb-2">
-                    <div className="text-[10px] uppercase tracking-[0.12em] text-base-500">
+                    <div className="text-label uppercase tracking-[0.12em] text-base-500">
                       Ready for pickup ({readyThreads.length})
                     </div>
-                    <div className="text-[10px] text-base-500">
+                    <div className="text-label text-base-500">
                       Tick to include in this pickup
                     </div>
                   </div>
@@ -1087,14 +1087,14 @@ function PickupDrawer({
                           aria-label={`Select thread for SO-${t.orders?.so ?? "?"}`}
                           data-testid={`drawer-thread-checkbox-${t.id}`}
                         />
-                        <span className="flex-1 min-w-0 text-[12px] truncate">
+                        <span className="flex-1 min-w-0 text-meta truncate">
                           <span className="font-mono font-semibold">
                             SO-{t.orders?.so ?? "?"}
                           </span>{" "}
                           · {t.orders?.customer_name ?? "—"}
                         </span>
                         {t.orders?.delivery_date && (
-                          <span className="font-mono text-[10px] text-base-500 shrink-0">
+                          <span className="font-mono text-label text-base-500 shrink-0">
                             {t.orders.delivery_date}
                           </span>
                         )}
@@ -1151,12 +1151,12 @@ function PickupDrawer({
           )}
 
           <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] text-base-500 mb-1">
+            <div className="text-label uppercase tracking-[0.12em] text-base-500 mb-1">
               Status
             </div>
-            <div className="text-[13px]">{po.sup_status}</div>
+            <div className="text-body">{po.sup_status}</div>
             {po.eta_date && (
-              <div className="text-[11px] text-base-500 mt-0.5">
+              <div className="text-label text-base-500 mt-0.5">
                 Pickup target: {po.eta_date}
               </div>
             )}
@@ -1169,7 +1169,7 @@ function PickupDrawer({
               type="button"
               disabled={selectedCount === 0}
               onClick={onPickupSelected}
-              className="px-5 py-2 bg-primary text-white rounded-md text-[13px] font-semibold disabled:opacity-50"
+              className="px-5 py-2 bg-primary text-white rounded-md text-body font-semibold disabled:opacity-50"
               data-testid={`drawer-pickup-selected-${po.id}`}
             >
               🚚 Pickup selected ({selectedCount})
@@ -1180,7 +1180,7 @@ function PickupDrawer({
               type="button"
               disabled={accepting}
               onClick={onAccept}
-              className="px-5 py-2 bg-primary text-white rounded-md text-[13px] font-semibold disabled:opacity-50"
+              className="px-5 py-2 bg-primary text-white rounded-md text-body font-semibold disabled:opacity-50"
             >
               {accepting ? "Accepting…" : "✓ Accept pickup"}
             </button>
@@ -1190,7 +1190,7 @@ function PickupDrawer({
               type="button"
               disabled={markingCollected}
               onClick={onMarkCollected}
-              className="px-5 py-2 bg-primary text-white rounded-md text-[13px] font-semibold disabled:opacity-50"
+              className="px-5 py-2 bg-primary text-white rounded-md text-body font-semibold disabled:opacity-50"
             >
               {markingCollected ? "Marking…" : "📦 Mark collected"}
             </button>
@@ -1199,7 +1199,7 @@ function PickupDrawer({
             <button
               type="button"
               onClick={onMarkArrived}
-              className="px-5 py-2 bg-primary text-white rounded-md text-[13px] font-semibold"
+              className="px-5 py-2 bg-primary text-white rounded-md text-body font-semibold"
             >
               🏢 Arrived at WH · Receive
             </button>
@@ -1235,12 +1235,12 @@ function ThreadGroup({
   return (
     <div>
       <div className="flex items-baseline justify-between mb-2 gap-3">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-base-500">
+        <div className="text-label uppercase tracking-[0.12em] text-base-500">
           {title}{" "}
           <span className={`font-mono font-semibold ${countCls}`}>({count})</span>
         </div>
         {hint && (
-          <div className="text-[10px] text-base-500 text-right truncate">{hint}</div>
+          <div className="text-label text-base-500 text-right truncate">{hint}</div>
         )}
       </div>
       <div
@@ -1267,7 +1267,7 @@ function ThreadRow({
 }) {
   return (
     <div className="flex items-center gap-2.5 px-3.5 py-2.5">
-      <span className="flex-1 min-w-0 text-[12px] truncate">
+      <span className="flex-1 min-w-0 text-meta truncate">
         <span className="font-mono font-semibold">
           SO-{thread.orders?.so ?? "?"}
         </span>{" "}
@@ -1275,14 +1275,14 @@ function ThreadRow({
       </span>
       {doNumber && (
         <span
-          className="font-mono text-[10px] text-info bg-info/10 px-2 py-0.5 rounded-full shrink-0"
+          className="font-mono text-label text-info bg-info/10 px-2 py-0.5 rounded-full shrink-0"
           title="Picked under this DO"
         >
           🚚 {doNumber}
         </span>
       )}
       {thread.orders?.delivery_date && (
-        <span className="font-mono text-[10px] text-base-500 shrink-0">
+        <span className="font-mono text-label text-base-500 shrink-0">
           {thread.orders.delivery_date}
         </span>
       )}

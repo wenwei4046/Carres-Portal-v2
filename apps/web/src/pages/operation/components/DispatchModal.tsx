@@ -64,7 +64,7 @@ export default function DispatchModal({ order, warehouse, onClose }: Props) {
       title={`Assign delivery partner · #${order.so}`}
       onClose={onClose}
     >
-      <div className="text-[12px] text-base-600 mb-3.5 font-body">
+      <div className="text-meta text-base-600 mb-3.5 font-body">
         Stock has been allocated. Pick a delivery partner — they&rsquo;ll be
         notified to collect from{" "}
         <strong>{warehouse?.name ?? "the source warehouse"}</strong>.
@@ -73,13 +73,13 @@ export default function DispatchModal({ order, warehouse, onClose }: Props) {
       <div className="label mb-1.5">Delivery partner *</div>
 
       {partnersQ.isLoading ? (
-        <div className="text-[12px] text-base-500 mb-3.5">Loading partners…</div>
+        <div className="text-meta text-base-500 mb-3.5">Loading partners…</div>
       ) : partnersQ.isError ? (
-        <div className="text-[12px] text-destructive mb-3.5">
+        <div className="text-meta text-destructive mb-3.5">
           Couldn&rsquo;t load partners — try again later.
         </div>
       ) : partners.length === 0 ? (
-        <div className="text-[12px] text-warning mb-3.5">
+        <div className="text-meta text-warning mb-3.5">
           No delivery partners on file.
         </div>
       ) : (
@@ -99,7 +99,7 @@ export default function DispatchModal({ order, warehouse, onClose }: Props) {
       )}
 
       {partner && (
-        <div className="text-[12px] text-base-600 px-3 py-2.5 bg-base-50 rounded-[4px] mb-3.5">
+        <div className="text-meta text-base-600 px-3 py-2.5 bg-base-50 rounded-[4px] mb-3.5">
           <div>
             <strong>{partner.name}</strong>
           </div>

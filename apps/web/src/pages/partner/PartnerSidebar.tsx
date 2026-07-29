@@ -50,12 +50,12 @@ export default function PartnerSidebar() {
         title="Profile · Sign out"
         className="px-[18px] pt-[14px] pb-1 border-t border-border flex items-center gap-2.5 hover:bg-accent/40 transition-colors"
       >
-        <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-semibold flex-shrink-0">
+        <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground grid place-items-center text-meta font-semibold flex-shrink-0">
           {initials}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-xs font-semibold truncate">{email}</div>
-          <div className="text-[11px] text-muted-foreground">Delivery Partner</div>
+          <div className="text-meta font-semibold truncate">{email}</div>
+          <div className="text-label text-muted-foreground">Delivery Partner</div>
         </div>
       </Link>
     </aside>
@@ -63,7 +63,7 @@ export default function PartnerSidebar() {
 }
 
 function NavItem({ item }: { item: (typeof NAV_ITEMS)[number] }) {
-  const baseStyle = "relative flex items-center gap-3 px-3.5 py-2.5 rounded-md text-sm";
+  const baseStyle = "relative flex items-center gap-3 px-3.5 py-2.5 rounded-md text-body";
   return (
     <NavLink
       to={item.to}
@@ -79,7 +79,7 @@ function NavItem({ item }: { item: (typeof NAV_ITEMS)[number] }) {
       {({ isActive }) => (
         <>
           {isActive && <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-primary rounded-r" />}
-          <span className={`w-4 text-center text-[14px] ${isActive ? "text-primary" : ""}`}>{item.icon}</span>
+          <span className={`w-4 text-center text-body ${isActive ? "text-primary" : ""}`}>{item.icon}</span>
           <span>{item.label}</span>
         </>
       )}

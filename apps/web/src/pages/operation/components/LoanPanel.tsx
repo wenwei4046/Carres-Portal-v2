@@ -76,7 +76,7 @@ function condTone(c: string): string {
 }
 
 const TAG =
-  "inline-flex items-center rounded-[5px] px-1.5 py-0.5 text-[10.5px] font-bold tracking-[0.02em]";
+  "inline-flex items-center rounded-[5px] px-1.5 py-0.5 text-label font-semibold tracking-[0.02em]";
 
 /** Category → icon, SAME map as the Items-ordered panel (drawer §710): a
  *  loaned mattress wears the mattress icon, bedframe the bed, sofa the sofa. */
@@ -140,8 +140,8 @@ function Row({
     <div
       className={`grid grid-cols-[80px_1fr_auto] items-center gap-2.5 px-3 py-1.5 border-t border-base-100 first:border-t-0 ${bg}`}
     >
-      <span className="text-[11px] text-base-500">{k}</span>
-      <span className="text-[12.5px] text-base-900 font-medium min-w-0">{children}</span>
+      <span className="text-label text-base-500">{k}</span>
+      <span className="text-meta text-base-900 font-medium min-w-0">{children}</span>
       <span className="shrink-0">{action ?? null}</span>
     </div>
   );
@@ -230,24 +230,24 @@ function LoanCard({
             <Icon size={16} />
           </span>
           <div className="min-w-0">
-            <div className="text-[10px] font-bold tracking-[0.05em] uppercase text-base-400">
+            <div className="text-label font-semibold tracking-[0.05em] uppercase text-base-400">
               {src}
             </div>
-            <div className="text-[13.5px] font-semibold text-base-900 truncate" title={name}>
+            <div className="text-body font-semibold text-base-900 truncate" title={name}>
               {name}
             </div>
           </div>
         </div>
         <span className="flex flex-col items-end gap-0.5 shrink-0">
           {loan.loaned_at && (
-            <span className="font-mono text-[11.5px] text-base-400">
+            <span className="font-mono text-label text-base-400">
               {fmtDateShort(loan.loaned_at)}
             </span>
           )}
           <button
             type="button"
             onClick={onPrintNote}
-            className="inline-flex items-center gap-1 text-[11px] text-primary"
+            className="inline-flex items-center gap-1 text-label text-primary"
             title="Print the ON LOAN note the customer signs"
           >
             <Printer size={12} />
@@ -296,7 +296,7 @@ function LoanCard({
                     value={loan.out_partner_id ?? ""}
                     onChange={(e) => onSetPartner(e.target.value || null)}
                     aria-label="Logistic partner"
-                    className="border border-base-300 rounded-[6px] bg-white px-1.5 py-1 text-[12px] focus:border-primary focus:outline-none"
+                    className="border border-base-300 rounded-[6px] bg-white px-1.5 py-1 text-meta focus:border-primary focus:outline-none"
                   >
                     <option value="">Logistic…</option>
                     {partners.map((p) => (
@@ -309,7 +309,7 @@ function LoanCard({
                 <button
                   type="button"
                   onClick={() => setRouteEditing(false)}
-                  className="text-[11px] text-base-400"
+                  className="text-label text-base-400"
                 >
                   done
                 </button>
@@ -336,7 +336,7 @@ function LoanCard({
         )}
         {loan.do_number && (
           <Row k="Loan DO">
-            <span className="inline-flex items-center gap-1 font-mono text-[11.5px] text-primary">
+            <span className="inline-flex items-center gap-1 font-mono text-label text-primary">
               <Link2 size={12} />
               {loan.do_number}
             </span>
@@ -344,7 +344,7 @@ function LoanCard({
         )}
         {loan.item_po && (
           <Row k="PO">
-            <span className="font-mono text-[11.5px] text-base-700">{loan.item_po}</span>
+            <span className="font-mono text-label text-base-700">{loan.item_po}</span>
           </Row>
         )}
 
@@ -369,7 +369,7 @@ function LoanCard({
                 type="button"
                 onClick={onCollect}
                 disabled={busy}
-                className="btn-secondary text-[12px] py-0.5 px-2.5"
+                className="btn-secondary text-meta py-0.5 px-2.5"
               >
                 Collected back
               </button>
@@ -406,7 +406,7 @@ function LoanCard({
                     setReturnRef("");
                   }}
                   disabled={busy}
-                  className="btn-primary text-[12px] py-0.5 px-2.5"
+                  className="btn-primary text-meta py-0.5 px-2.5"
                 >
                   Confirm
                 </button>
@@ -418,7 +418,7 @@ function LoanCard({
                 onChange={(e) => setReturnRef(e.target.value)}
                 placeholder="Returned with… (e.g. Laveo DO-2207) — optional"
                 aria-label="Returned with which supplier delivery"
-                className="w-full border border-base-300 rounded-[6px] bg-white px-2 py-1 text-[12px] focus:border-primary focus:outline-none"
+                className="w-full border border-base-300 rounded-[6px] bg-white px-2 py-1 text-meta focus:border-primary focus:outline-none"
               />
             </Row>
           ) : (
@@ -431,7 +431,7 @@ function LoanCard({
                     type="button"
                     onClick={() => setReturningSup(true)}
                     disabled={busy}
-                    className="btn-primary text-[12px] py-0.5 px-2.5"
+                    className="btn-primary text-meta py-0.5 px-2.5"
                   >
                     Mark returned
                   </button>
@@ -452,12 +452,12 @@ function LoanCard({
                     }}
                     onBlur={() => setDueEditing(false)}
                     aria-label="Return-by date"
-                    className="border border-base-300 rounded-[6px] bg-white px-2 py-1 text-[12px] focus:border-primary focus:outline-none"
+                    className="border border-base-300 rounded-[6px] bg-white px-2 py-1 text-meta focus:border-primary focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setDueEditing(false)}
-                    className="text-[11px] text-base-400"
+                    className="text-label text-base-400"
                   >
                     cancel
                   </button>
@@ -488,14 +488,14 @@ function LoanCard({
                     })()}
                   </button>
                   {returnIsAuto ? (
-                    <span className="text-[11px] text-base-400">auto</span>
+                    <span className="text-label text-base-400">auto</span>
                   ) : (
                     <button
                       type="button"
                       onClick={() => onSetReturnDue(null)}
                       disabled={busy}
                       title="Clear the override — back to auto"
-                      className="text-[11px] text-base-400 border-b border-dashed border-base-300"
+                      className="text-label text-base-400 border-b border-dashed border-base-300"
                     >
                       clear
                     </button>
@@ -579,7 +579,7 @@ function WarehousePick({
     });
 
   if (lendable.length === 0)
-    return <div className="text-[12px] text-base-500 px-1 py-1">No free unit to lend for this order.</div>;
+    return <div className="text-meta text-base-500 px-1 py-1">No free unit to lend for this order.</div>;
 
   function UnitRow({ g }: { g: UnitGroup }) {
     const isSofa = g.cat === "sofa";
@@ -592,7 +592,7 @@ function WarehousePick({
             <UIcon size={16} />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-[12.5px] font-semibold text-base-900 truncate" title={g.sku}>
+            <div className="text-meta font-semibold text-base-900 truncate" title={g.sku}>
               {g.sku}
             </div>
             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
@@ -600,14 +600,14 @@ function WarehousePick({
                 {CONDITION_LABEL[g.condition] ?? g.condition}
                 {g.condition === "new" ? " · sellable" : ""}
               </span>
-              <span className="text-[11px] text-base-500">{g.count} free</span>
+              <span className="text-label text-base-500">{g.count} free</span>
               {g.dateIn && (
-                <span className="font-mono text-[10.5px] text-base-500">in {fmtDateShort(g.dateIn)}</span>
+                <span className="font-mono text-label text-base-500">in {fmtDateShort(g.dateIn)}</span>
               )}
               {g.poNo && (
-                <span className="font-mono text-[10.5px] text-base-500">PO {g.poNo}</span>
+                <span className="font-mono text-label text-base-500">PO {g.poNo}</span>
               )}
-              {g.location && <span className="text-[11px] text-base-500">{g.location}</span>}
+              {g.location && <span className="text-label text-base-500">{g.location}</span>}
             </div>
           </div>
           <Btn size="sm" onClick={() => onLend?.(g.firstId, g.sku)} disabled={!onLend || gated}>
@@ -615,7 +615,7 @@ function WarehousePick({
           </Btn>
         </div>
         {isSofa && (
-          <label className="flex items-center gap-2 mt-2 pl-[42px] text-[11.5px] text-base-600 cursor-pointer">
+          <label className="flex items-center gap-2 mt-2 pl-[42px] text-label text-base-600 cursor-pointer">
             <input
               type="checkbox"
               checked={enterOk.has(g.key)}
@@ -633,7 +633,7 @@ function WarehousePick({
     <div>
       {safe.length > 0 && (
         <>
-          <div className="text-[10px] font-bold tracking-[0.05em] uppercase text-base-500 mb-1.5 px-0.5">
+          <div className="text-label font-semibold tracking-[0.05em] uppercase text-base-500 mb-1.5 px-0.5">
             Available to lend · display stock first
           </div>
           {safe.map((g) => (
@@ -644,11 +644,11 @@ function WarehousePick({
 
       {sellable.length > 0 && (
         <>
-          <div className="text-[10px] font-bold tracking-[0.05em] uppercase text-base-500 mt-2 mb-1.5 px-0.5">
+          <div className="text-label font-semibold tracking-[0.05em] uppercase text-base-500 mt-2 mb-1.5 px-0.5">
             New stock · lend only if no display
           </div>
           {safe.length > 0 && (
-            <div className="flex items-start gap-1.5 bg-warning-soft/60 border border-warning/30 rounded-[8px] px-2.5 py-1.5 mb-2 text-[11px] text-warning">
+            <div className="flex items-start gap-1.5 bg-warning-soft/60 border border-warning/30 rounded-[8px] px-2.5 py-1.5 mb-2 text-label text-warning">
               <AlertTriangle size={13} className="shrink-0 mt-0.5" />
               This is sellable new stock — lend a display unit above when you have one.
             </div>
@@ -797,7 +797,7 @@ export default function LoanPanel({
   }
 
   const field =
-    "border border-base-300 rounded-[6px] bg-white px-2 py-1.5 text-[12px] focus:border-primary focus:outline-none";
+    "border border-base-300 rounded-[6px] bg-white px-2 py-1.5 text-meta focus:border-primary focus:outline-none";
 
   return (
     <div className="p-3 space-y-2.5">
@@ -884,7 +884,7 @@ export default function LoanPanel({
 
           {source === "supplier" && (
             <div className="space-y-2">
-              <div className="text-[11px] text-base-500 px-0.5">
+              <div className="text-label text-base-500 px-0.5">
                 Borrow whatever the supplier currently has — describe the piece.
               </div>
               <select
@@ -920,7 +920,7 @@ export default function LoanPanel({
               </select>
               {/* OUT leg (0242) — how it reaches the customer */}
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11.5px] text-base-500 shrink-0">Send</span>
+                <span className="text-label text-base-500 shrink-0">Send</span>
                 <Segmented
                   ariaLabel="Loaner delivery route"
                   options={[
@@ -951,7 +951,7 @@ export default function LoanPanel({
                 </select>
               )}
               <div className="flex items-center gap-2">
-                <span className="text-[11.5px] text-base-500 shrink-0">Return by</span>
+                <span className="text-label text-base-500 shrink-0">Return by</span>
                 <ReturnByChip value={returnDate} onChange={setReturnDate} />
               </div>
               <div className="flex items-center justify-end pt-0.5">
@@ -959,7 +959,7 @@ export default function LoanPanel({
                   type="button"
                   onClick={submitBorrow}
                   disabled={borrow.isPending}
-                  className="btn-primary text-[12px]"
+                  className="btn-primary text-meta"
                 >
                   {borrow.isPending ? "Borrowing…" : "Borrow + lend out"}
                 </button>
@@ -991,7 +991,7 @@ function ReturnByChip({
         onChange={(e) => onChange(e.target.value)}
         onBlur={() => setOpen(false)}
         aria-label="Expected return to supplier"
-        className="border border-base-300 rounded-[6px] bg-white px-2 py-1 text-[12px] focus:border-primary focus:outline-none"
+        className="border border-base-300 rounded-[6px] bg-white px-2 py-1 text-meta focus:border-primary focus:outline-none"
       />
     );
   }
@@ -999,7 +999,7 @@ function ReturnByChip({
     <button
       type="button"
       onClick={() => setOpen(true)}
-      className="inline-flex items-center font-mono text-[12px] font-semibold text-base-800 border border-base-300 border-dashed rounded-[6px] px-2 py-1 bg-white"
+      className="inline-flex items-center font-mono text-meta font-semibold text-base-800 border border-base-300 border-dashed rounded-[6px] px-2 py-1 bg-white"
     >
       {fmtDateShort(value)}
     </button>

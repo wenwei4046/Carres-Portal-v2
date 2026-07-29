@@ -181,7 +181,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
 
   return (
     <Modal title={`Count ${po.po_id}`} onClose={onClose} size="lg">
-      <div className="text-[12px] text-base-600 mb-3.5 font-body">
+      <div className="text-meta text-base-600 mb-3.5 font-body">
         Goods from <strong>{po.supplier_name ?? "the factory"}</strong>. For each
         item: how many arrived good, how many arrived damaged, how many are the
         wrong item. Anything not counted stays{" "}
@@ -211,12 +211,12 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                 style={{ gridTemplateColumns: GRID }}
               >
                 <div>
-                  <div className="text-[12px] font-body">{l.sku}</div>
-                  <div className="font-mono text-[10px] text-base-500 mt-0.5">
+                  <div className="text-meta font-body">{l.sku}</div>
+                  <div className="font-mono text-label text-base-500 mt-0.5">
                     Ordered {l.qty} · already checked in {l.received_qty}
                   </div>
                 </div>
-                <div className="font-mono text-[12px] text-right font-semibold">
+                <div className="font-mono text-meta text-right font-semibold">
                   {pending}
                 </div>
                 <input
@@ -235,7 +235,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                   }
                   aria-label={`Good units for ${l.sku}`}
                   data-testid={`warehouse-good-${l.sku}`}
-                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] text-right bg-white outline-none focus:border-base-500"
+                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
                 />
                 <input
                   type="number"
@@ -253,7 +253,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                   }
                   aria-label={`Damaged units for ${l.sku}`}
                   data-testid={`warehouse-damaged-${l.sku}`}
-                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] text-right bg-white outline-none focus:border-base-500"
+                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
                 />
                 <input
                   type="number"
@@ -271,7 +271,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                   }
                   aria-label={`Wrong item units for ${l.sku}`}
                   data-testid={`warehouse-wrong-${l.sku}`}
-                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] text-right bg-white outline-none focus:border-base-500"
+                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
                 />
               </div>
 
@@ -282,7 +282,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                   className="px-3.5 pb-3 pt-1 bg-base-50/60 grid gap-2"
                   data-testid={`warehouse-claim-panel-${l.sku}`}
                 >
-                  <div className="text-[10px] uppercase tracking-[0.12em] text-base-500 font-body">
+                  <div className="text-label uppercase tracking-[0.12em] text-base-500 font-body">
                     Photos Carres will show the factory
                   </div>
 
@@ -303,7 +303,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                     <>
                       <div className="flex items-center gap-2 flex-wrap">
                         <label
-                          className="text-[11px] text-base-600 font-body"
+                          className="text-label text-base-600 font-body"
                           htmlFor={`wh-wrong-kind-${l.id}`}
                         >
                           What is wrong with it?
@@ -318,7 +318,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                             }))
                           }
                           data-testid={`warehouse-wrong-kind-${l.sku}`}
-                          className="px-2 py-1 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+                          className="px-2 py-1 border border-base-300 rounded-[4px] text-meta bg-white outline-none focus:border-base-500"
                         >
                           <option value="">Choose…</option>
                           {wrongItemClaimTypesFor(l.category).map((o) => (
@@ -348,7 +348,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
 
         <div className="flex justify-end items-center px-3.5 py-2 bg-base-50 border-t border-base-100">
           <div
-            className="font-mono text-[11px] font-semibold"
+            className="font-mono text-label font-semibold"
             data-testid="warehouse-count-totals"
           >
             Σ {totals.good} good
@@ -372,7 +372,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
           />
         </div>
         <div className="px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] bg-white">
-          <div className="text-[11px] text-base-600 mb-2 font-body">
+          <div className="text-label text-base-600 mb-2 font-body">
             Photo of the signed DO *{" "}
             <span className="text-base-400">(PDF/JPG/PNG · ≤10 MB)</span>
           </div>
@@ -401,7 +401,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
           does NOT do. A clerk who believes the stock has moved will not chase
           the PO that is still open. */}
       <div
-        className="text-[11px] text-base-600 mb-3.5 font-body px-3 py-2 border border-dashed border-base-300 rounded-[4px]"
+        className="text-label text-base-600 mb-3.5 font-body px-3 py-2 border border-dashed border-base-300 rounded-[4px]"
         data-testid="warehouse-count-note"
       >
         Nothing moves yet. Carres checks this in, and the stock is booked then.
@@ -416,7 +416,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
 
       {problems.length > 0 && (
         <div
-          className="text-[11px] text-danger mb-3 font-body"
+          className="text-label text-danger mb-3 font-body"
           data-testid="warehouse-count-problems"
         >
           {problems.map(warehouseReceiptProblemText).join(" · ")}

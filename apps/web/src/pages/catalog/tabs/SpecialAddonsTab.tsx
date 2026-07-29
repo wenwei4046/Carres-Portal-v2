@@ -235,8 +235,8 @@ function ProductAddonsPanel({
     <section data-testid="product-addons-panel">
       <div className="flex items-start justify-between gap-4 mb-4">
         <div>
-          <div className="t-h4 font-display text-base-900">Product Add-ons</div>
-          <p className="t-tiny text-base-500 mt-0.5 max-w-[520px]">
+          <div className="text-strong font-display text-base-900">Product Add-ons</div>
+          <p className="text-meta text-base-500 mt-0.5 max-w-[520px]">
             Per-model surcharges with optional follow-up questions. Attach them to a
             model in the Modular tab.
             {!isPrincipal && " Master Admin only — read-only for your role."}
@@ -246,7 +246,7 @@ function ProductAddonsPanel({
           <button
             type="button"
             onClick={() => setEditing(toDraft())}
-            className="btn-hero text-[12px] shrink-0"
+            className="btn-hero text-meta shrink-0"
             data-testid="special-new"
           >
             + New special add-on
@@ -255,10 +255,10 @@ function ProductAddonsPanel({
       </div>
 
       {rows.length === 0 ? (
-        <div className="t-small text-base-500 py-6">No special add-ons yet.</div>
+        <div className="text-body text-base-500 py-6">No special add-ons yet.</div>
       ) : (
         <div className="bg-white border border-base-200 rounded-[4px] overflow-hidden">
-          <div className="grid grid-cols-[1.4fr_140px_110px_90px_80px_64px] bg-base-50 t-micro text-base-500 px-3 py-2">
+          <div className="grid grid-cols-[1.4fr_140px_110px_90px_80px_64px] bg-base-50 text-label uppercase tracking-[0.05em] text-base-500 px-3 py-2">
             <span>NAME</span>
             <span>CATEGORIES</span>
             <span className="text-right">BASE PRICE</span>
@@ -273,17 +273,17 @@ function ProductAddonsPanel({
               data-testid={`special-row-${a.code}`}
             >
               <div className="min-w-0">
-                <div className="t-small text-base-900 font-medium truncate">{a.label}</div>
+                <div className="text-body text-base-900 font-medium truncate">{a.label}</div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <CodeChip>{a.code}</CodeChip>
-                  {a.soDescription && <span className="t-tiny text-base-400 truncate">{a.soDescription}</span>}
+                  {a.soDescription && <span className="text-meta text-base-400 truncate">{a.soDescription}</span>}
                 </div>
               </div>
-              <span className="t-tiny text-base-500 truncate">
+              <span className="text-meta text-base-500 truncate">
                 {a.categories.map((c) => CATEGORY_LABEL[c as ProductCategory] ?? c).join(", ") || "—"}
               </span>
-              <span className="t-small text-right tabular-nums">{fmtRm(a.sellingPrice)}</span>
-              <span className="t-tiny text-right text-base-500">
+              <span className="text-body text-right tabular-nums">{fmtRm(a.sellingPrice)}</span>
+              <span className="text-meta text-right text-base-500">
                 {a.optionGroups.length === 0 ? "—" : `${a.optionGroups.length}`}
               </span>
               <span>
@@ -297,7 +297,7 @@ function ProductAddonsPanel({
                 <button
                   type="button"
                   onClick={() => setEditing(toDraft(a))}
-                  className="btn-ghost text-[11px]"
+                  className="btn-ghost text-label"
                   data-testid={`special-edit-${a.code}`}
                   disabled={!isPrincipal}
                 >
@@ -458,11 +458,11 @@ function SpecialAddonEditor({ draft, onClose }: { draft: Draft; onClose: () => v
         <div className="border-t border-base-200 pt-3">
           <div className="flex items-center justify-between mb-2">
             <span className="label">Follow-up questions (optional)</span>
-            <button type="button" onClick={addGroup} className="btn-secondary text-[11px]" data-testid="special-add-group">
+            <button type="button" onClick={addGroup} className="btn-secondary text-label" data-testid="special-add-group">
               + Question
             </button>
           </div>
-          {d.optionGroups.length === 0 && <p className="t-tiny text-base-400">No follow-up questions — the base surcharge applies as-is.</p>}
+          {d.optionGroups.length === 0 && <p className="text-meta text-base-400">No follow-up questions — the base surcharge applies as-is.</p>}
           <div className="flex flex-col gap-3">
             {d.optionGroups.map((g, gi) => (
               <div key={gi} className="border border-base-200 rounded-[4px] p-2.5 bg-base-50" data-testid={`special-group-${gi}`}>
@@ -474,11 +474,11 @@ function SpecialAddonEditor({ draft, onClose }: { draft: Draft; onClose: () => v
                     className={`${INPUT_CLS} flex-1`}
                     data-testid={`special-group-label-${gi}`}
                   />
-                  <label className="flex items-center gap-1 t-tiny text-base-600">
+                  <label className="flex items-center gap-1 text-meta text-base-600">
                     <input type="checkbox" checked={g.required} onChange={(e) => patchGroup(gi, { required: e.target.checked })} />
                     required
                   </label>
-                  <button type="button" onClick={() => removeGroup(gi)} className="btn-danger text-[11px]">Remove</button>
+                  <button type="button" onClick={() => removeGroup(gi)} className="btn-danger text-label">Remove</button>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   {g.choices.map((c, ci) => (
@@ -500,10 +500,10 @@ function SpecialAddonEditor({ draft, onClose }: { draft: Draft; onClose: () => v
                         data-testid={`special-choice-extra-${gi}-${ci}`}
                         title="Extra surcharge for this choice (± ok)"
                       />
-                      <button type="button" onClick={() => removeChoice(gi, ci)} className="btn-ghost text-[11px]" disabled={g.choices.length <= 1}>✕</button>
+                      <button type="button" onClick={() => removeChoice(gi, ci)} className="btn-ghost text-label" disabled={g.choices.length <= 1}>✕</button>
                     </div>
                   ))}
-                  <button type="button" onClick={() => addChoice(gi)} className="btn-ghost text-[11px] self-start" data-testid={`special-add-choice-${gi}`}>
+                  <button type="button" onClick={() => addChoice(gi)} className="btn-ghost text-label self-start" data-testid={`special-add-choice-${gi}`}>
                     + choice
                   </button>
                 </div>
@@ -512,7 +512,7 @@ function SpecialAddonEditor({ draft, onClose }: { draft: Draft; onClose: () => v
           </div>
         </div>
 
-        <label className="flex items-center gap-2 t-small text-base-700">
+        <label className="flex items-center gap-2 text-body text-base-700">
           <input type="checkbox" checked={d.active} onChange={(e) => set("active", e.target.checked)} />
           Active (offered at POS)
         </label>
@@ -520,7 +520,7 @@ function SpecialAddonEditor({ draft, onClose }: { draft: Draft; onClose: () => v
 
       <div className="flex items-center justify-between mt-1">
         {!isNew ? (
-          <button type="button" onClick={remove} className="btn-danger text-[12px]" disabled={pending}>
+          <button type="button" onClick={remove} className="btn-danger text-meta" disabled={pending}>
             Turn off
           </button>
         ) : (

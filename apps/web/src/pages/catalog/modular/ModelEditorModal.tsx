@@ -70,7 +70,7 @@ function Chip({
       onClick={onToggle}
       disabled={disabled}
       aria-pressed={on}
-      className={`t-small font-semibold px-3 py-1 rounded-full border transition-colors disabled:opacity-50 ${on ? CHIP_ON : CHIP_OFF}`}
+      className={`text-body font-semibold px-3 py-1 rounded-full border transition-colors disabled:opacity-50 ${on ? CHIP_ON : CHIP_OFF}`}
       data-testid={testid}
     >
       {label}
@@ -81,7 +81,7 @@ function Chip({
 function SectionHead({ label, right }: { label: string; right?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between mb-2">
-      <div className="t-micro text-base-500">{label}</div>
+      <div className="text-label uppercase tracking-[0.05em] text-base-500">{label}</div>
       {right}
     </div>
   );
@@ -347,7 +347,7 @@ export default function ModelEditorModal({
   return (
     <Modal title={model.name} onClose={onClose} size="lg">
       <div data-testid="model-editor-modal" className="flex flex-col gap-5">
-        <div className="t-tiny text-base-500 -mt-4 flex items-center gap-1.5">
+        <div className="text-meta text-base-500 -mt-4 flex items-center gap-1.5">
           {CATEGORY_LABEL[model.category]} · <CodeChip>{model.modelKey}</CodeChip>
         </div>
 
@@ -360,7 +360,7 @@ export default function ModelEditorModal({
               className="w-20 h-20 object-cover rounded-[6px] border border-base-200 bg-base-50"
             />
           ) : (
-            <div className="w-20 h-20 rounded-[6px] border border-dashed border-base-300 bg-base-50 grid place-items-center text-base-300 text-[24px]">
+            <div className="w-20 h-20 rounded-[6px] border border-dashed border-base-300 bg-base-50 grid place-items-center text-base-300 text-page">
               ▦
             </div>
           )}
@@ -378,7 +378,7 @@ export default function ModelEditorModal({
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={setPhoto.isPending}
-                className="btn-secondary text-[12px]"
+                className="btn-secondary text-meta"
               >
                 {setPhoto.isPending ? "Uploading…" : model.photoUrl ? "Replace photo" : "Upload photo"}
               </button>
@@ -387,13 +387,13 @@ export default function ModelEditorModal({
                   type="button"
                   onClick={removePhoto}
                   disabled={delPhoto.isPending}
-                  className="btn-danger text-[12px]"
+                  className="btn-danger text-meta"
                 >
                   Remove
                 </button>
               )}
             </div>
-            <span className="t-tiny text-base-400">JPEG/PNG/WebP · auto-shrunk to ≤2 MB</span>
+            <span className="text-meta text-base-400">JPEG/PNG/WebP · auto-shrunk to ≤2 MB</span>
           </div>
         </div>
 
@@ -437,7 +437,7 @@ export default function ModelEditorModal({
                   ))}
                 </div>
                 {!isSofa && (
-                  <p className="t-tiny text-base-400 mt-1.5">
+                  <p className="text-meta text-base-400 mt-1.5">
                     Turning a size off hides every SKU of that size from POS. New sizes are
                     created in + New Model / SKU Master, not here.
                   </p>
@@ -451,7 +451,7 @@ export default function ModelEditorModal({
                   label="Compartments"
                   right={
                     !isPrincipal ? (
-                      <span className="t-tiny text-base-400">Principal only</span>
+                      <span className="text-meta text-base-400">Principal only</span>
                     ) : undefined
                   }
                 />
@@ -467,7 +467,7 @@ export default function ModelEditorModal({
                     />
                   ))}
                 </div>
-                <p className="t-tiny text-base-400 mt-1.5">
+                <p className="text-meta text-base-400 mt-1.5">
                   Ticking a compartment creates its SKU in SKU Master and puts the model
                   live in POS — set the selling price there (it starts at RM0). Unticking
                   hides it from the builder.
@@ -507,7 +507,7 @@ export default function ModelEditorModal({
                     />
                   ))}
                 </div>
-                <p className="t-tiny text-base-400 mt-1.5">
+                <p className="text-meta text-base-400 mt-1.5">
                   Turning a height off hides it from the POS divan picker. All off = every height.
                 </p>
               </div>
@@ -528,7 +528,7 @@ export default function ModelEditorModal({
                     />
                   ))}
                 </div>
-                <p className="t-tiny text-base-400 mt-1.5">
+                <p className="text-meta text-base-400 mt-1.5">
                   Turning a gap off hides it from the POS gap picker. All off = every gap.
                 </p>
               </div>
@@ -560,12 +560,12 @@ export default function ModelEditorModal({
                     return (
                       <div key={series}>
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="t-small font-medium text-base-700">{series}</span>
+                          <span className="text-body font-medium text-base-700">{series}</span>
                           <span className="flex gap-1.5">
                             <button
                               type="button"
                               onClick={() => setFabricsBulk(codes, true)}
-                              className="btn-ghost text-[11px]"
+                              className="btn-ghost text-label"
                               data-testid={`allowed-fabrics-allon-${series}`}
                             >
                               All on
@@ -573,7 +573,7 @@ export default function ModelEditorModal({
                             <button
                               type="button"
                               onClick={() => setFabricsBulk(codes, false)}
-                              className="btn-ghost text-[11px]"
+                              className="btn-ghost text-label"
                             >
                               All off
                             </button>
@@ -608,8 +608,8 @@ export default function ModelEditorModal({
             data-testid="flat-show-in-pos"
           >
             <div>
-              <div className="t-small font-semibold text-base-900">Activate in POS</div>
-              <div className="t-tiny text-base-500 mt-0.5">
+              <div className="text-body font-semibold text-base-900">Activate in POS</div>
+              <div className="text-meta text-base-500 mt-0.5">
                 {showInPos
                   ? "On — sales staff can add this to an order."
                   : "Off — hidden from the POS catalog."}
@@ -622,7 +622,7 @@ export default function ModelEditorModal({
               aria-checked={showInPos}
               onClick={() => setShowInPos((v) => !v)}
               disabled={liveSkus.length === 0}
-              className={`t-small font-semibold px-4 py-1.5 rounded-full border transition-colors disabled:opacity-50 ${showInPos ? "bg-base-900 text-white border-base-900" : CHIP_OFF}`}
+              className={`text-body font-semibold px-4 py-1.5 rounded-full border transition-colors disabled:opacity-50 ${showInPos ? "bg-base-900 text-white border-base-900" : CHIP_OFF}`}
               data-testid="flat-show-in-pos-switch"
             >
               {showInPos ? "On" : "Off"}
@@ -632,14 +632,14 @@ export default function ModelEditorModal({
 
         {/* Footer — Cancel / Save */}
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-base-100">
-          <button type="button" onClick={onClose} className="btn-ghost text-[12px]">
+          <button type="button" onClick={onClose} className="btn-ghost text-meta">
             Cancel
           </button>
           <button
             type="button"
             onClick={save}
             disabled={saving || !nameValid}
-            className="btn-primary text-[12px] disabled:opacity-40"
+            className="btn-primary text-meta disabled:opacity-40"
             data-testid="model-editor-save"
           >
             {saving ? "Saving…" : "Save"}

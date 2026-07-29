@@ -77,7 +77,7 @@ export default function KeepPanel() {
               className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
             >
               <Plus size={16} className="text-primary" />
-              <span className="text-[13px] text-base-500">Take a note…</span>
+              <span className="text-body text-base-500">Take a note…</span>
               <ListChecks size={15} className="ml-auto text-base-400" />
             </button>
           ) : (
@@ -88,7 +88,7 @@ export default function KeepPanel() {
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="Take a note…"
                 rows={3}
-                className="w-full text-[13px] resize-none focus:outline-none bg-transparent"
+                className="w-full text-body resize-none focus:outline-none bg-transparent"
               />
               <div className="flex justify-end gap-2 mt-1">
                 <button
@@ -97,7 +97,7 @@ export default function KeepPanel() {
                     setExpanded(false);
                     setDraft("");
                   }}
-                  className="text-[12px] text-base-500 px-2 py-1 rounded hover:bg-base-100"
+                  className="text-meta text-base-500 px-2 py-1 rounded hover:bg-base-100"
                 >
                   Close
                 </button>
@@ -110,7 +110,7 @@ export default function KeepPanel() {
                       { onSuccess: () => { setDraft(""); setExpanded(false); } },
                     )
                   }
-                  className="text-[12px] font-semibold text-primary px-2 py-1 rounded hover:bg-primary/5 disabled:opacity-40"
+                  className="text-meta font-semibold text-primary px-2 py-1 rounded hover:bg-primary/5 disabled:opacity-40"
                 >
                   Add
                 </button>
@@ -123,9 +123,9 @@ export default function KeepPanel() {
       {/* Notes */}
       <div className="flex-1 overflow-auto space-y-2">
         {isLoading ? (
-          <div className="text-[12px] text-base-400 text-center py-6">Loading…</div>
+          <div className="text-meta text-base-400 text-center py-6">Loading…</div>
         ) : notes.length === 0 ? (
-          <div className="text-[12px] text-base-400 text-center py-6">
+          <div className="text-meta text-base-400 text-center py-6">
             {view === "archived" ? "No archived notes." : "Notes you add appear here."}
           </div>
         ) : (
@@ -145,7 +145,7 @@ export default function KeepPanel() {
       <button
         type="button"
         onClick={() => setView((v) => (v === "active" ? "archived" : "active"))}
-        className="mt-2 pt-2 border-t border-base-100 text-[11px] text-base-500 hover:text-base-900 flex items-center gap-1.5"
+        className="mt-2 pt-2 border-t border-base-100 text-label text-base-500 hover:text-base-900 flex items-center gap-1.5"
       >
         <Archive size={12} /> {view === "active" ? "View archived" : "← Back to notes"}
       </button>
@@ -184,13 +184,13 @@ function NoteCard({
             if (text !== note.content) onPatch({ content: text });
           }}
           rows={3}
-          className="w-full text-[13px] bg-transparent resize-none focus:outline-none"
+          className="w-full text-body bg-transparent resize-none focus:outline-none"
         />
       ) : (
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="w-full text-left text-[13px] text-base-800 whitespace-pre-wrap break-words pr-4"
+          className="w-full text-left text-body text-base-800 whitespace-pre-wrap break-words pr-4"
         >
           {note.content || <span className="text-base-400">Empty note — click to edit</span>}
         </button>
@@ -221,7 +221,7 @@ function NoteCard({
             <MoreVertical size={14} />
           </button>
           {menu && (
-            <div className="absolute right-0 top-full mt-1 z-20 w-36 bg-white rounded-md shadow-lg border border-base-200 py-1 text-[12px]">
+            <div className="absolute right-0 top-full mt-1 z-20 w-36 bg-white rounded-md shadow-lg border border-base-200 py-1 text-meta">
               <button
                 type="button"
                 onClick={() => { onPatch({ pinned: !note.pinned }); setMenu(false); }}

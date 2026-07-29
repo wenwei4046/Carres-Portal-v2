@@ -53,7 +53,7 @@ export default function AbandonOrderModal({ order, onClose }: Props) {
 
   return (
     <Modal title={`Abandon order · #${order.so}`} onClose={onClose}>
-      <div className="text-[12px] text-base-600 mb-3.5 font-body">
+      <div className="text-meta text-base-600 mb-3.5 font-body">
         This will set the order to <strong>cancelled</strong>.
         {hadReserve ? (
           <> Reserved stock will be released back to the warehouse.</>
@@ -75,7 +75,7 @@ export default function AbandonOrderModal({ order, onClose }: Props) {
           className={`${INPUT_CLS} resize-y`}
         />
         {reason.trim().length > 0 && reason.trim().length < 3 && (
-          <div className="text-[11px] text-warning mt-1">
+          <div className="text-label text-warning mt-1">
             Reason must be at least 3 characters.
           </div>
         )}

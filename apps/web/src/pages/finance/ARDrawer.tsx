@@ -150,11 +150,11 @@ export default function ARDrawer({
       >
         <div className="px-6 py-5 border-b border-border flex items-start justify-between">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+            <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
               Receivable
             </div>
-            <div className="font-display text-[22px] mt-1">{row.invoice_no}</div>
-            <div className="text-[12.5px] text-muted-foreground mt-0.5">
+            <div className="font-display text-title mt-1">{row.invoice_no}</div>
+            <div className="text-meta text-muted-foreground mt-0.5">
               {row.customer_name} · {row.dealer_name ?? "—"}
             </div>
           </div>
@@ -162,7 +162,7 @@ export default function ARDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="text-[18px] text-muted-foreground hover:text-foreground"
+            className="text-strong text-muted-foreground hover:text-foreground"
           >
             ×
           </button>
@@ -175,10 +175,10 @@ export default function ARDrawer({
           </div>
 
           <div>
-            <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1.5">
+            <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1.5">
               Order summary
             </div>
-            <div className="bg-background/60 rounded-md border border-border px-3 py-2 text-[12.5px] flex justify-between">
+            <div className="bg-background/60 rounded-md border border-border px-3 py-2 text-meta flex justify-between">
               <span>SO-{row.so} · {row.status}</span>
               <span className="font-mono">{rm(row.total)}</span>
             </div>
@@ -205,13 +205,13 @@ export default function ARDrawer({
                     setRecPanelOpen(true);
                     setRecAmt(String(row.outstanding));
                   }}
-                  className="w-full py-2.5 rounded-md bg-primary text-primary-foreground font-semibold text-[13px]"
+                  className="w-full py-2.5 rounded-md bg-primary text-primary-foreground font-semibold text-body"
                 >
                   Record receipt
                 </button>
               ) : (
                 <div className="bg-background/60 rounded-md border border-border p-3.5">
-                  <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-2">
+                  <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-2">
                     Record payment received
                   </div>
                   <input
@@ -220,13 +220,13 @@ export default function ARDrawer({
                     onChange={(e) => setRecAmt(e.target.value)}
                     placeholder="Amount (RM)"
                     inputMode="decimal"
-                    className="w-full px-2.5 py-1.5 border border-border rounded text-[12.5px] mb-2 bg-card"
+                    className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-2 bg-card"
                   />
                   <select
                     aria-label="Method"
                     value={recMethod}
                     onChange={(e) => setRecMethod(e.target.value as PaymentMethod)}
-                    className="w-full px-2.5 py-1.5 border border-border rounded text-[12.5px] mb-2 bg-card"
+                    className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-2 bg-card"
                   >
                     {METHODS.map((m) => (
                       <option key={m.value} value={m.value}>{m.label}</option>
@@ -237,21 +237,21 @@ export default function ARDrawer({
                     value={recRef}
                     onChange={(e) => setRecRef(e.target.value)}
                     placeholder="Bank ref / FPX ref (optional)"
-                    className="w-full px-2.5 py-1.5 border border-border rounded text-[12.5px] mb-2.5 bg-card"
+                    className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-2.5 bg-card"
                   />
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={submitReceipt}
                       disabled={recordReceipt.isPending}
-                      className="flex-1 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-[12.5px] disabled:opacity-60"
+                      className="flex-1 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-meta disabled:opacity-60"
                     >
                       {recordReceipt.isPending ? "Recording…" : "Confirm"}
                     </button>
                     <button
                       type="button"
                       onClick={() => setRecPanelOpen(false)}
-                      className="px-3 py-2 rounded-md border border-border text-[12.5px]"
+                      className="px-3 py-2 rounded-md border border-border text-meta"
                     >
                       Cancel
                     </button>
@@ -262,21 +262,21 @@ export default function ARDrawer({
           )}
 
           <div>
-            <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1.5">
+            <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1.5">
               Payment history
             </div>
             <div className="bg-background/60 rounded-md border border-border px-3 py-2">
               {payments.isLoading ? (
-                <div className="py-1 text-[11.5px] text-muted-foreground">Loading…</div>
+                <div className="py-1 text-label text-muted-foreground">Loading…</div>
               ) : (payments.data ?? []).length === 0 ? (
-                <div className="py-1.5 text-[11.5px] text-muted-foreground">
+                <div className="py-1.5 text-label text-muted-foreground">
                   No receipts recorded yet.
                 </div>
               ) : (
                 (payments.data ?? []).map((p: FinancePaymentRow) => (
                   <div
                     key={p.id}
-                    className="flex justify-between py-1 text-[12px] border-b border-dashed border-border last:border-0"
+                    className="flex justify-between py-1 text-meta border-b border-dashed border-border last:border-0"
                   >
                     <span>
                       {p.direction === "in" ? "Receipt" : "Outbound"} · {p.method}
@@ -297,7 +297,7 @@ export default function ARDrawer({
                 type="button"
                 onClick={downloadInvoicePdf}
                 title="Download tax invoice PDF"
-                className="flex-1 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-[12.5px]"
+                className="flex-1 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-meta"
               >
                 Download invoice (PDF)
               </button>
@@ -311,7 +311,7 @@ export default function ARDrawer({
                     ? "Issue available only after delivery + full payment"
                     : "Issue tax invoice"
                 }
-                className="flex-1 py-2 rounded-md border border-border text-[12.5px] disabled:opacity-60"
+                className="flex-1 py-2 rounded-md border border-border text-meta disabled:opacity-60"
               >
                 {issueInvoice.isPending ? "Issuing…" : "Issue invoice"}
               </button>
@@ -335,10 +335,10 @@ function Mini({
   const valTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
   return (
     <div className="bg-background/60 rounded-md border border-border px-3.5 py-2.5">
-      <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground">
+      <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground">
         {label}
       </div>
-      <div className={`font-display text-[20px] mt-0.5 leading-none tabular-nums ${valTone}`}>
+      <div className={`font-display text-title mt-0.5 leading-none tabular-nums ${valTone}`}>
         {value}
       </div>
     </div>

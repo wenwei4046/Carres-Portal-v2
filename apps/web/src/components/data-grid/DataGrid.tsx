@@ -162,16 +162,16 @@ function FilterPopover({
         className="absolute z-30 mt-1 left-0 w-56 max-h-72 overflow-auto bg-card text-card-foreground border border-base-200 rounded-[4px] shadow-lg p-2"
       >
         <div className="flex items-center justify-between mb-1.5 px-1">
-          <span className="t-micro text-base-500">Filter {col.label}</span>
+          <span className="text-label uppercase tracking-[0.05em] text-base-500">Filter {col.label}</span>
           <button
             type="button"
-            className="t-tiny text-primary hover:underline"
+            className="text-meta text-primary hover:underline"
             onClick={() => onChange(undefined)}
           >
             Clear
           </button>
         </div>
-        {choices.length === 0 && <div className="t-tiny text-base-400 px-1 py-1">No values</div>}
+        {choices.length === 0 && <div className="text-meta text-base-400 px-1 py-1">No values</div>}
         {choices.map((choice) => {
           const stored = col.type === "bool" ? (choice === "Yes" ? "true" : "false") : choice;
           return (
@@ -184,7 +184,7 @@ function FilterPopover({
                 checked={current.has(stored)}
                 onChange={() => toggle(choice)}
               />
-              <span className="t-small text-base-700 truncate">{choice || "—"}</span>
+              <span className="text-body text-base-700 truncate">{choice || "—"}</span>
             </label>
           );
         })}
@@ -199,10 +199,10 @@ function FilterPopover({
       className="absolute z-30 mt-1 left-0 w-56 bg-card text-card-foreground border border-base-200 rounded-[4px] shadow-lg p-2"
     >
       <div className="flex items-center justify-between mb-1.5 px-1">
-        <span className="t-micro text-base-500">Filter {col.label}</span>
+        <span className="text-label uppercase tracking-[0.05em] text-base-500">Filter {col.label}</span>
         <button
           type="button"
-          className="t-tiny text-primary hover:underline"
+          className="text-meta text-primary hover:underline"
           onClick={() => onChange(undefined)}
         >
           Clear
@@ -213,7 +213,7 @@ function FilterPopover({
         value={q}
         onChange={(e) => onChange(e.target.value ? { kind: "text", q: e.target.value } : undefined)}
         placeholder={`Contains…`}
-        className="w-full px-2 py-1.5 border border-base-300 rounded-[4px] text-[13px] bg-white outline-none focus:border-base-500"
+        className="w-full px-2 py-1.5 border border-base-300 rounded-[4px] text-body bg-white outline-none focus:border-base-500"
       />
     </div>
   );
@@ -403,7 +403,7 @@ export default function DataGrid({
 
           {/* body */}
           {capped.length === 0 ? (
-            <div className="px-3 py-8 t-small text-base-400 text-center">{emptyHint}</div>
+            <div className="px-3 py-8 text-body text-base-400 text-center">{emptyHint}</div>
           ) : (
             capped.map((row) => (
               <div
@@ -417,7 +417,7 @@ export default function DataGrid({
                   return (
                     <div
                       key={col.key}
-                      className="px-3 py-1.5 t-small text-base-700 truncate"
+                      className="px-3 py-1.5 text-body text-base-700 truncate"
                       style={{ textAlign: col.align === "right" ? "right" : "left" }}
                       title={txt}
                     >
@@ -433,13 +433,13 @@ export default function DataGrid({
 
       {/* footer */}
       <div className="flex items-center justify-between px-3 py-2 border-t border-base-200 bg-base-50/50">
-        <span className="t-tiny text-base-500">
+        <span className="text-meta text-base-500">
           {processed.length === rows.length
             ? `${rows.length} rows`
             : `${processed.length} of ${rows.length} rows`}
         </span>
         {processed.length > rowCap && (
-          <span className="t-tiny text-base-400">
+          <span className="text-meta text-base-400">
             Showing first {rowCap} — refine filters to see the rest
           </span>
         )}

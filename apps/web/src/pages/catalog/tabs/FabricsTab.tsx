@@ -201,8 +201,8 @@ function PerModelTierOverride({
 
   return (
     <section data-testid="per-model-tier-override">
-      <div className="t-h4 font-display text-base-900 mb-1">Per-model tier override</div>
-      <p className="t-tiny text-base-500 mb-3 max-w-[560px]">
+      <div className="text-strong font-display text-base-900 mb-1">Per-model tier override</div>
+      <p className="text-meta text-base-500 mb-3 max-w-[560px]">
         Model-specific premium for P2 / P3 fabrics — overrides the global deltas above.
         Blank = use global.
         {!isPrincipal && " Master Admin only — read-only for your role."}
@@ -260,7 +260,7 @@ function PerModelTierOverride({
               type="button"
               onClick={save}
               disabled={!valid || !dirty || upsert.isPending}
-              className="btn-primary text-[12px] self-start disabled:opacity-40"
+              className="btn-primary text-meta self-start disabled:opacity-40"
               data-testid="tier-override-save"
             >
               {upsert.isPending ? "Saving…" : override?.tier2Delta != null || override?.tier3Delta != null ? "Update override" : "Save override"}
@@ -282,7 +282,7 @@ function PerModelTierOverride({
               <div className="label text-right">Actions</div>
             </div>
             {saved.length === 0 && (
-              <div className="t-small text-base-500 px-3 py-4" data-testid="tier-override-empty">
+              <div className="text-body text-base-500 px-3 py-4" data-testid="tier-override-empty">
                 No overrides — every model uses the global deltas.
               </div>
             )}
@@ -293,14 +293,14 @@ function PerModelTierOverride({
                 style={{ gridTemplateColumns: "minmax(120px,1.4fr) 84px 84px 140px" }}
                 data-testid={`tier-override-row-${o.modelId}`}
               >
-                <div className="t-small text-base-900 truncate">{modelById.get(o.modelId)?.name}</div>
-                <div className="text-right t-small">{deltaCell(o.tier2Delta)}</div>
-                <div className="text-right t-small">{deltaCell(o.tier3Delta)}</div>
+                <div className="text-body text-base-900 truncate">{modelById.get(o.modelId)?.name}</div>
+                <div className="text-right text-body">{deltaCell(o.tier2Delta)}</div>
+                <div className="text-right text-body">{deltaCell(o.tier3Delta)}</div>
                 <div className="text-right flex justify-end gap-1.5">
                   <button
                     type="button"
                     onClick={() => setModelId(o.modelId)}
-                    className="btn-ghost text-[11px]"
+                    className="btn-ghost text-label"
                     data-testid={`tier-override-edit-${o.modelId}`}
                   >
                     Edit
@@ -310,7 +310,7 @@ function PerModelTierOverride({
                       type="button"
                       onClick={() => remove(o.modelId)}
                       disabled={upsert.isPending}
-                      className="btn-danger text-[11px]"
+                      className="btn-danger text-label"
                       data-testid={`tier-override-remove-${o.modelId}`}
                     >
                       Remove
@@ -403,15 +403,15 @@ function PerCompartmentSpecialPrice({
 
   return (
     <section data-testid="per-compartment-special-price">
-      <div className="t-h4 font-display text-base-900 mb-1">Per-compartment special price</div>
-      <p className="t-tiny text-base-500 mb-3 max-w-[560px]">
+      <div className="text-strong font-display text-base-900 mb-1">Per-compartment special price</div>
+      <p className="text-meta text-base-500 mb-3 max-w-[560px]">
         When any sofa build uses this compartment, its P2 / P3 fabric premium
         replaces the per-model / global deltas above for the whole sofa (highest
         wins if a build spans several). Blank = no special.
         {!isPrincipal && " Master Admin only — read-only for your role."}
       </p>
       {compartments.length === 0 ? (
-        <div className="bg-white border border-base-200 rounded-[4px] p-4 t-small text-base-500">
+        <div className="bg-white border border-base-200 rounded-[4px] p-4 text-body text-base-500">
           No compartments yet — add them in the Maintenance tab first.
         </div>
       ) : (
@@ -470,7 +470,7 @@ function PerCompartmentSpecialPrice({
                 type="button"
                 onClick={save}
                 disabled={!valid || !dirty || patch.isPending}
-                className="btn-primary text-[12px] self-start disabled:opacity-40"
+                className="btn-primary text-meta self-start disabled:opacity-40"
                 data-testid="compartment-special-save"
               >
                 {patch.isPending
@@ -496,7 +496,7 @@ function PerCompartmentSpecialPrice({
                 <div className="label text-right">Actions</div>
               </div>
               {saved.length === 0 && (
-                <div className="t-small text-base-500 px-3 py-4" data-testid="compartment-special-empty">
+                <div className="text-body text-base-500 px-3 py-4" data-testid="compartment-special-empty">
                   No compartment specials set.
                 </div>
               )}
@@ -507,17 +507,17 @@ function PerCompartmentSpecialPrice({
                   style={{ gridTemplateColumns: "minmax(120px,1.4fr) 84px 84px 140px" }}
                   data-testid={`compartment-special-row-${c.id}`}
                 >
-                  <div className="t-small text-base-900 truncate" title={c.description ?? c.code}>
+                  <div className="text-body text-base-900 truncate" title={c.description ?? c.code}>
                     <span className="font-mono">{c.code}</span>
                     {!c.active && <span className="ml-1 text-base-400">(off)</span>}
                   </div>
-                  <div className="text-right t-small">{deltaCell(c.specialTier2Delta)}</div>
-                  <div className="text-right t-small">{deltaCell(c.specialTier3Delta)}</div>
+                  <div className="text-right text-body">{deltaCell(c.specialTier2Delta)}</div>
+                  <div className="text-right text-body">{deltaCell(c.specialTier3Delta)}</div>
                   <div className="text-right flex justify-end gap-1.5">
                     <button
                       type="button"
                       onClick={() => setCompartmentId(c.id)}
-                      className="btn-ghost text-[11px]"
+                      className="btn-ghost text-label"
                       data-testid={`compartment-special-edit-${c.id}`}
                     >
                       Edit
@@ -527,7 +527,7 @@ function PerCompartmentSpecialPrice({
                         type="button"
                         onClick={() => remove(c.id)}
                         disabled={patch.isPending}
-                        className="btn-danger text-[11px]"
+                        className="btn-danger text-label"
                         data-testid={`compartment-special-remove-${c.id}`}
                       >
                         Remove
@@ -660,13 +660,13 @@ function FabricsPanel({
       {/* header */}
       <div className="flex items-start justify-between gap-4 mb-4">
         <div>
-          <div className="t-h4 font-display text-base-900">Fabrics</div>
-          <p className="t-tiny text-base-500 mt-0.5 max-w-[520px]">
+          <div className="text-strong font-display text-base-900">Fabrics</div>
+          <p className="text-meta text-base-500 mt-0.5 max-w-[520px]">
             Procurement fabric tiers (cost side, read-only reference).
             {!isPrincipal && " Principal only — read-only for your role."}
           </p>
           {effectiveFrom && (
-            <p className="t-tiny text-base-400 mt-1" data-testid="fabrics-effective">
+            <p className="text-meta text-base-400 mt-1" data-testid="fabrics-effective">
               Effective from {effectiveFrom}
             </p>
           )}
@@ -674,14 +674,14 @@ function FabricsPanel({
         <div className="flex items-center gap-2 shrink-0">
           {editing ? (
             <>
-              <button type="button" onClick={() => setDraft(null)} className="btn-ghost text-[12px]">
+              <button type="button" onClick={() => setDraft(null)} className="btn-ghost text-meta">
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={submit}
                 disabled={!canSave || save.isPending}
-                className="btn-primary text-[12px] disabled:opacity-40"
+                className="btn-primary text-meta disabled:opacity-40"
                 data-testid="fabrics-save"
               >
                 {save.isPending ? "Saving…" : "Save"}
@@ -692,7 +692,7 @@ function FabricsPanel({
               <button
                 type="button"
                 onClick={() => setDraft(toDraft(fabrics))}
-                className="btn-ghost text-[12px] inline-flex items-center gap-1.5"
+                className="btn-ghost text-meta inline-flex items-center gap-1.5"
                 data-testid="fabrics-edit"
               >
                 <Edit3 size={13} strokeWidth={2} /> Edit
@@ -702,7 +702,7 @@ function FabricsPanel({
           <button
             type="button"
             onClick={() => setShowHistory(true)}
-            className="btn-ghost text-[12px] inline-flex items-center gap-1.5"
+            className="btn-ghost text-meta inline-flex items-center gap-1.5"
             data-testid="fabrics-history"
           >
             <History size={13} strokeWidth={2} /> History
@@ -722,7 +722,7 @@ function FabricsPanel({
             data-testid="fabrics-search"
             className={`${INPUT_CLS} w-72`}
           />
-          <span className="t-micro text-base-400">
+          <span className="text-label uppercase tracking-[0.05em] text-base-400">
             {visible.length} of {fabrics.length} records
           </span>
         </div>
@@ -743,7 +743,7 @@ function FabricsPanel({
             <div className="label">Bedframe tier</div>
           </div>
           {visible.length === 0 && (
-            <div className="t-small text-base-500 px-3 py-6 text-center">
+            <div className="text-body text-base-500 px-3 py-6 text-center">
               {fabrics.length === 0
                 ? "No fabrics yet — press Edit to add some."
                 : "No fabrics match the search."}
@@ -759,13 +759,13 @@ function FabricsPanel({
               <div>
                 <CodeChip>{f.fabricCode}</CodeChip>
               </div>
-              <div className="t-small text-base-700 truncate">
+              <div className="text-body text-base-700 truncate">
                 {f.series || <span className="text-base-300">—</span>}
               </div>
-              <div className="t-small text-base-800 truncate" title={f.description ?? ""}>
+              <div className="text-body text-base-800 truncate" title={f.description ?? ""}>
                 {f.description || <span className="text-base-300">—</span>}
               </div>
-              <div className="t-small text-base-700 truncate">
+              <div className="text-body text-base-700 truncate">
                 {f.supplierCode || <span className="text-base-300">—</span>}
               </div>
               <div data-testid={`fabric-sofa-tier-${f.fabricCode}`}>
@@ -830,7 +830,7 @@ function FabricsPanel({
                 value={r.fabricCode}
                 onChange={(e) => patchRow(i, { fabricCode: e.target.value })}
                 placeholder="BF-01"
-                className={`${INPUT_CLS} font-mono text-[12px]`}
+                className={`${INPUT_CLS} font-mono text-meta`}
                 aria-label={`row ${i + 1} fabric code`}
               />
               <input
@@ -851,7 +851,7 @@ function FabricsPanel({
                 value={r.supplierCode}
                 onChange={(e) => patchRow(i, { supplierCode: e.target.value })}
                 placeholder="PC151-01"
-                className={`${INPUT_CLS} font-mono text-[12px]`}
+                className={`${INPUT_CLS} font-mono text-meta`}
                 aria-label={`row ${i + 1} supplier code`}
               />
               <button
@@ -893,13 +893,13 @@ function FabricsPanel({
           <button
             type="button"
             onClick={addRow}
-            className="btn-ghost text-[12px] self-start inline-flex items-center gap-1.5"
+            className="btn-ghost text-meta self-start inline-flex items-center gap-1.5"
             data-testid="fabrics-add-row"
           >
             <Plus size={13} strokeWidth={2} /> Add fabric
           </button>
           {hasDuplicates && (
-            <p className="t-tiny text-danger">
+            <p className="text-meta text-danger">
               Duplicate fabric codes — each code must be unique.
             </p>
           )}
@@ -910,24 +910,24 @@ function FabricsPanel({
       {showHistory && (
         <Modal title="History — Fabrics" onClose={() => setShowHistory(false)}>
           <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-1">
-            {historyQ.isLoading && <p className="t-small text-base-500">Loading history…</p>}
+            {historyQ.isLoading && <p className="text-body text-base-500">Loading history…</p>}
             {!historyQ.isLoading && history.length === 0 && (
-              <p className="t-small text-base-500">No history yet — the first Edit save writes one.</p>
+              <p className="text-body text-base-500">No history yet — the first Edit save writes one.</p>
             )}
             {history.map((h) => (
               <div key={h.id} className="border border-base-200 rounded-[4px] p-3 bg-base-50">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="t-small font-medium text-base-900">
+                  <div className="text-body font-medium text-base-900">
                     Effective from {h.effectiveFrom}
                   </div>
-                  <div className="t-tiny text-base-400">
+                  <div className="text-meta text-base-400">
                     saved {new Date(h.createdAt).toLocaleString("en-MY")}
                   </div>
                 </div>
-                {h.notes && <p className="t-tiny text-base-500 mt-1">{h.notes}</p>}
+                {h.notes && <p className="text-meta text-base-500 mt-1">{h.notes}</p>}
                 <div className="mt-2 flex flex-col gap-1">
                   {h.entries.map((e, i) => (
-                    <div key={i} className="flex items-center gap-2 t-tiny text-base-700">
+                    <div key={i} className="flex items-center gap-2 text-meta text-base-700">
                       <span className="text-base-400 w-6 text-center tabular-nums">{i + 1}</span>
                       <span className={e.active ? "" : "line-through text-base-400"}>
                         {e.fabricCode}
@@ -941,7 +941,7 @@ function FabricsPanel({
                       </span>
                     </div>
                   ))}
-                  {h.entries.length === 0 && <p className="t-tiny text-base-400 italic">empty</p>}
+                  {h.entries.length === 0 && <p className="text-meta text-base-400 italic">empty</p>}
                 </div>
               </div>
             ))}

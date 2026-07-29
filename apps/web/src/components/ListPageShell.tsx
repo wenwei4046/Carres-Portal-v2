@@ -116,15 +116,15 @@ export default function ListPageShell({
       {hasHeader && (
         <div className="shrink-0 bg-white border-b border-base-200 px-6 pt-2 pb-2.5">
           <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 flex items-center gap-1.5 text-[12px] text-base-400">
+            <div className="min-w-0 flex items-center gap-1.5 text-meta text-base-400">
               {breadcrumb}
             </div>
             {actions && <div className="shrink-0 flex items-center gap-1">{actions}</div>}
           </div>
           <div className="flex items-baseline gap-2.5 min-w-0">
-            <div className="min-w-0 truncate t-h2 text-base-900">{title}</div>
+            <div className="min-w-0 truncate text-page text-base-900">{title}</div>
             {meta && (
-              <div className="shrink-0 flex items-center gap-1 text-[12px] text-base-400">
+              <div className="shrink-0 flex items-center gap-1 text-meta text-base-400">
                 {meta}
               </div>
             )}
@@ -213,7 +213,7 @@ export default function ListPageShell({
                   key={i}
                   type="button"
                   onClick={c.onClear}
-                  className="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border border-base-200 bg-white text-[12px] text-base-700 hover:border-base-400"
+                  className="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border border-base-200 bg-white text-meta text-base-700 hover:border-base-400"
                 >
                   {c.label}
                   <X size={12} className="text-base-400" />
@@ -225,7 +225,7 @@ export default function ListPageShell({
           {children}
           {footer && (
             <footer
-              className="shrink-0 flex items-center justify-between gap-3 px-3 h-9 rounded-b-[12px] border border-t-0 border-base-200 bg-white text-[12px] text-base-500"
+              className="shrink-0 flex items-center justify-between gap-3 px-3 h-9 rounded-b-[12px] border border-t-0 border-base-200 bg-white text-meta text-base-500"
               data-testid="listshell-footer"
             >
               {footer}

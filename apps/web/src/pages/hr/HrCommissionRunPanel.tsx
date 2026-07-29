@@ -78,8 +78,8 @@ function CheckRow({ c }: { c: ReadinessCheck }) {
         {tone === "ok" ? <Check size={12} /> : tone === "no" ? <X size={12} /> : <CircleDot size={12} />}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-[13px] font-semibold leading-tight">{c.title}</div>
-        <div className="t-tiny mt-0.5 leading-relaxed text-base-400">{c.detail}</div>
+        <div className="text-body font-semibold leading-tight">{c.title}</div>
+        <div className="text-meta mt-0.5 leading-relaxed text-base-400">{c.detail}</div>
       </div>
     </div>
   );
@@ -112,17 +112,17 @@ function AdjustmentDialog({
     <div className="fixed inset-0 z-[70] grid place-items-center bg-base-900/30 p-6">
       <div className="w-[492px] max-w-full overflow-hidden rounded-xl bg-card shadow-xl">
         <div className="px-6 pt-5">
-          <h3 className="t-h3 mb-1 font-semibold">Add an adjustment</h3>
-          <p className="t-small text-base-500">
+          <h3 className="text-strong mb-1 font-semibold">Add an adjustment</h3>
+          <p className="text-body text-base-500">
             A correction that should be paid — or taken back — in {monthLabel(year, month)}.
           </p>
         </div>
 
         <div className="px-6 pt-3">
           <div className="flex min-h-[36px] items-center gap-3 border-t border-base-100 py-2 first:border-t-0">
-            <span className="t-tiny w-[104px] shrink-0 text-base-400">Person</span>
+            <span className="text-meta w-[104px] shrink-0 text-base-400">Person</span>
             <select
-              className={`${fieldCls} h-8 flex-1 text-[13px]`}
+              className={`${fieldCls} h-8 flex-1 text-body`}
               value={subjectId}
               onChange={(e) => setSubjectId(e.target.value)}
             >
@@ -136,14 +136,14 @@ function AdjustmentDialog({
           </div>
 
           <div className="flex min-h-[36px] items-center gap-3 border-t border-base-100 py-2">
-            <span className="t-tiny w-[104px] shrink-0 text-base-400">Reason</span>
+            <span className="text-meta w-[104px] shrink-0 text-base-400">Reason</span>
             <div className="inline-flex flex-wrap gap-0.5 rounded-lg bg-base-100 p-0.5">
               {adjustmentReasonSchema.options.map((r) => (
                 <button
                   key={r}
                   type="button"
                   onClick={() => setReason(r)}
-                  className={`rounded-md px-2.5 py-1.5 text-[12px] font-semibold ${
+                  className={`rounded-md px-2.5 py-1.5 text-meta font-semibold ${
                     reason === r ? "bg-card text-base-900 shadow-sm" : "text-base-600"
                   }`}
                 >
@@ -154,31 +154,31 @@ function AdjustmentDialog({
           </div>
 
           <div className="flex min-h-[36px] items-center gap-3 border-t border-base-100 py-2">
-            <span className="t-tiny w-[104px] shrink-0 text-base-400">Amount</span>
+            <span className="text-meta w-[104px] shrink-0 text-base-400">Amount</span>
             <input
-              className={`${fieldCls} h-8 max-w-[150px] font-mono text-[13px]`}
+              className={`${fieldCls} h-8 max-w-[150px] font-mono text-body`}
               placeholder="-183.00"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
-            <span className="t-tiny text-base-400">negative takes money back</span>
+            <span className="text-meta text-base-400">negative takes money back</span>
           </div>
 
           <div className="flex min-h-[36px] items-center gap-3 border-t border-base-100 py-2">
-            <span className="t-tiny w-[104px] shrink-0 text-base-400">Originally</span>
+            <span className="text-meta w-[104px] shrink-0 text-base-400">Originally</span>
             <input
               type="month"
-              className={`${fieldCls} h-8 max-w-[170px] text-[13px]`}
+              className={`${fieldCls} h-8 max-w-[170px] text-body`}
               value={originMonth}
               onChange={(e) => setOriginMonth(e.target.value)}
             />
-            <span className="t-tiny text-base-400">which month it came from</span>
+            <span className="text-meta text-base-400">which month it came from</span>
           </div>
 
           <div className="flex min-h-[36px] items-center gap-3 border-t border-base-100 py-2">
-            <span className="t-tiny w-[104px] shrink-0 text-base-400">Note</span>
+            <span className="text-meta w-[104px] shrink-0 text-base-400">Note</span>
             <input
-              className={`${fieldCls} h-8 flex-1 text-[13px]`}
+              className={`${fieldCls} h-8 flex-1 text-body`}
               placeholder="Optional"
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -186,7 +186,7 @@ function AdjustmentDialog({
           </div>
         </div>
 
-        <p className="t-tiny mx-6 mt-3 rounded-lg border border-base-200 bg-base-50 px-3 py-2.5 leading-relaxed text-base-500">
+        <p className="text-meta mx-6 mt-3 rounded-lg border border-base-200 bg-base-50 px-3 py-2.5 leading-relaxed text-base-500">
           Goes on <b className="text-base-900">{monthLabel(year, month)}</b>, which is
           still open. An already-approved month is never edited — the statement someone
           has already seen does not change under them.
@@ -265,7 +265,7 @@ export default function HrCommissionRunPanel({
   if (isLoading) {
     return (
       <SectionCard>
-        <div className="t-small px-4 py-6 text-center text-base-500">Checking the month…</div>
+        <div className="text-body px-4 py-6 text-center text-base-500">Checking the month…</div>
       </SectionCard>
     );
   }
@@ -322,8 +322,8 @@ export default function HrCommissionRunPanel({
             {icon}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-semibold">{title}</div>
-            <div className="t-tiny mt-0.5 leading-relaxed text-base-500">{sub}</div>
+            <div className="text-body font-semibold">{title}</div>
+            <div className="text-meta mt-0.5 leading-relaxed text-base-500">{sub}</div>
           </div>
 
           {run && locked && (
@@ -423,12 +423,12 @@ export default function HrCommissionRunPanel({
           <div className="border-t border-base-200 px-4 pb-3.5 pt-1">
             <button
               type="button"
-              className="t-micro flex w-full items-center gap-2 py-2.5 text-left text-base-400 hover:text-base-600"
+              className="text-label uppercase tracking-[0.05em] flex w-full items-center gap-2 py-2.5 text-left text-base-400 hover:text-base-600"
               onClick={() => setShowChecks((v) => !v)}
             >
               Before the month can be closed
               <span className="flex-1" />
-              <span className="t-tiny normal-case">{showChecks ? "Hide" : "Show"}</span>
+              <span className="text-meta normal-case">{showChecks ? "Hide" : "Show"}</span>
             </button>
             {showChecks && checks.map((c) => <CheckRow key={c.key} c={c} />)}
           </div>
@@ -439,8 +439,8 @@ export default function HrCommissionRunPanel({
       {(runs.length > 0 || !locked) && (
         <SectionCard>
           <div className="flex items-center gap-2.5 border-b border-base-200 px-4 py-3">
-            <h3 className="t-h4 flex-1 font-semibold">Runs</h3>
-            <span className="t-tiny text-base-400">every close, kept</span>
+            <h3 className="text-strong flex-1 font-semibold">Runs</h3>
+            <span className="text-meta text-base-400">every close, kept</span>
             {!locked && people.length > 0 && (
               <Btn variant="box" size="sm" onClick={() => setShowAdjust(true)}>
                 <Plus size={14} />
@@ -450,7 +450,7 @@ export default function HrCommissionRunPanel({
           </div>
 
           {runs.length === 0 ? (
-            <div className="t-small px-4 py-5 text-center text-base-400">
+            <div className="text-body px-4 py-5 text-center text-base-400">
               No month has been closed yet.
             </div>
           ) : (
@@ -459,7 +459,7 @@ export default function HrCommissionRunPanel({
                 {["Month", "Status", "Who", "People", "Total"].map((h, i) => (
                   <span
                     key={h}
-                    className={`t-micro text-base-400 ${i >= 3 ? "text-right" : ""}`}
+                    className={`text-label uppercase tracking-[0.05em] text-base-400 ${i >= 3 ? "text-right" : ""}`}
                   >
                     {h}
                   </span>
@@ -468,7 +468,7 @@ export default function HrCommissionRunPanel({
               {runs.map((r) => (
                 <div
                   key={r.id}
-                  className="grid grid-cols-[130px_100px_1fr_80px_130px] items-center gap-2.5 border-b border-base-100 px-4 py-2.5 text-[12.5px] last:border-b-0"
+                  className="grid grid-cols-[130px_100px_1fr_80px_130px] items-center gap-2.5 border-b border-base-100 px-4 py-2.5 text-meta last:border-b-0"
                 >
                   <span className="font-semibold">{monthLabel(r.year, r.month)}</span>
                   <span>
@@ -490,7 +490,7 @@ export default function HrCommissionRunPanel({
           )}
 
           {(state?.pendingAdjustments ?? 0) !== 0 && (
-            <div className="t-tiny border-t border-base-200 bg-base-50 px-4 py-2.5 text-base-500">
+            <div className="text-meta border-t border-base-200 bg-base-50 px-4 py-2.5 text-base-500">
               {rm(state!.pendingAdjustments)} of adjustments are waiting on{" "}
               {monthLabel(year, month)} and will be folded in when it closes.
             </div>

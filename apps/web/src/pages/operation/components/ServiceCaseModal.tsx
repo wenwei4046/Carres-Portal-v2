@@ -173,7 +173,7 @@ export default function ServiceCaseModal({
       <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-base-200 px-6 py-4">
-          <h2 className="t-h3 text-base-900">
+          <h2 className="text-strong text-base-900">
             {mode === "create" ? "New Case" : "Edit Case"}
           </h2>
           <button type="button" onClick={onClose} className="text-base-400 hover:text-base-700">
@@ -185,7 +185,7 @@ export default function ServiceCaseModal({
           {/* Lookup */}
           {mode === "create" && (
             <div className="rounded border border-base-200 bg-base-50 p-3">
-              <label className="t-tiny text-base-500 uppercase tracking-wider">
+              <label className="text-meta text-base-500 uppercase tracking-wider">
                 Look up by Ref No or Order ID
               </label>
               <div className="mt-1.5 flex gap-2">
@@ -194,18 +194,18 @@ export default function ServiceCaseModal({
                   onChange={(e) => setLookupTerm(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") lookupMut.mutate(lookupTerm); }}
                   placeholder="CR0418  or  SO-1147"
-                  className="flex-1 rounded border border-base-300 px-2.5 py-1.5 text-sm"
+                  className="flex-1 rounded border border-base-300 px-2.5 py-1.5 text-body"
                 />
                 <button
                   type="button"
                   onClick={() => lookupMut.mutate(lookupTerm)}
                   disabled={!lookupTerm.trim() || lookupMut.isPending}
-                  className="btn-primary flex items-center gap-1 text-[13px] py-1.5 disabled:opacity-40"
+                  className="btn-primary flex items-center gap-1 text-body py-1.5 disabled:opacity-40"
                 >
                   <Search size={14} /> Find
                 </button>
               </div>
-              {lookupMsg && <p className="mt-1.5 text-xs text-base-600">{lookupMsg}</p>}
+              {lookupMsg && <p className="mt-1.5 text-meta text-base-600">{lookupMsg}</p>}
             </div>
           )}
 
@@ -213,10 +213,10 @@ export default function ServiceCaseModal({
           <div className="grid grid-cols-2 gap-3">
             <Field label={`Ref No${mode === "create" ? " (alias)" : ""}`}>
               <input value={refNo} onChange={(e) => setRefNo(e.target.value)}
-                className="w-full rounded border border-base-300 px-2.5 py-1.5 text-sm font-mono" />
+                className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body font-mono" />
             </Field>
             <Field label="Linked Order">
-              <div className="px-2.5 py-1.5 text-sm text-base-600">
+              <div className="px-2.5 py-1.5 text-body text-base-600">
                 {/* J2 — the case→order link. This field used to render the bare
                     word "linked" whenever the case was opened for editing:
                     `matchedSo` is only ever set by the create-mode lookup, so an
@@ -235,23 +235,23 @@ export default function ServiceCaseModal({
           <div className="grid grid-cols-2 gap-3">
             <Field label="Customer Name *">
               <input value={customerName} onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full rounded border border-base-300 px-2.5 py-1.5 text-sm" />
+                className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
             </Field>
             <Field label="Phone">
               <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
-                className="w-full rounded border border-base-300 px-2.5 py-1.5 text-sm" />
+                className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
             </Field>
           </div>
           <Field label="Address">
             <input value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)}
-              className="w-full rounded border border-base-300 px-2.5 py-1.5 text-sm" />
+              className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
           </Field>
 
           {/* Classification */}
           <div className="grid grid-cols-3 gap-3">
             <Field label="Case Type">
               <select value={caseTypeId} onChange={(e) => setCaseTypeId(e.target.value)}
-                className="w-full rounded border border-base-300 px-2 py-1.5 text-sm bg-white">
+                className="w-full rounded border border-base-300 px-2 py-1.5 text-body bg-white">
                 <option value="">— select —</option>
                 {configQ.data?.types.map((t) => (
                   <option key={t.id} value={t.id}>{t.label}</option>
@@ -265,7 +265,7 @@ export default function ServiceCaseModal({
                   they could have seen coming. Already-closed cases keep every
                   option: the gate is the transition, not a lock on the row. */}
               <select value={statusId} onChange={(e) => setStatusId(e.target.value)}
-                className="w-full rounded border border-base-300 px-2 py-1.5 text-sm bg-white">
+                className="w-full rounded border border-base-300 px-2 py-1.5 text-body bg-white">
                 <option value="">— select —</option>
                 {configQ.data?.statuses.map((s) => (
                   <option key={s.id} value={s.id} disabled={s.isClosed && !canClose}>
@@ -276,7 +276,7 @@ export default function ServiceCaseModal({
             </Field>
             <Field label="Opened">
               <input type="date" value={openedAt} onChange={(e) => setOpenedAt(e.target.value)}
-                className="w-full rounded border border-base-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-base-300 px-2 py-1.5 text-body" />
             </Field>
           </div>
 
@@ -290,7 +290,7 @@ export default function ServiceCaseModal({
           {existingQ.data?.issueType && (
             <div className="rounded border border-base-200 bg-base-50 p-3">
               <div className="flex items-center justify-between">
-                <p className="t-tiny uppercase tracking-wider text-base-500">Reported issue</p>
+                <p className="text-meta uppercase tracking-wider text-base-500">Reported issue</p>
                 {existingQ.data.priority && (
                   <span className="inline-flex items-center gap-1.5">
                     <span className={`pill ${existingQ.data.priority === "high" ? "pill-overdue" : "pill-neutral"}`}>
@@ -301,12 +301,12 @@ export default function ServiceCaseModal({
                           : "Low"}
                     </span>
                     {caseNeedsManager(existingQ.data.priority) && (
-                      <span className="text-xs text-base-600">tell manager</span>
+                      <span className="text-meta text-base-600">tell manager</span>
                     )}
                   </span>
                 )}
               </div>
-              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-body">
                 <IntakeRow label="Found by" value={reporterLabel(existingQ.data.reportedBy)} />
                 <IntakeRow
                   label="Product"
@@ -375,24 +375,24 @@ export default function ServiceCaseModal({
           <div className="grid grid-cols-2 gap-3">
             <Field label="What happened">
               <textarea value={whatHappened} onChange={(e) => setWhatHappened(e.target.value)} rows={3}
-                className="w-full rounded border border-base-300 px-2.5 py-1.5 text-sm" />
+                className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
             </Field>
             <Field label="Carres action">
               <textarea value={carresAction} onChange={(e) => setCarresAction(e.target.value)} rows={3}
-                className="w-full rounded border border-base-300 px-2.5 py-1.5 text-sm" />
+                className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
             </Field>
             <Field label="What was affected">
               <textarea value={whatAffected} onChange={(e) => setWhatAffected(e.target.value)} rows={2}
-                className="w-full rounded border border-base-300 px-2.5 py-1.5 text-sm" />
+                className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
             </Field>
             <Field label="Incurred charges">
               <textarea value={incurredCharges} onChange={(e) => setIncurredCharges(e.target.value)} rows={2}
-                className="w-full rounded border border-base-300 px-2.5 py-1.5 text-sm" />
+                className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
             </Field>
           </div>
 
           {saveMut.isError && (
-            <p className="text-xs text-error-700 break-words">
+            <p className="text-meta text-error-700 break-words">
               Save failed: {(saveMut.error as Error)?.message ?? "unknown error"}
             </p>
           )}
@@ -400,11 +400,11 @@ export default function ServiceCaseModal({
 
         {/* Footer */}
         <div className="flex justify-end gap-2 border-t border-base-200 px-6 py-4">
-          <button type="button" onClick={onClose} className="btn-secondary text-[13px] py-1.5">
+          <button type="button" onClick={onClose} className="btn-secondary text-body py-1.5">
             Cancel
           </button>
           <button type="button" onClick={() => saveMut.mutate()} disabled={!canSave}
-            className="btn-hero text-[13px] py-1.5 disabled:opacity-40">
+            className="btn-hero text-body py-1.5 disabled:opacity-40">
             {saveMut.isPending ? "Saving…" : mode === "create" ? "Create Case" : "Save"}
           </button>
         </div>
@@ -416,7 +416,7 @@ export default function ServiceCaseModal({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="t-tiny text-base-500 uppercase tracking-wider">{label}</label>
+      <label className="text-meta text-base-500 uppercase tracking-wider">{label}</label>
       <div className="mt-1">{children}</div>
     </div>
   );
@@ -425,8 +425,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function IntakeRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div className="flex gap-2">
-      <dt className="t-tiny w-24 shrink-0 pt-0.5 text-base-500">{label}</dt>
-      <dd className="text-sm text-base-800">{value || "—"}</dd>
+      <dt className="text-meta w-24 shrink-0 pt-0.5 text-base-500">{label}</dt>
+      <dd className="text-body text-base-800">{value || "—"}</dd>
     </div>
   );
 }

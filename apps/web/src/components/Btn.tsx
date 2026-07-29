@@ -38,8 +38,8 @@ const VARIANT: Record<Variant, string> = {
 };
 
 const SIZE: Record<Size, string> = {
-  md: "h-8 px-4 text-[13px] gap-1.5 [&_svg]:w-4 [&_svg]:h-4",
-  sm: "h-6 px-2.5 text-[11px] gap-1 [&_svg]:w-3.5 [&_svg]:h-3.5",
+  md: "h-8 px-4 text-body gap-1.5 [&_svg]:w-4 [&_svg]:h-4",
+  sm: "h-6 px-2.5 text-label gap-1 [&_svg]:w-3.5 [&_svg]:h-3.5",
 };
 
 /** iconOnly circles share the md/sm heights; the glyph centres, no label. */

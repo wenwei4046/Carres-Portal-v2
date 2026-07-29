@@ -211,17 +211,17 @@ export default function OrderCard({
       )}
       <div className="flex-1 min-w-0 px-3 py-2.5">
         <div className="flex items-baseline justify-between">
-          <span className="font-mono text-[11px] font-semibold text-base-900">
+          <span className="font-mono text-label font-semibold text-base-900">
             #{order.so}
           </span>
           {!compact && (
-            <span className="font-mono text-[10px] text-base-500">
+            <span className="font-mono text-label text-base-500">
               {placedShort}
             </span>
           )}
         </div>
         <div
-          className={`${cjkClassName(customer)} text-[13px] font-medium text-base-900 mt-0.5 ${compact ? "truncate" : ""}`}
+          className={`${cjkClassName(customer)} text-body font-medium text-base-900 mt-0.5 ${compact ? "truncate" : ""}`}
         >
           {customer}
         </div>
@@ -230,17 +230,17 @@ export default function OrderCard({
             <div className="flex items-center gap-1.5 mt-0.5">
               {isShowroom && (
                 <span
-                  className="inline-block text-[9px] font-bold uppercase tracking-[0.1em] leading-none py-[2px] px-[5px] border rounded-[2px] flex-shrink-0"
+                  className="inline-block text-label font-semibold uppercase tracking-[0.1em] leading-none py-[2px] px-[5px] border rounded-[2px] flex-shrink-0"
                   style={{ color: "#3c5a78", borderColor: "#3c5a78" }}
                 >
                   Showroom
                 </span>
               )}
-              <span className="text-[11px] text-base-600 overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
+              <span className="text-label text-base-600 overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
                 {dealerLabel}
               </span>
             </div>
-            <div className="text-[11px] text-base-500 mt-0.5">{dateLabel}</div>
+            <div className="text-label text-base-500 mt-0.5">{dateLabel}</div>
             {/* Phase B — latest annotation snippet */}
             {latestAnnotation && (
               <div
@@ -248,15 +248,15 @@ export default function OrderCard({
                 data-testid={`order-card-annotation-${order.so}`}
               >
                 {latestAnnotation.tag === "escalate" && (
-                  <span className="text-[9px] flex-shrink-0 mt-0.5">🚨</span>
+                  <span className="text-label flex-shrink-0 mt-0.5">🚨</span>
                 )}
                 {latestAnnotation.tag === "follow_up" && (
-                  <span className="text-[9px] flex-shrink-0 mt-0.5">🔔</span>
+                  <span className="text-label flex-shrink-0 mt-0.5">🔔</span>
                 )}
                 {latestAnnotation.tag === "resolved" && (
-                  <span className="text-[9px] flex-shrink-0 mt-0.5">✅</span>
+                  <span className="text-label flex-shrink-0 mt-0.5">✅</span>
                 )}
-                <span className="text-[10px] text-base-500 line-clamp-1 italic">
+                <span className="text-label text-base-500 line-clamp-1 italic">
                   {latestAnnotation.content.slice(0, 50)}
                   {latestAnnotation.content.length > 50 ? "…" : ""}
                 </span>
@@ -272,12 +272,12 @@ export default function OrderCard({
                 className="flex items-center gap-1 mt-1"
                 data-testid="order-card-lp-pill"
               >
-                <span className="text-[9px] uppercase tracking-[0.1em] font-semibold text-base-500">
+                <span className="text-label uppercase tracking-[0.1em] font-semibold text-base-500">
                   via
                 </span>
                 {lpSummary.kind === "single" ? (
                   <span
-                    className="text-[10px] text-base-700 font-semibold"
+                    className="text-label text-base-700 font-semibold"
                     data-testid="order-card-lp-pill-partner"
                     title={`LP id: ${lpSummary.partnerId}`}
                   >
@@ -286,7 +286,7 @@ export default function OrderCard({
                   </span>
                 ) : (
                   <span
-                    className="font-mono text-[10px] text-warning"
+                    className="font-mono text-label text-warning"
                     data-testid="order-card-lp-pill-multi"
                   >
                     Multi-LP &middot; {lpSummary.count}
@@ -328,7 +328,7 @@ export default function OrderCard({
                 <span />
               )}
               {actionHint && (
-                <span className="text-[10px] text-primary font-semibold">
+                <span className="text-label text-primary font-semibold">
                   {actionHint} &rarr;
                 </span>
               )}
@@ -341,7 +341,7 @@ export default function OrderCard({
                   if (revertKind) onRevert?.(revertKind);
                 }}
                 onKeyDown={(e) => e.stopPropagation()}
-                className="mt-1.5 text-[10px] text-base-500 hover:text-primary underline-offset-2 hover:underline transition-colors"
+                className="mt-1.5 text-label text-base-500 hover:text-primary underline-offset-2 hover:underline transition-colors"
                 data-testid={`order-card-revert-${order.so}`}
                 aria-label={`Revert order ${order.so} to previous stage`}
               >
@@ -354,7 +354,7 @@ export default function OrderCard({
                 className="mt-1.5 flex items-center gap-2 px-2 py-1 rounded-[3px] border border-destructive/30 bg-destructive/5"
                 title={order.partner_rejected_reason ?? "LP rejected"}
               >
-                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-destructive">
+                <span className="text-label font-semibold uppercase tracking-[0.08em] text-destructive">
                   LP rejected
                 </span>
                 {onReselectPartner && (
@@ -365,7 +365,7 @@ export default function OrderCard({
                       onReselectPartner();
                     }}
                     onKeyDown={(e) => e.stopPropagation()}
-                    className="ml-auto text-[10px] font-semibold text-primary hover:underline"
+                    className="ml-auto text-label font-semibold text-primary hover:underline"
                     aria-label={`Reselect LP for order ${order.so}`}
                   >
                     Reselect &rarr;

@@ -46,7 +46,7 @@ function fmtMonth(month: string): string {
 }
 
 const VERB_CHIP =
-  "text-[11px] leading-4 border border-base-300 rounded-full px-2 py-0.5 text-base-800 bg-white whitespace-nowrap";
+  "text-label leading-4 border border-base-300 rounded-full px-2 py-0.5 text-base-800 bg-white whitespace-nowrap";
 
 /** Inline holder picker (Jess option A, 2026-07-19): the month's name turns
  *  into a select of plain-staff candidates; picking saves immediately (the
@@ -85,7 +85,7 @@ function DutySelect({
       onBlur={() => {
         if (!mut.isPending) onDone();
       }}
-      className="border border-base-200 rounded-md text-[12px] px-1.5 py-1 bg-white text-base-900"
+      className="border border-base-200 rounded-md text-meta px-1.5 py-1 bg-white text-base-900"
       aria-label={`PO duty holder for ${fmtMonth(month)}`}
     >
       {candidates.map((s) => (
@@ -170,7 +170,7 @@ export default function TeamPanel() {
 
   if (!holder) {
     return (
-      <div className="p-1 text-[12px] text-base-400" data-testid="team-panel">
+      <div className="p-1 text-meta text-base-400" data-testid="team-panel">
         Duty roster not live yet — it appears once the rotation table is
         deployed.
       </div>
@@ -180,12 +180,12 @@ export default function TeamPanel() {
   const c = avatarColor(holder.userId);
   return (
     <div className="flex flex-col" data-testid="team-panel">
-      <div className="t-micro text-base-500 mb-1.5">PO DUTY</div>
+      <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-1.5">PO DUTY</div>
       <div className="rounded-lg border border-base-200 overflow-hidden">
       <div className="group bg-base-50 p-3">
         <div className="flex items-center gap-2.5">
           <span
-            className="relative w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold leading-none shrink-0"
+            className="relative w-7 h-7 rounded-full flex items-center justify-center text-meta font-semibold leading-none shrink-0"
             style={{ background: c.bg, color: c.fg }}
             title="On duty now"
           >
@@ -204,10 +204,10 @@ export default function TeamPanel() {
             />
           ) : (
             <span className="min-w-0">
-              <span className="block text-[13px] font-semibold text-base-900 truncate">
+              <span className="block text-body font-semibold text-base-900 truncate">
                 {personLabel(holder.name, holder.email)}
               </span>
-              <span className="block text-[11px] text-base-500">
+              <span className="block text-label text-base-500">
                 on PO duty · until {untilLabel}
               </span>
             </span>
@@ -242,7 +242,7 @@ export default function TeamPanel() {
         return (
           <div
             key={r.month}
-            className="flex items-center gap-2 px-3 h-9 bg-white border-t border-base-100 text-[12.5px] text-base-800"
+            className="flex items-center gap-2 px-3 h-9 bg-white border-t border-base-100 text-meta text-base-800"
           >
             {editingMonth === r.month ? (
               <DutySelect
@@ -254,7 +254,7 @@ export default function TeamPanel() {
             ) : (
               <>
                 <span
-                  className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
+                  className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-label font-semibold leading-none shrink-0"
                   style={{ background: rc.bg, color: rc.fg }}
                 >
                   {personInitials(r.name, r.email)}
@@ -273,7 +273,7 @@ export default function TeamPanel() {
                 )}
               </>
             )}
-            <span className="ml-auto text-[11px] text-base-500 tabular-nums shrink-0">
+            <span className="ml-auto text-label text-base-500 tabular-nums shrink-0">
               from {fmtDateShort(`${r.month}-01`)}
             </span>
           </div>
@@ -281,17 +281,17 @@ export default function TeamPanel() {
       })}
       </div>
 
-      <div className="t-micro text-base-500 mt-3 mb-1.5">PO DAYS · MON &amp; THU</div>
+      <div className="text-label uppercase tracking-[0.05em] text-base-500 mt-3 mb-1.5">PO DAYS · MON &amp; THU</div>
       <div className="grid grid-cols-7 gap-0.5 text-center">
         {WEEKDAYS.map((w, i) => (
-          <span key={`w${i}`} className="text-[11px] text-base-400 py-0.5">
+          <span key={`w${i}`} className="text-label text-base-400 py-0.5">
             {w}
           </span>
         ))}
         {cells.map((d) => (
           <span
             key={d.key}
-            className={`text-[11px] tabular-nums py-1 rounded ${
+            className={`text-label tabular-nums py-1 rounded ${
               d.key === nextPoIso
                 ? "bg-success-soft text-success font-semibold"
                 : d.poDay
@@ -306,14 +306,14 @@ export default function TeamPanel() {
           </span>
         ))}
       </div>
-      <div className="text-[11px] text-base-400 mt-1">
+      <div className="text-label text-base-400 mt-1">
         next: <span className="text-success font-semibold">{nextPoLabel}</span>
       </div>
 
-      <div className="t-micro text-base-500 mt-3 mb-1.5">EVERYONE — YOUR OWN ORDERS</div>
+      <div className="text-label uppercase tracking-[0.05em] text-base-500 mt-3 mb-1.5">EVERYONE — YOUR OWN ORDERS</div>
       <div className="flex items-center gap-1.5 rounded-lg border border-base-200 bg-white px-2.5 h-9">
         <span
-          className="text-[11px] leading-4 border border-base-200 rounded-full px-1.5 text-base-500 bg-white"
+          className="text-label leading-4 border border-base-200 rounded-full px-1.5 text-base-500 bg-white"
           title="Each PIC follows up their own orders — one counterparty, one REF-first message"
         >
           PIC

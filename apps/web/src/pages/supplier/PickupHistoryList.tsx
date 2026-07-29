@@ -20,13 +20,13 @@ export default function PickupHistoryList({ poId }: { poId: string }) {
 
   if (q.isPending) {
     return (
-      <div className="text-[12px] text-muted-foreground">Loading…</div>
+      <div className="text-meta text-muted-foreground">Loading…</div>
     );
   }
   const events = q.data ?? [];
   if (events.length === 0) {
     return (
-      <div className="text-[12px] text-muted-foreground">No pickups yet.</div>
+      <div className="text-meta text-muted-foreground">No pickups yet.</div>
     );
   }
 
@@ -39,8 +39,8 @@ export default function PickupHistoryList({ poId }: { poId: string }) {
           data-testid={`pickup-event-row-${e.id}`}
         >
           <div className="min-w-0">
-            <div className="text-sm font-mono font-semibold">{e.do_number}</div>
-            <div className="text-[11px] text-muted-foreground">
+            <div className="text-body font-mono font-semibold">{e.do_number}</div>
+            <div className="text-label text-muted-foreground">
               {new Date(e.picked_up_at).toLocaleString()} · {e.ack_role} ·{" "}
               {e.thread_count} thread{e.thread_count === 1 ? "" : "s"}
             </div>
@@ -48,7 +48,7 @@ export default function PickupHistoryList({ poId }: { poId: string }) {
           <button
             type="button"
             onClick={() => window.open(`/print/pickup-event/${e.id}`, "_blank")}
-            className="text-[12.5px] px-3 py-1.5 border border-border rounded-md hover:border-primary transition-colors flex-shrink-0 ml-3"
+            className="text-meta px-3 py-1.5 border border-border rounded-md hover:border-primary transition-colors flex-shrink-0 ml-3"
             data-testid={`reprint-do-${e.id}`}
           >
             Reprint DO

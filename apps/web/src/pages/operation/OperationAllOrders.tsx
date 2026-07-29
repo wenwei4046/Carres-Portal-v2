@@ -67,10 +67,10 @@ export default function OperationAllOrders() {
     <div className="px-9 py-8 pb-14">
       <div className="mb-[22px]">
         <div className="kicker">HQ · Operations</div>
-        <h1 className="t-h1 font-display mt-1.5">
+        <h1 className="text-page font-display mt-1.5">
           Every order, every dealer
         </h1>
-        <div className="text-[13px] text-base-600 mt-1.5">
+        <div className="text-body text-base-600 mt-1.5">
           {orders.length} order{orders.length !== 1 ? "s" : ""}. Read-only.
         </div>
       </div>
@@ -82,12 +82,12 @@ export default function OperationAllOrders() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="SO number or customer name…"
-          className="flex-1 min-w-[220px] px-3 py-2 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+          className="flex-1 min-w-[220px] px-3 py-2 border border-base-200 rounded text-body bg-white outline-none focus:border-base-700"
         />
         <select
           value={dealerFilter}
           onChange={(e) => setDealerFilter(e.target.value)}
-          className="px-3 py-2 border border-base-200 rounded text-[13px] bg-white"
+          className="px-3 py-2 border border-base-200 rounded text-body bg-white"
         >
           <option value="all">All dealers</option>
           {dealersFromRows.map((d) => (
@@ -99,7 +99,7 @@ export default function OperationAllOrders() {
             <button
               key={k}
               onClick={() => setStatusFilter(k)}
-              className={`px-3 py-1.5 text-[11.5px] rounded cursor-pointer capitalize ${
+              className={`px-3 py-1.5 text-label rounded cursor-pointer capitalize ${
                 statusFilter === k
                   ? "bg-white text-base-900 font-semibold"
                   : "text-base-600 font-medium"
@@ -113,7 +113,7 @@ export default function OperationAllOrders() {
 
       {/* Table */}
       <div className="bg-white border border-base-200 rounded overflow-auto">
-        <table className="w-full border-collapse text-[13px]" style={{ minWidth: 720 }}>
+        <table className="w-full border-collapse text-body" style={{ minWidth: 720 }}>
           <thead>
             <tr className="bg-base-50 border-b border-base-200">
               <Th>SO</Th>
@@ -128,10 +128,10 @@ export default function OperationAllOrders() {
           </thead>
           <tbody>
             {isLoading && (
-              <tr><td colSpan={8} className="p-10 text-center text-[12px] text-base-500">Loading…</td></tr>
+              <tr><td colSpan={8} className="p-10 text-center text-meta text-base-500">Loading…</td></tr>
             )}
             {!isLoading && orders.length === 0 && (
-              <tr><td colSpan={8} className="p-10 text-center text-[12px] text-base-500">No orders match those filters.</td></tr>
+              <tr><td colSpan={8} className="p-10 text-center text-meta text-base-500">No orders match those filters.</td></tr>
             )}
             {orders.map((o) => (
               <tr key={o.id} className="border-t border-base-100">
@@ -140,7 +140,7 @@ export default function OperationAllOrders() {
                 </td>
                 <td className="px-4 py-2.5 text-base-700">{o.dealerName ?? "—"}</td>
                 <td className="px-4 py-2.5">{o.customerName ?? "—"}</td>
-                <td className="px-4 py-2.5 text-base-600 text-[12px]">
+                <td className="px-4 py-2.5 text-base-600 text-meta">
                   {o.qtyTotal} item{o.qtyTotal !== 1 ? "s" : ""}
                 </td>
                 <td className="px-4 py-2.5 text-right font-semibold font-mono">
@@ -152,7 +152,7 @@ export default function OperationAllOrders() {
                 <td className="px-4 py-2.5">
                   <StatusChip status={o.status} />
                 </td>
-                <td className="px-4 py-2.5 text-base-500 text-[11.5px]">
+                <td className="px-4 py-2.5 text-base-500 text-label">
                   {fmtDate(o.placedAt)}
                 </td>
               </tr>
@@ -166,7 +166,7 @@ export default function OperationAllOrders() {
 
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
   return (
-    <th className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-base-500 ${right ? "text-right" : "text-left"}`}>
+    <th className={`px-4 py-2.5 text-label font-semibold uppercase tracking-[0.05em] text-base-500 ${right ? "text-right" : "text-left"}`}>
       {children}
     </th>
   );

@@ -38,9 +38,9 @@ export default function ClaimGuaranteeModal({
     >
       <div className="w-full max-w-lg rounded-lg bg-card shadow-xl border border-base-200">
         <div className="p-5 border-b border-base-200">
-          <h2 className="t-h4 text-base-900">Claim this guarantee</h2>
-          <p className="t-small text-base-600 mt-1">{summary}</p>
-          <p className="t-small text-base-600 mt-1">
+          <h2 className="text-strong text-base-900">Claim this guarantee</h2>
+          <p className="text-body text-base-600 mt-1">{summary}</p>
+          <p className="text-body text-base-600 mt-1">
             {guarantee.customerName}
             {guarantee.so != null ? ` · SO-${guarantee.so}` : ""}
           </p>
@@ -49,14 +49,14 @@ export default function ClaimGuaranteeModal({
         <div className="p-5 flex flex-col gap-4">
           <div className="flex gap-3 rounded border border-warning/40 bg-warning-soft p-3">
             <AlertTriangle size={17} strokeWidth={1.75} className="text-warning shrink-0 mt-0.5" />
-            <p className="t-small text-base-700">
+            <p className="text-body text-base-700">
               This uses the guarantee up. We replace the item one-for-one; the replacement carries
               no cover unless the customer buys a new guarantee.
             </p>
           </div>
 
           <label className="flex flex-col gap-1">
-            <span className="t-small font-medium text-base-700">
+            <span className="text-body font-medium text-base-700">
               Replacement SKU <span className="text-base-500">(what we handed over)</span>
             </span>
             <input
@@ -64,18 +64,18 @@ export default function ClaimGuaranteeModal({
               value={replacementSku}
               onChange={(e) => setReplacementSku(e.target.value)}
               placeholder={guarantee.coversSku ?? "e.g. B1201S-K"}
-              className="rounded border border-base-300 px-3 py-2 t-body focus:border-base-500 outline-none"
+              className="rounded border border-base-300 px-3 py-2 text-body focus:border-base-500 outline-none"
             />
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="t-small font-medium text-base-700">What happened</span>
+            <span className="text-body font-medium text-base-700">What happened</span>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               placeholder="Foam collapsed on the left side; swapped at Klang."
-              className="rounded border border-base-300 px-3 py-2 t-body focus:border-base-500 outline-none resize-y"
+              className="rounded border border-base-300 px-3 py-2 text-body focus:border-base-500 outline-none resize-y"
             />
           </label>
         </div>

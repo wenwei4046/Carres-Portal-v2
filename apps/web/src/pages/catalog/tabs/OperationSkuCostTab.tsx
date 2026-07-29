@@ -131,7 +131,7 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
           <button
             type="button"
             onClick={() => setEditMode((v) => !v)}
-            className={`${editMode ? "btn-secondary" : "btn-primary"} text-[12px]`}
+            className={`${editMode ? "btn-secondary" : "btn-primary"} text-meta`}
             data-testid="opcost-edit-costs"
           >
             {editMode ? "Done editing" : "Edit Costs"}
@@ -145,7 +145,7 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
           className="flex items-center gap-1.5 flex-wrap -mt-1 mb-4"
           data-testid="opcost-model-filter"
         >
-          <span className="t-micro text-base-400 mr-1">Model</span>
+          <span className="text-label uppercase tracking-[0.05em] text-base-400 mr-1">Model</span>
           <CategoryChip active={modelFilter === "all"} onClick={() => setModelFilter("all")}>
             All {CATEGORY_LABEL[category]}
           </CategoryChip>
@@ -161,7 +161,7 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
         </div>
       )}
 
-      <p className="t-tiny text-base-500 mb-2">
+      <p className="text-meta text-base-500 mb-2">
         {filtered.length} SKU{filtered.length === 1 ? "" : "s"}
         {overflow > 0 && (
           <span className="text-base-400">
@@ -188,7 +188,7 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
         </div>
 
         {visible.length === 0 && (
-          <div className="t-small text-base-500 px-3 py-6 text-center">
+          <div className="text-body text-base-500 px-3 py-6 text-center">
             No SKUs match. Adjust the filter or the search.
           </div>
         )}
@@ -240,14 +240,14 @@ const CostRowView = memo(function CostRowView({
       <div>
         <CodeChip>{sku.sku}</CodeChip>
       </div>
-      <div className="t-small text-base-700 truncate" title={sku.description ?? ""}>
+      <div className="text-body text-base-700 truncate" title={sku.description ?? ""}>
         {sku.description || <span className="text-base-400">—</span>}
       </div>
-      <div className="t-small text-base-800 truncate" title={productName}>
+      <div className="text-body text-base-800 truncate" title={productName}>
         {productName}
       </div>
-      <div className="t-tiny text-base-600">{category ? CATEGORY_LABEL[category] : "—"}</div>
-      <div className="t-small text-base-700">{sku.variant || "—"}</div>
+      <div className="text-meta text-base-600">{category ? CATEGORY_LABEL[category] : "—"}</div>
+      <div className="text-body text-base-700">{sku.variant || "—"}</div>
       <div className="text-right" data-testid={`opcost-cost-${sku.sku}`}>
         {editMode ? (
           <input
@@ -261,12 +261,12 @@ const CostRowView = memo(function CostRowView({
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
             aria-label={`${sku.sku} cost`}
-            className={`${INPUT_CLS} text-right t-num text-[12px]`}
+            className={`${INPUT_CLS} text-right t-num text-meta`}
           />
         ) : sku.cost == null ? (
-          <span className="t-tiny text-base-400 italic">not set</span>
+          <span className="text-meta text-base-400 italic">not set</span>
         ) : (
-          <span className="t-num text-[12px] text-base-800">{fmtRm(sku.cost)}</span>
+          <span className="t-num text-meta text-base-800">{fmtRm(sku.cost)}</span>
         )}
       </div>
       <div />

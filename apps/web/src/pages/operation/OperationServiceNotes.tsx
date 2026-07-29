@@ -57,16 +57,16 @@ export default function OperationServiceNotes() {
     <div className="p-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <p className="text-xs uppercase tracking-wider text-base-500 mb-1">Operation</p>
-        <h1 className="t-h1 text-base-900">Service Notes</h1>
-        <p className="text-sm text-base-600 mt-2">
+        <p className="text-meta uppercase tracking-wider text-base-500 mb-1">Operation</p>
+        <h1 className="text-page text-base-900">Service Notes</h1>
+        <p className="text-body text-base-600 mt-2">
           Issue tracker · every case gets an SN number · printable for NETS / supplier
         </p>
       </div>
 
       {/* Toolbar */}
       <div className="flex items-center gap-3 mb-4">
-        <div className="flex rounded border border-base-200 overflow-hidden text-sm">
+        <div className="flex rounded border border-base-200 overflow-hidden text-body">
           {(["", "ongoing", "closed"] as const).map((s) => (
             <button
               key={s}
@@ -88,7 +88,7 @@ export default function OperationServiceNotes() {
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="btn-hero text-[13px] py-1.5"
+          className="btn-hero text-body py-1.5"
         >
           + New Case
         </button>
@@ -96,16 +96,16 @@ export default function OperationServiceNotes() {
 
       {/* Table */}
       {listQ.isLoading ? (
-        <p className="text-sm text-base-500">Loading…</p>
+        <p className="text-body text-base-500">Loading…</p>
       ) : rows.length === 0 ? (
         <div className="rounded border border-base-200 bg-white p-12 text-center">
           <p className="text-base-700 font-medium">No cases yet.</p>
-          <p className="text-sm text-base-500 mt-1">Create a new case when an issue arises.</p>
+          <p className="text-body text-base-500 mt-1">Create a new case when an issue arises.</p>
         </div>
       ) : (
         <div className="rounded border border-base-200 bg-white overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-base-50 text-xs uppercase tracking-wider text-base-500">
+          <table className="w-full text-body">
+            <thead className="bg-base-50 text-meta uppercase tracking-wider text-base-500">
               <tr>
                 <th className="text-left px-3 py-2 font-medium">SN No.</th>
                 <th className="text-left px-3 py-2 font-medium">Type</th>
@@ -130,55 +130,55 @@ export default function OperationServiceNotes() {
 
                 return (
                   <tr key={r.id} className="border-t border-base-200 hover:bg-base-50">
-                    <td className="px-3 py-2 font-mono text-xs text-base-900 font-semibold whitespace-nowrap">
+                    <td className="px-3 py-2 font-mono text-meta text-base-900 font-semibold whitespace-nowrap">
                       {r.snNo}
                     </td>
                     <td className="px-3 py-2">
                       {r.type ? (
-                        <span className="rounded bg-base-100 px-1.5 py-0.5 text-xs text-base-700">
+                        <span className="rounded bg-base-100 px-1.5 py-0.5 text-meta text-base-700">
                           {r.type}
                         </span>
                       ) : (
-                        <span className="text-base-400 text-xs">—</span>
+                        <span className="text-base-400 text-meta">—</span>
                       )}
                     </td>
                     <td className="px-3 py-2">
-                      <div className="text-base-900 text-sm">{r.customerName || "—"}</div>
+                      <div className="text-base-900 text-body">{r.customerName || "—"}</div>
                       {r.refNo && (
-                        <div className="text-xs text-base-500 font-mono">{r.refNo}</div>
+                        <div className="text-meta text-base-500 font-mono">{r.refNo}</div>
                       )}
                     </td>
                     <td className="px-3 py-2 max-w-xs">
-                      <p className="text-sm text-base-700 line-clamp-2">
+                      <p className="text-body text-base-700 line-clamp-2">
                         {r.whatHappened || <span className="text-base-400">—</span>}
                       </p>
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex gap-1 flex-wrap">
                         {r.sectionA && (
-                          <span className="rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-xs text-blue-700">
+                          <span className="rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-meta text-blue-700">
                             A · Logistic
                           </span>
                         )}
                         {r.sectionB && (
-                          <span className="rounded bg-orange-50 border border-orange-200 px-1.5 py-0.5 text-xs text-orange-700">
+                          <span className="rounded bg-orange-50 border border-orange-200 px-1.5 py-0.5 text-meta text-orange-700">
                             B · Supplier
                           </span>
                         )}
                         {r.sectionC && (
-                          <span className="rounded bg-base-100 border border-base-200 px-1.5 py-0.5 text-xs text-base-600">
+                          <span className="rounded bg-base-100 border border-base-200 px-1.5 py-0.5 text-meta text-base-600">
                             C · WH
                           </span>
                         )}
                         {!r.sectionA && !r.sectionB && !r.sectionC && (
-                          <span className="text-xs text-base-400">Internal</span>
+                          <span className="text-meta text-base-400">Internal</span>
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-xs text-base-500 whitespace-nowrap">
+                    <td className="px-3 py-2 text-meta text-base-500 whitespace-nowrap">
                       {fmtDate(r.requestDate)}
                     </td>
-                    <td className="px-3 py-2 text-xs whitespace-nowrap">
+                    <td className="px-3 py-2 text-meta whitespace-nowrap">
                       {r.deadline ? (
                         <span className={overdue ? "text-error-700 font-semibold" : "text-base-600"}>
                           {fmtDate(r.deadline)}
@@ -206,14 +206,14 @@ export default function OperationServiceNotes() {
                         <button
                           type="button"
                           onClick={() => setEditId(r.id)}
-                          className="rounded border border-base-300 bg-white px-2 py-1 text-xs text-base-700 hover:bg-base-100"
+                          className="rounded border border-base-300 bg-white px-2 py-1 text-meta text-base-700 hover:bg-base-100"
                         >
                           Edit
                         </button>
                         <button
                           type="button"
                           onClick={() => window.open(`/print/service-note/${r.id}`, "_blank")}
-                          className="rounded border border-base-300 bg-white px-2 py-1 text-xs text-base-700 hover:bg-base-100"
+                          className="rounded border border-base-300 bg-white px-2 py-1 text-meta text-base-700 hover:bg-base-100"
                         >
                           Print
                         </button>
@@ -222,7 +222,7 @@ export default function OperationServiceNotes() {
                             type="button"
                             onClick={() => advanceStage(r)}
                             disabled={isBusy}
-                            className={`rounded border px-2 py-1 text-xs font-medium disabled:opacity-40 ${
+                            className={`rounded border px-2 py-1 text-meta font-medium disabled:opacity-40 ${
                               nextStage
                                 ? "border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
                                 : "border-success-300 bg-success-50 text-success-700 hover:bg-success-100"

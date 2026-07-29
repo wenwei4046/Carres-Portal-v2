@@ -72,7 +72,7 @@ export default function ChangeRequestsPanel({ orderId }: { orderId: string }) {
       className="rounded border border-warning bg-warning-soft/40 p-3 my-3"
       data-testid="ops-change-requests"
     >
-      <p className="t-micro text-base-600 mb-1.5">
+      <p className="text-label uppercase tracking-[0.05em] text-base-600 mb-1.5">
         {isReplace
           ? "Item change · awaiting approval"
           : isAddonEdit
@@ -81,14 +81,14 @@ export default function ChangeRequestsPanel({ orderId }: { orderId: string }) {
       </p>
       {isAddonEdit ? (
         <div data-testid="ops-cr-editaddon">
-          <div className="flex items-center justify-between t-small text-base-500 line-through">
+          <div className="flex items-center justify-between text-body text-base-500 line-through">
             <span>
               {(pending.payload.label as string | undefined) ?? "Add-on"} ×
               {pending.payload.oldQty ?? "?"}
               {pending.payload.oldSize ? ` · ${pending.payload.oldSize}` : ""}
             </span>
           </div>
-          <div className="flex items-center justify-between t-small text-base-800">
+          <div className="flex items-center justify-between text-body text-base-800">
             <span>
               → ×{pending.payload.qty ?? "?"}
               {typeof (pending.payload.attrs as { size?: unknown } | null | undefined)?.size ===
@@ -103,7 +103,7 @@ export default function ChangeRequestsPanel({ orderId }: { orderId: string }) {
           {targetLines.map((l, i) => (
             <div
               key={i}
-              className="flex items-center justify-between t-small text-base-500 line-through"
+              className="flex items-center justify-between text-body text-base-500 line-through"
             >
               <span>
                 {l.label ?? l.sku} ×{l.qty ?? 1}
@@ -113,7 +113,7 @@ export default function ChangeRequestsPanel({ orderId }: { orderId: string }) {
               )}
             </div>
           ))}
-          <div className="flex items-center justify-between t-small text-base-800">
+          <div className="flex items-center justify-between text-body text-base-800">
             <span>
               → {newLine.label ?? newLine.sku} ×{newLine.qty ?? 1}
             </span>
@@ -126,7 +126,7 @@ export default function ChangeRequestsPanel({ orderId }: { orderId: string }) {
         </div>
       ) : (
         lines.map((l, i) => (
-          <div key={i} className="flex items-center justify-between t-small text-base-800">
+          <div key={i} className="flex items-center justify-between text-body text-base-800">
             <span>
               {l.label ?? l.sku} ×{l.qty ?? 1}
             </span>
@@ -138,7 +138,7 @@ export default function ChangeRequestsPanel({ orderId }: { orderId: string }) {
           </div>
         ))
       )}
-      <p className="t-tiny text-base-500 mt-1">
+      <p className="text-meta text-base-500 mt-1">
         Prices re-derive from the live catalog at approval.
       </p>
       <textarea
@@ -146,18 +146,18 @@ export default function ChangeRequestsPanel({ orderId }: { orderId: string }) {
         onChange={(e) => setNote(e.target.value)}
         placeholder="Decision note (sent to the dealer on reject)"
         rows={2}
-        className="w-full mt-2 px-2 py-1.5 border border-base-300 rounded text-sm bg-white outline-none focus:border-primary"
+        className="w-full mt-2 px-2 py-1.5 border border-base-300 rounded text-body bg-white outline-none focus:border-primary"
         data-testid="ops-cr-note"
       />
       {err && (
-        <p className="t-tiny text-danger mt-1" data-testid="ops-cr-error">
+        <p className="text-meta text-danger mt-1" data-testid="ops-cr-error">
           {err}
         </p>
       )}
       <div className="flex gap-2 justify-end mt-2">
         <button
           type="button"
-          className="btn-danger text-[12px]"
+          className="btn-danger text-meta"
           disabled={decideMut.isPending}
           onClick={() => decide(false)}
           data-testid="ops-cr-reject"
@@ -166,7 +166,7 @@ export default function ChangeRequestsPanel({ orderId }: { orderId: string }) {
         </button>
         <button
           type="button"
-          className="btn-primary text-[12px]"
+          className="btn-primary text-meta"
           disabled={decideMut.isPending}
           onClick={() => decide(true)}
           data-testid="ops-cr-approve"

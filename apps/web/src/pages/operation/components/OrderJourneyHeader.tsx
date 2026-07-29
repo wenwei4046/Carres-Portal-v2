@@ -342,7 +342,7 @@ export default function OrderJourneyHeader({ journey }: { journey: OrderJourney 
           {journey.stages.map((c, i) => (
             <span key={c.stage} className="flex items-center gap-1">
               {i > 0 && (
-                <span className="text-base-300 text-[11px]" aria-hidden="true">
+                <span className="text-base-300 text-label" aria-hidden="true">
                   ·
                 </span>
               )}
@@ -352,10 +352,10 @@ export default function OrderJourneyHeader({ journey }: { journey: OrderJourney 
                 data-state={c.state}
                 className={
                   c.state === "current"
-                    ? "inline-flex items-center gap-1 text-[13px] font-semibold text-foreground"
+                    ? "inline-flex items-center gap-1 text-body font-semibold text-foreground"
                     : c.state === "done"
-                      ? "inline-flex items-center gap-1 text-[13px] font-medium text-base-600"
-                      : "inline-flex items-center gap-1 text-[13px] font-normal text-base-400"
+                      ? "inline-flex items-center gap-1 text-body font-medium text-base-600"
+                      : "inline-flex items-center gap-1 text-body font-normal text-base-400"
                 }
               >
                 {c.state === "done" && (
@@ -402,7 +402,7 @@ export default function OrderJourneyHeader({ journey }: { journey: OrderJourney 
                 data-testid="journey-health"
                 data-key={h.key}
                 data-tone={h.tone}
-                className={`flex items-center gap-1 text-[13px] font-medium ${
+                className={`flex items-center gap-1 text-body font-medium ${
                   h.tone === "danger" ? "text-danger" : "text-warning"
                 }`}
               >

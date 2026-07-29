@@ -262,7 +262,7 @@ export default function PortalSidebar() {
                     <button
                       type="button"
                       onClick={() => toggleGroup(group)}
-                      className={`w-full flex items-center justify-between px-3.5 pb-1.5 pt-1 text-[9px] uppercase tracking-[0.16em] font-semibold ${
+                      className={`w-full flex items-center justify-between px-3.5 pb-1.5 pt-1 text-label uppercase tracking-[0.16em] font-semibold ${
                         group.area === activeArea
                           ? "text-base-700 cursor-default"
                           : "text-base-500 hover:text-base-700 cursor-pointer"
@@ -283,7 +283,7 @@ export default function PortalSidebar() {
                       {visibleItems(group, role).map((item) => {
                         const active = isItemActive(group, item);
                         const baseCls =
-                          "relative w-full text-left px-3.5 py-[9px] rounded text-[13px] flex items-center gap-[11px]";
+                          "relative w-full text-left px-3.5 py-[9px] rounded text-body flex items-center gap-[11px]";
                         const cls = active
                           ? `${baseCls} bg-base-100 text-base-900 font-semibold`
                           : `${baseCls} text-base-600 font-medium hover:bg-hovertint`;
@@ -316,7 +316,7 @@ export default function PortalSidebar() {
                             )}
                             {item.pendingPill && pendingCount > 0 && (
                               <span
-                                className="font-mono bg-primary text-primary-foreground rounded-full px-[7px] py-px text-[10px] font-bold text-center"
+                                className="font-mono bg-primary text-primary-foreground rounded-full px-[7px] py-px text-label font-semibold text-center"
                                 style={{ minWidth: 16 }}
                               >
                                 {pendingCount}
@@ -341,15 +341,15 @@ export default function PortalSidebar() {
             : "px-[22px] py-4 gap-2.5"
         }`}
       >
-        <div className="w-[34px] h-[34px] shrink-0 rounded-full bg-base-900 text-white grid place-items-center text-[11px] font-semibold">
+        <div className="w-[34px] h-[34px] shrink-0 rounded-full bg-base-900 text-white grid place-items-center text-label font-semibold">
           {initials}
         </div>
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <div className="text-[12px] font-semibold text-base-900 truncate">
+            <div className="text-meta font-semibold text-base-900 truncate">
               {email}
             </div>
-            <div className="text-[9.5px] text-base-500 uppercase tracking-[0.1em] mt-px">
+            <div className="text-label text-base-500 uppercase tracking-[0.1em] mt-px">
               {roleLabel}
             </div>
           </div>
