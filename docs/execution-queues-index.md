@@ -27,7 +27,7 @@
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | ✅ **LINE COMPLETE** — T1-T11 shipped |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
-| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · R6 ✅ #490 · **R8 ✅ #499** (the banned-verb sweep) — only **R7** left |
+| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · R6 ✅ #490 · **R8 ✅ #499** (the banned-verb sweep) — only **R7** left, and it was **RE-CUT 2026-07-29 (Loo) to the Receiving design, Phase 1** (docs + architecture, no migration). **It is no longer GRN duty auto-assign, and that is now unowned** |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 + C8b + **C11 · C12** | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C8 ✅ #493 (0304) · C8b ✅ #497 (0305) · C9 ✅ #472 · C10 ✅ #471** — **C4 RETIRED 2026-07-28 and re-cut as C11 + C12** (PR #484 stays open, unmerged: R8 shipped part of it, P1 deleted a file it edits, and Loo's money ruling made its own fix wrong). **C11** = a money figure is the money owed · **C12** = the last `Chase` leaves the portal |
 | ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings) · **P2 ✅ #492 + #494 + #495** — the click law is true on all three Purchasing lists (To Order · Claims · Receiving) · **P3 ✅ #506** (0306 — the two supplier calls, and a balance date enters Delay planning too). **P4 is the next card** |
@@ -448,8 +448,8 @@ behaves, and a chat that treats it as the flow will name things on the business'
 ```
 ✅ P2-Receiving  #495            ✅ C8b  #497 (0305)   ✅ R8  #499   ✅ D0.5b #502
 ✅ P3            the two supplier calls   #506   (0306)
-▶  P4            where the goods go              (migration)
-   R7            GRN duty — receiving assigns itself   (migration)
+✅ P4            where the goods go     #513 (0307) — DB half; the app half is its own card
+🔨 R7            the Receiving design, Phase 1   docs only, NO migration
    P5            one REAL PO, end to end
    T3            the Purchasing guided review + Jess's drawer day
    Foundation    1. RECEIVING-WORKING-FLOW.md
@@ -461,28 +461,37 @@ behaves, and a chat that treats it as the flow will name things on the business'
    C12           the last `Chase` leaves the portal      PURCHASING + ORDERS lanes
 ```
 
-**R7 moved INTO the line on 2026-07-28 (Loo), between P4 and P5, and the reason is the
-reason it cannot be skipped:** P5 is the card that puts one REAL purchase order through the
-module end to end, and **a real PO must be received by whoever the system says owns that
-GRN.** Validating the flow with the owner still a human roster rule would validate a
-different flow from the one that goes live. R7 was previously loose in ④ with "any time";
-it now has a place, and ④'s own row still lists it because it is still ④'s card.
+**⚠️ R7 WAS RE-CUT BY LOO ON 2026-07-29 AND IT IS NO LONGER THE GRN-DUTY CARD.** It is now
+**the Receiving design, Phase 1** — documentation and architecture, no migration, no
+behaviour change. The design has ONE home,
+`docs/carres-portal-system-architecture.md` **§3.17**: receiving only RECORDS FACTS and never
+decides delivery readiness · the result is one of exactly three (`Received` · `Received with
+exception` · `Rejected`, already locked in COPY-STANDARD 2026-07-27) · Phase 1 is the current
+WhatsApp workflow · Phase 2 (Warehouse Mobile Check-in → Operation Review & Confirm) is
+roadmap only · no Warehouse Code · no photo upload ADDED to the GRN.
 
-**⚠️ Loo's reason names TWO things and only one of them exists as a card.** He wrote *"real
-PO validation must include the completed GRN duty assignment **and Smart Cover flow**"*.
-GRN duty assignment IS R7. **Smart Cover is not** — it sits in ④'s LATER list, and its own
-entry says why: *"staff on leave stop receiving NEW assignments automatically — needs leave
-data, which nothing tracks yet"*. **Leave tracking was DROPPED**: HR-P8 (roster / presence /
-leave) was dropped by Loo on 2026-07-26 at the design stage, never started. So today Smart
-Cover has no data to read and no card to build it in.
+**What that costs, and it is not bookkeeping.** R7 was placed between P4 and P5 for one
+reason — *"a real PO must be received by whoever the system says owns that GRN"* — and the
+re-cut removes exactly that. **GRN duty auto-assign is now UNOWNED: no card builds it.** The
+rotation stays LOCKED business (§3.16) and stays a HUMAN roster rule the system does not
+enforce; the "GRN duty" chip on the Purchase panel is computed in the browser as next month's
+PO-duty holder, is stored nowhere, and goes blank by itself once the seeded roster runs past
+2026-09. **So P5 will validate with the owner still a human rule** unless Loo gives the
+auto-assign a new card first. Reported, not resolved — and **nobody may quietly fold it back
+into R7**, which no longer has the scope for it.
 
-**This is reported, not resolved, and R7's scope is NOT widened on a chat's own initiative.**
-Three ways out, and it is Loo's to pick: (a) P5 proceeds with R7 alone and Smart Cover is
-explicitly out of the go-live scope; (b) Smart Cover becomes its own card and something must
-first re-open leave data — which re-opens a decision Loo already made; (c) a manual stand-in
-(a manager marks somebody unavailable) is carded, which is a smaller thing than leave
-tracking and needs its own words. **Nobody may fold Smart Cover into R7 as "part of GRN
-duty" — it is a different concept with a dependency that does not exist.**
+**Smart Cover is unchanged and still has no card.** Loo's 2026-07-28 note said P5 must include
+*"the completed GRN duty assignment **and Smart Cover flow**"*; the first is now unowned per
+above, and the second sits in ④'s LATER list and cannot be built — it needs staff-leave data,
+and **HR-P8 (roster / presence / leave) was dropped by Loo on 2026-07-26** at the design stage.
+Three ways out, all still Loo's: (a) P5 proceeds without either and both are out of go-live
+scope; (b) Smart Cover becomes its own card, which re-opens the leave decision he already made;
+(c) a manual stand-in (a manager marks somebody unavailable) is carded — smaller than leave
+tracking, and it needs its own words. **One measured fact for that choice, and it widens
+nothing:** `seenTodayMYT` already exists and the Orders auto-assign sweep already skips staff
+who have not opened the portal today (*"MC / no-show = never stamped = skipped automatically"*).
+That is not leave data and it is not Smart Cover, but it is nearer option (c) than this note
+used to assume.
 
 **C11 and C12 replaced C4 on 2026-07-28 and neither is scheduled yet.** They sit here so the
 lane cost is visible before anything is picked: **C12 touches `OperationPurchase.tsx`, so it
