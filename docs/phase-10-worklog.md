@@ -4496,3 +4496,88 @@ building, so the branch merged `origin/main` first. One conflict, in
 `phase-10-worklog.md`, where both sides had appended an entry — both kept, R8's
 first. Everything else auto-merged, including the guard's `KIT_FILES` list,
 which both cards edited for different reasons.
+
+---
+
+**2026-07-29 · ⑧ D0.5c is MERGED and DEPLOYED — components-only, and zero visual
+change proved by checksum** (PR #505, merge `929fa746`, web `index-ydv91zJ9.js`
++ `UiShowcase-qyt-I2oo.js` [carres-portal `7fca85d7` + carres-pos `064595c2`,
+both `--branch=main`], **no api deploy**, **no migration**)
+
+`wrangler pages deployment list` names Production/main source **`929fa74`** the
+newest writer; all four canonicals converged on the first poll. `SERVICE_ROLE`
+**0** in both live files.
+
+**The duplicate check the PM asked for came back clean.** Before merging,
+`git ls-tree origin/main -- apps/web/src/components/kit` was read directly:
+`PageShell.tsx`, `DataTable.tsx` and `DetailShell.tsx` were all **absent**, so
+no equivalent D0.5c implementation existed on main and nothing was superseded.
+What main HAD gained meanwhile was **D0.5b.1** (PR #504, `dialog-container` — a
+picker inside a dialog rendering under it), which is a D0.5b follow-up and was
+merged into this branch first.
+
+## Zero visual change, proved rather than asserted
+
+This is a card whose acceptance criterion is *zero visual change*, and a word
+grep cannot prove that — it can only show what a bundle says. So the proof is a
+checksum:
+
+```
+operator's main bundle   before 4,500,781 bytes   after 4,500,781 bytes
+md5 (raw)                a4d1778f…               15cdc8f9…      DIFFERENT
+md5 (lazy chunk name normalised)   0d551c1b…  ==  0d551c1b…     IDENTICAL
+```
+
+**The only change in the bundle every operator downloads is the hash inside the
+`/ui` chunk's filename** (`UiShowcase-Crp3T1zQ.js` → `UiShowcase-qyt-I2oo.js`),
+which is also why the two files are the same LENGTH — the two hashes have the
+same character count. Equal size was the first thing measured and it was nearly
+reported as "byte-identical"; the md5 said otherwise, and the normalised
+comparison is what turned a near-miss into an exact statement. **When two files
+are the same size, that is not the same as being the same file.**
+
+## A marker that would have read as a false positive
+
+`page-shell` greps **4** in the live main bundle. That looked like a D0.5c
+component leaking into the operator's bundle, which would have contradicted the
+whole card. It greps **4 in the predecessor too**: it is the POS's own
+`.page-shell` CSS class in `pages/dealer/DealerPos.tsx` — Part B, `.pos-proto`,
+explicitly out of §1–§14 scope and years older than the kit. The kit's
+`PageShell` renders `data-kit="page-shell"` and appears only in the lazy chunk.
+
+The genuinely new markers behave exactly as the card claims: `data-table` ·
+`detail-shell` · `detail-current-issues` · `persistentFacts` grep **0 · 0 · 0 ·
+0** in the main bundle and **1 · 2 · 1 · 2** in `UiShowcase-*.js`.
+
+**The lesson is the one this line keeps re-learning from the other end:** pick
+proof markers from MOUNTED components, and when a marker fires, check whether it
+fired *before* as well. A one-sided grep on a name as generic as `page-shell`
+would have produced a confident, wrong conclusion in either direction.
+
+## The four things the PM asked to verify
+
+| | |
+|---|---|
+| Existing pages visually unchanged | ✅ the main bundle is md5-identical modulo the chunk name; and **no page file is in the diff at all** — it is `components/kit/**`, `pages/dev/**`, the guard's file list and docs |
+| Build clean | ✅ `v4-guard: clean` · `tsc` clean · `vite build` clean |
+| Baseline tests unchanged | ✅ **2230 passed / 16 pre-existing**, and the failures are the same four documented files in the same counts: `OperationOrders` ×7 · `OrderCustomerCard` ×4 · `OhanaSofaTab` ×4 · `NiceFutureMattressTab` ×1 |
+| No regression in Orders | ✅ **no file with `order` in its name appears in the diff**, and the 7 `OperationOrders` failures are the documented pre-existing ones — same test names, same count |
+
+Also checked before deploying: `git diff aa70cd45..929fa746 -- apps/api
+packages/shared supabase/migrations` is **empty**, so R8's Worker `0b2640bc`
+still matches the tip and no api deploy was made; the migration tail stays
+`0305`.
+
+## What is now live, and what is deliberately not
+
+Live: three more kit components (`PageShell` · `DataTable` · `DetailShell`) and
+`/ui` rendering them. **Nothing else changed for any operator** — no page has
+been migrated onto any of them, which is the card's final shape after the PM
+closed it components-only.
+
+Not live and not built: the Order drawer's migration onto `DetailShell`. The PM
+ruled on 2026-07-29 that the drawer does **not** gain a Persistent Facts strip
+and that §7② stays RESERVED — real-page adoption is **D6**. The `DetailShell`
+contract is unchanged by that ruling: `identity.persistentFacts` is still L4's
+required 4-tuple and the shell still renders it. What was deferred is the
+migration, not the type.

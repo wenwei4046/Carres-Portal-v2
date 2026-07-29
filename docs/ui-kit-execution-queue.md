@@ -429,7 +429,32 @@ disciplined and behaves like a trap."*
 
 ---
 
-## D0.5c ✅ CLOSED — components only (2026-07-28, ruled by the PM 2026-07-29)
+## D0.5c ✅ CLOSED — components only (PR #505 `929fa746`, DEPLOYED 2026-07-29)
+
+> **Deploy receipt.** web `index-ydv91zJ9.js` + `UiShowcase-qyt-I2oo.js`
+> (carres-portal `7fca85d7` + carres-pos `064595c2`, both `--branch=main`;
+> `wrangler pages deployment list` names Production/main source `929fa74`; all
+> four canonicals converged on the first poll; `SERVICE_ROLE` **0** in both
+> files). **No api deploy, no migration** — `git diff aa70cd45..929fa746 --
+> apps/api packages/shared supabase/migrations` is empty and the tail stays
+> `0305`.
+>
+> **Zero visual change, proved by checksum rather than by inspection.** The
+> operator's main bundle is 4,500,781 bytes before and after, and once the lazy
+> chunk's filename is normalised the two are **md5-identical**
+> (`0d551c1b…` both sides). The only change in the bundle every operator
+> downloads is the hash in the `/ui` chunk's name.
+>
+> **One marker would have read as a false positive.** `page-shell` greps 4 in
+> the live main bundle — and 4 in the predecessor, because it is the POS's own
+> `.page-shell` class in `pages/dealer/DealerPos.tsx` (Part B, out of §1–§14
+> scope). The kit's own markers — `data-table` · `detail-shell` ·
+> `detail-current-issues` · `persistentFacts` — grep **0** in the main bundle
+> and are present only in the lazy chunk.
+>
+> **No Orders regression:** no file with `order` in its name is in the diff at
+> all, and the suite held at **2230 passed / 16 pre-existing** in the same four
+> documented files.
 
 **All three shells exist**, extracted from the live Orders implementation, and
 `/ui` renders them. **No page renders through any of them, and that is the
