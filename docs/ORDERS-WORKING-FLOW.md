@@ -410,6 +410,19 @@ Secondary: the customer's promised date.
 Tertiary: order value, high to low — a tie-breaker only. A large order weeks away never
 outranks a small one going out tomorrow.
 
+## 6a · Which day a delivery sits on
+
+A calendar day answers ONE question: **which trucks move that day.** A day is therefore
+filled by the **booking**, never by the date we promised the customer — the two diverge the
+moment anything is rescheduled, which is why D1 split them.
+
+- **"This week" means the REST of this week** — today through Saturday. Sunday is never in
+  a delivery range: it is refused for every logistics company.
+- **A promised-but-unbooked order is never COUNTED as a delivery.** It is listed under its
+  own heading with the call that fixes it, so a day never reads as empty when work is
+  sitting on it, and never reads as booked when nothing is. The words for that heading and
+  that call are `docs/COPY-STANDARD.md`'s.
+
 ## 7 · The three dots
 
 Three independent facts. Each dot carries its own small icon, so the dots need no header of

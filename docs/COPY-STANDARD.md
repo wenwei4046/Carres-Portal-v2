@@ -424,14 +424,16 @@ word** — `docs/ORDERS-WORKING-FLOW.md` §5.
 | No logistics picked yet | **No logistics picked** |
 | Nothing booked on a day | **No deliveries booked this day.** |
 
-> **⇢ NOT LANGUAGE · future owner: `docs/ORDERS-WORKING-FLOW.md`** (colour →
-> `docs/UI-KIT.md` §3.6) — a calendar day answers ONE question, *which trucks move
-> that day*, so a day is filled by the BOOKING and never by the date we promised;
-> **"This week" means the REST of this week** (today through Saturday, Sunday never
-> in a delivery range); a promised-but-unbooked order is never COUNTED as a
-> delivery but is listed under its own heading with the call that fixes it
-> (`Call {customer} — book delivery date`); **Confirmed is the ONLY green on the
-> calendar**, and the logistics company's own date is amber, always.
+**Which day an order sits on, and what a day counts, is a business rule** —
+`docs/ORDERS-WORKING-FLOW.md` §6a. The call that fixes a promised-but-unbooked day is
+`Call {customer} — book delivery date` (§2.1), and the heading it sits under is
+`Promised this day, no date yet` above.
+
+> **⇢ NOT LANGUAGE · future owner: `docs/UI-KIT.md` §3.6** — **Confirmed is the ONLY
+> green on the calendar**, and the logistics company's own date is amber, always.
+> **This did NOT move with the rest of the block on 2026-07-29: UI-KIT does not carry
+> it yet, and adding a presentation rule to a Foundation file is not something the
+> cleanup phase may do.** It waits for a UI-KIT card.
 
 ## The delivery window words (locked with Jess 2026-07-27)
 
