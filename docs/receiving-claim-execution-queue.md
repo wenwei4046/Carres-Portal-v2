@@ -293,13 +293,16 @@ R1's own form and files it; ops presses one button. Notes the next cards need:
 ## R7 · The Receiving design — Phase 1, written down
 
 **⚠️ RE-CUT BY LOO 2026-07-29. R7 is no longer "GRN duty — receiving assigns itself".** The
-old card built a round-robin that auto-stamped one owner per GRN. **That is not what R7 is any
-more, and it is not deferred inside R7 either — it is unowned.** The reason is not lost: the
-GRN-duty rotation is still LOCKED business in `docs/carres-portal-system-architecture.md`
-§3.16, it is still only a HUMAN roster rule, and §3.16 now carries the note saying no card
-builds it. **⑦ P5's scheduling reason depended on it** — *"a real PO must be received by
-whoever the SYSTEM says owns that GRN"* — so that dependency is open and needs Loo's word.
-The old card text is deleted rather than annotated (one concern, one file).
+old card built a round-robin that auto-stamped one owner per GRN. The old text is deleted
+rather than annotated (one concern, one file).
+
+**GRN Duty Rotation is still REQUIRED — it was removed from Receiving, not cancelled** (Loo,
+2026-07-29 — final). **Its permanent home will be decided in the Administration / Work
+Assignment module**, and **it does not come back into R7 under any circumstance.** The
+rotation itself stays LOCKED business in `docs/carres-portal-system-architecture.md` §3.16,
+where it is a HUMAN roster rule the system does not enforce. **⑦ P5 therefore validates a real
+PO with the GRN owner still a human rule** — known, accepted, and not a reason to re-open this
+card.
 
 **Goal:** the Receiving design is written down, and the portal's documentation stops
 describing a flow nobody had ruled. **This card is documentation and architecture. It ships
@@ -327,22 +330,27 @@ contradicts it.
 Every one of these is a real gap between the ruling and the code. **None is fixed by this
 card**, because each needs either a migration or a word nobody has ruled.
 
-1. **`Rejected` does not exist.** Zero occurrences as a receiving result anywhere in the
-   codebase. Nothing in the portal can refuse a whole delivery — R1's model is quantity-based
-   and damaged / wrong units stay Pending delivery. **"We refused the lorry" and "we took it
-   and 2 are broken" are different events**, with different consequences for the supplier
-   claim and for `received_qty`. Its own card, with a migration.
-2. **`Received with exception` does not exist either** (0 occurrences). What ships today is
-   R1's PROGRESS state `receiving_issue`, which is a different axis: per PO, derived from
-   quantities, describing today — not the outcome of one arrival. **The two must not be
-   merged into each other** on the way to fixing this.
+1. **`Received with exception` and `Rejected` ship with the SUPPLIER CLAIM module** (Loo,
+   2026-07-29 — final). Neither exists today: zero occurrences of either as a receiving result
+   anywhere in the codebase, so nothing in the portal can refuse a whole delivery — R1's model
+   is quantity-based and damaged / wrong units stay Pending delivery. **They are NOT a
+   standalone Receiving card**, and R7 does not build them. That seam is the right one:
+   "we refused the lorry" and "we took it and 2 are broken" are different events whose whole
+   consequence is a supplier claim, so the status and the claim it raises get designed
+   together or they disagree.
+2. **Do not fold either status into R1's progress axis to close the gap early.**
+   `receiving_issue` is a different question — per PO, derived from quantities, describing
+   today — not the outcome of one arrival. Only `Received` is reachable until the Supplier
+   Claim module carries the other two.
 3. **The three results have no five-string dictionary rows.** COPY-STANDARD lists them as a
    vocabulary group, which is enough to stop a synonym being invented and not enough to build
    a screen. That is the flow file's job, below.
-4. **"No photo upload in Phase 1" must never be read as "delete the evidence law".** Two file
-   paths already exist and both stay: the supplier D/O file (required to submit a check-in)
-   and R2's damage / wrong-item photos, **which a CHECK constraint in migration 0288
-   enforces** — removing them is a schema change. The ruling forbids adding a new photo step.
+4. **Existing attachment behaviour is UNCHANGED** (Loo, 2026-07-29 — final). R7 means exactly
+   two things: **no new Receiving photo upload is introduced**, and **the current attachment
+   behaviour is not redesigned.** It must never be read as "delete the evidence law": two file
+   paths already exist and both stay exactly as they are — the supplier D/O file (required to
+   submit a check-in) and R2's damage / wrong-item photos, **which a CHECK constraint in
+   migration 0288 enforces**, so removing them is a schema change.
 5. **Phase 2's machinery is already built and dormant** — ④ R6 (PR #490, migrations 0301 +
    0302) is Warehouse Mobile Check-in + Operation Review & Confirm under another name. It is
    unreachable only because **0 warehouse accounts exist**. **Nobody may delete R6 to enforce
@@ -579,5 +587,5 @@ queue, not a flow with two holes in it.
 | R4 | ✅ | [#454](https://github.com/wenwei4046/Carres-Portal-v2/pull/454) · 0299 |
 | R5 | ✅ | [#475](https://github.com/wenwei4046/Carres-Portal-v2/pull/475) · no migration |
 | R6 | ✅ | [#490](https://github.com/wenwei4046/Carres-Portal-v2/pull/490) · 0301 + 0302 |
-| R7 | ✅ the Receiving design, Phase 1 — **docs + architecture only, NO migration** · RE-CUT by Loo 2026-07-29, so **it is no longer GRN duty auto-assign and that is now UNOWNED** (§3.16) | [#515](https://github.com/wenwei4046/Carres-Portal-v2/pull/515) |
+| R7 | ✅ the Receiving design, Phase 1 — **docs + architecture only, NO migration** · RE-CUT by Loo 2026-07-29, so **it is no longer GRN duty auto-assign — that rotation is still REQUIRED and belongs to Administration / Work Assignment** (§3.16) | [#515](https://github.com/wenwei4046/Carres-Portal-v2/pull/515) |
 | R8 | ✅ | [#499](https://github.com/wenwei4046/Carres-Portal-v2/pull/499) · no migration |

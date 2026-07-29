@@ -27,13 +27,13 @@
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | ✅ **LINE COMPLETE** — T1-T11 shipped |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
-| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · R6 ✅ #490 · **R8 ✅ #499** (the banned-verb sweep) — **R7 ✅ #515** — **RE-CUT 2026-07-29 (Loo) to the Receiving design, Phase 1** (docs + architecture, no migration). **It is no longer GRN duty auto-assign, and that is now unowned** |
+| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · R6 ✅ #490 · **R8 ✅ #499** (the banned-verb sweep) — **R7 ✅ #515** — **RE-CUT 2026-07-29 (Loo) to the Receiving design, Phase 1** (docs + architecture, no migration). **It is no longer GRN duty auto-assign — that rotation is still REQUIRED and its home is the Administration / Work Assignment module, never R7** |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 + C8b + **C11 · C12** | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C8 ✅ #493 (0304) · C8b ✅ #497 (0305) · C9 ✅ #472 · C10 ✅ #471** — **C4 RETIRED 2026-07-28 and re-cut as C11 + C12** (PR #484 stays open, unmerged: R8 shipped part of it, P1 deleted a file it edits, and Loo's money ruling made its own fix wrong). **C11** = a money figure is the money owed · **C12** = the last `Chase` leaves the portal |
 | ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings) · **P2 ✅ #492 + #494 + #495** — the click law is true on all three Purchasing lists (To Order · Claims · Receiving) · **P3 ✅ #506** (0306 — the two supplier calls, and a balance date enters Delay planning too). **P4 is the next card** |
 | ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 + **D0.6** | D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3` · **D0.4 ✅ the old order-portal master spec is DELETED** · **D0.5a ✅ built 2026-07-28** — ten Foundation Components + a live `/ui`. **D0.5b ✅ SHIPPED 2026-07-28 (PR #502 `d77bd4f6`, deployed; `/ui` now shows the frozen record, verified in a real browser)** — the Radix half (`Modal` · `Drawer` · `Select` · `DropdownMenu` · `Tooltip` · `Popover` · `Tabs` · `Checkbox` · `DatePicker` · `Toast`), and **the PENDING REGISTER is now EMPTY: Jess froze Q1 = the 8-step scale · Q3 = `font-bold` deleted into 600 · Q4 = Lucide's stroke 2.** Each answer became a mechanism (a re-pointed source scan · a scan rule · a deleted prop), and the freeze cost **zero** component changes because D0.5a had built for both answers. §16 coverage 31.58% → 47.83%, blocked-on-a-decision 3 → 0, so **D5 is no longer blocked on a decision.** **D0.5c ✅ CLOSED as components-only and DEPLOYED** (PR #505 `929fa746`, 2026-07-29; **zero visual change proved by checksum** — the operator's main bundle is md5-identical to its predecessor once the lazy `/ui` chunk's filename is normalised) — `PageShell` (from `ListPageShell`) · `DataTable` (from the Orders table) · `DetailShell` (L4's six slots, all seven constraints as types, **no `state` prop**). §16 coverage 47.83% → 65.38% and **the Human-Review debt goes DOWN for the first time, 4 → 3**: "Progress carries no events" became a type. **No page renders through any of them, and that is the card's final shape — real-page adoption is D6.** **The drawer is NOT migrated**: L4 requires a 4-tuple of persistent facts (客户名 · Ref · promised date · outstanding), on today's drawer those four sit in four different blocks, and the header carries Jess's own rev-4 ruling *"ZERO order data here"* — so the strip would be a new layout reversing a frozen ruling. **PM, 2026-07-29: do not add it, and do NOT turn §7② into law** — Persistent Facts stays RESERVED and the first page through the shell is where the four get a home. **T3 = Jess uses the drawer for a day** (still waiting for P5). **Reference Review CLOSED 2026-07-28** — `docs/ui-reference-review.md` R1-R5 frozen (Fiori · Linear · Stripe · Vercel · GOV.UK/NNg/Polaris); five principles; that line froze **no** enforcement mechanism. **D0.6 KIT-CONSOLIDATION = planning card only, approved 2026-07-28, builds after D0.5c — it is the only card that may write the REFERENCE-REVIEW principles into `docs/UI-KIT.md`.** *(Corrected 2026-07-28: this row used to say D0.6 was the only card that may edit the kit at all, which the kit itself contradicts — §6 says each component's dictionary entry is written "when it lands on `/ui`" and §9 says "Written by D0.5a". A D-card still writes the chapter the law assigns it; D0.6 owns the review principles and the mirror's claims.)* TEMPORARY doc — delete when the line ends |
 
-**State 2026-07-29:** ① ② ③ ⑤ **LINE COMPLETE** · ④ **LINE COMPLETE — R1-R8 ✅** (R7 re-cut to the Receiving design; **GRN duty auto-assign is now unowned**) · ⑥ C1 · C2 · C3 · C5 · C6 · **C7** · C8 · C8b · C9 · C10 ✅ ·
+**State 2026-07-29:** ① ② ③ ⑤ **LINE COMPLETE** · ④ **LINE COMPLETE — R1-R8 ✅** (R7 re-cut to the Receiving design; **GRN duty rotation moved to Administration / Work Assignment — still required, never back into R7**) · ⑥ C1 · C2 · C3 · C5 · C6 · **C7** · C8 · C8b · C9 · C10 ✅ ·
 ⑦ **P1 ✅ · P2 ✅ · P3 ✅** · ⑧ D0 + T1 + T2 + **D0.5a + D0.5b + D0.5c** ✅ (**Q1/Q3/Q4 FROZEN 2026-07-28 — the PENDING REGISTER is empty**; T3 is still a Jess task, not a build card). **D0.5c ✅ CLOSED as components-only** (`PageShell` · `DataTable` · `DetailShell`; the drawer is not migrated — PM, 2026-07-29). **Next on ⑦: P4.** On ⑧: D0.6 ✅ · D1 ✅ · D2 ✅ · **D3 ✅ BUILT 2026-07-29** (Option A = Phase 1 the ruler + Phase 2 the 10 byte-equal conversions). **D3's real product is the RULER, and the number that says why: the portal has 6,385 colour sites and the guard saw 435 of them — 6.8%, with 249 of those out of scope. After D3, 5,545 of 6,129 are measured — 90.5%.** (Counting method recorded in UI-KIT §13.3 beside the figures; the planning draft's "≈6,290 / 6.9%" was hand-mixed and is corrected.) Rules O 4,661 · P 594 · Q 111 make the colour debt countable for the first time, and rule B, which exists to find the flame, could not see it: the live `--primary` is HSL and B matched the hex only.** Next on ⑧: **D3 Phase 3** (`--primary` flame → blue, 594 sites — needs its own card AND a visual approval; it cannot be proved by checksum) and **D3 Phase 4** (`base-*` → kit palette, 4,661 sites — ten steps into six, so it rolls out page by page with D6/D7, never globally).**
 
 **What P2 changed so far (2026-07-28, PR #492) — the To Order half, web only, no
@@ -468,21 +468,24 @@ behaviour change. The design has ONE home,
 decides delivery readiness · the result is one of exactly three (`Received` · `Received with
 exception` · `Rejected`, already locked in COPY-STANDARD 2026-07-27) · Phase 1 is the current
 WhatsApp workflow · Phase 2 (Warehouse Mobile Check-in → Operation Review & Confirm) is
-roadmap only · no Warehouse Code · no photo upload ADDED to the GRN.
+roadmap only · no Warehouse Code · **no new Receiving photo upload, and the existing
+attachment behaviour is not redesigned** · **`Received with exception` and `Rejected` are not
+built by R7 — they ship with the Supplier Claim module** (Loo, 2026-07-29, final).
 
-**What that costs, and it is not bookkeeping.** R7 was placed between P4 and P5 for one
-reason — *"a real PO must be received by whoever the system says owns that GRN"* — and the
-re-cut removes exactly that. **GRN duty auto-assign is now UNOWNED: no card builds it.** The
-rotation stays LOCKED business (§3.16) and stays a HUMAN roster rule the system does not
-enforce; the "GRN duty" chip on the Purchase panel is computed in the browser as next month's
+**GRN DUTY ROTATION IS STILL REQUIRED — it moved OUT of Receiving, it was not cancelled**
+(Loo, 2026-07-29, final). **Its permanent home will be decided in the Administration / Work
+Assignment module, and it does NOT come back into R7.** The rotation stays LOCKED business
+(§3.16) and, until that module carries it, stays a HUMAN roster rule the system does not
+enforce: the "GRN duty" chip on the Purchase panel is computed in the browser as next month's
 PO-duty holder, is stored nowhere, and goes blank by itself once the seeded roster runs past
-2026-09. **So P5 will validate with the owner still a human rule** unless Loo gives the
-auto-assign a new card first. Reported, not resolved — and **nobody may quietly fold it back
-into R7**, which no longer has the scope for it.
+2026-09. **⑦ P5 therefore validates a real PO with the GRN owner still a human rule** — known
+and accepted, and not a reason to re-open R7. R7 was originally placed between P4 and P5 for
+exactly this dependency; that reason no longer applies to R7.
 
 **Smart Cover is unchanged and still has no card.** Loo's 2026-07-28 note said P5 must include
-*"the completed GRN duty assignment **and Smart Cover flow**"*; the first is now unowned per
-above, and the second sits in ④'s LATER list and cannot be built — it needs staff-leave data,
+*"the completed GRN duty assignment **and Smart Cover flow**"*; the first now belongs to
+Administration / Work Assignment per above, and the second sits in ④'s LATER list and cannot
+be built — it needs staff-leave data,
 and **HR-P8 (roster / presence / leave) was dropped by Loo on 2026-07-26** at the design stage.
 Three ways out, all still Loo's: (a) P5 proceeds without either and both are out of go-live
 scope; (b) Smart Cover becomes its own card, which re-opens the leave decision he already made;
@@ -552,6 +555,23 @@ no-paper rule. Every module uses it; no module invents its own action model.
 
 ## Standing laws (apply to every line)
 
+- **⭐ BUSINESS ARCHITECTURE IS THE SOURCE OF TRUTH. EXISTING CODE IS NOT** (Loo, 2026-07-29).
+  What is already built does not define what the business is. **Existing implementation may be
+  reused ONLY where it matches the approved business workflow** — and where it does not, the
+  code is the thing that is wrong, not the workflow.
+
+  **This does not weaken "measure, do not assume."** Reading the code remains the only way to
+  learn what is TRUE today, and every card still proves its claims by measuring. The
+  distinction is what that measurement is FOR: it tells you the current state, it never tells
+  you the intended one. A chat that finds a shipped behaviour and infers the business rule
+  from it has taken the reading in the wrong direction — the same error as recovering a rule
+  from a deleted file and treating it as re-confirmed.
+
+  **Two consequences worth naming, because both have already happened.** A shipped feature
+  that does not match the approved workflow is **not** grandfathered by having shipped — it is
+  a defect to report (Law 0), never a precedent to build on. And "we already have something
+  like this" is not a reason to reuse it; the only reason is that it matches the workflow the
+  business approved.
 - One card = one chat = one PR = one deploy. Never two cards in one chat.
 - **⭐ ONE CARD = ONE EXECUTION CHAT. A card must be CLAIMED before it is implemented**
   (PM, 2026-07-29). The old law above says one chat may not hold two cards; it never said one

@@ -217,16 +217,18 @@ read. The one true half is kept above: **do not invent staff.**
   reading the old sentence would go and "fix" a constant that is not there. Jess's business
   rulings in this section are untouched.)*
 
-**⚠️ GRN duty auto-assign is now UNOWNED — no card builds it** (recorded 2026-07-29). The
-rotation above is still LOCKED business and it is still a **human roster rule the system does
-not enforce**: the "GRN duty" chip on the Purchase panel is computed in the browser as *next
-month's PO-duty holder* (`OperationPurchase.tsx`), nothing is stored, and it goes blank by
-itself once the seeded roster runs past 2026-09. Card ④ R7 used to be the card that would make
-the system enforce it; **Loo re-cut R7 on 2026-07-29 to the Receiving design (§3.17)**, so the
-auto-assign has no home. **This matters to ⑦ P5**, whose scheduling reason was *"a real PO must
-be received by whoever the SYSTEM says owns that GRN"* — that dependency is currently unmet and
-needs Loo's word: give it a new card, or accept that P5 validates with the owner still a human
-roster rule.
+**⚠️ GRN DUTY ROTATION IS STILL REQUIRED, AND ITS HOME IS NOT RECEIVING** (Loo, 2026-07-29 —
+final). It was removed from the Receiving workflow, **not cancelled**. **Its permanent home
+will be decided in the Administration / Work Assignment module**, and **it does not go back
+into ④ R7** — R7 is the Receiving design (§3.17) and has no scope for it. A chat that finds
+the auto-assign attractive is looking at work that belongs to another module.
+
+Until Administration / Work Assignment carries it, the rotation above stays **LOCKED business
+the system does not enforce**: the "GRN duty" chip on the Purchase panel is computed in the
+browser as *next month's PO-duty holder* (`OperationPurchase.tsx`), nothing is stored, and it
+goes blank by itself once the seeded roster runs past 2026-09. **⑦ P5 therefore validates a
+real PO with the GRN owner still a human roster rule** — known, accepted, and not a reason to
+re-open R7.
 - Migration `0236_ops_po_duty.sql` seed originally wrote `Jul=Shasha · Aug=Li Ching · Sep=Khor Yee`. Prod was manually corrected on 2026-07-18 16:35 (~47min after the seed) — the Aug row was updated to `yujun@carres.com` (real account). **Prod state verified 2026-07-24 = Jul Shasha · Aug Yu Jun · Sep Khor Yee, all correct.** No follow-up migration needed. The originally-proposed 0243 reseed migration was DROPPED (would have destroyed the manual correction).
 
 ### 3.17 · Receiving — the operating design (LOCKED · Loo 2026-07-29, card ④ R7)
@@ -254,12 +256,18 @@ different axes and R1 already owns them (`in_transit · partially_received · fu
 receiving_issue`, per PO, derived from quantities). **A result is the outcome of ONE arrival;
 a progress state is where the whole PO stands today.**
 
-**`Rejected` has no implementation today** (measured 2026-07-29: zero occurrences as a
-receiving result anywhere in the codebase). Nothing in the portal can currently refuse a whole
-delivery — R1's model is quantity-based, and damaged or wrong units stay Pending delivery
-rather than being rejected. **That gap is named here, not quietly filled**; building it needs
-its own card, because "we refused the lorry" and "we took it and 2 are broken" are different
-events with different consequences for the supplier claim.
+**`Received with exception` and `Rejected` are NOT implemented, and they are NOT R7's to
+build** (Loo, 2026-07-29 — final). Measured 2026-07-29: zero occurrences of either as a
+receiving result anywhere in the codebase, so nothing in the portal can currently refuse a
+whole delivery — R1's model is quantity-based, and damaged or wrong units stay Pending
+delivery. **Both statuses will be implemented together with the Supplier Claim module, never
+as a standalone Receiving card.** That is the right seam: "we refused the lorry" and "we took
+it and 2 are broken" are different events whose whole consequence is a supplier claim, so the
+status and the claim it raises are designed in one place or they disagree.
+
+Only `Received` is reachable today. **A chat that meets the gap records it and moves on** — it
+does not invent a fourth word, and it does not fold either status into R1's PROGRESS axis to
+make a screen look finished.
 
 #### Phase 1 — the workflow that is LIVE, and the only one in scope
 
@@ -279,12 +287,13 @@ happens on WhatsApp — **that is deliberate and it is not a gap to close in Pha
 - **No Warehouse Code.** Nothing identifies a warehouse by a typed code, and nothing may start
   to. (Measured 2026-07-29: zero occurrences repo-wide. This is a constraint on future work,
   not a removal.)
-- **No photo upload is ADDED to the GRN in Phase 1.** ⚠️ **This does not mean the GRN carries
-  no files today, and it must never be read that way.** Two file paths already exist, both
-  load-bearing, both staying: the **supplier D/O file** (required to submit a check-in, since
-  Phase 4.5) and the **damage / wrong-item photos** that R2's evidence law requires — the
-  latter enforced by a CHECK constraint in migration 0288, so removing it is a schema change,
-  not a UI tidy. The ruling forbids adding a NEW photo step, not deleting the evidence law.
+- **Existing attachment behaviour is UNCHANGED** (Loo, 2026-07-29 — final). R7 means exactly
+  two things and nothing else: **no new Receiving photo upload is introduced**, and **the
+  current attachment behaviour is not redesigned.** ⚠️ **It must never be read as "the GRN
+  carries no files".** Two file paths already exist, both load-bearing, both staying exactly
+  as they are: the **supplier D/O file** (required to submit a check-in, since Phase 4.5) and
+  the **damage / wrong-item photos** that R2's evidence law requires — the latter enforced by
+  a CHECK constraint in migration 0288, so removing it is a schema change, not a UI tidy.
 
 #### Phase 2 — ROADMAP ONLY. Not to be implemented, and not to be re-implemented
 
