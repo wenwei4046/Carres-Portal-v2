@@ -410,12 +410,8 @@ Fixed phrasings — reuse these, do not invent variants:
 **Never** write "partial delivery", "split shipment", "back-order" or
 "consignment" on screen — say what goes and what follows, in furniture words (§9).
 
-> **⇢ NOT LANGUAGE · future owner: `docs/ORDERS-WORKING-FLOW.md`** — **what may
-> travel apart and what may never**: a Bed set may go alone but never one half of
-> it without the other; a Sofa may follow on a second trip ONLY if the customer
-> agreed; accessories never block a delivery and are back-ordered. That is a
-> business rule about goods, not a word. Still the ruling; moves at the Foundation
-> cleanup phase.
+**What may travel apart and what may never is a business rule about goods, not a
+word** — `docs/ORDERS-WORKING-FLOW.md` §5.
 
 ## The delivery calendar words (T10, locked with Jess 2026-07-27)
 

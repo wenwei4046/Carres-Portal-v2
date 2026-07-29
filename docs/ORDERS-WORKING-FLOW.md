@@ -397,7 +397,8 @@ What only WARNS: a logistics company's own working days, closed dates, capacity 
 period — a phone call beats a calendar.
 
 **Grouping rules, unchanged:** a bed set (mattress + frame) can never be split; a sofa may
-travel on a second trip only if the customer agreed; accessories never block a delivery.
+travel on a second trip only if the customer agreed; accessories never block a delivery —
+an accessory that is not ready is back-ordered and follows later.
 **The default is one trip** — with a one-month selling window both usually make it — and the
 split question is only asked when the sofa would hold the bed set back.
 
