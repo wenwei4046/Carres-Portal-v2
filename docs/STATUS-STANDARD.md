@@ -287,15 +287,14 @@ UI-KIT; this family describes the track, not the pointer.
 | # | What | Where | Owner of the fix |
 |---|---|---|---|
 | 1 | The ownership table assigns *"Status wording and status semantics"* to this file, two rows after assigning every visible word to COPY-STANDARD. **This file owns semantics only** | `docs/UI-KIT.md` (What this file does NOT own) | Cross-document Cleanup |
-| 2 | Code cites **`STATUS-STANDARD §7.5`** for the storage-fee window. **This file has never had a §7.5**, and that rule's home is the storage rule in `packages/shared` | `OrderDetailDrawer.tsx` ×2 | Pointer Migration |
-| 3 | A stylesheet comment cites **`MASTER SPEC §4`** and claims it supersedes this file's old §3. **`MASTER SPEC` exists as no document in the repo** | `apps/web/src/index.css` ×2 | Pointer Migration |
-| 4 | **`.btn-reminder` has zero call sites** and **`CheckMark` has zero implementations** — dead style and a spec for a component that was never built | `index.css` · repo-wide | a BUILD card (UI-KIT lane) |
-| 5 | **The banned word `Chase` is live on screen** as `Last chased {date}` — a rendered line and a tooltip | `OrderDetailDrawer.tsx` · `OperationPayments.tsx` | a BUILD card; the word is already ruled (COPY-STANDARD §9) |
-| 6 | The dial's rendered size has been three different numbers (this file said 30, the component defaults to 24, the one call site passes 18). **Presentation, so it is UI-KIT's to settle** — recorded so the discrepancy is not lost with the deleted spec | `OrderDetailDrawer.tsx` | UI-KIT lane |
-| 7 | **Eleven semantic statuses in §1 and §2 have no ruled word.** They are on screen today under words nobody approved, two of which are banned | COPY-STANDARD §0.2 — ask | Jess / Loo, then a BUILD card |
-| 8 | The queue row that verified this file's old §1 and §2 as *"CHECK ✅"* was verifying the PRESENTATION spec that is now deleted | `docs/ui-kit-execution-queue.md` row 8 | Cross-document Cleanup |
+| 2 | A stylesheet comment cites **`MASTER SPEC §4`** and claims it supersedes this file's old §3. **`MASTER SPEC` exists as no document in the repo** | `apps/web/src/index.css` ×2 | Pointer Migration |
+| 3 | **`.btn-reminder` has zero call sites** and **`CheckMark` has zero implementations** — dead style and a spec for a component that was never built | `index.css` · repo-wide | a BUILD card (UI-KIT lane) |
+| 4 | **The banned word `Chase` is live on screen** as `Last chased {date}` — a rendered line and a tooltip | `OrderDetailDrawer.tsx` · `OperationPayments.tsx` | a BUILD card; the word is already ruled (COPY-STANDARD §9) |
+| 5 | The dial's rendered size has been three different numbers (this file said 30, the component defaults to 24, the one call site passes 18). **Presentation, so it is UI-KIT's to settle** — recorded so the discrepancy is not lost with the deleted spec | `OrderDetailDrawer.tsx` | UI-KIT lane |
+| 6 | **Eleven semantic statuses in §1 and §2 have no ruled word.** They are on screen today under words nobody approved, two of which are banned | COPY-STANDARD §0.2 — ask | Jess / Loo, then a BUILD card |
+| 7 | The queue row that verified this file's old §1 and §2 as *"CHECK ✅"* was verifying the PRESENTATION spec that is now deleted | `docs/ui-kit-execution-queue.md` row 8 | Cross-document Cleanup |
 
-**Row 7 is the one with business consequence.** Everything else is a stale pointer;
+**Row 6 is the one with business consequence.** Everything else is a stale pointer;
 row 7 means the operations team is reading status words that no law has ever approved.
 It is also the smallest fix: eleven words, one sitting.
 

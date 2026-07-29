@@ -922,6 +922,9 @@ all** — `0 ÷ 0` shown as `0%` reads "this supplier never delivers on time" an
 > **⇢ NOT LANGUAGE · future owner: `docs/UI-KIT.md` §3.6** — the same rule stated as
 > COLOUR: a number gets a tone only once a human has set the line. Tone comes from a
 > CONDITION, which is already §3.6's law; this file keeps only the words.
+> **This did not move on 2026-07-29: the authoritative UI-KIT owner has not yet accepted
+> this presentation rule, and cleanup may not introduce new presentation rules.** It waits
+> for a UI-KIT card.
 
 ---
 
