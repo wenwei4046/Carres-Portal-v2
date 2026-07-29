@@ -990,8 +990,13 @@ test goes red.
 
 ## D1 · BUILD GUARD over all 225 files — warn only, write the baseline (EXECUTION CARD, opened 2026-07-29)
 
-> **STATUS: card opened by the PM, 2026-07-29, immediately after D0.6 was approved.
-> Nothing is implemented yet.** This card is the plan; a build chat takes it and does ONE card.
+> **STATUS: ✅ APPROVED by the PM, 2026-07-29, with two rulings folded in (findings ③ and ⑤).
+> Ready for a fresh BUILD chat. Nothing is implemented yet.** This card is the plan; a build chat
+> takes it and does ONE card.
+>
+> **The two rulings, so they are not missed:** **`hiddenCols` stays** — detect, report, baseline,
+> never remove (③). **The variant guard enforces the SHIPPED union `list` · `module`** and may not
+> add, rename or remove a variant; the §8.1 mismatch is reported only (⑤).
 
 **Why now, and not earlier.** D0.6 was D1's precondition and the reason is arithmetic, not
 ceremony: **a guard written against a law about to gain five principles is a guard that gets
@@ -1052,6 +1057,7 @@ repo-wide.
 | 4 | **§16's generator** — the `--report` mode that parses the Enforcement column and rewrites the block | §16 says the block *"is GENERATED, not hand-typed"* and then says the numbers are a hand count. One of those is a lie today. |
 | 5 | The three enforcement mechanisms D0.6 handed to D1 | §14.1 (R2) · §10.1 (R3) · §0.3 (R4). Each is Build-Guard shaped and each is named as D1's in the law. |
 | 6 | The stale index rows, per the PM 2026-07-29 | D0.5b.1's row still reads "before D0.5c" though it shipped in `2d5aaddb`. Documentation cleanup, carried here rather than reopening D0.6. |
+| 7 | **A guard rule for the `PageShell` variant** — rejects an arbitrary variant, never allows `"custom"`, and enforces **only the shipped union `list` · `module`** | **PM ruling, 2026-07-29** (finding ⑤). Catches what the Type System cannot see — a variant arriving through a cast or from outside TypeScript. **Adds no rule to §16 and moves no number**: §8.0 is already counted ✅ via the Type System. |
 
 **OUT of scope — named so the card cannot creep:**
 
@@ -1099,15 +1105,38 @@ is `check-design-standard.mjs`. Harmless while the block is hand-typed, load-bea
 D1 wires the generator — a chat will run the cited command and get "not found".
 **Reported, not fixed: editing §16 means editing the law, and D0.6 is closed.**
 
-**③ R2's mechanism removes a feature, and that is the PM's call, not D1's.** §14.1 forbids a
-per-user UI preference; three live browser-persisted UI-state sites under `pages/**` violate it,
-and one (`hiddenCols` on the Orders list) is a feature somebody asked for. **D1 may write the rule
-and must not silently delete the feature.** If the PM has not ruled by then, the mechanism ships
-warn-only with the three sites baselined and named.
+**③ R2's mechanism touches a live feature — ✅ RULED BY THE PM, 2026-07-29.**
+
+> **`hiddenCols` stays. It is an existing user UI preference, not a business-rule override.**
+> **D1 may DETECT, REPORT and BASELINE it. D1 may not remove, rewrite or disable it.**
+
+§14.1 forbids a per-user UI preference and three live browser-persisted UI-state sites under
+`pages/**` sit against it. **The rule is not weakened and the feature is not deleted** — the sites
+are measured and frozen into the baseline like every other pre-existing violation, which is what
+warn-only means and is the whole reason D1 is warn-only. **A build chat that "tidies away"
+`hiddenCols` has broken this card, not completed it.** Whether the preference is eventually
+removed is a later ruling and belongs to nobody in the D-line today.
 
 **④ `MUST_USE_SHELL` holds exactly ONE page** (`OperationOrdersControl.tsx`) against 236. Rule B
 is repo-wide for NEW pages but only one existing page is held to it. Widening that list is a
 **D2–D7** consequence, not D1's — noted so D1 does not mistake it for its own job.
+
+**⑤ The floorplan catalogue's membership — ✅ RULED BY THE PM, 2026-07-29.**
+
+> **For D1, enforce only the currently shipped closed union: `list` · `module`.**
+> **The guard must reject an arbitrary variant and must never allow `"custom"`.**
+> **D1 may not add, rename or remove any `PageShell` variant.**
+
+**The guard enforces what SHIPS, not what the law aspires to.** §8.1 names four
+(`list · dashboard · detail · settings`); `PageShell.tsx` ships two. **That mismatch stays
+REPORTED ONLY, for a later ruling** — D1 does not close it, does not pick a side, and does not
+edit either the component or §8.1 to make them agree.
+
+**A note so the build chat does not double-count**: §8.0's rule is ALREADY enforced and already
+counted ✅ in §16, by the Type System — `"custom"` does not compile. The guard here is a **second
+mechanism on the same one rule**, which catches the case the type cannot see (a variant string
+arriving through a cast or from outside TypeScript). **It adds no rule and no numerator**; §16 is
+unchanged by it.
 
 ---
 
@@ -1125,6 +1154,11 @@ Every line is checkable by someone who did not write the card.
       it lands — if it does not, the hand count was wrong and the difference is explained.
 - [ ] Each of the three inherited mechanisms is either **live** (and §16's numerator moves) or
       **stays scheduled with a stated reason**. No principle silently loses its card.
+- [ ] **The variant rule rejects `"custom"` and an arbitrary string, and accepts `list` and
+      `module`** — all four cases asserted. `PageShell.tsx` is **not edited**: `git diff` on it is
+      empty, proving no variant was added, renamed or removed.
+- [ ] **`hiddenCols` still works.** The three UI-preference sites appear in the baseline and
+      **none of them is edited** — `git diff` touches no file that implements them.
 - [ ] Web suite at baseline (16 failures in 4 files, zero new) and `tsc -p tsconfig.app.json` clean.
 - [ ] **`docs/UI-KIT.md` is NOT in `git diff --name-only`.**
 - [ ] The stale index rows are corrected in THIS file.
