@@ -552,16 +552,24 @@ exactly the px / weight / line-height above.
 > touch.
 >
 > **D2 answered the rename question with a NO, and the reason is Part B**
-> (2026-07-29). The legacy `.t-*` ramp is gone from every in-scope file — 848
-> uses converted — but **its definitions stay in `index.css`, because 110 uses
+> (2026-07-29). The legacy `.t-*` ramp is gone from every in-scope file — **844
+> uses converted** — but **its definitions stay in `index.css`, because 110 uses
 > survive under `pages/dealer/**` and `pages/print/**`**, which §15 and §13.1 put
 > out of scope. Deleting the ramp would restyle the POS from a card that may not
 > touch it, and taking its NAMES would do the same thing one step later. The six
 > classes keep the `text-*` spelling; the question is closed, not deferred.
 
-**After D2** (measured 2026-07-29): the six tokens are used **3,970** times in
-scope, and `text-[Npx]`, `font-bold` and the `.t-*` ramp appear in exactly ONE
-in-scope file — `index.css`, holding the definitions Part B still needs.
+**After D2** (measured 2026-07-29 on the rebased tree): the six tokens are used
+**3,975** times in scope, and `text-[Npx]`, `font-bold` and the `.t-*` ramp appear
+in exactly ONE in-scope file — `index.css`, holding the definitions Part B still
+needs.
+
+> **Read that sentence as being about those three spellings and nothing else.** A
+> SECOND retired ramp — `.t4-*`, nine classes from the v4 kit — is still live at
+> **42 uses across 8 in-scope files**, and it is invisible to the codemod AND to
+> guard rule D, because a page writes only the class name while the size and the
+> weight sit in `index.css`. See the note under §2.2; converting it is its own
+> card, not D2's.
 
 ```
 Orders                                       24  t-page
@@ -583,16 +591,25 @@ SO-1256   Tan Wei Ming   27 Jul 26, Sun      13  t-body
 | 400 | body text | 33 uses |
 | 500 | labels, light emphasis | 202 uses |
 | 600 | titles, numbers — **the heavy weight** | 854 uses |
-| ~~700~~ | **DEAD (Q3, frozen 2026-07-28)** — `font-bold` folds into 600 | ✅ **0 left in scope (D2)** — 169 converted |
+| ~~700~~ | **DEAD (Q3, frozen 2026-07-28)** — `font-bold` folds into 600 | ✅ **0 written by any page (D2)** — 164 converted; one stylesheet class still computes 700, below |
 
 `font-bold` (700) and `font-semibold` (600) were doing the same job at every
 size; `/ui` showed both on the same words and Jess deleted 700. **There are
 three weights, and there is no fourth.**
 
 A kit file that writes `font-bold` fails the source scan today, and **D2 converted
-the 169 live uses across the pages** (2026-07-29). The only `font-bold` left in
-`apps/web/src` is inside `index.css`'s retired `.t-h1` / `.t-h2` definitions,
-which survive because Part B still uses them — see §2.1.
+the 164 live uses across the pages** (2026-07-29). No page, panel or component
+under `apps/web/src` writes `font-bold` any more.
+
+> **Where 700 still survives, stated rather than rounded off.** `index.css` keeps
+> three definitions that compute it: `.t-h1` and `.t-h2`, which Part B needs and
+> §15 protects — and **`.t4-hero-num` (20px/700), which is not Part B's.** It is
+> the retired v4 ramp, `lib/design-standard.ts:132` records its weight as 700, and
+> one in-scope page still renders it. **So "0 left" is true of what a page WRITES
+> and not of what the browser COMPUTES**, and neither the codemod nor rule D can
+> see it: the page writes `t4-hero-num` and the number lives in the stylesheet.
+> Converting the nine `.t4-*` classes moves 42 sites including a money figure, so
+> it is a visual change with its own card — reported here, not smuggled into D2.
 
 ## §2.3 Numbers and codes
 

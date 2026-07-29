@@ -48,6 +48,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { maskComments } from "./lib/source-mask.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LAW = join(ROOT, "docs/UI-KIT.md");
@@ -176,8 +177,17 @@ function scan(files, rec, words) {
      * punishes the explanation teaches people to delete the explanation.**
      * Comments are blanked, not removed, so every reported line number is
      * still the real one.
+     *
+     * D2's first pass did this with one regex, and the PM review found the cure
+     * had its own disease: that regex is NOT string-aware, so a line holding
+     * `"https://cdn…"` had everything after the `//` blanked and a real
+     * violation later on that line stopped being counted. **A stripper that
+     * silently DEPRESSES the number the whole D-series is scored against is
+     * worse than one that inflates it.** `scripts/lib/source-mask.mjs` walks the
+     * source once, string- and regex-aware, and the CODEMOD reads the same
+     * module — fixing only one of the two would make them disagree.
      */
-    const src = full.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (c) => c.replace(/[^\n]/g, " "));
+    const src = maskComments(full, f);
 
     /* A — a raw hex literal ------------------------------------------------ */
     if (!HEX_OK.some((re) => re.test(f))) {
@@ -529,7 +539,10 @@ if (UPDATE) {
   const health = { coverage: (enf / rows.length) * 100, debt: rows.filter((r) => r.debt).length };
   writeFileSync(
     BASELINE_PATH,
-    JSON.stringify({ edition: EDITION, takenAt: "D1", files: files.length, counts, health }, null, 2) + "\n",
+    // `takenAt` is the card whose MEASUREMENT this is, not the card that wrote
+    // the writer. D1 froze it; D2 re-froze it after the typography sweep, so a
+    // hardcoded "D1" would tell the next chat these are D1's numbers.
+    JSON.stringify({ edition: EDITION, takenAt: "D2", files: files.length, counts, health }, null, 2) + "\n",
   );
   console.log(`✓ baseline written — ${files.length} files in scope.`);
   for (const r of RULES) console.log(`   ${r.id}  ${String(counts[r.id]).padStart(5)}  ${r.what}`);

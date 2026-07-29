@@ -26,6 +26,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { replaceInCode } from "./lib/source-mask.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DRY = process.argv.includes("--dry");
@@ -102,12 +103,16 @@ const files = execSync('git ls-files "apps/web/src/**"', { cwd: ROOT, encoding: 
  * FALSE. D0.5b had already written this lesson down for the kit's source scan
  * ("a scan that punishes the explanation teaches people to delete the
  * explanation") and a codemod can commit the same error in the other direction.
+ *
+ * The second run split on one regex, which is NOT string-aware: a line holding
+ * `"https://cdn…"` had everything after the `//` treated as prose, so real class
+ * values on that line were never converted. **The guard had the identical defect
+ * in mirror image, and the two errors cancelled into a number that looked
+ * right.** Both now read `scripts/lib/source-mask.mjs` — one implementation, so
+ * what the codemod skips and what the guard forgives are the same set BY
+ * CONSTRUCTION rather than by two authors agreeing.
  */
-function codeOnly(src, apply) {
-  // Split into alternating code / comment segments and transform only the code.
-  const parts = src.split(/(\/\*[\s\S]*?\*\/|\/\/[^\n]*)/g);
-  return parts.map((seg, i) => (i % 2 === 1 ? seg : apply(seg))).join("");
-}
+const codeOnly = (src, file, apply) => replaceInCode(src, file, apply);
 
 const tally = { px: 0, ramp: 0, legacy: 0, weight: 0 };
 let touched = 0;
@@ -117,7 +122,7 @@ for (const f of files) {
   const before = readFileSync(p, "utf8");
   let s = before;
 
-  s = codeOnly(s, (code) =>
+  s = codeOnly(s, f, (code) =>
     code
       .replace(/\btext-\[(\d+(?:\.\d+)?)px\]/g, (_, px) => {
         tally.px++;

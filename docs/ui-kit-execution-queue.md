@@ -50,8 +50,8 @@ deliverable is Foundation Components, not a better document.
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ✅ **CLOSED as components-only** (PM, 2026-07-29), merged as PR #505 `929fa746`. The drawer is NOT migrated; real-page adoption is D6 |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **CLOSED 2026-07-29** — §8.0 · §0.3 · §0.4 · §0.5 · §10.1, the mirror re-based, §16 counted. Findings below, all Reported Only |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ✅ **BUILT 2026-07-29** — `scripts/check-design.mjs`, 348 files, 14 rules, 9,511 findings frozen. §16 is generated. Card below |
-| **D2** | codemod **typography** | ✅ **BUILT 2026-07-29** — 4,047 conversions in 235 files; guard rule D **3,239 → 33**, and all 33 are `index.css`. Card below |
-| **D3 / D4** | codemod colour / spacing | ⏳ — the guard has them baselined at A 442 · B 8 and E 1,727 |
+| **D2** | codemod **typography** | ✅ **BUILT 2026-07-29**, rebased onto `origin/main` and revised under the PM's seven items — **4,052 conversions in 236 files**; guard rule D **3,239 → 33**, and all 33 are `index.css`. Card below |
+| **D3 / D4** | codemod colour / spacing | ⏳ — the guard has them baselined at **A 430 · B 5** and **E 1,727** (D2's re-freeze; the older A 442 · B 8 counted comment prose as code) |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
 | **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ |
 | **D7+** | Delivery · Purchase · Receiving · Stock · Service · Payments · Catalog — one card each | ⏳ |
@@ -717,17 +717,23 @@ opportunity to break it.
 
 ## D2 ✅ THE TYPOGRAPHY CODEMOD — BUILT 2026-07-29
 
-**`scripts/codemod-d2-typography.mjs`** — mechanical, re-runnable, idempotent. **4,047 conversions
-across 235 files**, and guard rule **D falls 3,239 → 33**.
+**`scripts/codemod-d2-typography.mjs`** — mechanical, re-runnable, idempotent. **4,052 conversions
+across 236 files**, and guard rule **D falls 3,239 → 33**.
 
 ```
-  text-[Npx] → a §2.1 token ........ 2,731
+  text-[Npx] → a §2.1 token ........ 2,735
   Tailwind's own ramp → a token .....  309
-  the retired .t-* ramp → a token ...  843
+  the retired .t-* ramp → a token ...  844
   a dead weight → a §2.2 weight .....  164   (font-bold · font-black · font-extrabold)
                                      ─────
-                                     4,047 conversions in 235 files
+                                     4,052 conversions in 236 files
 ```
+
+> **These are the REBASED figures** (2026-07-29, after the PM review). The card was first
+> measured against D1's tip; `origin/main` had since taken Purchasing P3, whose two web files
+> had never been through the codemod. Re-running it there is what moved 4,047 → 4,052 and
+> 235 → 236. **The numbers a chat reports must be the numbers of the tree it is asking to
+> merge** — see the PM-revision section at the end of this card.
 
 **All 33 survivors are `index.css`** — the class DEFINITIONS — and they survive on purpose:
 **110 uses of the `.t-*` ramp and 154 `text-[Npx]` live under `pages/dealer/**` and
@@ -746,7 +752,14 @@ the token won, the codemod would have silently flattened every emphasised label 
 Measured on this project's own Tailwind build rather than assumed: `.text-meta` lands at byte
 22,105 and `.font-semibold` at 22,181 — **the explicit weight comes later and wins.** So an
 explicit weight survives untouched, and the conversion is weight-safe. That single check is what
-made the other 4,057 edits safe to make at all.
+made the other 4,051 edits safe to make at all.
+
+**Re-verified on the FULL production stylesheet after the rebase** (`index-B5k9pr_Q.css`,
+231,701 bytes): `.text-meta` at byte 74,708 · `.font-semibold` at 75,169, so the finding holds at
+production scale and not only in the slice first measured. **The same question exists for
+LINE-HEIGHT and was not asked the first time** — a token sets one and `text-[Npx]` never did — and
+it has the same answer: the `.leading-*` block lands at ~76,000, after every token, so an explicit
+`leading-none` or `leading-[1.05]` also survives. Both directions are now measured, not reasoned.
 
 ### The codemod's own first run was WRONG, and the failure is worth keeping
 
@@ -788,25 +801,124 @@ codemod was the thing that found it — you cannot check a ruler against nothing
 
 ### Verification
 
-`tsc` clean · lint clean · **web suite 2230 passed / 16 pre-existing** in the four documented
-files, zero new · `pnpm build` clean · guard re-baselined · the self-test still fires on all twelve
-provoked rules. **The generator touched nothing outside its markers** — proved by diffing the law
-either side of the block: byte-identical.
+Re-run on the REBASED tree (2026-07-29): `tsc` clean · lint clean · `pnpm build` clean
+(`index-40A5S1xU.js` + `index-B5k9pr_Q.css`) · **web suite 2,240 passed / 16 failed, and the 16
+are the four documented files exactly** — `OperationOrders` ×7 · `OrderCustomerCard` ×4 ·
+`OhanaSofaTab` ×4 · `NiceFutureMattressTab` ×1, run on their own to confirm the set rather than
+the count · **zero new** · guard re-baselined and every rule reads `=` on a second run · the
+self-test still fires on all twelve provoked rules. **The generator touched nothing outside its
+markers** — proved by diffing the law either side of the block: byte-identical.
 
 ### Findings, Reported Only
 
 1. **`.t-micro` carried more than a size.** It is `11px/500 + uppercase + tracking-[0.05em]`, so
    converting it to `text-label` alone would have dropped the capitals on 104 labels. The codemod
    emits `text-label uppercase tracking-[0.05em]`. **The law rules neither uppercase nor tracking**,
-   so preserving them is a codemod; dropping them would have been a redesign.
-2. **Sizes above 24 collapse to 24** — `32 · 36 · 44` existed, and §2.1 says *"Nothing is larger
-   than 24."* That is the law applied, and it is the most visible change D2 makes.
-3. **`.t-num` was deliberately NOT converted.** §2.3 keeps it as law (tabular figures, slashed
+   so preserving them is a codemod; dropping them would have been a redesign. It puts **130 new
+   `tracking-[0.05em]` literals into 50 files**, which no rule in the guard can see.
+2. **Sizes above 24 collapse to 24.** The card first named `32 · 36 · 44`; the measured set is
+   **51 sites across `26 · 28 · 30 · 32 · 34 · 36 · 44`**, and §2.1 says *"Nothing is larger than
+   24."* That is the law applied.
+3. **Sizes below 11 rise to 11, and that is the bigger change by volume** — **324 sites** at
+   `9 · 9.5 · 10 · 10.5px`, against §2.1's other bound. Named late (the PM review found it
+   missing): it lands in dense tables and pills where widths were measured by hand, so it deserved
+   naming before the collapse did, not after.
+4. **A weight-bearing token also changes the weight where a site declared none.** The source-order
+   proof covers a site that WROTE `font-semibold`; where nothing was written, the token's own
+   weight now applies — measured at **756 `text-label` (500) · 65 `text-strong` · 14 `text-page` ·
+   4 `text-title` (600)**. Not reversible cheaply: undoing it means writing `font-normal` at 800
+   sites, which is worse than the change. On the record rather than fixed.
+5. **`.t-num` was deliberately NOT converted.** §2.3 keeps it as law (tabular figures, slashed
    zero); it is not part of the retired ramp, and its 126 uses are untouched.
-4. **Part B now has two type systems in one stylesheet** — the six tokens for the portal and the
+6. **A SECOND retired ramp is still live, and neither the codemod nor the guard can see it.**
+   `.t4-*` — nine v4 classes in `index.css` — is used **42 times across 8 in-scope files**, and a
+   page writes only the class name while the size and weight sit in the stylesheet, so rule D
+   (which reads what a page WRITES) is structurally blind to it. **`.t4-hero-num` is `20px/700`**,
+   `lib/design-standard.ts:132` records that 700, and one in-scope page renders it — so §2.2's
+   "0 left" is true of what a page writes and false of what the browser computes. Converting nine
+   classes moves 42 sites including a money figure: **its own card, not D2's.**
+7. **Part B now has two type systems in one stylesheet** — the six tokens for the portal and the
    `.t-*` / `.pos-proto` ramp for the POS. That is what §15 asks for, but the shipped CSS still
-   emits `font-weight: 700` 114 times for Part B, so *"there is no 700 anywhere"* is true of the
-   portal and NOT of the bundle. Worth knowing before anyone greps the CSS as proof.
+   emits `font-weight: 700` **116 times** (measured on this build), so *"there is no 700 anywhere"*
+   is true of the portal and NOT of the bundle. Worth knowing before anyone greps the CSS as proof.
+8. **Rule I went UP, 294 → 298, and the re-freeze absorbed it.** Converting to tokens makes
+   previously-distinct class strings identical, so four more ≥40-char strings now repeat across
+   files — new §6.6 extraction candidates, not a regression in behaviour. Recorded because D5 turns
+   this baseline into a build failure and a silently-raised rung is how a ratchet stops ratcheting.
+9. **Comments now name classes the code no longer writes** — `PageHeader.tsx:7` still says *"a
+   consistent title size (`t-h2`, 24px)"* over a line that writes `text-page`; `ListPageShell.tsx:38`
+   the same. Skipping comments was right for the sentences that BAN a value and it left the
+   sentences that DESCRIBE one behind. Prose only; no rule reads it.
+
+### PM REVISIONS — accepted with revisions 2026-07-29, seven items
+
+The PM approved the implementation and blocked the merge on seven items. All seven are done and
+each was measured rather than asserted.
+
+1. **Rebased onto `origin/main`** (`e0a3c7a7`, which carries Purchasing P3 / PR #506). One
+   conflict, `OperationReceiving.tsx`, resolved **to main's P3 version** — the P3 logic is the
+   thing that must survive, and typography is what a codemod re-applies.
+2. **Codemod re-run.** It converted the two P3 web files nothing had ever swept —
+   `OperationReceiving.tsx` and `RecordSupplierAnswerModal.tsx`, the second a file created after
+   D1's baseline was taken. 19 conversions; totals 4,047 → **4,052** in **236** files. Idempotent
+   on a third run: 0 conversions.
+3. **Guard re-run** → **3,412 findings**, and the delta is attributed, not rounded: **+5 from the
+   rebase** (P3's own drift: E +2, G +3) and **+1 from item 7** (a real finding the old stripper
+   had hidden).
+4. **Baseline re-frozen** at those counts. `takenAt` changed `"D1"` → `"D2"`: the counts are D2's
+   measurement now, and a hardcoded `"D1"` would tell the next chat otherwise.
+5. **The new D-rule count is 33 — unchanged.** Every survivor is still `index.css`. That number
+   surviving the rebase is the point of item 2: without it, D would have merged at 51.
+6. **The two figures in the law corrected.** §2.2's `169 → 164`, as instructed. §2.1's `848` went
+   to **844, not the instructed 843** — 843 was the pre-rebase truth and the rebase converted one
+   more `.t-*` use, so writing 843 would have put a freshly-wrong number in the law to satisfy an
+   instruction issued against an older tree. Both figures now match the codemod's own printed
+   tally and the diff, independently. §2.1's `3,970` → **3,975** for the same reason.
+7. **The comment stripper is string-aware** — `scripts/lib/source-mask.mjs`. **The cure had its own
+   disease**: D2's one-regex stripper blanked everything after a `//` inside a string, so
+   **2,360 characters of real code across 9 files** were invisible to every value rule, including
+   1,105 in `OrderDetailDrawer.tsx`, 985 in `App.tsx` and 91 in `Login.css` — where `//` is not a
+   comment at all. It was hiding exactly one true finding: a raw `<input type="text">` at
+   `OrderDetailDrawer.tsx:6327`, rule G. **The codemod read the identical regex**, so the guard hid
+   those regions and the codemod skipped them and the two errors cancelled into a number that
+   looked right; fixing one alone would have made them disagree. Both now import the one module.
+   `//` is treated as a comment in TS and NOT in CSS, because `index.css` holds all 33 rule-D
+   survivors and mistaking `url(//…)` for prose there would corrupt the one number this card
+   reports.
+
+### Visual sanity check — Order List · Order Detail · Dashboard
+
+**No screenshot: the three surfaces sit behind an operation login, and taking one would mean typing
+a password into a form.** So the check is by measurement on the built stylesheet and the diff — the
+same substitution every prior card in this queue has recorded.
+
+**The general result first, because it settles overflow for all 4,052 sites at once.** `index.css`
+sets no base line-height, so an arbitrary `text-[Npx]` inherited Tailwind preflight's `1.5`. Every
+§2.1 token is TIGHTER than that: 11→14 (was 16.5) · 12→16 (18) · 13→18 (19.5) · 15→22 (22.5) ·
+20→28 (30) · 24→32 (36). **A conversion can only make a block shorter, never taller**, and an
+explicit `leading-*` survives anyway (`.leading-*` at ~76,000 vs every token below 75,000).
+
+- **Order List** (`OperationOrders.tsx`) — **5 conversions, and not one is in the table.** All five
+  are in the error banner, the empty state and one secondary button. The `<tr>`, the column cells,
+  the header and the facet rail are untouched, so C10's measured column widths and the 40px row are
+  **not in the diff at all.** No break, no overflow, no truncation.
+- **Order Detail** (`OrderDetailDrawer.tsx`) — 176 lines, the largest single file, and **0 sites
+  grow**: nothing below 11px existed there, so no text gets bigger and nothing truncates sooner.
+  103 × 12px and 32 × 13px keep their size and gain a tighter line-height; 13 × `t-tiny` is
+  12px→12px; 18 × `font-bold` → 600. The only shrink is two `text-[18px] … leading-none` glyph
+  buttons → 15px, `leading-none` preserved. Five converted sites sit in fixed boxes
+  (`h-4` · `w-5 h-5` · `w-6 h-6` · `min-h-9`) and every token's line-height fits inside its box,
+  all five with `grid place-items-center`.
+- **Dashboard** (`OperationDashboard.tsx` · `PrincipalDashboard.tsx`) — 7 and 4 conversions. The
+  visible one is the page title: `t-h1` 32/700 → `text-page` 24/600, and Principal's
+  `text-[34px]` → 24px with its `leading-[1.05]` intact. **Both shrink, and a heading that shrinks
+  cannot overflow**; neither `<h1>` carries `truncate` or a fixed width.
+- **Where truncation DOES get tighter, named rather than waved through**: 16 sites outside these
+  three surfaces grow inside a `truncate` / `line-clamp` box — worst are `SupplierSidebar` (9.5→12px
+  on an email) and `ApprovalRow` / `SupplierPOs` (11→13px). No new mechanism and no overflow —
+  `truncate` is doing what it is for — but the ellipsis arrives earlier on 16 external-portal rows.
+  The badges among them (`min-w-[16px] h-[16px]` counters, a `w-[30px]` avatar) fit: 11px text with
+  `leading-none` in a 16px circle.
 
 ---
 
