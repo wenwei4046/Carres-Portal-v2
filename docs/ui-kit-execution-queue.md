@@ -16,7 +16,7 @@
 
 | | |
 |---|---|
-| On `main` | `ba7b7798` D0 law + doors · `19cad8e4` merge · `d83ecf98` §1.4 hierarchy · **`c9966ee3` T2 drawer** · **`a548ddc9` D0.5a (PR #498)** |
+| On `main` | `ba7b7798` D0 law + doors · `19cad8e4` merge · `d83ecf98` §1.4 hierarchy · **`c9966ee3` T2 drawer** · **`a548ddc9` D0.5a (PR #498)** · **`d77bd4f6` D0.5b (PR #502)** · **`2d5aaddb` D0.5b.1** · **`929fa746` D0.5c (PR #505)**. **The whole D0.5 block is merged**, and `docs/UI-KIT.md` no longer marks any of it `⏳` (D0.6, 2026-07-29) |
 | **`/ui` is LIVE** | **https://erp.carresofficial.com/ui** — public, no login, also on `pos.carresofficial.com/ui` and both `pages.dev` apexes. **Deployed from main tip `d77bd4f6` (PR #502, D0.5b) and it now shows the FROZEN RECORD, verified in a real browser**: the heading is `Frozen decisions`, `Pending decisions` is gone, `Candidate B` is absent, and all four answers render. It did its job — Jess answered Q1 · Q3 · Q4 there, and the page is now the record rather than the question |
 | Deployed to prod | ✅ **YES — corrected 2026-07-28.** `git merge-base --is-ancestor c9966ee3 10f49add` passes, and `10f49add` is the live web tip in CLAUDE.md §17.1 (`index-c7LT9aSQ.js`, PR #492). **T2 has been in front of users since that deploy.** This row previously read *"NOT YET… nobody has seen it in a browser"* — it went stale when a parallel line shipped a bundle containing it. |
 | Next thing that matters | **T3 — Jess uses the reordered drawer for one day.** **No longer blocked**: the deploy it was waiting for already happened. T3 is a Jess task, not a build card. **Deliberately scheduled AFTER the Purchasing line finishes** (Loo, 2026-07-28: P2 · C8b · R8 first). The reason is the point of T3 — it tests whether the Information Hierarchy helps, and a review run while three chats are still changing screens measures the churn instead of the hierarchy. **Re-scheduled 2026-07-28: it now runs after P5**, not after R8 — Loo ruled that R8 is a words card and does not close Purchasing, so the review waits for the module to be finished AND used (P5 puts a real PO through it). **Do not offer T3 to a chat before P5 has merged**, and do not read the delay as T3 being optional. |
@@ -46,10 +46,10 @@ deliverable is Foundation Components, not a better document.
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
 | **D0.5b** | Foundation components, Radix | ✅ **SHIPPED 2026-07-28, PR #502 `d77bd4f6`, deployed** — full card below. The gate opened: Jess froze Q1 · Q3 · Q4 |
-| **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ✅ **shipped on main** |
-| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ✅ **CLOSED as components-only** (PM, 2026-07-29). The drawer is NOT migrated; real-page adoption is D6 |
-| **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
-| **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
+| **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ✅ **shipped on main** (`2d5aaddb`) |
+| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ✅ **CLOSED as components-only** (PM, 2026-07-29), merged as PR #505 `929fa746`. The drawer is NOT migrated; real-page adoption is D6 |
+| **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **CLOSED 2026-07-29** — §8.0 · §0.3 · §0.4 · §0.5 · §10.1, the mirror re-based, §16 counted. Findings below, all Reported Only |
+| **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ✅ **BUILT 2026-07-29** — `scripts/check-design.mjs`, 348 files, 14 rules, 9,511 findings frozen. §16 is generated. Card below |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
 | **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ |
@@ -714,10 +714,220 @@ opportunity to break it.
 
 ---
 
-## D0.6 · KIT-CONSOLIDATION — the PLANNING CARD
+## D1 ✅ THE BUILD GUARD — BUILT 2026-07-29
 
-> **STATUS: planning card APPROVED by the PM, 2026-07-28.** The work may begin **only after
-> D0.5c ships** — see Sequencing. `docs/UI-KIT.md` is still untouched today.
+**`scripts/check-design.mjs`.** §13.1's real scope — **all of `apps/web/src`, 348 files**, not a
+hand-maintained list. The previous guard read a 30-file allow-list and checked colour only, which
+is why 225 files drifted while it reported clean.
+
+**§13.2 stage 1: it counts and never fails.** That is the design, not a compromise — the baseline
+is the measurement D2–D4 are scored against, and a guard that failed on day one would have been
+switched off on day one. `--strict` is built and is what D5 switches on.
+
+### The fourteen rules, and the baseline they froze
+
+```
+  A   442  a raw hex literal              I   294  a repeated class string
+  B     8  the flame outside the logo     J     3  no kit edition declared
+  C   146  an icon outside §5             K     0  an authority claim
+  D  6081  a type value outside §2        L     8  a persisted UI shape
+  E  1765  a §4 value                     M     2  a key built from a label
+  F    78  a `z-` class in pages/**       N     0  a component spelling a word
+  G   684  a hand-rolled box              H     0  a PageShell over budget
+                                          ─────────────────────────────────
+                                          9,511 findings, 348 files
+```
+
+**J–N are the five mechanisms D0.6 wrote into §0.3 · §0.4 · §0.5 · §10.1** — all five were `⏳ D1`
+and are now `✅ live`, which is the whole reason D0.6 was allowed to write them with a named card
+instead of a mechanism.
+
+### Nothing in the guard retypes a token
+
+The eight spacing steps, four radii, six type tokens, three weights, three icon sizes and forty
+icon meanings are READ at runtime out of `components/kit/tokens.ts` and `components/kit/Icon.tsx`.
+A ninth step is picked up by editing the record. **This is the direct answer to the §16 disease:**
+the percentage drifted for three cards because it was retyped; the guard cannot drift because it
+never holds a copy.
+
+### §16 is GENERATED, and its two health rules are now a ratchet
+
+`--report` parses the Enforcement column of every rule table in §1–§8, rewrites the block between
+`<!-- UI-HEALTH:START -->` markers, and **fails** if coverage drops or the Human Review debt grows.
+Proved by negative control: downgrade one ✅ and it exits 1 with
+*"coverage 72.92% is BELOW the baseline 75.00%"*.
+
+**It also caught a bug in its own first draft.** The generator read **33/48** where the tables said
+**36/48**, because three Enforcement cells contain an ESCAPED pipe — ``​`size` is `14 \| 16 \| 18`​``
+— and a naive `split("|")` reads the Status column out of the middle of the Enforcement cell. **The
+generator was wrong and the hand count was right**, which is the opposite of what I expected and the
+reason the two were compared at all.
+
+### Twelve of fourteen rules are PROVED able to fire
+
+`scripts/check-design.selftest.mjs` writes one file per rule that breaks exactly that rule, re-runs
+the guard, and asserts the count went up. **A rule reporting 0 is either clean or broken, and from
+the outside those are identical.** That is not hypothetical: the first draft of **L and M reported
+ZERO** on the three `localStorage` sites reference R2 had already found by hand, because the key is
+a `const` two lines above the call rather than a literal at it. Resolving the expression first took
+L from 2 → 8 and M from 0 → 2, and M now names the exact `ops-drawer-panel-v4:${title}` key R3
+called out.
+
+**J is proved by its 3 live hits. H is the one rule with no proof of life** — provoking it means
+editing `PageShell.tsx`, another card's file — and that is stated rather than left looking clean.
+
+### Findings, all Reported Only
+
+1. **The two guards' rule LETTERS mean different things.** The legacy `check-design-standard.mjs`
+   calls hex `A`, the shell `B`, icons `C`, KPI fill `E`, row height `F`, section chrome `G`, hand
+   -rolled selection `H`, grey hover `I` — while §13.3 calls those letters flame, spacing, `z-`,
+   hand-rolled boxes, PageShell budget, duplicate class strings. **Two files, one letter, two
+   meanings.** D1 did not renumber the legacy script: it is the live hard gate on `main` and
+   changing what it fails on is not a warn-only card's business. `lint` now runs both. **D5 folds
+   them into one.**
+2. **`B` reports 8 flame sites and the top two are the definition itself** — `index.css` sets
+   `--primary` to the flame, so the portal's PRIMARY ACTION colour *is* the flame, while §3.3 gives
+   that job to blue and §3.4 keeps the flame in the logo alone. **There is no logo component in
+   `apps/web/src`.** This is a real contradiction between the law and the running stylesheet, and it
+   is D3's to resolve, not a guard's.
+3. **`J` reports 3 kit artifacts with no edition** — `DialogFrame.tsx`, `dialog-container.tsx`,
+   `index.css`. One line each; not fixed here because D1 measures and D2–D7 edit.
+4. **`D` = 6,081 is bigger than the appendix's 2,556** because it also counts Tailwind's own type
+   ramp (`text-xs` …) and every dead weight, which §2.1 and §2.2 both forbid. The appendix counted
+   `text-[Npx]` only. **The appendix is not wrong, it is narrower** — re-measuring it is D1's own
+   listed job and is done here.
+5. **`I` = 294 duplicated class strings** is §6.6's "extract it" rule, and it is the single clearest
+   map of what D2–D4 should extract first.
+
+---
+
+## D0.6 ✅ KIT-CONSOLIDATION — CLOSED 2026-07-29
+
+> **PM review 2026-07-29: consolidation accepted; closed after the status
+> synchronisation below.** Every milestone merged into `main` — D0.5a · D0.5b · D0.5b.1 · D0.5c —
+> reads its real state in `docs/UI-KIT.md`, verified against the live repository. All findings
+> stay **Reported Only**. **D1 is not started.**
+
+**The five frozen principles are law.** Each landed in exactly one chapter, each with a
+`Rule · Enforcement · Status · Evidence` row, and a grep for each PM-ratified sentence returns
+**exactly one hit** outside `ui-reference-review.md` — measured, all five.
+
+| Principle | Chapter | Rule row's Enforcement |
+|---|---|---|
+| R1 the floorplan catalogue is CLOSED | **§8.0** (new) | Type System — `variant` is a closed union of exactly the four · ✅ **live (D0.5c)** |
+| R4 every kit artifact declares its edition | **§0.3** (extended) | Build Guard — a header scan · ⏳ **D1** (×2 rows) |
+| R2 opinionated UI, configurable business numbers | **§0.4** (new) | Build Guard — no `localStorage` layout key in `pages/**` · ⏳ **D1** |
+| R3 the identifier is the contract | **§0.5** (new) | Build Guard — no key built from a display string · ⏳ **D1** |
+| R5 words are delivered, not remembered | **§10.1** (new) | Build Guard — no COPY-STANDARD literal in `components/**` · ⏳ **D1** |
+
+**The kit now HAS an edition, because R4's principle needs something to declare.** It is the date
+this law was last rewritten — **`UI-KIT 2026-07-27`** — a date and not a semver, because R4 ②#1
+already refused the package ceremony. Choosing that mechanism was this card's job (Rule 4); it is
+the least-invention option available, since the date is already line 4 of the law.
+
+**Nothing was redesigned, no business rule moved, and the IA was not opened.** `git diff
+--name-only` contains neither `ORDER-DETAIL-INFORMATION-MODEL.md` nor `ACTION-FLOW-STANDARD.md`.
+
+### The mirror is re-based, and provably no value moved
+
+`design-standard.ts` **declares the edition it follows and no longer claims to outrank the law.**
+The header sentence *"where any older doc, code comment, or token conflicts with UI-KIT v4, v4
+wins"* is retired — two bodies of one kit each declaring itself the winner was R4's material
+finding, and the mirror is *"a record of the kit, never a place to drive a change from."*
+
+**Every line of CODE in that file is byte-identical** — proved by stripping comments from both
+revisions and diffing: no change. In the raw diff, lines containing `hex:` = **0** and lines
+containing a colour literal = **0**. Nine stale `v4 §N` citations became either the current section
+number or an explicit `⚠️ STALE` note naming the card that corrects the value (D2 · D3 · D0.5c).
+
+**One dead citation is deliberately LEFT, and it is listed rather than passed on.** `v4 §11a` on
+the `canvas` entry sits inside an **exported `use:` string**, and this card may change no exported
+value; it is neutralised by a comment immediately above it that names §3.2 and the correcting card.
+
+### Findings handed back to the PM
+
+1. **The mirror is not what the law says it is.** `docs/UI-KIT.md` calls it the body that *"code
+   reads"*. Measured 2026-07-28: **1 real importer** (`lib/staff-avatar.ts`, for `AVATAR_COLORS`
+   only), **28 files that merely name it in a comment**, and `check-design-standard.mjs` **never
+   parses it** — it is hex-ALLOW-LISTED. Every export except `AVATAR_COLORS` has no reader. The
+   three-bodies model may be correct and unimplemented, or the mirror may have no job left. **Both
+   are above this card**, so the law's sentence was NOT edited.
+2. **§16's published percentage has drifted through THREE cards, and D0.6 had to COUNT before it
+   could recompute.** `main` published **34 / 52 = 65.38%**; counted off the tables by script it
+   actually carried **35 / 47 = 74.47%**. The entire gap is one section — §16 credited
+   **Components 13 / 19** where §6 has **14 / 15**. D0.5a, D0.5b and D0.5c each ADDED to the figure
+   in front of them instead of re-counting, so one wrong number propagated silently across three
+   cards. §16's own opening line predicted exactly this (*"a hand-maintained percentage is prose,
+   and prose drifts"*). **D1's `--report` generator is not a nicety — it is the only thing that
+   makes this number true.**
+3. **RESOLVED by D0.5c merging — kept on the record because the resolution is the lesson.** This
+   card first ran against a `main` that did not yet carry `PageShell.tsx`, so §8.0's rule was `⏳`
+   and coverage ticked DOWN — which collided with the card's own two rules (Rule 4 permits `⏳` with
+   a named card *because "this card writes law, not code"*; Rule 5 forbids coverage going down).
+   With D0.5c merged, **§8.0 is born enforced and coverage goes UP, 74.47% → 75.00%.** The conflict
+   was real and it was dissolved by SEQUENCE, not by argument: the PM's `D0.5c → D0.6 → D1` order is
+   exactly what made the mechanism exist before the rule was written.
+4. **The exit criterion and §16's health rule disagree about what "coverage" is measured against.**
+   The criterion pins an absolute floor — *"not lower than the 3 / 33 = 9.09% it reads today"* — a
+   figure that went stale the moment D0.5a shipped. §16 rule 1 states a DIRECTION. Read as an
+   absolute the card passes; read as a direction it does not. **A number written into an exit
+   criterion goes stale; a direction does not.**
+5. **Governance and copy rules have no home in the health number.** §16 counts §1–§8, so §0.1's
+   five existing rules — and the four this card added to §0 and §10 — are outside it. Widening the
+   denominator would read **36 / 58 = 62.07%** on a day nothing got worse, so it is reported and not
+   taken. §16 now states the exclusion out loud instead of leaving it to be inferred.
+6. **WITHDRAWN — I reported this wrongly, and the correction matters more than the finding.** I
+   reported that the closed catalogue *"already has a member the law does not name"*, because
+   `PageShell.tsx` on `origin/claude/carres-d05c-shells` shipped `variant: "list" | "module"`. **That
+   branch is not what merged.** PR #505 merged a different implementation whose union is
+   `list | dashboard | detail | settings` — **exactly §8.1's four, no `module`.** I read a superseded
+   branch and reported it as the live state. *Read the tip that merged, not the branch that shares
+   its name.*
+7. **Two z-layers were still credited to D0.5c and only one of them shipped.** §4.4's layer 10
+   (sticky table header) IS wired — `DataTable.tsx` imports `Z_TABLE_HEADER`. **Layer 20
+   (toolbar / bulk bar) is not**: `overlay-layer.ts`'s own comment says *"Layer 2 still has no class
+   string: nothing uses it"*, and `PageShell.tsx` writes no `z-` at all. The row now reads ⏳ **D6**,
+   because the bulk bar arrives with page adoption, not with the shell.
+8. **The stale-citation sprawl is far wider than R4's five.** `grep "UI-KIT v4|v4 §"` over
+   `apps/web/src` returns **28 citations across 12 files**, naming `§8b · §11a · §11c · §11e · §A0 ·
+   §A1 · §A5 · §A6 · §A8` — **lettered sections this law has never had.** The five R4 recorded are
+   closed by this card; the rest are page files, which this card may not touch, and they are D1–D7's.
+   It is also the strongest possible evidence for R4's principle.
+
+### Sequencing note — the card ran twice, and the second run is why it closes
+
+The PM's order is `D0.5c → D0.6 → D1`, and the reason given was *"the components are built first,
+and consolidation writes down what exists."* **The first pass broke that order without meaning
+to**: `origin/main` was `51f2758d`, D0.5c was unmerged on a branch, and the card wrote down what
+existed on `main` — so §8.0 was `⏳` and coverage dipped.
+
+**D0.5c then merged as PR #505 (`929fa746`), and the card was re-run against it.** §8.0 is enforced,
+coverage rises, and finding 6 was withdrawn because the merged `PageShell` is not the one the branch
+carried. **The whole difference between the two passes is which tip was read** — which is the
+sequencing rule stated as a consequence rather than as advice.
+
+### Status synchronisation (PM instruction, 2026-07-29)
+
+Every milestone merged into `main` no longer reads `⏳` anywhere in the law. Verified against the
+live repository, not assumed:
+
+| Card | On `main` | Law now reads |
+|---|---|---|
+| **D0.5a** | `a548ddc9` (PR #498) | ✅ throughout — §5, §6.0–§6.5, §9 |
+| **D0.5b** | `d77bd4f6` (PR #502) | ✅ throughout — §6.7–§6.14, §4.4 layers 30 · 40 |
+| **D0.5b.1** | `2d5aaddb` | ✅ — §4.4's note; `dialog-container.tsx` is on `main` |
+| **D0.5c** | `929fa746` (PR #505) | ✅ — §8.0 · §8.1 · §7 · §1.4's seven constraints · §4.4 layer 10 |
+
+**Three rows deliberately still read `⏳`, because the thing itself has not shipped** — a status sync
+may not paint a ✅ on something that does not exist: §4.4 layer 20 (no bulk bar renders through
+`PageShell`) → **D6** · §8.2's one-interaction-model row (no page renders through the components)
+→ **D6** · Build Guard rules **G** and **H**, whose D0.5 blocker is gone but whose guard is **D1**.
+
+---
+
+## D0.6 · KIT-CONSOLIDATION — the PLANNING CARD (the approved scope, kept for audit)
+
+> **STATUS: planning card APPROVED by the PM, 2026-07-28; BUILT 2026-07-29** — see the record above.
 
 **Why this card exists.** The Reference Review line (`docs/ui-reference-review.md`, R1–R5, closed
 2026-07-28) reviewed five international references and froze **five principles**. Rule 5 of that
@@ -778,15 +988,21 @@ Everything this card is allowed to read *as a source*. Nothing else may become l
 | The **parking lot** in `ui-reference-review.md` | Implementation observations classified by the PM — read as context, **never pasted in as law.** |
 | `docs/execution-queues-index.md` | Where this card is indexed and which lane owns which file. |
 
-**The five frozen principles, listed here so the builder does not have to reconstruct them:**
+**The five frozen principles, and where each one now LIVES.**
 
-| From | Principle (PM-ratified wording where one exists) |
-|---|---|
-| **R1** SAP Fiori | Closed Pattern Library — *accepted as an observation for consolidation* |
-| **R2** Linear | *"UI, workflow and navigation are opinionated and consistent across the company. Business parameters remain configurable."* |
-| **R3** Stripe | *"Stable ID is the contract. Visible labels are presentation attached to the Stable ID."* |
-| **R4** Vercel | *"Every kit artifact must declare the kit version it follows."* |
-| **R5** GOV.UK · NN/g · Polaris | *"Words are delivered by the system, not remembered from a document."* |
+*(This table used to reprint all four PM-ratified sentences verbatim, so a builder did not have to
+reconstruct them. It stops doing that on the day they land: the card's own exit criterion is that a
+grep for each sentence returns **exactly one hit** outside `ui-reference-review.md`, and a copy in a
+work-list is a second home. The wording is in the chapter named below; the reasoning behind it stays
+in `ui-reference-review.md`, which is the record.)*
+
+| From | Principle | Now lives in |
+|---|---|---|
+| **R1** SAP Fiori | the floorplan catalogue is CLOSED | **UI-KIT §8.0** |
+| **R2** Linear | opinionated UI · configurable business numbers | **UI-KIT §0.4** |
+| **R3** Stripe | the identifier is the contract, the label is presentation | **UI-KIT §0.5** |
+| **R4** Vercel | every kit artifact declares its kit edition | **UI-KIT §0.3** |
+| **R5** GOV.UK · NN/g · Polaris | words are delivered, not remembered | **UI-KIT §10.1** |
 
 **NOT an input:** any reference not in R1–R5, any observation the PM did not approve, and any
 design idea this card's author has. **The review line is closed; consolidation writes it down, it
