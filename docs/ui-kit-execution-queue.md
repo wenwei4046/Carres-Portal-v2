@@ -50,7 +50,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ✅ **COMPLETE 2026-07-29** — all three built and tested, Orders renders through the first two. **Scope is component EXTRACTION; the drawer migration was never in it** (PM, 2026-07-29) — card below |
 | **D0.5c.1** | **DECISION card** — §7② and §10 disagreed about whether the Persistent Facts cap is law. No code | ✅ **RULED 2026-07-29 — A: §10 (L4) is the authoritative law.** Card below |
 | **D0.5c.2** | **`OrderDetailDrawer` renders through `DetailShell`** — the four `identity` nodes have to exist first. Own card, not yet written | ⏳ **after D0.5c.1** |
-| **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
+| **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **DONE 2026-07-29.** R1 → §8.0 · R2 → §14.1 · R3 → §10.1 · R4 → §0.3 · R5 → §10.2. §16 **47.83% → 48.94% ⬆**, debt 4 → 4. The kit is now the source; the review file is the record |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
@@ -805,15 +805,18 @@ Everything this card is allowed to read *as a source*. Nothing else may become l
 | The **parking lot** in `ui-reference-review.md` | Implementation observations classified by the PM — read as context, **never pasted in as law.** |
 | `docs/execution-queues-index.md` | Where this card is indexed and which lane owns which file. |
 
-**The five frozen principles, listed here so the builder does not have to reconstruct them:**
+**The five frozen principles — ✅ CONSOLIDATED 2026-07-29. The sentences are NOT repeated here any
+more:** they lived in this table while the card was unbuilt so the builder did not have to
+reconstruct them, and the moment they became law that made two homes for one sentence. **The law
+is the home; this table is the index.**
 
-| From | Principle (PM-ratified wording where one exists) |
-|---|---|
-| **R1** SAP Fiori | Closed Pattern Library — *accepted as an observation for consolidation* |
-| **R2** Linear | *"UI, workflow and navigation are opinionated and consistent across the company. Business parameters remain configurable."* |
-| **R3** Stripe | *"Stable ID is the contract. Visible labels are presentation attached to the Stable ID."* |
-| **R4** Vercel | *"Every kit artifact must declare the kit version it follows."* |
-| **R5** GOV.UK · NN/g · Polaris | *"Words are delivered by the system, not remembered from a document."* |
+| From | Principle | Now lives in |
+|---|---|---|
+| **R1** SAP Fiori | Closed Pattern Library — *accepted as an observation for consolidation* | **`UI-KIT` §8.0** |
+| **R2** Linear | opinionated product, configurable business | **`UI-KIT` §14.1** |
+| **R3** Stripe | the ID is the contract, the label is presentation | **`UI-KIT` §10.1** |
+| **R4** Vercel | every kit artifact declares its edition | **`UI-KIT` §0.3** |
+| **R5** GOV.UK · NN/g · Polaris | words are delivered, not remembered | **`UI-KIT` §10.2** |
 
 **NOT an input:** any reference not in R1–R5, any observation the PM did not approve, and any
 design idea this card's author has. **The review line is closed; consolidation writes it down, it

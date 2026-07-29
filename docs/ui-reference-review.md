@@ -72,9 +72,9 @@ Items recorded once, here, so no entry repeats them.
 
 | Item | What it is | Ruling |
 |---|---|---|
-| **KIT-CONSOLIDATION** | The single card that updates `docs/UI-KIT.md` from the frozen set. | **Carded 2026-07-28 as D0.6** in [`docs/ui-kit-execution-queue.md`](ui-kit-execution-queue.md) — **planning card only, awaiting PM approval. Nothing may be built from it yet.** |
+| **KIT-CONSOLIDATION** | The single card that updates `docs/UI-KIT.md` from the frozen set. | ✅ **DONE 2026-07-29, card D0.6.** All five principles are in the law: **R1 → §8.0** · **R2 → §14.1** · **R3 → §10.1** · **R4 → §0.3** · **R5 → §10.2**. **From this moment `docs/UI-KIT.md` is the source and THIS FILE is the record of where the reasoning came from** (Rule 0). A chat citing this file as law has cited an input. Carried but NOT written as law: R1's *"the catalogue is full at four"* (the code ships a closed union of two — membership referred to the PM) and R1's build-guard row (no mechanism yet → D1). |
 | **Worklist floorplan** | R1's finding: Fiori would call `ACTION-FLOW-STANDARD`'s "Open My Work" a Worklist, and that page does not exist. | **Parked by the PM, 2026-07-28.** Noted only. **No design discussion may be started from it.** |
-| **Implementation observations** | R2's three `localStorage` sites; R4's stale machine mirror. | **Classified by the PM, 2026-07-28** as implementation observations held for KIT-CONSOLIDATION. Not design work, not a defect list to be worked during this phase. |
+| **Implementation observations** | R2's three `localStorage` sites; R4's stale machine mirror. | **Classified by the PM, 2026-07-28** as implementation observations held for KIT-CONSOLIDATION. **Handled 2026-07-29 (D0.6):** the mirror's *claims* are corrected — it declares its edition, no longer claims to outrank the law, and its dead citations carry a warning; **its exported values are untouched** (a value is a visual change → D2/D3). The three `localStorage` sites are **NOT removed** — §14.1 states the rule and names D1, because one of them is a feature somebody asked for and removing it is the PM's call. |
 | **Documentation debt** | `docs/ui-reference/` does not exist while `UI-KIT` §11 cites screenshots in it. | **Classified by the PM, 2026-07-28** as documentation debt. **The review does not stop to fix it.** |
 
 ## What each entry must record when it freezes

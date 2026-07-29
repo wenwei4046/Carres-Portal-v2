@@ -1,14 +1,35 @@
 /**
- * CARRES PORTAL — DESIGN STANDARD (single source of truth)
+ * CARRES PORTAL — DESIGN STANDARD (the machine mirror)
  * =========================================================
- * ⭐ v4 — rewritten 2026-07-15 from `docs/UI-KIT.md` (Jess).
- * THAT file overwrites ALL prior UI baselines; this module is its
- * machine-readable mirror. Where any older doc, code comment, or token
- * conflicts with UI-KIT v4, **v4 wins**. Prior scattered UI decisions
- * (cream content backgrounds, mixed font sizes, light-grey content text,
- * small checkboxes) are VOID.
+ * FOLLOWS KIT EDITION: **UI-KIT v4 (2026-07-15)**
+ * CURRENT KIT EDITION:  **UI-KIT 2026-07-27 (D0)**  ← this file is BEHIND
  *
- * Principles (UI-KIT v4 §1–§2):
+ * ⚠️ THIS FILE DOES NOT WIN. `docs/UI-KIT.md` is the law; this module is a
+ * RECORD of it, never a place to drive a change from (CLAUDE.md). Where this
+ * file and the law disagree, **the law wins and this file is the thing that is
+ * wrong.** It previously claimed the opposite — two bodies of one kit each
+ * declaring itself the winner — corrected by card D0.6, 2026-07-29.
+ *
+ * Per UI-KIT §0.3, every kit artifact declares the edition it follows. This one
+ * declares that it is stale: the law was rewritten on 2026-07-27 and this
+ * mirror was not. **Its exported VALUES are deliberately untouched by D0.6** —
+ * correcting a value is a visual change, and that is D2/D3's codemod, not a
+ * documentation card's. Known divergences from the current law, so that a
+ * reader is not misled by a value below:
+ *
+ *   canvas   #F3F4F6   →  law §3.2 froze Radix `slate-3` (≈ #F0F0F3), and
+ *                         §3.1 says the law names the STEP, never the hex
+ *   flame    #C44D2B   →  law §3.4 bans the Carres flame outside the logo,
+ *                         and §13.3 rule B fails the build on it
+ *
+ * Section citations below are marked `v4 §…` and refer to the RETIRED v4
+ * edition, not to the current law. Two of them (`v4 §11a`, `v4 §9`) name
+ * sections the current law does not have at all — kept with this warning
+ * rather than renumbered, because renumbering a citation into a live section
+ * would silently claim the current law says something it may not.
+ *
+ * Principles as v4 stated them (retained for the audit trail — the current
+ * law states its own in §3.2–§3.4):
  *  - The content area is WHITE. Brand colour lives only in the left nav.
  *  - Colour is a functional signal, never decoration. It appears only for
  *    ACTION · SELECTION · STATUS · ALERT. Everything else black/grey/white.
@@ -18,9 +39,8 @@
  *  - Content is darker than labels: main content near-black, secondary
  *    mid-grey, labels/meta muted. NEVER light-grey content text.
  *
- * Page-by-page alignment status: tokens below are LIVE law; existing pages
- * still carrying old values get converged one page at a time (Jess's call
- * on order). Do NOT hand-roll a hex/px that exists here.
+ * Do NOT hand-roll a hex/px that exists here — and do NOT read a value here as
+ * current law without checking `docs/UI-KIT.md` first.
  */
 
 // ─────────────────────────────────────────────────────────────────────────────

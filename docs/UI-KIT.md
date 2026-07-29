@@ -180,6 +180,26 @@ To change the look: edit the token source, then update **this file + the
 machine mirror + `/ui`** in the same commit. A page conforms to the kit; the
 kit does not bend to a page. See §14.
 
+### The kit is a dependency, and a dependency has a version
+
+中文：引用没有版本号,就永远看不出它引错了哪一版。
+
+> **Every kit artifact must declare the kit version it follows.**
+> *(R4 · Vercel (Geist), ratified by the PM 2026-07-28, consolidated D0.6.)*
+
+**Why the sentence alone is not enough to carry it: a citation without a version
+cannot be wrong on its face, which is exactly how it survives.** On 2026-07-28
+five live citations were measured naming a file, a section and an authority —
+and every one of them pointed at a dead edition. `v4 §11a` and `v4 §9` name
+sections this file does not have.
+
+**This edition is `UI-KIT 2026-07-27` (D0).** An artifact that follows the kit
+says which edition it follows, at the top, in words a grep can find.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| Every kit artifact declares the kit edition it follows | Build Guard | ⏳ **D1** | `lib/design-standard.ts` header (first artifact to comply) |
+
 ---
 
 # §1 Decision Process & Information Hierarchy
@@ -1150,6 +1170,38 @@ visual languages** (dark header + white text ×6, light grey header + grey text
 > ⏳ **Written by D0.5c** — except the slot contract below, which is already
 > decided, because §1.3 depends on it.
 
+## §8.0 The floorplan catalogue is CLOSED
+
+中文：每一页都是目录里的一种,没有「这页比较特别」这个选项。
+
+> **Every in-scope page renders exactly one `PageShell` and declares one
+> `variant` from a closed union.** There is no `custom`, no free-form page, and
+> no in-scope page that renders no shell.
+
+**Adding a variant is a governance event**, under the same discipline as §4.2's
+four radii: it requires naming the **user task** that no existing floorplan can
+serve. *"This page is a bit different"* is not a task and is not an argument.
+
+**Why closed rather than merely documented.** An open catalogue does not fail —
+it dilutes. The 274-of-285 hand-rolled shells measured in the rewrite were never
+a decision anybody made; they were the absence of a union that refuses.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| Every page declares one floorplan from a closed union | **Type System** — `variant` is a closed union; `"custom"` does not compile | ✅ | `components/kit/PageShell.tsx` |
+
+**Not yet a rule, because it has no mechanism**: *a page component that renders
+no `PageShell` fails the build.* It is Build-Guard shaped and belongs to **D1**,
+which writes the guard over all 225 pages. It is deliberately NOT written into
+the table above — §16 rule 1 forbids adding a rule that nothing enforces, and a
+row with no mechanism is the debt this file exists to shrink.
+
+⚠️ **The catalogue's MEMBERSHIP is unsettled and is not frozen here.** §8.1 names
+four (`list · dashboard · detail · settings`); `PageShell.tsx` ships a closed
+union of two, and one of them — `module` — is in neither list. **The principle
+above is true of the code today; the count is not**, so no number is written
+into law until the PM rules the membership. See the D0.6 findings note.
+
 ## §8.1 The `PageShell` slot contract (decided)
 
 ```tsx
@@ -1307,6 +1359,54 @@ UI wording is owned by [`COPY-STANDARD.md`](COPY-STANDARD.md).
 **No word is copied into this file.** Two files holding the same words will
 drift — the failure this rewrite exists to end.
 
+**Two principles about words live here — neither of them IS a word**, which is
+why they do not violate the rule above. One says what a label is; the other says
+how it reaches the screen.
+
+## §10.1 A label is presentation; the ID is the contract
+
+中文：合约是那个 id。看得见的字只是挂在上面的皮,换字不换合约。
+
+> **Stable ID is the contract. Visible labels are presentation attached to the Stable ID.**
+> *(R3 · Stripe Dashboard, ratified by the PM 2026-07-28 in these words,
+> consolidated D0.6.)*
+
+**The correction the PM made, recorded so it is not re-introduced:** an earlier
+draft read *"a visible word is a contract"*, which reads as though the label
+carried the contract — the exact confusion this principle ends. **The label
+carries nothing.** The ID is the contract; the label hangs off it and may be
+replaced without the contract moving.
+
+What follows: **nothing may key on a label** — not a count, not a filter, not a
+stored state, not a test. Renaming is then a display change and never a data
+change. The pattern already exists and is typed (`OrderActionKey` is a union;
+`DISPLAY_RANK` is keyed by it), so the mechanism is **generalisation, not
+invention**. And because the *word* is still governed even though it is not the
+contract, changing one goes through `COPY-STANDARD` as an event — never as an
+edit made in passing.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| No persisted state, query key, storage key or test selector is built from a display string | Build Guard | ⏳ **D1** | `packages/shared/order-action-words.ts` — the shape this generalises |
+
+## §10.2 Words are delivered, not remembered
+
+中文：字要跟着画它的东西一起送到,不是叫人去记一份文件。
+
+> **Words are delivered by the system, not remembered from a document.**
+> *(R5 · GOV.UK · NN/g · Shopify Polaris, ratified by the PM 2026-07-28 in these
+> words, consolidated D0.6.)*
+
+One dictionary, one word per concept, and a reason for every banned word — which
+`COPY-STANDARD` already is — **plus the words travelling with the thing that
+renders them**, so a surface cannot be built without them. **A rule that must be
+remembered is enforced by whoever happens to be reading**, which is not an
+enforcement at all.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| A locked string is delivered by the module that renders it, never retyped at the call site | Component API | ⏳ **D2–D7** | `order-action-words.ts` delivers 3 of its 5 locked strings today |
+
 ---
 
 # §11 Reference Library
@@ -1418,6 +1518,32 @@ Any UI change answers these seven before code is written. If any answer is
 
 Plus, for anything occupying permanent vertical space, the §1.1 gate.
 
+## §14.1 The product is opinionated; the business is configurable
+
+中文：界面、流程、导航全公司一个样。可以调的是生意的数字,不是画面。
+
+> **UI, workflow and navigation are opinionated and consistent across the company. Business parameters remain configurable.**
+> *(R2 · Linear, ratified by the PM 2026-07-28 in these words, consolidated D0.6.)*
+
+**The reasoning, kept because the sentence alone does not carry it:** a user who
+can rearrange the tool must be taught their own version of it, and every
+handover then starts from zero. The line is not between *flexible* and *rigid* —
+it is between **the picture** and **the business**. Production working days per
+supplier, reorder points, commission rates and storage fees are business
+parameters and are meant to be edited by a manager (Purchasing P1 is exactly
+this). Which band sits where, which columns exist, and what the navigation is
+called are not.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| No per-user UI preference is persisted — layout, panel and column state are the kit's, not the user's | Build Guard | ⏳ **D1** | no browser-persisted UI state under `pages/**` |
+
+⚠️ **The mechanism has a cost the PM has not yet ruled on.** Three live
+`localStorage` sites under `pages/**` would come off, and one of them
+(`hiddenCols` on the Orders list) is a feature somebody asked for. **D1 may not
+remove it silently** — the rule is written here, the removal is a decision. See
+the D0.6 findings note.
+
 ---
 
 # §15 Part B — POS (`.pos-proto`)
@@ -1454,21 +1580,46 @@ document.
   Spacing       ██▌░░░░░░░    25%     1 / 4
   Icons         ██████████   100%     4 / 4
   Components    ██████▊░░░    68%    13 / 19
-  Layout        ░░░░░░░░░░    0%      0 / 6
+  Layout        █▍░░░░░░░░    14%     1 / 7
   Hierarchy     ██░░░░░░░░    20%     1 / 5
   ──────────────────────────────────────────
-  TOTAL         ████▊░░░░░    48%    22 / 46
+  TOTAL         ████▉░░░░░    49%    23 / 47
 ```
 
 | | Count | Meaning |
 |---|---|---|
-| Rules | **46** | design rules stated in §1–§8 |
-| **Enforced** | **22** | Type System / Component API / Build Guard / ESLint is live |
-| Scheduled | 24 | a card exists (D0.5c–D5) |
+| Rules | **47** | design rules stated in §1–§8 |
+| **Enforced** | **23** | Type System / Component API / Build Guard / ESLint is live |
+| Scheduled | 24 | a card exists (D1–D7) |
 | **Blocked on a decision** | **0** | ✅ the PENDING REGISTER is empty |
 | **Human Review debt** | 4 | `fmtDate()` · "max 2 reds per screen" · facet group order · "Progress carries no events" — nobody has found a mechanism |
 
-**The D0.5b arithmetic, shown so it can be checked** (health rule 1 says
+**The D0.6 arithmetic, shown so it can be checked:**
+
+```
+rules      46  +  1  =  47     §8.0, the closed floorplan catalogue (R1)
+enforced   22  +  1  =  23     it arrives with its mechanism ALREADY LIVE —
+                               PageShell's `variant` is a closed union and
+                               "custom" does not compile (D0.5c)
+coverage   47.83%  →  48.94%   ⬆
+debt          4    →      4    unchanged — no rule was added with Human Review
+blocked       0    →      0    unchanged
+```
+
+**Four of the five consolidated principles do not appear in this count, and that
+is a scope fact rather than an omission.** This block counts *design rules
+stated in §1–§8*. R2 landed in **§14**, R3 and R5 in **§10**, R4 in **§0.3** —
+each in the chapter that owns its concern, and all four outside the counted
+range. Every one of them still names an Enforcement and a card, so health rule 2
+holds by the same discipline it would inside §1–§8.
+
+**Only R1 was countable, and the reason is worth keeping**: it is the one
+principle whose mechanism was already live when it was written down. Had all
+five been forced into §1–§8 with four of them scheduled, the count would have
+read 23 / 51 = 45.10% — **down**, which §16 rule 1 forbids. That is the
+arithmetic R1's own entry predicted, met and reported rather than worked around.
+
+**The D0.5b arithmetic, kept for the audit trail** (health rule 1 says
 coverage may never go down, and rule 2 says the debt may never grow):
 
 ```
