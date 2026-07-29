@@ -369,6 +369,21 @@ and party-named labels are exactly the ones that carry one. That is how `Last ch
 passed a guard whose banned list already held `/chase[ds]?/`. Extract to
 `src/test/banned-words.ts`, blank interpolations before matching, point it at all three pages.
 
+**Added by ⑦ P3 (2026-07-29) — the Purchase page DOES have a scanner, and it EXEMPTS ②'s own
+strings by name.** `apps/web/src/pages/operation/purchasing-words.test.ts:79` strips
+`Chase on WhatsApp`, `Nothing to chase here` and `items to chase` out of the source with a
+regex before the banned list runs, so the guard is green while three banned strings are live on
+[OperationPurchase.tsx:1172](../apps/web/src/pages/operation/OperationPurchase.tsx:1172)
+(`text="Nothing to chase here"`),
+[OperationPurchase.tsx:1411](../apps/web/src/pages/operation/OperationPurchase.tsx:1411)
+(`"Select a PO on the left to see the items to chase."`) and
+[OperationPurchase.tsx:1537](../apps/web/src/pages/operation/OperationPurchase.tsx:1537)
+(`Chase on WhatsApp`). R8 put the exemption there deliberately, because the words were not
+ruled yet and a red guard nobody can fix teaches a chat to delete the guard. **They are ruled
+now**, so C12's job includes DELETING that regex — a scanner with a carve-out for the exact
+strings it exists to find is the same lie as a filter nobody can switch on. P3 did not touch it:
+one file, another card's lane.
+
 **Do NOT re-do R8's work.** `Chase factory`, the middle-list header and the VOCAB comment block
 are already done and done wider (#499). A rebase of #484 that keeps them re-opens a merged card.
 
