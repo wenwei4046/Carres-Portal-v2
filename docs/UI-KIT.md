@@ -409,9 +409,12 @@ Purchasing, Receiving and Service Detail without learning any of them again.
 > screen"*) turned into a type: a component that cannot be told a state cannot
 > print one.
 >
-> **`DetailShell` is BUILT and no page renders through it yet.** The drawer
-> migration is blocked on one business decision — see the D0.5c card in
-> `ui-kit-execution-queue.md`.
+> **`DetailShell` is BUILT and no page renders through it yet, by ruling.** The
+> PM closed D0.5c as components-only on 2026-07-29: the order drawer does NOT
+> gain a Persistent Facts strip, because §7② of the information model still
+> reads *"RESERVED, NOT YET LAW"* and the drawer's header carries Jess's frozen
+> *"ZERO order data here"*. **Real-page adoption is D6.** The contract above is
+> unchanged — the ruling is about the drawer, not about the type.
 
 ---
 
@@ -694,6 +697,16 @@ Fifteen levels exist today (`1 · 10 · 20 · 30 · 40 · 50 · 55 · 60 · 70 �
 `components/kit/overlay-layer.ts` — and `kit-source.test.ts` fails if any other
 kit file writes a `z-` class at all. A chat needing a new layer has to come
 here first, which is the whole point.
+
+> **A picker inside a dialog needs no sixth layer** (D0.5b.1, written down
+> because the next person will hit it). A `Select` at 30 opened inside a `Modal`
+> at 40 painted UNDERNEATH it, because both Radix portals mount as SIBLINGS on
+> `<body>` — and "a picker inside a dialog" is the commonest form pattern there
+> is. **The fix is structural, not numeric**: `DialogFrame` publishes its own
+> content node and every picker portals INTO it, so 30-above-the-dialog's-
+> children is exactly right and this ladder is untouched. Raising a number to
+> fix a component is how fifteen levels happened the first time; a test asserts
+> the ladder still reads 10 · 20 · 30 · 40 · 50.
 
 | Rule | Enforcement | Status | Evidence |
 |---|---|---|---|

@@ -29,12 +29,12 @@
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · R6 ✅ #490 · **R8 ✅ #499** (the banned-verb sweep) — only **R7** left |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
-| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 + C8b | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C8 ✅ #493 (0304) · C8b ✅ #497 (0305) · C9 ✅ #472 · C10 ✅ #471** — only **C4** left |
+| ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 + C8b + **C11 · C12** | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C8 ✅ #493 (0304) · C8b ✅ #497 (0305) · C9 ✅ #472 · C10 ✅ #471** — **C4 RETIRED 2026-07-28 and re-cut as C11 + C12** (PR #484 stays open, unmerged: R8 shipped part of it, P1 deleted a file it edits, and Loo's money ruling made its own fix wrong). **C11** = a money figure is the money owed · **C12** = the last `Chase` leaves the portal |
 | ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings) · **P2 ✅ #492 + #494 + #495** — the click law is true on all three Purchasing lists (To Order · Claims · Receiving). **P3 is the next card** |
-| ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 + **D0.6** | D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3` · **D0.4 ✅ the old order-portal master spec is DELETED** · **D0.5a ✅ built 2026-07-28** — ten Foundation Components + a live `/ui`. **D0.5b ✅ SHIPPED 2026-07-28 (PR #502 `d77bd4f6`, deployed; `/ui` now shows the frozen record, verified in a real browser)** — the Radix half (`Modal` · `Drawer` · `Select` · `DropdownMenu` · `Tooltip` · `Popover` · `Tabs` · `Checkbox` · `DatePicker` · `Toast`), and **the PENDING REGISTER is now EMPTY: Jess froze Q1 = the 8-step scale · Q3 = `font-bold` deleted into 600 · Q4 = Lucide's stroke 2.** Each answer became a mechanism (a re-pointed source scan · a scan rule · a deleted prop), and the freeze cost **zero** component changes because D0.5a had built for both answers. §16 coverage 31.58% → 47.83%, blocked-on-a-decision 3 → 0, so **D5 is no longer blocked on a decision.** **D0.5c ✅ COMPONENTS BUILT 2026-07-28** — `PageShell` (from `ListPageShell`) · `DataTable` (from the Orders table) · `DetailShell` (L4's six slots, all seven constraints as types, **no `state` prop**). §16 coverage 47.83% → 65.38% and **the Human-Review debt goes DOWN for the first time, 4 → 3**: "Progress carries no events" became a type. **No page renders through any of them — that is D6/D7.** ⛔ **The drawer migration is BLOCKED on one business decision**: L4 requires a 4-tuple of persistent facts (客户名 · Ref · promised date · outstanding) and on today's drawer those four sit in four different blocks, with the header carrying Jess's own rev-4 ruling *"ZERO order data here"* — so rendering the drawer through the shell means creating a facts strip that does not exist, which is a visual change, permanent height, and a reversal of her ruling. **T3 = Jess uses the drawer for a day** (still waiting for P5). **Reference Review CLOSED 2026-07-28** — `docs/ui-reference-review.md` R1-R5 frozen (Fiori · Linear · Stripe · Vercel · GOV.UK/NNg/Polaris); five principles; that line froze **no** enforcement mechanism. **D0.6 KIT-CONSOLIDATION = planning card only, approved 2026-07-28, builds after D0.5c — it is the only card that may write the REFERENCE-REVIEW principles into `docs/UI-KIT.md`.** *(Corrected 2026-07-28: this row used to say D0.6 was the only card that may edit the kit at all, which the kit itself contradicts — §6 says each component's dictionary entry is written "when it lands on `/ui`" and §9 says "Written by D0.5a". A D-card still writes the chapter the law assigns it; D0.6 owns the review principles and the mirror's claims.)* TEMPORARY doc — delete when the line ends |
+| ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 + **D0.6** | D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3` · **D0.4 ✅ the old order-portal master spec is DELETED** · **D0.5a ✅ built 2026-07-28** — ten Foundation Components + a live `/ui`. **D0.5b ✅ SHIPPED 2026-07-28 (PR #502 `d77bd4f6`, deployed; `/ui` now shows the frozen record, verified in a real browser)** — the Radix half (`Modal` · `Drawer` · `Select` · `DropdownMenu` · `Tooltip` · `Popover` · `Tabs` · `Checkbox` · `DatePicker` · `Toast`), and **the PENDING REGISTER is now EMPTY: Jess froze Q1 = the 8-step scale · Q3 = `font-bold` deleted into 600 · Q4 = Lucide's stroke 2.** Each answer became a mechanism (a re-pointed source scan · a scan rule · a deleted prop), and the freeze cost **zero** component changes because D0.5a had built for both answers. §16 coverage 31.58% → 47.83%, blocked-on-a-decision 3 → 0, so **D5 is no longer blocked on a decision.** **D0.5c ✅ CLOSED as components-only** (built 2026-07-28, ruled by the PM 2026-07-29) — `PageShell` (from `ListPageShell`) · `DataTable` (from the Orders table) · `DetailShell` (L4's six slots, all seven constraints as types, **no `state` prop**). §16 coverage 47.83% → 65.38% and **the Human-Review debt goes DOWN for the first time, 4 → 3**: "Progress carries no events" became a type. **No page renders through any of them, and that is the card's final shape — real-page adoption is D6.** **The drawer is NOT migrated**: L4 requires a 4-tuple of persistent facts (客户名 · Ref · promised date · outstanding), on today's drawer those four sit in four different blocks, and the header carries Jess's own rev-4 ruling *"ZERO order data here"* — so the strip would be a new layout reversing a frozen ruling. **PM, 2026-07-29: do not add it, and do NOT turn §7② into law** — Persistent Facts stays RESERVED and the first page through the shell is where the four get a home. **T3 = Jess uses the drawer for a day** (still waiting for P5). **Reference Review CLOSED 2026-07-28** — `docs/ui-reference-review.md` R1-R5 frozen (Fiori · Linear · Stripe · Vercel · GOV.UK/NNg/Polaris); five principles; that line froze **no** enforcement mechanism. **D0.6 KIT-CONSOLIDATION = planning card only, approved 2026-07-28, builds after D0.5c — it is the only card that may write the REFERENCE-REVIEW principles into `docs/UI-KIT.md`.** *(Corrected 2026-07-28: this row used to say D0.6 was the only card that may edit the kit at all, which the kit itself contradicts — §6 says each component's dictionary entry is written "when it lands on `/ui`" and §9 says "Written by D0.5a". A D-card still writes the chapter the law assigns it; D0.6 owns the review principles and the mirror's claims.)* TEMPORARY doc — delete when the line ends |
 
 **State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ **R1-R6 ✅** · ⑥ C1 · C2 · C3 · C5 · C6 · **C7** · C9 · C10 ✅ ·
-⑦ **P1 ✅ · P2 ✅** · ⑧ D0 + T1 + T2 + **D0.5a + D0.5b** ✅ (**Q1/Q3/Q4 FROZEN 2026-07-28 — the PENDING REGISTER is empty**; T3 is still a Jess task, not a build card). **D0.5c ✅ components built** (`PageShell` · `DataTable` · `DetailShell`); its drawer migration is ⛔ blocked on one business decision. **Next on ⑧: D0.6 KIT-CONSOLIDATION**, or D6 if the shells are to reach a page first.
+⑦ **P1 ✅ · P2 ✅** · ⑧ D0 + T1 + T2 + **D0.5a + D0.5b** ✅ (**Q1/Q3/Q4 FROZEN 2026-07-28 — the PENDING REGISTER is empty**; T3 is still a Jess task, not a build card). **D0.5c ✅ CLOSED as components-only** (`PageShell` · `DataTable` · `DetailShell`; the drawer is not migrated — PM, 2026-07-29). **Next on ⑧: D0.6 KIT-CONSOLIDATION.**
 
 **What P2 changed so far (2026-07-28, PR #492) — the To Order half, web only, no
 migration.** UI-KIT §8.2 is now true on that tab. Three things it asks for were missing,
@@ -428,15 +428,53 @@ behaves, and a chat that treats it as the flow will name things on the business'
 ### ⭐ THE RUNNING ORDER (Loo, 2026-07-28) — read this before picking any card
 
 ```
-✅ P2-Receiving  #495            ✅ C8b  #497 (0305)   ✅ R8  #499
+✅ P2-Receiving  #495            ✅ C8b  #497 (0305)   ✅ R8  #499   ✅ D0.5b #502
 ▶  P3            the two supplier calls          (migration)
    P4            where the goods go              (migration)
+   R7            GRN duty — receiving assigns itself   (migration)
    P5            one REAL PO, end to end
    T3            the Purchasing guided review + Jess's drawer day
    Foundation    1. RECEIVING-WORKING-FLOW.md
                  2. SERVICE-CASES-WORKING-FLOW.md
                  3. READY-STOCK-WORKING-FLOW.md
+
+   ── carrying their own lanes, NOT in the line above ──
+   C11           a money figure is the money owed        ORDERS lane
+   C12           the last `Chase` leaves the portal      PURCHASING + ORDERS lanes
 ```
+
+**R7 moved INTO the line on 2026-07-28 (Loo), between P4 and P5, and the reason is the
+reason it cannot be skipped:** P5 is the card that puts one REAL purchase order through the
+module end to end, and **a real PO must be received by whoever the system says owns that
+GRN.** Validating the flow with the owner still a human roster rule would validate a
+different flow from the one that goes live. R7 was previously loose in ④ with "any time";
+it now has a place, and ④'s own row still lists it because it is still ④'s card.
+
+**⚠️ Loo's reason names TWO things and only one of them exists as a card.** He wrote *"real
+PO validation must include the completed GRN duty assignment **and Smart Cover flow**"*.
+GRN duty assignment IS R7. **Smart Cover is not** — it sits in ④'s LATER list, and its own
+entry says why: *"staff on leave stop receiving NEW assignments automatically — needs leave
+data, which nothing tracks yet"*. **Leave tracking was DROPPED**: HR-P8 (roster / presence /
+leave) was dropped by Loo on 2026-07-26 at the design stage, never started. So today Smart
+Cover has no data to read and no card to build it in.
+
+**This is reported, not resolved, and R7's scope is NOT widened on a chat's own initiative.**
+Three ways out, and it is Loo's to pick: (a) P5 proceeds with R7 alone and Smart Cover is
+explicitly out of the go-live scope; (b) Smart Cover becomes its own card and something must
+first re-open leave data — which re-opens a decision Loo already made; (c) a manual stand-in
+(a manager marks somebody unavailable) is carded, which is a smaller thing than leave
+tracking and needs its own words. **Nobody may fold Smart Cover into R7 as "part of GRN
+duty" — it is a different concept with a dependency that does not exist.**
+
+**C11 and C12 replaced C4 on 2026-07-28 and neither is scheduled yet.** They sit here so the
+lane cost is visible before anything is picked: **C12 touches `OperationPurchase.tsx`, so it
+cannot run beside P3** — if P3 starts first, C12's Purchase half (5 strings, one file) is the
+piece to split off and run in a single sitting to release the lane. C11 is the ORDERS lane and
+collides with ⑧ **D0.5c**, not with P3.
+
+**C11 is the one with a live cost.** 18 orders owe RM 56,859 today and every figure is printed
+by one of its five broken call sites — the collections desk shows `Collect RM RM 1,250.00`, and
+the Orders row, its drawer and the Delivery module round the sen away.
 
 **⚠️ R8 IS A WORDS CARD. It does not mean Purchasing is finished** (Loo, 2026-07-28, in
 those words). **It shipped 2026-07-28 as #499 and the guard is now live, not hypothetical:**

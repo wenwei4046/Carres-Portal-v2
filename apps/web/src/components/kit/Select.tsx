@@ -21,6 +21,7 @@
 import * as RadixSelect from "@radix-ui/react-select";
 import FieldFrame from "./FieldFrame";
 import Icon, { type IconName } from "./Icon";
+import { useDialogContainer } from "./dialog-container";
 import { controlClass } from "./field-recipe";
 import { FLOATING_ITEM, FLOATING_SURFACE } from "./floating-surface";
 
@@ -56,6 +57,9 @@ export default function Select({
   placeholder?: string;
   options: readonly SelectOption[];
 }) {
+  /* D0.5b.1 — null outside a dialog, which is Radix's own "use <body>", so the
+   * ordinary case does not move. */
+  const dialogContainer = useDialogContainer();
   return (
     <FieldFrame id={id} label={label} hint={hint} error={error} required={required}>
       <RadixSelect.Root value={value} onValueChange={onValueChange} disabled={disabled}>
@@ -72,7 +76,7 @@ export default function Select({
           </RadixSelect.Icon>
         </RadixSelect.Trigger>
 
-        <RadixSelect.Portal>
+        <RadixSelect.Portal container={dialogContainer}>
           {/* `--radix-select-trigger-width` is Radix's own measurement of the
            *  trigger. Binding the list to it is behaviour, not a token: the
            *  list is as wide as the control that opened it, whatever that is. */}

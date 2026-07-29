@@ -46,7 +46,8 @@ deliverable is Foundation Components, not a better document.
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
 | **D0.5b** | Foundation components, Radix | ✅ **SHIPPED 2026-07-28, PR #502 `d77bd4f6`, deployed** — full card below. The gate opened: Jess froze Q1 · Q3 · Q4 |
-| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ✅ **components BUILT 2026-07-28** · ⛔ the drawer migration is blocked on ONE decision — full card below |
+| **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ✅ **shipped on main** |
+| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ✅ **CLOSED as components-only** (PM, 2026-07-29). The drawer is NOT migrated; real-page adoption is D6 |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
@@ -378,19 +379,88 @@ about TIMING; neither cancels the other, and T3 never gated D0.5b.
 
 ---
 
-## D0.5c ✅ COMPONENTS BUILT · ⛔ the drawer migration is BLOCKED on one decision (2026-07-28)
+## D0.5b.1 — a picker inside a dialog renders UNDER it (P1, scoped by the PM 2026-07-28)
+
+**The defect.** §4.4 puts popovers on **30** and dialogs on **40**. Both Radix portals mount as
+SIBLINGS on `<body>`, so a `Select`, `Popover` or `DatePicker` opened inside a `Modal` or `Drawer`
+paints underneath the dialog. *A picker inside a dialog* is the commonest form pattern there is —
+the first real form in a modal hits this.
+
+**Found by comparison, not by a bug report.** Two chats built D0.5b; the second (PR #501, closed as
+superseded) had carried a fix the merged one does not. On `main`, `container` greps **0** in
+`DialogFrame.tsx`, `Select.tsx`, `Popover.tsx` and `DatePicker.tsx`.
+
+**Not reachable on `/ui` today** — the shipped demo modal contains no picker, checked on the live
+page. Nothing is visibly broken; this is a trap, not an outage.
+
+### The fix, and why it is not a number
+
+The obvious repair is to raise the popover layer above 40. **That is how fifteen z-levels happened
+the first time**, and §4.4 is frozen. Instead: **the dialog publishes its own content node, and a
+picker portals INTO it.** Inside the dialog's stacking context, 30-above-the-dialog's-children is
+exactly right, so **the ladder is untouched**.
+
+### Scope — the PM's, verbatim, and nothing beside it
+
+```
+IN    portal container for Select · Popover · DatePicker inside a Dialog
+IN    the negative-control test
+OUT   redesign of anything
+OUT   any other D0.5b work
+```
+
+### Acceptance
+
+1. A `Select` opened inside a `Modal` is a DOM **descendant** of that dialog.
+2. The same for `Popover` and `DatePicker`.
+3. Outside a dialog all three still portal to `<body>` — the fix must not move the normal case.
+4. **`Z_LADDER` is byte-identical.** A diff that touches a z-value has missed the point.
+5. Negative control: remove the `container` from `Select`'s portal → exactly the Select test fails.
+6. Gates at baseline; no visual change (`git diff` introduces no hex, no `text-[`, no `h-[`).
+
+### Reported by the build, for the PM to rule
+
+**`DropdownMenu` and `Tooltip` have the identical defect** — same portal shape, same two layers,
+one line each to fix. They are NOT in this card's scope because the scope names three components,
+and the scope came from a report that had listed only those three. **They are left open
+deliberately and said out loud**, because this line already paid for the opposite mistake once:
+*"closing the old door is not the optional half — leaving it open while filing a CF looks
+disciplined and behaves like a trap."*
+
+---
+
+## D0.5c ✅ CLOSED — components only (2026-07-28, ruled by the PM 2026-07-29)
 
 **All three shells exist**, extracted from the live Orders implementation, and
-`/ui` renders them. **No page renders through any of them yet**, and one of the
-three reasons is a decision only Jess/Loo can make.
+`/ui` renders them. **No page renders through any of them, and that is the
+card's final shape** — the PM closed D0.5c as components-only.
 
 | | Built | Migrated |
 |---|---|---|
 | `PageShell` | ✅ from `components/ListPageShell.tsx` | ⏳ **D6** (Orders) then D7+ |
 | `DataTable` | ✅ from `OperationOrdersControl.tsx`'s table | ⏳ **D6** |
-| `DetailShell` | ✅ to L4 exactly — all seven constraints | ⛔ **blocked, see below** |
+| `DetailShell` | ✅ to L4 exactly — all seven constraints | **not in this card** — see the ruling |
 
-### ⛔ THE DECISION — `identity.persistentFacts` has no home on today's drawer
+### ✅ RULED BY THE PM, 2026-07-29 — no Persistent Facts strip on the drawer
+
+**The decision: do NOT add a Persistent Facts strip to the Order drawer, and do
+NOT turn §7② into law.** D0.5c closes as components-only; the drawer is not
+migrated here, and real-page adoption belongs to **D6**.
+
+The PM's four reasons, recorded verbatim in substance: Persistent Facts is
+explicitly **RESERVED, NOT YET LAW** · the frozen drawer ruling says the header
+carries **ZERO order data** · D0.5c requires **zero visual change** · adding the
+strip would create a new layout **and reverse a frozen ruling**.
+
+**What this leaves standing, and it is worth being exact about.**
+`DetailShell` still implements L4 as frozen — `identity.persistentFacts` is a
+required 4-tuple and the shell renders it — because the ruling is about the
+DRAWER, not about the contract. So the component is complete and correct, and
+what is deferred is the migration. The first page to render through it (D6, or
+whichever card follows the Persistent Facts law) is where the four facts get a
+home.
+
+**The evidence the ruling was made on, kept so nobody re-derives it:**
 
 **L4 makes `persistentFacts` a required 4-tuple**, and §7② of the information
 model names the four: **客户名 · Ref · the promised date · outstanding.** The
@@ -419,12 +489,13 @@ It is also not obviously ripe: **§7② says Persistent Facts is "RESERVED, NOT 
 LAW … until it is, nothing here is enforceable"**, while §10's L4 — frozen the
 same day — makes it a required type.
 
-**The question, in one line:** *does the order drawer gain a persistent
-four-fact strip (customer · ref · promised date · outstanding), or does
-`DetailShell` wait until Persistent Facts is law?*
+**The question that was asked, in one line:** *does the order drawer gain a
+persistent four-fact strip (customer · ref · promised date · outstanding), or
+does `DetailShell` wait until Persistent Facts is law?* — **Answered
+2026-07-29: it waits.**
 
-**Nothing was invented while this is open.** The component implements L4 as
-frozen; the drawer is untouched.
+**Nothing was invented while it was open, and nothing was invented after.** The
+component implements L4 as frozen; the drawer is untouched; §7② stays RESERVED.
 
 ### What was built
 

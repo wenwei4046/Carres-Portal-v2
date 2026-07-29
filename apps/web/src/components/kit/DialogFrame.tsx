@@ -27,6 +27,7 @@
 import type { ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import Icon from "./Icon";
+import { DialogContainerProvider } from "./dialog-container";
 import { Z_DIALOG } from "./overlay-layer";
 
 const SURFACE = "bg-white border border-kit-slate-5 flex flex-col";
@@ -71,7 +72,13 @@ export default function DialogFrame({
           data-kit="dialog-overlay"
           className={`fixed inset-0 bg-kit-slate-12/40 ${Z_DIALOG}`}
         />
+        {/* D0.5b.1 — publishing the content node is what lets a Select, a
+         *  Popover or a DatePicker opened INSIDE this dialog render above it,
+         *  without touching §4.4's ladder. See `dialog-container`. */}
+        <DialogContainerProvider>
+          {(setContainer) => (
         <Dialog.Content
+          ref={setContainer}
           data-kit={kind}
           /* Radix warns when Content carries no Description. Passing undefined
            * explicitly is its documented way of saying "there is none". */
@@ -104,6 +111,8 @@ export default function DialogFrame({
             </footer>
           )}
         </Dialog.Content>
+          )}
+        </DialogContainerProvider>
       </Dialog.Portal>
     </Dialog.Root>
   );
