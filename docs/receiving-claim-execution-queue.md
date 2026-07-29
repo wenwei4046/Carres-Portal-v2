@@ -374,12 +374,26 @@ design decision. Three separate rename cards for one law would be worse than one
 crosses two lines inside the SAME lane (Purchasing / Receiving is one lane by the index's own
 rule), which is why P2's finding was folded in here rather than becoming a P-card.
 
-**⓪ The To Order stage cells** (`OperationPurchase.tsx`), found by P2 2026-07-28 and live on
-screen right now: they read **`Send POs` · `Chase factory` · `Receive`**. The dictionary locks
-**`Send PO` · `Confirm ready date` · `Check in`**, and **`Chase` is a BANNED word** — this is
-not lag, it is a banned word shipped. Same fix as C1 did for Orders: read from the shared word
-module. **The cells are a STAGE picker, not queue tiles** (UI-KIT §8.2, the no-empty-state
-rule) — R8 renames them and changes no behaviour.
+**⓪ The To Order stage cells** (`OperationPurchase.tsx`) — **✅ DONE by R8 (PR #499). The
+paragraph below described the state BEFORE that ship and is kept only as the record of why.**
+
+> **Corrected 2026-07-29 (measured):** `OperationPurchase.tsx`'s `STAGE_LABEL` now reads from
+> `purchasingActionQueue()`, so the cells render **`Send PO` · `Confirm ready date` ·
+> `Check in`** and no banned word survives on them. **Anything still asserting they read
+> `Send POs` · `Chase factory` · `Receive` "right now" is stale, not a live finding.**
+>
+> Separately and later: the FRAME around those cells changes. The purchase-order lifecycle
+> was redesigned and frozen on 2026-07-29 —
+> [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) — which moves
+> `Check in` off To Order to Receiving and adds a Draft PO region. **That is P6's, not R8's,
+> and no R-card touches it.**
+
+What it was, when it was found by P2 2026-07-28: the cells read **`Send POs` · `Chase
+factory` · `Receive`** while the dictionary locked **`Send PO` · `Confirm ready date` ·
+`Check in`**, and **`Chase` is a BANNED word** — not lag, a banned word shipped. Fixed the
+same way C1 fixed Orders: read from the shared word module. **The cells are a STAGE picker,
+not queue tiles** (UI-KIT §8.2, the no-empty-state rule) — R8 renamed them and changed no
+behaviour.
 
 **⓪b Delete the two dead filters in the same visit** (Loo ruled 2026-07-28). `attn` and
 `selectedDay` in `OperationPurchase.tsx` carry state, filter logic and a clear chip that

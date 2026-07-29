@@ -15,7 +15,7 @@ Paste this into a fresh chat:
 > 2. `docs/subscription-mattress-proposal.md` — this file, the SPEC
 > 3. `docs/COPY-STANDARD.md` — microcopy rules
 > 4. `docs/UI-KIT.md` §A0 — Module-tab law
-> 5. `docs/purchase-cockpit-handoff.md` §5 — Purchase cockpit reference
+> 5. `docs/PURCHASING-WORKING-FLOW.md` — Purchasing reference *(corrected 2026-07-29: `purchase-cockpit-handoff.md` deleted 2026-07-27)*
 > 6. `docs/orders-panel-concept-proposal.md` — Orders integration (subscription SO type lives there)
 > 7. `docs/payment-module-proposal.md` — billing + collections cross-module
 > 8. `docs/delivery-module-proposal.md` — first-mattress delivery cross-module

@@ -11,10 +11,14 @@ Paste this into a fresh chat:
 > Continue Inventory module redesign. Read in order:
 > 1. `docs/inventory-module-proposal.md` — this file, the SPEC
 > 2. `docs/COPY-STANDARD.md` — microcopy rules + canonical vocabulary
-> 3. `docs/UI-KIT.md` §A0 — Module-tab law, Copy law
-> 4. `docs/purchase-cockpit-handoff.md` §5 — Purchase cockpit reference (design language proof)
+> 3. `docs/UI-KIT.md` §8.2 (interaction law) + §8.3 (module-tab law) — **corrected
+>    2026-07-29: `§A0` no longer exists; the kit was rewritten 2026-07-27**
+> 4. `docs/PURCHASING-INFORMATION-MODEL.md` — the Purchasing information architecture,
+>    frozen 2026-07-29. **This replaces the two dead pointers this list used to carry**
+>    (`purchase-cockpit-handoff.md` §5 and `purchasing-3panels-proposal.md`, both DELETED
+>    2026-07-27 — a chat following them was being sent to files that do not exist)
 > 5. `docs/orders-panel-concept-proposal.md` — Orders sibling (same discipline)
-> 6. `docs/purchasing-3panels-proposal.md` — Purchasing 3-panel sibling
+> 6. `docs/PURCHASING-WORKING-FLOW.md` — how Purchasing behaves (the ONE flow file)
 >
 > Live-poke `https://erp.carresofficial.com/operation?tab=purchase` for the visual/interaction language.
 >
@@ -27,7 +31,9 @@ Paste this into a fresh chat:
 - **LAYER on top of existing `Stock · On Hand` + `Stock · Movements`** — don't tear down. Merge into `Inventory` module with 4 tabs.
 - Zero danger-zone breakage — `stock_balances` / `ops_stock_items` schema untouched; new tables (`sku_aliases`, `supplier_aliases`, `stock_reconciliations`) are additive.
 - One PR per phase. Review + merge + deploy independently.
-- Deploy only from `main` per `docs/purchase-cockpit-handoff.md` §2.
+- Deploy only from `main` — the rule lives in `CLAUDE.md` §17.1 ("Deploy rules (Loo,
+  permanent)"). *(Corrected 2026-07-29: this line pointed at `docs/purchase-cockpit-handoff.md`
+  §2, deleted 2026-07-27.)*
 
 ---
 

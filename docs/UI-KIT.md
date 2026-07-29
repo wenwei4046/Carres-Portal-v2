@@ -1444,6 +1444,16 @@ clear back to. Some do not. Purchasing's To Order is a **stage** page: three
 cells, exactly one always on, and no way to show all three at once — clearing the
 stage would show a blank screen, not every row.
 
+> **⚠️ To Order's COMPOSITION changed on 2026-07-29 and its SHAPE is not yet re-decided.**
+> The frozen purchasing information model
+> ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md)) moves
+> `Check in` out of To Order to Receiving and gives To Order a second business object,
+> the **Draft PO**. So the three cells this paragraph describes are no longer the three that
+> will be there. **The stage-vs-queue rule below is unchanged and still decides it** — the
+> test is the empty state, and that test is applied to the new composition in the UI-KIT
+> phase, not here. **Nothing about To Order's shape may be assumed from this paragraph until
+> then.**
+
 **So a picker with no empty state is not a queue tile and does not toggle.**
 
 | | Queue tile / facet | Stage picker |

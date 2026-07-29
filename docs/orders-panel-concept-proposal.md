@@ -14,7 +14,7 @@ Read these BEFORE writing any code:
 
 - `docs/COPY-STANDARD.md` — 10 rules · row action-line template · What-to-do template · canonical vocabulary (SO vs PO)
 - `docs/UI-KIT.md` §A0 — Module-tab law · Copy law · Date law · Hover law · Action law
-- `docs/purchase-cockpit-handoff.md` §5 — the LOCKED design for Purchase (mirror the discipline)
+- `docs/PURCHASING-WORKING-FLOW.md` + `docs/PURCHASING-INFORMATION-MODEL.md` — Purchasing's live rules (mirror the discipline). *(Corrected 2026-07-29: `purchase-cockpit-handoff.md` was deleted 2026-07-27.)*
 - `apps/web/src/pages/operation/OperationPurchase.tsx` — the shipped reference implementation
 - `apps/web/src/pages/operation/OperationOrdersControl.tsx` — the Orders panel we're modifying
 - `apps/web/src/pages/operation/components/OrderDetailDrawer.tsx` — the current drawer (to be replaced by inline detail in Phase 2)
@@ -55,7 +55,7 @@ Each phase = its own PR. Follows the same discipline as this Purchase cockpit �
 ## Deploy notes
 
 - Purchase cockpit deployed 2026-07-22 from main tip `0777e1d6` (PR #243 merged) — api Worker + web to both carres-portal + carres-pos Pages projects, `--branch=main`.
-- Any Orders panel changes follow the SAME procedure (`docs/purchase-cockpit-handoff.md` §2 deploy procedure — deploy only from `main`, `pnpm install` first, re-curl canonicals ~15s after).
+- Any Orders panel changes follow the SAME procedure (the deploy rules in `CLAUDE.md` §17.1 — deploy only from `main`, re-curl all canonicals and poll until they converge *(corrected 2026-07-29: `purchase-cockpit-handoff.md` deleted 2026-07-27)*).
 
 ## Resume prompt (any machine, any new chat)
 
@@ -64,7 +64,7 @@ Paste this into a fresh chat on Sat:
 > Continue Orders panel redesign. Read:
 > 1. `docs/COPY-STANDARD.md`
 > 2. `docs/UI-KIT.md` §A0
-> 3. `docs/purchase-cockpit-handoff.md` §5
+> 3. `docs/PURCHASING-WORKING-FLOW.md` *(was `purchase-cockpit-handoff.md` §5, deleted 2026-07-27)*
 > 4. `docs/orders-panel-concept-proposal.md` (this file)
 >
 > Visually study `https://erp.carresofficial.com/operation?tab=purchase` for the design language. Then start Phase 1 (copy audit + row action-line + What-to-do — safe, non-structural, no layout change).
@@ -73,5 +73,5 @@ Paste this into a fresh chat on Sat:
 
 - Sat / Sun / public holidays greyed on Purchase Days-to-order strip (`packages/shared/src/my-holidays.ts` already exists — just import + check each cell's ISO).
 - L / R chevron nav on Purchase strip (shift the 14-day window ±7 days).
-- Real Send PO / Chase WhatsApp / Check-in GRN write paths (`docs/purchase-cockpit-handoff.md` §6 later units).
+- Real Send PO / Chase WhatsApp / Check-in GRN write paths (now `docs/PURCHASING-WORKING-FLOW.md` §3 — `purchase-cockpit-handoff.md` was deleted 2026-07-27).
 - Lead-time settings screen (migration 0243).

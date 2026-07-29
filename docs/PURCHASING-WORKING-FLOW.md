@@ -29,6 +29,35 @@ Buying and receiving are the same job on the same PO, done by the same people. R
 **not** a separate menu item: warehouse staff reach it through their own login landing page,
 which removes the only usability reason for splitting it out. `Settings` is manager-only.
 
+**HOW THE WORK DIVIDES BETWEEN THE TABS — FROZEN 2026-07-29 by Loo. This is the governing
+rule, and it is measurable:**
+
+> **Work whose deadline is derived from the CUSTOMER commitment belongs to To Order.**
+> **Work whose deadline is derived from the physical movement or arrival of GOODS belongs to
+> Receiving.**
+
+Every action's Due is written in §3, so no case has to be argued:
+
+```
+To Order    ⟨SLOT-1⟩ prepare demand · Issue PO · Confirm ready date
+Receiving   Confirm tomorrow's delivery · Check in · Confirm balance delivery date
+Claims      Confirm what happens next
+```
+
+**Every action of the module has exactly one home** — none in two tabs, none in none.
+
+The sentence above about buying and receiving being the same job stays true of the PEOPLE and
+of the tab bar. It is **not** the rule that decides which tab an action lives on. Neither is
+*"goods are not yet secured → To Order"*: sending the PO is itself what secures the goods
+(§4 rung 3), so read literally that sentence would put `Confirm ready date` on the wrong side.
+It survives only as a plain-language explanation for a person.
+
+**To Order is the PLANNING WORKSPACE and it holds a second business object: the Draft PO.**
+How its information is organised — the seven regions, the legal overlap between a draft and
+the plan, and what may never be silently discarded — is
+[`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), frozen 2026-07-29.
+That file is read before any To Order work.
+
 **Receiving here means goods coming IN from a supplier.** Goods going OUT to a customer are
 Delivery. The two never share a word.
 
@@ -143,6 +172,19 @@ goods are collected by NETS; the row says `Call NETS — collect from Nice Futur
 `Call Nice Future`).
 
 ### `Send PO to {supplier}`
+
+> **⚠️ THIS ACTION SPLITS IN TWO — ruled 2026-07-29, wording NOT yet ruled.** Under the frozen
+> Purchase Order lifecycle, raising goods against demand is two steps, not one:
+> **⟨SLOT-1⟩ prepare** produces a **Draft PO**, and **`Issue PO`** is the only action that
+> creates the official Purchase Order. `Issue PO` is the decided word; `⟨SLOT-1⟩` is not.
+>
+> **The six things below still describe the OLD single step, and they stay until Jess rules
+> the missing word** — a half-rewritten action is worse than an honestly stale one. What is
+> already known to change: the Completion (*"a PO exists for the line"*) is the completion of
+> `Issue PO`, not of the preparing step; and the done message `PO sent to {supplier}` in
+> `docs/COPY-STANDARD.md` describes a step that no longer sends anything.
+> See [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §10,
+> SLOT-1 and SLOT-2.
 
 - **Trigger** — a customer line needs goods, no PO covers it, and today is a PO day **or**
   the line's order-by date has passed
@@ -354,12 +396,21 @@ The click behaviour is **§8.2**: a queue tile filters, clicking it again clears
 the drawer on its FIRST tab, and closing keeps the filter and the scroll — one behaviour for
 every module.
 
-**The queue tiles** (each is a count of open actions, and its name IS the action):
+**The queue tiles** (each is a count of open actions, and its name IS the action). **They are
+not one set on one screen — each lives on exactly ONE tab**, decided by §1's deadline-anchor
+rule. A chat that reads this as a single list will build a tile for an action the tab cannot
+count:
 
 ```
-Send PO · Confirm ready date · Confirm tomorrow's delivery · Check in ·
-Confirm balance delivery date · Confirm what happens next
+To Order    ⟨SLOT-1⟩ prepare demand  ·  Issue PO  ·  Confirm ready date
+Receiving   Confirm tomorrow's delivery  ·  Check in  ·  Confirm balance delivery date
+Claims      Confirm what happens next
 ```
+
+**On To Order the three rank in that order** (`docs/ACTION-FLOW-STANDARD.md` Law 4 rung 3,
+frozen 2026-07-29): a broken supplier commitment first, then work already prepared, then work
+not yet started. `⟨SLOT-1⟩` is an unresolved terminology slot —
+[`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §10.
 
 **The last tile is `Confirm what happens next`, not `Claims`.** A tile's name IS its action
 (COPY-STANDARD); `Claims` is the TAB, which is a place, and a place and an action may not
@@ -425,6 +476,35 @@ Part received     0 < received_qty < po_qty
 Fully received    received_qty >= po_qty
 Balance owed      po_qty − received_qty
 ```
+
+**TWO INDEPENDENT STATUS AXES — FROZEN 2026-07-29 by Loo. They are never merged:**
+
+| Axis | What it is | Who moves it |
+|---|---|---|
+| **Operation Status** | Carres' own workflow: `Draft` · `Issued` · `In Production` · `Receiving` · `Completed` · `Cancelled` | Carres |
+| **Supplier Status** | what the factory and the logistics partner report | the supplier portal and the partner portal |
+
+A screen may show both. **Neither is ever collapsed into the other**, and the supplier axis is
+not a Purchasing decision to redefine — two external roles run their whole lifecycle on it.
+
+**`Open` may not appear in the UI as an Operation Status. The word is `Issued`.**
+
+**A DRAFT PO IS NOT IN THE TABLE ABOVE, and that is the point.** The five lines are DERIVED
+from quantities. A Draft PO is a **stored business object** with its own identity, and it is
+**not a Purchase Order** — it has no PO number and produces no external document. It is
+therefore not a state of a PO and never becomes one; issuing it is what creates the PO.
+See [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §2–§3.
+
+**DEMAND THAT NEVER REACHED THE PLAN IS ALSO NOT IN THE TABLE ABOVE.** `required_qty` only
+means anything for a line the plan could read. Two kinds of demand cannot be described by any
+line above and **may never be silently discarded**:
+
+- **the configuration is missing** — the supplier cannot be resolved, or production working
+  days are not set for that supplier × category
+- **a human held it** — excluded, time-boxed or snoozed, with who, why and until when
+
+They are two different facts with two different owners and they never share one status or one
+empty state (information model §3 · §6.6 · §6.7).
 
 **There is no cancelled quantity, and purchasing does not model a cancellation**
 (Loo, 2026-07-28). A customer may not cancel an order in the normal course; a cancellation

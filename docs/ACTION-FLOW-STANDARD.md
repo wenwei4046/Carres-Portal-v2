@@ -159,12 +159,32 @@ open on the same record at the same time.
    phone about a delay, and never before the ready date is known)
      Call {logistics} — arrange new delivery date
 3  Goods are not secured
-     Send PO to {supplier} · Call {supplier} — confirm ready date
+     Call {supplier} — confirm ready date
+     Issue PO
+     ⟨SLOT-1⟩ — turn unprotected demand into a Draft PO
 4  Delivery preparation
      Assign logistics · Call {logistics} — confirm delivery date · Issue delivery order
 5  Money
      Collect RM {amount} from {customer}
 ```
+
+**Rung 3 is ORDERED INSIDE ITSELF, frozen 2026-07-29 by Loo.** The three are not equal
+members of one rung — they are three distances from a commitment, and the order is
+commitment descending:
+
+1. **`Call {supplier} — confirm ready date`** — an existing supplier commitment is missing
+   or broken. Something already promised has stopped being true.
+2. **`Issue PO`** — work is already prepared and has not yet become a formal PO.
+3. **`⟨SLOT-1⟩`** — demand has not yet been placed into a Draft PO at all.
+
+**`⟨SLOT-1⟩` is an UNRESOLVED TERMINOLOGY SLOT and no chat may fill it.** The ORDERING is
+frozen; the WORD is Jess's, and `Send PO` cannot simply be reused — under the frozen
+Purchase Order lifecycle that step produces a **Draft PO** and sends nothing. The slot is
+tracked in [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §10.
+
+**`Send PO to {supplier}` used to be listed on this rung and has been removed from it**, not
+because the action stopped existing but because it split in two and only one half kept a
+ruled name. `docs/COPY-STANDARD.md` still carries its five strings; that entry is SLOT-2.
 
 **`Delay planning` sits at the TOP of rung 2, immediately above the call it guards**
 (added 2026-07-28 — C8 found that Law 4 ranked it nowhere at all). It is the decision
