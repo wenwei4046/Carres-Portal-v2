@@ -14,7 +14,7 @@ Read these BEFORE writing any code:
 
 - `docs/COPY-STANDARD.md` — 10 rules · row action-line template · What-to-do template · canonical vocabulary (SO vs PO)
 - `docs/UI-KIT.md` §A0 — Module-tab law · Copy law · Date law · Hover law · Action law
-- `docs/purchase-cockpit-handoff.md` §5 — the LOCKED design for Purchase (mirror the discipline)
+- `docs/PURCHASING-WORKING-FLOW.md` + `docs/PURCHASING-INFORMATION-MODEL.md` — Purchasing's live rules (mirror the discipline). *(Corrected 2026-07-29: `purchase-cockpit-handoff.md` was deleted 2026-07-27.)*
 - `apps/web/src/pages/operation/OperationPurchase.tsx` — the shipped reference implementation
 - `apps/web/src/pages/operation/OperationOrdersControl.tsx` — the Orders panel we're modifying
 - `apps/web/src/pages/operation/components/OrderDetailDrawer.tsx` — the current drawer (to be replaced by inline detail in Phase 2)
@@ -28,7 +28,7 @@ Read these BEFORE writing any code:
 | **3-pane inline split** (facet · list · detail always visible) | Kill the Order drawer overlay → detail lives beside the list, always visible | Biggest UX win — same as Purchase; new operator sees list + detail together, never navigates away |
 | **Compact pill stage tabs** (~40px vs ~72px cards) | Same compact pill row for Orders status tabs (Placed · Proceed · Pending · Scheduled · Completed · All) | Half the vertical space; frees room for the detail pane |
 | **Row action-line** (≤10 words, verb + object + when) | Every Orders row ends with a plain-English "next step" sentence: `Confirm delivery date with Ali Chen.` · `Chase Nice Future — 2d late.` · `Assign NETS for SO-1234.` | Zero-experience friendly; layers on top of existing action pills (doesn't replace them) |
-| **Inline What-to-do (3-4 step, horizontal)** in detail pane | Per stage guide: **Placed** → "Wait for customer to confirm ETA → move to Proceed." · **Proceed** → "Send POs · confirm delivery · schedule NETS." · **Scheduled** → "Confirm morning-of · dispatch · POD." · **Completed** → "Post-invoice · archive." | New employees know the flow at every stage |
+| **Inline What-to-do (3-4 step, horizontal)** in detail pane | Per stage guide: **Placed** → "Wait for customer to confirm ETA → move to Proceed." · **Proceed** → "Prepare and issue POs · confirm delivery · schedule NETS." · **Scheduled** → "Confirm morning-of · dispatch · POD." · **Completed** → "Post-invoice · archive." | New employees know the flow at every stage |
 | **COPY-STANDARD vocab alignment** | Audit every Orders string: SO for customer orders, PO for supplier orders, no mixing; canonical Send / Chase / Receive / Remind / Placed / Proceed | Same one-vocab-across-app discipline as Purchase |
 | **Days-to-deliver strip** (14-day) | Same shape as Purchase's Days-to-order — but keyed on `delivery_date` instead of order-by. See today's + this week's delivery load at a glance. Cadence day markers = customer delivery peak days (Mon-Fri; Sat/Sun/PH greyed). L/R chevrons to shift window. | Fits Master-Sheet mentality perfectly; scales at 1000 orders/mo |
 | **Missing-data guard bar** | `N SOs need delivery date` · `N SOs need address` · `N SOs need customer contact` — one guard per data gap | Prevents work stalling downstream (currently silent-fail) |
@@ -55,7 +55,7 @@ Each phase = its own PR. Follows the same discipline as this Purchase cockpit �
 ## Deploy notes
 
 - Purchase cockpit deployed 2026-07-22 from main tip `0777e1d6` (PR #243 merged) — api Worker + web to both carres-portal + carres-pos Pages projects, `--branch=main`.
-- Any Orders panel changes follow the SAME procedure (`docs/purchase-cockpit-handoff.md` §2 deploy procedure — deploy only from `main`, `pnpm install` first, re-curl canonicals ~15s after).
+- Any Orders panel changes follow the SAME procedure (the deploy rules in `CLAUDE.md` §17.1 — deploy only from `main`, re-curl all canonicals and poll until they converge *(corrected 2026-07-29: `purchase-cockpit-handoff.md` deleted 2026-07-27)*).
 
 ## Resume prompt (any machine, any new chat)
 
@@ -64,7 +64,7 @@ Paste this into a fresh chat on Sat:
 > Continue Orders panel redesign. Read:
 > 1. `docs/COPY-STANDARD.md`
 > 2. `docs/UI-KIT.md` §A0
-> 3. `docs/purchase-cockpit-handoff.md` §5
+> 3. `docs/PURCHASING-WORKING-FLOW.md` *(was `purchase-cockpit-handoff.md` §5, deleted 2026-07-27)*
 > 4. `docs/orders-panel-concept-proposal.md` (this file)
 >
 > Visually study `https://erp.carresofficial.com/operation?tab=purchase` for the design language. Then start Phase 1 (copy audit + row action-line + What-to-do — safe, non-structural, no layout change).
@@ -73,5 +73,5 @@ Paste this into a fresh chat on Sat:
 
 - Sat / Sun / public holidays greyed on Purchase Days-to-order strip (`packages/shared/src/my-holidays.ts` already exists — just import + check each cell's ISO).
 - L / R chevron nav on Purchase strip (shift the 14-day window ±7 days).
-- Real Send PO / Chase WhatsApp / Check-in GRN write paths (`docs/purchase-cockpit-handoff.md` §6 later units).
+- Real `Prepare PO` / `Issue PO` / `Check in` write paths (now `docs/PURCHASING-WORKING-FLOW.md` §3 — `purchase-cockpit-handoff.md` was deleted 2026-07-27). *(Corrected 2026-07-29: this line said `Send PO` and `Chase WhatsApp`; `Send PO` is retired and `Chase` is a banned word.)*
 - Lead-time settings screen (migration 0243).

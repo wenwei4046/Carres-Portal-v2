@@ -724,7 +724,7 @@ repeating the button.
 
 **And it independently reached GOV.UK's most-quoted rule, with GOV.UK's own justification.** This
 entry set out to report a law-vs-law contradiction — *"no abbreviations, ever"* against
-`ACTION-FLOW-STANDARD` Law 4's own `Send PO to {supplier}`. **The evidence refuted it before it
+`ACTION-FLOW-STANDARD` Law 4's own `Send PO to {supplier}` *(retired 2026-07-29 → `Prepare PO` + `Issue PO`; the argument below is unaffected — it is about abbreviations, not about this label)*. **The evidence refuted it before it
 shipped:** COPY-STANDARD line 177 reads
 
 > **"DO" and "PO" survive because the team already speaks them daily.**

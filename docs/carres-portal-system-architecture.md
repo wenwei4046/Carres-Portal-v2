@@ -14,11 +14,11 @@ You are reviewing the Carres Portal — a make-to-order furniture operations sys
 
 1. **`docs/carres-portal-system-architecture.md`** — THIS file (system overview + business locks)
 2. **`docs/COPY-STANDARD.md`** — microcopy vocabulary rules
-3. **`docs/UI-KIT.md`** §A0 — design laws
-4. **`docs/purchase-cockpit-handoff.md`** §5 — the shipped reference implementation (Purchase cockpit, live at erp.carresofficial.com/operation?tab=purchase)
+3. **`docs/UI-KIT.md`** — design laws *(corrected 2026-07-29: `§A0` stopped existing in the 2026-07-27 kit rewrite; the live sections are §8.2 interaction law and §8.3 module-tab law)*
+4. **`docs/PURCHASING-WORKING-FLOW.md`** + **`docs/PURCHASING-INFORMATION-MODEL.md`** — Purchasing's behaviour and its frozen information architecture *(corrected 2026-07-29: this line pointed at `docs/purchase-cockpit-handoff.md` §5, deleted 2026-07-27)*
 5. Module proposals in priority order:
    - `docs/orders-panel-concept-proposal.md`
-   - `docs/purchasing-3panels-proposal.md`
+   - *(`docs/purchasing-3panels-proposal.md` — DELETED 2026-07-27; Purchasing's live docs are the two named at 4 above)*
    - `docs/inventory-module-proposal.md`
    - `docs/delivery-module-proposal.md`
    - `docs/payment-module-proposal.md`
@@ -64,7 +64,7 @@ You are reviewing the Carres Portal — a make-to-order furniture operations sys
 | # | Module | Status | Sidebar item | 1-line purpose |
 |---|---|---|---|---|
 | 1 | **Orders** | 🟡 half-shipped · proposal locked (PR #244) | Orders | Customer SO lifecycle: placed → proceed → pending → scheduled → delivered |
-| 2 | **Purchasing** | 🟢 1/3 tabs shipped + proposal for others (PR #245) | Purchasing (3 tabs) | Supplier PO lifecycle: To Order (send) · Purchase Orders (chase) · Receiving (GRN) |
+| 2 | **Purchasing** | 🟢 **all 5 tabs shipped** (P1-P4). PO lifecycle redesigned + frozen 2026-07-29 — see [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) | Purchasing (**5 tabs**) | Supplier PO lifecycle: To Order (plan + Draft PO) · Purchase Orders (the official document) · Receiving · Claims · Settings (manager-only) |
 | 3 | **Inventory** | 🔵 proposal locked (PR #247) | Inventory (4 tabs, replaces Stock) | On hand · Ready stock · Movements · Reconciliation |
 | 4 | **Delivery** | 🔵 proposal locked (PR #247) | Delivery (new module) | 3PL delivery lifecycle: To assign · In transit · POD queue |
 | 5 | **Payments** | 🟡 basic shipped · proposal locked (PR #247) | Payments (4 tabs) | Money flows: Collect (customer AR) · Pay (supplier AP) · Reconcile (bank) · Refunds |
@@ -95,11 +95,28 @@ You are reviewing the Carres Portal — a make-to-order furniture operations sys
 
 > **CORRECTED 2026-07-23 (Jess — supersedes the earlier 14/8/10).** Two numbers per category: an **official/safe** lead (drives raise-by = order early enough) and the shorter **actual/promise** lead (what we tell the customer).
 
-- **Mattress (Nice Future):** **5–7 working days** (WILL STOP when subscription supplier lands)
-- **Bedframe:** **5–7 working days** (same as mattress)
-- **Sofa:** **14 working days official · ~10 actual** (supplier currently sends in 10 → promise the shorter credible date, don't pad to 14)
-- **Peak OFF** — the engine NEVER auto-pads lead times for peak season. Human overrides only.
-- A lead-time settings table = migration 0243 (deferred; draft-first per §7 guardrail #8). Design = an **official + actual** two-column table, per category, room for per-supplier.
+> **⛔ SUPERSEDED 2026-07-29 — every number below is stale and the settings table is BUILT.**
+> **P1 (PR #488, migration 0303) made every purchasing number a manager-edited setting**, per
+> supplier × category, with a change history the screen reads. **The live values are
+> [`docs/PURCHASING-WORKING-FLOW.md`](PURCHASING-WORKING-FLOW.md) §2 — read them there, never
+> from this list.** Three corrections that matter, because a chat acting on the old text
+> would order late:
+>
+> - **Sofa production time is 14 working days**, ruled by Jess 2026-07-27. The "~10 actual"
+>   second column was never built and is not coming — a production time written too LONG only
+>   makes the portal order earlier, never later.
+> - **There is deliberately no "official + actual" two-column model.** One number per
+>   supplier × category, and a pair with no number set is **not defaulted to 7** — it reads
+>   `Set a number` and its lines are held out of the plan entirely.
+> - **"Peak OFF" is right and its reason changed.** Peak season is not a mode, not a second
+>   set of numbers, and not an effective-from date (Jess + Loo, 2026-07-28) — it is a manager
+>   raising one supplier's production time and lowering it again.
+>
+> **Migration 0243 is not "deferred" — the settings landed as 0303 and 0243 shipped long ago
+> for a different purpose** (excluded / snoozed demand).
+
+*(Historical, kept only so the correction is traceable: mattress 5–7 · bedframe 5–7 · sofa
+14 official / ~10 actual · a deferred two-column lead-time table at 0243.)*
 
 ### 3.3 · Go-live rules (Jess 2026-07-21)
 
@@ -419,7 +436,7 @@ Right rail widgets sit on EVERY module and interlink (see §3.11 + right-rail-wi
 
 **Critical cross-module rules:**
 
-- **Orders proceed → Purchasing To Order** — when SO status flips to `proceed_order`, auto-triggers Purchasing to plan a PO.
+- **Orders → Purchasing To Order** — **corrected 2026-07-29 (measured):** the plan reads orders in **BOTH** `place` **and** `proceed_order`, marking the latter `committed`. It does not wait for the proceed flip, deliberately — a 14-working-day production time means demand seen only after confirmation is already two weeks late. It is a read, not a trigger.
 - **Purchasing Receive → Inventory On hand** — GRN write path adds units to `ops_stock_items`, refreshes `stock_balances` rollup.
 - **Inventory Ready stock reserve → Orders line stock_ready=true** — Book now action writes back to the SO.
 - **Payments Collect success → Delivery unblock** — payment marked paid, PayHold cleared, Assign action re-enabled.
@@ -509,9 +526,9 @@ Send this checklist along with the docs:
 1. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/docs/carres-portal-system-architecture.md (this file)
 2. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/docs/COPY-STANDARD.md
 3. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/docs/UI-KIT.md
-4. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/docs/purchase-cockpit-handoff.md
+4. *(purchase-cockpit-handoff.md — DELETED 2026-07-27, link removed)*
 5. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/docs/orders-panel-concept-proposal.md
-6. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/docs/purchasing-3panels-proposal.md
+6. *(purchasing-3panels-proposal.md — DELETED 2026-07-27, link removed)*
 7. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/docs/inventory-module-proposal.md
 8. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/docs/delivery-module-proposal.md
 9. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/docs/payment-module-proposal.md

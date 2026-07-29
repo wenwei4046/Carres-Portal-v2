@@ -24,7 +24,7 @@
 |---|---|---|---|
 | 1 | Orders — **List** redesign | 🟡 in progress | `ORDERS_LIST_SPEC.md` |
 | 2 | Orders — **Detail** panel/drawer | 🟡 in progress | `docs/ORDER-DETAIL-INFORMATION-MODEL.md` (frozen 2026-07-28 — the highest business rule for this page) |
-| 3 | **Purchasing / Procurement** | ✅ flow locked 2026-07-27 | `docs/PURCHASING-WORKING-FLOW.md` |
+| 3 | **Purchasing / Procurement** | ✅ **SHIPPED** (all 5 tabs, P1-P4) · flow locked 2026-07-27 · **PO lifecycle + To Order information architecture frozen 2026-07-29** | `docs/PURCHASING-WORKING-FLOW.md` + `docs/PURCHASING-INFORMATION-MODEL.md` |
 | 4 | **Payments / Collections** desk | 🟢 shipped, extensions pending | `docs/master-sheet-operating-model.md` |
 | 5 | **Catalog** (Product & Maintenance, 9-tab) | 🟢 shipped | `docs/superpowers/plans/2026-06-25-2990s-products-9tab-parity-roadmap.md` |
 | 6 | **POS** (dealer/showroom) | 🟢 shipped | `docs/superpowers/plans/2026-06-20-pos-2990s-alignment.md` |
@@ -101,46 +101,42 @@ The order detail is the **hub** — every other module (stock, payments, procure
 
 ---
 
-## 3. Purchasing / Procurement Cockpit  🔵 (the highest-value review target — engine WIP, UI not built)
+## 3. Purchasing / Procurement  🟢 (SHIPPED — this section's old design is SUPERSEDED)
 
-**Full spec:** `docs/PURCHASING-WORKING-FLOW.md` (the ONE file; seven older purchasing docs were deleted 2026-07-27). Logic ported from the sister company's "2990s ERP", rebuilt in Carres's UI-KIT.
+> **⛔ SUPERSEDED 2026-07-29. Everything this section used to propose has been replaced by
+> shipped code and by two frozen documents. It is NOT a design to review and NOT a design to
+> build from.**
+>
+> **Read these instead:**
+> - [`docs/PURCHASING-WORKING-FLOW.md`](PURCHASING-WORKING-FLOW.md) — how Purchasing behaves
+>   (the ONE flow file)
+> - [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) — the To Order
+>   information architecture, **frozen 2026-07-29**
+> - [`docs/purchasing-execution-queue.md`](purchasing-execution-queue.md) — what shipped and
+>   what is next
 
-### Business problem
-Operations must buy the right goods, from the right supplier, early enough to hit each customer's deadline — without over-buying (money tied up) or under-buying (missed deadline). The business's real pain: **staff pad lead times "to be safe", producing the longest promised date = lost sales.**
+**What this section claimed, and why every line of it had to go** (kept so the correction is
+traceable, not as guidance):
 
-### Proposed design
-A **procurement cockpit** (called "Purchase page" in UI — the word "MRP" is banned): a top At-Risk radar (must-order-now · PO-late-to-chase · due-soon · to-receive) + three zones **Buy · Expedite · Receive**. Not an orders-list clone.
+| It said | Measured / ruled reality |
+|---|---|
+| 🔵 "engine WIP, UI not built" | **All five Purchasing tabs are shipped and live** (P1-P4) |
+| a cockpit with three zones **Buy · Expedite · Receive** | the module is five TABS, and `Check in` has moved OFF To Order to Receiving (2026-07-29 boundary ruling) |
+| lead times listed as fixed numbers (sofa 14 / peak 21 · bedframe 7-10) | **P1 (migration 0303) made every purchasing number a manager-edited setting**, per supplier × category, with change history. A supplier × category with no number reads `Set a number` and is held out of the plan — it never falls back to a default |
+| "peak season = Nov → CNY, a separate lead profile" | **Peak season is explicitly NOT a mode and NOT a second set of numbers** (Jess + Loo, 2026-07-28). It is a manager raising one supplier's production time and lowering it again |
+| "mattress + bedframe merge into one bundle" on a PO | consolidation is **across CUSTOMER ORDERS, not across categories** — every non-sofa line for one supplier merges into one PO; sofa splits |
+| "**GRN** receive" as the act | `GRN` is the DOCUMENT. **`Check in` is the act** — the banned-verb sweep (R8) took `GRN`-as-a-verb, `Chase` and `Receive`-as-a-verb off the whole lane |
+| "raise PO → PDF → send" as one step | the PO lifecycle was **redesigned and frozen 2026-07-29**: preparing produces a **Draft PO**, and **`Issue PO`** is the only action that creates the official Purchase Order |
 
-- **Two buying modes:**
-  1. **Order-driven (make-to-order)** — sofa / bedframe / mattress (Nice Future): a customer order creates demand → raise a PO.
-  2. **Forecast / reorder-point** — pillow + M.P (imported from China, ~2-month lead): pre-bought to stock, reorder when FREE stock hits **200/SKU**.
-- **The net-requirements engine (pure, TDD, in `packages/shared`):**
-  `to order = customer demand − FREE (unreserved) stock − qty on open PO`. Nets off stock + open POs so it never double-orders or misses. Greedy earliest-deadline-first allocation.
-- **Lead times** — all editable defaults, counted in **working days** (Mon–Sat, skip Sunday + Selangor/national MY holidays):
-  - Sofa 14 / peak 21 · Bedframe 7–10 · Mattress (Nice Future) TBD.
-  - Peak season = Nov → Chinese New Year (separate lead profile, not year-round padding).
-  - **Extra safety buffer default 0** — report the shortest credible date; don't lazy-pad.
-  - **Raise-by = customer deadline − lead (working days).** ETA = order date + lead.
-- **Short-delivery strategy** (the anti-padding levers): ready-stock-first = instant ~3-day promise; price promises off real supplier performance (scorecard: actual avg lead / on-time %); keep the customer promise (short) separate from the internal buffer (order early).
-- **Order → PO → Receive:** demand → MRP shows netted shortage → group **one PO per supplier** (sofa = one PO per order / dye lot; mattress+bedframe merge into one bundle) → raise PO auto-costed from the Operation Catalog cost → PO PDF → send to supplier (v1 manual PDF; later one-tap WhatsApp) → **GRN receive** (partial OK, dye-lot = PO number, capture supplier DO) → stock IN → auto-reserve to the source order.
-- **SKU model:** one SKU → one supplier → one cost (from `product_skus.cost`, migration 0226). No dual-code, no supplier price-matrix (simpler than 2990s).
+**The business problem it named is still true and is worth keeping:** operations must buy the
+right goods from the right supplier early enough to hit each customer's deadline, without
+over-buying; and **staff padding lead times "to be safe" produces the longest promised date
+and loses sales.** That problem is what the frozen documents above now answer.
 
-### Locked decisions
-- Cadence **C**: fixed review windows + urgent override; always **auto-SUGGEST, never auto-place** a PO.
-- Mattress + bedframe review Mon/Wed/Fri (cycles skip if empty, look ahead to next).
-- Sofa = one PO per order, no batching.
-- Bed-set (mattress + frame) = one delivery bundle: raise-by = deadline − MAX(component leads); sofa is a separate trip.
-- 5-colour urgency + a single "ready date" per trip.
-- Forecast track watches pillow / M.P reorder < 200.
-- Scope v1 = sofa + bedframe + mattress (Nice Future via portal now). Future subscription-mattress supplier is a separate later track.
-
-### Open questions to review (genuinely open — this is what needs eyes before code)
-- **Mattress (Nice Future) lead-time number** for the table — still TBD.
-- **Peak-season exact start/end** (which day in Nov; CNY day or the week before).
-- **Holiday calendar** — verify lunar/Islamic dates against the official Selangor gazette (starter data flagged as needs-verify).
-- D1–D4 default parameters (defaults drafted, final sign-off pending).
-- **Cross-team dependency (must align with the stock/on-hand model):** net requirements needs a per-SKU **FREE/available** quantity; GRN receive must post stock IN and auto-reserve to the source order; Klg (Klang warehouse) = the only real stock quantity, PJ Showroom = a filtered view of Klg.
-- Is greedy earliest-deadline-first the right allocation when two orders compete for the same scarce stock, or should priority also weigh customer/payment status?
+**Nothing in this section is an open question any more.** The ones it listed were closed by
+P1 (the numbers), by the working flow (consolidation, peak season, cadence) or by the
+2026-07-29 lifecycle freeze. Allocation across competing orders is the one genuinely open
+item and it is tracked as **P5**, not here.
 
 ---
 
@@ -185,14 +181,14 @@ A catalog-first full-screen point-of-sale (01 CATALOG → 02 CUSTOMER → 03 CON
 
 ## 7. Stock / On-hand  🔵 (dependency, not yet its own panel)
 
-There is no standalone stock panel proposal yet, but the **Purchasing cockpit (#3) depends on a stock model** with these requirements (from the cross-team section of the purchase plan):
+There is no standalone stock panel proposal yet, but **Purchasing (#3) depends on a stock model** with these requirements. *(Corrected 2026-07-29: "cockpit" was the superseded design's word; the source it cites, `purchase-procurement-plan.md`, was deleted 2026-07-27.)*
 - Per-SKU **FREE (unreserved) / available** quantity exposed for net-requirements.
 - **GRN receive posts stock IN and auto-reserves to the source order.**
 - **Ready-stock-first** is the short-delivery lever.
 - Pillow / M.P reorder point = 200 free stock per SKU.
 - **Klg** (Klang warehouse) = the only real stock quantity; **PJ Showroom** = a filtered view of Klg.
 
-**For review:** should stock become its own panel, or stay embedded in Purchasing (Receive zone) + Orders (Stock pill)? The current plan embeds it.
+**Answered, not open.** Stock became its own door — the `Stock` sidebar item with `On hand` / `In & out` / `Ready stock` (line ⑤, K0-K5, complete). It is not embedded in Purchasing, and there is no "Receive zone" — receiving is the `Receiving` TAB, and from 2026-07-29 `Check in` lives only there.
 
 ---
 
@@ -219,7 +215,7 @@ All printable docs (loan note / receipt / DO / invoice) use `docNumber()` in `pa
 
 ## What I'd most want the reviewer to focus on
 
-1. **Purchasing cockpit (#3)** — the net-requirements engine + lead-time / allocation model. It's the one panel where the code isn't written yet and the business logic is subtle (padding, peak season, bundle raise-by, scarce-stock allocation).
+1. ~~**Purchasing cockpit (#3)**~~ — **CLOSED 2026-07-29.** The engine shipped, the lead-time model became manager-edited settings (P1 / migration 0303), peak season was ruled NOT to be a mode, and the PO lifecycle is frozen. **Scarce-stock allocation is the one item still open and it is tracked as P5**, not as a panel review.
 2. **The Outstanding / storage-fee money model** (#2, #4) — there's a known real bug (Outstanding = 0 for owing orders); the correct definition deserves scrutiny.
 3. **Combined-ref rollout sequencing** (cross-cutting A) — a data-integrity change on shared prod that can create duplicates if mis-sequenced.
 4. **The dormant-engine wake risk** (#5) — sofa/PWP/delivery have never run on live data.

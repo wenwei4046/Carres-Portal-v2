@@ -37,12 +37,12 @@ prioritized P1/P2/P3 to lift toward 10/10. Zero-experience UX standard.
    business locks (Loo/Jess decisions · NEVER override silently).
 2. `docs/COPY-STANDARD.md` — microcopy rules + canonical vocabulary
 3. `docs/UI-KIT.md` §A0 — design laws
-4. `docs/purchase-cockpit-handoff.md` §5 — shipped reference implementation
+4. `docs/PURCHASING-WORKING-FLOW.md` — shipped reference *(corrected 2026-07-29: `purchase-cockpit-handoff.md` deleted 2026-07-27)*
 5. `docs/reviewer-prompt-template.md` — this prompt (for reference)
 6. Then module proposals in priority order:
    - `docs/subscription-mattress-proposal.md` (Sept 2026 hard deadline)
    - `docs/orders-panel-concept-proposal.md`
-   - `docs/purchasing-3panels-proposal.md`
+   - *(`docs/purchasing-3panels-proposal.md` — DELETED 2026-07-27)*
    - `docs/inventory-module-proposal.md`
    - `docs/delivery-module-proposal.md`
    - `docs/payment-module-proposal.md`
@@ -92,7 +92,7 @@ Every panel/widget MUST have:
 - **Step 1-2-3 pedagogy** top-to-bottom (Red = fix first · Yellow = do next ·
   Green = plan). New staff reads top-to-bottom = knows what to do.
 - **Row action-line** at end of each row: verb + object + when (≤10 words).
-  Example: `Send PO to Ohana today.` · `Chase Nice Future — PO-86 due Fri.`
+  Example: `Prepare PO for Ohana today.` · `Call Nice Future — confirm ready date.` *(Corrected 2026-07-29: the old examples used `Send PO`, retired, and `Chase`, a banned word — a reviewer prompt that teaches banned words is worse than none.)*
 - **Inline What-to-do** 3-4 numbered steps per detail pane (each step ≤8 words).
 - **COPY-STANDARD vocabulary strict** — SO for customer sales order · PO for
   supplier purchase order. NEVER mix. Send / Chase / Receive / Remind /
@@ -216,7 +216,7 @@ Confirm you have read (list which files you can access):
 - Master doc §3 business locks
 - COPY-STANDARD.md
 - UI-KIT.md §A0
-- purchase-cockpit-handoff.md §5
+- *(purchase-cockpit-handoff.md — DELETED 2026-07-27; use PURCHASING-WORKING-FLOW.md)*
 
 Then ask Jess:
 

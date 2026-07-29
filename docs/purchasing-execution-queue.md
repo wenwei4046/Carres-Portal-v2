@@ -1032,6 +1032,190 @@ and stopping is the whole PO (`purchase_orders.status = 'cancelled'`, already bu
 **Done when:** one real PO has gone the whole way, including a short delivery, and every
 number on screen matches what actually happened.
 
+## P6 · Purchasing terminology freeze
+
+**Goal:** rule **SLOT-1 through SLOT-8 in ONE session** and write every ruled word into
+`docs/COPY-STANDARD.md`, so the Purchasing dictionary is whole again.
+
+**⛔ THIS CARD IS A PLAN CHAT, NOT A BUILD CHAT.** It writes documentation and nothing else —
+no schema, no migration, no API, no React, no deploy. Its output is words.
+
+**⛔ IT MUST BE ONE SESSION.** Ruling four slots and stopping is worse than ruling none: the
+half-renamed state puts one act on two screens under two words, which is the exact defect the
+shared word module exists to prevent, and it is what `Send PO` is suffering from right now.
+
+### Read first, all three
+
+| File | For |
+|---|---|
+| `docs/COPY-STANDARD.md` | **the canonical slot definitions** — what each of the eight needs. The words are that file's |
+| `docs/PURCHASING-INFORMATION-MODEL.md` §10 | **where each slot is USED**, so a ruling can be checked against the thing it unblocks |
+| `docs/PURCHASING-WORKING-FLOW.md` §1 · §3 · §7 · §9 | the actions the words name, and their trigger / due / completion |
+
+### The one slot that is NOT a Purchasing-only decision — put it to Jess FIRST
+
+**SLOT-2 reaches into Orders.** `docs/COPY-STANDARD.md` declares `Send PO` **one action shared
+by Orders and Purchasing**, spelt identically in both. The frozen lifecycle splits the
+Purchasing side into `Prepare PO` → `Issue PO`.
+So there are only two honest outcomes and both are Jess's:
+
+- the action stays shared and **the Orders wording moves too**, or
+- it stops being one shared action and **each flow gets its own entry**, and the sentence
+  claiming they are one is deleted.
+
+**Anything else leaves one act with two spellings.** Settle this before the other seven — it
+decides whether SLOT-1 is a new word or a re-scoping of an existing one.
+
+### What the card must produce
+
+1. **Eight rulings.** Five strings each (queue tile · row line · button · done message ·
+   empty state) for the action slots; one fact string each for the fact slots; a name plus
+   its facts for SLOT-7; a home for SLOT-4.
+2. **Every ruled word written into `docs/COPY-STANDARD.md`** — its canonical home.
+3. **Every terminology placeholder replaced in the same session**, across:
+   `docs/ACTION-FLOW-STANDARD.md` (Law 4 rung 3) · `docs/PURCHASING-WORKING-FLOW.md`
+   (§1 · §3's `Send PO` warning block · §7) · `docs/PURCHASING-INFORMATION-MODEL.md`
+   (§4 · §9's ASCII · §10) · `docs/purchasing-execution-queue.md` (this file, P7).
+4. **`docs/PURCHASING-WORKING-FLOW.md` §3's six things for the two halves.** The `Send PO`
+   entry currently carries a warning saying its six things describe the OLD single step and
+   stay until this card runs. **This is the card. Rewrite them** — trigger, checklist,
+   completion, due, task owner, counted per, re-checked when — for `Prepare PO` and for
+   `Issue PO` separately. `Issue PO`'s completion is *a PO exists for the line*; the old
+   entry's is already that sentence, so it moves rather than being invented.
+
+### Rules this card may not break
+
+- **No temporary wording.** A word Jess has not ruled does not go on a screen or into a
+  document. If a slot cannot be settled, the card reports it and **the other seven still ship
+  in that session** — but a reported slot keeps its placeholder rather than
+  receiving a stand-in.
+- **The approved business meaning does not change.** This card names things; it does not
+  re-decide the lifecycle, the ordering, the boundary or the regions.
+- **`Issue PO`, `Draft PO`, `Issued`, and the six Operation Status values are already ruled**
+  (Loo, 2026-07-29) and are not reopened. SLOT-3 and SLOT-4 are about the SCREEN noun and the
+  vocabulary HOME, not about those decisions.
+- **Ownership holds**: the words go to `COPY-STANDARD`, the workflow effects to
+  `PURCHASING-WORKING-FLOW`, the region effects to `PURCHASING-INFORMATION-MODEL`. One
+  canonical home each, pointers elsewhere.
+
+**No migration. No code.**
+
+**Done when — and this is measurable, so measure it:**
+
+```
+grep -rho "<SLOT-[0-9]>" docs/ | wc -l        ->  0        # ✅ 0 as of 2026-07-29
+```
+
+**Baseline 2026-07-29: 20 placeholders across 5 files** — `PURCHASING-INFORMATION-MODEL.md`
+(incl. the ASCII layout) · `PURCHASING-WORKING-FLOW.md` · `COPY-STANDARD.md` ·
+`ACTION-FLOW-STANDARD.md` · this file. The angle-bracket form was the placeholder; a bare
+slot number in this card's own history is prose about the card and does not count.
+
+Plus: `docs/COPY-STANDARD.md` carries five strings for every Purchasing action, and
+`PURCHASING-WORKING-FLOW.md` §3 describes the two halves of raising a PO as two actions with
+six things each.
+
+### ✅ SHIPPED — what actually landed (2026-07-29)
+
+**All eight slots ruled by Loo in one session. Documentation only — no schema, no migration,
+no API, no React.** `docs/COPY-STANDARD.md` is the canonical home for every word below and
+the four other documents reference it.
+
+| # | Ruled |
+|---|---|
+| 1 | **`Prepare PO`** · queue `Prepare PO for {supplier}` · button `Prepare PO` · done `Draft PO prepared for {supplier}` · empty `No purchase orders need preparation.` |
+| 2 | **`Send PO` retired from Purchasing**, and the statement that Orders and Purchasing must carry one identical `Send PO` entry is **deleted** |
+| 3 | **`Draft PO`** — the visible noun everywhere |
+| 4 | the six Operation Status labels, with a meaning each, canonical in COPY-STANDARD |
+| 5 | **`Demand no longer required`** + its supporting line |
+| 6 | **`Covered by {count} Draft POs`** / `Covered by 1 Draft PO` |
+| 7 | region **`Purchasing on Hold`** · row `On hold until {date}` · Held by · Reason · Held time · Resume date |
+| 8 | **`Supplier not assigned`** + its supporting line |
+
+**`Issue PO`'s five strings were DERIVED, not dictated, and that is stated rather than
+hidden.** Loo ruled the word in Q1 and gave five strings for `Prepare PO` only; acceptance
+test 3 requires both actions to have one complete definition. They were written to the same
+pattern — `Issue PO to {supplier}` · button `Issue PO` · `PO issued to {supplier}` ·
+`No draft purchase orders are ready to issue.` — and **no placeholder token was invented**
+for the PO number, so the done message stays parallel to `Draft PO prepared for {supplier}`.
+
+**Two things this card had to decide because the repository proved a conflict:**
+
+1. **The verb dictionary went SIX → SEVEN.** It says *"no module invents a seventh"* and
+   states the bar for one: no existing verb fits, and the alternative is a module inventing
+   its own. **`Prepare` clears exactly that bar** — `Issue` is the SECOND act, `Send` would
+   name the thing that has not happened, and `Assign` · `Call` · `Upload` · `Close` ·
+   `Return` are about other objects. `Issue PO` needed nothing new: `Issue` already means
+   *the SYSTEM produces a formal document*.
+2. **`Send` is retired as an action verb and STAYS BANNED FROM REUSE.** It was pinned to
+   raising a PO; nothing is named `Send` any more. The pin does not lift with it — a word
+   with no owner is not a free word, and the Ready Stock carry-forward
+   (`ready-stock-plan-review-has-no-ruled-words`) reasons from that pin.
+
+**The Orders side had to move, and the evidence is why.** The instruction was to leave Orders
+alone *unless its actual meaning is also incorrect*. Measured: `docs/ORDERS-WORKING-FLOW.md`'s
+`Send PO to {supplier}` is the SAME act, not "sending an already-created PO" — same trigger
+(*a goods line needs buying and no PO covers it*), same completion (*a PO exists for the
+line*), and a checklist folding both halves. Its stated meaning is now wrong, so the exception
+applied: Orders shows the two ruled actions and points at the Purchasing table for their
+definitions, which is that file's own existing discipline (*"Orders reads them, never
+re-states them"*).
+
+
+## P7 · To Order becomes the Planning Workspace
+
+**Goal:** make the frozen purchasing information architecture true on the To Order tab.
+
+**READ FIRST, BOTH, IN FULL:**
+[`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) (frozen 2026-07-29 —
+the seven regions, the legal overlap, the seven model rules, the boundary) and
+[`docs/PURCHASING-WORKING-FLOW.md`](PURCHASING-WORKING-FLOW.md) §1 · §7 · §9.
+
+**✅ THE TERMINOLOGY IS FROZEN — P6 ruled all eight slots on 2026-07-29.** Every word this
+card needs exists in `docs/COPY-STANDARD.md`. **Nothing here is blocked on a word any more**,
+and a chat that invents one has broken rule 8 for no reason at all.
+
+**ALREADY EXISTS — do not rebuild:** the plan engine · the order-by computation · the urgency
+buckets · the working-day calendar · the settings store (P1/0303) · the facet rail and the
+§8.2 click behaviour on this tab (P2/#492) · the freshness stamp (`TodayRefresh`) · the
+`Set a number` output for a supplier × category with no production days.
+
+### The measured gaps this card carries
+
+Every one was measured on 2026-07-29. **They are facts, not estimates.**
+
+| # | Gap | Where |
+|---|---|---|
+| **G1** | **Demand whose supplier cannot be resolved is silently discarded.** The planning read drops any line whose item resolves to no supplier and produces no output anywhere. **Silent discard is not permitted** — it must appear under Missing configuration stating the customer order, the item, the category, the quantity and why resolution failed | `apps/api/src/routes/operation/purchase.ts` |
+| **G2** | **Supplier resolution runs by TWO different rules in one module.** Planning resolves by the item's own supplier alone; PO creation additionally falls back to which categories a supplier covers. A requirement invisible to one and buyable in the other is one requirement with two truths. **One rule, shared** | `purchase.ts` + `CreatePOModal.tsx` |
+| **G3** | **Intentionally held demand produces no output at all.** Deliberately excluded, time-boxed and snoozed demand is dropped with nothing on screen. It must state **what · who · why · until when**, and it may **never share a status or an empty state** with Missing configuration | `purchase.ts` |
+| **G4** | **There is no Draft PO anywhere in the system** — no store, no route, no schema, no screen. `DraftLine` in `CreatePOModal.tsx` is a form-row type, not a persisted object; do not mistake it for one | whole stack |
+| **G5** | **`Check in` must leave To Order, and no information may leave with it.** To Order's receiving stage states the **customer name / SO number** per entry; the Receiving tab does not carry that fact. **The To Order implementation is not removed until Receiving carries: PO · supplier · customer name · SO number · warehouse · ETA · quantity still to receive** | `OperationPurchase.tsx` → `OperationReceiving.tsx` |
+| **G6** | **`Confirm ready date` cannot be closed.** No route in the portal writes `purchase_orders.expected_ready_date`; the only supplier-facing write inserts one audit sentence and touches no date. The queue can only grow. **This is P5's finding and P5 still owns the fix** — P6 must not ship a To Order whose second queue is permanently red without saying so on screen | `apps/api` |
+| **G7** | **A draft's risk date is computed at read time, never stamped** (model §6.4), and **a draft whose covered demand has disappeared must be able to say so** (§6.5). Both are model rules, not optional polish | new work |
+
+### Order of operations
+
+1. **The shape decision comes first and is written down before any code**: UI-KIT §8.2's
+   stage-vs-queue test applied to the NEW composition of To Order. **The test is the empty
+   state, never the look.** §8.2 currently describes the OLD three cells and says so.
+2. **G5 before the removal.** Receiving gains the facts first; only then does `Check in`
+   leave To Order. Doing it in the other order deletes information.
+3. Everything blocked on a word waits for Jess. Report it; do not name it.
+
+**Migration:** likely — a Draft PO is a stored business object and it is **not** a row of
+`purchase_orders` (it has no PO number and produces no external document, and that absence is
+what makes "a Draft is not a PO" structural). **Draft to Jess first (guardrail #8); number
+from the TRACKER at apply time, never from `ls`. Apply and verify BEFORE merging.**
+
+**P7 runs AFTER P6, which is ✅ DONE.** **P4 is FROZEN and this card may unfreeze it
+only where the new architecture requires it**
+(Loo, 2026-07-29) — no unrelated refactoring of 0307's objects.
+
+**Done when:** no real procurable demand can leave the purchasing workload silently, held
+demand states who held it and until when, a Draft PO exists as its own business object inside
+To Order, and `Check in` has left To Order without a single fact being lost.
+
 ## Reported, not built (recorded so nobody rediscovers them late)
 
 - **PO revisions — RULED OUT, not deferred** (Loo 2026-07-28). A sent PO is never edited: more
@@ -1053,3 +1237,5 @@ number on screen matches what actually happened.
 | P3 | ✅ the two missing supplier calls (migration **0306**) — and a balance date enters Delay planning too (Loo, 2026-07-29) | #506 |
 | P4 | ✅ where the goods go — migration **0307 applied, verified and merged** 2026-07-29 · **P4 FROZEN**; the application-code half is NOT P4 and starts as its own execution card (§10) | #513 |
 | P5 | ⬜ after P1-P4 · prove it with a real PO | — |
+| P6 | ✅ **Purchasing terminology freeze** (2026-07-29) — all eight slots ruled and written into `docs/COPY-STANDARD.md`. `Prepare PO` + `Issue PO` replace `Send PO`, which is retired along with the verb `Send`; the verb dictionary goes 6 → 7 with `Prepare`. Docs only | — |
+| P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |

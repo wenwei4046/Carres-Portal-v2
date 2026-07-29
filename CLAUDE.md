@@ -9,7 +9,13 @@
 >
 > **SEVEN lines now — ⑦ Purchasing opened 2026-07-27** with
 > [`docs/PURCHASING-WORKING-FLOW.md`](docs/PURCHASING-WORKING-FLOW.md) +
-> [`docs/purchasing-execution-queue.md`](docs/purchasing-execution-queue.md). **Seven older
+> [`docs/purchasing-execution-queue.md`](docs/purchasing-execution-queue.md).
+> **Purchasing has a THIRD file since 2026-07-29 and it is read before any To Order work:**
+> [`docs/PURCHASING-INFORMATION-MODEL.md`](docs/PURCHASING-INFORMATION-MODEL.md) — the
+> information architecture, frozen by Loo. It is not a second flow file: the flow file says
+> what Purchasing DOES, the information model says how To Order's information is ORGANISED,
+> and neither repeats the other. **Eight terminology slots in its §10 are OPEN and no chat
+> may fill one.** **Seven older
 > purchasing documents (1,222 lines) were DELETED** — none was authoritative, so every build
 > chat picked a different one and built something different. That is the whole reason the
 > module failed five times, and it is why one concern gets exactly one file.
