@@ -690,12 +690,16 @@ has overturned a ruling. Everything below is decided.**
 
 #### 1 · Migration status
 
-- **`0307` is still FREE.** The tracker tail is `0306_purchasing_supplier_calls`.
-- **`0307` has NOT been applied.**
-- **Production has NOT been changed by P4.** No table, column, trigger, function, grant or row.
-- The next chat **must** run the deliberately failing negative-control harness **and** a
-  complete rolled-back dry run, and **report both** before asking to apply. `list_migrations`
-  immediately before numbering AND again immediately before applying (guardrail #8).
+- **✅ CLOSED. `0307_where_the_goods_go` is APPLIED, VERIFIED and MERGED (2026-07-29).** The
+  tracker tail is `0307_where_the_goods_go` and `main` carries the file — see §8 for the
+  receipt.
+- **The migration line of P4 is finished. Nobody re-opens it.** A later correction is a NEW
+  migration, never an edit to 0307 (guardrail: never alter committed migration history).
+- **What this section used to say, kept because the sequence is the lesson:** the chat that
+  built 0307 ran a deliberately failing negative-control harness AND a complete rolled-back dry
+  run, and reported both **before** asking to apply; it re-read `list_migrations` immediately
+  before numbering and again immediately before applying (guardrail #8). That order is what a
+  future P-card copies.
 
 #### 2 · Destination freeze rule (Loo)
 
@@ -804,6 +808,183 @@ document, or an error a store reads. `HOUZS` is deliberately shorter than "HOUZS
 do not "complete" it. The PO and the external document print the **saved destination name**,
 never `Ship-to` · `Destination` · `Drop point`.
 
+#### 8 · APPLIED AND VERIFIED — production 2026-07-29, migration line CLOSED
+
+**`0307_where_the_goods_go` is APPLIED to production, verified, and merged to `main`.** The
+migration tracker tail is `0307_where_the_goods_go` and the repository matches it. Production
+is healthy and no production data moved.
+
+**The order was: dry run → PM approval → commit the file → apply → verify → merge**, and it is
+the order that keeps prod from serving a page whose table does not exist. The file was
+committed BEFORE the apply so the exact reviewed bytes are what reached production, and the
+migration-only PR (**#513**, squash `91d7bf8d`) carried that one file and nothing else —
+application code is deliberately not part of P4.
+
+**One thing worth not re-learning about the apply.** The migration was committed alongside a
+docs edit, and a migration-only PR cannot carry two files, so the migration was split onto its
+own branch off `main`. **The split was proved by BLOB IDENTITY, not by re-copying**: the blob
+is `7b6e5867…` in the original commit, on the split branch and on `main`, and its LF content
+hashes to `d5f1cb55…` — the exact bytes applied. A local `md5sum` of the checked-out file
+disagrees, and that is Windows `core.autocrlf` writing CRLF, not a difference in the file. A
+chat that compares working-copy hashes on Windows will chase a ghost.
+
+**Built from live definitions with `pg_get_functiondef()`** — nothing reconstructed from
+memory. All four anchors of §4 were verified to occur **exactly once** in the live source
+before editing, and `v_posts_stock` did not previously exist.
+
+**The negative-control harness fired as intended** (a deliberately wrong assertion placed
+after every real one), so the harness is proved capable of failing. It also caught a real
+defect in its own first draft: an assertion tried to "change" the destination to the value it
+already held, and the guard correctly treats a no-op as a no-op.
+
+**The complete rolled-back dry run passed with 34 assertions green.** The load-bearing ones:
+
+- **The byte proof.** Applying the four edits in REVERSE to the new `prosrc` yields the live
+  `prosrc` exactly — the only differences from live are the four intended anchors.
+- **The point of the card.** Receiving an AL-bound PO leaves `stock_balances` unmoved, writes
+  **0** `stock_movements` and **0** `ops_stock_items`, while `received_qty`, `do_number`,
+  `do_file_path` and `po_history` are all recorded.
+- **Nothing else moved.** A Klang-bound receipt still posts balance +2, one movement and two
+  `incoming → free`.
+- A non-`incoming` unit survives a destination flip · a supplier and a partner are each
+  refused 42501 · the destination freezes once `received_qty > 0` while a non-destination
+  update still works · export is refused with `destination_address_missing` · the payload key
+  set is exact and `fabric_surcharge` is stripped while `fabric_name` survives.
+
+**Rollback verified total BEFORE the apply:** table absent · both `purchase_orders` columns
+absent · both `purchasing_supplier_settings` columns absent · 0 P4 functions · 0 P4 triggers ·
+`operation_receive_po_with_do` back to md5 `a5c31f93babd7a20f3c5c74e313d4256` at 16,163 chars
+· `anon`/`authenticated` EXECUTE restored on both revoked functions · 0 POs · 0 lines · 87
+units · 0 incoming · 40 balances · 0 movements · 0 `po_history` · 0 setting changes · **0 rows
+written to `audit_log` that day.**
+
+**The one failure mode a dry run could NOT catch, and how it was closed.** The dry run proves
+the payload it was HANDED is correct; it cannot prove the committed FILE holds those same
+bytes, and a file that differs by one character would apply cleanly and be silently wrong. So
+before applying, the expected new source was computed in SQL from the live pre-apply source
+(the four forward replacements) and hashed — `5ff0f5692406c73fe8a15b7300c10548`, 16,719
+chars — and the committed file's own function body was hashed locally to exactly that. Only
+then was the file applied.
+
+**All 13 production verification checks PASSED after the apply:**
+
+| # | Check | Result |
+|---|---|---|
+| 1 | tracker tail · `0307%` rows | `0307_where_the_goods_go` · 1 |
+| 2 | destinations seeded | 3 — `Carres Klang \| AL Sungai Buloh \| HOUZS` |
+| 3 | one default linked · externals unlinked and address-less | 1 · 2 |
+| 4 | RLS on · 1 policy · **0 write policies** | true · 1 · 0 |
+| 5 | 2 CHECKs · one-default index | 2 · 1 |
+| 6 | `destination_id` NOT NULL + default fn · `delivery_instructions` nullable | `NO / purchasing_default_destination()` · `YES` |
+| 7 | both triggers · units trigger deferred | 2 · `true/true` |
+| 8 | 6 new signatures · 1 receive signature (no ghost overload) | 6 · 1 |
+| 9 | byte reconcile of the replaced function | `5ff0f569…` · 16,719 |
+| 10 | `public`/`anon`/`authenticated` lose EXECUTE on both · owner + `service_role` keep · both still exist | false ×6 · true · true · 2 |
+| 11 | no collateral damage · `anon` cannot export | true · false |
+| 12 | Nice Future rule stored, and ONLY Nice Future | 1 · `Nice Future -> Carres Klang collected by NETS` |
+| 13 | untouched data | 0 POs · 0 lines · 87 units · 0 incoming · 40 balances · 0 movements · 0 `po_history` · 0 claims · 0 promises · **55 control rows** · 0 setting changes |
+
+**All SEVEN functions reconcile byte-for-byte, file vs production** (guardrail #3, applied to
+every function rather than the one that was replaced): `operation_receive_po_with_do` 16719
+`5ff0f569…` · `purchasing_default_destination` 91 `f526941f…` · `purchasing_po_document` 2819
+`d6316c92…` · `purchasing_set_destination_address` 909 `faefa34c…` ·
+`purchasing_set_supplier_collection` 1729 `789bf0fb…` · `trg_po_destination_guard` 744
+`515d8e76…` · `trg_po_units_follow_destination` 2291 `f6ff11ff…`
+
+**Live effect today: NONE** — 0 purchase orders exist, so nothing can yet reach a destination,
+a freeze, a unit reconcile or an export. P4 decides the behaviour before the first PO exists,
+exactly as C7, C8, C9 and P3 did.
+
+**THREE DECISIONS BEYOND THE HANDOFF, ALL ACCEPTED BY THE PM 2026-07-29:**
+
+1. **The units trigger is `DEFERRABLE INITIALLY DEFERRED`, not immediate.** §3 says it runs
+   "after PO insert"; measured, `_operation_create_po_inner` inserts the PO row FIRST and mints
+   units later inside its per-line loop, after each line insert — so an immediate trigger on
+   either table fires before the units exist and does nothing. Deferring is what makes §3's own
+   *"in whatever order the fields were set"* literally true.
+2. **The guard gates WHO may change the destination, not only WHEN.** `po_scoped_update` lets
+   the SUPPLIER and the PARTNER update their own `purchase_orders` rows over PostgREST, and
+   `enforce_partner_po_column_whitelist` is really a BLACKLIST — a new column is permitted by
+   default. Without the role gate a supplier could redirect its own goods and the document
+   would print the new address. This is §6's own *"a gated front door with an open side door"*
+   applied to a door §2 did not enumerate.
+3. **`attrs` is ALLOWLISTED (`color · gap · fabric_name`).** Money leaks through `attrs`, not
+   only through the named fields: `fabric_surcharge` rides in `purchase_order_lines.attrs` and
+   `po-template.tsx` prints it as `Walnut (+RM 250)`, so removing `unit_price` / `line_total` /
+   `grand_total` alone would NOT have removed the money.
+
+**Reported only — these stay open and nothing was changed for them:** concurrency (the freeze
+reads `sum(received_qty)` without locking lines) · the RLS layer (gate assertions ran as
+`postgres` with a JWT claim, proving the `app_role()` path rather than PostgREST's
+`authenticated` + RLS) · `service_role` keeps EXECUTE on both revoked functions, per Loo's
+"keep the administrative access already in place" · and the remaining edge cases in §9.
+
+#### 9 · Planning Clarifications
+
+**Planning clarification required — the flow file, not the code:**
+
+- §3's *"trigger runs after PO insert"* cannot be implemented as an immediate trigger, for the
+  measured reason in §8 decision 1. The wording describes an ordering the create path does not
+  have.
+- §2's freeze alone does not close the supplier/partner write door (§8 decision 2). The freeze
+  is about WHEN; the door needed a rule about WHO.
+- `PURCHASING-WORKING-FLOW.md` §3's *"Where the goods go"* table and §9 still do not say what
+  receiving does when the goods never reach a Carres warehouse. Q2's ruling is the flow's rule
+  and the flow file is where it has to live — a BUILD chat implements standards, it does not
+  write them.
+
+**Planning clarification required — data, not code:** `Carres Klang`'s warehouse address reads
+`NETS-managed facility (Klang)`, which is a description rather than a postal address. It is
+non-empty so it passes the export gate, and the supplier document would print it.
+
+**Recorded for whoever wires the api half:** `renderPoPdf` has **four** external consumers, not
+two — `AssignPickupDialog.tsx` · `PoDetailModal.tsx` · `OrderDetailDrawer.tsx` (plus a test).
+All four go through `/print-data`, so re-pointing that one route covers every one of them.
+
+**Q3 stores FACTS, not the sentence.** `NETS collects from Nice Future and delivers to Carres
+Klang.` is composed from `collected_by_partner_id` + the supplier + `fixed_destination_id`.
+Storing the sentence would give a locked word a second home.
+
+**Edge cases NOT covered by the dry run, reported only:**
+
+1. **Over-mint after a partial flip** — a PO holding a non-`incoming` unit whose destination
+   flips back to a warehouse mints to full line quantity and ignores it. Unreachable today: a
+   free unit only exists after receiving, and §2's freeze blocks the change.
+2. **`purchasing_set_supplier_collection` was never called** — its gate and audit path are
+   untested.
+3. **`HOUZS` was never used on a PO** (only AL); symmetric code path, untested.
+4. **Partner warehouse (`kind <> 'own'`) and a second own warehouse** — neither exists, so
+   `v_is_own = false` and the warehouse-mismatch branch are untested live.
+5. **Cancelled-PO export refusal** (`po_not_printable`) untested; **`delivery_instructions`**
+   never populated or printed.
+
+#### 10 · P4 IS FROZEN — and the application code is NOT part of it
+
+**Ruled by the PM, 2026-07-29.** P4 delivered the DATABASE half: the destination model, the
+guard, the unit reconcile, the four anchored edits, the document RPC, the revokes. It is
+applied, verified, merged and **closed**. No chat re-opens P4 to "finish" it.
+
+**The application-code half is a NEW execution card in a NEW chat**, under the governance
+rule `CLAIM → PUSH → VERIFY CLAIM → IMPLEMENTATION`. Do not reuse the migration chat.
+
+**What that card owes** — recorded here only so nobody re-derives it, not as a licence to
+build it from this file:
+
+- `/api/operation/pos/:id/print-data` reads `purchasing_po_document` instead of assembling the
+  document from tables. **No second direct-table external export path is allowed** (§5).
+- `unit_price` · `line_total` · `grand_total` · `currency` come out of `PoTemplateData` and
+  `apps/web/src/lib/pdf/po-template.tsx`, including the `+RM {surcharge}` the template builds
+  from `attrs`. The money is absent from the payload already; the template must stop asking.
+- **`renderPoPdf` has FOUR external consumers, not two** — `AssignPickupDialog.tsx` ·
+  `PoDetailModal.tsx` · `OrderDetailDrawer.tsx` (plus a test). All four go through
+  `/print-data`, so re-pointing that one route covers every one of them.
+- The `Where the goods go` field on the PO form, and the manager Settings rows, using ONLY the
+  locked wording in §7. `Address not set` is a Settings word and may not leak onto a PO, onto
+  the external document, or into an error a store reads.
+
+**Its first act is a rebase.** The D2 typography codemod has already rewritten every
+Purchasing page that card will touch; a branch cut before it will conflict on files this card
+has no business changing.
 
 ## P5 · Prove it with a real PO
 
@@ -870,5 +1051,5 @@ number on screen matches what actually happened.
 | P1 | ✅ the numbers become settings (migration **0303**) | #488 |
 | P2 | ✅ the interaction law is true on **To Order** (#492) · **Claims** (#494) · **Receiving** (#495). Purchase Orders is a nested route with no rail and was never in scope | #492 · #494 · #495 |
 | P3 | ✅ the two missing supplier calls (migration **0306**) — and a balance date enters Delay planning too (Loo, 2026-07-29) | #506 |
-| P4 | ⬜ where the goods go (migration) | — |
+| P4 | ✅ where the goods go — migration **0307 applied, verified and merged** 2026-07-29 · **P4 FROZEN**; the application-code half is NOT P4 and starts as its own execution card (§10) | #513 |
 | P5 | ⬜ after P1-P4 · prove it with a real PO | — |
