@@ -180,6 +180,111 @@ To change the look: edit the token source, then update **this file + the
 machine mirror + `/ui`** in the same commit. A page conforms to the kit; the
 kit does not bend to a page. See §14.
 
+### The kit has an EDITION, and every artifact declares the one it follows
+
+> **Every kit artifact must declare the kit version it follows.**
+
+**The edition is the date this law was last rewritten — `UI-KIT 2026-07-27`.**
+A date rather than a semver: the kit has one consumer and no strangers to
+promise anything to, so a release number would buy ceremony and nothing else.
+The rewrite date is already the first thing this file states; declaring it is
+free.
+
+A **kit artifact** is anything that carries a rule of this kit outside this
+file — the machine mirror, a component, a block of `index.css`, a comment that
+cites a section. It writes the edition string, and a citation then has
+something to be checked against.
+
+**Why an undeclared citation is the dangerous shape: it cannot be wrong on its
+face, which is exactly how it survives.** Every one of these names a file, a
+section and an authority, and every one of them is a confident reference to a
+dead edition — measured 2026-07-28, not recalled:
+
+| Where | What it says | What is true |
+|---|---|---|
+| `design-standard.ts:4` | *"v4 — rewritten 2026-07-15"* | this law was rewritten **2026-07-27**; the mirror is 12 days behind |
+| `design-standard.ts:7` | *"where any older doc… conflicts with UI-KIT v4, **v4 wins**"* | this file's own first line says **this file wins**. Two bodies of one kit each claiming to outrank the other |
+| `design-standard.ts:38` | the canvas hex, *"v4 §11a COOL neutral"* | §3.2 froze the canvas at Radix `slate-3`, and **§11a does not exist** — `grep "11a"` over this file returns 0 |
+| `design-standard.ts:11–18` | *"Flame appears ONLY on a clickable primary action + a checked checkbox"* | §3.4: the flame survives in **exactly one place, the logo**, and §13.3 rule B fails the build on it |
+| `OrderDetailDrawer.tsx:653` | *"UI-KIT v4 §9: panels default COLLAPSED"* | today's §9 is **UI States**. The rule is cited out of a law that no longer exists |
+
+**The sprawl is wider than those five, and the width is the argument.** A
+`grep` for `UI-KIT v4` / `v4 §` across `apps/web/src` on 2026-07-28 returns
+**28 citations in 12 files**, naming `v4 §1` · `§2` · `§3` · `§4` · `§5` ·
+`§6` · `§8` · `§8b` · `§9` · `§10` · `§11a` · `§11c` · `§11e` · `§A0` · `§A1` ·
+`§A5` · `§A6` · `§A8` — **lettered sections this file has never had.** Not one
+of them looks wrong when read on its own.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| Every kit artifact declares the kit edition it follows | Build Guard — a header scan for the edition string in `components/kit/**`, `lib/design-standard.ts` and `index.css` | ⏳ **D1** | `check-design.mjs` |
+| No artifact claims to outrank this file | Build Guard — the same scan refuses a second authority claim | ⏳ **D1** | `check-design.mjs` |
+
+*(Both land with the Build Guard, which is D1's whole job. Naming the card is
+what §16 requires of a rule this file cannot enforce on the day it is written.)*
+
+## §0.4 What is configurable, and what never is
+
+> **UI, workflow and navigation are opinionated and consistent across the company.
+> Business parameters remain configurable.**
+
+A user who can rearrange the tool must be taught **their own version of it**,
+and every handover then starts from zero. `ACTION-FLOW-STANDARD` prices a new
+hire's whole training at four lines; four lines only works if it is the same
+tool for everybody.
+
+Two things wear the word *settings* and they are opposites:
+
+| | Configurable? | Why |
+|---|---|---|
+| **Business numbers** — production days per supplier, work weeks, reorder points, reserve levels, commission rates | **Yes, and it is compulsory** | a business number only a developer can change is a defect. Purchasing P1 made seven of them editable for exactly this reason |
+| **The UI, the workflow and the navigation** — which columns exist, what order blocks appear in, which panels are open, what an action is called, which step comes next | **No, ever** | this is the tool's shape, and two operators seeing two shapes is how a handover fails |
+
+**This is the same sentence §8.2 already says about list pages**, stated once
+for the whole company instead of once per page type. §8.2 narrows it to clicks;
+this section owns the principle.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| No per-user store of UI shape — no browser-persisted layout, panel or column state under `pages/**` | Build Guard — a scan for `localStorage` keyed to layout in `pages/**` | ⏳ **D1** | `check-design.mjs` |
+
+> **Its cost is not zero, and it is stated rather than discovered later.** Three
+> live behaviours fail this rule today (measured by R2, 2026-07-28):
+> `carres.orders.hiddenCols` — which columns the Orders table shows, per browser
+> · `ops-drawer-panel-v4:{title}` — every drawer panel's open/closed state,
+> across orders · `ops-drawer-rail` — the rail's collapsed state. **One of them
+> is a feature somebody asked for.** D1 writes the scan; whether those three come
+> off, and in which card, is Jess's, not the guard's.
+
+## §0.5 A label is presentation; the identifier is the contract
+
+> **Stable ID is the contract. Visible labels are presentation attached to the Stable ID.**
+
+**The label carries nothing.** The ID is the contract; the label hangs off it
+and may be replaced without the contract moving. What follows: **nothing may
+key on a label** — not a count, not a filter, not a stored state, not a test.
+Renaming is then a display change and never a data change.
+
+Carres already built this, for one module: every action carries a `key` from
+the `OrderActionKey` union and `DISPLAY_RANK` is keyed by that union, never by
+a word. It is why C1 could delete `Chase` from the whole portal without
+touching a count, a filter or a stored row. **What this section adds is the
+scope** — it is a rule about every visible word, not a technique that happened
+to be applied once.
+
+**The counter-example is live and is the same rule not yet applied:** the
+drawer's panel state is keyed by the panel's **title** (`ops-drawer-panel-v4:{title}`),
+so renaming a panel silently resets every user's state for it — and C1 renamed
+that rail's panel from `Actions` to `Calls`.
+
+**The word is still governed even though it is not the contract.** Changing one
+is an event that goes through [`COPY-STANDARD.md`](COPY-STANDARD.md), never an
+edit somebody makes while they are in the file for another reason.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| No persisted state, query key or storage key is built from a display string | Build Guard — a scan for a `localStorage` / query key composed from a label | ⏳ **D1** | `check-design.mjs` |
+
 ---
 
 # §1 Decision Process & Information Hierarchy
@@ -1150,6 +1255,38 @@ visual languages** (dark header + white text ×6, light grey header + grey text
 > ⏳ **Written by D0.5c** — except the slot contract below, which is already
 > decided, because §1.3 depends on it.
 
+## §8.0 The floorplan catalogue is CLOSED
+
+Every in-scope page renders **exactly one `PageShell`** and declares **one
+`variant`** from a closed set. There is no `custom`, no free-form page, and no
+in-scope page that renders no shell.
+
+**The catalogue is full at four** — `list · dashboard · detail · settings`.
+Adding a fifth is a **governance event** under the same discipline
+`ORDER-DETAIL-INFORMATION-MODEL` §7② applies to persistent facts: it requires
+naming the **user task** that no existing floorplan can serve. *"This page is a
+bit different"* is not a task and is not an argument.
+
+**The closure is the feature, not a side effect of having four.** A page that
+fits none of them means either the task was misunderstood or a real gap was
+found — and finding a gap is something the kit decides, never a licence to
+draw. A catalogue big enough to hold every page is the same as no catalogue.
+
+**The floorplan is chosen by the user's TASK, not by the data's shape.** Two
+pages over identical rows can be two floorplans, because the two readers arrive
+with different questions — which is the Business Thinking Model's *same page,
+three people, three entry questions* reached from the page side.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| Every page declares one floorplan from a closed set, and the set is full at four | **Type System** — `variant` is a closed union; `"custom"` does not compile | ⏳ **D0.5c** | `PageShell.tsx` |
+
+*(The second half of this principle — **a page component that renders no
+`PageShell` fails the build** — is already law as §0.1's "No hand-rolled page
+shell", and §1.3's "a list page cannot add an 8th band" already carries the
+variant's type consequence. Only the CAP was missing, so only the cap is added:
+one concern, one row.)*
+
 ## §8.1 The `PageShell` slot contract (decided)
 
 ```tsx
@@ -1307,6 +1444,36 @@ UI wording is owned by [`COPY-STANDARD.md`](COPY-STANDARD.md).
 **No word is copied into this file.** Two files holding the same words will
 drift — the failure this rewrite exists to end.
 
+## §10.1 How a word reaches a screen
+
+> **Words are delivered by the system, not remembered from a document.**
+
+One dictionary, one word per concept, a reason for every banned word — which
+`COPY-STANDARD` already is — **plus the words travelling with the thing that
+renders them**, so a surface cannot be built without them.
+
+**A rule that must be remembered is enforced by whoever happens to be reading.**
+That is not a hypothetical here: `Chase` was banned and still shipped, survived
+a week in the drawer, and was caught by a **source scan** — not by anybody
+remembering the document. A word that ships with the component that renders it
+cannot be forgotten by a chat that never opened the document.
+
+**Measured 2026-07-28, so the size of the gap is on the record:**
+`packages/shared/src/order-action-words.ts` delivers **three of the five
+COPY-STANDARD strings, for one module.** Every other module's words, and the
+other two strings, are recall.
+
+**This chapter still copies no word.** It owns the DELIVERY — that a string
+arrives with its component — and `COPY-STANDARD` owns which string it is.
+
+| Rule | Enforcement | Status | Evidence |
+|---|---|---|---|
+| A component may not spell a business word; it receives one from the dictionary module | Build Guard — a scan for a COPY-STANDARD label literal inside `components/**` | ⏳ **D1** | `check-design.mjs` |
+
+*(Two components already hold this by construction and are the shape the scan
+generalises: `StatusPill` spells no word, and `Icon` carries §5.3's meanings
+rather than any label.)*
+
 ---
 
 # §11 Reference Library
@@ -1445,7 +1612,7 @@ parses the Enforcement column out of this file, checks which mechanisms
 actually exist in the repo, and rewrites the block. A hand-maintained
 percentage is prose, and prose drifts; that is the whole thesis of this
 document.
-*(The numbers below are the D0.5b hand count, valid until D1 wires the generator.)*
+*(The numbers below are the D0.6 hand count, valid until D1 wires the generator.)*
 
 ```
                          enforced / total
@@ -1454,19 +1621,59 @@ document.
   Spacing       ██▌░░░░░░░    25%     1 / 4
   Icons         ██████████   100%     4 / 4
   Components    ██████▊░░░    68%    13 / 19
-  Layout        ░░░░░░░░░░    0%      0 / 6
+  Layout        ░░░░░░░░░░    0%      0 / 7
   Hierarchy     ██░░░░░░░░    20%     1 / 5
   ──────────────────────────────────────────
-  TOTAL         ████▊░░░░░    48%    22 / 46
+  TOTAL         ████▋░░░░░    47%    22 / 47
 ```
 
 | | Count | Meaning |
 |---|---|---|
-| Rules | **46** | design rules stated in §1–§8 |
+| Rules | **47** | design rules stated in §1–§8 |
 | **Enforced** | **22** | Type System / Component API / Build Guard / ESLint is live |
-| Scheduled | 24 | a card exists (D0.5c–D5) |
+| Scheduled | 25 | a card exists (D0.5c–D5) |
 | **Blocked on a decision** | **0** | ✅ the PENDING REGISTER is empty |
 | **Human Review debt** | 4 | `fmtDate()` · "max 2 reds per screen" · facet group order · "Progress carries no events" — nobody has found a mechanism |
+
+**Governance and copy rules are NOT in this number, and never have been.** The
+count is *design* rules — §1–§8. §0 and §10 carry **10** more rule rows (§0.1's
+five, plus §0.3's two, §0.4's one and §0.5's one added by D0.6, plus §10.1's
+one), every one of them ⏳ **D1**. They are stated here rather than folded in
+because widening the denominator is a change to what this number MEANS, and
+that is §16's own decision, not a consolidation card's. **Reported, not
+taken:** widening it would read 22 / 57 = 38.6% on the same day nothing about
+the kit got worse.
+
+**The D0.6 arithmetic, shown so it can be checked — and it goes DOWN, which is
+reported rather than dressed up:**
+
+```
+rules      46  +  1  =  47     §8.0's cap. The other four principles landed in
+                               §0.3 · §0.4 · §0.5 · §10.1 — governance and copy,
+                               outside this count by its own definition
+enforced   22  +  0  =  22     §8.0's mechanism is `PageShell.tsx`, and on the
+                               tip this was written against that file does not
+                               exist yet
+coverage   47.83%  →  46.81%   ⬇  −1.02
+debt          4    →      4    unchanged — no rule was added with Human Review
+blocked       0    →      0    unchanged
+```
+
+**Why it dipped, and why the dip is a SPLIT rather than a regression.** The
+reference review's own arithmetic said this rule *"lands in the same PR as
+`PageShell.tsx`"* — rule and mechanism together, so the number goes up. The
+component was built on its own card and **did not write the rule**; this card
+writes the rule and does not build components. The pair is therefore split
+across two PRs, and the number is down for exactly as long as that split lasts:
+**the day `PageShell.tsx` reaches this branch it reads 23 / 47 = 48.94%**, above
+where it started.
+
+**This is a real conflict between two rules of the consolidation card**, not an
+oversight: its Rule 4 says a principle may arrive `⏳` with a named card,
+because *"this card writes law, not code"* — and its Rule 5 says coverage may
+never go down. A card that writes law and no code cannot satisfy both unless
+every principle it writes already has a live mechanism. Recorded here so the
+next person meets the finding instead of the dip.
 
 **The D0.5b arithmetic, shown so it can be checked** (health rule 1 says
 coverage may never go down, and rule 2 says the debt may never grow):

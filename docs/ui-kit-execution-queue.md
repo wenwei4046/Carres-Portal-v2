@@ -48,7 +48,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.5b** | Foundation components, Radix | ✅ **SHIPPED 2026-07-28, PR #502 `d77bd4f6`, deployed** — full card below. The gate opened: Jess froze Q1 · Q3 · Q4 |
 | **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ⏳ **before D0.5c** |
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ after D0.5b.1 |
-| **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
+| **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **BUILT 2026-07-29** — §8.0 · §0.3 · §0.4 · §0.5 · §10.1, the mirror re-based, §16 recomputed. Findings below |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
@@ -565,10 +565,97 @@ opportunity to break it.
 
 ---
 
-## D0.6 · KIT-CONSOLIDATION — the PLANNING CARD
+## D0.6 ✅ KIT-CONSOLIDATION — BUILT 2026-07-29
 
-> **STATUS: planning card APPROVED by the PM, 2026-07-28.** The work may begin **only after
-> D0.5c ships** — see Sequencing. `docs/UI-KIT.md` is still untouched today.
+**The five frozen principles are law.** Each landed in exactly one chapter, each with a
+`Rule · Enforcement · Status · Evidence` row, and a grep for each PM-ratified sentence returns
+**exactly one hit** outside `ui-reference-review.md` — measured, all five.
+
+| Principle | Chapter | Rule row's Enforcement |
+|---|---|---|
+| R1 the floorplan catalogue is CLOSED | **§8.0** (new) | Type System — `variant` is a closed union · ⏳ **D0.5c** |
+| R4 every kit artifact declares its edition | **§0.3** (extended) | Build Guard — a header scan · ⏳ **D1** (×2 rows) |
+| R2 opinionated UI, configurable business numbers | **§0.4** (new) | Build Guard — no `localStorage` layout key in `pages/**` · ⏳ **D1** |
+| R3 the identifier is the contract | **§0.5** (new) | Build Guard — no key built from a display string · ⏳ **D1** |
+| R5 words are delivered, not remembered | **§10.1** (new) | Build Guard — no COPY-STANDARD literal in `components/**` · ⏳ **D1** |
+
+**The kit now HAS an edition, because R4's principle needs something to declare.** It is the date
+this law was last rewritten — **`UI-KIT 2026-07-27`** — a date and not a semver, because R4 ②#1
+already refused the package ceremony. Choosing that mechanism was this card's job (Rule 4); it is
+the least-invention option available, since the date is already line 4 of the law.
+
+**Nothing was redesigned, no business rule moved, and the IA was not opened.** `git diff
+--name-only` contains neither `ORDER-DETAIL-INFORMATION-MODEL.md` nor `ACTION-FLOW-STANDARD.md`.
+
+### The mirror is re-based, and provably no value moved
+
+`design-standard.ts` **declares the edition it follows and no longer claims to outrank the law.**
+The header sentence *"where any older doc, code comment, or token conflicts with UI-KIT v4, v4
+wins"* is retired — two bodies of one kit each declaring itself the winner was R4's material
+finding, and the mirror is *"a record of the kit, never a place to drive a change from."*
+
+**Every line of CODE in that file is byte-identical** — proved by stripping comments from both
+revisions and diffing: no change. In the raw diff, lines containing `hex:` = **0** and lines
+containing a colour literal = **0**. Nine stale `v4 §N` citations became either the current section
+number or an explicit `⚠️ STALE` note naming the card that corrects the value (D2 · D3 · D0.5c).
+
+**One dead citation is deliberately LEFT, and it is listed rather than passed on.** `v4 §11a` on
+the `canvas` entry sits inside an **exported `use:` string**, and this card may change no exported
+value; it is neutralised by a comment immediately above it that names §3.2 and the correcting card.
+
+### Findings handed back to the PM
+
+1. **The mirror is not what the law says it is.** `docs/UI-KIT.md` calls it the body that *"code
+   reads"*. Measured 2026-07-28: **1 real importer** (`lib/staff-avatar.ts`, for `AVATAR_COLORS`
+   only), **28 files that merely name it in a comment**, and `check-design-standard.mjs` **never
+   parses it** — it is hex-ALLOW-LISTED. Every export except `AVATAR_COLORS` has no reader. The
+   three-bodies model may be correct and unimplemented, or the mirror may have no job left. **Both
+   are above this card**, so the law's sentence was NOT edited.
+2. **§16 coverage went DOWN, 47.83% → 46.81%, and the card's own two rules cannot both hold.** Rule
+   4 says a principle may arrive `⏳` with a named card *because "this card writes law, not code"*;
+   Rule 5 says coverage may never go down. A law-only card satisfies both only if every principle
+   already has a live mechanism. R1's mechanism is `PageShell.tsx` — **the reference review's own
+   arithmetic said the rule "lands in the same PR as `PageShell.tsx`"**, and it did not. The dip
+   lasts exactly as long as that split: **23 / 47 = 48.94% the day D0.5c merges.** Human Review debt
+   unchanged at 4; blocked-on-a-decision unchanged at 0.
+3. **The exit criterion and §16's health rule disagree about what "coverage" is measured against.**
+   The criterion pins an absolute floor — *"not lower than the 3 / 33 = 9.09% it reads today"* — a
+   figure that went stale when D0.5a/b raised it to 47.83%. §16 rule 1 states a DIRECTION. Read as
+   an absolute the card passes; read as a direction it does not. **A number written into an exit
+   criterion goes stale; a direction does not.**
+4. **Governance and copy rules have no home in the health number.** §16 counts §1–§8, so §0.1's
+   five existing rules — and the four this card added to §0 and §10 — are outside it. Widening the
+   denominator would read **22 / 57 = 38.6%** on a day nothing got worse, so it is reported and not
+   taken. §16 now states the exclusion out loud instead of leaving it to be inferred.
+5. **The closed catalogue already has a member the law does not name.** §8.1 names four variants —
+   `list · dashboard · detail · settings`. `PageShell.tsx` on the D0.5c branch ships
+   `variant: "list" | "module"`: **`module` is in no catalogue**, and three of the four named
+   variants do not exist. §8.0 makes a fifth floorplan a governance event, so this needs a ruling —
+   either `module` joins §8.1's list with its user task named (§8.3's module-tab law is the
+   obvious one), or the variant is renamed. **Not fixed here: it is a code file on another card.**
+6. **D0.5c did not update the law it satisfies.** Its branch changes `docs/ui-kit-execution-queue.md`
+   and no line of `docs/UI-KIT.md`, so seven rule rows still read `⏳ D0.5c` while their mechanisms
+   exist on that branch. That is what makes finding 2 look like a regression instead of a split.
+7. **The stale-citation sprawl is far wider than R4's five.** `grep "UI-KIT v4|v4 §"` over
+   `apps/web/src` returns **28 citations across 12 files**, naming `§8b · §11a · §11c · §11e · §A0 ·
+   §A1 · §A5 · §A6 · §A8` — **lettered sections this law has never had.** The five R4 recorded are
+   closed by this card; the rest are page files, which this card may not touch, and they are D1–D7's.
+   It is also the strongest possible evidence for R4's principle.
+
+### Sequencing note — this ran with D0.5c on a branch, not on `main`
+
+The PM's order is `D0.5c → D0.6 → D1`, and the reason given was *"the components are built first,
+and consolidation writes down what exists."* At the time this card ran, `origin/main` was
+`51f2758d` and **D0.5c was on `origin/claude/carres-d05c-shells`, unmerged and 🟡 blocked on
+D0.5c.1.** This card was written against `main`, so it wrote down what exists **on `main`** — which
+is why R1's row is `⏳` and finding 2 exists. Nothing here has to be redone when D0.5c lands: the
+row's Status flips and the number goes up.
+
+---
+
+## D0.6 · KIT-CONSOLIDATION — the PLANNING CARD (the approved scope, kept for audit)
+
+> **STATUS: planning card APPROVED by the PM, 2026-07-28; BUILT 2026-07-29** — see the record above.
 
 **Why this card exists.** The Reference Review line (`docs/ui-reference-review.md`, R1–R5, closed
 2026-07-28) reviewed five international references and froze **five principles**. Rule 5 of that
@@ -629,15 +716,21 @@ Everything this card is allowed to read *as a source*. Nothing else may become l
 | The **parking lot** in `ui-reference-review.md` | Implementation observations classified by the PM — read as context, **never pasted in as law.** |
 | `docs/execution-queues-index.md` | Where this card is indexed and which lane owns which file. |
 
-**The five frozen principles, listed here so the builder does not have to reconstruct them:**
+**The five frozen principles, and where each one now LIVES.**
 
-| From | Principle (PM-ratified wording where one exists) |
-|---|---|
-| **R1** SAP Fiori | Closed Pattern Library — *accepted as an observation for consolidation* |
-| **R2** Linear | *"UI, workflow and navigation are opinionated and consistent across the company. Business parameters remain configurable."* |
-| **R3** Stripe | *"Stable ID is the contract. Visible labels are presentation attached to the Stable ID."* |
-| **R4** Vercel | *"Every kit artifact must declare the kit version it follows."* |
-| **R5** GOV.UK · NN/g · Polaris | *"Words are delivered by the system, not remembered from a document."* |
+*(This table used to reprint all four PM-ratified sentences verbatim, so a builder did not have to
+reconstruct them. It stops doing that on the day they land: the card's own exit criterion is that a
+grep for each sentence returns **exactly one hit** outside `ui-reference-review.md`, and a copy in a
+work-list is a second home. The wording is in the chapter named below; the reasoning behind it stays
+in `ui-reference-review.md`, which is the record.)*
+
+| From | Principle | Now lives in |
+|---|---|---|
+| **R1** SAP Fiori | the floorplan catalogue is CLOSED | **UI-KIT §8.0** |
+| **R2** Linear | opinionated UI · configurable business numbers | **UI-KIT §0.4** |
+| **R3** Stripe | the identifier is the contract, the label is presentation | **UI-KIT §0.5** |
+| **R4** Vercel | every kit artifact declares its kit edition | **UI-KIT §0.3** |
+| **R5** GOV.UK · NN/g · Polaris | words are delivered, not remembered | **UI-KIT §10.1** |
 
 **NOT an input:** any reference not in R1–R5, any observation the PM did not approve, and any
 design idea this card's author has. **The review line is closed; consolidation writes it down, it
