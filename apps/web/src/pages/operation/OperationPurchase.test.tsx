@@ -360,8 +360,16 @@ describe("To Order · §8.2 closing the drawer gives the list back (card P2)", (
     Object.defineProperty(rail, "clientHeight", { value: 400, configurable: true });
     rail.scrollTop = 260;
 
-    // Open the drawer (+ New PO), then close it.
-    fireEvent.click(screen.getByText("New PO"));
+    // Open the drawer, then close it.
+    //
+    // 0308 — this used to click `+ New PO`, the facet-rail button that opened
+    // CreatePOModal with an EMPTY prefill. That button is DELETED: an empty
+    // prefill is a purchase no customer order asked for, and the card makes
+    // `Purchase Orders → Create Purchase` its only door. The drawer opens from
+    // the selected group's own `Issue PO` now — a customer-driven open, which
+    // is the only kind To Order has left. Matched on the button's title
+    // because its label is built by the shared word dictionary.
+    fireEvent.click(screen.getByTitle(/Creates the PO number/));
     await waitFor(() =>
       expect(screen.getByRole("dialog")).toBeInTheDocument(),
     );
@@ -374,19 +382,28 @@ describe("To Order · §8.2 closing the drawer gives the list back (card P2)", (
     expect(rail.scrollTop).toBe(260);
   });
 
-  it("gives back an EMPTY selection too — a clear survives the drawer", async () => {
+  it("respects the operator's own clear — auto-select does not re-pick", async () => {
+    // 0308 — this test used to CLEAR the selection and then open a drawer via
+    // `+ New PO`, asserting the empty selection survived the round trip.
+    // Deleting that button makes the drawer half UNREACHABLE from To Order:
+    // both remaining drawers (`Issue PO`, `Check in`) hang off the SELECTED
+    // group's detail pane, so with nothing selected there is nothing to open.
+    //
+    // What stays reachable — and is what the clear was really protecting — is
+    // the auto-select guard itself: `selectionCleared` means the operator said
+    // no, and no re-render may quietly pick a row back. That is asserted here
+    // directly, rather than through a door that no longer exists.
     renderPage();
     const nice = firstPlaceRow(NICE);
     await waitFor(() => expect(nice).toHaveAttribute("aria-pressed", "true"));
     fireEvent.click(nice);
     await waitFor(() => expect(nice).toHaveAttribute("aria-pressed", "false"));
 
-    fireEvent.click(screen.getByText("New PO"));
-    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
-    fireEvent.click(screen.getByLabelText("Close modal"));
-
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // Nothing is selected, and nothing selects itself.
     expect(firstPlaceRow(NICE)).toHaveAttribute("aria-pressed", "false");
     expect(firstPlaceRow(OHANA)).toHaveAttribute("aria-pressed", "false");
+    // And with no selection there is no detail pane, so no drawer can be
+    // opened at all — the state this test used to reach through `+ New PO`.
+    expect(screen.queryByTitle(/Creates the PO number/)).toBeNull();
   });
 });

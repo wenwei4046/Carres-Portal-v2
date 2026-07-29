@@ -74,7 +74,17 @@ async function loadChaseReceive(
     .select(
       "id, supplier_id, sup_status, status, expected_ready_date, eta_date, so, so_refs, purchase_order_lines(sku, qty, received_qty)",
     )
-    .eq("status", "open");
+    .eq("status", "open")
+    // 0308 — a MANUAL PURCHASE never appears inside To Order (the card's item
+    // 4). To Order answers one question — "which customer orders should be
+    // issued as Purchase Orders today?" — and a purchase nobody's customer
+    // asked for cannot be an answer to it. It is entered from Purchase Orders →
+    // Create Purchase and it is followed up there.
+    //
+    // Filtered on `reason_code` rather than on a mode word, because that column
+    // IS the marker (0308) and the CHECK behind it is what keeps the marker and
+    // the customer link from ever both being true.
+    .is("reason_code", null);
   if (poErr) return { ok: false, err: poErr };
   const pos = poRows ?? [];
 

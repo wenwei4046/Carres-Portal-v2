@@ -3129,8 +3129,17 @@ export interface operationPoListRow {
     delivery_date: string | null;
   }[];
   /** 2026-05-18 (Loo C+D) — worst-case urgency across source SOs. NULL when
-   *  the PO has no source SOs (stockpile) or all delivery_date are NULL. */
+   *  the PO has no source SOs or all delivery_date are NULL. */
   urgency?: "critical" | "urgent" | "normal" | null;
+  /** 0308 — why this was bought when no customer order asked for it. NON-NULL
+   *  is what MAKES a PO a manual purchase: it is the sole stored marker, which
+   *  is why the DB forbids clearing it and pairs it with a CHECK refusing a
+   *  customer order beside it. NULL on every customer-driven PO.
+   *
+   *  OPTIONAL for the usual degrade-don't-crash reason — a browser on this
+   *  build talking to a pre-0308 Worker simply sees no reason rather than
+   *  crashing. */
+  reason_code?: string | null;
 }
 export interface operationPosListResponse {
   pos: operationPoListRow[];

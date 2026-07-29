@@ -230,7 +230,11 @@ procurementTabsRouter.get("/:slug", async (c) => {
     const { data, error } = await sb
       .from("purchase_orders")
       .select(
-        "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, suppliers!inner(slug, name), purchase_order_lines(id, sku, qty, received_qty, attrs)",
+        // 0308: `reason_code` rides the row so the list can say WHY a PO with
+        // no source order exists. It is the manual purchase's only identity —
+        // this tab is where such a PO is followed up, since To Order no longer
+        // carries it.
+        "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, reason_code, suppliers!inner(slug, name), purchase_order_lines(id, sku, qty, received_qty, attrs)",
       )
       .in("id", matchedIds)
       .order("placed_at", { ascending: false })
@@ -246,7 +250,8 @@ procurementTabsRouter.get("/:slug", async (c) => {
     const { data, error } = await sb
       .from("purchase_orders")
       .select(
-        "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, suppliers!inner(slug, name), purchase_order_lines(id, sku, qty, received_qty, attrs)",
+        // 0308 — see the sibling select above.
+        "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, reason_code, suppliers!inner(slug, name), purchase_order_lines(id, sku, qty, received_qty, attrs)",
       )
       .eq("suppliers.slug", supplierSlug)
       .order("placed_at", { ascending: false })

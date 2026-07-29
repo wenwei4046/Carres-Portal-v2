@@ -315,6 +315,63 @@ describe('createPoInput', () => {
       }).success,
     ).toBe(false);
   });
+
+  // ── 0308 · the manual-purchase reason ─────────────────────────────────────
+  //
+  // The wire half of `purchase_orders_manual_has_no_customer_order`. The DB
+  // CHECK is the enforcement and the RPC names the failure; this schema is the
+  // edge, so a caller gets a field-pointed 422 rather than a raw 23514. One
+  // rule, three layers, none of them softer than the others.
+  const BASE = { supplierId: UUID, warehouseId: UUID2, lines: [VALID_LINE], etaDate: ETA };
+
+  it('0308 — accepts a reason with no customer order (a manual purchase)', () => {
+    expect(
+      createPoInput.safeParse({ ...BASE, reasonCode: 'Showroom display set' }).success,
+    ).toBe(true);
+  });
+  it('0308 — accepts no reason at all (a customer-driven PO)', () => {
+    expect(createPoInput.safeParse({ ...BASE, so: 4001 }).success).toBe(true);
+  });
+  it('0308 — rejects a reason beside a single customer order', () => {
+    expect(
+      createPoInput.safeParse({ ...BASE, so: 4001, reasonCode: 'Showroom display set' })
+        .success,
+    ).toBe(false);
+  });
+  it('0308 — rejects a reason beside a bundle of customer orders', () => {
+    expect(
+      createPoInput.safeParse({
+        ...BASE,
+        soRefs: [4001, 4002],
+        reasonCode: 'Showroom display set',
+      }).success,
+    ).toBe(false);
+  });
+  it('0308 — an EMPTY soRefs array is not a customer order', () => {
+    // The DB CHECK tests `so_refs` by CARDINALITY for the same reason: `{}` is
+    // a shape the batch path can produce, and it links to nobody.
+    expect(
+      createPoInput.safeParse({ ...BASE, soRefs: [], reasonCode: 'Showroom display set' })
+        .success,
+    ).toBe(true);
+  });
+  it('0308 — rejects a blank reason (a blank is not a reason)', () => {
+    // Mirrors `purchase_orders_reason_not_blank`. Without it the marker could
+    // be a space: "manual purchase" to every query, "nothing" to a human.
+    expect(createPoInput.safeParse({ ...BASE, reasonCode: '   ' }).success).toBe(false);
+    expect(createPoInput.safeParse({ ...BASE, reasonCode: '' }).success).toBe(false);
+  });
+  it('0308 — the failure points at the reason field, not at the order', () => {
+    const r = createPoInput.safeParse({
+      ...BASE,
+      so: 4001,
+      reasonCode: 'Showroom display set',
+    });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(r.error.issues.some((i) => i.path.includes('reasonCode'))).toBe(true);
+    }
+  });
 });
 
 describe('createPosBatchInput', () => {

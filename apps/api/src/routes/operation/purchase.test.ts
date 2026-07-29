@@ -164,6 +164,33 @@ describe("GET /api/operation/purchase/today — auth", () => {
 // Shape / happy path (integration through the route)
 // =====================================================================
 describe("GET /api/operation/purchase/today — assembly", () => {
+  // ── 0308 · a manual purchase never appears inside To Order ─────────────────
+  //
+  // The card's item 4. To Order answers ONE question — "which customer orders
+  // should be issued as Purchase Orders today?" — and a purchase nobody's
+  // customer asked for cannot be an answer to it.
+  //
+  // The guard is the FILTER, not the shape of the returned rows: a `reason_code`
+  // that stopped being applied would leak manual purchases into the Chase and
+  // Receive queues, and with 0 POs live today no fixture could tell the
+  // difference. Asserting the applied predicate is what catches that.
+  it("0308 — excludes manual purchases from the Chase / Receive read", async () => {
+    const sb = makeSb({ ...PURCHASING_TABLES, orders: { data: [], error: null } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(URL, { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // Filtered on `reason_code` — the SOLE stored marker of a manual purchase.
+    // There is deliberately no `origin` column to filter on instead.
+    expect(sb.builders.purchase_orders.is).toHaveBeenCalledWith("reason_code", null);
+    // ...and still only the OPEN ones, which is the filter that was already there.
+    expect(sb.builders.purchase_orders.eq).toHaveBeenCalledWith("status", "open");
+  });
+
   it("200 with an empty list when there are no live orders", async () => {
     const sb = makeSb({ ...PURCHASING_TABLES, orders: { data: [], error: null } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

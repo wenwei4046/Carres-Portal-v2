@@ -62,15 +62,21 @@ export default function TabbedProcurementShell() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // T42-C2 — restore the "+ New PO" entry point that lived on the deleted
-  // operationProcurement.tsx (T36). The shell is now the only mount point for
-  // the procurement section, so the create-PO button + CreatePOModal mount
-  // belong here. Stockpile mode (no `so` / `soRefs` prefill) is the default;
-  // the user can still tick the in-modal stockpile toggle or use the
-  // "Suggest from alerts" / auto-fill buttons inside the modal.
+  // T42-C2 — the shell is the only mount point for the procurement section, so
+  // the create-PO button + CreatePOModal mount belong here.
+  //
+  // 0308 — this ONE mount now serves two different business events, and they
+  // are held apart by two pieces of state rather than by one nullable prefill:
+  //   • `createManual`  — Purchase Orders → Create Purchase. No customer order,
+  //                       a required Reason to Purchase.
+  //   • `createPrefill` — a customer-driven PO arriving from the order drawer's
+  //                       "+ Issue POs" (via location.state). Unchanged.
+  // Collapsing them into "empty prefill means manual" would make an order-drawer
+  // handoff that happens to arrive empty into a manual purchase silently.
   const [createPrefill, setCreatePrefill] = useState<CreatePoPrefill | null>(
     null,
   );
+  const [createManual, setCreateManual] = useState(false);
 
   // 2026-05-10 (Loo) — accept a CreatePOModal prefill via React Router
   // location.state. Used by OrderDetailDrawer's "+ Issue POs" navigate-to-
@@ -123,13 +129,18 @@ export default function TabbedProcurementShell() {
             focused on the channel the user is working on.
           </div>
         </div>
+        {/* 0308 — `Create Purchase` is the ONLY door to a purchase no customer
+            order asked for (the card's item 3). The twin button that used to
+            sit on To Order is gone: To Order plans customer orders, and a
+            second entry to manual buying inside it is what made the two look
+            like one job. */}
         <button
           type="button"
           className="btn-hero text-meta"
-          onClick={() => setCreatePrefill({})}
-          data-testid="new-po-button"
+          onClick={() => setCreateManual(true)}
+          data-testid="create-purchase-button"
         >
-          + New PO
+          + Create Purchase
         </button>
       </div>
 
@@ -170,16 +181,17 @@ export default function TabbedProcurementShell() {
           TanStack query runs against its own slug-keyed cache. */}
       <ActiveTab />
 
-      {/* T42-C2 — CreatePOModal mount. Empty prefill (`{}`) opens the modal
-          in its default mode: user can tick stockpile, paste lines manually,
-          or hit "Suggest from alerts" / "Auto-fill from awaiting stock"
-          inside the modal. Order-pinned prefill flows still flow through
-          their own callers (e.g. the awaiting-stock dialog on the dashboard)
-          — this is the manual-entry / stockpile entry point. */}
-      {createPrefill !== null && (
+      {/* CreatePOModal mount — one component, the two events kept apart by
+          `manual`. Order-pinned prefills (the order drawer's "+ Issue POs")
+          open it exactly as before. */}
+      {(createPrefill !== null || createManual) && (
         <CreatePOModal
-          prefill={createPrefill}
-          onClose={() => setCreatePrefill(null)}
+          prefill={createPrefill ?? {}}
+          manual={createManual}
+          onClose={() => {
+            setCreatePrefill(null);
+            setCreateManual(false);
+          }}
         />
       )}
     </div>

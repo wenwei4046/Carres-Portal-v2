@@ -402,6 +402,12 @@ describe("POST /api/operation/pos", () => {
       // 0079 (Loo 2026-05-10) — procurement-leg LP pre-assigned at PO
       // creation. Null when caller omits (own_logistics suppliers).
       p_procurement_partner_id: null,
+      // 0308 — the manual-purchase reason. NULL here, and that is the point:
+      // this is a customer-driven PO (`p_so` is set), and `reason_code` NULL
+      // is what keeps it out of the manual lane. A non-null value beside a
+      // `p_so` is refused by the DB CHECK.
+      p_reason_code: null,
+      p_reason_note: null,
     });
     assertRpcCallShape(rpc, "operation_create_po", [
       "p_supplier_id",
@@ -410,6 +416,8 @@ describe("POST /api/operation/pos", () => {
       "p_so",
       "p_so_refs",
       "p_procurement_partner_id",
+      "p_reason_code",
+      "p_reason_note",
     ]);
     // 0083 (Loo 2026-05-10) — post-RPC UPDATE persists eta_date on the
     // returned PO id (RPC public signature doesn't accept p_eta_date).
@@ -449,6 +457,10 @@ describe("POST /api/operation/pos", () => {
       p_so_refs: [4001, 4002, 4003],
       // 0079 (Loo 2026-05-10) — see prior test for rationale.
       p_procurement_partner_id: null,
+      // 0308 — see prior test. A bundle of customer orders is still
+      // customer-driven, so it states no reason either.
+      p_reason_code: null,
+      p_reason_note: null,
     });
     assertRpcCallShape(rpc, "operation_create_po", [
       "p_supplier_id",
@@ -457,7 +469,118 @@ describe("POST /api/operation/pos", () => {
       "p_so",
       "p_so_refs",
       "p_procurement_partner_id",
+      "p_reason_code",
+      "p_reason_note",
     ]);
+  });
+
+  // ── 0308 · MANUAL PURCHASE ────────────────────────────────────────────────
+  //
+  // A purchase no customer order asked for. `reasonCode` is its ONLY marker —
+  // the card refuses an `origin` column, because a third word beside "states a
+  // reason" and "points at a customer order" could disagree with both and then
+  // nothing would say which is true.
+
+  it("0308 — forwards the manual-purchase reason with NO customer order", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { id: "PO-2060", reason_code: "Showroom display set" },
+      error: null,
+    });
+    const fromMock = makeFromMock();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from: fromMock.from } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supplierId: SUPPLIER_ID,
+          warehouseId: WAREHOUSE_ID,
+          lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, costSource: "hand_entered" }],
+          etaDate: "2026-06-01",
+          reasonCode: "Showroom display set",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const args = rpc.mock.calls[0][1] as Record<string, unknown>;
+    expect(args.p_reason_code).toBe("Showroom display set");
+    // The card's item 6: a PO with a purchase reason carries neither.
+    expect(args.p_so).toBeNull();
+    expect(args.p_so_refs).toBeNull();
+  });
+
+  it("0308 — refuses a reason beside a customer order, at the edge (422)", async () => {
+    // The DB CHECK is the enforcement and the RPC names the failure; this is
+    // the third layer, and none of the three is softer than the others. A 422
+    // here means the request never reaches the database at all.
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...VALID, reasonCode: "Showroom display set" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("0308 — refuses a blank reason (a blank is not a reason)", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supplierId: SUPPLIER_ID,
+          warehouseId: WAREHOUSE_ID,
+          lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, costSource: "hand_entered" }],
+          etaDate: "2026-06-01",
+          reasonCode: "   ",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("0308 — a DB reason failure keeps its name instead of arriving as a 500", async () => {
+    // 23514 is the CHECK. `mapPgError` sends it to `rpc_failed` / 500, which
+    // would tell an operator the portal broke when in fact they broke a rule.
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "23514",
+        message:
+          'new row for relation "purchase_orders" violates check constraint "purchase_orders_manual_has_no_customer_order"',
+        details: "Failing row contains (...)",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(VALID),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("manual_purchase_has_no_customer_order");
   });
 
   it("returns 422 when lines is empty", async () => {
@@ -2437,6 +2560,11 @@ describe("POST /api/operation/pos/batch", () => {
           eta_date: "2026-06-01",
           so_refs: null,
           note: null,
+          // 0308 — the batch RPC reads the manual-purchase reason off each
+          // entry, so a batch may legitimately MIX: one manual purchase and
+          // customer-driven POs beside it. These two state none.
+          reason_code: null,
+          reason_note: null,
         },
         {
           supplier_id: SUPPLIER_B,
@@ -2446,6 +2574,8 @@ describe("POST /api/operation/pos/batch", () => {
           eta_date: "2026-06-15",
           so_refs: null,
           note: null,
+          reason_code: null,
+          reason_note: null,
         },
       ],
     });

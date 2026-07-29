@@ -754,8 +754,10 @@ export default function OperationPurchase() {
 
   // ── P2 · closing a drawer gives the list back (UI-KIT §8.2) ────────────────
   //
-  // The two drawers this tab opens are CreatePOModal (Send PO · + New PO ·
-  // Send separately) and ReceivePOModal (Check in). Both close by refetching
+  // The two drawers this tab opens are CreatePOModal (Issue PO · Send
+  // separately) and ReceivePOModal (Check in) — 0308 deleted the third,
+  // `+ New PO`, whose empty prefill was a manual purchase raised from inside
+  // the customer-order plan. Both close by refetching
   // the plan, which re-renders the facet tree — and a shorter tree makes the
   // browser clamp the rail's scrollTop before React has finished. So the state
   // is snapshotted when the drawer opens and put back when it closes.
@@ -859,20 +861,17 @@ export default function OperationPurchase() {
           activeChips={activeChips}
           facet={
             <div ref={facetInnerRef} className="flex flex-col gap-2 min-h-0 flex-1">
-              {/* + New PO — Gmail compose style (Jess 2026-07-23). Always
-                  visible at the top; opens CreatePOModal with EMPTY prefill
-                  so the operator can raise an ad-hoc PO (stockpile / runner /
-                  special order) not tied to a specific SO. Grey box (not
-                  flame — Send PO in the preview owns the ONE flame per page,
-                  UI-KIT §A5). */}
-              <button
-                type="button"
-                onClick={() => openCreatePo({ lines: [] })}
-                className="shrink-0 flex items-center justify-center gap-2 h-9 rounded-full border border-base-200 bg-white text-base-800 text-body font-semibold hover:bg-hovertint transition-colors"
-              >
-                <span className="text-strong leading-none">+</span> New PO
-              </button>
+              {/* 0308 — the `+ New PO` button that stood here is DELETED.
+                  It opened CreatePOModal with an EMPTY prefill, which is a
+                  purchase no customer order asked for — a manual purchase,
+                  raised from inside the workspace whose whole question is
+                  "which CUSTOMER orders should be issued as Purchase Orders
+                  today?". The card makes Purchase Orders → Create Purchase the
+                  only door to it.
 
+                  Nothing replaces it here, deliberately: To Order's own
+                  purchasing actions already sit in the plan below, each raised
+                  by demand rather than by a person deciding to buy. */}
               <SectionCard>
               {/* TODAY'S WORK — 3 stages with avatar chip left (Jess 2026-07-23
                   v2 · rev 2): chip = who's on duty for that stage. Numbers

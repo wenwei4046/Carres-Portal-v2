@@ -88,6 +88,21 @@ export interface CreatePoPrefill {
 interface Props {
   prefill: CreatePoPrefill;
   onClose: () => void;
+  /**
+   * 0308 — MANUAL PURCHASE mode. True only when the operator came through
+   * Purchase Orders → `Create Purchase`, which the card makes the ONLY door to
+   * a purchase no customer order asked for.
+   *
+   * It is a PROP, not something derived from whether the lines carry a source
+   * SO, and that is deliberate: the customer-driven To Order flow can itself
+   * submit with no SO on the payload today (`buildPlacePrefill` sets
+   * `prefill.soRefs`, but the submit reads `line.sourceSos`, which the
+   * caller-supplied-lines path leaves empty). Deriving "manual" from an absent
+   * SO would therefore demand a purchase reason from the customer flow — the
+   * one thing the card's item 7 forbids. The door you came through is the fact;
+   * the reason is what records it.
+   */
+  manual?: boolean;
 }
 
 interface DraftLine {
@@ -185,7 +200,7 @@ function findSupplierForSku(
   return suppliers.find((s) => (s.cat_covered ?? []).includes(cat)) ?? null;
 }
 
-export default function CreatePOModal({ prefill, onClose }: Props) {
+export default function CreatePOModal({ prefill, onClose, manual = false }: Props) {
   const suppliersQ = useOperationSuppliers();
   const warehousesQ = useOperationWarehouse();
   const catalogQ = useCatalog();
@@ -223,21 +238,24 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // below is a defensive guard rather than a hot path.
   const alertsQ = useStockAlerts({ enabled: false });
 
-  // v3-S4.5 — Stockpile PO mode. When the user wants to procure inventory
-  // ahead of demand (no specific customer order to cover), they tick this
-  // toggle. The submission then drops `so` / `soRefs` from the payload —
-  // backend RPC accepts NULL for both (validated against migration 0019/0025).
-  // Spec §17.1 A3 promotes this from edge-case to 1st-class flow.
-  //
-  // Mutually exclusive with auto-fill prefill: when the modal is opened with
-  // `so` / `soRefs` set, the toggle is disabled (you can't stockpile if the
-  // caller already pinned the order ref). UI-locked rather than hidden so the
-  // operator sees the option exists but understands why it's not available
-  // here.
   const autoFillPrefilled =
     prefill.so != null ||
     (prefill.soRefs != null && prefill.soRefs.length > 0);
-  const [stockpile, setStockpile] = useState<boolean>(false);
+
+  // 0308 — the v3-S4.5 "Stockpile PO" TOGGLE is gone, and its behaviour is now
+  // the manual-purchase mode above. It was a second door to a purchase carrying
+  // no customer order, reachable from inside a customer-driven modal, and the
+  // card makes `Create Purchase` the only one. Dropping the order link is no
+  // longer something you tick mid-flow; it is which button you pressed.
+  //
+  // Everything the toggle used to switch reads `manual` instead, so a manual
+  // purchase still forces `so` / `soRefs` out of the payload exactly as
+  // stockpile did — plus the reason the toggle never asked for.
+
+  // The purchase reason. Free text today; the dictionary comes later (the
+  // card's item 5), which is why this is a single input and not a picker.
+  const [reasonCode, setReasonCode] = useState<string>("");
+  const reasonOk = !manual || reasonCode.trim().length > 0;
   // Phase 3 (2026-05-18 — Loo) — auto-split is always on. The previous
   // `splitPerVariant` toggle is gone: every PO is keyed by (supplier,
   // sourceSo, sku, attrs). The fanning happens at line build time
@@ -468,7 +486,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // v3-S4.5 — also hidden in stockpile mode (auto-fill is order-shortage-
   // driven; stockpile by definition has no order to drive from).
   const showAutoFill =
-    !stockpile &&
+    !manual &&
     prefill.so == null && (prefill.soRefs == null || prefill.soRefs.length === 0);
 
   // T22 — "Suggest from alerts" visibility. Same prefill-guard as auto-fill
@@ -767,6 +785,10 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     groups.orphans.length === 0 &&
     partnersOk &&
     !!eta &&
+    // 0308 — required before submit (the card's item 5). Only in manual mode:
+    // a customer-driven PO must never be asked for a reason, and the CHECK
+    // behind it refuses one.
+    reasonOk &&
     !isPending;
 
   // 0076: dup detection keys on (sku, attrs canonical) so multi-variant
@@ -873,7 +895,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         // RPC both accept either shape. Sofa per-variant groups still have one
         // SO each (key includes sourceSo) so they fall into the `.length === 1`
         // branch unchanged. Stockpile = both omitted.
-        const distinctSos = stockpile
+        const distinctSos = manual
           ? []
           : Array.from(new Set(g.lines.flatMap((l) => l.sourceSos)));
         const soPayload =
@@ -895,9 +917,15 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           })),
           ...soPayload,
           etaDate: eta,
+          // 0308 — sent ONLY in manual mode, so a customer-driven PO leaves
+          // `reason_code` NULL and stays outside the manual lane by
+          // construction rather than by a flag somebody has to keep in step.
+          ...(manual ? { reasonCode: reasonCode.trim() } : {}),
         });
         toast.success(
-          `PO issued · ${lines.length} line${lines.length === 1 ? "" : "s"} · ${totalUnits} units`,
+          manual
+            ? `Purchase created · ${lines.length} line${lines.length === 1 ? "" : "s"} · ${totalUnits} units`
+            : `PO issued · ${lines.length} line${lines.length === 1 ? "" : "s"} · ${totalUnits} units`,
         );
       } else {
         // 2+ POs → atomic batch RPC. Each entry carries its own warehouse +
@@ -918,7 +946,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             // single-PO branch above. A non-sofa group may consolidate many
             // SOs; sofa-split groups always have exactly one SO so they fall
             // through with soRefs: [singleSo].
-            const distinctSos = stockpile
+            const distinctSos = manual
               ? []
               : Array.from(new Set(g.lines.flatMap((l) => l.sourceSos)));
             const soPayload =
@@ -942,86 +970,80 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
               })),
               ...soPayload,
               etaDate: eta,
+              // 0308 — same reason on every PO of a manual batch. They are one
+              // purchase decision that happened to split across suppliers, so
+              // splitting the answer would leave some rows unable to say why
+              // they exist.
+              ...(manual ? { reasonCode: reasonCode.trim() } : {}),
             };
           }),
         });
-        toast.success(`Issued ${n} POs`);
+        toast.success(manual ? `Created ${n} purchases` : `Issued ${n} POs`);
       }
       onClose();
     } catch (e: unknown) {
-      if (e instanceof ApiError) toast.error(e.message || "Issue PO failed");
-      else toast.error(e instanceof Error ? e.message : "Issue PO failed");
+      const fallback = manual ? "Create Purchase failed" : "Issue PO failed";
+      if (e instanceof ApiError) toast.error(e.message || fallback);
+      else toast.error(e instanceof Error ? e.message : fallback);
     }
   }
 
-  // v3-S4.5: stockpile mode overrides any order-ref title suffix because the
-  // PO is no longer for that order. We still use Modal's static `title` prop
-  // (so the test util's `getByText` lookups continue to work) and decorate
-  // with a "Stockpile" pill below in the body.
-  const titleSuffix = stockpile
+  // 0308 — the title says which of the two purchases this is. `Create Purchase`
+  // is the card's word for the manual one; everything else keeps the wording it
+  // shipped with, because the customer-driven flow is unchanged.
+  const titleSuffix = manual
     ? ""
     : prefill.so
       ? ` · for order #${prefill.so}`
       : prefill.soRefs && prefill.soRefs.length > 0
         ? ` · bundle of ${prefill.soRefs.length} orders`
         : "";
-  const baseTitle = stockpile
-    ? "New stockpile PO"
+  const baseTitle = manual
+    ? "Create Purchase"
     : prefill.so || prefill.soRefs?.length
       ? `New PO${titleSuffix}`
       : "New purchase order";
 
   return (
     <Modal title={baseTitle} onClose={onClose} size="lg">
-      {/* v3-S4.5 — Stockpile PO toggle. Disabled when caller pre-pinned an
-          order ref (single so or bundle soRefs); the prefill there dictates
-          the lines and dropping it would lose the link. */}
-      <div className="mb-3 flex items-center gap-2 text-meta font-body">
-        <input
-          id="stockpile-po-toggle"
-          data-testid="stockpile-po-toggle"
-          type="checkbox"
-          checked={stockpile}
-          disabled={autoFillPrefilled}
-          onChange={(e) => setStockpile(e.target.checked)}
-          className="h-3.5 w-3.5"
-          title={
-            autoFillPrefilled
-              ? "Disabled — modal opened with an order/bundle prefill"
-              : undefined
-          }
-        />
-        <label
-          htmlFor="stockpile-po-toggle"
-          className="select-none"
-          style={{ opacity: autoFillPrefilled ? 0.55 : 1 }}
-        >
-          <strong>Stockpile PO</strong>
-          <span className="text-base-600"> (no order ref — pre-stock inventory)</span>
-        </label>
-        {stockpile && (
-          <span
-            data-testid="stockpile-mode-badge"
-            className="px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
-            style={{
-              fontSize: "9.5px",
-              background: "rgba(58,89,131,.12)",
-              color: "rgb(58,89,131)",
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-            }}
+      {/* 0308 — Reason to Purchase. Required before submit; free text until the
+          reason dictionary lands (the card's item 5). It is asked FIRST because
+          it is the one thing that makes this a different business event from
+          every other PO the portal raises — and it is asked only here, since a
+          customer-driven PO is answered by the customer order it points at. */}
+      {manual && (
+        <div className="mb-3">
+          <label
+            htmlFor="purchase-reason"
+            className="block text-label uppercase tracking-wide text-base-500 mb-1"
           >
-            Stockpile
-          </span>
-        )}
-      </div>
+            Reason to Purchase
+          </label>
+          <input
+            id="purchase-reason"
+            data-testid="purchase-reason-input"
+            type="text"
+            value={reasonCode}
+            onChange={(e) => setReasonCode(e.target.value)}
+            className={INPUT_CLS}
+            placeholder="Why is this being bought?"
+          />
+          {!reasonOk && (
+            <div
+              data-testid="purchase-reason-required"
+              className="text-meta text-base-600 mt-1 font-body"
+            >
+              State why this is being bought before creating it.
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="text-meta text-base-600 mb-3 font-body">
-        {stockpile ? (
+        {manual ? (
           <>
-            <strong>Stockpile mode:</strong> this PO is for inventory
-            replenishment only — it won&rsquo;t be linked to any specific
-            customer order.
+            No customer order asked for this purchase, so it stays out of To
+            Order and is followed up here.
           </>
         ) : prefill.so ? (
           <>
@@ -1636,9 +1658,14 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         onCancel={onClose}
         onPrimary={submit}
         primary={
-          willSplit
-            ? `Issue ${groups.groups.length} POs · ${lines.length} line${lines.length === 1 ? "" : "s"}`
-            : `Issue PO · ${lines.length} line${lines.length === 1 ? "" : "s"}`
+          // 0308 — a manual purchase is CREATED, not issued. `Issue PO` is the
+          // customer-driven act (COPY-STANDARD), and one word may not name two
+          // different acts.
+          manual
+            ? `Create Purchase · ${lines.length} line${lines.length === 1 ? "" : "s"}`
+            : willSplit
+              ? `Issue ${groups.groups.length} POs · ${lines.length} line${lines.length === 1 ? "" : "s"}`
+              : `Issue PO · ${lines.length} line${lines.length === 1 ? "" : "s"}`
         }
         primaryDisabled={!valid}
         primaryPending={isPending}

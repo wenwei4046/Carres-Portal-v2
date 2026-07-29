@@ -337,8 +337,23 @@ export default function ProcurementTabContent({
               </div>
               <div className="min-w-0">
                 {orders.length === 0 ? (
-                  <div className="text-label text-base-500 italic font-body">
-                    Stockpile · no source order
+                  // 0308 — a PO with no source order used to be labelled
+                  // `Stockpile`, the word the deleted in-modal toggle owned.
+                  // A manual purchase now STATES why it exists, and this is
+                  // the only screen it appears on (To Order excludes it), so
+                  // the reason is what stands here.
+                  //
+                  // A no-SO PO carrying no reason is a legacy row — every one
+                  // raised from here on is refused without a reason. It is
+                  // stated as the plain fact rather than back-filled into a
+                  // reason nobody gave.
+                  <div
+                    className="text-label text-base-500 italic font-body"
+                    data-testid={`po-reason-${po.id}`}
+                  >
+                    {po.reason_code
+                      ? `Manual purchase · ${po.reason_code}`
+                      : "No source order"}
                   </div>
                 ) : (
                   <>

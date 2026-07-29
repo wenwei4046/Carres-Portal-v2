@@ -262,57 +262,82 @@ function fillEta(date: string = ETA_FIXTURE) {
   });
 }
 
-describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
-  it("Stockpile PO toggle hides order-ref fields when checked", () => {
-    // Open with bundle prefill so the bundle intro text would normally render.
-    // Toggle is disabled in this case (see test 3) — switch to a stockpile-
-    // safe entry: empty prefill, then toggle on. The intro text "Pick the
-    // SKUs you need..." should be replaced by the stockpile description, and
-    // the auto-fill button (which is order-shortage-driven) should disappear.
-    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+/**
+ * 0308 — MANUAL PURCHASE mode, which REPLACES the v3-S4.5 "Stockpile PO"
+ * toggle these tests used to drive.
+ *
+ * The behaviour the toggle carried (drop `so` / `soRefs`) survives; what
+ * changed is what turns it on. It was a checkbox reachable from inside the
+ * customer-driven modal — a second door to a purchase no customer asked for.
+ * It is now the DOOR you came through: `Purchase Orders → Create Purchase`
+ * passes `manual`, and nothing else can.
+ *
+ * The card adds one thing the toggle never asked for: a manual purchase must
+ * state WHY it exists, before it can be created.
+ *
+ * The mirror-image guard — the customer-driven modal must never ask for a
+ * reason nor send one — is the last test here, and it is the one that holds
+ * the card's item 7 ("keep customer-driven purchasing behaviour unchanged").
+ */
+describe("CreatePOModal — Manual Purchase mode (0308)", () => {
+  /** Fill the required Reason to Purchase. */
+  function fillReason(text = "Showroom display set") {
+    fireEvent.change(screen.getByTestId("purchase-reason-input"), {
+      target: { value: text },
+    });
+  }
 
-    // Default state — auto-fill button is visible (no order-ref prefill).
-    expect(
-      screen.getByTestId("auto-fill-shortage-button"),
-    ).toBeInTheDocument();
+  it("asks for a reason and drops the order-driven affordances", () => {
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} manual />));
 
-    // Flip the stockpile toggle on.
-    const toggle = screen.getByTestId("stockpile-po-toggle");
-    expect(toggle).not.toBeChecked();
-    fireEvent.click(toggle);
-    expect(toggle).toBeChecked();
+    // The reason field is the mode's whole point.
+    expect(screen.getByTestId("purchase-reason-input")).toBeInTheDocument();
 
-    // Auto-fill button (order-shortage-driven) hidden — stockpile is
-    // explicitly NOT order-driven.
+    // Auto-fill is order-shortage-driven, so it has nothing to fill from.
     expect(
       screen.queryByTestId("auto-fill-shortage-button"),
     ).not.toBeInTheDocument();
 
-    // Stockpile-mode hint visible somewhere in the modal.
+    // The act is named `Create Purchase`, never `Issue PO` — one word may not
+    // name two different acts.
     const dialog = screen.getByRole("dialog");
-    expect(dialog.textContent ?? "").toMatch(/[Ss]tockpile/);
+    expect(dialog.textContent ?? "").toMatch(/Create Purchase/);
+    expect(screen.queryByRole("button", { name: /Issue PO/ })).toBeNull();
   });
 
-  it("Submit in stockpile mode sends so=null and soRefs=null", async () => {
-    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+  it("refuses to submit until the reason is stated (the card's item 5)", () => {
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} manual />));
 
-    // Toggle stockpile on
-    fireEvent.click(screen.getByTestId("stockpile-po-toggle"));
-
-    // Pick the warehouse (the single supplier group needs one)
+    // Everything else satisfied — warehouse + ETA. Cost auto-fills from the
+    // catalog (King fixture = 1500), so the reason is the only thing short.
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
       target: { value: WAREHOUSE_KL.id },
     });
-
-    // 0074 — cost auto-fills from product_skus.cost (King fixture = 1500).
-    // No more hand-entry; the valid-form gate just needs the seeded SKU.
-    // 0083 — ETA also required.
     fillEta();
 
-    // Submit
-    const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
-    expect(issueBtn).not.toBeDisabled();
-    fireEvent.click(issueBtn);
+    const createBtn = screen.getByRole("button", { name: /Create Purchase/ });
+    expect(createBtn).toBeDisabled();
+
+    // Whitespace is not a reason — same rule the DB CHECK holds.
+    fillReason("   ");
+    expect(createBtn).toBeDisabled();
+
+    fillReason();
+    expect(createBtn).not.toBeDisabled();
+  });
+
+  it("submit sends the reason and NO customer order", async () => {
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} manual />));
+
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
+    fillEta();
+    fillReason("Showroom display set");
+
+    const createBtn = screen.getByRole("button", { name: /Create Purchase/ });
+    expect(createBtn).not.toBeDisabled();
+    fireEvent.click(createBtn);
 
     await waitFor(() => {
       expect(createMutateAsync).toHaveBeenCalledTimes(1);
@@ -324,6 +349,7 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
       so?: number | null;
       soRefs?: number[] | null;
       etaDate?: string;
+      reasonCode?: string;
     };
     expect(callArg.supplierId).toBe(SUPPLIER_A.id);
     expect(callArg.warehouseId).toBe(WAREHOUSE_KL.id);
@@ -331,18 +357,45 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
     // 0074 — every emitted line carries the catalog cost + costSource='catalog'.
     expect(callArg.lines[0].cost).toBe(1500);
     expect(callArg.lines[0].costSource).toBe("catalog");
-    // The contract: stockpile mode forces so/soRefs out of the payload.
-    // Either omitted or explicitly null is acceptable per the API zod
-    // (so/soRefs are .optional()), but neither must carry a value.
+    // The card's item 6, on the wire: a PO carrying a reason carries no
+    // customer order. Omitted or explicitly null both satisfy the API zod;
+    // neither may carry a value.
     expect(callArg.so ?? null).toBeNull();
     expect(callArg.soRefs ?? null).toBeNull();
     // 0083 — etaDate forwarded.
     expect(callArg.etaDate).toBe(ETA_FIXTURE);
+    // The reason, trimmed.
+    expect(callArg.reasonCode).toBe("Showroom display set");
   });
 
-  it("Stockpile PO toggle is disabled when modal opened with auto-fill prefill", () => {
-    // Single-order shortage prefill → stockpile makes no sense (the order
-    // dictates the lines). Toggle must be disabled + unchecked.
+  it("submit blocked when any line points at a SKU with NULL cost", () => {
+    // 0074 — replaces the T29 "missing cost/costSource" gate. Cost is now
+    // catalog-driven; the gate refuses lines whose SKU has cost=null (i.e.
+    // catalog admin hasn't set a procurement cost yet). A stated reason must
+    // not buy past it.
+    catalogHookState = {
+      data: {
+        ...catalogHookState.data!,
+        skus: catalogHookState.data!.skus.map((s) =>
+          s.sku === "mattress:carres-cloud:King" ? { ...s, cost: null } : s,
+        ),
+      },
+    };
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} manual />));
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
+    fillEta();
+    fillReason();
+    expect(
+      screen.getByRole("button", { name: /Create Purchase/ }),
+    ).toBeDisabled();
+  });
+
+  it("a customer-driven PO is never asked for a reason and never sends one", async () => {
+    // The card's item 7. This is the guard, not a courtesy: the DB CHECK
+    // refuses a reason beside a customer order, so a customer-driven modal
+    // that grew a reason field would raise POs the database rejects.
     render(
       wrap(
         <CreatePOModal
@@ -354,72 +407,31 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
         />,
       ),
     );
-    const toggle = screen.getByTestId("stockpile-po-toggle");
-    expect(toggle).toBeDisabled();
-    expect(toggle).not.toBeChecked();
 
-    // Same when the prefill is a cross-order bundle.
-    const { unmount } = render(
-      wrap(
-        <CreatePOModal
-          prefill={{
-            soRefs: [101, 102],
-            lines: [{ sku: "mattress:carres-cloud:King", qty: 5 }],
-          }}
-          onClose={() => {}}
-        />,
-      ),
-    );
-    const toggles = screen.getAllByTestId("stockpile-po-toggle");
-    // Both modals are mounted — find the bundle one (the second).
-    const bundleToggle = toggles[toggles.length - 1];
-    expect(bundleToggle).toBeDisabled();
-    expect(bundleToggle).not.toBeChecked();
-    unmount();
-  });
+    expect(screen.queryByTestId("purchase-reason-input")).toBeNull();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent ?? "").not.toMatch(/Create Purchase/);
 
-  it("Form valid without so when stockpile mode on", () => {
-    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
-
-    // Issue button starts disabled (warehouse blank).
-    const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
-    expect(issueBtn).toBeDisabled();
-
-    // Toggle stockpile — this alone shouldn't unblock the button (warehouse
-    // still blank).
-    fireEvent.click(screen.getByTestId("stockpile-po-toggle"));
-    expect(issueBtn).toBeDisabled();
-
-    // 0074 — cost auto-fills from product_skus.cost on the seeded line
-    // (King fixture = 1500). Submit only needs warehouse picked.
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
       target: { value: WAREHOUSE_KL.id },
     });
-    // 0083 — ETA also required.
-    expect(issueBtn).toBeDisabled();
     fillEta();
-    expect(issueBtn).not.toBeDisabled();
-  });
 
-  it("submit blocked when any line points at a SKU with NULL cost", () => {
-    // 0074 — replaces the T29 "missing cost/costSource" gate. Cost is now
-    // catalog-driven; the gate refuses lines whose SKU has cost=null (i.e.
-    // catalog admin hasn't set a procurement cost yet).
-    catalogHookState = {
-      data: {
-        ...catalogHookState.data!,
-        skus: catalogHookState.data!.skus.map((s) =>
-          s.sku === "mattress:carres-cloud:King" ? { ...s, cost: null } : s,
-        ),
-      },
-    };
-    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
-    fireEvent.click(screen.getByTestId("stockpile-po-toggle"));
-    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
-      target: { value: WAREHOUSE_KL.id },
-    });
     const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
-    expect(issueBtn).toBeDisabled();
+    expect(issueBtn).not.toBeDisabled();
+    fireEvent.click(issueBtn);
+
+    await waitFor(() => {
+      expect(createMutateAsync).toHaveBeenCalledTimes(1);
+    });
+    const callArg = createMutateAsync.mock.calls[0][0] as {
+      so?: number | null;
+      reasonCode?: string;
+    };
+    // The order link survives untouched...
+    expect(callArg.so).toBe(4321);
+    // ...and no reason rides along with it.
+    expect(callArg.reasonCode).toBeUndefined();
   });
 });
 

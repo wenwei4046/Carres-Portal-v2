@@ -170,18 +170,25 @@ describe("TabbedProcurementShell", () => {
     );
   });
 
-  it("'+ New PO' button opens CreatePOModal (T42-C2 restore)", () => {
-    // The shell-level button replaces the entry point that lived on the
-    // deleted operationProcurement.tsx. Default click → empty prefill, so
-    // the modal title is "New purchase order" (no order/bundle suffix).
+  it("'+ Create Purchase' opens the modal in MANUAL mode (0308)", () => {
+    // 0308 — this button is the ONLY door to a purchase no customer order
+    // asked for (the card's item 3). Its twin on To Order is gone, so what
+    // this test guards is not that a modal opens but that it opens in the
+    // right MODE: the reason field is what proves `manual` was passed, and
+    // without it the door would silently raise customer-driven POs that
+    // state nothing.
     renderShell("/operation/procurement/nice-future");
-    expect(screen.queryByText(/New purchase order/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("new-po-button"));
-    // Modal is mounted: header + the lines table the modal scaffolds on
-    // first paint both render. We don't drive submit — that's covered by
-    // CreatePOModal's own suite — only the open path that codex flagged as
-    // unreachable.
-    expect(screen.getByText(/New purchase order/)).toBeInTheDocument();
+    // Closed to begin with. `Create Purchase` is NOT the marker for that —
+    // the button itself now carries those words, which is exactly the point
+    // of the door. The reason field is what only the open modal has.
+    expect(screen.queryByTestId("purchase-reason-input")).toBeNull();
+    fireEvent.click(screen.getByTestId("create-purchase-button"));
+    // Modal is mounted, in manual mode: the required reason and the lines
+    // table the modal scaffolds on first paint. We don't drive submit —
+    // that's covered by CreatePOModal's own suite.
+    expect(screen.getByTestId("purchase-reason-input")).toBeInTheDocument();
     expect(screen.getByTestId("po-lines-table")).toBeInTheDocument();
+    // The customer-driven title must NOT be what opened.
+    expect(screen.queryByText(/New purchase order/)).not.toBeInTheDocument();
   });
 });

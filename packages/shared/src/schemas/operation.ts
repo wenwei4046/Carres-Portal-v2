@@ -245,7 +245,30 @@ export const createPoInput = z.object({
   // closed). Supplier/Finance AP-aging both read `purchase_orders.eta_date`;
   // null was silently corrupting both surfaces.
   etaDate: z.string().date(),
-}).strict();
+  // 0308 — a MANUAL PURCHASE states why it was bought. `reasonCode` carries
+  // that answer as free text today and becomes the picked key once the reason
+  // dictionary lands (the card's item 5); `reasonNote` is optional detail
+  // beside it and never a substitute for it.
+  //
+  // Its PRESENCE is what marks a purchase as manual — there is deliberately no
+  // `origin` field (the card's item 6), because a third word beside these two
+  // facts could disagree with them and then nothing would say which is true.
+  reasonCode: z.string().trim().min(1).optional(),
+  reasonNote: z.string().trim().min(1).optional(),
+}).strict().superRefine((v, ctx) => {
+  // The wire half of `purchase_orders_manual_has_no_customer_order` (0308).
+  // The CHECK is the enforcement and the RPC names the failure; this is the
+  // edge, so a caller gets a 422 pointing at the field instead of a raw 23514.
+  // One rule, three layers, and none of them softer than the others.
+  if (v.reasonCode == null) return;
+  if (v.so != null || (v.soRefs?.length ?? 0) > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['reasonCode'],
+      message: 'a manual purchase does not come from a customer order',
+    });
+  }
+});
 export type CreatePoInput = z.infer<typeof createPoInput>;
 
 /**

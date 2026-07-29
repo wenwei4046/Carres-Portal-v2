@@ -114,7 +114,11 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // P3 (0306): `short_since` is the balance call's Due anchor — the day the
       // line last took a short delivery, stamped by a trigger so every door
       // that writes `received_qty` stamps it.
-      "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs)",
+      // 0308: `reason_code` is a manual purchase's ONLY identity — it says why
+      // a PO exists that no customer order asked for. Carried on the list so
+      // the Purchase Orders tab, which is now where such a PO is followed up,
+      // can print it instead of a mode word.
+      "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, reason_code, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs)",
     );
 
   if (status !== "all") q = q.eq("status", status);
@@ -796,6 +800,64 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
 // transform pattern as POST /batch below — the wire contract stays
 // camelCase (parity with every other route), and the snake_case translation
 // happens once at the DB edge.
+/**
+ * 0308 — name the purchase-reason failures instead of letting them arrive as a
+ * generic `invalid_param` (22023) or, worse, a 500 (23514 falls to `rpc_failed`
+ * in mapPgError). Two doors reach the same rule: the RPC guard raises first
+ * with a named detail, and the CHECK behind it is what actually holds — so both
+ * are mapped, in one place, for both create routes.
+ *
+ * Returns null when the error is not a reason failure; the caller then falls
+ * through to its existing mapping.
+ */
+function mapReasonError(e: {
+  code?: string;
+  message?: string;
+  details?: string;
+}): { status: 422; body: Record<string, unknown> } | null {
+  const named = new Set([
+    "reason_required",
+    "manual_purchase_has_no_customer_order",
+    "reason_cannot_be_cleared",
+  ]);
+  if (e.code === "22023" && e.details && named.has(e.details)) {
+    return {
+      status: 422,
+      body: {
+        error: "rule_violation",
+        code: e.details,
+        message: e.message ?? "invalid purchase reason",
+      },
+    };
+  }
+  // 23514 — the CHECK itself. `details` carries the failing row, not the
+  // constraint, so the constraint name is read off `message`.
+  if (e.code === "23514") {
+    const msg = e.message ?? "";
+    if (msg.includes("purchase_orders_manual_has_no_customer_order")) {
+      return {
+        status: 422,
+        body: {
+          error: "rule_violation",
+          code: "manual_purchase_has_no_customer_order",
+          message: "a manual purchase does not come from a customer order",
+        },
+      };
+    }
+    if (msg.includes("purchase_orders_reason_not_blank")) {
+      return {
+        status: 422,
+        body: {
+          error: "rule_violation",
+          code: "reason_required",
+          message: "a manual purchase must state a reason",
+        },
+      };
+    }
+  }
+  return null;
+}
+
 operationPosRouter.post("/", requireOperation, async (c) => {
   const gated = await poDutyGate(c);
   if (gated) return gated;
@@ -824,8 +886,15 @@ operationPosRouter.post("/", requireOperation, async (c) => {
     // a partner picked; own_logistics suppliers omit the field and the RPC
     // accepts null.
     p_procurement_partner_id: parsed.data.procurementPartnerId ?? null,
+    // 0308 — the manual-purchase reason. Absent on every customer-driven PO,
+    // which is exactly what leaves `reason_code` NULL and keeps that column the
+    // sole marker of "nobody's customer asked for this".
+    p_reason_code: parsed.data.reasonCode ?? null,
+    p_reason_note: parsed.data.reasonNote ?? null,
   });
   if (error) {
+    const reason = mapReasonError(error);
+    if (reason) return c.json(reason.body, reason.status);
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
@@ -893,6 +962,11 @@ operationPosRouter.post("/batch", requireOperation, async (c) => {
     eta_date: p.etaDate,
     so_refs: p.soRefs ?? null,
     note: null as string | null,
+    // 0308 — per-PO manual-purchase reason. The batch RPC reads it off each
+    // entry, so a batch may legitimately mix: a manual purchase carries one and
+    // every customer-driven PO beside it carries none.
+    reason_code: p.reasonCode ?? null,
+    reason_note: p.reasonNote ?? null,
   }));
 
   const { data, error } = await sb.rpc("operation_create_pos_batch", {
@@ -900,6 +974,21 @@ operationPosRouter.post("/batch", requireOperation, async (c) => {
   });
   if (error) {
     const e = error as { code?: string; message?: string; details?: string; hint?: string };
+
+    // 0308 — a reason failure keeps its name here too, and gains the
+    // `pos_index` the batch RPC already attaches to every helper failure so a
+    // single entry in the batch can be pointed at.
+    const reason = mapReasonError(e);
+    if (reason) {
+      const idx = /pos_index=(\d+)/.exec(e.hint ?? "");
+      return c.json(
+        {
+          ...reason.body,
+          pos_index: idx ? Number.parseInt(idx[1], 10) : null,
+        },
+        reason.status,
+      );
+    }
 
     // 22023 invalid_batch_size — surface the detail code unchanged.
     if (e.code === "22023" && e.details === "invalid_batch_size") {
