@@ -83,6 +83,18 @@ export interface CreatePoPrefill {
   warehouseId?: string;
   /** Inline annotation copy ("Auto-matched 3 SKUs across 2 orders…"). */
   note?: string;
+  /**
+   * 0308 — WHICH DOOR OPENED THIS MODAL.
+   *
+   * `"customer"` (the default, and what every To Order / Orders opener passes)
+   * is a purchase a customer order asked for. `"manual"` is `+ Create Purchase`
+   * on the Purchase Orders tab — nobody ordered it, so it must say why.
+   *
+   * The modal cannot switch between them. A modal that can change its own mode
+   * is the boundary back again with an extra click, which is exactly what the
+   * old `Stockpile PO` toggle was.
+   */
+  mode?: "customer" | "manual";
 }
 
 interface Props {
@@ -223,21 +235,26 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // below is a defensive guard rather than a hot path.
   const alertsQ = useStockAlerts({ enabled: false });
 
-  // v3-S4.5 — Stockpile PO mode. When the user wants to procure inventory
-  // ahead of demand (no specific customer order to cover), they tick this
-  // toggle. The submission then drops `so` / `soRefs` from the payload —
-  // backend RPC accepts NULL for both (validated against migration 0019/0025).
-  // Spec §17.1 A3 promotes this from edge-case to 1st-class flow.
-  //
-  // Mutually exclusive with auto-fill prefill: when the modal is opened with
-  // `so` / `soRefs` set, the toggle is disabled (you can't stockpile if the
-  // caller already pinned the order ref). UI-locked rather than hidden so the
-  // operator sees the option exists but understands why it's not available
-  // here.
+  // Whether the caller pinned an order ref. Still read by `showSuggestAlerts`
+  // below; the stockpile toggle it used to gate is gone (see 0308 note).
   const autoFillPrefilled =
     prefill.so != null ||
     (prefill.soRefs != null && prefill.soRefs.length > 0);
-  const [stockpile, setStockpile] = useState<boolean>(false);
+  // 0308 — the toggle is GONE and `stockpile` is now derived from the door.
+  //
+  // `Stockpile PO` was a manual purchase reachable from inside a
+  // customer-driven flow: ticking it dropped `so` / `soRefs` and asked for no
+  // reason at all. Removing `+ New PO` from To Order while leaving this in
+  // place would have closed the front door and left the side door open.
+  //
+  // A stockpile purchase is still available — it is what `+ Create Purchase`
+  // on the Purchase Orders tab now is, and it states its reason.
+  const manual = prefill.mode === "manual";
+  const stockpile = manual;
+  // 0308 — free text for this implementation (Loo 2026-07-29, Decision B
+  // deferred). A controlled dictionary replaces the input with a picker later;
+  // nothing here presumes a value.
+  const [reasonCode, setReasonCode] = useState<string>("");
   // Phase 3 (2026-05-18 — Loo) — auto-split is always on. The previous
   // `splitPerVariant` toggle is gone: every PO is keyed by (supplier,
   // sourceSo, sku, attrs). The fanning happens at line build time
@@ -761,11 +778,16 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // handled by the orphans guard below.
   const warehousesOk = groups.groups.every((g) => !!warehouseFor(g.supplier));
   const isPending = create.isPending || createBatch.isPending;
+  // 0308 — a manual purchase must state a reason. Same shape as `partnersOk`:
+  // the button stays disabled until it is answered, so the boundary is met
+  // before a request is made rather than as a 422 afterwards.
+  const reasonOk = !manual || reasonCode.trim().length > 0;
   const valid =
     allLinesOk &&
     warehousesOk &&
     groups.orphans.length === 0 &&
     partnersOk &&
+    reasonOk &&
     !!eta &&
     !isPending;
 
@@ -895,6 +917,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           })),
           ...soPayload,
           etaDate: eta,
+          ...(manual ? { reasonCode: reasonCode.trim() } : {}),
         });
         toast.success(
           `PO issued · ${lines.length} line${lines.length === 1 ? "" : "s"} · ${totalUnits} units`,
@@ -942,6 +965,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
               })),
               ...soPayload,
               etaDate: eta,
+              ...(manual ? { reasonCode: reasonCode.trim() } : {}),
             };
           }),
         });
@@ -954,74 +978,59 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     }
   }
 
-  // v3-S4.5: stockpile mode overrides any order-ref title suffix because the
-  // PO is no longer for that order. We still use Modal's static `title` prop
-  // (so the test util's `getByText` lookups continue to work) and decorate
-  // with a "Stockpile" pill below in the body.
-  const titleSuffix = stockpile
+  // 0308 — a manual purchase covers no customer order, so an order-ref suffix
+  // can never apply to one. Same shape as the old stockpile branch; the mode
+  // now comes from the door instead of a checkbox.
+  const titleSuffix = manual
     ? ""
     : prefill.so
       ? ` · for order #${prefill.so}`
       : prefill.soRefs && prefill.soRefs.length > 0
         ? ` · bundle of ${prefill.soRefs.length} orders`
         : "";
-  const baseTitle = stockpile
-    ? "New stockpile PO"
+  const baseTitle = manual
+    ? "Create Purchase"
     : prefill.so || prefill.soRefs?.length
       ? `New PO${titleSuffix}`
       : "New purchase order";
 
   return (
     <Modal title={baseTitle} onClose={onClose} size="lg">
-      {/* v3-S4.5 — Stockpile PO toggle. Disabled when caller pre-pinned an
-          order ref (single so or bundle soRefs); the prefill there dictates
-          the lines and dropping it would lose the link. */}
-      <div className="mb-3 flex items-center gap-2 text-meta font-body">
-        <input
-          id="stockpile-po-toggle"
-          data-testid="stockpile-po-toggle"
-          type="checkbox"
-          checked={stockpile}
-          disabled={autoFillPrefilled}
-          onChange={(e) => setStockpile(e.target.checked)}
-          className="h-3.5 w-3.5"
-          title={
-            autoFillPrefilled
-              ? "Disabled — modal opened with an order/bundle prefill"
-              : undefined
-          }
-        />
-        <label
-          htmlFor="stockpile-po-toggle"
-          className="select-none"
-          style={{ opacity: autoFillPrefilled ? 0.55 : 1 }}
-        >
-          <strong>Stockpile PO</strong>
-          <span className="text-base-600"> (no order ref — pre-stock inventory)</span>
-        </label>
-        {stockpile && (
-          <span
-            data-testid="stockpile-mode-badge"
-            className="px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
-            style={{
-              fontSize: "9.5px",
-              background: "rgba(58,89,131,.12)",
-              color: "rgb(58,89,131)",
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-            }}
+      {/* 0308 — the reason. Rendered ONLY on the manual door, and required
+          there. On a customer-driven PO the justification IS the customer
+          order, so there is no field to fill and none is shown.
+
+          Free text for this implementation (Loo 2026-07-29 — Decision B
+          deferred); a controlled dictionary turns this input into a picker
+          later without touching the boundary around it. */}
+      {manual && (
+        <div className="mb-3 font-body">
+          <label
+            htmlFor="purchase-reason"
+            className="block text-meta font-semibold text-base-900 mb-1"
           >
-            Stockpile
-          </span>
-        )}
-      </div>
+            Reason to purchase
+          </label>
+          <input
+            id="purchase-reason"
+            data-testid="purchase-reason"
+            type="text"
+            value={reasonCode}
+            onChange={(e) => setReasonCode(e.target.value)}
+            className="w-full h-8 px-2 rounded-[4px] border border-base-200 text-meta"
+          />
+          <div className="text-label text-base-600 mt-1">
+            No customer order asked for this purchase, so the record has to say
+            why it was bought.
+          </div>
+        </div>
+      )}
 
       <div className="text-meta text-base-600 mb-3 font-body">
-        {stockpile ? (
+        {manual ? (
           <>
-            <strong>Stockpile mode:</strong> this PO is for inventory
-            replenishment only — it won&rsquo;t be linked to any specific
-            customer order.
+            This purchase is not linked to any customer order. SKUs are matched
+            to suppliers automatically.
           </>
         ) : prefill.so ? (
           <>

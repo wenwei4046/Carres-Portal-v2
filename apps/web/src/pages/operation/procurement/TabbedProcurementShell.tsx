@@ -62,12 +62,13 @@ export default function TabbedProcurementShell() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // T42-C2 — restore the "+ New PO" entry point that lived on the deleted
-  // operationProcurement.tsx (T36). The shell is now the only mount point for
-  // the procurement section, so the create-PO button + CreatePOModal mount
-  // belong here. Stockpile mode (no `so` / `soRefs` prefill) is the default;
-  // the user can still tick the in-modal stockpile toggle or use the
-  // "Suggest from alerts" / auto-fill buttons inside the modal.
+  // T42-C2 — the create-PO entry point + CreatePOModal mount live here.
+  //
+  // 0308 — this button is now `+ Create Purchase`, the module's ONE manual
+  // purchasing door, and it passes `mode: "manual"` so the modal requires a
+  // reason. The `location.state` prefill path below is untouched and carries
+  // no mode, so an order-driven prefill stays customer-driven — which is the
+  // safe default direction.
   const [createPrefill, setCreatePrefill] = useState<CreatePoPrefill | null>(
     null,
   );
@@ -123,13 +124,18 @@ export default function TabbedProcurementShell() {
             focused on the channel the user is working on.
           </div>
         </div>
+        {/* 0308 — THE manual-purchase door, and the only one.
+            This button already existed here opening an empty prefill; it is
+            now named for what it does and states its mode, so the modal it
+            opens asks for a reason. `+ New PO` on the To Order tab was the
+            second door and is deleted. */}
         <button
           type="button"
           className="btn-hero text-meta"
-          onClick={() => setCreatePrefill({})}
-          data-testid="new-po-button"
+          onClick={() => setCreatePrefill({ mode: "manual" })}
+          data-testid="create-purchase-button"
         >
-          + New PO
+          + Create Purchase
         </button>
       </div>
 

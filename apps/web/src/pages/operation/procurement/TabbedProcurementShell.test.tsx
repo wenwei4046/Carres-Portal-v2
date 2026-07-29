@@ -170,18 +170,30 @@ describe("TabbedProcurementShell", () => {
     );
   });
 
-  it("'+ New PO' button opens CreatePOModal (T42-C2 restore)", () => {
-    // The shell-level button replaces the entry point that lived on the
-    // deleted operationProcurement.tsx. Default click → empty prefill, so
-    // the modal title is "New purchase order" (no order/bundle suffix).
+  it("'+ Create Purchase' opens the modal on its MANUAL door (0308)", () => {
+    // T42-C2 restored a `+ New PO` button here; 0308 makes it the module's ONE
+    // manual purchasing door and names it for what it does. The assertion that
+    // matters is not the label — it is that the modal opens in manual mode, so
+    // it asks for a reason. A rename with the old mode behind it would pass a
+    // label check and leave the boundary undrawn.
     renderShell("/operation/procurement/nice-future");
-    expect(screen.queryByText(/New purchase order/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("new-po-button"));
-    // Modal is mounted: header + the lines table the modal scaffolds on
-    // first paint both render. We don't drive submit — that's covered by
-    // CreatePOModal's own suite — only the open path that codex flagged as
-    // unreachable.
-    expect(screen.getByText(/New purchase order/)).toBeInTheDocument();
+    // The precondition is asserted on the MODAL's own markers, not on the text
+    // "Create Purchase" — the button and the manual modal's title are the same
+    // words now, so a text query would match the trigger and never the dialog.
+    expect(screen.queryByTestId("po-lines-table")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("purchase-reason")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("create-purchase-button"));
+
     expect(screen.getByTestId("po-lines-table")).toBeInTheDocument();
+    // The reason field IS the manual door. Without this the test would pass on
+    // a button that merely reads differently.
+    expect(screen.getByTestId("purchase-reason")).toBeInTheDocument();
+  });
+
+  it("has no `+ New PO` — the old door is gone, not renamed in place", () => {
+    renderShell("/operation/procurement/nice-future");
+    expect(screen.queryByTestId("new-po-button")).toBeNull();
+    expect(screen.queryByText("+ New PO")).toBeNull();
   });
 });

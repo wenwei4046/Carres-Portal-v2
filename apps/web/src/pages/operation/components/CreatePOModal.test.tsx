@@ -262,54 +262,128 @@ function fillEta(date: string = ETA_FIXTURE) {
   });
 }
 
-describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
-  it("Stockpile PO toggle hides order-ref fields when checked", () => {
-    // Open with bundle prefill so the bundle intro text would normally render.
-    // Toggle is disabled in this case (see test 3) — switch to a stockpile-
-    // safe entry: empty prefill, then toggle on. The intro text "Pick the
-    // SKUs you need..." should be replaced by the stockpile description, and
-    // the auto-fill button (which is order-shortage-driven) should disappear.
-    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+/**
+ * Migration 0308 — MANUAL PURCHASE.
+ *
+ * This block replaces "CreatePOModal — Stockpile PO mode (v3-S4.5)". The
+ * stockpile TOGGLE is gone, and its removal is the point rather than a
+ * side-effect: it was a manual purchase reachable from inside a customer-driven
+ * flow, it dropped `so` / `soRefs`, and it asked for no reason at all. Deleting
+ * `+ New PO` from To Order while leaving that checkbox in place would have
+ * closed the front door and left the side door open.
+ *
+ * The behaviour the old block protected is KEPT — a purchase with no customer
+ * order can still be raised, still drops `so` / `soRefs`, still hides the
+ * order-shortage auto-fill, and still refuses a NULL-cost line. It is now
+ * reached through `+ Create Purchase` on the Purchase Orders tab, which passes
+ * `mode: "manual"`, and it states a reason.
+ */
+describe("CreatePOModal — Manual Purchase (0308)", () => {
+  it("renders the reason field on the manual door and NOWHERE else", () => {
+    // The customer-driven door: a PO the customer order justifies, so there is
+    // no reason to ask for and no field to fill.
+    const { unmount } = render(
+      wrap(<CreatePOModal prefill={{}} onClose={() => {}} />),
+    );
+    expect(screen.queryByTestId("purchase-reason")).not.toBeInTheDocument();
+    unmount();
 
-    // Default state — auto-fill button is visible (no order-ref prefill).
-    expect(
-      screen.getByTestId("auto-fill-shortage-button"),
-    ).toBeInTheDocument();
-
-    // Flip the stockpile toggle on.
-    const toggle = screen.getByTestId("stockpile-po-toggle");
-    expect(toggle).not.toBeChecked();
-    fireEvent.click(toggle);
-    expect(toggle).toBeChecked();
-
-    // Auto-fill button (order-shortage-driven) hidden — stockpile is
-    // explicitly NOT order-driven.
-    expect(
-      screen.queryByTestId("auto-fill-shortage-button"),
-    ).not.toBeInTheDocument();
-
-    // Stockpile-mode hint visible somewhere in the modal.
-    const dialog = screen.getByRole("dialog");
-    expect(dialog.textContent ?? "").toMatch(/[Ss]tockpile/);
+    render(
+      wrap(<CreatePOModal prefill={{ mode: "manual" }} onClose={() => {}} />),
+    );
+    expect(screen.getByTestId("purchase-reason")).toBeInTheDocument();
   });
 
-  it("Submit in stockpile mode sends so=null and soRefs=null", async () => {
-    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+  it("has no stockpile toggle — the side door is closed, not hidden", () => {
+    // A control left behind as unreachable state is the `attn` / `selectedDay`
+    // disease R8 deleted. Asserted on BOTH doors so neither can grow one back.
+    const { unmount } = render(
+      wrap(<CreatePOModal prefill={{}} onClose={() => {}} />),
+    );
+    expect(screen.queryByTestId("stockpile-po-toggle")).not.toBeInTheDocument();
+    unmount();
 
-    // Toggle stockpile on
-    fireEvent.click(screen.getByTestId("stockpile-po-toggle"));
+    render(
+      wrap(<CreatePOModal prefill={{ mode: "manual" }} onClose={() => {}} />),
+    );
+    expect(screen.queryByTestId("stockpile-po-toggle")).not.toBeInTheDocument();
+  });
 
-    // Pick the warehouse (the single supplier group needs one)
+  it("a customer-driven prefill can never become a manual purchase", () => {
+    // The old toggle was DISABLED when the caller pinned an order ref. The
+    // boundary is stronger now: the mode comes from the door, so an order-driven
+    // prefill has no control that could switch it at all.
+    render(
+      wrap(
+        <CreatePOModal
+          prefill={{
+            so: 4321,
+            lines: [{ sku: "mattress:carres-cloud:King", qty: 3 }],
+          }}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    expect(screen.queryByTestId("purchase-reason")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("stockpile-po-toggle")).not.toBeInTheDocument();
+  });
+
+  it("blocks submit until a reason is given, then allows it", () => {
+    render(
+      wrap(<CreatePOModal prefill={{ mode: "manual" }} onClose={() => {}} />),
+    );
+    const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
+
+    // Everything else satisfied — warehouse + ETA — and it is STILL disabled,
+    // which is what proves the reason is the thing blocking it.
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
       target: { value: WAREHOUSE_KL.id },
     });
-
-    // 0074 — cost auto-fills from product_skus.cost (King fixture = 1500).
-    // No more hand-entry; the valid-form gate just needs the seeded SKU.
-    // 0083 — ETA also required.
     fillEta();
+    expect(issueBtn).toBeDisabled();
 
-    // Submit
+    // Whitespace is not a reason — the same rule 0308's CHECK enforces.
+    fireEvent.change(screen.getByTestId("purchase-reason"), {
+      target: { value: "   " },
+    });
+    expect(issueBtn).toBeDisabled();
+
+    fireEvent.change(screen.getByTestId("purchase-reason"), {
+      target: { value: "stockpile" },
+    });
+    expect(issueBtn).not.toBeDisabled();
+  });
+
+  it("hides the order-shortage auto-fill on the manual door", () => {
+    // Kept from the old block: auto-fill is order-shortage-driven, and a manual
+    // purchase is by definition not order-driven.
+    const { unmount } = render(
+      wrap(<CreatePOModal prefill={{}} onClose={() => {}} />),
+    );
+    expect(screen.getByTestId("auto-fill-shortage-button")).toBeInTheDocument();
+    unmount();
+
+    render(
+      wrap(<CreatePOModal prefill={{ mode: "manual" }} onClose={() => {}} />),
+    );
+    expect(
+      screen.queryByTestId("auto-fill-shortage-button"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("submits the reason and NO customer order", async () => {
+    render(
+      wrap(<CreatePOModal prefill={{ mode: "manual" }} onClose={() => {}} />),
+    );
+
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
+    fillEta();
+    fireEvent.change(screen.getByTestId("purchase-reason"), {
+      target: { value: "  showroom display  " },
+    });
+
     const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
     expect(issueBtn).not.toBeDisabled();
     fireEvent.click(issueBtn);
@@ -324,42 +398,24 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
       so?: number | null;
       soRefs?: number[] | null;
       etaDate?: string;
+      reasonCode?: string;
     };
     expect(callArg.supplierId).toBe(SUPPLIER_A.id);
     expect(callArg.warehouseId).toBe(WAREHOUSE_KL.id);
     expect(callArg.lines.length).toBeGreaterThan(0);
-    // 0074 — every emitted line carries the catalog cost + costSource='catalog'.
     expect(callArg.lines[0].cost).toBe(1500);
     expect(callArg.lines[0].costSource).toBe("catalog");
-    // The contract: stockpile mode forces so/soRefs out of the payload.
-    // Either omitted or explicitly null is acceptable per the API zod
-    // (so/soRefs are .optional()), but neither must carry a value.
+    expect(callArg.etaDate).toBe(ETA_FIXTURE);
+    // The reason travels, trimmed — `  showroom display  ` would fail 0308's
+    // non-blank CHECK if it reached the database with its padding.
+    expect(callArg.reasonCode).toBe("showroom display");
+    // And the boundary itself: a manual purchase carries no customer order.
     expect(callArg.so ?? null).toBeNull();
     expect(callArg.soRefs ?? null).toBeNull();
-    // 0083 — etaDate forwarded.
-    expect(callArg.etaDate).toBe(ETA_FIXTURE);
   });
 
-  it("Stockpile PO toggle is disabled when modal opened with auto-fill prefill", () => {
-    // Single-order shortage prefill → stockpile makes no sense (the order
-    // dictates the lines). Toggle must be disabled + unchecked.
+  it("sends NO reason on the customer-driven door", async () => {
     render(
-      wrap(
-        <CreatePOModal
-          prefill={{
-            so: 4321,
-            lines: [{ sku: "mattress:carres-cloud:King", qty: 3 }],
-          }}
-          onClose={() => {}}
-        />,
-      ),
-    );
-    const toggle = screen.getByTestId("stockpile-po-toggle");
-    expect(toggle).toBeDisabled();
-    expect(toggle).not.toBeChecked();
-
-    // Same when the prefill is a cross-order bundle.
-    const { unmount } = render(
       wrap(
         <CreatePOModal
           prefill={{
@@ -370,41 +426,36 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
         />,
       ),
     );
-    const toggles = screen.getAllByTestId("stockpile-po-toggle");
-    // Both modals are mounted — find the bundle one (the second).
-    const bundleToggle = toggles[toggles.length - 1];
-    expect(bundleToggle).toBeDisabled();
-    expect(bundleToggle).not.toBeChecked();
-    unmount();
-  });
-
-  it("Form valid without so when stockpile mode on", () => {
-    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
-
-    // Issue button starts disabled (warehouse blank).
-    const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
-    expect(issueBtn).toBeDisabled();
-
-    // Toggle stockpile — this alone shouldn't unblock the button (warehouse
-    // still blank).
-    fireEvent.click(screen.getByTestId("stockpile-po-toggle"));
-    expect(issueBtn).toBeDisabled();
-
-    // 0074 — cost auto-fills from product_skus.cost on the seeded line
-    // (King fixture = 1500). Submit only needs warehouse picked.
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
       target: { value: WAREHOUSE_KL.id },
     });
-    // 0083 — ETA also required.
-    expect(issueBtn).toBeDisabled();
     fillEta();
+    const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
     expect(issueBtn).not.toBeDisabled();
+    fireEvent.click(issueBtn);
+
+    await waitFor(() => {
+      expect(createMutateAsync).toHaveBeenCalledTimes(1);
+    });
+    const callArg = createMutateAsync.mock.calls[0][0] as {
+      soRefs?: number[] | null;
+      reasonCode?: string;
+      reasonNote?: string;
+    };
+    // 0308's CHECK 4: a customer-driven PO carries no purchase reason. The
+    // field is absent from the payload, not sent as an empty string — an empty
+    // string would fail the non-blank CHECK rather than mean "customer-driven".
+    expect(callArg.reasonCode).toBeUndefined();
+    expect(callArg.reasonNote).toBeUndefined();
+    // NOTE: `soRefs` is deliberately NOT asserted here. The payload's SO list is
+    // built from each LINE's own `sourceSos` (CreatePOModal's `distinctSos`),
+    // not from `prefill.soRefs`, so this fixture legitimately emits neither. An
+    // assertion on it would be testing the fixture, not the boundary.
   });
 
   it("submit blocked when any line points at a SKU with NULL cost", () => {
-    // 0074 — replaces the T29 "missing cost/costSource" gate. Cost is now
-    // catalog-driven; the gate refuses lines whose SKU has cost=null (i.e.
-    // catalog admin hasn't set a procurement cost yet).
+    // Kept verbatim in intent from the old block — it used the stockpile toggle
+    // only as a way to reach a no-order-ref modal, which the manual door now is.
     catalogHookState = {
       data: {
         ...catalogHookState.data!,
@@ -413,10 +464,14 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
         ),
       },
     };
-    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
-    fireEvent.click(screen.getByTestId("stockpile-po-toggle"));
+    render(
+      wrap(<CreatePOModal prefill={{ mode: "manual" }} onClose={() => {}} />),
+    );
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
       target: { value: WAREHOUSE_KL.id },
+    });
+    fireEvent.change(screen.getByTestId("purchase-reason"), {
+      target: { value: "stockpile" },
     });
     const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
     expect(issueBtn).toBeDisabled();

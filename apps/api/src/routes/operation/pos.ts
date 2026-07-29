@@ -824,6 +824,11 @@ operationPosRouter.post("/", requireOperation, async (c) => {
     // a partner picked; own_logistics suppliers omit the field and the RPC
     // accepts null.
     p_procurement_partner_id: parsed.data.procurementPartnerId ?? null,
+    // 0308 — MANUAL PURCHASE. Present <=> manual; absent <=> customer-driven.
+    // Written by the RPC in the SAME transaction as the insert, so a PO and
+    // its reason land together or not at all.
+    p_reason_code: parsed.data.reasonCode ?? null,
+    p_reason_note: parsed.data.reasonNote ?? null,
   });
   if (error) {
     const m = mapPgError(error);
@@ -893,6 +898,11 @@ operationPosRouter.post("/batch", requireOperation, async (c) => {
     eta_date: p.etaDate,
     so_refs: p.soRefs ?? null,
     note: null as string | null,
+    // 0308 — same manual-purchase contract as POST /, per batch entry. The
+    // RPC's per-PO exception block re-raises with `pos_index=N`, so a boundary
+    // violation still tells the FE which row it was.
+    reason_code: p.reasonCode ?? null,
+    reason_note: p.reasonNote ?? null,
   }));
 
   const { data, error } = await sb.rpc("operation_create_pos_batch", {

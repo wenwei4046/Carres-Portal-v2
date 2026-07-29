@@ -360,8 +360,14 @@ describe("To Order · §8.2 closing the drawer gives the list back (card P2)", (
     Object.defineProperty(rail, "clientHeight", { value: 400, configurable: true });
     rail.scrollTop = 260;
 
-    // Open the drawer (+ New PO), then close it.
-    fireEvent.click(screen.getByText("New PO"));
+    // Open the drawer, then close it.
+    //
+    // 0308 — this used to click `+ New PO`, which is deleted: it was the manual
+    // purchase door standing inside the planning workspace. The opener is now
+    // the preview's own `Issue PO to {supplier}`, which is the RIGHT opener for
+    // this test anyway — it is a customer-driven act, and this test is about
+    // what the To Order list is left as when a drawer closes over it.
+    fireEvent.click(screen.getByRole("button", { name: /Issue PO to Ohana/ }));
     await waitFor(() =>
       expect(screen.getByRole("dialog")).toBeInTheDocument(),
     );
@@ -374,19 +380,31 @@ describe("To Order · §8.2 closing the drawer gives the list back (card P2)", (
     expect(rail.scrollTop).toBe(260);
   });
 
-  it("gives back an EMPTY selection too — a clear survives the drawer", async () => {
+  /**
+   * 0308 — "gives back an EMPTY selection too" is RETIRED, and this note is
+   * why rather than a silent deletion.
+   *
+   * That test cleared the selection and then opened a drawer. The ONLY drawer
+   * this tab could open with nothing selected was `+ New PO`, because the
+   * preview column — which owns `Issue PO` and `Check in` — renders
+   * `DetailEmpty` when there is no selection. `+ New PO` is the manual purchase
+   * door and it has left this tab, so **no drawer on To Order can now be opened
+   * while the selection is empty**, and the path the test drove is unreachable.
+   *
+   * `restoreListState` still snapshots and restores `selectionCleared`, and it
+   * is still correct — it is simply only ever restoring `false` now. The code
+   * was NOT touched: `selectionCleared` is still load-bearing for the
+   * auto-select effects, and pruning the one unreachable branch of a snapshot
+   * is a change to P2's behaviour, which this card is not permitted to make.
+   *
+   * REPORTED as a finding rather than fixed here.
+   */
+  it("has no `+ New PO` — manual purchasing has left this workspace", () => {
     renderPage();
-    const nice = firstPlaceRow(NICE);
-    await waitFor(() => expect(nice).toHaveAttribute("aria-pressed", "true"));
-    fireEvent.click(nice);
-    await waitFor(() => expect(nice).toHaveAttribute("aria-pressed", "false"));
-
-    fireEvent.click(screen.getByText("New PO"));
-    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
-    fireEvent.click(screen.getByLabelText("Close modal"));
-
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(firstPlaceRow(NICE)).toHaveAttribute("aria-pressed", "false");
-    expect(firstPlaceRow(OHANA)).toHaveAttribute("aria-pressed", "false");
+    // The whole control, not just its label: the button, its handler and its
+    // empty-prefill call site were deleted together. A control left behind as
+    // unreachable state is the `attn` / `selectedDay` disease R8 removed.
+    expect(screen.queryByText("New PO")).toBeNull();
+    expect(screen.queryByText(/Create Purchase/)).toBeNull();
   });
 });

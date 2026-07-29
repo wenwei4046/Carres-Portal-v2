@@ -315,6 +315,69 @@ describe('createPoInput', () => {
       }).success,
     ).toBe(false);
   });
+
+  // ── Migration 0308 · MANUAL PURCHASE ──────────────────────────────────────
+  //
+  // These mirror 0308's CHECK constraints. They are NOT the enforcement — the
+  // database is — they exist so a store meets a 422 at the API edge instead of
+  // a raw 23514 constraint string.
+  //
+  // THERE IS NO `origin` FIELD. `reasonCode` present <=> manual purchase, by
+  // the frozen rules themselves (manual purchasing requires a reason · a
+  // customer-driven PO's justification IS the customer order). A second field
+  // would be two representations of one fact.
+  const BASE = { supplierId: UUID, warehouseId: UUID2, lines: [VALID_LINE], etaDate: ETA };
+
+  it('0308 · accepts a manual purchase: a reason and no customer order', () => {
+    expect(
+      createPoInput.safeParse({ ...BASE, reasonCode: 'stockpile' }).success,
+    ).toBe(true);
+  });
+
+  it('0308 · accepts a customer-driven PO: a customer order and no reason', () => {
+    expect(createPoInput.safeParse({ ...BASE, soRefs: [1207] }).success).toBe(true);
+    expect(createPoInput.safeParse({ ...BASE, so: 1207 }).success).toBe(true);
+  });
+
+  it('0308 · REFUSES a reason together with `so`', () => {
+    expect(
+      createPoInput.safeParse({ ...BASE, reasonCode: 'stockpile', so: 1207 }).success,
+    ).toBe(false);
+  });
+
+  it('0308 · REFUSES a reason together with `soRefs`', () => {
+    expect(
+      createPoInput.safeParse({ ...BASE, reasonCode: 'stockpile', soRefs: [1207] })
+        .success,
+    ).toBe(false);
+  });
+
+  it('0308 · an EMPTY soRefs array is not a customer order', () => {
+    // The CHECK reads `cardinality(so_refs) = 0`, so the zod mirror has to
+    // agree: an empty array is the absence of a customer order, not one.
+    expect(
+      createPoInput.safeParse({ ...BASE, reasonCode: 'stockpile', soRefs: [] }).success,
+    ).toBe(true);
+  });
+
+  it('0308 · REFUSES a blank reason (mirrors the non-blank CHECK)', () => {
+    expect(createPoInput.safeParse({ ...BASE, reasonCode: '   ' }).success).toBe(false);
+    expect(createPoInput.safeParse({ ...BASE, reasonCode: '' }).success).toBe(false);
+  });
+
+  it('0308 · REFUSES a note with no reason behind it', () => {
+    // `reason_note` is detail BESIDE the reason, never a substitute for it. A
+    // note alone would be a manual purchase the marker cannot see.
+    expect(createPoInput.safeParse({ ...BASE, reasonNote: 'ran out' }).success).toBe(
+      false,
+    );
+  });
+
+  it('0308 · there is no `origin` field, and strict mode refuses one', () => {
+    expect(
+      createPoInput.safeParse({ ...BASE, origin: 'manual' }).success,
+    ).toBe(false);
+  });
 });
 
 describe('createPosBatchInput', () => {

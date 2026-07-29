@@ -245,7 +245,36 @@ export const createPoInput = z.object({
   // closed). Supplier/Finance AP-aging both read `purchase_orders.eta_date`;
   // null was silently corrupting both surfaces.
   etaDate: z.string().date(),
-}).strict();
+  // Migration 0308 — MANUAL PURCHASE. `reasonCode` present <=> this is a
+  // manual purchase; absent <=> it came from a customer order. There is NO
+  // `origin` field and there may not be one: the two statements are a
+  // biconditional given the frozen rules (manual purchasing requires a reason ·
+  // a customer-driven PO's justification IS the customer order), so a second
+  // field would be two columns encoding one fact.
+  reasonCode: z.string().trim().min(1).optional(),
+  reasonNote: z.string().trim().min(1).optional(),
+}).strict().superRefine((v, ctx) => {
+  // A MIRROR of migration 0308's CHECK constraints, not the enforcement. It
+  // exists so a store meets a 422 at the API edge instead of a raw 23514
+  // constraint string — the same courtesy 0296 added for attribution.
+  if (v.reasonCode == null) {
+    if (v.reasonNote != null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["reasonNote"],
+        message: "reason_note_without_reason",
+      });
+    }
+    return;
+  }
+  if (v.so != null || (v.soRefs != null && v.soRefs.length > 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["reasonCode"],
+      message: "manual_purchase_has_no_customer_order",
+    });
+  }
+});
 export type CreatePoInput = z.infer<typeof createPoInput>;
 
 /**

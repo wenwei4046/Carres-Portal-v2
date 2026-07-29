@@ -402,6 +402,10 @@ describe("POST /api/operation/pos", () => {
       // 0079 (Loo 2026-05-10) — procurement-leg LP pre-assigned at PO
       // creation. Null when caller omits (own_logistics suppliers).
       p_procurement_partner_id: null,
+      // 0308 — MANUAL PURCHASE. Null on a customer-driven PO: the customer
+      // order IS its justification, so it carries no purchase reason.
+      p_reason_code: null,
+      p_reason_note: null,
     });
     assertRpcCallShape(rpc, "operation_create_po", [
       "p_supplier_id",
@@ -410,6 +414,8 @@ describe("POST /api/operation/pos", () => {
       "p_so",
       "p_so_refs",
       "p_procurement_partner_id",
+      "p_reason_code",
+      "p_reason_note",
     ]);
     // 0083 (Loo 2026-05-10) — post-RPC UPDATE persists eta_date on the
     // returned PO id (RPC public signature doesn't accept p_eta_date).
@@ -449,6 +455,10 @@ describe("POST /api/operation/pos", () => {
       p_so_refs: [4001, 4002, 4003],
       // 0079 (Loo 2026-05-10) — see prior test for rationale.
       p_procurement_partner_id: null,
+      // 0308 — MANUAL PURCHASE. Null on a customer-driven PO: the customer
+      // order IS its justification, so it carries no purchase reason.
+      p_reason_code: null,
+      p_reason_note: null,
     });
     assertRpcCallShape(rpc, "operation_create_po", [
       "p_supplier_id",
@@ -457,9 +467,96 @@ describe("POST /api/operation/pos", () => {
       "p_so",
       "p_so_refs",
       "p_procurement_partner_id",
+      "p_reason_code",
+      "p_reason_note",
     ]);
   });
 
+  // ── Migration 0308 · MANUAL PURCHASE ────────────────────────────────────
+  //
+  // The reason is the SOLE stored marker of a manual purchase — there is no
+  // `origin` column and there may not be one. These tests prove the ROUTE
+  // forwards the boundary; the DATABASE enforces it (0308's CHECKs plus the
+  // never-cleared trigger), and the shared zod mirrors it at the edge.
+
+  it("0308 · forwards the purchase reason on a manual purchase", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { id: "PO-2051" }, error: null });
+    const fromMock = makeFromMock();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from: fromMock.from } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supplierId: SUPPLIER_ID,
+          warehouseId: WAREHOUSE_ID,
+          lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, costSource: "hand_entered" }],
+          etaDate: "2026-06-01",
+          reasonCode: "stockpile",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const arg = rpc.mock.calls[0][1] as Record<string, unknown>;
+    expect(arg.p_reason_code).toBe("stockpile");
+    // And the boundary itself: a manual purchase carries no customer order.
+    expect(arg.p_so).toBeNull();
+    expect(arg.p_so_refs).toBeNull();
+  });
+
+  it("0308 · REFUSES a reason together with a customer order (422, not 500)", async () => {
+    // The shared zod refine catches this at the edge so a store never meets a
+    // raw 23514 from the CHECK that backs it. The CHECK is still the
+    // enforcement — this is the courtesy layer 0296 established.
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supplierId: SUPPLIER_ID,
+          warehouseId: WAREHOUSE_ID,
+          lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, costSource: "hand_entered" }],
+          etaDate: "2026-06-01",
+          reasonCode: "stockpile",
+          soRefs: [4001],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // Refused before the database was asked.
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("0308 · REFUSES a blank reason", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supplierId: SUPPLIER_ID,
+          warehouseId: WAREHOUSE_ID,
+          lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, costSource: "hand_entered" }],
+          etaDate: "2026-06-01",
+          reasonCode: "   ",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
   it("returns 422 when lines is empty", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
@@ -2437,6 +2534,9 @@ describe("POST /api/operation/pos/batch", () => {
           eta_date: "2026-06-01",
           so_refs: null,
           note: null,
+          // 0308 — null on a customer-driven PO, per entry.
+          reason_code: null,
+          reason_note: null,
         },
         {
           supplier_id: SUPPLIER_B,
@@ -2446,6 +2546,8 @@ describe("POST /api/operation/pos/batch", () => {
           eta_date: "2026-06-15",
           so_refs: null,
           note: null,
+          reason_code: null,
+          reason_note: null,
         },
       ],
     });

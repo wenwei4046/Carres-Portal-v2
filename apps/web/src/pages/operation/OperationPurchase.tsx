@@ -859,20 +859,15 @@ export default function OperationPurchase() {
           activeChips={activeChips}
           facet={
             <div ref={facetInnerRef} className="flex flex-col gap-2 min-h-0 flex-1">
-              {/* + New PO — Gmail compose style (Jess 2026-07-23). Always
-                  visible at the top; opens CreatePOModal with EMPTY prefill
-                  so the operator can raise an ad-hoc PO (stockpile / runner /
-                  special order) not tied to a specific SO. Grey box (not
-                  flame — Send PO in the preview owns the ONE flame per page,
-                  UI-KIT §A5). */}
-              <button
-                type="button"
-                onClick={() => openCreatePo({ lines: [] })}
-                className="shrink-0 flex items-center justify-center gap-2 h-9 rounded-full border border-base-200 bg-white text-base-800 text-body font-semibold hover:bg-hovertint transition-colors"
-              >
-                <span className="text-strong leading-none">+</span> New PO
-              </button>
-
+              {/* 0308 — `+ New PO` is GONE from this tab.
+                  It opened CreatePOModal with an EMPTY prefill: a purchase no
+                  customer order asked for, raised from the workspace whose one
+                  question is "goods we do not have yet — how far along is each
+                  one?". Manual purchasing has its own door now,
+                  `+ Create Purchase` on the Purchase Orders tab, and it states
+                  a reason. Deleted whole rather than hidden — a control left
+                  behind as unreachable state is the `attn` / `selectedDay`
+                  disease R8 removed. */}
               <SectionCard>
               {/* TODAY'S WORK — 3 stages with avatar chip left (Jess 2026-07-23
                   v2 · rev 2): chip = who's on duty for that stage. Numbers
