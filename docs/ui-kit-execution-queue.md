@@ -51,7 +51,8 @@ deliverable is Foundation Components, not a better document.
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **CLOSED 2026-07-29** — §8.0 · §0.3 · §0.4 · §0.5 · §10.1, the mirror re-based, §16 counted. Findings below, all Reported Only |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ✅ **BUILT 2026-07-29** — `scripts/check-design.mjs`, 348 files, 14 rules, 9,511 findings frozen. §16 is generated. Card below |
 | **D2** | codemod **typography** | ✅ **BUILT 2026-07-29 · accepted with revisions at PM review the same day** — 4,052 conversions in 236 files; guard rule D **3,239 → 33**, and all 33 are `index.css`. Card below |
-| **D3 / D4** | codemod colour / spacing | ⏳ — the guard has them baselined at A 442 · B 8 and E 1,727 |
+| **D3** | codemod **colour** | 🔨 **CLAIMED 2026-07-29** — branch `claude/carres-portal-d3-execution-0be46e`, worktree `carres-portal-d3-execution-0be46e`. **PM approved Option A: Phase 1 (the ruler) + Phase 2 (15 deterministic conversions) ONLY.** Phase 3 (`--primary` flame → blue) and Phase 4 (`base-*` → kit palette) are **NOT in this card** and each needs its own. Card below |
+| **D4** | codemod **spacing** | ⏳ — baselined at E 1,727 |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
 | **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ — **also carries the `.t4-*` legacy migration** (PM, 2026-07-29). D2 found a SECOND retired ramp: 9 classes, **44 in-scope uses across 8 files**, invisible to rule D because a page writes only the class name while the size and weight sit in `index.css`. **`.t4-hero-num` is `20px/700`** and `lib/design-standard.ts:132` records that 700, so a §2.2-dead weight still renders. Ruled **Reported Only for D2**: it is a visual change on a money figure and belongs with the pages when they migrate. **D6 owns the DEFINITIONS and the mirror's `weight: 700`** |
 | **D7+** | Delivery · Purchase · Receiving · Stock · Service · Payments · Catalog — one card each | ⏳ — whichever of these owns a file still writing `.t4-*` retires it there, so the last card to migrate does not inherit the ramp's deletion |
@@ -712,6 +713,72 @@ Recorded so the builder does not have to rediscover them. **They are observation
 so that if the page reads better afterwards it is provably the hierarchy that did it. The line's
 own lesson list already carries this one — it is repeated here because this card is the largest
 opportunity to break it.
+
+---
+
+## D3 🔨 THE COLOUR CARD — CLAIMED 2026-07-29 (Option A: Phase 1 + Phase 2 only)
+
+**This line is held.** Branch `claude/carres-portal-d3-execution-0be46e`. A second chat opening D3
+has taken this card.
+
+**Why D3 is not shaped like D2, measured before anything was written.** D2 was safe because
+typography had six tokens and a size→token map a machine could apply and a checksum could verify.
+**Colour has neither.** In the guard's own 349-file scope (rule A reproduced byte-for-byte at 430):
+
+```
+  raw hex (rule A) ....................... 430
+    styles/pos-prototype.css (§15 Part B) .. 249   ← 58%, and D3 may not touch it
+    portal hex ............................. 181
+      exactly equals a named token ......... 33  — but only 15 are UNAMBIGUOUS
+      equals nothing the law names ......... 148  (69 distinct colours)
+  flame hex (rule B) ....................... 5    ← and NONE is the live flame
+  ─────────────────────────────────────── measured by NO rule ───────────────
+  non-kit palette classes .................. 4,661  (4,577 are `base-*`)
+  flame-derived classes .................... 613
+  legacy .pill-* / .btn-* .................. 247 / 337
+  inline style={{ …color }} ................ 116
+```
+
+**≈6,290 colour sites; the guard sees 435 of them — 6.9% — and 249 of those are out of scope.**
+
+**Two facts decided the shape.** ① **An exact hex match is not automatically mechanical**:
+`#FFFFFF` equals EIGHT tokens (`--card` · `--popover` · `--primary-foreground` ·
+`--destructive-foreground` · `--danger-foreground` · `--success-foreground` ·
+`--warning-foreground` · `--info-foreground`), and picking one is a decision about what the surface
+IS. Unambiguous 1:1: `#1A1A1A`→`--foreground` (11) · `#D1D5DB`→`--base-300` (2) ·
+`#4B5563`→`--base-600` (2) = **15 sites.** ② **Rule B structurally cannot see the flame it exists
+to find** — the live assignment is `--primary: 13 64% 47%`, HSL, and rule B matches `#C44D2B` only,
+whose only appearance on that line is in a comment D2's stripper now blanks. So B = 5 and not one
+of the five is that assignment, while **613 class uses render flame.** D2's own lesson in its other
+form: *you cannot check a ruler against nothing.*
+
+### Scope — approved by the PM, and nothing beside it
+
+```
+IN   Phase 1  the RULER — guard scope correction, rule B learns HSL,
+              new rules O · P · Q, self-tests, re-frozen baseline
+IN   Phase 2  the 15 UNAMBIGUOUS hex conversions, byte-equal colour
+OUT  Phase 3  repointing --primary to blue  → its own card + visual approval
+OUT  Phase 4  base-* → kit palette          → its own card, page by page (D6/D7)
+OUT  .pill-* · .btn-*                        → component adoption, D6/D7
+OUT  pages/dealer/** · pages/print/** · styles/pos-prototype.css  → §15 Part B
+OUT  any token VALUE, any colour DECISION, any UI-KIT rule but §13.3 and §16
+```
+
+**`--primary` is not touched by this card** — not repointed, not commented, not moved. §3.3 and
+§3.4 already give the action colour to blue and keep the flame in the logo; **the live `--primary`
+flame assignment stays a REPORTED-ONLY contradiction**, and resolving it re-colours 613 sites,
+which is a business decision with a visual approval, not a codemod's.
+
+> **Read the tip that merged, not the branch that shares its name — again.** A PM colour ruling
+> commit (`4cf1d29e`, *"action stays BLUE, flame is brand only"*) exists on
+> `claude/carres-d0-6-kit-consolidation-6ccfb5` and is **NOT on `main`**: `docs/UI-KIT.md` here has
+> zero hits for its re-affirmation, and this table's D3 row still carried its pre-ruling text with
+> the stale figures `A 442 · B 8`. This card's planning quoted that commit as live state and was
+> wrong to; the substance is unaffected because the ruling is itself a re-affirmation of §3.3 /
+> §3.4, which ARE on main. **Reported, not merged by this card** — merging another line's branch is
+> not a colour card's business. D0.6 finding #6 wrote this lesson down and it recurred inside a
+> week.
 
 ---
 
