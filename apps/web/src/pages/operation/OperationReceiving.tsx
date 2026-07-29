@@ -3,12 +3,16 @@ import {
   poReceivingProgress,
   purchasingActionButton,
   purchasingActionQueue,
+  purchasingSupplierCallsOf,
   type PoReceivingState,
+  type PurchasingOpenCall,
+  type SupplierCallPo,
 } from "@carres/shared";
 import {
   useOperationPos,
   useOperationSuppliers,
   useOperationWarehouse,
+  type operationPoListRow,
   type SupplierRow,
 } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
@@ -16,6 +20,7 @@ import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
 import { SectionCard, SectionBand } from "@/components/SectionPanel";
 import FacetRow, { EmptyFacetHint } from "@/components/FacetRow";
 import ReceivePOModal from "./components/ReceivePOModal";
+import RecordSupplierAnswerModal from "./components/RecordSupplierAnswerModal";
 import WarehouseReceiptsPanel from "./components/WarehouseReceiptsPanel";
 import PurchasingTabs from "./PurchasingTabs";
 
@@ -173,9 +178,40 @@ interface ReceivingListState {
   tab: Tab;
   search: string;
   checkInOnly: boolean;
+  tomorrowOnly: boolean;
+  balanceOnly: boolean;
   progressFilter: Set<PoReceivingState>;
   supplierFilter: Set<string>;
   facetScrollTop: number;
+}
+
+/** Today, as a local ISO date — the engine takes it as a parameter so a test
+ *  can stand on any weekday and nothing drifts with the machine's clock. */
+function todayIso(): string {
+  const d = new Date();
+  const m = `${d.getMonth() + 1}`.padStart(2, "0");
+  const day = `${d.getDate()}`.padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+/** The list row → the P3 engine's own shape. ONE mapping, so the facet counts
+ *  and the row buttons can never read a PO two different ways. */
+export function supplierCallPoOf(po: operationPoListRow): SupplierCallPo {
+  return {
+    poId: po.id,
+    supplierId: po.supplier_id,
+    status: po.status,
+    etaDateIso: po.eta_date,
+    tomorrowAnswerAboutDateIso: po.tomorrow_answer_about_date ?? null,
+    lines: (po.purchase_order_lines ?? []).map((l) => ({
+      id: l.id,
+      sku: l.sku,
+      qty: Number(l.qty ?? 0),
+      receivedQty: Number(l.received_qty ?? 0),
+      shortSinceIso: l.short_since ?? null,
+      balanceAnswerAboutQty: l.balance_answer_about_qty ?? null,
+    })),
+  };
 }
 
 export default function OperationReceiving() {
@@ -186,6 +222,12 @@ export default function OperationReceiving() {
   // P2 — the facet rail this tab has never had.
   const [facetOpen, setFacetOpen] = useState(true);
   const [checkInOnly, setCheckInOnly] = useState(false);
+  // P3 — the two supplier calls this band was reserved for by P2-Receiving.
+  const [tomorrowOnly, setTomorrowOnly] = useState(false);
+  const [balanceOnly, setBalanceOnly] = useState(false);
+  const [answerFor, setAnswerFor] = useState<
+    { kind: "tomorrow" | "balance"; poId: string; poLineId?: string } | null
+  >(null);
   const [progressFilter, setProgressFilter] = useState<Set<PoReceivingState>>(
     () => new Set(),
   );
@@ -289,6 +331,49 @@ export default function OperationReceiving() {
     [tabScoped, progressById],
   );
 
+  // ── P3 · the two supplier calls ────────────────────────────────────────────
+  //
+  // Computed ONCE per PO and read by the tiles, the row buttons and nothing
+  // else, so a queue count and its list structurally cannot disagree — the same
+  // rule `progressById` follows one block up.
+  //
+  // `Confirm balance delivery date` is counted per PO LINE (§3), and this tab's
+  // ROW is a PO. The tile therefore prints the number of POs it will show —
+  // P2-Claims' honesty rule, a visible cell above zero always returns at least
+  // that many rows — and the ROW names its lines. The per-line figure is not
+  // lost: it is the number of buttons on the row.
+  const callsById = useMemo(() => {
+    const today = todayIso();
+    const m = new Map<string, PurchasingOpenCall[]>();
+    for (const p of live) {
+      m.set(
+        p.id,
+        purchasingSupplierCallsOf(supplierCallPoOf(p), { todayIso: today }),
+      );
+    }
+    return m;
+  }, [live]);
+
+  const tomorrowCount = useMemo(
+    () =>
+      tabScoped.filter((p) =>
+        (callsById.get(p.id) ?? []).some(
+          (a) => a.key === "confirm_tomorrows_delivery",
+        ),
+      ).length,
+    [tabScoped, callsById],
+  );
+
+  const balancePoCount = useMemo(
+    () =>
+      tabScoped.filter((p) =>
+        (callsById.get(p.id) ?? []).some(
+          (a) => a.key === "confirm_balance_delivery_date",
+        ),
+      ).length,
+    [tabScoped, callsById],
+  );
+
   const progressCounts = useMemo(() => {
     const m = new Map<PoReceivingState, number>();
     for (const p of tabScoped) {
@@ -310,7 +395,18 @@ export default function OperationReceiving() {
     const q = search.trim().toLowerCase();
     return tabScoped.filter((p) => {
       const progress = progressById.get(p.id);
+      const calls = callsById.get(p.id) ?? [];
       if (checkInOnly && (progress?.pendingDelivery ?? 0) <= 0) return false;
+      if (
+        tomorrowOnly &&
+        !calls.some((a) => a.key === "confirm_tomorrows_delivery")
+      )
+        return false;
+      if (
+        balanceOnly &&
+        !calls.some((a) => a.key === "confirm_balance_delivery_date")
+      )
+        return false;
       if (progressFilter.size > 0 && (!progress || !progressFilter.has(progress.state)))
         return false;
       if (supplierFilter.size > 0 && !supplierFilter.has(p.supplier_id)) return false;
@@ -323,7 +419,10 @@ export default function OperationReceiving() {
   }, [
     tabScoped,
     progressById,
+    callsById,
     checkInOnly,
+    tomorrowOnly,
+    balanceOnly,
     progressFilter,
     supplierFilter,
     search,
@@ -336,6 +435,16 @@ export default function OperationReceiving() {
     activeChips.push({
       label: purchasingActionQueue("check_in"),
       onClear: () => setCheckInOnly(false),
+    });
+  if (tomorrowOnly)
+    activeChips.push({
+      label: purchasingActionQueue("confirm_tomorrows_delivery"),
+      onClear: () => setTomorrowOnly(false),
+    });
+  if (balanceOnly)
+    activeChips.push({
+      label: purchasingActionQueue("confirm_balance_delivery_date"),
+      onClear: () => setBalanceOnly(false),
     });
   for (const f of PROGRESS_FACETS)
     if (progressFilter.has(f.state))
@@ -352,11 +461,15 @@ export default function OperationReceiving() {
 
   const anyFilter =
     checkInOnly ||
+    tomorrowOnly ||
+    balanceOnly ||
     progressFilter.size > 0 ||
     supplierFilter.size > 0 ||
     search.trim() !== "";
   const resetFilters = () => {
     setCheckInOnly(false);
+    setTomorrowOnly(false);
+    setBalanceOnly(false);
     setProgressFilter(new Set());
     setSupplierFilter(new Set());
     setSearch("");
@@ -378,29 +491,59 @@ export default function OperationReceiving() {
   const listStateBeforeDrawer = useRef<ReceivingListState | null>(null);
   const pendingFacetScroll = useRef<number | null>(null);
 
-  const openReceive = (poId: string) => {
+  const snapshotList = () => {
     listStateBeforeDrawer.current = {
       tab,
       search,
       checkInOnly,
+      tomorrowOnly,
+      balanceOnly,
       progressFilter,
       supplierFilter,
       facetScrollTop: getFacetScroller()?.scrollTop ?? 0,
     };
-    setReceivePoId(poId);
   };
 
-  const closeReceive = () => {
-    setReceivePoId(null);
+  /** §8.2's last line, and it applies to EVERY overlay this tab opens — the
+   *  Check in form and P3's two record-answer forms alike. One snapshot/restore
+   *  pair, so a third overlay cannot be added that forgets to give the list
+   *  back. */
+  const restoreList = () => {
     const s = listStateBeforeDrawer.current;
     listStateBeforeDrawer.current = null;
     if (!s) return;
     setTab(s.tab);
     setSearch(s.search);
     setCheckInOnly(s.checkInOnly);
+    setTomorrowOnly(s.tomorrowOnly);
+    setBalanceOnly(s.balanceOnly);
     setProgressFilter(s.progressFilter);
     setSupplierFilter(s.supplierFilter);
     pendingFacetScroll.current = s.facetScrollTop;
+  };
+
+  const openReceive = (poId: string) => {
+    snapshotList();
+    setReceivePoId(poId);
+  };
+
+  const closeReceive = () => {
+    setReceivePoId(null);
+    restoreList();
+  };
+
+  const openAnswer = (
+    kind: "tomorrow" | "balance",
+    poId: string,
+    poLineId?: string,
+  ) => {
+    snapshotList();
+    setAnswerFor({ kind, poId, poLineId });
+  };
+
+  const closeAnswer = () => {
+    setAnswerFor(null);
+    restoreList();
   };
 
   // Re-apply the scroll after every render until it sticks. One assignment is
@@ -420,6 +563,10 @@ export default function OperationReceiving() {
 
   const receivePo = receivePoId
     ? live.find((p) => p.id === receivePoId) ?? null
+    : null;
+
+  const answerPo = answerFor
+    ? live.find((p) => p.id === answerFor.poId) ?? null
     : null;
 
   if (isLoading) {
@@ -554,7 +701,7 @@ export default function OperationReceiving() {
                     count would be a number nobody wrote. The band hides itself
                     when the count is zero — on the `Received` tab there is by
                     definition nothing to check in. */}
-                {checkInCount > 0 && (
+                {(checkInCount > 0 || tomorrowCount > 0 || balancePoCount > 0) && (
                   <>
                     <SectionBand
                       title="Today's work"
@@ -564,14 +711,43 @@ export default function OperationReceiving() {
                     />
                     {!collapsedFacet.has("today") && (
                       <div>
-                        <FacetRow
-                          testId="receiving-facet-checkin"
-                          label={purchasingActionQueue("check_in")}
-                          count={checkInCount}
-                          active={checkInOnly}
-                          title="A PO that still owes units — counted from the quantities booked in, never from a status word somebody typed."
-                          onClick={() => setCheckInOnly((v) => !v)}
-                        />
+                        {/* §4's display order, top rung first: the tomorrow call
+                            and Check in are both "today's run"; the balance call
+                            is rung 4, cleaning up a part-delivery. Each band row
+                            hides at zero — a reassuring `0` is not a fact worth
+                            permanent height. */}
+                        {tomorrowCount > 0 && (
+                          <FacetRow
+                            testId="receiving-facet-tomorrow"
+                            label={purchasingActionQueue(
+                              "confirm_tomorrows_delivery",
+                            )}
+                            count={tomorrowCount}
+                            active={tomorrowOnly}
+                            onClick={() => setTomorrowOnly((v) => !v)}
+                          />
+                        )}
+                        {checkInCount > 0 && (
+                          <FacetRow
+                            testId="receiving-facet-checkin"
+                            label={purchasingActionQueue("check_in")}
+                            count={checkInCount}
+                            active={checkInOnly}
+                            title="A PO that still owes units — counted from the quantities booked in, never from a status word somebody typed."
+                            onClick={() => setCheckInOnly((v) => !v)}
+                          />
+                        )}
+                        {balancePoCount > 0 && (
+                          <FacetRow
+                            testId="receiving-facet-balance"
+                            label={purchasingActionQueue(
+                              "confirm_balance_delivery_date",
+                            )}
+                            count={balancePoCount}
+                            active={balanceOnly}
+                            onClick={() => setBalanceOnly((v) => !v)}
+                          />
+                        )}
                       </div>
                     )}
                   </>
@@ -737,6 +913,11 @@ export default function OperationReceiving() {
                           {done ? "Received" : supStatusLabel(po.sup_status)}
                         </span>
                       </td>
+                      {/* P3 — every open action of this PO, never just the top
+                          one: Law 1 says one action may not suppress another,
+                          and a PO delivered short on Monday genuinely carries
+                          its balance call AND its next tomorrow call at once.
+                          Order is §4's. */}
                       <td className="px-4 py-3 whitespace-nowrap text-right">
                         {done ? (
                           <span className="inline-flex items-center gap-1 text-[12px] text-success">
@@ -744,14 +925,63 @@ export default function OperationReceiving() {
                             Done
                           </span>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => openReceive(po.id)}
-                            className="btn-primary text-[11px] py-1.5 px-3"
-                            data-testid={`receive-${po.id}`}
-                          >
-                            {purchasingActionButton("check_in")}
-                          </button>
+                          <div className="inline-flex flex-col items-end gap-1">
+                            {(callsById.get(po.id) ?? [])
+                              .filter(
+                                (a) => a.key === "confirm_tomorrows_delivery",
+                              )
+                              .map((a) => (
+                                <button
+                                  key={a.key}
+                                  type="button"
+                                  onClick={() => openAnswer("tomorrow", po.id)}
+                                  className={`text-[11px] py-1.5 px-3 ${
+                                    a.late ? "btn-danger" : "btn-secondary"
+                                  }`}
+                                  title={purchasingActionQueue(
+                                    "confirm_tomorrows_delivery",
+                                  )}
+                                  data-testid={`tomorrow-${po.id}`}
+                                >
+                                  {purchasingActionButton(
+                                    "confirm_tomorrows_delivery",
+                                  )}
+                                </button>
+                              ))}
+                            <button
+                              type="button"
+                              onClick={() => openReceive(po.id)}
+                              className="btn-primary text-[11px] py-1.5 px-3"
+                              data-testid={`receive-${po.id}`}
+                            >
+                              {purchasingActionButton("check_in")}
+                            </button>
+                            {(callsById.get(po.id) ?? [])
+                              .filter(
+                                (a) =>
+                                  a.key === "confirm_balance_delivery_date",
+                              )
+                              .map((a) => (
+                                <button
+                                  key={a.poLineId}
+                                  type="button"
+                                  onClick={() =>
+                                    openAnswer("balance", po.id, a.poLineId)
+                                  }
+                                  className={`text-[11px] py-1.5 px-3 ${
+                                    a.late ? "btn-danger" : "btn-secondary"
+                                  }`}
+                                  title={`${a.sku} · ${purchasingActionQueue(
+                                    "confirm_balance_delivery_date",
+                                  )}`}
+                                  data-testid={`balance-${a.poLineId}`}
+                                >
+                                  {purchasingActionButton(
+                                    "confirm_balance_delivery_date",
+                                  )}
+                                </button>
+                              ))}
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -769,6 +999,16 @@ export default function OperationReceiving() {
           supplier={supplierById.get(receivePo.supplier_id)}
           warehouse={warehouseById.get(receivePo.warehouse_id)}
           onClose={closeReceive}
+        />
+      )}
+
+      {answerPo && answerFor && (
+        <RecordSupplierAnswerModal
+          kind={answerFor.kind}
+          po={answerPo}
+          supplierName={supplierById.get(answerPo.supplier_id)?.name ?? ""}
+          poLineId={answerFor.poLineId}
+          onClose={closeAnswer}
         />
       )}
     </div>

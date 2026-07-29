@@ -494,6 +494,30 @@ export function checkedInDone(received: number, ordered: number): string {
   return `Checked in ${received} of ${ordered}`;
 }
 
+/**
+ * The TWO ANSWERS to `Confirm tomorrow's delivery` — COPY-STANDARD's answers
+ * table, ruled by Loo 2026-07-29.
+ *
+ * They name the DATE rather than saying yes and no, for the same reason
+ * `Delay planning`'s name the promised date: the reader must not have to
+ * remember what was asked. And for one more, which is Loo's own: **the action
+ * opens the working day before the goods are due and stays open until somebody
+ * answers it**, so a relative word is true only on the first day —
+ * `Shipping tomorrow`, answered two days late, is a sentence about a day that
+ * has already gone.
+ *
+ * `date` is the caller's already-formatted string (`5 Aug 26, Wed`): this
+ * module owns WORDS and never dates.
+ */
+export function tomorrowDeliveryAnswerLabel(
+  answer: "shipping" | "delayed",
+  date: string,
+): string {
+  return answer === "shipping"
+    ? `It ships on ${date}`
+    : `It ships later than ${date}`;
+}
+
 /** Every purchasing queue word, in §4's display order — for a banned-word
  *  guard to walk, and for a test to assert the table is complete. */
 export const PURCHASING_ACTION_QUEUES: readonly string[] = (

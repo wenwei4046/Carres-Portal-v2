@@ -63,20 +63,39 @@ describe("GET /api/operation/pos", () => {
     eta_date: "2026-05-15",
     placed_at: "2026-05-03T10:00:00Z",
     purchase_order_lines: [
-      { sku: "MAT-K-001", qty: 2, received_qty: 0 },
+      // 0076's line UUID + P3's `short_since` (0306) both ride the list select.
+      { id: "line-a", sku: "MAT-K-001", qty: 2, received_qty: 0, short_since: null },
     ],
   };
 
-  function mockPosList(rows: typeof PO_ROW[]) {
+  /**
+   * The list route makes TWO reads, and the mock has to know which is which:
+   * the POs themselves, then P3's `po_supplier_promises` (0306) for the latest
+   * answer per PO / per line. A single shared chain would let the second read
+   * silently consume the first one's resolution.
+   */
+  function mockPosList(
+    rows: typeof PO_ROW[],
+    promises: Record<string, unknown>[] = [],
+  ) {
     const eq = vi.fn().mockReturnThis();
     const order = vi.fn().mockReturnThis();
     const limit = vi.fn().mockResolvedValue({ data: rows, error: null });
     const select = vi.fn(() => ({ eq, order, limit }));
+
+    const promiseOrder = vi.fn().mockResolvedValue({ data: promises, error: null });
+    const promiseIn = vi.fn(() => ({ order: promiseOrder }));
+    const promiseSelect = vi.fn(() => ({ in: promiseIn }));
+
     vi.mocked(userClient).mockReturnValue({
-      from: vi.fn(() => ({ select })),
+      from: vi.fn((table: string) =>
+        table === "po_supplier_promises"
+          ? { select: promiseSelect }
+          : { select },
+      ),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-    return { eq, order, limit };
+    return { eq, order, limit, promiseIn, promiseSelect };
   }
 
   it("returns POs for operation with default 'all' status", async () => {
@@ -94,6 +113,58 @@ describe("GET /api/operation/pos", () => {
     expect(body.pos[0]?.id).toBe("PO-2030");
     expect(order).toHaveBeenCalledWith("placed_at", { ascending: false });
     expect(limit).toHaveBeenCalledWith(200);
+  });
+
+  // ── P3 (0306) · what the supplier last told us, and what it was ABOUT ──────
+  it("carries the LATEST answer per PO and per line, newest first", async () => {
+    const { promiseIn } = mockPosList(
+      [PO_ROW],
+      [
+        // Newest first — the route takes the FIRST row it sees for each key.
+        { po_id: "PO-2030", po_line_id: null, kind: "tomorrow_delivery", about_date: "2026-09-15", recorded_at: "2026-09-02T00:00:00Z" },
+        { po_id: "PO-2030", po_line_id: null, kind: "tomorrow_delivery", about_date: "2026-08-01", recorded_at: "2026-08-01T00:00:00Z" },
+        { po_id: "PO-2030", po_line_id: "line-a", kind: "balance_delivery", about_qty: 2, recorded_at: "2026-09-03T00:00:00Z" },
+        { po_id: "PO-2030", po_line_id: "line-a", kind: "balance_delivery", about_qty: 1, recorded_at: "2026-08-20T00:00:00Z" },
+      ],
+    );
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      pos: {
+        tomorrow_answer_about_date: string | null;
+        purchase_order_lines: { id: string; balance_answer_about_qty: number | null }[];
+      }[];
+    };
+    expect(promiseIn).toHaveBeenCalledWith("po_id", ["PO-2030"]);
+    expect(body.pos[0]?.tomorrow_answer_about_date).toBe("2026-09-15");
+    const lineA = body.pos[0]?.purchase_order_lines.find((l) => l.id === "line-a");
+    expect(lineA?.balance_answer_about_qty).toBe(2);
+  });
+
+  it("a PO with no answer on file carries null, never a stale one", async () => {
+    mockPosList([PO_ROW], []);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    const body = (await res.json()) as {
+      pos: {
+        tomorrow_answer_about_date: string | null;
+        purchase_order_lines: { balance_answer_about_qty: number | null }[];
+      }[];
+    };
+    expect(body.pos[0]?.tomorrow_answer_about_date).toBeNull();
+    for (const l of body.pos[0]?.purchase_order_lines ?? [])
+      expect(l.balance_answer_about_qty).toBeNull();
   });
 
   it("filters by status when query param provided", async () => {

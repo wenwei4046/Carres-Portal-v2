@@ -302,9 +302,21 @@ question, the answers are locked strings like any other:
 | Action | The question | The answers | The queue tooltip |
 |---|---|---|---|
 | `Delay planning` | can the promised date still be met? | `We can still make the promised date` · `We cannot make the promised date` | `Supplier date lands after the promised date — decide before anyone calls (Delay planning)` |
+| `Confirm tomorrow's delivery` | is it coming on the day we expect it? | `It ships on {date}` · `It ships later than {date}` | — (none: the tile's own label is already the whole instruction, and this file's tooltip rule says delete a tooltip that would restate the label) |
 
 Both answers name **the promised date** rather than "yes" and "no", because the reader must
 not have to remember what was asked.
+
+**`Confirm tomorrow's delivery`'s two answers name the DATE for a second reason, and Loo said
+it in one line when he ruled them (2026-07-29):** *"These answers remain true regardless of
+when the user opens the action."* The action opens the working day before the goods are due and
+stays open until somebody answers it — so a relative word is only true on the first day.
+`Shipping tomorrow`, answered two days late, is a sentence about a day that has already passed.
+`{date}` is the PO's expected arrival, and it is right whenever it is read.
+
+**`Confirm balance delivery date` gets no row here and that is a filled answer, not a missing
+one**: it asks no question. It records ONE date, so its Button (`Record balance date`) is the
+whole interaction and there is nothing for a second string to say.
 The code mirror is `packages/shared/order-action-words.ts`; that module and this
 table are one-to-one, so a queue and a row can never spell one action two ways.
 

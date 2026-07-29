@@ -849,6 +849,7 @@ export {
   purchasingActionEmpty,
   purchasingActionLine,
   purchasingActionQueue,
+  tomorrowDeliveryAnswerLabel,
   type OrderActionKey,
   type OrderActionParties,
   type PurchasingActionKey,
