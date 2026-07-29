@@ -688,6 +688,6 @@ number on screen matches what actually happened.
 |---|---|---|
 | P1 | ✅ the numbers become settings (migration **0303**) | #488 |
 | P2 | ✅ the interaction law is true on **To Order** (#492) · **Claims** (#494) · **Receiving** (#495). Purchase Orders is a nested route with no rail and was never in scope | #492 · #494 · #495 |
-| P3 | ✅ the two missing supplier calls (migration **0306**) — and a balance date enters Delay planning too (Loo, 2026-07-29) | #503 |
+| P3 | ✅ the two missing supplier calls (migration **0306**) — and a balance date enters Delay planning too (Loo, 2026-07-29) | #506 |
 | P4 | ⬜ where the goods go (migration) | — |
 | P5 | ⬜ after P1-P4 · prove it with a real PO | — |
