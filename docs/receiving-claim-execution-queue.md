@@ -542,5 +542,5 @@ queue, not a flow with two holes in it.
 | R4 | ✅ | [#454](https://github.com/wenwei4046/Carres-Portal-v2/pull/454) · 0299 |
 | R5 | ✅ | [#475](https://github.com/wenwei4046/Carres-Portal-v2/pull/475) · no migration |
 | R6 | ✅ | [#490](https://github.com/wenwei4046/Carres-Portal-v2/pull/490) · 0301 + 0302 |
-| R7 | ⬜ **scheduled: between P4 and P5** (Loo 2026-07-28) · GRN duty auto-assign. Smart Cover is NOT in it — its leave data was dropped | — |
+| R7 | 🔨 **CLAIMED 2026-07-29 — `claude/r7-preflight-fa9383`** · RE-CUT by Loo 2026-07-29: the Receiving design, Phase 1 only. **It is no longer GRN duty auto-assign** | — |
 | R8 | ✅ | [#499](https://github.com/wenwei4046/Carres-Portal-v2/pull/499) · no migration |
