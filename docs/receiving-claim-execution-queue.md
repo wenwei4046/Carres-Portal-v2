@@ -290,37 +290,74 @@ R1's own form and files it; ops presses one button. Notes the next cards need:
 - Live at ship: **0 POs · 0 PO lines · 0 receipts**, so the queue reads empty
   until the first PO is received — nothing was backfilled.
 
-## R7 · GRN duty — receiving assigns itself (from PORTAL_CORE_ENGINE, 2026-07-27)
+## R7 · The Receiving design — Phase 1, written down
 
-**Concept (Jess's architecture doc):** the PO-duty holder does NOT do GRN; the OTHER
-operational staff share receiving, round-robin, one owner per GRN — separation gives
-independent verification (the person who ordered isn't the person who checks it in).
+**⚠️ RE-CUT BY LOO 2026-07-29. R7 is no longer "GRN duty — receiving assigns itself".** The
+old card built a round-robin that auto-stamped one owner per GRN. **That is not what R7 is any
+more, and it is not deferred inside R7 either — it is unowned.** The reason is not lost: the
+GRN-duty rotation is still LOCKED business in `docs/carres-portal-system-architecture.md`
+§3.16, it is still only a HUMAN roster rule, and §3.16 now carries the note saying no card
+builds it. **⑦ P5's scheduling reason depended on it** — *"a real PO must be received by
+whoever the SYSTEM says owns that GRN"* — so that dependency is open and needs Loo's word.
+The old card text is deleted rather than annotated (one concern, one file).
 
-**ALREADY EXISTS — do not rebuild:** `org_duties` (HR-P2, 0260) holds duty keys incl.
-PO-duty; the orders fair-split auto-assign (PRs #188-#192) is the proven distribution
-pattern; the offset-1 PO/GRN rotation is today a HUMAN planning rule (memory:
-Jul = Shasha PO / Yu Jun GRN) — R7 makes the system enforce what the roster already does.
-**Build:** each receiving (R1's form) auto-stamps ONE owner: round-robin over active
-operation staff EXCLUDING the current PO-duty holder; owner shows on the Receiving row +
-a "My receiving" count. Manual reassign stays possible (manager override), logged.
-**Needs R1 first** (the owner must have a form to own). Small migration likely (owner
-column) — guardrail #8.
-**Done when:** no GRN exists without exactly one owner; the PO-duty holder never
-auto-receives their own PO.
+**Goal:** the Receiving design is written down, and the portal's documentation stops
+describing a flow nobody had ruled. **This card is documentation and architecture. It ships
+no migration and changes no behaviour.**
 
-**SCHEDULED 2026-07-28 (Loo): R7 runs BETWEEN P4 AND P5**, not "any time". P5 puts one REAL
-purchase order through the module end to end, and a real PO must be received by whoever the
-SYSTEM says owns that GRN — validating with the owner still a human roster rule would
-validate a different flow from the one that goes live. The running order is
-`P3 → P4 → R7 → P5 → T3 → Foundation` (`docs/execution-queues-index.md`).
+**THE DESIGN LIVES IN `docs/carres-portal-system-architecture.md` §3.17 — read it there, not
+here.** This card records what was ruled and what the ruling costs; the design has ONE home.
+In one line each:
 
-**Smart Cover is NOT part of this card, and the reason is a missing dependency.** Loo's
-scheduling note says P5 must include "the completed GRN duty assignment and Smart Cover
-flow". The first is R7. The second is in this doc's LATER list and cannot be built: it needs
-staff-leave data, and **HR-P8 (roster / presence / leave) was dropped by Loo on 2026-07-26**
-at the design stage. **Do not widen R7 to cover it** — a round-robin that skips people is
-a different concept from a round-robin that assigns them, and it reads a store that does not
-exist. It is reported in the index with the three ways out; the choice is Loo's.
+1. **Receiving only RECORDS FACTS. It does not decide delivery readiness.**
+2. **The receiving result is one of exactly three** — `Received` · `Received with exception` ·
+   `Rejected` — which were already locked in `docs/COPY-STANDARD.md` on 2026-07-27.
+3. **Phase 1 is the current WhatsApp workflow** and is the only thing in scope: warehouse
+   checks → marks Supplier D/O → signs received → sends evidence to Operation on WhatsApp →
+   Operation reviews → Operation keys in the GRN → complete.
+4. **Phase 2** (Warehouse Mobile Check-in → Operation Review & Confirm) is **roadmap only.**
+5. **No Warehouse Code.**
+6. **No photo upload is ADDED to the GRN in Phase 1.**
+
+**Done when:** §3.17 exists, and no document in the repo describes a receiving flow that
+contradicts it.
+
+### What the ruling costs — measured 2026-07-29, reported not fixed
+
+Every one of these is a real gap between the ruling and the code. **None is fixed by this
+card**, because each needs either a migration or a word nobody has ruled.
+
+1. **`Rejected` does not exist.** Zero occurrences as a receiving result anywhere in the
+   codebase. Nothing in the portal can refuse a whole delivery — R1's model is quantity-based
+   and damaged / wrong units stay Pending delivery. **"We refused the lorry" and "we took it
+   and 2 are broken" are different events**, with different consequences for the supplier
+   claim and for `received_qty`. Its own card, with a migration.
+2. **`Received with exception` does not exist either** (0 occurrences). What ships today is
+   R1's PROGRESS state `receiving_issue`, which is a different axis: per PO, derived from
+   quantities, describing today — not the outcome of one arrival. **The two must not be
+   merged into each other** on the way to fixing this.
+3. **The three results have no five-string dictionary rows.** COPY-STANDARD lists them as a
+   vocabulary group, which is enough to stop a synonym being invented and not enough to build
+   a screen. That is the flow file's job, below.
+4. **"No photo upload in Phase 1" must never be read as "delete the evidence law".** Two file
+   paths already exist and both stay: the supplier D/O file (required to submit a check-in)
+   and R2's damage / wrong-item photos, **which a CHECK constraint in migration 0288
+   enforces** — removing them is a schema change. The ruling forbids adding a new photo step.
+5. **Phase 2's machinery is already built and dormant** — ④ R6 (PR #490, migrations 0301 +
+   0302) is Warehouse Mobile Check-in + Operation Review & Confirm under another name. It is
+   unreachable only because **0 warehouse accounts exist**. **Nobody may delete R6 to enforce
+   Phase 1.** Phase 2 starts the day Jess mints a login — a business decision, not a deploy.
+6. **This line still has no working-flow file, and R7 deliberately did NOT write one.**
+   Law 0A says a module's flow belongs in `docs/RECEIVING-WORKING-FLOW.md` and nowhere else,
+   so §3.17 is a holding home by necessity, not by right. Loo ruled TWICE (2026-07-28) that
+   the three Foundation files come after **P5** and that none may be "just started" while
+   waiting — *"a flow file drafted from the code would be an eighth purchasing document:
+   fluent, plausible, and nobody's."* **When `RECEIVING-WORKING-FLOW.md` is written it
+   ABSORBS §3.17 and §3.17 is deleted**, so the design never has two homes.
+7. **`Received with Exception` vs `Received with exception`.** The ruling was written with a
+   capital E; COPY-STANDARD locked lower-case on 2026-07-27 and every other portal string is
+   sentence case. **The law was not edited to match a chat** — one word for Loo whenever the
+   first screen needs it.
 
 ## R8 · The banned-verb sweep across the Purchasing lane
 
@@ -542,5 +579,5 @@ queue, not a flow with two holes in it.
 | R4 | ✅ | [#454](https://github.com/wenwei4046/Carres-Portal-v2/pull/454) · 0299 |
 | R5 | ✅ | [#475](https://github.com/wenwei4046/Carres-Portal-v2/pull/475) · no migration |
 | R6 | ✅ | [#490](https://github.com/wenwei4046/Carres-Portal-v2/pull/490) · 0301 + 0302 |
-| R7 | ⬜ **scheduled: between P4 and P5** (Loo 2026-07-28) · GRN duty auto-assign. Smart Cover is NOT in it — its leave data was dropped | — |
+| R7 | ✅ the Receiving design, Phase 1 — **docs + architecture only, NO migration** · RE-CUT by Loo 2026-07-29, so **it is no longer GRN duty auto-assign and that is now UNOWNED** (§3.16) | [#515](https://github.com/wenwei4046/Carres-Portal-v2/pull/515) |
 | R8 | ✅ | [#499](https://github.com/wenwei4046/Carres-Portal-v2/pull/499) · no migration |

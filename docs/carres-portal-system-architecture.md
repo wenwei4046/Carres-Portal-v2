@@ -207,8 +207,108 @@ read. The one true half is kept above: **do not invent staff.**
 - **Rotation locked:** Jul PO=Shasha / GRN=Yu Jun · Aug PO=Yu Jun / GRN=Khor Yee · Sep PO=Khor Yee / GRN=Shasha · loops.
 - **PO days: Mon / Wed / Fri (MYT)** — the 3 batching days for bedframe + mattress. Sofa POs can go any day (one PO per SO, dye-lot). URGENT BYPASS: order deadline inside stock lead window (MS/BF 7d · Sofa 5d) fires red on ANY day, must not wait for PO day.
 - **Purchase middle panel shows TWO chips: PO duty holder + GRN duty holder.** NOT a per-person workload strip (that pattern belongs to Orders panel where PIC filters real order counts).
-- Code today: `packages/shared/src/schemas/ops-po-duty.ts · PO_DUTY_DAYS_MYT = [1, 4]` (Mon+Thu) is WRONG — needs correction to `[1, 3, 5]` (Mon/Wed/Fri).
+- ~~Code today: `PO_DUTY_DAYS_MYT = [1, 4]` (Mon+Thu) is WRONG — needs correction to `[1, 3, 5]`.~~
+  **DONE, and the constant no longer exists** (⑦ P1, PR #488, migration 0303, 2026-07-28).
+  PO days · the production window · the urgent bypass are all **settings** now
+  (`purchasing_settings`, Purchasing → Settings); `isPoDayMYT` takes `poDays` with no default,
+  deliberately, so no caller can fall back to a literal. **The two numbers in the bullet above
+  (`MS/BF 7d · Sofa 5d`) are also dead** — `PO_STOCK_LEAD_DAYS` was deleted and sofa is 14
+  working days. *(Correction of a CODE fact only, made 2026-07-29 by card ④ R7 because a chat
+  reading the old sentence would go and "fix" a constant that is not there. Jess's business
+  rulings in this section are untouched.)*
+
+**⚠️ GRN duty auto-assign is now UNOWNED — no card builds it** (recorded 2026-07-29). The
+rotation above is still LOCKED business and it is still a **human roster rule the system does
+not enforce**: the "GRN duty" chip on the Purchase panel is computed in the browser as *next
+month's PO-duty holder* (`OperationPurchase.tsx`), nothing is stored, and it goes blank by
+itself once the seeded roster runs past 2026-09. Card ④ R7 used to be the card that would make
+the system enforce it; **Loo re-cut R7 on 2026-07-29 to the Receiving design (§3.17)**, so the
+auto-assign has no home. **This matters to ⑦ P5**, whose scheduling reason was *"a real PO must
+be received by whoever the SYSTEM says owns that GRN"* — that dependency is currently unmet and
+needs Loo's word: give it a new card, or accept that P5 validates with the owner still a human
+roster rule.
 - Migration `0236_ops_po_duty.sql` seed originally wrote `Jul=Shasha · Aug=Li Ching · Sep=Khor Yee`. Prod was manually corrected on 2026-07-18 16:35 (~47min after the seed) — the Aug row was updated to `yujun@carres.com` (real account). **Prod state verified 2026-07-24 = Jul Shasha · Aug Yu Jun · Sep Khor Yee, all correct.** No follow-up migration needed. The originally-proposed 0243 reseed migration was DROPPED (would have destroyed the manual correction).
+
+### 3.17 · Receiving — the operating design (LOCKED · Loo 2026-07-29, card ④ R7)
+
+**Receiving only RECORDS FACTS. It does not decide delivery readiness.** This is the whole
+principle and everything below follows from it. Receiving answers *what physically arrived*.
+Whether a customer can be delivered is decided by the Orders action engine reading those
+facts (`docs/ACTION-FLOW-STANDARD.md`), never by the person keying in the GRN. A receiving
+screen that says "ready to deliver" has taken a decision that is not its to take.
+
+*(Not to be confused with the supplier-side words already on the Receiving tab —
+`po_sup_status = ready_for_pickup` renders as `Ready`. That is the FACTORY saying the goods
+are ready for collection. It is a different leg and a different question from the customer's
+delivery readiness.)*
+
+#### Receiving result — the only three (already in `docs/COPY-STANDARD.md`, locked 2026-07-27)
+
+```
+Received  ·  Received with exception  ·  Rejected
+```
+
+**There is no fourth, and no synonym.** A module that needs to say something else is
+describing a QUANTITY (`8 of 10`) or a PROGRESS state, not a receiving result — those are
+different axes and R1 already owns them (`in_transit · partially_received · fully_received ·
+receiving_issue`, per PO, derived from quantities). **A result is the outcome of ONE arrival;
+a progress state is where the whole PO stands today.**
+
+**`Rejected` has no implementation today** (measured 2026-07-29: zero occurrences as a
+receiving result anywhere in the codebase). Nothing in the portal can currently refuse a whole
+delivery — R1's model is quantity-based, and damaged or wrong units stay Pending delivery
+rather than being rejected. **That gap is named here, not quietly filled**; building it needs
+its own card, because "we refused the lorry" and "we took it and 2 are broken" are different
+events with different consequences for the supplier claim.
+
+#### Phase 1 — the workflow that is LIVE, and the only one in scope
+
+```
+Warehouse checks goods
+  → marks Supplier D/O
+  → signs received
+  → sends evidence to Operation via WhatsApp
+  → Operation reviews
+  → Operation keys in the GRN
+  → Receiving complete
+```
+
+The system's part begins at *Operation keys in the GRN*. Everything before it is physical and
+happens on WhatsApp — **that is deliberate and it is not a gap to close in Phase 1.**
+
+- **No Warehouse Code.** Nothing identifies a warehouse by a typed code, and nothing may start
+  to. (Measured 2026-07-29: zero occurrences repo-wide. This is a constraint on future work,
+  not a removal.)
+- **No photo upload is ADDED to the GRN in Phase 1.** ⚠️ **This does not mean the GRN carries
+  no files today, and it must never be read that way.** Two file paths already exist, both
+  load-bearing, both staying: the **supplier D/O file** (required to submit a check-in, since
+  Phase 4.5) and the **damage / wrong-item photos** that R2's evidence law requires — the
+  latter enforced by a CHECK constraint in migration 0288, so removing it is a schema change,
+  not a UI tidy. The ruling forbids adding a NEW photo step, not deleting the evidence law.
+
+#### Phase 2 — ROADMAP ONLY. Not to be implemented, and not to be re-implemented
+
+```
+Warehouse Mobile Check-in  →  Operation Review & Confirm
+```
+
+**⚠️ The machinery for this already EXISTS and is DORMANT.** Card ④ R6 shipped it
+(PR #490, migrations 0301 + 0302): a warehouse role, a warehouse login, the warehouse filing
+its own count, and ops reviewing and confirming it — which is Phase 2 by another name.
+
+**It is dormant because nobody can reach it.** Measured on production 2026-07-29:
+
+```
+app_users role='warehouse' .... 0        warehouse_receipts ..... 0
+warehouse_id set on any user .. 0        purchase_orders ........ 0
+```
+
+**So "Phase 1 only" is true of the operating reality today and costs no code change.** The
+door is built and no key has been cut. **Nobody may delete R6's code to "enforce Phase 1"** —
+that would throw away a shipped, verified card to make a document read tidily. Phase 2 begins
+the day Jess mints the first warehouse login, and that is a business decision, not a deploy.
+
+---
 
 ### 3.13 · Purchase — line-change policy (LOCKED · Jess 2026-07-24)
 
