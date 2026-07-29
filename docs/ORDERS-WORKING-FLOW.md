@@ -123,9 +123,9 @@ case from start to finish; it never changes and is never repeated on an action.
 "12 Aug" is not yet a delay — we may have the item in ready stock, or another supplier may
 cover it. Only when we have tried and failed does anyone reach the customer.
 
-**The word is `Delay planning`.** `Recovery` is banned on screen: staff say "this order
-going to delay", never "this order is in recovery". Nothing is being recovered yet — a
-decision is being planned.
+**The word is `Delay planning`** (`docs/COPY-STANDARD.md` §2.1). Why `Recovery` may not
+be used for it — and the one place that word legitimately survives — is §9.1, the portal's
+only banned-word register; this file does not re-rule it.
 
 **Stage 1 — Delay planning**
 - Trigger: latest supplier ready date **>** the customer's promised date

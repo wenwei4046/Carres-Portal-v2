@@ -472,7 +472,7 @@ Right rail widgets sit on EVERY module and interlink (see §3.11 + right-rail-wi
 ## §6 · Design laws (LOCKED · in all module proposals but summarized here)
 
 1. **COPY-STANDARD** — 10 microcopy rules, canonical vocab (SO for customer sales order, PO for supplier purchase order, Send/Chase/Receive/Remind/Placed/Proceed)
-2. **UI-KIT §A0** — Module-tab law (drop breadcrumb + title on module-tab pages), Copy law (must read COPY-STANDARD before writing UI text), Date law (fmtDate everywhere), Hover law (blue tint), Action law (Manage column .pill only)
+2. **UI-KIT §8.3** Module-tab law (drop breadcrumb + title on module-tab pages), **§2.4** Date law (fmtDate everywhere), **§3.5** Hover law (blue tint) — the Copy law is `docs/COPY-STANDARD.md` (must be read before writing UI text) and the Action law is `docs/ACTION-FLOW-STANDARD.md`
 3. **3-pane inline split** — facet 200 · list 420 · detail always visible (kill drawer overlays)
 4. **Compact pill stage tabs** — ~40px pill row (not tall KPI cards)
 5. **Row action-line** — every row ends with a ≤10-word action-line (verb + object + when)

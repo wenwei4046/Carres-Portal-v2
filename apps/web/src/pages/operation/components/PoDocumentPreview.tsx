@@ -13,7 +13,7 @@
  * "today" ISO + onSendPo callback. This component owns display only, never the
  * mutate. Send PO opens the shipped CreatePOModal (via the callback).
  *
- * UI-KIT: dates via `fmtDate()` (§A0 date law); flame button = one per page
+ * UI-KIT: dates via `fmtDate()` (date law, UI-KIT §2.4); flame button = one per page
  * (§A5); status pill = `.pill-*` (§A6); mono for SKU/PO-no/ref/currency;
  * radius 12 outer, 8 inner (§A6 radius ladder).
  */

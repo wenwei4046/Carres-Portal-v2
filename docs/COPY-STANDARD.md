@@ -863,15 +863,9 @@ it is in the wrong element.
 | Filter | fact only |
 | Bulk action | verb + PLURAL object (`Issue 12 POs` · `Call 8 suppliers — confirm ready date`) |
 
-> **⇢ NOT LANGUAGE · future owner: `docs/ACTION-FLOW-STANDARD.md` Law 2** — **the
-> no-decorative-checkbox law.** A checklist item may exist only if it is either
-> (a) DERIVED from a signal the system already stores, or (b) an input the system
-> then stores. **A tick-box that only records "I say I did it" is banned** — it turns
-> the portal into a manual to-do list and lets an order look complete when nothing
-> happened. Where a FORM already collects the inputs (the PO form, the
-> confirm-booking form), that form IS the checklist — never a second list of ticks
-> beside it. *(This is about behaviour, not wording; Law 2 already carries the
-> DERIVED / INPUT halves.)*
+**A checklist item is not this file's to admit or refuse** — whether one may exist at
+all is the no-decorative-checkbox law, `docs/ACTION-FLOW-STANDARD.md` Law 2. This table
+rules only how one is WORDED.
 
 ---
 
@@ -1103,14 +1097,13 @@ each labelled by its own small icon from the portal icon set, never emoji
 
 ## Header rules (see UI-KIT for the shell)
 
-When a page sits under a module tab bar (Purchasing's `To Order / Purchase
-Orders / Receiving / Claims / Settings`), the page does NOT repeat the active tab as
-a breadcrumb or big title. **The tab is the title.**
+**The tab is the title.** A page sitting under a module tab bar does not spell that
+tab's word a second time as a breadcrumb or a big title — one word, one place on the
+screen.
 
-> **⇢ NOT LANGUAGE · future owner: `docs/UI-KIT.md` §8.3 (Module-tab law)** — where
-> the freshness stamp (`Today · Wed 22 Jul`) and the refresh icon sit is layout, and
-> the UI-KIT's own §8.3 already carries it. The wording half — *the tab is the title, do not repeat
-> it* — is this file's and stays.
+**Everything else about that header is layout and is already ruled** — which slots the
+page drops, and where the freshness stamp and the refresh icon sit, are
+`docs/UI-KIT.md` §8.3 (Module-tab law).
 
 ---
 

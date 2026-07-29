@@ -38,7 +38,7 @@ interface Props {
   /** Page title → the 56px PageHeader bar (t-h2). Optional: when both `title`
    *  and `breadcrumb` are omitted the whole white header row is skipped — used
    *  by module-tab pages (Purchasing's To Order / Purchase Orders / Receiving)
-   *  where the tab bar above IS the title. See UI-KIT §A0 "Module-tab law". */
+   *  where the tab bar above IS the title. See UI-KIT §8.3 "Module-tab law". */
   title?: ReactNode;
   /** Right-side header cluster: search · Alerts · Help · the ONE hero action. */
   actions?: ReactNode;
@@ -112,7 +112,7 @@ export default function ListPageShell({
           the search/utility cluster on the SAME line (her round-2 ask); row 2 =
           the page title + freshness stamp, KEPT (round-3: "i never ask you
           removed my 2row header — Order + synced"). Module-tab pages skip the
-          whole block (Jess 2026-07-22, UI-KIT §A0 "Module-tab law"). */}
+          whole block (Jess 2026-07-22, UI-KIT §8.3 "Module-tab law"). */}
       {hasHeader && (
         <div className="shrink-0 bg-white border-b border-base-200 px-6 pt-2 pb-2.5">
           <div className="flex items-center justify-between gap-3">

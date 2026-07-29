@@ -21,8 +21,8 @@
 
 ## 模板 & 参考(要 adapt,不要照抄)
 9. **Orders 面板**(`apps/web/src/pages/operation/OperationOrdersControl.tsx` + `ListPageShell`)= 所有 listing 页的**样式/结构模板**。复用外壳 + 积木,但要**建议这个面板该怎么建**,别硬塞成 Orders 的样子。
-10. **2990s ERP**(`C:/Users/User/OneDrive/Desktop/2990s` = Hookka/Ohana 姐妹公司,同一 management)= 任何家具运营系统(MRP/PO/供应商/库存/物流)的强参考。可以**抄它的逻辑**,但:UI 用 Carres 自己的 **Tailwind + UI-KIT v4** 重画(2990 是 CSS-module,别抄),表名 remap 成 Carres 的,并**指出它的短板去改进**(它**没有工作日/假期引擎、没有预测补货、交期还懒 buffer**)。**不是全部都能照搬 —— 逐个功能给我建议。**
-11. **UI-KIT v4 完整遵守**(`docs/CARRES_UI_KIT_V4.md`)。要嘛全跟,要嘛别 ship。
+10. **2990s ERP**(`C:/Users/User/OneDrive/Desktop/2990s` = Hookka/Ohana 姐妹公司,同一 management)= 任何家具运营系统(MRP/PO/供应商/库存/物流)的强参考。可以**抄它的逻辑**,但:UI 用 Carres 自己的 **Tailwind + UI-KIT** 重画(2990 是 CSS-module,别抄),表名 remap 成 Carres 的,并**指出它的短板去改进**(它**没有工作日/假期引擎、没有预测补货、交期还懒 buffer**)。**不是全部都能照搬 —— 逐个功能给我建议。**
+11. **UI-KIT 完整遵守**(`docs/UI-KIT.md`)。要嘛全跟,要嘛别 ship。
 
 ## 规模 & 安全
 12. 每个运营 listing 页都按 **500+ orders/月 + 1000+ 库存单位** 设计(server 分页、左筛选栏、分组 rollup、批量导入),不是照今天的小数字。

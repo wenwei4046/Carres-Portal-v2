@@ -36,7 +36,7 @@ import { usePurchasingSettings } from "@/lib/queries";
  * by pages under this bar to host the freshness stamp + refresh icon that
  * would otherwise live in the ListPageShell header. This is how module-tab
  * pages avoid duplicating the tab as a breadcrumb / big title (Jess 2026-07-22,
- * UI-KIT §A0 "Module-tab law").
+ * UI-KIT §8.3 "Module-tab law").
  *
  * UI-KIT v4: token classes only (no raw hex), Lucide icons, English copy.
  */

@@ -1788,7 +1788,8 @@ function DrawerBody({
   // ── Balance v3 invoice math (2026-07-17) — the Balance tab reads as an
   // INVOICE: CHARGES (goods + the storage fee) − PAYMENTS (all kinds) =
   // Balance due. The storage FEE flows in as one charge line; the Storage tab
-  // owns the detail (rule per STATUS-STANDARD §7.5: start = next same weekday
+  // owns the detail (rule per `computeStorageFee` in
+  // packages/shared/src/schemas/ops-order-control.ts: start = next same weekday
   // after the deadline; MS/BF RM150/month; sofa 14d free then RM200).
   const storageEndEff =
     form.draft.storage_to.trim() || form.draft.logistic_eta.trim() || todayIso;
@@ -1886,7 +1887,7 @@ function DrawerBody({
     : order.delivery_date
       ? fmtDate(order.delivery_date).split(", ")[0]
       : "—";
-  // Full canonical date (date law §A0: weekday ALWAYS on a displayed date) —
+  // Full canonical date (date law, UI-KIT §2.4: weekday ALWAYS on a displayed date) —
   // the Delivery card shows this; deadlineLabel (weekday stripped) stays for
   // the short message-template strings only.
   const deadlineFull = order.delivery_date_tbd
@@ -7134,7 +7135,7 @@ function MoneyCard({
             </div>
           )}
           {/* The storage FEE flows in as a charge (no number); the Storage tab
-              owns the detail (STATUS-STANDARD §7.5 rule). */}
+              owns the detail — `computeStorageFee` owns the rule. */}
           <ChargeRow
             label="Storage fee"
             sub={storageIncurred ? undefined : "· not accruing"}

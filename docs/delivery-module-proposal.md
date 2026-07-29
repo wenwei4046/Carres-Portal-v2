@@ -14,7 +14,7 @@
 |---|---|
 | `docs/ACTION-FLOW-STANDARD.md` | how actions are computed, when they appear, which shows first |
 | `docs/COPY-STANDARD.md` | every visible word (the dictionary + the audit table) |
-| `docs/UI-KIT.md` §A0 | the shell, the module-tab law, the golden reference page |
+| `docs/UI-KIT.md` §8.3 | the shell, the module-tab law, the golden reference page |
 | `docs/delivery-execution-queue.md` T1-T10 shipped notes | what already exists and must not be rebuilt |
 
 ## What T11 builds

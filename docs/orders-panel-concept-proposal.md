@@ -13,7 +13,8 @@ She now wants the same design DNA applied to the **Orders panel** (`OperationOrd
 Read these BEFORE writing any code:
 
 - `docs/COPY-STANDARD.md` — 10 rules · row action-line template · What-to-do template · canonical vocabulary (SO vs PO)
-- `docs/UI-KIT.md` §A0 — Module-tab law · Copy law · Date law · Hover law · Action law
+- `docs/UI-KIT.md` §8.3 Module-tab law · §2.4 Date law · §3.5 Hover law — and the Copy law is
+  `docs/COPY-STANDARD.md`, the Action law `docs/ACTION-FLOW-STANDARD.md`
 - `docs/PURCHASING-WORKING-FLOW.md` + `docs/PURCHASING-INFORMATION-MODEL.md` — Purchasing's live rules (mirror the discipline). *(Corrected 2026-07-29: `purchase-cockpit-handoff.md` was deleted 2026-07-27.)*
 - `apps/web/src/pages/operation/OperationPurchase.tsx` — the shipped reference implementation
 - `apps/web/src/pages/operation/OperationOrdersControl.tsx` — the Orders panel we're modifying
@@ -63,7 +64,7 @@ Paste this into a fresh chat on Sat:
 
 > Continue Orders panel redesign. Read:
 > 1. `docs/COPY-STANDARD.md`
-> 2. `docs/UI-KIT.md` §A0
+> 2. `docs/UI-KIT.md`
 > 3. `docs/PURCHASING-WORKING-FLOW.md` *(was `purchase-cockpit-handoff.md` §5, deleted 2026-07-27)*
 > 4. `docs/orders-panel-concept-proposal.md` (this file)
 >

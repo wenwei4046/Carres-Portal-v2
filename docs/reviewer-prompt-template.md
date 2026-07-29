@@ -36,7 +36,7 @@ prioritized P1/P2/P3 to lift toward 10/10. Zero-experience UX standard.
 1. `docs/carres-portal-system-architecture.md` — THE master doc. §3 is
    business locks (Loo/Jess decisions · NEVER override silently).
 2. `docs/COPY-STANDARD.md` — microcopy rules + canonical vocabulary
-3. `docs/UI-KIT.md` §A0 — design laws
+3. `docs/UI-KIT.md` — design laws
 4. `docs/PURCHASING-WORKING-FLOW.md` — shipped reference *(corrected 2026-07-29: `purchase-cockpit-handoff.md` deleted 2026-07-27)*
 5. `docs/reviewer-prompt-template.md` — this prompt (for reference)
 6. Then module proposals in priority order:
@@ -215,7 +215,7 @@ usage revealing what only real usage reveals. Purchase cockpit is our proof:
 Confirm you have read (list which files you can access):
 - Master doc §3 business locks
 - COPY-STANDARD.md
-- UI-KIT.md §A0
+- UI-KIT.md
 - *(purchase-cockpit-handoff.md — DELETED 2026-07-27; use PURCHASING-WORKING-FLOW.md)*
 
 Then ask Jess:
