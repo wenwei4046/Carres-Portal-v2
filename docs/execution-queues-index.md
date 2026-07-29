@@ -544,6 +544,30 @@ no-paper rule. Every module uses it; no module invents its own action model.
 ## Standing laws (apply to every line)
 
 - One card = one chat = one PR = one deploy. Never two cards in one chat.
+- **⭐ ONE CARD = ONE EXECUTION CHAT. A card must be CLAIMED before it is implemented**
+  (PM, 2026-07-29). The old law above says one chat may not hold two cards; it never said one
+  card may not be held by two chats, and **that is the failure mode that has now happened
+  twice** — #495 / #496 on P2-Receiving, and #509 / #510 on **D2**, eight days apart.
+
+  **How to claim.** Before writing any code, edit this file: put the card's status cell in its
+  own queue doc to **`🔨 CLAIMED <date> — <branch>`**, commit that one line, and push it. The
+  claim IS the push; an unpushed claim claims nothing, because the only thing another chat can
+  see is `origin`. Then **re-read the claim immediately before opening the PR**, not only
+  before starting — a chat that read the lane once and started building never looks again,
+  which is exactly what let both collisions through. Same shape as the migration guard
+  (`list_migrations` twice: once before numbering, once before applying).
+
+  **If you find a card already claimed, STOP and say so.** Do not build it in parallel "to
+  compare", and do not assume a stale-looking claim is dead — ask.
+
+  **What a collision costs, from the two real cases.** On P2-Receiving the two builds
+  DISAGREED, and reconciling them would have overturned two decisions already reported to
+  Jess, so #496 was closed unmerged and nothing continued from it. On D2 the two builds
+  AGREED — `git diff` on `apps/web/src` between them was empty and both guard baselines were
+  byte-identical — and it still cost a full duplicate review, a conflicted PR, and a wrong
+  number in the law that only surfaced BECAUSE the two were compared (§2.1 read 3,971 against
+  a measured 3,975; the source agreed and the counting did not). **Agreement is the lucky
+  outcome, not the safe one.**
 - **Count the exits before you gate one.** If a card makes something require a reason, a
   permission or a record, find EVERY path that reaches it first — a gated front door with an
   open side door is worse than no gate, because the numbers now look complete. (K4 found a

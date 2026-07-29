@@ -53,8 +53,8 @@ deliverable is Foundation Components, not a better document.
 | **D2** | codemod **typography** | ✅ **BUILT 2026-07-29 · accepted with revisions at PM review the same day** — 4,052 conversions in 236 files; guard rule D **3,239 → 33**, and all 33 are `index.css`. Card below |
 | **D3 / D4** | codemod colour / spacing | ⏳ — the guard has them baselined at A 442 · B 8 and E 1,727 |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
-| **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ |
-| **D7+** | Delivery · Purchase · Receiving · Stock · Service · Payments · Catalog — one card each | ⏳ |
+| **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ — **also carries the `.t4-*` legacy migration** (PM, 2026-07-29). D2 found a SECOND retired ramp: 9 classes, **44 in-scope uses across 8 files**, invisible to rule D because a page writes only the class name while the size and weight sit in `index.css`. **`.t4-hero-num` is `20px/700`** and `lib/design-standard.ts:132` records that 700, so a §2.2-dead weight still renders. Ruled **Reported Only for D2**: it is a visual change on a money figure and belongs with the pages when they migrate. **D6 owns the DEFINITIONS and the mirror's `weight: 700`** |
+| **D7+** | Delivery · Purchase · Receiving · Stock · Service · Payments · Catalog — one card each | ⏳ — whichever of these owns a file still writing `.t4-*` retires it there, so the last card to migrate does not inherit the ramp's deletion |
 
 **Order is not negotiable for D0.5 → D6.** Rebuilding a page before the
 components exist means hand-rolling it twice.
@@ -814,8 +814,20 @@ either side of the block: byte-identical.
    zero); it is not part of the retired ramp, and its 126 uses are untouched.
 4. **Part B now has two type systems in one stylesheet** — the six tokens for the portal and the
    `.t-*` / `.pos-proto` ramp for the POS. That is what §15 asks for, but the shipped CSS still
-   emits `font-weight: 700` 114 times for Part B, so *"there is no 700 anywhere"* is true of the
-   portal and NOT of the bundle. Worth knowing before anyone greps the CSS as proof.
+   emits `font-weight: 700` **116 times** (re-measured 2026-07-29; this line first said 114), so
+   *"there is no 700 anywhere"* is true of the portal and NOT of the bundle. Worth knowing before
+   anyone greps the CSS as proof.
+5. **THERE ARE TWO RETIRED RAMPS, NOT ONE, and finding #4 above is what hid the second one**
+   (added 2026-07-29, from the parallel D2 review; §2.1 and §2.2 now carry it). Reading "the
+   surviving 700 is Part B's" closes the question, and **one of the three survivors is not Part
+   B's**: `.t4-hero-num` is `20px/700`, `lib/design-standard.ts:132` records that weight, and one
+   in-scope page renders it. The whole `.t4-*` ramp is **9 classes,
+   44 in-scope uses across 8 files**, and **neither the codemod nor rule D can see any of it**,
+   structurally: rule D reads the values a page WRITES, and a page writes only `t4-hero-num` while
+   the size and the weight live in `index.css`. §16's class-use table has counted `t4-* 33` all
+   along with nothing connecting that number to §2.2's claim — **a number in the law is not the
+   same thing as a number the law reads.** RULED Reported Only by the PM; **scheduled onto D6/D7**,
+   see the queue table at the top of this file.
 
 ### PM REVIEW — accepted with revisions (2026-07-29). What the review changed
 
