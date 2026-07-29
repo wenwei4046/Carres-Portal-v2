@@ -21,25 +21,53 @@
  *     importing the shell fails — annotate `// design-standard: not-a-list-page`
  *     with a reason to opt out.
  *
- *   UI-KIT hard rules (docs/UI-KIT.md §E) — NOT ratcheted; any violation fails.
- *   Kit scope = KIT_FILES below (the order-drawer family + shared section
- *   chrome; ADD each file here as it is migrated to the kit). POS
- *   (pages/dealer/**) has its own contract and is never in scope.
+ *   UI-KIT rules C/D/F — D1 (2026-07-29) widened these from the kit to ALL of
+ *   apps/web/src. They are enforced at TWO strengths, and the split is the whole
+ *   design of that card:
+ *     · KIT scope   — a violation FAILS. Unchanged behaviour.
+ *     · WIDER scope — a violation WARNS and is ratcheted against the baseline.
+ *   D1 measured 965 pre-existing violations across 184 files. Failing on those
+ *   would go red on every build in the repo, and a guard that fails on day one
+ *   gets switched off on day one. D5 is the card that flips warn → fail, once
+ *   the D2/D3/D4 codemods have walked the baseline down.
  *
- *   RULE C — Lucide icon sizes: `size={N}` with N ∉ {14, 16, 18}. (kit scope)
- *   RULE D — inline text sizes: `text-[Npx]` with N ∉ {12 label, 13 btn/ref,
- *     14 secondary, 15 content, 18 stat-card money hero, 20 page hero}.
- *     Headings use `.t-*`. (kit scope)
+ *   Kit scope is DERIVED from apps/web/src/components/kit/** (D1) plus the
+ *   MIGRATED_FILES list of non-kit files already held to the kit. It used to be
+ *   one hand-typed list, and the three D0.5c shells shipped into the kit without
+ *   anybody adding them — the exact failure UI-KIT §13.1's "not a hand-
+ *   maintained file list" sentence exists to prevent. POS (pages/dealer/**) has
+ *   its own contract (§15) and is never in scope.
+ *
+ *   RULE C — Lucide icon sizes: `size={N}` with N ∉ {14, 16, 18}.
+ *   RULE D — inline text sizes: `text-[Npx]` with N ∉ {11, 12, 13, 18}.
  *   RULE E — inline `#F7F4EE`: the KPI fill exists ONLY as `.kpi-box` in
- *     index.css. (all web src)
- *   RULE F — row heights: `h-[Npx]` with N ≠ 44 — rows are 44px FIXED (`h-11`);
- *     content truncates, the row never grows. (kit scope)
+ *     index.css. (all web src, hard)
+ *   RULE F — row heights: `h-[Npx]` with N ∉ {36, 40, 52}.
  *   RULE G — hand-rolled section chrome: a literal `section-band` class in JSX
  *     outside components/SectionPanel.tsx — render <SectionBand>. (all web src)
  *
+ *   The three mechanisms D0.6 handed to D1, one per consolidated principle:
+ *   RULE J — UI-KIT §8.0 (R1 · closed floorplan catalogue). A `PageShell`
+ *     `variant` outside the SHIPPED union fails. PM ruling 2026-07-29: the
+ *     shipped union is `list` | `module` and this guard may not add, rename or
+ *     remove one. `custom` is refused by name. HARD — nothing violates it today,
+ *     so it can never be "pre-existing". Second mechanism on a rule the Type
+ *     System already enforces; it catches a variant arriving through a cast.
+ *   RULE K — UI-KIT §14.1 (R2 · opinionated product, configurable business). No
+ *     browser-persisted UI state under pages/**. WARN + ratchet: PM ruling
+ *     2026-07-29 keeps `hiddenCols`, so this rule DETECTS and BASELINES and
+ *     never removes.
+ *   RULE L — UI-KIT §0.3 (R4 · every kit artifact declares its edition). HARD
+ *     over a small, explicit artifact list.
+ *
+ *   (R3 · UI-KIT §10.1, "no state keyed off a display string", has NO mechanism
+ *   here — see the D1 findings note. It stays scheduled rather than shipping a
+ *   check that cannot tell a display string from an id.)
+ *
  * Usage:
- *   node scripts/check-design-standard.mjs                # check (CI/local)
+ *   node scripts/check-design-standard.mjs                     # check (CI/local)
  *   node scripts/check-design-standard.mjs --update-baseline   # re-freeze debt
+ *   node scripts/check-design-standard.mjs --report            # §16 UI Health
  */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
@@ -50,6 +78,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const WEB_SRC = join(ROOT, "apps/web/src");
 const BASELINE_PATH = join(ROOT, "scripts/design-standard-baseline.json");
 const UPDATE = process.argv.includes("--update-baseline");
+const REPORT = process.argv.includes("--report");
+const KIT_DOC = join(ROOT, "docs/UI-KIT.md");
 
 const HEX_RE = /#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g;
 // Directories/files where a raw hex is legitimate (no Tailwind at that layer).
@@ -109,22 +139,14 @@ for (const f of files) {
   if (m) currentHoverGrey += m.length;
 }
 
-if (UPDATE) {
-  const baseline = {
-    hex: currentHex,
-    hoverGrey: currentHoverGrey,
-    listPages: files.filter((f) => f.startsWith("apps/web/src/pages/")),
-  };
-  writeFileSync(BASELINE_PATH, JSON.stringify(baseline, null, 2) + "\n");
-  console.log(`✓ baseline refrozen — ${Object.keys(currentHex).length} files carry legacy hex.`);
-  process.exit(0);
-}
-
-if (!existsSync(BASELINE_PATH)) {
+if (!existsSync(BASELINE_PATH) && !UPDATE) {
   console.error("✗ missing scripts/design-standard-baseline.json — run: node scripts/check-design-standard.mjs --update-baseline");
   process.exit(1);
 }
-const baseline = JSON.parse(readFileSync(BASELINE_PATH, "utf8"));
+// Under --update-baseline the file loop below still runs — that is what POPULATES
+// the new per-rule tallies — so the ratchet reads an empty baseline and never
+// fires, and the freeze is written at the end from what was actually measured.
+const baseline = existsSync(BASELINE_PATH) ? JSON.parse(readFileSync(BASELINE_PATH, "utf8")) : { hex: {}, listPages: [] };
 const errors = [];
 
 // ---- RULE I — grey-hover ratchet (Jess 2026-07-20) ----------------------------
@@ -172,36 +194,11 @@ for (const f of files) {
   }
 }
 
-// ---- UI-KIT hard rules C–G (docs/UI-KIT.md §E) ---------------------------------
-// Kit-governed files — hard rules C/D/F apply here. ADD a file when you
-// migrate it to the kit; never remove one.
-const KIT_FILES = new Set([
-  // D0.5a — the Foundation Components. They are the kit by definition, so they
-  // are in scope from the day they land.
-  "apps/web/src/components/kit/Badge.tsx",
-  "apps/web/src/components/kit/Button.tsx",
-  "apps/web/src/components/kit/Card.tsx",
-  "apps/web/src/components/kit/EmptyState.tsx",
-  "apps/web/src/components/kit/FieldFrame.tsx",
-  "apps/web/src/components/kit/Icon.tsx",
-  "apps/web/src/components/kit/Input.tsx",
-  "apps/web/src/components/kit/Loading.tsx",
-  "apps/web/src/components/kit/Panel.tsx",
-  "apps/web/src/components/kit/SearchInput.tsx",
-  "apps/web/src/components/kit/StatusPill.tsx",
-  "apps/web/src/components/kit/Textarea.tsx",
-  // D0.5b — the Radix half.
-  "apps/web/src/components/kit/Checkbox.tsx",
-  "apps/web/src/components/kit/DatePicker.tsx",
-  "apps/web/src/components/kit/DialogFrame.tsx",
-  "apps/web/src/components/kit/Drawer.tsx",
-  "apps/web/src/components/kit/DropdownMenu.tsx",
-  "apps/web/src/components/kit/Modal.tsx",
-  "apps/web/src/components/kit/Popover.tsx",
-  "apps/web/src/components/kit/Select.tsx",
-  "apps/web/src/components/kit/Tabs.tsx",
-  "apps/web/src/components/kit/Toast.tsx",
-  "apps/web/src/components/kit/Tooltip.tsx",
+// ---- UI-KIT rules C–G (docs/UI-KIT.md) -----------------------------------------
+// Files OUTSIDE components/kit/** that are nevertheless held to the kit. This is
+// the only hand-maintained half, and it may only ever GROW: a file joins when it
+// is migrated, and never leaves.
+const MIGRATED_FILES = [
   // `/ui` joins the kit at D0.5b. It was exempt while it rendered BOTH pending
   // spacing candidates on purpose; Jess froze Q1 on 2026-07-28, the comparison
   // is gone, and the exemption died with the code it described.
@@ -211,7 +208,22 @@ const KIT_FILES = new Set([
   "apps/web/src/pages/operation/components/StockPickerGrid.tsx",
   "apps/web/src/pages/operation/components/RouteJourneyBar.tsx",
   "apps/web/src/pages/operation/components/OrderControlPanel.tsx",
-]);
+];
+// D1 — the kit is a DIRECTORY, not a list. Everything under components/kit/** is
+// the kit by definition and is in scope from the moment the file lands, with no
+// second edit anywhere. Before this, KIT_FILES was typed by hand and PageShell ·
+// DataTable · DetailShell had shipped into the kit unguarded.
+const KIT_DIR = "apps/web/src/components/kit/";
+const KIT_FILES = new Set([...files.filter((f) => f.startsWith(KIT_DIR)), ...MIGRATED_FILES]);
+// UI-KIT §8.0 — the SHIPPED floorplan catalogue. PM ruling 2026-07-29: D1
+// enforces what `PageShell.tsx` actually ships and may not add, rename or remove
+// a member. §8.1 still names four (list · dashboard · detail · settings); that
+// mismatch is REPORTED ONLY and is not this guard's to settle.
+const SHIPPED_VARIANTS = new Set(["list", "module"]);
+// Per-rule per-file tallies for the widened rules. A global total would let one
+// file improve while another rots and the number would not move.
+const wide = { C: {}, D: {}, F: {}, K: {} };
+const warnings = [];
 const ICON_SIZES = new Set([14, 16, 18]); // SIZING LAW: 14 pill/inline · 16 default UI · 18 top-bar (stroke 2)
 // SIZING LAW (MASTER SPEC §3, final 2026-07-18): 13 body · 12 caption/meta/pill
 // · 11 micro/label · 18 money hero. 10 deleted (use 11); 14/15/16/20/22 deleted.
@@ -260,7 +272,20 @@ for (const f of files) {
     }
   }
 
-  if (!KIT_FILES.has(f)) continue;
+  // ---- RULES C · D · F — kit = HARD, everywhere else = WARN + ratchet -----------
+  // D1 widened these off the kit. `inKit` decides the STRENGTH, never whether the
+  // rule is checked: a violation outside the kit is still measured, still counted
+  // per rule per file, and still fails the moment it EXCEEDS what was frozen.
+  const inKit = KIT_FILES.has(f);
+  // UI-KIT §15 — Part B, the POS, is "out of scope for §1–§14 and for the Build
+  // Guard". It has its own contract under `.pos-proto`. The kit-only version of
+  // C/D/F never met a POS file because no POS file was in KIT_FILES; widening
+  // walked straight into 57 pages the law exempts, so the exemption is explicit
+  // now. RULES A · E · G · I keep whatever scope they already had — D1 widens
+  // C/D/F and changes nothing else.
+  const isPos = f.startsWith("apps/web/src/pages/dealer/");
+  if (!inKit && isPos) continue;
+  const sink = inKit ? errors : [];
 
   // RULE C — Lucide icon sizes.
   {
@@ -269,7 +294,8 @@ for (const f of files) {
     while ((m = sizeRe.exec(src))) {
       const n = Number(m[1]);
       if (!ICON_SIZES.has(n)) {
-        errors.push(
+        wide.C[f] = (wide.C[f] ?? 0) + 1;
+        sink.push(
           `RULE C · icon size — ${f}:${lineOf(src, m.index)} size={${n}}; icons are 14 (pill/inline) / 16 (default UI) / 18 (top bar) only (docs/UI-KIT.md §A4).`,
         );
       }
@@ -283,7 +309,8 @@ for (const f of files) {
     while ((m = txtRe.exec(src))) {
       const n = Number(m[1]);
       if (!TEXT_SIZES.has(n)) {
-        errors.push(
+        wide.D[f] = (wide.D[f] ?? 0) + 1;
+        sink.push(
           `RULE D · text size — ${f}:${lineOf(src, m.index)} text-[${m[1]}px]; inline sizes are 11 micro / 12 caption / 13 body (+18 money hero) — typography law, docs/UI-KIT.md §2.1.`,
         );
       }
@@ -299,12 +326,173 @@ for (const f of files) {
     while ((m = hRe.exec(src))) {
       const n = Number(m[1]);
       if (!ROW_HEIGHTS.has(n)) {
-        errors.push(
+        wide.F[f] = (wide.F[f] ?? 0) + 1;
+        sink.push(
           `RULE F · row height — ${f}:${lineOf(src, m.index)} h-[${n}px]; rows are 36 panel/KV · 40 list · 52 product-line only — table law, docs/UI-KIT.md §7 (row height is written there by card D0.5c).`,
         );
       }
     }
   }
+
+  // ---- RULE J — the floorplan catalogue is CLOSED (UI-KIT §8.0) -----------------
+  // HARD. Nothing in the repo violates it today, so it can never be pre-existing.
+  {
+    let m;
+    const vRe = /<PageShell\b[^>]*?\bvariant=["']([a-zA-Z0-9_-]+)["']/gs;
+    while ((m = vRe.exec(src))) {
+      if (!SHIPPED_VARIANTS.has(m[1])) {
+        errors.push(
+          `RULE J · floorplan — ${f}:${lineOf(src, m.index)} <PageShell variant="${m[1]}">; the shipped catalogue is ` +
+            `${[...SHIPPED_VARIANTS].join(" | ")} and it is CLOSED (docs/UI-KIT.md §8.0). ` +
+            `There is no "custom". Adding a variant is a governance event, not a page's decision.`,
+        );
+      }
+    }
+  }
+
+  // ---- RULE K — no per-user UI preference (UI-KIT §14.1) -----------------------
+  // WARN + ratchet. PM ruling 2026-07-29: `hiddenCols` STAYS — this rule DETECTS,
+  // REPORTS and BASELINES, and never removes. POS is out of scope (§15).
+  if (f.startsWith("apps/web/src/pages/") && !f.startsWith("apps/web/src/pages/dealer/")) {
+    let m;
+    const uiStateRe = /\b(?:localStorage|sessionStorage)\s*\.\s*(?:get|set|remove)Item\b/g;
+    while ((m = uiStateRe.exec(src))) {
+      wide.K[f] = (wide.K[f] ?? 0) + 1;
+    }
+  }
+}
+
+// ---- RULE L — every kit artifact declares its edition (UI-KIT §0.3) -----------
+// HARD, over an explicit artifact list. R4's whole finding is that a citation
+// with no version cannot be wrong on its face, which is how it survives.
+const EDITION_RE = /KIT EDITION/;
+for (const f of ["apps/web/src/lib/design-standard.ts"]) {
+  if (!files.includes(f)) continue;
+  if (!EDITION_RE.test(readFileSync(join(ROOT, f), "utf8"))) {
+    errors.push(
+      `RULE L · undeclared edition — ${f} does not state which kit edition it follows. ` +
+        `Every kit artifact declares its edition (docs/UI-KIT.md §0.3).`,
+    );
+  }
+}
+
+// ---- the widened ratchet — C · D · F · K -------------------------------------
+// Pre-existing is frozen and WARNS. Exceeding what was frozen FAILS: a baseline
+// that nothing can ever breach is a number, not a ratchet.
+const WIDE_LABEL = {
+  C: "icon size (§5.1)",
+  D: "inline text size (§2.1)",
+  F: "row height (§7)",
+  K: "per-user UI preference (§14.1)",
+};
+let wideTotal = 0;
+for (const rule of ["C", "D", "F", "K"]) {
+  const base = UPDATE ? wide[rule] : (baseline.wide?.[rule] ?? {});
+  for (const [f, n] of Object.entries(wide[rule])) {
+    wideTotal += n;
+    const b = base[f] ?? 0;
+    if (n > b) {
+      errors.push(
+        `RULE ${rule} · ${WIDE_LABEL[rule]} — ${f}: ${n} violation(s), baseline ${b}. ` +
+          `Pre-existing debt is frozen; this one is NEW (docs/UI-KIT.md).`,
+      );
+    } else if (n > 0 && !KIT_FILES.has(f)) {
+      warnings.push(`RULE ${rule} · ${WIDE_LABEL[rule]} — ${f}: ${n} (frozen, D2–D4 burns it down)`);
+    }
+  }
+}
+
+if (UPDATE) {
+  writeFileSync(
+    BASELINE_PATH,
+    JSON.stringify(
+      {
+        hex: currentHex,
+        hoverGrey: currentHoverGrey,
+        listPages: files.filter((f) => f.startsWith("apps/web/src/pages/")),
+        wide,
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  const n = (r) => Object.values(wide[r]).reduce((a, b) => a + b, 0);
+  console.log(`✓ baseline refrozen — ${Object.keys(currentHex).length} files carry legacy hex.`);
+  console.log(`  widened rules frozen: C ${n("C")} · D ${n("D")} · F ${n("F")} · K ${n("K")}`);
+  console.log(`  total ${n("C") + n("D") + n("F") + n("K")} violations across ` +
+    `${new Set(["C", "D", "F", "K"].flatMap((r) => Object.keys(wide[r]))).size} files.`);
+  process.exit(0);
+}
+
+// ---- --report — regenerate §16 UI Health from the law itself -------------------
+// §16 says the block "is GENERATED, not hand-typed". This is that generator: it
+// parses the Enforcement column out of docs/UI-KIT.md rather than trusting a
+// number somebody maintained by hand.
+if (REPORT) {
+  const doc = readFileSync(KIT_DOC, "utf8");
+  const lines = doc.split("\n");
+  // §16 counts "design rules stated in §1–§8" — its own scope sentence. Rules in
+  // §0, §10, §13, §14 and §16 are governance and are deliberately NOT counted.
+  // A rule is a row in a table whose header is exactly Rule|Enforcement|Status|
+  // Evidence. Counting every 4-column table instead reads 67 rules, because
+  // §1.3's height budget, §5.3's 40-row icon name map and the §6 component
+  // tables are all four columns wide and none of them is a rule.
+  let chapter = null;
+  let inRuleTable = false;
+  const rows = [];
+  for (const line of lines) {
+    const h = line.match(/^#{1,2}\s+§(\d+)/);
+    if (h) {
+      chapter = Number(h[1]);
+      inRuleTable = false;
+    }
+    if (!line.startsWith("|")) {
+      inRuleTable = false;
+      continue;
+    }
+    // Split on UNescaped pipes only. §5.1 writes "14 | 16 | 18" inside a cell as
+    // `14 \| 16 \| 18`; a naive split shifts every later column and that row's
+    // Status reads "16 \" instead of "✅", silently under-counting the enforced.
+    const cells = line.split(/(?<!\\)\|/).map((c) => c.trim());
+    if (cells[1] === "Rule" && cells[2] === "Enforcement") {
+      inRuleTable = true;
+      continue;
+    }
+    if (!inRuleTable || chapter === null || chapter < 1 || chapter > 8) continue;
+    const [, rule, enforcement, status] = cells;
+    if (!rule || /^[-:]+$/.test(rule)) continue;
+    rows.push({ chapter, rule, enforcement, enforced: (status ?? "").startsWith("✅") });
+  }
+  const total = rows.length;
+  const enforced = rows.filter((r) => r.enforced).length;
+  const debt = rows.filter((r) => /Human Review/i.test(r.enforcement)).length;
+  const pct = ((enforced / total) * 100).toFixed(2);
+  // The hand count §16 carries today, so the generator can disagree out loud.
+  // D1 may not edit §16 to make them agree — that is the law, and D0.6 closed it.
+  const HAND = { total: 47, enforced: 23, debt: 4 };
+  console.log(`§16 UI Health — parsed from docs/UI-KIT.md §1–§8\n`);
+  const cmp = (label, got, hand) =>
+    console.log(`  ${label.padEnd(9)} ${String(got).padStart(3)}   §16 says ${String(hand).padStart(3)}` +
+      (got === hand ? "" : `   ← DIFFERS by ${got - hand > 0 ? "+" : ""}${got - hand}`));
+  cmp("Rules", total, HAND.total);
+  cmp("Enforced", enforced, HAND.enforced);
+  cmp("HR debt", debt, HAND.debt);
+  console.log(`  Coverage  ${pct}%   §16 says ${((HAND.enforced / HAND.total) * 100).toFixed(2)}%`);
+  const perCh = {};
+  for (const r of rows) (perCh[r.chapter] ??= []).push(r);
+  console.log("\n  per chapter (enforced / rules):");
+  for (const k of Object.keys(perCh).sort())
+    console.log(`    §${k}  ${perCh[k].filter((r) => r.enforced).length} / ${perCh[k].length}`);
+  if (total !== HAND.total || enforced !== HAND.enforced || debt !== HAND.debt) {
+    console.log(
+      `\n  ⚠ The generated figure and §16's hand count DISAGREE. Every rule table in\n` +
+        `    the law uses the exact "Rule | Enforcement | Status | Evidence" header and\n` +
+        `    all 18 of them are read, so this is a stale hand count rather than a parse\n` +
+        `    miss. D1 REPORTS it and does not edit §16 — that is the law, and D0.6 is\n` +
+        `    closed. Whoever reopens the law reconciles the block against this output.`,
+    );
+  }
+  process.exit(0);
 }
 
 if (errors.length) {
@@ -312,5 +500,14 @@ if (errors.length) {
   for (const e of errors) console.error("  • " + e);
   console.error("\nSee docs/UI-KIT.md. Legacy debt is baselined; this only flags NEW violations.\n");
   process.exit(1);
+}
+if (warnings.length) {
+  // Count FILES, not warning entries — a file breaking C and D produces two
+  // entries and is still one file. Printing entries as files would overstate the
+  // debt by a third, and this number is the one D2–D4 are measured against.
+  const debtFiles = new Set(["C", "D", "F", "K"].flatMap((r) => Object.keys(wide[r]).filter((f) => !KIT_FILES.has(f)))).size;
+  console.log(`\n⚠ design-standard: ${debtFiles} file(s) carry ${wideTotal} frozen violation(s) — warn only, D5 flips this to fail.`);
+  if (process.argv.includes("--verbose")) for (const w of warnings) console.log("  · " + w);
+  else console.log("  run with --verbose to list them\n");
 }
 console.log("✓ design-standard: no new violations.");

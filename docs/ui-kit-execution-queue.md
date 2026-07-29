@@ -46,12 +46,12 @@ deliverable is Foundation Components, not a better document.
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
 | **D0.5b** | Foundation components, Radix | ✅ **SHIPPED 2026-07-28, PR #502 `d77bd4f6`, deployed** — full card below. The gate opened: Jess froze Q1 · Q3 · Q4 |
-| **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ⏳ **before D0.5c** |
+| **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ✅ **SHIPPED 2026-07-28, `2d5aaddb`.** *(Row corrected by D1 — it read "⏳ before D0.5c" for a day after the fix landed.)* |
 | **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ✅ **COMPLETE 2026-07-29** — all three built and tested, Orders renders through the first two. **Scope is component EXTRACTION; the drawer migration was never in it** (PM, 2026-07-29) — card below |
 | **D0.5c.1** | **DECISION card** — §7② and §10 disagreed about whether the Persistent Facts cap is law. No code | ✅ **RULED 2026-07-29 — A: §10 (L4) is the authoritative law.** Card below |
 | **D0.5c.2** | **`OrderDetailDrawer` renders through `DetailShell`** — the four `identity` nodes have to exist first. Own card, not yet written | ⏳ **after D0.5c.1** |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **DONE 2026-07-29.** R1 → §8.0 · R2 → §14.1 · R3 → §10.1 · R4 → §0.3 · R5 → §10.2. §16 **47.83% → 48.94% ⬆**, debt 4 → 4. The kit is now the source; the review file is the record |
-| **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ▶ **CARD OPEN 2026-07-29 — full card below, not started.** Widens rules C · D · F off `KIT_FILES`; inherits the three enforcement mechanisms D0.6 named (§0.3 · §10.1 · §14.1) + the stale index rows |
+| **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ✅ **BUILT 2026-07-29.** C · D · F widened off `KIT_FILES`; kit scope DERIVED from `components/kit/**`; **860 violations across 151 files frozen**, guard exits 0. New RULE J (floorplan) · K (UI preference) · L (kit edition). `--report` generates §16 — **and disagrees with its hand count; reported, not fixed** |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
 | **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ |
@@ -990,13 +990,23 @@ test goes red.
 
 ## D1 · BUILD GUARD over all 225 files — warn only, write the baseline (EXECUTION CARD, opened 2026-07-29)
 
-> **STATUS: ✅ APPROVED by the PM, 2026-07-29, with two rulings folded in (findings ③ and ⑤).
-> Ready for a fresh BUILD chat. Nothing is implemented yet.** This card is the plan; a build chat
-> takes it and does ONE card.
+> **STATUS: ✅ BUILT 2026-07-29.** Both PM rulings honoured (③ `hiddenCols` stays · ⑤ the shipped
+> union `list` · `module`). **Only `scripts/` changed — `apps/web` is untouched entirely**, which
+> is stronger than the card's own Rule 5 asked for.
 >
-> **The two rulings, so they are not missed:** **`hiddenCols` stays** — detect, report, baseline,
-> never remove (③). **The variant guard enforces the SHIPPED union `list` · `module`** and may not
-> add, rename or remove a variant; the §8.1 mismatch is reported only (⑤).
+> ```
+> guard exits 0 on a clean tree, with 860 frozen violations across 151 files
+>   RULE C icon size    132        RULE J floorplan   0 pre-existing, HARD
+>   RULE D text size    671        RULE K UI pref     9 (the 3 ruled sites, frozen)
+>   RULE F row height    48        RULE L kit edition live
+> ```
+>
+> **Two things this card found and did NOT fix, both by its own Rule 4:**
+> **(a) `--report` disagrees with §16's hand count** — 43 rules / 24 enforced against 47 / 23.
+> All 18 rule tables use the exact header and all 18 are read, so it is a stale hand count, not a
+> parse miss. Reconciling it means editing the law, and D0.6 is closed.
+> **(b) POS was walked into and walked back out** — widening C · D · F reached `pages/dealer/**`,
+> which UI-KIT §15 puts out of Build Guard scope. The exemption is now explicit in the script.
 
 **Why now, and not earlier.** D0.6 was D1's precondition and the reason is arithmetic, not
 ceremony: **a guard written against a law about to gain five principles is a guard that gets
