@@ -310,7 +310,7 @@ export default function CalendarPanel() {
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={`shrink-0 flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold transition-colors ${
+              className={`shrink-0 flex items-center gap-1 rounded-full px-2 py-1 text-label font-semibold transition-colors ${
                 active
                   ? TAB_TONE[t]
                   : "bg-white text-base-500 hover:bg-base-100 border border-base-200"
@@ -318,7 +318,7 @@ export default function CalendarPanel() {
             >
               <span>{TAB_LABEL[t]}</span>
               {n > 0 && (
-                <span className="tabular-nums font-bold">{n > 99 ? "99+" : n}</span>
+                <span className="tabular-nums font-semibold">{n > 99 ? "99+" : n}</span>
               )}
             </button>
           );
@@ -348,14 +348,14 @@ export default function CalendarPanel() {
                   ? fmtDateShort(r.fromIso)
                   : `${fmtDateShort(r.fromIso)} – ${fmtDateShort(r.toIso)}`
               }
-              className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-label font-semibold transition-colors ${
                 active
                   ? "bg-base-900 text-white"
                   : "bg-white text-base-500 border border-base-200 hover:bg-hovertint"
               }`}
             >
               <span>{r.label}</span>
-              {n > 0 && <span className="tabular-nums font-bold">{n > 99 ? "99+" : n}</span>}
+              {n > 0 && <span className="tabular-nums font-semibold">{n > 99 ? "99+" : n}</span>}
             </button>
           );
         })}
@@ -371,7 +371,7 @@ export default function CalendarPanel() {
         >
           <ChevronLeft size={16} />
         </button>
-        <div className="t-h4 text-base-900">{monthLabel}</div>
+        <div className="text-strong text-base-900">{monthLabel}</div>
         <button
           type="button"
           onClick={() => setView((v) => (v.m === 11 ? { y: v.y + 1, m: 0 } : { y: v.y, m: v.m + 1 }))}
@@ -385,7 +385,7 @@ export default function CalendarPanel() {
       {/* Weekday header */}
       <div className="grid grid-cols-7 mb-1">
         {WEEKDAYS.map((w, i) => (
-          <div key={i} className="text-center text-[10px] font-semibold text-base-400 uppercase">
+          <div key={i} className="text-center text-label font-semibold text-base-400 uppercase">
             {w}
           </div>
         ))}
@@ -427,7 +427,7 @@ export default function CalendarPanel() {
               }`}
             >
               <span
-                className={`w-6 h-6 grid place-items-center rounded-full text-[12px] ${
+                className={`w-6 h-6 grid place-items-center rounded-full text-meta ${
                   isToday
                     ? "ring-1 ring-primary text-primary font-semibold"
                     : isSel
@@ -438,7 +438,7 @@ export default function CalendarPanel() {
                 {cell.day}
               </span>
               <span
-                className={`h-3.5 min-w-[16px] px-1 grid place-items-center rounded-full text-[10px] font-bold leading-none ${countTone}`}
+                className={`h-3.5 min-w-[16px] px-1 grid place-items-center rounded-full text-label font-semibold leading-none ${countTone}`}
               >
                 {count > 0 ? count : "0"}
               </span>
@@ -451,12 +451,12 @@ export default function CalendarPanel() {
           one picked day). Content adapts to the active tab. */}
       <div className="mt-3 pt-3 border-t border-base-200 flex-1 overflow-auto space-y-4">
         {shownDays.length === 0 && (
-          <div className="text-[12px] text-base-400 text-center py-4">
+          <div className="text-meta text-base-400 text-center py-4">
             Pick a day, or Today / Tomorrow / This week.
           </div>
         )}
         {shownDays.length > 1 && !hasAnything && (
-          <div className="text-[12px] text-base-400 text-center py-4">
+          <div className="text-meta text-base-400 text-center py-4">
             Nothing on the books for these days.
           </div>
         )}
@@ -473,7 +473,7 @@ export default function CalendarPanel() {
           const loads = carrierDayLoads(dayDeliveries, day, rulesByPartner);
           return (
             <div key={day} data-testid={`calendar-day-${day}`}>
-              <div className="t-micro text-base-500 mb-2">
+              <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-2">
                 {word ? `${word} · ${fmtDateShort(day)}` : fmtDateShort(day)}
               </div>
 
@@ -515,9 +515,9 @@ export default function CalendarPanel() {
               )}
               {showsDeliveries && (
                 <div className="space-y-1.5">
-                  <div className="t-micro text-info">Deliveries</div>
+                  <div className="text-label uppercase tracking-[0.05em] text-info">Deliveries</div>
                   {dayDeliveries.length === 0 ? (
-                    <div className="text-[12px] text-base-400 text-center py-3">
+                    <div className="text-meta text-base-400 text-center py-3">
                       No deliveries booked this day.
                     </div>
                   ) : (
@@ -528,7 +528,7 @@ export default function CalendarPanel() {
                   ))}
                   {dayPromised.length > 0 && (
                     <div className="pt-1.5 space-y-1.5">
-                      <div className="t-micro text-warning">Promised this day, no date yet</div>
+                      <div className="text-label uppercase tracking-[0.05em] text-warning">Promised this day, no date yet</div>
                       {dayPromised.map((o) => (
                         <div
                           key={o.id}
@@ -537,10 +537,10 @@ export default function CalendarPanel() {
                         >
                           <span className="w-1 rounded-full bg-warning shrink-0" />
                           <div className="min-w-0 flex-1">
-                            <div className="font-mono text-[12px] font-semibold text-base-900">
+                            <div className="font-mono text-meta font-semibold text-base-900">
                               SO-{o.so}
                             </div>
-                            <div className="text-[11px] text-base-500 truncate">
+                            <div className="text-label text-base-500 truncate">
                               Call {o.customer_name?.trim() || "the customer"} — book delivery date
                             </div>
                           </div>
@@ -576,17 +576,17 @@ function DeliveryRow({ d }: { d: DayDelivery }) {
       <span className={`w-1 rounded-full shrink-0 ${confirmed ? "bg-success" : "bg-warning"}`} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-mono text-[12px] font-semibold text-base-900">SO-{d.so}</span>
+          <span className="font-mono text-meta font-semibold text-base-900">SO-{d.so}</span>
           <span
-            className={`text-[11px] font-semibold shrink-0 ${confirmed ? "text-success" : "text-warning"}`}
+            className={`text-label font-semibold shrink-0 ${confirmed ? "text-success" : "text-warning"}`}
           >
             {confirmed ? (d.slot ? shortSlot(d.slot) : "Confirmed") : "Logistics' date"}
           </span>
         </div>
-        <div className={`text-[12px] text-base-700 truncate ${cjkClassName(d.customer)}`}>
+        <div className={`text-meta text-base-700 truncate ${cjkClassName(d.customer)}`}>
           {d.customer || "—"}
         </div>
-        <div className="text-[11px] text-base-500 truncate">
+        <div className="text-label text-base-500 truncate">
           {carrier}
           {loc.label ? ` · ${loc.label}` : ""}
         </div>
@@ -609,7 +609,7 @@ function CarrierLoadRow({ load }: { load: CarrierDayLoad }) {
   return (
     <div className="px-2 pt-1">
       <div
-        className={`flex items-center justify-between gap-2 text-[11px] ${
+        className={`flex items-center justify-between gap-2 text-label ${
           alert ? "text-warning font-semibold" : "text-base-500"
         }`}
       >
@@ -620,7 +620,7 @@ function CarrierLoadRow({ load }: { load: CarrierDayLoad }) {
             : `${load.confirmed + load.provisional}`}
         </span>
       </div>
-      {note && <div className="text-[11px] text-warning mt-0.5">{note}</div>}
+      {note && <div className="text-label text-warning mt-0.5">{note}</div>}
     </div>
   );
 }
@@ -640,18 +640,18 @@ function DaySection({
 }) {
   return (
     <div className="mb-3">
-      <div className={`t-micro mb-1.5 ${tone}`}>{title}</div>
+      <div className={`text-label uppercase tracking-[0.05em] mb-1.5 ${tone}`}>{title}</div>
       {items.length === 0 ? (
-        <div className="text-[12px] text-base-400 text-center py-3">{empty}</div>
+        <div className="text-meta text-base-400 text-center py-3">{empty}</div>
       ) : (
         <div className="space-y-1.5">
           {items.map((it) => (
             <div key={it.key} className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors">
               <div className="min-w-0 flex-1">
-                <div className="font-mono text-[12px] font-semibold text-base-900 truncate">
+                <div className="font-mono text-meta font-semibold text-base-900 truncate">
                   {it.main}
                 </div>
-                <div className="text-[11px] text-base-500 truncate">{it.sub}</div>
+                <div className="text-label text-base-500 truncate">{it.sub}</div>
               </div>
             </div>
           ))}

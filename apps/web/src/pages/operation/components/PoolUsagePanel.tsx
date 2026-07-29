@@ -37,27 +37,27 @@ export default function PoolUsagePanel({ period }: { period: string }) {
       <header className="mb-3">
         <div className="flex items-center gap-2">
           <PieChart size={16} strokeWidth={2} className="text-primary" />
-          <h2 className="t-h3 text-base-900">Where the ready stock went</h2>
+          <h2 className="text-strong text-base-900">Where the ready stock went</h2>
           {data && data.lowCount > 0 ? (
             <span className="pill pill-warning" data-testid="pool-low-count">
               {data.lowCount} at the reserve level
             </span>
           ) : null}
         </div>
-        <div className="text-[13px] text-base-600 mt-1">
+        <div className="text-body text-base-600 mt-1">
           Every unit taken off the shelf says why. Set how low each item may go
           — the screen reminds whoever takes the next one, and never stops them.
         </div>
       </header>
 
       {isLoading ? (
-        <p className="text-sm text-base-500">Loading…</p>
+        <p className="text-body text-base-500">Loading…</p>
       ) : isError || !data ? (
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-1">
             Couldn&rsquo;t load the usage split
           </div>
-          <div className="text-[12px] text-base-700">
+          <div className="text-meta text-base-700">
             {(error as Error | undefined)?.message ?? "Unknown error"}
           </div>
         </div>
@@ -88,8 +88,8 @@ function UsageSplit({
   return (
     <div className="rounded border border-base-200 bg-white" data-testid="usage-split">
       <header className="px-4 py-3 border-b border-base-100 flex items-baseline justify-between gap-3">
-        <div className="t-h4 text-base-900">This month</div>
-        <div className="text-[12px] text-base-600">
+        <div className="text-strong text-base-900">This month</div>
+        <div className="text-meta text-base-600">
           <span className="font-mono tabular-nums text-base-900">
             {data.totalUnits ?? 0}
           </span>{" "}
@@ -101,7 +101,7 @@ function UsageSplit({
 
       {byReason.length === 0 ? (
         <div
-          className="px-4 py-8 text-center text-[13px] text-base-500"
+          className="px-4 py-8 text-center text-body text-base-500"
           data-testid="usage-empty"
         >
           Nothing has been taken from ready stock this month.
@@ -111,13 +111,13 @@ function UsageSplit({
           <div className="px-4 py-3 flex flex-col gap-2.5">
             {byReason.map((s) => (
               <div key={s.reason} data-testid={`usage-reason-${s.reason}`}>
-                <div className="flex items-baseline justify-between gap-3 text-[13px]">
+                <div className="flex items-baseline justify-between gap-3 text-body">
                   <span className="text-base-900 truncate">{s.label}</span>
                   <span className="shrink-0 text-base-600">
                     <span className="font-mono tabular-nums text-base-900 font-semibold">
                       {s.share}%
                     </span>{" "}
-                    <span className="text-[12px]">
+                    <span className="text-meta">
                       · <span className="font-mono tabular-nums">{s.units}</span>{" "}
                       {s.units === 1 ? "unit" : "units"} ·{" "}
                       <span className="font-mono tabular-nums">{s.draws}</span>×
@@ -139,11 +139,11 @@ function UsageSplit({
 
           {bySku.length > 0 ? (
             <div className="px-4 pb-3">
-              <div className="t-micro text-base-400 mb-1.5">Most drawn on</div>
+              <div className="text-label uppercase tracking-[0.05em] text-base-400 mb-1.5">Most drawn on</div>
               {bySku.slice(0, 5).map((s) => (
                 <div
                   key={s.sku}
-                  className="flex items-baseline justify-between gap-3 text-[12px] py-0.5"
+                  className="flex items-baseline justify-between gap-3 text-meta py-0.5"
                   data-testid={`usage-sku-${s.sku}`}
                 >
                   <span className="text-base-700 truncate" title={s.sku}>
@@ -164,7 +164,7 @@ function UsageSplit({
             <button
               type="button"
               onClick={() => setShowLog((v) => !v)}
-              className="btn-ghost text-[12px] py-1"
+              className="btn-ghost text-meta py-1"
               data-testid="usage-log-toggle"
             >
               {showLog ? "Hide the list" : `Show all ${entries.length}`}
@@ -174,7 +174,7 @@ function UsageSplit({
                 {entries.map((e) => (
                   <div
                     key={e.id}
-                    className="text-[12px] text-base-600 py-1 border-t border-base-100 first:border-t-0"
+                    className="text-meta text-base-600 py-1 border-t border-base-100 first:border-t-0"
                   >
                     <span className="text-base-900">{e.sku}</span>{" "}
                     <span className="font-mono tabular-nums">&times;{e.qty}</span>{" "}
@@ -216,8 +216,8 @@ function ReserveLevels({
       <header className="px-4 py-3 border-b border-base-100 flex items-center gap-2">
         <ShieldAlert size={16} strokeWidth={2} className="text-base-400" />
         <div>
-          <div className="t-h4 text-base-900">How low it may go</div>
-          <div className="text-[12px] text-base-600 mt-0.5">
+          <div className="text-strong text-base-900">How low it may go</div>
+          <div className="text-meta text-base-600 mt-0.5">
             {canEdit
               ? "Your number. Taking stock past it warns, never blocks."
               : "Set by the COO. Taking stock past it warns, never blocks."}
@@ -226,7 +226,7 @@ function ReserveLevels({
       </header>
 
       {rows.length === 0 ? (
-        <div className="px-4 py-8 text-center text-[13px] text-base-500">
+        <div className="px-4 py-8 text-center text-body text-base-500">
           No stock on the floor to keep a level for.
         </div>
       ) : (
@@ -239,7 +239,7 @@ function ReserveLevels({
               <button
                 type="button"
                 onClick={() => setShowAll(true)}
-                className="btn-ghost text-[12px] py-1"
+                className="btn-ghost text-meta py-1"
                 data-testid="reserve-levels-more"
               >
                 Show the other {rows.length - shown.length}
@@ -273,10 +273,10 @@ function ReserveLevelRowView({
       data-testid={`reserve-level-${row.sku}`}
     >
       <div className="min-w-0">
-        <div className="text-[13px] text-base-900 truncate" title={row.sku}>
+        <div className="text-body text-base-900 truncate" title={row.sku}>
           {row.sku}
         </div>
-        <div className="text-[12px] text-base-500">
+        <div className="text-meta text-base-500">
           <span className="font-mono tabular-nums text-base-900">{row.free}</span>{" "}
           free
           {row.reserved > 0 ? (
@@ -304,7 +304,7 @@ function ReserveLevelRowView({
               value={value}
               inputMode="numeric"
               onChange={(e) => setValue(e.target.value.replace(/[^0-9]/g, ""))}
-              className="w-[70px] rounded border border-base-300 px-2 py-1 text-[13px] font-mono text-right focus:border-primary focus:outline-none"
+              className="w-[70px] rounded border border-base-300 px-2 py-1 text-body font-mono text-right focus:border-primary focus:outline-none"
               aria-label={`Reserve level for ${row.sku}`}
               data-testid={`reserve-level-input-${row.sku}`}
             />
@@ -317,7 +317,7 @@ function ReserveLevelRowView({
                 )
               }
               disabled={!valid || save.isPending}
-              className="btn-primary text-[12px] py-1 px-2 disabled:opacity-40"
+              className="btn-primary text-meta py-1 px-2 disabled:opacity-40"
               data-testid={`reserve-level-save-${row.sku}`}
             >
               <Check size={14} strokeWidth={2} />
@@ -328,7 +328,7 @@ function ReserveLevelRowView({
                 setValue(String(row.reserveLevel ?? ""));
                 setEditing(false);
               }}
-              className="btn-ghost text-[12px] py-1 px-1"
+              className="btn-ghost text-meta py-1 px-1"
             >
               <X size={14} strokeWidth={2} />
             </button>

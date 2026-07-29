@@ -109,11 +109,11 @@ export default function APDrawer({
       >
         <div className="px-6 py-5 border-b border-border flex items-start justify-between">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+            <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
               Payable
             </div>
-            <div className="font-display text-[22px] mt-1">{row.po_id}</div>
-            <div className="text-[12.5px] text-muted-foreground mt-0.5">
+            <div className="font-display text-title mt-1">{row.po_id}</div>
+            <div className="text-meta text-muted-foreground mt-0.5">
               {row.supplier_name ?? "Unknown supplier"}
             </div>
           </div>
@@ -121,7 +121,7 @@ export default function APDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="text-[18px] text-muted-foreground hover:text-foreground"
+            className="text-strong text-muted-foreground hover:text-foreground"
           >
             ×
           </button>
@@ -134,7 +134,7 @@ export default function APDrawer({
           </div>
 
           <div>
-            <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1.5">
+            <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1.5">
               Three-way match
             </div>
             <div className="bg-background/60 rounded-md border border-border px-3 py-2">
@@ -168,14 +168,14 @@ export default function APDrawer({
 
           {row.lines.length > 1 && (
             <div>
-              <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1.5">
+              <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1.5">
                 Lines
               </div>
               <div className="bg-background/60 rounded-md border border-border px-3 py-2">
                 {row.lines.map((ln) => (
                   <div
                     key={ln.sku}
-                    className="flex justify-between py-1.5 text-[12px] border-b border-dashed border-border last:border-0"
+                    className="flex justify-between py-1.5 text-meta border-b border-dashed border-border last:border-0"
                   >
                     <span>
                       {ln.sku_name}{" "}
@@ -191,19 +191,19 @@ export default function APDrawer({
           )}
 
           <div>
-            <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1.5">
+            <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1.5">
               PO history
             </div>
             <div className="bg-background/60 rounded-md border border-border px-3 py-2">
               {row.history.length === 0 ? (
-                <div className="py-1.5 text-[11.5px] text-muted-foreground">
+                <div className="py-1.5 text-label text-muted-foreground">
                   No history entries yet.
                 </div>
               ) : (
                 row.history.map((h, i) => (
                   <div
                     key={i}
-                    className="flex justify-between py-1 text-[12px] border-b border-dashed border-border last:border-0"
+                    className="flex justify-between py-1 text-meta border-b border-dashed border-border last:border-0"
                   >
                     <span>{h.text}</span>
                     <span className="text-muted-foreground font-mono">
@@ -221,14 +221,14 @@ export default function APDrawer({
                 type="button"
                 onClick={submitSchedule}
                 disabled={poSchedule.isPending}
-                className="flex-1 py-2 rounded-md border border-border text-[12.5px] disabled:opacity-60"
+                className="flex-1 py-2 rounded-md border border-border text-meta disabled:opacity-60"
               >
                 {poSchedule.isPending ? "Scheduling…" : "Schedule payment"}
               </button>
               <button
                 type="button"
                 onClick={() => setPayPanelOpen(true)}
-                className="flex-1 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-[12.5px]"
+                className="flex-1 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-meta"
               >
                 Mark as paid
               </button>
@@ -239,7 +239,7 @@ export default function APDrawer({
             <button
               type="button"
               onClick={() => setPayPanelOpen(true)}
-              className="w-full py-2.5 rounded-md bg-primary text-primary-foreground font-semibold text-[13px]"
+              className="w-full py-2.5 rounded-md bg-primary text-primary-foreground font-semibold text-body"
             >
               Release payment
             </button>
@@ -247,7 +247,7 @@ export default function APDrawer({
 
           {payPanelOpen && (
             <div className="bg-background/60 rounded-md border border-border p-3.5">
-              <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-2">
+              <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-2">
                 Release payment
               </div>
               <input
@@ -256,13 +256,13 @@ export default function APDrawer({
                 onChange={(e) => setPayAmt(e.target.value)}
                 placeholder="Amount (RM)"
                 inputMode="decimal"
-                className="w-full px-2.5 py-1.5 border border-border rounded text-[12.5px] mb-2 bg-card"
+                className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-2 bg-card"
               />
               <select
                 aria-label="Method"
                 value={payMethod}
                 onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
-                className="w-full px-2.5 py-1.5 border border-border rounded text-[12.5px] mb-2 bg-card"
+                className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-2 bg-card"
               >
                 {METHODS.map((m) => (
                   <option key={m.value} value={m.value}>{m.label}</option>
@@ -273,21 +273,21 @@ export default function APDrawer({
                 value={payRef}
                 onChange={(e) => setPayRef(e.target.value)}
                 placeholder="Bank ref / cheque no. (optional)"
-                className="w-full px-2.5 py-1.5 border border-border rounded text-[12.5px] mb-2.5 bg-card"
+                className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-2.5 bg-card"
               />
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={submitPay}
                   disabled={poPay.isPending}
-                  className="flex-1 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-[12.5px] disabled:opacity-60"
+                  className="flex-1 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-meta disabled:opacity-60"
                 >
                   {poPay.isPending ? "Releasing…" : "Confirm payment"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPayPanelOpen(false)}
-                  className="px-3 py-2 rounded-md border border-border text-[12.5px]"
+                  className="px-3 py-2 rounded-md border border-border text-meta"
                 >
                   Cancel
                 </button>
@@ -311,17 +311,17 @@ function MatchRow({
 }) {
   return (
     <div className={`flex items-center gap-3 py-2 ${last ? "" : "border-b border-dashed border-border"}`}>
-      <div className={`w-[22px] h-[22px] rounded grid place-items-center text-[12px] font-bold flex-shrink-0 ${
+      <div className={`w-[22px] h-[22px] rounded grid place-items-center text-meta font-semibold flex-shrink-0 ${
         ok ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
       }`}>
         {ok ? "✓" : "○"}
       </div>
       <div className="flex-1">
-        <div className="text-[12.5px] font-semibold">
+        <div className="text-meta font-semibold">
           {label}{" "}
-          <span className="font-mono text-[12px] font-medium text-muted-foreground ml-1">{id}</span>
+          <span className="font-mono text-meta font-medium text-muted-foreground ml-1">{id}</span>
         </div>
-        <div className="text-[11px] text-muted-foreground mt-0.5">{detail}</div>
+        <div className="text-label text-muted-foreground mt-0.5">{detail}</div>
       </div>
     </div>
   );
@@ -337,10 +337,10 @@ function Mini({
   const valTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
   return (
     <div className="bg-background/60 rounded-md border border-border px-3.5 py-2.5">
-      <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground">
+      <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground">
         {label}
       </div>
-      <div className={`font-display text-[20px] mt-0.5 leading-none tabular-nums ${valTone}`}>
+      <div className={`font-display text-title mt-0.5 leading-none tabular-nums ${valTone}`}>
         {value}
       </div>
     </div>

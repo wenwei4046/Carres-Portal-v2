@@ -91,9 +91,9 @@ export default function DOFileUploadField({ poId, doNumber, onUploaded }: Props)
         aria-label="DO file"
       />
       {previewName && (
-        <p className="text-sm text-base-600 mt-1">Uploaded: {previewName}</p>
+        <p className="text-body text-base-600 mt-1">Uploaded: {previewName}</p>
       )}
-      {error && <p className="text-red-600 text-sm mt-1">{error}</p>}
+      {error && <p className="text-red-600 text-body mt-1">{error}</p>}
     </div>
   );
 }

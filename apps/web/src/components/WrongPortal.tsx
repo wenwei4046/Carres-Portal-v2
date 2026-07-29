@@ -17,9 +17,9 @@ export default function WrongPortal({ role }: { role: Role }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6">
       <div className="w-full max-w-sm rounded-xl border border-border bg-card p-8 text-center shadow-sm" data-testid="wrong-portal">
-        <p className="t-micro text-muted-foreground">WRONG DOOR</p>
-        <h1 className="t-h3 mt-2 text-foreground">This account belongs to {label}</h1>
-        <p className="t-small mt-2 text-muted-foreground">
+        <p className="text-label uppercase tracking-[0.05em] text-muted-foreground">WRONG DOOR</p>
+        <h1 className="text-strong mt-2 text-foreground">This account belongs to {label}</h1>
+        <p className="text-body mt-2 text-muted-foreground">
           Please sign in on {label} instead.
         </p>
         <a

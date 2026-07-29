@@ -260,7 +260,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
               type="button"
               onClick={bulkDelete}
               disabled={del.isPending}
-              className="btn-danger text-[12px]"
+              className="btn-danger text-meta"
               data-testid="sku-bulk-delete"
             >
               {del.isPending ? "Working…" : `Delete ${selected.size}`}
@@ -268,7 +268,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           )}
           {!isPrincipal && (
             <span
-              className="t-tiny text-base-400 italic"
+              className="text-meta text-base-400 italic"
               data-testid="sku-price-lock-hint"
               title="Price + cost are set by the principal (Master Admin)"
             >
@@ -278,7 +278,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           <button
             type="button"
             onClick={() => setEditAll((v) => !v)}
-            className={`${editAll ? "btn-primary" : "btn-secondary"} text-[12px]`}
+            className={`${editAll ? "btn-primary" : "btn-secondary"} text-meta`}
             title="Edit every visible SKU inline — changes commit on blur"
             data-testid="sku-edit-all"
           >
@@ -287,7 +287,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           <button
             type="button"
             onClick={exportCsv}
-            className="btn-secondary text-[12px]"
+            className="btn-secondary text-meta"
             data-testid="sku-export"
           >
             Export SKUs
@@ -295,7 +295,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           <button
             type="button"
             onClick={() => setImportOpen(true)}
-            className="btn-secondary text-[12px]"
+            className="btn-secondary text-meta"
             data-testid="sku-import"
           >
             Import SKUs
@@ -303,7 +303,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           <button
             type="button"
             onClick={() => setNewOpen(true)}
-            className="btn-hero text-[12px]"
+            className="btn-hero text-meta"
             data-testid="sku-new"
           >
             + New SKU
@@ -319,7 +319,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           className="flex items-center gap-1.5 flex-wrap -mt-1 mb-4"
           data-testid="sku-model-filter"
         >
-          <span className="t-micro text-base-400 mr-1">Model</span>
+          <span className="text-label uppercase tracking-[0.05em] text-base-400 mr-1">Model</span>
           <CategoryChip active={modelFilter === "all"} onClick={() => setModelFilter("all")}>
             All {CATEGORY_LABEL_SHORT[category]}
           </CategoryChip>
@@ -335,7 +335,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
         </div>
       )}
 
-      <p className="t-tiny text-base-500 mb-2">
+      <p className="text-meta text-base-500 mb-2">
         {filtered.length} SKU{filtered.length === 1 ? "" : "s"}
         {overflow > 0 && (
           <span className="text-base-400">
@@ -392,7 +392,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
         </div>
 
         {visible.length === 0 && (
-          <div className="t-small text-base-500 px-3 py-6 text-center">
+          <div className="text-body text-base-500 px-3 py-6 text-center">
             No SKUs match. Adjust the filter or add one with + New SKU.
           </div>
         )}
@@ -542,7 +542,7 @@ const SkuRowView = memo(function SkuRowView({
       }}
       aria-label={`${sku.sku} code`}
       title="Edit the full SKU code — new orders/POs use the new code; history keeps the old string"
-      className={`${INPUT_CLS} t-num text-[12px] w-full min-w-0`}
+      className={`${INPUT_CLS} t-num text-meta w-full min-w-0`}
     />
   ) : (
     <div>
@@ -560,10 +560,10 @@ const SkuRowView = memo(function SkuRowView({
         if (e.key === "Enter") (e.target as HTMLInputElement).blur();
       }}
       aria-label={`${sku.sku} description`}
-      className={`${INPUT_CLS} t-small text-[12px]`}
+      className={`${INPUT_CLS} text-body text-meta`}
     />
   ) : (
-    <div className="t-small text-base-700 truncate" title={sku.description ?? ""}>
+    <div className="text-body text-base-700 truncate" title={sku.description ?? ""}>
       {sku.description || <span className="text-base-400">—</span>}
     </div>
   );
@@ -634,7 +634,7 @@ const SkuRowView = memo(function SkuRowView({
             style={{ gridColumn: `span ${sofaSizes.length}` }}
             data-testid={`sku-flat-price-${sku.sku}`}
           >
-            <span className="t-tiny text-base-400 mr-1.5">flat SKU · one price</span>
+            <span className="text-meta text-base-400 mr-1.5">flat SKU · one price</span>
             {priceEdit ? (
               <input
                 type="number"
@@ -646,12 +646,12 @@ const SkuRowView = memo(function SkuRowView({
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 }}
                 aria-label={`${sku.sku} price`}
-                className={`${INPUT_CLS} text-right t-num text-[12px] max-w-[140px] inline-block`}
+                className={`${INPUT_CLS} text-right t-num text-meta max-w-[140px] inline-block`}
               />
             ) : sku.price === 0 ? (
-              <span className="t-tiny text-base-400 italic">price not set</span>
+              <span className="text-meta text-base-400 italic">price not set</span>
             ) : (
-              <span className="t-num text-[12px] text-base-800">{fmtPrice(sku.price)}</span>
+              <span className="t-num text-meta text-base-800">{fmtPrice(sku.price)}</span>
             )}
           </div>
         )}
@@ -678,7 +678,7 @@ const SkuRowView = memo(function SkuRowView({
       />
       {codeCell}
       {descriptionCell}
-      <div className="t-small text-base-800 truncate" title={productName}>
+      <div className="text-body text-base-800 truncate" title={productName}>
         {productName}
       </div>
       {inlineEdit && model ? (
@@ -687,7 +687,7 @@ const SkuRowView = memo(function SkuRowView({
           onChange={(e) => commitCategory(e.target.value)}
           aria-label={`${sku.sku} category`}
           title="Category lives on the product — changing it moves ALL of this product's SKUs"
-          className={`${INPUT_CLS} t-tiny`}
+          className={`${INPUT_CLS} text-meta`}
           data-testid={`sku-category-select-${sku.sku}`}
         >
           {PRODUCT_CATEGORIES.map((c) => (
@@ -697,7 +697,7 @@ const SkuRowView = memo(function SkuRowView({
           ))}
         </select>
       ) : (
-        <div className="t-tiny text-base-600">
+        <div className="text-meta text-base-600">
           {category ? CATEGORY_LABEL[category] : "—"}
         </div>
       )}
@@ -716,10 +716,10 @@ const SkuRowView = memo(function SkuRowView({
                 ? "Optional — accessories/services carry no size"
                 : "The SIZE label — editing it never changes the code"
             }
-            className={`${INPUT_CLS} t-small text-[12px] w-full min-w-0`}
+            className={`${INPUT_CLS} text-body text-meta w-full min-w-0`}
           />
         ) : (
-          <div className="t-small text-base-700">{sizeless ? "—" : sku.variant || "—"}</div>
+          <div className="text-body text-base-700">{sizeless ? "—" : sku.variant || "—"}</div>
         ))}
 
       {/* Price */}
@@ -735,12 +735,12 @@ const SkuRowView = memo(function SkuRowView({
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
             aria-label={`${sku.sku} price`}
-            className={`${INPUT_CLS} text-right t-num text-[12px]`}
+            className={`${INPUT_CLS} text-right t-num text-meta`}
           />
         ) : sku.price === 0 ? (
-          <span className="t-tiny text-base-400 italic">price not set</span>
+          <span className="text-meta text-base-400 italic">price not set</span>
         ) : (
-          <span className="t-num text-[12px] text-base-800">{fmtPrice(sku.price)}</span>
+          <span className="t-num text-meta text-base-800">{fmtPrice(sku.price)}</span>
         )}
       </div>
 
@@ -758,28 +758,28 @@ const SkuRowView = memo(function SkuRowView({
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
             aria-label={`${sku.sku} PWP price`}
-            className={`${INPUT_CLS} text-right t-num text-[12px]`}
+            className={`${INPUT_CLS} text-right t-num text-meta`}
           />
         ) : sku.pwpPrice == null ? (
-          <span className="t-tiny text-base-400 italic" title="No PWP price — this SKU cannot be a PWP reward">
+          <span className="text-meta text-base-400 italic" title="No PWP price — this SKU cannot be a PWP reward">
             —
           </span>
         ) : (
-          <span className="t-num text-[12px] text-base-800">{fmtPrice(sku.pwpPrice)}</span>
+          <span className="t-num text-meta text-base-800">{fmtPrice(sku.pwpPrice)}</span>
         )}
       </div>
 
       {/* Margin */}
       <div className="text-right" data-testid={`sku-margin-${sku.sku}`}>
         {margin === null ? (
-          <span className="t-tiny text-base-400 italic" title={`${marginLabel} · cost not set`}>—</span>
+          <span className="text-meta text-base-400 italic" title={`${marginLabel} · cost not set`}>—</span>
         ) : (
           <span
-            className={`t-num text-[12px] ${margin.amount < 0 ? "text-[#C44D2B]" : "text-base-700"}`}
+            className={`t-num text-meta ${margin.amount < 0 ? "text-[#C44D2B]" : "text-base-700"}`}
             title={marginLabel}
           >
             {fmtPrice(margin.amount)}
-            <span className="text-base-400 text-[10px] ml-0.5">
+            <span className="text-base-400 text-label ml-0.5">
               {(margin.pct * 100).toFixed(1)}%
             </span>
           </span>
@@ -873,19 +873,19 @@ function CompartmentSizeCells({
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 }}
                 aria-label={`${sku.sku} price at ${s}`}
-                className={`${INPUT_CLS} text-right t-num text-[12px]`}
+                className={`${INPUT_CLS} text-right t-num text-meta`}
               />
             ) : typeof explicit === "number" ? (
-              <span className="t-num text-[12px] text-base-800">{fmtPrice(explicit)}</span>
+              <span className="t-num text-meta text-base-800">{fmtPrice(explicit)}</span>
             ) : sku.price > 0 ? (
               <span
-                className="t-tiny text-base-400"
+                className="text-meta text-base-400"
                 title={`Inherits the base price ${fmtPrice(sku.price)} — set a price for ${s} to override`}
               >
                 ({fmtPrice(sku.price)})
               </span>
             ) : (
-              <span className="t-tiny text-base-400 italic">—</span>
+              <span className="text-meta text-base-400 italic">—</span>
             )}
           </div>
         );

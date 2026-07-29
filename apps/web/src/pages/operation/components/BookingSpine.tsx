@@ -38,7 +38,7 @@ export default function BookingSpine({
           key={s.label}
           data-testid="spine-row"
           data-state={s.state}
-          className="flex items-center gap-1.5 py-[3px] text-[12px] leading-none"
+          className="flex items-center gap-1.5 py-[3px] text-meta leading-none"
         >
           {s.state === "done" ? (
             <Check

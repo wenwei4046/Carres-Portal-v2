@@ -325,23 +325,23 @@ export default function OpsStockListView(props: Props) {
     <div className={props.embedded ? "" : "p-8 max-w-7xl mx-auto"}>
       {!props.embedded && (
         <div className="mb-6">
-          <p className="text-xs uppercase tracking-wider text-base-500 mb-1">
+          <p className="text-meta uppercase tracking-wider text-base-500 mb-1">
             {props.kicker}
           </p>
-          <h1 className="t-h1 text-base-900">{props.title}</h1>
-          <p className="text-sm text-base-600 mt-2">{props.blurb}</p>
+          <h1 className="text-page text-base-900">{props.title}</h1>
+          <p className="text-body text-base-600 mt-2">{props.blurb}</p>
         </div>
       )}
 
       {props.actions.includes("add") ? (
         <section className="rounded border border-base-200 bg-white p-4 mb-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-base-900">
+            <h2 className="text-body font-semibold text-base-900">
               Add stock (receive new units)
             </h2>
             <button
               type="button"
-              className="text-xs font-medium text-primary hover:underline"
+              className="text-meta font-medium text-primary hover:underline"
               onClick={() => setShowAdd((s) => !s)}
             >
               {showAdd ? "Cancel" : "+ Add stock"}
@@ -349,20 +349,20 @@ export default function OpsStockListView(props: Props) {
           </div>
           {showAdd ? (
             <div className="mt-3 flex flex-wrap gap-2 items-end">
-              <label className="text-xs">
+              <label className="text-meta">
                 <span className="block text-base-500 mb-1">SKU (Item Code)</span>
                 <input
-                  className="rounded border border-base-300 px-2 py-1.5 text-sm w-56"
+                  className="rounded border border-base-300 px-2 py-1.5 text-body w-56"
                   value={add.sku}
                   onChange={(e) => setAdd((a) => ({ ...a, sku: e.target.value }))}
                   placeholder="1007-K BEDFRAME"
                   autoFocus
                 />
               </label>
-              <label className="text-xs">
+              <label className="text-meta">
                 <span className="block text-base-500 mb-1">Condition</span>
                 <select
-                  className="rounded border border-base-300 px-2 py-1.5 text-sm"
+                  className="rounded border border-base-300 px-2 py-1.5 text-body"
                   value={add.condition}
                   onChange={(e) => setAdd((a) => ({ ...a, condition: e.target.value }))}
                 >
@@ -371,10 +371,10 @@ export default function OpsStockListView(props: Props) {
                   ))}
                 </select>
               </label>
-              <label className="text-xs">
+              <label className="text-meta">
                 <span className="block text-base-500 mb-1">Status</span>
                 <select
-                  className="rounded border border-base-300 px-2 py-1.5 text-sm"
+                  className="rounded border border-base-300 px-2 py-1.5 text-body"
                   value={add.status}
                   onChange={(e) => setAdd((a) => ({ ...a, status: e.target.value }))}
                 >
@@ -383,56 +383,56 @@ export default function OpsStockListView(props: Props) {
                 </select>
               </label>
               {add.status === "reserved" ? (
-                <label className="text-xs">
+                <label className="text-meta">
                   <span className="block text-base-500 mb-1">Reserved ref</span>
                   <input
-                    className="rounded border border-base-300 px-2 py-1.5 text-sm w-32"
+                    className="rounded border border-base-300 px-2 py-1.5 text-body w-32"
                     value={add.reservedRef}
                     onChange={(e) => setAdd((a) => ({ ...a, reservedRef: e.target.value }))}
                     placeholder="SO-1001"
                   />
                 </label>
               ) : null}
-              <label className="text-xs">
+              <label className="text-meta">
                 <span className="block text-base-500 mb-1">Supplier</span>
                 <input
-                  className="rounded border border-base-300 px-2 py-1.5 text-sm w-28"
+                  className="rounded border border-base-300 px-2 py-1.5 text-body w-28"
                   value={add.supplier}
                   onChange={(e) => setAdd((a) => ({ ...a, supplier: e.target.value }))}
                   placeholder="NF"
                 />
               </label>
-              <label className="text-xs">
+              <label className="text-meta">
                 <span className="block text-base-500 mb-1">PO No.</span>
                 <input
-                  className="rounded border border-base-300 px-2 py-1.5 text-sm w-32"
+                  className="rounded border border-base-300 px-2 py-1.5 text-body w-32"
                   value={add.poNo}
                   onChange={(e) => setAdd((a) => ({ ...a, poNo: e.target.value }))}
                   placeholder="PO/2604-042"
                 />
               </label>
-              <label className="text-xs">
+              <label className="text-meta">
                 <span className="block text-base-500 mb-1">Source ref</span>
                 <input
-                  className="rounded border border-base-300 px-2 py-1.5 text-sm w-28"
+                  className="rounded border border-base-300 px-2 py-1.5 text-body w-28"
                   value={add.sourceRef}
                   onChange={(e) => setAdd((a) => ({ ...a, sourceRef: e.target.value }))}
                   placeholder="CR0973"
                 />
               </label>
-              <label className="text-xs">
+              <label className="text-meta">
                 <span className="block text-base-500 mb-1">Qty</span>
                 <input
                   type="number"
                   min={1}
-                  className="rounded border border-base-300 px-2 py-1.5 text-sm w-16"
+                  className="rounded border border-base-300 px-2 py-1.5 text-body w-16"
                   value={add.qty}
                   onChange={(e) => setAdd((a) => ({ ...a, qty: e.target.value }))}
                 />
               </label>
               <button
                 type="button"
-                className="rounded bg-base-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-base-800 disabled:opacity-50"
+                className="rounded bg-base-900 px-3 py-1.5 text-body font-medium text-white hover:bg-base-800 disabled:opacity-50"
                 disabled={!add.sku.trim() || createMut.isPending}
                 onClick={submitAdd}
               >
@@ -441,7 +441,7 @@ export default function OpsStockListView(props: Props) {
             </div>
           ) : null}
           {createMut.isError ? (
-            <p className="mt-2 text-xs text-error-700">
+            <p className="mt-2 text-meta text-error-700">
               {(createMut.error as { message?: string })?.message ?? "add failed"}
             </p>
           ) : null}
@@ -450,32 +450,32 @@ export default function OpsStockListView(props: Props) {
 
       {props.actions.includes("reserve") ? (
         <section className="rounded border border-base-200 bg-white p-4 mb-4">
-          <h2 className="text-sm font-semibold text-base-900 mb-2">
+          <h2 className="text-body font-semibold text-base-900 mb-2">
             Reserve oldest free unit
           </h2>
           <div className="flex flex-wrap gap-2 items-end">
-            <label className="text-xs">
+            <label className="text-meta">
               <span className="block text-base-500 mb-1">SKU (Item Code)</span>
               <input
-                className="rounded border border-base-300 px-2 py-1.5 text-sm w-56"
+                className="rounded border border-base-300 px-2 py-1.5 text-body w-56"
                 value={reserveSku}
                 onChange={(e) => setReserveSku(e.target.value)}
                 placeholder="MS01-B1201F-K"
               />
             </label>
-            <label className="text-xs">
+            <label className="text-meta">
               <span className="block text-base-500 mb-1">Customer Ref</span>
               <input
-                className="rounded border border-base-300 px-2 py-1.5 text-sm w-40"
+                className="rounded border border-base-300 px-2 py-1.5 text-body w-40"
                 value={reserveRef}
                 onChange={(e) => setReserveRef(e.target.value)}
                 placeholder="SO-1001"
               />
             </label>
-            <label className="text-xs">
+            <label className="text-meta">
               <span className="block text-base-500 mb-1">Reason</span>
               <select
-                className="rounded border border-base-300 px-2 py-1.5 text-sm w-44"
+                className="rounded border border-base-300 px-2 py-1.5 text-body w-44"
                 value={reserveReason}
                 onChange={(e) =>
                   setReserveReason(e.target.value as PoolUseReason | "")
@@ -490,10 +490,10 @@ export default function OpsStockListView(props: Props) {
                 ))}
               </select>
             </label>
-            <label className="text-xs">
+            <label className="text-meta">
               <span className="block text-base-500 mb-1">Detail</span>
               <input
-                className="rounded border border-base-300 px-2 py-1.5 text-sm w-48"
+                className="rounded border border-base-300 px-2 py-1.5 text-body w-48"
                 value={reserveNote}
                 onChange={(e) => setReserveNote(e.target.value)}
                 placeholder={
@@ -506,7 +506,7 @@ export default function OpsStockListView(props: Props) {
             </label>
             <button
               type="button"
-              className="rounded bg-base-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-base-800 disabled:opacity-50"
+              className="rounded bg-base-900 px-3 py-1.5 text-body font-medium text-white hover:bg-base-800 disabled:opacity-50"
               disabled={
                 !reserveSku.trim() ||
                 !reserveRef.trim() ||
@@ -536,7 +536,7 @@ export default function OpsStockListView(props: Props) {
             </button>
             {reserveProblem ? (
               <span
-                className="text-xs text-base-500 self-center"
+                className="text-meta text-base-500 self-center"
                 data-testid="onhand-reserve-problem"
               >
                 {reserveProblem}
@@ -544,7 +544,7 @@ export default function OpsStockListView(props: Props) {
             ) : null}
           </div>
           {reserveMut.isError ? (
-            <p className="mt-2 text-xs text-error-700">
+            <p className="mt-2 text-meta text-error-700">
               {(reserveMut.error as { message?: string })?.message ??
                 "reserve failed"}
             </p>
@@ -553,7 +553,7 @@ export default function OpsStockListView(props: Props) {
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-base-500">Loading…</p>
+        <p className="text-body text-base-500">Loading…</p>
       ) : rows.length === 0 ? (
         <div className="rounded border border-base-200 bg-white p-12 text-center">
           <p className="text-base-700 font-medium">Nothing here.</p>
@@ -562,10 +562,10 @@ export default function OpsStockListView(props: Props) {
         <>
           {grouped ? (
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] text-base-500">
+              <span className="text-label text-base-500">
                 {groups?.length ?? 0} models · {rows.length} units
               </span>
-              <div className="flex gap-3 text-[11px]">
+              <div className="flex gap-3 text-label">
                 <button
                   type="button"
                   className="text-primary hover:underline"
@@ -586,19 +586,19 @@ export default function OpsStockListView(props: Props) {
             </div>
           ) : null}
           <div className="rounded border border-base-200 bg-white overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-base-700 border-b-2 border-primary text-[11px] uppercase tracking-[0.02em] text-white">
+            <table className="w-full text-body">
+              <thead className="bg-base-700 border-b-2 border-primary text-label uppercase tracking-[0.02em] text-white">
                 <tr>
-                  <th className="text-left px-3 py-2 font-bold">Unit ID</th>
-                  <th className="text-left px-3 py-2 font-bold">SKU</th>
-                  <th className="text-left px-3 py-2 font-bold">Condition</th>
-                  <th className="text-left px-3 py-2 font-bold">Status</th>
-                  <th className="text-left px-3 py-2 font-bold">Reserved for</th>
-                  <th className="text-left px-3 py-2 font-bold">History</th>
-                  <th className="text-left px-3 py-2 font-bold">PO No.</th>
-                  <th className="text-left px-3 py-2 font-bold">Source Ref</th>
-                  <th className="text-left px-3 py-2 font-bold">Date in</th>
-                  <th className="text-right px-3 py-2 font-bold">Actions</th>
+                  <th className="text-left px-3 py-2 font-semibold">Unit ID</th>
+                  <th className="text-left px-3 py-2 font-semibold">SKU</th>
+                  <th className="text-left px-3 py-2 font-semibold">Condition</th>
+                  <th className="text-left px-3 py-2 font-semibold">Status</th>
+                  <th className="text-left px-3 py-2 font-semibold">Reserved for</th>
+                  <th className="text-left px-3 py-2 font-semibold">History</th>
+                  <th className="text-left px-3 py-2 font-semibold">PO No.</th>
+                  <th className="text-left px-3 py-2 font-semibold">Source Ref</th>
+                  <th className="text-left px-3 py-2 font-semibold">Date in</th>
+                  <th className="text-right px-3 py-2 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -629,10 +629,10 @@ export default function OpsStockListView(props: Props) {
                                 <span className="text-base-400 w-3 inline-block">
                                   {isOpen ? "▾" : "▸"}
                                 </span>
-                                <span className="font-mono text-[12px] font-semibold text-base-900">
+                                <span className="font-mono text-meta font-semibold text-base-900">
                                   {sku}
                                 </span>
-                                <span className="text-[11px] text-base-500">
+                                <span className="text-label text-base-500">
                                   {rs.length} units ·{" "}
                                   <span className="text-success-700">
                                     {ready} ready
@@ -663,7 +663,7 @@ export default function OpsStockListView(props: Props) {
             </table>
           </div>
           {totalPages > 1 ? (
-            <div className="flex items-center justify-between mt-3 text-[12px] text-base-600">
+            <div className="flex items-center justify-between mt-3 text-meta text-base-600">
               <span>
                 Page {safePage + 1} of {totalPages}
               </span>
@@ -672,7 +672,7 @@ export default function OpsStockListView(props: Props) {
                   type="button"
                   disabled={safePage <= 0}
                   onClick={() => setPage(safePage - 1)}
-                  className="rounded border border-base-300 bg-white px-2.5 py-1 text-xs hover:bg-base-100 disabled:opacity-40"
+                  className="rounded border border-base-300 bg-white px-2.5 py-1 text-meta hover:bg-base-100 disabled:opacity-40"
                 >
                   Prev
                 </button>
@@ -680,7 +680,7 @@ export default function OpsStockListView(props: Props) {
                   type="button"
                   disabled={safePage >= totalPages - 1}
                   onClick={() => setPage(safePage + 1)}
-                  className="rounded border border-base-300 bg-white px-2.5 py-1 text-xs hover:bg-base-100 disabled:opacity-40"
+                  className="rounded border border-base-300 bg-white px-2.5 py-1 text-meta hover:bg-base-100 disabled:opacity-40"
                 >
                   Next
                 </button>
@@ -740,14 +740,14 @@ function RowItem({
           showed row.sku, which (a) was wrong and (b) left the header row one
           column wider than the body — fixed by adding the dedicated SKU cell
           that follows. */}
-      <td className="px-3 py-2 font-mono text-[11px] text-base-900 whitespace-nowrap">
+      <td className="px-3 py-2 font-mono text-label text-base-900 whitespace-nowrap">
         {row.unitCode ?? <span className="text-base-400">—</span>}
       </td>
       <td className="px-3 py-2 font-mono text-base-700">
         {row.sku}
         {row.qty && row.qty > 1 ? (
           <span
-            className="ml-1.5 rounded bg-base-100 px-1.5 py-0.5 text-[10px] font-semibold text-base-600"
+            className="ml-1.5 rounded bg-base-100 px-1.5 py-0.5 text-label font-semibold text-base-600"
             title="Bulk line — this record represents this many units"
           >
             ×{row.qty}
@@ -759,7 +759,7 @@ function RowItem({
           value={row.condition}
           onChange={(e) => onConditionChange(e.target.value)}
           disabled={busy}
-          className="rounded border border-base-200 bg-white px-1.5 py-0.5 text-xs text-base-700 focus:border-primary focus:outline-none disabled:opacity-50"
+          className="rounded border border-base-200 bg-white px-1.5 py-0.5 text-meta text-base-700 focus:border-primary focus:outline-none disabled:opacity-50"
         >
           {Object.entries(CONDITION_LABEL).map(([v, l]) => (
             <option key={v} value={v}>{l}</option>
@@ -789,12 +789,12 @@ function RowItem({
         </span>
       </td>
       <td className="px-3 py-2 text-base-700">{row.reservedRef ?? "—"}</td>
-      <td className="px-3 py-2 text-xs text-base-500">
+      <td className="px-3 py-2 text-meta text-base-500">
         {row.refHistory.length > 0 ? row.refHistory.join(", ") : "—"}
       </td>
-      <td className="px-3 py-2 text-xs text-base-600 font-mono">{row.poNo ?? "—"}</td>
-      <td className="px-3 py-2 text-xs text-base-500 font-mono">{row.sourceRef ?? "—"}</td>
-      <td className="px-3 py-2 text-xs text-base-500">{fmtDate(row.dateIn)}</td>
+      <td className="px-3 py-2 text-meta text-base-600 font-mono">{row.poNo ?? "—"}</td>
+      <td className="px-3 py-2 text-meta text-base-500 font-mono">{row.sourceRef ?? "—"}</td>
+      <td className="px-3 py-2 text-meta text-base-500">{fmtDate(row.dateIn)}</td>
       <td className="px-3 py-2 text-right">
         <div className="flex flex-wrap gap-1 justify-end items-center">
           {actions.includes("release") && row.status === "reserved" ? (
@@ -804,7 +804,7 @@ function RowItem({
             showReassign ? (
               <>
                 <input
-                  className="rounded border border-base-300 px-2 py-1 text-xs w-28"
+                  className="rounded border border-base-300 px-2 py-1 text-meta w-28"
                   value={newRef}
                   onChange={(e) => setNewRef(e.target.value)}
                   placeholder="new ref"
@@ -846,7 +846,7 @@ function RowItem({
                   onChange={(e) =>
                     setTakeoutReason(e.target.value as PoolUseReason | "")
                   }
-                  className="rounded border border-base-300 px-1.5 py-1 text-xs"
+                  className="rounded border border-base-300 px-1.5 py-1 text-meta"
                   aria-label={`Why ${row.sku} is being taken`}
                   data-testid={`takeout-reason-${row.id}`}
                 >
@@ -858,7 +858,7 @@ function RowItem({
                   ))}
                 </select>
                 <input
-                  className="rounded border border-base-300 px-2 py-1 text-xs w-28"
+                  className="rounded border border-base-300 px-2 py-1 text-meta w-28"
                   value={takeoutNote}
                   onChange={(e) => setTakeoutNote(e.target.value)}
                   placeholder={takeoutReason === "other" ? "say what" : "detail"}
@@ -933,7 +933,7 @@ function ActionBtn({
   return (
     <button
       type="button"
-      className="rounded border border-base-300 bg-white px-2 py-1 text-xs text-base-700 hover:bg-base-100 disabled:opacity-40 disabled:cursor-not-allowed"
+      className="rounded border border-base-300 bg-white px-2 py-1 text-meta text-base-700 hover:bg-base-100 disabled:opacity-40 disabled:cursor-not-allowed"
       onClick={onClick}
       disabled={disabled}
     >

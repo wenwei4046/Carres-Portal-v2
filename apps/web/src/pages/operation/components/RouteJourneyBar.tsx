@@ -107,7 +107,7 @@ export function RouteJourneyBar({
   open?: boolean;
 }) {
   if (legs.length === 0) {
-    return <span className="text-base-300 text-[12px]">—</span>;
+    return <span className="text-base-300 text-meta">—</span>;
   }
   const stuck = legs.some((l) => l.status === "stuck");
   return (
@@ -178,7 +178,7 @@ export function RouteQuietButton({
         onClick?.();
       }}
       title="Goes here by default — click to arrange a special transfer"
-      className={`w-full flex items-center gap-1.5 rounded px-1.5 py-1 text-[12px] hover:bg-base-50 ${
+      className={`w-full flex items-center gap-1.5 rounded px-1.5 py-1 text-meta hover:bg-base-50 ${
         open ? "bg-base-50 text-primary" : "text-base-600 hover:text-primary"
       }`}
     >
@@ -237,7 +237,7 @@ export function MiniStopsBar({
             <span className="w-4 h-0.5 bg-base-200 rounded-full" aria-hidden="true" />
           )}
           <span
-            className={`w-4 h-4 rounded-full grid place-items-center text-[11px] font-bold leading-none ${
+            className={`w-4 h-4 rounded-full grid place-items-center text-label font-semibold leading-none ${
               i === 0
                 ? "bg-base-700 text-white"
                 : "bg-white border border-base-300 text-base-400"
@@ -247,7 +247,7 @@ export function MiniStopsBar({
           </span>
         </span>
       ))}
-      <span className="text-[11px] text-base-500 truncate min-w-0">{names}</span>
+      <span className="text-label text-base-500 truncate min-w-0">{names}</span>
     </span>
   );
 }
@@ -285,7 +285,7 @@ export function StopsEditor({
       {shown.map((s, i) => (
         <span key={i} className="inline-flex items-center gap-1.5">
           {i > 0 && (
-            <span className="text-base-400 text-[13px]" aria-hidden="true">
+            <span className="text-base-400 text-body" aria-hidden="true">
               →
             </span>
           )}
@@ -296,7 +296,7 @@ export function StopsEditor({
               onClick={halt}
               onChange={(e) => update(i, e.target.value)}
               title={i === 0 ? "Where the item sits" : "Next transfer stop"}
-              className="bg-transparent text-[12px] text-base-800 focus:outline-none cursor-pointer"
+              className="bg-transparent text-meta text-base-800 focus:outline-none cursor-pointer"
             >
               {LEG_PLACES.map((p) => (
                 <option key={p} value={p}>
@@ -342,7 +342,7 @@ export function StopsEditor({
             onDone();
           }}
           title="Done — close the route editor (the route is kept)"
-          className="inline-flex items-center gap-1 text-[12px] font-semibold text-base-600 hover:text-base-900 bg-white border border-base-200 rounded-full px-2.5 py-0.5 shrink-0 ml-1"
+          className="inline-flex items-center gap-1 text-meta font-semibold text-base-600 hover:text-base-900 bg-white border border-base-200 rounded-full px-2.5 py-0.5 shrink-0 ml-1"
         >
           ✓ Done
         </button>
@@ -361,7 +361,7 @@ export function RouteLegList({ legs }: { legs: RouteLeg[] }) {
   return (
     <div className="space-y-1">
       {legs.map((leg, i) => (
-        <div key={i} className="flex items-center gap-2 text-[12px]">
+        <div key={i} className="flex items-center gap-2 text-meta">
           <span style={{ color: iconColor(leg.status) }} className="shrink-0">
             {leg.status === "done" ? (
               "●"
@@ -377,7 +377,7 @@ export function RouteLegList({ legs }: { legs: RouteLeg[] }) {
           <PlaceIcon loc={leg.to} className="w-3.5 h-3.5 text-base-500 shrink-0" />
           <span className="text-base-600 truncate">{leg.to}</span>
           {leg.carrier && (
-            <span className="ml-auto text-[12px] font-medium px-2 py-0.5 rounded-full bg-white border border-base-200 whitespace-nowrap">
+            <span className="ml-auto text-meta font-medium px-2 py-0.5 rounded-full bg-white border border-base-200 whitespace-nowrap">
               {leg.carrier}
             </span>
           )}

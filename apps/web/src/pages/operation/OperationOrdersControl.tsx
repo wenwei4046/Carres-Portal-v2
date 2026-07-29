@@ -2492,17 +2492,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
   if (isError) {
     return (
       <div className="px-9 py-8 pb-14">
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-2">
             Couldn&rsquo;t load orders
           </div>
-          <div className="text-[12px] text-base-700 mb-3">
+          <div className="text-meta text-base-700 mb-3">
             {(error as Error | undefined)?.message ?? "Unknown error"}
           </div>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="btn-secondary text-[11px] py-1.5 px-3"
+            className="btn-secondary text-label py-1.5 px-3"
           >
             Retry
           </button>
@@ -2630,7 +2630,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const dutyQueueChip = chipSlot(
     poDutyHolderShown ? (
       <span
-        className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
+        className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-label font-semibold leading-none shrink-0"
         style={{
           background: avatarColor(poDutyHolderShown.userId).bg,
           color: avatarColor(poDutyHolderShown.userId).fg,
@@ -2643,7 +2643,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   const picQueueChip = chipSlot(
     <span
-      className="shrink-0 text-[11px] leading-4 border border-base-200 rounded-full px-1.5 text-base-500 bg-white"
+      className="shrink-0 text-label leading-4 border border-base-200 rounded-full px-1.5 text-base-500 bg-white"
       title="Each PIC follows up their own orders"
     >
       PIC
@@ -2652,11 +2652,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const poDutyTitleChips = poDutyHolderShown ? (
     <div className="flex items-center gap-1.5" data-testid="po-duty-strip">
       <span
-        className="inline-flex items-center gap-1.5 h-[26px] rounded-full border border-base-200 bg-white px-2 text-[11px] text-base-500 whitespace-nowrap"
+        className="inline-flex items-center gap-1.5 h-[26px] rounded-full border border-base-200 bg-white px-2 text-label text-base-500 whitespace-nowrap"
         title={`PO duty this month: ${poDutyHolderShown.name ?? poDutyHolderShown.email}${poDutyHolder ? "" : " (demo)"} — controls ${orderActionQueue("send_po")} + ${orderActionQueue("confirm_ready_date")} (the one voice to suppliers). Full roster: right rail → Team.`}
       >
         <span
-          className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold leading-none shrink-0"
+          className="w-4 h-4 rounded-full flex items-center justify-center text-label font-semibold leading-none shrink-0"
           style={{
             background: avatarColor(poDutyHolderShown.userId).bg,
             color: avatarColor(poDutyHolderShown.userId).fg,
@@ -2668,7 +2668,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       </span>
       {poHot && (
         <span
-          className={`inline-flex items-center gap-1 h-[26px] rounded-full px-2 text-[11px] font-semibold whitespace-nowrap ${
+          className={`inline-flex items-center gap-1 h-[26px] rounded-full px-2 text-label font-semibold whitespace-nowrap ${
             urgentPoCount > 0 && !(poDayPreview || isPoDayToday)
               ? "bg-destructive/10 text-destructive"
               : "bg-warning-soft text-warning"
@@ -2692,7 +2692,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               liveScope.filter((o) => stockBucketOf(o, availableBySku) !== "Ready"),
             )
           }
-          className="btn-secondary text-[11px] h-[26px] py-0 px-2 whitespace-nowrap inline-flex items-center"
+          className="btn-secondary text-label h-[26px] py-0 px-2 whitespace-nowrap inline-flex items-center"
         >
           Raise PO
         </button>
@@ -2719,7 +2719,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           <span className="inline-flex items-baseline gap-3">
             <span>Orders</span>
             {latestIn && (
-              <span className="inline-flex items-center gap-1.5 text-[12px] font-normal text-base-400">
+              <span className="inline-flex items-center gap-1.5 text-meta font-normal text-base-400">
                 <span className="tabular-nums" title="Most recent order / import">
                   Synced {fmtDate(latestIn)}
                 </span>
@@ -2746,7 +2746,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="SO number or customer…"
-              className="w-[230px] px-4 py-1.5 border border-base-200 rounded-full text-[13px] bg-white outline-none focus:border-base-700"
+              className="w-[230px] px-4 py-1.5 border border-base-200 rounded-full text-body bg-white outline-none focus:border-base-700"
             />
             <TopBarIcons />
           </>
@@ -2774,7 +2774,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <button
               type="button"
               onClick={() => setEtaImportOpen(true)}
-              className="btn-secondary text-[12px] whitespace-nowrap rounded-xl"
+              className="btn-secondary text-meta whitespace-nowrap rounded-xl"
               title="Import from Master — fill each order line's Stock ETA + status from your Master sheet"
             >
               + Master
@@ -2783,7 +2783,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <button
                 type="button"
                 onClick={onImport}
-                className="btn-hero text-[12px] whitespace-nowrap rounded-xl"
+                className="btn-hero text-meta whitespace-nowrap rounded-xl"
                 title="Import orders from AutoCount"
               >
                 + AutoCount
@@ -2791,7 +2791,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             )}
             {hiddenCols.size > 0 && (
               <span
-                className="t-tiny text-base-500 tabular-nums"
+                className="text-meta text-base-500 tabular-nums"
                 title="Some columns are hidden"
               >
                 {visibleColDefs.length}/{ORDER_COL_DEFS.length}
@@ -2811,7 +2811,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               </button>
               {columnsOpen && (
                 <div className="absolute z-30 mt-1 right-0 w-56 max-h-80 overflow-auto bg-card text-card-foreground border border-base-200 rounded-md shadow-lg py-1">
-                  <div className="t-micro text-base-500 px-3 pt-1 pb-1.5">Show columns</div>
+                  <div className="text-label uppercase tracking-[0.05em] text-base-500 px-3 pt-1 pb-1.5">Show columns</div>
                   <div className="px-1.5 pb-1">
                     {ORDER_COL_DEFS.map((d) => (
                       <label
@@ -2823,7 +2823,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                           checked={showCol(d.key)}
                           onChange={() => toggleCol(d.key)}
                         />
-                        <span className="t-small text-base-700 truncate">{d.label}</span>
+                        <span className="text-body text-base-700 truncate">{d.label}</span>
                       </label>
                     ))}
                   </div>
@@ -3162,7 +3162,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                         chip={chipSlot(
                           <span className="relative w-[18px] h-[18px] shrink-0">
                             <span
-                              className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none"
+                              className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-label font-semibold leading-none"
                               style={{
                                 background: avatarColor(s.user_id).bg,
                                 color: avatarColor(s.user_id).fg,
@@ -3207,7 +3207,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                         active={staffFilter === s.user_id}
                         chip={chipSlot(
                           <span
-                            className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0 opacity-60"
+                            className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-label font-semibold leading-none shrink-0 opacity-60"
                             style={{
                               background: avatarColor(s.user_id).bg,
                               color: avatarColor(s.user_id).fg,
@@ -3264,7 +3264,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                           type="button"
                           aria-pressed={dueFilter.has(b)}
                           onClick={() => setDueFilter((p) => toggleInSet(p, b))}
-                          className={`pill ${cls} hover:brightness-95 ${dueFilter.has(b) ? "font-bold ring-1 ring-current" : ""}`}
+                          className={`pill ${cls} hover:brightness-95 ${dueFilter.has(b) ? "font-semibold ring-1 ring-current" : ""}`}
                         >
                           {b} {count}
                         </button>
@@ -3398,7 +3398,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
              kills the silent row-growers (text WRAPPING inside narrow fixed
              columns); the two-line cells (Order / Customer / Stock / Delivery)
              stack at 15px line-height, each line just ellipsises. */
-          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[40px] [&_td]:py-1 [&_td]:align-middle [&_td]:overflow-hidden [&_td]:whitespace-nowrap"
+          className="w-full border-collapse text-body table-fixed [&_td]:h-[40px] [&_td]:py-1 [&_td]:align-middle [&_td]:overflow-hidden [&_td]:whitespace-nowrap"
         >
           {/* PERCENTAGE colgroup (Loo 2026-07-09) — table-fixed + w-full + % widths
               so the table is ALWAYS exactly the container width → it NEVER
@@ -3476,7 +3476,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <tr>
                 <td
                   colSpan={visibleColSpan}
-                  className="p-12 text-center text-[12px] text-base-500"
+                  className="p-12 text-center text-meta text-base-500"
                 >
                   No orders in this tab.
                 </td>
@@ -3522,7 +3522,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             {/* Infinite-scroll sentinel — appends the next 30 as it nears view. */}
             {shown.length < total && (
               <tr ref={sentinelRef} aria-hidden>
-                <td colSpan={visibleColSpan} className="text-center text-[11px] text-base-400">
+                <td colSpan={visibleColSpan} className="text-center text-label text-base-400">
                   Loading more… ({shown.length} of {total})
                 </td>
               </tr>
@@ -3653,7 +3653,7 @@ function OrdersBulkBar({
   busy: boolean;
 }) {
   const chip =
-    "inline-flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-md hover:bg-white/70 disabled:opacity-50";
+    "inline-flex items-center gap-1.5 text-body px-2.5 py-1 rounded-md hover:bg-white/70 disabled:opacity-50";
   const toggle = (m: "supplier" | "logistic" | "assign" | "more") =>
     setMenu(menu === m ? null : m);
   const pop =
@@ -3671,7 +3671,7 @@ function OrdersBulkBar({
         title="Deselect all"
         className="cursor-pointer accent-primary align-middle"
       />
-      <span className="text-[13px] font-semibold tabular-nums whitespace-nowrap">
+      <span className="text-body font-semibold tabular-nums whitespace-nowrap">
         {count} selected
       </span>
       {/* Gmail cross-page select-all — only while the tab holds more. */}
@@ -3679,7 +3679,7 @@ function OrdersBulkBar({
         <button
           type="button"
           onClick={onSelectAllInTab}
-          className="text-[12px] text-primary hover:underline whitespace-nowrap"
+          className="text-meta text-primary hover:underline whitespace-nowrap"
         >
           Select all {total} in {tabLabel}
         </button>
@@ -3769,11 +3769,11 @@ function OrdersBulkBar({
         )}
         {menu === "assign" && (
           <div className={pop} role="menu">
-            <div className="px-2 py-1.5 text-[10px] uppercase tracking-[0.08em] text-base-400">
+            <div className="px-2 py-1.5 text-label uppercase tracking-[0.08em] text-base-400">
               Assign to…
             </div>
             {partners.length === 0 && (
-              <div className="px-2 py-1.5 text-[12px] text-base-400">
+              <div className="px-2 py-1.5 text-meta text-base-400">
                 No logistics companies on file. Ask a manager to add one.
               </div>
             )}
@@ -3782,7 +3782,7 @@ function OrdersBulkBar({
                 key={p.id}
                 type="button"
                 onClick={() => onAssign(p.id)}
-                className="w-full text-left px-2 py-1.5 text-[12px] rounded hover:bg-hovertint"
+                className="w-full text-left px-2 py-1.5 text-meta rounded hover:bg-hovertint"
               >
                 {p.name}
               </button>
@@ -3828,7 +3828,7 @@ function OrdersBulkBar({
         onClick={onClear}
         aria-label="Clear selection"
         title="Clear selection"
-        className="ml-auto inline-flex items-center gap-1 text-[13px] text-base-500 hover:text-base-900"
+        className="ml-auto inline-flex items-center gap-1 text-body text-base-500 hover:text-base-900"
       >
         <X size={15} />
       </button>
@@ -3865,14 +3865,14 @@ function BulkMenuItem({
       disabled={disabled}
       title={title}
       role="menuitem"
-      className="w-full flex items-center gap-2 px-2 py-2 text-[12px] rounded hover:bg-hovertint disabled:opacity-45 disabled:hover:bg-transparent"
+      className="w-full flex items-center gap-2 px-2 py-2 text-meta rounded hover:bg-hovertint disabled:opacity-45 disabled:hover:bg-transparent"
     >
       <Icon
         size={14}
         className={tone === "wa" ? "text-[#25D366]" : "text-base-500"}
       />
       <span>{label}</span>
-      {hint && <span className="text-[11px] text-base-400">{hint}</span>}
+      {hint && <span className="text-label text-base-400">{hint}</span>}
       {right && <span className="ml-auto flex items-center">{right}</span>}
     </button>
   );
@@ -3927,13 +3927,13 @@ function KanbanRow({
           at number there") — identity first, the count column stays clean. */}
       {chip}
       <span
-        className="flex-1 min-w-0 truncate text-[13px]"
+        className="flex-1 min-w-0 truncate text-body"
         style={{ color: active ? "#0B0B0B" : "#3C4043", fontWeight: active ? 700 : 400 }}
       >
         {label}
       </span>
       <span
-        className="text-[13px] tabular-nums shrink-0"
+        className="text-body tabular-nums shrink-0"
         style={{ color: valueColor, fontWeight: active || tone ? 700 : 400 }}
       >
         {valueText ?? count}
@@ -4020,23 +4020,23 @@ function StaffChip({
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] whitespace-nowrap transition-colors ${
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-meta whitespace-nowrap transition-colors ${
         active
-          ? "border-transparent font-bold text-[#0B0B0B]"
+          ? "border-transparent font-semibold text-[#0B0B0B]"
           : "border-base-200 bg-white text-base-700 hover:bg-hovertint hover:border-base-300"
       }`}
       style={active ? { backgroundColor: "#C2E7FF" } : undefined}
     >
       {avatar && (
         <span
-          className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold leading-none shrink-0"
+          className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-label font-semibold leading-none shrink-0"
           style={{ background: avatar.bg, color: avatar.fg }}
         >
           {avatar.text}
         </span>
       )}
       {label}
-      <span className="tabular-nums text-[11px] text-base-500">{count}</span>
+      <span className="tabular-nums text-label text-base-500">{count}</span>
     </button>
   );
 }
@@ -4115,7 +4115,7 @@ function TeamPopover({
           className="fixed z-40 w-72 bg-card text-card-foreground border border-base-200 rounded-md shadow-lg py-1"
           style={{ top: pos.top, left: pos.left }}
         >
-          <div className="t-micro text-base-500 px-3 pt-1 pb-1.5">
+          <div className="text-label uppercase tracking-[0.05em] text-base-500 px-3 pt-1 pb-1.5">
             Auto-assign pool
           </div>
           {staff.map((s) => (
@@ -4124,13 +4124,13 @@ function TeamPopover({
               className="flex items-center gap-2 px-3 py-1.5 hover:bg-hovertint"
             >
               <div className="flex-1 min-w-0">
-                <div className="text-[13px] text-base-900 truncate">
+                <div className="text-body text-base-900 truncate">
                   {staffLabel(s)}
                   {s.pooled && !s.available && (
-                    <span className="text-[11px] text-base-500"> · away</span>
+                    <span className="text-label text-base-500"> · away</span>
                   )}
                 </div>
-                <div className="text-[11px] text-base-500 truncate">
+                <div className="text-label text-base-500 truncate">
                   {s.email}
                   {s.pooled &&
                     (seenTodayMYT(s.last_seen_at) ? " · in today" : " · not in yet")}
@@ -4141,7 +4141,7 @@ function TeamPopover({
                    is only an optional head-start (deals her a share today). */
                 <button
                   type="button"
-                  className="btn-ghost text-[11px] py-0.5 px-2 text-base-500"
+                  className="btn-ghost text-label py-0.5 px-2 text-base-500"
                   disabled={mut.isPending}
                   title="She joins automatically the first time she logs in — click only to deal her a share before that"
                   onClick={() => mut.mutate({ userId: s.user_id, pooled: true })}
@@ -4151,7 +4151,7 @@ function TeamPopover({
               ) : (
                 <>
                   <label
-                    className="flex items-center gap-1 text-[11px] text-base-600 cursor-pointer"
+                    className="flex items-center gap-1 text-label text-base-600 cursor-pointer"
                     title="Planned leave — orders shift to the others while checked (day-to-day MC is automatic, no click needed)"
                   >
                     <input
@@ -4171,7 +4171,7 @@ function TeamPopover({
                   {(openCounts.get(s.user_id) ?? 0) > 0 && (
                     <button
                       type="button"
-                      className="btn-ghost text-[11px] py-0.5 px-1.5"
+                      className="btn-ghost text-label py-0.5 px-1.5"
                       title="Shift all their open orders to the other available staff"
                       onClick={() => onRedistribute(s.user_id)}
                     >
@@ -4182,7 +4182,7 @@ function TeamPopover({
               )}
             </div>
           ))}
-          <div className="t-micro text-base-400 px-3 pt-1.5 pb-1">
+          <div className="text-label uppercase tracking-[0.05em] text-base-400 px-3 pt-1.5 pb-1">
             New staff join automatically on their first login. No-show after
             10:00 → their orders shift for the day. Leaving staff → disable
             the account (Principal · Accounts).
@@ -4235,7 +4235,7 @@ function StatusTabs({
             type="button"
             onClick={() => onSelect(t.key)}
             title={t.title}
-            className={`inline-flex items-center gap-1.5 px-2 pt-1.5 pb-1 border-b-2 transition-colors text-[13px] whitespace-nowrap ${
+            className={`inline-flex items-center gap-1.5 px-2 pt-1.5 pb-1 border-b-2 transition-colors text-body whitespace-nowrap ${
               on
                 ? "border-[#1A1A1A] text-[#1A1A1A] font-semibold"
                 : "border-transparent text-base-500 font-medium hover:text-base-800"
@@ -4249,7 +4249,7 @@ function StatusTabs({
             />
             {t.label}
             <span
-              className={`tabular-nums text-[11px] px-1.5 rounded-full ${
+              className={`tabular-nums text-label px-1.5 rounded-full ${
                 on ? "bg-base-200 text-base-700" : "bg-base-100 text-base-500"
               }`}
             >
@@ -4302,7 +4302,7 @@ function OwnerChip({
   if (!canEdit) {
     return member ? (
       <span
-        className="shrink-0 w-[20px] h-[20px] rounded-full flex items-center justify-center text-[11px] font-semibold leading-none"
+        className="shrink-0 w-[20px] h-[20px] rounded-full flex items-center justify-center text-label font-semibold leading-none"
         style={{ background: av!.bg, color: av!.fg }}
         title={`PIC: ${member.name ?? member.email}`}
         aria-label={`Assigned to ${staffLabel(member)}`}
@@ -4311,7 +4311,7 @@ function OwnerChip({
       </span>
     ) : (
       <span
-        className="shrink-0 w-[20px] h-[20px] rounded-full border border-dashed border-base-300 flex items-center justify-center text-[11px] text-base-300 leading-none"
+        className="shrink-0 w-[20px] h-[20px] rounded-full border border-dashed border-base-300 flex items-center justify-center text-label text-base-300 leading-none"
         title="No PIC yet"
       >
         —
@@ -4336,7 +4336,7 @@ function OwnerChip({
           });
           setOpen((v) => !v);
         }}
-        className={`w-[20px] h-[20px] rounded-full flex items-center justify-center text-[11px] font-semibold leading-none ${
+        className={`w-[20px] h-[20px] rounded-full flex items-center justify-center text-label font-semibold leading-none ${
           member
             ? "hover:ring-2 hover:ring-base-300"
             : "border border-dashed border-base-300 text-base-300 hover:border-base-500 hover:text-base-500"
@@ -4354,7 +4354,7 @@ function OwnerChip({
             <button
               key={s.user_id}
               type="button"
-              className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-hovertint ${
+              className={`w-full text-left px-3 py-1.5 text-body hover:bg-hovertint ${
                 s.user_id === owner ? "font-semibold text-base-900" : "text-base-700"
               }`}
               onClick={() => {
@@ -4369,7 +4369,7 @@ function OwnerChip({
           {owner && (
             <button
               type="button"
-              className="w-full text-left px-3 py-1.5 text-[13px] text-base-500 hover:bg-hovertint border-t border-base-100"
+              className="w-full text-left px-3 py-1.5 text-body text-base-500 hover:bg-hovertint border-t border-base-100"
               onClick={() => {
                 setOpen(false);
                 onAssignStaff(o.id, null);
@@ -4476,7 +4476,7 @@ function OrderRow({
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="min-w-0 truncate">
             {completed ? (
-              <span className="text-[12px] text-base-400">Delivered</span>
+              <span className="text-meta text-base-400">Delivered</span>
             ) : (
               (() => {
                 const label = TAB_LABEL[controlTabOf(o, availableBySku)];
@@ -4504,7 +4504,7 @@ function OrderRow({
                 approval; open the order → the approval card tops the drawer. */}
             {hasPendingChange && (
               <span
-                className="ml-1 inline-block align-middle rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-warning-soft text-base-800 border border-warning"
+                className="ml-1 inline-block align-middle rounded-full px-1.5 py-0.5 text-label font-semibold bg-warning-soft text-base-800 border border-warning"
                 title="Product change awaiting approval — open the order to decide"
                 data-testid="oc-change-badge"
               >
@@ -4568,7 +4568,7 @@ function OrderRow({
             <span className="text-base-300">—</span>
           )
         ) : o.delivery_date_tbd ? (
-          <span className="text-[11px] font-medium" style={{ color: "#A8A8A8" }}>TBD</span>
+          <span className="text-label font-medium" style={{ color: "#A8A8A8" }}>TBD</span>
         ) : o.delivery_date ? (
           (() => {
             const datePart = fmtDate(o.delivery_date);
@@ -4792,7 +4792,7 @@ function OrderRow({
                     e.stopPropagation();
                     onOpen();
                   }}
-                  className="shrink-0 tabular-nums text-[12px] font-semibold text-base-500 hover:text-base-900"
+                  className="shrink-0 tabular-nums text-meta font-semibold text-base-500 hover:text-base-900"
                   title={`Also open: ${more
                     .map((a) => orderActionLine(a.key, parties))
                     .join(" · ")} — click to see them all`}

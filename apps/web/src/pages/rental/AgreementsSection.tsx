@@ -51,19 +51,19 @@ export default function AgreementsSection({
 
   return (
     <section className="card p-5">
-      <div className="t-h4 font-display flex items-center gap-2 mb-1">
+      <div className="text-strong font-display flex items-center gap-2 mb-1">
         <FileSignature size={16} strokeWidth={1.75} className="text-primary" />
         Agreements
         <span className="pill pill-neutral">{templates.length}</span>
       </div>
-      <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
+      <p className="text-meta text-base-500 mb-4 pb-3 border-b border-base-100">
         The wording a rental signs, printed as written. The POS fills the blanks and the customer
         signs at the sales order — no signature, no order, so there is no draft agreement.
         {!isPrincipal && " Principal only — read-only for your role."}
       </p>
 
       {templates.length === 0 && (
-        <div className="t-small text-base-500 py-3" data-testid="agreements-empty">
+        <div className="text-body text-base-500 py-3" data-testid="agreements-empty">
           No wording saved yet.
           {isPrincipal && " Load the supplied Rental Agreement below, read it, and save it as version 1."}
         </div>
@@ -72,8 +72,8 @@ export default function AgreementsSection({
       {byDoc.map(([docKey, versions]) => (
         <div key={docKey} className="mb-4 last:mb-0" data-testid={`agreement-doc-${docKey}`}>
           <div className="flex items-center gap-2 flex-wrap mb-2">
-            <span className="t-small font-semibold">{versions[0]!.name}</span>
-            <span className="t-tiny text-base-500">
+            <span className="text-body font-semibold">{versions[0]!.name}</span>
+            <span className="text-meta text-base-500">
               binds to {versions[0]!.bindsTo.length > 0 ? versions[0]!.bindsTo.join(" · ") : "nothing yet"}
             </span>
           </div>
@@ -117,7 +117,7 @@ export default function AgreementsSection({
                   blocks: RENT_TO_OWN_V5.blocks,
                 })
               }
-              className="btn-primary text-[12px]"
+              className="btn-primary text-meta"
               data-testid="agreement-load-supplied"
             >
               Load the supplied Rental Agreement (v5)
@@ -126,7 +126,7 @@ export default function AgreementsSection({
           <button
             type="button"
             onClick={() => setEditing({ docKey: "", name: "", blocks: [] })}
-            className="btn-ghost text-[12px]"
+            className="btn-ghost text-meta"
             data-testid="agreement-new-doc"
           >
             + Another document
@@ -184,10 +184,10 @@ function VersionRow({
       style={{ gridTemplateColumns: GRID }}
       data-testid={`agreement-version-${template.id}`}
     >
-      <div className="t-num text-[13px]">v{template.version}</div>
-      <div className="t-tiny text-base-500">{template.effectiveFrom}</div>
-      <div className="text-right t-num text-[12px]">{template.body.length}</div>
-      <div className="text-right t-num text-[12px]">{template.fields.length}</div>
+      <div className="t-num text-body">v{template.version}</div>
+      <div className="text-meta text-base-500">{template.effectiveFrom}</div>
+      <div className="text-right t-num text-meta">{template.body.length}</div>
+      <div className="text-right t-num text-meta">{template.fields.length}</div>
       <div>
         {isPrincipal && isLatest ? (
           <input
@@ -216,7 +216,7 @@ function VersionRow({
         <button
           type="button"
           onClick={onPreview}
-          className="btn-ghost text-[11px]"
+          className="btn-ghost text-label"
           data-testid={`agreement-preview-${template.id}`}
         >
           Preview
@@ -225,7 +225,7 @@ function VersionRow({
           <button
             type="button"
             onClick={onNewVersion}
-            className="btn-secondary text-[11px]"
+            className="btn-secondary text-label"
             data-testid={`agreement-new-version-${template.id}`}
           >
             New version
@@ -317,7 +317,7 @@ function WordingForm({
               onClick={() =>
                 setBinds((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]))
               }
-              className={`${binds.includes(c) ? "btn-primary" : "btn-ghost"} text-[11px] capitalize`}
+              className={`${binds.includes(c) ? "btn-primary" : "btn-ghost"} text-label capitalize`}
               data-testid={`agreement-binds-${c}`}
             >
               {c}
@@ -334,13 +334,13 @@ function WordingForm({
           placeholder="Paste the agreement from Word. Blank lines separate paragraphs; a short line becomes a heading."
           data-testid="agreement-text"
         />
-        <p className="t-tiny text-base-400 mt-1.5">
+        <p className="text-meta text-base-400 mt-1.5">
           The words are yours — nothing is added. Write <span className="t-num">{"{{customer.name}}"}</span>{" "}
           style placeholders wherever the system should fill a blank.
         </p>
       </div>
       <div
-        className="t-tiny text-base-600 bg-base-50 border border-base-200 rounded-[4px] px-3 py-2"
+        className="text-meta text-base-600 bg-base-50 border border-base-200 rounded-[4px] px-3 py-2"
         data-testid="agreement-parse-preview"
       >
         {blocks.length} block{blocks.length === 1 ? "" : "s"} ·{" "}
@@ -370,35 +370,35 @@ export function AgreementBody({ blocks }: { blocks: AgreementBlock[] }) {
       {blocks.map((b, i) => {
         if (b.kind === "title") {
           return (
-            <h3 key={i} className="t-h4 font-display uppercase tracking-[0.08em] mb-1">
+            <h3 key={i} className="text-strong font-display uppercase tracking-[0.08em] mb-1">
               {b.text}
             </h3>
           );
         }
         if (b.kind === "subtitle") {
           return (
-            <div key={i} className="t-small font-semibold text-base-600 uppercase mb-4">
+            <div key={i} className="text-body font-semibold text-base-600 uppercase mb-4">
               {b.text}
             </div>
           );
         }
         if (b.kind === "h2") {
           return (
-            <div key={i} className="t-small font-semibold mt-4 mb-1.5">
+            <div key={i} className="text-body font-semibold mt-4 mb-1.5">
               {b.text}
             </div>
           );
         }
         if (b.kind === "li") {
           return (
-            <div key={i} className="t-tiny text-base-700 leading-relaxed pl-4 mb-1 relative">
+            <div key={i} className="text-meta text-base-700 leading-relaxed pl-4 mb-1 relative">
               <span className="absolute left-0 top-0">·</span>
               {b.text}
             </div>
           );
         }
         return (
-          <p key={i} className="t-tiny text-base-700 leading-relaxed mb-2">
+          <p key={i} className="text-meta text-base-700 leading-relaxed mb-2">
             {b.text}
           </p>
         );

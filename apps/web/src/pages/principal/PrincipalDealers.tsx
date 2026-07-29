@@ -95,7 +95,7 @@ export default function PrincipalDealers({ channel }: { channel: StoreChannel })
 
   if (isLoading || !data) {
     return (
-      <div className="px-9 py-8 text-sm text-muted-foreground">Loading…</div>
+      <div className="px-9 py-8 text-body text-muted-foreground">Loading…</div>
     );
   }
 
@@ -110,14 +110,14 @@ export default function PrincipalDealers({ channel }: { channel: StoreChannel })
       <div className="flex justify-between items-start mb-5">
         <div>
           <div className="kicker">{t.kicker}</div>
-          <h1 className="font-display text-[30px] leading-[1.05] mt-1.5 tracking-tight font-semibold">
+          <h1 className="font-display text-page leading-[1.05] mt-1.5 tracking-tight font-semibold">
             {t.title}
           </h1>
-          <div className="text-[13px] text-base-600 mt-1.5">
+          <div className="text-body text-base-600 mt-1.5">
             {counts.active} active · {counts.pending} pending ·{" "}
             {counts.suspended} suspended
           </div>
-          <div className="text-[12px] text-base-500 mt-1">{t.blurb}</div>
+          <div className="text-meta text-base-500 mt-1">{t.blurb}</div>
         </div>
         {/* A dealer is invited (pending → approval); a showroom is ours, so it
             is born straight out of Accounts with its login + first staff PIN. */}
@@ -140,7 +140,7 @@ export default function PrincipalDealers({ channel }: { channel: StoreChannel })
           placeholder={t.searchPlaceholder}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 px-3 py-2 border border-base-200 rounded text-[13px] outline-none"
+          className="flex-1 px-3 py-2 border border-base-200 rounded text-body outline-none"
         />
         <div className="flex gap-1 p-1 bg-base-100 rounded">
           {(
@@ -148,8 +148,8 @@ export default function PrincipalDealers({ channel }: { channel: StoreChannel })
           ).map((f) => {
             const isActive = statusFilter === f;
             const cls = isActive
-              ? "px-2.5 py-1 text-[11.5px] rounded-sm capitalize bg-white font-semibold text-base-900 cursor-pointer border-0"
-              : "px-2.5 py-1 text-[11.5px] rounded-sm capitalize text-base-600 font-medium cursor-pointer bg-transparent border-0";
+              ? "px-2.5 py-1 text-label rounded-sm capitalize bg-white font-semibold text-base-900 cursor-pointer border-0"
+              : "px-2.5 py-1 text-label rounded-sm capitalize text-base-600 font-medium cursor-pointer bg-transparent border-0";
             return (
               <button
                 key={f}
@@ -166,14 +166,14 @@ export default function PrincipalDealers({ channel }: { channel: StoreChannel })
 
       {filtered.length === 0 ? (
         <div className="bg-white border border-base-200 rounded-md p-12 text-center text-base-500">
-          <div className="text-[32px] mb-2 text-base-300">—</div>
-          <div className="font-display text-[18px]">{t.empty}</div>
-          <div className="text-[12px] mt-1">{t.emptyHint}</div>
+          <div className="text-page mb-2 text-base-300">—</div>
+          <div className="font-display text-strong">{t.empty}</div>
+          <div className="text-meta mt-1">{t.emptyHint}</div>
         </div>
       ) : (
         <div className="bg-white border border-base-200 rounded-md overflow-auto">
           <table
-            className="w-full border-collapse text-[13px]"
+            className="w-full border-collapse text-body"
             style={{ minWidth: 800 }}
           >
             <thead>
@@ -223,7 +223,7 @@ function Th({
 }) {
   return (
     <th
-      className={`px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-base-500 ${
+      className={`px-4 py-2.5 text-label font-semibold uppercase tracking-wider text-base-500 ${
         right ? "text-right" : "text-left"
       }`}
     >

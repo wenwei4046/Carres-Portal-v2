@@ -54,12 +54,12 @@ export default function SupplierSidebar() {
         title="Profile · Sign out"
         className="px-[18px] pt-3 pb-1 border-t border-border flex items-center gap-2.5 hover:bg-accent/40 transition-colors"
       >
-        <div className="w-[30px] h-[30px] rounded bg-primary text-primary-foreground grid place-items-center text-[11px] font-semibold flex-shrink-0">
+        <div className="w-[30px] h-[30px] rounded bg-primary text-primary-foreground grid place-items-center text-label font-semibold flex-shrink-0">
           {initials || "SP"}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-xs font-semibold truncate">{email || "Supplier"}</div>
-          <div className="text-[9.5px] uppercase tracking-[0.1em] text-muted-foreground mt-px">
+          <div className="text-meta font-semibold truncate">{email || "Supplier"}</div>
+          <div className="text-label uppercase tracking-[0.1em] text-muted-foreground mt-px">
             Supplier · Production
           </div>
         </div>
@@ -79,7 +79,7 @@ function NavItem({
     <NavLink
       to={item.to}
       className={({ isActive }) =>
-        `relative flex items-center gap-2.5 px-3 py-2 rounded-md text-[12.5px] font-semibold ${
+        `relative flex items-center gap-2.5 px-3 py-2 rounded-md text-meta font-semibold ${
           isActive
             ? "text-foreground bg-secondary"
             : "text-muted-foreground hover:bg-accent/50"
@@ -91,12 +91,12 @@ function NavItem({
           {isActive && (
             <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-primary rounded-r" />
           )}
-          <span className={`w-3.5 text-center text-[13px] ${isActive ? "text-primary" : ""}`}>
+          <span className={`w-3.5 text-center text-body ${isActive ? "text-primary" : ""}`}>
             {item.icon}
           </span>
           <span className="flex-1">{item.label}</span>
           {badge > 0 && (
-            <span className="font-mono text-[10px] font-bold px-1.5 py-px rounded-full bg-primary text-primary-foreground">
+            <span className="font-mono text-label font-semibold px-1.5 py-px rounded-full bg-primary text-primary-foreground">
               {badge}
             </span>
           )}

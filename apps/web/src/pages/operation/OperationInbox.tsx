@@ -97,13 +97,13 @@ export default function OperationInbox() {
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <div className="mb-6">
-        <p className="text-xs uppercase tracking-wider text-base-500 mb-1">
+        <p className="text-meta uppercase tracking-wider text-base-500 mb-1">
           Operation · Triage
         </p>
-        <h1 className="t-h1 text-base-900">
+        <h1 className="text-page text-base-900">
           Inbox · awaiting logistic
         </h1>
-        <p className="text-sm text-base-600 mt-2">
+        <p className="text-body text-base-600 mt-2">
           AutoCount-imported orders that still need a logistic partner. Pick
           NETS / TSDD / AL / HOUZS per order — the order leaves Inbox the
           moment you assign.
@@ -111,18 +111,18 @@ export default function OperationInbox() {
       </div>
 
       {inboxQ.isLoading ? (
-        <p className="text-sm text-base-500">Loading…</p>
+        <p className="text-body text-base-500">Loading…</p>
       ) : rows.length === 0 ? (
         <div className="rounded border border-base-200 bg-white p-12 text-center">
           <p className="text-base-700 font-medium">Inbox clear.</p>
-          <p className="text-sm text-base-500 mt-1">
+          <p className="text-body text-base-500 mt-1">
             No AutoCount orders waiting for triage right now.
           </p>
         </div>
       ) : (
         <div className="rounded border border-base-200 bg-white overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-base-50 text-xs uppercase tracking-wider text-base-500">
+          <table className="w-full text-body">
+            <thead className="bg-base-50 text-meta uppercase tracking-wider text-base-500">
               <tr>
                 <th className="text-left px-4 py-3 font-medium">SO #</th>
                 <th className="text-left px-4 py-3 font-medium">Customer</th>
@@ -140,17 +140,17 @@ export default function OperationInbox() {
                     <div className="font-medium text-base-900">
                       {r.customer_name ?? "—"}
                     </div>
-                    <div className="text-xs text-base-500">
+                    <div className="text-meta text-base-500">
                       {r.customer_phone ?? ""}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-xs text-base-600 font-mono whitespace-nowrap">
+                  <td className="px-4 py-3 text-meta text-base-600 font-mono whitespace-nowrap">
                     {(r.source_ref ?? []).join(" + ") || "—"}
                   </td>
                   <td className="px-4 py-3 max-w-xs">
                     <ul className="space-y-0.5">
                       {(r.order_lines ?? []).map((l, i) => (
-                        <li key={i} className="text-xs text-base-700">
+                        <li key={i} className="text-meta text-base-700">
                           <span className="font-mono">{l.sku}</span>
                           {l.attrs && Object.keys(l.attrs).length > 0 && (
                             <span className="text-base-500 ml-1">
@@ -167,7 +167,7 @@ export default function OperationInbox() {
                   </td>
                   <td className="px-4 py-3">
                     <select
-                      className="w-full rounded border border-base-300 bg-white px-2 py-1.5 text-sm focus:border-primary focus:outline-none disabled:bg-base-100"
+                      className="w-full rounded border border-base-300 bg-white px-2 py-1.5 text-body focus:border-primary focus:outline-none disabled:bg-base-100"
                       value={r.ops_assigned_logistic ?? ""}
                       disabled={assignMut.isPending}
                       onChange={(e) => {
@@ -194,7 +194,7 @@ export default function OperationInbox() {
       )}
 
       {assignMut.isError ? (
-        <p className="mt-4 text-sm text-error-700">
+        <p className="mt-4 text-body text-error-700">
           Assign failed:{" "}
           {(assignMut.error as { message?: string })?.message ?? "unknown error"}
         </p>

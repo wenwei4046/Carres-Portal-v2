@@ -149,9 +149,9 @@ export default function SofaCombosPanel({
     <div className="mb-8" data-testid={`sofa-combos-model-${modelId}`}>
       {/* Model heading + pricing-combo count + New button. */}
       <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-        <div className="t-h4 font-display">
+        <div className="text-strong font-display">
           {modelName}{" "}
-          <span className="t-small text-base-400 font-sans font-normal">
+          <span className="text-body text-base-400 font-sans font-normal">
             ({mine.length} combo{mine.length === 1 ? "" : "s"})
           </span>
         </div>
@@ -159,7 +159,7 @@ export default function SofaCombosPanel({
           <button
             type="button"
             onClick={() => setEditing("new")}
-            className="btn-ghost text-[11px] inline-flex items-center gap-1"
+            className="btn-ghost text-label inline-flex items-center gap-1"
             data-testid="sofa-combo-add"
           >
             <Plus size={13} strokeWidth={2.4} /> New combo
@@ -171,7 +171,7 @@ export default function SofaCombosPanel({
           seat-height price grid (RM or —) + any PWP reward prices + the effective
           date, with Edit / History / delete affordances. */}
       {mine.length === 0 ? (
-        <div className="t-small text-base-500 border border-base-200 rounded-[6px] px-3 py-6 text-center">
+        <div className="text-body text-base-500 border border-base-200 rounded-[6px] px-3 py-6 text-center">
           No combos yet for {modelName}.
         </div>
       ) : (
@@ -256,11 +256,11 @@ function SofaComboCard({
       {/* Header: model badge + slots + delete */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-baseline gap-2 min-w-0">
-          <span className="shrink-0 t-tiny font-semibold px-2 py-0.5 rounded-[4px] border border-base-300 bg-base-50 text-base-700">
+          <span className="shrink-0 text-meta font-semibold px-2 py-0.5 rounded-[4px] border border-base-300 bg-base-50 text-base-700">
             {modelName}
           </span>
           <span
-            className="t-small font-semibold text-base-900 font-mono truncate"
+            className="text-body font-semibold text-base-900 font-mono truncate"
             title={slotsSummary(combo.slots)}
           >
             {combo.label ?? slotsSummary(combo.slots)}
@@ -296,16 +296,16 @@ function SofaComboCard({
               }`}
               data-testid={`sofa-combo-cell-${combo.id}-${h}`}
             >
-              <span className="t-micro text-base-400">{heightLabel(h)}</span>
+              <span className="text-label uppercase tracking-[0.05em] text-base-400">{heightLabel(h)}</span>
               {has ? (
                 <span
-                  className="t-tiny t-num font-semibold text-base-900 leading-tight"
+                  className="text-meta t-num font-semibold text-base-900 leading-tight"
                   data-testid={`sofa-combo-price-${combo.id}-${h}`}
                 >
                   {fmtRM(price as number)}
                 </span>
               ) : (
-                <span className="t-tiny text-base-300">—</span>
+                <span className="text-meta text-base-300">—</span>
               )}
             </div>
           );
@@ -315,7 +315,7 @@ function SofaComboCard({
       {/* PWP reward prices (0186) — flame; only the heights that carry one. */}
       {anyPwp && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="t-micro text-primary font-semibold">PWP</span>
+          <span className="text-label uppercase tracking-[0.05em] text-primary font-semibold">PWP</span>
           {heights
             .filter((h) => typeof pwp?.[h] === "number")
             .map((h) => (
@@ -324,8 +324,8 @@ function SofaComboCard({
                 className="inline-flex items-baseline gap-1 rounded-[4px] border border-primary/30 bg-primary/10 px-2 py-0.5"
                 data-testid={`sofa-combo-pwp-${combo.id}-${h}`}
               >
-                <span className="t-tiny text-base-500">{heightLabel(h)}</span>
-                <span className="t-tiny t-num font-semibold text-primary">
+                <span className="text-meta text-base-500">{heightLabel(h)}</span>
+                <span className="text-meta t-num font-semibold text-primary">
                   RM {fmtRM(pwp![h] as number)}
                 </span>
               </span>
@@ -335,7 +335,7 @@ function SofaComboCard({
 
       {/* Footer: effective date · tier · status · Edit · History */}
       <div className="flex items-center justify-between gap-2 flex-wrap mt-auto pt-2 border-t border-base-100">
-        <div className="flex items-center gap-2 t-tiny text-base-500">
+        <div className="flex items-center gap-2 text-meta text-base-500">
           <span>Effective {fmtDate(combo.effectiveFrom)}</span>
           <span className="text-base-300">·</span>
           <span>Tier {combo.tier ? combo.tier.replace("PRICE_", "P") : "Any"}</span>
@@ -350,7 +350,7 @@ function SofaComboCard({
             <button
               type="button"
               onClick={onEdit}
-              className="t-tiny font-semibold text-base-700 hover:text-base-900 inline-flex items-center gap-1"
+              className="text-meta font-semibold text-base-700 hover:text-base-900 inline-flex items-center gap-1"
               data-testid={`sofa-combo-edit-${combo.id}`}
             >
               <Edit3 size={12} strokeWidth={2} /> Edit
@@ -359,7 +359,7 @@ function SofaComboCard({
           <button
             type="button"
             onClick={onHistory}
-            className="t-tiny font-semibold text-base-600 hover:text-base-900 inline-flex items-center gap-1"
+            className="text-meta font-semibold text-base-600 hover:text-base-900 inline-flex items-center gap-1"
             data-testid={`sofa-combo-history-${combo.id}`}
           >
             <History size={12} strokeWidth={2} /> History
@@ -394,7 +394,7 @@ function SofaComboHistoryModal({
   return (
     <Modal title="History" onClose={onClose}>
       <div className="flex flex-col gap-3" data-testid={`sofa-combo-history-modal-${combo.id}`}>
-        <div className="t-small text-base-700">
+        <div className="text-body text-base-700">
           <span className="font-semibold">{modelName}</span>
           <span className="text-base-400"> · </span>
           <span className="font-mono">{combo.label ?? slotsSummary(combo.slots)}</span>
@@ -402,12 +402,12 @@ function SofaComboHistoryModal({
         <div className="flex flex-col divide-y divide-base-100 border border-base-200 rounded-[6px]">
           {rows.map((r) => (
             <div key={r.label} className="flex items-center justify-between gap-4 px-3 py-2">
-              <span className="t-tiny text-base-500">{r.label}</span>
-              <span className="t-small t-num text-base-900">{r.value}</span>
+              <span className="text-meta text-base-500">{r.label}</span>
+              <span className="text-body t-num text-base-900">{r.value}</span>
             </div>
           ))}
         </div>
-        <p className="t-tiny text-base-400">
+        <p className="text-meta text-base-400">
           A full price-change log (every edit versioned) isn&apos;t tracked yet — this shows the
           current version&apos;s key dates.
         </p>
@@ -634,7 +634,7 @@ function SofaComboEditor({
             <select
               value={tier}
               onChange={(e) => setTier(e.target.value as FabricTierValue | "")}
-              className={`${INPUT_CLS} text-[12px]`}
+              className={`${INPUT_CLS} text-meta`}
               data-testid="sofa-combo-tier"
             >
               <option value="">Any tier</option>
@@ -649,7 +649,7 @@ function SofaComboEditor({
               type="date"
               value={effectiveFrom}
               onChange={(e) => setEffectiveFrom(e.target.value)}
-              className={`${INPUT_CLS} text-[12px]`}
+              className={`${INPUT_CLS} text-meta`}
               data-testid="sofa-combo-effective-from"
             />
           </label>
@@ -661,7 +661,7 @@ function SofaComboEditor({
               className="accent-primary"
               data-testid="sofa-combo-active"
             />
-            <span className="t-small text-base-700">Active</span>
+            <span className="text-body text-base-700">Active</span>
           </label>
         </div>
 
@@ -672,14 +672,14 @@ function SofaComboEditor({
             <button
               type="button"
               onClick={addSlot}
-              className="btn-ghost text-[12px] inline-flex items-center gap-1"
+              className="btn-ghost text-meta inline-flex items-center gap-1"
               data-testid="sofa-combo-add-slot"
             >
               <Plus size={13} strokeWidth={2.4} /> Add slot
             </button>
           </div>
           {offeredCodes.length === 0 && (
-            <p className="t-tiny text-base-400 mb-2">
+            <p className="text-meta text-base-400 mb-2">
               This model offers no compartments yet — tick some in Offered compartments above first.
             </p>
           )}
@@ -690,7 +690,7 @@ function SofaComboEditor({
                 className="flex items-start gap-2 bg-base-50 border border-base-200 rounded-[4px] px-2.5 py-2"
                 data-testid={`sofa-combo-slot-${i}`}
               >
-                <span className="t-tiny text-base-400 t-num mt-2 w-5 shrink-0">{i + 1}</span>
+                <span className="text-meta text-base-400 t-num mt-2 w-5 shrink-0">{i + 1}</span>
                 <SlotCodePicker
                   selected={slot}
                   options={offeredCodes}
@@ -710,7 +710,7 @@ function SofaComboEditor({
               </div>
             ))}
           </div>
-          <p className="t-tiny text-base-400 mt-1.5">
+          <p className="text-meta text-base-400 mt-1.5">
             Each slot must be filled by a distinct built compartment whose code is in that slot.
             Extra compartments beyond the slots add at à-la-carte.
           </p>
@@ -727,7 +727,7 @@ function SofaComboEditor({
                 priceNum !== null && Number.isFinite(priceNum) ? baseline - priceNum : null;
               return (
                 <label key={h} className="block">
-                  <span className="t-tiny text-base-500 block mb-0.5">{h}&Prime;</span>
+                  <span className="text-meta text-base-500 block mb-0.5">{h}&Prime;</span>
                   <input
                     type="number"
                     min={0}
@@ -735,13 +735,13 @@ function SofaComboEditor({
                     value={prices[h] ?? ""}
                     onChange={(e) => setPrices((p) => ({ ...p, [h]: e.target.value }))}
                     placeholder="n/a"
-                    className={`${INPUT_CLS} text-right t-num text-[12px]`}
+                    className={`${INPUT_CLS} text-right t-num text-meta`}
                     data-testid={`sofa-combo-price-${h}`}
                     aria-label={`combo price at height ${h}`}
                   />
                   {saves !== null && (
                     <span
-                      className={`block t-tiny mt-0.5 text-right t-num ${
+                      className={`block text-meta mt-0.5 text-right t-num ${
                         saves >= 0 ? "text-base-500" : "text-danger"
                       }`}
                       data-testid={`sofa-combo-implied-${h}`}
@@ -753,7 +753,7 @@ function SofaComboEditor({
               );
             })}
           </div>
-          <p className="t-tiny text-base-400 mt-1.5">
+          <p className="text-meta text-base-400 mt-1.5">
             Blank = the combo does not apply at that height. À-la-carte baseline (sum of each
             slot&apos;s first code):{" "}
             <b className="t-num text-base-600">RM {fmtRM(baseline)}</b>. The figure under each
@@ -777,7 +777,7 @@ function SofaComboEditor({
                   : null;
               return (
                 <label key={h} className="block">
-                  <span className="t-tiny text-base-500 block mb-0.5">{h}&Prime;</span>
+                  <span className="text-meta text-base-500 block mb-0.5">{h}&Prime;</span>
                   <input
                     type="number"
                     min={0}
@@ -785,13 +785,13 @@ function SofaComboEditor({
                     value={pwpPrices[h] ?? ""}
                     onChange={(e) => setPwpPrices((p) => ({ ...p, [h]: e.target.value }))}
                     placeholder="n/a"
-                    className={`${INPUT_CLS} text-right t-num text-[12px]`}
+                    className={`${INPUT_CLS} text-right t-num text-meta`}
                     data-testid={`sofa-combo-pwp-${h}`}
                     aria-label={`combo PWP price at height ${h}`}
                   />
                   {saves !== null && (
                     <span
-                      className={`block t-tiny mt-0.5 text-right t-num ${
+                      className={`block text-meta mt-0.5 text-right t-num ${
                         saves >= 0 ? "text-base-500" : "text-danger"
                       }`}
                       data-testid={`sofa-combo-pwp-saves-${h}`}
@@ -803,7 +803,7 @@ function SofaComboEditor({
               );
             })}
           </div>
-          <p className="t-tiny text-base-400 mt-1.5">
+          <p className="text-meta text-base-400 mt-1.5">
             The price a customer pays for THIS combo when redeeming it as a PWP reward. Blank =
             the combo cannot be a PWP reward at that height. The figure under each price is the
             saving vs that height&apos;s normal combo price.
@@ -827,7 +827,7 @@ function SofaComboEditor({
                   : null;
               return (
                 <label key={h} className="block">
-                  <span className="t-tiny text-base-500 block mb-0.5">{h}&Prime;</span>
+                  <span className="text-meta text-base-500 block mb-0.5">{h}&Prime;</span>
                   <input
                     type="number"
                     min={0}
@@ -835,12 +835,12 @@ function SofaComboEditor({
                     value={costs[h] ?? ""}
                     onChange={(e) => setCosts((c) => ({ ...c, [h]: e.target.value }))}
                     placeholder="n/a"
-                    className={`${INPUT_CLS} text-right t-num text-[12px]`}
+                    className={`${INPUT_CLS} text-right t-num text-meta`}
                     data-testid={`sofa-combo-cost-${h}`}
                     aria-label={`combo cost at height ${h}`}
                   />
                   <span
-                    className={`block t-tiny mt-0.5 text-right t-num ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-500"}`}
+                    className={`block text-meta mt-0.5 text-right t-num ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-500"}`}
                     data-testid={`sofa-combo-margin-${h}`}
                   >
                     {margin != null ? `${(margin.pct * 100).toFixed(1)}%` : "—"}
@@ -849,7 +849,7 @@ function SofaComboEditor({
               );
             })}
           </div>
-          <p className="t-tiny text-base-400 mt-1.5">
+          <p className="text-meta text-base-400 mt-1.5">
             Principal-only benchmark. Blank = no cost set at that height. The figure below each cost
             is the margin vs that height&apos;s selling price. Cost never affects checkout pricing.
           </p>
@@ -857,14 +857,14 @@ function SofaComboEditor({
 
         {/* Footer */}
         <div className="flex justify-end gap-2 mt-1">
-          <button type="button" onClick={onClose} className="btn-ghost text-[12px]">
+          <button type="button" onClick={onClose} className="btn-ghost text-meta">
             Cancel
           </button>
           <button
             type="button"
             onClick={save}
             disabled={!canSave}
-            className="btn-primary text-[12px] disabled:opacity-40"
+            className="btn-primary text-meta disabled:opacity-40"
             data-testid="sofa-combo-save"
           >
             {busy ? "Saving…" : editing ? "Save changes" : "Create sofa combo"}
@@ -905,12 +905,12 @@ function SlotCodePicker({
       {/* Selected chips */}
       <div className="flex flex-wrap gap-1.5 mb-1.5" data-testid={`${testId}-selected`}>
         {selected.length === 0 ? (
-          <span className="t-tiny text-base-400">No codes — tick one or more below.</span>
+          <span className="text-meta text-base-400">No codes — tick one or more below.</span>
         ) : (
           selected.map((code) => (
             <span
               key={code}
-              className="inline-flex items-center gap-1 t-tiny font-medium px-2 py-0.5 rounded-full bg-base-900 text-white"
+              className="inline-flex items-center gap-1 text-meta font-medium px-2 py-0.5 rounded-full bg-base-900 text-white"
               data-testid={`${testId}-chip-${code}`}
             >
               {code}
@@ -937,7 +937,7 @@ function SlotCodePicker({
               onClick={() => toggle(o.code)}
               aria-pressed={on}
               title={o.description ?? undefined}
-              className={`t-tiny font-semibold px-2 py-0.5 rounded-full border transition-colors ${
+              className={`text-meta font-semibold px-2 py-0.5 rounded-full border transition-colors ${
                 on
                   ? "bg-base-900 text-white border-base-900"
                   : "bg-white text-base-500 border-base-300 hover:border-base-500"

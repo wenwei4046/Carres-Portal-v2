@@ -440,7 +440,7 @@ export default function OperationSupplierClaims() {
                     role="tab"
                     aria-selected={active}
                     onClick={() => goTab(t.key)}
-                    className={`px-3 py-1.5 text-[12px] rounded cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 text-meta rounded cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                       active
                         ? "bg-white text-base-900 font-semibold shadow-sm"
                         : "text-base-600 font-medium hover:text-base-900"
@@ -448,7 +448,7 @@ export default function OperationSupplierClaims() {
                   >
                     <span>{t.label}</span>
                     <span
-                      className={`text-[10px] font-mono px-1.5 py-px rounded-full ${
+                      className={`text-label font-mono px-1.5 py-px rounded-full ${
                         active
                           ? "bg-base-100 text-base-700"
                           : "bg-base-200 text-base-500"
@@ -493,17 +493,17 @@ export default function OperationSupplierClaims() {
           )}
 
           {isError && (
-            <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+            <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
               <div className="text-destructive font-semibold mb-2">
                 Couldn&rsquo;t load claims
               </div>
-              <div className="text-[12px] text-base-700 mb-3">
+              <div className="text-meta text-base-700 mb-3">
                 {(error as Error | undefined)?.message ?? "Unknown error"}
               </div>
               <button
                 type="button"
                 onClick={() => void refetch()}
-                className="btn-secondary text-[11px] py-1.5 px-3"
+                className="btn-secondary text-label py-1.5 px-3"
               >
                 Retry
               </button>
@@ -517,7 +517,7 @@ export default function OperationSupplierClaims() {
               className="flex-1 min-h-0 bg-white border border-base-200 rounded-t-[12px] overflow-auto"
             >
               <table
-                className="w-full border-collapse text-[13px] [&_tbody_tr:nth-child(even)]:bg-base-100/70"
+                className="w-full border-collapse text-body [&_tbody_tr:nth-child(even)]:bg-base-100/70"
                 style={{ minWidth: 1120 }}
               >
                 <thead className="bg-base-700 border-b-2 border-primary text-white">
@@ -539,7 +539,7 @@ export default function OperationSupplierClaims() {
                     <tr>
                       <td
                         colSpan={8}
-                        className="p-12 text-center text-[12px] text-base-500"
+                        className="p-12 text-center text-meta text-base-500"
                       >
                         {/* An empty state that is a real answer, not a shrug —
                             and when the queue is the thing that emptied it, the
@@ -573,7 +573,7 @@ export default function OperationSupplierClaims() {
                           </td>
                           <td className="px-4 py-3 text-base-800">
                             <div>{c.sku}</div>
-                            <div className="font-mono text-[10.5px] text-base-500 mt-0.5">
+                            <div className="font-mono text-label text-base-500 mt-0.5">
                               {c.qty} unit{c.qty === 1 ? "" : "s"}
                             </div>
                           </td>
@@ -585,7 +585,7 @@ export default function OperationSupplierClaims() {
                               {supplierClaimTypeLabel(c.claim_type)}
                             </span>
                             {c.note && (
-                              <div className="text-[11px] text-base-600 mt-1">
+                              <div className="text-label text-base-600 mt-1">
                                 {c.note}
                               </div>
                             )}
@@ -593,14 +593,14 @@ export default function OperationSupplierClaims() {
                           <td className="px-4 py-3 whitespace-nowrap font-mono text-base-700">
                             {c.po_id}
                             {c.do_number && (
-                              <div className="text-[10.5px] text-base-500 mt-0.5">
+                              <div className="text-label text-base-500 mt-0.5">
                                 DO {c.do_number}
                               </div>
                             )}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-base-700">
                             {fmtDate(c.reported_at)}
-                            <div className="text-[10.5px] text-base-500 mt-0.5">
+                            <div className="text-label text-base-500 mt-0.5">
                               {/* A late-delivery claim is raised by the nightly
                                   sweep, so there is no human to name. Say so
                                   rather than printing a blank. */}
@@ -611,7 +611,7 @@ export default function OperationSupplierClaims() {
                             {c.status === "closed" ? (
                               // A closed claim keeps BOTH sides on the row — the
                               // card's done-when, readable without opening it.
-                              <div className="text-[12px] text-base-600">
+                              <div className="text-meta text-base-600">
                                 Asked {supplierClaimRequestLabel(c.requested_action)}{" "}
                                 → got {supplierClaimResponseLabel(c.supplier_response)}
                               </div>
@@ -627,7 +627,7 @@ export default function OperationSupplierClaims() {
                                   )}
                                 </span>
                                 <span
-                                  className="text-[12px] text-base-800"
+                                  className="text-meta text-base-800"
                                   data-testid={`claim-next-move-${c.claim_no}`}
                                 >
                                   {c.next_move.label}
@@ -645,13 +645,13 @@ export default function OperationSupplierClaims() {
                                 e.stopPropagation();
                                 toggleClaim(c.id);
                               }}
-                              className="btn-secondary text-[11px] py-1.5 px-3"
+                              className="btn-secondary text-label py-1.5 px-3"
                               data-testid={`claim-open-${c.claim_no}`}
                             >
                               {expanded ? "Hide" : "Open"}
                             </button>
                             {c.photo_count > 0 && !expanded && (
-                              <div className="text-[10.5px] text-base-500 mt-1">
+                              <div className="text-label text-base-500 mt-1">
                                 {c.photo_count} photo{c.photo_count === 1 ? "" : "s"}
                               </div>
                             )}
@@ -684,7 +684,7 @@ export default function OperationSupplierClaims() {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.02em] text-white text-left">
+    <th className="px-4 py-2.5 text-label font-semibold uppercase tracking-[0.02em] text-white text-left">
       {children}
     </th>
   );

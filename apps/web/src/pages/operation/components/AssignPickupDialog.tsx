@@ -183,7 +183,7 @@ export default function AssignPickupDialog({
 
   return (
     <Modal title={`Assign pickup partner · ${po.id}`} onClose={onClose}>
-      <div className="text-[12px] text-base-600 mb-3.5 font-body">
+      <div className="text-meta text-base-600 mb-3.5 font-body">
         <strong>{supplier?.name ?? "Supplier"}</strong> has {totalUnits} unit
         {totalUnits === 1 ? "" : "s"} ready for collection. Choose a partner to
         dispatch to their factory.
@@ -194,26 +194,26 @@ export default function AssignPickupDialog({
         style={{ background: "var(--base-50)" }}
       >
         <div className="label mb-1.5">Pickup details</div>
-        <div className="text-[12px] font-body">
+        <div className="text-meta font-body">
           From <strong>{supplier?.name ?? "Supplier"}</strong>
         </div>
-        <div className="text-[12px] font-body mt-0.5">
+        <div className="text-meta font-body mt-0.5">
           To <strong>{warehouse?.name ?? "Warehouse"}</strong>
         </div>
-        <div className="font-mono text-[11px] text-base-500 mt-1.5">
+        <div className="font-mono text-label text-base-500 mt-1.5">
           {lines.map((l) => `${l.sku} ×${l.qty}`).join(" · ") || "—"}
         </div>
       </div>
 
       <div className="label mb-1.5">Delivery partner *</div>
       {partnersQ.isLoading ? (
-        <div className="text-[12px] text-base-500 mb-3.5">Loading partners…</div>
+        <div className="text-meta text-base-500 mb-3.5">Loading partners…</div>
       ) : partnersQ.isError ? (
-        <div className="text-[12px] text-destructive mb-3.5">
+        <div className="text-meta text-destructive mb-3.5">
           Couldn&rsquo;t load partners — try again later.
         </div>
       ) : partners.length === 0 ? (
-        <div className="text-[12px] text-warning mb-3.5">
+        <div className="text-meta text-warning mb-3.5">
           No delivery partners on file.
         </div>
       ) : (
@@ -239,7 +239,7 @@ export default function AssignPickupDialog({
       )}
 
       {!isOutsource && partner && (
-        <div className="text-[12px] text-base-600 px-3 py-2.5 bg-base-50 rounded-[4px] mb-3.5">
+        <div className="text-meta text-base-600 px-3 py-2.5 bg-base-50 rounded-[4px] mb-3.5">
           <div>
             <strong>{partner.name}</strong>
           </div>
@@ -306,15 +306,15 @@ export default function AssignPickupDialog({
         Destination warehouse <span className="text-destructive">*</span>
       </div>
       {warehousesQ.isLoading ? (
-        <div className="text-[12px] text-base-500 mb-3.5">
+        <div className="text-meta text-base-500 mb-3.5">
           Loading warehouses…
         </div>
       ) : warehousesQ.isError ? (
-        <div className="text-[12px] text-destructive mb-3.5">
+        <div className="text-meta text-destructive mb-3.5">
           Couldn&rsquo;t load warehouses — try again later.
         </div>
       ) : warehouses.length === 0 ? (
-        <div className="text-[12px] text-warning mb-3.5">
+        <div className="text-meta text-warning mb-3.5">
           No warehouses on file.
         </div>
       ) : (
@@ -334,14 +334,14 @@ export default function AssignPickupDialog({
 
       {selectedWarehouse && (
         <div
-          className="text-[12px] text-base-600 px-3 py-2.5 bg-base-50 rounded-[4px] mb-3.5"
+          className="text-meta text-base-600 px-3 py-2.5 bg-base-50 rounded-[4px] mb-3.5"
           data-testid="assign-pickup-warehouse-preview"
         >
           <div>
             <strong>{selectedWarehouse.name}</strong>
           </div>
           {selectedWarehouse.address && (
-            <div className="font-mono text-[11px] mt-1">
+            <div className="font-mono text-label mt-1">
               {selectedWarehouse.address}
             </div>
           )}

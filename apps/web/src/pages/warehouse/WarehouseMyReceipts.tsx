@@ -49,17 +49,17 @@ export default function WarehouseMyReceipts() {
   if (isError) {
     return (
       <div className="px-9 py-8">
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-2">
             Couldn&rsquo;t load what we filed
           </div>
-          <div className="text-[12px] text-base-700 mb-3">
+          <div className="text-meta text-base-700 mb-3">
             {(error as Error | undefined)?.message ?? "Unknown error"}
           </div>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="btn-secondary text-[11px] py-1.5 px-3"
+            className="btn-secondary text-label py-1.5 px-3"
           >
             Retry
           </button>
@@ -71,13 +71,13 @@ export default function WarehouseMyReceipts() {
   return (
     <div className="px-9 py-8 pb-14" data-testid="warehouse-receipts">
       <PageHeader kicker="Warehouse" title="My receiving" className="mb-3" />
-      <div className="text-[13px] text-base-600 mb-[18px]">
+      <div className="text-body text-base-600 mb-[18px]">
         Every count we sent, and what Carres did with it.
       </div>
 
       <div className="bg-white border border-base-200 rounded overflow-auto">
         <table
-          className="w-full border-collapse text-[13px] [&_tbody_tr:nth-child(even)]:bg-base-100/70"
+          className="w-full border-collapse text-body [&_tbody_tr:nth-child(even)]:bg-base-100/70"
           style={{ minWidth: 820 }}
         >
           <thead className="bg-base-700 border-b-2 border-primary text-white">
@@ -92,7 +92,7 @@ export default function WarehouseMyReceipts() {
           <tbody>
             {receipts.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-12 text-center text-[12px] text-base-500">
+                <td colSpan={5} className="p-12 text-center text-meta text-base-500">
                   Nothing counted yet.
                 </td>
               </tr>
@@ -105,17 +105,17 @@ export default function WarehouseMyReceipts() {
               >
                 <td className="px-4 py-3 whitespace-nowrap font-mono font-semibold text-base-900">
                   {r.po_id}
-                  <div className="font-normal text-[11px] text-base-600 mt-0.5">
+                  <div className="font-normal text-label text-base-600 mt-0.5">
                     {r.supplier_name ?? "—"}
                   </div>
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap font-mono text-[12px]">
+                <td className="px-4 py-3 whitespace-nowrap font-mono text-meta">
                   {r.do_number}
                 </td>
                 <td className="px-4 py-3 text-base-800">
                   <div>{warehouseReceiptSummary(r.lines)}</div>
                   {r.note && (
-                    <div className="text-[11px] text-base-600 mt-1">{r.note}</div>
+                    <div className="text-label text-base-600 mt-1">{r.note}</div>
                   )}
                   {/* The claims this count opened, once Carres checked it in. */}
                   {(r.claims ?? []).length > 0 && (
@@ -123,7 +123,7 @@ export default function WarehouseMyReceipts() {
                       {(r.claims ?? []).map((c) => (
                         <div
                           key={c.claim_no}
-                          className="text-[11px] text-base-700"
+                          className="text-label text-base-700"
                           data-testid={`warehouse-receipt-claim-${c.claim_no}`}
                         >
                           <span className="font-mono">{c.claim_no}</span>{" "}
@@ -150,7 +150,7 @@ export default function WarehouseMyReceipts() {
                   </span>
                   {r.status === "returned" && r.return_reason && (
                     <div
-                      className="text-[11px] text-danger mt-1 max-w-[280px]"
+                      className="text-label text-danger mt-1 max-w-[280px]"
                       data-testid={`warehouse-receipt-reason-${r.id}`}
                     >
                       {r.return_reason}
@@ -168,7 +168,7 @@ export default function WarehouseMyReceipts() {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.02em] text-white text-left">
+    <th className="px-4 py-2.5 text-label font-semibold uppercase tracking-[0.02em] text-white text-left">
       {children}
     </th>
   );

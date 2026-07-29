@@ -48,6 +48,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { blankComments } from "./lib/source-segments.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LAW = join(ROOT, "docs/UI-KIT.md");
@@ -150,7 +151,13 @@ const RULES = [
 // Hex is legitimate where Tailwind does not reach.
 const HEX_OK = [/(^|\/)index\.css$/, /design-standard/, /\/lib\/pdf\//];
 // Tailwind's own default type ramp — a typography token outside §2.1.
-const TW_TYPE = /\btext-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)\b/g;
+//
+// The `(?!-)` is load-bearing, and D2 found it the hard way. This repo's
+// NEUTRAL PALETTE is `base` — `text-base-500`, `text-base-700` — so without the
+// lookahead `\btext-base\b` matches a COLOUR class, and rule D counted **2,842
+// colours as typography**: 5 of the 2,847 `text-base` hits were the type class.
+// A codemod scored against that baseline would have "fixed" 2,842 non-problems.
+const TW_TYPE = /\btext-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)\b(?!-)/g;
 const TW_WEIGHT = /\bfont-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black)\b/g;
 const WEIGHT_PX = { thin: 100, extralight: 200, light: 300, normal: 400, medium: 500, semibold: 600, bold: 700, extrabold: 800, black: 900 };
 const SPACING_PROPS = "p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap|gap-x|gap-y|space-x|space-y";
@@ -161,8 +168,23 @@ function scan(files, rec, words) {
   const classStrings = new Map(); // rule I
 
   for (const f of files) {
-    const src = read(join(ROOT, f));
+    const full = read(join(ROOT, f));
     const tsx = f.endsWith(".tsx");
+    /**
+     * VALUE rules read CODE, not comments — D0.5b wrote this lesson for the
+     * kit's own scan and D1 shipped without it: rule D flagged `tokens.ts`
+     * TWICE for the sentence that EXPLAINS that 700 is dead. **A scan that
+     * punishes the explanation teaches people to delete the explanation.**
+     * Comments are blanked, not removed, so every reported line number is
+     * still the real one.
+     *
+     * **The regex that did this shipped in D2 and was wrong** (fixed at the
+     * PM's review, 2026-07-29): it could not see a string, so the `//` in
+     * `href="https://…"` blanked the rest of the line and the value rules
+     * stopped counting real values. `blankComments` is a scanner that knows a
+     * string, a template's every `${…}`, and a regex literal from a comment.
+     */
+    const src = blankComments(full);
 
     /* A — a raw hex literal ------------------------------------------------ */
     if (!HEX_OK.some((re) => re.test(f))) {
@@ -203,7 +225,8 @@ function scan(files, rec, words) {
     for (const m of src.matchAll(new RegExp(`\\b(?:${SPACING_PROPS})-\\[(\\d+(?:\\.\\d+)?)px\\]`, "g")))
       push("E", f, src, m.index, `${m[0]} — §4.1 is eight frozen steps`);
     for (const m of src.matchAll(new RegExp(`\\b(?:${SPACING_PROPS})-(\\d+(?:\\.\\d+)?)\\b`, "g"))) {
-      if (!rec.spacing.includes(m[1])) push("E", f, src, m.index, `${m[0]} — not a §4.1 step`);
+      // `0` is the absence of spacing, not a ninth step.
+      if (m[1] !== "0" && !rec.spacing.includes(m[1])) push("E", f, src, m.index, `${m[0]} — not a §4.1 step`);
     }
     for (const m of src.matchAll(/\brounded-(?!\[)([a-z0-9]+)\b/g)) {
       if (!rec.radii.includes(`rounded-${m[1]}`) && m[1] !== "none")
@@ -239,13 +262,16 @@ function scan(files, rec, words) {
     }
 
     /* J · K — the edition, and the authority claim --------------------------- */
+    // J and K read the FULL source on purpose: an edition declaration and an
+    // authority claim both live in a header COMMENT, so the stripped copy
+    // would make these two rules structurally incapable of ever firing.
     if (isKit(f) || /lib\/design-standard\.ts$/.test(f) || /(^|\/)index\.css$/.test(f)) {
-      const head = src.slice(0, 2000);
+      const head = full.slice(0, 2000);
       if (!head.includes(EDITION) && !/UI-KIT §/.test(head))
-        push("J", f, src, 0, `no kit edition declared — §0.3 asks for "${EDITION}"`);
+        push("J", f, full, 0, `no kit edition declared — §0.3 asks for "${EDITION}"`);
     }
-    for (const m of src.matchAll(/\bv4 wins\b|\bthis file wins\b|\boverrides? (?:docs\/)?UI-KIT\b/gi)) {
-      if (!/UI-KIT\.md$/.test(f)) push("K", f, src, m.index, "only docs/UI-KIT.md may claim to win (§0.3)");
+    for (const m of full.matchAll(/\bv4 wins\b|\bthis file wins\b|\boverrides? (?:docs\/)?UI-KIT\b/gi)) {
+      if (!/UI-KIT\.md$/.test(f)) push("K", f, full, m.index, "only docs/UI-KIT.md may claim to win (§0.3)");
     }
 
     /* L · M — storage keys.
@@ -510,7 +536,9 @@ if (UPDATE) {
   const health = { coverage: (enf / rows.length) * 100, debt: rows.filter((r) => r.debt).length };
   writeFileSync(
     BASELINE_PATH,
-    JSON.stringify({ edition: EDITION, takenAt: "D1", files: files.length, counts, health }, null, 2) + "\n",
+    // `takenAt` names the CARD that last froze this file — whoever re-freezes
+    // edits it, exactly as D2 did at the PM's review on 2026-07-29.
+    JSON.stringify({ edition: EDITION, takenAt: "D2", files: files.length, counts, health }, null, 2) + "\n",
   );
   console.log(`✓ baseline written — ${files.length} files in scope.`);
   for (const r of RULES) console.log(`   ${r.id}  ${String(counts[r.id]).padStart(5)}  ${r.what}`);

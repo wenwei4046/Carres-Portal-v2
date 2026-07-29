@@ -49,8 +49,8 @@ export default function ResumeFromWaitingDialog({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-card rounded-lg p-6 max-w-md w-full">
-        <h2 className="t-h3 mb-4">Resume from at_warehouse_waiting</h2>
-        <p className="text-sm text-base-600 mb-4">
+        <h2 className="text-strong mb-4">Resume from at_warehouse_waiting</h2>
+        <p className="text-body text-base-600 mb-4">
           Order #{so} threads will be advanced from <code>waiting</code> →{" "}
           <code>ready_to_dispatch</code>. Customer date confirmation is off-system;
           click only after customer has confirmed.

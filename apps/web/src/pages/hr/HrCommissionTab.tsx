@@ -26,13 +26,13 @@ function StaffBreakdown({ row }: { row: StaffCommissionResult }) {
   return (
     <div className="px-10 py-3 space-y-3">
       {!hasAnything && (
-        <div className="text-[12px] text-base-500">
+        <div className="text-meta text-base-500">
           No commission activity this month.
         </div>
       )}
 
       {row.basis > 0 && (
-        <div className="text-[12px] text-base-700">
+        <div className="text-meta text-base-700">
           Sold <span className="t-num font-semibold">{rm(row.basis)}</span> of
           items personally
           {row.pctUsed != null && (
@@ -52,12 +52,12 @@ function StaffBreakdown({ row }: { row: StaffCommissionResult }) {
 
       {row.overrideDetail.length > 0 && (
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-base-500 mb-1">
+          <div className="text-label font-semibold uppercase tracking-[0.06em] text-base-500 mb-1">
             Override from team sales
           </div>
           <ul className="space-y-0.5">
             {row.overrideDetail.map((d) => (
-              <li key={d.fromStaffId} className="text-[12px] text-base-700">
+              <li key={d.fromStaffId} className="text-meta text-base-700">
                 From {d.fromStaffName} —{" "}
                 <span className="t-num font-semibold">{rm(d.amount)}</span>
               </li>
@@ -68,12 +68,12 @@ function StaffBreakdown({ row }: { row: StaffCommissionResult }) {
 
       {row.perModel.length > 0 && (
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-base-500 mb-1">
+          <div className="text-label font-semibold uppercase tracking-[0.06em] text-base-500 mb-1">
             Per-model earnings
           </div>
           <ul className="space-y-0.5">
             {row.perModel.map((m) => (
-              <li key={m.modelId} className="text-[12px] text-base-700">
+              <li key={m.modelId} className="text-meta text-base-700">
                 {m.modelName} — {m.units} unit{m.units === 1 ? "" : "s"} ×{" "}
                 <span className="t-num">{rm(m.perUnitAmount)}</span> each ={" "}
                 <span className="t-num font-semibold">
@@ -97,12 +97,12 @@ function StaffBreakdown({ row }: { row: StaffCommissionResult }) {
 
       {row.milestones.length > 0 && (
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-base-500 mb-1">
+          <div className="text-label font-semibold uppercase tracking-[0.06em] text-base-500 mb-1">
             Milestone bonuses
           </div>
           <ul className="space-y-0.5">
             {row.milestones.map((m, i) => (
-              <li key={i} className="text-[12px] text-base-700">
+              <li key={i} className="text-meta text-base-700">
                 {m.units} unit{m.units === 1 ? "" : "s"} of{" "}
                 {m.category ?? "all items"} sold — passed the {m.thresholdQty}
                 -unit milestone, bonus{" "}
@@ -125,19 +125,19 @@ function BdBreakdown({ row }: { row: BdCommissionResult }) {
   return (
     <div className="px-10 py-3 space-y-3">
       {!hasAnything && (
-        <div className="text-[12px] text-base-500">
+        <div className="text-meta text-base-500">
           No dealer sales this month.
         </div>
       )}
 
       {row.portfolio.length > 0 && (
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-base-500 mb-1">
+          <div className="text-label font-semibold uppercase tracking-[0.06em] text-base-500 mb-1">
             Dealer portfolio
           </div>
           <ul className="space-y-0.5">
             {row.portfolio.map((p) => (
-              <li key={p.dealerId} className="text-[12px] text-base-700">
+              <li key={p.dealerId} className="text-meta text-base-700">
                 {p.dealerName} — {p.orderCount} order
                 {p.orderCount === 1 ? "" : "s"},{" "}
                 <span className="t-num">{rm(p.amount)}</span> sold
@@ -157,12 +157,12 @@ function BdBreakdown({ row }: { row: BdCommissionResult }) {
 
       {row.overrideDetail.length > 0 && (
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-base-500 mb-1">
+          <div className="text-label font-semibold uppercase tracking-[0.06em] text-base-500 mb-1">
             Override from BD Executives' dealer sales
           </div>
           <ul className="space-y-0.5">
             {row.overrideDetail.map((d) => (
-              <li key={d.fromStaffId} className="text-[12px] text-base-700">
+              <li key={d.fromStaffId} className="text-meta text-base-700">
                 Override from {d.fromStaffName} —{" "}
                 <span className="t-num font-semibold">{rm(d.amount)}</span>
               </li>
@@ -173,12 +173,12 @@ function BdBreakdown({ row }: { row: BdCommissionResult }) {
 
       {row.perModel.length > 0 && (
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-base-500 mb-1">
+          <div className="text-label font-semibold uppercase tracking-[0.06em] text-base-500 mb-1">
             Per-model earnings
           </div>
           <ul className="space-y-0.5">
             {row.perModel.map((m) => (
-              <li key={m.modelId} className="text-[12px] text-base-700">
+              <li key={m.modelId} className="text-meta text-base-700">
                 {m.modelName} — {m.units} unit{m.units === 1 ? "" : "s"} ×{" "}
                 <span className="t-num">{rm(m.perUnitAmount)}</span> each ={" "}
                 <span className="t-num font-semibold">
@@ -202,12 +202,12 @@ function BdBreakdown({ row }: { row: BdCommissionResult }) {
 
       {row.milestones.length > 0 && (
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-base-500 mb-1">
+          <div className="text-label font-semibold uppercase tracking-[0.06em] text-base-500 mb-1">
             Milestone bonuses
           </div>
           <ul className="space-y-0.5">
             {row.milestones.map((m, i) => (
-              <li key={i} className="text-[12px] text-base-700">
+              <li key={i} className="text-meta text-base-700">
                 {m.units} unit{m.units === 1 ? "" : "s"} of{" "}
                 {m.category ?? "all items"} sold — passed the {m.thresholdQty}
                 -unit milestone, bonus{" "}
@@ -241,11 +241,11 @@ export default function HrCommissionTab({
     });
 
   if (isLoading) {
-    return <div className="py-12 text-[13px] text-base-500">Loading the month report…</div>;
+    return <div className="py-12 text-body text-base-500">Loading the month report…</div>;
   }
   if (isError || !data) {
     return (
-      <div className="py-12 text-[13px] text-danger">
+      <div className="py-12 text-body text-danger">
         Failed to load the commission report. Refresh to retry.
       </div>
     );
@@ -271,26 +271,26 @@ export default function HrCommissionTab({
       {/* Summary row — three independent white KPI cards (UI-KIT §A8). */}
       <div className="grid grid-cols-3 gap-2.5">
         <div className="kpi-box">
-          <div className="text-[12px] uppercase tracking-[0.06em] text-base-500">
+          <div className="text-meta uppercase tracking-[0.06em] text-base-500">
             Total commission
           </div>
-          <div className="text-[18px] font-bold t-num mt-0.5">
+          <div className="text-strong font-semibold t-num mt-0.5">
             {rm(report.totalCommission)}
           </div>
         </div>
         <div className="kpi-box">
-          <div className="text-[12px] uppercase tracking-[0.06em] text-base-500">
+          <div className="text-meta uppercase tracking-[0.06em] text-base-500">
             Total sales basis
           </div>
-          <div className="text-[18px] font-bold t-num mt-0.5">
+          <div className="text-strong font-semibold t-num mt-0.5">
             {rm(report.totalBasis)}
           </div>
         </div>
         <div className="kpi-box">
-          <div className="text-[12px] uppercase tracking-[0.06em] text-base-500">
+          <div className="text-meta uppercase tracking-[0.06em] text-base-500">
             Staff
           </div>
-          <div className="text-[18px] font-bold t-num mt-0.5">
+          <div className="text-strong font-semibold t-num mt-0.5">
             {report.perStaff.length}
           </div>
         </div>
@@ -320,28 +320,28 @@ export default function HrCommissionTab({
           <thead>
             <tr className="border-b border-base-200">
               <th aria-label="Expand" />
-              <th className="text-left px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-left px-2 py-2 text-meta font-semibold text-base-900">
                 Name
               </th>
-              <th className="text-right px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-2 py-2 text-meta font-semibold text-base-900">
                 Orders
               </th>
-              <th className="text-right px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-2 py-2 text-meta font-semibold text-base-900">
                 Sales basis
               </th>
-              <th className="text-right px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-2 py-2 text-meta font-semibold text-base-900">
                 Direct
               </th>
-              <th className="text-right px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-2 py-2 text-meta font-semibold text-base-900">
                 Override
               </th>
-              <th className="text-right px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-2 py-2 text-meta font-semibold text-base-900">
                 Per-model
               </th>
-              <th className="text-right px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-2 py-2 text-meta font-semibold text-base-900">
                 Milestone
               </th>
-              <th className="text-right px-3 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-3 py-2 text-meta font-semibold text-base-900">
                 Total
               </th>
             </tr>
@@ -349,7 +349,7 @@ export default function HrCommissionTab({
           <tbody>
             {report.perStaff.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-[13px] text-base-500">
+                <td colSpan={9} className="px-4 py-8 text-center text-body text-base-500">
                   No showroom staff found. Add staff from the store's POS Staff
                   page first.
                 </td>
@@ -383,38 +383,38 @@ export default function HrCommissionTab({
                     </td>
                     <td className="px-2 whitespace-nowrap overflow-hidden">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-[13px] font-semibold text-base-900 truncate">
+                        <span className="text-body font-semibold text-base-900 truncate">
                           {row.staff.name}
                         </span>
                         <span className="pill pill-neutral shrink-0">
                           {STAFF_TIER_LABEL[row.staff.staffRole] ?? row.staff.staffRole}
                         </span>
                       </div>
-                      <div className="text-[11px] text-base-500 truncate">
+                      <div className="text-label text-base-500 truncate">
                         {[row.staff.storeName, row.staff.outletName]
                           .filter(Boolean)
                           .join(" · ") || "—"}
                       </div>
                     </td>
-                    <td className="px-2 text-right text-[13px] t-num">
+                    <td className="px-2 text-right text-body t-num">
                       {row.orderCount}
                     </td>
-                    <td className="px-2 text-right text-[13px] t-num">
+                    <td className="px-2 text-right text-body t-num">
                       {rm(row.basis)}
                     </td>
-                    <td className="px-2 text-right text-[13px] t-num">
+                    <td className="px-2 text-right text-body t-num">
                       {rm(row.directCommission)}
                     </td>
-                    <td className="px-2 text-right text-[13px] t-num">
+                    <td className="px-2 text-right text-body t-num">
                       {rm(row.overrideCommission)}
                     </td>
-                    <td className="px-2 text-right text-[13px] t-num">
+                    <td className="px-2 text-right text-body t-num">
                       {rm(row.perModelCommission)}
                     </td>
-                    <td className="px-2 text-right text-[13px] t-num">
+                    <td className="px-2 text-right text-body t-num">
                       {rm(row.milestoneCommission)}
                     </td>
-                    <td className="px-3 text-right text-[13px] t-num font-bold">
+                    <td className="px-3 text-right text-body t-num font-semibold">
                       {rm(row.total)}
                     </td>
                   </tr>
@@ -434,10 +434,10 @@ export default function HrCommissionTab({
 
       {/* 0250 — BD commission: paid by what their assigned dealers sell. */}
       <div className="pt-2">
-        <div className="text-[14px] font-semibold text-base-900">
+        <div className="text-body font-semibold text-base-900">
           BD commission — paid by dealer sales
         </div>
-        <div className="text-[12px] text-base-500">
+        <div className="text-meta text-base-500">
           {bdReport.method === "per_model"
             ? "Per model · item KPI"
             : "% of dealer sales"}
@@ -445,7 +445,7 @@ export default function HrCommissionTab({
       </div>
 
       {bdReport.unassignedDealers.length > 0 && (
-        <div className="flex items-center gap-1.5 text-[12px] text-base-700">
+        <div className="flex items-center gap-1.5 text-meta text-base-700">
           <AlertTriangle
             size={14}
             className="shrink-0 text-warning"
@@ -482,31 +482,31 @@ export default function HrCommissionTab({
           <thead>
             <tr className="border-b border-base-200">
               <th aria-label="Expand" />
-              <th className="text-left px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-left px-2 py-2 text-meta font-semibold text-base-900">
                 Name
               </th>
-              <th className="text-right px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-2 py-2 text-meta font-semibold text-base-900">
                 Dealers
               </th>
-              <th className="text-right px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-2 py-2 text-meta font-semibold text-base-900">
                 Orders
               </th>
-              <th className="text-right px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-2 py-2 text-meta font-semibold text-base-900">
                 Sales basis
               </th>
-              <th className="text-right px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-2 py-2 text-meta font-semibold text-base-900">
                 Direct
               </th>
-              <th className="text-right px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-2 py-2 text-meta font-semibold text-base-900">
                 Override
               </th>
-              <th className="text-right px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-2 py-2 text-meta font-semibold text-base-900">
                 Per-model
               </th>
-              <th className="text-right px-2 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-2 py-2 text-meta font-semibold text-base-900">
                 Milestone
               </th>
-              <th className="text-right px-3 py-2 text-[12px] font-semibold text-base-900">
+              <th className="text-right px-3 py-2 text-meta font-semibold text-base-900">
                 Total
               </th>
             </tr>
@@ -516,7 +516,7 @@ export default function HrCommissionTab({
               <tr>
                 <td
                   colSpan={10}
-                  className="px-4 py-8 text-center text-[13px] text-base-500"
+                  className="px-4 py-8 text-center text-body text-base-500"
                 >
                   No BD accounts found.
                 </td>
@@ -550,45 +550,45 @@ export default function HrCommissionTab({
                     </td>
                     <td className="px-2 whitespace-nowrap overflow-hidden">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-[13px] font-semibold text-base-900 truncate">
+                        <span className="text-body font-semibold text-base-900 truncate">
                           {row.user.name}
                         </span>
                         <span className="pill pill-neutral shrink-0">
                           {row.position === "cbo" ? "CBO" : "BD Executive"}
                         </span>
                       </div>
-                      <div className="text-[11px] text-base-500 truncate">
+                      <div className="text-label text-base-500 truncate">
                         {row.user.email}
                       </div>
                     </td>
-                    <td className="px-2 text-right text-[13px] t-num">
+                    <td className="px-2 text-right text-body t-num">
                       {row.dealerCount}
                     </td>
-                    <td className="px-2 text-right text-[13px] t-num">
+                    <td className="px-2 text-right text-body t-num">
                       {row.orderCount}
                     </td>
-                    <td className="px-2 text-right text-[13px] t-num">
+                    <td className="px-2 text-right text-body t-num">
                       {rm(row.basis)}
                     </td>
-                    <td className="px-2 text-right text-[13px] t-num">
+                    <td className="px-2 text-right text-body t-num">
                       {row.directCommission > 0 ? rm(row.directCommission) : "—"}
                     </td>
-                    <td className="px-2 text-right text-[13px] t-num">
+                    <td className="px-2 text-right text-body t-num">
                       {row.overrideCommission > 0
                         ? rm(row.overrideCommission)
                         : "—"}
                     </td>
-                    <td className="px-2 text-right text-[13px] t-num">
+                    <td className="px-2 text-right text-body t-num">
                       {row.perModelCommission > 0
                         ? rm(row.perModelCommission)
                         : "—"}
                     </td>
-                    <td className="px-2 text-right text-[13px] t-num">
+                    <td className="px-2 text-right text-body t-num">
                       {row.milestoneCommission > 0
                         ? rm(row.milestoneCommission)
                         : "—"}
                     </td>
-                    <td className="px-3 text-right text-[13px] t-num font-bold">
+                    <td className="px-3 text-right text-body t-num font-semibold">
                       {rm(row.commission)}
                     </td>
                   </tr>

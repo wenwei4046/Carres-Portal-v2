@@ -118,7 +118,7 @@ export function TopBarIcons() {
         >
           <Bell size={18} />
           {alerts.total > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-danger text-white text-[10px] font-bold leading-[16px] text-center">
+            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-danger text-white text-label font-semibold leading-[16px] text-center">
               {alerts.total > 99 ? "99+" : alerts.total}
             </span>
           )}
@@ -126,8 +126,8 @@ export function TopBarIcons() {
         {open === "alerts" && (
           <div className="absolute right-0 top-full mt-1 z-40 w-80 bg-card text-card-foreground border border-base-200 rounded-lg shadow-lg overflow-hidden">
             <div className="px-3 py-2 border-b border-base-100 flex items-center justify-between">
-              <span className="t-h4">Alerts</span>
-              <span className="t-tiny text-base-400 tabular-nums">
+              <span className="text-strong">Alerts</span>
+              <span className="text-meta text-base-400 tabular-nums">
                 {alerts.total} to action
               </span>
             </div>
@@ -151,8 +151,8 @@ export function TopBarIcons() {
                 onClick={goOrders}
                 className="w-full px-3 py-2 flex items-center justify-between hover:bg-hovertint"
               >
-                <span className="t-micro text-info">Escalated to Jess</span>
-                <span className="t-tiny text-base-400 tabular-nums">
+                <span className="text-label uppercase tracking-[0.05em] text-info">Escalated to Jess</span>
+                <span className="text-meta text-base-400 tabular-nums">
                   {alerts.escalated.length}
                 </span>
               </button>
@@ -160,7 +160,7 @@ export function TopBarIcons() {
             <button
               type="button"
               onClick={goOrders}
-              className="w-full text-center py-2 t-small text-primary hover:bg-hovertint border-t border-base-100"
+              className="w-full text-center py-2 text-body text-primary hover:bg-hovertint border-t border-base-100"
             >
               Open Orders
             </button>
@@ -191,8 +191,8 @@ export function TopBarIcons() {
             >
               <HelpCircle size={16} className="shrink-0 text-base-400" />
               <span className="min-w-0">
-                <span className="t-small text-base-800 block">Help</span>
-                <span className="t-tiny text-base-400 block">Coming soon</span>
+                <span className="text-body text-base-800 block">Help</span>
+                <span className="text-meta text-base-400 block">Coming soon</span>
               </span>
             </button>
             <button
@@ -202,8 +202,8 @@ export function TopBarIcons() {
             >
               <GraduationCap size={16} className="shrink-0 text-base-400" />
               <span className="min-w-0">
-                <span className="t-small text-base-800 block">Training · SOP</span>
-                <span className="t-tiny text-base-400 block">
+                <span className="text-body text-base-800 block">Training · SOP</span>
+                <span className="text-meta text-base-400 block">
                   Standard operating procedures — coming soon
                 </span>
               </span>
@@ -228,8 +228,8 @@ export function TopBarIcons() {
         {open === "settings" && (
           <div className="absolute right-0 top-full mt-1 z-40 w-56 bg-card text-card-foreground border border-base-200 rounded-lg shadow-lg p-4 text-center">
             <Settings size={22} className="mx-auto text-base-300 mb-2" />
-            <div className="t-small text-base-700 font-semibold mb-0.5">Settings</div>
-            <div className="t-tiny text-base-400">Coming soon.</div>
+            <div className="text-body text-base-700 font-semibold mb-0.5">Settings</div>
+            <div className="text-meta text-base-400">Coming soon.</div>
           </div>
         )}
       </div>
@@ -255,11 +255,11 @@ function AlertGroup({
   return (
     <div className="px-3 py-2 border-b border-base-100">
       <div className="flex items-center justify-between mb-1">
-        <span className={`t-micro ${tone}`}>{title}</span>
-        <span className="t-tiny text-base-400 tabular-nums">{rows.length}</span>
+        <span className={`text-label uppercase tracking-[0.05em] ${tone}`}>{title}</span>
+        <span className="text-meta text-base-400 tabular-nums">{rows.length}</span>
       </div>
       {rows.length === 0 ? (
-        <div className="t-tiny text-base-400">{empty}</div>
+        <div className="text-meta text-base-400">{empty}</div>
       ) : (
         <ul className="space-y-0.5">
           {rows.slice(0, 5).map((o) => (
@@ -269,7 +269,7 @@ function AlertGroup({
                 onClick={onOpen}
                 className="w-full text-left px-1 py-0.5 rounded hover:bg-hovertint"
               >
-                <span className="t-small text-base-700 truncate block">
+                <span className="text-body text-base-700 truncate block">
                   <span className="font-mono tabular-nums">SO-{o.so}</span>
                   {o.customer_name ? ` · ${o.customer_name}` : ""}
                 </span>
@@ -277,7 +277,7 @@ function AlertGroup({
             </li>
           ))}
           {rows.length > 5 && (
-            <li className="t-tiny text-base-400 px-1">+{rows.length - 5} more</li>
+            <li className="text-meta text-base-400 px-1">+{rows.length - 5} more</li>
           )}
         </ul>
       )}

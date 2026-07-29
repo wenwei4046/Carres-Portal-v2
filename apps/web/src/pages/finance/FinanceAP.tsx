@@ -58,13 +58,13 @@ export default function FinanceAP() {
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="flex items-end justify-between gap-4 flex-wrap mb-7">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
             Finance · Payables
           </div>
-          <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
+          <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
             A/P · Payables
           </h1>
-          <div className="text-[13px] text-muted-foreground">
+          <div className="text-body text-muted-foreground">
             Supplier POs · NET 30 from issue date · three-way match required to pay
           </div>
         </div>
@@ -85,14 +85,14 @@ export default function FinanceAP() {
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={`px-3.5 py-2 text-[12.5px] font-semibold transition-colors -mb-px border-b-2 ${
+              className={`px-3.5 py-2 text-meta font-semibold transition-colors -mb-px border-b-2 ${
                 active
                   ? "text-foreground border-primary"
                   : "text-muted-foreground border-transparent hover:text-foreground"
               }`}
             >
               {TAB_LABEL[t]}{" "}
-              <span className="font-mono text-[10.5px] text-muted-foreground ml-1">· {count}</span>
+              <span className="font-mono text-label text-muted-foreground ml-1">· {count}</span>
             </button>
           );
         })}
@@ -100,7 +100,7 @@ export default function FinanceAP() {
 
       <div className="bg-card rounded-md border border-border overflow-auto">
         <div
-          className="grid items-center px-4 py-2.5 bg-muted/40 border-b border-border text-[10px] uppercase tracking-[0.06em] font-bold text-muted-foreground"
+          className="grid items-center px-4 py-2.5 bg-muted/40 border-b border-border text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground"
           style={{ gridTemplateColumns: "110px 1.4fr 1.2fr 70px 130px 100px 90px", minWidth: 920 }}
         >
           <span>PO</span>
@@ -113,16 +113,16 @@ export default function FinanceAP() {
         </div>
 
         {aging.isLoading ? (
-          <div className="p-12 text-center text-[12.5px] text-muted-foreground">Loading…</div>
+          <div className="p-12 text-center text-meta text-muted-foreground">Loading…</div>
         ) : filtered.length === 0 ? (
-          <div className="p-12 text-center text-[12.5px] text-muted-foreground">No POs in this state.</div>
+          <div className="p-12 text-center text-meta text-muted-foreground">No POs in this state.</div>
         ) : (
           filtered.map((r) => <ApTableRow key={r.po_id} row={r} onView={() => setDrawer(r)} />)
         )}
       </div>
 
       {aging.error && (
-        <div className="mt-5 p-3 text-[12px] rounded-md bg-destructive/5 text-destructive border border-destructive/30">
+        <div className="mt-5 p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
           Failed to load payables: {String(aging.error)}
         </div>
       )}
@@ -150,24 +150,24 @@ function ApTableRow({ row, onView }: { row: FinanceApAgingRow; onView: () => voi
 
   return (
     <div
-      className="grid items-center px-4 py-3 border-b border-border text-[12.5px]"
+      className="grid items-center px-4 py-3 border-b border-border text-meta"
       style={{ gridTemplateColumns: "110px 1.4fr 1.2fr 70px 130px 100px 90px", minWidth: 920 }}
     >
       <span className="font-mono font-semibold">{row.po_id}</span>
       <span>{row.supplier_name ?? "—"}</span>
-      <span className="text-muted-foreground text-[11.5px]">{skuLabel}</span>
+      <span className="text-muted-foreground text-label">{skuLabel}</span>
       <span className="font-mono text-right">{row.qty}</span>
-      <span className="flex gap-1 text-[9.5px]">
+      <span className="flex gap-1 text-label">
         <MatchPill ok>PO</MatchPill>
         <MatchPill ok={doOk}>DO</MatchPill>
         <MatchPill ok={invOk}>INV</MatchPill>
       </span>
-      <span className="font-mono text-right font-bold">{rm(row.total)}</span>
+      <span className="font-mono text-right font-semibold">{rm(row.total)}</span>
       <span className="text-right">
         <button
           type="button"
           onClick={onView}
-          className="text-[11px] px-2.5 py-1 rounded border border-border bg-background hover:bg-muted/40"
+          className="text-label px-2.5 py-1 rounded border border-border bg-background hover:bg-muted/40"
         >
           View
         </button>
@@ -179,7 +179,7 @@ function ApTableRow({ row, onView }: { row: FinanceApAgingRow; onView: () => voi
 function MatchPill({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
     <span
-      className={`px-1.5 py-0.5 rounded font-bold text-[9.5px] ${
+      className={`px-1.5 py-0.5 rounded font-semibold text-label ${
         ok
           ? "bg-success/15 text-success"
           : "bg-muted text-muted-foreground"
@@ -202,13 +202,13 @@ function Kpi({
   const valueTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
   return (
     <div className={`bg-card rounded-md border ${accent ? "border-primary" : "border-border"} px-5 py-[18px]`}>
-      <div className={`text-[10px] uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
+      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
         {label}
       </div>
-      <div className={`font-display text-[26px] mt-1.5 leading-none tabular-nums ${valueTone}`}>
+      <div className={`font-display text-page mt-1.5 leading-none tabular-nums ${valueTone}`}>
         {value}
       </div>
-      {hint && <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>}
+      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
     </div>
   );
 }

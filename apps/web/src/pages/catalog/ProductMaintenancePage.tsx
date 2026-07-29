@@ -83,8 +83,8 @@ export default function ProductMaintenancePage({
       <div className="flex justify-between items-end mb-6 gap-4 flex-wrap">
         <div>
           <div className="kicker">Catalog</div>
-          <h1 className="t-h1 font-display mt-1.5 text-base-900">Product &amp; Maintenance</h1>
-          <p className="t-small text-base-600 mt-1">
+          <h1 className="text-page font-display mt-1.5 text-base-900">Product &amp; Maintenance</h1>
+          <p className="text-body text-base-600 mt-1">
             Manage the SKU master, modular models, combos, and delivery / add-on config.
           </p>
         </div>
@@ -101,10 +101,10 @@ export default function ProductMaintenancePage({
           that is otherwise pure catalog work. */}
 
       {catalogQ.isLoading && (
-        <div className="t-small text-base-500">Loading catalog…</div>
+        <div className="text-body text-base-500">Loading catalog…</div>
       )}
       {catalogQ.isError && !catalogQ.isLoading && (
-        <div className="t-small text-danger">
+        <div className="text-body text-danger">
           Failed to load the catalog. Try refreshing — your session may have expired.
         </div>
       )}

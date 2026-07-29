@@ -97,19 +97,19 @@ export default function PipelineColumn({
       <div className="px-4 py-3.5 border-b border-base-100">
         <div className="flex items-baseline justify-between">
           <div
-            className={`text-[11px] uppercase tracking-[0.14em] font-bold ${accentText}`}
+            className={`text-label uppercase tracking-[0.14em] font-semibold ${accentText}`}
           >
             {label}
           </div>
-          <span className="font-mono text-[13px] font-semibold text-base-900">
+          <span className="font-mono text-body font-semibold text-base-900">
             {count}
           </span>
         </div>
-        <div className="text-[11px] text-base-500 mt-0.5">{hint}</div>
+        <div className="text-label text-base-500 mt-0.5">{hint}</div>
       </div>
       <div className="p-2 min-h-[200px]">
         {items.length === 0 ? (
-          <div className="text-center text-base-400 text-[11px] py-6">—</div>
+          <div className="text-center text-base-400 text-label py-6">—</div>
         ) : (
           items.map((o) => (
             <PipelineOrderCard
@@ -149,19 +149,19 @@ function PipelineOrderCard({ order, onClick }: OrderCardProps) {
   const inner = (
     <>
       <div className="flex items-baseline justify-between">
-        <span className="font-mono text-[11px] font-semibold text-base-900">
+        <span className="font-mono text-label font-semibold text-base-900">
           #{order.so}
         </span>
-        <span className="font-mono text-[11px] text-base-500">
+        <span className="font-mono text-label text-base-500">
           {deliveryDate === "TBD" ? "TBD" : deliveryDate}
         </span>
       </div>
       <div
-        className={`${cjkClassName(customerName)} text-[13px] font-medium text-base-900 mt-0.5`}
+        className={`${cjkClassName(customerName)} text-body font-medium text-base-900 mt-0.5`}
       >
         {customerName}
       </div>
-      <div className="text-[10px] text-base-500 mt-1">
+      <div className="text-label text-base-500 mt-1">
         {dealerName} · {deliveryDate === "TBD" ? "TBD" : `→ ${deliveryDate}`}
       </div>
     </>

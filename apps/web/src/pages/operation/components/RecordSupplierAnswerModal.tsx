@@ -155,7 +155,7 @@ export default function RecordSupplierAnswerModal({
                     data-testid={`supplier-answer-${a}`}
                     className="mt-0.5"
                   />
-                  <span className="text-[13px] text-base-900">{label}</span>
+                  <span className="text-body text-base-900">{label}</span>
                 </label>
               );
             })}
@@ -175,7 +175,7 @@ export default function RecordSupplierAnswerModal({
           <div className="grid gap-2 mb-4">
             {/* R1's own sentence about this line — a FACT, so it states what is
                 short without a to-do word in it. */}
-            <div className="text-[13px] text-base-900" data-testid="balance-line-fact">
+            <div className="text-body text-base-900" data-testid="balance-line-fact">
               {line?.sku ?? "—"}
               {(() => {
                 const p = poReceivingProgress(line ? [line] : []);
@@ -197,7 +197,7 @@ export default function RecordSupplierAnswerModal({
           {/* Reused verbatim from the order drawer — free text has no dictionary
               row anywhere in COPY-STANDARD, and C8 met the same square and made
               the same call rather than inventing one. Reported, not smuggled. */}
-          <span className="t-tiny text-base-500">Note (optional)</span>
+          <span className="text-meta text-base-500">Note (optional)</span>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}

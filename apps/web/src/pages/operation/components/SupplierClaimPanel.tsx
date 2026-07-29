@@ -141,16 +141,16 @@ export default function SupplierClaimPanel({
       <div>
         <SectionTitle>Evidence</SectionTitle>
         {claim.photo_count === 0 && (
-          <div className="text-[12px] text-base-500">
+          <div className="text-meta text-base-500">
             {/* Late claims carry no photo by design — nothing arrived. */}
             No photo — a late delivery has nothing to photograph.
           </div>
         )}
         {photosQ.isLoading && (
-          <div className="text-[12px] text-base-500">Loading photos…</div>
+          <div className="text-meta text-base-500">Loading photos…</div>
         )}
         {photosQ.isError && (
-          <div className="text-[12px] text-danger">Couldn&rsquo;t load the photos.</div>
+          <div className="text-meta text-danger">Couldn&rsquo;t load the photos.</div>
         )}
         <div className="flex gap-3 flex-wrap">
           {(photosQ.data?.photos ?? []).map((p) =>
@@ -163,7 +163,7 @@ export default function SupplierClaimPanel({
                 />
               </a>
             ) : (
-              <span key={p.path} className="text-[11px] text-base-500">
+              <span key={p.path} className="text-label text-base-500">
                 {p.path} (unavailable)
               </span>
             ),
@@ -173,7 +173,7 @@ export default function SupplierClaimPanel({
         {/* R4 · the goods themselves */}
         <div className="mt-5" data-testid="claim-held-stock">
           <SectionTitle>The goods</SectionTitle>
-          <div className="text-[12.5px] text-base-800">
+          <div className="text-meta text-base-800">
             {heldUnitsLine(claim.held_units, claim.hold_reason)}
           </div>
 
@@ -186,7 +186,7 @@ export default function SupplierClaimPanel({
                     type="button"
                     onClick={() => setOutcome(o.key)}
                     aria-pressed={outcome === o.key}
-                    className={`text-[12px] px-2.5 py-1 rounded border ${
+                    className={`text-meta px-2.5 py-1 rounded border ${
                       outcome === o.key
                         ? "bg-base-900 text-white border-base-900 font-semibold"
                         : "bg-white text-base-700 border-base-200 hover:border-base-400"
@@ -208,7 +208,7 @@ export default function SupplierClaimPanel({
                       ? "Say why the units were written off"
                       : "Anything worth keeping (optional)"
                   }
-                  className="w-full text-[12px] rounded border border-base-200 px-2 py-1.5 focus:outline-none focus:border-base-400"
+                  className="w-full text-meta rounded border border-base-200 px-2 py-1.5 focus:outline-none focus:border-base-400"
                   data-testid="hold-outcome-note"
                 />
               )}
@@ -228,21 +228,21 @@ export default function SupplierClaimPanel({
                       setOutcomeNote("");
                     })
                 }
-                className="btn-primary text-[12px] py-1.5 px-3 disabled:opacity-40"
+                className="btn-primary text-meta py-1.5 px-3 disabled:opacity-40"
                 data-testid="hold-resolve"
               >
                 {holdM.isPending ? "Saving…" : "Save what happened"}
               </button>
 
               {holdProblems.length > 0 && outcome && (
-                <div className="text-[11.5px] text-base-600">
+                <div className="text-label text-base-600">
                   {holdProblems
                     .map((p) => STOCK_HOLD_RESOLVE_PROBLEM_TEXT[p])
                     .join(" ")}
                 </div>
               )}
               {holdM.isError && (
-                <div className="text-[11.5px] text-danger">
+                <div className="text-label text-danger">
                   {holdM.error?.message ?? "Couldn't save."}
                 </div>
               )}
@@ -253,11 +253,11 @@ export default function SupplierClaimPanel({
         {claim.status === "closed" && (
           <div className="mt-5">
             <SectionTitle>Closed</SectionTitle>
-            <div className="text-[13px] text-base-800">
+            <div className="text-body text-base-800">
               {claim.closed_at ? fmtDate(claim.closed_at) : "—"}
             </div>
             {claim.close_note && (
-              <div className="text-[12px] text-base-600 mt-1">{claim.close_note}</div>
+              <div className="text-meta text-base-600 mt-1">{claim.close_note}</div>
             )}
           </div>
         )}
@@ -270,17 +270,17 @@ export default function SupplierClaimPanel({
           <SectionTitle>What we asked</SectionTitle>
 
           {claim.requested_action ? (
-            <div className="text-[13px] text-base-800" data-testid="claim-request-recorded">
+            <div className="text-body text-base-800" data-testid="claim-request-recorded">
               <span className="font-semibold">
                 {supplierClaimRequestLabel(claim.requested_action)}
               </span>
               {claim.requested_at && (
-                <span className="text-[11px] text-base-500 ml-2">
+                <span className="text-label text-base-500 ml-2">
                   {fmtDate(claim.requested_at)}
                 </span>
               )}
               {asks.length === 0 && (
-                <div className="text-[11px] text-base-500 mt-1">
+                <div className="text-label text-base-500 mt-1">
                   {/* Why there was nothing to pick — see 0291's design note. */}
                   Set by the system: a late delivery can only be asked to deliver
                   the rest.
@@ -296,7 +296,7 @@ export default function SupplierClaimPanel({
                     type="button"
                     onClick={() => setAsk(a.key)}
                     aria-pressed={ask === a.key}
-                    className={`text-[12px] px-2.5 py-1 rounded border ${
+                    className={`text-meta px-2.5 py-1 rounded border ${
                       ask === a.key
                         ? "bg-base-900 text-white border-base-900 font-semibold"
                         : "bg-white text-base-700 border-base-200 hover:border-base-400"
@@ -308,13 +308,13 @@ export default function SupplierClaimPanel({
               </div>
 
               {ask && (
-                <div className="rounded border border-base-200 bg-base-50 p-2.5 text-[12px] text-base-700 whitespace-pre-wrap leading-relaxed">
+                <div className="rounded border border-base-200 bg-base-50 p-2.5 text-meta text-base-700 whitespace-pre-wrap leading-relaxed">
                   {message}
                 </div>
               )}
 
               {!supplierGroupUrl && (
-                <div className="text-[11.5px] text-base-600">
+                <div className="text-label text-base-600">
                   {/* Error pattern: what is missing · how to fix · who to ask. */}
                   {supplier}&rsquo;s WhatsApp group is not saved. Ask a manager to
                   add it in Suppliers, then send it by hand this time.
@@ -326,7 +326,7 @@ export default function SupplierClaimPanel({
                   type="button"
                   disabled={!ask || requestM.isPending}
                   onClick={() => void sendAsk()}
-                  className="btn-primary text-[12px] py-1.5 px-3 inline-flex items-center gap-1.5 disabled:opacity-40"
+                  className="btn-primary text-meta py-1.5 px-3 inline-flex items-center gap-1.5 disabled:opacity-40"
                   title={
                     supplierGroupUrl
                       ? `Saves what we asked, copies the message and opens ${supplier}'s WhatsApp group.`
@@ -345,14 +345,14 @@ export default function SupplierClaimPanel({
                   <button
                     type="button"
                     onClick={() => void copyMessage().then((ok) => ok && toast.success("Message copied"))}
-                    className="btn-ghost text-[12px] py-1.5 px-2 inline-flex items-center gap-1"
+                    className="btn-ghost text-meta py-1.5 px-2 inline-flex items-center gap-1"
                   >
                     <Copy size={13} strokeWidth={2} /> Copy
                   </button>
                 )}
               </div>
               {requestM.isError && (
-                <div className="text-[11.5px] text-danger">
+                <div className="text-label text-danger">
                   {requestM.error?.message ?? "Couldn't save."}
                 </div>
               )}
@@ -365,23 +365,23 @@ export default function SupplierClaimPanel({
           <SectionTitle>What {supplier} answered</SectionTitle>
 
           {claim.supplier_response ? (
-            <div className="text-[13px] text-base-800" data-testid="claim-response-recorded">
+            <div className="text-body text-base-800" data-testid="claim-response-recorded">
               <span className="font-semibold">
                 {supplierClaimResponseLabel(claim.supplier_response)}
               </span>
               {claim.responded_at && (
-                <span className="text-[11px] text-base-500 ml-2">
+                <span className="text-label text-base-500 ml-2">
                   {fmtDate(claim.responded_at)}
                 </span>
               )}
               {claim.supplier_response_note && (
-                <div className="text-[12px] text-base-600 mt-1">
+                <div className="text-meta text-base-600 mt-1">
                   {claim.supplier_response_note}
                 </div>
               )}
             </div>
           ) : !claim.requested_action ? (
-            <div className="text-[12px] text-base-500">
+            <div className="text-meta text-base-500">
               Ask {supplier} first — an answer needs a question.
             </div>
           ) : (
@@ -393,7 +393,7 @@ export default function SupplierClaimPanel({
                     type="button"
                     onClick={() => setAnswer(r.key)}
                     aria-pressed={answer === r.key}
-                    className={`text-[12px] px-2.5 py-1 rounded border ${
+                    className={`text-meta px-2.5 py-1 rounded border ${
                       answer === r.key
                         ? "bg-base-900 text-white border-base-900 font-semibold"
                         : "bg-white text-base-700 border-base-200 hover:border-base-400"
@@ -415,7 +415,7 @@ export default function SupplierClaimPanel({
                       ? "Say what was agreed, or why they refused"
                       : "Anything else worth keeping (optional)"
                   }
-                  className="w-full text-[12px] rounded border border-base-200 px-2 py-1.5 focus:outline-none focus:border-base-400"
+                  className="w-full text-meta rounded border border-base-200 px-2 py-1.5 focus:outline-none focus:border-base-400"
                   data-testid="claim-answer-note"
                 />
               )}
@@ -430,19 +430,19 @@ export default function SupplierClaimPanel({
                     note: answerNote.trim() || undefined,
                   })
                 }
-                className="btn-primary text-[12px] py-1.5 px-3 disabled:opacity-40"
+                className="btn-primary text-meta py-1.5 px-3 disabled:opacity-40"
                 data-testid="claim-save-answer"
               >
                 {responseM.isPending ? "Saving…" : `Save ${supplier}'s answer`}
               </button>
               {answer && answerNoteRequired && answerNote.trim().length === 0 && (
-                <div className="text-[11.5px] text-base-600">
+                <div className="text-label text-base-600">
                   A &ldquo;{supplierClaimResponseLabel(answer)}&rdquo; answer must say
                   what was agreed, or why.
                 </div>
               )}
               {responseM.isError && (
-                <div className="text-[11.5px] text-danger">
+                <div className="text-label text-danger">
                   {responseM.error?.message ?? "Couldn't save."}
                 </div>
               )}
@@ -455,7 +455,7 @@ export default function SupplierClaimPanel({
           <div>
             <SectionTitle>Settle it</SectionTitle>
             {!canClose ? (
-              <div className="text-[12px] text-base-500" data-testid="claim-close-blocked">
+              <div className="text-meta text-base-500" data-testid="claim-close-blocked">
                 {closeProblems.map((p) => SUPPLIER_CLAIM_CLOSE_PROBLEM_TEXT[p]).join(" ")}
               </div>
             ) : (
@@ -465,7 +465,7 @@ export default function SupplierClaimPanel({
                   onChange={(e) => setCloseNote(e.target.value)}
                   maxLength={500}
                   placeholder="What finally happened (optional)"
-                  className="w-full text-[12px] rounded border border-base-200 px-2 py-1.5 focus:outline-none focus:border-base-400"
+                  className="w-full text-meta rounded border border-base-200 px-2 py-1.5 focus:outline-none focus:border-base-400"
                 />
                 <button
                   type="button"
@@ -476,13 +476,13 @@ export default function SupplierClaimPanel({
                       note: closeNote.trim() || undefined,
                     })
                   }
-                  className="btn-secondary text-[12px] py-1.5 px-3 disabled:opacity-40"
+                  className="btn-secondary text-meta py-1.5 px-3 disabled:opacity-40"
                   data-testid="claim-close"
                 >
                   {closeM.isPending ? "Closing…" : "Close claim"}
                 </button>
                 {closeM.isError && (
-                  <div className="text-[11.5px] text-danger">
+                  <div className="text-label text-danger">
                     {closeM.error?.message ?? "Couldn't close."}
                   </div>
                 )}
@@ -497,7 +497,7 @@ export default function SupplierClaimPanel({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[11px] font-bold uppercase tracking-[0.02em] text-base-500 mb-1.5">
+    <div className="text-label font-semibold uppercase tracking-[0.02em] text-base-500 mb-1.5">
       {children}
     </div>
   );

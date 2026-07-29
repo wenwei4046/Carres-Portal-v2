@@ -39,14 +39,14 @@ export default function ApprovalRow({ a, onOpen }: Props) {
     >
       <ApprovalKindBadge kind={a.kind} />
       <div className="min-w-0">
-        <div className="text-[14px] font-semibold text-base-900 truncate">{a.title}</div>
-        <div className="text-[11.5px] text-base-500 mt-0.5">
+        <div className="text-body font-semibold text-base-900 truncate">{a.title}</div>
+        <div className="text-label text-base-500 mt-0.5">
           {a.actor ?? "System"} &middot; {new Date(a.created_at).toLocaleDateString()}
           {a.refers_to ? ` · ref ${a.refers_to}` : ""}
         </div>
       </div>
       {a.amount != null ? (
-        <div className="font-mono text-[14px] font-bold text-base-900">
+        <div className="font-mono text-body font-semibold text-base-900">
           RM {Number(a.amount).toLocaleString()}
         </div>
       ) : (

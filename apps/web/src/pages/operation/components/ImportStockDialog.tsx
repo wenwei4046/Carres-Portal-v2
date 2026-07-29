@@ -134,13 +134,13 @@ export default function ImportStockDialog({
     <Modal title="Import warehouse sheet" onClose={onClose}>
       {stage === "pick" && (
         <div className="flex flex-col gap-3">
-          <p className="t-small text-base-600">
+          <p className="text-body text-base-600">
             Upload your <span className="font-semibold">Klg Warehouse</span>{" "}
             sheet (.xlsx). Each row is one physical unit; we book them in at{" "}
             <span className="font-semibold">Carres Klang</span>. You&rsquo;ll see
             the counts — new vs already-in — before anything saves.
           </p>
-          <p className="t-tiny text-base-500">
+          <p className="text-meta text-base-500">
             Add-only + idempotent: lines already in the pool are matched on a
             stable key (SKU · PO · ref · supplier · date) and skipped, so
             re-importing the same sheet won&rsquo;t double up.
@@ -148,7 +148,7 @@ export default function ImportStockDialog({
           <div>
             <button
               type="button"
-              className="btn-primary text-[12px]"
+              className="btn-primary text-meta"
               onClick={() => fileInput.current?.click()}
               data-testid="stock-import-pick"
             >
@@ -168,7 +168,7 @@ export default function ImportStockDialog({
             }}
           />
           {parseError && (
-            <p className="t-small text-red-600" data-testid="stock-import-error">
+            <p className="text-body text-red-600" data-testid="stock-import-error">
               {parseError}
             </p>
           )}
@@ -177,8 +177,8 @@ export default function ImportStockDialog({
 
       {stage === "preview" && (
         <div className="flex flex-col gap-3">
-          <div className="t-small text-base-700">
-            <span className="font-mono t-tiny">{fileName}</span> ·{" "}
+          <div className="text-body text-base-700">
+            <span className="font-mono text-meta">{fileName}</span> ·{" "}
             <span className="font-semibold text-base-900">{rows.length}</span>{" "}
             lines ·{" "}
             <span className="font-semibold text-base-900">{unitsOf(rows)}</span>{" "}
@@ -187,16 +187,16 @@ export default function ImportStockDialog({
 
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-[6px] bg-base-50 px-3 py-2">
-              <div className="t-h4 text-green-700">{fresh.length}</div>
-              <div className="t-micro text-base-500">new lines — will add</div>
+              <div className="text-strong text-green-700">{fresh.length}</div>
+              <div className="text-label uppercase tracking-[0.05em] text-base-500">new lines — will add</div>
             </div>
             <div className="rounded-[6px] bg-base-50 px-3 py-2">
-              <div className="t-h4 text-base-900">{alreadyIn}</div>
-              <div className="t-micro text-base-500">already in — skipped</div>
+              <div className="text-strong text-base-900">{alreadyIn}</div>
+              <div className="text-label uppercase tracking-[0.05em] text-base-500">already in — skipped</div>
             </div>
           </div>
 
-          <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2 t-tiny text-base-600">
+          <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2 text-meta text-base-600">
             Booking in <span className="font-semibold">{fresh.length}</span> new
             line(s) at Carres Klang. Condition, PO, supplier, reserved-ref, qty +
             date-in come straight from the sheet. Bulk lines (e.g. accessories)
@@ -207,7 +207,7 @@ export default function ImportStockDialog({
             <button
               type="button"
               onClick={() => setStage("pick")}
-              className="btn-ghost text-[12px]"
+              className="btn-ghost text-meta"
               disabled={busy}
             >
               Back
@@ -216,7 +216,7 @@ export default function ImportStockDialog({
               type="button"
               onClick={confirm}
               disabled={busy || fresh.length === 0}
-              className="btn-primary text-[12px] disabled:opacity-40"
+              className="btn-primary text-meta disabled:opacity-40"
               data-testid="stock-import-confirm"
             >
               {busy ? "Booking in…" : `Add ${fresh.length} line(s)`}
@@ -228,15 +228,15 @@ export default function ImportStockDialog({
       {stage === "result" && (
         <div className="flex flex-col gap-3" data-testid="stock-import-result">
           <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2.5">
-            <div className="t-h4 text-green-700">{created} line(s) booked in</div>
-            <div className="t-small text-base-600 mt-0.5">
+            <div className="text-strong text-green-700">{created} line(s) booked in</div>
+            <div className="text-body text-base-600 mt-0.5">
               at Carres Klang · the On Hand list has refreshed.
             </div>
           </div>
           <div className="flex justify-end">
             <button
               type="button"
-              className="btn-primary text-[12px]"
+              className="btn-primary text-meta"
               onClick={onClose}
               data-testid="stock-import-done"
             >

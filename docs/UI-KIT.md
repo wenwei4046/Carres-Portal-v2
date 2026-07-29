@@ -548,9 +548,20 @@ exactly the px / weight / line-height above.
 
 > **Why the class is `text-page` and not `t-page`** (D0.5a, recorded so nobody
 > "fixes" it): `.t-body` already exists in `index.css` as the retired v17 ramp's
-> **14px/400** and is live in 5 files. Taking the name would have re-sized pages
-> D0.5a is forbidden to touch. The legacy `.t-*` ramp dies in **D2**, and the
-> question of whether the class then takes the law's own name is D2's.
+> **14px/400**. Taking the name would have re-sized pages D0.5a is forbidden to
+> touch.
+>
+> **D2 answered the rename question with a NO, and the reason is Part B**
+> (2026-07-29). The legacy `.t-*` ramp is gone from every in-scope file — 844
+> uses converted — but **its definitions stay in `index.css`, because 110 uses
+> survive under `pages/dealer/**` and `pages/print/**`**, which §15 and §13.1 put
+> out of scope. Deleting the ramp would restyle the POS from a card that may not
+> touch it, and taking its NAMES would do the same thing one step later. The six
+> classes keep the `text-*` spelling; the question is closed, not deferred.
+
+**After D2** (measured 2026-07-29): the six tokens are used **3,971** times in
+scope, and `text-[Npx]`, `font-bold` and the `.t-*` ramp appear in exactly ONE
+in-scope file — `index.css`, holding the definitions Part B still needs.
 
 ```
 Orders                                       24  t-page
@@ -572,15 +583,16 @@ SO-1256   Tan Wei Ming   27 Jul 26, Sun      13  t-body
 | 400 | body text | 33 uses |
 | 500 | labels, light emphasis | 202 uses |
 | 600 | titles, numbers — **the heavy weight** | 854 uses |
-| ~~700~~ | **DEAD (Q3, frozen 2026-07-28)** — `font-bold` folds into 600 | 158 uses left to migrate |
+| ~~700~~ | **DEAD (Q3, frozen 2026-07-28)** — `font-bold` folds into 600 | ✅ **0 left in scope (D2)** — 164 converted |
 
 `font-bold` (700) and `font-semibold` (600) were doing the same job at every
 size; `/ui` showed both on the same words and Jess deleted 700. **There are
 three weights, and there is no fourth.**
 
-A kit file that writes `font-bold` fails the source scan today. The **158 live
-uses across the 225 pages are D2's codemod** — a card that changes the law does
-not also rewrite the pages, or nothing can be reviewed.
+A kit file that writes `font-bold` fails the source scan today, and **D2 converted
+the 164 live uses across the pages** (2026-07-29). The only `font-bold` left in
+`apps/web/src` is inside `index.css`'s retired `.t-h1` / `.t-h2` definitions,
+which survive because Part B still uses them — see §2.1.
 
 ## §2.3 Numbers and codes
 

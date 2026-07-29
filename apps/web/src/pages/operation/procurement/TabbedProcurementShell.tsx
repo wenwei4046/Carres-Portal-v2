@@ -114,10 +114,10 @@ export default function TabbedProcurementShell() {
       <div className="px-9 pt-7 pb-3 flex justify-between items-start gap-4">
         <div>
           <div className="kicker">Procurement</div>
-          <h1 className="t-h1 font-display mt-1.5 text-base-900">
+          <h1 className="text-page font-display mt-1.5 text-base-900">
             Purchase orders
           </h1>
-          <div className="font-body text-[13px] text-base-600 mt-1 max-w-[780px]">
+          <div className="font-body text-body text-base-600 mt-1 max-w-[780px]">
             Per-supplier channels for purchase orders. Each tab loads its own PO
             list (server-filtered by supplier slug + category) so the view stays
             focused on the channel the user is working on.
@@ -125,7 +125,7 @@ export default function TabbedProcurementShell() {
         </div>
         <button
           type="button"
-          className="btn-hero text-[12px]"
+          className="btn-hero text-meta"
           onClick={() => setCreatePrefill({})}
           data-testid="new-po-button"
         >
@@ -152,7 +152,7 @@ export default function TabbedProcurementShell() {
               data-testid={`procurement-tab-link-${slug}`}
               className={({ isActive }) =>
                 [
-                  "relative px-4 py-3 text-[13px] font-body transition-colors",
+                  "relative px-4 py-3 text-body font-body transition-colors",
                   "border-b-2 -mb-px",
                   isActive
                     ? "border-accent text-base-900 font-semibold"

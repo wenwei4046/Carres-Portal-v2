@@ -111,7 +111,7 @@ export default function ReselectPartnerDialog({ order, onClose }: Props) {
     <Modal title={`Reselect LP · #${order.so}`} onClose={onClose}>
       <div
         data-testid="reselect-rejected-context"
-        className="text-[12px] px-3 py-2.5 rounded-[4px] mb-3.5 font-body text-destructive border border-destructive/30 bg-destructive/5"
+        className="text-meta px-3 py-2.5 rounded-[4px] mb-3.5 font-body text-destructive border border-destructive/30 bg-destructive/5"
       >
         <div>
           <strong>{rejectedByName}</strong> rejected this delivery
@@ -126,11 +126,11 @@ export default function ReselectPartnerDialog({ order, onClose }: Props) {
 
       <div className="label mb-1.5">Pick a different delivery partner *</div>
       {partnersQ.isLoading ? (
-        <div className="text-[12px] text-base-500 mb-3.5">
+        <div className="text-meta text-base-500 mb-3.5">
           Loading partners…
         </div>
       ) : candidatePartners.length === 0 ? (
-        <div className="text-[12px] text-warning mb-3.5">
+        <div className="text-meta text-warning mb-3.5">
           No other logistic partners available.
         </div>
       ) : (

@@ -78,10 +78,10 @@ export default function PartnerRequestForDeliveryDialog({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-card rounded-lg p-6 max-w-md w-full">
-        <h2 className="text-lg font-semibold mb-4">
+        <h2 className="text-strong font-semibold mb-4">
           Request for Delivery — {poLabel ?? threadId.slice(0, 8)}
         </h2>
-        {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
+        {error && <p className="text-red-600 text-body mb-2">{error}</p>}
         <div className="flex gap-2 justify-end">
           <button onClick={onClose} className="px-4 py-2 border border-base-200 rounded">Cancel</button>
           <button

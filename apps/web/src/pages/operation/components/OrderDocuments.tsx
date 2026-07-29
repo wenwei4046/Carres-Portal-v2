@@ -272,23 +272,23 @@ export default function OrderDocuments({
           data-missing={r.missing ? "1" : "0"}
           className="px-3 py-1.5 border-b border-base-100 last:border-b-0 flex items-center justify-between gap-x-3 gap-y-1 flex-wrap min-h-9"
         >
-          <span className="text-[11px] font-semibold uppercase tracking-[0.03em] text-base-500 shrink-0">
+          <span className="text-label font-semibold uppercase tracking-[0.03em] text-base-500 shrink-0">
             {r.label}
           </span>
           <span className="min-w-0 text-right flex items-center gap-2.5 justify-end flex-wrap">
             {r.missing ? (
-              <span className="text-[12px] font-medium text-warning">
+              <span className="text-meta font-medium text-warning">
                 missing
               </span>
             ) : (
               <>
-                <span className="text-[13px] font-medium text-base-900 truncate">
+                <span className="text-body font-medium text-base-900 truncate">
                   {r.detail}
                 </span>
                 <button
                   type="button"
                   onClick={() => onOpen(r)}
-                  className="inline-flex items-center gap-1 text-[12px] text-info hover:underline shrink-0"
+                  className="inline-flex items-center gap-1 text-meta text-info hover:underline shrink-0"
                 >
                   Open
                   <ExternalLink size={12} aria-hidden />

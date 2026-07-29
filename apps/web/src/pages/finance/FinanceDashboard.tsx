@@ -40,19 +40,19 @@ export default function FinanceDashboard() {
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="flex items-end justify-between gap-4 flex-wrap mb-7">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
             Finance · Overview
           </div>
-          <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
+          <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
             Dashboard
           </h1>
-          <div className="text-[13px] text-muted-foreground">
+          <div className="text-body text-muted-foreground">
             Cash position, receivables, payables · live from Supabase
           </div>
         </div>
         <button
           type="button"
-          className="px-3.5 py-1.5 text-[12px] font-medium border border-border rounded-md text-muted-foreground"
+          className="px-3.5 py-1.5 text-meta font-medium border border-border rounded-md text-muted-foreground"
           disabled
           title="Export · coming in Chunk B"
         >
@@ -102,7 +102,7 @@ export default function FinanceDashboard() {
       </div>
 
       {summary.error && (
-        <div className="mt-5 p-3 text-[12px] rounded-md bg-destructive/5 text-destructive border border-destructive/30">
+        <div className="mt-5 p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
           Failed to load dashboard summary: {String(summary.error)}
         </div>
       )}
@@ -133,16 +133,16 @@ function FinKpi({
   const labelClass  = accent ? "text-primary" : "text-muted-foreground";
   return (
     <div className={`bg-card rounded-md border ${borderClass} px-5 py-[18px]`}>
-      <div className={`text-[10px] uppercase tracking-[0.06em] font-semibold ${labelClass}`}>
+      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${labelClass}`}>
         {label}
       </div>
       <div
         data-kpi-value
-        className={`font-display text-[26px] mt-1.5 leading-none tabular-nums ${toneClass}`}
+        className={`font-display text-page mt-1.5 leading-none tabular-nums ${toneClass}`}
       >
         {value}
       </div>
-      {hint && <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>}
+      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
     </div>
   );
 }
@@ -178,17 +178,17 @@ function AgingCard({
 
   return (
     <div className="bg-card rounded-md border border-border px-5 py-[18px]">
-      <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground">
+      <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground">
         A/R Aging
       </div>
-      <div className="text-[14px] font-semibold mt-0.5 mb-3.5">Outstanding by age</div>
+      <div className="text-body font-semibold mt-0.5 mb-3.5">Outstanding by age</div>
       <div className="flex flex-col gap-3">
         {BUCKET_KEYS.map((b) => {
           const row = buckets[b] ?? { amount: 0, count: 0 };
           const pct = totalAr > 0 ? (row.amount / totalAr) * 100 : 0;
           return (
             <div key={b}>
-              <div className="flex justify-between text-[11.5px] mb-1">
+              <div className="flex justify-between text-label mb-1">
                 <span className="text-foreground font-semibold">{b} days</span>
                 <span className="font-mono">
                   {rm(row.amount)} · {row.count}
@@ -214,12 +214,12 @@ function CashflowStubCard({ inflow, outflow }: { inflow: number; outflow: number
     <div className="bg-card rounded-md border border-border px-5 py-[18px]">
       <div className="flex items-center justify-between mb-3.5">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground">
+          <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground">
             Cashflow
           </div>
-          <div className="text-[14px] font-semibold mt-0.5">Last 12 weeks</div>
+          <div className="text-body font-semibold mt-0.5">Last 12 weeks</div>
         </div>
-        <div className="flex gap-3.5 text-[11px] text-muted-foreground">
+        <div className="flex gap-3.5 text-label text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 bg-success rounded-sm" />
             Inflow
@@ -232,23 +232,23 @@ function CashflowStubCard({ inflow, outflow }: { inflow: number; outflow: number
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground">
+          <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground">
             Inflow total
           </div>
-          <div className="font-display text-[22px] text-success mt-0.5 tabular-nums">
+          <div className="font-display text-title text-success mt-0.5 tabular-nums">
             {rmCompact(inflow)}
           </div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground">
+          <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground">
             Outflow total
           </div>
-          <div className="font-display text-[22px] text-primary mt-0.5 tabular-nums">
+          <div className="font-display text-title text-primary mt-0.5 tabular-nums">
             {rmCompact(outflow)}
           </div>
         </div>
       </div>
-      <div className="mt-3.5 text-[11px] text-muted-foreground italic">
+      <div className="mt-3.5 text-label text-muted-foreground italic">
         Per-week sparkline lands in Chunk B (cashflow_series RPC).
       </div>
     </div>
@@ -259,11 +259,11 @@ function CashflowStubCard({ inflow, outflow }: { inflow: number; outflow: number
 function ActivityStubCard() {
   return (
     <div className="bg-card rounded-md border border-border p-5">
-      <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground">
+      <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground">
         Activity
       </div>
-      <div className="text-[14px] font-semibold mt-0.5">Recent transactions</div>
-      <div className="mt-5 text-[12px] text-muted-foreground italic">
+      <div className="text-body font-semibold mt-0.5">Recent transactions</div>
+      <div className="mt-5 text-meta text-muted-foreground italic">
         Live activity feed lands alongside the AR + AP pages.
       </div>
     </div>
@@ -274,14 +274,14 @@ function ActivityStubCard() {
 function PayablesStubCard({ apCount, apAmt }: { apCount: number; apAmt: number }) {
   return (
     <div className="bg-card rounded-md border border-border p-5">
-      <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground">
+      <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground">
         Payables
       </div>
-      <div className="text-[14px] font-semibold mt-0.5">Ready to pay</div>
-      <div className="mt-3 font-display text-[22px] tabular-nums text-foreground">
+      <div className="text-body font-semibold mt-0.5">Ready to pay</div>
+      <div className="mt-3 font-display text-title tabular-nums text-foreground">
         {rmCompact(apAmt)}
       </div>
-      <div className="text-[11px] text-muted-foreground mt-1">
+      <div className="text-label text-muted-foreground mt-1">
         {apCount} matched PO{apCount === 1 ? "" : "s"} · detail list lands with AP page
       </div>
     </div>

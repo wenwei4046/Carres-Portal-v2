@@ -204,12 +204,12 @@ export default function PoDetailModal({
           <div className="min-w-0">
             <div className="kicker">Purchase Order</div>
             <div
-              className="t-h2 font-display mt-1.5 text-base-900 font-mono"
+              className="text-page font-display mt-1.5 text-base-900 font-mono"
               title={po.id}
             >
               #PO-{poShortId}
             </div>
-            <div className="text-[13px] text-base-700 font-body mt-1">
+            <div className="text-body text-base-700 font-body mt-1">
               {supplier?.name ?? "—"}
             </div>
           </div>
@@ -254,7 +254,7 @@ export default function PoDetailModal({
                     return (
                       <div
                         key={d}
-                        className="text-[12px] font-mono text-base-900"
+                        className="text-meta font-mono text-base-900"
                         data-testid={`po-detail-order-ref-${d}`}
                       >
                         #{d}
@@ -283,7 +283,7 @@ export default function PoDetailModal({
             <div className="label text-right">Status</div>
           </div>
           {lines.length === 0 && (
-            <div className="px-3.5 py-4 text-center text-base-500 text-[12px]">
+            <div className="px-3.5 py-4 text-center text-base-500 text-meta">
               No lines on this PO.
             </div>
           )}
@@ -298,11 +298,11 @@ export default function PoDetailModal({
                 className="grid items-center gap-3 px-3.5 py-2.5 border-t border-base-100"
                 style={{ gridTemplateColumns: "2.4fr 80px 80px 90px" }}
               >
-                <div className="min-w-0 text-[12px] font-body" title={line.sku}>
+                <div className="min-w-0 text-meta font-body" title={line.sku}>
                   <div className="overflow-hidden text-ellipsis whitespace-nowrap">
                     {friendlySku(line.sku)}
                   </div>
-                  <div className="font-mono text-[10px] text-base-500 mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
+                  <div className="font-mono text-label text-base-500 mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
                     {line.sku}
                   </div>
                   {/* 0073 cascade picker (Loo 2026-05-09): render bedframe
@@ -328,7 +328,7 @@ export default function PoDetailModal({
                     if (parts.length === 0) return null;
                     return (
                       <div
-                        className="text-[10.5px] text-base-700 mt-0.5"
+                        className="text-label text-base-700 mt-0.5"
                         data-testid={`po-detail-line-attrs-${i}`}
                       >
                         {parts.join(" · ")}
@@ -336,15 +336,15 @@ export default function PoDetailModal({
                     );
                   })()}
                 </div>
-                <div className="text-right font-mono text-[12px]">
+                <div className="text-right font-mono text-meta">
                   {line.qty}
                 </div>
-                <div className="text-right font-mono text-[12px]">
+                <div className="text-right font-mono text-meta">
                   {line.received_qty || 0}
                 </div>
                 <div className="text-right">
                   <span
-                    className="font-ui font-bold uppercase border rounded-[3px]"
+                    className="font-ui font-semibold uppercase border rounded-[3px]"
                     style={{
                       fontSize: 9,
                       letterSpacing: "0.12em",
@@ -360,7 +360,7 @@ export default function PoDetailModal({
             );
           })}
           {lines.length > 1 && (
-            <div className="border-t border-base-100 px-3.5 py-2 text-right font-mono text-[11px] text-base-600">
+            <div className="border-t border-base-100 px-3.5 py-2 text-right font-mono text-label text-base-600">
               Σ {totalGot}/{totalQty} units
             </div>
           )}
@@ -372,7 +372,7 @@ export default function PoDetailModal({
             type="button"
             onClick={handlePrint}
             disabled={printing}
-            className="btn-secondary text-[12px] disabled:opacity-50"
+            className="btn-secondary text-meta disabled:opacity-50"
             data-testid="po-detail-print-button"
           >
             {printing ? "Opening…" : "Print PO"}
@@ -382,7 +382,7 @@ export default function PoDetailModal({
               <button
                 type="button"
                 onClick={onReceive}
-                className="btn-primary text-[12px]"
+                className="btn-primary text-meta"
                 data-testid="po-detail-receive-button"
               >
                 Receive PO
@@ -391,7 +391,7 @@ export default function PoDetailModal({
             <button
               type="button"
               onClick={onClose}
-              className="btn-ghost text-[12px]"
+              className="btn-ghost text-meta"
               data-testid="po-detail-close-button"
             >
               Close
@@ -422,7 +422,7 @@ function KV({
       <div className="label mb-0.5">{label}</div>
       {isString ? (
         <div
-          className={`text-[12px] ${mono ? "font-mono" : "font-body"} text-base-900`}
+          className={`text-meta ${mono ? "font-mono" : "font-body"} text-base-900`}
           style={valueStyle}
         >
           {value}

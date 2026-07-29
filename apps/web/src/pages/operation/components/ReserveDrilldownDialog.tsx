@@ -67,7 +67,7 @@ export default function ReserveDrilldownDialog({
 
   return (
     <Modal title={`Reserved orders · ${friendlySku}`} onClose={onClose} size="lg">
-      <div className="text-[12px] text-base-600 mb-3.5 font-body">
+      <div className="text-meta text-base-600 mb-3.5 font-body">
         Orders currently holding reserved stock at{" "}
         <strong>{warehouseName}</strong>. Reserve releases automatically on DO
         upload or order abandon.
@@ -84,19 +84,19 @@ export default function ReserveDrilldownDialog({
         </div>
       ) : drilldown.isError ? (
         <div
-          className="rounded-[4px] bg-destructive/10 border border-destructive/30 p-4 text-sm"
+          className="rounded-[4px] bg-destructive/10 border border-destructive/30 p-4 text-body"
           data-testid="reserve-drilldown-error"
         >
           <div className="text-destructive font-semibold mb-2">
             Couldn&rsquo;t load drill-down
           </div>
-          <div className="text-[12px] text-base-700 mb-3">
+          <div className="text-meta text-base-700 mb-3">
             {(drilldown.error as Error | undefined)?.message ?? "Unknown error"}
           </div>
           <button
             type="button"
             onClick={() => void drilldown.refetch()}
-            className="btn-secondary text-[11px] py-1.5 px-3"
+            className="btn-secondary text-label py-1.5 px-3"
           >
             Retry
           </button>
@@ -110,16 +110,16 @@ export default function ReserveDrilldownDialog({
             data-testid="reserve-drilldown-summary"
           >
             <div className="flex justify-between items-center gap-4 flex-wrap">
-              <div className="font-body text-[12px]">
+              <div className="font-body text-meta">
                 <strong>{friendlySku}</strong>
                 {skuLabel ? (
-                  <span className="font-mono text-[10px] text-base-500 ml-1.5">
+                  <span className="font-mono text-label text-base-500 ml-1.5">
                     {sku}
                   </span>
                 ) : null}
                 <span className="text-base-500"> @ {warehouseName}</span>
               </div>
-              <div className="font-mono text-[11px] text-base-600">
+              <div className="font-mono text-label text-base-600">
                 <strong>{data?.total ?? 0}</strong> reserved across{" "}
                 <strong>{orders.length}</strong> order
                 {orders.length === 1 ? "" : "s"}
@@ -129,7 +129,7 @@ export default function ReserveDrilldownDialog({
 
           {orders.length === 0 ? (
             <div
-              className="p-9 text-center text-base-500 text-[13px] border border-base-100 rounded-[4px]"
+              className="p-9 text-center text-base-500 text-body border border-base-100 rounded-[4px]"
               data-testid="reserve-drilldown-empty"
             >
               No orders are currently holding reserve for this SKU.
@@ -157,23 +157,23 @@ export default function ReserveDrilldownDialog({
                     gridTemplateColumns: "100px minmax(0,1fr) 150px 90px 90px",
                   }}
                 >
-                  <div className="font-mono text-[12px] font-semibold">
+                  <div className="font-mono text-meta font-semibold">
                     #SO{o.so}
                   </div>
-                  <div className="font-body text-[13px] truncate">
+                  <div className="font-body text-body truncate">
                     {o.customerName}
                   </div>
                   <div>
                     <StageChip stage={o.operationStage} />
                   </div>
-                  <div className="font-mono text-[13px] text-right font-semibold">
+                  <div className="font-mono text-body text-right font-semibold">
                     ×{o.reservedQty}
                   </div>
                   <div className="text-right">
                     <button
                       type="button"
                       onClick={() => void copyDl(o.so)}
-                      className="btn-ghost text-[11px] py-1 px-2"
+                      className="btn-ghost text-label py-1 px-2"
                       data-testid={`reserve-drilldown-copy-${o.id}`}
                     >
                       Copy SO
@@ -188,7 +188,7 @@ export default function ReserveDrilldownDialog({
 
       {/* Footer with single Close button — no destructive primary action. */}
       <div className="flex justify-end gap-2 mt-4">
-        <button type="button" onClick={onClose} className="btn-secondary text-[12px]">
+        <button type="button" onClick={onClose} className="btn-secondary text-meta">
           Close
         </button>
       </div>

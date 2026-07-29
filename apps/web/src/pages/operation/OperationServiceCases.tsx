@@ -83,9 +83,9 @@ export default function OperationServiceCases() {
     <div className="p-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <p className="text-xs uppercase tracking-wider text-base-500 mb-1">Operation</p>
-        <h1 className="t-h1 text-base-900">Service Cases</h1>
-        <p className="text-sm text-base-600 mt-2">
+        <p className="text-meta uppercase tracking-wider text-base-500 mb-1">Operation</p>
+        <h1 className="text-page text-base-900">Service Cases</h1>
+        <p className="text-body text-base-600 mt-2">
           Every issue is a case · classify · record · generate a Service Note dispatch order
         </p>
       </div>
@@ -100,7 +100,7 @@ export default function OperationServiceCases() {
             onClick={() => setTab(t)}
             aria-pressed={tab === t}
             data-testid={`case-tab-${t}`}
-            className={`-mb-px border-b-2 px-1 py-2 text-sm font-medium ${
+            className={`-mb-px border-b-2 px-1 py-2 text-body font-medium ${
               tab === t
                 ? "border-primary text-base-900"
                 : "border-transparent text-base-500 hover:text-base-700"
@@ -117,7 +117,7 @@ export default function OperationServiceCases() {
       <>
       {/* Toolbar */}
       <div className="flex items-center gap-3 mb-4">
-        <div className="flex rounded border border-base-200 overflow-hidden text-sm">
+        <div className="flex rounded border border-base-200 overflow-hidden text-body">
           {(["", "ongoing", "closed"] as const).map((s) => (
             <button
               key={s}
@@ -139,7 +139,7 @@ export default function OperationServiceCases() {
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="btn-hero text-[13px] py-1.5"
+          className="btn-hero text-body py-1.5"
         >
           + New Case
         </button>
@@ -147,16 +147,16 @@ export default function OperationServiceCases() {
 
       {/* Table */}
       {listQ.isLoading ? (
-        <p className="text-sm text-base-500">Loading…</p>
+        <p className="text-body text-base-500">Loading…</p>
       ) : rows.length === 0 ? (
         <div className="rounded border border-base-200 bg-white p-12 text-center">
           <p className="text-base-700 font-medium">No cases yet.</p>
-          <p className="text-sm text-base-500 mt-1">Open a new case when an issue arises.</p>
+          <p className="text-body text-base-500 mt-1">Open a new case when an issue arises.</p>
         </div>
       ) : (
         <div className="rounded border border-base-200 bg-white overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-base-50 text-xs uppercase tracking-wider text-base-500">
+          <table className="w-full text-body">
+            <thead className="bg-base-50 text-meta uppercase tracking-wider text-base-500">
               <tr>
                 <th className="text-left px-3 py-2 font-medium">Case No.</th>
                 {/* J2 — the case→order link gets its own column: it is the
@@ -200,7 +200,7 @@ export default function OperationServiceCases() {
                   className="border-t border-base-200 hover:bg-base-50 cursor-pointer"
                   onClick={() => setEditId(r.id)}
                 >
-                  <td className="px-3 py-2 font-mono text-xs text-base-900 font-semibold whitespace-nowrap">
+                  <td className="px-3 py-2 font-mono text-meta text-base-900 font-semibold whitespace-nowrap">
                     {r.caseNo}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
@@ -211,19 +211,19 @@ export default function OperationServiceCases() {
                   </td>
                   <td className="px-3 py-2">
                     {r.caseTypeLabel ? (
-                      <span className="rounded bg-base-100 px-1.5 py-0.5 text-xs text-base-700">
+                      <span className="rounded bg-base-100 px-1.5 py-0.5 text-meta text-base-700">
                         {r.caseTypeLabel}
                       </span>
                     ) : (
-                      <span className="text-base-400 text-xs">—</span>
+                      <span className="text-base-400 text-meta">—</span>
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <div className="text-base-900 text-sm">{r.customerName || "—"}</div>
-                    {r.refNo && <div className="text-xs text-base-500 font-mono">{r.refNo}</div>}
+                    <div className="text-base-900 text-body">{r.customerName || "—"}</div>
+                    {r.refNo && <div className="text-meta text-base-500 font-mono">{r.refNo}</div>}
                   </td>
                   <td className="px-3 py-2 max-w-xs">
-                    <p className="text-sm text-base-700 line-clamp-2">
+                    <p className="text-body text-base-700 line-clamp-2">
                       {r.whatHappened || <span className="text-base-400">—</span>}
                     </p>
                   </td>
@@ -235,7 +235,7 @@ export default function OperationServiceCases() {
                       {r.statusLabel ?? "Unset"}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-xs text-base-500 whitespace-nowrap">
+                  <td className="px-3 py-2 text-meta text-base-500 whitespace-nowrap">
                     {fmtDate(r.openedAt)}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
@@ -245,7 +245,7 @@ export default function OperationServiceCases() {
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setEditId(r.id); }}
-                      className="rounded border border-base-300 bg-white px-2 py-1 text-xs text-base-700 hover:bg-base-100"
+                      className="rounded border border-base-300 bg-white px-2 py-1 text-meta text-base-700 hover:bg-base-100"
                     >
                       Open
                     </button>
@@ -282,7 +282,7 @@ export default function OperationServiceCases() {
  * to do on it, and "Done" is a fact, not a to-do word.
  */
 function NextStepCell({ row, clock }: { row: ServiceCase; clock: CaseSlaClock }) {
-  if (row.statusIsClosed) return <span className="text-xs text-base-500">Done</span>;
+  if (row.statusIsClosed) return <span className="text-meta text-base-500">Done</span>;
 
   const open = caseOpenSteps(
     caseFollowUpPlan({
@@ -303,15 +303,15 @@ function NextStepCell({ row, clock }: { row: ServiceCase; clock: CaseSlaClock })
 
   if (actions.length === 0) {
     return (
-      <span className="text-sm text-base-700">Everything done — close this case.</span>
+      <span className="text-body text-base-700">Everything done — close this case.</span>
     );
   }
 
   return (
     <span className="block">
-      <span className="block text-sm text-base-900">{actions[0]}</span>
+      <span className="block text-body text-base-900">{actions[0]}</span>
       {actions.length > 1 && (
-        <span className="t-tiny text-base-500">+{actions.length - 1} more</span>
+        <span className="text-meta text-base-500">+{actions.length - 1} more</span>
       )}
     </span>
   );
@@ -326,15 +326,15 @@ function NextStepCell({ row, clock }: { row: ServiceCase; clock: CaseSlaClock })
  * count on a finished case would be a number nobody can act on.
  */
 function DeadlineCell({ clock }: { clock: CaseSlaClock }) {
-  if (!clock.dueIso) return <span className="text-base-400 text-xs">—</span>;
+  if (!clock.dueIso) return <span className="text-base-400 text-meta">—</span>;
   const count = caseSlaCountLabel(clock);
 
   return (
     <span className="block">
-      <span className="block text-sm text-base-900 tabular-nums">{fmtDate(clock.dueIso)}</span>
+      <span className="block text-body text-base-900 tabular-nums">{fmtDate(clock.dueIso)}</span>
       {count && (
         <span
-          className={`t-tiny block tabular-nums ${
+          className={`text-meta block tabular-nums ${
             clock.state === "late" ? "text-error-700" : "text-base-500"
           }`}
         >
@@ -342,7 +342,7 @@ function DeadlineCell({ clock }: { clock: CaseSlaClock }) {
         </span>
       )}
       {clock.extendedToIso && (
-        <span className="t-tiny block text-base-500">Moved once</span>
+        <span className="text-meta block text-base-500">Moved once</span>
       )}
     </span>
   );
@@ -352,13 +352,13 @@ function DeadlineCell({ clock }: { clock: CaseSlaClock }) {
  *  the edit modal, which asks no usability question) has none, and says so
  *  rather than inventing a middle value. */
 function PriorityCell({ priority }: { priority: CasePriority | null }) {
-  if (!priority) return <span className="text-base-400 text-xs">—</span>;
+  if (!priority) return <span className="text-base-400 text-meta">—</span>;
   if (priority === "high") {
     return (
       <span className="inline-flex items-center gap-1.5">
         <span className="pill pill-overdue">Urgent</span>
         {caseNeedsManager(priority) && (
-          <span className="text-xs text-base-600">tell manager</span>
+          <span className="text-meta text-base-600">tell manager</span>
         )}
       </span>
     );

@@ -124,7 +124,7 @@ export default function DeliveryChain({
   // route" seeded an EMPTY chain when no carrier was assigned → a dead no-op).
   if (!hasChain) {
     return (
-      <div className="text-xs">
+      <div className="text-meta">
         {/* Single trip — the SAME wordless journey-bar language as the item Route
             (Jess 2026-07-11): warehouse → partner → customer. Icons are the
             places, colour is the progress; the only word is the partner pill. */}
@@ -138,11 +138,11 @@ export default function DeliveryChain({
             style={{ backgroundColor: fallbackPartnerName ? "#2563EB" : "#D8D3C8" }}
           />
           {fallbackPartnerName ? (
-            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-white border border-base-200 whitespace-nowrap">
+            <span className="text-label font-medium px-2 py-0.5 rounded-full bg-white border border-base-200 whitespace-nowrap">
               {fallbackPartnerName}
             </span>
           ) : (
-            <span className="text-[10px] text-base-400 whitespace-nowrap">
+            <span className="text-label text-base-400 whitespace-nowrap">
               set in Delivery
             </span>
           )}
@@ -169,7 +169,7 @@ export default function DeliveryChain({
         ) : (
           <button
             type="button"
-            className="text-[11px] font-medium text-primary hover:underline"
+            className="text-label font-medium text-primary hover:underline"
             onClick={() => setShowAddLeg(true)}
           >
             + Add stop (multi-leg)
@@ -203,7 +203,7 @@ export default function DeliveryChain({
       {!showAddLeg ? (
         <button
           type="button"
-          className="w-full rounded border border-dashed border-base-300 px-3 py-2 text-xs font-medium text-base-600 hover:bg-base-50 hover:text-base-900"
+          className="w-full rounded border border-dashed border-base-300 px-3 py-2 text-meta font-medium text-base-600 hover:bg-base-50 hover:text-base-900"
           onClick={() => setShowAddLeg(true)}
         >
           + Add another leg
@@ -230,7 +230,7 @@ export default function DeliveryChain({
       <div className="pt-1 text-right">
         <button
           type="button"
-          className="text-[11px] text-base-500 hover:text-error-700"
+          className="text-label text-base-500 hover:text-error-700"
           onClick={() => {
             if (!confirm("Clear the whole delivery chain back to single-leg?")) return;
             setChain.mutate({ stops: [] });
@@ -288,15 +288,15 @@ function StopRow({ stop, isLast, onPatch, patchPending, onRemove }: StopRowProps
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-base-500">LEG {stop.leg}</span>
-            <span className="text-sm font-semibold text-base-900">{stop.partner_name}</span>
-            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-base-700 bg-base-100`}>
+            <span className="text-label font-mono text-base-500">LEG {stop.leg}</span>
+            <span className="text-body font-semibold text-base-900">{stop.partner_name}</span>
+            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-label font-medium text-base-700 bg-base-100`}>
               <span className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_DOT[stop.status]}`} />
               {STATUS_LABEL[stop.status]}
               {stampLabel ? <span className="text-base-500"> · {stampLabel}</span> : null}
             </span>
           </div>
-          <div className="mt-1 text-xs text-base-600">
+          <div className="mt-1 text-meta text-base-600">
             <span className="font-mono">{stop.from_loc}</span>
             <span className="mx-1 text-base-400">→</span>
             <span className="font-mono">{stop.to_loc}</span>
@@ -304,7 +304,7 @@ function StopRow({ stop, isLast, onPatch, patchPending, onRemove }: StopRowProps
         </div>
         <button
           type="button"
-          className="text-[11px] text-base-400 hover:text-error-700"
+          className="text-label text-base-400 hover:text-error-700"
           onClick={onRemove}
           title="Remove this leg"
         >
@@ -313,18 +313,18 @@ function StopRow({ stop, isLast, onPatch, patchPending, onRemove }: StopRowProps
       </div>
 
       {/* Stop ETA (scheduled_at) — inline-editable per leg */}
-      <div className="mt-2 text-xs">
+      <div className="mt-2 text-meta">
         {editingEta ? (
           <div className="flex items-center gap-2">
             <input
               type="date"
-              className="rounded border border-base-300 px-2 py-1 text-xs"
+              className="rounded border border-base-300 px-2 py-1 text-meta"
               value={etaDraft}
               onChange={(e) => setEtaDraft(e.target.value)}
             />
             <button
               type="button"
-              className="rounded bg-base-900 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-base-800 disabled:opacity-50"
+              className="rounded bg-base-900 px-2 py-0.5 text-label font-medium text-white hover:bg-base-800 disabled:opacity-50"
               disabled={patchPending}
               onClick={() => {
                 onPatch({ scheduled_at: etaDraft ? dateInputToIso(etaDraft) : null });
@@ -335,7 +335,7 @@ function StopRow({ stop, isLast, onPatch, patchPending, onRemove }: StopRowProps
             </button>
             <button
               type="button"
-              className="text-[11px] text-base-500"
+              className="text-label text-base-500"
               onClick={() => {
                 setEtaDraft(isoToDateInput(stop.scheduled_at));
                 setEditingEta(false);
@@ -347,7 +347,7 @@ function StopRow({ stop, isLast, onPatch, patchPending, onRemove }: StopRowProps
         ) : (
           <button
             type="button"
-            className="text-[11px] text-base-500 hover:text-base-700"
+            className="text-label text-base-500 hover:text-base-700"
             onClick={() => setEditingEta(true)}
           >
             {etaLabel ? (
@@ -360,11 +360,11 @@ function StopRow({ stop, isLast, onPatch, patchPending, onRemove }: StopRowProps
       </div>
 
       {/* Notes — inline-editable */}
-      <div className="mt-2 text-xs">
+      <div className="mt-2 text-meta">
         {editingNotes ? (
           <div className="space-y-1">
             <textarea
-              className="w-full rounded border border-base-300 px-2 py-1 text-xs"
+              className="w-full rounded border border-base-300 px-2 py-1 text-meta"
               rows={2}
               value={noteDraft}
               onChange={(e) => setNoteDraft(e.target.value)}
@@ -373,7 +373,7 @@ function StopRow({ stop, isLast, onPatch, patchPending, onRemove }: StopRowProps
             <div className="flex gap-2">
               <button
                 type="button"
-                className="rounded bg-base-900 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-base-800 disabled:opacity-50"
+                className="rounded bg-base-900 px-2 py-0.5 text-label font-medium text-white hover:bg-base-800 disabled:opacity-50"
                 disabled={patchPending}
                 onClick={() => {
                   onPatch({ notes: noteDraft || null });
@@ -384,7 +384,7 @@ function StopRow({ stop, isLast, onPatch, patchPending, onRemove }: StopRowProps
               </button>
               <button
                 type="button"
-                className="text-[11px] text-base-500"
+                className="text-label text-base-500"
                 onClick={() => {
                   setNoteDraft(stop.notes ?? "");
                   setEditingNotes(false);
@@ -397,7 +397,7 @@ function StopRow({ stop, isLast, onPatch, patchPending, onRemove }: StopRowProps
         ) : (
           <button
             type="button"
-            className="w-full text-left text-[11px] text-base-500 hover:text-base-700"
+            className="w-full text-left text-label text-base-500 hover:text-base-700"
             onClick={() => setEditingNotes(true)}
           >
             {stop.notes ? <span className="text-base-700">📝 {stop.notes}</span> : <span>+ Add notes</span>}
@@ -410,7 +410,7 @@ function StopRow({ stop, isLast, onPatch, patchPending, onRemove }: StopRowProps
         <div className="mt-2 flex justify-end">
           <button
             type="button"
-            className="rounded bg-base-900 px-2 py-1 text-[11px] font-medium text-white hover:bg-base-800 disabled:opacity-50"
+            className="rounded bg-base-900 px-2 py-1 text-label font-medium text-white hover:bg-base-800 disabled:opacity-50"
             disabled={patchPending}
             onClick={() => onPatch({ status: nextStatus.status })}
           >
@@ -451,9 +451,9 @@ function AddLegForm({
 
   return (
     <div className="rounded border border-primary/30 bg-primary/5 p-3 space-y-2">
-      <div className="text-[11px] font-semibold text-base-900">Add Leg {nextLeg}</div>
+      <div className="text-label font-semibold text-base-900">Add Leg {nextLeg}</div>
       <select
-        className="w-full rounded border border-base-300 bg-white px-2 py-1 text-xs"
+        className="w-full rounded border border-base-300 bg-white px-2 py-1 text-meta"
         value={partnerId}
         onChange={(e) => setPartnerId(e.target.value)}
       >
@@ -469,7 +469,7 @@ function AddLegForm({
           not free text. A previous leg's custom destination stays pickable. */}
       <div className="grid grid-cols-2 gap-2">
         <select
-          className="rounded border border-base-300 px-2 py-1 text-xs bg-white"
+          className="rounded border border-base-300 px-2 py-1 text-meta bg-white"
           aria-label="Leg from"
           value={fromLoc}
           onChange={(e) => setFromLoc(e.target.value)}
@@ -486,7 +486,7 @@ function AddLegForm({
           ))}
         </select>
         <select
-          className="rounded border border-base-300 px-2 py-1 text-xs bg-white"
+          className="rounded border border-base-300 px-2 py-1 text-meta bg-white"
           aria-label="Leg to"
           value={toLoc}
           onChange={(e) => setToLoc(e.target.value)}
@@ -502,14 +502,14 @@ function AddLegForm({
       <div className="flex justify-end gap-2">
         <button
           type="button"
-          className="text-[11px] text-base-500 hover:text-base-700"
+          className="text-label text-base-500 hover:text-base-700"
           onClick={onCancel}
         >
           Cancel
         </button>
         <button
           type="button"
-          className="rounded bg-primary px-2 py-1 text-[11px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="rounded bg-primary px-2 py-1 text-label font-medium text-white hover:opacity-90 disabled:opacity-50"
           disabled={!canSubmit || pending}
           onClick={() => {
             if (!partner) return;

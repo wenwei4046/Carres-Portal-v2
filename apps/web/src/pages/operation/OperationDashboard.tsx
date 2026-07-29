@@ -72,17 +72,17 @@ export default function OperationDashboard({ setTab, goWarehouse }: Props) {
   if (isError || !data) {
     return (
       <div className="px-9 py-8 pb-14">
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-2">
             Couldn&rsquo;t load dashboard
           </div>
-          <div className="text-[12px] text-base-700 mb-3">
+          <div className="text-meta text-base-700 mb-3">
             {(error as Error | undefined)?.message ?? "Unknown error"}
           </div>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="btn-secondary text-[11px] py-1.5 px-3"
+            className="btn-secondary text-label py-1.5 px-3"
           >
             Retry
           </button>
@@ -143,13 +143,13 @@ export default function OperationDashboard({ setTab, goWarehouse }: Props) {
           Tailwind here instead of the .kicker utility (which @applies
           text-primary). */}
       <div className="flex items-end justify-between gap-4 mb-3.5 flex-wrap">
-        <div className="text-[11px] uppercase tracking-[0.22em] font-semibold text-base-500">
+        <div className="text-label uppercase tracking-[0.22em] font-semibold text-base-500">
           Active pipeline
         </div>
         <button
           type="button"
           onClick={() => setTab("orders")}
-          className="btn-ghost text-[12px] py-1 px-2"
+          className="btn-ghost text-meta py-1 px-2"
         >
           See all orders &rarr;
         </button>
@@ -249,7 +249,7 @@ function Hero({ kpis, pipeline }: HeroProps) {
   return (
     <div>
       <div className="kicker">{fmtDate} &middot; operation</div>
-      <h1 className="t-h1 font-display mt-2 text-base-900">
+      <h1 className="text-page font-display mt-2 text-base-900">
         {kpis.today_deliveries} deliveries today.
         <br />
         <span className="text-base-600 font-medium">
@@ -257,7 +257,7 @@ function Hero({ kpis, pipeline }: HeroProps) {
           {pipeline.ready_to_dispatch} ready to ship.
         </span>
       </h1>
-      <div className="text-[13px] text-base-600 mt-1.5">
+      <div className="text-body text-base-600 mt-1.5">
         <strong className="font-mono">{kpis.active_orders}</strong> active
         orders &middot; value{" "}
         <strong className="font-mono">{RM(kpis.active_gmv)}</strong>

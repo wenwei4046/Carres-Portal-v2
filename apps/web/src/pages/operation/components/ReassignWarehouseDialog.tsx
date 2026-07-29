@@ -78,7 +78,7 @@ export default function ReassignWarehouseDialog({
   return (
     <Modal title={`Reassign warehouse · ${po.id}`} onClose={onClose}>
       <div
-        className="text-[11px] px-3 py-2.5 rounded-[4px] mb-3.5 font-body"
+        className="text-label px-3 py-2.5 rounded-[4px] mb-3.5 font-body"
         style={{
           color: "var(--brand-signature)",
           background: "rgba(217, 119, 87, 0.08)",
@@ -93,14 +93,14 @@ export default function ReassignWarehouseDialog({
         style={{ background: "var(--base-50)" }}
       >
         <div className="label mb-1.5">Goods staged at supplier</div>
-        <div className="text-[12px] font-body">
+        <div className="text-meta font-body">
           <strong>{supplier?.name ?? "Supplier"}</strong> · {totalUnits} unit
           {totalUnits === 1 ? "" : "s"}
         </div>
-        <div className="font-mono text-[11px] text-base-500 mt-1.5">
+        <div className="font-mono text-label text-base-500 mt-1.5">
           {lines.map((l) => `${l.sku} ×${l.qty}`).join(" · ") || "—"}
         </div>
-        <div className="text-[12px] mt-2 text-base-600 font-body">
+        <div className="text-meta mt-2 text-base-600 font-body">
           Originally bound for{" "}
           <strong className="text-base-900">
             {currentWh?.name ?? po.warehouse_id}
@@ -110,11 +110,11 @@ export default function ReassignWarehouseDialog({
 
       <div className="label mb-1.5">New destination warehouse *</div>
       {warehousesQ.isLoading ? (
-        <div className="text-[12px] text-base-500 mb-3.5">
+        <div className="text-meta text-base-500 mb-3.5">
           Loading warehouses…
         </div>
       ) : altWarehouses.length === 0 ? (
-        <div className="text-[12px] text-warning mb-3.5">
+        <div className="text-meta text-warning mb-3.5">
           No alternate warehouse available.
         </div>
       ) : (
@@ -134,16 +134,16 @@ export default function ReassignWarehouseDialog({
 
       {newWh && (
         <div
-          className="text-[12px] text-base-600 px-3 py-2.5 rounded-[4px] mb-3.5 font-body"
+          className="text-meta text-base-600 px-3 py-2.5 rounded-[4px] mb-3.5 font-body"
           style={{ background: "var(--base-50)" }}
         >
           <div>
             <strong>{newWh.name}</strong>
           </div>
-          <div className="font-mono text-[11px] mt-1">
+          <div className="font-mono text-label mt-1">
             {newWh.address ?? "—"}
           </div>
-          <div className="text-[11px] text-base-500 mt-1.5">
+          <div className="text-label text-base-500 mt-1.5">
             Supplier will be notified · status returns to{" "}
             <strong>Ready · awaiting partner</strong> · partner reassignment
             follows.
