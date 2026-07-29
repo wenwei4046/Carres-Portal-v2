@@ -46,8 +46,8 @@ deliverable is Foundation Components, not a better document.
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
 | **D0.5b** | Foundation components, Radix | ✅ **SHIPPED 2026-07-28, PR #502 `d77bd4f6`, deployed** — full card below. The gate opened: Jess froze Q1 · Q3 · Q4 |
-| **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ⏳ **before D0.5c** |
-| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ after D0.5b.1 |
+| **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ✅ **shipped on main** |
+| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ✅ **CLOSED as components-only** (PM, 2026-07-29). The drawer is NOT migrated; real-page adoption is D6 |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
@@ -429,7 +429,131 @@ disciplined and behaves like a trap."*
 
 ---
 
-## D0.5c — `DetailShell`, in full (the `PageShell` / `DataTable` halves keep their one-liners above)
+## D0.5c ✅ CLOSED — components only (2026-07-28, ruled by the PM 2026-07-29)
+
+**All three shells exist**, extracted from the live Orders implementation, and
+`/ui` renders them. **No page renders through any of them, and that is the
+card's final shape** — the PM closed D0.5c as components-only.
+
+| | Built | Migrated |
+|---|---|---|
+| `PageShell` | ✅ from `components/ListPageShell.tsx` | ⏳ **D6** (Orders) then D7+ |
+| `DataTable` | ✅ from `OperationOrdersControl.tsx`'s table | ⏳ **D6** |
+| `DetailShell` | ✅ to L4 exactly — all seven constraints | **not in this card** — see the ruling |
+
+### ✅ RULED BY THE PM, 2026-07-29 — no Persistent Facts strip on the drawer
+
+**The decision: do NOT add a Persistent Facts strip to the Order drawer, and do
+NOT turn §7② into law.** D0.5c closes as components-only; the drawer is not
+migrated here, and real-page adoption belongs to **D6**.
+
+The PM's four reasons, recorded verbatim in substance: Persistent Facts is
+explicitly **RESERVED, NOT YET LAW** · the frozen drawer ruling says the header
+carries **ZERO order data** · D0.5c requires **zero visual change** · adding the
+strip would create a new layout **and reverse a frozen ruling**.
+
+**What this leaves standing, and it is worth being exact about.**
+`DetailShell` still implements L4 as frozen — `identity.persistentFacts` is a
+required 4-tuple and the shell renders it — because the ruling is about the
+DRAWER, not about the contract. So the component is complete and correct, and
+what is deferred is the migration. The first page to render through it (D6, or
+whichever card follows the Persistent Facts law) is where the four facts get a
+home.
+
+**The evidence the ruling was made on, kept so nobody re-derives it:**
+
+**L4 makes `persistentFacts` a required 4-tuple**, and §7② of the information
+model names the four: **客户名 · Ref · the promised date · outstanding.** The
+shell renders them, because a prop nobody reads is the disease this codebase
+keeps naming.
+
+**On the live drawer those four facts do not sit together, and one block
+explicitly refuses to carry them.** Measured, not assumed:
+
+```
+客户名      CustomerIdentityCard, in the left rail
+Ref         the header strip — "#1256"
+promised    the journey strip / the Delivery card
+outstanding the money card (C5's ONE Outstanding)
+```
+
+The drawer's header carries a comment from Jess, rev 4: **"ZERO order data here
+— the identity lives in the Customer card below."** So rendering the drawer
+through `DetailShell` means creating a four-fact strip that does not exist
+today, which is (a) a **visual change**, and this card's own acceptance
+criterion 3 is *zero visual change*; (b) **permanent vertical height**, which
+§1.1's four-question gate must rule; and (c) a **reversal of a ruling Jess made
+by name**.
+
+It is also not obviously ripe: **§7② says Persistent Facts is "RESERVED, NOT YET
+LAW … until it is, nothing here is enforceable"**, while §10's L4 — frozen the
+same day — makes it a required type.
+
+**The question that was asked, in one line:** *does the order drawer gain a
+persistent four-fact strip (customer · ref · promised date · outstanding), or
+does `DetailShell` wait until Persistent Facts is law?* — **Answered
+2026-07-29: it waits.**
+
+**Nothing was invented while it was open, and nothing was invented after.** The
+component implements L4 as frozen; the drawer is untouched; §7② stays RESERVED.
+
+### What was built
+
+**`PageShell`** — extracted from `ListPageShell`, which is the live shell on 10
+pages and already carries the geometry Jess ruled through July. What changed in
+the move: it takes **no `className`** (§6.0), and **§1.3's budget became a
+type** — `variant="list"` has no `kpi` slot at all, `variant="dashboard"` does,
+and no variant has an `extraBand`. §8.1's *"an eighth band is not forbidden by a
+sentence — it has nowhere to go"* is now literally true.
+
+**`DataTable`** — extracted from the Orders table: `table-fixed` percentage
+widths so it never scrolls sideways, 40px fixed rows that clip rather than wrap,
+a sticky head reading §4.4's layer 1 from `overlay-layer.ts` rather than typing
+a number, whole-row selection with a real indeterminate select-all, §3.5's
+washes. **The header word comes from the column def** — C1 found `Manage`
+surviving in a hand-written `<th>` while the Columns popover already read the
+def, and now there is nowhere else to type it. It formats nothing: money and
+dates stay `Money` / `fmtDate()`, or the kit would own a second date spelling.
+
+**`DetailShell`** — L4's six ordered slots with all seven constraints as types,
+and **no `state` prop**, which is L3 turned into a compiler rule.
+
+### Three findings, reported not settled
+
+1. **§1.3 and §8.1 disagree by 8px.** §8.1's band table sums to **208** against
+   §1.3's **200** list budget. Neither was edited; a test pins 208, the 180 with
+   no filter on, and §1.3's own 168 D6 projection, so the contradiction cannot be
+   lost. Recorded in UI-KIT §1.3.
+2. **§8.3 says the module-tab exception "stops being an exception… it is
+   `variant`"**, but §1.3's four variants contain nothing meaning
+   *module-tabbed*. The shell expresses it by the title being absent — still a
+   thing to remember. Either §1.3 gains a fifth variant or §8.3's sentence is
+   wrong. No variant was invented.
+3. **L4 does not say which section is open.** A shell that renders §1.4's ⑤⑥
+   must know, so `activeSectionId` + `onSectionChange` were added and are
+   flagged here. Mechanics, not information architecture — but an addition to a
+   frozen contract, so it is reported rather than assumed.
+
+### What a TypeScript quirk cost, written down
+
+**`@ts-expect-error` does not work on a JSX element that carries a
+`{...spread}`** — TypeScript switches excess-property checking off, so
+`<DetailShell {...BASE} emptyLabel="None" />` compiles happily and the directive
+reports as *unused*. Two of the seven constraints (no `emptyLabel`, no
+`children`) silently proved nothing until they were rewritten without a spread.
+Measured, not guessed: that is exactly how they first failed.
+
+### Verification
+
+`tsc -p tsconfig.app.json` clean (which is where the seven `@ts-expect-error`
+constraints are actually checked) · `pnpm --filter @carres/web lint` clean ·
+`pnpm build` clean · web suite **at baseline: 2225 passed / 16 pre-existing**,
+zero new · **negative control run**: make `currentIssues: []` render a container
+and exactly the "renders NO issues container" test goes red, nothing else moves.
+
+---
+
+## D0.5c — the original card (`DetailShell` in full; the `PageShell` / `DataTable` halves keep their one-liners above)
 
 **Written 2026-07-28, the day the Order Detail Information Architecture closed.** Its whole
 input is [`docs/ORDER-DETAIL-INFORMATION-MODEL.md`](ORDER-DETAIL-INFORMATION-MODEL.md) §10 (L4),
