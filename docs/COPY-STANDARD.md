@@ -389,6 +389,7 @@ The concept is already in the vocabulary table below (`where the goods go`, with
 | The three options | **`Carres Klang`** · **`AL Sungai Buloh`** · **`HOUZS`** |
 | Nice Future, which does not deliver | **`NETS collects from Nice Future and delivers to Carres Klang.`** |
 | The optional free-text field beside it | **`Delivery instructions`** |
+| A destination nobody has given an address for — **Settings only** | **`Address not set`** |
 
 **The PO and the external document print the SAVED destination name**, never a re-derived one
 and never one of the banned nouns. That is why the name is stored rather than mapped from a
@@ -398,6 +399,13 @@ destination on screen.
 **`HOUZS` is the option word and it is deliberately shorter than the place.** The warehouse the
 business says out loud is "HOUZS Balakong"; Loo ruled the option `HOUZS`. Do not "complete" it
 — a chat that helpfully expands it has invented a fourth string.
+
+**`Address not set` is a SETTINGS word and appears nowhere else** (Loo, 2026-07-29). It is a
+FACT stating an absence, which the fact/action rule allows, and it carries no to-do word. It
+may not leak onto a PO, onto the external document, or into an error a store reads: **a PO may
+stay a draft while its external destination has no address, and it may not be issued, exported
+or sent until the address is complete** — that refusal is enforced in the database, not by this
+string. `Carres Klang` never shows it: its address is derived from the own warehouse record.
 
 ### Facet group headings (locked 2026-07-28, after P2-Claims found they had no home)
 

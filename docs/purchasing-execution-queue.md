@@ -682,6 +682,129 @@ and the two stock-posting RPCs. Draft to Loo first.
 PO can only say one thing, **no Klang stock record is created for goods delivered to AL or
 HOUZS**, and no external PO document carries an RM figure.
 
+### 🔴 AUTHORITATIVE HANDOFF — read this before touching P4 (written 2026-07-29)
+
+**This section is the design, ruled by Loo and already paid for in measurement. A chat that
+re-derives it has spent a session re-discovering what is written here; a chat that changes it
+has overturned a ruling. Everything below is decided.**
+
+#### 1 · Migration status
+
+- **`0307` is still FREE.** The tracker tail is `0306_purchasing_supplier_calls`.
+- **`0307` has NOT been applied.**
+- **Production has NOT been changed by P4.** No table, column, trigger, function, grant or row.
+- The next chat **must** run the deliberately failing negative-control harness **and** a
+  complete rolled-back dry run, and **report both** before asking to apply. `list_migrations`
+  immediately before numbering AND again immediately before applying (guardrail #8).
+
+#### 2 · Destination freeze rule (Loo)
+
+- Once ANY line on the PO has `received_qty > 0`, **`destination_id` is frozen**.
+- Any later destination change is **rejected**.
+- **No partial preservation and no automatic stock reconciliation.** The reason is not
+  laziness: a PO whose destination says `AL Sungai Buloh` while half its units are already
+  booked into Klang is a state the register cannot express, so the honest move is to refuse
+  the change rather than invent a mixed truth.
+- **Enforced in the DATABASE**, not only in the UI — a trigger, so it holds against every door
+  including PostgREST.
+
+#### 3 · `trg_po_units_follow_destination`
+
+- `purchase_orders.destination_id` is **NOT NULL**, and its **database default is the single
+  active default destination** (initially `Carres Klang`). This is the card's own item 4, not
+  a fallback of the kind P1 deleted.
+- **Existing PO-creation functions need NO new parameters.** The API updates `destination_id`
+  after creation, following the **existing `eta_date` pattern**
+  (`apps/api/src/routes/operation/pos.ts` — Loo, 2026-05-10: *"adding a 6th param would need a
+  DROP+CREATE migration. Cheaper: post-RPC UPDATE"*).
+- The trigger runs **after PO insert and after a destination change**.
+- A destination **linked to a warehouse** ensures the correct `incoming` units exist.
+- A destination with **`warehouse_id = NULL` leaves NO incoming inventory units.**
+- **Idempotent** — safe on repeated updates.
+- **It must NEVER delete received, completed or historically used inventory records.** It only
+  ever reconciles units still in `incoming`; §2's freeze means a destination cannot change once
+  receiving has begun, so the dangerous case is blocked upstream rather than handled here.
+
+**Why a trigger and not parameters** (measured, not preferred): threading `destination_id`
+through the create doors would mean DROP+CREATE on **five** live functions
+(`_operation_create_po_inner` · `operation_create_po` · `operation_create_pos_batch` ·
+`operation_issue_pos_for_order` · `operation_receive_po_with_do`, ≈35,000 characters of live
+inventory code), and it would still leave phantom units on the real path *create as Klang →
+change to AL*. The trigger makes the register correct **whichever door created the PO and in
+whatever order the fields were set** — 0305/0306's rule that a stamp one route writes is a
+stamp the other doors walk around.
+
+#### 4 · `operation_receive_po_with_do` — the FOUR anchored edits
+
+Extract with `pg_get_functiondef()`. **Do not reconstruct it from memory.** It is 16,163
+characters live; the change is four narrow anchors:
+
+| # | Anchor (live text) | Edit |
+|---|---|---|
+| 1 | the declaration `v_is_own boolean := false;` | add `v_posts_stock boolean := false;` after it |
+| 2 | `select (kind = 'own') into v_is_own from warehouses where id = v_po.warehouse_id;` | after it, resolve `v_posts_stock` from `purchase_orders.destination_id` → `purchasing_destinations.warehouse_id` — true only when that warehouse is non-null AND equals `v_po.warehouse_id` |
+| 3 | `if v_delta > 0 then` | → **`if v_delta > 0 and v_posts_stock then`** — this ONE anchor covers `stock_balances`, `stock_movements`, the `incoming → free` flip and the replacement mint, because all four already share that outer condition |
+| 4 | the `for v_reserve … loop` that runs `update stock_balances set reserved = reserved + …` | wrap it in `if v_posts_stock then` — the thread still advances; there is simply no Klang stock to reserve |
+
+**Explicitly unchanged, and this is the point of the card:**
+
+- `received_qty` — unchanged
+- receipt evidence (`do_file_path` · `do_number` · photos) — unchanged
+- claims (damaged / wrong item, and their evidence gates) — unchanged
+- `po_history` — unchanged
+- thread progression — unchanged
+- **a non-warehouse destination creates NO balances, NO movements, NO stock items and NO
+  reservations**
+
+#### 5 · `purchasing_po_document(p_po_id)`
+
+- It is the **only** database source for external PO documents.
+- It enforces the **internal role gate**.
+- An external destination with **no complete address raises `destination_address_missing`**.
+- Its payload contains **no unit price, no line total, no grand total, no surcharge amount, no
+  RM field and no other purchase-price data** — the money is not removed from a template, it
+  is *absent from the payload*, so no client can print what it never receives.
+- **`/api/operation/pos/:id/print-data` must read from it** instead of assembling the document
+  from tables.
+- **Every external consumer of `renderPoPdf` uses this same payload** — supplier documents and
+  pickup-partner documents alike (`AssignPickupDialog.tsx` is one of them; the card's original
+  item 5 named `PoDocumentPreview.tsx`, which already carries no RM. **The document that breaks
+  the rule is `apps/web/src/lib/pdf/po-template.tsx`**, which prints `Unit Price`, `Line Total`,
+  `Total` and `+RM {surcharge}`).
+- **No second direct-table external export path is allowed.**
+- Internal portal screens keep reading internal price data through their existing authorised
+  paths. This ruling is about EXTERNAL documents only.
+- **The boundary did not exist before P4 and this is why it is being created**: `po_sup_status`
+  has no `sent` or `issued` value (a PO is born `pending`; the next state, `acknowledged`, is
+  the *supplier's* action), and the export was assembled in TypeScript straight from tables —
+  so the database could not see an export happen at all.
+
+#### 6 · Revokes
+
+- **Revoke `EXECUTE` from `anon` AND `authenticated`** on `operation_receive_po_line` and
+  `po_receive`. Both directions matter: `revoke … from public` alone does not drop `anon` on
+  Supabase.
+- **Keep the owner (`postgres`) and the administrative access already in place.**
+  **Do not delete the functions and do not redesign them** (Loo).
+- **Dependency checks were ALL ZERO before approval** (verified 2026-07-29): 0 web call sites ·
+  0 api call sites (the single mention is a comment at
+  `apps/api/src/routes/operation/pos.ts:949` saying the RPC *"is still in the DB but unused"*) ·
+  0 calls from other functions · 0 trigger calls · 0 hard dependents (view / rule / default /
+  constraint) · **`pg_cron` is not installed**, so there are no database scheduled jobs at all,
+  and the only scheduler is the Worker's 09:00-MYT cron, which calls neither.
+
+#### 7 · Locked wording — already in COPY-STANDARD, do not reinvent
+
+`Where the goods go` · `Carres Klang` · `AL Sungai Buloh` · `HOUZS` ·
+`NETS collects from Nice Future and delivers to Carres Klang.` · `Delivery instructions` ·
+`Address not set`
+
+`Address not set` appears in **manager Settings only** and must never reach a PO, the external
+document, or an error a store reads. `HOUZS` is deliberately shorter than "HOUZS Balakong" —
+do not "complete" it. The PO and the external document print the **saved destination name**,
+never `Ship-to` · `Destination` · `Drop point`.
+
+
 ## P5 · Prove it with a real PO
 
 **Goal:** the whole line has never run. Take one real customer order from To Order through
