@@ -53,8 +53,8 @@ deliverable is Foundation Components, not a better document.
 | **D2** | codemod **typography** | ✅ **BUILT 2026-07-29**, rebased onto `origin/main` and revised under the PM's seven items — **4,052 conversions in 236 files**; guard rule D **3,239 → 33**, and all 33 are `index.css`. Card below |
 | **D3 / D4** | codemod colour / spacing | ⏳ — the guard has them baselined at **A 430 · B 5** and **E 1,727** (D2's re-freeze; the older A 442 · B 8 counted comment prose as code) |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
-| **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ |
-| **D7+** | Delivery · Purchase · Receiving · Stock · Service · Payments · Catalog — one card each | ⏳ |
+| **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ — **carries the `.t4-*` legacy migration** (PM, 2026-07-29): D2 found a SECOND retired ramp, 9 classes / **42 uses in 8 files**, invisible to rule D because a page writes only the class name. **`.t4-hero-num` is 20px/700** and `lib/design-standard.ts:132` records that 700, so a §2.2-dead weight still renders. Ruled **Reported Only for D2** — it is a visual change on a money figure and belongs with the pages when they migrate |
+| **D7+** | Delivery · Purchase · Receiving · Stock · Service · Payments · Catalog — one card each | ⏳ — whichever of these owns a file still writing `.t4-*` retires it there; **D6 owns the ramp's DEFINITIONS and the mirror's `weight: 700`**, so the last card to migrate does not inherit the deletion |
 
 **Order is not negotiable for D0.5 → D6.** Rebuilding a page before the
 components exist means hand-rolling it twice.
@@ -836,7 +836,10 @@ markers** — proved by diffing the law either side of the block: byte-identical
    (which reads what a page WRITES) is structurally blind to it. **`.t4-hero-num` is `20px/700`**,
    `lib/design-standard.ts:132` records that 700, and one in-scope page renders it — so §2.2's
    "0 left" is true of what a page writes and false of what the browser computes. Converting nine
-   classes moves 42 sites including a money figure: **its own card, not D2's.**
+   classes moves 42 sites including a money figure: **its own card, not D2's.** **RULED by the PM
+   2026-07-29: Reported Only, D2 is not extended, and it is scheduled onto D6/D7** — D6 owns the
+   ramp's definitions and the mirror's `weight: 700`, so whichever page card migrates last does not
+   inherit the deletion. See the queue table at the top of this file.
 7. **Part B now has two type systems in one stylesheet** — the six tokens for the portal and the
    `.t-*` / `.pos-proto` ramp for the POS. That is what §15 asks for, but the shipped CSS still
    emits `font-weight: 700` **116 times** (measured on this build), so *"there is no 700 anywhere"*
