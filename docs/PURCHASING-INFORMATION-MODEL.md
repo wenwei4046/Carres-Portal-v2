@@ -1,5 +1,26 @@
 # Purchasing — the Information Model
 
+> ## ⚖️ OWNERSHIP — Purchasing has exactly TWO documents and they are LAYERS, not versions
+>
+> **These two documents are complementary and non-overlapping.**
+> **Business workflow belongs to `docs/PURCHASING-WORKING-FLOW.md`.**
+> **Information Architecture belongs to `docs/PURCHASING-INFORMATION-MODEL.md` — this file.**
+> **A rule must have only one canonical home and may only be REFERENCED, not duplicated, in
+> the other document.**
+>
+> | | **`PURCHASING-WORKING-FLOW.md`** | **`PURCHASING-INFORMATION-MODEL.md`** — this file |
+> |---|---|---|
+> | owns | business workflow · business rules · action ownership · trigger · due · completion · status progression · queue behaviour · cross-module workflow boundaries | information architecture · information regions · information hierarchy · information relationships · the legal overlap between Planning and Draft PO · the facts each region must carry · information excluded from To Order |
+>
+> **There is no third Purchasing master document and none may be created** — no
+> `PURCHASING_MODULE_MASTER.md`, no V2 / FINAL / COPY. **A rule that appears in full in both
+> files is a defect**, and the fix is always the same: keep it whole in its canonical file
+> above and leave a one-line pointer in the other.
+>
+> **When this file needs a workflow rule, it POINTS.** Trigger, due, completion, which tab an
+> action lives on, and what a status means are never restated here — they change, and a copy
+> is how two files start disagreeing.
+
 > **FROZEN 2026-07-29 by Loo.** This is the ONE home for how the Purchasing module organises
 > information. It is read before any Purchasing work — layout, copy, or code.
 >
@@ -124,12 +145,14 @@ Each action carries three facts:
 **Order within this region is frozen — see §4.**
 
 **Never carries:** any communication state (Q5, frozen: communication is not part of the PO
-lifecycle) · any priority word. Row order IS the priority
-(`PURCHASING-WORKING-FLOW.md` §6).
+lifecycle) · **any priority word** — the reason, and the rule that replaces it, are
+`docs/PURCHASING-WORKING-FLOW.md` §6.
 
 ### C · Drafts in preparation
 
-A **Draft PO** is a Purchasing business object. It is **not** a Purchase Order.
+**What a Draft PO IS** — a stored business object, not a Purchase Order, and not a state of
+one — is a status-progression rule and lives in `docs/PURCHASING-WORKING-FLOW.md` §9. **What
+a draft ENTRY must carry, and must never carry, is this file's** and is below.
 
 Each draft carries:
 
@@ -171,8 +194,9 @@ been made actionable, and **nobody has looked at it**.
 Two causes, and both belong here:
 
 1. **The supplier cannot be resolved** for the item (§6.6)
-2. **Production working days are not configured** for that supplier × category
-   (P1/0303's rule — there is deliberately no default to fall back on)
+2. **Production working days are not configured** for that supplier × category — the rule
+   that no number means no order-by date, rather than a fallback, is
+   `docs/PURCHASING-WORKING-FLOW.md` §2
 
 Each entry carries:
 
@@ -380,33 +404,18 @@ Stated in §3 · E/F. Repeated here because it is the rule most likely to be los
 
 ---
 
-## 7 · The workspace boundary — FROZEN 2026-07-29 by Loo
+## 7 · The workspace boundary
 
-> **Work whose deadline is derived from the CUSTOMER commitment belongs to To Order.**
-> **Work whose deadline is derived from the physical movement or arrival of GOODS belongs to
-> Receiving.**
+**→ The boundary rule is `docs/PURCHASING-WORKING-FLOW.md` §1.** It is a cross-module
+workflow boundary, so the workflow file owns it whole: the deadline-anchor rule, the list of
+which action lives on which tab, and why the plain-language "goods are not yet secured"
+sentence is an explanation rather than the rule.
 
-This is the governing rule. It is measurable — every action's Due is written down in
-`PURCHASING-WORKING-FLOW.md` §3 — so no case needs to be argued.
-
-| Work | Its deadline comes from | Workspace |
-|---|---|---|
-| preparing unprotected demand | the customer's promised date, via the order-by formula | **To Order** |
-| Issue PO | the covered demand's order-by date | **To Order** |
-| Confirm ready date | the arrival window derived from the customer's promised date | **To Order** |
-| Confirm tomorrow's delivery | the working day before arrival | **Receiving** |
-| Check in | the day the goods arrive | **Receiving** |
-| Confirm balance delivery date | the working day after a short delivery | **Receiving** |
-| Confirm what happens next | the claim | **Claims** |
-
-**Every action of the module has exactly one home. There is no action in two workspaces and
-no action in none.**
-
-**The plain-language explanation** — *"goods are not yet secured → To Order; goods are
-physically arriving → Receiving"* — may be used to explain the boundary to a person. **It is
-not the governing rule**, because sending a PO is itself what secures goods
-(`PURCHASING-WORKING-FLOW.md` §4 rung 3), so read literally it puts `Confirm ready date` on
-the wrong side.
+**Why this model needs it at all:** the boundary is what decides the CONTENTS of this
+workspace. Everything §1–§6 organises is the work the boundary assigns to To Order; the
+moment an action moves across it, this model's regions change with it. That is also why §7.1
+below is here and not there — the MOVE is a workflow decision, but which FACTS must survive
+the move is an information requirement.
 
 ### 7.1 · Moving `Check in` out of To Order may not delete information
 
@@ -522,33 +531,33 @@ phase.
 │  ╚═════════════════════════════════════════════════════════════════════════════════════╝ │
 └──────────────────────────────────────────────────────────────────────────────────────────┘
 
-  BOUNDARY (§7) — deadline anchor, the governing rule:
-
-     deadline from the CUSTOMER commitment  ─────────►  To Order
-        prepare demand · Issue PO · Confirm ready date
-
-     deadline from the GOODS moving         ─────────►  Receiving
-        Confirm tomorrow's delivery · Check in · Confirm balance delivery date
+  What crosses OUT of this workspace, and what decides it:
+     a requirement leaves the moment a PO exists          → Purchase Orders · Receiving
+     which ACTION sits on which tab is the deadline-anchor boundary
+                                        → PURCHASING-WORKING-FLOW.md §1 (not restated here)
 ```
 
 ---
 
 ## 10 · Unresolved terminology slots
 
-**Nothing below may be filled by a chat.** Each needs Jess's ruling and then five strings in
-`docs/COPY-STANDARD.md` (queue tile · row line · button · done message · empty state) unless
-noted otherwise.
+**→ What each slot needs, and the rule that no chat may fill one, is
+`docs/COPY-STANDARD.md`** — the words are that file's, not this one's, and a second copy of
+the definitions is how the two would drift apart the moment Jess rules one.
 
-| Slot | What needs a word | Note |
-|---|---|---|
-| **SLOT-1** | the action that turns unprotected demand into a Draft PO | ranked (§4) but unnamed. `Send PO` cannot be reused as-is: under this model that step sends nothing |
-| **SLOT-2** | what becomes of the existing `Send PO` entry | its done message `PO sent to {supplier}` no longer describes what the step does. It is also declared ONE action shared with Orders — Orders' meaning has not changed |
-| **SLOT-3** | the on-screen noun for a Draft PO | `Draft PO` is the approved OBJECT name; the screen word is not ruled |
-| **SLOT-4** | the six Operation Status words as a vocabulary entry | `Draft` · `Issued` · `In Production` · `Receiving` · `Completed` · `Cancelled` are the decided VALUES. Their home — the portal state vocabulary or COPY-STANDARD — is not decided |
-| **SLOT-5** | the fact "this draft's covered demand has disappeared" | one fact string |
-| **SLOT-6** | the fact "N drafts already cover this" | one fact string |
-| **SLOT-7** | the name of region F and its facts | the other half already has `Set a number` |
-| **SLOT-8** | the fact "the supplier cannot be resolved" | one fact string |
+**What THIS file owns is where each slot is USED**, so that ruling a word tells you exactly
+which part of the model becomes buildable:
+
+| Slot | Used by this model at |
+|---|---|
+| **SLOT-1** | §4 — the third action of To Order, ranked and unnamed · §9 — region D's outbound arrow |
+| **SLOT-2** | not used by this model. It is the fate of an EXISTING dictionary entry, and it is listed here only because ruling SLOT-1 without it would leave one act spelt two ways |
+| **SLOT-3** | §3 · C — the region's own on-screen noun |
+| **SLOT-4** | §8 — the row that keeps the supplier axis out of this workspace depends on the two axes being named apart |
+| **SLOT-5** | §3 · C and §6.5 — the fact a draft states when its covered demand has gone |
+| **SLOT-6** | §3 · D and §6.1 — the fact that pays for the legal overlap in §5.3. **Without a word for it, §5.3 is a trap and not a design** |
+| **SLOT-7** | §3 · F — the region has no name and no fact strings; its sibling E already has `Set a number` for one of its two causes |
+| **SLOT-8** | §3 · E and §6.6 — the fact that keeps M1's demand from vanishing |
 
 ---
 

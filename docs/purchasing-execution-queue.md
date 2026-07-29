@@ -1032,7 +1032,90 @@ and stopping is the whole PO (`purchase_orders.status = 'cancelled'`, already bu
 **Done when:** one real PO has gone the whole way, including a short delivery, and every
 number on screen matches what actually happened.
 
-## P6 · To Order becomes the Planning Workspace
+## P6 · Purchasing terminology freeze
+
+**Goal:** rule **SLOT-1 through SLOT-8 in ONE session** and write every ruled word into
+`docs/COPY-STANDARD.md`, so the Purchasing dictionary is whole again.
+
+**⛔ THIS CARD IS A PLAN CHAT, NOT A BUILD CHAT.** It writes documentation and nothing else —
+no schema, no migration, no API, no React, no deploy. Its output is words.
+
+**⛔ IT MUST BE ONE SESSION.** Ruling four slots and stopping is worse than ruling none: the
+half-renamed state puts one act on two screens under two words, which is the exact defect the
+shared word module exists to prevent, and it is what `Send PO` is suffering from right now.
+
+### Read first, all three
+
+| File | For |
+|---|---|
+| `docs/COPY-STANDARD.md` | **the canonical slot definitions** — what each of the eight needs. The words are that file's |
+| `docs/PURCHASING-INFORMATION-MODEL.md` §10 | **where each slot is USED**, so a ruling can be checked against the thing it unblocks |
+| `docs/PURCHASING-WORKING-FLOW.md` §1 · §3 · §7 · §9 | the actions the words name, and their trigger / due / completion |
+
+### The one slot that is NOT a Purchasing-only decision — put it to Jess FIRST
+
+**SLOT-2 reaches into Orders.** `docs/COPY-STANDARD.md` declares `Send PO` **one action shared
+by Orders and Purchasing**, spelt identically in both. The frozen lifecycle splits the
+Purchasing side into ⟨SLOT-1⟩ prepare → `Issue PO`, and **the Orders side has not changed**.
+So there are only two honest outcomes and both are Jess's:
+
+- the action stays shared and **the Orders wording moves too**, or
+- it stops being one shared action and **each flow gets its own entry**, and the sentence
+  claiming they are one is deleted.
+
+**Anything else leaves one act with two spellings.** Settle this before the other seven — it
+decides whether SLOT-1 is a new word or a re-scoping of an existing one.
+
+### What the card must produce
+
+1. **Eight rulings.** Five strings each (queue tile · row line · button · done message ·
+   empty state) for the action slots; one fact string each for the fact slots; a name plus
+   its facts for SLOT-7; a home for SLOT-4.
+2. **Every ruled word written into `docs/COPY-STANDARD.md`** — its canonical home.
+3. **Every `⟨SLOT-n⟩` placeholder replaced in the same session**, across:
+   `docs/ACTION-FLOW-STANDARD.md` (Law 4 rung 3) · `docs/PURCHASING-WORKING-FLOW.md`
+   (§1 · §3's `Send PO` warning block · §7) · `docs/PURCHASING-INFORMATION-MODEL.md`
+   (§4 · §9's ASCII · §10) · `docs/purchasing-execution-queue.md` (this file, P7).
+4. **`docs/PURCHASING-WORKING-FLOW.md` §3's six things for the two halves.** The `Send PO`
+   entry currently carries a warning saying its six things describe the OLD single step and
+   stay until this card runs. **This is the card. Rewrite them** — trigger, checklist,
+   completion, due, task owner, counted per, re-checked when — for ⟨SLOT-1⟩ and for
+   `Issue PO` separately. `Issue PO`'s completion is *a PO exists for the line*; the old
+   entry's is already that sentence, so it moves rather than being invented.
+
+### Rules this card may not break
+
+- **No temporary wording.** A word Jess has not ruled does not go on a screen or into a
+  document. If a slot cannot be settled, the card reports it and **the other seven still ship
+  in that session** — but a reported slot keeps its `⟨SLOT-n⟩` placeholder rather than
+  receiving a stand-in.
+- **The approved business meaning does not change.** This card names things; it does not
+  re-decide the lifecycle, the ordering, the boundary or the regions.
+- **`Issue PO`, `Draft PO`, `Issued`, and the six Operation Status values are already ruled**
+  (Loo, 2026-07-29) and are not reopened. SLOT-3 and SLOT-4 are about the SCREEN noun and the
+  vocabulary HOME, not about those decisions.
+- **Ownership holds**: the words go to `COPY-STANDARD`, the workflow effects to
+  `PURCHASING-WORKING-FLOW`, the region effects to `PURCHASING-INFORMATION-MODEL`. One
+  canonical home each, pointers elsewhere.
+
+**No migration. No code.**
+
+**Done when — and this is measurable, so measure it:**
+
+```
+grep -rho "⟨SLOT-[0-9]⟩" docs/ | wc -l        →  0
+```
+
+**Baseline 2026-07-29: 20 placeholders across 5 files** — `PURCHASING-INFORMATION-MODEL.md`
+(incl. the ASCII layout) · `PURCHASING-WORKING-FLOW.md` · `COPY-STANDARD.md` ·
+`ACTION-FLOW-STANDARD.md` · this file. **The `⟨…⟩` brackets are the placeholder form**; a
+bare `SLOT-1` in a card description is prose about the card and does not count.
+
+Plus: `docs/COPY-STANDARD.md` carries five strings for every Purchasing action, and
+`PURCHASING-WORKING-FLOW.md` §3 describes the two halves of raising a PO as two actions with
+six things each.
+
+## P7 · To Order becomes the Planning Workspace
 
 **Goal:** make the frozen purchasing information architecture true on the To Order tab.
 
@@ -1080,7 +1163,9 @@ Every one was measured on 2026-07-29. **They are facts, not estimates.**
 what makes "a Draft is not a PO" structural). **Draft to Jess first (guardrail #8); number
 from the TRACKER at apply time, never from `ls`. Apply and verify BEFORE merging.**
 
-**P4 is FROZEN and this card may unfreeze it only where the new architecture requires it**
+**P7 runs AFTER P6.** Every `⟨SLOT-n⟩` below is a word P6 rules; a chat that starts P7
+with slots still open will invent terminology. **P4 is FROZEN and this card may unfreeze it
+only where the new architecture requires it**
 (Loo, 2026-07-29) — no unrelated refactoring of 0307's objects.
 
 **Done when:** no real procurable demand can leave the purchasing workload silently, held
@@ -1108,4 +1193,5 @@ To Order, and `Check in` has left To Order without a single fact being lost.
 | P3 | ✅ the two missing supplier calls (migration **0306**) — and a balance date enters Delay planning too (Loo, 2026-07-29) | #506 |
 | P4 | ✅ where the goods go — migration **0307 applied, verified and merged** 2026-07-29 · **P4 FROZEN**; the application-code half is NOT P4 and starts as its own execution card (§10) | #513 |
 | P5 | ⬜ after P1-P4 · prove it with a real PO | — |
-| P6 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |
+| P6 | ⬜ **Purchasing terminology freeze** — SLOT-1 to SLOT-8 ruled in ONE session and written into `docs/COPY-STANDARD.md`. **A PLAN card: words only, no code.** SLOT-2 reaches into Orders (`Send PO` is declared one shared action) and is Jess's first decision. **P7 is blocked on this** | — |
+| P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |

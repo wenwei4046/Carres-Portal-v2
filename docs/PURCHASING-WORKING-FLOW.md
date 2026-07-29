@@ -1,8 +1,26 @@
 # Purchasing — the working flow
 
-> **THE one file for how purchasing behaves.** A chat working on Purchasing reads this and
-> nothing else for the flow. It is overwritten in place; there is never a second version,
-> never a "v2", never a "superseded" note.
+> ## ⚖️ OWNERSHIP — Purchasing has exactly TWO documents and they are LAYERS, not versions
+>
+> **These two documents are complementary and non-overlapping.**
+> **Business workflow belongs to `docs/PURCHASING-WORKING-FLOW.md`.**
+> **Information Architecture belongs to `docs/PURCHASING-INFORMATION-MODEL.md`.**
+> **A rule must have only one canonical home and may only be REFERENCED, not duplicated, in
+> the other document.**
+>
+> | | **`PURCHASING-WORKING-FLOW.md`** — this file | **`PURCHASING-INFORMATION-MODEL.md`** |
+> |---|---|---|
+> | owns | business workflow · business rules · action ownership · trigger · due · completion · status progression · queue behaviour · cross-module workflow boundaries | information architecture · information regions · information hierarchy · information relationships · the legal overlap between Planning and Draft PO · the facts each region must carry · information excluded from To Order |
+>
+> **There is no third Purchasing master document and none may be created** — no
+> `PURCHASING_MODULE_MASTER.md`, no V2 / FINAL / COPY. **A rule that appears in full in both
+> files is a defect**, and the fix is always the same: keep it whole in its canonical file
+> above and leave a one-line pointer in the other.
+
+> **THE one file for how purchasing BEHAVES.** A chat working on Purchasing reads this for
+> the flow, and [`PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) for how
+> To Order's information is organised. It is overwritten in place; there is never a second
+> version, never a "v2", never a "superseded" note.
 >
 > This file says WHAT the Purchasing module does. It does not repeat:
 > the action MODEL → `docs/ACTION-FLOW-STANDARD.md` · the WORDS → `docs/COPY-STANDARD.md`
@@ -122,6 +140,15 @@ it was before.
 | Days before the delivery date the logistics call is raised | 1 working day | editable; Jess may set 5 |
 | PO days | Mon · Wed · Fri | editable. **A late line never waits for a PO day** |
 | Supplier work week | mattress 5-day · bedframe/sofa 6-day, keyed by CATEGORY | keyed by **supplier**. Nice Future works 5 days; Ohana works Saturday |
+
+**A SUPPLIER × CATEGORY WITH NO NUMBER IS NOT DEFAULTED TO 7** (Jess, 2026-07-28 — shipped
+with P1 / migration 0303). The resolver returns nothing, the line is **held out of the plan
+entirely**, and the To Order tab names the pair. **There is deliberately no per-category
+default column to fall back on**, and a sanity block in the migration fails if one is ever
+added. A fallback is how a setting silently stops mattering, and a quiet screen must mean
+*watched and fine*, never *nobody looked*. **How that held-out demand is presented** — which
+region carries it, beside what, and what it must state — is
+[`PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §3 · E.
 
 **Peak season is NOT a setting** (Jess + Loo, 2026-07-28). There is no peak-season mode,
 no second set of numbers, no "is it peak season today" state and no effective-from date.
@@ -500,11 +527,12 @@ means anything for a line the plan could read. Two kinds of demand cannot be des
 line above and **may never be silently discarded**:
 
 - **the configuration is missing** — the supplier cannot be resolved, or production working
-  days are not set for that supplier × category
-- **a human held it** — excluded, time-boxed or snoozed, with who, why and until when
+  days are not set for that supplier × category (§2)
+- **a human held it** — excluded, time-boxed or snoozed
 
-They are two different facts with two different owners and they never share one status or one
-empty state (information model §3 · §6.6 · §6.7).
+They are two different business facts and neither may be dropped. **How each is presented —
+which region carries it, what it must state, and why the two may never share a voice — is
+[`PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §3 · §6.7.**
 
 **There is no cancelled quantity, and purchasing does not model a cancellation**
 (Loo, 2026-07-28). A customer may not cancel an order in the normal course; a cancellation
