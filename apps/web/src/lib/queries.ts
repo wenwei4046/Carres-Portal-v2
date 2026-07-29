@@ -3099,11 +3099,25 @@ export interface operationPoListRow {
      *  absent value reads as "no problem recorded", not as unknown. */
     damaged_qty?: number;
     wrong_item_qty?: number;
+    /** P3 (0306) — the day this line last took a SHORT delivery, stamped
+     *  server-side. It is the balance call's Due anchor. OPTIONAL, so a browser
+     *  on this build against an older Worker degrades to "no anchor" (the call
+     *  shows with no deadline) rather than crashing. */
+    short_since?: string | null;
+    /** P3 — the received quantity the latest balance answer was made ABOUT.
+     *  A second short delivery changes `received_qty`, the two stop matching,
+     *  and the call re-opens by itself (S4 / C8's discipline). */
+    balance_answer_about_qty?: number | null;
     // 0073 cascade picker (Loo 2026-05-09). Null for mattress + legacy
     // pre-0073 lines; bedframe carries {color, gap}; sofa carries
     // {fabric_id, fabric_name, fabric_surcharge}.
     attrs?: Record<string, unknown> | null;
   }[];
+  /** P3 (0306) — the expected arrival the latest tomorrow's-delivery answer was
+   *  made ABOUT. The factory moving the date again makes the old answer an
+   *  answer about nothing, and the call re-opens. OPTIONAL for the same
+   *  degrade-don't-crash reason as `short_since`. */
+  tomorrow_answer_about_date?: string | null;
   /** 2026-05-18 (Loo C+D) — per-source-SO enrichment from
    *  /api/operation/procurement/:slug. One entry per SO this PO serves
    *  (po.so for single, po.so_refs[] for bundle). Empty for stockpile POs
@@ -5295,6 +5309,93 @@ export function useChasePoEventMutation(
       // Refresh the cockpit's chase list — the row's "last chased" surface
       // reads from this same query in a future iteration.
       await qc.invalidateQueries({ queryKey: qk.operation.purchaseToday() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * P3 · `Call {supplier} — confirm tomorrow's delivery` — record the answer.
+ *
+ * Two answers and no third (`PURCHASING-WORKING-FLOW.md` §3). A `delayed`
+ * answer moves the PO's expected arrival AND reaches the ladder's own store, so
+ * **Delay planning opens by itself** on every customer order the PO covers —
+ * which is why this invalidates the ORDERS queries too, not only the PO list.
+ */
+export interface RecordTomorrowDeliveryVars {
+  poId: string;
+  answer: "shipping" | "delayed";
+  newDate?: string;
+  reason?: string;
+}
+export interface SupplierCallResponse {
+  ok: boolean;
+  result: Record<string, unknown>;
+}
+
+export function useRecordTomorrowDeliveryMutation(
+  opts?: Partial<
+    UseMutationOptions<SupplierCallResponse, ApiError, RecordTomorrowDeliveryVars>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<SupplierCallResponse, ApiError, RecordTomorrowDeliveryVars>({
+    mutationFn: ({ poId, answer, newDate, reason }) =>
+      apiFetch<SupplierCallResponse>(
+        `/api/operation/pos/${encodeURIComponent(poId)}/tomorrow-delivery`,
+        {
+          method: "POST",
+          body: JSON.stringify(
+            answer === "delayed"
+              ? { answer, newDate, ...(reason ? { reason } : {}) }
+              : { answer, ...(reason ? { reason } : {}) },
+          ),
+        },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.pos() });
+      await qc.invalidateQueries({ queryKey: qk.operation.purchaseToday() });
+      // The delay lands on the ORDERS board, so the board must re-read.
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * P3 · `Call {supplier} — confirm balance delivery date` — record the date.
+ *
+ * Keyed on the PO LINE, because that is what §3 counts this action per. PM
+ * decision A (2026-07-29): the date reaches the ladder too, so a balance that
+ * lands after the promised date opens Delay planning by itself.
+ */
+export interface RecordBalanceDateVars {
+  poLineId: string;
+  newDate: string;
+  reason?: string;
+}
+
+export function useRecordBalanceDateMutation(
+  opts?: Partial<
+    UseMutationOptions<SupplierCallResponse, ApiError, RecordBalanceDateVars>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<SupplierCallResponse, ApiError, RecordBalanceDateVars>({
+    mutationFn: ({ poLineId, newDate, reason }) =>
+      apiFetch<SupplierCallResponse>(
+        `/api/operation/pos/lines/${encodeURIComponent(poLineId)}/balance-date`,
+        {
+          method: "POST",
+          body: JSON.stringify({ newDate, ...(reason ? { reason } : {}) }),
+        },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.pos() });
+      await qc.invalidateQueries({ queryKey: qk.operation.purchaseToday() });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

@@ -409,6 +409,9 @@ export {
 export {
   assignPartnerInput,
   chasePoEventInput,
+  // P3 (0306) — the two supplier calls' answer bodies.
+  recordTomorrowDeliveryInput,
+  recordBalanceDateInput,
   attachDoInput,
   receivePoWithDoInput,
   adjustStockInput,
@@ -443,6 +446,8 @@ export {
   OperationReceiveThreadsInput,
   type AssignPartnerInput,
   type ChasePoEventInput,
+  type RecordTomorrowDeliveryInput,
+  type RecordBalanceDateInput,
   type AttachDoInput,
   type ReceivePoWithDoInput,
   type AdjustStockInput,
@@ -840,6 +845,7 @@ export {
   orderActionLine,
   orderActionQueue,
   purchasingActionButton,
+  purchasingActionDone,
   purchasingActionEmpty,
   purchasingActionLine,
   purchasingActionQueue,
@@ -847,6 +853,21 @@ export {
   type OrderActionParties,
   type PurchasingActionKey,
 } from "./order-action-words";
+
+// P3 · The two supplier calls — `Confirm tomorrow's delivery` (per PO) and
+// `Confirm balance delivery date` (per PO LINE). Pure; names its calendar.
+export {
+  PURCHASING_OFFICE_OFF_DAYS,
+  balanceDeliveryCallsOf,
+  purchasingSupplierCallCounts,
+  purchasingSupplierCallsOf,
+  tomorrowDeliveryCallOf,
+  type PurchasingOpenCall,
+  type PurchasingSupplierCallKey,
+  type SupplierCallLine,
+  type SupplierCallOptions,
+  type SupplierCallPo,
+} from "./purchasing-supplier-calls";
 
 // C6 · What closes one action — the steps, each of them one of the portal's own
 // actions, each measured from the signals the ladder already reads.
