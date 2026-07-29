@@ -476,10 +476,9 @@ exceeded") tells a new hire nothing about the next second. **Sunday never appear
 in a logistics company's rules**: a per-partner Sunday line would read as though a
 phone call could buy one.
 
-> **⇢ NOT LANGUAGE · future owner: `docs/ORDERS-WORKING-FLOW.md`** — that every
-> delivery-rule line WARNS and none of them BLOCKS, and that Sunday is refused for
-> every logistics company, are business rules. The wording law above stands on its
-> own without them.
+*(That every delivery-rule line WARNS and none BLOCKS, and that Sunday is refused for every
+logistics company, are business rules — `docs/ORDERS-WORKING-FLOW.md` §5. The wording law
+above stands on its own without them.)*
 
 **The Logistics word law (Jess 2026-07-27).** Jess: "our english bad — logistic & logistics
 we don't see different", so this was decided rather than asked again. **`Logistics`, always
