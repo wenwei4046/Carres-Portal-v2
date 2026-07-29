@@ -51,7 +51,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.5c.1** | **DECISION card** — §7② and §10 disagreed about whether the Persistent Facts cap is law. No code | ✅ **RULED 2026-07-29 — A: §10 (L4) is the authoritative law.** Card below |
 | **D0.5c.2** | **`OrderDetailDrawer` renders through `DetailShell`** — the four `identity` nodes have to exist first. Own card, not yet written | ⏳ **after D0.5c.1** |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **DONE 2026-07-29.** R1 → §8.0 · R2 → §14.1 · R3 → §10.1 · R4 → §0.3 · R5 → §10.2. §16 **47.83% → 48.94% ⬆**, debt 4 → 4. The kit is now the source; the review file is the record |
-| **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
+| **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ▶ **CARD OPEN 2026-07-29 — full card below, not started.** Widens rules C · D · F off `KIT_FILES`; inherits the three enforcement mechanisms D0.6 named (§0.3 · §10.1 · §14.1) + the stale index rows |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
 | **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ |
@@ -985,3 +985,162 @@ test goes red.
 - **Never enforce a PENDING rule.** Half-enforcement is worse than none.
 - **Never add a rule with no Enforcement** without either a mechanism in the same
   PR or a card that names one (UI-KIT §16).
+
+---
+
+## D1 · BUILD GUARD over all 225 files — warn only, write the baseline (EXECUTION CARD, opened 2026-07-29)
+
+> **STATUS: card opened by the PM, 2026-07-29, immediately after D0.6 was approved.
+> Nothing is implemented yet.** This card is the plan; a build chat takes it and does ONE card.
+
+**Why now, and not earlier.** D0.6 was D1's precondition and the reason is arithmetic, not
+ceremony: **a guard written against a law about to gain five principles is a guard that gets
+rewritten.** The law gained them on 2026-07-29 and is now still. D1 writes the baseline against a
+law that is no longer moving.
+
+**The card template, answered:**
+
+```
+Who uses it?            every chat that touches apps/web — it is the thing that
+                        catches what a chat forgot to read
+How often?              every commit (it is @carres/web's `lint`, already in CI)
+If removed?             NO — without it §16's number is a hand count, and a hand
+                        count is prose. Prose drifts; that is this file's thesis
+Permanent height?       0px — it is a script, it draws nothing
+Priority?               P1
+```
+
+---
+
+### 1 · WHAT ALREADY EXISTS — measured 2026-07-29, not assumed
+
+**A chat that starts by writing a new guard has misread this card.** The guard is live and has
+been for months. D1 **widens** it; it does not create it.
+
+```
+scripts/check-design-standard.mjs      the guard — zero-dependency, wired as
+                                       @carres/web's `lint`, runs in CI + locally
+scripts/design-standard-baseline.json  the ratchet — hex: 35 files
+                                                     listPages: 255 entries
+```
+
+| Rule | What it catches | Scope TODAY |
+|---|---|---|
+| **A** | hard-coded hex | **all** `apps/web/src` (ratcheted) |
+| **B** | a list page that does not use the shell | **all** `pages/**` (ratcheted) |
+| **C** | Lucide `size={N}`, N not in {14,16,18} | WARNING — **kit only** (`KIT_FILES`) |
+| **D** | inline `text-[Npx]` off the scale | WARNING — **kit only** |
+| **E** | inline KPI fill hex | **all** web src |
+| **F** | `h-[Npx]` where N is not 44 | WARNING — **kit only** |
+| **G** | hand-rolled `section-band` | **all** web src |
+
+**So D1's real job is C, D and F**, which today see **29 kit files** and must come to see all
+**236 in-scope page files** (`pages/**` minus `dealer/**` minus tests). A, B, E and G are already
+repo-wide.
+
+---
+
+### 2 · SCOPE
+
+**In scope:**
+
+| # | What | Why |
+|---|---|---|
+| 1 | Widen rules **C, D and F** from `KIT_FILES` to all of `apps/web/src`, **warn only** | §13.1 already says the scope is *"all of `apps/web/src` — not a hand-maintained file list"*. The code does not do that yet. |
+| 2 | **Write the baseline** for the newly-seen violations, per rule and per file | The ratchet is how a 225-file debt becomes finite. Freezing is not forgiving — it is the only way the number can start going down. |
+| 3 | `KIT_FILES` **stops being hand-maintained** — the kit is `components/kit/**` | See finding ① below: three shells shipped into the kit and nobody added them to the list. |
+| 4 | **§16's generator** — the `--report` mode that parses the Enforcement column and rewrites the block | §16 says the block *"is GENERATED, not hand-typed"* and then says the numbers are a hand count. One of those is a lie today. |
+| 5 | The three enforcement mechanisms D0.6 handed to D1 | §14.1 (R2) · §10.1 (R3) · §0.3 (R4). Each is Build-Guard shaped and each is named as D1's in the law. |
+| 6 | The stale index rows, per the PM 2026-07-29 | D0.5b.1's row still reads "before D0.5c" though it shipped in `2d5aaddb`. Documentation cleanup, carried here rather than reopening D0.6. |
+
+**OUT of scope — named so the card cannot creep:**
+
+| What | Where it belongs |
+|---|---|
+| **Fixing any violation the guard newly sees** | D2 · D3 · D4 codemods. **D1 measures and freezes. It repairs nothing.** |
+| Turning the guard to **fail** | **D5**, and D5 is blocked until the debt is walked down. |
+| Migrating any page to the kit | D2–D7 |
+| `OrderDetailDrawer` rendering through `DetailShell` | **D0.5c.2** |
+| The Orders list 7 bands to 3 | **D6** |
+| Editing `docs/UI-KIT.md` | **D0.6, and it is CLOSED.** If D1 finds the law wrong, it REPORTS. |
+
+---
+
+### 3 · RULES
+
+1. **WARN ONLY. The build does not go red on a pre-existing violation.** A guard that fails on
+   day one gets switched off on day one, and then nothing is enforced at all.
+2. **D1 repairs nothing.** If the widened rules see 800 violations, the number is 800 and it is
+   written down. **A card that fixes what it measures cannot be trusted about what it measured.**
+3. **The baseline is per rule and per file**, never a global total — a global number lets one file
+   improve while another rots and the total stands still.
+4. **Report, never unilaterally change** (Law 0). Every finding below and every new one goes to the
+   PM. **The law is closed to this card.**
+5. **No visual change and no behaviour change.** `apps/web/src/**` is not edited except for
+   `KIT_FILES`' replacement. Web suite at baseline: **16 pre-existing failures in 4 documented
+   files** (`OperationOrders` x7, `OrderCustomerCard` x4, `OhanaSofaTab` x4,
+   `NiceFutureMattressTab` x1) — **zero new**.
+6. **§16's coverage may not go down and the debt may not grow.** D1 adds *mechanisms*, so the
+   number should go UP; if a mechanism cannot be built, its rule stays scheduled and the reason is
+   stated.
+
+---
+
+### 4 · FINDINGS ALREADY IN HAND — measured 2026-07-29, so D1 does not re-derive them
+
+**① The three D0.5c shells are in the kit and are not guarded.** `PageShell.tsx`,
+`DataTable.tsx` and `DetailShell.tsx` live in `components/kit/**` — the kit by definition — and
+none of them is in `KIT_FILES`, so rules C, D and F have never run on them. **This is exactly the
+failure §13.1's "not a hand-maintained file list" sentence exists to prevent, and it happened to
+the newest kit files within a day of shipping.** It is scope item 3, not a bug report.
+
+**② §16 cites a script that does not exist.** It names `check-design.mjs --report` twice; the file
+is `check-design-standard.mjs`. Harmless while the block is hand-typed, load-bearing the moment
+D1 wires the generator — a chat will run the cited command and get "not found".
+**Reported, not fixed: editing §16 means editing the law, and D0.6 is closed.**
+
+**③ R2's mechanism removes a feature, and that is the PM's call, not D1's.** §14.1 forbids a
+per-user UI preference; three live browser-persisted UI-state sites under `pages/**` violate it,
+and one (`hiddenCols` on the Orders list) is a feature somebody asked for. **D1 may write the rule
+and must not silently delete the feature.** If the PM has not ruled by then, the mechanism ships
+warn-only with the three sites baselined and named.
+
+**④ `MUST_USE_SHELL` holds exactly ONE page** (`OperationOrdersControl.tsx`) against 236. Rule B
+is repo-wide for NEW pages but only one existing page is held to it. Widening that list is a
+**D2–D7** consequence, not D1's — noted so D1 does not mistake it for its own job.
+
+---
+
+### 5 · EXIT CRITERIA
+
+Every line is checkable by someone who did not write the card.
+
+- [ ] Rules **C, D and F** run over all of `apps/web/src`, and a deliberately-planted violation in
+      a non-kit page is **seen** (proved by planting one, running, then removing it).
+- [ ] The guard **exits 0** on a clean tree. Warn-only is proved, not asserted.
+- [ ] `KIT_FILES` is **derived** from `components/kit/**`, not typed. Adding a kit component puts
+      it in scope with no second edit — proved by the three shells appearing without being listed.
+- [ ] The baseline is **committed**, per rule and per file, and its totals are printed in the PR.
+- [ ] The report mode regenerates §16's block, and its output **matches the hand count** on the day
+      it lands — if it does not, the hand count was wrong and the difference is explained.
+- [ ] Each of the three inherited mechanisms is either **live** (and §16's numerator moves) or
+      **stays scheduled with a stated reason**. No principle silently loses its card.
+- [ ] Web suite at baseline (16 failures in 4 files, zero new) and `tsc -p tsconfig.app.json` clean.
+- [ ] **`docs/UI-KIT.md` is NOT in `git diff --name-only`.**
+- [ ] The stale index rows are corrected in THIS file.
+- [ ] The four review questions are answered, findings ① to ④ carried forward or closed.
+
+---
+
+### 6 · SEQUENCING
+
+```
+D0.5a -> D0.5b -> D0.5b.1 -> D0.5c -> D0.6 (done) -> D1 -> D2/D3/D4 codemods -> D5 (guard = FAIL)
+
+D0.5c.2 (the drawer) runs beside these and blocks nothing.
+```
+
+**D1 does not block D0.5c.2 and D0.5c.2 does not block D1.** One widens a script, the other wraps
+a drawer; they touch no common file. **D5 is what D1 unlocks** — and D5 cannot start until the
+codemods have walked the baseline down, because turning the guard red over a frozen debt fails
+every build in the repo.
