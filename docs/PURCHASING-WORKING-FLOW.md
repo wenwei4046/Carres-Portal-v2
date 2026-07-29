@@ -57,7 +57,7 @@ rule, and it is measurable:**
 Every action's Due is written in §3, so no case has to be argued:
 
 ```
-To Order    ⟨SLOT-1⟩ prepare demand · Issue PO · Confirm ready date
+To Order    Prepare PO · Issue PO · Confirm ready date
 Receiving   Confirm tomorrow's delivery · Check in · Confirm balance delivery date
 Claims      Confirm what happens next
 ```
@@ -66,7 +66,7 @@ Claims      Confirm what happens next
 
 The sentence above about buying and receiving being the same job stays true of the PEOPLE and
 of the tab bar. It is **not** the rule that decides which tab an action lives on. Neither is
-*"goods are not yet secured → To Order"*: sending the PO is itself what secures the goods
+*"goods are not yet secured → To Order"*: issuing the PO is itself what secures the goods
 (§4 rung 3), so read literally that sentence would put `Confirm ready date` on the wrong side.
 It survives only as a plain-language explanation for a person.
 
@@ -198,37 +198,57 @@ second time.
 goods are collected by NETS; the row says `Call NETS — collect from Nice Future`, never
 `Call Nice Future`).
 
-### `Send PO to {supplier}`
+### `Prepare PO for {supplier}`
 
-> **⚠️ THIS ACTION SPLITS IN TWO — ruled 2026-07-29, wording NOT yet ruled.** Under the frozen
-> Purchase Order lifecycle, raising goods against demand is two steps, not one:
-> **⟨SLOT-1⟩ prepare** produces a **Draft PO**, and **`Issue PO`** is the only action that
-> creates the official Purchase Order. `Issue PO` is the decided word; `⟨SLOT-1⟩` is not.
->
-> **The six things below still describe the OLD single step, and they stay until Jess rules
-> the missing word** — a half-rewritten action is worse than an honestly stale one. What is
-> already known to change: the Completion (*"a PO exists for the line"*) is the completion of
-> `Issue PO`, not of the preparing step; and the done message `PO sent to {supplier}` in
-> `docs/COPY-STANDARD.md` describes a step that no longer sends anything.
-> See [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §10,
-> SLOT-1 and SLOT-2.
+**Raising a purchase order is TWO actions, never one** (Loo, 2026-07-29). This is the first.
+It gathers demand into a **Draft PO** and **nothing leaves our company** — no PO number, no
+document, no message to the factory.
 
-- **Trigger** — a customer line needs goods, no PO covers it, and today is a PO day **or**
-  the line's order-by date has passed
-- **Checklist** — supplier · items · quantity · purchase price · where the goods go · send ·
-  record the PO number · record the supplier's ready date
-- **Completion** — a PO exists for the line. **The ready date is NOT part of this** — it is
-  the outcome of the NEXT action, and the moment a PO exists the row reads
-  `Call {supplier} — confirm ready date`. Folding the two together would leave `Send PO` open
-  with nothing left to send, which is the one thing an action may never do
+- **Trigger** — a customer line needs goods, no PO covers it, no Draft PO covers it, and
+  today is a PO day **or** the line's order-by date has passed
+- **Checklist** — supplier · items · quantity · purchase price · where the goods go ·
+  save the Draft PO
+- **Completion** — **a Draft PO exists covering the line.** Nothing else. The moment it
+  exists the row reads `Issue PO to {supplier}`
 - **Due** — the order-by date (§2's formula). Red once it has passed
 - **Task owner** — the PO-duty holder (`org_duties`)
 - **Counted per** — one row per **supplier**, showing how many lines it holds. The queue
   count and the visible rows both count suppliers, and each row states its line count
-- **Re-checked when** — a customer line is added, changed, skipped or snoozed · a PO is
-  created · the promised date moves · a setting in §2 changes
+- **Re-checked when** — a customer line is added, changed, held or resumed · a Draft PO is
+  saved or deleted · a PO is issued · the promised date moves · a setting in §2 changes
 
-**The system suggests; a human sends.** The portal never sends a PO by itself. Today the PO
+**A line already covered by a Draft PO does not raise this action again.** It states
+`Covered by {count} Draft POs` instead — a fact, not an order (COPY-STANDARD). The line stays
+in the plan until a PO exists, because a draft can be deleted and the demand would otherwise
+vanish from the screen while still unmet
+([`PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §5.3).
+
+### `Issue PO to {supplier}`
+
+The second act, and **the only one that creates a formal Purchase Order.**
+
+- **Trigger** — a Draft PO exists and no PO has been issued from it
+- **Checklist** — check the supplier · the items · the quantity · where the goods go ·
+  issue the PO
+- **Completion** — **a PO exists for the line.** **The ready date is NOT part of this** — it
+  is the outcome of the NEXT action, and the moment a PO exists the row reads
+  `Call {supplier} — confirm ready date`. Folding the two together would leave `Issue PO`
+  open with nothing left to issue, which is the one thing an action may never do
+- **Due** — the order-by date of the earliest demand the draft covers. Red once it has passed
+- **Task owner** — the PO-duty holder (`org_duties`)
+- **Counted per** — one row per **Draft PO**. A supplier with three drafts raises three
+- **Re-checked when** — a Draft PO is saved or deleted · a PO is issued · the demand a draft
+  covers changes · the promised date moves
+
+**Only `Issue PO` mints the PO number, produces the external document, and opens the
+communication channels.** A Draft PO can do none of those, and that is structural rather than
+a gate: it has no PO number to print and no document to send.
+
+**A Draft PO whose demand has gone may not be issued until somebody has looked at it.** The
+row states `Demand no longer required` and the reason line explains it (COPY-STANDARD). This
+is a fact and a stop, never an error word.
+
+**The system suggests; a human issues.** The portal never issues a PO by itself. Today the PO
 leaves by WhatsApp; a supplier portal is a later phase and changes nothing here.
 
 **Consolidation is across CUSTOMER ORDERS, not across categories.** Every non-sofa line
@@ -352,7 +372,7 @@ future supply (0299) — otherwise the planner keeps believing goods are coming 
 2  A promise is already broken
      Call {supplier} — confirm ready date (the date has passed, or it beats the customer's)
 3  Goods are not secured
-     Send PO to {supplier}
+     Issue PO to {supplier} — then — Prepare PO for {supplier}
 4  Cleaning up a part-delivery
      Call {supplier} — confirm balance delivery date
 5  Claims
@@ -429,15 +449,15 @@ rule. A chat that reads this as a single list will build a tile for an action th
 count:
 
 ```
-To Order    ⟨SLOT-1⟩ prepare demand  ·  Issue PO  ·  Confirm ready date
+To Order    Prepare PO  ·  Issue PO  ·  Confirm ready date
 Receiving   Confirm tomorrow's delivery  ·  Check in  ·  Confirm balance delivery date
 Claims      Confirm what happens next
 ```
 
 **On To Order the three rank in that order** (`docs/ACTION-FLOW-STANDARD.md` Law 4 rung 3,
 frozen 2026-07-29): a broken supplier commitment first, then work already prepared, then work
-not yet started. `⟨SLOT-1⟩` is an unresolved terminology slot —
-[`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §10.
+not yet started. **All three words are ruled** and their five strings live in
+`docs/COPY-STANDARD.md`, the canonical home.
 
 **The last tile is `Confirm what happens next`, not `Claims`.** A tile's name IS its action
 (COPY-STANDARD); `Claims` is the TAB, which is a place, and a place and an action may not

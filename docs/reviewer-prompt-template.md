@@ -92,7 +92,7 @@ Every panel/widget MUST have:
 - **Step 1-2-3 pedagogy** top-to-bottom (Red = fix first · Yellow = do next ·
   Green = plan). New staff reads top-to-bottom = knows what to do.
 - **Row action-line** at end of each row: verb + object + when (≤10 words).
-  Example: `Send PO to Ohana today.` · `Chase Nice Future — PO-86 due Fri.`
+  Example: `Prepare PO for Ohana today.` · `Call Nice Future — confirm ready date.` *(Corrected 2026-07-29: the old examples used `Send PO`, retired, and `Chase`, a banned word — a reviewer prompt that teaches banned words is worse than none.)*
 - **Inline What-to-do** 3-4 numbered steps per detail pane (each step ≤8 words).
 - **COPY-STANDARD vocabulary strict** — SO for customer sales order · PO for
   supplier purchase order. NEVER mix. Send / Chase / Receive / Remind /

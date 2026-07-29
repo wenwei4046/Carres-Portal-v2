@@ -161,7 +161,7 @@ open on the same record at the same time.
 3  Goods are not secured
      Call {supplier} — confirm ready date
      Issue PO
-     ⟨SLOT-1⟩ — turn unprotected demand into a Draft PO
+     Prepare PO
 4  Delivery preparation
      Assign logistics · Call {logistics} — confirm delivery date · Issue delivery order
 5  Money
@@ -175,16 +175,13 @@ commitment descending:
 1. **`Call {supplier} — confirm ready date`** — an existing supplier commitment is missing
    or broken. Something already promised has stopped being true.
 2. **`Issue PO`** — work is already prepared and has not yet become a formal PO.
-3. **`⟨SLOT-1⟩`** — demand has not yet been placed into a Draft PO at all.
+3. **`Prepare PO`** — demand has not yet been placed into a Draft PO at all.
 
-**`⟨SLOT-1⟩` is an UNRESOLVED TERMINOLOGY SLOT and no chat may fill it.** The ORDERING is
-frozen; the WORD is Jess's, and `Send PO` cannot simply be reused — under the frozen
-Purchase Order lifecycle that step produces a **Draft PO** and sends nothing. The slot is
-tracked in [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §10.
-
-**`Send PO to {supplier}` used to be listed on this rung and has been removed from it**, not
-because the action stopped existing but because it split in two and only one half kept a
-ruled name. `docs/COPY-STANDARD.md` still carries its five strings; that entry is SLOT-2.
+**`Send PO to {supplier}` used to be this rung's first action and is RETIRED** (Loo,
+2026-07-29). Raising a purchase order is two acts: `Prepare PO` produces a Draft PO that has
+left our company in no way, and `Issue PO` creates the formal PO. **Neither is called
+`Send PO`, and the verb `Send` is retired with it** — `docs/COPY-STANDARD.md` is the
+canonical home for all three words.
 
 **`Delay planning` sits at the TOP of rung 2, immediately above the call it guards**
 (added 2026-07-28 — C8 found that Law 4 ranked it nowhere at all). It is the decision

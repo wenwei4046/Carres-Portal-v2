@@ -28,7 +28,7 @@ Read these BEFORE writing any code:
 | **3-pane inline split** (facet · list · detail always visible) | Kill the Order drawer overlay → detail lives beside the list, always visible | Biggest UX win — same as Purchase; new operator sees list + detail together, never navigates away |
 | **Compact pill stage tabs** (~40px vs ~72px cards) | Same compact pill row for Orders status tabs (Placed · Proceed · Pending · Scheduled · Completed · All) | Half the vertical space; frees room for the detail pane |
 | **Row action-line** (≤10 words, verb + object + when) | Every Orders row ends with a plain-English "next step" sentence: `Confirm delivery date with Ali Chen.` · `Chase Nice Future — 2d late.` · `Assign NETS for SO-1234.` | Zero-experience friendly; layers on top of existing action pills (doesn't replace them) |
-| **Inline What-to-do (3-4 step, horizontal)** in detail pane | Per stage guide: **Placed** → "Wait for customer to confirm ETA → move to Proceed." · **Proceed** → "Send POs · confirm delivery · schedule NETS." · **Scheduled** → "Confirm morning-of · dispatch · POD." · **Completed** → "Post-invoice · archive." | New employees know the flow at every stage |
+| **Inline What-to-do (3-4 step, horizontal)** in detail pane | Per stage guide: **Placed** → "Wait for customer to confirm ETA → move to Proceed." · **Proceed** → "Prepare and issue POs · confirm delivery · schedule NETS." · **Scheduled** → "Confirm morning-of · dispatch · POD." · **Completed** → "Post-invoice · archive." | New employees know the flow at every stage |
 | **COPY-STANDARD vocab alignment** | Audit every Orders string: SO for customer orders, PO for supplier orders, no mixing; canonical Send / Chase / Receive / Remind / Placed / Proceed | Same one-vocab-across-app discipline as Purchase |
 | **Days-to-deliver strip** (14-day) | Same shape as Purchase's Days-to-order — but keyed on `delivery_date` instead of order-by. See today's + this week's delivery load at a glance. Cadence day markers = customer delivery peak days (Mon-Fri; Sat/Sun/PH greyed). L/R chevrons to shift window. | Fits Master-Sheet mentality perfectly; scales at 1000 orders/mo |
 | **Missing-data guard bar** | `N SOs need delivery date` · `N SOs need address` · `N SOs need customer contact` — one guard per data gap | Prevents work stalling downstream (currently silent-fail) |
@@ -73,5 +73,5 @@ Paste this into a fresh chat on Sat:
 
 - Sat / Sun / public holidays greyed on Purchase Days-to-order strip (`packages/shared/src/my-holidays.ts` already exists — just import + check each cell's ISO).
 - L / R chevron nav on Purchase strip (shift the 14-day window ±7 days).
-- Real Send PO / Chase WhatsApp / Check-in GRN write paths (now `docs/PURCHASING-WORKING-FLOW.md` §3 — `purchase-cockpit-handoff.md` was deleted 2026-07-27).
+- Real `Prepare PO` / `Issue PO` / `Check in` write paths (now `docs/PURCHASING-WORKING-FLOW.md` §3 — `purchase-cockpit-handoff.md` was deleted 2026-07-27). *(Corrected 2026-07-29: this line said `Send PO` and `Chase WhatsApp`; `Send PO` is retired and `Chase` is a banned word.)*
 - Lead-time settings screen (migration 0243).

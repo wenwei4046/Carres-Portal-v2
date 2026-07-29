@@ -29,16 +29,16 @@ Two hard beliefs behind the rules:
 
 | # | Rule | ✘ Bad | ✔ Good |
 |---|------|-------|--------|
-| 1 | Button = verb + object | `OK` · `Submit` · `Send` (alone) | `Send order to Ohana` |
-| 2 | One action → one word | mix send / raise / place | `Send` everywhere |
-| 3 | Numbers up front | `There are 2 orders to send` | `2 to send · 1 late` |
+| 1 | Button = verb + object | `OK` · `Submit` · `Send` (alone) | `Prepare PO for Ohana` |
+| 2 | One action → one word | mix send / raise / place | `Prepare PO` everywhere |
+| 3 | Numbers up front | `There are 2 POs to prepare` | `2 to prepare · 1 late` |
 | 4 | Skip the obvious | `Below is the list of suppliers` | (just show the list) |
-| 5 | Empty states teach | `No results` | `No orders to send today. Check back after 2 PM.` |
+| 5 | Empty states teach | `No results` | `No purchase orders need preparation. Check back after 2 PM.` |
 | 6 | Errors give the fix | `Invalid input` | `Master row missing G column. Ask Sales to fill it before Monday.` |
-| 7 | Tooltip = WHY | button `Send` · tip `Click to send` | button `Send` · tip `Sends the PO to Ohana via WhatsApp` |
+| 7 | Tooltip = WHY | button `Issue PO` · tip `Click to issue` | button `Issue PO` · tip `Creates the PO number and the document Ohana receives` |
 | 8 | Same word app-wide | Orders `Confirm ready date` · Purchase `Follow up` | Both say `Confirm ready date` |
 | 9 | Zero jargon — **unless the team already says it** | requisition · expedite · MRP · `GRN` as a VERB | order · call · plan · check in · `GRN` as the DOCUMENT (see the document/act split) |
-| 10 | Cut a sentence if possible | `Please note that this order...` | `This order is 1 day late. Send now.` |
+| 10 | Cut a sentence if possible | `Please note that this order...` | `This order is 1 day late. Prepare PO now.` |
 
 ## The three "who / what / when" questions
 
@@ -61,7 +61,7 @@ action. **Length ≤ 10 words.** Shape:
 
 Examples (all pass):
 
-    ✔ Send order to Ohana today.               (5 words)
+    ✔ Prepare PO for Ohana today.              (5 words)
     ✔ Remind Nice Future — PO-86 due Fri.      (7 words)
     ✔ Call Ohana — confirm PO-88 ready date.   (7 words)
     ✔ Check in from Ohana (3 items).           (6 words)
@@ -90,7 +90,7 @@ Example (good):
     1. WhatsApp Ohana (012-3456).
     2. Send the SKU list above.
     3. Ask for ETA.
-    4. Click Send PO.
+    4. Click Prepare PO.
 
 Anti-pattern (too wordy):
 
@@ -112,7 +112,7 @@ it will change · (c) **what** the reader should do meanwhile.
 
 Examples:
 
-    ✔ "No orders to send today. Check back after 2 PM when Master syncs."
+    ✔ "No purchase orders need preparation. Check back after 2 PM when Master syncs."
     ✔ "0 calls to make · everything on track. Nothing to do here."
     ✔ "No goods arriving today. Ohana's next delivery is Thu 24 Jul."
 
@@ -133,7 +133,7 @@ Examples:
 
     ✔ "Master row missing G column. Ask Sales to fill it before Monday."
     ✔ "Ohana's phone number is not in Suppliers. Ask a manager to add it."
-    ✔ "PO already sent — you cannot send again. If wrong, click Cancel."
+    ✔ "PO already issued — you cannot issue it again. If wrong, click Cancel."
 
 Anti-patterns:
 
@@ -147,7 +147,7 @@ Anti-patterns:
 
 The visible label says **WHAT**. The tooltip says **WHY**. They must not repeat.
 
-    Label "Send"        · tooltip "Sends the PO to Ohana via WhatsApp."
+    Label "Issue PO"    · tooltip "Creates the PO number and the document Ohana receives."
     Label "Late 2d"     · tooltip "Order-by was 20 Jul; today is 22 Jul."
     Label "No deadline" · tooltip "This order's Master row has no G column."
 
@@ -324,8 +324,7 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 
 | Queue tile | Row line | Button | Done message | Empty state |
 |---|---|---|---|---|
-| `Send PO` | `Send PO to {supplier}` | `Send PO` | `PO sent to {supplier}` | `No POs to send today.` |
-| `Confirm ready date` | `Call {supplier} — confirm ready date` | `Record ready date` | `Ready date recorded` | `No supplier to call today. Everything on track.` |
+| `Prepare PO` · `Issue PO` · `Confirm ready date` | **→ defined once in the PURCHASING table below.** The Orders ladder DISPLAYS these three; it does not respell them. *(This row replaces the old `Send PO` entry — raising a purchase order is two acts now, and neither is called `Send PO`.)* | | | |
 | `Assign logistics` | `Assign logistics` | `Assign logistics` | `{logistics} assigned` | `Every order has a logistics company.` |
 | `Confirm delivery date` | `Call {logistics} — confirm delivery date` | `Confirm booking` | `Delivery confirmed {date} · {slot}` | `0 calls to make · everything on track.` |
 | `Issue delivery order` | `Issue delivery order` | `Issue delivery order` | `Delivery order issued` | `Nothing waiting for a delivery order.` |
@@ -339,25 +338,30 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 
 | Queue tile | Row line | Button | Done message | Empty state |
 |---|---|---|---|---|
-| `Send PO` | `Send PO to {supplier}` | `Send PO` | `PO sent to {supplier}` | `No POs to send today. Next PO day is {date}.` |
+| `Prepare PO` | `Prepare PO for {supplier}` | `Prepare PO` | `Draft PO prepared for {supplier}` | `No purchase orders need preparation.` |
+| `Issue PO` | `Issue PO to {supplier}` | `Issue PO` | `PO issued to {supplier}` | `No draft purchase orders are ready to issue.` |
 | `Confirm ready date` | `Call {supplier} — confirm ready date` | `Record ready date` | `Ready date recorded` | `No supplier to call today. Everything on track.` |
 | `Confirm tomorrow's delivery` | `Call {supplier} — confirm tomorrow's delivery` | `Record answer` | `Answer recorded` | `Nothing arriving tomorrow.` |
 | `Check in` | `Check in from {supplier}` | `Check in` | `Checked in {n} of {m}` | `No goods arriving today. {supplier}'s next delivery is {date}.` |
 | `Confirm balance delivery date` | `Call {supplier} — confirm balance delivery date` | `Record balance date` | `Balance date recorded` | `Nothing short today.` |
 | `Confirm what happens next` | `Call {supplier} — confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
 
-**`Send PO` and `Confirm ready date` are ONE action each, shared by Orders and
-Purchasing** — same trigger, same completion, same words. They are listed twice
-because both flows show them; they are never spelt differently.
+**THIS TABLE IS THE CANONICAL HOME FOR EVERY PURCHASING ACTION, INCLUDING THE ONES THE ORDERS
+LADDER DISPLAYS.** The Orders row and the Purchasing row show the same work, so `Prepare PO`,
+`Issue PO` and `Confirm ready date` are defined **once, here**. The ORDERS table above points
+at this one; it does not respell them.
 
-> **⚠️ `Send PO` — THIS ENTRY IS UNDER REVIEW AND IS SLOT-2 (Loo, 2026-07-29).** The frozen
-> Purchase Order lifecycle splits raising a PO into **⟨SLOT-1⟩ prepare a Draft PO** and
-> **`Issue PO`**, so on the Purchasing side the done message `PO sent to {supplier}` describes
-> a step that no longer sends anything — while on the ORDERS side the meaning has not changed.
-> The five strings above are left **exactly as they ship** until Jess rules SLOT-1 and SLOT-2
-> together: a half-renamed shared action would put one act on two screens under two words,
-> which is the error the shared-word module exists to make impossible.
-> **`Issue PO` is ruled and has no five strings yet — that is part of the same ruling.**
+*(This replaces the rule that `Send PO` and `Confirm ready date` were ONE action each "shared
+by Orders and Purchasing … listed twice". Loo deleted that statement on 2026-07-29: the
+requirement it created — that both flows carry an identical entry — is what made the
+Purchasing split unbuildable without dragging Orders' wording along. **Defining an action
+once and referencing it is stronger than defining it twice and promising the copies match.**)*
+
+> **`Send PO` IS GONE FROM PURCHASING (Loo, 2026-07-29).** Raising a purchase order is two
+> acts now — **`Prepare PO`** produces a Draft PO that has left our company in no way, and
+> **`Issue PO`** creates the formal Purchase Order. Neither is called `Send PO`, and the old
+> done message `PO sent to {supplier}` described a step that no longer exists. The verb `Send`
+> is retired with it and stays banned from reuse — see the verb dictionary.
 
 **RETIRED, and it is not in the table above because it is no longer an action**
 (C3, PR #479): the old bare `Confirm` fired when everything was already arranged
@@ -442,13 +446,16 @@ against.
 
 ### The verb dictionary — portal-wide (locked 2026-07-27)
 
-**SIX verbs, six meanings. Every module uses these; no module invents a seventh.**
+**SEVEN verbs, seven meanings. Every module uses these; no module invents an eighth.**
 
-*(It was five until 2026-07-28. `Return` was added by Loo's ruling and it is the only
-addition since the table was locked — it exists because R6 needed a word for "this record
-goes back to whoever produced it" and reached for `Send back`, which reuses the one verb
-this table pins hardest. The bar for a seventh is the bar that was cleared here: no
-existing verb fits, and the alternative was a module inventing its own.)*
+*(It was five until 2026-07-28. `Return` was added by Loo's ruling because R6 needed a word
+for "this record goes back to whoever produced it" and reached for `Send back`. **`Prepare`
+was added 2026-07-29 (P6) and cleared the same bar**: the frozen Purchase Order lifecycle
+splits raising a PO into two acts, and the first one produces a Draft PO that has left our
+company in no way. Every existing verb was tested against it and none fits — `Issue` is the
+SECOND act, `Send` would say the thing that has not happened, and `Assign` · `Call` ·
+`Upload` · `Close` · `Return` are about other objects entirely. **The bar for an eighth is
+this bar: no existing verb fits, and the alternative is a module inventing its own.**)*
 
 **They govern WORKLIST ACTIONS, not form buttons.** A button inside a form that stores what
 you just typed is `Save`, and one that abandons it is `Cancel` — those are not actions, they
@@ -458,8 +465,12 @@ never appear in a queue, and they need no verb from this table.
 action whether it is done by phone, by WhatsApp or in person: outward communication whose
 outcome is recorded. A button that opens WhatsApp or copies the message is HOW,
 not WHAT — never a second action.
-**`Send` stays pinned to raising a purchase order to a factory** and is never reused for
-"this message leaves our company" (rule 8).
+**`Send` IS RETIRED AS AN ACTION VERB (2026-07-29, P6) AND STAYS BANNED FROM REUSE.** It was
+pinned to raising a purchase order to a factory; the frozen lifecycle replaced that single
+act with **`Prepare PO`** then **`Issue PO`**, so **no action in the portal is named `Send`
+any more.** The pin does not lift with it: `Send` may still never be reused for "this message
+leaves our company" (rule 8), for returning a record (`Return`), or for anything else. A word
+with no owner is not a free word — it is a word one module is about to claim.
 
 #### The WhatsApp button — the label says which door it opens (Loo, 2026-07-28)
 
@@ -494,6 +505,7 @@ resolved at render time from what is on file — never a third blended word cove
 | **Upload** | evidence is attached | the file exists |
 | **Close** | a case or claim is finished and its record is sealed | the record can no longer change |
 | **Return** | a record goes BACK to the party that produced it, for them to act on | the record is with them **and its state says so on their screen** |
+| **Prepare** | work is gathered and organised into a document that is **not yet formal** and has left our company in no way | **the draft exists and can be reviewed.** Never "it was sent" — sending is a later, separate act, and under `Issue` |
 
 Examples: `Assign logistics` · `Assign PIC` · `Assign warehouse picker` ·
 `Call {supplier} — confirm ready date` · `Call {logistics} — confirm delivery date` ·
@@ -651,7 +663,7 @@ doubt, grep the codebase and match what already ships.
 
 | Concept | Canonical word | Do NOT use |
 |---------|---------------|------------|
-| Raise a purchase order to a factory | **Send** (order / PO) — **but see the Purchase Order lifecycle words below: from 2026-07-29 the official PO is created by `Issue PO`, and what `Send` still names is SLOT-2** | Place · Raise · Push · Submit · Create |
+| Raise a purchase order to a factory — **it is TWO acts, never one** | **`Prepare PO`** (a Draft PO exists; nothing has left our company) **then `Issue PO`** (the formal PO exists) | **Send PO** — retired 2026-07-29 · Place · Raise · Push · Submit · Create |
 | Pre-due polite follow-up on an open PO | **Remind** | Notify · Ping · Alert · Nudge |
 | Post-due firm follow-up on an open PO | **Call {supplier} — confirm ready date** | Chase · Expedite · Follow up · Push · Escalate |
 | Log goods arrival — the ACT | **Check in** | Receive (as a verb) · Book in · Goods receipt · **GRN** (that is the document, not the act) |
@@ -662,7 +674,7 @@ doubt, grep the codebase and match what already ships.
 | Cancel an order | **Cancel** | Void · Abandon · Kill |
 | Purchase order (the document) | **PO** | Purchase order · P/O · Order (ambiguous with customer order) |
 | Customer's own order | **Order** (or `SO-1207`) | Sales order · Job · Ticket |
-| ~~The Purchase panel's three stages~~ | **RE-RULED 2026-07-29 — see the Purchasing exception below.** `Receive` LEAVES To Order (it is Receiving's, by the deadline-anchor boundary) and the remaining stages are `⟨SLOT-1⟩ prepare · Issue PO · Confirm ready date` | Chase · Place · Follow up · Book in — **and `Receive` as a To Order stage word** |
+| The To Order stages | **`Confirm ready date` · `Issue PO` · `Prepare PO`** — in that display order (`docs/ACTION-FLOW-STANDARD.md` Law 4 rung 3) | Chase · Place · Follow up · Book in · **`Send PO`** · **`Receive` as a To Order stage** (it left for Receiving on the deadline-anchor boundary) |
 | Photo proving a delivery happened | **delivery photo** | POD · Proof of Delivery · e-POD |
 | Mattress + bed frame as one delivery | **Bed set** | Bedroom set · Bundle · Bed package |
 | A follow-up delivery on the same order | **Second trip** | Partial delivery · Split shipment · Back-order |
@@ -688,46 +700,57 @@ doubt, grep the codebase and match what already ships.
 | Goods moved between our own locations | **stock transfer** | Relocation · Internal shipment · Redeployment |
 | The drawer panel listing who to ring, one row per outside party | **Calls** | Chase Now · Actions · Follow-ups · Contacts — `Actions` is the ROW's open-action list and one word may not head two blocks (Jess 2026-07-28, PR #487); the panel's own empty state has read `0 calls to make · everything on track.` since C1, so the title is that sentence's noun, not a new word |
 
-## The Purchase Order lifecycle words (Loo, 2026-07-29)
+## The Purchase Order lifecycle words — CANONICAL HOME (Loo, 2026-07-29 · frozen by P6)
 
-**This is a PURCHASING exception to two rows in the table above, and it is deliberate.** A
-Purchase Order and a customer order are two different subjects; a word banned on one is not
-automatically banned on the other. **`Draft` and `Open` stay banned for a CUSTOMER ORDER.**
+**Every Purchasing word lives here. No other file may redefine one; they reference this
+section.** `docs/PURCHASING-WORKING-FLOW.md` owns what the actions DO,
+`docs/PURCHASING-INFORMATION-MODEL.md` owns where the facts sit — neither respells a word.
 
-**Action ≠ Status. They may never be mixed.**
+**This is a PURCHASING exception to two rows in the vocabulary table above, and it is
+deliberate.** A Purchase Order and a customer order are two different subjects; a word banned
+on one is not automatically banned on the other. **`Draft` and `Open` stay banned for a
+CUSTOMER ORDER.**
 
-| | Ruled words |
-|---|---|
-| **Operation Status** (Carres' own workflow on a PO) | `Draft` · `Issued` · `In Production` · `Receiving` · `Completed` · `Cancelled` |
-| **Supplier Status** | what the factory and the logistics partner report — a SEPARATE axis, never merged into the one above |
+**Action ≠ Status. They may never be mixed.** An action is something a person does and it
+LEAVES when its outcome is recorded. A status is what the PO currently is.
+
+### The six Operation Status labels — the ONLY six
+
+| # | Label | Means |
+|---|---|---|
+| 1 | **`Draft`** | **not a formal Purchase Order.** Nothing has left our company and no PO number exists |
+| 2 | **`Issued`** | a formal PO has been created and issued |
+| 3 | **`In Production`** | supplier fulfilment is underway |
+| 4 | **`Receiving`** | physical goods receipt has started |
+| 5 | **`Completed`** | the PO is fully received and no remaining purchasing action exists |
+| 6 | **`Cancelled`** | the PO will no longer be fulfilled |
+
+**`Open` is never a Purchase Order status.** The word for a PO that has been issued is
+`Issued`. (`Open` also reads as "not yet finished", which is a different fact and is what
+`Receiving` says.)
+
+**Supplier Status is a SEPARATE axis** — what the factory and the logistics partner report.
+It is never merged into the six above, and it is not Purchasing's to redefine: two external
+roles run their whole lifecycle on it.
+
+### The Purchasing nouns and facts
 
 | Concept | Canonical word | Do NOT use |
 |---|---|---|
-| A prepared purchase that is not yet official | **Draft PO** — a Purchasing business object, and **not** a Purchase Order: no PO number, no external document | Pending PO · Provisional PO · Unsent PO · Pre-PO |
-| The action that creates the official Purchase Order | **`Issue PO`** — the ONLY action that does so | Confirm PO · Approve PO · Finalise PO · Submit PO |
-| A PO that has been issued | **`Issued`** | **`Open`** — banned in the UI on this axis (it also reads as "not yet finished", which is a different fact) |
+| A prepared purchase that is not yet official | **`Draft PO`** — this exact noun, everywhere it is visible. It is a Purchasing business object and **not** a Purchase Order: no PO number, no external document | PO Draft · Purchase Draft · Draft Purchase · Open PO · Pending PO · Provisional PO · Unsent PO · Pre-PO |
+| Demand a Draft PO covers that no longer exists | **`Demand no longer required`** — a FACT, never an action and never a status. Supporting line: `The customer-order demand covered by this Draft PO no longer exists.` It must stop the draft being issued until somebody has looked at it | Invalid Draft · Draft Error · Exception · Orphan Draft |
+| Demand that one or more Draft POs already cover | **`Covered by {count} Draft POs`** · singular **`Covered by 1 Draft PO`** — informational only. **It does not mean the demand has been ordered** | Reserved · Allocated · Taken · In progress |
+| Demand somebody has consciously reviewed and delayed | region **`Purchasing on Hold`** · row fact **`On hold until {date}`**, carrying **Held by** · **Reason** · **Held time** · **Resume date** | Snoozed · Paused · Excluded · Hidden · Pending |
+| An item whose supplier cannot be worked out | **`Supplier not assigned`** — a FACT, under Missing Configuration. Supporting line: `Assign a supplier before this item can enter the purchasing plan.` | Orphan · Unknown supplier · Invalid SKU · Supplier error |
 
 **Communication is NOT part of the PO lifecycle** (Loo, 2026-07-29). WhatsApp and Email are
 channels that may vary per supplier; they are never a status, never an Operation Status value,
 and they occupy no position in the purchasing information model. The channel words themselves
 are unchanged (`Open WhatsApp` · `Open WhatsApp group`).
 
-### UNRESOLVED TERMINOLOGY SLOTS — do NOT fill these
-
-**Each needs Jess's ruling. A chat that writes a temporary word here has invented
-terminology.** Tracked in full at
-[`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §10.
-
-| Slot | What is missing |
-|---|---|
-| **SLOT-1** | the action that turns unprotected demand into a Draft PO. **`Send PO` cannot be reused as-is** — that step now sends nothing |
-| **SLOT-2** | what becomes of the `Send PO` entry in the PURCHASING table below: its done message `PO sent to {supplier}` no longer describes what the step does, and the note under that table declares it ONE action shared with Orders, whose meaning has NOT changed |
-| **SLOT-3** | the on-screen noun for a Draft PO (`Draft PO` is the ruled OBJECT name; the screen word is not ruled) |
-| **SLOT-4** | where the six Operation Status words live as a vocabulary entry — here, or in the portal state vocabulary |
-| **SLOT-5** | the fact "this draft's covered demand has disappeared" |
-| **SLOT-6** | the fact "N drafts already cover this" |
-| **SLOT-7** | the name of the intentionally-held-demand region and its facts (the other half already has `Set a number`) |
-| **SLOT-8** | the fact "the supplier cannot be resolved for this item" |
+**The eight terminology slots that stood open from 2026-07-29 are CLOSED by this section.**
+Every word above is ruled. No terminology placeholder is left in Purchasing, and a chat that finds
+one has found a document that was missed.
 
 ## The delivery calendar words (T10, locked with Jess 2026-07-27)
 

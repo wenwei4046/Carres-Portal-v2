@@ -53,6 +53,9 @@
 draft's risk date · a draft whose demand has gone · supplier-resolution failure · the two
 hidden-demand regions never sharing a voice.
 
+**FROZEN — the terminology** (2026-07-29, P6). Every word this workspace shows is ruled and
+lives in `docs/COPY-STANDARD.md`. §10 maps each one to where this model uses it.
+
 **FROZEN — the workspace boundary** (§7) and **what is excluded** (§8).
 
 **NOT frozen, and NOT decided by this file:**
@@ -60,8 +63,8 @@ hidden-demand regions never sharing a voice.
 - **Layout** — nothing about position on screen, visual order, or what is read first.
 - **Components** — no card, panel, table, rail, tab, drawer or button is implied here.
 - **UI** — no spacing, colour, typography, icon, dimension or responsive behaviour.
-- **Wording** — every word still open is listed in §10 as an explicit slot. **A chat that
-  fills one of those slots without Jess ruling it has invented terminology.**
+- **Wording** — the words are `docs/COPY-STANDARD.md`'s, not this file's. §10 lists which
+  word this model uses where; a chat that respells one here has created a second home for it.
 
 **The binding direction:**
 
@@ -119,7 +122,7 @@ Seven regions. Each is a unit of RESPONSIBILITY, not a place on a screen.
 | **C** | Drafts in preparation | What have I already started? | **stored objects** |
 | **D** | The plan | What still has no protection at all? | **computed** |
 | **E** | Missing configuration | What cannot even enter the plan? | computed |
-| **F** | Intentionally held demand | What did somebody decide to leave out, and until when? | stored decisions |
+| **F** | **`Purchasing on Hold`** | What did somebody decide to leave out, and until when? | stored decisions |
 | **G** | Narrowing conditions | How do I make all of the above smaller? | facts |
 
 ### A · Scope and freshness
@@ -163,7 +166,7 @@ Each draft carries:
 | **its origin** — from the plan · started manually · a line split out on its own | the three kinds are different work; only the first has a planning row behind it |
 | **its risk date** — the earliest order-by date across the demand it covers | when holding it stops being safe |
 | who is holding it | `PURCHASING-WORKING-FLOW.md` §5 — two people will open the same work |
-| **whether the demand it covers still exists** | §6.5 |
+| **`Demand no longer required`** when the demand it covers has gone | §6.5 |
 
 **Never carries — and their absence IS the proof that a draft is not a PO:**
 
@@ -181,7 +184,7 @@ Each planning entry carries:
 - how many customer orders, how many items
 - the order-by date (`PURCHASING-WORKING-FLOW.md` §2's formula)
 - how urgent that is against today
-- **how many drafts already cover it** — §6.1
+- **`Covered by {count} Draft POs`** (singular `Covered by 1 Draft PO`) — §6.1
 
 **Never carries:** a priority word · any requirement that already has a PO (that has left
 this workspace).
@@ -193,7 +196,7 @@ been made actionable, and **nobody has looked at it**.
 
 Two causes, and both belong here:
 
-1. **The supplier cannot be resolved** for the item (§6.6)
+1. **`Supplier not assigned`** — the supplier cannot be worked out for the item (§6.6)
 2. **Production working days are not configured** for that supplier × category — the rule
    that no number means no order-by date, rather than a fallback, is
    `docs/PURCHASING-WORKING-FLOW.md` §2
@@ -209,16 +212,18 @@ Each entry carries:
 **This region may never be silent about a requirement it is holding.** A quiet screen must
 mean *watched and fine*, never *nobody looked*.
 
-### F · Intentionally held demand
+### F · `Purchasing on Hold`
 
-Demand a human has **already reviewed** and deliberately excluded, paused or snoozed.
+Demand a human has **already reviewed** and deliberately delayed. The region's name is
+`Purchasing on Hold` and each row states `On hold until {date}` (COPY-STANDARD).
 
 Each entry carries:
 
 - **what** was held
-- **who** held it
-- **why** it was held
-- **until when** it is held
+- **Held by** — who held it
+- **Reason** — why it was held
+- **Held time** — when the hold was placed
+- **Resume date** — when it comes back
 
 **E and F may never share one status word and may never share one empty state**
 (Loo, 2026-07-29). They mean opposite things: E is *nobody has looked at this*; F is
@@ -278,7 +283,7 @@ Within To Order, actions rank:
 2  Issue PO
      work is already prepared and has not yet become a formal PO
 
-3  ⟨SLOT-1⟩ — start preparing the unprotected demand
+3  Prepare PO
      demand has not yet been placed into a Draft PO
 ```
 
@@ -287,8 +292,8 @@ model rather than a coincidence: the draft action ranks above the preparing acti
 prepared draft is closer to a commitment than an untouched requirement, which is the same
 sentence as "C before D".
 
-`⟨SLOT-1⟩` is an **unresolved terminology slot** (§10). The ORDERING is frozen; the WORD is
-not. Nothing may be built that requires the word until Jess rules it.
+All three words are ruled (Loo, 2026-07-29) and their five strings live in
+`docs/COPY-STANDARD.md`, which is their canonical home. This model never respells them.
 
 ---
 
@@ -340,7 +345,7 @@ of the workspace boundary (§7).
 
 ## 6 · Seven model rules, frozen with the model
 
-### 6.1 · A planning entry states how many drafts cover it
+### 6.1 · A planning entry states `Covered by {count} Draft POs`
 
 The consequence of the legal overlap (§5.3). It is a **fact** — it states what is true and
 carries no to-do word.
@@ -371,7 +376,7 @@ the exact disease this codebase has already paid for four times.
 
 A draft stores *what is to be bought*. It does not store *when the deadline was, once*.
 
-### 6.5 · A draft whose covered demand has disappeared must say so
+### 6.5 · A draft whose covered demand has disappeared states `Demand no longer required`
 
 A draft can outlive its reason: the customer order changed, another PO covered the goods, the
 line was excluded. The draft is still a legal stored object, but it now covers nothing.
@@ -474,7 +479,7 @@ phase.
 │  ║                                                                                     ║ │
 │  ║   1. Confirm ready date          how many open · how many late                      ║ │
 │  ║   2. Issue PO                    how many open · how many late                      ║ │
-│  ║   3. ⟨SLOT-1⟩ prepare demand     how many open · how many late                      ║ │
+│  ║   3. Prepare PO                  how many open · how many late                      ║ │
 │  ║                                                                                     ║ │
 │  ║  every count must be producible from C · D · E · F        (§5.1)                     ║ │
 │  ║  carries: who is on it            never carries: any communication state             ║ │
@@ -486,13 +491,13 @@ phase.
 │  ║   supplier · what it covers (customer orders + items) · origin                       ║ │
 │  ║   risk date  ← COMPUTED AT READ TIME from the demand it covers        (§6.4)         ║ │
 │  ║   who is holding it                                                                 ║ │
-│  ║   ⟨SLOT-5⟩ its covered demand has disappeared                         (§6.5)         ║ │
+│  ║   `Demand no longer required` — its covered demand has gone           (§6.5)         ║ │
 │  ║                                                                                     ║ │
 │  ║   NEVER: a PO number · an official document · a communication channel                ║ │
 │  ║          └── their absence IS the proof that a Draft is not a PO                     ║ │
 │  ╚═════════════════════════════════════════════════════════════════════════════════════╝ │
 │         │                                                                                │
-│         │  ⟨SLOT-1⟩ prepare  ▲                    ▼  Issue PO                            │
+│         │  Prepare PO        ▲                    ▼  Issue PO                            │
 │         │  ────────────────  │                    ─────────────────►  ╔══════════════╗   │
 │         │                    │                                        ║ PURCHASE     ║   │
 │  ╔══════▼═══════════════════ │ ═══════════════════════════════════╗   ║ ORDERS       ║   │
@@ -501,7 +506,7 @@ phase.
 │  ║                                                                ║   ╚══════╤═══════╝   │
 │  ║   how many customer orders · how many items                    ║          │           │
 │  ║   order-by date · urgency against today                        ║          │ goods     │
-│  ║   ⟨SLOT-6⟩ how many drafts already cover this      (§6.1)      ║          │ start     │
+│  ║   `Covered by {count} Draft POs`                   (§6.1)      ║          │ start     │
 │  ║                                                                ║          │ moving    │
 │  ║   D NEVER hides an entry because C has one           (§5.3)    ║          ▼           │
 │  ║   NEVER: a priority word · anything already secured             ║   ╔══════════════╗   │
@@ -511,16 +516,16 @@ phase.
 │  ║  demand that CANNOT enter the plan — nobody has looked at it    ║  ║  supplier    ║   │
 │  ║                                                                ║  ║  CUSTOMER    ║   │
 │  ║   SO · item · category · quantity · WHY it failed              ║  ║  SO NUMBER   ║   │
-│  ║     ├── ⟨SLOT-8⟩ the supplier cannot be resolved      (§6.6)   ║  ║  warehouse   ║   │
+│  ║     ├── `Supplier not assigned`                       (§6.6)   ║  ║  warehouse   ║   │
 │  ║     └── production working days are not set  → `Set a number`  ║  ║  ETA         ║   │
 │  ║                                                                ║  ║  qty left    ║   │
 │  ║   may NEVER be silent about a requirement it holds             ║  ║        (§7.1)║   │
 │  ╚════════════════════════════════════════════════════════════════╝  ╚══════════════╝   │
 │                                                                                          │
-│  ╔═ F · INTENTIONALLY HELD DEMAND ═════════════════════════════════════════════════════╗ │
+│  ╔═ F · PURCHASING ON HOLD ════════════════════════════════════════════════════════════╗ │
 │  ║  somebody already reviewed this and decided                                         ║ │
 │  ║                                                                                     ║ │
-│  ║   ⟨SLOT-7⟩  what was held · WHO held it · WHY · UNTIL WHEN                           ║ │
+│  ║   `On hold until {date}` · what was held · Held by · Reason · Held time              ║ │
 │  ║                                                                                     ║ │
 │  ║   E and F never share one status and never share one empty state       (§6.7)        ║ │
 │  ╚═════════════════════════════════════════════════════════════════════════════════════╝ │
@@ -539,25 +544,27 @@ phase.
 
 ---
 
-## 10 · Unresolved terminology slots
+## 10 · The words this model uses
 
-**→ What each slot needs, and the rule that no chat may fill one, is
-`docs/COPY-STANDARD.md`** — the words are that file's, not this one's, and a second copy of
-the definitions is how the two would drift apart the moment Jess rules one.
+**Every word on this workspace is ruled** (Loo, 2026-07-29 · P6) and **`docs/COPY-STANDARD.md`
+is their canonical home.** This file never respells one — it only says where each is used, so
+that reading a word tells you which part of the model it serves.
 
-**What THIS file owns is where each slot is USED**, so that ruling a word tells you exactly
-which part of the model becomes buildable:
-
-| Slot | Used by this model at |
+| Word | Used by this model at |
 |---|---|
-| **SLOT-1** | §4 — the third action of To Order, ranked and unnamed · §9 — region D's outbound arrow |
-| **SLOT-2** | not used by this model. It is the fate of an EXISTING dictionary entry, and it is listed here only because ruling SLOT-1 without it would leave one act spelt two ways |
-| **SLOT-3** | §3 · C — the region's own on-screen noun |
-| **SLOT-4** | §8 — the row that keeps the supplier axis out of this workspace depends on the two axes being named apart |
-| **SLOT-5** | §3 · C and §6.5 — the fact a draft states when its covered demand has gone |
-| **SLOT-6** | §3 · D and §6.1 — the fact that pays for the legal overlap in §5.3. **Without a word for it, §5.3 is a trap and not a design** |
-| **SLOT-7** | §3 · F — the region has no name and no fact strings; its sibling E already has `Set a number` for one of its two causes |
-| **SLOT-8** | §3 · E and §6.6 — the fact that keeps M1's demand from vanishing |
+| `Prepare PO` · `Prepare PO for {supplier}` | §4 — the third action of To Order · §9 — region D's outbound arrow |
+| `Issue PO` · `Issue PO to {supplier}` | §4 — the second action · §9 — region C's outbound arrow, the only path to Purchase Orders |
+| `Draft PO` | §3 · C — the region's object, everywhere it is visible |
+| `Demand no longer required` | §3 · C and §6.5 — the fact a draft states when its covered demand has gone. It is a fact and a stop, never an error word |
+| `Covered by {count} Draft POs` | §3 · D and §6.1 — the fact that pays for the legal overlap in §5.3. **Without it, §5.3 is a trap and not a design** |
+| `Purchasing on Hold` · `On hold until {date}` | §3 · F — the region and its row fact |
+| `Supplier not assigned` | §3 · E and §6.6 — the fact that keeps M1's demand from vanishing |
+| `Set a number` | §3 · E — the other cause under Missing configuration |
+| the six Operation Status labels | §8 — keeping the supplier axis out of this workspace depends on the two axes being named apart |
+
+**`Send PO` is retired and appears nowhere in this model.** Raising a purchase order is two
+acts — `Prepare PO`, then `Issue PO` — and the verb `Send` is retired with the old single
+action.
 
 ---
 

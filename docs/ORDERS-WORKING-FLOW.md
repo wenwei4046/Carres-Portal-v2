@@ -93,13 +93,19 @@ case from start to finish; it never changes and is never repeated on an action.
 
 ### Purchasing
 
-**`Send PO to {supplier}`**
-- Trigger: a goods line needs buying and no PO covers it
-- Checklist: supplier · items · quantity · purchase price · send · record PO number · record supplier ready date
-- Completion: a PO exists for the line. **The ready date is NOT part of it** — that is the
-  next action's outcome, and the row becomes `Call {supplier} — confirm ready date` the moment
-  a PO exists. Folding them together leaves `Send PO` open with nothing left to send.
-- Due: the customer's date minus the supplier's lead time minus the internal buffer
+**`Prepare PO for {supplier}`** then **`Issue PO to {supplier}`**
+
+> **`Send PO to {supplier}` is RETIRED (Loo, 2026-07-29).** Raising a purchase order is TWO
+> acts: `Prepare PO` produces a **Draft PO** that has left our company in no way, and
+> `Issue PO` creates the formal Purchase Order. The old single entry described both at once —
+> its checklist folded "send" into gathering the items, and its completion (*a PO exists for
+> the line*) is `Issue PO`'s. **Neither act is called `Send PO`, and the verb `Send` is
+> retired with it.**
+
+- **Both actions are DEFINED ONCE, in `docs/PURCHASING-WORKING-FLOW.md` §3** — trigger,
+  checklist, completion, due, task owner, counted per, re-checked when. **Orders DISPLAYS
+  them; it never re-states them**, the same discipline this file already applies to the
+  arrival window below.
 - Task Owner: the Purchasing task owner (today the PO-duty holder, `org_duties`)
 
 **`Call {supplier} — confirm ready date`**
@@ -331,7 +337,7 @@ them live here.
 2  The customer must be told something — THROUGH LOGISTICS, never by us
      Call {logistics} — arrange new delivery date
 3  Goods are not secured
-     Send PO to {supplier} · Call {supplier} — confirm ready date
+     Call {supplier} — confirm ready date · Issue PO · Prepare PO
 4  Delivery preparation
      Assign logistics · Call {logistics} — confirm delivery date · Issue delivery order
 5  Money
