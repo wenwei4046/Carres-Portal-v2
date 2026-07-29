@@ -1052,4 +1052,5 @@ number on screen matches what actually happened.
 | P2 | ✅ the interaction law is true on **To Order** (#492) · **Claims** (#494) · **Receiving** (#495). Purchase Orders is a nested route with no rail and was never in scope | #492 · #494 · #495 |
 | P3 | ✅ the two missing supplier calls (migration **0306**) — and a balance date enters Delay planning too (Loo, 2026-07-29) | #506 |
 | P4 | ✅ where the goods go — migration **0307 applied, verified and merged** 2026-07-29 · **P4 FROZEN**; the application-code half is NOT P4 and starts as its own execution card (§10) | #513 |
+| P4-APP | 🔨 CLAIMED 2026-07-29 — `claude/carres-portal-p4-app-4fbfea` · the application-code half of §10 (no migration, no doc rewrite) | — |
 | P5 | ⬜ after P1-P4 · prove it with a real PO | — |
