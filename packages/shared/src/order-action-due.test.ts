@@ -32,7 +32,7 @@ describe("order-action-due · the definitions", () => {
     // home for a number (Law 0A).
     expect(orderActionDueDef("assign_logistics")).toBeNull();
     expect(orderActionDueDef("confirm_delivery_date")).toBeNull();
-    expect(orderActionDueDef("send_po")).toBeNull();
+    expect(orderActionDueDef("prepare_po")).toBeNull();
     expect(orderActionDueDef("collect")).toBeNull();
   });
 
@@ -130,8 +130,8 @@ describe("order-action-due · Arrange new delivery date — the SAME working day
 
 describe("order-action-due · no anchor, no alarm", () => {
   it("an action with no Due has no deadline and can never be late", () => {
-    expect(orderActionDueIso("send_po", MON)).toBeNull();
-    expect(orderActionOverdue("send_po", MON, NEXT_MON)).toBe(false);
+    expect(orderActionDueIso("prepare_po", MON)).toBeNull();
+    expect(orderActionOverdue("prepare_po", MON, NEXT_MON)).toBe(false);
   });
 
   it("a missing anchor is silence, not a deadline of today", () => {

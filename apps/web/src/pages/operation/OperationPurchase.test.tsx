@@ -223,7 +223,7 @@ describe("To Order · §8.2 click again clears (card P2)", () => {
       expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument(),
     );
 
-    // Send POs is the active stage. Clicking it used to re-run the reset and
+    // The first stage is active. Clicking it used to re-run the reset and
     // drop the filter without saying so.
     fireEvent.click(screen.getByTestId("facet-stage-place"));
 
@@ -302,11 +302,15 @@ describe("To Order · §8.2 click again clears (card P2)", () => {
 });
 
 describe("To Order · R8 · the three stage cells speak the dictionary", () => {
-  it("reads Send PO · Confirm ready date · Check in, and nothing else", () => {
+  it("reads Prepare PO · Confirm ready date · Check in, and nothing else", () => {
     renderPage();
     // COPY-STANDARD, PURCHASING — the queue-tile string of each action, taken
     // from `order-action-words.ts` so the cell cannot drift from the row.
-    expect(screen.getByTestId("facet-stage-place")).toHaveTextContent("Send PO");
+    expect(screen.getByTestId("facet-stage-place")).toHaveTextContent("Prepare PO");
+    // P7A — the retired word is gone from the tab, both directions proved.
+    expect(screen.getByTestId("facet-stage-place")).not.toHaveTextContent(
+      "Send PO",
+    );
     expect(screen.getByTestId("facet-stage-chase")).toHaveTextContent(
       "Confirm ready date",
     );
@@ -320,7 +324,8 @@ describe("To Order · R8 · the three stage cells speak the dictionary", () => {
     // `Chase` is BANNED (it names a mood); `Receive` as a verb is banned in
     // favour of `Check in`; `Send POs` was the plural of an action that has a
     // locked singular. All three shipped on this cell row for months.
-    expect(container.textContent).not.toMatch(/Send POs/);
+    // P7A widened the third: `Send PO` in ANY form is retired, singular too.
+    expect(container.textContent).not.toMatch(/Send PO/);
     expect(container.textContent).not.toMatch(/Chase factory/);
   });
 

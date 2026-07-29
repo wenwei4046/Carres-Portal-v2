@@ -752,9 +752,11 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // T7 moved the two delivery actions into their own DELIVERY group (with
     // their own deadlines) — they are covered by the DELIVERY-queue tests
     // below, so this list is the STOCK actions that stayed in QUEUES.
+    // P7A — `Send PO` is retired; the first tooltip is the FIRST purchasing
+    // act's, and the second no longer says the retired verb either.
     const verbTitles = [
-      "Goods not ordered from any supplier yet — send the PO",
-      "PO sent but goods not in yet — call the supplier for the ready date (red once inside the stock window)",
+      "Nothing ordered and no draft purchase order covers these goods — prepare one",
+      "PO issued but goods not in yet — call the supplier for the ready date (red once inside the stock window)",
     ];
     const row = verbTitles.map((t) => screen.queryByTitle(t)).find((b) => !!b);
     expect(row).toBeTruthy();
@@ -1340,14 +1342,14 @@ describe("nextActionOf (C2)", () => {
   it("past deadline + partner + No PO → Order PO (RUNG 1 not leapfrogged by the overdue escalation — SO-1104)", () => {
     const o = makeRow({ id: "x", so: 1, delivery_date: inDays(-2), ops_assigned_logistic: "p1" });
     // stock.state 'unknown' = No PO → the real unblock is Order PO, not Chase logistic.
-    expect(nextActionOf(o, { state: "unknown" }, MS).label).toBe("Send PO");
+    expect(nextActionOf(o, { state: "unknown" }, MS).label).toBe("Prepare PO");
   });
 
   // ── STOCK TRACK — leads until goods are secured ──
   it("no PO (unknown stock) → Order PO (red)", () => {
     const o = makeRow({ id: "x", so: 1 });
     expect(nextActionOf(o, { state: "unknown" }, [])).toMatchObject({
-      label: "Send PO",
+      label: "Prepare PO",
       tone: "danger",
     });
   });
@@ -1517,7 +1519,7 @@ describe("nextActionOf (C2)", () => {
         line_etas: { "mattress:MAT-1": inDays(14) },
       },
     });
-    expect(nextActionOf(o, { state: "unknown" }, MS).label).toBe("Send PO");
+    expect(nextActionOf(o, { state: "unknown" }, MS).label).toBe("Prepare PO");
   });
 
   it("TBD delivery date → radar silent (no date to overshoot)", () => {
@@ -1909,7 +1911,7 @@ describe("nextActionOf (C2)", () => {
   // that Layer 1 stops one track eating another's work.
   describe("openActionsOf (C2 · Layer 1)", () => {
     it("the card's own example: no PO + no logistics + owing → THREE open actions", () => {
-      // The old ladder showed `Send PO` and the other two facts vanished.
+      // The old ladder showed the purchasing act and the other two facts vanished.
       const o = makeRow({
         id: "x",
         so: 1,
@@ -1917,7 +1919,7 @@ describe("nextActionOf (C2)", () => {
         paid: 2000,
       });
       expect(openActionsOf(o, { state: "unknown" }, MS).map((a) => a.key)).toEqual([
-        "send_po",
+        "prepare_po",
         "assign_logistics",
         "collect",
       ]);
@@ -2493,7 +2495,7 @@ describe("Actions column · +N and the delivering FACT (C3)", () => {
   it("an order with three open actions leads with one and counts the rest", () => {
     wrap(<OperationOrdersControl />);
     const cell = row(3001);
-    expect(within(cell).getByText("Send PO to supplier")).toBeInTheDocument();
+    expect(within(cell).getByText("Prepare PO for supplier")).toBeInTheDocument();
     expect(within(cell).getByTestId("next-more")).toHaveTextContent("+2");
   });
 

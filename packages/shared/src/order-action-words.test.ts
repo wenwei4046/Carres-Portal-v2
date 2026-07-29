@@ -20,7 +20,8 @@ import {
 } from "./order-action-words";
 
 const EVERY_KEY: OrderActionKey[] = [
-  "send_po",
+  "prepare_po",
+  "issue_po",
   "confirm_ready_date",
   "delay_planning",
   "arrange_new_delivery_date",
@@ -36,7 +37,8 @@ const EVERY_KEY: OrderActionKey[] = [
 
 describe("order action words — the queue word", () => {
   it("carries no party (a queue holds many suppliers)", () => {
-    expect(orderActionQueue("send_po")).toBe("Send PO");
+    expect(orderActionQueue("prepare_po")).toBe("Prepare PO");
+    expect(orderActionQueue("issue_po")).toBe("Issue PO");
     expect(orderActionQueue("confirm_ready_date")).toBe("Confirm ready date");
     expect(orderActionQueue("confirm_delivery_date")).toBe("Confirm delivery date");
     expect(orderActionQueue("arrange_new_delivery_date")).toBe(
@@ -60,7 +62,12 @@ describe("order action words — the queue word", () => {
 
 describe("order action words — the row line", () => {
   it("names the real party when the system knows it", () => {
-    expect(orderActionLine("send_po", { supplier: "Ohana" })).toBe("Send PO to Ohana");
+    expect(orderActionLine("prepare_po", { supplier: "Ohana" })).toBe(
+      "Prepare PO for Ohana",
+    );
+    expect(orderActionLine("issue_po", { supplier: "Ohana" })).toBe(
+      "Issue PO to Ohana",
+    );
     expect(orderActionLine("confirm_ready_date", { supplier: "Ohana" })).toBe(
       "Call Ohana — confirm ready date",
     );
@@ -249,7 +256,8 @@ describe("order action words — the banned words", () => {
  */
 describe("purchasing action words — the dictionary, verbatim", () => {
   const EVERY_PURCHASING_KEY: PurchasingActionKey[] = [
-    "send_po",
+    "prepare_po",
+    "issue_po",
     "confirm_ready_date",
     "confirm_tomorrows_delivery",
     "check_in",
@@ -257,9 +265,10 @@ describe("purchasing action words — the dictionary, verbatim", () => {
     "confirm_what_happens_next",
   ];
 
-  it("spells all six queue words exactly as COPY-STANDARD does", () => {
+  it("spells all seven queue words exactly as COPY-STANDARD does", () => {
     expect(EVERY_PURCHASING_KEY.map(purchasingActionQueue)).toEqual([
-      "Send PO",
+      "Prepare PO",
+      "Issue PO",
       "Confirm ready date",
       "Confirm tomorrow's delivery",
       "Check in",
@@ -296,12 +305,49 @@ describe("purchasing action words — the dictionary, verbatim", () => {
       .toBe("Call supplier — confirm balance delivery date");
   });
 
-  it("`Send PO` and `Confirm ready date` are read back out of the ORDERS table", () => {
-    // COPY-STANDARD: "ONE action each, shared by Orders and Purchasing … they
-    // are never spelt differently." Read back, never respelt.
-    expect(purchasingActionQueue("send_po")).toBe(orderActionQueue("send_po"));
+  it("the three shared rows are read back, never respelt", () => {
+    // COPY-STANDARD (Loo, 2026-07-29): the PURCHASING table is the canonical
+    // home for `Prepare PO`, `Issue PO` and `Confirm ready date`; the Orders
+    // ladder DISPLAYS them and does not respell them. One string, read twice.
+    expect(purchasingActionQueue("prepare_po")).toBe(orderActionQueue("prepare_po"));
+    expect(purchasingActionQueue("issue_po")).toBe(orderActionQueue("issue_po"));
+    expect(purchasingActionButton("prepare_po"))
+      .toBe(orderActionButton("prepare_po"));
+    expect(purchasingActionButton("issue_po"))
+      .toBe(orderActionButton("issue_po"));
     expect(purchasingActionButton("confirm_ready_date"))
       .toBe(orderActionButton("confirm_ready_date"));
+  });
+
+  // P7A · `Send PO` is RETIRED, and so is the verb `Send`. A rename card proves
+  // itself in BOTH directions: the new word present, the old one gone.
+  it("no surface can say `Send PO`, and no action verb is `Send`", () => {
+    for (const q of ORDER_ACTION_QUEUES) expect(q).not.toMatch(/\bSend\b/);
+    for (const q of PURCHASING_ACTION_QUEUES) expect(q).not.toMatch(/\bSend\b/);
+    for (const key of EVERY_KEY) {
+      expect(orderActionLine(key, { supplier: "Ohana" })).not.toMatch(/\bSend\b/);
+      expect(orderActionButton(key) ?? "").not.toMatch(/\bSend\b/);
+    }
+    for (const key of EVERY_PURCHASING_KEY) {
+      expect(purchasingActionLine(key, { supplier: "Ohana" })).not.toMatch(
+        /\bSend\b/,
+      );
+      expect(purchasingActionButton(key)).not.toMatch(/\bSend\b/);
+    }
+    expect(orderActionForQueue("Send PO")).toBeNull();
+  });
+
+  it("both purchasing acts carry the four strings COPY-STANDARD can hold here", () => {
+    expect(purchasingActionLine("prepare_po", { supplier: "Ohana" }))
+      .toBe("Prepare PO for Ohana");
+    expect(purchasingActionButton("prepare_po")).toBe("Prepare PO");
+    expect(purchasingActionLine("issue_po", { supplier: "Ohana" }))
+      .toBe("Issue PO to Ohana");
+    expect(purchasingActionButton("issue_po")).toBe("Issue PO");
+    // The role word, never an empty gap.
+    expect(purchasingActionLine("prepare_po")).toBe("Prepare PO for supplier");
+    expect(purchasingActionLine("issue_po", { supplier: "  " }))
+      .toBe("Issue PO to supplier");
   });
 
   it("the two answers name the DATE, so they stay true however late they are read", () => {
