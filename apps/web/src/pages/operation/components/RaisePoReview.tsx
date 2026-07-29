@@ -204,8 +204,8 @@ export default function RaisePoReview({
         {/* Header */}
         <div className="flex items-center gap-2 px-5 h-12 border-b border-base-200">
           <PackagePlus size={16} className="text-base-500" strokeWidth={2} />
-          <span className="text-[13px] font-semibold">Raise PO — one per supplier</span>
-          <span className="text-[12px] text-base-500 tabular-nums">
+          <span className="text-body font-semibold">Raise PO — one per supplier</span>
+          <span className="text-meta text-base-500 tabular-nums">
             {orders.length} order{orders.length === 1 ? "" : "s"} · {totalUnits} unit
             {totalUnits === 1 ? "" : "s"} to order
           </span>
@@ -221,7 +221,7 @@ export default function RaisePoReview({
 
         {/* What was excluded and why — no silent drops. */}
         {(plan.alreadyOnPo > 0 || plan.coveredUnits > 0 || plan.nonCore > 0) && (
-          <div className="px-5 py-2 text-[12px] text-base-500 border-b border-base-100">
+          <div className="px-5 py-2 text-meta text-base-500 border-b border-base-100">
             {[
               plan.coveredUnits > 0
                 ? `${plan.coveredUnits} unit${plan.coveredUnits === 1 ? "" : "s"} covered by stock`
@@ -239,7 +239,7 @@ export default function RaisePoReview({
         )}
 
         {plan.cards.length === 0 && plan.unresolved.length === 0 && (
-          <div className="px-5 py-8 text-[13px] text-base-500">
+          <div className="px-5 py-8 text-body text-base-500">
             Nothing to order — every selected line is covered by stock or
             already has a PO. For stock that is already ordered, use{" "}
             <span className="font-medium text-base-700">
@@ -267,25 +267,25 @@ export default function RaisePoReview({
                 data-testid={`raise-po-card-${supplier.name}`}
               >
                 <div className="flex items-center gap-2 px-4 h-10 bg-base-50 border-b border-base-100">
-                  <span className="text-[13px] font-semibold">{supplier.name}</span>
-                  <span className="text-[12px] text-base-500 tabular-nums">
+                  <span className="text-body font-semibold">{supplier.name}</span>
+                  <span className="text-meta text-base-500 tabular-nums">
                     {card.lines.length} SKU{card.lines.length === 1 ? "" : "s"} · {units} unit
                     {units === 1 ? "" : "s"}
                   </span>
                   {urgent && (
-                    <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-destructive">
+                    <span className="inline-flex items-center gap-1 text-meta font-semibold text-destructive">
                       <AlertTriangle size={14} strokeWidth={2} /> urgent
                     </span>
                   )}
                   <div className="ml-auto flex items-center gap-2">
                     {st.status === "sent" ? (
-                      <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-success">
+                      <span className="inline-flex items-center gap-1 text-meta font-semibold text-success">
                         <Check size={14} strokeWidth={2} /> PO sent
                       </span>
                     ) : st.status === "skipped" ? (
                       <button
                         type="button"
-                        className="text-[12px] text-base-500 hover:text-base-900"
+                        className="text-meta text-base-500 hover:text-base-900"
                         onClick={() => patchState(card.supplierId, card.lines, { status: "idle" })}
                       >
                         Skipped — undo
@@ -294,7 +294,7 @@ export default function RaisePoReview({
                       <>
                         <button
                           type="button"
-                          className="btn-ghost text-[12px] py-1 px-2"
+                          className="btn-ghost text-meta py-1 px-2"
                           onClick={() =>
                             patchState(card.supplierId, card.lines, { status: "skipped" })
                           }
@@ -303,7 +303,7 @@ export default function RaisePoReview({
                         </button>
                         <button
                           type="button"
-                          className="btn-primary text-[12px] py-1 px-3"
+                          className="btn-primary text-meta py-1 px-3"
                           disabled={blocked || st.status === "sending"}
                           title={
                             needsPartner
@@ -330,11 +330,11 @@ export default function RaisePoReview({
                         {card.lines.map((l) => (
                           <tr key={lineKey(l)} className="h-9 border-b border-base-100 last:border-b-0">
                             <td className="pl-4 pr-2 w-[46%]">
-                              <span className="font-mono text-[12px] truncate block" title={l.sku}>
+                              <span className="font-mono text-meta truncate block" title={l.sku}>
                                 {l.sku}
                               </span>
                             </td>
-                            <td className="px-2 w-[8%] text-[13px] tabular-nums font-semibold">
+                            <td className="px-2 w-[8%] text-body tabular-nums font-semibold">
                               {l.qty}×
                             </td>
                             <td className="px-2">
@@ -342,13 +342,13 @@ export default function RaisePoReview({
                                 {l.sos.map((so) => (
                                   <span
                                     key={so}
-                                    className="inline-flex items-center rounded-full border border-base-200 px-1.5 text-[11px] tabular-nums text-base-600"
+                                    className="inline-flex items-center rounded-full border border-base-200 px-1.5 text-label tabular-nums text-base-600"
                                   >
                                     SO-{so}
                                   </span>
                                 ))}
                                 {l.urgent && (
-                                  <span className="text-[11px] font-semibold text-destructive">
+                                  <span className="text-label font-semibold text-destructive">
                                     inside stock window
                                   </span>
                                 )}
@@ -368,7 +368,7 @@ export default function RaisePoReview({
                                         return n;
                                       })
                                     }
-                                    className="border border-base-200 rounded-md text-[11px] px-1 py-0.5 bg-white text-base-500 max-w-[130px]"
+                                    className="border border-base-200 rounded-md text-label px-1 py-0.5 bg-white text-base-500 max-w-[130px]"
                                   >
                                     {suppliers.map((s) => (
                                       <option key={s.id} value={s.id}>
@@ -380,7 +380,7 @@ export default function RaisePoReview({
                               </span>
                             </td>
                             <td className="px-2 w-[16%] text-right">
-                              <label className="inline-flex items-center gap-1 text-[11px] text-base-400">
+                              <label className="inline-flex items-center gap-1 text-label text-base-400">
                                 RM
                                 <input
                                   type="number"
@@ -396,7 +396,7 @@ export default function RaisePoReview({
                                       return n;
                                     })
                                   }
-                                  className="w-20 border border-base-200 rounded-md px-1.5 py-0.5 text-[12px] font-mono tabular-nums text-right bg-white"
+                                  className="w-20 border border-base-200 rounded-md px-1.5 py-0.5 text-meta font-mono tabular-nums text-right bg-white"
                                 />
                               </label>
                             </td>
@@ -405,14 +405,14 @@ export default function RaisePoReview({
                       </tbody>
                     </table>
                     <div className="flex items-center gap-3 px-4 py-2 border-t border-base-100 bg-white">
-                      <label className="inline-flex items-center gap-1.5 text-[12px] text-base-500">
+                      <label className="inline-flex items-center gap-1.5 text-meta text-base-500">
                         To
                         <select
                           value={st.warehouseId}
                           onChange={(e) =>
                             patchState(card.supplierId, card.lines, { warehouseId: e.target.value })
                           }
-                          className="border border-base-200 rounded-md text-[12px] px-1.5 py-1 bg-white text-base-900 w-[180px]"
+                          className="border border-base-200 rounded-md text-meta px-1.5 py-1 bg-white text-base-900 w-[180px]"
                         >
                           <option value="">Warehouse…</option>
                           {warehouses.map((w) => (
@@ -422,7 +422,7 @@ export default function RaisePoReview({
                           ))}
                         </select>
                       </label>
-                      <label className="inline-flex items-center gap-1.5 text-[12px] text-base-500">
+                      <label className="inline-flex items-center gap-1.5 text-meta text-base-500">
                         ETA
                         <input
                           type="date"
@@ -430,18 +430,18 @@ export default function RaisePoReview({
                           onChange={(e) =>
                             patchState(card.supplierId, card.lines, { etaDate: e.target.value })
                           }
-                          className="border border-base-200 rounded-md text-[12px] px-1.5 py-1 bg-white text-base-900 w-[150px] tabular-nums"
+                          className="border border-base-200 rounded-md text-meta px-1.5 py-1 bg-white text-base-900 w-[150px] tabular-nums"
                         />
                       </label>
                       {supplier.kind === "factory_pickup" && (
-                        <label className="inline-flex items-center gap-1.5 text-[12px] text-base-500">
+                        <label className="inline-flex items-center gap-1.5 text-meta text-base-500">
                           Pickup
                           <select
                             value={st.partnerId}
                             onChange={(e) =>
                               patchState(card.supplierId, card.lines, { partnerId: e.target.value })
                             }
-                            className="border border-base-200 rounded-md text-[12px] px-1.5 py-1 bg-white text-base-900 w-[160px]"
+                            className="border border-base-200 rounded-md text-meta px-1.5 py-1 bg-white text-base-900 w-[160px]"
                           >
                             <option value="">Partner…</option>
                             {partners.map((p) => (
@@ -464,8 +464,8 @@ export default function RaisePoReview({
           {plan.unresolved.length > 0 && (
             <div className="border border-base-200 rounded-xl overflow-hidden">
               <div className="flex items-center gap-2 px-4 h-10 bg-base-50 border-b border-base-100">
-                <span className="text-[13px] font-semibold">Pick supplier</span>
-                <span className="text-[12px] text-base-500">
+                <span className="text-body font-semibold">Pick supplier</span>
+                <span className="text-meta text-base-500">
                   {plan.unresolved.length} SKU{plan.unresolved.length === 1 ? "" : "s"} we can&rsquo;t
                   match automatically
                 </span>
@@ -475,17 +475,17 @@ export default function RaisePoReview({
                   {plan.unresolved.map((l) => (
                     <tr key={lineKey(l)} className="h-9 border-b border-base-100 last:border-b-0">
                       <td className="pl-4 pr-2 w-[46%]">
-                        <span className="font-mono text-[12px] truncate block" title={l.sku}>
+                        <span className="font-mono text-meta truncate block" title={l.sku}>
                           {l.sku}
                         </span>
                       </td>
-                      <td className="px-2 w-[8%] text-[13px] tabular-nums font-semibold">{l.qty}×</td>
+                      <td className="px-2 w-[8%] text-body tabular-nums font-semibold">{l.qty}×</td>
                       <td className="px-2">
                         <span className="flex flex-wrap gap-1">
                           {l.sos.map((so) => (
                             <span
                               key={so}
-                              className="inline-flex items-center rounded-full border border-base-200 px-1.5 text-[11px] tabular-nums text-base-600"
+                              className="inline-flex items-center rounded-full border border-base-200 px-1.5 text-label tabular-nums text-base-600"
                             >
                               SO-{so}
                             </span>
@@ -503,7 +503,7 @@ export default function RaisePoReview({
                               return n;
                             })
                           }
-                          className="border border-base-200 rounded-md text-[12px] px-1.5 py-1 bg-white text-base-900 w-full"
+                          className="border border-base-200 rounded-md text-meta px-1.5 py-1 bg-white text-base-900 w-full"
                         >
                           <option value="">Supplier…</option>
                           {suppliers.map((s) => (
@@ -523,13 +523,13 @@ export default function RaisePoReview({
 
         {/* Footer */}
         <div className="flex items-center gap-2 px-5 py-3 border-t border-base-200">
-          <span className="text-[12px] text-base-500">
+          <span className="text-meta text-base-500">
             Each Send raises ONE PO for that supplier, covering every ticked SO.
           </span>
           <button
             type="button"
             onClick={onClose}
-            className={`ml-auto text-[12px] py-1.5 px-3 ${allDone ? "btn-primary" : "btn-secondary"}`}
+            className={`ml-auto text-meta py-1.5 px-3 ${allDone ? "btn-primary" : "btn-secondary"}`}
           >
             {allDone ? "Done" : "Close"}
           </button>

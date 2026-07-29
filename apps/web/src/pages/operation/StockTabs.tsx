@@ -59,7 +59,7 @@ export default function StockTabs({ right }: { right?: ReactNode } = {}) {
                 aria-selected={isActive}
                 data-testid={`stock-tab-${t.key}`}
                 className={[
-                  "relative flex items-center gap-1.5 px-4 py-3 text-[13px] transition-colors border-b-2 -mb-px",
+                  "relative flex items-center gap-1.5 px-4 py-3 text-body transition-colors border-b-2 -mb-px",
                   isActive
                     ? "border-primary text-base-900 font-semibold"
                     : "border-transparent text-base-600 font-medium hover:text-base-900",

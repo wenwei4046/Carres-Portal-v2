@@ -176,7 +176,7 @@ export default function PartnerDashboard() {
     deliveryBuckets.out_for_delivery.length;
 
   if (counts.isLoading || !counts.data) {
-    return <div className="px-9 py-8 pb-14 text-[13px] text-base-600">Loading…</div>;
+    return <div className="px-9 py-8 pb-14 text-body text-base-600">Loading…</div>;
   }
   const c = counts.data;
 
@@ -184,7 +184,7 @@ export default function PartnerDashboard() {
     <div className="px-9 py-8 pb-14 space-y-6">
       <div>
         <div className="kicker">LP · Today</div>
-        <h1 className="font-display text-[30px] leading-[1.05] mt-1.5 tracking-tight font-semibold">
+        <h1 className="font-display text-page leading-[1.05] mt-1.5 tracking-tight font-semibold">
           Today
         </h1>
       </div>
@@ -213,7 +213,7 @@ export default function PartnerDashboard() {
         <div className="kicker text-base-500">Active pipeline</div>
         <Link
           to="/delivery-partner/factory-pickups"
-          className="text-[12px] text-primary hover:underline font-semibold"
+          className="text-meta text-primary hover:underline font-semibold"
         >
           See all pickups →
         </Link>
@@ -254,7 +254,7 @@ export default function PartnerDashboard() {
         </div>
         <Link
           to="/delivery-partner/deliveries"
-          className="text-[12px] text-primary hover:underline font-semibold"
+          className="text-meta text-primary hover:underline font-semibold"
         >
           See all deliveries →
         </Link>
@@ -308,7 +308,7 @@ export default function PartnerDashboard() {
           hint={`${fleet.data?.length ?? 0} vehicle${(fleet.data?.length ?? 0) === 1 ? "" : "s"}`}
         >
           {(fleet.data ?? []).length === 0 ? (
-            <div className="text-[12px] text-base-500 py-4 text-center">
+            <div className="text-meta text-base-500 py-4 text-center">
               No vehicles yet — add via Fleet.
             </div>
           ) : (
@@ -317,19 +317,19 @@ export default function PartnerDashboard() {
                 key={f.id}
                 className="grid grid-cols-[auto_1fr_auto] gap-2.5 items-center px-1 py-2.5 border-t border-base-100 first:border-0"
               >
-                <span className="font-mono text-[11px] font-bold py-0.5 px-1.5 border border-base-300 rounded-[3px]">
+                <span className="font-mono text-label font-semibold py-0.5 px-1.5 border border-base-300 rounded-[3px]">
                   {f.plate}
                 </span>
                 <div className="min-w-0">
-                  <div className="font-body text-[12px] font-medium">
+                  <div className="font-body text-meta font-medium">
                     {f.driver_name ?? "—"}
                   </div>
-                  <div className="font-body text-[10px] text-base-500">
+                  <div className="font-body text-label text-base-500">
                     {f.vehicle_type ?? "—"}
                     {f.capacity ? ` · ${f.capacity}` : ""}
                   </div>
                 </div>
-                <span className="font-mono text-[10px] text-base-500">
+                <span className="font-mono text-label text-base-500">
                   {f.driver_phone ?? ""}
                 </span>
               </div>
@@ -342,7 +342,7 @@ export default function PartnerDashboard() {
           hint={`${buckets.delivered.length} this week`}
         >
           {buckets.delivered.length === 0 ? (
-            <div className="text-[12px] text-base-500 py-4 text-center">
+            <div className="text-meta text-base-500 py-4 text-center">
               No completed pickups yet.
             </div>
           ) : (
@@ -354,16 +354,16 @@ export default function PartnerDashboard() {
                   key={po.id}
                   className="grid grid-cols-[auto_1fr_auto] gap-3 items-center px-1 py-2.5 border-t border-base-100 first:border-0"
                 >
-                  <span className="font-mono text-[12px] font-semibold">
+                  <span className="font-mono text-meta font-semibold">
                     {po.id}
                   </span>
                   <div className="min-w-0">
-                    <div className="font-body text-[12px]">{summary}</div>
-                    <div className="font-body text-[11px] text-base-500">
+                    <div className="font-body text-meta">{summary}</div>
+                    <div className="font-body text-label text-base-500">
                       {po.suppliers?.name ?? "—"} → {po.warehouses?.name ?? "—"}
                     </div>
                   </div>
-                  <span className="font-mono text-[10px] text-success uppercase tracking-[0.1em] font-bold">
+                  <span className="font-mono text-label text-success uppercase tracking-[0.1em] font-semibold">
                     {po.status === "received" ? "DONE" : "AT WH"}
                   </span>
                 </div>
@@ -394,17 +394,17 @@ function KpiTile({
       }`}
     >
       <div
-        className={`text-[11px] uppercase tracking-[0.18em] font-semibold ${
+        className={`text-label uppercase tracking-[0.18em] font-semibold ${
           accent ? "text-primary" : "text-base-600"
         }`}
       >
         {label}
       </div>
-      <div className="font-display text-[36px] leading-none mt-1.5 font-bold tracking-tight text-base-900">
+      <div className="font-display text-page leading-none mt-1.5 font-semibold tracking-tight text-base-900">
         {value}
       </div>
       {hint && (
-        <div className="text-[10px] text-base-500 mt-1.5">{hint}</div>
+        <div className="text-label text-base-500 mt-1.5">{hint}</div>
       )}
     </div>
   );
@@ -431,16 +431,16 @@ function PreviewColumn({
     <div className="bg-white border border-base-200 rounded-md overflow-hidden">
       <div className="px-4 py-3.5 border-b border-base-100">
         <div className="flex justify-between items-baseline">
-          <div className={`text-[11px] font-bold uppercase tracking-[0.14em] ${accentCls}`}>
+          <div className={`text-label font-semibold uppercase tracking-[0.14em] ${accentCls}`}>
             {label}
           </div>
-          <span className="font-mono text-[13px] font-semibold">{items.length}</span>
+          <span className="font-mono text-body font-semibold">{items.length}</span>
         </div>
-        <div className="font-body text-[11px] text-base-500 mt-0.5">{hint}</div>
+        <div className="font-body text-label text-base-500 mt-0.5">{hint}</div>
       </div>
       <div className="p-2 min-h-[140px]">
         {items.length === 0 ? (
-          <div className="text-center text-base-400 text-[11px] py-6">—</div>
+          <div className="text-center text-base-400 text-label py-6">—</div>
         ) : (
           items.slice(0, 4).map((po) => {
             const { head, rest, totalQty } = lineSummary(po.lines);
@@ -452,13 +452,13 @@ function PreviewColumn({
                 className="block w-full bg-white border border-base-100 rounded-[4px] px-3 py-2.5 mb-1.5 hover:border-primary transition-colors"
               >
                 <div className="flex justify-between items-baseline">
-                  <span className="font-mono text-[11px] font-semibold">{po.id}</span>
-                  <span className="font-mono text-[11px] text-base-500">×{totalQty}</span>
+                  <span className="font-mono text-label font-semibold">{po.id}</span>
+                  <span className="font-mono text-label text-base-500">×{totalQty}</span>
                 </div>
-                <div className="font-body text-[12px] font-medium mt-0.5 truncate">
+                <div className="font-body text-meta font-medium mt-0.5 truncate">
                   {summary}
                 </div>
-                <div className="font-body text-[10px] text-base-500 mt-1">
+                <div className="font-body text-label text-base-500 mt-1">
                   {po.suppliers?.name ?? "—"} → {po.warehouses?.name ?? "—"}
                   {po.eta_date ? ` · ${po.eta_date}` : ""}
                 </div>
@@ -492,16 +492,16 @@ function DeliveryPreviewColumn({
     <div className="bg-white border border-base-200 rounded-md overflow-hidden">
       <div className="px-4 py-3.5 border-b border-base-100">
         <div className="flex justify-between items-baseline">
-          <div className={`text-[11px] font-bold uppercase tracking-[0.14em] ${accentCls}`}>
+          <div className={`text-label font-semibold uppercase tracking-[0.14em] ${accentCls}`}>
             {label}
           </div>
-          <span className="font-mono text-[13px] font-semibold">{count}</span>
+          <span className="font-mono text-body font-semibold">{count}</span>
         </div>
-        <div className="font-body text-[11px] text-base-500 mt-0.5">{hint}</div>
+        <div className="font-body text-label text-base-500 mt-0.5">{hint}</div>
       </div>
       <div className="p-2 min-h-[140px]">
         {rows.length === 0 ? (
-          <div className="text-center text-base-400 text-[11px] py-6">—</div>
+          <div className="text-center text-base-400 text-label py-6">—</div>
         ) : (
           rows.slice(0, 4).map((r, i) => (
             <Link
@@ -510,12 +510,12 @@ function DeliveryPreviewColumn({
               className="block w-full bg-white border border-base-100 rounded-[4px] px-3 py-2.5 mb-1.5 hover:border-primary transition-colors"
             >
               <div className="flex justify-between items-baseline">
-                <span className="font-mono text-[11px] font-semibold">{r.poId}</span>
+                <span className="font-mono text-label font-semibold">{r.poId}</span>
               </div>
-              <div className="font-body text-[12px] font-medium mt-0.5 truncate">
+              <div className="font-body text-meta font-medium mt-0.5 truncate">
                 {r.customer}
               </div>
-              <div className="font-body text-[10px] text-base-500 mt-1">
+              <div className="font-body text-label text-base-500 mt-1">
                 {r.dateLine}
               </div>
             </Link>
@@ -538,9 +538,9 @@ function SideCard({
   return (
     <div className="bg-white border border-base-200 rounded-md overflow-hidden">
       <div className="px-4 py-3 border-b border-base-100 flex justify-between items-baseline">
-        <h3 className="text-[13px] font-semibold text-base-900">{title}</h3>
+        <h3 className="text-body font-semibold text-base-900">{title}</h3>
         {hint && (
-          <span className="font-mono text-[11px] text-base-500">{hint}</span>
+          <span className="font-mono text-label text-base-500">{hint}</span>
         )}
       </div>
       <div className="px-4 py-1">{children}</div>

@@ -22,7 +22,7 @@ export default function DealerStatusPill({ status }: Props) {
   const s = STYLE[status] ?? STYLE.pending;
   return (
     <span
-      className={`px-2.5 py-[3px] rounded-full text-[10px] font-bold uppercase tracking-wider ${s.cls}`}
+      className={`px-2.5 py-[3px] rounded-full text-label font-semibold uppercase tracking-wider ${s.cls}`}
     >
       {s.l}
     </span>

@@ -92,13 +92,13 @@ export default function PartnerFleet() {
     <div className="px-9 py-8 pb-14 space-y-6">
       <div>
         <div className="kicker">LP · Fleet</div>
-        <h1 className="font-display text-[30px] leading-[1.05] mt-1.5 tracking-tight font-semibold">
+        <h1 className="font-display text-page leading-[1.05] mt-1.5 tracking-tight font-semibold">
           Fleet
         </h1>
       </div>
 
       <section data-testid="partner-fleet-add">
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.18em] text-base-700 mb-2">
+        <h2 className="text-body font-semibold uppercase tracking-[0.18em] text-base-700 mb-2">
           Add vehicle
         </h2>
         <form
@@ -109,28 +109,28 @@ export default function PartnerFleet() {
             placeholder="Plate (e.g. WPB 1234)"
             value={plate}
             onChange={(e) => setPlate(e.target.value)}
-            className="px-2.5 py-1.5 border border-border rounded text-[12.5px] bg-background"
+            className="px-2.5 py-1.5 border border-border rounded text-meta bg-background"
             aria-label="Plate"
           />
           <input
             placeholder="Vehicle type"
             value={vehicleType}
             onChange={(e) => setVehicleType(e.target.value)}
-            className="px-2.5 py-1.5 border border-border rounded text-[12.5px] bg-background"
+            className="px-2.5 py-1.5 border border-border rounded text-meta bg-background"
             aria-label="Vehicle type"
           />
           <input
             placeholder="Capacity (optional)"
             value={capacity}
             onChange={(e) => setCapacity(e.target.value)}
-            className="px-2.5 py-1.5 border border-border rounded text-[12.5px] bg-background"
+            className="px-2.5 py-1.5 border border-border rounded text-meta bg-background"
             aria-label="Capacity"
           />
           <input
             placeholder="Driver name"
             value={driverName}
             onChange={(e) => setDriverName(e.target.value)}
-            className="px-2.5 py-1.5 border border-border rounded text-[12.5px] bg-background"
+            className="px-2.5 py-1.5 border border-border rounded text-meta bg-background"
             aria-label="Driver name"
           />
           <div className="flex gap-2">
@@ -138,13 +138,13 @@ export default function PartnerFleet() {
               placeholder="Driver phone"
               value={driverPhone}
               onChange={(e) => setDriverPhone(e.target.value)}
-              className="flex-1 px-2.5 py-1.5 border border-border rounded text-[12.5px] bg-background"
+              className="flex-1 px-2.5 py-1.5 border border-border rounded text-meta bg-background"
               aria-label="Driver phone"
             />
             <button
               type="submit"
               disabled={create.isPending}
-              className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-[12.5px] font-medium disabled:opacity-50"
+              className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-meta font-medium disabled:opacity-50"
             >
               Add
             </button>
@@ -153,7 +153,7 @@ export default function PartnerFleet() {
       </section>
 
       <section>
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.18em] text-base-700 mb-2">
+        <h2 className="text-body font-semibold uppercase tracking-[0.18em] text-base-700 mb-2">
           Vehicles
         </h2>
         <div
@@ -161,31 +161,31 @@ export default function PartnerFleet() {
           data-testid="partner-fleet-list"
         >
           {fleet.isLoading ? (
-            <div className="p-4 text-[12px] text-base-500">Loading…</div>
+            <div className="p-4 text-meta text-base-500">Loading…</div>
           ) : (fleet.data ?? []).length === 0 ? (
-            <div className="p-4 text-[12px] text-base-500">
+            <div className="p-4 text-meta text-base-500">
               No vehicles yet. Add one above.
             </div>
           ) : (
             <table className="w-full">
               <thead>
                 <tr className="border-b border-base-200 bg-base-50">
-                  <th className="text-left p-3 text-[11px] uppercase tracking-[0.18em] font-semibold text-base-600">
+                  <th className="text-left p-3 text-label uppercase tracking-[0.18em] font-semibold text-base-600">
                     Plate
                   </th>
-                  <th className="text-left p-3 text-[11px] uppercase tracking-[0.18em] font-semibold text-base-600">
+                  <th className="text-left p-3 text-label uppercase tracking-[0.18em] font-semibold text-base-600">
                     Type
                   </th>
-                  <th className="text-left p-3 text-[11px] uppercase tracking-[0.18em] font-semibold text-base-600">
+                  <th className="text-left p-3 text-label uppercase tracking-[0.18em] font-semibold text-base-600">
                     Capacity
                   </th>
-                  <th className="text-left p-3 text-[11px] uppercase tracking-[0.18em] font-semibold text-base-600">
+                  <th className="text-left p-3 text-label uppercase tracking-[0.18em] font-semibold text-base-600">
                     Driver
                   </th>
-                  <th className="text-left p-3 text-[11px] uppercase tracking-[0.18em] font-semibold text-base-600">
+                  <th className="text-left p-3 text-label uppercase tracking-[0.18em] font-semibold text-base-600">
                     Phone
                   </th>
-                  <th className="text-right p-3 text-[11px] uppercase tracking-[0.18em] font-semibold text-base-600">
+                  <th className="text-right p-3 text-label uppercase tracking-[0.18em] font-semibold text-base-600">
                     Action
                   </th>
                 </tr>
@@ -197,13 +197,13 @@ export default function PartnerFleet() {
                     className="border-b border-base-200 last:border-0"
                     data-testid={`fleet-row-${v.id}`}
                   >
-                    <td className="p-3 text-[13px] font-mono font-medium text-base-900">
+                    <td className="p-3 text-body font-mono font-medium text-base-900">
                       {v.plate}
                     </td>
-                    <td className="p-3 text-[13px] text-base-700">{v.vehicle_type}</td>
-                    <td className="p-3 text-[13px] text-base-700">{v.capacity ?? "—"}</td>
-                    <td className="p-3 text-[13px] text-base-700">{v.driver_name ?? "—"}</td>
-                    <td className="p-3 text-[12px] text-base-600">{v.driver_phone ?? "—"}</td>
+                    <td className="p-3 text-body text-base-700">{v.vehicle_type}</td>
+                    <td className="p-3 text-body text-base-700">{v.capacity ?? "—"}</td>
+                    <td className="p-3 text-body text-base-700">{v.driver_name ?? "—"}</td>
+                    <td className="p-3 text-meta text-base-600">{v.driver_phone ?? "—"}</td>
                     <td className="p-3 text-right">
                       <button
                         type="button"
@@ -211,7 +211,7 @@ export default function PartnerFleet() {
                           if (confirm(`Remove ${v.plate}?`)) remove.mutate(v.id);
                         }}
                         disabled={remove.isPending}
-                        className="px-2.5 py-1 text-[11px] border border-border rounded hover:bg-destructive/10 disabled:opacity-50"
+                        className="px-2.5 py-1 text-label border border-border rounded hover:bg-destructive/10 disabled:opacity-50"
                       >
                         Remove
                       </button>

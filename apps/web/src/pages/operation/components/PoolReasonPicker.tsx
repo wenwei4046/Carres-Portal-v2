@@ -106,7 +106,7 @@ export default function PoolReasonPicker({
         <select
           value={state.reason}
           onChange={(e) => state.setReason(e.target.value as PoolUseReason | "")}
-          className="rounded border border-base-300 px-2 py-1.5 t-tiny bg-white focus:border-primary focus:outline-none"
+          className="rounded border border-base-300 px-2 py-1.5 text-meta bg-white focus:border-primary focus:outline-none"
           aria-label="Why this unit is being taken"
           data-testid="pool-reason"
         >
@@ -123,7 +123,7 @@ export default function PoolReasonPicker({
           placeholder={needsWords ? "Say what the reason is" : "More detail (optional)"}
           className={`${
             compact ? "w-[160px]" : "flex-1 min-w-[180px]"
-          } rounded border border-base-300 px-2 py-1.5 t-tiny focus:border-primary focus:outline-none`}
+          } rounded border border-base-300 px-2 py-1.5 text-meta focus:border-primary focus:outline-none`}
           aria-label="More detail"
           data-testid="pool-reason-note"
         />
@@ -134,7 +134,7 @@ export default function PoolReasonPicker({
           {(warnings ?? []).map((w) => (
             <div
               key={w.sku}
-              className="t-tiny text-warning-700 inline-flex items-center gap-1"
+              className="text-meta text-warning-700 inline-flex items-center gap-1"
             >
               <TriangleAlert size={14} strokeWidth={2} className="shrink-0" />
               <span>

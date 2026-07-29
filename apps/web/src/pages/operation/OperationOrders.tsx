@@ -234,17 +234,17 @@ export default function OperationOrders() {
   if (isError) {
     return (
       <div className="px-9 py-7 pb-14">
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-2">
             Couldn&rsquo;t load orders
           </div>
-          <div className="text-[12px] text-base-700 mb-3">
+          <div className="text-meta text-base-700 mb-3">
             {(error as Error | undefined)?.message ?? "Unknown error"}
           </div>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="btn-secondary text-[11px] py-1.5 px-3"
+            className="btn-secondary text-label py-1.5 px-3"
           >
             Retry
           </button>
@@ -339,10 +339,10 @@ export default function OperationOrders() {
               data-testid="stage-empty-state"
               className="rounded-[6px] border border-dashed border-base-200 bg-card py-16 text-center"
             >
-              <div className="text-[12px] text-base-500 font-body uppercase tracking-[0.14em] mb-2">
+              <div className="text-meta text-base-500 font-body uppercase tracking-[0.14em] mb-2">
                 Empty stage
               </div>
-              <div className="text-[14px] text-base-700 font-body">
+              <div className="text-body text-base-700 font-body">
                 No orders in this stage
               </div>
             </div>

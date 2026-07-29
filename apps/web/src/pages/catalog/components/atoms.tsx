@@ -51,7 +51,7 @@ export function CategoryChip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`t-small font-semibold px-3.5 py-1 rounded-full border transition-colors ${
+      className={`text-body font-semibold px-3.5 py-1 rounded-full border transition-colors ${
         active
           ? "bg-base-900 text-white border-base-900"
           : "bg-white text-base-700 border-base-300 hover:border-base-500"
@@ -65,7 +65,7 @@ export function CategoryChip({
 /** Monospaced product-code chip (e.g. `LUMI-K`, `MS01-B1201F-S`). */
 export function CodeChip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-block font-mono text-[11px] bg-base-100 text-base-700 px-1.5 py-0.5 rounded-[3px]">
+    <span className="inline-block font-mono text-label bg-base-100 text-base-700 px-1.5 py-0.5 rounded-[3px]">
       {children}
     </span>
   );

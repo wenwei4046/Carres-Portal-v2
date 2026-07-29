@@ -94,7 +94,7 @@ export default function ClaimPhotoUploadField({
   return (
     <div data-testid={testId}>
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[11px] text-base-600 font-body">{label}</span>
+        <span className="text-label text-base-600 font-body">{label}</span>
         <input
           type="file"
           accept="image/jpeg,image/png"
@@ -102,11 +102,11 @@ export default function ClaimPhotoUploadField({
           onChange={handleChange}
           disabled={busy || doNumber.trim().length < 3}
           aria-label={label}
-          className="text-[11px]"
+          className="text-label"
         />
         {paths.length > 0 && (
           <span
-            className="text-[11px] text-success font-body"
+            className="text-label text-success font-body"
             data-testid={testId ? `${testId}-count` : undefined}
           >
             {paths.length} photo{paths.length === 1 ? "" : "s"} attached
@@ -114,7 +114,7 @@ export default function ClaimPhotoUploadField({
         )}
       </div>
       {doNumber.trim().length < 3 && (
-        <p className="text-[10.5px] text-base-500 mt-1 font-body">
+        <p className="text-label text-base-500 mt-1 font-body">
           Enter the supplier DO number first — the photo files are named after it.
         </p>
       )}
@@ -122,13 +122,13 @@ export default function ClaimPhotoUploadField({
         <ul className="mt-1 grid gap-0.5">
           {paths.map((p) => (
             <li key={p} className="flex items-center gap-2">
-              <span className="font-mono text-[10px] text-base-500 truncate max-w-[240px]">
+              <span className="font-mono text-label text-base-500 truncate max-w-[240px]">
                 {p.split("/").pop()}
               </span>
               <button
                 type="button"
                 onClick={() => onChange(paths.filter((x) => x !== p))}
-                className="btn-ghost text-[10px] py-0 px-1.5"
+                className="btn-ghost text-label py-0 px-1.5"
               >
                 Remove
               </button>
@@ -136,7 +136,7 @@ export default function ClaimPhotoUploadField({
           ))}
         </ul>
       )}
-      {error && <p className="text-danger text-[11px] mt-1 font-body">{error}</p>}
+      {error && <p className="text-danger text-label mt-1 font-body">{error}</p>}
     </div>
   );
 }

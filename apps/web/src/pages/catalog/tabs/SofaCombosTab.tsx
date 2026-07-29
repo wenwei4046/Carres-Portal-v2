@@ -56,14 +56,14 @@ export default function SofaCombosTab({
   return (
     <section className="max-w-[1600px]" data-testid="sofa-combos-section">
       <div className="flex items-end justify-between gap-4 flex-wrap mb-1">
-        <div className="t-h4 font-display">Sofa combos</div>
+        <div className="text-strong font-display">Sofa combos</div>
         {sofaModels.length > 0 && (
           <label className="inline-flex items-center gap-2">
             <span className="label">Model</span>
             <select
               value={selected}
               onChange={(e) => setSelected(e.target.value)}
-              className="px-3 py-1.5 border border-base-300 rounded-[4px] text-[13px] bg-white outline-none focus:border-base-500"
+              className="px-3 py-1.5 border border-base-300 rounded-[4px] text-body bg-white outline-none focus:border-base-500"
               aria-label="Sofa model"
               data-testid="sofa-combos-model"
             >
@@ -81,7 +81,7 @@ export default function SofaCombosTab({
           </label>
         )}
       </div>
-      <p className="t-tiny text-base-500 mb-6">
+      <p className="text-meta text-base-500 mb-6">
         Matched-shape compartment bundles priced per seat height, grouped by base model. When a
         build matches a combo&apos;s slots, the combo price for the chosen height wins over
         à-la-carte. Offer compartments to the model in Modular first. Pricing is principal-only.
@@ -89,11 +89,11 @@ export default function SofaCombosTab({
       </p>
 
       {sofaModels.length === 0 ? (
-        <div className="t-small text-base-500 border border-base-200 rounded-[6px] px-3 py-6 text-center">
+        <div className="text-body text-base-500 border border-base-200 rounded-[6px] px-3 py-6 text-center">
           No sofa models yet. Add a sofa model in Modular first.
         </div>
       ) : modelsToShow.length === 0 ? (
-        <div className="t-small text-base-500 border border-base-200 rounded-[6px] px-3 py-6 text-center">
+        <div className="text-body text-base-500 border border-base-200 rounded-[6px] px-3 py-6 text-center">
           No sofa combos yet. Pick a model from the dropdown above to create one.
         </div>
       ) : (

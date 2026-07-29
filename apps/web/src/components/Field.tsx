@@ -6,7 +6,7 @@
  * take `fieldBase` (no fixed height). Labels are the v4 label (.t4-label).
  */
 export const fieldBase =
-  "w-full px-2.5 border border-base-200 rounded-md text-[13px] bg-white outline-none focus:border-base-700 disabled:bg-base-50 disabled:text-base-400";
+  "w-full px-2.5 border border-base-200 rounded-md text-body bg-white outline-none focus:border-base-700 disabled:bg-base-50 disabled:text-base-400";
 
 /** Single-line controls: input / select — 32px, aligned with Btn md. */
 export const fieldCls = `h-8 ${fieldBase}`;

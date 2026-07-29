@@ -108,8 +108,8 @@ export default function NewModelModal({ onClose }: { onClose: () => void }) {
             className="rounded-[4px] border border-amber-300 bg-amber-50 px-3 py-2"
             data-testid="new-model-created-notice"
           >
-            <div className="t-small font-semibold text-amber-800">Model created</div>
-            <div className="t-tiny text-amber-700 mt-0.5">
+            <div className="text-body font-semibold text-amber-800">Model created</div>
+            <div className="text-meta text-amber-700 mt-0.5">
               The model exists — fix the issue above and click again to retry SKU generation only.
             </div>
           </div>
@@ -142,7 +142,7 @@ export default function NewModelModal({ onClose }: { onClose: () => void }) {
             className={`${INPUT_CLS} disabled:opacity-50`}
           />
           {modelKey && (
-            <div className="t-tiny text-base-500 font-mono mt-1">
+            <div className="text-meta text-base-500 font-mono mt-1">
               Internal id: <span className="text-base-700">{modelKey}</span>
             </div>
           )}
@@ -157,7 +157,7 @@ export default function NewModelModal({ onClose }: { onClose: () => void }) {
             data-testid="new-model-sizes"
             className={INPUT_CLS}
           />
-          <div className="t-tiny text-base-500 mt-1">
+          <div className="text-meta text-base-500 mt-1">
             {sizes.length > 0 ? (
               <>
                 Generates <span className="text-base-700 font-medium">{sizes.length}</span> SKU
@@ -173,7 +173,7 @@ export default function NewModelModal({ onClose }: { onClose: () => void }) {
             )}
           </div>
           {!sizesOk && (
-            <div className="t-tiny text-red-600 mt-1" data-testid="new-model-sizes-error">
+            <div className="text-meta text-red-600 mt-1" data-testid="new-model-sizes-error">
               Max 100 sizes, each ≤ 60 chars. Trim the list before creating.
             </div>
           )}
@@ -198,8 +198,8 @@ export default function NewModelModal({ onClose }: { onClose: () => void }) {
             className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2"
             data-testid="new-model-price-lock-hint"
           >
-            <div className="t-small text-base-600">Price</div>
-            <div className="t-tiny text-base-400 mt-0.5">
+            <div className="text-body text-base-600">Price</div>
+            <div className="text-meta text-base-400 mt-0.5">
               Generated SKUs are created unpriced — the principal (Master Admin) prices them.
             </div>
           </div>

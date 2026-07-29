@@ -63,8 +63,8 @@ export default function LpInboundConfirmDialog({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-card rounded-lg p-6 max-w-md w-full">
-        <h2 className="t-h3 mb-4">LP Pre-flight — {poId}</h2>
-        <p className="text-sm text-base-600 mb-4">
+        <h2 className="text-strong mb-4">LP Pre-flight — {poId}</h2>
+        <p className="text-body text-base-600 mb-4">
           Proxy LP confirm/reject for Ohana Sofa inbound delivery. Reason not stored (per C1.9).
         </p>
         <div className="flex gap-2 justify-end">

@@ -77,7 +77,7 @@ export default function PartnerPickupsPage() {
   const totalAll = rfdRows.length + toDeliverRows.length;
 
   if (rfdLoading || toDeliverLoading) {
-    return <div className="px-9 py-8 pb-14 text-[13px] text-base-600">Loading…</div>;
+    return <div className="px-9 py-8 pb-14 text-body text-base-600">Loading…</div>;
   }
 
   const closeRfdDialog = () => {
@@ -89,14 +89,14 @@ export default function PartnerPickupsPage() {
     <div className="px-9 py-7 pb-14 space-y-5">
       <div>
         <div className="kicker">LP · Deliveries</div>
-        <h1 className="font-display text-[32px] mt-1.5 leading-[1.05] tracking-[-0.025em] font-bold text-base-900">
+        <h1 className="font-display text-page mt-1.5 leading-[1.05] tracking-[-0.025em] font-semibold text-base-900">
           Deliveries
         </h1>
-        <div className="font-body text-[13px] text-base-600 mt-1">
+        <div className="font-body text-body text-base-600 mt-1">
           Warehouse → customer leg. For supplier pickups (factory →
           warehouse), see <strong>Factory pickups</strong>.
         </div>
-        <div className="font-body text-[13px] text-base-600 mt-1">
+        <div className="font-body text-body text-base-600 mt-1">
           {totalAll} delivery{totalAll === 1 ? "" : "s"} ·{" "}
           {buckets.awaiting.length} awaiting accept
         </div>
@@ -104,7 +104,7 @@ export default function PartnerPickupsPage() {
 
       {totalAll === 0 ? (
         <div
-          className="bg-white border border-base-200 rounded-md p-15 text-center text-[13px] text-base-500"
+          className="bg-white border border-base-200 rounded-md p-15 text-center text-body text-base-500"
           data-testid="partner-deliveries-empty"
         >
           No RFD requests waiting for your response. Accepted RFDs will surface
@@ -136,7 +136,7 @@ export default function PartnerPickupsPage() {
                         onClick={() =>
                           setOpenRfd({ threadId: r.thread_id, poLabel: r.po_id })
                         }
-                        className="w-full px-3 py-1.5 bg-warning text-white rounded text-[12px] font-semibold"
+                        className="w-full px-3 py-1.5 bg-warning text-white rounded text-meta font-semibold"
                       >
                         ✋ View RFD
                       </button>
@@ -169,7 +169,7 @@ export default function PartnerPickupsPage() {
                         <button
                           type="button"
                           onClick={() => setOpenPod(r)}
-                          className="w-full px-3 py-1.5 bg-primary text-primary-foreground rounded text-[12px] font-semibold"
+                          className="w-full px-3 py-1.5 bg-primary text-primary-foreground rounded text-meta font-semibold"
                           data-testid={`mark-delivered-${r.thread_id}`}
                         >
                           🚚 Mark Delivered
@@ -252,13 +252,13 @@ function PipelineColumn({
       <div className="px-4 py-3.5 border-b border-base-100">
         <div className="flex justify-between items-baseline">
           <div
-            className={`text-[11px] font-bold uppercase tracking-[0.14em] ${accentCls}`}
+            className={`text-label font-semibold uppercase tracking-[0.14em] ${accentCls}`}
           >
             {label}
           </div>
-          <span className="font-mono text-[13px] font-semibold">{count}</span>
+          <span className="font-mono text-body font-semibold">{count}</span>
         </div>
-        <div className="font-body text-[11px] text-base-500 mt-0.5">{hint}</div>
+        <div className="font-body text-label text-base-500 mt-0.5">{hint}</div>
       </div>
       <div className="p-2.5 min-h-[220px] flex flex-col gap-2">{children}</div>
     </div>
@@ -266,7 +266,7 @@ function PipelineColumn({
 }
 
 function EmptyDash() {
-  return <div className="text-center text-base-400 text-[11px] py-6">—</div>;
+  return <div className="text-center text-base-400 text-label py-6">—</div>;
 }
 
 function Card({
@@ -292,16 +292,16 @@ function Card({
   return (
     <div className="bg-white border border-base-100 rounded-md p-3 flex flex-col gap-2.5">
       <div className="space-y-0.5">
-        <div className="font-mono text-[11px] font-semibold text-base-900 flex items-center gap-2 flex-wrap">
+        <div className="font-mono text-label font-semibold text-base-900 flex items-center gap-2 flex-wrap">
           <span>{primary}</span>
           {doNumber && (
             <span className="text-base-500 font-medium">· {doNumber}</span>
           )}
         </div>
-        <div className="font-body text-[13px] font-medium text-base-800 truncate">
+        <div className="font-body text-body font-medium text-base-800 truncate">
           {secondary}
         </div>
-        <div className="font-mono text-[10.5px] text-base-500 flex gap-1">
+        <div className="font-mono text-label text-base-500 flex gap-1">
           {dateLabel && <span>{dateLabel}</span>}
           <span>{dateValue}</span>
         </div>
@@ -354,7 +354,7 @@ function PrintDoButton({ orderId, threadId }: { orderId: string; threadId: strin
       type="button"
       onClick={open}
       disabled={pending}
-      className="w-full px-3 py-1.5 border border-base-200 bg-white text-base-900 rounded text-[12px] font-semibold disabled:opacity-50 hover:border-primary transition-colors"
+      className="w-full px-3 py-1.5 border border-base-200 bg-white text-base-900 rounded text-meta font-semibold disabled:opacity-50 hover:border-primary transition-colors"
       data-testid={`print-do-${threadId}`}
     >
       {pending ? "Opening…" : "🖨 Print DO"}

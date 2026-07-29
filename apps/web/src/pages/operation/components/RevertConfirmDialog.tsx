@@ -67,13 +67,13 @@ export default function RevertConfirmDialog({ orderId, so, kind, onClose }: Prop
         className="bg-card rounded-md shadow-xl w-[440px] max-w-full p-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-1.5">
+        <div className="text-label uppercase tracking-[0.12em] text-muted-foreground mb-1.5">
           Revert order
         </div>
-        <div className="t-h3 font-display text-foreground mb-3 leading-tight">
+        <div className="text-strong font-display text-foreground mb-3 leading-tight">
           Revert order #{so} from {c.fromLabel} to {c.toLabel}?
         </div>
-        <div className="text-[12.5px] text-base-700 mb-5 leading-relaxed">
+        <div className="text-meta text-base-700 mb-5 leading-relaxed">
           {c.sideEffect}
         </div>
         <div className="flex justify-end gap-2">
@@ -81,7 +81,7 @@ export default function RevertConfirmDialog({ orderId, so, kind, onClose }: Prop
             type="button"
             onClick={onClose}
             disabled={active.isPending}
-            className="px-3.5 py-2 border border-border rounded text-[12.5px] text-foreground disabled:opacity-50"
+            className="px-3.5 py-2 border border-border rounded text-meta text-foreground disabled:opacity-50"
           >
             Cancel
           </button>
@@ -89,7 +89,7 @@ export default function RevertConfirmDialog({ orderId, so, kind, onClose }: Prop
             type="button"
             onClick={onConfirm}
             disabled={active.isPending}
-            className="px-3.5 py-2 bg-base-900 text-white font-semibold rounded text-[12.5px] hover:bg-base-800 disabled:opacity-50"
+            className="px-3.5 py-2 bg-base-900 text-white font-semibold rounded text-meta hover:bg-base-800 disabled:opacity-50"
             data-testid="revert-confirm-button"
           >
             {active.isPending ? "Reverting…" : `Revert to ${c.toLabel}`}

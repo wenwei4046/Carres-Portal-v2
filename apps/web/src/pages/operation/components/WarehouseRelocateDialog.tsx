@@ -65,7 +65,7 @@ export default function WarehouseRelocateDialog({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-card rounded-lg p-6 max-w-md w-full">
-        <h2 className="t-h3 mb-4">Relocate PO {poId}</h2>
+        <h2 className="text-strong mb-4">Relocate PO {poId}</h2>
         <ul className="space-y-2 mb-4">
           {(warehouses ?? []).map((wh) => (
             <li key={wh.id}>
@@ -78,7 +78,7 @@ export default function WarehouseRelocateDialog({
                   onChange={() => setSelected(wh.id)}
                 />
                 {wh.name}{" "}
-                <span className="text-xs text-base-500">({wh.kind})</span>
+                <span className="text-meta text-base-500">({wh.kind})</span>
               </label>
             </li>
           ))}

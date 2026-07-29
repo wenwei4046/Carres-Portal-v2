@@ -46,17 +46,17 @@ export default function WarehouseIncoming() {
   if (isError) {
     return (
       <div className="px-9 py-8">
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-2">
             Couldn&rsquo;t load what is coming in
           </div>
-          <div className="text-[12px] text-base-700 mb-3">
+          <div className="text-meta text-base-700 mb-3">
             {(error as Error | undefined)?.message ?? "Unknown error"}
           </div>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="btn-secondary text-[11px] py-1.5 px-3"
+            className="btn-secondary text-label py-1.5 px-3"
           >
             Retry
           </button>
@@ -73,14 +73,14 @@ export default function WarehouseIncoming() {
         title="Incoming"
         className="mb-3"
       />
-      <div className="text-[13px] text-base-600 mb-[18px]">
+      <div className="text-body text-base-600 mb-[18px]">
         Goods on their way here. Count what the driver brings, then Carres checks
         it in.
       </div>
 
       <div className="bg-white border border-base-200 rounded overflow-auto">
         <table
-          className="w-full border-collapse text-[13px] [&_tbody_tr:nth-child(even)]:bg-base-100/70"
+          className="w-full border-collapse text-body [&_tbody_tr:nth-child(even)]:bg-base-100/70"
           style={{ minWidth: 760 }}
         >
           <thead className="bg-base-700 border-b-2 border-primary text-white">
@@ -95,7 +95,7 @@ export default function WarehouseIncoming() {
           <tbody>
             {pos.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-12 text-center text-[12px] text-base-500">
+                <td colSpan={5} className="p-12 text-center text-meta text-base-500">
                   Nothing is on its way here right now.
                 </td>
               </tr>
@@ -125,11 +125,11 @@ export default function WarehouseIncoming() {
                     {po.supplier_name ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-base-700">
-                    <div className="text-[12px]">
+                    <div className="text-meta">
                       {po.lines.length} item{po.lines.length === 1 ? "" : "s"}
                     </div>
                     {progress.pendingLabel && (
-                      <div className="text-[11px] text-base-600 mt-1">
+                      <div className="text-label text-base-600 mt-1">
                         {progress.pendingLabel}
                       </div>
                     )}
@@ -153,7 +153,7 @@ export default function WarehouseIncoming() {
                       <button
                         type="button"
                         onClick={() => setCountPoId(po.po_id)}
-                        className="btn-primary text-[11px] py-1.5 px-3"
+                        className="btn-primary text-label py-1.5 px-3"
                         data-testid={`warehouse-count-${po.po_id}`}
                       >
                         Count this delivery
@@ -176,7 +176,7 @@ export default function WarehouseIncoming() {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.02em] text-white text-left">
+    <th className="px-4 py-2.5 text-label font-semibold uppercase tracking-[0.02em] text-white text-left">
       {children}
     </th>
   );

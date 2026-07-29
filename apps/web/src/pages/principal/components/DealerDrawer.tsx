@@ -89,7 +89,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
           className="relative bg-white h-screen p-7"
           style={{ width: 520 }}
         >
-          <div className="text-base-500 text-[13px]">Loading…</div>
+          <div className="text-base-500 text-body">Loading…</div>
         </div>
       </div>
     );
@@ -194,10 +194,10 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
         <div className="flex justify-between items-start mb-[18px]">
           <div>
             <div className="kicker">{dealer.id.slice(0, 8)}</div>
-            <h2 className="font-display text-[22px] leading-tight mt-1 tracking-tight font-semibold">
+            <h2 className="font-display text-title leading-tight mt-1 tracking-tight font-semibold">
               {dealer.name}
             </h2>
-            <div className="text-[12px] text-base-600 mt-1">
+            <div className="text-meta text-base-600 mt-1">
               {dealer.contact ?? "—"}
             </div>
           </div>
@@ -205,7 +205,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="text-base-500 text-lg bg-transparent border-0 cursor-pointer leading-none px-1"
+            className="text-base-500 text-strong bg-transparent border-0 cursor-pointer leading-none px-1"
           >
             ×
           </button>
@@ -213,7 +213,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
 
         <div className="flex gap-2 mb-[18px] items-center">
           <DealerStatusPill status={dealer.status} />
-          <span className="text-[11.5px] text-base-500">
+          <span className="text-label text-base-500">
             {dealer.region} · joined {dealer.joined_date ?? "—"}
           </span>
         </div>
@@ -236,7 +236,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
         </div>
 
         <div className="mb-[18px]">
-          <div className="text-[10px] uppercase tracking-wider text-base-500 font-semibold mb-2">
+          <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-2">
             Recent orders
           </div>
           {recentOrders.length > 0 ? (
@@ -244,15 +244,15 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
               {recentOrders.map((o: PrincipalDealerRecentOrder, i: number) => (
                 <div
                   key={o.id}
-                  className={`px-3.5 py-2.5 flex justify-between text-[12px] ${
+                  className={`px-3.5 py-2.5 flex justify-between text-meta ${
                     i ? "border-t border-base-100" : ""
                   }`}
                 >
                   <div>
-                    <div className="font-mono text-[11px] font-semibold">
+                    <div className="font-mono text-label font-semibold">
                       SO-{o.so}
                     </div>
-                    <div className="text-[11px] text-base-500">
+                    <div className="text-label text-base-500">
                       {o.customerName ?? "—"}
                     </div>
                   </div>
@@ -260,7 +260,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
                     <div className="font-mono font-semibold">
                       RM {Number(o.total).toLocaleString()}
                     </div>
-                    <div className="text-[10px] text-base-500 uppercase">
+                    <div className="text-label text-base-500 uppercase">
                       {o.status.replace("_", " ")}
                     </div>
                   </div>
@@ -268,7 +268,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
               ))}
             </div>
           ) : (
-            <div className="bg-base-50 rounded-md p-6 text-center text-[12px] text-base-500">
+            <div className="bg-base-50 rounded-md p-6 text-center text-meta text-base-500">
               No orders yet.
             </div>
           )}
@@ -279,7 +279,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
             contact_phone) for existing dealers, and lets the principal correct
             them later. Save button disabled until something changes. */}
         <div className="mb-[18px] pt-[18px] border-t border-base-100">
-          <div className="text-[10px] uppercase tracking-wider text-base-500 font-semibold mb-2">
+          <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-2">
             {storeNoun(dealer.channel)} profile
           </div>
           <div className="grid gap-3">
@@ -293,7 +293,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
                     value={draft.ssmCode}
                     onChange={(e) => setField("ssmCode", e.target.value)}
                     placeholder="e.g. 201801234567"
-                    className="w-full px-3 py-2 border border-base-200 rounded text-[13px] outline-none focus:border-primary"
+                    className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary"
                   />
                 </ProfileField>
                 <div className="grid grid-cols-2 gap-3">
@@ -302,7 +302,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
                       value={draft.contactName}
                       onChange={(e) => setField("contactName", e.target.value)}
                       placeholder="e.g. Aisha Rahman"
-                      className="w-full px-3 py-2 border border-base-200 rounded text-[13px] outline-none focus:border-primary"
+                      className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary"
                     />
                   </ProfileField>
                   <ProfileField label="Contact phone">
@@ -310,7 +310,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
                       value={draft.contactPhone}
                       onChange={(e) => setField("contactPhone", e.target.value)}
                       placeholder="e.g. 012-3344556"
-                      className="w-full px-3 py-2 border border-base-200 rounded text-[13px] outline-none focus:border-primary"
+                      className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary"
                     />
                   </ProfileField>
                 </div>
@@ -322,7 +322,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
                 onChange={(e) => setField("address", e.target.value)}
                 placeholder="109, Jalan SS 25/2, Taman Mayang, 47301 Petaling Jaya, Selangor"
                 rows={3}
-                className="w-full px-3 py-2 border border-base-200 rounded text-[13px] outline-none focus:border-primary resize-none"
+                className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary resize-none"
               />
             </ProfileField>
             <div className="flex justify-end">
@@ -360,13 +360,13 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
             </button>
           )}
           {dealer.status === "pending" && (
-            <div className="flex-1 text-[11.5px] text-base-500 text-center p-2">
+            <div className="flex-1 text-label text-base-500 text-center p-2">
               Awaiting approval · review in{" "}
               <strong className="text-primary">Approvals</strong> tab
             </div>
           )}
           {dealer.status === "rejected" && (
-            <div className="flex-1 text-[11.5px] text-base-500 text-center p-2">
+            <div className="flex-1 text-label text-base-500 text-center p-2">
               Application rejected.
             </div>
           )}
@@ -388,11 +388,11 @@ function ProfileField({
 }) {
   return (
     <div>
-      <div className="text-[9.5px] uppercase tracking-wider text-base-500 font-semibold mb-1">
+      <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1">
         {label}
       </div>
       {hint ? (
-        <div className="text-[10px] text-base-500 mb-1.5 leading-snug">{hint}</div>
+        <div className="text-label text-base-500 mb-1.5 leading-snug">{hint}</div>
       ) : null}
       {children}
     </div>
@@ -411,11 +411,11 @@ function Stat({
 }) {
   return (
     <div className="bg-base-50 p-3 rounded">
-      <div className="text-[9.5px] uppercase tracking-wider text-base-500 font-semibold mb-1">
+      <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1">
         {label}
       </div>
       <div
-        className={`font-mono text-base font-bold ${
+        className={`font-mono text-strong font-semibold ${
           accent ? "text-primary" : "text-base-900"
         }`}
       >

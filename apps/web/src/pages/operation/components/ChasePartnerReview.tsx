@@ -111,10 +111,10 @@ export default function ChasePartnerReview({
         {/* Header */}
         <div className="flex items-center gap-2 px-5 h-12 border-b border-base-200">
           <MessageCircle size={16} className="text-base-500" strokeWidth={2} />
-          <span className="text-[13px] font-semibold">
+          <span className="text-body font-semibold">
             Confirm delivery date — one message per logistics company
           </span>
-          <span className="text-[12px] text-base-500 tabular-nums">
+          <span className="text-meta text-base-500 tabular-nums">
             {orders.length} order{orders.length === 1 ? "" : "s"} · {totalUnits} unit
             {totalUnits === 1 ? "" : "s"}
           </span>
@@ -136,7 +136,7 @@ export default function ChasePartnerReview({
                 key={m}
                 type="button"
                 onClick={() => setMode(m)}
-                className={`text-[12px] font-medium px-3 py-1 rounded-md ${
+                className={`text-meta font-medium px-3 py-1 rounded-md ${
                   mode === m ? "bg-white text-base-900 shadow-sm" : "text-base-500 hover:text-base-900"
                 }`}
               >
@@ -144,7 +144,7 @@ export default function ChasePartnerReview({
               </button>
             ))}
           </div>
-          <span className="text-[12px] text-base-500">
+          <span className="text-meta text-base-500">
             {mode === "remind"
               ? "Gentle — before the delivery deadline."
               : "Firmer — the deadline is close or already passed."}
@@ -152,14 +152,14 @@ export default function ChasePartnerReview({
         </div>
 
         {unassigned > 0 && (
-          <div className="px-5 py-2 text-[12px] text-base-500 border-b border-base-100">
+          <div className="px-5 py-2 text-meta text-base-500 border-b border-base-100">
             {unassigned} order{unassigned === 1 ? "" : "s"} have no logistics company
             yet — assign one first, then call.
           </div>
         )}
 
         {cards.length === 0 && (
-          <div className="px-5 py-8 text-[13px] text-base-500">
+          <div className="px-5 py-8 text-body text-base-500">
             No calls to make — no order in the selection has a logistics company.
           </div>
         )}
@@ -192,20 +192,20 @@ export default function ChasePartnerReview({
                 data-testid={`chase-partner-card-${partner.name}`}
               >
                 <div className="flex items-center gap-2 px-4 h-10 bg-base-50 border-b border-base-100">
-                  <span className="text-[13px] font-semibold">{partner.name}</span>
-                  <span className="text-[12px] text-base-500 tabular-nums">
+                  <span className="text-body font-semibold">{partner.name}</span>
+                  <span className="text-meta text-base-500 tabular-nums">
                     {card.ords.length} order{card.ords.length === 1 ? "" : "s"} · {units} unit
                     {units === 1 ? "" : "s"}
                   </span>
                   <span
-                    className={`text-[11px] ${groupUrl ? "text-base-400" : "text-base-400 italic"}`}
+                    className={`text-label ${groupUrl ? "text-base-400" : "text-base-400 italic"}`}
                   >
                     {groupUrl ? "group linked" : "group not set"}
                   </span>
                   <div className="ml-auto flex items-center gap-2">
                     <button
                       type="button"
-                      className="btn-ghost text-[12px] py-1 px-2 inline-flex items-center gap-1"
+                      className="btn-ghost text-meta py-1 px-2 inline-flex items-center gap-1"
                       onClick={() => void copyMsg(msg, partner.name)}
                     >
                       <Copy size={13} strokeWidth={2} /> Copy
@@ -213,7 +213,7 @@ export default function ChasePartnerReview({
                     {groupUrl && (
                       <button
                         type="button"
-                        className="btn-primary text-[12px] py-1 px-3 inline-flex items-center gap-1"
+                        className="btn-primary text-meta py-1 px-3 inline-flex items-center gap-1"
                         // GROUP invite links can't carry a pre-typed message
                         // (WhatsApp limit) — so one click COPIES the message,
                         // then opens the group; the operator just pastes.
@@ -227,7 +227,7 @@ export default function ChasePartnerReview({
                     )}
                   </div>
                 </div>
-                <div className="px-4 py-3 text-[13px] text-base-700 whitespace-pre-wrap font-sans leading-relaxed">
+                <div className="px-4 py-3 text-body text-base-700 whitespace-pre-wrap font-sans leading-relaxed">
                   {msg}
                 </div>
               </div>
@@ -237,13 +237,13 @@ export default function ChasePartnerReview({
 
         {/* Footer */}
         <div className="flex items-center gap-2 px-5 py-3 border-t border-base-200">
-          <span className="text-[12px] text-base-500">
+          <span className="text-meta text-base-500">
             Copy the message, then open the company&rsquo;s WhatsApp group and paste.
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="ml-auto btn-secondary text-[12px] py-1.5 px-3"
+            className="ml-auto btn-secondary text-meta py-1.5 px-3"
           >
             Close
           </button>

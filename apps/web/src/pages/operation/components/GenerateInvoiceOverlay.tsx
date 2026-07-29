@@ -309,10 +309,10 @@ export default function GenerateInvoiceOverlay({
         {/* Header */}
         <div className="flex items-center gap-2.5 px-4 h-[52px] border-b border-base-200 shrink-0">
           <FileText size={16} className="text-base-500" />
-          <span className="text-[13px] font-bold text-base-900">
+          <span className="text-body font-semibold text-base-900">
             {imported ? "Payment request" : "Generate invoice"}
           </span>
-          <span className="font-mono text-[12px] text-base-500">
+          <span className="font-mono text-meta text-base-500">
             {imported ? `SO-${so} · statement` : effectiveNo}
             {!imported && !isIssued && " · draft"}
           </span>
@@ -337,7 +337,7 @@ export default function GenerateInvoiceOverlay({
                     key={m.sku}
                     className="flex items-center justify-between gap-3 py-1.5"
                   >
-                    <span className="min-w-0 truncate text-[13px] text-base-800">
+                    <span className="min-w-0 truncate text-body text-base-800">
                       <span className="text-base-400 tabular-nums">{i + 1}. </span>
                       {m.sku}
                       <span className="text-base-400">
@@ -350,14 +350,14 @@ export default function GenerateInvoiceOverlay({
                 ))
               ) : (
                 <div className="flex items-center justify-between gap-3 py-1.5">
-                  <span className="text-[13px] text-base-800">
+                  <span className="text-body text-base-800">
                     Goods total <span className="text-base-400">· keyed</span>
                   </span>
                   <Money value={orderTotal} tone="row" className="text-base-900" />
                 </div>
               )}
               <div className="flex items-center justify-between gap-3 py-1.5">
-                <span className="text-[13px] text-base-800">
+                <span className="text-body text-base-800">
                   Storage fee
                   {!storageIncurred && (
                     <span className="text-base-400"> · not accruing</span>
@@ -370,18 +370,18 @@ export default function GenerateInvoiceOverlay({
                 />
               </div>
               <div className="flex items-center justify-between gap-3 py-2 border-t border-base-200">
-                <span className="text-[13px] font-bold text-base-900">Total</span>
+                <span className="text-body font-semibold text-base-900">Total</span>
                 <Money value={invoiceTotal} tone="row" className="text-base-900" />
               </div>
             </div>
             {!totalSet && (
-              <div className="mt-2 text-[12px] text-danger">
+              <div className="mt-2 text-meta text-danger">
                 No goods total set — close this and key the total in the
                 Balance tab first.
               </div>
             )}
             {balanceDue > 0 && totalSet && (
-              <div className="mt-2 text-[12px] text-base-500">
+              <div className="mt-2 text-meta text-base-500">
                 Outstanding after payments:{" "}
                 <span className="font-mono font-semibold text-danger">
                   RM {rmAmount(balanceDue)}
@@ -392,7 +392,7 @@ export default function GenerateInvoiceOverlay({
 
           <div className="min-w-0 bg-base-50 grid place-items-stretch">
             {previewErr ? (
-              <div className="place-self-center text-[12px] text-danger px-6 text-center">
+              <div className="place-self-center text-meta text-danger px-6 text-center">
                 Preview failed — {previewErr}
               </div>
             ) : previewUrl ? (
@@ -402,7 +402,7 @@ export default function GenerateInvoiceOverlay({
                 className="w-full h-full border-0"
               />
             ) : (
-              <div className="place-self-center text-[12px] text-base-400">
+              <div className="place-self-center text-meta text-base-400">
                 Rendering preview…
               </div>
             )}
@@ -411,7 +411,7 @@ export default function GenerateInvoiceOverlay({
 
         {/* Footer — issue state + outputs */}
         <div className="flex items-center gap-2 px-4 h-[52px] border-t border-base-200 shrink-0">
-          <span className="text-[12px] text-base-500 min-w-0 truncate">
+          <span className="text-meta text-base-500 min-w-0 truncate">
             {imported
               ? "Statement only — the tax invoice for an imported order lives in AutoCount"
               : isIssued

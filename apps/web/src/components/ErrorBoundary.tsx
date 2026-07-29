@@ -71,13 +71,13 @@ export default class ErrorBoundary extends Component<Props, State> {
         role="alert"
       >
         <div className="max-w-md w-full rounded-md border border-border bg-card p-6 text-center">
-          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
             {this.props.area ?? "Carres Portal"}
           </div>
-          <h1 className="text-[20px] font-semibold text-foreground mt-1.5">
+          <h1 className="text-title font-semibold text-foreground mt-1.5">
             This page hit a problem
           </h1>
-          <p className="text-[13px] text-muted-foreground mt-2 leading-relaxed">
+          <p className="text-body text-muted-foreground mt-2 leading-relaxed">
             Nothing you just did was lost — anything already saved is safe. Try again, and if
             it keeps happening, send this screen to the team.
           </p>
@@ -86,7 +86,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             <button
               type="button"
               onClick={this.reset}
-              className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-[12px] font-semibold"
+              className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-meta font-semibold"
               data-testid="error-boundary-retry"
             >
               Try again
@@ -94,7 +94,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             <button
               type="button"
               onClick={() => window.location.assign("/")}
-              className="px-3 py-2 rounded-md border border-border text-[12px] font-semibold"
+              className="px-3 py-2 rounded-md border border-border text-meta font-semibold"
               data-testid="error-boundary-home"
             >
               Back to start
@@ -103,7 +103,7 @@ export default class ErrorBoundary extends Component<Props, State> {
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="px-3 py-2 rounded-md border border-border text-[12px] font-semibold"
+                className="px-3 py-2 rounded-md border border-border text-meta font-semibold"
               >
                 Reload
               </button>
@@ -113,10 +113,10 @@ export default class ErrorBoundary extends Component<Props, State> {
           {/* The message is the one thing that makes a screenshot actionable.
               Collapsed so the screen stays calm for the operator, but present. */}
           <details className="mt-5 text-left">
-            <summary className="text-[11.5px] text-muted-foreground cursor-pointer">
+            <summary className="text-label text-muted-foreground cursor-pointer">
               Technical detail
             </summary>
-            <pre className="mt-2 max-h-40 overflow-auto rounded bg-muted/40 p-2 text-[11px] whitespace-pre-wrap break-words text-muted-foreground">
+            <pre className="mt-2 max-h-40 overflow-auto rounded bg-muted/40 p-2 text-label whitespace-pre-wrap break-words text-muted-foreground">
               {error.message || String(error)}
             </pre>
           </details>

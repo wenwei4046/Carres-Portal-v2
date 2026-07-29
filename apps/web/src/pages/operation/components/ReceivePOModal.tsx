@@ -375,7 +375,7 @@ export default function ReceivePOModal({
       onClose={onClose}
       size="lg"
     >
-      <div className="text-[12px] text-base-600 mb-3.5 font-body">
+      <div className="text-meta text-base-600 mb-3.5 font-body">
         Booking goods from <strong>{supplier?.name ?? "supplier"}</strong> into{" "}
         <strong>{warehouse?.name ?? "warehouse"}</strong>. Check each SKU on this
         delivery: how many arrived good, how many arrived damaged, how many are
@@ -436,17 +436,17 @@ export default function ReceivePOModal({
                 aria-label={`Tick ${l.sku} to receive`}
               />
               <div>
-                <div className="text-[12px] font-body">{l.sku}</div>
+                <div className="text-meta font-body">{l.sku}</div>
                 {variantLabel && (
-                  <div className="text-[10.5px] text-base-700 font-body">
+                  <div className="text-label text-base-700 font-body">
                     {variantLabel}
                   </div>
                 )}
-                <div className="font-mono text-[10px] text-base-500 mt-0.5">
+                <div className="font-mono text-label text-base-500 mt-0.5">
                   Ordered {l.qty} · already received {l.received_qty}
                 </div>
               </div>
-              <div className="font-mono text-[12px] text-right font-semibold">
+              <div className="font-mono text-meta text-right font-semibold">
                 {pending}
               </div>
               <input
@@ -459,7 +459,7 @@ export default function ReceivePOModal({
                   setLine(l.id, parseInt(e.target.value, 10) || 0, pending)
                 }
                 aria-label={`Receive qty for ${l.sku}`}
-                className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] text-right bg-white outline-none focus:border-base-500"
+                className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
               />
               {/* R1: the two inspection numbers. Neither books stock — they
                   keep their qty in Pending delivery until the supplier
@@ -475,7 +475,7 @@ export default function ReceivePOModal({
                 }
                 aria-label={`Damaged qty for ${l.sku}`}
                 data-testid={`receive-damaged-${l.sku}`}
-                className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] text-right bg-white outline-none focus:border-base-500"
+                className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
               />
               <input
                 type="number"
@@ -488,7 +488,7 @@ export default function ReceivePOModal({
                 }
                 aria-label={`Wrong item qty for ${l.sku}`}
                 data-testid={`receive-wrong-${l.sku}`}
-                className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] text-right bg-white outline-none focus:border-base-500"
+                className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
               />
             </label>
 
@@ -501,7 +501,7 @@ export default function ReceivePOModal({
                 className="px-3.5 pb-3 pt-1 bg-base-50/60 grid gap-2"
                 data-testid={`receive-claim-panel-${l.sku}`}
               >
-                <div className="text-[10px] uppercase tracking-[0.12em] text-base-500 font-body">
+                <div className="text-label uppercase tracking-[0.12em] text-base-500 font-body">
                   Supplier claim for this line
                 </div>
 
@@ -522,7 +522,7 @@ export default function ReceivePOModal({
                   <>
                     <div className="flex items-center gap-2 flex-wrap">
                       <label
-                        className="text-[11px] text-base-600 font-body"
+                        className="text-label text-base-600 font-body"
                         htmlFor={`wrong-kind-${l.id}`}
                       >
                         What is wrong with it?
@@ -537,7 +537,7 @@ export default function ReceivePOModal({
                           }))
                         }
                         data-testid={`claim-wrong-kind-${l.sku}`}
-                        className="px-2 py-1 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+                        className="px-2 py-1 border border-base-300 rounded-[4px] text-meta bg-white outline-none focus:border-base-500"
                       >
                         <option value="">Choose…</option>
                         {/* The list follows the product family — Jess's own
@@ -564,7 +564,7 @@ export default function ReceivePOModal({
 
                 {problems.length > 0 && (
                   <div
-                    className="text-[11px] text-danger font-body"
+                    className="text-label text-danger font-body"
                     data-testid={`claim-problems-${l.sku}`}
                   >
                     {problems.join(" · ")}
@@ -580,20 +580,20 @@ export default function ReceivePOModal({
             <button
               type="button"
               onClick={receiveAllPending}
-              className="btn-ghost text-[11px] py-0.5 px-2"
+              className="btn-ghost text-label py-0.5 px-2"
             >
               Receive all pending
             </button>
             <button
               type="button"
               onClick={clearAll}
-              className="btn-ghost text-[11px] py-0.5 px-2"
+              className="btn-ghost text-label py-0.5 px-2"
             >
               Clear
             </button>
           </div>
           <div
-            className="font-mono text-[11px] font-semibold"
+            className="font-mono text-label font-semibold"
             data-testid="receive-po-totals"
           >
             {/* R1: the footer speaks the same three words as the columns —
@@ -608,7 +608,7 @@ export default function ReceivePOModal({
 
       {totalIssue > 0 && (
         <div
-          className="text-[11px] text-base-600 mb-3.5 font-body px-3 py-2 border border-dashed border-base-300 rounded-[4px]"
+          className="text-label text-base-600 mb-3.5 font-body px-3 py-2 border border-dashed border-base-300 rounded-[4px]"
           data-testid="receive-po-issue-note"
         >
           Damaged and wrong-item units are not booked into stock. Their qty stays{" "}
@@ -631,7 +631,7 @@ export default function ReceivePOModal({
             onChange={(e) => setDoNumber(e.target.value)}
             className={INPUT_CLS}
           />
-          <div className="text-[10px] text-base-500 mt-1 font-body">
+          <div className="text-label text-base-500 mt-1 font-body">
             From the signed delivery order accompanying the goods.
           </div>
         </div>
@@ -649,7 +649,7 @@ export default function ReceivePOModal({
           />
         </div>
         <div className="px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] bg-white">
-          <div className="text-[11px] text-base-600 mb-2 font-body">
+          <div className="text-label text-base-600 mb-2 font-body">
             Attach signed DO file{" "}
             <span className="text-base-400">(PDF/JPG/PNG · ≤10 MB)</span>
           </div>
@@ -666,7 +666,7 @@ export default function ReceivePOModal({
             onChange={(e) => setSigned(e.target.checked)}
             className="accent-primary"
           />
-          <span className="text-[12px] font-body">
+          <span className="text-meta font-body">
             Goods inspected and DO signed by warehouse
           </span>
         </label>
@@ -683,7 +683,7 @@ export default function ReceivePOModal({
           className="card p-3.5 mb-3.5 border-base-200"
           data-testid="receive-po-ready-threads-section"
         >
-          <h3 className="text-[10px] uppercase tracking-[0.12em] text-base-500 mb-2 font-body">
+          <h3 className="text-label uppercase tracking-[0.12em] text-base-500 mb-2 font-body">
             Ready threads ({readyThreads.length})
           </h3>
           <div className="grid gap-1">
@@ -700,7 +700,7 @@ export default function ReceivePOModal({
                   className="accent-primary"
                   aria-label={`Tick thread for SO-${t.order_dl}`}
                 />
-                <span className="text-[12px] font-body">
+                <span className="text-meta font-body">
                   SO-{t.order_dl}
                   {t.customer_name ? ` · ${t.customer_name}` : ""}
                 </span>
@@ -712,7 +712,7 @@ export default function ReceivePOModal({
               type="button"
               onClick={submitThreads}
               disabled={!canReceiveThreads}
-              className="btn-primary text-[12px] disabled:opacity-40"
+              className="btn-primary text-meta disabled:opacity-40"
               data-testid="receive-po-receive-threads-btn"
             >
               {receiveThreads.isPending

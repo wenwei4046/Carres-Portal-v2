@@ -38,13 +38,13 @@ export default function PrincipalPartners() {
     <div className="px-9 py-8 pb-14 space-y-6">
       <div>
         <div className="kicker">HQ · Network</div>
-        <h1 className="font-display text-[30px] leading-[1.05] mt-1.5 tracking-tight font-semibold">
+        <h1 className="font-display text-page leading-[1.05] mt-1.5 tracking-tight font-semibold">
           operation Partners
         </h1>
       </div>
 
       <section>
-        <h2 className="text-[15px] font-semibold mb-2.5">
+        <h2 className="text-strong font-semibold mb-2.5">
           Create new LP account
         </h2>
         <CreateLpAccountForm
@@ -55,11 +55,11 @@ export default function PrincipalPartners() {
       </section>
 
       <section>
-        <h2 className="text-[15px] font-semibold mb-2.5">All LPs</h2>
+        <h2 className="text-strong font-semibold mb-2.5">All LPs</h2>
         {isLoading ? (
-          <p className="text-[13px] text-base-600">Loading…</p>
+          <p className="text-body text-base-600">Loading…</p>
         ) : !lps || lps.length === 0 ? (
-          <p className="text-[13px] text-base-500">
+          <p className="text-body text-base-500">
             No operation partners yet.
           </p>
         ) : (
@@ -68,23 +68,23 @@ export default function PrincipalPartners() {
               <li key={lp.id} className="py-3 px-3.5 flex items-baseline gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-3">
-                    <strong className="text-[13px] text-base-900">
+                    <strong className="text-body text-base-900">
                       {lp.name}
                     </strong>
                     {lp.contact && (
-                      <span className="text-[12px] text-base-500">
+                      <span className="text-meta text-base-500">
                         {lp.contact}
                       </span>
                     )}
                   </div>
                   {lp.address && (
-                    <div className="text-[11px] text-base-500 mt-0.5">
+                    <div className="text-label text-base-500 mt-0.5">
                       {lp.address}
                     </div>
                   )}
                 </div>
                 {lp.zones && (
-                  <span className="text-[10px] uppercase tracking-wider text-base-400">
+                  <span className="text-label uppercase tracking-wider text-base-400">
                     {lp.zones}
                   </span>
                 )}

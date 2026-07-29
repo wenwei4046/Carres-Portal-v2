@@ -242,7 +242,7 @@ function PerModelConfig({
         </select>
         {modelId && (
           <>
-            <span className="text-[12px] text-base-500">
+            <span className="text-meta text-base-500">
               RM per unit sold
             </span>
             <input
@@ -258,7 +258,7 @@ function PerModelConfig({
             <Btn size="sm" disabled={setModelRate.isPending} onClick={savePerUnit}>
               Save rate
             </Btn>
-            <span className="text-[11px] text-base-500">
+            <span className="text-label text-base-500">
               Leave empty + Save to remove.
             </span>
           </>
@@ -268,17 +268,17 @@ function PerModelConfig({
       {/* tier ladder for the picked model */}
       {modelId && (
         <div className="border border-base-200 rounded-lg p-3 space-y-2">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-base-500">
+          <div className="text-label font-semibold uppercase tracking-[0.06em] text-base-500">
             Volume tier ladder for this model
           </div>
           {tierDrafts.length === 0 && (
-            <div className="text-[12px] text-base-500">
+            <div className="text-meta text-base-500">
               No tiers yet — add one below.
             </div>
           )}
           {tierDrafts.map((t, i) => (
             <div key={i} className="flex items-center gap-2">
-              <span className="text-[12px] text-base-700">Sell</span>
+              <span className="text-meta text-base-700">Sell</span>
               <input
                 type="number"
                 min={1}
@@ -294,7 +294,7 @@ function PerModelConfig({
                   )
                 }
               />
-              <span className="text-[12px] text-base-700">
+              <span className="text-meta text-base-700">
                 units or more → bonus RM
               </span>
               <input
@@ -348,11 +348,11 @@ function PerModelConfig({
 
       {/* overall milestones */}
       <div className="border border-base-200 rounded-lg p-3 space-y-2">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-base-500">
+        <div className="text-label font-semibold uppercase tracking-[0.06em] text-base-500">
           Overall milestones
         </div>
         {milestoneDrafts.length === 0 && (
-          <div className="text-[12px] text-base-500">
+          <div className="text-meta text-base-500">
             No milestones yet — add one below.
           </div>
         )}
@@ -376,7 +376,7 @@ function PerModelConfig({
                 </option>
               ))}
             </select>
-            <span className="text-[12px] text-base-700">Sell</span>
+            <span className="text-meta text-base-700">Sell</span>
             <input
               type="number"
               min={1}
@@ -392,7 +392,7 @@ function PerModelConfig({
                 )
               }
             />
-            <span className="text-[12px] text-base-700">
+            <span className="text-meta text-base-700">
               units → bonus RM
             </span>
             <input
@@ -449,7 +449,7 @@ function PerModelConfig({
         </div>
       </div>
 
-      <div className="text-[12px] text-base-500">
+      <div className="text-meta text-base-500">
         Highest reached tier pays — tiers do not stack. Example: a{" "}
         {rm(100)} bonus at 5 units and a {rm(300)} bonus at 10 units pay{" "}
         {rm(300)} (not {rm(400)}) when 10 units are sold.
@@ -528,11 +528,11 @@ export default function HrSetupTab({
       ?.method ?? "percentage";
 
   if (isLoading) {
-    return <div className="py-12 text-[13px] text-base-500">Loading commission setup…</div>;
+    return <div className="py-12 text-body text-base-500">Loading commission setup…</div>;
   }
   if (isError || !data || !config) {
     return (
-      <div className="py-12 text-[13px] text-danger">
+      <div className="py-12 text-body text-danger">
         Failed to load commission setup. Refresh to retry.
       </div>
     );
@@ -637,7 +637,7 @@ export default function HrSetupTab({
         {methodOpen && (
           <div className="px-2 py-1">
             {stores.length === 0 && (
-              <div className="py-4 text-[13px] text-base-500">
+              <div className="py-4 text-body text-base-500">
                 No showroom stores with staff yet.
               </div>
             )}
@@ -646,7 +646,7 @@ export default function HrSetupTab({
                 key={store.dealerId}
                 className="h-11 flex items-center justify-between gap-3 border-b border-base-100 last:border-b-0"
               >
-                <div className="text-[13px] font-semibold text-base-900 truncate">
+                <div className="text-body font-semibold text-base-900 truncate">
                   {store.name}
                 </div>
                 <Segmented
@@ -673,7 +673,7 @@ export default function HrSetupTab({
                 />
               </div>
             ))}
-            <div className="py-2 text-[12px] text-base-500">
+            <div className="py-2 text-meta text-base-500">
               The method applies to the whole store. Every store starts on % of
               sales until changed here.
             </div>
@@ -692,7 +692,7 @@ export default function HrSetupTab({
         {ratesOpen && (
           <div className="px-2 py-1">
             {staff.length === 0 && (
-              <div className="py-4 text-[13px] text-base-500">
+              <div className="py-4 text-body text-base-500">
                 No showroom staff yet.
               </div>
             )}
@@ -704,17 +704,17 @@ export default function HrSetupTab({
                   className="h-11 flex items-center gap-3 border-b border-base-100 last:border-b-0"
                 >
                   <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                    <span className="text-[13px] font-semibold text-base-900 truncate">
+                    <span className="text-body font-semibold text-base-900 truncate">
                       {s.name}
                     </span>
                     <span className="pill pill-neutral shrink-0">
                       {STAFF_TIER_LABEL[s.staffRole] ?? s.staffRole}
                     </span>
-                    <span className="text-[11px] text-base-500 truncate">
+                    <span className="text-label text-base-500 truncate">
                       {[s.storeName, s.outletName].filter(Boolean).join(" · ")}
                     </span>
                   </div>
-                  <div className="shrink-0 text-[12px] text-base-500 t-num">
+                  <div className="shrink-0 text-meta text-base-500 t-num">
                     now {pct != null ? `${pct}%` : "—"}
                   </div>
                   <div className="shrink-0 flex items-center gap-1.5">
@@ -731,7 +731,7 @@ export default function HrSetupTab({
                         setRateDraft((d) => ({ ...d, [s.id]: e.target.value }))
                       }
                     />
-                    <span className="text-[12px] text-base-500">%</span>
+                    <span className="text-meta text-base-500">%</span>
                     <Btn
                       size="sm"
                       disabled={
@@ -747,7 +747,7 @@ export default function HrSetupTab({
                 </div>
               );
             })}
-            <div className="py-2 text-[12px] text-base-500">
+            <div className="py-2 text-meta text-base-500">
               A new rate takes effect from today; past months keep the rate that
               was in force. Manager rate above a salesperson's rate earns the
               difference as override.
@@ -782,7 +782,7 @@ export default function HrSetupTab({
           <div className="px-2 py-1">
             {/* 0251 — the ONE global BD calculation method */}
             <div className="h-11 flex items-center justify-between gap-3 border-b border-base-100">
-              <div className="text-[13px] font-semibold text-base-900">
+              <div className="text-body font-semibold text-base-900">
                 Calculation method
               </div>
               <Segmented
@@ -810,7 +810,7 @@ export default function HrSetupTab({
             </div>
 
             {bdUsers.length === 0 && (
-              <div className="py-4 text-[13px] text-base-500">
+              <div className="py-4 text-body text-base-500">
                 No BD accounts yet.
               </div>
             )}
@@ -822,10 +822,10 @@ export default function HrSetupTab({
                   className="h-11 flex items-center gap-3 border-b border-base-100 last:border-b-0"
                 >
                   <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                    <span className="text-[13px] font-semibold text-base-900 truncate">
+                    <span className="text-body font-semibold text-base-900 truncate">
                       {u.name}
                     </span>
-                    <span className="text-[11px] text-base-500 truncate">
+                    <span className="text-label text-base-500 truncate">
                       {u.email}
                     </span>
                   </div>
@@ -841,7 +841,7 @@ export default function HrSetupTab({
                     <option value="executive">BD Executive</option>
                     <option value="cbo">CBO</option>
                   </select>
-                  <div className="shrink-0 text-[12px] text-base-500 t-num">
+                  <div className="shrink-0 text-meta text-base-500 t-num">
                     now {pct != null ? `${pct}%` : "—"}
                   </div>
                   <div className="shrink-0 flex items-center gap-1.5">
@@ -858,7 +858,7 @@ export default function HrSetupTab({
                         setBdRateDraft((d) => ({ ...d, [u.id]: e.target.value }))
                       }
                     />
-                    <span className="text-[12px] text-base-500">%</span>
+                    <span className="text-meta text-base-500">%</span>
                     <Btn
                       size="sm"
                       disabled={
@@ -874,16 +874,16 @@ export default function HrSetupTab({
                 </div>
               );
             })}
-            <div className="py-2 text-[12px] text-base-500">
+            <div className="py-2 text-meta text-base-500">
               A CBO's higher rate earns the difference as override on BD
               Executives' dealer sales.
             </div>
 
-            <div className="pt-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-base-500">
+            <div className="pt-3 pb-1 text-label font-semibold uppercase tracking-[0.06em] text-base-500">
               Dealer portfolio
             </div>
             {dealers.length === 0 && (
-              <div className="py-4 text-[13px] text-base-500">
+              <div className="py-4 text-body text-base-500">
                 No dealer stores yet.
               </div>
             )}
@@ -896,7 +896,7 @@ export default function HrSetupTab({
                   className="h-11 flex items-center gap-3 border-b border-base-100 last:border-b-0"
                 >
                   <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                    <span className="text-[13px] font-semibold text-base-900 truncate">
+                    <span className="text-body font-semibold text-base-900 truncate">
                       {d.name}
                     </span>
                     {d.status && d.status !== "active" && (
@@ -939,14 +939,14 @@ export default function HrSetupTab({
                 </div>
               );
             })}
-            <div className="py-2 text-[12px] text-base-500">
+            <div className="py-2 text-meta text-base-500">
               A BD earns their % on every order the assigned dealers place.
             </div>
 
             {/* 0251 — the BD program's own per-model numbers (item KPI method) */}
             {bdMethod === "per_model" && (
               <>
-                <div className="pt-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-base-500">
+                <div className="pt-3 pb-1 text-label font-semibold uppercase tracking-[0.06em] text-base-500">
                   BD per-model rates & bonuses
                 </div>
                 <div className="py-2">

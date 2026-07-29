@@ -87,15 +87,15 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
     <Modal title="Import SKUs" onClose={onClose}>
       {stage === "pick" && (
         <div className="flex flex-col gap-3">
-          <p className="t-small text-base-600">
+          <p className="text-body text-base-600">
             Upload a <span className="font-semibold">CSV</span> or{" "}
             <span className="font-semibold">Excel (.xlsx)</span> file. Required columns:{" "}
-            <span className="font-mono t-tiny">model</span>,{" "}
-            <span className="font-mono t-tiny">category</span>,{" "}
-            <span className="font-mono t-tiny">variant</span>. Optional:{" "}
-            <span className="font-mono t-tiny">model_key, variant_kind, price, cost, description, pos_active, supplier</span>.
+            <span className="font-mono text-meta">model</span>,{" "}
+            <span className="font-mono text-meta">category</span>,{" "}
+            <span className="font-mono text-meta">variant</span>. Optional:{" "}
+            <span className="font-mono text-meta">model_key, variant_kind, price, cost, description, pos_active, supplier</span>.
           </p>
-          <p className="t-tiny text-base-500">
+          <p className="text-meta text-base-500">
             Rows sharing a model become one product; each row is one SKU under it. A blank cell never
             overwrites existing data, so you can export → edit → re-import safely.
             {!isPrincipal && " Price / cost columns are Master-Admin only."}
@@ -103,7 +103,7 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="btn-primary text-[12px]"
+              className="btn-primary text-meta"
               onClick={() => fileInput.current?.click()}
               data-testid="import-pick-file"
             >
@@ -111,7 +111,7 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
             </button>
             <button
               type="button"
-              className="btn-ghost text-[12px]"
+              className="btn-ghost text-meta"
               onClick={() => downloadCsv("carres-sku-import-template.csv", TEMPLATE)}
               data-testid="import-template"
             >
@@ -130,14 +130,14 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
               e.target.value = ""; // allow re-pick of the same file
             }}
           />
-          {parseError && <p className="t-small text-red-600" data-testid="import-parse-error">{parseError}</p>}
+          {parseError && <p className="text-body text-red-600" data-testid="import-parse-error">{parseError}</p>}
         </div>
       )}
 
       {stage === "preview" && (
         <div className="flex flex-col gap-3">
-          <div className="t-small text-base-700">
-            <span className="font-mono t-tiny">{fileName}</span> ·{" "}
+          <div className="text-body text-base-700">
+            <span className="font-mono text-meta">{fileName}</span> ·{" "}
             <span className="font-semibold text-base-900" data-testid="import-ready-count">{rows.length}</span> ready
             {skipped.length > 0 && (
               <>
@@ -149,8 +149,8 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
 
           {pricingBlocked && (
             <div className="rounded-[4px] border border-amber-300 bg-amber-50 px-3 py-2" data-testid="import-pricing-blocked">
-              <div className="t-small font-semibold text-amber-800">This file sets prices</div>
-              <div className="t-tiny text-amber-700 mt-0.5">
+              <div className="text-body font-semibold text-amber-800">This file sets prices</div>
+              <div className="text-meta text-amber-700 mt-0.5">
                 Only the principal (Master Admin) can import price / cost. Remove those columns, or ask
                 the principal to run this import.
               </div>
@@ -159,7 +159,7 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
 
           {rows.length > 0 && (
             <div className="border border-base-200 rounded-[4px] overflow-hidden">
-              <div className="grid grid-cols-[1.4fr_90px_80px_90px] bg-base-50 t-micro text-base-500 px-2 py-1.5">
+              <div className="grid grid-cols-[1.4fr_90px_80px_90px] bg-base-50 text-label uppercase tracking-[0.05em] text-base-500 px-2 py-1.5">
                 <span>MODEL</span>
                 <span>CATEGORY</span>
                 <span>VARIANT</span>
@@ -169,7 +169,7 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
                 {rows.slice(0, 50).map((r, i) => (
                   <div
                     key={`${r.modelKey}-${r.variant}-${i}`}
-                    className="grid grid-cols-[1.4fr_90px_80px_90px] px-2 py-1 t-tiny border-t border-base-100 items-center"
+                    className="grid grid-cols-[1.4fr_90px_80px_90px] px-2 py-1 text-meta border-t border-base-100 items-center"
                   >
                     <span className="truncate" title={r.model}>{r.model}</span>
                     <span className="text-base-500">{CATEGORY_LABEL[r.category]}</span>
@@ -179,7 +179,7 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
               {rows.length > 50 && (
-                <div className="t-tiny text-base-400 px-2 py-1 border-t border-base-100">
+                <div className="text-meta text-base-400 px-2 py-1 border-t border-base-100">
                   + {rows.length - 50} more…
                 </div>
               )}
@@ -187,7 +187,7 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
           )}
 
           {skipped.length > 0 && (
-            <details className="t-tiny text-base-600">
+            <details className="text-meta text-base-600">
               <summary className="cursor-pointer text-amber-700">{skipped.length} skipped row(s) — why</summary>
               <ul className="mt-1 space-y-0.5 max-h-32 overflow-y-auto">
                 {skipped.slice(0, 50).map((s) => (
@@ -200,14 +200,14 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
           )}
 
           <div className="flex justify-end gap-2 mt-1">
-            <button type="button" onClick={() => setStage("pick")} className="btn-ghost text-[12px]">
+            <button type="button" onClick={() => setStage("pick")} className="btn-ghost text-meta">
               Back
             </button>
             <button
               type="button"
               onClick={confirm}
               disabled={rows.length === 0 || pricingBlocked || importSkus.isPending}
-              className="btn-primary text-[12px] disabled:opacity-40"
+              className="btn-primary text-meta disabled:opacity-40"
               data-testid="import-confirm"
             >
               {importSkus.isPending ? "Working…" : `Import ${rows.length} SKU${rows.length === 1 ? "" : "s"}`}
@@ -219,14 +219,14 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
       {stage === "result" && result && (
         <div className="flex flex-col gap-3" data-testid="import-result">
           <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2.5">
-            <div className="t-h4 text-base-900">{result.upserted} SKU(s) imported</div>
-            <div className="t-small text-base-600 mt-0.5">
+            <div className="text-strong text-base-900">{result.upserted} SKU(s) imported</div>
+            <div className="text-body text-base-600 mt-0.5">
               {result.createdModels} new product{result.createdModels === 1 ? "" : "s"} created
               {result.failed > 0 && <> · <span className="text-red-600 font-semibold">{result.failed} failed</span></>}
             </div>
           </div>
           {result.failures.length > 0 && (
-            <details className="t-tiny text-base-600" open>
+            <details className="text-meta text-base-600" open>
               <summary className="cursor-pointer text-red-600">{result.failed} failed row(s)</summary>
               <ul className="mt-1 space-y-0.5 max-h-40 overflow-y-auto">
                 {result.failures.map((f) => (
@@ -239,7 +239,7 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
             </details>
           )}
           <div className="flex justify-end">
-            <button type="button" className="btn-primary text-[12px]" onClick={onClose} data-testid="import-done">
+            <button type="button" className="btn-primary text-meta" onClick={onClose} data-testid="import-done">
               Done
             </button>
           </div>

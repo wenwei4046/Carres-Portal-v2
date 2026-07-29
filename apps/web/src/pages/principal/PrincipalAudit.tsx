@@ -68,10 +68,10 @@ export default function PrincipalAudit() {
     <div className="px-9 py-8 pb-14">
       <div className="mb-[22px]">
         <div className="kicker">HQ · Compliance</div>
-        <h1 className="font-display text-[30px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-semibold">
+        <h1 className="font-display text-page leading-[1.05] mt-1.5 tracking-[-0.025em] font-semibold">
           Audit log
         </h1>
-        <div className="text-[13px] text-base-600 mt-1.5">
+        <div className="text-body text-base-600 mt-1.5">
           Every meaningful action, every role, immutable timeline.
         </div>
       </div>
@@ -81,7 +81,7 @@ export default function PrincipalAudit() {
           <button
             key={r}
             onClick={() => setRoleFilter(r)}
-            className={`px-3.5 py-1.5 text-[12px] rounded cursor-pointer capitalize ${
+            className={`px-3.5 py-1.5 text-meta rounded cursor-pointer capitalize ${
               roleFilter === r
                 ? "bg-white text-base-900 font-semibold"
                 : "text-base-600 font-medium"
@@ -94,26 +94,26 @@ export default function PrincipalAudit() {
 
       <div className="bg-white border border-base-200 rounded">
         {isLoading && (
-          <div className="p-8 text-center text-[12px] text-base-500">Loading…</div>
+          <div className="p-8 text-center text-meta text-base-500">Loading…</div>
         )}
         {!isLoading && rows.length === 0 && (
-          <div className="p-8 text-center text-[12px] text-base-500">No entries.</div>
+          <div className="p-8 text-center text-meta text-base-500">No entries.</div>
         )}
         {rows.map((e, i) => (
           <div
             key={e.id}
-            className={`px-[18px] py-3 grid gap-3.5 items-center text-[13px] ${i ? "border-t border-base-100" : ""}`}
+            className={`px-[18px] py-3 grid gap-3.5 items-center text-body ${i ? "border-t border-base-100" : ""}`}
             style={{ gridTemplateColumns: "auto 1fr auto" }}
           >
             <RoleChip role={e.role ?? "system"} />
             <div className="min-w-0">
               <div className="text-base-900">{e.action}</div>
-              <div className="text-[11px] text-base-500 mt-0.5">
+              <div className="text-label text-base-500 mt-0.5">
                 {e.actor ?? "—"}
                 {e.ref ? ` · ${e.ref.slice(0, 8)}` : ""}
               </div>
             </div>
-            <div className="font-mono text-[11px] text-base-400 whitespace-nowrap">
+            <div className="font-mono text-label text-base-400 whitespace-nowrap">
               {formatTs(e.occurredAt)}
             </div>
           </div>
@@ -121,7 +121,7 @@ export default function PrincipalAudit() {
       </div>
 
       {rows.length > 0 && (
-        <div className="text-[11px] text-base-500 mt-3 text-right">
+        <div className="text-label text-base-500 mt-3 text-right">
           {rows.length} entries (latest first, max 500).
         </div>
       )}
@@ -133,7 +133,7 @@ function RoleChip({ role }: { role: string }) {
   const color = ROLE_COLORS[role] ?? "#5a5a5a";
   return (
     <span
-      className="inline-block px-2.5 py-[2px] rounded bg-base-100 text-[10.5px] font-semibold uppercase tracking-[0.05em]"
+      className="inline-block px-2.5 py-[2px] rounded bg-base-100 text-label font-semibold uppercase tracking-[0.05em]"
       style={{ color }}
     >
       {role}

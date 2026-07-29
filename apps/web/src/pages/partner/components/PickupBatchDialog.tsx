@@ -54,13 +54,13 @@ export default function PickupBatchDialog({
     >
       <div className="bg-card border border-base-200 rounded-md p-6 max-w-md w-full space-y-4">
         <div>
-          <h2 className="font-display text-[22px] leading-tight">
+          <h2 className="font-display text-title leading-tight">
             Pickup {selectedThreadIds.length} thread(s)
           </h2>
-          <p className="text-[12px] text-base-500 font-mono mt-0.5">
+          <p className="text-meta text-base-500 font-mono mt-0.5">
             PO {poId}
           </p>
-          <p className="text-[11px] text-base-500 mt-2">
+          <p className="text-label text-base-500 mt-2">
             Carres will auto-generate the DO number for this pickup. Click
             Pickup to confirm — no need to enter a number.
           </p>
@@ -69,7 +69,7 @@ export default function PickupBatchDialog({
         <div>
           <label
             htmlFor="pickup-do-note"
-            className="block text-[10px] uppercase tracking-[0.06em] text-base-500 mb-1"
+            className="block text-label uppercase tracking-[0.06em] text-base-500 mb-1"
           >
             Note (optional)
           </label>
@@ -78,7 +78,7 @@ export default function PickupBatchDialog({
             value={doNote}
             onChange={(e) => setDoNote(e.target.value)}
             placeholder="e.g. driver name, plate, condition"
-            className="w-full border border-base-300 rounded px-3 py-2 text-sm h-20 bg-white outline-none focus:border-primary resize-y"
+            className="w-full border border-base-300 rounded px-3 py-2 text-body h-20 bg-white outline-none focus:border-primary resize-y"
           />
         </div>
 
@@ -86,7 +86,7 @@ export default function PickupBatchDialog({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-base-300 rounded bg-white text-base-700"
+            className="px-4 py-2 text-body border border-base-300 rounded bg-white text-base-700"
           >
             Cancel
           </button>
@@ -94,7 +94,7 @@ export default function PickupBatchDialog({
             type="button"
             disabled={selectedThreadIds.length === 0 || pickup.isPending}
             onClick={handleSubmit}
-            className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded disabled:opacity-50"
+            className="px-4 py-2 text-body bg-primary text-primary-foreground rounded disabled:opacity-50"
             data-testid="pickup-batch-submit"
           >
             {pickup.isPending ? "Submitting…" : "Pickup"}

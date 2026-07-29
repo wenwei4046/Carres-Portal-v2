@@ -82,7 +82,7 @@ export default function GlobalActivity() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search order, customer, or staff…"
-          className="w-full text-[12px] bg-transparent outline-none placeholder-base-400"
+          className="w-full text-meta bg-transparent outline-none placeholder-base-400"
         />
       </div>
 
@@ -104,7 +104,7 @@ export default function GlobalActivity() {
       {/* Staff filter */}
       {staffNames.length > 1 && (
         <div className="flex flex-wrap items-center gap-1 mb-2">
-          <span className="text-[10px] text-base-400 mr-0.5">Staff</span>
+          <span className="text-label text-base-400 mr-0.5">Staff</span>
           <Chip label="Everyone" active={staff === "all"} onClick={() => setStaff("all")} subtle />
           {staffNames.map((n) => (
             <Chip key={n} label={n} active={staff === n} onClick={() => setStaff(n)} subtle />
@@ -113,9 +113,9 @@ export default function GlobalActivity() {
       )}
 
       {isLoading ? (
-        <div className="text-[12px] text-base-400 py-2">Loading…</div>
+        <div className="text-meta text-base-400 py-2">Loading…</div>
       ) : filtered.length === 0 ? (
-        <div className="text-[12px] text-base-500 py-4 text-center">Nothing matches.</div>
+        <div className="text-meta text-base-500 py-4 text-center">Nothing matches.</div>
       ) : (
         <div className="bg-white border border-base-200 rounded-[8px] px-3 py-1">
           {today.length > 0 && <DayGroup label="Today" items={today} onOpen={setActiveOrder} />}
@@ -147,7 +147,7 @@ function DayGroup({
 }) {
   return (
     <>
-      <div className="text-[10px] uppercase tracking-[0.05em] text-base-400 pt-2 pb-0.5">
+      <div className="text-label uppercase tracking-[0.05em] text-base-400 pt-2 pb-0.5">
         {label}
       </div>
       {items.map((d) => (
@@ -173,13 +173,13 @@ function FeedRow({ d, onOpen }: { d: Decorated; onOpen: (orderId: string | null)
         <IconChip category={category} size={26} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-[12px] text-base-800 leading-snug truncate">
+        <div className="text-meta text-base-800 leading-snug truncate">
           <span className={category === "exception" ? "font-medium text-red-700" : "font-medium"}>
             {title}
           </span>
           {body ? <span className="text-base-600"> — {body}</span> : null}
         </div>
-        <div className="text-[11px] text-base-500 truncate">
+        <div className="text-label text-base-500 truncate">
           {row.so ? <span className="font-medium text-base-700">SO-{row.so}</span> : "—"}
           {row.customer_name ? ` · ${row.customer_name}` : ""}
           {row.actor_name ? ` · ${row.actor_name}` : ""}

@@ -217,8 +217,8 @@ export default function OperationStockOnHand() {
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <div className="kicker">HQ · Operations · Carres Klang</div>
-          <h1 className="t-h1 font-display mt-1.5">On Hand</h1>
-          <div className="text-[13px] text-base-600 mt-1.5">
+          <h1 className="text-page font-display mt-1.5">On Hand</h1>
+          <div className="text-body text-base-600 mt-1.5">
             Every physical unit at Carres Klang, tracked by Unit ID.
           </div>
         </div>
@@ -228,14 +228,14 @@ export default function OperationStockOnHand() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="SKU / ref / PO…"
-              className="rounded border border-base-300 pl-3 pr-8 py-2 text-sm w-64 focus:border-primary focus:outline-none"
+              className="rounded border border-base-300 pl-3 pr-8 py-2 text-body w-64 focus:border-primary focus:outline-none"
               aria-label="Search stock"
             />
             {q ? (
               <button
                 type="button"
                 onClick={() => setQ("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-base-400 hover:text-base-700 text-sm"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-base-400 hover:text-base-700 text-body"
                 aria-label="Clear search"
               >
                 ×
@@ -245,7 +245,7 @@ export default function OperationStockOnHand() {
           <button
             type="button"
             onClick={() => setShowImport(true)}
-            className="btn-secondary text-[12px] py-2 whitespace-nowrap"
+            className="btn-secondary text-meta py-2 whitespace-nowrap"
             data-testid="onhand-import-open"
           >
             Import sheet
@@ -265,19 +265,19 @@ export default function OperationStockOnHand() {
       <ReorderStockCard />
 
       {invQ.isLoading ? (
-        <p className="text-sm text-base-500">Loading…</p>
+        <p className="text-body text-base-500">Loading…</p>
       ) : invQ.isError ? (
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-2">
             Couldn&rsquo;t load stock
           </div>
-          <div className="text-[12px] text-base-700 mb-3">
+          <div className="text-meta text-base-700 mb-3">
             {(invQ.error as Error | undefined)?.message ?? "Unknown error"}
           </div>
           <button
             type="button"
             onClick={() => void invQ.refetch()}
-            className="btn-secondary text-[11px] py-1.5 px-3"
+            className="btn-secondary text-label py-1.5 px-3"
           >
             Retry
           </button>
@@ -391,7 +391,7 @@ export default function OperationStockOnHand() {
               <button
                 type="button"
                 onClick={clearAll}
-                className="text-[11px] text-base-500 hover:text-primary underline pl-1"
+                className="text-label text-base-500 hover:text-primary underline pl-1"
               >
                 Clear filters
               </button>
@@ -401,7 +401,7 @@ export default function OperationStockOnHand() {
           {/* LIST — reuse the per-unit table + all shipped actions/mutations. */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-[12px] text-base-500">
+              <div className="text-meta text-base-500">
                 Showing{" "}
                 <span className="font-semibold text-base-800">
                   {filtered.length}
@@ -449,8 +449,8 @@ function MetricRow({
 }) {
   return (
     <div className="flex items-baseline justify-between">
-      <span className="text-[12px] text-base-600">{label}</span>
-      <span className={`text-[15px] font-semibold ${tone ?? "text-base-900"}`}>
+      <span className="text-meta text-base-600">{label}</span>
+      <span className={`text-strong font-semibold ${tone ?? "text-base-900"}`}>
         {n}
       </span>
     </div>
@@ -459,7 +459,7 @@ function MetricRow({
 
 function RailLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[10px] font-semibold uppercase tracking-[0.03em] text-base-400">
+    <div className="text-label font-semibold uppercase tracking-[0.03em] text-base-400">
       {children}
     </div>
   );
@@ -495,7 +495,7 @@ function FilterPill({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center justify-between gap-2 rounded px-2 py-1 text-[12px] text-left transition-colors ${
+      className={`flex items-center justify-between gap-2 rounded px-2 py-1 text-meta text-left transition-colors ${
         active
           ? "bg-primary text-white font-medium"
           : "text-base-700 hover:bg-base-100"
@@ -504,7 +504,7 @@ function FilterPill({
       <span className="truncate">{label}</span>
       {n !== undefined ? (
         <span
-          className={`text-[10px] font-mono ${
+          className={`text-label font-mono ${
             active ? "text-white/80" : "text-base-400"
           }`}
         >
@@ -536,12 +536,12 @@ function AttnChip({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center justify-between gap-2 rounded border px-2 py-1 text-[12px] transition-colors ${
+      className={`flex items-center justify-between gap-2 rounded border px-2 py-1 text-meta transition-colors ${
         active ? "ring-2 ring-primary/40 " + toneCls : toneCls + " hover:brightness-95"
       }`}
     >
       <span>{label}</span>
-      <span className="text-[11px] font-mono font-semibold">{n}</span>
+      <span className="text-label font-mono font-semibold">{n}</span>
     </button>
   );
 }

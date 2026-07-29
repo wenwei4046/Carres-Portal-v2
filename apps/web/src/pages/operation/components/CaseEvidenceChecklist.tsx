@@ -47,7 +47,7 @@ export default function CaseEvidenceChecklist({
 
   if (checklist.length === 0) {
     return (
-      <p className="text-sm text-base-500">
+      <p className="text-body text-base-500">
         Answer what is wrong first — it decides which photos to take.
       </p>
     );
@@ -120,26 +120,26 @@ function EvidenceRow({
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-base-900">
+          <p className="text-body font-medium text-base-900">
             {req.label}
             {req.minCount > 1 && (
-              <span className="t-tiny ml-1.5 text-base-500">
+              <span className="text-meta ml-1.5 text-base-500">
                 {have} of {req.minCount}
               </span>
             )}
             {!req.required && (
-              <span className="t-tiny ml-1.5 text-base-500">If you have it</span>
+              <span className="text-meta ml-1.5 text-base-500">If you have it</span>
             )}
           </p>
-          <p className="t-tiny mt-0.5 text-base-600">{req.instruction}</p>
-          {error && <p className="t-tiny mt-1 text-error-700">{error}</p>}
+          <p className="text-meta mt-0.5 text-base-600">{req.instruction}</p>
+          {error && <p className="text-meta mt-1 text-error-700">{error}</p>}
         </div>
 
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={busy}
-          className="btn-secondary flex shrink-0 items-center gap-1 py-1 text-[12px] disabled:opacity-40"
+          className="btn-secondary flex shrink-0 items-center gap-1 py-1 text-meta disabled:opacity-40"
         >
           {req.kind === "video" ? <Video size={13} /> : <Camera size={13} />}
           {busy ? "Uploading…" : `${done ? "Add another" : "Upload"} ${req.kind}`}

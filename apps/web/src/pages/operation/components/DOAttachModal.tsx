@@ -200,7 +200,7 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
 
   return (
     <Modal title={`Attach Delivery Order · #${order.so}`} onClose={onClose}>
-      <div className="text-[12px] text-base-600 mb-3.5 font-body">
+      <div className="text-meta text-base-600 mb-3.5 font-body">
         Once attached, the order moves to <strong>Delivered</strong> and{" "}
         {itemCount} item{itemCount === 1 ? "" : "s"} will be deducted from{" "}
         <strong>{warehouse?.name ?? "the source warehouse"}</strong>.
@@ -209,7 +209,7 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
       <div className="grid gap-3 mb-4">
         <div>
           <span className="label mb-1.5 block">DO number</span>
-          <div className="font-mono text-[13px] font-semibold text-base-900">
+          <div className="font-mono text-body font-semibold text-base-900">
             {doNumber}
           </div>
         </div>
@@ -227,7 +227,7 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
           />
         </div>
         <div className="px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] bg-white">
-          <div className="text-[11px] text-base-600 mb-2 font-body">
+          <div className="text-label text-base-600 mb-2 font-body">
             Attach signed DO file *{" "}
             <span className="text-base-400">(PDF/JPG/PNG · ≤10 MB)</span>
           </div>
@@ -237,12 +237,12 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
             onChange={handleFileChange}
             disabled={uploading || attach.isPending}
             aria-label="DO file"
-            className="block w-full text-[12px]"
+            className="block w-full text-meta"
             data-testid="do-file-input"
           />
           {uploadName && (
             <p
-              className="text-[11px] text-base-600 mt-1.5 font-body"
+              className="text-label text-base-600 mt-1.5 font-body"
               data-testid="do-file-status"
             >
               {uploading
@@ -254,7 +254,7 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
           )}
           {uploadError && (
             <p
-              className="text-[11px] text-destructive mt-1.5"
+              className="text-label text-destructive mt-1.5"
               data-testid="do-file-error"
             >
               {uploadError}
@@ -273,7 +273,7 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
             className={INPUT_CLS}
             data-testid="do-signer-name"
           />
-          <div className="text-[11px] text-base-600 mt-2.5 mb-1.5 font-body">
+          <div className="text-label text-base-600 mt-2.5 mb-1.5 font-body">
             Customer signature *
           </div>
           <SignaturePad

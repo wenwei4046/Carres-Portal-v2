@@ -58,13 +58,13 @@ export default function Me() {
           <div className="flex items-center gap-2">
             <Link
               to={homeForRole(role)}
-              className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+              className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-body font-medium hover:bg-accent hover:text-accent-foreground"
             >
               ← Back to dashboard
             </Link>
             <button
               onClick={handleSignOut}
-              className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+              className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-body font-medium hover:bg-accent hover:text-accent-foreground"
             >
               Sign out
             </button>
@@ -72,10 +72,10 @@ export default function Me() {
         </header>
 
         <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="mb-4 text-body font-semibold uppercase tracking-wider text-muted-foreground">
             Browser session (Supabase JWT)
           </h2>
-          <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 font-mono text-sm">
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 font-mono text-body">
             <dt className="text-muted-foreground">user.id</dt>
             <dd className="break-all">{user?.id ?? "—"}</dd>
             <dt className="text-muted-foreground">user.email</dt>
@@ -86,15 +86,15 @@ export default function Me() {
         <ChangePasswordCard email={user?.email ?? ""} />
 
         <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="mb-4 text-body font-semibold uppercase tracking-wider text-muted-foreground">
             GET /api/auth/me (Hono → JWT verify → response)
           </h2>
-          {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {loading && <p className="text-body text-muted-foreground">Loading…</p>}
           {error && (
-            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+            <p className="rounded-md bg-destructive/10 px-3 py-2 text-body text-destructive">{error}</p>
           )}
           {me && (
-            <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 font-mono text-sm">
+            <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 font-mono text-body">
               <dt className="text-muted-foreground">role</dt>
               <dd className="font-semibold text-primary">{me.role}</dd>
               <dt className="text-muted-foreground">dealerId</dt>
@@ -173,10 +173,10 @@ function ChangePasswordCard({ email }: { email: string }) {
 
   return (
     <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
-      <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+      <h2 className="mb-1 text-body font-semibold uppercase tracking-wider text-muted-foreground">
         Change password
       </h2>
-      <p className="mb-4 text-xs text-muted-foreground">
+      <p className="mb-4 text-meta text-muted-foreground">
         Rotate your own password. We verify your current password before applying the change.
       </p>
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -200,12 +200,12 @@ function ChangePasswordCard({ email }: { email: string }) {
           autoComplete="new-password"
         />
         {error && (
-          <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <div className="rounded-md bg-destructive/10 px-3 py-2 text-body text-destructive">
             {error}
           </div>
         )}
         {success && (
-          <div className="rounded-md bg-success-soft px-3 py-2 text-sm text-success">
+          <div className="rounded-md bg-success-soft px-3 py-2 text-body text-success">
             Password updated. Use your new password next time you sign in.
           </div>
         )}
@@ -213,7 +213,7 @@ function ChangePasswordCard({ email }: { email: string }) {
           <button
             type="submit"
             disabled={busy}
-            className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-body font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {busy ? "Updating…" : "Update password"}
           </button>
@@ -239,7 +239,7 @@ function PwField({
   const [show, setShow] = useState(false);
   return (
     <div>
-      <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <label className="mb-1 block text-meta font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </label>
       <div className="flex items-center gap-2">
@@ -248,17 +248,17 @@ function PwField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           autoComplete={autoComplete}
-          className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary"
+          className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-body outline-none focus:border-primary"
         />
         <button
           type="button"
           onClick={() => setShow((s) => !s)}
-          className="h-9 px-3 text-xs font-medium text-muted-foreground border border-input rounded-md hover:bg-accent cursor-pointer"
+          className="h-9 px-3 text-meta font-medium text-muted-foreground border border-input rounded-md hover:bg-accent cursor-pointer"
         >
           {show ? "Hide" : "Show"}
         </button>
       </div>
-      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+      {hint && <p className="mt-1 text-meta text-muted-foreground">{hint}</p>}
     </div>
   );
 }

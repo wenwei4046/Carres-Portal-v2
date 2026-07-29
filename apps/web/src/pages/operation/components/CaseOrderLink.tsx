@@ -35,7 +35,7 @@ export default function CaseOrderLink({
 
   if (!orderId) {
     return (
-      <span className={compact ? "text-[12px] text-base-400" : "text-sm text-base-400"}>
+      <span className={compact ? "text-meta text-base-400" : "text-body text-base-400"}>
         Not linked to an order
       </span>
     );
@@ -51,7 +51,7 @@ export default function CaseOrderLink({
         navigate(`/operation/orders?order=${encodeURIComponent(orderId)}`);
       }}
       className={`inline-flex items-center gap-1 text-info hover:underline ${
-        compact ? "text-[12px]" : "text-sm"
+        compact ? "text-meta" : "text-body"
       }`}
     >
       {typeof so === "number" ? `SO-${so}` : "Open order"}

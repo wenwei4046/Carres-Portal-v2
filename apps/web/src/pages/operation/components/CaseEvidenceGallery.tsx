@@ -78,14 +78,14 @@ export default function CaseEvidenceGallery({
 
   return (
     <div className="rounded border border-base-200 bg-base-50 p-3">
-      <p className="t-tiny uppercase tracking-wider text-base-500">
+      <p className="text-meta uppercase tracking-wider text-base-500">
         Evidence{files.length > 0 ? ` · ${files.length}` : ""}
       </p>
 
       {q.isLoading ? (
-        <p className="mt-2 text-sm text-base-500">Loading…</p>
+        <p className="mt-2 text-body text-base-500">Loading…</p>
       ) : files.length === 0 ? (
-        <p className="mt-2 text-sm text-base-600">
+        <p className="mt-2 text-body text-base-600">
           No photos on this case. It was filed before photos became part of opening one.
         </p>
       ) : (
@@ -111,11 +111,11 @@ export default function CaseEvidenceGallery({
                 </span>
               )}
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm text-base-800">
+                <span className="block truncate text-body text-base-800">
                   {caseEvidenceSlotLabel(f.slot)}
                 </span>
                 {/* The card's own ask: who uploaded it, and when. */}
-                <span className="t-tiny block text-base-500">
+                <span className="text-meta block text-base-500">
                   {f.byRole || "unknown"} · {stamp(f.at)}
                 </span>
               </span>
@@ -130,7 +130,7 @@ export default function CaseEvidenceGallery({
             value={addSlot}
             onChange={(e) => setAddSlot(e.target.value as CaseEvidenceSlotKey | "")}
             aria-label="What kind of photo to add"
-            className="rounded border border-base-300 bg-white px-2 py-1 text-[13px]"
+            className="rounded border border-base-300 bg-white px-2 py-1 text-body"
           >
             <option value="">— add a photo —</option>
             {slots.map((s) => (
@@ -143,7 +143,7 @@ export default function CaseEvidenceGallery({
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={!addSlot || busy}
-            className="btn-secondary py-1 text-[12px] disabled:opacity-40"
+            className="btn-secondary py-1 text-meta disabled:opacity-40"
           >
             {busy ? "Uploading…" : `Upload ${addSlot ? (caseEvidenceSlot(addSlot)?.kind ?? "photo") : "photo"}`}
           </button>
@@ -160,7 +160,7 @@ export default function CaseEvidenceGallery({
         </div>
       )}
 
-      {error && <p className="t-tiny mt-1.5 text-error-700">{error}</p>}
+      {error && <p className="text-meta mt-1.5 text-error-700">{error}</p>}
     </div>
   );
 }

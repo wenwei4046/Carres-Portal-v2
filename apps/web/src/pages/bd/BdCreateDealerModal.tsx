@@ -25,17 +25,17 @@ import { ColorDotPicker, ModalShell, tierLabel } from "@/pages/dealer/staff/staf
  */
 
 const inputCls =
-  "w-full px-3 py-2.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
+  "w-full px-3 py-2.5 border border-base-200 rounded text-body bg-white outline-none focus:border-base-700";
 const pinCls =
-  "w-full px-3 py-2.5 border border-base-200 rounded text-[15px] tracking-[0.4em] font-mono bg-white outline-none focus:border-base-700";
+  "w-full px-3 py-2.5 border border-base-200 rounded text-strong tracking-[0.4em] font-mono bg-white outline-none focus:border-base-700";
 const btnGhost =
-  "px-4 py-[9px] text-[13px] font-semibold text-base-600 rounded hover:bg-base-100 cursor-pointer disabled:opacity-50";
+  "px-4 py-[9px] text-body font-semibold text-base-600 rounded hover:bg-base-100 cursor-pointer disabled:opacity-50";
 const btnSolid =
-  "px-[18px] py-[9px] bg-base-900 text-white text-[13px] font-semibold rounded hover:bg-base-800 cursor-pointer disabled:opacity-50";
+  "px-[18px] py-[9px] bg-base-900 text-white text-body font-semibold rounded hover:bg-base-800 cursor-pointer disabled:opacity-50";
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
+    <span className="text-label font-semibold uppercase tracking-[0.08em] text-base-700">
       {children}
     </span>
   );
@@ -43,7 +43,7 @@ function Label({ children }: { children: React.ReactNode }) {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-base-500 border-b border-base-100 pb-1.5 mt-1">
+    <div className="text-label font-semibold uppercase tracking-[0.1em] text-base-500 border-b border-base-100 pb-1.5 mt-1">
       {children}
     </div>
   );
@@ -234,7 +234,7 @@ export default function BdCreateDealerModal({ onClose }: { onClose: () => void }
           onChange={setOutletName}
           placeholder="e.g. Mont Kiara"
         />
-        <span className="text-[11px] text-base-500">
+        <span className="text-label text-base-500">
           {outletName.trim()
             ? `Saved as "${carresLocationName(outletName) || "Carres …"}"`
             : "Blank falls back to the company name"}
@@ -292,7 +292,7 @@ export default function BdCreateDealerModal({ onClose }: { onClose: () => void }
         </label>
       </div>
       {password2.length >= 8 && password !== password2 && (
-        <div className="text-[12px] text-destructive">Passwords don&apos;t match.</div>
+        <div className="text-meta text-destructive">Passwords don&apos;t match.</div>
       )}
 
       <SectionTitle>First staff &amp; PIN</SectionTitle>
@@ -400,11 +400,11 @@ export default function BdCreateDealerModal({ onClose }: { onClose: () => void }
         </label>
       </div>
       {stPin2.length === 6 && stPin !== stPin2 && (
-        <div className="text-[12px] text-destructive">PINs don&apos;t match.</div>
+        <div className="text-meta text-destructive">PINs don&apos;t match.</div>
       )}
 
       {create.isError && (
-        <div className="text-[12px] text-destructive" data-testid="bd-cd-error">
+        <div className="text-meta text-destructive" data-testid="bd-cd-error">
           {create.error?.message ?? "Could not create the dealer account"}
         </div>
       )}

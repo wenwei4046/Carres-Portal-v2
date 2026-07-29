@@ -49,20 +49,20 @@ export default function FinanceRecon() {
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="flex items-end justify-between gap-4 flex-wrap mb-7">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
             Finance · Books
           </div>
-          <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
+          <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
             Reconciliation
           </h1>
-          <div className="text-[13px] text-muted-foreground">
+          <div className="text-body text-muted-foreground">
             Match bank statement lines to ledger
           </div>
         </div>
         <button
           type="button"
           onClick={() => setImportOpen(true)}
-          className="px-3 py-2 rounded-md border border-border bg-background text-[12px] font-semibold"
+          className="px-3 py-2 rounded-md border border-border bg-background text-meta font-semibold"
         >
           Import statement
         </button>
@@ -77,7 +77,7 @@ export default function FinanceRecon() {
 
       <div className="bg-card rounded-md border border-border overflow-auto">
         <div
-          className="grid items-center px-4 py-2.5 bg-muted/40 border-b border-border text-[10px] uppercase tracking-[0.06em] font-bold text-muted-foreground"
+          className="grid items-center px-4 py-2.5 bg-muted/40 border-b border-border text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground"
           style={{ gridTemplateColumns: "100px 1.6fr 130px 130px 140px", minWidth: 760 }}
         >
           <span>Date</span>
@@ -88,9 +88,9 @@ export default function FinanceRecon() {
         </div>
 
         {lines.isLoading ? (
-          <div className="p-12 text-center text-[12.5px] text-muted-foreground">Loading…</div>
+          <div className="p-12 text-center text-meta text-muted-foreground">Loading…</div>
         ) : rows.length === 0 ? (
-          <div className="p-12 text-center text-[12.5px] text-muted-foreground">
+          <div className="p-12 text-center text-meta text-muted-foreground">
             No bank statement lines. Click Import statement to add one manually.
           </div>
         ) : (
@@ -105,7 +105,7 @@ export default function FinanceRecon() {
         )}
       </div>
 
-      <div className="mt-3.5 px-4 py-3 bg-muted/30 rounded-md text-[11.5px] text-muted-foreground flex gap-3">
+      <div className="mt-3.5 px-4 py-3 bg-muted/30 rounded-md text-label text-muted-foreground flex gap-3">
         <span>💡</span>
         <span>
           Auto-match runs nightly using FPX customer reference + amount. Unmatched lines need a finance person to manually link them — usually customer transferred without quoting their SO number.
@@ -129,7 +129,7 @@ export default function FinanceRecon() {
       )}
 
       {lines.error && (
-        <div className="mt-5 p-3 text-[12px] rounded-md bg-destructive/5 text-destructive border border-destructive/30">
+        <div className="mt-5 p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
           Failed to load bank statements: {String(lines.error)}
         </div>
       )}
@@ -149,16 +149,16 @@ function ReconRow({
 
   return (
     <div
-      className="grid items-center px-4 py-3 border-b border-border text-[12.5px]"
+      className="grid items-center px-4 py-3 border-b border-border text-meta"
       style={{ gridTemplateColumns: "100px 1.6fr 130px 130px 140px", minWidth: 760 }}
     >
-      <span className="font-mono text-[11px] text-muted-foreground">{row.statement_date.slice(5)}</span>
+      <span className="font-mono text-label text-muted-foreground">{row.statement_date.slice(5)}</span>
       <span>{row.description}</span>
-      <span className={`font-mono text-right font-bold ${positive ? "text-success" : "text-primary"}`}>
+      <span className={`font-mono text-right font-semibold ${positive ? "text-success" : "text-primary"}`}>
         {positive ? "+" : ""}{rm(Math.abs(row.amount)).replace("RM ", "")}
       </span>
       <span>
-        <span className={`px-2 py-0.5 rounded text-[10.5px] font-bold ${tone}`}>
+        <span className={`px-2 py-0.5 rounded text-label font-semibold ${tone}`}>
           {row.matched_ref ?? "Unmatched"}
         </span>
       </span>
@@ -167,7 +167,7 @@ function ReconRow({
           <button
             type="button"
             onClick={onOpen}
-            className="text-[11px] px-2.5 py-1 rounded border border-border bg-background hover:bg-muted/40"
+            className="text-label px-2.5 py-1 rounded border border-border bg-background hover:bg-muted/40"
           >
             Open
           </button>
@@ -175,7 +175,7 @@ function ReconRow({
           <button
             type="button"
             onClick={onMatch}
-            className="text-[11px] px-2.5 py-1 rounded bg-primary text-primary-foreground font-semibold"
+            className="text-label px-2.5 py-1 rounded bg-primary text-primary-foreground font-semibold"
           >
             Match…
           </button>
@@ -219,26 +219,26 @@ function MatchModal({
         aria-label="Match bank line"
         className="relative w-[480px] max-w-[92vw] p-6 rounded-md bg-card shadow-2xl"
       >
-        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Reconciliation</div>
-        <div className="font-display text-[20px] mt-1">Match bank line</div>
-        <div className="text-[12px] text-muted-foreground mt-1.5 mb-4">
+        <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Reconciliation</div>
+        <div className="font-display text-title mt-1">Match bank line</div>
+        <div className="text-meta text-muted-foreground mt-1.5 mb-4">
           {line.description} ·{" "}
           <span className={`font-mono font-semibold ${line.amount > 0 ? "text-success" : "text-primary"}`}>
             {line.amount > 0 ? "+" : ""}RM {Math.abs(line.amount).toFixed(2)}
           </span>
         </div>
 
-        <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1.5">
+        <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1.5">
           Suggested matches
         </div>
 
         <div className="flex flex-col gap-1.5 mb-4 max-h-[320px] overflow-auto">
           {suggest.isLoading ? (
-            <div className="p-3 text-[12px] text-muted-foreground text-center border border-dashed border-border rounded">
+            <div className="p-3 text-meta text-muted-foreground text-center border border-dashed border-border rounded">
               Loading candidates…
             </div>
           ) : candidates.length === 0 ? (
-            <div className="p-3 text-[12px] text-muted-foreground text-center border border-dashed border-border rounded">
+            <div className="p-3 text-meta text-muted-foreground text-center border border-dashed border-border rounded">
               No open invoices to match against.
             </div>
           ) : (
@@ -250,7 +250,7 @@ function MatchModal({
           <button
             type="button"
             onClick={onCancel}
-            className="px-3 py-2 rounded-md border border-border text-[12.5px]"
+            className="px-3 py-2 rounded-md border border-border text-meta"
           >
             Cancel
           </button>
@@ -258,7 +258,7 @@ function MatchModal({
             type="button"
             onClick={submit}
             disabled={pick === null || createRec.isPending}
-            className="px-3 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-[12.5px] disabled:opacity-60"
+            className="px-3 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-meta disabled:opacity-60"
           >
             {createRec.isPending ? "Matching…" : "Confirm match"}
           </button>
@@ -293,10 +293,10 @@ function CandidateRow({
         className="accent-primary"
       />
       <div className="flex-1 min-w-0">
-        <div className="font-mono text-[12px] font-semibold">{c.invoice_no}</div>
-        <div className="text-[11px] text-muted-foreground truncate">{c.customer_name}</div>
+        <div className="font-mono text-meta font-semibold">{c.invoice_no}</div>
+        <div className="text-label text-muted-foreground truncate">{c.customer_name}</div>
       </div>
-      <div className={`font-mono text-[12px] font-semibold ${close ? "text-success" : "text-foreground"}`}>
+      <div className={`font-mono text-meta font-semibold ${close ? "text-success" : "text-foreground"}`}>
         {rm(c.outstanding)}
       </div>
     </label>
@@ -317,14 +317,14 @@ function OpenMatchModal({
         aria-label="Matched bank line"
         className="relative w-[420px] max-w-[92vw] p-6 rounded-md bg-card shadow-2xl"
       >
-        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Reconciliation</div>
-        <div className="font-display text-[20px] mt-1 mb-4">Matched line</div>
-        <div className="grid gap-2 text-[13px]">
+        <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Reconciliation</div>
+        <div className="font-display text-title mt-1 mb-4">Matched line</div>
+        <div className="grid gap-2 text-body">
           <Row k="Bank line"   v={line.id.slice(0, 8)} />
           <Row k="Date"        v={line.statement_date} />
           <Row k="Description" v={line.description} />
           <Row k="Amount"      v={
-            <span className={`font-mono font-bold ${line.amount > 0 ? "text-success" : "text-primary"}`}>
+            <span className={`font-mono font-semibold ${line.amount > 0 ? "text-success" : "text-primary"}`}>
               {line.amount > 0 ? "+" : ""}RM {Math.abs(line.amount).toFixed(2)}
             </span>
           } />
@@ -334,7 +334,7 @@ function OpenMatchModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-[12.5px]"
+            className="px-3 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-meta"
           >
             Close
           </button>
@@ -390,28 +390,28 @@ function ImportStatementModal({ onClose }: { onClose: () => void }) {
         aria-label="Import bank statement line"
         className="relative w-[440px] max-w-[92vw] p-6 rounded-md bg-card shadow-2xl"
       >
-        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Reconciliation</div>
-        <div className="font-display text-[20px] mt-1 mb-4">Import statement line</div>
+        <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Reconciliation</div>
+        <div className="font-display text-title mt-1 mb-4">Import statement line</div>
 
-        <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Statement date</div>
+        <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Statement date</div>
         <input
           type="date"
           aria-label="Statement date"
           value={statementDate}
           onChange={(e) => setStatementDate(e.target.value)}
-          className="w-full px-2.5 py-1.5 border border-border rounded text-[12.5px] mb-3 bg-background"
+          className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-3 bg-background"
         />
 
-        <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Description</div>
+        <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Description</div>
         <input
           aria-label="Description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="e.g. FPX TRF · Tan Mei Ling"
-          className="w-full px-2.5 py-1.5 border border-border rounded text-[12.5px] mb-3 bg-background"
+          className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-3 bg-background"
         />
 
-        <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">
+        <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">
           Amount (positive = inflow, negative = outflow)
         </div>
         <input
@@ -420,19 +420,19 @@ function ImportStatementModal({ onClose }: { onClose: () => void }) {
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="5970"
-          className="w-full px-2.5 py-1.5 border border-border rounded text-[12.5px] mb-3 bg-background"
+          className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-3 bg-background"
         />
 
-        <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Reference (optional)</div>
+        <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Reference (optional)</div>
         <input
           aria-label="Reference"
           value={reference}
           onChange={(e) => setReference(e.target.value)}
           placeholder="FPX-8821"
-          className="w-full px-2.5 py-1.5 border border-border rounded text-[12.5px] mb-4 bg-background"
+          className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-4 bg-background"
         />
 
-        <div className="text-[11.5px] text-muted-foreground mb-3 px-3 py-2 rounded bg-muted/30">
+        <div className="text-label text-muted-foreground mb-3 px-3 py-2 rounded bg-muted/30">
           CSV bulk import (Maybank2u 5-col format) lands in Chunk C / Phase 9. V1 supports manual single-line entry.
         </div>
 
@@ -440,7 +440,7 @@ function ImportStatementModal({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-2 rounded-md border border-border text-[12.5px]"
+            className="px-3 py-2 rounded-md border border-border text-meta"
           >
             Cancel
           </button>
@@ -448,7 +448,7 @@ function ImportStatementModal({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={submit}
             disabled={create.isPending || !description || !amount}
-            className="px-3 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-[12.5px] disabled:opacity-60"
+            className="px-3 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-meta disabled:opacity-60"
           >
             {create.isPending ? "Importing…" : "Import"}
           </button>
@@ -470,13 +470,13 @@ function Kpi({
   const valueTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
   return (
     <div className={`bg-card rounded-md border ${accent ? "border-primary" : "border-border"} px-5 py-[18px]`}>
-      <div className={`text-[10px] uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
+      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
         {label}
       </div>
-      <div className={`font-display text-[26px] mt-1.5 leading-none tabular-nums ${valueTone}`}>
+      <div className={`font-display text-page mt-1.5 leading-none tabular-nums ${valueTone}`}>
         {value}
       </div>
-      {hint && <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>}
+      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
     </div>
   );
 }

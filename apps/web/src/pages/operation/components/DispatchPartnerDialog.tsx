@@ -88,10 +88,10 @@ export default function DispatchPartnerDialog({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-card rounded-lg p-6 max-w-md w-full">
-        <h2 className="t-h3 mb-4">Dispatch — {poLabel ?? threadId.slice(0, 8)}</h2>
+        <h2 className="text-strong mb-4">Dispatch — {poLabel ?? threadId.slice(0, 8)}</h2>
 
         <div className="mb-3">
-          <label className="block text-sm font-medium mb-1">operation Partner</label>
+          <label className="block text-body font-medium mb-1">operation Partner</label>
           <ul className="space-y-1">
             {(partners ?? []).map((p) => (
               <li key={p.id}>
@@ -110,7 +110,7 @@ export default function DispatchPartnerDialog({
         </div>
 
         <div className="mb-3">
-          <label htmlFor="cdd" className="block text-sm font-medium mb-1">
+          <label htmlFor="cdd" className="block text-body font-medium mb-1">
             Confirm delivery date
           </label>
           <input
@@ -118,7 +118,7 @@ export default function DispatchPartnerDialog({
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full border border-base-200 rounded px-3 py-2 text-sm"
+            className="w-full border border-base-200 rounded px-3 py-2 text-body"
           />
         </div>
 

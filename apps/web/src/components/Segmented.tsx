@@ -33,7 +33,7 @@ export default function Segmented<T extends string>({
             role="tab"
             aria-selected={on}
             onClick={() => onChange(o.value)}
-            className={`h-7 px-3 rounded-full text-[12px] font-semibold whitespace-nowrap transition-colors ${
+            className={`h-7 px-3 rounded-full text-meta font-semibold whitespace-nowrap transition-colors ${
               on
                 ? "bg-white text-base-900 shadow-sm"
                 : "text-base-500 hover:text-base-800"

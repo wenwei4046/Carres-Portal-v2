@@ -544,12 +544,12 @@ export default function OperationPayments() {
   if (isError) {
     return (
       <div className="px-6 py-8">
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-2">Couldn&rsquo;t load payments</div>
-          <div className="text-[12px] text-base-700 mb-3">
+          <div className="text-meta text-base-700 mb-3">
             {(error as Error | undefined)?.message ?? "Unknown error"}
           </div>
-          <button type="button" onClick={() => void refetch()} className="btn-secondary text-[11px] py-1.5 px-3">
+          <button type="button" onClick={() => void refetch()} className="btn-secondary text-label py-1.5 px-3">
             Retry
           </button>
         </div>
@@ -570,7 +570,7 @@ export default function OperationPayments() {
         }
         meta={
           <div className="flex items-center gap-3">
-            <span className="text-[12px] text-base-400">
+            <span className="text-meta text-base-400">
               Synced {dataUpdatedAt ? fmtDate(new Date(dataUpdatedAt).toISOString(), { time: true }) : "—"}
             </span>
             <button
@@ -598,7 +598,7 @@ export default function OperationPayments() {
           />
         }
         toolbarRight={
-          <span className="text-[12px] text-base-500 tabular-nums" title="Rows shown / in this view">
+          <span className="text-meta text-base-500 tabular-nums" title="Rows shown / in this view">
             {visible.length} of {baseRows.length}
           </span>
         }
@@ -619,7 +619,7 @@ export default function OperationPayments() {
           <>
             {/* Summary — the three heroes, 18px mono (§A0 money hero). */}
             <div className="bg-white border border-base-200 rounded-[12px] p-3">
-              <div className="px-1 pb-2 text-[11px] font-bold uppercase tracking-[0.04em] text-base-500">
+              <div className="px-1 pb-2 text-label font-semibold uppercase tracking-[0.04em] text-base-500">
                 Summary
               </div>
               {[
@@ -640,8 +640,8 @@ export default function OperationPayments() {
                 },
               ].map((s) => (
                 <div key={s.label} className="flex items-center justify-between px-1 py-1.5">
-                  <span className="text-[13px] text-base-700">{s.label}</span>
-                  <span className={`text-[18px] font-bold font-mono tabular-nums ${s.cls}`}>{rm(s.value)}</span>
+                  <span className="text-body text-base-700">{s.label}</span>
+                  <span className={`text-strong font-semibold font-mono tabular-nums ${s.cls}`}>{rm(s.value)}</span>
                 </div>
               ))}
             </div>
@@ -704,7 +704,7 @@ export default function OperationPayments() {
       >
         {/* Listing — loose full-width white table, 52px rows, no truncation. */}
         <div className="flex-1 min-h-0 bg-white border border-base-200 rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto">
-          <table className="w-full border-collapse text-[13px] table-fixed">
+          <table className="w-full border-collapse text-body table-fixed">
             <colgroup>
               <col style={{ width: "16%" }} />
               <col style={{ width: "20%" }} />
@@ -724,14 +724,14 @@ export default function OperationPayments() {
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={5} className="p-12 text-center text-[12px] text-base-500">
+                  <td colSpan={5} className="p-12 text-center text-meta text-base-500">
                     Loading…
                   </td>
                 </tr>
               )}
               {!isLoading && visible.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-12 text-center text-[12px] text-base-500">
+                  <td colSpan={5} className="p-12 text-center text-meta text-base-500">
                     {anyFilter
                       ? "No orders match these filters."
                       : view === "owing"
@@ -780,9 +780,9 @@ function PaymentRow({
       {/* Order · Status */}
       <td className="px-5 py-3">
         <div className="flex items-baseline gap-2" title={r.ref.length > 0 ? r.ref.join(" + ") : undefined}>
-          <span className="font-mono font-semibold text-base-900 text-[13px]">SO-{r.so}</span>
+          <span className="font-mono font-semibold text-base-900 text-body">SO-{r.so}</span>
           {r.ref.length > 0 && (
-            <span className="font-mono text-[11px] text-base-400">
+            <span className="font-mono text-label text-base-400">
               {r.ref.length === 1 ? r.ref[0] : `${r.ref[0]} +${r.ref.length - 1}`}
             </span>
           )}
@@ -796,37 +796,37 @@ function PaymentRow({
       {/* Customer + phone (no truncation) */}
       <td className="px-5 py-3">
         <div className="flex items-center gap-2">
-          <span className={`${cjkClassName(r.customer)} font-semibold text-base-900 text-[13.5px]`}>
+          <span className={`${cjkClassName(r.customer)} font-semibold text-base-900 text-body`}>
             {r.customer || "—"}
           </span>
-          {r.delivered && <span className="text-[10px] text-success">delivered</span>}
+          {r.delivered && <span className="text-label text-success">delivered</span>}
         </div>
         {r.phone ? (
           <a
             href={waLink(r.phone) ?? undefined}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-1.5 inline-flex items-center gap-1.5 text-[11.5px] text-info hover:underline font-mono"
+            className="mt-1.5 inline-flex items-center gap-1.5 text-label text-info hover:underline font-mono"
             title="Open WhatsApp to the customer"
           >
             <Phone size={12} strokeWidth={2} aria-hidden="true" />
             {r.phone}
           </a>
         ) : (
-          <span className="mt-1.5 block text-[11px] text-base-400">no phone</span>
+          <span className="mt-1.5 block text-label text-base-400">no phone</span>
         )}
       </td>
 
       {/* Owing hero + editable balance / storage */}
       <td className="px-5 py-3">
         <div
-          className={`text-[19px] font-bold font-mono tabular-nums leading-none ${
+          className={`text-title font-semibold font-mono tabular-nums leading-none ${
             r.owing > 0 ? (r.storageOwing > 0 && r.goodsOwing === 0 ? "text-warning" : "text-danger") : "text-base-400"
           }`}
         >
           {rm(r.owing)}
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-base-500">
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-label text-base-500">
           <span className="inline-flex items-center gap-1">
             bal
             <EditableNumber value={r.balance} placeholder="0" onSave={(v) => onSave(r.id, { balance: v })} width={60} />
@@ -840,12 +840,12 @@ function PaymentRow({
               width={52}
             />
             {r.storageOverride != null && (
-              <span className="text-[10px] text-warning" title={`manual — auto ${rm(r.storage.total)}`}>
+              <span className="text-label text-warning" title={`manual — auto ${rm(r.storage.total)}`}>
                 M
               </span>
             )}
             {r.storageCollected && (
-              <span className="text-[10px] text-success" title="storage collected">
+              <span className="text-label text-success" title="storage collected">
                 ✓
               </span>
             )}
@@ -884,7 +884,7 @@ function PaymentRow({
                   {collectPillLabel(rm(r.owing))}
                 </button>
                 <div
-                  className="mt-1.5 text-[11px] text-base-400"
+                  className="mt-1.5 text-label text-base-400"
                   title={r.lastChasedAt ? `Last chased ${fmtDate(r.lastChasedAt, { time: true })}` : undefined}
                 >
                   {chasedAgo(r.lastChasedAt) ?? "Not chased yet"}
@@ -976,17 +976,17 @@ function OrderMoneyDetail({
   };
 
   const inputCls =
-    "text-[12px] px-2 py-1.5 border border-base-200 rounded bg-white outline-none focus:border-base-700";
+    "text-meta px-2 py-1.5 border border-base-200 rounded bg-white outline-none focus:border-base-700";
 
   return (
     <div className="grid grid-cols-[1.1fr_1fr_0.9fr] gap-6 pt-3">
       {/* Record payment — closes the loop, mints a receipt no */}
       <div>
-        <h4 className="text-[11px] font-bold uppercase tracking-[0.04em] text-base-500 mb-2">
+        <h4 className="text-label font-semibold uppercase tracking-[0.04em] text-base-500 mb-2">
           Record payment
         </h4>
         <div className="flex flex-wrap gap-2">
-          <label className="flex flex-col gap-1 text-[10px] text-base-400 uppercase tracking-wide">
+          <label className="flex flex-col gap-1 text-label text-base-400 uppercase tracking-wide">
             Amount
             <input
               value={amount}
@@ -997,7 +997,7 @@ function OrderMoneyDetail({
               aria-label="Payment amount"
             />
           </label>
-          <label className="flex flex-col gap-1 text-[10px] text-base-400 uppercase tracking-wide">
+          <label className="flex flex-col gap-1 text-label text-base-400 uppercase tracking-wide">
             Paid on
             <input
               type="date"
@@ -1007,7 +1007,7 @@ function OrderMoneyDetail({
               aria-label="Paid on"
             />
           </label>
-          <label className="flex flex-col gap-1 text-[10px] text-base-400 uppercase tracking-wide">
+          <label className="flex flex-col gap-1 text-label text-base-400 uppercase tracking-wide">
             Method
             <select
               value={method}
@@ -1022,7 +1022,7 @@ function OrderMoneyDetail({
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-[10px] text-base-400 uppercase tracking-wide">
+          <label className="flex flex-col gap-1 text-label text-base-400 uppercase tracking-wide">
             For
             <select
               value={kind}
@@ -1037,7 +1037,7 @@ function OrderMoneyDetail({
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-[10px] text-base-400 uppercase tracking-wide">
+          <label className="flex flex-col gap-1 text-label text-base-400 uppercase tracking-wide">
             Reference
             <input
               value={reference}
@@ -1059,18 +1059,18 @@ function OrderMoneyDetail({
             </button>
           </div>
         </div>
-        <div className="mt-2 text-[11px] text-base-400">
+        <div className="mt-2 text-label text-base-400">
           A receipt number is minted automatically (R{r.so}-n) — print it from the history at right.
         </div>
         {role && (
           <div className="mt-3 flex items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-base-500">Documents</span>
+            <span className="text-label font-semibold uppercase tracking-[0.04em] text-base-500">Documents</span>
             <DownloadInvoiceButton
               orderId={r.id}
               so={r.so}
               role={role as "operation" | "principal"}
               variant="secondary"
-              className="text-[11px] py-1 px-2.5"
+              className="text-label py-1 px-2.5"
             />
           </div>
         )}
@@ -1078,19 +1078,19 @@ function OrderMoneyDetail({
 
       {/* Payment history */}
       <div>
-        <h4 className="text-[11px] font-bold uppercase tracking-[0.04em] text-base-500 mb-2">
+        <h4 className="text-label font-semibold uppercase tracking-[0.04em] text-base-500 mb-2">
           Payment history
         </h4>
         {isLoading ? (
-          <div className="text-[12px] text-base-400">Loading…</div>
+          <div className="text-meta text-base-400">Loading…</div>
         ) : ledger.length === 0 ? (
-          <div className="text-[12px] text-base-400">No payments recorded yet.</div>
+          <div className="text-meta text-base-400">No payments recorded yet.</div>
         ) : (
           <div className="flex flex-col gap-1">
             {ledger.map((p) => (
               <div
                 key={p.id}
-                className="flex items-center justify-between gap-2 text-[12px] border-b border-base-100 pb-1"
+                className="flex items-center justify-between gap-2 text-meta border-b border-base-100 pb-1"
               >
                 <span className="text-base-600 min-w-0 truncate">
                   <span className="capitalize font-medium text-base-800">{p.kind}</span> ·{" "}
@@ -1119,10 +1119,10 @@ function OrderMoneyDetail({
 
       {/* Promise-to-pay (reuses balance_due_date) */}
       <div>
-        <h4 className="text-[11px] font-bold uppercase tracking-[0.04em] text-base-500 mb-2">
+        <h4 className="text-label font-semibold uppercase tracking-[0.04em] text-base-500 mb-2">
           Promise to pay
         </h4>
-        <label className="flex flex-col gap-1 text-[10px] text-base-400 uppercase tracking-wide">
+        <label className="flex flex-col gap-1 text-label text-base-400 uppercase tracking-wide">
           Committed date
           <input
             type="date"
@@ -1132,7 +1132,7 @@ function OrderMoneyDetail({
             aria-label="Promise-to-pay date"
           />
         </label>
-        <div className="mt-2 text-[11px] text-base-400 leading-snug">
+        <div className="mt-2 text-label text-base-400 leading-snug">
           {r.dueDate
             ? r.overdue
               ? `Overdue since ${fmtDate(r.dueDate)} — chase now.`
@@ -1171,11 +1171,11 @@ function StockCell({ r }: { r: Row }) {
 
   return (
     <div>
-      <span className={`inline-flex items-center gap-1.5 text-[13px] font-semibold ${badge.cls}`}>
+      <span className={`inline-flex items-center gap-1.5 text-body font-semibold ${badge.cls}`}>
         <span className={`w-2 h-2 rounded-full ${badge.dot}`} aria-hidden="true" />
         {badge.text}
       </span>
-      <div className="mt-1.5 text-[11.5px] text-base-500 leading-snug">{windowNote}</div>
+      <div className="mt-1.5 text-label text-base-500 leading-snug">{windowNote}</div>
     </div>
   );
 }
@@ -1192,7 +1192,7 @@ function StatusSelect({
     <select
       value={r.paymentStatus ?? ""}
       onChange={(e) => onSave(r.id, { payment_status: e.target.value || null })}
-      className="text-[11px] px-1.5 py-1 border border-base-200 rounded bg-white text-base-600"
+      className="text-label px-1.5 py-1 border border-base-200 rounded bg-white text-base-600"
       aria-label={`Payment status for SO-${r.so}`}
     >
       <option value="">— set —</option>
@@ -1262,7 +1262,7 @@ function ChasePopover({
       >
         <div className="flex items-center gap-2 px-4 py-3 border-b border-base-100">
           <MessageCircle size={16} className="text-success" strokeWidth={2.5} />
-          <span className="text-[13px] font-bold text-base-900">
+          <span className="text-body font-semibold text-base-900">
             Chase · {r.customer} · {r.phone ?? "no phone"}
           </span>
           <div className="ml-auto flex items-center gap-2">
@@ -1272,7 +1272,7 @@ function ChasePopover({
                   key={t}
                   type="button"
                   onClick={() => setTone(t)}
-                  className={`text-[11px] px-2.5 py-1 rounded-full font-semibold capitalize transition-colors ${
+                  className={`text-label px-2.5 py-1 rounded-full font-semibold capitalize transition-colors ${
                     tone === t ? "bg-white text-base-900 shadow-sm" : "text-base-500"
                   }`}
                 >
@@ -1288,7 +1288,7 @@ function ChasePopover({
 
         {/* Pre-call brief */}
         <div className="mx-4 mt-3 rounded-xl border border-info/30 bg-info/5 px-3 py-2.5">
-          <div className="text-[11px] font-bold uppercase tracking-[0.04em] text-info mb-1.5">
+          <div className="text-label font-semibold uppercase tracking-[0.04em] text-info mb-1.5">
             Before you call — they'll ask about delivery
           </div>
           <BriefRow k="Stock" v={stockLine} />
@@ -1298,10 +1298,10 @@ function ChasePopover({
 
         {/* WhatsApp text (date-free, per locked template) */}
         <div className="mx-4 my-3">
-          <div className="text-[10px] text-base-400 italic mb-1.5">
+          <div className="text-label text-base-400 italic mb-1.5">
             ↓ WhatsApp message (date-free, per the locked rule)
           </div>
-          <pre className="whitespace-pre-wrap font-sans text-[12.5px] text-base-800 bg-success/5 border border-success/20 rounded-xl px-3 py-2.5 leading-relaxed">
+          <pre className="whitespace-pre-wrap font-sans text-meta text-base-800 bg-success/5 border border-success/20 rounded-xl px-3 py-2.5 leading-relaxed">
             {text}
           </pre>
         </div>
@@ -1310,14 +1310,14 @@ function ChasePopover({
           <button
             type="button"
             onClick={send}
-            className="flex-1 inline-flex items-center justify-center gap-2 bg-success text-white rounded-lg py-2.5 text-[13px] font-bold hover:brightness-95"
+            className="flex-1 inline-flex items-center justify-center gap-2 bg-success text-white rounded-lg py-2.5 text-body font-semibold hover:brightness-95"
           >
             <MessageCircle size={15} strokeWidth={2.5} /> Send on WhatsApp
           </button>
           <button
             type="button"
             onClick={copy}
-            className="rounded-lg border border-base-200 bg-white px-4 py-2.5 text-[13px] font-semibold text-base-700 hover:bg-base-50"
+            className="rounded-lg border border-base-200 bg-white px-4 py-2.5 text-body font-semibold text-base-700 hover:bg-base-50"
           >
             Copy
           </button>
@@ -1329,7 +1329,7 @@ function ChasePopover({
 
 function BriefRow({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex gap-2 py-0.5 text-[12.5px] text-base-800">
+    <div className="flex gap-2 py-0.5 text-meta text-base-800">
       <span className="w-[72px] shrink-0 text-base-500 font-semibold">{k}</span>
       <span className="font-semibold">{v}</span>
     </div>
@@ -1366,7 +1366,7 @@ function EditableNumber({
 
   return (
     <span className="inline-flex items-center gap-1 rounded border border-base-200 px-1.5 py-0.5 bg-white focus-within:border-base-700">
-      <span className="text-[10px] text-base-400">RM</span>
+      <span className="text-label text-base-400">RM</span>
       <input
         type="text"
         inputMode="decimal"
@@ -1377,7 +1377,7 @@ function EditableNumber({
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
-        className="text-[12px] tabular-nums bg-transparent outline-none"
+        className="text-meta tabular-nums bg-transparent outline-none"
         style={{ width: width ?? 72 }}
       />
     </span>
@@ -1386,7 +1386,7 @@ function EditableNumber({
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.05em] text-base-500 text-left">
+    <th className="px-5 py-3 text-label font-semibold uppercase tracking-[0.05em] text-base-500 text-left">
       {children}
     </th>
   );
@@ -1419,10 +1419,10 @@ function FacetRow({
       }`}
     >
       {dotClass && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} aria-hidden="true" />}
-      <span className={`flex-1 min-w-0 truncate text-[13px] ${active ? "text-base-900 font-bold" : "text-base-700"}`}>
+      <span className={`flex-1 min-w-0 truncate text-body ${active ? "text-base-900 font-semibold" : "text-base-700"}`}>
         {label}
       </span>
-      <span className={`text-[13px] tabular-nums shrink-0 ${active ? "text-base-900 font-bold" : "text-base-500"}`}>
+      <span className={`text-body tabular-nums shrink-0 ${active ? "text-base-900 font-semibold" : "text-base-500"}`}>
         {count}
       </span>
     </button>
@@ -1454,11 +1454,11 @@ function FacetGroup({
         ) : (
           <ChevronDown size={12} className="shrink-0 text-base-500" />
         )}
-        <span className="uppercase flex-1 text-left text-[11px] font-bold tracking-[0.04em] text-base-900">
+        <span className="uppercase flex-1 text-left text-label font-semibold tracking-[0.04em] text-base-900">
           {title}
         </span>
         {total !== undefined && (
-          <span className="tabular-nums shrink-0 text-[11px] font-semibold text-base-500">{total}</span>
+          <span className="tabular-nums shrink-0 text-label font-semibold text-base-500">{total}</span>
         )}
       </button>
       {!collapsed && <div className="flex flex-col gap-0.5 mt-0.5">{children}</div>}
@@ -1484,14 +1484,14 @@ function StatusTabs({
             key={t.key}
             type="button"
             onClick={() => onSelect(t.key)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full transition-colors text-[13px] border ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full transition-colors text-body border ${
               on
                 ? "bg-base-900 text-white font-semibold border-base-900"
                 : "bg-white text-base-600 font-medium border-base-200"
             }`}
           >
             {t.label}
-            <span className={`tabular-nums text-[12px] ${on ? "text-white/70" : "text-base-400"}`}>{t.count}</span>
+            <span className={`tabular-nums text-meta ${on ? "text-white/70" : "text-base-400"}`}>{t.count}</span>
           </button>
         );
       })}

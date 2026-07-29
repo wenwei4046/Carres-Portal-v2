@@ -448,17 +448,17 @@ export default function OperationReceiving() {
       <>
         <PurchasingTabs />
         <div className="px-9 py-8 pb-14">
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-2">
             Couldn&rsquo;t load purchase orders
           </div>
-          <div className="text-[12px] text-base-700 mb-3">
+          <div className="text-meta text-base-700 mb-3">
             {(error as Error | undefined)?.message ?? "Unknown error"}
           </div>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="btn-secondary text-[11px] py-1.5 px-3"
+            className="btn-secondary text-label py-1.5 px-3"
           >
             Retry
           </button>
@@ -497,7 +497,7 @@ export default function OperationReceiving() {
                     role="tab"
                     aria-selected={active}
                     onClick={() => setTab(t.key)}
-                    className={`px-3 py-1.5 text-[12px] rounded cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 text-meta rounded cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                       active
                         ? "bg-white text-base-900 font-semibold shadow-sm"
                         : "text-base-600 font-medium hover:text-base-900"
@@ -505,7 +505,7 @@ export default function OperationReceiving() {
                   >
                     <span>{t.label}</span>
                     <span
-                      className={`text-[10px] font-mono px-1.5 py-px rounded-full ${
+                      className={`text-label font-mono px-1.5 py-px rounded-full ${
                         active
                           ? "bg-base-100 text-base-700"
                           : "bg-base-200 text-base-500"
@@ -524,7 +524,7 @@ export default function OperationReceiving() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="PO number or supplier…"
-              className="w-[230px] px-3 py-1.5 border border-base-200 rounded-full text-[13px] bg-white outline-none focus:border-base-700"
+              className="w-[230px] px-3 py-1.5 border border-base-200 rounded-full text-body bg-white outline-none focus:border-base-700"
             />
           }
           activeChips={activeChips}
@@ -658,7 +658,7 @@ export default function OperationReceiving() {
           {/* Table */}
           <div className="flex-1 min-h-0 bg-white border border-base-200 rounded-t-[12px] rounded-b-none shadow-sm overflow-auto">
             <table
-              className="w-full border-collapse text-[13px] [&_tbody_tr:nth-child(even)]:bg-base-100/70"
+              className="w-full border-collapse text-body [&_tbody_tr:nth-child(even)]:bg-base-100/70"
               style={{ minWidth: 920 }}
             >
               <thead className="bg-base-700 border-b-2 border-primary text-white sticky top-0 z-10">
@@ -677,7 +677,7 @@ export default function OperationReceiving() {
                   <tr>
                     <td
                       colSpan={7}
-                      className="p-12 text-center text-[12px] text-base-500"
+                      className="p-12 text-center text-meta text-base-500"
                     >
                       No purchase orders in this tab.
                     </td>
@@ -713,12 +713,12 @@ export default function OperationReceiving() {
                           {progress.label}
                         </span>
                         {progress.pendingLabel && (
-                          <div className="text-[11px] text-base-600 mt-1">
+                          <div className="text-label text-base-600 mt-1">
                             {progress.pendingLabel}
                           </div>
                         )}
                         {progress.issueLabel && (
-                          <div className="text-[11px] text-danger mt-0.5">
+                          <div className="text-label text-danger mt-0.5">
                             {progress.issueLabel}
                           </div>
                         )}
@@ -739,7 +739,7 @@ export default function OperationReceiving() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right">
                         {done ? (
-                          <span className="inline-flex items-center gap-1 text-[12px] text-success">
+                          <span className="inline-flex items-center gap-1 text-meta text-success">
                             <span className="w-[7px] h-[7px] rounded-full bg-success" />
                             Done
                           </span>
@@ -747,7 +747,7 @@ export default function OperationReceiving() {
                           <button
                             type="button"
                             onClick={() => openReceive(po.id)}
-                            className="btn-primary text-[11px] py-1.5 px-3"
+                            className="btn-primary text-label py-1.5 px-3"
                             data-testid={`receive-${po.id}`}
                           >
                             {purchasingActionButton("check_in")}
@@ -777,7 +777,7 @@ export default function OperationReceiving() {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.02em] text-white text-left">
+    <th className="px-4 py-2.5 text-label font-semibold uppercase tracking-[0.02em] text-white text-left">
       {children}
     </th>
   );

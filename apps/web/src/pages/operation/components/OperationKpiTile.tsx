@@ -104,17 +104,17 @@ function TileBody({
   return (
     <>
       <div
-        className={`text-[11px] uppercase tracking-[0.18em] font-semibold ${labelCls}`}
+        className={`text-label uppercase tracking-[0.18em] font-semibold ${labelCls}`}
       >
         {label}
       </div>
       <div
         data-kpi-value
-        className="font-display text-[36px] leading-none mt-1.5 font-bold tracking-tight text-base-900"
+        className="font-display text-page leading-none mt-1.5 font-semibold tracking-tight text-base-900"
       >
         {value}
       </div>
-      <div className="text-[12px] text-base-600 mt-1">{hint}</div>
+      <div className="text-meta text-base-600 mt-1">{hint}</div>
     </>
   );
 }

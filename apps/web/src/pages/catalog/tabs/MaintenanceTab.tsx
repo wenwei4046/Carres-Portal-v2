@@ -145,14 +145,14 @@ function SofaCompartmentsSection({
   return (
     <section>
       <div className="flex items-center justify-between mb-1">
-        <div className="t-h4 font-display">Sofa Compartments</div>
+        <div className="text-strong font-display">Sofa Compartments</div>
         {isPrincipal && (
-          <button type="button" onClick={() => setAdding((v) => !v)} className="btn-ghost text-[12px]">
+          <button type="button" onClick={() => setAdding((v) => !v)} className="btn-ghost text-meta">
             {adding ? "Close" : "+ Add compartment"}
           </button>
         )}
       </div>
-      <p className="t-tiny text-base-500 mb-3">
+      <p className="text-meta text-base-500 mb-3">
         The compartment pool (1A(LHF), 1NA, 2A(RHF), …) — a foundation catalog
         only. A sofa is assembled from these; each sofa model ticks which it
         offers in the Modular tab, and prices live on the per-model compartment
@@ -174,7 +174,7 @@ function SofaCompartmentsSection({
           <div className="label text-right">Actions</div>
         </div>
         {compartments.length === 0 && (
-          <div className="t-small text-base-500 px-3 py-4">No compartments configured.</div>
+          <div className="text-body text-base-500 px-3 py-4">No compartments configured.</div>
         )}
         {compartments.map((comp) => (
           <SofaCompartmentRow key={comp.id} comp={comp} isPrincipal={isPrincipal} />
@@ -254,7 +254,7 @@ function SofaCompartmentRow({
         </span>
         {isPrincipal && (
           <div className="flex flex-col items-start gap-0.5">
-            <label className="btn-ghost text-[11px] cursor-pointer">
+            <label className="btn-ghost text-label cursor-pointer">
               {setPhoto.isPending ? "Uploading…" : comp.iconUrl ? "Replace" : "Upload"}
               <input
                 type="file"
@@ -271,7 +271,7 @@ function SofaCompartmentRow({
                 type="button"
                 onClick={removePhoto}
                 disabled={delPhoto.isPending}
-                className="btn-danger text-[11px]"
+                className="btn-danger text-label"
                 aria-label={`${comp.code} remove photo`}
               >
                 Remove
@@ -288,11 +288,11 @@ function SofaCompartmentRow({
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
         aria-label={`${comp.code} description`}
-        className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-[13px] outline-none bg-transparent disabled:opacity-60"
+        className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-body outline-none bg-transparent disabled:opacity-60"
       />
       <div className="text-right">
         {isPrincipal && (
-          <button type="button" onClick={remove} disabled={del.isPending} className="btn-danger text-[11px]">
+          <button type="button" onClick={remove} disabled={del.isPending} className="btn-danger text-label">
             Disable
           </button>
         )}
@@ -346,7 +346,7 @@ function SofaCompartmentAddForm({ onDone }: { onDone: () => void }) {
         type="button"
         onClick={submit}
         disabled={!valid || busy}
-        className="btn-primary text-[12px] disabled:opacity-40"
+        className="btn-primary text-meta disabled:opacity-40"
         data-testid="compartment-add-submit"
       >
         {busy ? "Saving…" : "Add"}

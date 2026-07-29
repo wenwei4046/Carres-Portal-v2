@@ -88,20 +88,20 @@ export default function FinanceRefunds() {
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="flex items-end justify-between gap-4 flex-wrap mb-7">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
             Finance · Documents
           </div>
-          <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
+          <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
             Refunds &amp; Credit Notes
           </h1>
-          <div className="text-[13px] text-muted-foreground">
+          <div className="text-body text-muted-foreground">
             Money going back to customers · credits applied against future orders
           </div>
         </div>
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-[12px] font-semibold"
+          className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-meta font-semibold"
         >
           + Issue credit note
         </button>
@@ -115,7 +115,7 @@ export default function FinanceRefunds() {
 
       <div className="bg-card rounded-md border border-border overflow-auto">
         <div
-          className="grid items-center px-4 py-2.5 bg-muted/40 border-b border-border text-[10px] uppercase tracking-[0.06em] font-bold text-muted-foreground"
+          className="grid items-center px-4 py-2.5 bg-muted/40 border-b border-border text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground"
           style={{ gridTemplateColumns: "120px 90px 1.4fr 1.6fr 110px 110px 100px", minWidth: 920 }}
         >
           <span>Note ID</span>
@@ -128,9 +128,9 @@ export default function FinanceRefunds() {
         </div>
 
         {refundsQ.isLoading ? (
-          <div className="p-12 text-center text-[12.5px] text-muted-foreground">Loading…</div>
+          <div className="p-12 text-center text-meta text-muted-foreground">Loading…</div>
         ) : enriched.length === 0 ? (
-          <div className="p-12 text-center text-[12.5px] text-muted-foreground">
+          <div className="p-12 text-center text-meta text-muted-foreground">
             No refunds or credit notes yet. Click + Issue credit note to start.
           </div>
         ) : (
@@ -138,7 +138,7 @@ export default function FinanceRefunds() {
         )}
       </div>
 
-      <div className="mt-3.5 px-4 py-3 bg-muted/30 rounded-md text-[11.5px] text-muted-foreground">
+      <div className="mt-3.5 px-4 py-3 bg-muted/30 rounded-md text-label text-muted-foreground">
         <b>Credit note</b> reduces what a customer owes (applied to balance on next order).{" "}
         <b>Refund</b> moves cash back to customer's bank.
       </div>
@@ -148,7 +148,7 @@ export default function FinanceRefunds() {
       )}
 
       {refundsQ.error && (
-        <div className="mt-5 p-3 text-[12px] rounded-md bg-destructive/5 text-destructive border border-destructive/30">
+        <div className="mt-5 p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
           Failed to load refunds: {String(refundsQ.error)}
         </div>
       )}
@@ -179,24 +179,24 @@ function RefundRow({ r }: { r: RefundDisplayRow }) {
 
   return (
     <div
-      className="grid items-center px-4 py-3 border-b border-border text-[12.5px]"
+      className="grid items-center px-4 py-3 border-b border-border text-meta"
       style={{ gridTemplateColumns: "120px 90px 1.4fr 1.6fr 110px 110px 100px", minWidth: 920 }}
     >
       <span className="font-mono font-semibold">{r.noteId}</span>
-      <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+      <span className="text-label uppercase tracking-wider text-muted-foreground">
         {r.kind === "credit" ? "Credit" : "Refund"}
       </span>
-      <span className="text-muted-foreground text-[11.5px] truncate" title={r.reason ?? ""}>
+      <span className="text-muted-foreground text-label truncate" title={r.reason ?? ""}>
         {r.reason ?? "—"}
       </span>
-      <span className="text-[11.5px] text-muted-foreground truncate">{detail}</span>
-      <span className="font-mono text-right font-bold text-primary">{rm(r.amount)}</span>
+      <span className="text-label text-muted-foreground truncate">{detail}</span>
+      <span className="font-mono text-right font-semibold text-primary">{rm(r.amount)}</span>
       <span>
-        <span className={`px-2 py-0.5 rounded text-[10.5px] font-bold ${tone}`}>
+        <span className={`px-2 py-0.5 rounded text-label font-semibold ${tone}`}>
           {r.uiStatusLabel}
         </span>
       </span>
-      <span className="text-right text-[11px] text-muted-foreground">{date}</span>
+      <span className="text-right text-label text-muted-foreground">{date}</span>
     </div>
   );
 }
@@ -253,8 +253,8 @@ function IssueRefundModal({ onClose }: { onClose: () => void }) {
         aria-label={`Issue ${kind === "credit" ? "credit note" : "refund"}`}
         className="relative w-[480px] max-w-[92vw] p-6 rounded-md bg-card shadow-2xl"
       >
-        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Finance · New note</div>
-        <div className="font-display text-[22px] mt-1 mb-4">
+        <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Finance · New note</div>
+        <div className="font-display text-title mt-1 mb-4">
           Issue {kind === "credit" ? "credit note" : "refund"}
         </div>
 
@@ -264,7 +264,7 @@ function IssueRefundModal({ onClose }: { onClose: () => void }) {
               key={k}
               type="button"
               onClick={() => setKind(k)}
-              className={`px-3 py-1 rounded text-[11.5px] font-semibold transition-colors ${
+              className={`px-3 py-1 rounded text-label font-semibold transition-colors ${
                 kind === k
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -275,12 +275,12 @@ function IssueRefundModal({ onClose }: { onClose: () => void }) {
           ))}
         </div>
 
-        <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Source order</div>
+        <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Source order</div>
         <select
           aria-label="Source order"
           value={orderId}
           onChange={(e) => setOrderId(e.target.value)}
-          className="w-full px-2.5 py-1.5 border border-border rounded text-[12.5px] mb-3 bg-background"
+          className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-3 bg-background"
         >
           <option value="">Select order…</option>
           {orders.map((o) => (
@@ -290,28 +290,28 @@ function IssueRefundModal({ onClose }: { onClose: () => void }) {
           ))}
         </select>
 
-        <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Amount (RM)</div>
+        <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Amount (RM)</div>
         <input
           aria-label="Amount"
           inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="e.g. 480"
-          className="w-full px-2.5 py-1.5 border border-border rounded text-[12.5px] mb-3 bg-background"
+          className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-3 bg-background"
         />
 
-        <div className="text-[10px] uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Reason</div>
+        <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Reason</div>
         <textarea
           aria-label="Reason"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="Damaged on delivery, dealer goodwill, etc."
           rows={3}
-          className="w-full px-2.5 py-1.5 border border-border rounded text-[12.5px] mb-3 bg-background resize-none"
+          className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-3 bg-background resize-none"
         />
 
         {kind === "refund" && parseFloat(amount) > 1000 && (
-          <div className="px-3 py-2 mb-3 rounded bg-primary/10 text-[11.5px] text-primary">
+          <div className="px-3 py-2 mb-3 rounded bg-primary/10 text-label text-primary">
             Refunds &gt; RM 1,000 require principal approval before payout (Q5=A locked).
           </div>
         )}
@@ -320,7 +320,7 @@ function IssueRefundModal({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-2 rounded-md border border-border text-[12.5px]"
+            className="px-3 py-2 rounded-md border border-border text-meta"
           >
             Cancel
           </button>
@@ -328,7 +328,7 @@ function IssueRefundModal({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={submit}
             disabled={create.isPending}
-            className="px-3 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-[12.5px] disabled:opacity-60"
+            className="px-3 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-meta disabled:opacity-60"
           >
             {create.isPending ? "Issuing…" : `Issue ${kind === "credit" ? "credit" : "refund"}`}
           </button>
@@ -350,13 +350,13 @@ function Kpi({
   const valueTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
   return (
     <div className={`bg-card rounded-md border ${accent ? "border-primary" : "border-border"} px-5 py-[18px]`}>
-      <div className={`text-[10px] uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
+      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
         {label}
       </div>
-      <div className={`font-display text-[26px] mt-1.5 leading-none tabular-nums ${valueTone}`}>
+      <div className={`font-display text-page mt-1.5 leading-none tabular-nums ${valueTone}`}>
         {value}
       </div>
-      {hint && <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>}
+      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
     </div>
   );
 }

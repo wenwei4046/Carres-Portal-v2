@@ -51,7 +51,7 @@ export default function ServiceCaseNumbersPanel() {
     placeholderData: keepPreviousData,
   });
 
-  if (q.isLoading) return <p className="text-sm text-base-500">Loading…</p>;
+  if (q.isLoading) return <p className="text-body text-base-500">Loading…</p>;
 
   // A browser on this build can reach a Worker that predates /numbers (the
   // deploy is never atomic). That must degrade to a plain sentence, never take
@@ -60,7 +60,7 @@ export default function ServiceCaseNumbersPanel() {
     return (
       <div className="rounded border border-base-200 bg-white p-12 text-center">
         <p className="text-base-700 font-medium">The numbers are not available yet.</p>
-        <p className="text-sm text-base-500 mt-1">
+        <p className="text-body text-base-500 mt-1">
           Open the Cases tab to work on cases while this catches up.
         </p>
       </div>
@@ -76,18 +76,18 @@ export default function ServiceCaseNumbersPanel() {
         <header className="px-4 py-3 border-b border-base-100">
           <div className="flex items-center gap-1.5">
             <BarChart3 size={16} strokeWidth={2} className="text-base-400" />
-            <span className="t-h4 text-base-900">
+            <span className="text-strong text-base-900">
               {d.period ? fmtMonth(d.period) : "Last 6 months"}
             </span>
           </div>
-          <div className="text-[13px] text-base-900 mt-1" data-testid="numbers-headline">
+          <div className="text-body text-base-900 mt-1" data-testid="numbers-headline">
             {d.headline}
           </div>
         </header>
 
         {/* Jess's hand count, and the only control: click a month to narrow. */}
         <div className="px-4 py-3">
-          <div className="t-tiny uppercase tracking-wider text-base-500 mb-2">
+          <div className="text-meta uppercase tracking-wider text-base-500 mb-2">
             Cases by month
           </div>
           {d.byMonth.map((m) => {
@@ -103,13 +103,13 @@ export default function ServiceCaseNumbersPanel() {
                   on ? "bg-hovertint ring-1 ring-base-300" : ""
                 }`}
               >
-                <span className="text-[13px] text-base-700 w-24 shrink-0">
+                <span className="text-body text-base-700 w-24 shrink-0">
                   {fmtMonth(m.period)}
                 </span>
-                <span className="font-mono tabular-nums text-sm text-base-900 w-8 shrink-0 text-right">
+                <span className="font-mono tabular-nums text-body text-base-900 w-8 shrink-0 text-right">
                   {m.total}
                 </span>
-                <span className="text-[12px] text-base-500 truncate">
+                <span className="text-meta text-base-500 truncate">
                   {CASE_NUMBERS_CATEGORIES.filter((cat) => (m.byCategory?.[cat] ?? 0) > 0)
                     .map(
                       (cat) => `${caseCategoryBucketLabel(cat)} ${m.byCategory[cat]}`,
@@ -126,7 +126,7 @@ export default function ServiceCaseNumbersPanel() {
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded border border-base-200 bg-white" data-testid="numbers-issues">
           <header className="px-4 py-3 border-b border-base-100">
-            <span className="t-h4 text-base-900">What is going wrong</span>
+            <span className="text-strong text-base-900">What is going wrong</span>
           </header>
           <div className="px-4 py-2">
             {d.byIssue.length === 0 ? (
@@ -139,13 +139,13 @@ export default function ServiceCaseNumbersPanel() {
                   data-testid={`numbers-issue-${i.key}`}
                 >
                   <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-[13px] text-base-900 truncate">{i.label}</span>
-                    <span className="font-mono tabular-nums text-sm text-base-900 shrink-0">
+                    <span className="text-body text-base-900 truncate">{i.label}</span>
+                    <span className="font-mono tabular-nums text-body text-base-900 shrink-0">
                       {i.count}
                     </span>
                   </div>
                   {/* The card's "issues by type PER CATEGORY". */}
-                  <div className="text-[12px] text-base-500">
+                  <div className="text-meta text-base-500">
                     {CASE_NUMBERS_CATEGORIES.filter((c) => (i.byCategory?.[c] ?? 0) > 0)
                       .map((c) => `${caseCategoryBucketLabel(c)} ${i.byCategory[c]}`)
                       .join(" · ")}
@@ -158,7 +158,7 @@ export default function ServiceCaseNumbersPanel() {
 
         <section className="rounded border border-base-200 bg-white" data-testid="numbers-suppliers">
           <header className="px-4 py-3 border-b border-base-100">
-            <span className="t-h4 text-base-900">Which factory</span>
+            <span className="text-strong text-base-900">Which factory</span>
           </header>
           <div className="px-4 py-2">
             {d.bySupplier.length === 0 ? (
@@ -170,16 +170,16 @@ export default function ServiceCaseNumbersPanel() {
                   className="flex items-baseline justify-between gap-3 py-1.5 border-t border-base-100 first:border-t-0"
                   data-testid={`numbers-supplier-${s.name}`}
                 >
-                  <span className="text-[13px] text-base-900 truncate" title={s.name}>
+                  <span className="text-body text-base-900 truncate" title={s.name}>
                     {s.name}
                   </span>
-                  <span className="shrink-0 text-[12px] text-base-500">
+                  <span className="shrink-0 text-meta text-base-500">
                     {s.lateCount > 0 && (
                       <span className="text-error-700 mr-2 tabular-nums">
                         {s.lateCount} late
                       </span>
                     )}
-                    <span className="font-mono tabular-nums text-sm text-base-900">
+                    <span className="font-mono tabular-nums text-body text-base-900">
                       {s.count}
                     </span>
                   </span>
@@ -193,7 +193,7 @@ export default function ServiceCaseNumbersPanel() {
       {/* How long it takes, and how often the promise was kept. */}
       <section className="rounded border border-base-200 bg-white" data-testid="numbers-time">
         <header className="px-4 py-3 border-b border-base-100">
-          <span className="t-h4 text-base-900">How long it takes</span>
+          <span className="text-strong text-base-900">How long it takes</span>
         </header>
         <div className="px-4 py-3 grid gap-4 md:grid-cols-2">
           <Figure
@@ -220,7 +220,7 @@ export default function ServiceCaseNumbersPanel() {
           />
         </div>
 
-        <div className="px-4 pb-3 text-[12px] text-base-600 border-t border-base-100 pt-3">
+        <div className="px-4 pb-3 text-meta text-base-600 border-t border-base-100 pt-3">
           {d.totals.stillOpen > 0 && (
             <span data-testid="numbers-still-open">
               <span className="font-mono tabular-nums text-base-900">
@@ -287,19 +287,19 @@ function Figure({
 }) {
   return (
     <div data-testid={testId}>
-      <div className="t-tiny uppercase tracking-wider text-base-500">{label}</div>
+      <div className="text-meta uppercase tracking-wider text-base-500">{label}</div>
       <div
         className={`tabular-nums ${
-          value === null ? "t-h4 text-base-400" : "t-h2 text-base-900"
+          value === null ? "text-strong text-base-400" : "text-page text-base-900"
         }`}
       >
         {value ?? "—"}
       </div>
-      {note && <div className="text-[12px] text-base-500 mt-1">{note}</div>}
+      {note && <div className="text-meta text-base-500 mt-1">{note}</div>}
     </div>
   );
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="text-[12px] text-base-500 py-2">{children}</div>;
+  return <div className="text-meta text-base-500 py-2">{children}</div>;
 }

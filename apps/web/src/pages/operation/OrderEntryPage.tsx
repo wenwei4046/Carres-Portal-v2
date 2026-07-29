@@ -413,16 +413,16 @@ export default function OrderEntryPage() {
     <div className="px-9 py-8 pb-14 max-w-[880px]">
       <div className="mb-6">
         <div className="kicker">Point of Sale</div>
-        <h1 className="t-h1 font-display mt-1.5 text-base-900">Order Entry</h1>
-        <p className="t-small text-base-600 mt-1">
+        <h1 className="text-page font-display mt-1.5 text-base-900">Order Entry</h1>
+        <p className="text-body text-base-600 mt-1">
           Configure the POS "Open Sales Order" format: the payment methods offered at
           checkout and the Customer-step form fields. Saved config is shared for everyone.
         </p>
       </div>
 
-      {cfgQ.isLoading && <div className="t-small text-base-500">Loading config…</div>}
+      {cfgQ.isLoading && <div className="text-body text-base-500">Loading config…</div>}
       {cfgQ.isError && !cfgQ.isLoading && (
-        <div className="t-small text-danger">Failed to load the order entry config.</div>
+        <div className="text-body text-danger">Failed to load the order entry config.</div>
       )}
 
       {draft && (
@@ -448,8 +448,8 @@ export default function OrderEntryPage() {
                     aria-label={`${m.key} sublabel`}
                     className={`${INPUT_CLS} max-w-[170px]`}
                   />
-                  <span className="t-tiny text-base-400 font-mono">{m.key}</span>
-                  <label className="flex items-center gap-1.5 t-tiny text-base-700 cursor-pointer">
+                  <span className="text-meta text-base-400 font-mono">{m.key}</span>
+                  <label className="flex items-center gap-1.5 text-meta text-base-700 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={m.active}
@@ -458,7 +458,7 @@ export default function OrderEntryPage() {
                     />
                     Active
                   </label>
-                  <label className="flex items-center gap-1.5 t-tiny text-base-700 cursor-pointer">
+                  <label className="flex items-center gap-1.5 text-meta text-base-700 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={m.approvalCodeRequired}
@@ -498,7 +498,7 @@ export default function OrderEntryPage() {
                         aria-label={`${m.key} follow-up ${fu.key} options`}
                         className={`${INPUT_CLS} flex-1 min-w-[200px] font-mono`}
                       />
-                      <label className="flex items-center gap-1.5 t-tiny text-base-700 cursor-pointer mt-2">
+                      <label className="flex items-center gap-1.5 text-meta text-base-700 cursor-pointer mt-2">
                         <input
                           type="checkbox"
                           checked={fu.required}
@@ -521,7 +521,7 @@ export default function OrderEntryPage() {
                     <button
                       type="button"
                       onClick={() => addFollowUp(i)}
-                      className="btn-ghost text-[12px]"
+                      className="btn-ghost text-meta"
                     >
                       + Add follow-up
                     </button>
@@ -538,10 +538,10 @@ export default function OrderEntryPage() {
               data-testid="entry-config-stripe-row"
             >
               <Lock className="w-3 h-3 text-base-400 shrink-0" />
-              <span className="t-small text-base-700">{STRIPE_PAYMENT_METHOD.label}</span>
-              <span className="t-tiny text-base-500">{STRIPE_PAYMENT_METHOD.sublabel}</span>
-              <span className="t-tiny text-base-400 font-mono">{STRIPE_PAYMENT_METHOD.key}</span>
-              <span className="t-micro text-base-400 ml-auto">
+              <span className="text-body text-base-700">{STRIPE_PAYMENT_METHOD.label}</span>
+              <span className="text-meta text-base-500">{STRIPE_PAYMENT_METHOD.sublabel}</span>
+              <span className="text-meta text-base-400 font-mono">{STRIPE_PAYMENT_METHOD.key}</span>
+              <span className="text-label uppercase tracking-[0.05em] text-base-400 ml-auto">
                 system · always offered at checkout
               </span>
             </div>
@@ -556,14 +556,14 @@ export default function OrderEntryPage() {
               className={`${INPUT_CLS} max-w-[220px]`}
             />
             {newMethodName.trim() !== "" && (
-              <span className="t-tiny text-base-400 font-mono">
+              <span className="text-meta text-base-400 font-mono">
                 {kebabKey(newMethodName) || "—"}
               </span>
             )}
             <button
               type="button"
               onClick={addMethod}
-              className="btn-secondary text-[12px] inline-flex items-center gap-1"
+              className="btn-secondary text-meta inline-flex items-center gap-1"
             >
               <Plus className="w-3.5 h-3.5" /> Add method
             </button>
@@ -571,7 +571,7 @@ export default function OrderEntryPage() {
 
           {/* --------------------------------------------------- form fields */}
           <div className="label mb-1.5">Form fields — POS Customer step</div>
-          <p className="t-tiny text-base-500 mb-3">
+          <p className="text-meta text-base-500 mb-3">
             Locked fields are the structural spine (order identity / date engine) and
             always show. Custom fields are stored on the order and shown in the detail.
           </p>
@@ -581,23 +581,23 @@ export default function OrderEntryPage() {
             const builtins = POS_FORM_BUILTINS.filter((f) => f.tab === tab);
             return (
               <div key={tab} className="mb-5">
-                <div className="t-h4 font-display text-base-800 mb-1.5">{TAB_LABELS[tab]}</div>
+                <div className="text-strong font-display text-base-800 mb-1.5">{TAB_LABELS[tab]}</div>
                 <div className="border border-base-200 rounded-[4px] divide-y divide-base-100">
                   {builtins.map((f) => {
                     if (f.locked) {
                       return (
                         <div key={f.key} className="flex items-center gap-2 px-3 py-1.5 opacity-60">
                           <Lock className="w-3 h-3 text-base-400 shrink-0" />
-                          <span className="t-small text-base-500">{f.label}</span>
-                          <span className="t-micro text-base-400 ml-auto">locked</span>
+                          <span className="text-body text-base-500">{f.label}</span>
+                          <span className="text-label uppercase tracking-[0.05em] text-base-400 ml-auto">locked</span>
                         </div>
                       );
                     }
                     const st = t.builtins[f.key];
                     return (
                       <div key={f.key} className="flex items-center gap-4 px-3 py-1.5">
-                        <span className="t-small text-base-700 flex-1">{f.label}</span>
-                        <label className="flex items-center gap-1.5 t-tiny text-base-600 cursor-pointer">
+                        <span className="text-body text-base-700 flex-1">{f.label}</span>
+                        <label className="flex items-center gap-1.5 text-meta text-base-600 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={st.enabled}
@@ -612,7 +612,7 @@ export default function OrderEntryPage() {
                           Enabled
                         </label>
                         <label
-                          className={`flex items-center gap-1.5 t-tiny text-base-600 ${
+                          className={`flex items-center gap-1.5 text-meta text-base-600 ${
                             !st.enabled || !f.requiredToggleable
                               ? "opacity-40"
                               : "cursor-pointer"
@@ -641,7 +641,7 @@ export default function OrderEntryPage() {
                           aria-label={`${tab} custom ${cf.key} label`}
                           className={`${INPUT_CLS} max-w-[180px]`}
                         />
-                        <span className="t-tiny text-base-400 font-mono">{cf.key}</span>
+                        <span className="text-meta text-base-400 font-mono">{cf.key}</span>
                         <select
                           value={cf.type}
                           onChange={(e) =>
@@ -656,7 +656,7 @@ export default function OrderEntryPage() {
                             </option>
                           ))}
                         </select>
-                        <label className="flex items-center gap-1.5 t-tiny text-base-700 cursor-pointer">
+                        <label className="flex items-center gap-1.5 text-meta text-base-700 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={cf.required}
@@ -700,14 +700,14 @@ export default function OrderEntryPage() {
                     className={`${INPUT_CLS} max-w-[220px]`}
                   />
                   {newFieldNames[tab].trim() !== "" && (
-                    <span className="t-tiny text-base-400 font-mono">
+                    <span className="text-meta text-base-400 font-mono">
                       {kebabKey(newFieldNames[tab]) || "—"}
                     </span>
                   )}
                   <button
                     type="button"
                     onClick={() => addCustom(tab)}
-                    className="btn-ghost text-[12px] inline-flex items-center gap-1"
+                    className="btn-ghost text-meta inline-flex items-center gap-1"
                   >
                     <Plus className="w-3.5 h-3.5" /> Add field
                   </button>
@@ -718,14 +718,14 @@ export default function OrderEntryPage() {
 
           {/* ---------------------------------------------------------- save */}
           <div className="flex justify-end gap-2 mt-2">
-            <button type="button" onClick={onReset} className="btn-ghost text-[12px]">
+            <button type="button" onClick={onReset} className="btn-ghost text-meta">
               Reset
             </button>
             <button
               type="button"
               onClick={onSave}
               disabled={saveMut.isPending}
-              className="btn-primary text-[12px] disabled:opacity-40"
+              className="btn-primary text-meta disabled:opacity-40"
             >
               {saveMut.isPending ? "Saving…" : "Save"}
             </button>

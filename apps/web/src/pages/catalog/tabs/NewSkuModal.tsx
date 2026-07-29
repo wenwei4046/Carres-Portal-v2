@@ -502,7 +502,7 @@ export default function NewSkuModal({
             type="button"
             onClick={() => setMode(m)}
             disabled={createdModelId !== null}
-            className={`t-small font-semibold px-3.5 py-1 rounded-full transition-colors disabled:opacity-50 ${
+            className={`text-body font-semibold px-3.5 py-1 rounded-full transition-colors disabled:opacity-50 ${
               mode === m ? "bg-white text-base-900 shadow-sm" : "text-base-600 hover:text-base-900"
             }`}
             data-testid={`new-sku-mode-${m}`}
@@ -518,8 +518,8 @@ export default function NewSkuModal({
             className="rounded-[4px] border border-amber-300 bg-amber-50 px-3 py-2"
             data-testid="new-sku-model-created-notice"
           >
-            <div className="t-small font-semibold text-amber-800">Model created</div>
-            <div className="t-tiny text-amber-700 mt-0.5">
+            <div className="text-body font-semibold text-amber-800">Model created</div>
+            <div className="text-meta text-amber-700 mt-0.5">
               The model exists — click create again to retry the remaining SKUs only.
             </div>
           </div>
@@ -581,8 +581,8 @@ export default function NewSkuModal({
                             : "bg-white text-base-700 border-base-300 hover:border-base-500"
                         }`}
                       >
-                        <span className="t-small font-semibold block">{title}</span>
-                        <span className="t-tiny opacity-80">{hint}</span>
+                        <span className="text-body font-semibold block">{title}</span>
+                        <span className="text-meta opacity-80">{hint}</span>
                       </button>
                     ))}
                   </div>
@@ -603,7 +603,7 @@ export default function NewSkuModal({
                     className={INPUT_CLS}
                   />
                   {!gYearsOk && gYears.trim() !== "" && (
-                    <p className="t-tiny text-danger mt-1">Between 1 and 50 years.</p>
+                    <p className="text-meta text-danger mt-1">Between 1 and 50 years.</p>
                   )}
                 </label>
 
@@ -621,11 +621,11 @@ export default function NewSkuModal({
                       className={INPUT_CLS}
                     />
                     {!gVisitsOk && gVisitsPerYear.trim() !== "" ? (
-                      <p className="t-tiny text-danger mt-1">Between 1 and 12 visits a year.</p>
+                      <p className="text-meta text-danger mt-1">Between 1 and 12 visits a year.</p>
                     ) : (
                       // The total is the thing being sold — an operator should
                       // never have to multiply it in their head at the counter.
-                      <p className="t-tiny text-base-500 mt-1" data-testid="new-sku-guarantee-total">
+                      <p className="text-meta text-base-500 mt-1" data-testid="new-sku-guarantee-total">
                         {gYearsOk
                           ? `${gVisitsTotal} visits in total over ${gYearsNum} year${gYearsNum === 1 ? "" : "s"}.`
                           : "Set the years to see the total."}
@@ -649,8 +649,8 @@ export default function NewSkuModal({
                   </label>
                 ) : (
                   <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2">
-                    <div className="t-small text-base-600">Principal only</div>
-                    <div className="t-tiny text-base-400 mt-0.5">
+                    <div className="text-body text-base-600">Principal only</div>
+                    <div className="text-meta text-base-400 mt-0.5">
                       A guarantee carries a multi-year liability, so only the Master Admin
                       can author one.
                     </div>
@@ -681,7 +681,7 @@ export default function NewSkuModal({
                 className={`${INPUT_CLS} disabled:opacity-50`}
               />
               {modelKey && (
-                <div className="t-tiny text-base-500 font-mono mt-1">
+                <div className="text-meta text-base-500 font-mono mt-1">
                   Internal id: <span className="text-base-700">{modelKey}</span>
                 </div>
               )}
@@ -719,7 +719,7 @@ export default function NewSkuModal({
                   <button
                     type="button"
                     onClick={() => setSelectedComps(new Set(compChoices.map((c) => c.id)))}
-                    className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
+                    className="text-meta font-semibold text-base-500 hover:text-base-900 uppercase"
                     data-testid="new-sku-comps-all"
                   >
                     All
@@ -727,7 +727,7 @@ export default function NewSkuModal({
                   <button
                     type="button"
                     onClick={() => setSelectedComps(new Set())}
-                    className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
+                    className="text-meta font-semibold text-base-500 hover:text-base-900 uppercase"
                     data-testid="new-sku-comps-none"
                   >
                     None
@@ -736,12 +736,12 @@ export default function NewSkuModal({
               )}
             </div>
             {compPool.length === 0 ? (
-              <div className="t-tiny text-base-500">
+              <div className="text-meta text-base-500">
                 No compartments in the pool yet — add them in Maintenance → Sofa
                 Compartments, or use the size field below for a flat sofa SKU.
               </div>
             ) : compChoices.length === 0 ? (
-              <div className="t-tiny text-base-500" data-testid="new-sku-comps-none-left">
+              <div className="text-meta text-base-500" data-testid="new-sku-comps-none-left">
                 This model already offers every pool compartment — nothing left to add.
               </div>
             ) : (
@@ -763,7 +763,7 @@ export default function NewSkuModal({
                         }
                         aria-pressed={on}
                         title={comp.description ?? comp.code}
-                        className={`t-tiny font-mono font-semibold px-2 py-1 rounded-[4px] border transition-colors ${
+                        className={`text-meta font-mono font-semibold px-2 py-1 rounded-[4px] border transition-colors ${
                           on
                             ? "bg-base-900 border-base-900 text-white"
                             : "bg-white border-base-200 text-base-500 hover:border-base-400"
@@ -775,7 +775,7 @@ export default function NewSkuModal({
                     );
                   })}
                 </div>
-                <div className="t-tiny text-base-500 mt-1.5">
+                <div className="text-meta text-base-500 mt-1.5">
                   {selectedComps.size > 0 ? (
                     <>
                       Every sofa is a combination of compartments — auto-generates{" "}
@@ -808,7 +808,7 @@ export default function NewSkuModal({
                   <button
                     type="button"
                     onClick={() => setSelectedSizes(new Set(sizeChoices.map((p) => p.value)))}
-                    className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
+                    className="text-meta font-semibold text-base-500 hover:text-base-900 uppercase"
                     data-testid="new-sku-sizes-all"
                   >
                     All
@@ -816,7 +816,7 @@ export default function NewSkuModal({
                   <button
                     type="button"
                     onClick={() => setSelectedSizes(new Set())}
-                    className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
+                    className="text-meta font-semibold text-base-500 hover:text-base-900 uppercase"
                     data-testid="new-sku-sizes-none"
                   >
                     None
@@ -825,7 +825,7 @@ export default function NewSkuModal({
               )}
             </div>
             {sizeChoices.length === 0 ? (
-              <div className="t-tiny text-base-500" data-testid="new-sku-sizes-none-left">
+              <div className="text-meta text-base-500" data-testid="new-sku-sizes-none-left">
                 This model already has a SKU for every pool size — nothing left to add.
               </div>
             ) : (
@@ -847,7 +847,7 @@ export default function NewSkuModal({
                         }
                         aria-pressed={on}
                         title={[p.value, p.label ?? p.dimensions].filter(Boolean).join(" · ")}
-                        className={`t-tiny font-semibold px-2 py-1 rounded-[4px] border transition-colors ${
+                        className={`text-meta font-semibold px-2 py-1 rounded-[4px] border transition-colors ${
                           on
                             ? "bg-base-900 border-base-900 text-white"
                             : "bg-white border-base-200 text-base-500 hover:border-base-400"
@@ -859,7 +859,7 @@ export default function NewSkuModal({
                     );
                   })}
                 </div>
-                <div className="t-tiny text-base-500 mt-1.5">
+                <div className="text-meta text-base-500 mt-1.5">
                   {selectedSizes.size > 0 ? (
                     <>
                       Auto-generates{" "}
@@ -911,8 +911,8 @@ export default function NewSkuModal({
               className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2"
               data-testid="new-sku-price-lock-hint"
             >
-              <div className="t-small text-base-600">Price</div>
-              <div className="t-tiny text-base-400 mt-0.5">
+              <div className="text-body text-base-600">Price</div>
+              <div className="text-meta text-base-400 mt-0.5">
                 Generated SKUs are created unpriced — the principal (Master Admin) prices them.
               </div>
             </div>
@@ -933,7 +933,7 @@ export default function NewSkuModal({
               // Just preview the code the server will mint (the bare model key).
               codePreview && (
                 <div
-                  className="t-tiny text-base-500 flex items-center gap-1.5"
+                  className="text-meta text-base-500 flex items-center gap-1.5"
                   data-testid="new-sku-no-variant-hint"
                 >
                   Code: <CodeChip>{codePreview}</CodeChip>
@@ -950,7 +950,7 @@ export default function NewSkuModal({
                   className={INPUT_CLS}
                 />
                 {codePreview && (
-                  <div className="t-tiny text-base-500 mt-1 flex items-center gap-1.5">
+                  <div className="text-meta text-base-500 mt-1 flex items-center gap-1.5">
                     Code: <CodeChip>{codePreview}</CodeChip>
                   </div>
                 )}
@@ -992,8 +992,8 @@ export default function NewSkuModal({
                 className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2"
                 data-testid="new-sku-price-lock-hint"
               >
-                <div className="t-small text-base-600">Price &amp; cost</div>
-                <div className="t-tiny text-base-400 mt-0.5">
+                <div className="text-body text-base-600">Price &amp; cost</div>
+                <div className="text-meta text-base-400 mt-0.5">
                   Set by the principal (Master Admin). This SKU is created unpriced —
                   the principal will price it.
                 </div>
@@ -1009,7 +1009,7 @@ export default function NewSkuModal({
                 className={INPUT_CLS}
               />
               {autoDescPreview && (
-                <div className="t-tiny text-base-500 mt-1" data-testid="new-sku-auto-desc">
+                <div className="text-meta text-base-500 mt-1" data-testid="new-sku-auto-desc">
                   Blank = auto-filled{" "}
                   <span className="font-mono text-base-700">{autoDescPreview}</span> (from the
                   size pool dimensions)

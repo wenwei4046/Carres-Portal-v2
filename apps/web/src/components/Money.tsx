@@ -14,13 +14,13 @@
 type Tone = "hero" | "row";
 
 const DIGITS: Record<Tone, string> = {
-  hero: "text-[18px] font-bold leading-none",
-  row: "text-[13px] font-semibold",
+  hero: "text-strong font-semibold leading-none",
+  row: "text-body font-semibold",
 };
 
 const MARK: Record<Tone, string> = {
-  hero: "text-[10px]",
-  row: "text-[9px]",
+  hero: "text-label",
+  row: "text-label",
 };
 
 /** "1,749" — thousands-separated, no decimals (matches the drawer's RM()). */

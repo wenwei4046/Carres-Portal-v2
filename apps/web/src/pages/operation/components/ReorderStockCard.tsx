@@ -58,9 +58,9 @@ export default function ReorderStockCard() {
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <PackageSearch size={16} strokeWidth={2} className="text-base-400" />
-            <span className="t-h4 text-base-900">Reorder</span>
+            <span className="text-strong text-base-900">Reorder</span>
           </div>
-          <div className="text-[12px] text-base-600 mt-0.5">
+          <div className="text-meta text-base-600 mt-0.5">
             Pillow and protector come from China — about 2 months. Order before
             the shelf runs down.
           </div>
@@ -85,7 +85,7 @@ export default function ReorderStockCard() {
 
       <div className="px-4 py-1">
         <div
-          className="grid items-center gap-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.03em] text-base-400"
+          className="grid items-center gap-3 py-1.5 text-label font-semibold uppercase tracking-[0.03em] text-base-400"
           style={{ gridTemplateColumns: "1fr 64px 64px 84px 132px 28px" }}
         >
           <span>Item</span>
@@ -130,28 +130,28 @@ function ReorderRow({
       data-testid={`reorder-row-${row.sku}`}
     >
       <div className="min-w-0">
-        <div className="text-[13px] text-base-900 truncate" title={row.sku}>
+        <div className="text-body text-base-900 truncate" title={row.sku}>
           {row.sku}
         </div>
         {row.kind ? (
-          <div className="text-[11px] text-base-500">
+          <div className="text-label text-base-500">
             {KIND_HINT[row.kind] ?? row.kind}
             {row.leadDays != null ? ` · ${row.leadDays} days to arrive` : ""}
           </div>
         ) : null}
       </div>
 
-      <span className="text-right font-mono text-[13px] text-base-900">
+      <span className="text-right font-mono text-body text-base-900">
         {row.onHand}
       </span>
       <span
-        className={`text-right font-mono text-[13px] ${
+        className={`text-right font-mono text-body ${
           row.incoming > 0 ? "text-base-900" : "text-base-400"
         }`}
       >
         {row.incoming}
       </span>
-      <span className="text-right font-mono text-[13px] text-base-700">
+      <span className="text-right font-mono text-body text-base-700">
         {row.reorderPoint == null ? "—" : row.reorderPoint}
       </span>
 
@@ -198,7 +198,7 @@ function StatePill({ row }: { row: OpsReorderRow }) {
   }
   return (
     <span
-      className="text-[12px] text-base-500"
+      className="text-meta text-base-500"
       data-testid={`reorder-state-${row.sku}`}
     >
       {row.reorderPoint === 0 ? "No alert" : "Enough"}
@@ -231,7 +231,7 @@ function PointEditor({ row, onDone }: { row: OpsReorderRow; onDone: () => void }
           if (e.key === "Enter") submit();
           if (e.key === "Escape") onDone();
         }}
-        className="w-[62px] rounded border border-base-300 px-2 py-1 text-[13px] font-mono focus:border-primary focus:outline-none"
+        className="w-[62px] rounded border border-base-300 px-2 py-1 text-body font-mono focus:border-primary focus:outline-none"
         aria-label={`Reorder point for ${row.sku}`}
         data-testid={`reorder-input-${row.sku}`}
       />
@@ -256,13 +256,13 @@ function PointEditor({ row, onDone }: { row: OpsReorderRow; onDone: () => void }
       </button>
       {save.isError ? (
         <span
-          className="text-[11px] text-danger"
+          className="text-label text-danger"
           data-testid={`reorder-error-${row.sku}`}
         >
           Not saved
         </span>
       ) : (
-        <span className="text-[11px] text-base-400">0 = off</span>
+        <span className="text-label text-base-400">0 = off</span>
       )}
     </div>
   );

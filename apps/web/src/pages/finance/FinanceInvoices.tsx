@@ -122,20 +122,20 @@ export default function FinanceInvoices() {
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="flex items-end justify-between gap-4 flex-wrap mb-7">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
             Finance · Documents
           </div>
-          <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
+          <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
             Invoices
           </h1>
-          <div className="text-[13px] text-muted-foreground">
+          <div className="text-body text-muted-foreground">
             Tax invoices issued to customers · SST 8% inclusive
           </div>
         </div>
         <button
           type="button"
           onClick={handleNewInvoice}
-          className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-[12px] font-semibold"
+          className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-meta font-semibold"
         >
           + New invoice
         </button>
@@ -155,14 +155,14 @@ export default function FinanceInvoices() {
               key={t.key}
               type="button"
               onClick={() => setTab(t.key)}
-              className={`px-3.5 py-2 text-[12.5px] font-semibold transition-colors -mb-px border-b-2 ${
+              className={`px-3.5 py-2 text-meta font-semibold transition-colors -mb-px border-b-2 ${
                 active
                   ? "text-foreground border-primary"
                   : "text-muted-foreground border-transparent hover:text-foreground"
               }`}
             >
               {t.label}{" "}
-              <span className="font-mono text-[10.5px] text-muted-foreground ml-1">· {t.count}</span>
+              <span className="font-mono text-label text-muted-foreground ml-1">· {t.count}</span>
             </button>
           );
         })}
@@ -170,7 +170,7 @@ export default function FinanceInvoices() {
 
       <div className="bg-card rounded-md border border-border overflow-auto">
         <div
-          className="grid items-center px-4 py-2.5 bg-muted/40 border-b border-border text-[10px] uppercase tracking-[0.06em] font-bold text-muted-foreground"
+          className="grid items-center px-4 py-2.5 bg-muted/40 border-b border-border text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground"
           style={{ gridTemplateColumns: "120px 1.3fr 1fr 90px 110px 110px 90px 100px", minWidth: 980 }}
         >
           <span>Invoice</span>
@@ -184,9 +184,9 @@ export default function FinanceInvoices() {
         </div>
 
         {aging.isLoading ? (
-          <div className="p-12 text-center text-[12.5px] text-muted-foreground">Loading…</div>
+          <div className="p-12 text-center text-meta text-muted-foreground">Loading…</div>
         ) : filtered.length === 0 ? (
-          <div className="p-12 text-center text-[12.5px] text-muted-foreground">No invoices.</div>
+          <div className="p-12 text-center text-meta text-muted-foreground">No invoices.</div>
         ) : (
           filtered.map((r) => (
             <InvoiceTableRow key={r.order_id} row={r} onPdf={() => handleDownloadPdf(r)} />
@@ -195,7 +195,7 @@ export default function FinanceInvoices() {
       </div>
 
       {aging.error && (
-        <div className="mt-5 p-3 text-[12px] rounded-md bg-destructive/5 text-destructive border border-destructive/30">
+        <div className="mt-5 p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
           Failed to load invoices: {String(aging.error)}
         </div>
       )}
@@ -212,17 +212,17 @@ function InvoiceTableRow({ row, onPdf }: { row: InvoiceRow; onPdf: () => void })
 
   return (
     <div
-      className="grid items-center px-4 py-3 border-b border-border text-[12.5px]"
+      className="grid items-center px-4 py-3 border-b border-border text-meta"
       style={{ gridTemplateColumns: "120px 1.3fr 1fr 90px 110px 110px 90px 100px", minWidth: 980 }}
     >
       <span className="font-mono font-semibold">{row.invoice_no}</span>
       <span>{row.customer_name}</span>
       <span className="text-muted-foreground">{row.dealer_name ?? "—"}</span>
-      <span className="text-[11px] text-muted-foreground">{issued}</span>
+      <span className="text-label text-muted-foreground">{issued}</span>
       <span className="font-mono text-right">{rm(row.net)}</span>
       <span className="font-mono text-right text-muted-foreground">{rm(row.tax)}</span>
       <span className="text-right">
-        <span className={`px-2 py-0.5 rounded text-[10.5px] font-bold ${tone}`}>
+        <span className={`px-2 py-0.5 rounded text-label font-semibold ${tone}`}>
           {row.status === "paid" ? "Paid" : row.status === "partial" ? "Partial" : "Unpaid"}
         </span>
       </span>
@@ -230,7 +230,7 @@ function InvoiceTableRow({ row, onPdf }: { row: InvoiceRow; onPdf: () => void })
         <button
           type="button"
           onClick={onPdf}
-          className="text-[11px] px-2.5 py-1 rounded border border-border bg-background hover:bg-muted/40"
+          className="text-label px-2.5 py-1 rounded border border-border bg-background hover:bg-muted/40"
         >
           PDF
         </button>
@@ -251,13 +251,13 @@ function Kpi({
   const valueTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
   return (
     <div className={`bg-card rounded-md border ${accent ? "border-primary" : "border-border"} px-5 py-[18px]`}>
-      <div className={`text-[10px] uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
+      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
         {label}
       </div>
-      <div className={`font-display text-[26px] mt-1.5 leading-none tabular-nums ${valueTone}`}>
+      <div className={`font-display text-page mt-1.5 leading-none tabular-nums ${valueTone}`}>
         {value}
       </div>
-      {hint && <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>}
+      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
     </div>
   );
 }

@@ -35,7 +35,7 @@ export default function PrincipalApprovals() {
   }, [all.data]);
 
   if (list.isLoading || !list.data) {
-    return <div className="px-9 py-8 text-sm text-muted-foreground">Loading…</div>;
+    return <div className="px-9 py-8 text-body text-muted-foreground">Loading…</div>;
   }
   const items = list.data.approvals;
 
@@ -43,10 +43,10 @@ export default function PrincipalApprovals() {
     <div className="px-9 py-8 pb-14">
       <div className="mb-5">
         <div className="kicker">HQ · Approvals</div>
-        <h1 className="font-display text-[30px] leading-[1.05] mt-1.5 tracking-tight font-semibold">
+        <h1 className="font-display text-page leading-[1.05] mt-1.5 tracking-tight font-semibold">
           Decisions in your court
         </h1>
-        <div className="text-[13px] text-base-600 mt-1.5">
+        <div className="text-body text-base-600 mt-1.5">
           {counts.pending} pending · auto-routed from Finance, Sales and Catalog.
         </div>
       </div>
@@ -55,8 +55,8 @@ export default function PrincipalApprovals() {
         {(["pending", "approved", "rejected", "all"] as Filter[]).map((f) => {
           const isActive = filter === f;
           const cls = isActive
-            ? "px-3.5 py-1.5 text-[12px] rounded-sm capitalize bg-white font-semibold text-base-900 cursor-pointer border-0"
-            : "px-3.5 py-1.5 text-[12px] rounded-sm capitalize text-base-600 font-medium cursor-pointer bg-transparent border-0";
+            ? "px-3.5 py-1.5 text-meta rounded-sm capitalize bg-white font-semibold text-base-900 cursor-pointer border-0"
+            : "px-3.5 py-1.5 text-meta rounded-sm capitalize text-base-600 font-medium cursor-pointer bg-transparent border-0";
           return (
             <button key={f} type="button" onClick={() => setFilter(f)} className={cls}>
               {f}
@@ -68,9 +68,9 @@ export default function PrincipalApprovals() {
 
       {items.length === 0 ? (
         <div className="bg-white border border-base-200 rounded-md p-12 text-center text-base-500">
-          <div className="text-[32px] mb-2 text-base-300">—</div>
-          <div className="font-display text-[18px]">Nothing here</div>
-          <div className="text-[12px] mt-1">No approvals match this filter.</div>
+          <div className="text-page mb-2 text-base-300">—</div>
+          <div className="font-display text-strong">Nothing here</div>
+          <div className="text-meta mt-1">No approvals match this filter.</div>
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">

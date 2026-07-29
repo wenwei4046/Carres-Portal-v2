@@ -62,13 +62,13 @@ export default function FinanceAR() {
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="flex items-end justify-between gap-4 flex-wrap mb-7">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
             Finance · Receivables
           </div>
-          <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
+          <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
             A/R · Receivables
           </h1>
-          <div className="text-[13px] text-muted-foreground">
+          <div className="text-body text-muted-foreground">
             Money customers owe Carres. Each row is one customer order.
           </div>
         </div>
@@ -88,7 +88,7 @@ export default function FinanceAR() {
 
       <div className="bg-card rounded-md border border-border overflow-auto">
         <div
-          className="grid items-center px-4 py-2.5 bg-muted/40 border-b border-border text-[10px] uppercase tracking-[0.06em] font-bold text-muted-foreground"
+          className="grid items-center px-4 py-2.5 bg-muted/40 border-b border-border text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground"
           style={{ gridTemplateColumns: "120px 1.2fr 1fr 90px 110px 110px 110px 90px", minWidth: 980 }}
         >
           <span>Invoice</span>
@@ -102,9 +102,9 @@ export default function FinanceAR() {
         </div>
 
         {aging.isLoading ? (
-          <div className="p-12 text-center text-[12.5px] text-muted-foreground">Loading…</div>
+          <div className="p-12 text-center text-meta text-muted-foreground">Loading…</div>
         ) : filtered.length === 0 ? (
-          <div className="p-12 text-center text-[12.5px] text-muted-foreground">
+          <div className="p-12 text-center text-meta text-muted-foreground">
             Nothing matches those filters.
           </div>
         ) : (
@@ -117,7 +117,7 @@ export default function FinanceAR() {
       {drawer && <ARDrawer row={drawer} onClose={() => setDrawer(null)} />}
 
       {aging.error && (
-        <div className="mt-5 p-3 text-[12px] rounded-md bg-destructive/5 text-destructive border border-destructive/30">
+        <div className="mt-5 p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
           Failed to load receivables: {String(aging.error)}
         </div>
       )}
@@ -141,7 +141,7 @@ function FilterBar({
         value={search}
         onChange={(e) => onSearch(e.target.value)}
         placeholder="Search customer, dealer, or INV-…"
-        className="flex-1 min-w-[240px] px-2.5 py-1.5 border border-border rounded text-[12.5px] bg-background outline-none"
+        className="flex-1 min-w-[240px] px-2.5 py-1.5 border border-border rounded text-meta bg-background outline-none"
       />
       <Segmented
         options={[["open", "Open"], ["settled", "Settled"], ["all", "All"]]}
@@ -171,7 +171,7 @@ function Segmented({
           key={k}
           type="button"
           onClick={() => onChange(k)}
-          className={`px-2.5 py-1 rounded text-[11.5px] font-semibold transition-colors ${
+          className={`px-2.5 py-1 rounded text-label font-semibold transition-colors ${
             value === k
               ? "bg-card text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
@@ -188,7 +188,7 @@ function Segmented({
 function ARRow({ row, onView }: { row: FinanceArAgingRow; onView: () => void }) {
   return (
     <div
-      className="grid items-center px-4 py-3 border-b border-border text-[12.5px]"
+      className="grid items-center px-4 py-3 border-b border-border text-meta"
       style={{ gridTemplateColumns: "120px 1.2fr 1fr 90px 110px 110px 110px 90px", minWidth: 980 }}
     >
       <span className="font-mono font-semibold">{row.invoice_no}</span>
@@ -199,14 +199,14 @@ function ARRow({ row, onView }: { row: FinanceArAgingRow; onView: () => void }) 
       </span>
       <span className="font-mono text-right">{rm(row.total)}</span>
       <span className="font-mono text-right text-muted-foreground">{rm(row.paid)}</span>
-      <span className={`font-mono text-right font-bold ${row.outstanding > 0 ? "text-primary" : "text-muted-foreground"}`}>
+      <span className={`font-mono text-right font-semibold ${row.outstanding > 0 ? "text-primary" : "text-muted-foreground"}`}>
         {rm(row.outstanding)}
       </span>
       <span className="text-right">
         <button
           type="button"
           onClick={onView}
-          className="px-2.5 py-1 text-[11px] border border-border rounded hover:bg-accent/50"
+          className="px-2.5 py-1 text-label border border-border rounded hover:bg-accent/50"
         >
           View
         </button>
@@ -221,7 +221,7 @@ function AgingPill({ bucket }: { bucket: FinanceArAgingRow["aging"] }) {
     bucket === "31-60" ? "bg-primary/10 text-primary"        :
                          "bg-destructive/10 text-destructive";
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${tone}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-label font-semibold ${tone}`}>
       <span className="w-1 h-1 rounded-full bg-current mr-1.5" />
       {bucket}d
     </span>
@@ -241,13 +241,13 @@ function Kpi({
   const valueTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
   return (
     <div className={`bg-card rounded-md border ${accent ? "border-primary" : "border-border"} px-5 py-[18px]`}>
-      <div className={`text-[10px] uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
+      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
         {label}
       </div>
-      <div className={`font-display text-[26px] mt-1.5 leading-none tabular-nums ${valueTone}`}>
+      <div className={`font-display text-page mt-1.5 leading-none tabular-nums ${valueTone}`}>
         {value}
       </div>
-      {hint && <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>}
+      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
     </div>
   );
 }

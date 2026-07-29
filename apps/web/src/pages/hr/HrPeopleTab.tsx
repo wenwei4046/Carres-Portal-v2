@@ -50,7 +50,7 @@ function Meter({ filled, total }: { filled: number; total: number }) {
       <div className="h-[5px] w-[52px] shrink-0 overflow-hidden rounded-full bg-base-200">
         <div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
       </div>
-      <span className="t-tiny tabular-nums text-base-400">
+      <span className="text-meta tabular-nums text-base-400">
         {filled}/{total}
       </span>
     </div>
@@ -78,26 +78,26 @@ function PersonRow({
       className={`${COLS} h-11 w-full border-t border-base-200 px-3.5 text-left hover:bg-hovertint`}
     >
       <span className="flex min-w-0 items-center gap-2.5">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-base-100 text-[10.5px] font-semibold text-base-600">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-base-100 text-label font-semibold text-base-600">
           {p.name.slice(0, 2).toUpperCase()}
         </span>
         <span className="min-w-0">
-          <span className="block truncate text-[13.5px] font-semibold leading-tight text-base-900">
+          <span className="block truncate text-body font-semibold leading-tight text-base-900">
             {p.name}
           </span>
-          <span className="t-micro block truncate normal-case leading-tight text-base-400">
+          <span className="text-label uppercase tracking-[0.05em] block truncate normal-case leading-tight text-base-400">
             {p.workEmail ?? "No email · signs in with a PIN"}
           </span>
         </span>
       </span>
 
-      <span className="font-mono text-[12.5px] font-semibold text-base-600">
+      <span className="font-mono text-meta font-semibold text-base-600">
         {p.staffCode ?? "—"}
       </span>
 
       <span className="min-w-0">
-        <span className="block truncate text-[12.5px] text-base-900">{seat ?? "Not set"}</span>
-        {sub && <span className="t-micro block truncate normal-case text-base-400">{sub}</span>}
+        <span className="block truncate text-meta text-base-900">{seat ?? "Not set"}</span>
+        {sub && <span className="text-label uppercase tracking-[0.05em] block truncate normal-case text-base-400">{sub}</span>}
       </span>
 
       <span>
@@ -120,8 +120,8 @@ function PersonRow({
 function GroupBand({ title, count }: { title: string; count: number }) {
   return (
     <div className="flex h-[30px] items-center gap-2 border-t border-base-200 bg-base-50 px-3.5">
-      <span className="t-micro text-base-400">{title}</span>
-      <span className="t-tiny text-base-300">{count}</span>
+      <span className="text-label uppercase tracking-[0.05em] text-base-400">{title}</span>
+      <span className="text-meta text-base-300">{count}</span>
     </div>
   );
 }
@@ -168,13 +168,13 @@ export default function HrPeopleTab() {
   const needsExit = people.filter(needsExitRecorded);
 
   if (isLoading) {
-    return <div className="t-small py-10 text-center text-base-500">Loading people…</div>;
+    return <div className="text-body py-10 text-center text-base-500">Loading people…</div>;
   }
   if (isError || !data) {
     // A browser on this build against an older Worker gets a 404 here. Say so
     // instead of showing an empty register, which would read as "no staff".
     return (
-      <div className="t-small py-10 text-center text-base-500">
+      <div className="text-body py-10 text-center text-base-500">
         People is not available yet. If this persists, the API needs deploying.
       </div>
     );
@@ -189,12 +189,12 @@ export default function HrPeopleTab() {
             <TriangleAlert size={16} />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[13.5px] font-semibold">
+            <div className="text-body font-semibold">
               {needsExit.length === 1
                 ? `${needsExit[0]!.name} lost access with no exit recorded`
                 : `${needsExit.length} people lost access with no exit recorded`}
             </div>
-            <div className="t-tiny text-base-500">
+            <div className="text-meta text-base-500">
               Access is already cut. The register still lists them as current, so they
               would carry into this month&apos;s commission run.
             </div>
@@ -211,23 +211,23 @@ export default function HrPeopleTab() {
 
       <SectionCard>
         <div className="flex items-center gap-2 px-3.5 py-3">
-          <span className="t-small text-base-500">
+          <span className="text-body text-base-500">
             <b className="text-base-900">{people.length}</b> people ·{" "}
             <b className="text-base-900">{complete}</b> profiles complete
           </span>
           <span className="flex-1" />
-          <span className="t-tiny text-base-400">
+          <span className="text-meta text-base-400">
             A person appears here the moment they get a CR code in Team
           </span>
         </div>
 
         <div className={`${COLS} h-[34px] border-t border-base-200 bg-base-50 px-3.5`}>
-          <span className="t-micro text-base-400">Person</span>
-          <span className="t-micro text-base-400">CR</span>
-          <span className="t-micro text-base-400">Position</span>
-          <span className="t-micro text-base-400">Employment</span>
-          <span className="t-micro text-base-400">Access</span>
-          <span className="t-micro text-base-400">Profile</span>
+          <span className="text-label uppercase tracking-[0.05em] text-base-400">Person</span>
+          <span className="text-label uppercase tracking-[0.05em] text-base-400">CR</span>
+          <span className="text-label uppercase tracking-[0.05em] text-base-400">Position</span>
+          <span className="text-label uppercase tracking-[0.05em] text-base-400">Employment</span>
+          <span className="text-label uppercase tracking-[0.05em] text-base-400">Access</span>
+          <span className="text-label uppercase tracking-[0.05em] text-base-400">Profile</span>
           <span />
         </div>
 
@@ -247,7 +247,7 @@ export default function HrPeopleTab() {
 
         <div className="flex items-center gap-2 border-t border-base-200 bg-base-50 px-3.5 py-2.5">
           <Info size={14} className="shrink-0 text-base-400" />
-          <span className="t-tiny text-base-400">
+          <span className="text-meta text-base-400">
             Showing all {people.length}. Store logins, supplier and partner accounts are not
             people — they have no CR code, so they never appear here.
           </span>

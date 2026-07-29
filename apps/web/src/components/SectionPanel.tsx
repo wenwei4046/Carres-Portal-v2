@@ -95,7 +95,7 @@ export function SectionBand({
         <span
           /* v4 §11c — panel header is DARK 12/600 (muted headers were
              unreadable; muted is for meta only). */
-          className={`uppercase flex-1 truncate text-[12px] font-semibold tracking-[0.04em] ${
+          className={`uppercase flex-1 truncate text-meta font-semibold tracking-[0.04em] ${
             danger ? "section-band-title-danger" : "section-band-title"
           }`}
         >
@@ -103,7 +103,7 @@ export function SectionBand({
         </span>
       </button>
       {total !== undefined && (
-        <span className="tabular-nums shrink-0 text-[12px] font-semibold section-band-total">
+        <span className="tabular-nums shrink-0 text-meta font-semibold section-band-total">
           {total}
         </span>
       )}

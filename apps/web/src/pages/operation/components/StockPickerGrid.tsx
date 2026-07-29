@@ -279,7 +279,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
         collapsed={collapsedCard}
         onToggle={() => setCollapsedCard((v) => !v)}
         right={
-          <span className="shrink-0 flex items-center gap-1.5 text-[12px] text-base-500">
+          <span className="shrink-0 flex items-center gap-1.5 text-meta text-base-500">
             <span className="whitespace-nowrap">
               {rows.length} free · {checked.size} picked
               {q.trim() ? ` · ${view.length} shown` : ""}
@@ -292,7 +292,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
       <>
       {/* Scope row — the same-model note + the sofa loan toggle. */}
       <div className="px-1.5 pt-1.5 pb-1 flex items-center justify-between gap-2 shrink-0">
-        <span className="t-tiny text-base-400 truncate">
+        <span className="text-meta text-base-400 truncate">
           {loanMode ? "any sofa — loan" : "same model + size"}
         </span>
         {isSofa && (
@@ -304,7 +304,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                 ? "Back to this line's exact model + size"
                 : "Show every free sofa so you can loan one (any model / fabric)"
             }
-            className={`inline-flex items-center gap-1 rounded-[5px] border px-2 py-0.5 t-tiny transition-colors ${
+            className={`inline-flex items-center gap-1 rounded-[5px] border px-2 py-0.5 text-meta transition-colors ${
               /* v4 §2 — a toggle is a secondary control: active reads as the
                  dark/grey state, never a flame tint (flame = primary action). */
               loanMode
@@ -337,7 +337,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search model / size / PO / old ref…"
-          className="w-full pl-7 pr-2 py-1 text-[12px] border border-base-200 rounded-md bg-white outline-none focus:border-primary"
+          className="w-full pl-7 pr-2 py-1 text-meta border border-base-200 rounded-md bg-white outline-none focus:border-primary"
         />
       </div>
 
@@ -345,7 +345,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
         <div className="min-w-[460px]">
           {/* header — §7.8 columns; neutral base-50 (the cream is the band's). */}
           <div
-            className="grid sticky top-0 z-20 bg-base-50 border-b border-base-200 text-base-500 text-[12px] font-bold"
+            className="grid sticky top-0 z-20 bg-base-50 border-b border-base-200 text-base-500 text-meta font-semibold"
             style={{ gridTemplateColumns: GRID }}
           >
             <div className="px-1.5 py-1.5" />
@@ -365,7 +365,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                 key={r.id}
                 onClick={() => toggle(r.id)}
                 title={r.sku}
-                className={`grid items-center h-[40px] border-b border-base-100 cursor-pointer text-[12px] ${
+                className={`grid items-center h-[40px] border-b border-base-100 cursor-pointer text-meta ${
                   on
                     ? "bg-[#e6f1fb]"
                     : i % 2
@@ -435,7 +435,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
             );
           })}
           {view.length === 0 && (
-            <div className="px-3 py-8 text-center t-tiny text-base-400">
+            <div className="px-3 py-8 text-center text-meta text-base-400">
               {rows.length > 0
                 ? "No units match this search."
                 : loanMode
@@ -467,7 +467,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
       ) : null}
 
       <div className="px-1.5 py-2 border-t border-base-100 flex items-center justify-end gap-2">
-        <span className="t-tiny text-base-500 mr-auto">
+        <span className="text-meta text-base-500 mr-auto">
           need {need} · {checked.size} picked
           {draw.problem && !loaning ? (
             <span className="ml-2 text-base-600" data-testid="picker-reason-problem">

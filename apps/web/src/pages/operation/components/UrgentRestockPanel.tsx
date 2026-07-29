@@ -57,14 +57,14 @@ export default function UrgentRestockPanel() {
         <div>
           <div className="flex items-center gap-2">
             <Zap size={16} strokeWidth={2} className="text-primary" />
-            <h2 className="t-h3 text-base-900">Urgent restock</h2>
+            <h2 className="text-strong text-base-900">Urgent restock</h2>
             {data && data.pendingCount > 0 ? (
               <span className="pill pill-sent" data-testid="urgent-pending-count">
                 {data.pendingCount} waiting
               </span>
             ) : null}
           </div>
-          <div className="text-[13px] text-base-600 mt-1">
+          <div className="text-body text-base-600 mt-1">
             Can&rsquo;t wait for next month. Ask any time, say why — the COO
             answers it directly. These numbers stay out of the monthly plan.
           </div>
@@ -73,7 +73,7 @@ export default function UrgentRestockPanel() {
           <button
             type="button"
             onClick={() => setRaising(true)}
-            className="btn-secondary text-[13px] py-1.5 shrink-0"
+            className="btn-secondary text-body py-1.5 shrink-0"
             data-testid="urgent-new"
           >
             <Plus size={14} strokeWidth={2} className="inline -mt-0.5 mr-1" />
@@ -87,13 +87,13 @@ export default function UrgentRestockPanel() {
       ) : null}
 
       {isLoading ? (
-        <p className="text-sm text-base-500">Loading…</p>
+        <p className="text-body text-base-500">Loading…</p>
       ) : isError ? (
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
+        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-1">
             Couldn&rsquo;t load the urgent list
           </div>
-          <div className="text-[12px] text-base-700">
+          <div className="text-meta text-base-700">
             {(error as Error | undefined)?.message ?? "Unknown error"}
           </div>
         </div>
@@ -105,7 +105,7 @@ export default function UrgentRestockPanel() {
           >
             {(data?.rows.length ?? 0) === 0 ? (
               <div
-                className="px-4 py-8 text-center text-[13px] text-base-500"
+                className="px-4 py-8 text-center text-body text-base-500"
                 data-testid="urgent-empty"
               >
                 Nothing urgent right now.
@@ -167,7 +167,7 @@ function RaiseForm({ skus, onDone }: { skus: string[]; onDone: () => void }) {
           onChange={(e) => setSku(e.target.value)}
           list="urgent-restock-skus"
           placeholder="Item / SKU"
-          className="flex-1 min-w-[180px] rounded border border-base-300 px-2 py-1.5 text-[13px] focus:border-primary focus:outline-none"
+          className="flex-1 min-w-[180px] rounded border border-base-300 px-2 py-1.5 text-body focus:border-primary focus:outline-none"
           aria-label="Item you need"
           data-testid="urgent-sku"
         />
@@ -181,14 +181,14 @@ function RaiseForm({ skus, onDone }: { skus: string[]; onDone: () => void }) {
           inputMode="numeric"
           onChange={(e) => setQty(e.target.value.replace(/[^0-9]/g, ""))}
           placeholder="How many"
-          className="w-[92px] rounded border border-base-300 px-2 py-1.5 text-[13px] font-mono text-right focus:border-primary focus:outline-none"
+          className="w-[92px] rounded border border-base-300 px-2 py-1.5 text-body font-mono text-right focus:border-primary focus:outline-none"
           aria-label="How many you need"
           data-testid="urgent-qty"
         />
         <select
           value={reason}
           onChange={(e) => setReason(e.target.value as EmergencyReason | "")}
-          className="rounded border border-base-300 px-2 py-1.5 text-[13px] focus:border-primary focus:outline-none"
+          className="rounded border border-base-300 px-2 py-1.5 text-body focus:border-primary focus:outline-none"
           aria-label="Why it is urgent"
           data-testid="urgent-reason"
         >
@@ -206,7 +206,7 @@ function RaiseForm({ skus, onDone }: { skus: string[]; onDone: () => void }) {
             if (e.key === "Enter") submit();
           }}
           placeholder={reason === "other" ? "Say what happened" : "More detail (optional)"}
-          className="flex-1 min-w-[180px] rounded border border-base-300 px-2 py-1.5 text-[13px] focus:border-primary focus:outline-none"
+          className="flex-1 min-w-[180px] rounded border border-base-300 px-2 py-1.5 text-body focus:border-primary focus:outline-none"
           aria-label="More detail"
           data-testid="urgent-note"
         />
@@ -216,7 +216,7 @@ function RaiseForm({ skus, onDone }: { skus: string[]; onDone: () => void }) {
           type="button"
           onClick={submit}
           disabled={!!problem || raise.isPending}
-          className="btn-primary text-[13px] py-1.5 disabled:opacity-40"
+          className="btn-primary text-body py-1.5 disabled:opacity-40"
           data-testid="urgent-submit"
         >
           {raise.isPending ? "Sending…" : "Send to the COO"}
@@ -224,18 +224,18 @@ function RaiseForm({ skus, onDone }: { skus: string[]; onDone: () => void }) {
         <button
           type="button"
           onClick={onDone}
-          className="btn-ghost text-[13px] py-1.5"
+          className="btn-ghost text-body py-1.5"
           data-testid="urgent-cancel"
         >
           Cancel
         </button>
         {problem ? (
-          <span className="text-[12px] text-base-500" data-testid="urgent-problem">
+          <span className="text-meta text-base-500" data-testid="urgent-problem">
             {problem}
           </span>
         ) : null}
         {raise.isError ? (
-          <span className="text-[12px] text-danger" data-testid="urgent-raise-error">
+          <span className="text-meta text-danger" data-testid="urgent-raise-error">
             {(raise.error as Error | undefined)?.message ?? "Not sent"}
           </span>
         ) : null}
@@ -263,10 +263,10 @@ function UrgentRow({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[13px] text-base-900 truncate" title={row.sku}>
+            <span className="text-body text-base-900 truncate" title={row.sku}>
               {row.sku}
             </span>
-            <span className="font-mono text-[13px] text-base-900 font-semibold">
+            <span className="font-mono text-body text-base-900 font-semibold">
               &times;{row.status === "pending" ? row.qty : (row.approvedQty ?? row.qty)}
             </span>
             <span className="pill pill-neutral">{row.reasonLabel}</span>
@@ -278,7 +278,7 @@ function UrgentRow({
             </span>
           </div>
 
-          <div className="text-[12px] text-base-600 mt-1">
+          <div className="text-meta text-base-600 mt-1">
             {row.requestedByName ?? "Someone"} asked
             {row.waitingDays != null
               ? row.waitingDays === 0
@@ -292,7 +292,7 @@ function UrgentRow({
           </div>
 
           {/* Facts about the warehouse, never a suggestion — see the header. */}
-          <div className="text-[12px] text-base-500 mt-1 flex flex-wrap gap-x-4">
+          <div className="text-meta text-base-500 mt-1 flex flex-wrap gap-x-4">
             <span>
               Free now{" "}
               <span className="font-mono text-base-900">{row.onHand}</span>
@@ -307,7 +307,7 @@ function UrgentRow({
 
           {row.coveredByFreeStock && row.status === "pending" ? (
             <div
-              className="text-[12px] text-warning-700 mt-1 inline-flex items-center gap-1"
+              className="text-meta text-warning-700 mt-1 inline-flex items-center gap-1"
               data-testid={`urgent-covered-${row.id}`}
             >
               <TriangleAlert size={14} strokeWidth={2} />
@@ -316,7 +316,7 @@ function UrgentRow({
           ) : null}
 
           {row.decisionRemark ? (
-            <div className="text-[12px] text-base-700 mt-1">
+            <div className="text-meta text-base-700 mt-1">
               <span className="text-base-500">
                 {row.decidedByName ?? "The COO"} said:{" "}
               </span>
@@ -324,7 +324,7 @@ function UrgentRow({
             </div>
           ) : null}
           {row.status === "ordered" && row.orderedByName ? (
-            <div className="text-[12px] text-base-500 mt-1">
+            <div className="text-meta text-base-500 mt-1">
               Purchase order raised by {row.orderedByName}.
             </div>
           ) : null}
@@ -336,7 +336,7 @@ function UrgentRow({
               <DecideBox row={row} />
             ) : (
               <span
-                className="text-[12px] text-base-500"
+                className="text-meta text-base-500"
                 data-testid={`urgent-awaiting-${row.id}`}
               >
                 Waiting for the COO
@@ -370,7 +370,7 @@ function DecideBox({ row }: { row: OpsStockEmergencyRow }) {
         value={remark}
         onChange={(e) => setRemark(e.target.value)}
         placeholder="Remark (needed to turn down)"
-        className="w-[180px] rounded border border-base-300 px-2 py-1 text-[12px] focus:border-primary focus:outline-none"
+        className="w-[180px] rounded border border-base-300 px-2 py-1 text-meta focus:border-primary focus:outline-none"
         aria-label={`Remark for ${row.sku}`}
         data-testid={`urgent-remark-${row.id}`}
       />
@@ -378,7 +378,7 @@ function DecideBox({ row }: { row: OpsStockEmergencyRow }) {
         value={qty}
         inputMode="numeric"
         onChange={(e) => setQty(e.target.value.replace(/[^0-9]/g, ""))}
-        className="w-[56px] rounded border border-base-300 px-1 py-1 text-[13px] font-mono text-right focus:border-primary focus:outline-none"
+        className="w-[56px] rounded border border-base-300 px-1 py-1 text-body font-mono text-right focus:border-primary focus:outline-none"
         aria-label={`Quantity to approve for ${row.sku}`}
         data-testid={`urgent-approve-qty-${row.id}`}
       />
@@ -393,7 +393,7 @@ function DecideBox({ row }: { row: OpsStockEmergencyRow }) {
           })
         }
         disabled={!qtyValid || decide.isPending}
-        className="btn-primary text-[12px] py-1 px-2 disabled:opacity-40"
+        className="btn-primary text-meta py-1 px-2 disabled:opacity-40"
         data-testid={`urgent-approve-${row.id}`}
       >
         <Check size={14} strokeWidth={2} className="inline -mt-0.5 mr-0.5" />
@@ -410,7 +410,7 @@ function DecideBox({ row }: { row: OpsStockEmergencyRow }) {
           })
         }
         disabled={decide.isPending || remark.trim() === ""}
-        className="btn-danger text-[12px] py-1 px-2 disabled:opacity-40"
+        className="btn-danger text-meta py-1 px-2 disabled:opacity-40"
         title={remark.trim() === "" ? "Say why before turning it down" : undefined}
         data-testid={`urgent-reject-${row.id}`}
       >
@@ -418,7 +418,7 @@ function DecideBox({ row }: { row: OpsStockEmergencyRow }) {
       </button>
       {decide.isError ? (
         <span
-          className="text-[11px] text-danger"
+          className="text-label text-danger"
           data-testid={`urgent-decide-error-${row.id}`}
         >
           Not saved
@@ -436,7 +436,7 @@ function MarkOrderedButton({ id }: { id: string }) {
       type="button"
       onClick={() => m.mutate({ id })}
       disabled={m.isPending}
-      className="btn-secondary text-[12px] py-1 disabled:opacity-50"
+      className="btn-secondary text-meta py-1 disabled:opacity-50"
       data-testid={`urgent-ordered-${id}`}
     >
       {m.isPending ? "Saving…" : "I ordered it"}
@@ -466,8 +466,8 @@ function UrgentPoList({
         <div className="flex items-center gap-2">
           <ShoppingCart size={16} strokeWidth={2} className="text-base-400" />
           <div>
-            <div className="t-h4 text-base-900">Order these now</div>
-            <div className="text-[12px] text-base-600 mt-0.5">
+            <div className="text-strong text-base-900">Order these now</div>
+            <div className="text-meta text-base-600 mt-0.5">
               Approved and not ordered yet. Tick each one off above once the
               purchase order is raised.
             </div>
@@ -476,7 +476,7 @@ function UrgentPoList({
         <button
           type="button"
           onClick={() => void navigator.clipboard?.writeText(copy)}
-          className="btn-secondary text-[12px] py-1.5 shrink-0"
+          className="btn-secondary text-meta py-1.5 shrink-0"
           data-testid="urgent-po-copy"
         >
           Copy list
@@ -488,16 +488,16 @@ function UrgentPoList({
           className="px-4 py-2 border-t border-base-100 flex items-center justify-between gap-3"
           data-testid={`urgent-po-${r.sku}`}
         >
-          <span className="text-[13px] text-base-900 truncate" title={r.sku}>
+          <span className="text-body text-base-900 truncate" title={r.sku}>
             {r.sku}
             {r.requestCount > 1 ? (
-              <span className="text-[12px] text-base-500">
+              <span className="text-meta text-base-500">
                 {" "}
                 · {r.requestCount} asks
               </span>
             ) : null}
           </span>
-          <span className="font-mono text-[13px] text-base-900 font-semibold shrink-0">
+          <span className="font-mono text-body text-base-900 font-semibold shrink-0">
             {r.qty}
           </span>
         </div>

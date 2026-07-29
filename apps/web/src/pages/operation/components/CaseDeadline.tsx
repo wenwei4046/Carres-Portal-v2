@@ -63,8 +63,8 @@ export default function CaseDeadline({
   if (!clock.dueIso) {
     return (
       <div className="rounded border border-base-200 bg-base-50 p-3">
-        <p className="t-tiny uppercase tracking-wider text-base-500">Deadline</p>
-        <p className="mt-1 text-sm text-base-700">
+        <p className="text-meta uppercase tracking-wider text-base-500">Deadline</p>
+        <p className="mt-1 text-body text-base-700">
           This case has no report date, so it has no deadline. Set the Opened date above.
         </p>
       </div>
@@ -75,14 +75,14 @@ export default function CaseDeadline({
     <div className="rounded border border-base-200 bg-base-50 p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="t-tiny uppercase tracking-wider text-base-500">Deadline</p>
-          <p className="mt-0.5 text-sm font-medium text-base-900 tabular-nums">
+          <p className="text-meta uppercase tracking-wider text-base-500">Deadline</p>
+          <p className="mt-0.5 text-body font-medium text-base-900 tabular-nums">
             {fmtDate(clock.dueIso)}
           </p>
         </div>
         {count && (
           <span
-            className={`t-tiny tabular-nums ${
+            className={`text-meta tabular-nums ${
               clock.state === "late" ? "text-error-700" : "text-base-600"
             }`}
           >
@@ -92,7 +92,7 @@ export default function CaseDeadline({
       </div>
 
       {/* The rule, where the work is — not learnt by being refused. */}
-      <p className="t-tiny mt-1 text-base-500">
+      <p className="text-meta mt-1 text-base-500">
         {closed
           ? `This case is closed. Every case is finished within ${CASE_SLA_WORKING_DAYS} working days of the day it was reported.`
           : `Every case is finished within ${CASE_SLA_WORKING_DAYS} working days of the day it was reported.`}
@@ -103,11 +103,11 @@ export default function CaseDeadline({
         <ul className="mt-2 space-y-1">
           {extension && (
             <li className="rounded border border-base-200 bg-white px-2.5 py-1.5">
-              <span className="block text-sm text-base-800">
+              <span className="block text-body text-base-800">
                 Deadline moved once — {fmtDate(clock.baseDueIso ?? "")} to{" "}
                 {fmtDate(extension.until ?? "")}
               </span>
-              <span className="t-tiny block text-base-500">
+              <span className="text-meta block text-base-500">
                 {fmtDate(extension.on)} · {caseDelayReasonLabel(extension.reason)}
                 {extension.note ? ` · ${extension.note}` : ""} · recorded by{" "}
                 {extension.byRole || "unknown"}
@@ -116,10 +116,10 @@ export default function CaseDeadline({
           )}
           {calls.map((e, i) => (
             <li key={`${e.at}-${i}`} className="rounded border border-base-200 bg-white px-2.5 py-1.5">
-              <span className="block text-sm text-base-800">
+              <span className="block text-body text-base-800">
                 {(customerName ?? "").trim() || "The customer"} was told why it is taking longer
               </span>
-              <span className="t-tiny block text-base-500">
+              <span className="text-meta block text-base-500">
                 {fmtDate(e.on)} · {caseDelayReasonLabel(e.reason)}
                 {e.note ? ` · ${e.note}` : ""} · recorded by {e.byRole || "unknown"}
               </span>
@@ -131,11 +131,11 @@ export default function CaseDeadline({
       {/* The ONE thing S4 ever asks a human to do. */}
       {action && (
         <div className="mt-2 flex items-center justify-between gap-3 rounded border border-base-200 bg-white px-2.5 py-2">
-          <span className="text-sm font-medium text-base-900">{action}</span>
+          <span className="text-body font-medium text-base-900">{action}</span>
           <button
             type="button"
             onClick={() => setForm(form === "customer_told" ? null : "customer_told")}
-            className="btn-secondary shrink-0 py-1 text-[12px]"
+            className="btn-secondary shrink-0 py-1 text-meta"
           >
             Record
           </button>
@@ -154,13 +154,13 @@ export default function CaseDeadline({
 
       {!closed && clock.mayExtend && (
         <div className="mt-2 flex items-center justify-between gap-3">
-          <span className="t-tiny text-base-500">
+          <span className="text-meta text-base-500">
             Parts on special order? The deadline can be moved once.
           </span>
           <button
             type="button"
             onClick={() => setForm(form === "extension" ? null : "extension")}
-            className="btn-secondary shrink-0 py-1 text-[12px]"
+            className="btn-secondary shrink-0 py-1 text-meta"
           >
             Move the deadline
           </button>
@@ -239,18 +239,18 @@ function RecordDeadlineForm({
   return (
     <div className="mt-2 space-y-2 border-t border-base-200 pt-2">
       <div className="flex flex-wrap items-end gap-2">
-        <label className="t-tiny text-base-500">
+        <label className="text-meta text-base-500">
           Date you told the customer
           <input
             type="date"
             value={on}
             onChange={(e) => setOn(e.target.value)}
-            className="mt-1 block rounded border border-base-300 px-2 py-1 text-sm"
+            className="mt-1 block rounded border border-base-300 px-2 py-1 text-body"
           />
         </label>
 
         {kind === "extension" && (
-          <label className="t-tiny text-base-500">
+          <label className="text-meta text-base-500">
             New deadline
             <input
               type="date"
@@ -258,7 +258,7 @@ function RecordDeadlineForm({
               min={clock.baseDueIso ?? undefined}
               max={max ?? undefined}
               onChange={(e) => setUntil(e.target.value)}
-              className="mt-1 block rounded border border-base-300 px-2 py-1 text-sm"
+              className="mt-1 block rounded border border-base-300 px-2 py-1 text-body"
             />
           </label>
         )}
@@ -267,18 +267,18 @@ function RecordDeadlineForm({
           type="button"
           onClick={() => saveMut.mutate()}
           disabled={!!problem || saveMut.isPending}
-          className="btn-primary py-1.5 text-[13px] disabled:opacity-40"
+          className="btn-primary py-1.5 text-body disabled:opacity-40"
         >
           {saveMut.isPending ? "Saving…" : "Save"}
         </button>
       </div>
 
-      <label className="t-tiny block text-base-500">
+      <label className="text-meta block text-base-500">
         Why is it taking longer?
         <select
           value={reason}
           onChange={(e) => setReason(e.target.value as CaseDelayReason)}
-          className="mt-1 block w-full rounded border border-base-300 bg-white px-2 py-1 text-sm"
+          className="mt-1 block w-full rounded border border-base-300 bg-white px-2 py-1 text-body"
         >
           {/* No default — a silent default records a reason nobody chose. */}
           <option value="">— pick one —</option>
@@ -290,7 +290,7 @@ function RecordDeadlineForm({
         </select>
       </label>
 
-      <label className="t-tiny block text-base-500">
+      <label className="text-meta block text-base-500">
         {reason && caseDelayNeedsNote(reason)
           ? "Say what the reason is"
           : "Anything to add? (optional)"}
@@ -298,20 +298,20 @@ function RecordDeadlineForm({
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder={reason && caseDelayNeedsNote(reason) ? "Factory closed for the holiday" : ""}
-          className="mt-1 w-full rounded border border-base-300 px-2 py-1 text-sm"
+          className="mt-1 w-full rounded border border-base-300 px-2 py-1 text-body"
         />
       </label>
 
       {kind === "extension" && movedUntil && movedUntil !== until && (
-        <p className="t-tiny text-base-600">
+        <p className="text-meta text-base-600">
           {fmtDate(until)} is not a working day — the deadline lands on {fmtDate(movedUntil)}.
         </p>
       )}
 
-      {problem && <p className="t-tiny text-base-600">{problem}</p>}
+      {problem && <p className="text-meta text-base-600">{problem}</p>}
 
       {saveMut.isError && (
-        <p className="t-tiny break-words text-error-700">
+        <p className="text-meta break-words text-error-700">
           Could not save: {(saveMut.error as Error)?.message ?? "unknown error"}
         </p>
       )}

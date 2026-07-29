@@ -58,17 +58,17 @@ export default function FacetRow({
     >
       {leadingChip}
       <span
-        className={`min-w-0 truncate text-[13px] ${
+        className={`min-w-0 truncate text-body ${
           active ? "text-base-900 font-semibold" : "text-base-700"
         }`}
       >
         {label}
       </span>
-      {suffix && <span className="text-[11px] shrink-0">{suffix}</span>}
+      {suffix && <span className="text-label shrink-0">{suffix}</span>}
       <span
-        className={`ml-auto text-[12px] tabular-nums shrink-0 ${
+        className={`ml-auto text-meta tabular-nums shrink-0 ${
           tone === "danger"
-            ? "text-danger font-bold"
+            ? "text-danger font-semibold"
             : tone === "muted"
               ? "text-base-400"
               : "text-base-500 font-semibold"
@@ -82,5 +82,5 @@ export default function FacetRow({
 }
 
 export function EmptyFacetHint({ text }: { text: string }) {
-  return <div className="px-2.5 py-1.5 text-[12px] text-base-400">{text}</div>;
+  return <div className="px-2.5 py-1.5 text-meta text-base-400">{text}</div>;
 }

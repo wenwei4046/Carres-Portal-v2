@@ -101,14 +101,14 @@ export default function ModularTab({
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search models…"
               aria-label="Search models"
-              className="pl-8 pr-3 py-1.5 border border-base-300 rounded-full text-[13px] bg-white outline-none focus:border-base-500 w-56"
+              className="pl-8 pr-3 py-1.5 border border-base-300 rounded-full text-body bg-white outline-none focus:border-base-500 w-56"
               data-testid="modular-search"
             />
           </div>
           <button
             type="button"
             onClick={() => setNewModelOpen(true)}
-            className="btn-hero text-[12px]"
+            className="btn-hero text-meta"
             data-testid="model-new"
           >
             + New Model
@@ -116,12 +116,12 @@ export default function ModularTab({
         </div>
       </div>
 
-      <div className="t-micro text-base-500 mb-4" data-testid="modular-count">
+      <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-4" data-testid="modular-count">
         {totalShown} MODEL{totalShown === 1 ? "" : "S"} · CLICK A CARD TO EDIT ALLOWED OPTIONS
       </div>
 
       {grouped.length === 0 && (
-        <div className="t-small text-base-500 py-6">No models match.</div>
+        <div className="text-body text-base-500 py-6">No models match.</div>
       )}
 
       <div className="flex flex-col gap-5">
@@ -133,7 +133,7 @@ export default function ModularTab({
           >
             <div className="flex items-center gap-2 mb-3">
               <span className="pill pill-neutral uppercase">{CATEGORY_LABEL[group.category]}</span>
-              <span className="t-tiny text-base-500">
+              <span className="text-meta text-base-500">
                 {group.models.length} model{group.models.length === 1 ? "" : "s"}
               </span>
             </div>
@@ -207,21 +207,21 @@ function ModelCard({
           loading="lazy"
         />
       ) : (
-        <div className="w-12 h-12 rounded-[4px] border border-dashed border-base-300 bg-white grid place-items-center text-base-300 text-[16px] shrink-0">
+        <div className="w-12 h-12 rounded-[4px] border border-dashed border-base-300 bg-white grid place-items-center text-base-300 text-strong shrink-0">
           ▦
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <div className="t-small font-semibold text-base-900 uppercase truncate">
+        <div className="text-body font-semibold text-base-900 uppercase truncate">
           {model.name}
         </div>
-        <div className="t-tiny text-base-500 truncate">{model.modelKey}</div>
+        <div className="text-meta text-base-500 truncate">{model.modelKey}</div>
         {hidden && (
           <span className="pill pill-neutral mt-1 inline-block" data-testid={`model-hidden-${model.modelKey}`}>
             Hidden from POS
           </span>
         )}
-        <div className="t-tiny text-base-500 mt-1 flex items-center gap-1">
+        <div className="text-meta text-base-500 mt-1 flex items-center gap-1">
           <Layers size={11} strokeWidth={1.75} />
           {liveSkus.length} SKU{liveSkus.length === 1 ? "" : "s"}
         </div>
