@@ -362,39 +362,79 @@ export const ORDER_ACTION_QUEUES: readonly string[] = WORDS.map((w) => w.queue);
 // One file (Law 0A: one home for the mirror), two tables, no duplicated string.
 //
 // Only rows with a READER in the code are here — the module's own rule above.
-// `Confirm tomorrow's delivery` and `Confirm balance delivery date` are locked
-// in COPY-STANDARD and nothing renders them yet, so they are deliberately absent.
+//
+// P3 (2026-07-29) added the last two: `Confirm tomorrow's delivery` and
+// `Confirm balance delivery date`. They sat out of this table until now for
+// exactly the reason the rule gives — nothing rendered them — and they arrive
+// with their four readers in the same PR (the Receiving tab's two facet tiles,
+// the row buttons and the record-answer form). All five strings come straight
+// off COPY-STANDARD's PURCHASING table; P3 invented no word.
 
 export type PurchasingActionKey =
   | "send_po"
   | "confirm_ready_date"
+  | "confirm_tomorrows_delivery"
   | "check_in"
+  | "confirm_balance_delivery_date"
   | "confirm_what_happens_next";
 
 interface PurchasingWord {
   queue: string;
   line: (p: OrderActionParties) => string;
   button: string;
+  /**
+   * String 4 — the DONE MESSAGE. `null` = not mirrored yet (the ORDERS table's
+   * own rule, one string per card that gains a READER), never "this action
+   * records nothing". `Check in`'s takes quantities rather than a party and
+   * lives in `checkedInDone` instead.
+   */
+  done: string | null;
   /** String 5. Present only where it takes no parameter — `Check in`'s own
    *  empty state names a supplier AND a date, and nothing reads it yet. */
   empty: string | null;
 }
 
 const PURCHASING_ONLY: Record<
-  "check_in" | "confirm_what_happens_next",
+  | "confirm_tomorrows_delivery"
+  | "check_in"
+  | "confirm_balance_delivery_date"
+  | "confirm_what_happens_next",
   PurchasingWord
 > = {
+  confirm_tomorrows_delivery: {
+    // P3 · §3's "the action the portal is missing today". The day before the
+    // goods are due, somebody asks the factory whether the van goes tomorrow —
+    // and that is when they say it will be late.
+    queue: "Confirm tomorrow's delivery",
+    line: (p) =>
+      `Call ${party(p.supplier, "supplier")} — confirm tomorrow's delivery`,
+    button: "Record answer",
+    done: "Answer recorded",
+    empty: "Nothing arriving tomorrow.",
+  },
   check_in: {
     queue: "Check in",
     line: (p) => `Check in from ${party(p.supplier, "supplier")}`,
     button: "Check in",
+    done: null,
     empty: null,
+  },
+  confirm_balance_delivery_date: {
+    // P3 · the van came short and somebody has to ask when the rest comes.
+    // Counted per PO LINE — the only one of the six that is.
+    queue: "Confirm balance delivery date",
+    line: (p) =>
+      `Call ${party(p.supplier, "supplier")} — confirm balance delivery date`,
+    button: "Record balance date",
+    done: "Balance date recorded",
+    empty: "Nothing short today.",
   },
   confirm_what_happens_next: {
     queue: "Confirm what happens next",
     line: (p) =>
       `Call ${party(p.supplier, "supplier")} — confirm what happens next`,
     button: "Record what happens next",
+    done: null,
     empty: "No claim is waiting for a supplier answer.",
   },
 };
@@ -403,7 +443,13 @@ function purchasingWord(key: PurchasingActionKey): PurchasingWord {
   if (key === "send_po" || key === "confirm_ready_date") {
     const w = wordFor(key);
     // `button` is non-null for both of these; the assertion is local and true.
-    return { queue: w.queue, line: w.line, button: w.button as string, empty: null };
+    return {
+      queue: w.queue,
+      line: w.line,
+      button: w.button as string,
+      done: w.done,
+      empty: null,
+    };
   }
   return PURCHASING_ONLY[key];
 }
@@ -432,6 +478,12 @@ export function purchasingActionEmpty(key: PurchasingActionKey): string | null {
   return purchasingWord(key).empty;
 }
 
+/** What the portal says once the outcome is recorded. `null` = not mirrored;
+ *  the caller must then say nothing rather than invent a sentence. */
+export function purchasingActionDone(key: PurchasingActionKey): string | null {
+  return purchasingWord(key).done;
+}
+
 /**
  * `Check in`'s DONE message — the dictionary's `Checked in {n} of {m}`.
  *
@@ -442,12 +494,39 @@ export function checkedInDone(received: number, ordered: number): string {
   return `Checked in ${received} of ${ordered}`;
 }
 
-/** Every purchasing queue word — for a banned-word guard to walk. */
+/**
+ * The TWO ANSWERS to `Confirm tomorrow's delivery` — COPY-STANDARD's answers
+ * table, ruled by Loo 2026-07-29.
+ *
+ * They name the DATE rather than saying yes and no, for the same reason
+ * `Delay planning`'s name the promised date: the reader must not have to
+ * remember what was asked. And for one more, which is Loo's own: **the action
+ * opens the working day before the goods are due and stays open until somebody
+ * answers it**, so a relative word is true only on the first day —
+ * `Shipping tomorrow`, answered two days late, is a sentence about a day that
+ * has already gone.
+ *
+ * `date` is the caller's already-formatted string (`5 Aug 26, Wed`): this
+ * module owns WORDS and never dates.
+ */
+export function tomorrowDeliveryAnswerLabel(
+  answer: "shipping" | "delayed",
+  date: string,
+): string {
+  return answer === "shipping"
+    ? `It ships on ${date}`
+    : `It ships later than ${date}`;
+}
+
+/** Every purchasing queue word, in §4's display order — for a banned-word
+ *  guard to walk, and for a test to assert the table is complete. */
 export const PURCHASING_ACTION_QUEUES: readonly string[] = (
   [
     "send_po",
     "confirm_ready_date",
+    "confirm_tomorrows_delivery",
     "check_in",
+    "confirm_balance_delivery_date",
     "confirm_what_happens_next",
   ] as const
 ).map(purchasingActionQueue);

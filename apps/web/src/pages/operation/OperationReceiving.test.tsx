@@ -436,3 +436,198 @@ describe("Receiving · §8.2 the facet rail (card P2)", () => {
     expect(screen.queryByTestId("listshell-active-chips")).toBeNull();
   });
 });
+
+/**
+ * P3 · the two supplier calls land on this tab, in the band P2-Receiving
+ * reserved for them ("When P3 lands, its two actions get their tiles in this
+ * same band").
+ *
+ * Dates are deliberately far from today in BOTH directions — a past arrival
+ * that only gets more past, a `2099` arrival that is never reached — so this
+ * fixture cannot quietly start testing a different rung the way T7 found one
+ * doing.
+ */
+describe("Receiving · P3 the two supplier calls", () => {
+  const P3_POS = [
+    // nothing due for a lifetime → no call
+    { ...po({ id: "T-1", supplier_id: "sup-nf", status: "open", sup_status: "in_production", lines: [{ id: "t1", sku: "MS01", qty: 4, received_qty: 0 }] }), eta_date: "2099-01-01" },
+    // due long ago, unanswered → the tomorrow call, late
+    { ...po({ id: "T-2", supplier_id: "sup-nf", status: "open", sup_status: "in_production", lines: [{ id: "t2", sku: "MS02", qty: 4, received_qty: 0 }] }), eta_date: "2026-06-20" },
+    // due long ago AND short → both calls at once (Law 1)
+    {
+      ...po({ id: "T-3", supplier_id: "sup-oh", status: "open", sup_status: "partially_shipped", lines: [{ id: "t3", sku: "SF01", qty: 4, received_qty: 1 }] }),
+      eta_date: "2026-06-20",
+      purchase_order_lines: [
+        { id: "t3", sku: "SF01", qty: 4, received_qty: 1, short_since: "2026-06-22" },
+      ],
+    },
+    // due long ago but ANSWERED about that very date → no call
+    {
+      ...po({ id: "T-4", supplier_id: "sup-oh", status: "open", sup_status: "in_production", lines: [{ id: "t4", sku: "BF01", qty: 4, received_qty: 0 }] }),
+      eta_date: "2026-06-20",
+      tomorrow_answer_about_date: "2026-06-20",
+    },
+  ];
+
+  beforeEach(() => {
+    apiFetchMock.mockImplementation((path: string) => {
+      if (typeof path === "string" && path.includes("/api/operation/suppliers"))
+        return Promise.resolve({ suppliers: SUPPLIERS });
+      if (typeof path === "string" && path.includes("/api/operation/warehouse"))
+        return Promise.resolve({ warehouses: WAREHOUSES });
+      if (typeof path === "string" && path.includes("/api/operation/pos"))
+        return Promise.resolve({ pos: P3_POS });
+      return Promise.resolve({});
+    });
+  });
+
+  const rows = () =>
+    screen
+      .getAllByTestId("receiving-row")
+      .map((r) => r.querySelector("td")?.textContent ?? "");
+
+  async function ready() {
+    wrap(<OperationReceiving />);
+    await waitFor(() => expect(screen.getByText("T-1")).toBeInTheDocument());
+  }
+
+  it("both tiles carry the dictionary's own words", async () => {
+    await ready();
+    expect(screen.getByTestId("receiving-facet-tomorrow")).toHaveTextContent(
+      "Confirm tomorrow's delivery",
+    );
+    expect(screen.getByTestId("receiving-facet-balance")).toHaveTextContent(
+      "Confirm balance delivery date",
+    );
+  });
+
+  it("the tomorrow tile counts POs that are due and unanswered — and no others", async () => {
+    await ready();
+    // T-2 and T-3. T-1 is not due for 70 years; T-4 has already been answered
+    // about this very arrival date.
+    expect(screen.getByTestId("receiving-facet-tomorrow")).toHaveTextContent("2");
+  });
+
+  it("the balance tile counts the POs it will SHOW, while the row names its line", async () => {
+    await ready();
+    // §3 counts this action per PO LINE; this tab's ROW is a PO, so the cell
+    // prints the rows it returns (P2-Claims' honesty rule) and the per-line
+    // figure is the number of buttons on the row.
+    expect(screen.getByTestId("receiving-facet-balance")).toHaveTextContent("1");
+    expect(screen.getByTestId("balance-t3")).toBeInTheDocument();
+  });
+
+  it("each tile filters and clears again (§8.2)", async () => {
+    await ready();
+    fireEvent.click(screen.getByTestId("receiving-facet-tomorrow"));
+    await waitFor(() => expect(rows()).toEqual(["T-2", "T-3"]));
+    fireEvent.click(screen.getByTestId("receiving-facet-tomorrow"));
+    await waitFor(() => expect(rows()).toHaveLength(4));
+
+    fireEvent.click(screen.getByTestId("receiving-facet-balance"));
+    await waitFor(() => expect(rows()).toEqual(["T-3"]));
+    fireEvent.click(screen.getByTestId("receiving-facet-balance"));
+    await waitFor(() => expect(rows()).toHaveLength(4));
+  });
+
+  it("a PO carries BOTH calls at once — one never hides the other (Law 1)", async () => {
+    await ready();
+    expect(screen.getByTestId("tomorrow-T-3")).toBeInTheDocument();
+    expect(screen.getByTestId("balance-t3")).toBeInTheDocument();
+    expect(screen.getByTestId("receive-T-3")).toBeInTheDocument();
+    // and an answered PO shows no tomorrow button at all
+    expect(screen.queryByTestId("tomorrow-T-4")).toBeNull();
+    expect(screen.queryByTestId("tomorrow-T-1")).toBeNull();
+  });
+
+  it("the tomorrow form asks the ruled question and names the DATE, not `tomorrow`", async () => {
+    await ready();
+    fireEvent.click(screen.getByTestId("tomorrow-T-2"));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveAttribute(
+      "aria-label",
+      "Call Nice Future — confirm tomorrow's delivery",
+    );
+    // Loo's reason for ruling these two (2026-07-29): they stay true however
+    // late they are read, so neither may contain a relative word.
+    const shipping = screen.getByTestId("supplier-answer-shipping").parentElement!;
+    const delayed = screen.getByTestId("supplier-answer-delayed").parentElement!;
+    expect(shipping).toHaveTextContent("It ships on");
+    expect(delayed).toHaveTextContent("It ships later than");
+    expect(shipping.textContent).not.toMatch(/\btomorrow\b/i);
+    expect(delayed.textContent).not.toMatch(/\btomorrow\b/i);
+  });
+
+  it("a delayed answer will not submit without the new date", async () => {
+    await ready();
+    fireEvent.click(screen.getByTestId("tomorrow-T-2"));
+    // The ROW button and the FORM button carry the same dictionary string, which
+    // is correct — so every assertion here is scoped to the dialog.
+    const form = within(await screen.findByRole("dialog"));
+    expect(form.getByText("Record answer")).not.toBeDisabled(); // shipping needs no date
+
+    fireEvent.click(screen.getByTestId("supplier-answer-delayed"));
+    await waitFor(() => expect(form.getByText("Record answer")).toBeDisabled());
+
+    fireEvent.change(screen.getByTestId("supplier-answer-new-date"), {
+      target: { value: "2026-09-15" },
+    });
+    await waitFor(() => expect(form.getByText("Record answer")).not.toBeDisabled());
+  });
+
+  it("the balance form is the balance action's own words", async () => {
+    await ready();
+    fireEvent.click(screen.getByTestId("balance-t3"));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveAttribute(
+      "aria-label",
+      "Call Ohana — confirm balance delivery date",
+    );
+    expect(within(dialog).getByText("Record balance date")).toBeInTheDocument();
+    // R1's own sentence about what is short — a FACT, no to-do word in it.
+    expect(screen.getByTestId("balance-line-fact")).toHaveTextContent(
+      "SF01 · 3 units pending delivery",
+    );
+  });
+
+  it("closing a record-answer form gives the list back (§8.2, last line)", async () => {
+    await ready();
+    fireEvent.click(screen.getByTestId("receiving-facet-tomorrow"));
+    await waitFor(() => expect(rows()).toEqual(["T-2", "T-3"]));
+
+    const rail = screen.getByTestId("listshell-facet");
+    Object.defineProperty(rail, "scrollHeight", { value: 900, configurable: true });
+    Object.defineProperty(rail, "clientHeight", { value: 400, configurable: true });
+    rail.scrollTop = 180;
+
+    fireEvent.click(screen.getByTestId("tomorrow-T-2"));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+    rail.scrollTop = 0; // what the refetch on close does to it
+    fireEvent.click(screen.getByLabelText("Close modal"));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(rows()).toEqual(["T-2", "T-3"]);
+    expect(rail.scrollTop).toBe(180);
+  });
+
+  it("records the answer through the route keyed on the LINE", async () => {
+    await ready();
+    fireEvent.click(screen.getByTestId("balance-t3"));
+    const form = within(await screen.findByRole("dialog"));
+    fireEvent.change(screen.getByTestId("supplier-answer-new-date"), {
+      target: { value: "2026-09-20" },
+    });
+    fireEvent.click(form.getByText("Record balance date"));
+
+    await waitFor(() => {
+      const call = apiFetchMock.mock.calls.find(
+        (c) => typeof c[0] === "string" && c[0].includes("/balance-date"),
+      );
+      expect(call).toBeTruthy();
+      expect(call![0]).toBe("/api/operation/pos/lines/t3/balance-date");
+      expect(JSON.parse((call![1] as { body: string }).body)).toEqual({
+        newDate: "2026-09-20",
+      });
+    });
+  });
+});

@@ -35,6 +35,49 @@ export const chasePoEventInput = z.object({
 export type ChasePoEventInput = z.infer<typeof chasePoEventInput>;
 
 /**
+ * P3 · `recordTomorrowDeliveryInput` —
+ * POST /api/operation/pos/:poId/tomorrow-delivery.
+ * Maps to `purchasing_record_tomorrow_delivery(po_id, answer, new_date,
+ * reason)` (0306).
+ *
+ * TWO answers and no third, because `docs/PURCHASING-WORKING-FLOW.md` §3 gives
+ * the action exactly two completions — **shipping**, or **delayed with a new
+ * date** — and the engine has no branch for a middle one. The DB CHECK says
+ * the same thing; this schema is its mirror, so a client meets a readable 422
+ * instead of a raw constraint string.
+ *
+ * `newDate` is REQUIRED on `delayed` and refused on `shipping`: a delay with no
+ * date records nothing anybody can act on, and a "shipping" answer carrying a
+ * date would be two different answers wearing one word.
+ */
+export const recordTomorrowDeliveryInput = z.discriminatedUnion('answer', [
+  z.object({
+    answer: z.literal('shipping'),
+    reason: z.string().max(300).optional(),
+  }).strict(),
+  z.object({
+    answer: z.literal('delayed'),
+    newDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'newDate must be YYYY-MM-DD'),
+    reason: z.string().max(300).optional(),
+  }).strict(),
+]);
+export type RecordTomorrowDeliveryInput = z.infer<typeof recordTomorrowDeliveryInput>;
+
+/**
+ * P3 · `recordBalanceDateInput` —
+ * POST /api/operation/pos/lines/:poLineId/balance-date.
+ * Maps to `purchasing_record_balance_date(po_line_id, new_date, reason)` (0306).
+ *
+ * The date is the whole record — §3's completion is "a date for the balance is
+ * recorded" — so it is not optional here either.
+ */
+export const recordBalanceDateInput = z.object({
+  newDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'newDate must be YYYY-MM-DD'),
+  reason: z.string().max(300).optional(),
+}).strict();
+export type RecordBalanceDateInput = z.infer<typeof recordBalanceDateInput>;
+
+/**
  * `attachDoInput` — POST /api/operation/orders/:id/attach-do.
  * Maps to `operation_attach_do_and_deliver(order_id, do_number, do_note,
  * signed, do_file_path)` RPC (D1.dispatch step 2 + Phase 9 Day 1 file-upload

@@ -504,6 +504,96 @@ the balance comes.
 **Done when:** a supplier who says "late" on the phone the day before produces a Delay
 planning action by itself, and a short delivery produces exactly one balance call.
 
+### ✅ SHIPPED — what actually landed (2026-07-29)
+
+Migration **0306** · **ONE append-only table** (`po_supplier_promises`) that is the answer
+record AND the promise history, because §3's *"every promise is kept, not overwritten"* is only
+structural when there is no column to overwrite — the CURRENT answer is the latest row. Plus a
+`purchase_order_lines.short_since` stamp, a fail-closed `operation|principal` gate, and three
+SECURITY DEFINER RPCs. **No write policy on the ledger**, so PostgREST cannot record a supplier
+promise without recording who promised what.
+
+**THE BUSINESS DECISION THIS CARD NEEDED, AND WHO MADE IT.** The card ties Delay planning to the
+tomorrow call only. A balance date can also land after the customer's promised date, and P3
+stopped rather than deciding on the business's behalf. **Loo ruled it 2026-07-29 (option A): a
+new BALANCE delivery date enters Delay planning too** — *"the portal must surface every known
+risk that may affect the Customer Delivery Window."* One delay model, reused: the date reaches
+`ops_order_control.line_etas`, C8's ladder opens `Delay planning` by itself and 0305's trigger
+starts the clock. **Nothing new was built for delay, and nothing about Delay planning changed.**
+
+**⚠️ ACCEPTED TEMPORARY LIMITATION — merged-PO false positives, and it belongs to P5.** A PO
+line MERGES several customers' quantities (§3: *"ten customers' bed frames from Ohana is one
+PO"*) and **nothing in the data says whose units are the short ones.** So a balance date reaches
+EVERY customer order the PO covers, and on a merged PO some of those orders are not really
+delayed. Loo accepted this knowingly: it is an ALLOCATION gap, P5 is the card that closes it,
+and the alternative — staying silent about the customers who ARE delayed — is worse. It is also
+consistent with what the engine already believes: 0299's receive RPC advances a customer thread
+only when `bool_and(received_qty >= qty)`, so a short PO line already leaves every linked
+customer waiting. **A chat that meets this must not "fix" it by narrowing the push; it is P5's.**
+
+**The card said the tomorrow call is "a one-day action" and that phrase is about the DUE.** Read
+as the trigger — `eta === tomorrow`, exactly — the call would vanish at midnight with nobody
+having closed it, and `ACTION-FLOW-STANDARD`'s opening sentence says an action leaves when its
+COMPLETION becomes true and at no other moment. So the window opens on the working day before
+the arrival (`eta <= the next OFFICE working day`) and stays open until answered; the Due is the
+working day before the arrival, and it turns red after that.
+
+**Both calls close only while the answer still describes the CURRENT facts** — S4's rule, the one
+C8 made load-bearing in `delay_decision_eta`. The tomorrow answer stores the arrival date it was
+made ABOUT; the balance answer stores the received quantity it was made ABOUT. A factory that
+moves the date again, or a second short delivery, re-opens the call **by itself**. Without that
+pair, one phone call would silence a PO forever.
+
+**THE BALANCE CALL'S DUE HAD NOWHERE TO LIVE, and the card did not predict it.** §3 says it is
+due *"the working day after the short delivery"* — and **nothing stored that day**: 0299's
+`operation_receive_po_with_do` writes `received_qty` and never writes `po_receipts` (zero
+references, measured). A Due that cannot be computed is one of Law 2's six things missing.
+`short_since` is stamped by a **TRIGGER, not route code**, which is 0305's own discipline:
+`received_qty` has three doors and a stamp one route writes is a stamp the other two walk
+around. A line short before 0306 raises the call with **no Due and never late** — a deadline
+nobody recorded may not be invented (T7: a step that cannot be late is not urgent).
+
+**Every word is COPY-STANDARD's.** The two rows joined the dictionary mirror with all five
+strings each; `Send PO` and `Confirm ready date` are still read back out of the ORDERS table
+rather than respelt. **The chat stopped once and asked**, exactly as C8 did: the action asks a
+question and COPY-STANDARD's answers table had ONE row (`Delay planning`). **Loo ruled the two
+answers: `It ships on {date}` · `It ships later than {date}`** — they name the date because the
+call stays open until it is answered, so `Shipping tomorrow` read two days late is a sentence
+about a day that has gone. A test refuses any relative word in either.
+
+**On screen:** the Receiving tab's `Today's work` band gains the two tiles, in §4's order, each
+hiding at zero. **A row shows EVERY open call, never only the top one** (Law 1) — a PO delivered
+short on Monday and expecting its balance van on Friday genuinely carries both. ONE record-answer
+form serves both actions (UI-KIT §6.1).
+
+**Live effect today: NONE** — 0 purchase orders, 0 lines, 0 promises. P3 decides the behaviour
+before the first PO exists, exactly as C7, C8 and C9 did.
+
+**Reported, not fixed (Law 0):**
+
+1. **The balance tile counts POs while §3 counts the action per PO LINE.** This tab's ROW is a
+   PO, and P2-Claims' honesty rule says a visible cell above zero must always return at least
+   that many ROWS. So the tile prints the POs it will show and the ROW prints one button per
+   short line — the per-line figure is visible, just not in the tile. A tile that counts lines
+   over a list of POs would be the first facet in the portal whose number its own click cannot
+   produce.
+2. **The two tiles carry no tooltip, and the other tiles on that page do.** COPY-STANDARD's
+   tooltip rule is *"if the tooltip would just re-state the label, delete the tooltip"*, and
+   these labels are already whole instructions. Writing one anyway would have been an invented
+   sentence on the day the answers had to be ruled. If Jess wants them, they are two strings.
+3. **`Note (optional)` has no dictionary row anywhere**, so the form reuses the order drawer's
+   own live string verbatim. C8 met this exact square and made the same call. Free text needs a
+   row or an explicit exemption; it has neither.
+4. **`purchase_orders.eta_date` is the only anchor either call can read, and §2's signal table
+   does not name it.** §2 names `expected_ready_date` for the supplier's ready date and lists no
+   column for *"when the goods are expected"*. A PO with no `eta_date` raises no tomorrow call
+   at all — no fallback to a lead time, because P1 deleted exactly that habit. Worth a line in
+   §2 either way.
+5. **A balance answer does not move `purchase_orders.eta_date`**, on purpose: that date is about
+   the whole PO and the promise is about one line. So a PO whose only outstanding line has a
+   balance date still shows the old PO-level arrival on the Receiving tab's ETA column. Correct
+   per line, confusing at a glance; the fix is a per-line date column and that is not P3's.
+
 ## P4 · Where the goods go
 
 **Goal:** a PO says where the supplier must send the goods, and prints it.
@@ -564,6 +654,18 @@ cancellation at all. A customer cancellation needs management approval and belon
 Orders cancellation policy; purchasing keeps processing a valid PO until Operations says stop,
 and stopping is the whole PO (`purchase_orders.status = 'cancelled'`, already built).
 
+4. **`Confirm ready date` has no button that can close it** — found by P3, 2026-07-29, and it
+   is the shape C3 retired one lane over. The action is live on the To Order tab's ② stage,
+   but **no route in the portal writes `purchase_orders.expected_ready_date`**: the only
+   supplier-facing write is `POST /api/operation/pos/:id/chase-event`
+   ([queries.ts](../apps/web/src/lib/queries.ts) → `useChasePoEventMutation`), which inserts
+   one `audit_log` sentence and touches no date. So the completion §3 states — "the latest
+   ready date **and** the outcome are recorded" — is unreachable, and the row can only leave
+   by the supplier's own portal moving the date. **P3 did not build it**: it is the EXISTING
+   action, not one of the two missing calls, and 0306's ledger is the right home for its
+   promise history when it is built (`kind` takes a third value and the RPC is a copy of
+   `purchasing_record_tomorrow_delivery`). Prove it on the real run and fix it here.
+
 **Migration:** likely. Draft to Jess first.
 **Done when:** one real PO has gone the whole way, including a short delivery, and every
 number on screen matches what actually happened.
@@ -586,6 +688,6 @@ number on screen matches what actually happened.
 |---|---|---|
 | P1 | ✅ the numbers become settings (migration **0303**) | #488 |
 | P2 | ✅ the interaction law is true on **To Order** (#492) · **Claims** (#494) · **Receiving** (#495). Purchase Orders is a nested route with no rail and was never in scope | #492 · #494 · #495 |
-| P3 | ⬜ after P1 · the two missing supplier calls (migration) | — |
+| P3 | ✅ the two missing supplier calls (migration **0306**) — and a balance date enters Delay planning too (Loo, 2026-07-29) | #506 |
 | P4 | ⬜ where the goods go (migration) | — |
 | P5 | ⬜ after P1-P4 · prove it with a real PO | — |

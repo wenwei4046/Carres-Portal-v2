@@ -2,13 +2,21 @@ import { describe, expect, it } from "vitest";
 
 import {
   ORDER_ACTION_QUEUES,
+  PURCHASING_ACTION_QUEUES,
   collectPillLabel,
   orderActionButton,
   orderActionDone,
   orderActionForQueue,
   orderActionLine,
   orderActionQueue,
+  purchasingActionButton,
+  purchasingActionDone,
+  purchasingActionEmpty,
+  purchasingActionLine,
+  purchasingActionQueue,
+  tomorrowDeliveryAnswerLabel,
   type OrderActionKey,
+  type PurchasingActionKey,
 } from "./order-action-words";
 
 const EVERY_KEY: OrderActionKey[] = [
@@ -230,5 +238,93 @@ describe("order action words — the banned words", () => {
     // and shares its opening words.
     expect(ORDER_ACTION_QUEUES).not.toContain("Confirm delivery");
     expect(orderActionForQueue("Confirm delivery")).toBeNull();
+  });
+});
+
+/**
+ * The PURCHASING table — COPY-STANDARD's second dictionary, transcribed here so
+ * a rename in one file fails in the other. It had no test until P3, which is
+ * how `Confirm tomorrow's delivery` and `Confirm balance delivery date` could
+ * sit locked in the law and absent from the mirror for a fortnight.
+ */
+describe("purchasing action words — the dictionary, verbatim", () => {
+  const EVERY_PURCHASING_KEY: PurchasingActionKey[] = [
+    "send_po",
+    "confirm_ready_date",
+    "confirm_tomorrows_delivery",
+    "check_in",
+    "confirm_balance_delivery_date",
+    "confirm_what_happens_next",
+  ];
+
+  it("spells all six queue words exactly as COPY-STANDARD does", () => {
+    expect(EVERY_PURCHASING_KEY.map(purchasingActionQueue)).toEqual([
+      "Send PO",
+      "Confirm ready date",
+      "Confirm tomorrow's delivery",
+      "Check in",
+      "Confirm balance delivery date",
+      "Confirm what happens next",
+    ]);
+    expect([...PURCHASING_ACTION_QUEUES]).toEqual(
+      EVERY_PURCHASING_KEY.map(purchasingActionQueue),
+    );
+  });
+
+  it("P3's two rows carry all five strings", () => {
+    expect(purchasingActionLine("confirm_tomorrows_delivery", { supplier: "Ohana" }))
+      .toBe("Call Ohana — confirm tomorrow's delivery");
+    expect(purchasingActionButton("confirm_tomorrows_delivery")).toBe("Record answer");
+    expect(purchasingActionDone("confirm_tomorrows_delivery")).toBe("Answer recorded");
+    expect(purchasingActionEmpty("confirm_tomorrows_delivery"))
+      .toBe("Nothing arriving tomorrow.");
+
+    expect(purchasingActionLine("confirm_balance_delivery_date", { supplier: "Ohana" }))
+      .toBe("Call Ohana — confirm balance delivery date");
+    expect(purchasingActionButton("confirm_balance_delivery_date"))
+      .toBe("Record balance date");
+    expect(purchasingActionDone("confirm_balance_delivery_date"))
+      .toBe("Balance date recorded");
+    expect(purchasingActionEmpty("confirm_balance_delivery_date"))
+      .toBe("Nothing short today.");
+  });
+
+  it("falls back to the role word, never to an empty gap", () => {
+    expect(purchasingActionLine("confirm_tomorrows_delivery"))
+      .toBe("Call supplier — confirm tomorrow's delivery");
+    expect(purchasingActionLine("confirm_balance_delivery_date", { supplier: "  " }))
+      .toBe("Call supplier — confirm balance delivery date");
+  });
+
+  it("`Send PO` and `Confirm ready date` are read back out of the ORDERS table", () => {
+    // COPY-STANDARD: "ONE action each, shared by Orders and Purchasing … they
+    // are never spelt differently." Read back, never respelt.
+    expect(purchasingActionQueue("send_po")).toBe(orderActionQueue("send_po"));
+    expect(purchasingActionButton("confirm_ready_date"))
+      .toBe(orderActionButton("confirm_ready_date"));
+  });
+
+  it("the two answers name the DATE, so they stay true however late they are read", () => {
+    // Loo's own reason for ruling them (2026-07-29). A relative word would be a
+    // sentence about a day that has already passed.
+    expect(tomorrowDeliveryAnswerLabel("shipping", "5 Aug 26, Wed"))
+      .toBe("It ships on 5 Aug 26, Wed");
+    expect(tomorrowDeliveryAnswerLabel("delayed", "5 Aug 26, Wed"))
+      .toBe("It ships later than 5 Aug 26, Wed");
+    for (const a of ["shipping", "delayed"] as const) {
+      expect(tomorrowDeliveryAnswerLabel(a, "5 Aug 26, Wed")).not.toMatch(
+        /\b(tomorrow|today|yesterday|now|soon)\b/i,
+      );
+    }
+  });
+
+  it("no banned word reaches a purchasing queue word or row line", () => {
+    const BANNED =
+      /\b(chase|chased|POD|proof of delivery|unscheduled|not booked|need booking|pending|processing|in progress|at risk|attention|inventory|movements)\b/i;
+    for (const key of EVERY_PURCHASING_KEY) {
+      expect(purchasingActionQueue(key)).not.toMatch(BANNED);
+      expect(purchasingActionLine(key, { supplier: "Ohana" })).not.toMatch(BANNED);
+      expect(purchasingActionButton(key)).not.toMatch(BANNED);
+    }
   });
 });

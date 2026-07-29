@@ -30,11 +30,11 @@
 | ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · R6 ✅ #490 · **R8 ✅ #499** (the banned-verb sweep) — only **R7** left |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 + C8b + **C11 · C12** | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C8 ✅ #493 (0304) · C8b ✅ #497 (0305) · C9 ✅ #472 · C10 ✅ #471** — **C4 RETIRED 2026-07-28 and re-cut as C11 + C12** (PR #484 stays open, unmerged: R8 shipped part of it, P1 deleted a file it edits, and Loo's money ruling made its own fix wrong). **C11** = a money figure is the money owed · **C12** = the last `Chase` leaves the portal |
-| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings) · **P2 ✅ #492 + #494 + #495** — the click law is true on all three Purchasing lists (To Order · Claims · Receiving). **P3 is the next card** |
+| ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 | **P1 ✅ #488** (0303 — the numbers became settings) · **P2 ✅ #492 + #494 + #495** — the click law is true on all three Purchasing lists (To Order · Claims · Receiving) · **P3 ✅ #506** (0306 — the two supplier calls, and a balance date enters Delay planning too). **P4 is the next card** |
 | ⑧ UI-KIT rebuild | `docs/ui-kit-execution-queue.md` | D0-D7 + T1-T4 + **D0.6** | D0 law ✅ · T1 hierarchy ✅ · T2 drawer ✅ `c9966ee3` · **D0.4 ✅ the old order-portal master spec is DELETED** · **D0.5a ✅ built 2026-07-28** — ten Foundation Components + a live `/ui`. **D0.5b ✅ SHIPPED 2026-07-28 (PR #502 `d77bd4f6`, deployed; `/ui` now shows the frozen record, verified in a real browser)** — the Radix half (`Modal` · `Drawer` · `Select` · `DropdownMenu` · `Tooltip` · `Popover` · `Tabs` · `Checkbox` · `DatePicker` · `Toast`), and **the PENDING REGISTER is now EMPTY: Jess froze Q1 = the 8-step scale · Q3 = `font-bold` deleted into 600 · Q4 = Lucide's stroke 2.** Each answer became a mechanism (a re-pointed source scan · a scan rule · a deleted prop), and the freeze cost **zero** component changes because D0.5a had built for both answers. §16 coverage 31.58% → 47.83%, blocked-on-a-decision 3 → 0, so **D5 is no longer blocked on a decision.** **D0.5c ✅ CLOSED as components-only and DEPLOYED** (PR #505 `929fa746`, 2026-07-29; **zero visual change proved by checksum** — the operator's main bundle is md5-identical to its predecessor once the lazy `/ui` chunk's filename is normalised) — `PageShell` (from `ListPageShell`) · `DataTable` (from the Orders table) · `DetailShell` (L4's six slots, all seven constraints as types, **no `state` prop**). §16 coverage 47.83% → 65.38% and **the Human-Review debt goes DOWN for the first time, 4 → 3**: "Progress carries no events" became a type. **No page renders through any of them, and that is the card's final shape — real-page adoption is D6.** **The drawer is NOT migrated**: L4 requires a 4-tuple of persistent facts (客户名 · Ref · promised date · outstanding), on today's drawer those four sit in four different blocks, and the header carries Jess's own rev-4 ruling *"ZERO order data here"* — so the strip would be a new layout reversing a frozen ruling. **PM, 2026-07-29: do not add it, and do NOT turn §7② into law** — Persistent Facts stays RESERVED and the first page through the shell is where the four get a home. **T3 = Jess uses the drawer for a day** (still waiting for P5). **Reference Review CLOSED 2026-07-28** — `docs/ui-reference-review.md` R1-R5 frozen (Fiori · Linear · Stripe · Vercel · GOV.UK/NNg/Polaris); five principles; that line froze **no** enforcement mechanism. **D0.6 KIT-CONSOLIDATION = planning card only, approved 2026-07-28, builds after D0.5c — it is the only card that may write the REFERENCE-REVIEW principles into `docs/UI-KIT.md`.** *(Corrected 2026-07-28: this row used to say D0.6 was the only card that may edit the kit at all, which the kit itself contradicts — §6 says each component's dictionary entry is written "when it lands on `/ui`" and §9 says "Written by D0.5a". A D-card still writes the chapter the law assigns it; D0.6 owns the review principles and the mirror's claims.)* TEMPORARY doc — delete when the line ends |
 
-**State 2026-07-28:** ① ② ③ ⑤ **LINE COMPLETE** · ④ **R1-R6 ✅** · ⑥ C1 · C2 · C3 · C5 · C6 · **C7** · C9 · C10 ✅ ·
-⑦ **P1 ✅ · P2 ✅** · ⑧ D0 + T1 + T2 + **D0.5a + D0.5b** ✅ (**Q1/Q3/Q4 FROZEN 2026-07-28 — the PENDING REGISTER is empty**; T3 is still a Jess task, not a build card). **D0.5c ✅ CLOSED as components-only** (`PageShell` · `DataTable` · `DetailShell`; the drawer is not migrated — PM, 2026-07-29). **Next on ⑧: D0.6 KIT-CONSOLIDATION.**
+**State 2026-07-29:** ① ② ③ ⑤ **LINE COMPLETE** · ④ **R1-R6 + R8 ✅** (R7 open) · ⑥ C1 · C2 · C3 · C5 · C6 · **C7** · C8 · C8b · C9 · C10 ✅ ·
+⑦ **P1 ✅ · P2 ✅ · P3 ✅** · ⑧ D0 + T1 + T2 + **D0.5a + D0.5b + D0.5c** ✅ (**Q1/Q3/Q4 FROZEN 2026-07-28 — the PENDING REGISTER is empty**; T3 is still a Jess task, not a build card). **D0.5c ✅ CLOSED as components-only** (`PageShell` · `DataTable` · `DetailShell`; the drawer is not migrated — PM, 2026-07-29). **Next on ⑦: P4. Next on ⑧: D0.6 KIT-CONSOLIDATION.**
 
 **What P2 changed so far (2026-07-28, PR #492) — the To Order half, web only, no
 migration.** UI-KIT §8.2 is now true on that tab. Three things it asks for were missing,
@@ -122,9 +122,27 @@ delivery queue is a deadline-carrying step, so the fifth tile waits on Jess ruli
 S / R / P run in parallel throughout; **C4 and ⑦ P share the Purchasing pages with ④ R —
 only ONE of those three at a time.**
 
-**Purchasing lane, 2026-07-28: FREE. R6 released it (#490); ⑦ P2 is COMPLETE** — To Order
-(#492) · Claims (#494) · Receiving (#495), each releasing the lane after itself. **④ R8 then
-took the whole lane for one PR and released it (#499).** **P3 is the next thing in it.**
+**Purchasing lane, 2026-07-29: FREE again. ⑦ P3 took it and released it (#506).** Before that:
+R6 released it (#490); ⑦ P2 completed across three chats — To Order (#492) · Claims (#494) ·
+Receiving (#495), each releasing the lane after itself; **④ R8 then took the whole lane for one
+PR and released it (#499).** **P4 is the next thing in it.**
+
+**What P3 changed (2026-07-29, PR #506, migration 0306).** The two supplier calls §3 names and
+the portal has never had: `Confirm tomorrow's delivery` (per PO) and `Confirm balance delivery
+date` (per PO line), with their tiles in the `Today's work` band P2-Receiving reserved for them.
+The promise ledger is **append-only**, so §3's *"every promise is kept, not overwritten"* has no
+column to overwrite; both calls close only while the answer still names the CURRENT facts, so a
+factory that slips again or a second short delivery re-opens the call by itself.
+**Loo made one business decision on it (2026-07-29): a new BALANCE delivery date enters Delay
+planning exactly as a delayed answer does** — the date reaches `ops_order_control.line_etas`,
+C8's ladder opens the decision, 0305 starts the clock, and **no second delay model exists**.
+**He accepted a named limitation with it**: a PO line merges several customers' quantities and
+nothing says whose units are short, so on a merged PO the date reaches customers who are not
+really delayed. **That is P5's allocation gap and nobody may narrow the push to "fix" it.**
+Two things the card did not predict: the balance call's Due had **nowhere to live** (0299 writes
+`received_qty` and never writes `po_receipts`), so 0306 stamps it with a trigger; and the two
+ANSWERS had no ruled words, so the chat stopped and asked — `It ships on {date}` ·
+`It ships later than {date}`, which stay true however late the call is read.
 
 **What R8 changed (2026-07-28, PR #499, web + shared, no migration).** Every banned word on
 the Purchasing lane is gone: `Chase factory` and `Send POs` on To Order, `Receive →` on
@@ -429,8 +447,8 @@ behaves, and a chat that treats it as the flow will name things on the business'
 
 ```
 ✅ P2-Receiving  #495            ✅ C8b  #497 (0305)   ✅ R8  #499   ✅ D0.5b #502
-▶  P3            the two supplier calls          (migration)
-   P4            where the goods go              (migration)
+✅ P3            the two supplier calls   #506   (0306)
+▶  P4            where the goods go              (migration)
    R7            GRN duty — receiving assigns itself   (migration)
    P5            one REAL PO, end to end
    T3            the Purchasing guided review + Jess's drawer day

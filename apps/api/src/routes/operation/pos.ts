@@ -9,6 +9,8 @@ import {
   normalizeSkuKey,
   reassignPoWarehouseInput,
   receivePoWithDoInput,
+  recordBalanceDateInput,
+  recordTomorrowDeliveryInput,
   type AwaitingStockShortageResponse,
 } from "@carres/shared";
 import { resolveCurrentPoDuty } from "./po-duty";
@@ -109,7 +111,10 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // The line UUID is the lookup key `operation_receive_po_with_do` needs
       // (0076) — without it the Receiving station could not submit a receive
       // at all. Every other PO-line select already carries it.
-      "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, attrs)",
+      // P3 (0306): `short_since` is the balance call's Due anchor — the day the
+      // line last took a short delivery, stamped by a trigger so every door
+      // that writes `received_qty` stamps it.
+      "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs)",
     );
 
   if (status !== "all") q = q.eq("status", status);
@@ -121,7 +126,67 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json({ pos: data ?? [] });
+  const pos = data ?? [];
+
+  // ── P3 · what the supplier last told us, and what it was ABOUT ────────────
+  //
+  // Both calls close on an answer that still describes the CURRENT facts (S4's
+  // rule, the one C8 made load-bearing): the tomorrow call closes only while
+  // the answer names the PO's current expected arrival, and the balance call
+  // only while it names the line's current received quantity. So the list
+  // carries the LATEST promise's `about_*` and the engine compares.
+  //
+  // A second read rather than an embed: `po_supplier_promises` has no FK
+  // PostgREST can traverse to give "the latest one" — an embed would return
+  // every promise ever made and the client would sort them. Bounded by the same
+  // 200-PO page above.
+  const poIds = pos.map((p) => (p as Record<string, unknown>).id as string);
+  const tomorrowAboutByPo = new Map<string, string | null>();
+  const balanceAboutByLine = new Map<string, number | null>();
+  if (poIds.length > 0) {
+    const { data: promiseRows, error: promiseErr } = await sb
+      .from("po_supplier_promises")
+      .select("po_id, po_line_id, kind, about_date, about_qty, recorded_at")
+      .in("po_id", poIds)
+      .order("recorded_at", { ascending: false });
+    if (promiseErr) {
+      const m = mapPgError(promiseErr);
+      return c.json(m.body, m.status);
+    }
+    // Newest first, so the FIRST row seen for a key is the current answer.
+    for (const r of promiseRows ?? []) {
+      const row = r as Record<string, unknown>;
+      if (row.kind === "tomorrow_delivery") {
+        const key = row.po_id as string;
+        if (!tomorrowAboutByPo.has(key)) {
+          tomorrowAboutByPo.set(key, (row.about_date as string | null) ?? null);
+        }
+      } else if (row.kind === "balance_delivery" && row.po_line_id) {
+        const key = row.po_line_id as string;
+        if (!balanceAboutByLine.has(key)) {
+          balanceAboutByLine.set(
+            key,
+            row.about_qty == null ? null : Number(row.about_qty),
+          );
+        }
+      }
+    }
+  }
+
+  const withAnswers = pos.map((p) => {
+    const row = p as Record<string, unknown>;
+    const lines = (row.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [];
+    return {
+      ...row,
+      tomorrow_answer_about_date: tomorrowAboutByPo.get(row.id as string) ?? null,
+      purchase_order_lines: lines.map((l) => ({
+        ...l,
+        balance_answer_about_qty: balanceAboutByLine.get(l.id as string) ?? null,
+      })),
+    };
+  });
+
+  return c.json({ pos: withAnswers });
 });
 
 // ----- GET /awaiting-stock-shortage -----
@@ -1156,6 +1221,85 @@ operationPosRouter.post("/:id/chase-event", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ ok: true, chasedAt: new Date().toISOString() });
+});
+
+// ----- P3 · the two supplier calls (`PURCHASING-WORKING-FLOW.md` §3) --------
+//
+// Both routes are THIN: the gate, the ledger row, the promise history, the
+// `line_etas` push and the audit are all inside one SECURITY DEFINER RPC
+// (0306), so there is no PostgREST door that can record a supplier promise
+// without writing who promised what — and no way for the two halves to land
+// separately.
+//
+// The 22023 / P0001 details the RPCs raise are mapped to named 422 codes here
+// so an operator meets a sentence rather than a Postgres string
+// (`attribution_becomes_a_constraint`'s lesson, 0296).
+const SUPPLIER_CALL_422: Record<string, string> = {
+  invalid_input: "invalid_input",
+  new_date_required: "new_date_required",
+  po_not_open: "po_not_open",
+  no_expected_arrival: "no_expected_arrival",
+  line_not_part_received: "line_not_part_received",
+};
+
+function mapSupplierCallError(
+  c: Context<AppEnv>,
+  error: { code?: string; message?: string; details?: string },
+) {
+  const detail = (error.details ?? "").trim();
+  const named = SUPPLIER_CALL_422[detail];
+  if (named) {
+    return c.json({ error: named, code: named, message: error.message ?? named }, 422);
+  }
+  if (detail === "po_not_found" || detail === "po_line_not_found") {
+    return c.json({ error: detail, code: detail, message: error.message ?? detail }, 404);
+  }
+  const m = mapPgError(error);
+  return c.json(m.body, m.status);
+}
+
+// ----- POST /:id/tomorrow-delivery -----
+// `Call {supplier} — confirm tomorrow's delivery`, counted per PO. Two answers
+// and no third (§3): shipping, or delayed with a new date. A DELAYED answer
+// moves the PO's expected arrival AND reaches `ops_order_control.line_etas`,
+// which is what opens **Delay planning** by itself — the Orders flow's stage 1,
+// unchanged. Purchasing never invents a second delay conversation and never
+// opens a call to the customer.
+operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, recordTomorrowDeliveryInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_record_tomorrow_delivery", {
+    p_po_id: c.req.param("id"),
+    p_answer: parsed.data.answer,
+    p_new_date: parsed.data.answer === "delayed" ? parsed.data.newDate : null,
+    p_reason: parsed.data.reason ?? null,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+// ----- POST /lines/:lineId/balance-date -----
+// `Call {supplier} — confirm balance delivery date`, counted per PO LINE — the
+// only one of the six purchasing actions that is, which is why this route keys
+// on the line and not on the PO.
+//
+// PM decision A (Loo, 2026-07-29): the balance date ALSO reaches the ladder, so
+// a balance landing after the customer's promised date opens Delay planning by
+// itself. Same engine, same clock, no second delay model. On a MERGED PO that
+// currently reaches every customer the PO covers — an accepted limitation until
+// P5 gives purchasing an allocation.
+operationPosRouter.post("/lines/:lineId/balance-date", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, recordBalanceDateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_record_balance_date", {
+    p_po_line_id: c.req.param("lineId"),
+    p_new_date: parsed.data.newDate,
+    p_reason: parsed.data.reason ?? null,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
 });
 
 export default operationPosRouter;
