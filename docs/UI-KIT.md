@@ -559,9 +559,20 @@ exactly the px / weight / line-height above.
 > touch it, and taking its NAMES would do the same thing one step later. The six
 > classes keep the `text-*` spelling; the question is closed, not deferred.
 
-**After D2** (measured 2026-07-29): the six tokens are used **3,971** times in
+**After D2** (re-measured 2026-07-29): the six tokens are used **3,975** times in
 scope, and `text-[Npx]`, `font-bold` and the `.t-*` ramp appear in exactly ONE
 in-scope file — `index.css`, holding the definitions Part B still needs.
+
+> **The figure was 3,971 and 3,971 was wrong** (corrected on the PM's standing
+> ruling that *the law must always reflect the measured repository state*). Count
+> it as occurrences of the six class names across `apps/web/src`, minus
+> `pages/dealer/**`, `pages/print/**` and `*.test.tsx`, and the answer on this
+> commit is **3,975**. Two parallel D2 reviews reached 3,971 and 3,975 from
+> byte-identical source — **the source agreed and the counting did not**, which is
+> the one number in §2 nothing generates.
+>
+> **Read the sentence above as being about those three spellings and nothing
+> else.** A SECOND retired ramp, `.t4-*`, is still live — see §2.2.
 
 ```
 Orders                                       24  t-page
@@ -590,9 +601,34 @@ size; `/ui` showed both on the same words and Jess deleted 700. **There are
 three weights, and there is no fourth.**
 
 A kit file that writes `font-bold` fails the source scan today, and **D2 converted
-the 164 live uses across the pages** (2026-07-29). The only `font-bold` left in
-`apps/web/src` is inside `index.css`'s retired `.t-h1` / `.t-h2` definitions,
-which survive because Part B still uses them — see §2.1.
+the 164 live uses across the pages** (2026-07-29). No page, panel or component
+under `apps/web/src` writes `font-bold` any more.
+
+> **Where 700 still survives — corrected 2026-07-29, because the sentence that
+> stood here was false.** It said the only `font-bold` left was `.t-h1` / `.t-h2`.
+> There are **three** definitions in `index.css`, and the third is not Part B's:
+>
+> | | | |
+> |---|---|---|
+> | `.t-h1` | `32px/700` | Part B — §15 protects it |
+> | `.t-h2` | `24px/700` | Part B — §15 protects it |
+> | **`.t4-hero-num`** | **`20px/700`** | **the retired v4 ramp. Nothing protects it** |
+>
+> `lib/design-standard.ts:132` records that weight as 700, and one in-scope page
+> renders it. **So "0 left" is true of what a page WRITES and false of what the
+> browser COMPUTES**, and the shipped stylesheet emits `font-weight:700` 116 times.
+>
+> **Neither the codemod nor guard rule D can see it**, and that is structural, not
+> an oversight: rule D reads the values a page writes, and a page writes only
+> `t4-hero-num` while the size and the weight live in the stylesheet. The whole
+> `.t4-*` ramp is **9 classes, 44 in-scope uses across 8 files** — §16's class-use
+> table has counted it all along without anything connecting that number to this
+> claim.
+>
+> **RULED by the PM 2026-07-29: Reported Only. D2 was NOT extended, and the ramp is
+> scheduled onto D6/D7** — converting it moves 44 sites including a money figure,
+> so it travels with the pages when they migrate. D6 owns the definitions and the
+> mirror's `weight: 700`.
 
 ## §2.3 Numbers and codes
 
