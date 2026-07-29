@@ -51,7 +51,7 @@ deliverable is Foundation Components, not a better document.
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **CLOSED 2026-07-29** — §8.0 · §0.3 · §0.4 · §0.5 · §10.1, the mirror re-based, §16 counted. Findings below, all Reported Only |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ✅ **BUILT 2026-07-29** — `scripts/check-design.mjs`, 348 files, 14 rules, 9,511 findings frozen. §16 is generated. Card below |
 | **D2** | codemod **typography** | ✅ **BUILT 2026-07-29 · accepted with revisions at PM review the same day** — 4,052 conversions in 236 files; guard rule D **3,239 → 33**, and all 33 are `index.css`. Card below |
-| **D3** | codemod **colour** | 🔨 **CLAIMED 2026-07-29** — branch `claude/carres-portal-d3-execution-0be46e`, worktree `carres-portal-d3-execution-0be46e`. **PM approved Option A: Phase 1 (the ruler) + Phase 2 (15 deterministic conversions) ONLY.** Phase 3 (`--primary` flame → blue) and Phase 4 (`base-*` → kit palette) are **NOT in this card** and each needs its own. Card below |
+| **D3** | codemod **colour** | ✅ **BUILT 2026-07-29 — Option A, Phase 1 + Phase 2 only.** The ruler: guard scope corrected (**A 430 → 181**, 58% of it was Part B), rule B taught the flame's second spelling (**5 → 8**), and three new rules **O 4,661 · P 594 · Q 111** make the colour debt countable for the first time. The codemod: **10 conversions**, byte-equal, in 3 files. **Phase 3 (`--primary` flame → blue, 594 sites) and Phase 4 (`base-*` → kit palette, 4,661 sites) are NOT in this card** — each needs its own. Card below |
 | **D4** | codemod **spacing** | ⏳ — baselined at E 1,727 |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
 | **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ — **also carries the `.t4-*` legacy migration** (PM, 2026-07-29). D2 found a SECOND retired ramp: 9 classes, **44 in-scope uses across 8 files**, invisible to rule D because a page writes only the class name while the size and weight sit in `index.css`. **`.t4-hero-num` is `20px/700`** and `lib/design-standard.ts:132` records that 700, so a §2.2-dead weight still renders. Ruled **Reported Only for D2**: it is a visual change on a money figure and belongs with the pages when they migrate. **D6 owns the DEFINITIONS and the mirror's `weight: 700`** |
@@ -716,10 +716,10 @@ opportunity to break it.
 
 ---
 
-## D3 🔨 THE COLOUR CARD — CLAIMED 2026-07-29 (Option A: Phase 1 + Phase 2 only)
+## D3 ✅ THE COLOUR CARD — BUILT 2026-07-29 (Option A: Phase 1 + Phase 2 only)
 
-**This line is held.** Branch `claude/carres-portal-d3-execution-0be46e`. A second chat opening D3
-has taken this card.
+**Claimed and built on** `claude/carres-portal-d3-execution-0be46e`. **Phase 3 and Phase 4 are
+NOT in it** and are open cards below.
 
 **Why D3 is not shaped like D2, measured before anything was written.** D2 was safe because
 typography had six tokens and a size→token map a machine could apply and a checksum could verify.
@@ -767,7 +767,8 @@ OUT  any token VALUE, any colour DECISION, any UI-KIT rule but §13.3 and §16
 
 **`--primary` is not touched by this card** — not repointed, not commented, not moved. §3.3 and
 §3.4 already give the action colour to blue and keep the flame in the logo; **the live `--primary`
-flame assignment stays a REPORTED-ONLY contradiction**, and resolving it re-colours 613 sites,
+flame assignment stays a REPORTED-ONLY contradiction**, and resolving it re-colours **594 sites**
+(the planning estimate said 613; rule P measures 594 — the rule's number, not the estimate's),
 which is a business decision with a visual approval, not a codemod's.
 
 > **Read the tip that merged, not the branch that shares its name — again.** A PM colour ruling
@@ -779,6 +780,117 @@ which is a business decision with a visual approval, not a codemod's.
 > §3.4, which ARE on main. **Reported, not merged by this card** — merging another line's branch is
 > not a colour card's business. D0.6 finding #6 wrote this lesson down and it recurred inside a
 > week.
+
+### Phase 1 ✅ — the ruler
+
+**Three corrections and three new rules**, `scripts/check-design.mjs`:
+
+| | Change | Effect |
+|---|---|---|
+| §13.1 | **`styles/pos-prototype.css` exempted** — §15 puts Part B out of scope, `pages/dealer/**` was excluded by PATH, and the POS's own stylesheet is not under that path | **A 430 → 181.** A **scope correction, not a fix** — nobody did that work |
+| B | **learns the flame's second spelling** | −1 (`lib/pdf/**`, already exempt from A) **+4** (the HSL) = **8** |
+| O · P · Q | palette classes · legacy brand aliases · inline colour | **4,661 · 594 · 111**, first measurement |
+
+**Rule B could not see the flame, and that is why its number looked small.** The live assignment
+is `--primary: 13 64% 47%` — HSL — and B matched `#C44D2B` only, whose one appearance on that line
+is a trailing comment the stripper correctly blanks. **B reported 5 and not one of the five was
+that assignment**, while 594 class uses render flame. The second spelling is now DERIVED from the
+law's own hex, never typed, so the pair cannot drift.
+
+**And deriving it found that the two spellings are not the same colour.** Integer HSL cannot hold
+`#C44D2B`: `13 64% 47%` renders **`#C54C2B`**, one unit out on every channel. Invisible on screen,
+decisive for a codemod — and it is exactly why D3 converts on EXACT equality only. Reported Only.
+
+**Fifteen of seventeen rules are proved able to fire**, and the two new controls were each proved
+able to **FAIL** before being trusted: delete rule B's HSL half → `expected +2, got +1`, exit 1;
+replace rule Q's brace counter with a `[^}]*` window → its provocation goes dead **and the live
+count silently drops 111 → 109**, which is D2's comment-regex disease one syntax down.
+
+### Phase 2 ✅ — the 10 conversions
+
+`scripts/codemod-d3-colour.mjs`. **10 substitutions, 3 files, all `#1A1A1A` → `foreground`.**
+`--dry` converges to 0 on a second run.
+
+**The card estimated 15 and shipped 10, and the narrowing is reported rather than absorbed.** A hex
+reaches the screen two ways and they do not carry the same risk:
+
+```
+  A  text-[#1A1A1A]                 a Tailwind utility — swapping the class name
+                                    resolves through the same mechanism every other
+                                    class in that same className already uses    → CONVERTED (10)
+  B  style={{ color: "#4B5563" }}   a JS string. An inline style resolves
+     const grey = "#D1D5DB"         hsl(var(--x)) fine; a canvas 2D context, an SVG
+                                    presentation attribute or a chart library does
+                                    NOT, and the consumer is not knowable here    → LEFT (6, named)
+```
+
+Proving each form-B consumer is a per-site investigation, which is not what *deterministic* means.
+The six are printed by name on every run.
+
+**Byte-equality is a CONSTRUCTION, not a claim.** The token table is derived — every
+`--name: H S% L%` in `index.css` is rendered to a hex with the CSS Color 4 algorithm, and a site
+converts only when that rendered hex equals the literal EXACTLY. **`#FFFFFF` equals eight tokens**
+(`--card` · `--popover` · `--primary-foreground` · `--destructive-foreground` ·
+`--danger-foreground` · `--success-foreground` · `--warning-foreground` · `--info-foreground`), so
+it converts to none of them: picking one is a decision about what the surface IS. The ambiguity
+reader is deliberately PERMISSIVE — over-counting names can only convert FEWER sites.
+
+**Verified in the built stylesheet rather than asserted**:
+`.text-foreground{color:hsl(var(--foreground))}` and `--foreground: 0 0% 10%` →
+**rgb(26,26,26) = #1A1A1A.** Identical.
+
+### Verification
+
+`tsc -p tsconfig.app.json` clean · `pnpm --filter @carres/web lint` clean · `pnpm build` clean ·
+self-test fires on all 15 provoked rules plus both controls · `--report` regenerated and the law
+outside the `UI-HEALTH` markers is **byte-identical across a run** · §16 **36/48 = 75.00%, debt 3**,
+unmoved (D3 adds guard rules, which §13.3 owns; it adds no §1–§8 rule row) ·
+**web suite 2,240 passed / 16 pre-existing failures in exactly the four documented files**
+(`OperationOrders` ×7 · `OrderCustomerCard` ×4 · `OhanaSofaTab` ×4 · `NiceFutureMattressTab` ×1 —
+re-run on their own to confirm the NAMES, not just the total) — **zero new**.
+
+The whole source diff is **9 lines in 3 files**: no hex introduced, no `text-[`, no `h-[`, no token
+value altered, nothing under `pages/dealer/**`, `pages/print/**` or `styles/pos-prototype.css`.
+
+### Findings, Reported Only
+
+1. **The flame is spelt twice and the two are not equal** — `#C44D2B` vs `#C54C2B`. §3.4's.
+2. **`.btn-primary` is GREY `#f3f4f6`, not the flame; the flame CTA is `.btn-hero`** (13 uses). A
+   chat told "primary is the action colour" would grep `btn-primary` (108 uses, 63 files) and
+   rewrite the workhorse button while never touching the 13 that carry the brand. **This is the
+   single most likely misreading in Phase 3**, written down before that card opens.
+3. **`--primary` is read by 594 class uses and by nothing that names it a decision.** Repointing it
+   is one line and re-colours all 594 at once. **Phase 3, with visual approval — not a codemod's.**
+4. **148 portal hexes (69 distinct colours) equal nothing §3 names**, 48 of them inside Tailwind
+   arbitrary classes on live pages — status fills like `bg-[#FCEBEB] text-[#A32D2D]` plainly doing
+   §3.3's *late* job in colours §3.3 does not name. Each needs a human to say which of the four
+   jobs it is. Phase 4's, page by page.
+5. **`lib/pdf/**` was exempt from rule A and a violation of rule B** — one file simultaneously out
+   of scope and in breach. Made consistent; the print contract stays §13.1's business.
+
+---
+
+## D3 · Phase 3 — the flame repoint ⏳ NOT STARTED (own card AND visual approval)
+
+**One line: `--primary`, `--ring`, `--accent-foreground` off the flame and onto §3.3's blue.**
+It re-colours **594 class uses** in a single merge. §3.3 and §3.4 already rule the direction — blue
+is the action colour, the flame is the logo — so what this card needs is not a ruling but a LOOK:
+nobody has seen the portal in blue, the change cannot be proved by checksum, and `/ui` does not
+exercise it (the kit already uses `bg-kit-blue-9`).
+
+**Required before it opens:** a preview deploy, screenshots of the Orders list and drawer, and
+Jess's word. **Blocked on nothing else** — it does not need Phase 4. **Read finding 2 first:**
+`.btn-primary` is grey; the flame CTA is `.btn-hero`.
+
+## D3 · Phase 4 — `base-*` → the kit palette ⏳ NOT STARTED (rolls out page by page)
+
+**4,661 palette-class uses, 4,577 of them `base-*`.** Ten steps (`base-50` … `base-900`, Tailwind
+gray) into six (`kit-slate-3/5/6/9/11/12`, Radix slate). **Ten into six is a collapse and gray is
+not slate, so every conversion is a colour change** — there is no mechanical mapping, and running
+one across 236 files is the exact opposite of the property that made D2 safe.
+
+**It belongs with page adoption (D6, then D7+)**: one page at a time, looked at, by the card that
+already owns that page. A card that does it globally first is a card nobody can review.
 
 ---
 

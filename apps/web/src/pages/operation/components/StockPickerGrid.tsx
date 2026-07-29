@@ -387,22 +387,22 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                 </div>
                 {/* Closed set — every read column is CONTENT: ink, not pale.
                     §11b: the item is a product NAME → Inter (mono = codes only). */}
-                <div className="px-2 py-1 font-semibold text-[#1A1A1A] truncate">
+                <div className="px-2 py-1 font-semibold text-foreground truncate">
                   {r.sku}
                 </div>
-                <div className="px-2 py-1 text-[#1A1A1A] truncate">{r.size}</div>
+                <div className="px-2 py-1 text-foreground truncate">{r.size}</div>
                 <div className="px-2 py-1">
                   <span className={`pill ${r.condition === "exhibition" ? "pill-warning" : "pill-confirmed"}`}>
                     {r.cond}
                   </span>
                 </div>
                 <div
-                  className="px-2 py-1 text-[#1A1A1A] tabular-nums truncate"
+                  className="px-2 py-1 text-foreground tabular-nums truncate"
                   title={r.dateLabel ? `in since ${r.dateLabel}` : ""}
                 >
                   {r.ageDays != null ? `${r.ageDays}d` : "—"}
                 </div>
-                <div className="px-2 py-1 font-mono text-[#1A1A1A] truncate" title={r.poNo ?? ""}>
+                <div className="px-2 py-1 font-mono text-foreground truncate" title={r.poNo ?? ""}>
                   {r.poNo ?? "—"}
                 </div>
                 <div className="px-1 py-1 text-right">

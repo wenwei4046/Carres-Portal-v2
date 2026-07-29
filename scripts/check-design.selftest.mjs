@@ -37,6 +37,12 @@ const PROVOCATIONS = {
   K: ['/** Where this conflicts with the kit, v4 wins. */\nexport const X = 1;', "k.tsx"],
   L: ['const railKey = "guardlab-rail-collapsed";\nlocalStorage.getItem(railKey);', "l.tsx"],
   M: ["const k = `guardlab:${title}`;\nlocalStorage.setItem(k, \"1\");", "m.tsx"],
+  // D3's three. O and P are one class each; Q's provocation carries a template
+  // literal ON PURPOSE — `${w}px` is what defeats a `[^}]*` window, so this
+  // provocation fails under the naive form and passes under the brace counter.
+  O: ['export const X = () => <p className="text-base-500 border-base-200">hi</p>;', "o.tsx"],
+  P: ['export const X = () => <p className="bg-primary">hi</p>;', "p.tsx"],
+  Q: ["export const X = ({ w }: { w: number }) => <p style={{ width: `${w}px`, color: \"#AB12CD\" }}>hi</p>;", "q.tsx"],
 };
 // Rule I needs the SAME string in two files — that is the whole rule.
 PROVOCATIONS.I2 = [PROVOCATIONS.I[0], "i2.tsx"];
@@ -47,7 +53,7 @@ const COMPONENT_PROVOCATION = ['const label = "Send PO";\nexport const X = label
 function counts() {
   const out = execSync("node scripts/check-design.mjs", { cwd: ROOT, encoding: "utf8" });
   const c = {};
-  for (const m of out.matchAll(/^\s{2}([A-N])\s+(\d+)\s{2}/gm)) c[m[1]] = Number(m[2]);
+  for (const m of out.matchAll(/^\s{2}([A-Q])\s+(\d+)\s{2}/gm)) c[m[1]] = Number(m[2]);
   return c;
 }
 
@@ -69,7 +75,7 @@ try {
   clean();
 }
 
-const checked = ["A", "B", "C", "D", "E", "F", "G", "I", "K", "L", "M", "N"];
+const checked = ["A", "B", "C", "D", "E", "F", "G", "I", "K", "L", "M", "N", "O", "P", "Q"];
 const dead = checked.filter((id) => (after[id] ?? 0) <= (before[id] ?? 0));
 
 console.log(`\nNegative control — ${REL}, ${Object.keys(PROVOCATIONS).length} provocations\n`);
@@ -128,5 +134,41 @@ console.log(`Comment stripper — a value hidden behind a URL and behind \`image
 console.log(`  D  ${sBefore.D} → ${sAfter.D}  ${dD === 2 ? "✓ both counted (+2)" : `✗ expected +2, got +${dD}`}\n`);
 if (dD !== 2) {
   console.error("✗ the stripper is blanking code it should not — see scripts/lib/source-segments.mjs\n");
+  process.exit(1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * THE FLAME IS SPELT TWICE — its own control (card D3)
+ *
+ * Rule B is the reason this whole file exists in miniature: it reported 5 for
+ * months and could not see the flame assignment that matters, because
+ * `--primary: 13 64% 47%` is HSL and B matched `#C44D2B` only. The hex on that
+ * line lives in a trailing comment, which the stripper correctly blanks — so
+ * the rule was clean-looking and blind at the same time.
+ *
+ * A `+1` here would pass with only the hex half working. The assertion is
+ * therefore `+2`, one per spelling, which is the only form that can fail if
+ * either half is deleted.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+const FLAME_SPELLINGS = [
+  ['const brand = "#C44D2B";', "fl1.tsx"],
+  ['export const css = ":root { --guardlab-brand: 13 64% 47%; }";', "fl2.tsx"],
+];
+
+clean();
+const fBefore = counts();
+mkdirSync(LAB, { recursive: true });
+for (const [body, name] of FLAME_SPELLINGS) writeFileSync(join(LAB, name), body + "\n");
+let fAfter;
+try {
+  fAfter = counts();
+} finally {
+  clean();
+}
+const dB = (fAfter.B ?? 0) - (fBefore.B ?? 0);
+console.log(`The flame in both spellings — #C44D2B and its HSL`);
+console.log(`  B  ${fBefore.B} → ${fAfter.B}  ${dB === 2 ? "✓ both spellings counted (+2)" : `✗ expected +2, got +${dB}`}\n`);
+if (dB !== 2) {
+  console.error("✗ rule B can see only one spelling of the flame — see FLAME_HSL in check-design.mjs\n");
   process.exit(1);
 }

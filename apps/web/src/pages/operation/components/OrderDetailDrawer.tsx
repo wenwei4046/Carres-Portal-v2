@@ -3377,7 +3377,7 @@ function DrawerBody({
                                 )}
                                 <span className="min-w-0 flex-1">
                                   <span
-                                    className="block text-body font-semibold text-[#1A1A1A] leading-tight truncate"
+                                    className="block text-body font-semibold text-foreground leading-tight truncate"
                                     title={l.sku}
                                   >
                                     {l.sku}
@@ -4632,7 +4632,7 @@ function ReceiveLineModal({
     <Modal title={purchasingActionButton("check_in")} onClose={onClose}>
       <div className="space-y-3">
         <div className="text-meta text-base-600">
-          <span className="font-semibold text-meta text-[#1A1A1A]">{sku}</span>
+          <span className="font-semibold text-meta text-foreground">{sku}</span>
           <span className="ml-2 text-base-400">
             received {alreadyReceived}/{lineQty}
           </span>
@@ -4747,7 +4747,7 @@ function LoanSofaModal({
     <Modal title="Loan this sofa" onClose={onClose}>
       <div className="space-y-3">
         <div className="text-meta text-base-600">
-          <span className="font-semibold text-meta text-[#1A1A1A]">{itemSku}</span>
+          <span className="font-semibold text-meta text-foreground">{itemSku}</span>
           <span className="ml-2 text-base-400">→ {soRef} · FREE loaner</span>
         </div>
         <p className="text-meta text-base-500">
@@ -7649,7 +7649,7 @@ function PoRow({
       <div>
         {po.lines.map((l, j) => (
           <div key={j} className="text-meta leading-snug font-body">
-            <span className="text-[#1A1A1A]">{l.sku}</span>{" "}
+            <span className="text-foreground">{l.sku}</span>{" "}
             <span className="font-mono text-base-500">
               {l.received_qty || 0}/{l.qty}
             </span>

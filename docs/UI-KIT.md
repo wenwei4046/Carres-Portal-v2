@@ -1633,7 +1633,17 @@ Nothing about D1–D10 belongs in this permanent law.
 
 **All of `apps/web/src`** — not a hand-maintained file list. The previous guard
 inspected 3 files and checked colour only; that is why 225 files drifted.
-Exempt: `pages/dealer/**` (POS, Part B) and `pages/print/**`.
+Exempt: `pages/dealer/**` (POS, Part B), `pages/print/**` and
+**`styles/pos-prototype.css`**.
+
+> **The third exemption is D3's, and it is a SCOPE CORRECTION rather than a
+> fix.** §15 puts Part B out of scope; `pages/dealer/**` was excluded by PATH,
+> and the POS's own stylesheet does not live under that path. It held **249 of
+> rule A's 430 hex hits — 58% of the colour baseline was one file no card is
+> allowed to touch.** A number nobody may act on is not a target; it is noise
+> standing where a target should be, and it would have made every colour card
+> look 58% incomplete for ever. **A 430 → 181 on the day the exemption landed,
+> and none of that drop is work anyone did.**
 
 ## §13.2 Ratchet
 
@@ -1675,25 +1685,64 @@ being built.
 | L | a browser-persisted UI-shape key under `pages/**` (§0.4) | ✅ **frozen** |
 | M | a persisted / query / storage key built from a display string (§0.5) | ✅ **frozen** |
 | N | a component spelling a COPY-STANDARD business word (§10.1) | ✅ **frozen** |
+| O | a colour class outside §3's palette — `text-base-500`, `bg-red-50` … (§3.1) | ✅ **frozen (D3)** |
+| P | a colour class bound to a legacy brand alias — `bg-primary`, `btn-hero` … (§3.1) | ✅ **frozen (D3)** |
+| Q | a colour written into an inline `style={{ … }}` (§3.1) | ✅ **frozen (D3)** |
 
-**All fourteen are implemented and measured (D1).** J–N are the five mechanisms
-card D0.6 wrote into §0.3 · §0.4 · §0.5 · §10.1 and scheduled here.
-
-### The baseline D1 froze, on 348 files
+**All seventeen are implemented and measured.** J–N are the five mechanisms card
+D0.6 wrote into §0.3 · §0.4 · §0.5 · §10.1. **O–Q are D3's**, and the reason
+they exist is the one number worth remembering from that card:
 
 ```
-  A   442  a raw hex literal              I   294  a repeated class string
+  the portal's colour surface .......... ~6,290 sites
+  what A and B between them saw ........    435   = 6.9%
+  …of which out of scope (Part B) ......    249
+```
+
+**A and B measured hex. The colour debt is not hex** — it is 4,661 palette
+classes, 594 legacy brand aliases and 111 inline colours, and none of it was
+counted by anything. **D5 cannot ratchet what nobody measures**, which is the
+whole reason a colour card's first output is a ruler rather than a codemod.
+
+> **Rule B could not see the flame it exists to find, and that is why it read
+> clean.** The live assignment is `--primary: 13 64% 47%` — HSL — while B matched
+> `#C44D2B` only, and the one appearance of that hex on the line is a trailing
+> comment which the stripper correctly blanks. B reported 5, none of them that
+> assignment, while **594 class uses render flame.** B now derives the HSL from
+> the law's own hex and counts both spellings: **5 → 8.**
+>
+> **The two spellings are not the same colour.** Integer HSL cannot hold
+> `#C44D2B`; `13 64% 47%` renders **`#C54C2B`**, one unit out on every channel.
+> Invisible on screen, decisive for a codemod — D3 converts on EXACT hex
+> equality only, so the rounding can never produce a wrong substitution.
+> **Reported Only:** which of the two is the real flame is §3.4's question.
+
+### The baseline, re-frozen by D3 on 348 files
+
+```
+  A   171  a raw hex literal              I   298  a repeated class string
   B     8  the flame outside the logo     J     3  no kit edition declared
-  C   146  an icon outside §5             K     0  an authority claim
-  D  6081  a type value outside §2        L     8  a persisted UI shape
-  E  1765  a §4 value                     M     2  a key built from a label
+  C   145  an icon outside §5             K     0  an authority claim
+  D    33  a type value outside §2        L     8  a persisted UI shape
+  E  1727  a §4 value                     M     2  a key built from a label
   F    78  a `z-` class in pages/**       N     0  a component spelling a word
-  G   684  a hand-rolled box              H     0  a PageShell over budget
+  G   683  a hand-rolled box              H     0  a PageShell over budget
+  O  4661  a colour class outside §3      P   594  a legacy brand alias
+  Q   111  a colour in an inline style
                                           ─────────────────────────────────
-                                          9,511 findings
+                                          8,522 findings
 ```
 
-**Twelve of the fourteen are proved able to FIRE**, by
+**Every movement from D1's own baseline is declared, because two of them go UP
+and a baseline that moves silently is worth nothing:**
+
+| Rule | D1 | D2 | D3 | Why |
+|---|---|---|---|---|
+| A | 442 | 430 | **171** | −249 the Part B **scope correction** (§13.1) · −10 **conversions D3 actually made** |
+| B | 8 | 5 | **8** | −1 `lib/pdf/**` now skipped as it already is for A · **+4 the HSL spelling B could not see** |
+| O · P · Q | — | — | **4661 · 594 · 111** | new rules; first measurement |
+
+**Fifteen of the seventeen are proved able to FIRE**, by
 `scripts/check-design.selftest.mjs`: it writes one file per rule that breaks
 exactly that rule, re-runs the guard and asserts the count went up. **A rule
 reporting 0 is either clean or broken, and from the outside those look
@@ -1702,6 +1751,16 @@ already found by hand, because the key was a `const` two lines above the call.
 J is proved instead by its 3 live hits. **H is the one rule with no proof of
 life**, said out loud rather than left looking clean: provoking it means editing
 `PageShell.tsx`, which belongs to another card.
+
+**Two controls beyond the per-rule ones, and each was proved able to FAIL before
+it was trusted.** The comment stripper's (D2) puts a real violation behind a URL
+and behind `accept="image/*"`. **The flame's (D3) asserts `+2`, not `+1`** — one
+per spelling — because a `+1` passes with the HSL half deleted; run with that
+half removed it reports `expected +2, got +1` and exits 1. Rule Q's brace
+counter is proved the same way: replaced with a `[^}]*` window it stops seeing a
+style object containing a template literal, its provocation goes dead and the
+live count silently drops 111 → 109. **A control that cannot fail measures
+nothing.**
 
 ## §13.4 The screenshot gate
 

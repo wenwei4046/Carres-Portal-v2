@@ -4237,7 +4237,7 @@ function StatusTabs({
             title={t.title}
             className={`inline-flex items-center gap-1.5 px-2 pt-1.5 pb-1 border-b-2 transition-colors text-body whitespace-nowrap ${
               on
-                ? "border-[#1A1A1A] text-[#1A1A1A] font-semibold"
+                ? "border-foreground text-foreground font-semibold"
                 : "border-transparent text-base-500 font-medium hover:text-base-800"
             }`}
           >

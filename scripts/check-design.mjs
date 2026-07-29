@@ -6,8 +6,14 @@
  *
  * §13.1 SCOPE — **all of `apps/web/src`**, not a hand-maintained file list. The
  * previous guard inspected a 30-file allow-list and checked colour only; that is
- * why 225 files drifted. Exempt: `pages/dealer/**` (POS, Part B — §15) and
- * `pages/print/**` (PDF, non-Tailwind contract).
+ * why 225 files drifted. Exempt: `pages/dealer/**` (POS, Part B — §15),
+ * `pages/print/**` (PDF, non-Tailwind contract) and **`styles/pos-prototype.css`**
+ * — the POS's OWN stylesheet, which §15 puts in Part B just as squarely as
+ * `pages/dealer/**` and which slipped in only because the exclusion was written
+ * as a PATH. D3 measured what that cost: **249 of rule A's 430 hits, 58%, were
+ * that one file** — more than half of the colour baseline was work no card is
+ * allowed to do. A number nobody may act on is not a target, it is noise sitting
+ * where a target should be.
  *
  * §13.2 RATCHET — this is **STAGE 1: WARN ONLY.** It counts, prints and writes
  * the baseline. It does not fail the build. Stage 2 (D2–D4) turns on `--strict`,
@@ -15,7 +21,10 @@
  *
  * §13.3 RULES — A–I are the law's own letters, read from the law, not invented
  * here. J–N are the five mechanisms card D0.6 scheduled onto D1 (§0.3 ×2, §0.4,
- * §0.5, §10.1).
+ * §0.5, §10.1). **O–Q are card D3's**, and they exist because A and B between
+ * them saw 435 of the portal's ~6,290 colour sites — 6.9% — while the actual
+ * colour mass (palette classes, the legacy brand aliases, inline colour) was
+ * measured by nothing at all. D5 cannot ratchet what nobody counts.
  *
  *   A  a raw hex literal
  *   B  the Carres flame outside the logo
@@ -31,6 +40,9 @@
  *   L  a browser-persisted UI-shape key under `pages/**` (§0.4)
  *   M  a persisted / query / storage key built from a display string (§0.5)
  *   N  a component spelling a COPY-STANDARD business word (§10.1)
+ *   O  a colour class outside §3's palette — `text-base-500`, `bg-red-50` … (§3.1)
+ *   P  a colour class bound to a legacy brand alias — `bg-primary`, `btn-hero` … (§3.1)
+ *   Q  a colour written into an inline `style={{ … }}` (§3.1)
  *
  * **NOTHING IN THIS FILE RETYPES A TOKEN.** The scale, the radii, the type
  * tokens, the weights, the icon sizes and the forty icon meanings are READ out
@@ -119,6 +131,7 @@ function inScopeFiles() {
       /\.(ts|tsx|css)$/.test(f) &&
       !f.startsWith("apps/web/src/pages/dealer/") && // §15 Part B — the POS
       !f.startsWith("apps/web/src/pages/print/") && // PDF, non-Tailwind
+      f !== "apps/web/src/styles/pos-prototype.css" && // §15 Part B — the POS's OWN stylesheet
       !/\.test\.tsx?$/.test(f), // a test asserts ON strings; it does not render them
   );
 }
@@ -146,10 +159,77 @@ const RULES = [
   { id: "L", law: "§0.4", what: "a browser-persisted UI-shape key in pages/**" },
   { id: "M", law: "§0.5", what: "a key built from a display string" },
   { id: "N", law: "§10.1", what: "a component spelling a business word" },
+  { id: "O", law: "§3.1", what: "a colour class outside §3's palette" },
+  { id: "P", law: "§3.1", what: "a colour class bound to a legacy brand alias" },
+  { id: "Q", law: "§3.1", what: "a colour written into an inline style" },
 ];
 
 // Hex is legitimate where Tailwind does not reach.
 const HEX_OK = [/(^|\/)index\.css$/, /design-standard/, /\/lib\/pdf\//];
+
+/**
+ * §3.4 — the flame, and it is spelt TWICE in this repo.
+ *
+ * D3 found rule B structurally unable to see the thing it exists to find. The
+ * live assignment is `--primary: 13 64% 47%` in `index.css` — **HSL** — while
+ * rule B matched `#C44D2B` only, and the one place that hex appears on that line
+ * is a trailing COMMENT, which D2's stripper now correctly blanks. So B reported
+ * 5 and not one of the five was that assignment, while 613 class uses rendered
+ * flame. A rule whose number is small because it cannot see is worse than no
+ * rule: it reads as clean.
+ *
+ * The second spelling is DERIVED from the first rather than typed, because this
+ * file retypes no token (see the header). One hex in the law, two spellings in
+ * the scan, no chance of the pair drifting apart.
+ *
+ * **AND THE TWO SPELLINGS ARE NOT THE SAME COLOUR** — found by deriving them
+ * rather than by typing them, which is the whole argument for deriving. The law
+ * names `#C44D2B`; integer HSL cannot hold it, so `13 64% 47%` renders
+ * **`#C54C2B`** — one unit out on every channel. Invisible on screen and
+ * decisive for a codemod: D3's conversions run on EXACT hex equality only, so
+ * this rounding can never produce a wrong substitution. Reported Only; picking
+ * which of the two is the real flame is §3.4's, not a guard's.
+ */
+const FLAME = "#C44D2B";
+function hexToHsl(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  const l = (max + min) / 2;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+  }
+  return [Math.round(h * 60 + 360) % 360, Math.round(s * 100), Math.round(l * 100)];
+}
+const [FH, FS, FL] = hexToHsl(FLAME);
+const FLAME_HSL = new RegExp(`\\b${FH}\\s+${FS}%\\s+${FL}%`, "g");
+
+/* ── D3's three colour rules ──────────────────────────────────────────────────
+ * §3.1: "The law names the STEP, never the hex … the class is
+ * `bg-kit-<scale>-<step>`." Everything below is a colour the law does not name.
+ */
+const TW_HUES =
+  "slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|base";
+const COLOUR_PROPS =
+  "bg|text|border|ring|from|to|via|divide|placeholder|decoration|outline|fill|stroke|accent|caret";
+/** O — a Tailwind/legacy palette step. `(?<!-kit-)` keeps the kit's own classes out. */
+const PALETTE_CLASS = new RegExp(`\\b(?:${COLOUR_PROPS})-(?:${TW_HUES})-\\d{2,3}\\b`, "g");
+/**
+ * P — the legacy brand aliases. These are counted whatever they RESOLVE to, and
+ * that is deliberate: `--primary` is the flame today and the law says the action
+ * colour is blue (§3.3), so the rule must survive the day someone repoints it —
+ * a `bg-primary` is a colour §3.1 does not name either way. It is also what
+ * makes the flame contradiction countable at all: 613 sites, against rule B's 5.
+ */
+const BRAND_ALIAS = new RegExp(
+  `\\b(?:${COLOUR_PROPS})-(?:primary|accent|signature-(?:50|100|700)|terracotta|hovertint)\\b|\\bbtn-hero\\b`,
+  "g",
+);
+/** Q — a colour property inside an inline style object. */
+const STYLE_COLOUR_PROP = /(?:^|[{,;\s])(?:color|background|backgroundColor|borderColor|fill|stroke|outlineColor|caretColor|textDecorationColor|boxShadow)\s*:/;
 // Tailwind's own default type ramp — a typography token outside §2.1.
 //
 // The `(?!-)` is load-bearing, and D2 found it the hard way. This repo's
@@ -192,10 +272,16 @@ function scan(files, rec, words) {
         push("A", f, src, m.index, `${m[0]} — §3.1 names the STEP, never the hex`);
     }
 
-    /* B — the flame outside the logo --------------------------------------- */
-    if (!/logo/i.test(f)) {
-      for (const m of src.matchAll(/#C44D2B/gi))
+    /* B — the flame outside the logo, in BOTH of its spellings ---------------
+     *
+     * `lib/pdf/**` is skipped here as it already is for rule A: a print template
+     * is not a Tailwind surface, and having one file be simultaneously exempt
+     * from A and a violation of B was an inconsistency, not a finding. */
+    if (!/logo/i.test(f) && !/\/lib\/pdf\//.test(f)) {
+      for (const m of src.matchAll(new RegExp(FLAME, "gi")))
         push("B", f, src, m.index, "the flame survives in exactly one place: the logo (§3.4)");
+      for (const m of src.matchAll(FLAME_HSL))
+        push("B", f, src, m.index, `${m[0]} is the flame ${FLAME} in HSL, rounded (§3.4)`);
     }
 
     /* C — icons ------------------------------------------------------------ */
@@ -305,6 +391,41 @@ function scan(files, rec, words) {
       for (const m of src.matchAll(/queryKey:\s*\[[^\]]*\$\{([^}]+)\}/g)) {
         if (DISPLAY.test(m[1]))
           push("M", f, src, m.index, `a query key built from \`${m[1].trim()}\` — §0.5`);
+      }
+    }
+
+    /* O · P — colour classes the law does not name (§3.1) ---------------------
+     *
+     * The kit's own files are exempt: they ARE the palette, and `bg-kit-slate-3`
+     * cannot match either pattern anyway. Everything else, including index.css,
+     * is counted — index.css is where the legacy `.btn-*` and `.pill-*` recipes
+     * spend these colours, and exempting the definition site is how a number
+     * gets to look smaller than the problem. */
+    if (!isKit(f)) {
+      for (const m of src.matchAll(PALETTE_CLASS))
+        push("O", f, src, m.index, `${m[0]} — §3.1 names the STEP: the class is bg-kit-<scale>-<step>`);
+      for (const m of src.matchAll(BRAND_ALIAS))
+        push("P", f, src, m.index, `${m[0]} — a legacy brand alias; §3.2 · §3.3 name only slate · blue · green · amber · red`);
+    }
+
+    /* Q — a colour written into an inline style (§3.1) ------------------------
+     *
+     * `style={{ … }}` is scanned with a BRACE COUNTER, not a `[^}]*` window: a
+     * template literal in a style object (`${x}px`) closes that window early and
+     * the rule would silently stop reading exactly the dynamic styles most
+     * likely to carry a computed colour. Same disease as the comment regex D2
+     * had to replace, one syntax down. */
+    if (tsx) {
+      for (const m of src.matchAll(/style=\{\{/g)) {
+        let i = m.index + m[0].length, depth = 2;
+        while (i < src.length && depth > 0) {
+          if (src[i] === "{") depth++;
+          else if (src[i] === "}") depth--;
+          i++;
+        }
+        const body = src.slice(m.index + m[0].length, i);
+        if (STYLE_COLOUR_PROP.test(body))
+          push("Q", f, src, m.index, "a colour in an inline style — §3.1 colour arrives as a class");
       }
     }
 
@@ -538,7 +659,7 @@ if (UPDATE) {
     BASELINE_PATH,
     // `takenAt` names the CARD that last froze this file — whoever re-freezes
     // edits it, exactly as D2 did at the PM's review on 2026-07-29.
-    JSON.stringify({ edition: EDITION, takenAt: "D2", files: files.length, counts, health }, null, 2) + "\n",
+    JSON.stringify({ edition: EDITION, takenAt: "D3", files: files.length, counts, health }, null, 2) + "\n",
   );
   console.log(`✓ baseline written — ${files.length} files in scope.`);
   for (const r of RULES) console.log(`   ${r.id}  ${String(counts[r.id]).padStart(5)}  ${r.what}`);
