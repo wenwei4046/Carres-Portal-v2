@@ -16,7 +16,7 @@
 
 | | |
 |---|---|
-| On `main` | `ba7b7798` D0 law + doors · `19cad8e4` merge · `d83ecf98` §1.4 hierarchy · **`c9966ee3` T2 drawer** · **`a548ddc9` D0.5a (PR #498)** |
+| On `main` | `ba7b7798` D0 law + doors · `19cad8e4` merge · `d83ecf98` §1.4 hierarchy · **`c9966ee3` T2 drawer** · **`a548ddc9` D0.5a (PR #498)** · **`d77bd4f6` D0.5b (PR #502)** · **`2d5aaddb` D0.5b.1** · **`929fa746` D0.5c (PR #505)**. **The whole D0.5 block is merged**, and `docs/UI-KIT.md` no longer marks any of it `⏳` (D0.6, 2026-07-29) |
 | **`/ui` is LIVE** | **https://erp.carresofficial.com/ui** — public, no login, also on `pos.carresofficial.com/ui` and both `pages.dev` apexes. **Deployed from main tip `d77bd4f6` (PR #502, D0.5b) and it now shows the FROZEN RECORD, verified in a real browser**: the heading is `Frozen decisions`, `Pending decisions` is gone, `Candidate B` is absent, and all four answers render. It did its job — Jess answered Q1 · Q3 · Q4 there, and the page is now the record rather than the question |
 | Deployed to prod | ✅ **YES — corrected 2026-07-28.** `git merge-base --is-ancestor c9966ee3 10f49add` passes, and `10f49add` is the live web tip in CLAUDE.md §17.1 (`index-c7LT9aSQ.js`, PR #492). **T2 has been in front of users since that deploy.** This row previously read *"NOT YET… nobody has seen it in a browser"* — it went stale when a parallel line shipped a bundle containing it. |
 | Next thing that matters | **T3 — Jess uses the reordered drawer for one day.** **No longer blocked**: the deploy it was waiting for already happened. T3 is a Jess task, not a build card. **Deliberately scheduled AFTER the Purchasing line finishes** (Loo, 2026-07-28: P2 · C8b · R8 first). The reason is the point of T3 — it tests whether the Information Hierarchy helps, and a review run while three chats are still changing screens measures the churn instead of the hierarchy. **Re-scheduled 2026-07-28: it now runs after P5**, not after R8 — Loo ruled that R8 is a words card and does not close Purchasing, so the review waits for the module to be finished AND used (P5 puts a real PO through it). **Do not offer T3 to a chat before P5 has merged**, and do not read the delay as T3 being optional. |
@@ -46,9 +46,9 @@ deliverable is Foundation Components, not a better document.
 | **D0.4** | **Retire the old order-portal master spec completely** — move what is still true, prove nothing was lost, delete the file, kill every pointer | ✅ PR #491 |
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
 | **D0.5b** | Foundation components, Radix | ✅ **SHIPPED 2026-07-28, PR #502 `d77bd4f6`, deployed** — full card below. The gate opened: Jess froze Q1 · Q3 · Q4 |
-| **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ⏳ **before D0.5c** |
-| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh**. `DetailShell` is specified in full below (L4 slot contract) | ⏳ after D0.5b.1 |
-| **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **BUILT 2026-07-29** — §8.0 · §0.3 · §0.4 · §0.5 · §10.1, the mirror re-based, §16 recomputed. Findings below |
+| **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ✅ **shipped on main** (`2d5aaddb`) |
+| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | ✅ **CLOSED as components-only** (PM, 2026-07-29), merged as PR #505 `929fa746`. The drawer is NOT migrated; real-page adoption is D6 |
+| **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **CLOSED 2026-07-29** — §8.0 · §0.3 · §0.4 · §0.5 · §10.1, the mirror re-based, §16 counted. Findings below, all Reported Only |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
@@ -429,7 +429,156 @@ disciplined and behaves like a trap."*
 
 ---
 
-## D0.5c — `DetailShell`, in full (the `PageShell` / `DataTable` halves keep their one-liners above)
+## D0.5c ✅ CLOSED — components only (PR #505 `929fa746`, DEPLOYED 2026-07-29)
+
+> **Deploy receipt.** web `index-ydv91zJ9.js` + `UiShowcase-qyt-I2oo.js`
+> (carres-portal `7fca85d7` + carres-pos `064595c2`, both `--branch=main`;
+> `wrangler pages deployment list` names Production/main source `929fa74`; all
+> four canonicals converged on the first poll; `SERVICE_ROLE` **0** in both
+> files). **No api deploy, no migration** — `git diff aa70cd45..929fa746 --
+> apps/api packages/shared supabase/migrations` is empty and the tail stays
+> `0305`.
+>
+> **Zero visual change, proved by checksum rather than by inspection.** The
+> operator's main bundle is 4,500,781 bytes before and after, and once the lazy
+> chunk's filename is normalised the two are **md5-identical**
+> (`0d551c1b…` both sides). The only change in the bundle every operator
+> downloads is the hash in the `/ui` chunk's name.
+>
+> **One marker would have read as a false positive.** `page-shell` greps 4 in
+> the live main bundle — and 4 in the predecessor, because it is the POS's own
+> `.page-shell` class in `pages/dealer/DealerPos.tsx` (Part B, out of §1–§14
+> scope). The kit's own markers — `data-table` · `detail-shell` ·
+> `detail-current-issues` · `persistentFacts` — grep **0** in the main bundle
+> and are present only in the lazy chunk.
+>
+> **No Orders regression:** no file with `order` in its name is in the diff at
+> all, and the suite held at **2230 passed / 16 pre-existing** in the same four
+> documented files.
+
+**All three shells exist**, extracted from the live Orders implementation, and
+`/ui` renders them. **No page renders through any of them, and that is the
+card's final shape** — the PM closed D0.5c as components-only.
+
+| | Built | Migrated |
+|---|---|---|
+| `PageShell` | ✅ from `components/ListPageShell.tsx` | ⏳ **D6** (Orders) then D7+ |
+| `DataTable` | ✅ from `OperationOrdersControl.tsx`'s table | ⏳ **D6** |
+| `DetailShell` | ✅ to L4 exactly — all seven constraints | **not in this card** — see the ruling |
+
+### ✅ RULED BY THE PM, 2026-07-29 — no Persistent Facts strip on the drawer
+
+**The decision: do NOT add a Persistent Facts strip to the Order drawer, and do
+NOT turn §7② into law.** D0.5c closes as components-only; the drawer is not
+migrated here, and real-page adoption belongs to **D6**.
+
+The PM's four reasons, recorded verbatim in substance: Persistent Facts is
+explicitly **RESERVED, NOT YET LAW** · the frozen drawer ruling says the header
+carries **ZERO order data** · D0.5c requires **zero visual change** · adding the
+strip would create a new layout **and reverse a frozen ruling**.
+
+**What this leaves standing, and it is worth being exact about.**
+`DetailShell` still implements L4 as frozen — `identity.persistentFacts` is a
+required 4-tuple and the shell renders it — because the ruling is about the
+DRAWER, not about the contract. So the component is complete and correct, and
+what is deferred is the migration. The first page to render through it (D6, or
+whichever card follows the Persistent Facts law) is where the four facts get a
+home.
+
+**The evidence the ruling was made on, kept so nobody re-derives it:**
+
+**L4 makes `persistentFacts` a required 4-tuple**, and §7② of the information
+model names the four: **客户名 · Ref · the promised date · outstanding.** The
+shell renders them, because a prop nobody reads is the disease this codebase
+keeps naming.
+
+**On the live drawer those four facts do not sit together, and one block
+explicitly refuses to carry them.** Measured, not assumed:
+
+```
+客户名      CustomerIdentityCard, in the left rail
+Ref         the header strip — "#1256"
+promised    the journey strip / the Delivery card
+outstanding the money card (C5's ONE Outstanding)
+```
+
+The drawer's header carries a comment from Jess, rev 4: **"ZERO order data here
+— the identity lives in the Customer card below."** So rendering the drawer
+through `DetailShell` means creating a four-fact strip that does not exist
+today, which is (a) a **visual change**, and this card's own acceptance
+criterion 3 is *zero visual change*; (b) **permanent vertical height**, which
+§1.1's four-question gate must rule; and (c) a **reversal of a ruling Jess made
+by name**.
+
+It is also not obviously ripe: **§7② says Persistent Facts is "RESERVED, NOT YET
+LAW … until it is, nothing here is enforceable"**, while §10's L4 — frozen the
+same day — makes it a required type.
+
+**The question that was asked, in one line:** *does the order drawer gain a
+persistent four-fact strip (customer · ref · promised date · outstanding), or
+does `DetailShell` wait until Persistent Facts is law?* — **Answered
+2026-07-29: it waits.**
+
+**Nothing was invented while it was open, and nothing was invented after.** The
+component implements L4 as frozen; the drawer is untouched; §7② stays RESERVED.
+
+### What was built
+
+**`PageShell`** — extracted from `ListPageShell`, which is the live shell on 10
+pages and already carries the geometry Jess ruled through July. What changed in
+the move: it takes **no `className`** (§6.0), and **§1.3's budget became a
+type** — `variant="list"` has no `kpi` slot at all, `variant="dashboard"` does,
+and no variant has an `extraBand`. §8.1's *"an eighth band is not forbidden by a
+sentence — it has nowhere to go"* is now literally true.
+
+**`DataTable`** — extracted from the Orders table: `table-fixed` percentage
+widths so it never scrolls sideways, 40px fixed rows that clip rather than wrap,
+a sticky head reading §4.4's layer 1 from `overlay-layer.ts` rather than typing
+a number, whole-row selection with a real indeterminate select-all, §3.5's
+washes. **The header word comes from the column def** — C1 found `Manage`
+surviving in a hand-written `<th>` while the Columns popover already read the
+def, and now there is nowhere else to type it. It formats nothing: money and
+dates stay `Money` / `fmtDate()`, or the kit would own a second date spelling.
+
+**`DetailShell`** — L4's six ordered slots with all seven constraints as types,
+and **no `state` prop**, which is L3 turned into a compiler rule.
+
+### Three findings, reported not settled
+
+1. **§1.3 and §8.1 disagree by 8px.** §8.1's band table sums to **208** against
+   §1.3's **200** list budget. Neither was edited; a test pins 208, the 180 with
+   no filter on, and §1.3's own 168 D6 projection, so the contradiction cannot be
+   lost. Recorded in UI-KIT §1.3.
+2. **§8.3 says the module-tab exception "stops being an exception… it is
+   `variant`"**, but §1.3's four variants contain nothing meaning
+   *module-tabbed*. The shell expresses it by the title being absent — still a
+   thing to remember. Either §1.3 gains a fifth variant or §8.3's sentence is
+   wrong. No variant was invented.
+3. **L4 does not say which section is open.** A shell that renders §1.4's ⑤⑥
+   must know, so `activeSectionId` + `onSectionChange` were added and are
+   flagged here. Mechanics, not information architecture — but an addition to a
+   frozen contract, so it is reported rather than assumed.
+
+### What a TypeScript quirk cost, written down
+
+**`@ts-expect-error` does not work on a JSX element that carries a
+`{...spread}`** — TypeScript switches excess-property checking off, so
+`<DetailShell {...BASE} emptyLabel="None" />` compiles happily and the directive
+reports as *unused*. Two of the seven constraints (no `emptyLabel`, no
+`children`) silently proved nothing until they were rewritten without a spread.
+Measured, not guessed: that is exactly how they first failed.
+
+### Verification
+
+`tsc -p tsconfig.app.json` clean (which is where the seven `@ts-expect-error`
+constraints are actually checked) · `pnpm --filter @carres/web lint` clean ·
+`pnpm build` clean · web suite **at baseline: 2225 passed / 16 pre-existing**,
+zero new · **negative control run**: make `currentIssues: []` render a container
+and exactly the "renders NO issues container" test goes red, nothing else moves.
+
+---
+
+## D0.5c — the original card (`DetailShell` in full; the `PageShell` / `DataTable` halves keep their one-liners above)
 
 **Written 2026-07-28, the day the Order Detail Information Architecture closed.** Its whole
 input is [`docs/ORDER-DETAIL-INFORMATION-MODEL.md`](ORDER-DETAIL-INFORMATION-MODEL.md) §10 (L4),
@@ -573,7 +722,7 @@ opportunity to break it.
 
 | Principle | Chapter | Rule row's Enforcement |
 |---|---|---|
-| R1 the floorplan catalogue is CLOSED | **§8.0** (new) | Type System — `variant` is a closed union · ⏳ **D0.5c** |
+| R1 the floorplan catalogue is CLOSED | **§8.0** (new) | Type System — `variant` is a closed union of exactly the four · ✅ **live (D0.5c)** |
 | R4 every kit artifact declares its edition | **§0.3** (extended) | Build Guard — a header scan · ⏳ **D1** (×2 rows) |
 | R2 opinionated UI, configurable business numbers | **§0.4** (new) | Build Guard — no `localStorage` layout key in `pages/**` · ⏳ **D1** |
 | R3 the identifier is the contract | **§0.5** (new) | Build Guard — no key built from a display string · ⏳ **D1** |
@@ -611,20 +760,21 @@ value; it is neutralised by a comment immediately above it that names §3.2 and 
    parses it** — it is hex-ALLOW-LISTED. Every export except `AVATAR_COLORS` has no reader. The
    three-bodies model may be correct and unimplemented, or the mirror may have no job left. **Both
    are above this card**, so the law's sentence was NOT edited.
-2. **§16 coverage went DOWN, 54.76% → 53.49%, and the card's own two rules cannot both hold.** Rule
-   4 says a principle may arrive `⏳` with a named card *because "this card writes law, not code"*;
-   Rule 5 says coverage may never go down. A law-only card satisfies both only if every principle
-   already has a live mechanism. R1's mechanism is `PageShell.tsx` — **the reference review's own
-   arithmetic said the rule "lands in the same PR as `PageShell.tsx`"**, and it did not. The dip
-   lasts exactly as long as that split: **24 / 43 = 55.81% the day D0.5c merges.** Human Review debt
-   unchanged at 4; blocked-on-a-decision unchanged at 0.
-3. **§16's own published percentage had drifted, and D0.6 had to COUNT before it could recompute.**
-   The block read **22 / 46 = 47.83%**; counted off the tables by script, `main` actually carried
-   **23 / 42 = 54.76%**. The entire gap is one section — §16 credited **Components 13 / 19** where
-   §6 has **14 / 15**. D0.5a and D0.5b each ADDED to the previous figure instead of re-counting, so
-   the error compounded silently across two cards. §16's own opening line predicted exactly this
-   (*"a hand-maintained percentage is prose, and prose drifts"*). **D1's `--report` generator is not
-   a nicety — it is the only thing that makes this number true.**
+2. **§16's published percentage has drifted through THREE cards, and D0.6 had to COUNT before it
+   could recompute.** `main` published **34 / 52 = 65.38%**; counted off the tables by script it
+   actually carried **35 / 47 = 74.47%**. The entire gap is one section — §16 credited
+   **Components 13 / 19** where §6 has **14 / 15**. D0.5a, D0.5b and D0.5c each ADDED to the figure
+   in front of them instead of re-counting, so one wrong number propagated silently across three
+   cards. §16's own opening line predicted exactly this (*"a hand-maintained percentage is prose,
+   and prose drifts"*). **D1's `--report` generator is not a nicety — it is the only thing that
+   makes this number true.**
+3. **RESOLVED by D0.5c merging — kept on the record because the resolution is the lesson.** This
+   card first ran against a `main` that did not yet carry `PageShell.tsx`, so §8.0's rule was `⏳`
+   and coverage ticked DOWN — which collided with the card's own two rules (Rule 4 permits `⏳` with
+   a named card *because "this card writes law, not code"*; Rule 5 forbids coverage going down).
+   With D0.5c merged, **§8.0 is born enforced and coverage goes UP, 74.47% → 75.00%.** The conflict
+   was real and it was dissolved by SEQUENCE, not by argument: the PM's `D0.5c → D0.6 → D1` order is
+   exactly what made the mechanism exist before the rule was written.
 4. **The exit criterion and §16's health rule disagree about what "coverage" is measured against.**
    The criterion pins an absolute floor — *"not lower than the 3 / 33 = 9.09% it reads today"* — a
    figure that went stale the moment D0.5a shipped. §16 rule 1 states a DIRECTION. Read as an
@@ -632,31 +782,54 @@ value; it is neutralised by a comment immediately above it that names §3.2 and 
    criterion goes stale; a direction does not.**
 5. **Governance and copy rules have no home in the health number.** §16 counts §1–§8, so §0.1's
    five existing rules — and the four this card added to §0 and §10 — are outside it. Widening the
-   denominator would read **22 / 57 = 38.6%** on a day nothing got worse, so it is reported and not
+   denominator would read **36 / 58 = 62.07%** on a day nothing got worse, so it is reported and not
    taken. §16 now states the exclusion out loud instead of leaving it to be inferred.
-6. **The closed catalogue already has a member the law does not name.** §8.1 names four variants —
-   `list · dashboard · detail · settings`. `PageShell.tsx` on the D0.5c branch ships
-   `variant: "list" | "module"`: **`module` is in no catalogue**, and three of the four named
-   variants do not exist. §8.0 makes a fifth floorplan a governance event, so this needs a ruling —
-   either `module` joins §8.1's list with its user task named (§8.3's module-tab law is the
-   obvious one), or the variant is renamed. **Not fixed here: it is a code file on another card.**
-7. **D0.5c did not update the law it satisfies.** Its branch changes `docs/ui-kit-execution-queue.md`
-   and no line of `docs/UI-KIT.md`, so seven rule rows still read `⏳ D0.5c` while their mechanisms
-   exist on that branch. That is what makes finding 2 look like a regression instead of a split.
+6. **WITHDRAWN — I reported this wrongly, and the correction matters more than the finding.** I
+   reported that the closed catalogue *"already has a member the law does not name"*, because
+   `PageShell.tsx` on `origin/claude/carres-d05c-shells` shipped `variant: "list" | "module"`. **That
+   branch is not what merged.** PR #505 merged a different implementation whose union is
+   `list | dashboard | detail | settings` — **exactly §8.1's four, no `module`.** I read a superseded
+   branch and reported it as the live state. *Read the tip that merged, not the branch that shares
+   its name.*
+7. **Two z-layers were still credited to D0.5c and only one of them shipped.** §4.4's layer 10
+   (sticky table header) IS wired — `DataTable.tsx` imports `Z_TABLE_HEADER`. **Layer 20
+   (toolbar / bulk bar) is not**: `overlay-layer.ts`'s own comment says *"Layer 2 still has no class
+   string: nothing uses it"*, and `PageShell.tsx` writes no `z-` at all. The row now reads ⏳ **D6**,
+   because the bulk bar arrives with page adoption, not with the shell.
 8. **The stale-citation sprawl is far wider than R4's five.** `grep "UI-KIT v4|v4 §"` over
    `apps/web/src` returns **28 citations across 12 files**, naming `§8b · §11a · §11c · §11e · §A0 ·
    §A1 · §A5 · §A6 · §A8` — **lettered sections this law has never had.** The five R4 recorded are
    closed by this card; the rest are page files, which this card may not touch, and they are D1–D7's.
    It is also the strongest possible evidence for R4's principle.
 
-### Sequencing note — this ran with D0.5c on a branch, not on `main`
+### Sequencing note — the card ran twice, and the second run is why it closes
 
 The PM's order is `D0.5c → D0.6 → D1`, and the reason given was *"the components are built first,
-and consolidation writes down what exists."* At the time this card ran, `origin/main` was
-`51f2758d` and **D0.5c was on `origin/claude/carres-d05c-shells`, unmerged and 🟡 blocked on
-D0.5c.1.** This card was written against `main`, so it wrote down what exists **on `main`** — which
-is why R1's row is `⏳` and finding 2 exists. Nothing here has to be redone when D0.5c lands: the
-row's Status flips and the number goes up.
+and consolidation writes down what exists."* **The first pass broke that order without meaning
+to**: `origin/main` was `51f2758d`, D0.5c was unmerged on a branch, and the card wrote down what
+existed on `main` — so §8.0 was `⏳` and coverage dipped.
+
+**D0.5c then merged as PR #505 (`929fa746`), and the card was re-run against it.** §8.0 is enforced,
+coverage rises, and finding 6 was withdrawn because the merged `PageShell` is not the one the branch
+carried. **The whole difference between the two passes is which tip was read** — which is the
+sequencing rule stated as a consequence rather than as advice.
+
+### Status synchronisation (PM instruction, 2026-07-29)
+
+Every milestone merged into `main` no longer reads `⏳` anywhere in the law. Verified against the
+live repository, not assumed:
+
+| Card | On `main` | Law now reads |
+|---|---|---|
+| **D0.5a** | `a548ddc9` (PR #498) | ✅ throughout — §5, §6.0–§6.5, §9 |
+| **D0.5b** | `d77bd4f6` (PR #502) | ✅ throughout — §6.7–§6.14, §4.4 layers 30 · 40 |
+| **D0.5b.1** | `2d5aaddb` | ✅ — §4.4's note; `dialog-container.tsx` is on `main` |
+| **D0.5c** | `929fa746` (PR #505) | ✅ — §8.0 · §8.1 · §7 · §1.4's seven constraints · §4.4 layer 10 |
+
+**Three rows deliberately still read `⏳`, because the thing itself has not shipped** — a status sync
+may not paint a ✅ on something that does not exist: §4.4 layer 20 (no bulk bar renders through
+`PageShell`) → **D6** · §8.2's one-interaction-model row (no page renders through the components)
+→ **D6** · Build Guard rules **G** and **H**, whose D0.5 blocker is gone but whose guard is **D1**.
 
 ---
 

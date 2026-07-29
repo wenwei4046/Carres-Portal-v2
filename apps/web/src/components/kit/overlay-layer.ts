@@ -8,11 +8,11 @@
  * `kit-source.test.ts` asserts exactly that. A component that wants a new layer
  * has to come here first, which is the friction §0.3 asks for.
  *
- * Two of the five have no class string yet, on purpose: `DataTable` and
- * `PageShell` are D0.5c, and an exported constant nobody imports is the same
- * disease as a column nobody writes. The ladder still LISTS them, because the
- * record is what makes the set closed — D0.5c reads its layer from here rather
- * than picking a number.
+ * `DataTable` (D0.5c) took layer 1 from here rather than typing a number, which
+ * is the whole intent of the record. Layer 2 still has no class string: nothing
+ * renders a floating toolbar yet, and an exported constant nobody imports is the
+ * same disease as a column nobody writes. The ladder still LISTS it, because the
+ * record is what makes the set closed.
  *
  * Toast (50) is sonner's own: it renders its host, it sets its own stacking,
  * and the kit never emits that class. Listed for completeness, owned elsewhere.
@@ -34,6 +34,9 @@ export const Z_LADDER: readonly ZLayer[] = [
   { layer: "modal · drawer", z: 40, owner: "Radix portal", card: "D0.5b" },
   { layer: "toast", z: 50, owner: "sonner", card: "shipped" },
 ] as const;
+
+/** Layer 1 — the sticky table head, owned by `DataTable` (D0.5c). */
+export const Z_TABLE_HEADER = "z-10";
 
 /** Layer 3 — everything that floats beside the thing that opened it. */
 export const Z_FLOATING = "z-30";
