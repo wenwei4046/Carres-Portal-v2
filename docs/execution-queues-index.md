@@ -549,16 +549,22 @@ no-paper rule. Every module uses it; no module invents its own action model.
   card may not be held by two chats, and **that is the failure mode that has now happened
   twice** — #495 / #496 on P2-Receiving, and #509 / #510 on **D2**, eight days apart.
 
-  **How to claim.** Before writing any code, edit this file: put the card's status cell in its
-  own queue doc to **`🔨 CLAIMED <date> — <branch>`**, commit that one line, and push it. The
-  claim IS the push; an unpushed claim claims nothing, because the only thing another chat can
-  see is `origin`. Then **re-read the claim immediately before opening the PR**, not only
-  before starting — a chat that read the lane once and started building never looks again,
-  which is exactly what let both collisions through. Same shape as the migration guard
-  (`list_migrations` twice: once before numbering, once before applying).
+  **EVERY CARD OPENS IN THIS ORDER, AND THE ORDER IS THE RULE** (frozen by the PM,
+  2026-07-29). Four steps, no step skipped and none reordered:
 
-  **If you find a card already claimed, STOP and say so.** Do not build it in parallel "to
-  compare", and do not assume a stale-looking claim is dead — ask.
+  ```
+  CLAIM  →  PUSH  →  VERIFY CLAIM  →  IMPLEMENTATION
+  ```
+
+  | Step | What it is | Why it is where it is |
+  |---|---|---|
+  | **1 · CLAIM** | Set the card's status cell in its own queue doc to **`🔨 CLAIMED <date> — <branch>`** | The claim lives with the CARD, not in a chat. A chat is invisible to every other chat |
+  | **2 · PUSH** | Commit that one line and push it | **The claim IS the push.** An unpushed claim claims nothing — `origin` is the only thing another chat can see. This is why PUSH is its own step and not a footnote to CLAIM |
+  | **3 · VERIFY CLAIM** | Re-read the claim on `origin` — **again immediately before opening the PR**, not only before starting | A chat that read the lane once and started building never looks again, and that is precisely what let both collisions through. Same shape as the migration guard reading the tracker twice: once before numbering, once before applying |
+  | **4 · IMPLEMENTATION** | Only now write code | Everything before this step is cheap. Everything after it is what gets thrown away when two chats collide |
+
+  **If you find a card already claimed, STOP and say so** before step 4. Do not build it in
+  parallel "to compare", and do not assume a stale-looking claim is dead — ask.
 
   **What a collision costs, from the two real cases.** On P2-Receiving the two builds
   DISAGREED, and reconciling them would have overturned two decisions already reported to
@@ -587,6 +593,16 @@ no-paper rule. Every module uses it; no module invents its own action model.
 
 ## Kickoff sentences (copy exactly, change the card number)
 
+> **⭐ EVERY ONE OF THESE OPENS WITH THE SAME FOUR STEPS** — `CLAIM → PUSH → VERIFY CLAIM →
+> IMPLEMENTATION`, frozen by the PM 2026-07-29 and specified in full under **Standing laws**
+> above. **A kickoff sentence is not permission to start writing code**; it is permission to
+> claim the card. The claim is a pushed one-line status edit in the card's own queue doc
+> (`🔨 CLAIMED <date> — <branch>`), re-verified on `origin` immediately before the PR is
+> opened. **A chat that reaches step 4 without steps 1–3 has broken the rule even if the card
+> turns out to be free** — the guard only works if it runs every time, and the two collisions
+> it exists to stop (#495/#496, #509/#510) were both cases where the card WAS free when the
+> chat started.
+
 ```
 Read docs/delivery-execution-queue.md. Do card T4 ONLY. ...
 Read docs/order-journey-execution-queue.md. Do card J1 ONLY. ...
@@ -597,6 +613,8 @@ Read docs/purchasing-execution-queue.md. Do card P1 ONLY. ...
 Read docs/portal-core-execution-queue.md. Do card C2 ONLY. ...
 ```
 
-Full sentence template: "Read <doc>. Do card <n> ONLY. Build it, test it, create the PR,
-merge, deploy from main, then mark <n> ✅ in the doc with the PR number. Do not touch any
-other card. Do not redesign anything marked ALREADY EXISTS."
+Full sentence template: "Read <doc>. Do card <n> ONLY. **CLAIM it first — set <n> to
+`🔨 CLAIMED <date> — <branch>` in that doc, push that line, then verify the claim on origin.**
+Build it, test it, create the PR, **re-verify the claim before opening it**, merge, deploy from
+main, then mark <n> ✅ in the doc with the PR number. Do not touch any other card. Do not
+redesign anything marked ALREADY EXISTS."
