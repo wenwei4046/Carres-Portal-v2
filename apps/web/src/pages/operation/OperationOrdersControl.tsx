@@ -576,18 +576,27 @@ function bookingConfirmedOf(o: operationOrderListRow): boolean {
 // two are different work done by different people: `Delay planning` is an
 // internal DECISION, `Arrange new delivery date` is a call to logistics that
 // only exists when the decision said the promise cannot be kept.
+// P7A (Loo, 2026-07-29) — `Send PO` is retired. Raising a purchase order is TWO
+// acts with two different completions, so it is TWO queues: `Prepare PO` ends
+// when a Draft PO exists, `Issue PO` ends when the formal PO does. They are
+// listed here in LIFECYCLE order, which is what this rail has always used
+// (`Delay planning` sits below the ready-date call here and above it in Law 4).
+// Display priority is the engine's DISPLAY_RANK and is not this list's job.
 const STOCK_QUEUE_KEYS = [
-  "send_po",
+  "prepare_po",
+  "issue_po",
   "confirm_ready_date",
   "delay_planning",
   "arrange_new_delivery_date",
 ] as const satisfies readonly OrderActionKey[];
 const NEXT_QUEUE_VERBS = STOCK_QUEUE_KEYS.map(orderActionQueue);
 const NEXT_QUEUE_DESC: Record<string, string> = {
-  [orderActionQueue("send_po")]:
-    "Goods not ordered from any supplier yet — send the PO",
+  [orderActionQueue("prepare_po")]:
+    "Nothing ordered and no draft purchase order covers these goods — prepare one",
+  [orderActionQueue("issue_po")]:
+    "A draft purchase order covers these goods — issue it, which mints the PO number and the document the supplier receives",
   [orderActionQueue("confirm_ready_date")]:
-    "PO sent but goods not in yet — call the supplier for the ready date (red once inside the stock window)",
+    "PO issued but goods not in yet — call the supplier for the ready date (red once inside the stock window)",
   // C8 — this tooltip used to read "call the customer now", which is the exact
   // thing Law 4 rung 2 forbids. Carres does not phone a customer about a delay.
   [orderActionQueue("delay_planning")]:
@@ -2603,7 +2612,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // private message — everyone must see whose month it is and that today is
   // PO day). Only the ACTION is gated: the Raise PO button renders for the
   // holder + management. Speaks the C-vocab queue words, same as QUEUES+NEXT.
-  const orderPoCount = nextCounts.get(orderActionQueue("send_po")) ?? 0;
+  // P7A — raising a PO is two acts, so the PO-day chip carries two counts.
+  // They are NEVER summed under one word: a number printed under a queue word
+  // must be a number that queue's own click can produce.
+  const preparePoCount = nextCounts.get(orderActionQueue("prepare_po")) ?? 0;
+  const issuePoCount = nextCounts.get(orderActionQueue("issue_po")) ?? 0;
   const chaseSupplierCount =
     nextCounts.get(orderActionQueue("confirm_ready_date")) ?? 0;
   // Quiet chip = every day (whole team, zero clicks): holder avatar + next PO
@@ -2653,7 +2666,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     <div className="flex items-center gap-1.5" data-testid="po-duty-strip">
       <span
         className="inline-flex items-center gap-1.5 h-[26px] rounded-full border border-base-200 bg-white px-2 text-label text-base-500 whitespace-nowrap"
-        title={`PO duty this month: ${poDutyHolderShown.name ?? poDutyHolderShown.email}${poDutyHolder ? "" : " (demo)"} — controls ${orderActionQueue("send_po")} + ${orderActionQueue("confirm_ready_date")} (the one voice to suppliers). Full roster: right rail → Team.`}
+        title={`PO duty this month: ${poDutyHolderShown.name ?? poDutyHolderShown.email}${poDutyHolder ? "" : " (demo)"} — controls ${orderActionQueue("prepare_po")} + ${orderActionQueue("issue_po")} + ${orderActionQueue("confirm_ready_date")} (the one voice to suppliers). Full roster: right rail → Team.`}
       >
         <span
           className="w-4 h-4 rounded-full flex items-center justify-center text-label font-semibold leading-none shrink-0"
@@ -2677,7 +2690,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
         >
           <PackagePlus size={14} strokeWidth={2} />
           {poDayPreview || isPoDayToday
-            ? `PO day — ${orderActionQueue("send_po")} ${orderPoCount} · ${orderActionQueue("confirm_ready_date")} ${chaseSupplierCount}`
+            ? `PO day — ${orderActionQueue("prepare_po")} ${preparePoCount}${issuePoCount > 0 ? ` · ${orderActionQueue("issue_po")} ${issuePoCount}` : ""} · ${orderActionQueue("confirm_ready_date")} ${chaseSupplierCount}`
             : `${urgentPoCount} urgent — inside the stock window`}
           {(poDayPreview || isPoDayToday) && urgentPoCount > 0 && (
             <span className="text-destructive">· {urgentPoCount} urgent</span>
@@ -3510,7 +3523,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   return sid ? supplierNameById.get(sid) ?? null : null;
                 })()}
                 onNextAction={(verb) => {
-                  if (verb === orderActionQueue("send_po")) setRaisePoOrders([o]);
+                  // P7A — both purchasing acts open the raise-PO flow today.
+                  // That flow is the only write path the portal has, and until
+                  // the Draft PO store exists `Issue PO` cannot be raised at
+                  // all; splitting the destination is the later card's, not a
+                  // second modal invented here.
+                  if (
+                    verb === orderActionQueue("prepare_po") ||
+                    verb === orderActionQueue("issue_po")
+                  )
+                    setRaisePoOrders([o]);
                   else if (verb === orderActionQueue("confirm_ready_date")) {
                     setChaseSupplierScope(null);
                     setChaseOrders([o]);

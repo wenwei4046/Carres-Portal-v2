@@ -30,7 +30,7 @@
  *  - `WhatToDo` inline horizontal (was a 4-row vertical list) — one line per
  *    stage, saves ~50px of vertical space.
  *  - Per-stage WhatToDo copy, correctly scoped:
- *      ① SEND    : WhatsApp → Paste SKU list → Click Send PO here     (3 steps)
+ *      ① SEND    : WhatsApp → Paste SKU list → raise the PO here      (3 steps)
  *      ② CHASE   : WhatsApp → Ask/update ready date → Arrange NETS → Update ETA (4)
  *      ③ RECEIVE : Count → Photograph DO → Book into Klg → Reserve   (4 steps)
  *    Send stage does NOT wait for supplier confirmation before sending — that
@@ -40,7 +40,7 @@
  *    don't act yet. Will be un-marked when the escape-hatch write path lands.
  *
  * VOCAB (rewritten by card **R8**, 2026-07-28): the three stage cells read
- *        `Send PO` · `Confirm ready date` · `Check in`, straight out of
+ *        `Prepare PO` · `Confirm ready date` · `Check in`, straight out of
  *        `order-action-words.ts`. They used to say `Send POs` · `Chase factory`
  *        · `Receive` — and `Chase` is a BANNED word (COPY-STANDARD), while
  *        `Receive` as a verb is banned outright in favour of `Check in`. The
@@ -141,7 +141,9 @@ type Stage = "place" | "chase" | "receive";
  *  the list header are ONE label rendered twice, and that is exactly where "the
  *  same act, two words, on one screen" came from in the first place. */
 const STAGE_LABEL: Record<Stage, string> = {
-  place: purchasingActionQueue("send_po"),
+  // P7A — the To Order tab's first stage reads `Prepare PO`. `Send PO` is
+  // retired; the stage itself is not re-cut here (that is a purchasing card).
+  place: purchasingActionQueue("prepare_po"),
   chase: purchasingActionQueue("confirm_ready_date"),
   receive: purchasingActionQueue("check_in"),
 };

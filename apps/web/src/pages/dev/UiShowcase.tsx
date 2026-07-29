@@ -363,7 +363,7 @@ export default function UiShowcase() {
           <Card>
             <div className="flex flex-col gap-8">
               <Sample label="default">
-                <Button variant="primary">Send PO</Button>
+                <Button variant="primary">Issue PO</Button>
                 <Button>Open order</Button>
                 <Button variant="ghost">Cancel</Button>
               </Sample>
@@ -381,7 +381,7 @@ export default function UiShowcase() {
               </Sample>
               <Sample label="hover (forced)">
                 <span className={FORCED_HOVER_PRIMARY}>
-                  <Button variant="primary">Send PO</Button>
+                  <Button variant="primary">Issue PO</Button>
                 </span>
                 <span className={FORCED_HOVER_NEUTRAL}>
                   <Button>Open order</Button>
@@ -389,12 +389,12 @@ export default function UiShowcase() {
               </Sample>
               <Sample label="focus (forced)">
                 <span className={FORCED_FOCUS_BUTTON}>
-                  <Button variant="primary">Send PO</Button>
+                  <Button variant="primary">Issue PO</Button>
                 </span>
               </Sample>
               <Sample label="disabled">
                 <Button variant="primary" disabled>
-                  Send PO
+                  Issue PO
                 </Button>
                 <Button disabled>Open order</Button>
               </Sample>

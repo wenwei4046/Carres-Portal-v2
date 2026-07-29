@@ -4,7 +4,12 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Check, PackagePlus, X } from "lucide-react";
 import { toast } from "sonner";
-import { orderActionQueue, PURCHASING_CATEGORIES, purchasingUrgentWindowDays } from "@carres/shared";
+import {
+  orderActionQueue,
+  purchasingActionButton,
+  PURCHASING_CATEGORIES,
+  purchasingUrgentWindowDays,
+} from "@carres/shared";
 import { apiFetch, type ApiError } from "@/lib/api";
 import {
   useCatalog,
@@ -316,7 +321,11 @@ export default function RaisePoReview({
                           }
                           onClick={() => void sendCard(supplier, card.lines)}
                         >
-                          {st.status === "sending" ? "Sending…" : "Send PO"}
+                          {/* P7A — this button creates the formal PO, so its word is
+                              `Issue PO`, read from the dictionary. */}
+                          {st.status === "sending"
+                            ? "Issuing…"
+                            : purchasingActionButton("issue_po")}
                         </button>
                       </>
                     )}

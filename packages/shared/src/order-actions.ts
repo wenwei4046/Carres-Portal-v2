@@ -3,7 +3,8 @@
  *
  * `docs/ACTION-FLOW-STANDARD.md` Law 1 retired the single ladder as a business
  * rule because it HID real work: an order with no PO, RM 2,000 owing and no
- * logistics company showed only `Send PO`, and the other two facts vanished.
+ * logistics company showed only the purchasing act, and the other two facts
+ * vanished. (That act was called `Send PO` until P7A retired the word.)
  *
  *   LAYER 1 · COMPUTE  — `openOrderActions`. Every track evaluates on its own.
  *                        One track's action may never suppress another's.
@@ -26,7 +27,8 @@
  * a signal owned by another track, and both are pre-existing locked rules, not
  * new couplings:
  *   · the past-deadline escalation is scoped to "something has been ordered"
- *     (Loo, freeze gate 2026-07-12) so it can never leapfrog `Send PO`;
+ *     (Loo, freeze gate 2026-07-12) so it can never leapfrog the purchasing
+ *     act (`Prepare PO` / `Issue PO`);
  *   · the money LOCK is a GATE (Law 4: "Money still LOCKS"), which C2 kept and
  *     C3 moved onto `collect` — the action that clears it — when the resting
  *     `Confirm delivery` it used to ride was retired.
@@ -97,6 +99,22 @@ export interface OrderActionSignals {
   goodsReady: boolean;
   /** Nothing has been ordered from anybody — no PO covers these goods. */
   goodsUnordered: boolean;
+  /**
+   * P7A — does a **Draft PO** already cover these goods?
+   *
+   * This is the one signal that tells the two purchasing acts apart
+   * (`docs/PURCHASING-WORKING-FLOW.md` §3): no draft → `Prepare PO`; a draft and
+   * no issued PO → `Issue PO`. It is only ever asked when `goodsUnordered` is
+   * true, because the moment a real PO exists the track has moved on to the
+   * ready-date call.
+   *
+   * **NO WRITER YET, and that is deliberate.** The Draft PO store is a later
+   * card; absent / false is UNKNOWN-as-no and reproduces the pre-split behaviour
+   * exactly — every unordered line raises the FIRST act, which is the truth
+   * today, since nothing can have been prepared. The same three-way discipline
+   * `deliveryOrderIssued` and `photoOnFile` use: an absent signal never accuses.
+   */
+  draftPoExists?: boolean | null;
   /** Latest supplier ready date among the waiting lines (ISO), else null. */
   stockEtaIso: string | null;
   /** The customer's promised date (ISO). Null when TBD or absent — a date
@@ -193,7 +211,18 @@ function delayDecided(s: OrderActionSignals): boolean {
 function goodsAction(s: OrderActionSignals): OrderOpenAction | null {
   // Guardrail #2: a delivered order never alarms about goods.
   if (s.completed || s.goodsReady) return null;
-  if (s.goodsUnordered) return action("send_po", "goods", "danger");
+  // P7A — raising a purchase order is TWO acts, never one (Loo, 2026-07-29).
+  // A Draft PO has left our company in no way, so the work that remains is a
+  // different act with a different completion: `Prepare PO` ends when a draft
+  // exists, `Issue PO` ends when a formal PO does. They are two rungs of the
+  // same question ("where are these goods?"), so at most one is ever open —
+  // which is why this is one branch and not two actions.
+  if (s.goodsUnordered)
+    return action(
+      s.draftPoExists === true ? "issue_po" : "prepare_po",
+      "goods",
+      "danger",
+    );
   // T3 DELAY RADAR: the latest ready date OVERSHOOTS the promised date, so
   // calling the supplier can no longer save the promise. Strict overshoot:
   // landing ON the date is not a delay.
@@ -327,8 +356,8 @@ function deliveryAction(s: OrderActionSignals): OrderOpenAction | null {
   // passed with a logistics company assigned and the customer still not
   // confirmed — a broken commitment, so it ranks first however the tracks sort.
   // Scoped to "something has been ordered": calling a logistics company about
-  // goods nobody has ordered is an empty action, and `Send PO` must stay the
-  // headline for those.
+  // goods nobody has ordered is an empty action, and the purchasing act must
+  // stay the headline for those.
   if (
     s.daysToDue !== null &&
     s.daysToDue < 0 &&
@@ -436,9 +465,16 @@ const DISPLAY_RANK: Record<OrderActionKey, number> = {
   // against the OTHER tracks, where the answer is the same for both.
   delay_planning: 19,
   arrange_new_delivery_date: 20,
-  // 3 · goods are not secured
-  send_po: 30,
-  confirm_ready_date: 31,
+  // 3 · goods are not secured — and this rung is ORDERED INSIDE ITSELF, frozen
+  // by Loo 2026-07-29 (ACTION-FLOW Law 4). The three are not equal members: they
+  // are three distances from a commitment, ordered commitment DESCENDING —
+  // a broken supplier promise · work prepared but not yet a formal PO · demand
+  // not yet in a draft at all. Only one is ever open per order (one goods
+  // track), so these numbers decide them against the OTHER tracks, where all
+  // three answer the same; they encode the law so a future reader cannot lose it.
+  confirm_ready_date: 30,
+  issue_po: 31,
+  prepare_po: 32,
   // 4 · delivery preparation
   assign_logistics: 40,
   confirm_delivery_date: 41,

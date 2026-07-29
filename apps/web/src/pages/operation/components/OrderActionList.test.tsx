@@ -14,7 +14,7 @@ import OrderActionList, { type OrderActionRow } from "./OrderActionList";
  */
 
 const THREE: OrderActionRow[] = [
-  { key: "send_po", line: "Send PO to Ohana", tone: "danger" },
+  { key: "prepare_po", line: "Prepare PO for Ohana", tone: "danger" },
   { key: "assign_logistics", line: "Assign logistics", tone: "info" },
   {
     key: "collect",
@@ -33,12 +33,12 @@ describe("OrderActionList", () => {
     render(<OrderActionList actions={THREE} />);
     expect(
       screen.getAllByTestId("order-action").map((n) => n.dataset.action),
-    ).toEqual(["send_po", "assign_logistics", "collect"]);
+    ).toEqual(["prepare_po", "assign_logistics", "collect"]);
   });
 
   it("every row names its party and its measurable object (COPY-STANDARD)", () => {
     render(<OrderActionList actions={THREE} />);
-    expect(screen.getByText("Send PO to Ohana")).toBeInTheDocument();
+    expect(screen.getByText("Prepare PO for Ohana")).toBeInTheDocument();
     expect(screen.getByText("Collect RM 2,455 from John Tan")).toBeInTheDocument();
   });
 

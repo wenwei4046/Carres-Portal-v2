@@ -28,6 +28,7 @@ import {
   Send,
 } from "lucide-react";
 import { toast } from "sonner";
+import { purchasingActionLine } from "@carres/shared";
 import type { ProductCategory } from "@carres/shared";
 import Btn from "@/components/Btn";
 import { fmtDate } from "@/lib/fmt-date";
@@ -88,7 +89,7 @@ interface PoDocumentPreviewProps {
   earliestCustomerDeadline: string | null;
   /** Prepared-by name — the current operator (right-side header). */
   preparedByName: string | null;
-  /** Duty holder for the badge shown next to Send PO. Null = duty layer dormant. */
+  /** Duty holder for the badge shown next to the issue button. Null = duty layer dormant. */
   dutyHolderName: string | null;
   /** onSendPo opens the shipped CreatePOModal with the prefill. */
   onSendPo: (prefill: CreatePoPrefill) => void;
@@ -154,8 +155,11 @@ export function PoDocumentPreview({
              already knows the price from their own quote). */}
       <div className="shrink-0 flex items-start justify-between gap-4 rounded-[8px] border border-base-200 bg-base-50 px-3 py-2.5 mb-3">
         <div className="min-w-0 flex-1">
+          {/* P7A — `Send PO` is retired; this preview is the ISSUE act (it
+              mints the PO number and produces the document the factory
+              receives). The words come from the dictionary, never from here. */}
           <div className="text-body font-semibold text-base-900">
-            Send PO to {supplierName} ({cats})
+            {purchasingActionLine("issue_po", { supplier: supplierName })} ({cats})
           </div>
           <div className="text-meta text-base-600 mt-0.5">
             {group.totalUnits} units · for {group.orderCount}{" "}
@@ -274,9 +278,9 @@ export function PoDocumentPreview({
           size="md"
           icon={Send}
           onClick={() => onSendPo(buildPrefill())}
-          title={`Open the PO form to raise this order to ${supplierName}.`}
+          title={`Creates the PO number and the document ${supplierName} receives.`}
         >
-          Send PO to {supplierName}
+          {purchasingActionLine("issue_po", { supplier: supplierName })}
         </Btn>
       </div>
     </div>

@@ -175,11 +175,12 @@ describe("CalendarPanel — Today / Tomorrow / This week", () => {
     h.orders = [order({ so: 1204, delivery_date: TODAY })];
     render(<CalendarPanel />);
     fireEvent.click(screen.getByText("This week"));
-    // R8 — the lens reads the dictionary now (`Send PO`), not the panel's own
+    // R8 — the lens reads the dictionary now (`Prepare PO` since P7A), not
+    // the panel's own
     // shorthand. `getByText("Send")` was an exact match and stops matching; and
     // the word now appears TWICE once the lens is open, because the tab and the
     // day section are the same action named once. [0] is the tab.
-    fireEvent.click(screen.getAllByText("Send PO")[0]);
+    fireEvent.click(screen.getAllByText("Prepare PO")[0]);
     expect(screen.getAllByText("Nothing on the books for these days.")).toHaveLength(1);
   });
 });

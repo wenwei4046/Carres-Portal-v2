@@ -50,7 +50,8 @@ const stateOf = (j: ReturnType<typeof deriveOrderJourney>, stage: string) =>
 describe("deriveOrderJourney — the stage strip agrees with the ladder", () => {
   // (verb, the signals an order carrying that verb really has, expected ●)
   const MATRIX: [string, Partial<OrderJourneySignals>, string][] = [
-    ["Send PO", { hasPo: false, goodsReady: false }, "Purchase"],
+    ["Prepare PO", { hasPo: false, goodsReady: false }, "Purchase"],
+    ["Issue PO", { hasPo: false, goodsReady: false }, "Purchase"],
     ["Confirm ready date", { hasPo: true, goodsReady: false }, "Goods"],
     // C8 — the delay radar's one rung became TWO: an internal DECISION first,
     // and only its NO answer opens the call to logistics. Both sit on Goods.
@@ -224,7 +225,8 @@ describe("deriveOrderJourney — the stage strip agrees with the ladder", () => 
 describe("deriveOrderJourney — owner", () => {
   it("names the party for every rung the ladder can emit", () => {
     const verbs = [
-      "Send PO",
+      "Prepare PO",
+      "Issue PO",
       "Confirm ready date",
       "Delay planning",
       "Arrange new delivery date",
@@ -431,7 +433,8 @@ describe("OrderJourneyHeader — the strip", () => {
     const banned =
       /\b(POD|Proof of Delivery|Unscheduled|Not booked|carrier|chase|logistic(?!s))\b/i;
     for (const label of [
-      "Send PO",
+      "Prepare PO",
+      "Issue PO",
       "Confirm ready date",
       "Delay planning",
       "Arrange new delivery date",
