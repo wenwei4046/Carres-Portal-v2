@@ -47,7 +47,8 @@ deliverable is Foundation Components, not a better document.
 | **D0.5a** | Foundation components, no behaviour + **`/ui`** — renders Q1/Q3/Q4 for Jess to freeze | ✅ **built 2026-07-28** — full card below |
 | **D0.5b** | Foundation components, Radix | ✅ **SHIPPED 2026-07-28, PR #502 `d77bd4f6`, deployed** — full card below. The gate opened: Jess froze Q1 · Q3 · Q4 |
 | **D0.5b.1** | **P1 follow-up** — a picker inside a dialog renders UNDER it. Scoped card below | ⏳ **before D0.5c** |
-| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | 🟡 **PARTLY DONE 2026-07-28** — all three built and tested, Orders renders through the first two; **the drawer migration is BLOCKED on one decision** (L4 constraint 5 vs the drawer’s identity block). Card below |
+| **D0.5c** | `PageShell` + `DataTable` + `DetailShell` — **extracted from Orders, not designed fresh** | 🟡 **PARTLY DONE 2026-07-28** — all three built and tested, Orders renders through the first two. The drawer wrap resumes **after D0.5c.1** |
+| **D0.5c.1** | **DECISION card** — §7② and §10 disagree about whether the Persistent Facts cap is law. No code. Card below | ⏳ **blocks the last step of D0.5c** |
 | **D0.6** | **KIT-CONSOLIDATION** — write the five frozen reference principles into the law, once. Full card below | ✅ **planning card APPROVED 2026-07-28.** Build **after D0.5c**, before D1 |
 | **D1** | Build Guard over all 225 files, **warn only**, write the baseline | ⏳ |
 | **D2 / D3 / D4** | codemod typography / colour / spacing | ⏳ |
@@ -426,6 +427,68 @@ and the scope came from a report that had listed only those three. **They are le
 deliberately and said out loud**, because this line already paid for the opposite mistake once:
 *"closing the old door is not the optional half — leaving it open while filing a CF looks
 disciplined and behaves like a trap."*
+
+---
+
+## D0.5c.1 — resolve the Persistent Facts law conflict (DECISION card, 2026-07-29)
+
+**This card writes no code.** It exists because **two frozen passages of the same document
+disagree**, and D0.5c's last step cannot be taken until one of them is authoritative. Nothing is
+implemented here and nothing is redesigned — the output is a ruling and one edited paragraph.
+
+### The two passages, verbatim
+
+> **`ORDER-DETAIL-INFORMATION-MODEL.md` §7② — "RESERVED, NOT YET LAW"**
+> *"**A law will be written later.** Until it is, nothing here is enforceable."*
+> …and, in the same block: *"**A cap.** The set is full at four."*
+
+> **`ORDER-DETAIL-INFORMATION-MODEL.md` §10 (L4), FROZEN, constraint 5**
+> *"`identity` takes values only, no `onAction`; its persistent facts are a **fixed 4-tuple**"*
+
+§7② says the concept is **not yet enforceable**. §10 **enforces it as a type**. Both are dated
+2026-07-28 and both are marked frozen.
+
+### What it costs today, in one line
+
+`DetailShell` implements §10 — `persistentFacts` is a 4-tuple, and a `@ts-expect-error` test
+proves a fifth or a third does not compile. The drawer has **no such four nodes**:
+`CustomerIdentityCard` renders the customer and the SO, while the promised date and the
+outstanding figure live in other blocks. So the wrap cannot be written without either moving
+business content or weakening the type — and the PM has ruled out both.
+
+### The decision, and ONLY this decision
+
+**Which definition is authoritative?**
+
+| | Ruling | What follows |
+|---|---|---|
+| **A** *(recommended)* | **§10 (L4) is authoritative.** §7②'s "not yet enforceable" is superseded — L4 froze the cap into a type the same day, which IS the law §7② said would be written later. | §7②'s sentence is corrected to point at L4. `DetailShell` is untouched. The wrap then needs the four nodes to EXIST, which becomes its own small card — **not this one** |
+| **B** | **§7② is authoritative.** The cap is not law yet, so a shell may not enforce it. | Constraint 5 loses the tuple — which the PM has already forbidden ("do not weaken existing constraints"), so this option exists only to be ruled out on the record |
+
+**Recommendation: A.** §7②'s own words are *"a law will be written later"*, and L4 is later on the
+same day and in the same file. Reading it as still-unwritten leaves the document saying a rule
+both is and is not enforceable, which is the state that stopped the build.
+
+### Scope — the PM's, and nothing beside it
+
+```
+IN    decide which of §7② / §10 is authoritative
+IN    edit the LOSING passage so the document stops contradicting itself
+OUT   redesigning the drawer
+OUT   redesigning DetailShell
+OUT   moving any business content (the promised date, the outstanding figure)
+OUT   weakening any existing constraint
+```
+
+### Exit criteria
+
+- [ ] One of the two passages is marked as superseded, in ONE edit, naming the ruling and its date.
+- [ ] `grep` finds no remaining sentence saying the cap is unenforceable — *one concern, one file*.
+- [ ] `DetailShell.tsx` and its test are **byte-identical** — `git diff` on both is empty.
+- [ ] No `apps/web` file changes at all. This card ships documentation only.
+- [ ] The queue records what the wrap still needs, so D0.5c resumes without re-deriving it.
+
+**After the ruling**, D0.5c's remaining step is the mechanical drawer wrap and nothing more.
 
 ---
 
