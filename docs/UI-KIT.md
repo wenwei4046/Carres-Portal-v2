@@ -1694,15 +1694,37 @@ D0.6 wrote into §0.3 · §0.4 · §0.5 · §10.1. **O–Q are D3's**, and the r
 they exist is the one number worth remembering from that card:
 
 ```
-  the portal's colour surface .......... ~6,290 sites
-  what A and B between them saw ........    435   = 6.9%
-  …of which out of scope (Part B) ......    249
+                                       BEFORE D3      AFTER D3
+  colour sites in scope ..............     6,385         6,129
+  measured by SOME rule ..............       435         5,545
+                                            6.8%         90.5%
 ```
 
+**HOW THAT IS COUNTED** — stated because a figure the generator does not produce
+must carry its method, and D2 is why: two independent reviews read byte-identical
+source and got 3,971 and 3,975 for one quantity. **The source agreed and the
+counting did not.**
+
+> *Colour sites* = the sum of the colour rules over §13.1's scope — `A + B + O +
+> P + Q` from `scripts/design-guard-baseline.json`, **plus** the two legacy
+> recipe families no rule owns, counted over the same file list with the guard's
+> own comment stripper: `\bpill-[a-z]+\b` = **247** and
+> `\bbtn-(?:primary|secondary|soft|ghost|danger|hero)\b` = **337**.
+> *Measured* = the rules only. **BEFORE** reads O · P · Q at the values D3 first
+> measured them at, since the code they count predates the rules.
+> The surface SHRINKS by 256 because 249 Part B hexes left scope, 10 were
+> converted, and rule B's net +3 stayed.
+
 **A and B measured hex. The colour debt is not hex** — it is 4,661 palette
-classes, 594 legacy brand aliases and 111 inline colours, and none of it was
-counted by anything. **D5 cannot ratchet what nobody measures**, which is the
-whole reason a colour card's first output is a ruler rather than a codemod.
+classes, 594 legacy brand aliases, 111 inline colours and 584 legacy `.pill-*` /
+`.btn-*` recipes, and until D3 none of it was counted by anything. **D5 cannot
+ratchet what nobody measures**, which is the whole reason a colour card's first
+output is a ruler rather than a codemod.
+
+> **`.pill-*` and `.btn-*` are in the SURFACE and in no RULE**, deliberately.
+> They are component adoption (§3.6's `StatusPill`, §6.1's `Button`), which is
+> D6/D7's, and a rule that flagged them would be a rule no colour card may act
+> on. They are counted so the denominator is honest.
 
 > **Rule B could not see the flame it exists to find, and that is why it read
 > clean.** The live assignment is `--primary: 13 64% 47%` — HSL — while B matched

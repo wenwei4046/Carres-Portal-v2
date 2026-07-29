@@ -739,7 +739,12 @@ typography had six tokens and a size→token map a machine could apply and a che
   inline style={{ …color }} ................ 116
 ```
 
-**≈6,290 colour sites; the guard sees 435 of them — 6.9% — and 249 of those are out of scope.**
+**6,385 colour sites; the guard saw 435 of them — 6.8% — and 249 of those were out of scope.**
+**After D3: 5,545 of 6,129 measured, 90.5%.** The counting method is recorded in UI-KIT §13.3
+beside the figures, because a number the §16 generator does not produce has to carry one — the
+planning draft of this card said "≈6,290 / 6.9%", which was hand-mixed from a pre-correction `A`
+and an estimated `P`, and nobody could have re-derived it. **D2's lesson applied to D3's own
+arithmetic: two reviews read identical source and counted 3,971 vs 3,975.**
 
 **Two facts decided the shape.** ① **An exact hex match is not automatically mechanical**:
 `#FFFFFF` equals EIGHT tokens (`--card` · `--popover` · `--primary-foreground` ·
@@ -867,6 +872,41 @@ value altered, nothing under `pages/dealer/**`, `pages/print/**` or `styles/pos-
    jobs it is. Phase 4's, page by page.
 5. **`lib/pdf/**` was exempt from rule A and a violation of rule B** — one file simultaneously out
    of scope and in breach. Made consistent; the print contract stays §13.1's business.
+
+### A correction D3 had to make on itself, after the card was already pushed
+
+**The D2 review chat sent a governance correction. Its premise was wrong and one of its three
+inherited rules caught a real defect in this card — both are recorded, because only writing down
+the half that landed would misrepresent both.**
+
+**The premise, checked rather than accepted.** It reported that the claim went only into the STATE
+LINE of `execution-queues-index.md` and that *"D3's row in `docs/ui-kit-execution-queue.md`
+carries no marker today."* **The claim commit `1cd8d406` changed BOTH files** — 2 files, and line
+54 of this doc read `🔨 **CLAIMED 2026-07-29** — branch claude/carres-portal-d3-execution-0be46e`
+verbatim. It reads `✅ BUILT` now because the card finished and pushed; **re-stamping it `🔨
+CLAIMED` would make the doc describe work that is done as work that is starting.** Not done. The
+sequence CLAIM → PUSH → VERIFY → IMPLEMENT was followed, and the verify was re-run against
+`origin` immediately before the implementation commit, not only at the start.
+
+**The rule that landed: a figure the generator does not produce must carry its counting method.**
+D3 wrote *"≈6,290 colour sites, 435 seen, 6.9%"* into UI-KIT §13.3 — **hand-mixed from a
+PRE-correction `A` (430, still carrying Part B) and an ESTIMATED `P` (613, against a measured
+594), with no method beside it.** Nobody could have re-derived it, which is the exact shape of the
+3,971-vs-3,975 disagreement that put the method into §2.1 in the first place. Re-derived from the
+frozen baseline plus two named greps: **6,385 before · 6,129 after**, and the achievement is
+**6.8% → 90.5% measured**, which the original figure did not state at all. §13.3 now carries the
+derivation.
+
+**The other two inherited rules were already honoured, checked not assumed:** the codemod was
+scored against `design-guard-baseline.json` as it stood (`A 430 · B 5 · D 33`, 3,412), and both
+the guard edit and the new codemod **import** `blankComments` / `codeSegments` from
+`scripts/lib/source-segments.mjs` — `grep -c "function blankComments" scripts/codemod-d3-colour.mjs`
+is **0**. The `.t4-*` ramp was not folded in; it stays D6/D7's.
+
+**Three figures in that message are the planning estimates rather than the measured ones**, and
+they are corrected here so the next card does not inherit them: Phase 2 shipped **10**
+conversions, not 15 (the form-B narrowing, above) · Phase 3 is **594** sites, not 613 (rule P
+measures it) · Phase 4 is **4,661** palette-class uses, of which 4,577 are `base-*`.
 
 ---
 
