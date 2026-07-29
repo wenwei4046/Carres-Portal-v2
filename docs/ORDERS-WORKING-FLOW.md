@@ -277,7 +277,7 @@ second customer conversation: it opens **Stage 1** of the delay recovery above.
 - Trigger: logistics assigned but the customer has not confirmed BOTH a date and a slot
 - Checklist: logistics contacted the customer · proposed date · customer-confirmed date · customer-confirmed slot · the response · the reason if unresolved · (for condominiums) driver name · driver phone · vehicle number · lift or registration requirement
 - Completion: a customer-confirmed date AND slot exist. **A date logistics proposed is a fact, not a confirmation**
-- **The slot length comes from the building type** — a condominium, apartment or office takes a half-day; landed and retail take a full day (`docs/COPY-STANDARD.md`)
+- **The slot length comes from the building type** — a condominium, apartment or office takes a half-day; landed and retail take a full day (§5)
 - Due: a settable number of working days before the customer's date — **1 today, Jess may set 5** (`docs/PURCHASING-WORKING-FLOW.md` §2 holds every settable number)
 - Task Owner: the module assigns it
 
@@ -389,9 +389,25 @@ refuse. What is refused at agreement time:
 
 - **Sunday and Malaysian public holidays** — the two hard blocks. No logistics company runs.
 - **A missing building type.** A condominium can only take a half-day delivery, so the date
-  cannot be agreed until the building type is filled in
-  (`docs/COPY-STANDARD.md`, the delivery window words). Measured 2026-07-27: 40 of 56 live
+  cannot be agreed until the building type is filled in. Measured 2026-07-27: 40 of 56 live
   orders have it blank, so without this refusal the half-day rule would never apply.
+
+**How long the truck has, by building** — the rule the refusal above enforces:
+
+| Building type | The window | Why |
+|---|---|---|
+| `Landed` · `Retail` | **Full-day delivery** | the truck drives up to the door |
+| `Condo` · `Apartment` · `Office` | **Half-day delivery** | the lift must be booked and the driver must report in |
+| `Other` / not filled | **Full-day delivery**, and the booking is refused until it is filled | see the ruling below |
+
+**Building type is MANDATORY at go-live, and the blanks are not a reason to soften it**
+(Loo, 2026-07-28). The AutoCount import rows disappear when the database starts clean; the
+handful of portal orders are blank because the POS writes the field only when it is
+non-empty — so "mandatory" is a change the POS still has to make, not a state it is already
+in. **The refusal STANDS as written.** This is CLAUDE.md's standing law made concrete: test
+data is evidence about whether CODE WORKS, never a reason to change what the business does.
+A chat that meets those blanks must not propose a default, a grandfather clause or a
+"legacy" branch. *(The words for the fact and the refusal are `docs/COPY-STANDARD.md` §2.6.)*
 
 What only WARNS: a logistics company's own working days, closed dates, capacity and notice
 period — a phone call beats a calendar.

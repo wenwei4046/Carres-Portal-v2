@@ -446,24 +446,9 @@ Fixed phrasings — reuse, never invent a variant:
 **Never** write "access restrictions", "site constraints", "delivery window policy" or
 "lift booking required" on screen (§9). Say what the building is and how long the truck has.
 
-> **⇢ NOT LANGUAGE · future owner: `docs/ORDERS-WORKING-FLOW.md`** — **how long a
-> delivery takes depends on the building**, and the rule behind the two phrasings
-> above is business, not wording:
->
-> | Building type | The window | Why |
-> |---|---|---|
-> | `Landed` · `Retail` | **Full-day delivery** | the truck drives up to the door |
-> | `Condo` · `Apartment` · `Office` | **Half-day delivery** | the lift must be booked and the driver must report in |
-> | `Other` / not filled | **Full-day delivery**, and the booking is refused until it is filled | the refusal STANDS |
->
-> **Building type is MANDATORY at go-live, and the blanks are not a reason to
-> soften it** (Loo, 2026-07-28). Of the live blanks measured 2026-07-28, the
-> AutoCount import rows disappear when the database starts clean; the handful of
-> portal orders are blank because the POS writes the field only when it is
-> non-empty — so "mandatory" is a change the POS still has to make, not a state it
-> is already in. *(The measured counts are evidence, not law: they live in
-> `docs/phase-10-worklog.md`.)* A chat that meets those blanks must not propose a
-> default, a grandfather clause or a "legacy" branch.
+**How long the truck has, and when a booking is refused for a missing building type, is a
+business rule** — `docs/ORDERS-WORKING-FLOW.md` §5. The two phrasings above are the words
+that rule produces.
 
 ## The Delivery module words (T11, locked with Jess 2026-07-27)
 
