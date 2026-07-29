@@ -579,5 +579,5 @@ queue, not a flow with two holes in it.
 | R4 | ✅ | [#454](https://github.com/wenwei4046/Carres-Portal-v2/pull/454) · 0299 |
 | R5 | ✅ | [#475](https://github.com/wenwei4046/Carres-Portal-v2/pull/475) · no migration |
 | R6 | ✅ | [#490](https://github.com/wenwei4046/Carres-Portal-v2/pull/490) · 0301 + 0302 |
-| R7 | 🔨 **CLAIMED 2026-07-29 — `claude/r7-preflight-fa9383`** · RE-CUT by Loo 2026-07-29: the Receiving design, Phase 1 only. **It is no longer GRN duty auto-assign** | — |
+| R7 | ✅ the Receiving design, Phase 1 — **docs + architecture only, NO migration** · RE-CUT by Loo 2026-07-29, so **it is no longer GRN duty auto-assign and that is now UNOWNED** (§3.16) | [#515](https://github.com/wenwei4046/Carres-Portal-v2/pull/515) |
 | R8 | ✅ | [#499](https://github.com/wenwei4046/Carres-Portal-v2/pull/499) · no migration |
