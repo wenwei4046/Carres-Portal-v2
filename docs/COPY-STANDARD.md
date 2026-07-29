@@ -1027,11 +1027,8 @@ business says out loud is "HOUZS Balakong"; Loo ruled the option `HOUZS`. Do not
 FACT stating an absence, which the fact/action rule allows, and it carries no to-do word. It
 may not leak onto a PO, onto the external document, or into an error a store reads.
 
-> **⇢ NOT LANGUAGE · future owner: `docs/PURCHASING-WORKING-FLOW.md`** — **a PO may
-> stay a draft while its external destination has no address, and it may not be
-> issued, exported or sent until the address is complete.** That refusal is a
-> business rule, enforced in the database; only the string above is this file's.
-> `Carres Klang` never shows it: its address is derived from the own warehouse record.
+*(When a PO may be issued with an incomplete destination address — and why `Carres Klang`
+never shows this string — is a business rule: `docs/PURCHASING-WORKING-FLOW.md`.)*
 
 ### Facet group headings (locked 2026-07-28, after P2-Claims found they had no home)
 

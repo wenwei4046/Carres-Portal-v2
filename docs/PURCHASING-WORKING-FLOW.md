@@ -274,6 +274,13 @@ record is created for either. Carres has exactly one warehouse, `Carres Klang`; 
 became a warehouse entity every stock rollup would start counting goods we do not hold and do
 not count.
 
+**A PO may stay a DRAFT while its external destination has no address — and it may not be
+issued, exported or sent until that address is complete** (Loo, 2026-07-29). The refusal is
+enforced in the database, not by a screen, so no door walks around it. `Carres Klang` can
+never hit it: its address is derived from the own warehouse record. The words a screen shows
+while an address is missing are `docs/COPY-STANDARD.md` §6.2 — and that string is a Settings
+word: it may not leak onto a PO, onto the external document, or into an error a store reads.
+
 **Items are ADDED to a sent PO by raising a NEW PO, never by editing the old one**
 (Loo, 2026-07-28). The document the supplier already has stays exactly as they received it.
 
