@@ -475,7 +475,7 @@ function StickyAction({
           onClick={onIssue}
           disabled={blocked || pending || !destId}
           data-testid="to-order-issue"
-          className="h-8 px-3.5 rounded-[6px] bg-primary text-white text-body font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-8 px-3.5 rounded-[6px] bg-kit-blue-9 text-white text-body font-medium disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {W.issue}
         </button>
@@ -517,7 +517,7 @@ function IssuedPanel({
           type="button"
           onClick={onOpenPurchaseOrders}
           data-testid="to-order-open-pos"
-          className="ml-auto h-8 px-3.5 rounded-[6px] bg-primary text-white text-body font-medium"
+          className="ml-auto h-8 px-3.5 rounded-[6px] bg-kit-blue-9 text-white text-body font-medium"
         >
           {W.openPurchaseOrders}
         </button>
