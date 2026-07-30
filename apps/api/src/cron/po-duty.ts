@@ -98,9 +98,9 @@ export async function runPoDutyCron(env: Bindings): Promise<number> {
   const { error } = await sb.from("ops_tasks").insert({
     title: `PO day — ${waiting} order${waiting === 1 ? "" : "s"} short of stock`,
     detail:
-            // P7A (Loo, 2026-07-29) — `Send PO` is retired: raising a purchase order
-      // is two acts, and the queues are named for them.
-      "PO day: open Orders → the Prepare PO / Issue PO / Confirm ready date queues, select, issue. Urgent (red) rows must not wait for a PO day.",
+            // `Send PO` is retired: raising a purchase order is ONE act, and the
+      // queues are named for it (Loo, 2026-07-30 — the Purchasing clean restart).
+      "PO day: open Orders → the Issue PO / Confirm ready date queues, select, issue. Urgent (red) rows must not wait for a PO day.",
     created_by: duty.user_id,
     assigned_to: duty.user_id,
     priority: "normal",

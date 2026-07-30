@@ -64,7 +64,7 @@ You are reviewing the Carres Portal — a make-to-order furniture operations sys
 | # | Module | Status | Sidebar item | 1-line purpose |
 |---|---|---|---|---|
 | 1 | **Orders** | 🟡 half-shipped · proposal locked (PR #244) | Orders | Customer SO lifecycle: placed → proceed → pending → scheduled → delivered |
-| 2 | **Purchasing** | 🟢 **all 5 tabs shipped** (P1-P4). PO lifecycle redesigned + frozen 2026-07-29 — see [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) | Purchasing (**5 tabs**) | Supplier PO lifecycle: To Order (plan + Draft PO) · Purchase Orders (the official document) · Receiving · Claims · Settings (manager-only) |
+| 2 | **Purchasing** | 🟢 **all 5 tabs shipped** (P1-P4). PO lifecycle redesigned + frozen 2026-07-29, simplified 2026-07-30 — see [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) | Purchasing (**5 tabs**) | Supplier PO lifecycle: To Order (the plan) · Purchase Orders (the official document) · Receiving · Claims · Settings (manager-only) |
 | 3 | **Inventory** | 🔵 proposal locked (PR #247) | Inventory (4 tabs, replaces Stock) | On hand · Ready stock · Movements · Reconciliation |
 | 4 | **Delivery** | 🔵 proposal locked (PR #247) | Delivery (new module) | 3PL delivery lifecycle: To assign · In transit · POD queue |
 | 5 | **Payments** | 🟡 basic shipped · proposal locked (PR #247) | Payments (4 tabs) | Money flows: Collect (customer AR) · Pay (supplier AP) · Reconcile (bank) · Refunds |

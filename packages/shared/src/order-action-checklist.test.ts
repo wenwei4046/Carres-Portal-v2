@@ -21,7 +21,6 @@ import {
  */
 
 const EVERY_KEY: OrderActionKey[] = [
-  "prepare_po",
   "issue_po",
   "confirm_ready_date",
   "delay_planning",
@@ -99,20 +98,9 @@ describe("C6 · a step reads a real signal, never an assertion", () => {
     ).toEqual({ key: "issue_po", state: "done" });
   });
 
-  // P7A · the split, in the checklist. Preparing is what `Issue PO` waits on,
-  // and it is read from the same signal that opened the action.
-  it("`Prepare PO` ticks once a draft PO exists", () => {
-    expect(
-      orderActionChecklist("issue_po", sig({ draftPoExists: false }))[0],
-    ).toEqual({ key: "prepare_po", state: "open" });
-    expect(
-      orderActionChecklist("issue_po", sig({ draftPoExists: true }))[0],
-    ).toEqual({ key: "prepare_po", state: "done" });
-  });
-
-  it("`Prepare PO` is where the goods track starts — no earlier step", () => {
-    expect(orderActionChecklist("prepare_po", sig())).toEqual([
-      { key: "prepare_po", state: "open" },
+  it("`Issue PO` is where the goods track starts — no earlier step", () => {
+    expect(orderActionChecklist("issue_po", sig())).toEqual([
+      { key: "issue_po", state: "open" },
     ]);
   });
 

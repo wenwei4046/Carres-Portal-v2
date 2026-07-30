@@ -46,7 +46,7 @@ describe("openOrderActions — one track never suppresses another", () => {
       confirmedDateIso: null,
       moneyOwing: true,
     });
-    expect(keys(s)).toEqual(["prepare_po", "assign_logistics", "collect"]);
+    expect(keys(s)).toEqual(["issue_po", "assign_logistics", "collect"]);
   });
 
   it("goods still coming does not hide the delivery work", () => {
@@ -93,61 +93,24 @@ describe("openOrderActions — one track never suppresses another", () => {
 describe("goods track", () => {
   const waiting = { goodsReady: false } as const;
 
-  it("nothing ordered and no draft → Prepare PO (act one)", () => {
+  it("nothing ordered → Issue PO, the one act that secures the goods", () => {
     expect(keys(sig({ ...waiting, goodsUnordered: true }))).toContain(
-      "prepare_po",
-    );
-  });
-
-  // P7A · the split. Raising a purchase order is TWO acts with two different
-  // completions, and this is the only signal that tells them apart.
-  it("a draft PO covers it → Issue PO (act two), never Prepare PO again", () => {
-    const s = sig({ ...waiting, goodsUnordered: true, draftPoExists: true });
-    expect(keys(s)).toContain("issue_po");
-    expect(keys(s)).not.toContain("prepare_po");
-  });
-
-  it("an ABSENT draft signal reproduces the pre-split behaviour exactly", () => {
-    // No writer exists yet, so every live order takes this branch: `undefined`
-    // and `null` are UNKNOWN-as-no, and UNKNOWN never accuses.
-    for (const draftPoExists of [undefined, null, false] as const)
-      expect(
-        keys(sig({ ...waiting, goodsUnordered: true, draftPoExists })),
-      ).toContain("prepare_po");
-  });
-
-  it("both acts are ONE goods action, never two at once", () => {
-    for (const draftPoExists of [undefined, true] as const) {
-      const goods = openOrderActions(
-        sig({ ...waiting, goodsUnordered: true, draftPoExists }),
-      ).filter((a) => a.track === "goods");
-      expect(goods).toHaveLength(1);
-    }
-  });
-
-  it("issuing beats preparing, and a broken supplier promise beats both (Law 4 rung 3)", () => {
-    // The rung is ordered inside itself, commitment descending. Only one is
-    // ever open per order, so the proof is the RANK, taken through the same
-    // Layer 2 the row uses.
-    const rank = (key: string, extra: Partial<OrderActionSignals>) =>
-      first(sig({ ...waiting, ...extra }));
-    expect(rank("prepare", { goodsUnordered: true })).toBe("prepare_po");
-    expect(rank("issue", { goodsUnordered: true, draftPoExists: true })).toBe(
       "issue_po",
     );
-    // Ranked against a MONEY action, which Law 4 puts last either way.
+  });
+
+  it("unordered goods raise ONE goods action, never two at once", () => {
+    const goods = openOrderActions(
+      sig({ ...waiting, goodsUnordered: true }),
+    ).filter((a) => a.track === "goods");
+    expect(goods).toHaveLength(1);
+  });
+
+  it("`Issue PO` outranks money (Law 4 rung 3 beats rung 5)", () => {
+    // Only one goods action is ever open per order, so the proof is the RANK,
+    // taken through the same Layer 2 the row uses.
     expect(
       first(sig({ ...waiting, goodsUnordered: true, moneyOwing: true })),
-    ).toBe("prepare_po");
-    expect(
-      first(
-        sig({
-          ...waiting,
-          goodsUnordered: true,
-          draftPoExists: true,
-          moneyOwing: true,
-        }),
-      ),
     ).toBe("issue_po");
   });
 
@@ -192,7 +155,6 @@ describe("goods track", () => {
 
   it("delivered orders never carry a goods action (guardrail #2)", () => {
     const s = sig({ completed: true, goodsReady: false, goodsUnordered: true });
-    expect(keys(s)).not.toContain("prepare_po");
     expect(keys(s)).not.toContain("issue_po");
   });
 });
@@ -237,7 +199,7 @@ describe("delivery track", () => {
       goodsReady: false,
       goodsUnordered: true,
     });
-    expect(first(s)).toBe("prepare_po");
+    expect(first(s)).toBe("issue_po");
     // and the delivery track is the plain amber call, not the red escalation
     expect(openOrderActions(s).find((a) => a.track === "delivery")).toMatchObject({
       key: "confirm_delivery_date",
@@ -521,7 +483,7 @@ describe("orderActionsInDisplayOrder — the drawer's list", () => {
     });
     const list = orderActionsInDisplayOrder(s);
     expect(list.map((a) => a.key)).toEqual([
-      "prepare_po",
+      "issue_po",
       "assign_logistics",
       "collect",
     ]);

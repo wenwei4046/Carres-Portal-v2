@@ -20,7 +20,6 @@ import {
 } from "./order-action-words";
 
 const EVERY_KEY: OrderActionKey[] = [
-  "prepare_po",
   "issue_po",
   "confirm_ready_date",
   "delay_planning",
@@ -37,7 +36,6 @@ const EVERY_KEY: OrderActionKey[] = [
 
 describe("order action words — the queue word", () => {
   it("carries no party (a queue holds many suppliers)", () => {
-    expect(orderActionQueue("prepare_po")).toBe("Prepare PO");
     expect(orderActionQueue("issue_po")).toBe("Issue PO");
     expect(orderActionQueue("confirm_ready_date")).toBe("Confirm ready date");
     expect(orderActionQueue("confirm_delivery_date")).toBe("Confirm delivery date");
@@ -62,9 +60,6 @@ describe("order action words — the queue word", () => {
 
 describe("order action words — the row line", () => {
   it("names the real party when the system knows it", () => {
-    expect(orderActionLine("prepare_po", { supplier: "Ohana" })).toBe(
-      "Prepare PO for Ohana",
-    );
     expect(orderActionLine("issue_po", { supplier: "Ohana" })).toBe(
       "Issue PO to Ohana",
     );
@@ -256,7 +251,6 @@ describe("order action words — the banned words", () => {
  */
 describe("purchasing action words — the dictionary, verbatim", () => {
   const EVERY_PURCHASING_KEY: PurchasingActionKey[] = [
-    "prepare_po",
     "issue_po",
     "confirm_ready_date",
     "confirm_tomorrows_delivery",
@@ -265,9 +259,8 @@ describe("purchasing action words — the dictionary, verbatim", () => {
     "confirm_what_happens_next",
   ];
 
-  it("spells all seven queue words exactly as COPY-STANDARD does", () => {
+  it("spells all six queue words exactly as COPY-STANDARD does", () => {
     expect(EVERY_PURCHASING_KEY.map(purchasingActionQueue)).toEqual([
-      "Prepare PO",
       "Issue PO",
       "Confirm ready date",
       "Confirm tomorrow's delivery",
@@ -305,14 +298,11 @@ describe("purchasing action words — the dictionary, verbatim", () => {
       .toBe("Call supplier — confirm balance delivery date");
   });
 
-  it("the three shared rows are read back, never respelt", () => {
-    // COPY-STANDARD (Loo, 2026-07-29): the PURCHASING table is the canonical
-    // home for `Prepare PO`, `Issue PO` and `Confirm ready date`; the Orders
-    // ladder DISPLAYS them and does not respell them. One string, read twice.
-    expect(purchasingActionQueue("prepare_po")).toBe(orderActionQueue("prepare_po"));
+  it("the two shared rows are read back, never respelt", () => {
+    // COPY-STANDARD: the PURCHASING table is the canonical home for `Issue PO`
+    // and `Confirm ready date`; the Orders ladder DISPLAYS them and does not
+    // respell them. One string, read twice.
     expect(purchasingActionQueue("issue_po")).toBe(orderActionQueue("issue_po"));
-    expect(purchasingActionButton("prepare_po"))
-      .toBe(orderActionButton("prepare_po"));
     expect(purchasingActionButton("issue_po"))
       .toBe(orderActionButton("issue_po"));
     expect(purchasingActionButton("confirm_ready_date"))
@@ -337,15 +327,12 @@ describe("purchasing action words — the dictionary, verbatim", () => {
     expect(orderActionForQueue("Send PO")).toBeNull();
   });
 
-  it("both purchasing acts carry the four strings COPY-STANDARD can hold here", () => {
-    expect(purchasingActionLine("prepare_po", { supplier: "Ohana" }))
-      .toBe("Prepare PO for Ohana");
-    expect(purchasingActionButton("prepare_po")).toBe("Prepare PO");
+  it("the purchasing act carries the strings COPY-STANDARD can hold here", () => {
     expect(purchasingActionLine("issue_po", { supplier: "Ohana" }))
       .toBe("Issue PO to Ohana");
     expect(purchasingActionButton("issue_po")).toBe("Issue PO");
     // The role word, never an empty gap.
-    expect(purchasingActionLine("prepare_po")).toBe("Prepare PO for supplier");
+    expect(purchasingActionLine("issue_po")).toBe("Issue PO to supplier");
     expect(purchasingActionLine("issue_po", { supplier: "  " }))
       .toBe("Issue PO to supplier");
   });

@@ -10,7 +10,7 @@
 >
 > | | **`PURCHASING-WORKING-FLOW.md`** — this file | **`PURCHASING-INFORMATION-MODEL.md`** |
 > |---|---|---|
-> | owns | business workflow · business rules · action ownership · trigger · due · completion · status progression · queue behaviour · cross-module workflow boundaries | information architecture · information regions · information hierarchy · information relationships · the legal overlap between Planning and Draft PO · the facts each region must carry · information excluded from To Order |
+> | owns | business workflow · business rules · action ownership · trigger · due · completion · status progression · queue behaviour · cross-module workflow boundaries | information architecture · information regions · information hierarchy · information relationships · the facts each region must carry · information excluded from To Order |
 >
 > **There is no third Purchasing master document and none may be created** — no
 > `PURCHASING_MODULE_MASTER.md`, no V2 / FINAL / COPY. **A rule that appears in full in both
@@ -57,7 +57,7 @@ rule, and it is measurable:**
 Every action's Due is written in §3, so no case has to be argued:
 
 ```
-To Order    Prepare PO · Issue PO · Confirm ready date
+To Order    Issue PO · Confirm ready date
 Receiving   Confirm tomorrow's delivery · Check in · Confirm balance delivery date
 Claims      Confirm what happens next
 ```
@@ -70,9 +70,9 @@ of the tab bar. It is **not** the rule that decides which tab an action lives on
 (§4 rung 3), so read literally that sentence would put `Confirm ready date` on the wrong side.
 It survives only as a plain-language explanation for a person.
 
-**To Order is the PLANNING WORKSPACE and it holds a second business object: the Draft PO.**
-How its information is organised — the seven regions, the legal overlap between a draft and
-the plan, and what may never be silently discarded — is
+**To Order is the PLANNING WORKSPACE and it stores no work-in-progress object of its own**
+(Loo, 2026-07-30 — the Purchasing clean restart). How its information is organised — the six
+regions and what may never be silently discarded — is
 [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), frozen 2026-07-29.
 That file is read before any To Order work.
 
@@ -198,55 +198,30 @@ second time.
 goods are collected by NETS; the row says `Call NETS — collect from Nice Future`, never
 `Call Nice Future`).
 
-### `Prepare PO for {supplier}`
-
-**Raising a purchase order is TWO actions, never one** (Loo, 2026-07-29). This is the first.
-It gathers demand into a **Draft PO** and **nothing leaves our company** — no PO number, no
-document, no message to the factory.
-
-- **Trigger** — a customer line needs goods, no PO covers it, no Draft PO covers it, and
-  today is a PO day **or** the line's order-by date has passed
-- **Checklist** — supplier · items · quantity · purchase price · where the goods go ·
-  save the Draft PO
-- **Completion** — **a Draft PO exists covering the line.** Nothing else. The moment it
-  exists the row reads `Issue PO to {supplier}`
-- **Due** — the order-by date (§2's formula). Red once it has passed
-- **Task owner** — the PO-duty holder (`org_duties`)
-- **Counted per** — one row per **supplier**, showing how many lines it holds. The queue
-  count and the visible rows both count suppliers, and each row states its line count
-- **Re-checked when** — a customer line is added, changed, held or resumed · a Draft PO is
-  saved or deleted · a PO is issued · the promised date moves · a setting in §2 changes
-
-**A line already covered by a Draft PO does not raise this action again.** It states
-`Covered by {count} Draft POs` instead — a fact, not an order (COPY-STANDARD). The line stays
-in the plan until a PO exists, because a draft can be deleted and the demand would otherwise
-vanish from the screen while still unmet
-([`PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §5.3).
-
 ### `Issue PO to {supplier}`
 
-The second act, and **the only one that creates a formal Purchase Order.**
+**Raising a purchase order is ONE action, never two** (Loo, 2026-07-30 — the Purchasing clean
+restart). It is **the only business action that creates a formal Purchase Order**: there is
+no preparation stage and no stored work-in-progress object between the demand and the
+document.
 
-- **Trigger** — a Draft PO exists and no PO has been issued from it
-- **Checklist** — check the supplier · the items · the quantity · where the goods go ·
+- **Trigger** — a customer line needs goods, no PO covers it, and today is a PO day **or**
+  the line's order-by date has passed
+- **Checklist** — supplier · items · quantity · purchase price · where the goods go ·
   issue the PO
 - **Completion** — **a PO exists for the line.** **The ready date is NOT part of this** — it
   is the outcome of the NEXT action, and the moment a PO exists the row reads
   `Call {supplier} — confirm ready date`. Folding the two together would leave `Issue PO`
   open with nothing left to issue, which is the one thing an action may never do
-- **Due** — the order-by date of the earliest demand the draft covers. Red once it has passed
+- **Due** — the order-by date (§2's formula). Red once it has passed
 - **Task owner** — the PO-duty holder (`org_duties`)
-- **Counted per** — one row per **Draft PO**. A supplier with three drafts raises three
-- **Re-checked when** — a Draft PO is saved or deleted · a PO is issued · the demand a draft
-  covers changes · the promised date moves
+- **Counted per** — one row per **supplier**, showing how many lines it holds. The queue
+  count and the visible rows both count suppliers, and each row states its line count
+- **Re-checked when** — a customer line is added, changed, held or resumed · a PO is issued ·
+  the promised date moves · a setting in §2 changes
 
 **Only `Issue PO` mints the PO number, produces the external document, and opens the
-communication channels.** A Draft PO can do none of those, and that is structural rather than
-a gate: it has no PO number to print and no document to send.
-
-**A Draft PO whose demand has gone may not be issued until somebody has looked at it.** The
-row states `Demand no longer required` and the reason line explains it (COPY-STANDARD). This
-is a fact and a stop, never an error word.
+communication channels.**
 
 **The system suggests; a human issues.** The portal never issues a PO by itself. Today the PO
 leaves by WhatsApp; a supplier portal is a later phase and changes nothing here.
@@ -372,7 +347,7 @@ future supply (0299) — otherwise the planner keeps believing goods are coming 
 2  A promise is already broken
      Call {supplier} — confirm ready date (the date has passed, or it beats the customer's)
 3  Goods are not secured
-     Issue PO to {supplier} — then — Prepare PO for {supplier}
+     Issue PO to {supplier}
 4  Cleaning up a part-delivery
      Call {supplier} — confirm balance delivery date
 5  Claims
@@ -449,7 +424,7 @@ rule. A chat that reads this as a single list will build a tile for an action th
 count:
 
 ```
-To Order    Prepare PO  ·  Issue PO  ·  Confirm ready date
+To Order    Issue PO  ·  Confirm ready date
 Receiving   Confirm tomorrow's delivery  ·  Check in  ·  Confirm balance delivery date
 Claims      Confirm what happens next
 ```
@@ -528,7 +503,7 @@ Balance owed      po_qty − received_qty
 
 | Axis | What it is | Who moves it |
 |---|---|---|
-| **Operation Status** | Carres' own workflow: `Draft` · `Issued` · `In Production` · `Receiving` · `Completed` · `Cancelled` | Carres |
+| **Operation Status** | Carres' own workflow: `Issued` · `In Production` · `Receiving` · `Completed` · `Cancelled` | Carres |
 | **Supplier Status** | what the factory and the logistics partner report | the supplier portal and the partner portal |
 
 A screen may show both. **Neither is ever collapsed into the other**, and the supplier axis is
@@ -536,10 +511,9 @@ not a Purchasing decision to redefine — two external roles run their whole lif
 
 **`Open` may not appear in the UI as an Operation Status. The word is `Issued`.**
 
-**A DRAFT PO IS NOT IN THE TABLE ABOVE, and that is the point.** The five lines are DERIVED
-from quantities. A Draft PO is a **stored business object** with its own identity, and it is
-**not a Purchase Order** — it has no PO number and produces no external document. It is
-therefore not a state of a PO and never becomes one; issuing it is what creates the PO.
+**THERE IS NO `Draft` OPERATION STATUS** (Loo, 2026-07-30 — the Purchasing clean restart).
+A purchase order exists only once it has been issued, so there is no state before `Issued`
+and no stored object that could occupy one.
 See [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §2–§3.
 
 **DEMAND THAT NEVER REACHED THE PLAN IS ALSO NOT IN THE TABLE ABOVE.** `required_qty` only

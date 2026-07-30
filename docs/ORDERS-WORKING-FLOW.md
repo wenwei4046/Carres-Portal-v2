@@ -93,16 +93,14 @@ case from start to finish; it never changes and is never repeated on an action.
 
 ### Purchasing
 
-**`Prepare PO for {supplier}`** then **`Issue PO to {supplier}`**
+**`Issue PO to {supplier}`**
 
-> **`Send PO to {supplier}` is RETIRED (Loo, 2026-07-29).** Raising a purchase order is TWO
-> acts: `Prepare PO` produces a **Draft PO** that has left our company in no way, and
-> `Issue PO` creates the formal Purchase Order. The old single entry described both at once —
-> its checklist folded "send" into gathering the items, and its completion (*a PO exists for
-> the line*) is `Issue PO`'s. **Neither act is called `Send PO`, and the verb `Send` is
-> retired with it.**
+> **`Send PO to {supplier}` is RETIRED (Loo, 2026-07-29), and `Prepare PO` with the Draft PO
+> it produced is RETIRED too (Loo, 2026-07-30 — the Purchasing clean restart).** Raising a
+> purchase order is ONE act: `Issue PO` creates the formal Purchase Order, and nothing is
+> stored before it. **No act is called `Send PO`, and the verb `Send` is retired with it.**
 
-- **Both actions are DEFINED ONCE, in `docs/PURCHASING-WORKING-FLOW.md` §3** — trigger,
+- **This action is DEFINED ONCE, in `docs/PURCHASING-WORKING-FLOW.md` §3** — trigger,
   checklist, completion, due, task owner, counted per, re-checked when. **Orders DISPLAYS
   them; it never re-states them**, the same discipline this file already applies to the
   arrival window below.
@@ -337,7 +335,7 @@ them live here.
 2  The customer must be told something — THROUGH LOGISTICS, never by us
      Call {logistics} — arrange new delivery date
 3  Goods are not secured
-     Call {supplier} — confirm ready date · Issue PO · Prepare PO
+     Call {supplier} — confirm ready date · Issue PO
 4  Delivery preparation
      Assign logistics · Call {logistics} — confirm delivery date · Issue delivery order
 5  Money

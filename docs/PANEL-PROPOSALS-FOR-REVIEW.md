@@ -126,7 +126,7 @@ traceable, not as guidance):
 | "peak season = Nov → CNY, a separate lead profile" | **Peak season is explicitly NOT a mode and NOT a second set of numbers** (Jess + Loo, 2026-07-28). It is a manager raising one supplier's production time and lowering it again |
 | "mattress + bedframe merge into one bundle" on a PO | consolidation is **across CUSTOMER ORDERS, not across categories** — every non-sofa line for one supplier merges into one PO; sofa splits |
 | "**GRN** receive" as the act | `GRN` is the DOCUMENT. **`Check in` is the act** — the banned-verb sweep (R8) took `GRN`-as-a-verb, `Chase` and `Receive`-as-a-verb off the whole lane |
-| "raise PO → PDF → send" as one step | the PO lifecycle was **redesigned and frozen 2026-07-29**: preparing produces a **Draft PO**, and **`Issue PO`** is the only action that creates the official Purchase Order |
+| "raise PO → PDF → send" as one step | the PO lifecycle was **redesigned and frozen 2026-07-29, then simplified on 2026-07-30**: **`Issue PO`** is the only business action that creates the official Purchase Order, and there is no preparation stage before it |
 
 **The business problem it named is still true and is worth keeping:** operations must buy the
 right goods from the right supplier early enough to hit each customer's deadline, without
