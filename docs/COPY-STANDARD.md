@@ -31,9 +31,9 @@ Two hard beliefs behind the rules:
 |---|------|-------|--------|
 | 1 | Button = verb + object | `OK` · `Submit` · `Send` (alone) | `Issue PO to Ohana` |
 | 2 | One action → one word | mix send / raise / place | `Issue PO` everywhere |
-| 3 | Numbers up front | `There are 2 POs to prepare` | `2 to prepare · 1 late` |
+| 3 | Numbers up front | `There are 2 POs to issue` | `2 to issue · 1 past the order-by date` |
 | 4 | Skip the obvious | `Below is the list of suppliers` | (just show the list) |
-| 5 | Empty states teach | `No results` | `No purchase orders need preparation. Check back after 2 PM.` |
+| 5 | Empty states teach | `No results` | `No purchase orders to issue.` |
 | 6 | Errors give the fix | `Invalid input` | `Master row missing G column. Ask Sales to fill it before Monday.` |
 | 7 | Tooltip = WHY | button `Issue PO` · tip `Click to issue` | button `Issue PO` · tip `Creates the PO number and the document Ohana receives` |
 | 8 | Same word app-wide | Orders `Confirm ready date` · Purchase `Follow up` | Both say `Confirm ready date` |
@@ -112,7 +112,7 @@ it will change · (c) **what** the reader should do meanwhile.
 
 Examples:
 
-    ✔ "No purchase orders need preparation. Check back after 2 PM when Master syncs."
+    ✔ "No purchase orders to issue. Check back after 2 PM when Master syncs."
     ✔ "0 calls to make · everything on track. Nothing to do here."
     ✔ "No goods arriving today. Ohana's next delivery is Thu 24 Jul."
 
@@ -338,7 +338,7 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 
 | Queue tile | Row line | Button | Done message | Empty state |
 |---|---|---|---|---|
-| `Issue PO` | `Issue PO to {supplier}` | `Issue PO` | `PO issued to {supplier}` | ⚠ **UNRULED** — the old string said `No draft purchase orders are ready to issue.` and died with the Draft PO. Nothing may render this queue's empty state until Jess rules it |
+| `Issue PO` | `Issue PO to {supplier}` | `Issue PO` | `PO issued to {supplier}` | `No purchase orders to issue.` |
 | `Confirm ready date` | `Call {supplier} — confirm ready date` | `Record ready date` | `Ready date recorded` | `No supplier to call today. Everything on track.` |
 | `Confirm tomorrow's delivery` | `Call {supplier} — confirm tomorrow's delivery` | `Record answer` | `Answer recorded` | `Nothing arriving tomorrow.` |
 | `Check in` | `Check in from {supplier}` | `Check in` | `Checked in {n} of {m}` | `No goods arriving today. {supplier}'s next delivery is {date}.` |

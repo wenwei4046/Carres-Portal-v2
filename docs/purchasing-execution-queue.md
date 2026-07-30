@@ -1034,6 +1034,14 @@ number on screen matches what actually happened.
 
 ## P6 · Purchasing terminology freeze
 
+> **⚠️ HISTORICAL RECORD — PARTLY SUPERSEDED 2026-07-30 by the Purchasing clean restart
+> (Loo). This whole card, instructions and shipped record alike, is kept as the account of
+> what was ruled on 2026-07-29 and is NOT a live word list.** `Draft PO` is permanently
+> removed, and with it slots 1 · 3 · 5 · 6 (`Prepare PO`, the `Draft PO` noun,
+> `Demand no longer required`, `Covered by {count} Draft POs`). Raising a purchase order is ONE
+> act, `Issue PO`. The Operation Status list is FIVE labels, not six — `Draft` is gone.
+> **`docs/COPY-STANDARD.md` is the canonical home and is already corrected.**
+
 **Goal:** rule **SLOT-1 through SLOT-8 in ONE session** and write every ruled word into
 `docs/COPY-STANDARD.md`, so the Purchasing dictionary is whole again.
 
@@ -1116,13 +1124,6 @@ Plus: `docs/COPY-STANDARD.md` carries five strings for every Purchasing action, 
 six things each.
 
 ### ✅ SHIPPED — what actually landed (2026-07-29)
-
-> **⚠️ PARTLY SUPERSEDED 2026-07-30 — the Purchasing clean restart (Loo).** `Draft PO` is
-> permanently removed, and with it slots 1 · 3 · 5 · 6 below (`Prepare PO`, the `Draft PO`
-> noun, `Demand no longer required`, `Covered by {count} Draft POs`). Raising a purchase
-> order is ONE act, `Issue PO`. The Operation Status list is FIVE labels, not six — `Draft` is
-> gone. `docs/COPY-STANDARD.md` is still the canonical home and is already corrected; this
-> card is the record of what was ruled on the day, not a live word list.
 
 **All eight slots ruled by Loo in one session. Documentation only — no schema, no migration,
 no API, no React.** `docs/COPY-STANDARD.md` is the canonical home for every word below and

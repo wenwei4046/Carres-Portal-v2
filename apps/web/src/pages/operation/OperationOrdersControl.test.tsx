@@ -752,10 +752,10 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // T7 moved the two delivery actions into their own DELIVERY group (with
     // their own deadlines) — they are covered by the DELIVERY-queue tests
     // below, so this list is the STOCK actions that stayed in QUEUES.
-    // P7A — `Send PO` is retired; the first tooltip is the FIRST purchasing
-    // act's, and the second no longer says the retired verb either.
+    // `Send PO` and `Prepare PO` are both retired; the first tooltip is the ONE
+    // purchasing act's, and the second no longer says a retired verb either.
     const verbTitles = [
-      "Nothing ordered and no draft purchase order covers these goods — prepare one",
+      "Nothing ordered and no purchase order covers these goods — issue one, which mints the PO number and the document the supplier receives",
       "PO issued but goods not in yet — call the supplier for the ready date (red once inside the stock window)",
     ];
     const row = verbTitles.map((t) => screen.queryByTitle(t)).find((b) => !!b);

@@ -385,7 +385,7 @@ paragraph below described the state BEFORE that ship and is kept only as the rec
 > Separately and later: the FRAME around those cells changes. The purchase-order lifecycle
 > was redesigned and frozen on 2026-07-29 —
 > [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) — which moves
-> `Check in` off To Order to Receiving and adds a Draft PO region. **That is P6's, not R8's,
+> `Check in` off To Order to Receiving. **That is P6's, not R8's,
 > and no R-card touches it.**
 
 What it was, when it was found by P2 2026-07-28: the cells read **`Send POs` · `Chase
