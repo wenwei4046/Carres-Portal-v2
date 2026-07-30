@@ -529,7 +529,7 @@ export function checkedInDone(received: number, ordered: number): string {
  * `Shipping tomorrow`, answered two days late, is a sentence about a day that
  * has already gone.
  *
- * `date` is the caller's already-formatted string (`5 Aug 26, Wed`): this
+ * `date` is the caller's already-formatted string (`Wed, 5 Aug 26`): this
  * module owns WORDS and never dates.
  */
 export function tomorrowDeliveryAnswerLabel(

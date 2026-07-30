@@ -1409,7 +1409,7 @@ const ORDER_COL_DEFS: OrderColDef[] = [
   { key: "order", label: "Order", w: 9 },
   { key: "customer", label: "Customer", w: 11 },
   // Deadline right after Customer (Jess 2026-07-18). Wide enough for the weekday:
-  // "20 Jul 26, Sun" + the heat pill (Jess 2026-07-19 date law). C3 took the
+  // "Sun, 20 Jul 26" + the heat pill (Jess 2026-07-19 date law). C3 took the
   // other point from C10's own measurement: 142px needed, 12 → 11 ≈ 159px.
   // `stock` was left alone — C10 had already cut it to its measured floor.
   { key: "deadline", label: "Deadline", w: 11 },

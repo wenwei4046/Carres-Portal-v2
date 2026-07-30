@@ -30,7 +30,7 @@ const BASE: DetailShellProps = {
     persistentFacts: [
       { label: "Customer", value: "Tan Wei Ming" },
       { label: "Ref", value: "SO-1256" },
-      { label: "Promised", value: "27 Jul 26, Sun" },
+      { label: "Promised", value: "Sun, 27 Jul 26" },
       { label: "Outstanding", value: "RM 2,000" },
     ],
   },

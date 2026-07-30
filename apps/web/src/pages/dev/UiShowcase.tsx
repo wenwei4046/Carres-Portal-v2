@@ -145,7 +145,7 @@ const DEMO_IDENTITY: IdentitySlot = {
   persistentFacts: [
     { label: "Customer", value: "Tan Wei Ming" },
     { label: "Ref", value: <span className="font-mono">SO-1256</span> },
-    { label: "Promised", value: "27 Jul 26, Sun" },
+    { label: "Promised", value: "Sun, 27 Jul 26" },
     { label: "Outstanding", value: "RM 2,000" },
   ],
 };
@@ -832,7 +832,7 @@ export default function UiShowcase() {
             </Card>
             <Card>
               <div className="flex flex-col gap-8">
-                <Sample label="a date — the canonical 19 Jul 26, Sun, from fmtDate()">
+                <Sample label="a date — the canonical Sun, 19 Jul 26, from fmtDate()">
                   <div className="w-full">
                     <DatePicker id="ui-date" label="Delivery date" value={date} onChange={setDate} />
                   </div>

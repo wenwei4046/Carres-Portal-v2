@@ -146,7 +146,19 @@ export interface BundleRequirement {
   deadline: IsoDate | null;
   /** Longest member lead — the slower item gates a one-trip delivery. */
   maxLeadDays: number;
-  /** deadline − maxLead (working days). `null` when deadline is TBD. */
+  /**
+   * **Stock Ready** — `deadline − arrivalBufferDays` (delivery-side working
+   * days): the day the goods must be in for the delivery to be arranged in
+   * time. It is what `raiseBy` is measured back FROM, so the two can never
+   * disagree, and it is the ONE source To Order reads (Loo, 2026-07-30 — the
+   * naming freeze: Stock Ready is Carres' own requirement, never a supplier's
+   * promise, which is `purchase_orders.expected_ready_date`).
+   *
+   * `null` when the deadline is TBD. It used to be a local variable here and
+   * was thrown away, which is why nothing downstream could show it.
+   */
+  arriveBy: IsoDate | null;
+  /** arriveBy − maxLead (working days). `null` when deadline is TBD. */
   raiseBy: IsoDate | null;
   /** One-trip ready date if the PO is cut today = today + maxLead. */
   promiseIfOrderedToday: IsoDate;
@@ -395,6 +407,7 @@ export function computeNetRequirements(
       supplierIds: [...new Set(members.map((m) => m.supplierId))],
       deadline,
       maxLeadDays,
+      arriveBy,
       raiseBy,
       promiseIfOrderedToday,
       toOrder,

@@ -1773,6 +1773,30 @@ export {
   type BundleRequirement,
   type NetRequirementsResult,
 } from "./net-requirements";
+// To Order — the Planning Workspace projection (2026-07-30).
+export {
+  TO_ORDER_WORDS,
+  TO_ORDER_CATEGORIES,
+  buildToOrder,
+  categoryLabel,
+  composeSummary,
+  isOnePoPerOrder,
+  isToOrderCategory,
+  issuedHeadline,
+  pickSpecToken,
+  planPurchaseOrders,
+  purchaseOrderCount,
+  sortToOrderRows,
+  unitLabel,
+  type BuildToOrderInput,
+  type PoToCreate,
+  type ToOrderBuild,
+  type ToOrderLine,
+  type ToOrderProposal,
+  type ToOrderRow,
+  type ToOrderSortKey,
+  type ToOrderSupplier,
+} from "./to-order";
 export {
   IMPORT_ACCESSORY_KINDS,
   IMPORT_LEAD_DAYS_DEFAULT,

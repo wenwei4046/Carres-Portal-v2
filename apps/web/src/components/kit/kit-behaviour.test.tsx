@@ -347,7 +347,7 @@ describe("Checkbox", () => {
 describe("DatePicker", () => {
   it("prints the canonical §2.4 date, never the locale's", () => {
     render(<DatePicker id="d" label="Delivery date" value="2026-07-19" onChange={() => {}} />);
-    expect(screen.getByText("19 Jul 26, Sun")).toBeInTheDocument();
+    expect(screen.getByText("Sun, 19 Jul 26")).toBeInTheDocument();
   });
 
   it("shows the placeholder when there is no date, and says so in the placeholder's own ink", () => {

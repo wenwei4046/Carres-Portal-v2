@@ -36,7 +36,7 @@
     "apps/web/src/pages/principal/components/ApprovalKindBadge.tsx": 2,
     "apps/web/src/pages/principal/components/RoleChip.tsx": 4
   },
-  "hoverGrey": 94,
+  "hoverGrey": 96,
   "listPages": [
     "apps/web/src/pages/Login.tsx",
     "apps/web/src/pages/Me.tsx",

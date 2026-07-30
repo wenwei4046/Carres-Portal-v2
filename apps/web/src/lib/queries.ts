@@ -512,6 +512,9 @@ export const qk = {
     purchaseToday: () => ["operation", "purchase", "today"] as const,
     /** P1 (0303) — the purchasing numbers (GET /api/operation/purchasing/settings). */
     purchasingSettings: () => ["operation", "purchasing", "settings"] as const,
+    /** To Order — the Planning Workspace projection, recomputed on every read
+     *  (GET /api/operation/purchase/to-order). Issuing invalidates ["operation"]. */
+    toOrder: () => ["operation", "purchase", "to-order"] as const,
   },
   // Phase 5 — HQ Finance namespace. Same nested-key strategy as `principal`
   // and `operation` so mutations can blast `["finance"]` (e.g. topup-approve

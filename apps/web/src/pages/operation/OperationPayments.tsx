@@ -58,7 +58,7 @@ import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
  *
  * Loose layout: full-width white table, 52px rows, generous padding, no
  * truncation of the customer, two-line cells. Facets are multi-select Sets with
- * ✕-able chips. Dates via fmtDate() → "19 Jul 26, Sun" everywhere.
+ * ✕-able chips. Dates via fmtDate() → "Sun, 19 Jul 26" everywhere.
  *
  * Data/edit logic (owing + storage-fee compute, EditableNumber, status, sparse
  * upsert PUT /operation/orders/:id/control) is unchanged; stock (line_etas +
