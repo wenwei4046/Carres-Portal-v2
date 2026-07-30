@@ -134,12 +134,24 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
   it("hand-writes no second FacetRow — the shared component is one import away", () => {
     // UI-KIT §6.1: the second occurrence is a full stop. Claims shipped a THIRD
     // copy in P2; R8 deleted it.
+    //
+    // To Order LEFT this list on 2026-07-30 and the reason is a design ruling,
+    // not an exemption: the Review Grid has no facet rail. Its 300px column
+    // lists PROPOSALS — one supplier × category each, one of which is always
+    // current — so there is nothing to filter and nothing to clear back to.
+    // The rule below still binds the two tabs that do have rails, and the
+    // negative half still binds all three.
     for (const f of [
       "pages/operation/OperationSupplierClaims.tsx",
       "pages/operation/OperationReceiving.tsx",
       "pages/operation/OperationPurchase.tsx",
     ]) {
       expect(read(f), f).not.toMatch(/function FacetRow\(/);
+    }
+    for (const f of [
+      "pages/operation/OperationSupplierClaims.tsx",
+      "pages/operation/OperationReceiving.tsx",
+    ]) {
       expect(read(f), f).toMatch(/from "@\/components\/FacetRow"/);
     }
   });
@@ -155,8 +167,10 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
     expect(src).not.toMatch(/shrink-0 px-6 pt-3 text-\[13px\]/);
   });
 
-  it("names the supplier facet the SAME way on every Purchasing tab", () => {
+  it("names the supplier facet the SAME way on every Purchasing tab that has one", () => {
     // COPY-STANDARD's facet-heading table lists `Supplier` and no `Factory`.
+    // `Factory` is banned on the whole lane; the positive half only binds the
+    // tabs that carry a facet rail (To Order stopped having one 2026-07-30).
     for (const f of [
       "pages/operation/OperationPurchase.tsx",
       "pages/operation/OperationReceiving.tsx",
@@ -165,6 +179,11 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
       expect(visibleSource(f), `${f} spells the facet chip its own way`).not.toMatch(
         /`Factory: /,
       );
+    }
+    for (const f of [
+      "pages/operation/OperationReceiving.tsx",
+      "pages/operation/OperationSupplierClaims.tsx",
+    ]) {
       expect(visibleSource(f), f).toMatch(/Supplier: /);
     }
   });

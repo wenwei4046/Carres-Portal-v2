@@ -9,7 +9,7 @@
  * **It speaks ISO in and ISO out, and prints `fmtDate()`.** The value is a
  * `YYYY-MM-DD` string, which is what every route, every column and every zod
  * schema in the portal already carries; the trigger renders it through
- * `fmtDate()`, so the canonical `19 Jul 26, Sun` reaches one more surface
+ * `fmtDate()`, so the canonical `Sun, 19 Jul 26` reaches one more surface
  * without anybody choosing a format. §2.4's Human-Review debt shrinks by one
  * control: this one cannot hand a date to the locale even if it wanted to.
  *

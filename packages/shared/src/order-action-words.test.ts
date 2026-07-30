@@ -340,12 +340,12 @@ describe("purchasing action words — the dictionary, verbatim", () => {
   it("the two answers name the DATE, so they stay true however late they are read", () => {
     // Loo's own reason for ruling them (2026-07-29). A relative word would be a
     // sentence about a day that has already passed.
-    expect(tomorrowDeliveryAnswerLabel("shipping", "5 Aug 26, Wed"))
-      .toBe("It ships on 5 Aug 26, Wed");
-    expect(tomorrowDeliveryAnswerLabel("delayed", "5 Aug 26, Wed"))
-      .toBe("It ships later than 5 Aug 26, Wed");
+    expect(tomorrowDeliveryAnswerLabel("shipping", "Wed, 5 Aug 26"))
+      .toBe("It ships on Wed, 5 Aug 26");
+    expect(tomorrowDeliveryAnswerLabel("delayed", "Wed, 5 Aug 26"))
+      .toBe("It ships later than Wed, 5 Aug 26");
     for (const a of ["shipping", "delayed"] as const) {
-      expect(tomorrowDeliveryAnswerLabel(a, "5 Aug 26, Wed")).not.toMatch(
+      expect(tomorrowDeliveryAnswerLabel(a, "Wed, 5 Aug 26")).not.toMatch(
         /\b(tomorrow|today|yesterday|now|soon)\b/i,
       );
     }

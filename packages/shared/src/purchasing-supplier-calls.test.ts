@@ -14,7 +14,7 @@ import { DEFAULT_OFF_DAYS, addWorkingDays } from "./working-days";
  * P3 · The two supplier calls.
  *
  * Every date below is anchored on a real weekday: 2026-07-19 is a Sunday (it is
- * COPY-STANDARD's own `fmtDate` example, `19 Jul 26, Sun`), so
+ * COPY-STANDARD's own `fmtDate` example, `Sun, 19 Jul 26`), so
  *   Mon 2026-07-27 · Tue 28 · Wed 29 · Thu 30 · Fri 31 · Sat 08-01 · Sun 08-02 · Mon 08-03.
  *
  * `holidays: new Set()` throughout, so a weekday assertion is about the WEEK and

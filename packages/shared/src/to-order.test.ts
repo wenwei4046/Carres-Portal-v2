@@ -1,0 +1,383 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildToOrder,
+  composeSummary,
+  isToOrderCategory,
+  pickSpecToken,
+  planPurchaseOrders,
+  purchaseOrderCount,
+  sortToOrderRows,
+  type ToOrderLine,
+  type ToOrderRow,
+} from "./to-order";
+import { subtractWorkingDays } from "./working-days";
+
+/**
+ * The fixture is the live Ohana · Sofa demand, shape for shape: PETER's one
+ * customer order holds TWO sofa builds, kee tong's order has no delivery date
+ * and no build key, and one line is a guarantee that must never reach this
+ * page. Nothing here is invented — the whole point of the projection is that
+ * the awkward real cases behave.
+ */
+
+const OHANA = "11111111-1111-1111-1111-111111111111";
+const NICE_FUTURE = "22222222-2222-2222-2222-222222222222";
+
+const TODAY = "2026-07-30";
+const BUFFER = 7;
+const OFFICE_OFF_DAYS = [0, 6]; // arranging a delivery is office work
+const OHANA_OFF_DAYS = [0]; // Ohana works Saturday
+
+function line(over: Partial<ToOrderLine> & Pick<ToOrderLine, "lineId" | "sku">): ToOrderLine {
+  return {
+    orderId: "o1",
+    category: "sofa",
+    supplierId: OHANA,
+    qty: 1,
+    deadline: "2026-08-22",
+    leadDays: 14,
+    placedAt: "2026-07-01",
+    committed: true,
+    offDays: OHANA_OFF_DAYS,
+    so: 1207,
+    customerName: "PETER",
+    modelName: "Booqit",
+    variant: null,
+    buildKey: null,
+    fabricName: null,
+    legHeight: null,
+    itemHeight: "24",
+    cost: null,
+    ...over,
+  };
+}
+
+const SUPPLIERS = [
+  { id: OHANA, name: "Ohana" },
+  { id: NICE_FUTURE, name: "Nice Future" },
+];
+
+const OPTIONS = {
+  today: TODAY,
+  offDays: OFFICE_OFF_DAYS,
+  arrivalBufferDays: BUFFER,
+  reviewDaysBySupplier: {},
+};
+
+/** PETER — one order, two sofa builds, five module lines. */
+const PETER = [
+  line({ lineId: "p1", sku: "5539-1B(LHF)", buildKey: "bk-a", legHeight: '6"' }),
+  line({ lineId: "p2", sku: "5539-CNR", buildKey: "bk-a", legHeight: '6"' }),
+  line({ lineId: "p3", sku: "5539-2A(RHF)", buildKey: "bk-a", legHeight: '6"' }),
+  line({ lineId: "p4", sku: "5539-1A(LHF)", buildKey: "bk-b", legHeight: '4"' }),
+  line({ lineId: "p5", sku: "5539-2A(RHF)", buildKey: "bk-b", legHeight: '4"' }),
+];
+
+/** ella — one build, two modules, a real fabric, the earliest deadline. */
+const ELLA = [
+  line({
+    lineId: "e1", sku: "5539-1A(LHF)", orderId: "o2", so: 1204, customerName: "ella",
+    buildKey: "bk-e", deadline: "2026-08-11", fabricName: "CG-004 Wood", legHeight: '4"',
+  }),
+  line({
+    lineId: "e2", sku: "5539-2A(RHF)", orderId: "o2", so: 1204, customerName: "ella",
+    buildKey: "bk-e", deadline: "2026-08-11", fabricName: "CG-004 Wood", legHeight: '4"',
+  }),
+];
+
+/** kee tong — no delivery date at all, and no build key on either line. */
+const KEE_TONG = [
+  line({
+    lineId: "k1", sku: "5539-2B(LHF)", orderId: "o3", so: 1257, customerName: "kee tong",
+    deadline: null, buildKey: null, fabricName: "CG-010 Gold", itemHeight: null,
+  }),
+  line({
+    lineId: "k2", sku: "5539-L(RHF)", orderId: "o3", so: 1257, customerName: "kee tong",
+    deadline: null, buildKey: null, fabricName: "CG-010 Gold", itemHeight: null,
+  }),
+];
+
+function run(lines: ToOrderLine[], extra: Partial<Parameters<typeof buildToOrder>[0]> = {}) {
+  return buildToOrder({
+    lines,
+    suppliers: SUPPLIERS,
+    options: OPTIONS,
+    ...extra,
+  });
+}
+
+// ── 1 · supplier × category is the unit ─────────────────────────────────────
+
+describe("supplier × category grouping", () => {
+  it("splits one supplier's two categories into two proposals", () => {
+    const ps = run([
+      ...PETER,
+      line({
+        lineId: "b1", sku: "CODY-Q", orderId: "o9", so: 1300, customerName: "wong",
+        category: "bedframe", leadDays: 7, modelName: "Cody",
+      }),
+    ]);
+    expect(ps.map((p) => p.label).sort()).toEqual(["Ohana · Bedframe", "Ohana · Sofa"]);
+  });
+
+  it("keeps two suppliers apart even in the same category", () => {
+    const ps = run([
+      line({ lineId: "m1", sku: "M1401S-Q", orderId: "o7", so: 1290, customerName: "ng",
+        category: "mattress", supplierId: NICE_FUTURE, leadDays: 7, modelName: "M1401S" }),
+      line({ lineId: "m2", sku: "OH-MAT", orderId: "o8", so: 1291, customerName: "lim",
+        category: "mattress", supplierId: OHANA, leadDays: 7, modelName: "OhanaMat" }),
+    ]);
+    expect(ps).toHaveLength(2);
+    expect(new Set(ps.map((p) => p.supplierId))).toEqual(new Set([OHANA, NICE_FUTURE]));
+  });
+});
+
+// ── 2 · 10 · the PO boundary ────────────────────────────────────────────────
+
+describe("the purchase-order boundary", () => {
+  it("sofa is one purchase order per customer order", () => {
+    const [sofa] = run([...PETER, ...ELLA]);
+    expect(sofa.rows).toHaveLength(2);
+    expect(sofa.poCount).toBe(2);
+    expect(planPurchaseOrders(sofa)).toHaveLength(2);
+  });
+
+  it("the grid's row count and the button's PO count are the same number", () => {
+    const [sofa] = run([...PETER, ...ELLA, ...KEE_TONG]);
+    expect(sofa.poCount).toBe(sofa.rows.length);
+    expect(purchaseOrderCount(sofa.poCount)).toBe("3 Purchase Orders");
+  });
+
+  it("a non-sofa category merges every customer order into ONE document", () => {
+    const [bed] = run([
+      line({ lineId: "b1", sku: "CODY-Q", orderId: "o9", so: 1300, customerName: "wong",
+        category: "bedframe", leadDays: 7, modelName: "Cody" }),
+      line({ lineId: "b2", sku: "CODY-K", orderId: "oA", so: 1301, customerName: "tan",
+        category: "bedframe", leadDays: 7, modelName: "Cody" }),
+    ]);
+    expect(bed.rows).toHaveLength(2);
+    expect(bed.poCount).toBe(1);
+    const plan = planPurchaseOrders(bed);
+    expect(plan).toHaveLength(1);
+    expect(plan[0].soRefs.sort()).toEqual([1300, 1301]);
+  });
+
+  it("merges a repeated SKU into one line on the document a factory reads", () => {
+    const [sofa] = run(PETER);
+    const [po] = planPurchaseOrders(sofa);
+    // 5539-2A(RHF) appears in BOTH of PETER's builds.
+    expect(po.lines.filter((l) => l.sku === "5539-2A(RHF)")).toHaveLength(1);
+    expect(po.lines.find((l) => l.sku === "5539-2A(RHF)")!.qty).toBe(2);
+  });
+});
+
+// ── 3 · 4 · builds and the business unit ────────────────────────────────────
+
+describe("sofa builds", () => {
+  it("groups module lines by sofa_build_key", () => {
+    const [sofa] = run(PETER);
+    const peter = sofa.rows[0];
+    expect(peter.builds).toHaveLength(2);
+    expect(peter.builds[0].codes).toBe("5539-1B(LHF) · 5539-CNR · 5539-2A(RHF)");
+    expect(peter.builds[1].codes).toBe("5539-1A(LHF) · 5539-2A(RHF)");
+  });
+
+  it("Qty counts sofas, never the module lines the database holds", () => {
+    const [sofa] = run(PETER);
+    const peter = sofa.rows[0];
+    expect(peter.qty).toBe(2); // two sofas
+    expect(peter.builds.flatMap((b) => b.lines)).toHaveLength(5); // five module lines
+  });
+
+  it("a line with no build key stands alone", () => {
+    const [sofa] = run(KEE_TONG);
+    expect(sofa.rows[0].builds).toHaveLength(2);
+    expect(sofa.rows[0].qty).toBe(2);
+  });
+
+  it("counts pieces, not builds, for a category that is not sofa", () => {
+    const [bed] = run([
+      line({ lineId: "b1", sku: "CODY-Q", orderId: "o9", so: 1300, customerName: "wong",
+        category: "bedframe", leadDays: 7, qty: 3, modelName: "Cody" }),
+    ]);
+    expect(bed.rows[0].qty).toBe(3);
+  });
+});
+
+// ── 5 · 6 · Summary ─────────────────────────────────────────────────────────
+
+describe("Summary", () => {
+  it("is never longer than three tokens", () => {
+    const s = composeSummary({ model: "Booqit", qty: 2, category: "sofa", spec: "CG-004 Wood" });
+    expect(s.split(" · ")).toHaveLength(3);
+    expect(s).toBe("Booqit · 2 Sofas · CG-004 Wood");
+  });
+
+  it("drops to two tokens when nothing is out of the ordinary", () => {
+    const [sofa] = run(PETER);
+    expect(sofa.rows[0].summary).toBe("Booqit · 2 Sofas");
+  });
+
+  it("never prints the default height", () => {
+    const [sofa] = run(PETER);
+    expect(sofa.rows[0].summary).not.toContain("24");
+    expect(pickSpecToken([{ fabricName: null, legHeight: null, itemHeight: "24" }])).toBeNull();
+  });
+
+  it("prints a non-default height when there is one", () => {
+    expect(pickSpecToken([{ fabricName: null, legHeight: null, itemHeight: "30" }]))
+      .toBe('Height 30"');
+  });
+
+  it("prefers the fabric over a missing leg — a wrong fabric cannot be undone", () => {
+    expect(
+      pickSpecToken([{ fabricName: "EZ-002 Sand", legHeight: "No Leg", itemHeight: "24" }]),
+    ).toBe("EZ-002 Sand");
+  });
+
+  it("shows No Leg when there is no fabric", () => {
+    expect(pickSpecToken([{ fabricName: null, legHeight: "No Leg", itemHeight: "24" }]))
+      .toBe("No Leg");
+  });
+
+  it("never prints a leg HEIGHT — nobody has said which is the default", () => {
+    expect(pickSpecToken([{ fabricName: null, legHeight: '6"', itemHeight: "24" }])).toBeNull();
+  });
+
+  it("uses the singular for one", () => {
+    const [sofa] = run(ELLA);
+    expect(sofa.rows[0].summary).toBe("Booqit · 1 Sofa · CG-004 Wood");
+  });
+});
+
+// ── 7 · 8 · 9 · Stock Ready ─────────────────────────────────────────────────
+
+describe("Stock Ready", () => {
+  it("is the engine's arriveBy and nothing recomputed here", () => {
+    const [sofa] = run(ELLA);
+    // deadline − the arrival buffer, counted on the OFFICE week.
+    expect(sofa.rows[0].stockReady).toBe(
+      subtractWorkingDays("2026-08-11", BUFFER, { offDays: OFFICE_OFF_DAYS }),
+    );
+  });
+
+  it("is null when the customer order carries no delivery date", () => {
+    const [sofa] = run(KEE_TONG);
+    expect(sofa.rows[0].stockReady).toBeNull();
+  });
+
+  it("sorts earliest first by default", () => {
+    const [sofa] = run([...PETER, ...ELLA]);
+    expect(sofa.rows.map((r) => r.customer)).toEqual(["ella", "PETER"]);
+  });
+
+  it("sinks a row with no date in BOTH directions", () => {
+    const rows: ToOrderRow[] = [
+      { orderId: "a", so: 1, customer: "a", qty: 1, summary: "", stockReady: "2026-08-01", builds: [] },
+      { orderId: "b", so: 2, customer: "b", qty: 1, summary: "", stockReady: null, builds: [] },
+      { orderId: "c", so: 3, customer: "c", qty: 1, summary: "", stockReady: "2026-08-20", builds: [] },
+    ];
+    expect(sortToOrderRows(rows, "stockReady", true).map((r) => r.orderId)).toEqual(["a", "c", "b"]);
+    expect(sortToOrderRows(rows, "stockReady", false).map((r) => r.orderId)).toEqual(["c", "a", "b"]);
+  });
+
+  it("sinks a dateless row under EVERY column, in both directions", () => {
+    // `aaa` would win a customer sort and `1` would win a Qty sort — it has no
+    // deadline, so neither may lift it above dated work.
+    const rows: ToOrderRow[] = [
+      { orderId: "none", so: 1, customer: "aaa", qty: 1, summary: "aaa", stockReady: null, builds: [] },
+      { orderId: "b", so: 9, customer: "zzz", qty: 9, summary: "zzz", stockReady: "2026-08-01", builds: [] },
+    ];
+    for (const key of ["cust", "so", "qty", "summary", "stockReady"] as const) {
+      expect(sortToOrderRows(rows, key, true).map((r) => r.orderId)).toEqual(["b", "none"]);
+      expect(sortToOrderRows(rows, key, false).map((r) => r.orderId)).toEqual(["b", "none"]);
+    }
+  });
+});
+
+// ── 12 · a secured requirement leaves the workspace ─────────────────────────
+
+describe("what leaves To Order", () => {
+  it("drops a line an open purchase order already covers", () => {
+    const covered = run(ELLA, {
+      supply: { openPoBySku: { "5539-1A(LHF)": 1, "5539-2A(RHF)": 1 } },
+    });
+    expect(covered).toHaveLength(0);
+  });
+
+  it("keeps the workspace when only part is covered", () => {
+    const ps = run(ELLA, { supply: { openPoBySku: { "5539-1A(LHF)": 1 } } });
+    expect(ps).toHaveLength(1);
+    expect(ps[0].rows[0].builds[0].lines.map((l) => l.sku)).toEqual(["5539-2A(RHF)"]);
+  });
+});
+
+// ── 15 · a pair with no production days ─────────────────────────────────────
+
+describe("production days", () => {
+  it("marks the pair blocked so Issue can refuse it", () => {
+    const [sofa] = run(PETER, {
+      missingProductionDays: [{ supplierId: OHANA, category: "sofa" }],
+    });
+    expect(sofa.blocked).toBe("production_days");
+  });
+
+  it("leaves a rated pair unblocked", () => {
+    const [sofa] = run(PETER);
+    expect(sofa.blocked).toBeNull();
+  });
+});
+
+// ── 16 · what never reaches this page ───────────────────────────────────────
+
+describe("inclusion", () => {
+  it("admits only the three made-to-order categories", () => {
+    expect(isToOrderCategory("sofa")).toBe(true);
+    expect(isToOrderCategory("mattress")).toBe(true);
+    expect(isToOrderCategory("bedframe")).toBe(true);
+    expect(isToOrderCategory("accessory")).toBe(false);
+    expect(isToOrderCategory("service")).toBe(false);
+    expect(isToOrderCategory("guarantee")).toBe(false);
+  });
+
+  it("drops an accessory, a service and a guarantee even when they carry a supplier", () => {
+    const ps = run([
+      ...ELLA,
+      line({ lineId: "x1", sku: "MEMORY-FOAM-PILLOW", orderId: "oB", category: "accessory",
+        modelName: "Memory Foam Pillow" }),
+      line({ lineId: "x2", sku: "SVC-DISPOSE", orderId: "oC", category: "service",
+        modelName: "Service" }),
+      line({ lineId: "x3", sku: "GRT-MATTRESS-15Y", orderId: "oD", category: "guarantee",
+        modelName: "Mattress Guarantee" }),
+    ]);
+    expect(ps).toHaveLength(1);
+    expect(ps[0].category).toBe("sofa");
+    expect(ps[0].rows).toHaveLength(1);
+  });
+});
+
+// ── the sidebar's own order ─────────────────────────────────────────────────
+
+describe("proposal order", () => {
+  it("puts the earliest order-by first", () => {
+    const ps = run([
+      ...PETER,
+      line({ lineId: "m1", sku: "M1401S-Q", orderId: "o7", so: 1290, customerName: "ng",
+        category: "mattress", supplierId: NICE_FUTURE, leadDays: 7, modelName: "M1401S",
+        deadline: "2026-08-04", offDays: OFFICE_OFF_DAYS }),
+    ]);
+    expect(ps[0].label).toBe("Nice Future · Mattress");
+    expect(ps[0].orderBy! < ps[1].orderBy!).toBe(true);
+  });
+
+  it("sinks a proposal whose every order is dateless", () => {
+    const ps = run([
+      ...KEE_TONG,
+      line({ lineId: "m1", sku: "M1401S-Q", orderId: "o7", so: 1290, customerName: "ng",
+        category: "mattress", supplierId: NICE_FUTURE, leadDays: 7, modelName: "M1401S",
+        deadline: "2026-08-04", offDays: OFFICE_OFF_DAYS }),
+    ]);
+    expect(ps[0].label).toBe("Nice Future · Mattress");
+    expect(ps[1].orderBy).toBeNull();
+  });
+});

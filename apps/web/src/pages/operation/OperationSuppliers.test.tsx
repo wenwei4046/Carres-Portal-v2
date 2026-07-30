@@ -164,7 +164,7 @@ describe("OperationSuppliers · the scorecard", () => {
       screen.getByText("1 PO has not reached its promised date."),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/5 POs on file since 1 Jul 26, Wed · 3 scored\./),
+      screen.getByText(/5 POs on file since Wed, 1 Jul 26 · 3 scored\./),
     ).toBeInTheDocument();
   });
 

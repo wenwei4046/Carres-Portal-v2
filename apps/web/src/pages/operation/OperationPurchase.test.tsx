@@ -1,392 +1,317 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import type {
-  PurchasePlaceGroup,
-  PurchaseTodayResponse,
-} from "@carres/shared";
-
-/**
- * To Order — card P2, the click behaviour (`docs/UI-KIT.md` §8.2).
- *
- * Every test here locks a behaviour a screenshot cannot prove, and each one
- * was broken before P2:
- *
- *  1. Clicking the SAME PO again clears it. The row already toggled `selection`
- *     to null; the auto-select effect put the first row straight back one hook
- *     later, so a re-click had never once cleared anything — it silently jumped
- *     to a DIFFERENT factory instead.
- *  2. Clicking the stage you are already on is a no-op. It used to re-run the
- *     whole reset and throw away the supplier filter the operator had just set
- *     — the exact opposite of §8.2's "the table keeps its filter".
- *  3. Clicking the same supplier again clears it. This one was already true;
- *     the test exists so it cannot quietly stop being true.
- *  4. Closing a drawer gives the list back — the filter, the selection and the
- *     facet rail's scroll position.
- */
-
-const mutation = () => ({ mutate: vi.fn(), isPending: false });
-
-const usePurchaseToday = vi.fn();
-const useOperationSuppliers = vi.fn();
-
-vi.mock("@/lib/queries", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/queries")>(
-    "@/lib/queries",
-  );
-  return {
-    ...actual,
-    usePurchaseToday: (...a: unknown[]) => usePurchaseToday(...a),
-    useOperationSuppliers: (...a: unknown[]) => useOperationSuppliers(...a),
-    // `refetch` MUST resolve to a query result — the drawer's close handler
-    // awaits it and reads `.data`. A bare `vi.fn()` returns undefined, which
-    // throws AFTER the test has finished and leaves an unhandled rejection
-    // that no assertion can see.
-    useOperationPos: () => ({
-      data: { pos: [] },
-      refetch: vi.fn().mockResolvedValue({ data: { pos: [] } }),
-    }),
-    useOperationWarehouse: () => ({ data: { warehouses: [] } }),
-    useOperationOrders: () => ({ data: { orders: [] } }),
-    useOperationPoDuty: () => ({ data: null }),
-    usePurchasingSettings: () => ({ data: { canEdit: false } }),
-    useChasePoEventMutation: () => mutation(),
-    usePurchaseSkipLines: () => mutation(),
-    usePurchasePushLines: () => mutation(),
-    usePurchaseSnoozeSupplier: () => mutation(),
-  };
-});
-
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import OperationPurchase from "./OperationPurchase";
 
-const NICE = "11111111-1111-1111-1111-111111111111";
-const OHANA = "22222222-2222-2222-2222-222222222222";
+/**
+ * To Order — the Review Grid.
+ *
+ * What these pin is the behaviour an operator relies on and a redesign could
+ * silently break: the grid sorts, a row opens the sofas inside it, the button's
+ * count is the sidebar's count, the destination the operator picked is the one
+ * that gets posted, and the success panel names the real purchase orders and
+ * leads to them.
+ *
+ * The business rules themselves are pinned in `packages/shared` — this file
+ * asserts nothing about qty, summaries or dates beyond what reaches the screen.
+ */
 
-function group(over: Partial<PurchasePlaceGroup> & { supplierId: string }): PurchasePlaceGroup {
-  return {
-    supplierName: null,
-    categories: ["mattress"],
-    totalUnits: 3,
-    orderCount: 1,
-    earliestOrderBy: "2026-08-01",
-    urgency: "scheduled",
-    lines: [
-      {
-        sku: "N1001S-Q",
-        modelName: "Nice 1001",
-        category: "mattress",
-        need: 3,
-        forOrders: [
-          {
-            so: 1256,
-            customerName: "Tan Wei Ming",
-            deliveryDate: "2026-08-20",
-            ref: null,
-          },
-        ],
-        orderBy: "2026-08-01",
-        ready: 0,
-        cost: null,
-        lineIds: [],
-      },
-    ],
-    ...over,
-  } as PurchasePlaceGroup;
+const navigate = vi.fn();
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return { ...actual, useNavigate: () => navigate };
+});
+
+const apiFetch = vi.fn();
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return { ...actual, apiFetch: (...a: unknown[]) => apiFetch(...a) };
+});
+
+const OHANA = "11111111-1111-1111-1111-111111111111";
+const KLANG = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
+const AL = "818b420c-27f9-4707-a516-b91a6e03f343";
+
+function build(key: string, title: string, spec: string, codes: string) {
+  return { key, title, spec, codes, lines: [] };
 }
 
-function today(over: Partial<PurchaseTodayResponse> = {}): PurchaseTodayResponse {
-  return {
-    today: "2026-07-28",
-    bundles: [],
-    placeGroups: [
-      group({ supplierId: NICE, categories: ["mattress"] }),
-      group({ supplierId: OHANA, categories: ["bedframe"], totalUnits: 5 }),
-    ],
-    bySku: [],
-    chase: [],
-    receive: [],
-    summary: {
-      late: 0,
-      urgent: 0,
-      due: 0,
-      scheduled: 2,
-      no_deadline: 0,
-      toPlaceBundles: 2,
-      toOrderUnits: 8,
-      toChase: 0,
-      chaseLate: 0,
-      toReceive: 0,
+const TO_ORDER = {
+  today: "2026-07-30",
+  destinations: [
+    { id: KLANG, name: "Carres Klang", isDefault: true },
+    { id: AL, name: "AL Sungai Buloh", isDefault: false },
+  ],
+  proposals: [
+    {
+      key: `${OHANA}::sofa`,
+      supplierId: OHANA,
+      supplierName: "Ohana",
+      category: "sofa",
+      label: "Ohana · Sofa",
+      orderBy: "2026-07-15",
+      poCount: 3,
+      blocked: null,
+      rows: [
+        {
+          orderId: "o2", so: 1204, customer: "ella", qty: 1,
+          summary: "Booqit · 1 Sofa · CG-004 Wood", stockReady: "2026-07-31",
+          builds: [build("bk-e", "Sofa 1 — Booqit", '2 Modules · CG-004 Wood', "5539-1A(LHF)")],
+        },
+        {
+          orderId: "o1", so: 1207, customer: "PETER", qty: 2,
+          summary: "Booqit · 2 Sofas", stockReady: "2026-08-13",
+          builds: [
+            build("bk-a", "Sofa 1 — Booqit", '3 Modules · Leg 6"', "5539-1B(LHF) · 5539-CNR"),
+            build("bk-b", "Sofa 2 — Booqit", '2 Modules · Leg 4"', "5539-1A(LHF)"),
+          ],
+        },
+        {
+          orderId: "o3", so: 1257, customer: "kee tong", qty: 2,
+          summary: "Booqit · 2 Sofas · CG-010 Gold", stockReady: null,
+          builds: [build("bk-k", "Sofa 1 — Booqit", "CG-010 Gold", "5539-2B(LHF)")],
+        },
+      ],
     },
-    ...over,
-  } as PurchaseTodayResponse;
+    {
+      key: `${OHANA}::bedframe`,
+      supplierId: OHANA,
+      supplierName: "Ohana",
+      category: "bedframe",
+      label: "Ohana · Bedframe",
+      orderBy: "2026-07-21",
+      poCount: 1,
+      blocked: null,
+      rows: [
+        {
+          orderId: "o9", so: 1300, customer: "wong", qty: 3,
+          summary: "Cody · 3 Bedframes", stockReady: "2026-07-29",
+          builds: [build("l1", "Bedframe 1 — Cody", "1 Module", "CODY-Q")],
+        },
+      ],
+    },
+  ],
+};
+
+function route(path: string, body?: unknown) {
+  if (path.startsWith("/api/operation/purchase/to-order/issue")) {
+    return Promise.resolve({
+      supplier: "Ohana",
+      destination: "Carres Klang",
+      pos: [
+        { id: "PO-2031", customer: "ella" },
+        { id: "PO-2032", customer: "PETER" },
+        { id: "PO-2033", customer: "kee tong" },
+      ],
+      _body: body,
+    });
+  }
+  if (path.startsWith("/api/operation/purchase/to-order")) return Promise.resolve(TO_ORDER);
+  if (path.startsWith("/api/operation/purchasing/settings")) {
+    return Promise.resolve({ canEdit: false });
+  }
+  return Promise.resolve({});
 }
 
-const refetch = vi.fn().mockResolvedValue({});
-
-function renderPage() {
+function wrap() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/operation?tab=purchase"]}>
+  return (
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>
         <OperationPurchase />
-      </MemoryRouter>
-    </QueryClientProvider>,
+      </QueryClientProvider>
+    </MemoryRouter>
   );
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  usePurchaseToday.mockReturnValue({
-    data: today(),
-    isLoading: false,
-    isError: false,
-    error: null,
-    refetch,
+  navigate.mockReset();
+  apiFetch.mockReset();
+  apiFetch.mockImplementation((path: string, init?: RequestInit) =>
+    route(path, init?.body ? JSON.parse(String(init.body)) : undefined),
+  );
+});
+
+const grid = () => screen.getByTestId("to-order-grid");
+const dataRows = () =>
+  within(grid())
+    .getAllByRole("row")
+    .filter((r) => r.getAttribute("data-testid")?.startsWith("to-order-row-"));
+
+describe("To Order — the sidebar", () => {
+  it("lists every proposal by how many purchase orders it will create", async () => {
+    render(wrap());
+    await screen.findByTestId(`to-order-proposal-${OHANA}::sofa`);
+
+    const sofa = screen.getByTestId(`to-order-proposal-${OHANA}::sofa`);
+    expect(sofa).toHaveTextContent("Ohana · Sofa");
+    expect(sofa).toHaveTextContent("3 Purchase Orders");
+
+    const bed = screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`);
+    expect(bed).toHaveTextContent("1 Purchase Order");
+    expect(bed).not.toHaveTextContent("1 Purchase Orders");
   });
-  useOperationSuppliers.mockReturnValue({
-    data: {
-      suppliers: [
-        { id: NICE, name: "Nice Future" },
-        { id: OHANA, name: "Ohana" },
-      ],
-    },
+
+  it("switches the grid when another proposal is picked", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-grid");
+    expect(dataRows()).toHaveLength(3);
+
+    fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
+    await waitFor(() => expect(dataRows()).toHaveLength(1));
+    expect(grid()).toHaveTextContent("wong");
   });
 });
 
-/** The place row's own selected state — `aria-pressed`, set by P2. */
-function placeRow(supplierId: string, category: string) {
-  return screen.getByTestId(`place-row-${supplierId}::${category}`);
-}
-function firstPlaceRow(supplierId: string) {
-  // Single-category groups keep the bare supplier id as their groupKey.
-  return screen.getByTestId(`place-row-${supplierId}`);
-}
-
-describe("To Order · §8.2 click again clears (card P2)", () => {
-  it("clicking the SAME PO again clears it instead of jumping to another factory", async () => {
-    renderPage();
-    // The page auto-selects the first row so the preview is never blank.
-    const nice = firstPlaceRow(NICE);
-    const ohana = firstPlaceRow(OHANA);
-    await waitFor(() => expect(nice).toHaveAttribute("aria-pressed", "true"));
-
-    // Pick the second factory, then click it again.
-    fireEvent.click(ohana);
-    await waitFor(() => expect(ohana).toHaveAttribute("aria-pressed", "true"));
-    fireEvent.click(ohana);
-
-    await waitFor(() =>
-      expect(ohana).toHaveAttribute("aria-pressed", "false"),
-    );
-    // The regression this test exists for: the auto-select effect used to fill
-    // the gap with the FIRST row, so "clear" silently meant "select Nice
-    // Future" — a different factory's PO on screen after asking for none.
-    expect(nice).toHaveAttribute("aria-pressed", "false");
-    expect(
-      screen.getByText("Select a factory on the left to see the SKU list."),
-    ).toBeInTheDocument();
+describe("To Order — the grid", () => {
+  it("opens on Stock ready, earliest first, with the dateless row last", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-grid");
+    expect(dataRows().map((r) => r.getAttribute("data-testid"))).toEqual([
+      "to-order-row-1204",
+      "to-order-row-1207",
+      "to-order-row-1257",
+    ]);
   });
 
-  it("clicking a cleared row again selects it — the clear is not sticky", async () => {
-    renderPage();
-    const nice = firstPlaceRow(NICE);
-    await waitFor(() => expect(nice).toHaveAttribute("aria-pressed", "true"));
-    fireEvent.click(nice);
-    await waitFor(() => expect(nice).toHaveAttribute("aria-pressed", "false"));
-    fireEvent.click(nice);
-    await waitFor(() => expect(nice).toHaveAttribute("aria-pressed", "true"));
-  });
-
-  it("clicking the same supplier facet cell again clears the filter", async () => {
-    renderPage();
-    const cell = screen.getByTestId(`facet-supplier-${OHANA}`);
-
-    fireEvent.click(cell);
+  it("keeps the dateless row last when the sort is reversed", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-grid");
+    fireEvent.click(screen.getByTestId("to-order-col-stockReady"));
     await waitFor(() =>
-      expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument(),
-    );
-    // Only Ohana's PO survives the filter.
-    expect(screen.queryByTestId(`place-row-${NICE}`)).toBeNull();
-
-    fireEvent.click(cell);
-    await waitFor(() =>
-      expect(screen.queryByText("Supplier: Ohana")).toBeNull(),
-    );
-    expect(screen.getByTestId(`place-row-${NICE}`)).toBeInTheDocument();
-  });
-
-  it("clicking the stage you are already on keeps the supplier filter", async () => {
-    renderPage();
-    fireEvent.click(screen.getByTestId(`facet-supplier-${OHANA}`));
-    await waitFor(() =>
-      expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument(),
-    );
-
-    // The first stage is active. Clicking it used to re-run the reset and
-    // drop the filter without saying so.
-    fireEvent.click(screen.getByTestId("facet-stage-place"));
-
-    expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument();
-    expect(screen.queryByTestId(`place-row-${NICE}`)).toBeNull();
-  });
-
-  it("switching to a DIFFERENT stage still clears the filters", async () => {
-    renderPage();
-    fireEvent.click(screen.getByTestId(`facet-supplier-${OHANA}`));
-    await waitFor(() =>
-      expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument(),
-    );
-
-    fireEvent.click(screen.getByTestId("facet-stage-chase"));
-    await waitFor(() =>
-      expect(screen.queryByText("Supplier: Ohana")).toBeNull(),
+      expect(dataRows().map((r) => r.getAttribute("data-testid"))).toEqual([
+        "to-order-row-1207",
+        "to-order-row-1204",
+        "to-order-row-1257",
+      ]),
     );
   });
 
-  it("a split supplier renders one row per category and each toggles on its own", async () => {
-    usePurchaseToday.mockReturnValue({
-      data: today({
-        placeGroups: [
-          group({
-            supplierId: OHANA,
-            categories: ["bedframe", "sofa"],
-            lines: [
-              {
-                sku: "BF-1-Q",
-                modelName: "Frame",
-                category: "bedframe",
-                need: 2,
-                forOrders: [
-                  { so: 1, customerName: "A", deliveryDate: "2026-08-20", ref: null },
-                ],
-                orderBy: "2026-08-01",
-                ready: 0,
-                cost: null,
-                lineIds: [],
-              },
-              {
-                sku: "SF-1",
-                modelName: "Sofa",
-                category: "sofa",
-                need: 1,
-                forOrders: [
-                  { so: 2, customerName: "B", deliveryDate: "2026-08-25", ref: null },
-                ],
-                orderBy: "2026-08-05",
-                ready: 0,
-                cost: null,
-                lineIds: [],
-              },
-            ],
-          }),
-        ],
-      }),
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch,
+  it("sorts by any column the operator clicks — and the dateless row still sinks", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-grid");
+    fireEvent.click(screen.getByTestId("to-order-col-cust"));
+    await waitFor(() =>
+      expect(dataRows().map((r) => r.getAttribute("data-testid"))).toEqual([
+        "to-order-row-1204", // ella
+        "to-order-row-1207", // PETER
+        "to-order-row-1257", // kee tong — alphabetically second, but has no date
+      ]),
+    );
+  });
+
+  it("says No delivery date in the cell instead of lighting a status column", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-grid");
+    expect(screen.getByTestId("to-order-row-1257")).toHaveTextContent("No delivery date");
+    // There is no status column at all.
+    expect(screen.queryByTestId("to-order-col-status")).toBeNull();
+    expect(grid()).not.toHaveTextContent("⚠");
+  });
+
+  it("shows a customer's sofas only when the row is opened", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-grid");
+    expect(grid()).not.toHaveTextContent("Sofa 2 — Booqit");
+
+    fireEvent.click(screen.getByTestId("to-order-row-1207"));
+    await waitFor(() => expect(grid()).toHaveTextContent("Sofa 2 — Booqit"));
+    expect(grid()).toHaveTextContent("Sofa 1 — Booqit");
+    expect(grid()).toHaveTextContent("5539-1B(LHF) · 5539-CNR");
+
+    fireEvent.click(screen.getByTestId("to-order-row-1207"));
+    await waitFor(() => expect(grid()).not.toHaveTextContent("Sofa 2 — Booqit"));
+  });
+
+  it("keeps price and address off the page", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-grid");
+    fireEvent.click(screen.getByTestId("to-order-row-1207"));
+    await waitFor(() => expect(grid()).toHaveTextContent("Sofa 2 — Booqit"));
+    expect(grid()).not.toHaveTextContent("RM");
+    expect(grid()).not.toHaveTextContent("Address");
+  });
+});
+
+describe("To Order — issuing", () => {
+  it("shows the same count the sidebar does", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-action");
+    expect(screen.getByTestId("to-order-action")).toHaveTextContent("3 Purchase Orders");
+  });
+
+  it("defaults the destination to Carres Klang", async () => {
+    render(wrap());
+    const sel = (await screen.findByTestId("to-order-destination")) as HTMLSelectElement;
+    expect(sel.value).toBe(KLANG);
+  });
+
+  it("posts the supplier, the category and the destination the operator picked", async () => {
+    render(wrap());
+    const sel = (await screen.findByTestId("to-order-destination")) as HTMLSelectElement;
+    fireEvent.change(sel, { target: { value: AL } });
+    fireEvent.click(screen.getByTestId("to-order-issue"));
+
+    await waitFor(() => {
+      const call = apiFetch.mock.calls.find((c) => String(c[0]).endsWith("/issue"));
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({
+        supplierId: OHANA,
+        category: "sofa",
+        destinationId: AL,
+      });
     });
-    renderPage();
+  });
 
-    const bedframe = placeRow(OHANA, "bedframe");
-    const sofa = placeRow(OHANA, "sofa");
-    fireEvent.click(sofa);
-    await waitFor(() => expect(sofa).toHaveAttribute("aria-pressed", "true"));
-    expect(bedframe).toHaveAttribute("aria-pressed", "false");
+  it("names the real purchase orders and their customers, then leads to them", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-issue");
+    fireEvent.click(screen.getByTestId("to-order-issue"));
 
-    fireEvent.click(sofa);
-    await waitFor(() => expect(sofa).toHaveAttribute("aria-pressed", "false"));
-    expect(bedframe).toHaveAttribute("aria-pressed", "false");
+    const panel = await screen.findByTestId("to-order-issued");
+    expect(panel).toHaveTextContent("3 purchase orders issued to Ohana");
+    expect(panel).toHaveTextContent("PO-2031");
+    expect(panel).toHaveTextContent("PO-2033");
+    expect(panel).toHaveTextContent("kee tong");
+    expect(panel).toHaveTextContent("Next: confirm the ready date in Purchase Orders");
+
+    fireEvent.click(screen.getByTestId("to-order-open-pos"));
+    expect(navigate).toHaveBeenCalledWith("/operation/procurement");
+  });
+
+  it("refuses to issue a pair with no production days, and says why", async () => {
+    apiFetch.mockImplementation((path: string) => {
+      if (path.startsWith("/api/operation/purchase/to-order")) {
+        return Promise.resolve({
+          ...TO_ORDER,
+          proposals: [{ ...TO_ORDER.proposals[0], blocked: "production_days" }],
+        });
+      }
+      return route(path);
+    });
+
+    render(wrap());
+    const action = await screen.findByTestId("to-order-action");
+    expect(action).toHaveTextContent("Production Days Required");
+    expect(action).toHaveTextContent("Set production days in Settings.");
+    expect(screen.getByTestId("to-order-issue")).toBeDisabled();
   });
 });
 
-describe("To Order · R8 · the three stage cells speak the dictionary", () => {
-  it("reads Issue PO · Confirm ready date · Check in, and nothing else", () => {
-    renderPage();
-    // COPY-STANDARD, PURCHASING — the queue-tile string of each action, taken
-    // from `order-action-words.ts` so the cell cannot drift from the row.
-    expect(screen.getByTestId("facet-stage-place")).toHaveTextContent("Issue PO");
-    // P7A — the retired word is gone from the tab, both directions proved.
-    expect(screen.getByTestId("facet-stage-place")).not.toHaveTextContent(
-      "Send PO",
-    );
-    expect(screen.getByTestId("facet-stage-chase")).toHaveTextContent(
-      "Confirm ready date",
-    );
-    expect(screen.getByTestId("facet-stage-receive")).toHaveTextContent(
-      "Check in",
-    );
-  });
+describe("To Order — nothing to do", () => {
+  it("says so plainly", async () => {
+    apiFetch.mockImplementation((path: string) => {
+      if (path.startsWith("/api/operation/purchase/to-order")) {
+        return Promise.resolve({ ...TO_ORDER, proposals: [] });
+      }
+      return route(path);
+    });
 
-  it("says none of the three retired words anywhere on the tab", () => {
-    const { container } = renderPage();
-    // `Chase` is BANNED (it names a mood); `Receive` as a verb is banned in
-    // favour of `Check in`; `Send POs` was the plural of an action that has a
-    // locked singular. All three shipped on this cell row for months.
-    // P7A widened the third: `Send PO` in ANY form is retired, singular too.
-    expect(container.textContent).not.toMatch(/Send PO/);
-    expect(container.textContent).not.toMatch(/Chase factory/);
-  });
-
-  it("the middle-list header repeats the CELL's word, not a second one", () => {
-    renderPage();
-    // The stage header used to say `Chase factories` while the cell beside it
-    // said `Chase factory` — one act, two spellings, one screen.
-    fireEvent.click(screen.getByTestId("facet-stage-chase"));
-    const shell = screen.getByTestId("operation-purchase");
-    expect(shell.textContent).not.toMatch(/Chase factories/);
-    expect(shell.textContent).not.toMatch(/Receive deliveries/);
-  });
-});
-
-describe("To Order · §8.2 closing the drawer gives the list back (card P2)", () => {
-  it("keeps the filter, the selection and the rail's scroll across the drawer", async () => {
-    renderPage();
-
-    // Leave the list in a specific state: filtered to Ohana, Ohana's PO open.
-    fireEvent.click(screen.getByTestId(`facet-supplier-${OHANA}`));
-    await waitFor(() =>
-      expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument(),
-    );
-    const ohana = firstPlaceRow(OHANA);
-    await waitFor(() => expect(ohana).toHaveAttribute("aria-pressed", "true"));
-
-    // Scroll the facet rail. jsdom has no layout, so give the element a real
-    // scrollable box first — otherwise scrollTop can only ever be 0 and the
-    // assertion would pass without proving anything.
-    const rail = screen.getByTestId("listshell-facet");
-    Object.defineProperty(rail, "scrollHeight", { value: 900, configurable: true });
-    Object.defineProperty(rail, "clientHeight", { value: 400, configurable: true });
-    rail.scrollTop = 260;
-
-    // Open the drawer (+ New PO), then close it.
-    fireEvent.click(screen.getByText("New PO"));
-    await waitFor(() =>
-      expect(screen.getByRole("dialog")).toBeInTheDocument(),
-    );
-    rail.scrollTop = 0; // what a re-render / refetch does to it
-    fireEvent.click(screen.getByLabelText("Close modal"));
-
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.getByText("Supplier: Ohana")).toBeInTheDocument();
-    expect(firstPlaceRow(OHANA)).toHaveAttribute("aria-pressed", "true");
-    expect(rail.scrollTop).toBe(260);
-  });
-
-  it("gives back an EMPTY selection too — a clear survives the drawer", async () => {
-    renderPage();
-    const nice = firstPlaceRow(NICE);
-    await waitFor(() => expect(nice).toHaveAttribute("aria-pressed", "true"));
-    fireEvent.click(nice);
-    await waitFor(() => expect(nice).toHaveAttribute("aria-pressed", "false"));
-
-    fireEvent.click(screen.getByText("New PO"));
-    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
-    fireEvent.click(screen.getByLabelText("Close modal"));
-
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(firstPlaceRow(NICE)).toHaveAttribute("aria-pressed", "false");
-    expect(firstPlaceRow(OHANA)).toHaveAttribute("aria-pressed", "false");
+    render(wrap());
+    // Wait for the SENTENCE, not the panel — the panel is on screen while the
+    // read is still in flight, and an empty answer must be a settled one.
+    await screen.findByText("No purchase orders to issue.");
+    expect(screen.getByTestId("to-order-empty")).toBeInTheDocument();
   });
 });

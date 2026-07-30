@@ -128,6 +128,15 @@ const errors = [];
 // KIT hover law: a clickable row/nav/chip hovers BLUE (`hover:bg-hovertint`),
 // never grey. Freeze the legacy grey hovers; any NEW one fails the build. Burn
 // the baseline down over time (re-run --update-baseline after a sweep).
+//
+// ⚠ THE LAW THIS RULE ENFORCES WAS REVERSED ON 2026-07-30 AND THE RULE HAS NOT
+// CAUGHT UP. Loo froze a portal-wide accent law: blue marks the CURRENT thing
+// and the primary action, and nothing else — so hover, selection and the
+// expanded row are all grey. An accent that marks four things marks nothing.
+// The baseline moved 94 → 96 for To Order's two greys, which are a ruling
+// rather than drift. `docs/UI-KIT.md` §3.5 has to be rewritten before this
+// rule can go back to being the truth, and until then it is measuring the
+// opposite of the law. Reported, not quietly re-pointed.
 if (currentHoverGrey > (baseline.hoverGrey ?? Infinity)) {
   errors.push(
     `RULE I · grey hover — ${currentHoverGrey} grey hover(s) across web (baseline ${baseline.hoverGrey}). ` +

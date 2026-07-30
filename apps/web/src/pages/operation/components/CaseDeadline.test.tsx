@@ -57,7 +57,7 @@ afterEach(() => vi.useRealTimers());
 describe("CaseDeadline", () => {
   it("prints the deadline and how the clock stands against it", () => {
     draw();
-    expect(screen.getByText("22 Jul 26, Wed")).toBeInTheDocument();
+    expect(screen.getByText("Wed, 22 Jul 26")).toBeInTheDocument();
     expect(screen.getByText("4 working days left")).toBeInTheDocument();
   });
 
@@ -83,7 +83,7 @@ describe("CaseDeadline", () => {
         told({ kind: "extension", reason: "supplier_special_order", until: "2026-07-31" }),
       ],
     });
-    expect(screen.getByText("31 Jul 26, Fri")).toBeInTheDocument();
+    expect(screen.getByText("Fri, 31 Jul 26")).toBeInTheDocument();
     expect(screen.getByText(/Deadline moved once/)).toBeInTheDocument();
     // The one move is spent — the button is gone, not merely disabled.
     expect(screen.queryByText("Move the deadline")).not.toBeInTheDocument();
@@ -109,7 +109,7 @@ describe("CaseDeadline", () => {
   it("says nothing about a case with time still on the clock", () => {
     vi.setSystemTime(new Date("2026-07-10T02:00:00Z"));
     draw();
-    expect(screen.getByText("22 Jul 26, Wed")).toBeInTheDocument();
+    expect(screen.getByText("Wed, 22 Jul 26")).toBeInTheDocument();
     expect(screen.queryByText(/say why it is taking longer/)).not.toBeInTheDocument();
   });
 });

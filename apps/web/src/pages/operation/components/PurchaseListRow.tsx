@@ -4,7 +4,7 @@
  * UI-KIT §A7 SIZING LAW: 40 = list · 36 = panel/KV · 52 = items. Purchase is a
  * list, so 40 (~27 rows on a 1080 screen). Three columns:
  *   1. Identity   — icon 14 + primary 13/600 + secondary 12 muted (grows)
- *   2. Send-by    — fmtDate() → "23 Jul 26, Wed", mono 12 tabular (right-aligned)
+ *   2. Send-by    — fmtDate() → "Wed, 23 Jul 26", mono 12 tabular (right-aligned)
  *   3. Urgency    — .pill 11px or nothing (right of the date)
  *
  * Selection = `.is-selected` (UI-KIT index.css :357 — the ONE selection blue
