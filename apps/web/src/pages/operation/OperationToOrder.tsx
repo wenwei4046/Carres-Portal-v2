@@ -163,15 +163,22 @@ export default function OperationToOrder() {
    */
   const [plan, setPlan] = useState<PreviewState | null>(null);
 
-  // The default pick follows Loo's WALKING order (mattress → bedframe → sofa),
-  // not urgency: the operator starts at the top of the rail and clears down.
-  const firstInSequence = useMemo(
-    () =>
+  const today = q.data?.today ?? null;
+
+  // The default pick is the TOP of the rail — first bucket, then the walking
+  // order (mattress → bedframe → sofa): the operator starts at the top and
+  // clears down.
+  const firstInSequence = useMemo(() => {
+    const bucketRank = (p: ToOrderProposal) =>
+      today ? BUCKET_ORDER.indexOf(bucketOf(p.orderBy, today)) : 0;
+    return (
       [...proposals].sort(
-        (a, b) => categoryRank(a.category) - categoryRank(b.category),
-      )[0] ?? null,
-    [proposals],
-  );
+        (a, b) =>
+          bucketRank(a) - bucketRank(b) ||
+          categoryRank(a.category) - categoryRank(b.category),
+      )[0] ?? null
+    );
+  }, [proposals, today]);
   const current = proposals.find((p) => p.key === pickedKey) ?? firstInSequence;
 
   /**
@@ -181,6 +188,11 @@ export default function OperationToOrder() {
    * purchase order nobody issues. The most urgent category opens itself.
    */
   const [expandedCats, setExpandedCats] = useState<ReadonlySet<string>>(new Set());
+  /** A ☑ pressed on a foreign card — applied once that proposal's plan loads. */
+  const [pendingInclude, setPendingInclude] = useState<{
+    proposal: string;
+    doc: string;
+  } | null>(null);
 
   // Follow the list when it changes under us — a proposal leaves once issued.
   useEffect(() => {
@@ -209,31 +221,48 @@ export default function OperationToOrder() {
     if (cat) setExpandedCats((s) => (s.has(cat) ? s : new Set(s).add(cat)));
   }, [currentKey, proposals]);
 
+  // A ☑ pressed on a foreign card lands after its proposal's plan is rebuilt.
+  useEffect(() => {
+    if (!pendingInclude || pendingInclude.proposal !== currentKey || !plan) return;
+    const doc = pendingInclude.doc;
+    setPendingInclude(null);
+    setPlan((st) => (st ? toggleInclude(st, doc) : st));
+  }, [pendingInclude, currentKey, plan]);
+
   /**
-   * The category level: proposals grouped by what the goods ARE, in Loo's
-   * FIXED walking order (2026-07-31): mattress → bedframe → sofa, and
-   * accessories take the fourth slot the day the reorder track joins this
-   * workspace. Suppliers inside keep the proposals' own urgency order.
+   * The queue's structure, exactly as the frozen blueprint reads it: time
+   * bucket → category (Loo's FIXED walking order: mattress → bedframe → sofa,
+   * accessories reserved) → supplier. Empty buckets never render; suppliers
+   * inside a category keep the proposals' own urgency order.
    */
-  const catGroups = useMemo(() => {
-    const byCat = new Map<string, ToOrderProposal[]>();
+  const buckets = useMemo(() => {
+    const byBucket = new Map<BucketKey, ToOrderProposal[]>();
     for (const p of proposals) {
-      const arr = byCat.get(p.category);
+      const k = today ? bucketOf(p.orderBy, today) : "today";
+      const arr = byBucket.get(k);
       if (arr) arr.push(p);
-      else byCat.set(p.category, [p]);
+      else byBucket.set(k, [p]);
     }
-    return [...byCat.entries()]
-      .map(([category, ps]) => ({
-        category,
-        proposals: ps,
+    const groupByCategory = (ps: ToOrderProposal[]) => {
+      const byCat = new Map<string, ToOrderProposal[]>();
+      for (const p of ps) {
+        const arr = byCat.get(p.category);
+        if (arr) arr.push(p);
+        else byCat.set(p.category, [p]);
+      }
+      return [...byCat.entries()]
+        .map(([category, list]) => ({ category, proposals: list }))
+        .sort((a, b) => categoryRank(a.category) - categoryRank(b.category));
+    };
+    return BUCKET_ORDER.filter((k) => byBucket.has(k)).map((k) => {
+      const ps = byBucket.get(k)!;
+      return {
+        key: k,
         poCount: ps.reduce((n, p) => n + p.poCount, 0),
-        earliest: ps.reduce<string | null>(
-          (d, p) => (p.orderBy != null && (d == null || p.orderBy < d) ? p.orderBy : d),
-          null,
-        ),
-      }))
-      .sort((a, b) => categoryRank(a.category) - categoryRank(b.category));
-  }, [proposals]);
+        groups: groupByCategory(ps),
+      };
+    });
+  }, [proposals, today]);
 
   const docs = useMemo(
     () => (current && plan ? describeDocs(current, plan) : []),
@@ -301,7 +330,7 @@ export default function OperationToOrder() {
 
       <div className="flex-1 min-h-0 flex gap-4 px-6 py-4 overflow-hidden">
         <QueueRail
-          catGroups={catGroups}
+          buckets={buckets}
           totalPos={proposals.reduce((n, p) => n + p.poCount, 0)}
           currentKey={current?.key ?? null}
           railDocs={railDocs}
@@ -320,10 +349,53 @@ export default function OperationToOrder() {
             setPickedDoc({ proposal: proposalKey, doc: docKey });
             setIssued(null);
           }}
+          onToggleInclude={(proposalKey, docKey) => {
+            if (proposalKey === currentKey) {
+              setPlan((st) => (st ? toggleInclude(st, docKey) : st));
+            } else {
+              // The ☑ on a foreign card first loads that proposal, then the
+              // pending effect below applies the toggle to the fresh plan.
+              setPickedKey(proposalKey);
+              setPickedDoc({ proposal: proposalKey, doc: docKey });
+              setPendingInclude({ proposal: proposalKey, doc: docKey });
+              setIssued(null);
+            }
+          }}
           loading={q.isLoading}
         />
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0 gap-3">
+          {/* ── COMMANDS — the layer above the regions (Golden Template).
+               `Create Proposal` is in the architecture, disabled until its
+               card builds the manual entrance (Loo's Office rule: keep the
+               slot visible, switch it on later). ── */}
+          <div className="shrink-0 flex items-center gap-4" data-testid="to-order-commands">
+            <span className="text-meta text-kit-slate-11 whitespace-nowrap">
+              {W.planFor}{" "}
+              <span className="text-kit-slate-12 tabular-nums">
+                {today ? fmtDate(today) : "—"}
+              </span>
+            </span>
+            <span className="ml-auto flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void q.refetch()}
+                data-testid="to-order-recompute"
+              >
+                {W.workOutPlanAgain}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled
+                data-testid="to-order-create-proposal"
+              >
+                {W.createProposal}
+              </Button>
+            </span>
+          </div>
+
           {issued ? (
             <IssuedPanel
               result={issued}
@@ -341,9 +413,6 @@ export default function OperationToOrder() {
                 destinations={destinations}
                 destId={destId}
                 onDest={setDestId}
-                onInclude={() =>
-                  setPlan((st) => (st ? toggleInclude(st, currentDoc.key) : st))
-                }
                 onRemove={(k) => setPlan((st) => (st ? removeBuild(st, k) : st))}
                 onSplit={(k) => setPlan((st) => (st ? splitOut(st, [k]) : st))}
                 onMove={(k, to) => setPlan((st) => (st ? moveBuild(st, k, to) : st))}
@@ -432,6 +501,38 @@ function categoryRank(c: string): number {
 }
 
 /**
+ * The queue's OUTERMOST split — Loo's time buckets (2026-07-31): the bucket
+ * name carries WHEN, so no row below it ever carries a date. Overdue is first
+ * and red; an empty bucket is never rendered; no order-by date sinks to Later.
+ */
+type BucketKey = "overdue" | "today" | "tomorrow" | "thisWeek" | "nextWeek" | "later";
+
+const BUCKET_ORDER: readonly BucketKey[] = [
+  "overdue",
+  "today",
+  "tomorrow",
+  "thisWeek",
+  "nextWeek",
+  "later",
+];
+
+function bucketOf(orderBy: string | null, today: string): BucketKey {
+  if (!orderBy) return "later";
+  if (orderBy < today) return "overdue";
+  if (orderBy === today) return "today";
+  const t = new Date(`${today}T00:00:00Z`).getTime();
+  const d = new Date(`${orderBy}T00:00:00Z`).getTime();
+  const diff = Math.round((d - t) / 86400000);
+  if (diff === 1) return "tomorrow";
+  // The week runs Monday–Sunday, same as the office calendar reads it.
+  const dow = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7; // Mon = 0
+  const daysToNextMonday = 7 - dow;
+  if (diff < daysToNextMonday) return "thisWeek";
+  if (diff < daysToNextMonday + 7) return "nextWeek";
+  return "later";
+}
+
+/**
  * The Fiori-worklist rail as a THREE-LEVEL tree (Loo, 2026-07-31):
  * category (icon) → supplier → purchase orders. Listing by listing — each
  * level opens the next, and only the deepest row selects. Three type sizes
@@ -444,8 +545,17 @@ function categoryRank(c: string): number {
  * yet. It is extracted into the kit on its second occurrence, per the kit's
  * own law, not invented for its first.
  */
+const BUCKET_LABEL: Record<BucketKey, string> = {
+  overdue: W.bucketOverdue,
+  today: W.bucketToday,
+  tomorrow: W.bucketTomorrow,
+  thisWeek: W.bucketThisWeek,
+  nextWeek: W.bucketNextWeek,
+  later: W.bucketLater,
+};
+
 function QueueRail({
-  catGroups,
+  buckets,
   totalPos,
   currentKey,
   railDocs,
@@ -453,13 +563,13 @@ function QueueRail({
   expandedCats,
   onToggleCat,
   onPickDoc,
+  onToggleInclude,
   loading,
 }: {
-  catGroups: readonly {
-    category: string;
-    proposals: ToOrderProposal[];
+  buckets: readonly {
+    key: BucketKey;
     poCount: number;
-    earliest: string | null;
+    groups: readonly { category: string; proposals: ToOrderProposal[] }[];
   }[];
   totalPos: number;
   currentKey: string | null;
@@ -469,6 +579,7 @@ function QueueRail({
   expandedCats: ReadonlySet<string>;
   onToggleCat: (category: string) => void;
   onPickDoc: (proposalKey: string, docKey: string) => void;
+  onToggleInclude: (proposalKey: string, docKey: string) => void;
   loading: boolean;
 }) {
   return (
@@ -486,16 +597,43 @@ function QueueRail({
         </span>
       </div>
 
-      {loading && catGroups.length === 0 ? (
+      {loading && buckets.length === 0 ? (
         <div className="px-3 py-2">
           <Loading variant="skeleton" lines={3} label="Loading purchase orders" />
         </div>
       ) : (
-        catGroups.map((g) => {
-          const catOpen = expandedCats.has(g.category);
-          return (
-            // Linear's section rhythm: air BETWEEN sections, none inside them.
-            <div key={g.category} className="pt-3 first:pt-0">
+        buckets.map((b) => (
+          <div key={b.key} className="pt-3 first:pt-0">
+            {/* ── The time bucket — the queue's outermost split. Its NAME
+                 carries when, so no row below carries a date; Overdue is red
+                 and always first; an empty bucket was never rendered. ── */}
+            <div
+              className="flex items-baseline gap-2 px-2 pb-1"
+              data-testid={`to-order-bucket-${b.key}`}
+            >
+              <span
+                className={
+                  b.key === "overdue"
+                    ? "text-label text-kit-red-11"
+                    : "text-label text-kit-slate-11"
+                }
+              >
+                {BUCKET_LABEL[b.key]}
+              </span>
+              <span
+                className={[
+                  "ml-auto text-meta font-medium tabular-nums",
+                  b.key === "overdue" ? "text-kit-red-11" : "text-kit-slate-11",
+                ].join(" ")}
+              >
+                {b.poCount}
+              </span>
+            </div>
+
+            {b.groups.map((g) => {
+              const catOpen = expandedCats.has(g.category);
+              return (
+                <div key={g.category}>
               {/* ── Level 1 · the category — GitHub's sidebar voice (Loo,
                    2026-07-31): every level reads the SAME dark size; the
                    hierarchy is carried by the icon, the indent and the guide
@@ -537,9 +675,11 @@ function QueueRail({
                             <Icon name="supplier" size={14} />
                           </span>
                           {/* The category said what the goods are — the
-                              section says WHO makes them. Name only. */}
+                              section says WHO makes them and WHY we buy
+                              (the Source; only Customer Order exists until
+                              Create Proposal builds the manual entrance). */}
                           <span className="text-meta font-medium text-kit-slate-11 truncate">
-                            {p.supplierName}
+                            {p.supplierName} · {W.sourceCustomerOrder}
                           </span>
                         </div>
 
@@ -551,6 +691,7 @@ function QueueRail({
                               on={p.key === currentKey && d.key === currentDocKey}
                               dimmed={p.key === currentKey && !d.include}
                               onPick={() => onPickDoc(p.key, d.key)}
+                              onToggleInclude={() => onToggleInclude(p.key, d.key)}
                               testId={`to-order-doc-${p.key}-${d.key}`}
                             />
                           ))}
@@ -559,9 +700,11 @@ function QueueRail({
                     );
                   })
                 : null}
-            </div>
-          );
-        })
+                </div>
+              );
+            })}
+          </div>
+        ))
       )}
     </aside>
   );
@@ -582,12 +725,14 @@ function PoCard({
   on,
   dimmed,
   onPick,
+  onToggleInclude,
   testId,
 }: {
   doc: PreviewDoc;
   on: boolean;
   dimmed: boolean;
   onPick: () => void;
+  onToggleInclude: () => void;
   testId: string;
 }) {
   // Counted by ORDER (an order can lack an SO number); the preview line reads
@@ -597,13 +742,11 @@ function PoCard({
     ...new Set(doc.builds.map((b) => b.so).filter((s): s is number => s != null)),
   ];
   return (
-    <button
-      type="button"
-      onClick={onPick}
+    <div
       data-testid={testId}
       aria-current={on ? "true" : undefined}
       className={[
-        "relative block w-full text-left rounded-card border border-kit-slate-5 px-3 py-2",
+        "relative rounded-card border border-kit-slate-5 px-3 py-2",
         on ? "bg-kit-blue-3" : "bg-white hover:bg-kit-blue-3",
         dimmed ? "opacity-40" : "",
       ].join(" ")}
@@ -616,19 +759,31 @@ function PoCard({
           className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
         />
       ) : null}
-      <div className="text-body font-medium text-kit-slate-12 truncate tabular-nums">
-        {doc.so != null ? `SO-${doc.so}` : countOrders(orders)}
+      <div className="flex items-start gap-2">
+        {/* PayEm's ☑, made ours: include in THIS issue. Unticking changes
+            nothing about the customer's order; a refresh puts it back. */}
+        <Checkbox
+          id={`${testId}-include`}
+          ariaLabel={W.include}
+          checked={doc.include}
+          onCheckedChange={onToggleInclude}
+        />
+        <button type="button" onClick={onPick} className="flex-1 min-w-0 text-left">
+          <div className="text-body font-medium text-kit-slate-12 truncate tabular-nums">
+            {doc.so != null ? `SO-${doc.so}` : countOrders(orders)}
+          </div>
+          {doc.so == null && sos.length > 0 ? (
+            <div className="text-meta text-kit-slate-11 truncate tabular-nums">
+              {sos
+                .slice(0, 2)
+                .map((s) => `SO-${s}`)
+                .join(" · ")}
+              {sos.length > 2 ? ` · +${sos.length - 2}` : ""}
+            </div>
+          ) : null}
+        </button>
       </div>
-      {doc.so == null && sos.length > 0 ? (
-        <div className="text-meta text-kit-slate-11 truncate tabular-nums">
-          {sos
-            .slice(0, 2)
-            .map((s) => `SO-${s}`)
-            .join(" · ")}
-          {sos.length > 2 ? ` · +${sos.length - 2}` : ""}
-        </div>
-      ) : null}
-    </button>
+    </div>
   );
 }
 
@@ -654,7 +809,6 @@ function Workspace({
   destId,
   onDest,
   moveTargets,
-  onInclude,
   onRemove,
   onSplit,
   onMove,
@@ -668,7 +822,6 @@ function Workspace({
   destId: string | null;
   onDest: (id: string) => void;
   moveTargets: readonly MoveTarget[];
-  onInclude: () => void;
   onRemove: (buildKey: string) => void;
   onSplit: (buildKey: string) => void;
   onMove: (buildKey: string, toKey: string) => void;
@@ -770,22 +923,18 @@ function Workspace({
   }
 
   const units = doc.builds.reduce((n, b) => n + b.qty, 0);
+  const auditSos = [
+    ...new Set(doc.builds.map((b) => b.so).filter((s): s is number => s != null)),
+  ];
 
   return (
     <div
       className="flex-1 min-h-0 flex flex-col bg-white border border-kit-slate-5 rounded-card overflow-hidden"
       data-testid="to-order-workspace"
     >
-      {/* ── PO bar — which document, and whether it goes out this time ──── */}
+      {/* ── PO bar — which document. The ☑ lives on the queue card now
+           (PayEm's shape, Loo 2026-07-31) — one home, not two. ──────────── */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-kit-slate-5">
-        <span title={W.include}>
-          <Checkbox
-            id={`to-order-include-${doc.key}`}
-            ariaLabel={W.include}
-            checked={doc.include}
-            onCheckedChange={onInclude}
-          />
-        </span>
         <span className="text-body font-medium text-kit-slate-12 whitespace-nowrap">
           {poIndexLabel(index, total)}
         </span>
@@ -852,6 +1001,24 @@ function Workspace({
             }
           />
         </section>
+
+        {/* ── Planning & Audit — how this proposal came to be. NEVER
+             communication: nothing exists to say to a supplier before Issue
+             (Loo's ruling, 2026-07-31). v1 states the one stored fact that
+             exists — which customer orders the system generated it from. ── */}
+        {auditSos.length > 0 ? (
+          <section data-testid="to-order-audit">
+            <SectionHeader title={W.planningAudit} testId="to-order-audit-header" />
+            <div className="px-4 py-2 text-meta text-kit-slate-11">
+              <span className="font-medium text-kit-slate-12">
+                {W.systemGeneratedFrom}
+              </span>{" "}
+              <span className="tabular-nums">
+                {auditSos.map((s) => `SO-${s}`).join(" · ")}
+              </span>
+            </div>
+          </section>
+        ) : null}
 
         {/* ── Items — the region the review happens in ─────────────────── */}
         <section data-testid="to-order-items">
