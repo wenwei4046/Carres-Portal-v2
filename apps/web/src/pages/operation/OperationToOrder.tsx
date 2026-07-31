@@ -10,12 +10,14 @@
  *
  * Shape (Queue pattern wrapping the Review workspace):
  *
- *     queue rail 320px       the Fiori-worklist rail (Loo, 2026-07-31):
- *                            `Ready to issue` + total, then one COLLAPSED row
- *                            per proposal — chevron · supplier · the COUNT is
- *                            the big fact — expanding shows small `PO n` rows.
- *                            The rail is scanned for numbers; a PO row is only
- *                            the door to the workspace. Zero actions here.
+ *     queue rail 320px       the Fiori-worklist rail as a THREE-LEVEL tree
+ *                            (Loo, 2026-07-31): `Ready to issue` + total, then
+ *                            category (icon) → supplier → small `PO n` rows.
+ *                            Each level opens the next; the COUNT is the big
+ *                            fact on every row; a lower level never repeats
+ *                            what the level above already said. The rail is
+ *                            scanned for numbers; a PO row is only the door to
+ *                            the workspace. Zero actions here.
  *     workspace              ONE purchase order fills the pane
  *       PO bar               include · PO 1 of N · customer · SO
  *       Header line          ONE row of facts: supplier · category ····
@@ -56,6 +58,7 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   TO_ORDER_WORDS as W,
+  categoryLabel,
   countItems,
   countOrders,
   issuedHeadline,
@@ -76,7 +79,7 @@ import Checkbox from "@/components/kit/Checkbox";
 import DataTable, { type Column } from "@/components/kit/DataTable";
 import DropdownMenu, { type MenuItem } from "@/components/kit/DropdownMenu";
 import EmptyState from "@/components/kit/EmptyState";
-import Icon from "@/components/kit/Icon";
+import Icon, { type IconName } from "@/components/kit/Icon";
 import Loading from "@/components/kit/Loading";
 import Panel from "@/components/kit/Panel";
 import SectionHeader from "@/components/kit/SectionHeader";
@@ -165,11 +168,12 @@ export default function OperationToOrder() {
   const current = proposals.find((p) => p.key === pickedKey) ?? proposals[0] ?? null;
 
   /**
-   * Which rail groups are open. The most urgent proposal (the sort puts it
-   * first) is opened for the operator, so the pane is never empty and the rail
-   * never starts fully shut; the rest stay collapsed — the rail is scanned for
-   * COUNTS first (Loo, 2026-07-31).
+   * Which rail levels are open — the rail is a three-level tree (Loo,
+   * 2026-07-31): category → supplier → purchase orders. The most urgent path
+   * opens itself so the pane is never empty; everything else stays collapsed —
+   * the rail is scanned for COUNTS first.
    */
+  const [expandedCats, setExpandedCats] = useState<ReadonlySet<string>>(new Set());
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
 
   // Follow the list when it changes under us — a proposal leaves once issued.
@@ -192,11 +196,45 @@ export default function OperationToOrder() {
     setPlan(current ? initialState(current) : null);
   }, [currentKey, current]);
 
-  // The current group always shows its rows.
+  // The current path always shows its rows — category and supplier both.
   useEffect(() => {
     if (!currentKey) return;
     setExpanded((s) => (s.has(currentKey) ? s : new Set(s).add(currentKey)));
-  }, [currentKey]);
+    const cat = proposals.find((p) => p.key === currentKey)?.category;
+    if (cat) setExpandedCats((s) => (s.has(cat) ? s : new Set(s).add(cat)));
+  }, [currentKey, proposals]);
+
+  /**
+   * The category level: proposals grouped by what the goods ARE. Categories
+   * rank by their most urgent pair (a dateless one sinks), suppliers inside
+   * keep the proposals' own urgency order.
+   */
+  const catGroups = useMemo(() => {
+    const byCat = new Map<string, ToOrderProposal[]>();
+    for (const p of proposals) {
+      const arr = byCat.get(p.category);
+      if (arr) arr.push(p);
+      else byCat.set(p.category, [p]);
+    }
+    return [...byCat.entries()]
+      .map(([category, ps]) => ({
+        category,
+        proposals: ps,
+        poCount: ps.reduce((n, p) => n + p.poCount, 0),
+        earliest: ps.reduce<string | null>(
+          (d, p) => (p.orderBy != null && (d == null || p.orderBy < d) ? p.orderBy : d),
+          null,
+        ),
+      }))
+      .sort((a, b) => {
+        if (a.earliest == null && b.earliest == null)
+          return a.category < b.category ? -1 : 1;
+        if (a.earliest == null) return 1;
+        if (b.earliest == null) return -1;
+        if (a.earliest !== b.earliest) return a.earliest < b.earliest ? -1 : 1;
+        return a.category < b.category ? -1 : 1;
+      });
+  }, [proposals]);
 
   const docs = useMemo(
     () => (current && plan ? describeDocs(current, plan) : []),
@@ -264,11 +302,21 @@ export default function OperationToOrder() {
 
       <div className="flex-1 min-h-0 flex gap-4 px-6 py-4 overflow-hidden">
         <QueueRail
-          proposals={proposals}
+          catGroups={catGroups}
+          totalPos={proposals.reduce((n, p) => n + p.poCount, 0)}
           currentKey={current?.key ?? null}
           railDocs={railDocs}
           currentDocKey={currentDoc?.key ?? null}
+          expandedCats={expandedCats}
           expanded={expanded}
+          onToggleCat={(c) =>
+            setExpandedCats((s) => {
+              const n = new Set(s);
+              if (n.has(c)) n.delete(c);
+              else n.add(c);
+              return n;
+            })
+          }
           onToggle={(k) =>
             setExpanded((s) => {
               const n = new Set(s);
@@ -374,38 +422,57 @@ export default function OperationToOrder() {
 
 // ── Queue rail ──────────────────────────────────────────────────────────────
 
+/** What the goods ARE → the glyph that says it. Only the three to-order categories. */
+const CATEGORY_ICON: Record<string, IconName> = {
+  mattress: "mattress",
+  bedframe: "bedframe",
+  sofa: "sofa",
+};
+
 /**
- * The Fiori-worklist rail (Loo, 2026-07-31). Three type sizes only: the COUNT
- * is the big fact — the rail answers "how many purchase orders do I owe" at a
- * glance — the supplier is the grouping, and a PO row is small because it is
- * only the door to the workspace. The rail carries ZERO actions: expanding a
- * group changes nothing, and only picking a PO row changes the pane.
+ * The Fiori-worklist rail as a THREE-LEVEL tree (Loo, 2026-07-31):
+ * category (icon) → supplier → purchase orders. Listing by listing — each
+ * level opens the next, and only the deepest row selects. Three type sizes
+ * only: the COUNT is the big fact — the rail answers "how many purchase
+ * orders do I owe" at a glance — and a PO row is small because it is only the
+ * door to the workspace. The rail carries ZERO actions: expanding changes
+ * nothing, and only picking a PO row changes the pane.
  *
  * Page-local markup, tokens only — no kit component renders a picking list
  * yet. It is extracted into the kit on its second occurrence, per the kit's
  * own law, not invented for its first.
  */
 function QueueRail({
-  proposals,
+  catGroups,
+  totalPos,
   currentKey,
   railDocs,
   currentDocKey,
+  expandedCats,
   expanded,
+  onToggleCat,
   onToggle,
   onPickDoc,
   loading,
 }: {
-  proposals: ToOrderProposal[];
+  catGroups: readonly {
+    category: string;
+    proposals: ToOrderProposal[];
+    poCount: number;
+    earliest: string | null;
+  }[];
+  totalPos: number;
   currentKey: string | null;
   /** Rows per proposal — live for the current one, the default for the rest. */
   railDocs: ReadonlyMap<string, PreviewDoc[]>;
   currentDocKey: string | null;
+  expandedCats: ReadonlySet<string>;
   expanded: ReadonlySet<string>;
+  onToggleCat: (category: string) => void;
   onToggle: (key: string) => void;
   onPickDoc: (proposalKey: string, docKey: string) => void;
   loading: boolean;
 }) {
-  const total = proposals.reduce((n, p) => n + p.poCount, 0);
   return (
     <aside
       className="w-[320px] shrink-0 flex flex-col min-h-0 overflow-y-auto"
@@ -417,56 +484,98 @@ function QueueRail({
           className="ml-auto text-body font-semibold text-kit-slate-12 tabular-nums"
           data-testid="to-order-queue-total"
         >
-          {total}
+          {totalPos}
         </span>
       </div>
 
-      {loading && proposals.length === 0 ? (
+      {loading && catGroups.length === 0 ? (
         <div className="px-3 py-2">
           <Loading variant="skeleton" lines={3} label="Loading purchase orders" />
         </div>
       ) : (
-        proposals.map((p) => {
-          const open = expanded.has(p.key);
-          const docs = railDocs.get(p.key) ?? [];
+        catGroups.map((g) => {
+          const catOpen = expandedCats.has(g.category);
           return (
-            <div key={p.key}>
+            <div key={g.category}>
+              {/* ── Level 1 · the category ─────────────────────────────── */}
               <button
                 type="button"
-                onClick={() => onToggle(p.key)}
-                data-testid={`to-order-proposal-${p.key}`}
-                aria-expanded={open}
+                onClick={() => onToggleCat(g.category)}
+                data-testid={`to-order-category-${g.category}`}
+                aria-expanded={catOpen}
                 className="flex w-full items-center gap-2 text-left rounded-control px-2 py-2 mb-px hover:bg-kit-blue-3"
               >
                 <span className="text-kit-slate-11">
-                  <Icon name={open ? "expand" : "forward"} size={16} />
+                  <Icon name={catOpen ? "expand" : "forward"} size={16} />
+                </span>
+                <span className="text-kit-slate-11">
+                  <Icon name={CATEGORY_ICON[g.category] ?? "goods"} size={16} />
                 </span>
                 <span className="text-body font-medium text-kit-slate-12 truncate">
-                  {p.label}
+                  {categoryLabel(g.category)}
                 </span>
                 {/* The big fact. The full sentence rides the hover. */}
                 <span
                   className="ml-auto text-body font-semibold text-kit-slate-12 tabular-nums"
-                  title={purchaseOrderCount(p.poCount)}
+                  title={purchaseOrderCount(g.poCount)}
                 >
-                  {p.poCount}
+                  {g.poCount}
                 </span>
                 <span className="text-meta text-kit-slate-11 whitespace-nowrap tabular-nums">
-                  · {p.orderBy ? fmtDate(p.orderBy) : W.noDeliveryDate}
+                  · {g.earliest ? fmtDate(g.earliest) : W.noDeliveryDate}
                 </span>
               </button>
-              {open
-                ? docs.map((d, i) => (
-                    <DocRow
-                      key={d.key}
-                      doc={d}
-                      index={i + 1}
-                      on={p.key === currentKey && d.key === currentDocKey}
-                      dimmed={p.key === currentKey && !d.include}
-                      onPick={() => onPickDoc(p.key, d.key)}
-                      testId={`to-order-doc-${p.key}-${d.key}`}
-                    />
-                  ))
+
+              {/* ── Level 2 · the suppliers of this category ───────────── */}
+              {catOpen
+                ? g.proposals.map((p) => {
+                    const open = expanded.has(p.key);
+                    const docs = railDocs.get(p.key) ?? [];
+                    return (
+                      <div key={p.key}>
+                        <button
+                          type="button"
+                          onClick={() => onToggle(p.key)}
+                          data-testid={`to-order-proposal-${p.key}`}
+                          aria-expanded={open}
+                          className="flex w-full items-center gap-2 text-left rounded-control pl-4 pr-2 py-1.5 mb-px hover:bg-kit-blue-3"
+                        >
+                          <span className="text-kit-slate-11">
+                            <Icon name={open ? "expand" : "forward"} size={16} />
+                          </span>
+                          {/* The category said what the goods are — the row
+                              does not repeat it. */}
+                          <span className="text-body text-kit-slate-12 truncate">
+                            {p.supplierName}
+                          </span>
+                          <span
+                            className="ml-auto text-body font-semibold text-kit-slate-12 tabular-nums"
+                            title={purchaseOrderCount(p.poCount)}
+                          >
+                            {p.poCount}
+                          </span>
+                          <span className="text-meta text-kit-slate-11 whitespace-nowrap tabular-nums">
+                            · {p.orderBy ? fmtDate(p.orderBy) : W.noDeliveryDate}
+                          </span>
+                        </button>
+
+                        {/* ── Level 3 · the purchase orders ────────────── */}
+                        {open
+                          ? docs.map((d, i) => (
+                              <DocRow
+                                key={d.key}
+                                doc={d}
+                                index={i + 1}
+                                on={p.key === currentKey && d.key === currentDocKey}
+                                dimmed={p.key === currentKey && !d.include}
+                                onPick={() => onPickDoc(p.key, d.key)}
+                                testId={`to-order-doc-${p.key}-${d.key}`}
+                              />
+                            ))
+                          : null}
+                      </div>
+                    );
+                  })
                 : null}
             </div>
           );

@@ -84,8 +84,10 @@ describe("closed sets", () => {
     expect(true).toBe(true);
   });
 
-  it("carries §5.3's 40 meanings and renders the mapped glyph", () => {
-    expect(ICON_NAMES).toHaveLength(40);
+  it("carries §5.3's 40 meanings + the 3 categories, and renders the mapped glyph", () => {
+    // 40 = §5.3 verbatim; +3 = mattress · bedframe · sofa, added by Loo
+    // 2026-07-31 for the To Order rail's category level.
+    expect(ICON_NAMES).toHaveLength(43);
     // one meaning, one glyph — `ready` and `confirm` deliberately share Check
     render(
       <>
