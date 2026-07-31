@@ -163,20 +163,24 @@ beforeEach(() => {
   );
 });
 
-/** Expand Bedframe down to its PO rows: category first, then the supplier. */
-async function openBedframe() {
-  fireEvent.click(screen.getByTestId("to-order-category-bedframe"));
-  fireEvent.click(await screen.findByTestId(`to-order-proposal-${OHANA}::bedframe`));
-  return screen.findByTestId(`to-order-doc-${OHANA}::bedframe-d1`);
+/**
+ * Open the Sofa category — the fixture has no mattress, so bedframe leads the
+ * walking order and starts OPEN; sofa is the closed one to exercise.
+ */
+async function openSofa() {
+  fireEvent.click(screen.getByTestId("to-order-category-sofa"));
+  return screen.findByTestId(`to-order-doc-${OHANA}::sofa-d1`);
 }
 
 describe("the queue", () => {
-  it("is scanned for counts: the rail totals, and each level leads with its number", async () => {
+  it("each rail level carries its NAME and nothing extra — one number, on the supplier", async () => {
     render(wrap());
-    // Level 1 — the categories, most urgent first, each with its icon.
+    // Level 1 — icon + word ONLY: no count, no date (Loo, 2026-07-31 — a
+    // second number on a title is what made the rail unreadable).
     const sofaCat = await screen.findByTestId("to-order-category-sofa");
     expect(sofaCat).toHaveTextContent("Sofa");
-    expect(sofaCat).toHaveTextContent(`· ${fmtDate("2026-07-15")}`);
+    expect(sofaCat).not.toHaveTextContent(fmtDate("2026-07-15"));
+    expect(sofaCat).not.toHaveTextContent("3");
     expect(sofaCat.querySelector('[data-icon="sofa"]')).toBeInTheDocument();
     expect(
       screen
@@ -184,86 +188,108 @@ describe("the queue", () => {
         .querySelector('[data-icon="bedframe"]'),
     ).toBeInTheDocument();
 
-    // Level 2 — the supplier does NOT repeat what the category already said.
-    const sofa = screen.getByTestId(`to-order-proposal-${OHANA}::sofa`);
-    expect(sofa).toHaveTextContent("Ohana");
-    expect(sofa).not.toHaveTextContent("Ohana · Sofa");
+    // Level 2 — the supplier's NAME and nothing else (Loo, 2026-07-31: the
+    // `N proposals` word came off too; the rail's only number is the total).
+    const bed = screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`);
+    expect(bed).toHaveTextContent("Ohana");
+    expect(bed).not.toHaveTextContent("Ohana · Bedframe");
+    expect(bed).not.toHaveTextContent("proposal");
+    expect(bed).not.toHaveTextContent(fmtDate("2026-07-21"));
 
-    // The big fact is the bare count; the full sentence rides the hover.
-    expect(screen.getAllByTitle("3 Purchase Orders").length).toBeGreaterThan(0);
     expect(screen.getByText(W.readyToIssue)).toBeInTheDocument();
     expect(screen.getByTestId("to-order-queue-total")).toHaveTextContent("4");
+
+    // Loo's fixed walking order (2026-07-31): mattress → bedframe → sofa —
+    // NOT urgency order (sofa is the more urgent group in this fixture).
+    expect(
+      // eslint-disable-next-line no-bitwise
+      screen
+        .getByTestId("to-order-category-bedframe")
+        .compareDocumentPosition(sofaCat) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
-  it("opens the most urgent path by itself and keeps its PO rows small doors", async () => {
+  it("opens the FIRST category of the walking order by itself, cards visible at once", async () => {
     render(wrap());
-    const d1 = await screen.findByTestId(`to-order-doc-${OHANA}::sofa-d1`);
+    // Bedframe leads (no mattress in the fixture) — its card is on screen
+    // with no click, titled by its count, second line reading the SOs out.
+    const card = await screen.findByTestId(`to-order-doc-${OHANA}::bedframe-d1`);
+    expect(card).toHaveTextContent("2 orders");
+    expect(card).toHaveTextContent("SO-1300 · SO-1301");
 
-    // Sofa: one document per customer order, in the grid's own row order.
-    expect(d1).toHaveTextContent("PO 1");
-    expect(d1).toHaveTextContent("ella");
-    const d2 = screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`);
-    expect(d2).toHaveTextContent("PETER");
-    expect(d2).toHaveTextContent("2 items");
-    // The collapsed category shows neither its supplier nor its documents.
-    expect(screen.queryByTestId(`to-order-proposal-${OHANA}::bedframe`)).toBeNull();
-    expect(screen.queryByTestId(`to-order-doc-${OHANA}::bedframe-d1`)).toBeNull();
+    // The later category starts closed: no supplier, no cards.
+    expect(screen.queryByTestId(`to-order-proposal-${OHANA}::sofa`)).toBeNull();
+    expect(screen.queryByTestId(`to-order-doc-${OHANA}::sofa-d1`)).toBeNull();
   });
 
-  it("expanding is not a selection at either level — the workspace does not move", async () => {
+  it("a sofa card is its SO number, nothing else", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-workspace");
+    const d1 = await openSofa();
+
+    // This page controls ORDERS, not customers (Loo, 2026-07-31): the card's
+    // title is the SO number — no customer name, no `PO n`, no items count.
+    expect(d1).toHaveTextContent("SO-1204");
+    expect(d1).not.toHaveTextContent("ella");
+    expect(d1).not.toHaveTextContent("PO 1");
+    const d2 = screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`);
+    expect(d2).toHaveTextContent("SO-1207");
+    expect(d2).not.toHaveTextContent("items");
+  });
+
+  it("opening a category is not a selection — the workspace does not move", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
 
-    // Level 1 open shows the supplier, not the documents.
-    fireEvent.click(screen.getByTestId("to-order-category-bedframe"));
+    // Opening shows the supplier section and ALL its cards at once — the
+    // category is the rail's only fold (Loo, 2026-07-31).
+    await openSofa();
     expect(
-      await screen.findByTestId(`to-order-proposal-${OHANA}::bedframe`),
+      screen.getByTestId(`to-order-proposal-${OHANA}::sofa`),
     ).toHaveTextContent("Ohana");
-    expect(screen.queryByTestId(`to-order-doc-${OHANA}::bedframe-d1`)).toBeNull();
-
-    // Level 2 open shows the documents…
-    fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
-    expect(
-      await screen.findByTestId(`to-order-doc-${OHANA}::bedframe-d1`),
-    ).toHaveTextContent("2 orders");
-    // …and the pane still shows the sofa document it showed before.
-    expect(screen.getByTestId("to-order-workspace")).toHaveTextContent("Ohana · Sofa");
+    // …and the pane still shows the bedframe document it showed before.
+    expect(screen.getByTestId("to-order-workspace")).toHaveTextContent(
+      "Ohana · Bedframe",
+    );
 
     // Toggling the category shut hides the whole branch again.
-    fireEvent.click(screen.getByTestId("to-order-category-bedframe"));
-    expect(screen.queryByTestId(`to-order-proposal-${OHANA}::bedframe`)).toBeNull();
+    fireEvent.click(screen.getByTestId("to-order-category-sofa"));
+    expect(screen.queryByTestId(`to-order-proposal-${OHANA}::sofa`)).toBeNull();
   });
 
-  it("picking a PO row of another supplier switches the pane to exactly that document", async () => {
+  it("picking a card of another supplier switches the pane to exactly that document", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
-
-    fireEvent.click(await openBedframe());
     expect(screen.getByTestId("to-order-workspace")).toHaveTextContent("PO 1 of 1");
 
-    // Back across, to a NON-first document — the pane must land on PO 2, not
-    // fall back to PO 1 (the reset-effect regression this pins).
+    // Across to a NON-first document — the pane must land on PO 2, not fall
+    // back to PO 1 (the reset-effect regression this pins).
+    await openSofa();
     fireEvent.click(screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`));
     const bar = screen.getByTestId("to-order-workspace");
     expect(bar).toHaveTextContent("PO 2 of 3");
     expect(bar).toHaveTextContent("PETER");
+
+    // And back to the consolidated one.
+    fireEvent.click(screen.getByTestId(`to-order-doc-${OHANA}::bedframe-d1`));
+    expect(screen.getByTestId("to-order-workspace")).toHaveTextContent("PO 1 of 1");
   });
 });
 
 describe("the workspace", () => {
-  it("fills the pane with the first document and names it", async () => {
+  it("fills the pane with the walking order's first document and names it", async () => {
     render(wrap());
     const bar = await screen.findByTestId("to-order-workspace");
-    expect(bar).toHaveTextContent("PO 1 of 3");
-    expect(bar).toHaveTextContent("ella");
-    expect(bar).toHaveTextContent("SO-1204");
+    // Bedframe leads the walking order in this fixture — one consolidated
+    // document, so no single customer and no single SO on the bar.
+    expect(bar).toHaveTextContent("PO 1 of 1");
     // The header is ONE row of facts (Loo's frozen draft): supplier ·
     // category ···· Order by · production days · Destination.
     const header = screen.getByTestId("to-order-header");
-    expect(header).toHaveTextContent("Ohana · Sofa");
-    expect(header).toHaveTextContent(`Order by ${fmtDate("2026-07-15")}`);
+    expect(header).toHaveTextContent("Ohana · Bedframe");
+    expect(header).toHaveTextContent(`Order by ${fmtDate("2026-07-21")}`);
     expect(screen.getByTestId("to-order-production-days")).toHaveTextContent(
-      "14 working days",
+      "7 working days",
     );
     expect(within(header).getByTestId("to-order-destination")).toHaveTextContent(
       "Carres Klang",
@@ -278,7 +304,7 @@ describe("the workspace", () => {
     const action = screen.getByTestId("to-order-action");
     expect(within(action).queryByText(W.destination)).toBeNull();
     expect(within(action).getByTestId("to-order-count")).toHaveTextContent(
-      "3 Purchase Orders",
+      "1 Purchase Order",
     );
   });
 
@@ -308,8 +334,7 @@ describe("the workspace", () => {
   it("shows Size and Qty — the two facts the table exists to stop hiding", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
-    fireEvent.click(await openBedframe());
-
+    // Bedframe is the default document — its items are already on the pane.
     const items = await screen.findByTestId("to-order-items");
     expect(within(items).getByText("Queen")).toBeInTheDocument();
     expect(within(items).getByText("3")).toBeInTheDocument();
@@ -319,6 +344,7 @@ describe("the workspace", () => {
   it("tells identical siblings apart with an earned ordinal, and a sofa's Size is a dash", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
+    await openSofa();
     fireEvent.click(screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`));
 
     const items = await screen.findByTestId("to-order-items");
@@ -331,6 +357,7 @@ describe("the workspace", () => {
   it("leaving a document out of this issue drops the count and says what it means", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
+    fireEvent.click(await openSofa());
     expect(screen.getByTestId("to-order-count")).toHaveTextContent("3 Purchase Orders");
 
     fireEvent.click(includeBox());
@@ -341,6 +368,7 @@ describe("the workspace", () => {
   it("refuses an issue with nothing selected, in the operator's words", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
+    await openSofa();
 
     for (const k of ["d1", "d2", "d3"]) {
       fireEvent.click(screen.getByTestId(`to-order-doc-${OHANA}::sofa-${k}`));
@@ -357,6 +385,7 @@ describe("the row menu", () => {
   it("a sofa document can never split and never merge", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
+    fireEvent.click(await openSofa());
     await openMenu("bk-e");
 
     // Three documents exist beside this one, and still no Move: a sofa
@@ -371,8 +400,7 @@ describe("the row menu", () => {
   it("Move only exists after a split has made somewhere to move to", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
-    fireEvent.click(await openBedframe());
-
+    // Bedframe is the default document — its menu is directly reachable.
     await openMenu("l1");
     expect(screen.queryByText(/^Move to /)).toBeNull();
     fireEvent.click(screen.getByText(W.itemsSplit));
@@ -387,6 +415,7 @@ describe("the row menu", () => {
   it("a removed item is not lost — it waits outside and can be put back", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
+    await openSofa();
     fireEvent.click(screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`));
 
     await openMenu("bk-b");
@@ -404,6 +433,7 @@ describe("the row menu", () => {
   it("Open Customer Order leaves for the order, and says which document it is", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
+    fireEvent.click(await openSofa());
     await openMenu("bk-e");
     fireEvent.click(screen.getByText(W.itemsOpenOrder));
     expect(navigate).toHaveBeenCalledWith("/operation/orders?order=o2");
