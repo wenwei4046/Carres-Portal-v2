@@ -1,8 +1,34 @@
-# CARRES UI-KIT
+# CARRES UI-KIT — ⛔ SUPERSEDED 2026-07-31
 
-> **The ONE UI law. Read it before changing anything under `apps/web`.**
-> Rewritten 2026-07-27 (D0). This file OVERWRITES every earlier design text.
-> If any other doc, skill, checkpoint or old chat disagrees — **this file wins.**
+> **This file is NO LONGER the law. The Design System is:**
+>
+> · [`01-design-tokens.md`](01-design-tokens.md) — the visual rules
+> · [`02-components.md`](02-components.md) — the components
+> · [`03-page-patterns.md`](03-page-patterns.md) — the page shapes and Carres examples
+>
+> **Why this file is still here.** It is 2,020 lines and ten live pages are
+> built on it: `scripts/check-design-standard.mjs` reports 8,504 findings keyed
+> to its § numbers, `components/kit/tokens.ts` mirrors §2 · §3 · §4 · §5, and
+> `Icon` implements §5.3's forty meanings. Deleting it in one commit would
+> delete live law for every page not yet rebuilt.
+>
+> **It is being migrated the same way the pages are — one section at a time,
+> and it is DELETED when the ledger below is empty.** Nothing new may be added
+> to it. When a section moves, its text is REMOVED from here, never left in
+> both places.
+
+## Migration ledger
+
+| Section | Moved to | State |
+|---|---|---|
+| §2 Typography · §3 Colour · §4 Spacing/Radius/Border · §5 Icons | `01` | ✅ moved 2026-07-31 |
+| §6 Box Dictionary — `DataTable` · `DropdownMenu` · `Icon` · `Button` | `02` | ✅ moved 2026-07-31 |
+| §6 — the other 20 built components | `02` | ⏳ as each is proven by a real page |
+| §0 Governance · §1 Decision process · §1.4 Information hierarchy | `01` §0 partly; the rest ⏳ | 🔶 partial |
+| §1.3 Height budget · §7 Tables · §8 Page bands | `03` | ⏳ |
+| §16 Coverage number | — | ⏳ decide whether it survives |
+
+**Everything below this line is still in force for anything not yet migrated.**
 
 ---
 

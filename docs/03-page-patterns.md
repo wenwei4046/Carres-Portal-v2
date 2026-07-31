@@ -1,0 +1,166 @@
+# 03 · PAGE PATTERNS
+
+> **Status: FROZEN.** Standard page layouts for the whole Carres Portal.
+>
+> Business modules REUSE these patterns and never invent their own page layout.
+> A module's shape is recorded here as a **Carres Example** under the pattern it
+> uses — an example is not a new standard, and a module never gets its own
+> standards document (Loo, 2026-07-31: *"我们现在最大的目标是减少文件"*).
+
+Page patterns use `01-design-tokens.md` and `02-components.md` only. They never
+define typography, colour, spacing or component styles.
+
+**One purpose per page. One primary action. Business logic belongs to modules,
+never to a pattern.**
+
+---
+
+## Pattern standard
+
+**Purpose · When to use · When NOT to use · Information Hierarchy · Layout ·
+Regions · Primary action · Secondary actions · Responsive · Do · Don't ·
+Carres Examples**
+
+---
+
+# Dashboard
+
+**Purpose.** Monitor overall status.
+
+**Information Hierarchy.** 1 Current Actions · 2 KPIs · 3 Issues · 4 Recent Activity
+
+**Regions.** Header · KPI area · Action queue · Issues · Activity
+
+---
+
+# Queue
+
+**Purpose.** Process multiple work items.
+
+**Information Hierarchy.** 1 Current work · 2 Priority · 3 Status · 4 Assignee
+
+**Regions.** Filters · Queue list · Detail panel · Bulk actions
+
+---
+
+# List
+
+**Purpose.** Browse and manage records.
+
+**Information Hierarchy.** 1 Records · 2 Filters · 3 Sorting · 4 Pagination
+
+**Regions.** Toolbar · Filters · Table · Pagination
+
+---
+
+# Detail
+
+**Purpose.** View one record.
+
+**Information Hierarchy.** 1 Identity · 2 Current status · 3 Current action ·
+4 Details · 5 History
+
+**Regions.** Header · Summary · Detail sections · Activity timeline
+
+### Carres Examples
+
+**Order Detail** — the Golden Template. Six questions in the order a human asks
+them, and the System Model is re-fitted to serve it, never the reverse.
+Detail in `docs/ORDER-DETAIL-INFORMATION-MODEL.md`.
+
+---
+
+# Review
+
+**Purpose.** Verify information before committing it.
+
+**When to use.** The operator's job is to CHECK, then commit — not to fill in.
+Roughly 80% of the time on the page is reading.
+
+**When NOT to use.** Creating a record (that is Create) or browsing many
+records without committing anything (that is List).
+
+**Information Hierarchy.** 1 Summary · 2 Review items · 3 Validation · 4 Confirmation
+
+**Regions.** Summary · Review items · Validation · Actions
+
+**Primary action.** One, at the end, that commits. It carries the count of what
+it is about to do.
+
+**Do.** Give the review items the largest region — they are what is being
+reviewed.
+**Don't.** Put the commit parameters far from the commit, or the identity far
+from the irreversible button.
+
+### Carres Examples
+
+**Purchase Orders → To Order** *(frozen 2026-07-31, building section by section)*
+
+```
+Header                    supplier · destination · dates      collapsed by default
+Supplier Communication    channels · WhatsApp + Email drafts   collapsed by default
+Items                     the review itself                    the largest region
+Notes to Supplier
+Issue Purchase Order      the one primary action
+```
+
+Order is deliberate: **who am I sending to → can I reach them → what am I
+sending.** Communication sits ABOVE Items and collapsed, because the real
+sequence is review-then-send, and a section at the bottom of a long table is a
+section that gets missed.
+
+Section status:
+
+| Section | State |
+|---|---|
+| Items | ✅ built 2026-07-31 — `DataTable`, Ref · Item · Size · Qty · `⋯` |
+| Items section header | next |
+| Header | blocked — `suppliers` has no address / tel / attn |
+| Supplier Communication | blocked — no `po_sends` table |
+| Notes to Supplier | blocked — no ruled word |
+| Issue | already live |
+
+Frozen rules this example depends on, owned by Business not by this file:
+one purchase order has exactly one fulfilment destination · a sofa purchase
+order carries one customer order and never merges · Communication is an EVENT,
+never a status · there is no `Sent` state, because the portal cannot observe
+WhatsApp.
+
+**Receiving** · **Claims** — not yet designed. When they are, their shape is
+recorded here, under the pattern they use.
+
+---
+
+# Create
+
+**Purpose.** Create a new record.
+
+**Information Hierarchy.** 1 Required · 2 Optional · 3 Review · 4 Submit
+
+**Regions.** Form · Context panel · Actions
+
+---
+
+# Edit
+
+**Purpose.** Modify an existing record.
+
+**Information Hierarchy.** 1 Current information · 2 Editable fields · 3 Save
+
+**Regions.** Form · History · Actions
+
+---
+
+# Settings
+
+**Purpose.** Configure system behaviour.
+
+**Information Hierarchy.** 1 Categories · 2 Settings · 3 Description · 4 Save
+
+**Regions.** Navigation · Settings panel · Actions
+
+### Carres Examples
+
+**Purchasing → Settings** — production working days, supplier work week,
+order-by buffer. A supplier × category with no number reads `Set a number` and
+is never defaulted.
