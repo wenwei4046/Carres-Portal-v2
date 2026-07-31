@@ -7,6 +7,7 @@ import {
   issuedHeadline,
   purchaseOrderCount,
   sortToOrderRows,
+  unresolvedHeadline,
   type ToOrderProposal,
   type ToOrderRow,
   type ToOrderSortKey,
@@ -58,10 +59,18 @@ interface Destination {
   isDefault: boolean;
 }
 
+interface Unresolved {
+  sku: string;
+  orderId: string;
+  so: number | null;
+}
+
 interface ToOrderResponse {
   today: string;
   proposals: ToOrderProposal[];
   destinations: Destination[];
+  /** Demand the catalog could not answer for. Empty is the only healthy value. */
+  unresolved?: Unresolved[];
 }
 
 interface IssueResponse {
@@ -84,6 +93,7 @@ export default function OperationPurchase() {
 
   const proposals = useMemo(() => q.data?.proposals ?? [], [q.data]);
   const destinations = useMemo(() => q.data?.destinations ?? [], [q.data]);
+  const unresolved = useMemo(() => q.data?.unresolved ?? [], [q.data]);
 
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [destId, setDestId] = useState<string | null>(null);
@@ -177,6 +187,7 @@ export default function OperationPurchase() {
               />
               <StickyAction
                 proposal={current}
+                unresolved={unresolved}
                 destinations={destinations}
                 destId={destId}
                 onDest={setDestId}
@@ -413,6 +424,7 @@ function RowPair({
 
 function StickyAction({
   proposal,
+  unresolved,
   destinations,
   destId,
   onDest,
@@ -421,6 +433,7 @@ function StickyAction({
   onIssue,
 }: {
   proposal: ToOrderProposal;
+  unresolved: Unresolved[];
   destinations: Destination[];
   destId: string | null;
   onDest: (id: string) => void;
@@ -429,13 +442,30 @@ function StickyAction({
   onIssue: () => void;
 }) {
   const blocked = proposal.blocked === "production_days";
+  // A requirement the catalog could not answer for belongs to nobody in
+  // particular — so it stops EVERY issue, not just this supplier's. Refusing at
+  // the button beats refusing after the click.
+  const unread = unresolved.length > 0;
 
   return (
     <div
       className="shrink-0 mt-2.5 bg-white border border-base-200 rounded-[8px] px-3.5 py-2"
       data-testid="to-order-action"
     >
-      {blocked ? (
+      {unread ? (
+        <div className="mb-1.5" data-testid="to-order-unresolved">
+          <div className="text-body font-semibold text-base-900">
+            {unresolvedHeadline(unresolved.length)}
+          </div>
+          <div className="text-meta text-base-600">{W.unresolvedHelp}</div>
+          <div className="text-meta text-base-600">
+            {unresolved
+              .slice(0, 6)
+              .map((u) => `${u.so != null ? `SO-${u.so}` : "—"} · ${u.sku}`)
+              .join("  ·  ")}
+          </div>
+        </div>
+      ) : blocked ? (
         <div className="mb-1.5">
           <div className="text-body font-semibold text-base-900">{W.productionDaysRequired}</div>
           <div className="text-meta text-base-600">{W.productionDaysHelp}</div>
@@ -473,7 +503,7 @@ function StickyAction({
         <button
           type="button"
           onClick={onIssue}
-          disabled={blocked || pending || !destId}
+          disabled={blocked || unread || pending || !destId}
           data-testid="to-order-issue"
           className="h-8 px-3.5 rounded-[6px] bg-kit-blue-9 text-white text-body font-medium disabled:opacity-40 disabled:cursor-not-allowed"
         >

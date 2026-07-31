@@ -70,6 +70,12 @@ export const TO_ORDER_WORDS = {
   productionDaysRequired: "Production Days Required",
   productionDaysHelp: "Set production days in Settings.",
 
+  // The 2026-07-30 regression, given a voice. A requirement the catalog could
+  // not answer for used to be skipped in silence; it now stops the button and
+  // names itself, because a purchase order that quietly omits a customer's
+  // goods is worse than one that was never raised.
+  unresolvedHelp: "Nothing can be issued until every item resolves.",
+
   nextStep: "Next: confirm the ready date in Purchase Orders",
   openPurchaseOrders: "Open Purchase Orders",
 
@@ -79,6 +85,11 @@ export const TO_ORDER_WORDS = {
 /** `1 Purchase Order` / `7 Purchase Orders` — the sidebar and the button. */
 export function purchaseOrderCount(n: number): string {
   return `${n} Purchase Order${n === 1 ? "" : "s"}`;
+}
+
+/** `3 items could not be read` — the count is the point, so it leads. */
+export function unresolvedHeadline(n: number): string {
+  return `${n} item${n === 1 ? "" : "s"} could not be read`;
 }
 
 /** `{N} purchase orders issued to {supplier}` — the success line. */

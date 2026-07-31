@@ -40,6 +40,29 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * Split an `.in(…)` list into small batches.
+ *
+ * On 2026-07-30 seven customer requirements across five customer orders reached
+ * no purchase order at all, and two whole customer orders disappeared from the
+ * workspace. The projection was proved correct on the same data, every SKU
+ * existed with the same supplier, the same category and the same production
+ * time as the ones that DID get ordered, none was excluded and none was covered
+ * — so the loss happened in the catalog read, and a `.in()` of 78 values with
+ * quoted parentheses is the one thing between the demand and the plan.
+ *
+ * Chunking removes the whole class rather than one instance. The guard below
+ * removes the rest: even if a read still comes back short, the demand is now
+ * NAMED instead of skipped.
+ */
+const IN_CHUNK = 40;
+
+function chunk<T>(xs: readonly T[], n = IN_CHUNK): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < xs.length; i += n) out.push(xs.slice(i, i + n));
+  return out;
+}
+
 /** `attrs` is jsonb; read one string field defensively. */
 function attr(attrs: unknown, key: string): string | null {
   if (!attrs || typeof attrs !== "object") return null;
@@ -47,9 +70,13 @@ function attr(attrs: unknown, key: string): string | null {
   return typeof v === "string" && v.length > 0 ? v : null;
 }
 
+type Unresolved = { sku: string; orderId: string; so: number | null };
+
 type Loaded = {
   proposals: ToOrderProposal[];
   today: string;
+  /** Demand the catalog could not answer for. Empty is the only healthy value. */
+  unresolved: Unresolved[];
 };
 
 /**
@@ -90,18 +117,21 @@ async function loadToOrder(
   const orderIds = orders.map((o) => o.id as string);
 
   if (orderIds.length === 0) {
-    return { ok: true, data: { proposals: [], today: todayIso() } };
+    return { ok: true, data: { proposals: [], today: todayIso(), unresolved: [] } };
   }
 
-  const { data: lineRows, error: lineErr } = await sb
-    .from("order_lines")
-    .select("id, order_id, sku, qty, attrs, excluded_from_plan, exclude_from_plan_until")
-    .in("order_id", orderIds);
-  if (lineErr) {
-    const m = mapPgError(lineErr);
-    return { ok: false, status: m.status, body: m.body };
+  const lines: Record<string, unknown>[] = [];
+  for (const batch of chunk(orderIds)) {
+    const { data, error } = await sb
+      .from("order_lines")
+      .select("id, order_id, sku, qty, attrs, excluded_from_plan, exclude_from_plan_until")
+      .in("order_id", batch);
+    if (error) {
+      const m = mapPgError(error);
+      return { ok: false, status: m.status, body: m.body };
+    }
+    lines.push(...((data ?? []) as Record<string, unknown>[]));
   }
-  const lines = lineRows ?? [];
   const skus = [...new Set(lines.map((l) => l.sku as string))];
 
   // Catalog facts. No FK exists on order_lines.sku, so this is a second query
@@ -116,16 +146,20 @@ async function loadToOrder(
       modelName: string | null;
     }
   >();
-  if (skus.length > 0) {
-    const { data: skuRows, error: skuErr } = await sb
+  const skuRows: Record<string, unknown>[] = [];
+  for (const batch of chunk(skus)) {
+    const { data, error } = await sb
       .from("product_skus")
       .select("sku, supplier_id, cost, variant, product_models!inner(category, name)")
-      .in("sku", skus);
-    if (skuErr) {
-      const m = mapPgError(skuErr);
+      .in("sku", batch);
+    if (error) {
+      const m = mapPgError(error);
       return { ok: false, status: m.status, body: m.body };
     }
-    for (const s of skuRows ?? []) {
+    skuRows.push(...((data ?? []) as Record<string, unknown>[]));
+  }
+  {
+    for (const s of skuRows) {
       const pm = (s as Record<string, unknown>).product_models as
         | { category?: string | null; name?: string | null }
         | null;
@@ -148,17 +182,49 @@ async function loadToOrder(
   const demand: ToOrderLine[] = [];
   const missingProductionDays: { supplierId: string; category: string }[] = [];
   const seenMissing = new Set<string>();
+  /** Demand the catalog could not answer for. Never dropped in silence. */
+  const unresolved: { sku: string; orderId: string; so: number | null }[] = [];
 
   for (const l of lines) {
     const c = cat.get(l.sku as string);
-    const category = c?.category;
-    const supplierId = c?.supplierId ?? null;
+
+    // ⚠ THE LINE THE CATALOG DID NOT ANSWER FOR.
+    //
+    // Not the same as "this SKU is an accessory". A SKU the read did not return
+    // AT ALL is a requirement nobody has judged, and skipping it is how seven of
+    // them reached no purchase order on 2026-07-30 while the documents that were
+    // issued looked complete. It is recorded by name, and it stops `Issue`
+    // dead — a short purchase order is worse than none, because nothing
+    // downstream will ever say the goods are missing.
+    if (!c) {
+      unresolved.push({
+        sku: l.sku as string,
+        orderId: l.order_id as string,
+        so: (orderById.get(l.order_id as string)?.so as number | null) ?? null,
+      });
+      continue;
+    }
+
+    const category = c.category;
+    const supplierId = c.supplierId ?? null;
 
     // POSITIVE rule: only the three made-to-order categories reach this page.
     // Accessories are replenished against a reorder point; a guarantee or a
     // service is not goods. Filtering on the category rather than on "the SKU
     // happens to have no supplier" is what stops a pillow appearing here the
     // day somebody maps one.
+    //
+    // A SKU that resolved but carries no supplier is NOT silent either — it is
+    // a real procurable item nobody has mapped, and the information model
+    // (§6.3) forbids it disappearing.
+    if (category && isToOrderCategory(category) && !supplierId) {
+      unresolved.push({
+        sku: l.sku as string,
+        orderId: l.order_id as string,
+        so: (orderById.get(l.order_id as string)?.so as number | null) ?? null,
+      });
+      continue;
+    }
     if (!category || !isToOrderCategory(category) || !supplierId) continue;
 
     if ((l as { excluded_from_plan?: boolean }).excluded_from_plan === true) continue;
@@ -252,7 +318,7 @@ async function loadToOrder(
     missingProductionDays,
   });
 
-  return { ok: true, data: { proposals, today } };
+  return { ok: true, data: { proposals, today, unresolved } };
 }
 
 toOrderRouter.get("/", requireOperation, async (c) => {
@@ -275,6 +341,7 @@ toOrderRouter.get("/", requireOperation, async (c) => {
   return c.json({
     today: res.data.today,
     proposals: res.data.proposals,
+    unresolved: res.data.unresolved,
     destinations: (destRows ?? []).map((d) => ({
       id: d.id as string,
       name: d.name as string,
@@ -308,6 +375,23 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
   // the server's own reading, so a stale tab cannot order last hour's demand.
   const res = await loadToOrder(sb);
   if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
+
+  // A requirement the catalog could not answer for could belong to ANY supplier
+  // — nothing about it is known, including whose it is. So it stops every
+  // issue, not just this supplier's: a purchase order that quietly omits a
+  // customer's goods is worse than one that was never raised, because from that
+  // point on nothing downstream is looking for them.
+  if (res.data.unresolved.length > 0) {
+    return c.json(
+      {
+        error: "demand_unresolved",
+        code: "demand_unresolved",
+        message: `${res.data.unresolved.length} customer requirement(s) could not be read from the catalog. Nothing was issued.`,
+        unresolved: res.data.unresolved,
+      },
+      409,
+    );
+  }
 
   const proposal = res.data.proposals.find(
     (p) => p.supplierId === supplierId && p.category === category,

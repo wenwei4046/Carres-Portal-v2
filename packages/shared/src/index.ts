@@ -1787,6 +1787,7 @@ export {
   planPurchaseOrders,
   purchaseOrderCount,
   sortToOrderRows,
+  unresolvedHeadline,
   unitLabel,
   type BuildToOrderInput,
   type PoToCreate,
