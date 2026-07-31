@@ -1790,6 +1790,7 @@ export {
   pickSpecToken,
   planFromDocuments,
   planPurchaseOrders,
+  poIndexLabel,
   purchaseOrderCount,
   toOrderBuilds,
   validateIssuePlan,

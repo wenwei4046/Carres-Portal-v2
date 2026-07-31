@@ -6,6 +6,7 @@ import {
   nameBuild,
   pickSpecToken,
   planPurchaseOrders,
+  poIndexLabel,
   purchaseOrderCount,
   sortToOrderRows,
   type ToOrderLine,
@@ -148,6 +149,12 @@ describe("the purchase-order boundary", () => {
     const [sofa] = run([...PETER, ...ELLA, ...KEE_TONG]);
     expect(sofa.poCount).toBe(sofa.rows.length);
     expect(purchaseOrderCount(sofa.poCount)).toBe("3 Purchase Orders");
+  });
+
+  it("the workspace names which document it shows — `PO 1 of 3`", () => {
+    // Lived as a literal in the page's markup, twice; one word list now.
+    expect(poIndexLabel(1, 3)).toBe("PO 1 of 3");
+    expect(poIndexLabel(1, 1)).toBe("PO 1 of 1");
   });
 
   it("a non-sofa category merges every customer order into ONE document", () => {
