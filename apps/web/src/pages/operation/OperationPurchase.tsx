@@ -24,6 +24,7 @@ import {
   type PreviewDoc,
   type PreviewState,
 } from "./to-order-preview";
+import ItemsSection from "./purchase-order/ItemsSection";
 import PurchasingTabs from "./PurchasingTabs";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -217,6 +218,10 @@ export default function OperationPurchase() {
                 }
                 onSplit={(k) => setPlan((st) => (st ? splitOut(st, [k]) : st))}
                 onMove={(k, to) => setPlan((st) => (st ? moveBuild(st, k, to) : st))}
+                // The customer's order opens on the Orders page's own deep
+                // link. This page never renders an order — one record, one
+                // screen that owns it.
+                onOpenOrder={(orderId) => navigate(`/operation/orders?order=${orderId}`)}
               />
               <StickyAction
                 proposal={current}
@@ -327,6 +332,7 @@ function Preview({
   onRestore,
   onSplit,
   onMove,
+  onOpenOrder,
 }: {
   proposal: ToOrderProposal;
   docs: PreviewDoc[];
@@ -338,6 +344,7 @@ function Preview({
   onRestore: (buildKey: string) => void;
   onSplit: (buildKey: string) => void;
   onMove: (buildKey: string, toKey: string) => void;
+  onOpenOrder: (orderId: string) => void;
 }) {
   const rearrange = canRearrange(proposal);
 
@@ -357,6 +364,8 @@ function Preview({
             total={docs.length}
             others={docs.filter((x) => x.key !== d.key)}
             rearrange={rearrange}
+            category={proposal.category}
+            onOpenOrder={onOpenOrder}
             open={Boolean(open[d.key])}
             onToggleOpen={() => onToggleOpen(d.key)}
             onInclude={() => onInclude(d.key)}
@@ -399,24 +408,29 @@ function PoBlock({
   total,
   others,
   rearrange,
+  category,
   open,
   onToggleOpen,
   onInclude,
   onRemove,
   onSplit,
   onMove,
+  onOpenOrder,
 }: {
   doc: PreviewDoc;
   index: number;
   total: number;
   others: PreviewDoc[];
   rearrange: boolean;
+  /** Decides what one unit is called in the Items count. */
+  category: string;
   open: boolean;
   onToggleOpen: () => void;
   onInclude: () => void;
   onRemove: (buildKey: string) => void;
   onSplit: (buildKey: string) => void;
   onMove: (buildKey: string, toKey: string) => void;
+  onOpenOrder: (orderId: string) => void;
 }) {
   const customers = new Set(doc.builds.map((b) => b.customer));
   const who =
@@ -471,68 +485,16 @@ function PoBlock({
       ) : null}
 
       {open ? (
-        <div className="px-3.5 pb-2.5 pl-[46px]">
-          {doc.builds.map((b) => (
-            <div key={b.buildKey} className="py-1.5 border-t border-base-100 first:border-t-0">
-              <div className="flex items-baseline gap-2 text-meta font-semibold text-base-900">
-                <span className="truncate">
-                  {b.customer}
-                  {b.so != null ? ` · SO-${b.so}` : ""} · {b.title}
-                </span>
-                {/* Units, not lines. A line of 2 read exactly like a line of 1
-                    until this shipped — the proposal said 14 where the factory
-                    had 16 to build. */}
-                <span
-                  className="ml-auto shrink-0 tabular-nums"
-                  data-testid={`to-order-build-qty-${b.buildKey}`}
-                >
-                  × {b.qty}
-                </span>
-              </div>
-              <div className="flex items-baseline gap-3 flex-wrap mt-0.5">
-                <button
-                  type="button"
-                  onClick={() => onRemove(b.buildKey)}
-                  data-testid={`to-order-remove-${b.buildKey}`}
-                  className="text-meta text-base-900 underline underline-offset-2"
-                >
-                  {W.removeFromPo}
-                </button>
-                {rearrange ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onSplit(b.buildKey)}
-                      data-testid={`to-order-split-${b.buildKey}`}
-                      className="text-meta text-base-900 underline underline-offset-2"
-                    >
-                      {W.splitOut}
-                    </button>
-                    {others.length > 0 ? (
-                      <label className="text-meta text-base-600 flex items-center gap-1">
-                        {W.moveTo}
-                        <select
-                          value=""
-                          onChange={(e) => e.target.value && onMove(b.buildKey, e.target.value)}
-                          aria-label={W.moveTo}
-                          data-testid={`to-order-move-${b.buildKey}`}
-                          className="text-meta text-base-900 bg-transparent border-0 cursor-pointer"
-                        >
-                          <option value="">…</option>
-                          {others.map((o, i) => (
-                            <option key={o.key} value={o.key}>
-                              PO {i + 1}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
-                  </>
-                ) : null}
-              </div>
-            </div>
-          ))}
-        </div>
+        <ItemsSection
+          builds={doc.builds}
+          category={category}
+          canRearrange={rearrange}
+          moveTargets={others.map((o, i) => ({ key: o.key, label: `Purchase Order ${i + 1}` }))}
+          onRemove={onRemove}
+          onSplit={onSplit}
+          onMove={onMove}
+          onOpenOrder={onOpenOrder}
+        />
       ) : null}
     </div>
   );

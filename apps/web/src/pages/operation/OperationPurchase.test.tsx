@@ -34,9 +34,13 @@ const KLANG = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
 const AL = "818b420c-27f9-4707-a516-b91a6e03f343";
 
 function build(key: string, title: string, spec: string, codes: string, qty = 1, size: string | null = null) {
+  // `Sofa 2 — Booqit` is the shape the projection produces when two siblings
+  // of one customer order would otherwise read identically.
+  const parts = title.split(" — ");
   return {
     key, title, spec, codes, qty, size,
-    model: title.split(" — ").pop() ?? title,
+    model: parts.length > 1 ? parts[1] : title,
+    ordinal: parts.length > 1 ? Number(parts[0].split(" ")[1]) : null,
     lines: [{ lineId: `${key}-l1`, sku: codes, qty, cost: null }],
   };
 }
@@ -119,6 +123,19 @@ function route(path: string, body?: unknown) {
   return Promise.resolve({});
 }
 
+/**
+ * Open a row's ⋯ menu.
+ *
+ * By KEYBOARD, not by click: jsdom has no `PointerEvent`, so `fireEvent.click`
+ * dispatches an event Radix's trigger never sees and the menu silently never
+ * opens — the trap D0.5b hit and wrote down. Enter on the trigger is also the
+ * assertion a keyboard operator needs to pass anyway.
+ */
+async function openMenu(buildKey: string) {
+  fireEvent.keyDown(screen.getByTestId(`items-menu-${buildKey}`), { key: "Enter" });
+  await screen.findByRole("menu");
+}
+
 function wrap() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
@@ -177,10 +194,14 @@ describe("To Order — the Purchase Order Preview", () => {
   it("opens a document to its sofas", async () => {
     render(wrap());
     await screen.findByTestId("to-order-preview");
-    expect(screen.queryByText("Sofa 2 — Booqit")).toBeNull();
+    expect(screen.queryByTestId("po-items")).toBeNull();
 
     fireEvent.click(screen.getByTestId("to-order-po-toggle-d2"));
-    await screen.findByText(/Sofa 2 — Booqit/);
+    const items = await screen.findByTestId("po-items");
+    // PETER's order holds TWO sofa builds — the table is the unit an operator
+    // points at, so both are rows, not one summary line.
+    expect(items).toHaveTextContent("Sofa 1 — Booqit");
+    expect(items).toHaveTextContent("Sofa 2 — Booqit");
   });
 
   /**
@@ -196,19 +217,27 @@ describe("To Order — the Purchase Order Preview", () => {
     await waitFor(() => expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(1));
 
     fireEvent.click(screen.getByTestId("to-order-po-toggle-d1"));
-    const qty = await screen.findByTestId("to-order-build-qty-l1");
-    expect(qty.textContent?.replace(/\s+/g, " ").trim()).toBe("× 3");
-    // and the size the factory has to cut to travels with it
-    await screen.findByText(/Cody Queen/);
+    const items = await screen.findByTestId("po-items");
+    // Size and quantity are their OWN columns — neither is inside a sentence
+    // an operator has to parse.
+    expect(items).toHaveTextContent("Cody");
+    expect(items).toHaveTextContent("Queen");
+    expect(items).toHaveTextContent("3");
+    expect(screen.getByTestId("po-items-count")).toHaveTextContent("1 line · 3 bedframes");
   });
 
   it("has no Split or Move on sofa — a sofa PO carries one customer order", async () => {
     render(wrap());
     await screen.findByTestId("to-order-preview");
     fireEvent.click(screen.getByTestId("to-order-po-toggle-d2"));
-    await screen.findByText(/Sofa 2 — Booqit/);
-    expect(screen.queryByTestId(/^to-order-split-/)).toBeNull();
-    expect(screen.queryByTestId(/^to-order-move-/)).toBeNull();
+    await screen.findByTestId("po-items");
+
+    await openMenu("bk-b");
+    expect(screen.queryByText("Create Another Purchase Order")).toBeNull();
+    expect(screen.queryByText(/^Move to /)).toBeNull();
+    // and what a sofa row DOES offer is still there
+    expect(screen.getByText("Remove")).toBeInTheDocument();
+    expect(screen.getByText("Open Customer Order")).toBeInTheDocument();
   });
 
   it("leaving a document out changes the count and says it changes nothing else", async () => {
@@ -229,9 +258,10 @@ describe("To Order — the Purchase Order Preview", () => {
     render(wrap());
     await screen.findByTestId("to-order-preview");
     fireEvent.click(screen.getByTestId("to-order-po-toggle-d2"));
-    await screen.findByText(/Sofa 2 — Booqit/);
+    await screen.findByTestId("po-items");
 
-    fireEvent.click(screen.getByTestId("to-order-remove-bk-b"));
+    await openMenu("bk-b");
+    fireEvent.click(screen.getByText("Remove"));
     const removed = await screen.findByTestId("to-order-removed");
     expect(removed).toHaveTextContent("Not on any purchase order");
     expect(removed).toHaveTextContent("Still waiting to be ordered.");
@@ -242,8 +272,9 @@ describe("To Order — the Purchase Order Preview", () => {
     render(wrap());
     await screen.findByTestId("to-order-preview");
     fireEvent.click(screen.getByTestId("to-order-po-toggle-d2"));
-    await screen.findByText(/Sofa 2 — Booqit/);
-    fireEvent.click(screen.getByTestId("to-order-remove-bk-b"));
+    await screen.findByTestId("po-items");
+    await openMenu("bk-b");
+    fireEvent.click(screen.getByText("Remove"));
     await screen.findByTestId("to-order-removed");
 
     fireEvent.click(screen.getByTestId("to-order-putback-bk-b"));
@@ -269,8 +300,9 @@ describe("To Order — the Purchase Order Preview", () => {
     await waitFor(() => expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(1));
 
     fireEvent.click(screen.getByTestId("to-order-po-toggle-d1"));
-    await screen.findByTestId("to-order-split-l1");
-    fireEvent.click(screen.getByTestId("to-order-split-l1"));
+    await screen.findByTestId("po-items");
+    await openMenu("l1");
+    fireEvent.click(screen.getByText("Create Another Purchase Order"));
     // One build, split out of a one-build document, is still one document.
     await waitFor(() => expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(1));
   });

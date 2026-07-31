@@ -1,0 +1,206 @@
+/**
+ * Purchase Order · ITEMS — the first section of the rebuilt page, and the first
+ * business page in the portal to render through a Design System component.
+ *
+ * **Why this section first.** It is the one an operator spends the review in
+ * (Loo, 2026-07-31 — *"Operator 80% 的时间是在 Review PO,不是填写 PO"*), its
+ * business rules are already shipped and tested in `packages/shared`, and it
+ * needs no column that does not exist and no migration. Every other section of
+ * the page is blocked on one or the other.
+ *
+ * **Four Table decisions, all ruled rather than invented (Loo, 2026-07-31):**
+ * use the existing `DataTable` and do not rewrite it · rows 40px, with 48 and
+ * 56 kept in the tokens for elsewhere · the Orders header, unchanged · the
+ * empty and loading states `DataTable` already carries, replaced portal-wide
+ * later rather than forked here.
+ *
+ * **The row is a BUILD — one physical thing.** That is the unit an operator can
+ * point at (*that* sofa, not "line 3 of 5") and the unit `Remove`, `Create
+ * Another Purchase Order` and `Move` all act on.
+ *
+ * **Size and Qty are the two facts this table exists to stop hiding.** Live on
+ * 2026-07-31 the preview printed `B1201S` for a King and `B1201S` for a Queen,
+ * and showed 14 lines where Nice Future had 16 mattresses to build.
+ *
+ * This file spells no word of its own: every string is a caller-visible label
+ * ruled by Loo in the 2026-07-31 design freeze, and each is owed a
+ * COPY-STANDARD row.
+ */
+import DataTable, { type Column } from "@/components/kit/DataTable";
+import DropdownMenu, { type MenuItem } from "@/components/kit/DropdownMenu";
+import Button from "@/components/kit/Button";
+import Icon from "@/components/kit/Icon";
+import { unitLabel, type ToOrderBuildRef } from "@carres/shared";
+
+/** Ruled 2026-07-31. Owed a COPY-STANDARD row before this ships to Jess. */
+export const ITEMS_WORDS = {
+  heading: "Items",
+  colRef: "Ref",
+  colItem: "Item",
+  colSize: "Size",
+  colQty: "Qty",
+  /** The action column carries no header — the ⋯ names itself. */
+  colAction: "",
+  menuLabel: "More",
+  split: "Create Another Purchase Order",
+  remove: "Remove",
+  openOrder: "Open Customer Order",
+  /** `Move to Purchase Order 2` — the target is named, never a submenu. */
+  moveTo: (target: string) => `Move to ${target}`,
+  empty: "Nothing on this purchase order.",
+  tableLabel: "Items on this purchase order",
+} as const;
+
+/** `13 lines · 14 units` — the count the header printed as one number. */
+export function itemsCount(builds: readonly ToOrderBuildRef[], category: string): string {
+  const units = builds.reduce((s, b) => s + b.qty, 0);
+  const lines = builds.length;
+  return `${lines} line${lines === 1 ? "" : "s"} · ${units} ${unitLabel(category, units).toLowerCase()}`;
+}
+
+export interface MoveTarget {
+  key: string;
+  /** `Purchase Order 2` — what the operator sees, composed by the caller. */
+  label: string;
+}
+
+export default function ItemsSection({
+  builds,
+  category,
+  canRearrange,
+  moveTargets,
+  loading = false,
+  onRemove,
+  onSplit,
+  onMove,
+  onOpenOrder,
+}: {
+  builds: readonly ToOrderBuildRef[];
+  /** Decides what one unit is called — sofas, mattresses, bedframes. */
+  category: string;
+  /**
+   * False on sofa. A sofa purchase order carries exactly one customer order, so
+   * there is nothing to split out of it and moving would be the merge the
+   * category boundary forbids.
+   */
+  canRearrange: boolean;
+  /** Every OTHER document on this proposal. Empty = no Move item at all. */
+  moveTargets: readonly MoveTarget[];
+  loading?: boolean;
+  onRemove: (buildKey: string) => void;
+  onSplit: (buildKey: string) => void;
+  onMove: (buildKey: string, toKey: string) => void;
+  onOpenOrder: (orderId: string) => void;
+}) {
+  const columns: readonly Column<ToOrderBuildRef>[] = [
+    {
+      key: "ref",
+      label: ITEMS_WORDS.colRef,
+      width: 16,
+      cell: (b) => (b.so != null ? `SO-${b.so}` : "—"),
+    },
+    {
+      key: "item",
+      label: ITEMS_WORDS.colItem,
+      width: 44,
+      // The ordinal only when a sibling would read identically — PETER's two
+      // Booqits are different sofas and an operator removing one has to know
+      // which. It is NOT `title`: that carries the size, and Size is a column.
+      cell: (b) =>
+        b.ordinal != null ? `${unitLabel(category, 1)} ${b.ordinal} — ${b.model}` : b.model,
+    },
+    {
+      key: "size",
+      // Null where the category HAS no size, which is a different fact from
+      // nobody having typed one — every sofa reads the dash for the first
+      // reason and no mattress can read it for the second.
+      label: ITEMS_WORDS.colSize,
+      width: 16,
+      cell: (b) => b.size ?? "—",
+    },
+    {
+      key: "qty",
+      label: ITEMS_WORDS.colQty,
+      width: 12,
+      align: "right",
+      numeric: true,
+      cell: (b) => b.qty,
+    },
+    {
+      key: "action",
+      label: ITEMS_WORDS.colAction,
+      width: 12,
+      align: "right",
+      cell: (b) => (
+        <DropdownMenu
+          label={ITEMS_WORDS.menuLabel}
+          trigger={
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={ITEMS_WORDS.menuLabel}
+              data-testid={`items-menu-${b.buildKey}`}
+            >
+              {/* The kit's 40 meanings hold exactly one kebab, and it is
+                  `overflow` — a name invented here would not compile. */}
+              <Icon name="overflow" size={16} />
+            </Button>
+          }
+          items={menuFor(b)}
+        />
+      ),
+    },
+  ];
+
+  function menuFor(b: ToOrderBuildRef): MenuItem[] {
+    const items: MenuItem[] = [];
+    // Move is the SECOND step, never the first: until a split has happened
+    // there is nowhere to move to, and a menu item with no destination is a
+    // dead end wearing a verb (Loo, 2026-07-31).
+    if (canRearrange) {
+      for (const t of moveTargets) {
+        items.push({
+          key: `move-${t.key}`,
+          label: ITEMS_WORDS.moveTo(t.label),
+          onSelect: () => onMove(b.buildKey, t.key),
+        });
+      }
+      items.push({
+        key: "split",
+        label: ITEMS_WORDS.split,
+        onSelect: () => onSplit(b.buildKey),
+      });
+    }
+    items.push({
+      key: "remove",
+      label: ITEMS_WORDS.remove,
+      onSelect: () => onRemove(b.buildKey),
+    });
+    items.push({
+      key: "open",
+      label: ITEMS_WORDS.openOrder,
+      separatorBefore: true,
+      onSelect: () => onOpenOrder(b.orderId),
+    });
+    return items;
+  }
+
+  return (
+    <section data-testid="po-items">
+      <div className="flex items-baseline justify-between gap-3 px-4 py-2">
+        <span className="text-label uppercase tracking-wide">{ITEMS_WORDS.heading}</span>
+        <span className="text-meta tabular-nums" data-testid="po-items-count">
+          {itemsCount(builds, category)}
+        </span>
+      </div>
+      <DataTable
+        rows={builds}
+        columns={columns}
+        rowId={(b) => b.buildKey}
+        loading={loading}
+        empty={ITEMS_WORDS.empty}
+        label={ITEMS_WORDS.tableLabel}
+      />
+    </section>
+  );
+}

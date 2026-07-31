@@ -77,12 +77,9 @@ export const TO_ORDER_WORDS = {
    */
   include: "Include in this issue",
   includeOffHelp: "Not issued this time. Nothing about the order changes.",
-  removeFromPo: "Remove from this Purchase Order",
   removedHeading: "Not on any purchase order",
   removedHelp: "Still waiting to be ordered. It comes back on the next refresh.",
   putBack: "Put back",
-  splitOut: "Split into a new purchase order",
-  moveTo: "Move to",
 
   productionDaysRequired: "Production Days Required",
   productionDaysHelp: "Set production days in Settings.",
@@ -221,6 +218,13 @@ export interface ToOrderBuild {
   size: string | null;
   /** Units to make. NOT the number of lines — see `title`. */
   qty: number;
+  /**
+   * `1` / `2` when a sibling of the same customer order would read identically,
+   * null otherwise. A table with its own Size column cannot use `title` (it
+   * would print the size twice), so the disambiguator travels as a number and
+   * the caller composes it with the unit word.
+   */
+  ordinal: number | null;
   /** `B1201S King` · `Sofa 2 — Booqit` when a sibling would read identically. */
   title: string;
   /** `3 Modules · CG-004 Wood · Leg 6" · Height 24"` — everything, unabridged. */
@@ -478,6 +482,7 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
           key,
           model,
           size,
+          ordinal: (nameCount.get(named) ?? 0) > 1 ? i : null,
           // A sofa build IS one sofa however many module lines it has; every
           // other category is one line whose own quantity is the answer.
           qty: isOnePoPerOrder(category)
@@ -596,6 +601,10 @@ export interface ToOrderBuildRef {
   so: number | null;
   customer: string;
   title: string;
+  /** `B1201S` · `Booqit` — the model alone, for a table with its own Size column. */
+  model: string;
+  /** See `ToOrderBuild.ordinal`. */
+  ordinal: number | null;
   /** Units to make. The preview printed a line count and called it items. */
   qty: number;
   /** `King` · `Queen`, or null where the category has no size at all. */
@@ -629,6 +638,8 @@ export function toOrderBuilds(proposal: ToOrderProposal): ToOrderBuildRef[] {
         so: r.so,
         customer: r.customer,
         title: b.title,
+        model: b.model,
+        ordinal: b.ordinal,
         qty: b.qty,
         size: b.size,
         lineIds: b.lines.map((l) => l.lineId),
