@@ -33,10 +33,51 @@ export interface PreviewDoc extends IssueDocument {
 
 export interface PreviewState {
   docs: IssueDocument[];
+  /**
+   * Builds UNTICKED on the workbench — `Included in this Purchase Order`
+   * turned off (Loo, 2026-07-31). MEMBERSHIP, not a business decision: the
+   * build stays on its document so the row stays visible (dimmed, re-tickable
+   * where it was), and only `effectiveDocs` — the shape the wire and the
+   * validator see — leaves it out. A document never vanishes mid-session and
+   * nothing becomes homeless.
+   */
+  excluded: readonly string[];
 }
 
 export function initialState(proposal: ToOrderProposal): PreviewState {
-  return { docs: defaultDocuments(proposal) };
+  return { docs: defaultDocuments(proposal), excluded: [] };
+}
+
+/** Tick one build's `Included in this Purchase Order` on or off. */
+export function toggleBuild(state: PreviewState, buildKey: string): PreviewState {
+  return state.excluded.includes(buildKey)
+    ? { ...state, excluded: state.excluded.filter((k) => k !== buildKey) }
+    : { ...state, excluded: [...state.excluded, buildKey] };
+}
+
+/** The header ☑ — set every named build included (true) or excluded (false). */
+export function setBuildsIncluded(
+  state: PreviewState,
+  buildKeys: readonly string[],
+  included: boolean,
+): PreviewState {
+  const named = new Set(buildKeys);
+  const rest = state.excluded.filter((k) => !named.has(k));
+  return { ...state, excluded: included ? rest : [...rest, ...buildKeys] };
+}
+
+/**
+ * The arrangement as the WIRE and the validator see it. An excluded build is
+ * absent from its document's keys; a document whose every build is excluded
+ * goes out whole as `include: false` — both are shapes the server has always
+ * accepted, so the write contract does not move.
+ */
+export function effectiveDocs(state: PreviewState): IssueDocument[] {
+  const excluded = new Set(state.excluded);
+  return state.docs.map((d) => {
+    const keep = d.buildKeys.filter((k) => !excluded.has(k));
+    return keep.length === 0 ? { ...d, include: false } : { ...d, buildKeys: keep };
+  });
 }
 
 /** Hydrate the arrangement with the facts the screen needs to draw it. */
@@ -58,7 +99,7 @@ export function describe(proposal: ToOrderProposal, state: PreviewState): Previe
 }
 
 export function check(proposal: ToOrderProposal, state: PreviewState): IssuePlanCheck {
-  return validateIssuePlan(proposal, state.docs);
+  return validateIssuePlan(proposal, effectiveDocs(state));
 }
 
 /**
@@ -82,6 +123,7 @@ function nextKey(docs: readonly IssueDocument[]): string {
 /** This visit only: leave a whole document out of the issue, or put it back. */
 export function toggleInclude(state: PreviewState, key: string): PreviewState {
   return {
+    ...state,
     docs: state.docs.map((d) => (d.key === key ? { ...d, include: !d.include } : d)),
   };
 }
@@ -98,7 +140,7 @@ export function removeBuild(state: PreviewState, buildKey: string): PreviewState
   const docs = state.docs
     .map((d) => ({ ...d, buildKeys: d.buildKeys.filter((k) => k !== buildKey) }))
     .filter((d) => d.buildKeys.length > 0);
-  return { docs };
+  return { ...state, docs };
 }
 
 /** Put a build back on a document it was taken off. */
@@ -121,12 +163,16 @@ export function restoreBuild(
     : state.docs[0];
   if (home) {
     return {
+      ...state,
       docs: state.docs.map((d) =>
         d.key === home.key ? { ...d, buildKeys: [...d.buildKeys, buildKey] } : d,
       ),
     };
   }
-  return { docs: [...state.docs, { key: nextKey(state.docs), include: true, buildKeys: [buildKey] }] };
+  return {
+    ...state,
+    docs: [...state.docs, { key: nextKey(state.docs), include: true, buildKeys: [buildKey] }],
+  };
 }
 
 /** Everything not on a document right now. */
@@ -146,6 +192,7 @@ export function splitOut(state: PreviewState, buildKeys: readonly string[]): Pre
     .map((d) => ({ ...d, buildKeys: d.buildKeys.filter((k) => !moving.has(k)) }))
     .filter((d) => d.buildKeys.length > 0);
   return {
+    ...state,
     docs: [...rest, { key: nextKey(state.docs), include: true, buildKeys: [...moving] }],
   };
 }
@@ -164,5 +211,5 @@ export function moveBuild(
         : { ...d, buildKeys: d.buildKeys.filter((k) => k !== buildKey) },
     )
     .filter((d) => d.buildKeys.length > 0);
-  return { docs };
+  return { ...state, docs };
 }
