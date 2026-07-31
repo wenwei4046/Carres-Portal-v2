@@ -33,8 +33,12 @@ const OHANA = "11111111-1111-1111-1111-111111111111";
 const KLANG = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
 const AL = "818b420c-27f9-4707-a516-b91a6e03f343";
 
-function build(key: string, title: string, spec: string, codes: string) {
-  return { key, title, spec, codes, lines: [{ lineId: `${key}-l1`, sku: codes, qty: 1, cost: null }] };
+function build(key: string, title: string, spec: string, codes: string, qty = 1, size: string | null = null) {
+  return {
+    key, title, spec, codes, qty, size,
+    model: title.split(" — ").pop() ?? title,
+    lines: [{ lineId: `${key}-l1`, sku: codes, qty, cost: null }],
+  };
 }
 
 const TO_ORDER = {
@@ -87,7 +91,8 @@ const TO_ORDER = {
         {
           orderId: "o9", so: 1300, customer: "wong", qty: 3,
           summary: "Cody · 3 Bedframes", stockReady: "2026-07-29",
-          builds: [build("l1", "Bedframe 1 — Cody", "1 Module", "CODY-Q")],
+          // ONE line, THREE units — the case the old row rendered as "1 item".
+          builds: [build("l1", "Cody Queen", "1 Module", "CODY-Q", 3, "Queen")],
         },
       ],
     },
@@ -176,6 +181,25 @@ describe("To Order — the Purchase Order Preview", () => {
 
     fireEvent.click(screen.getByTestId("to-order-po-toggle-d2"));
     await screen.findByText(/Sofa 2 — Booqit/);
+  });
+
+  /**
+   * The row printed a line count and let the operator read it as a quantity.
+   * Live on 2026-07-31 that was 14 rows against 16 mattresses to build, and
+   * two of the fourteen were the lines carrying the extra units. The number
+   * has to be on the row a human looks at, not only in the projection.
+   */
+  it("prints how many units a line is, not just that a line exists", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-preview");
+    fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
+    await waitFor(() => expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(1));
+
+    fireEvent.click(screen.getByTestId("to-order-po-toggle-d1"));
+    const qty = await screen.findByTestId("to-order-build-qty-l1");
+    expect(qty.textContent?.replace(/\s+/g, " ").trim()).toBe("× 3");
+    // and the size the factory has to cut to travels with it
+    await screen.findByText(/Cody Queen/);
   });
 
   it("has no Split or Move on sofa — a sofa PO carries one customer order", async () => {

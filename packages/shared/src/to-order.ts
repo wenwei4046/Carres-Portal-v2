@@ -171,6 +171,15 @@ export interface ToOrderLine extends DemandLine {
   modelName: string | null;
   /** `product_skus.variant` — the module code a factory reads. */
   variant: string | null;
+  /**
+   * `product_skus.variant_kind`. `variant` means two different things by
+   * category and only the catalog knows which: measured 2026-07-31, all 58
+   * mattress + bedframe skus are `size` (`King` / `Queen`) and all 138 sofa
+   * skus are `part` (`1A(LHF)`). A part code printed as a size is a sentence
+   * the factory would act on, so the size is read through this and never
+   * from `variant` alone.
+   */
+  variantKind: string | null;
   /** `order_lines.attrs.sofa_build_key`; null means the line stands alone. */
   buildKey: string | null;
   fabricName: string | null;
@@ -202,7 +211,17 @@ export interface BuildToOrderInput {
 
 export interface ToOrderBuild {
   key: string;
-  /** `Sofa 1 — Booqit` */
+  /** `product_models.name`, falling back to the sku. `B1201S` · `Booqit`. */
+  model: string;
+  /**
+   * The size a factory has to cut to — `King`, `Queen`. NULL when the category
+   * has no size (every sofa) rather than when nobody typed one, because the
+   * two read the same on screen and only one of them is a data problem.
+   */
+  size: string | null;
+  /** Units to make. NOT the number of lines — see `title`. */
+  qty: number;
+  /** `B1201S King` · `Sofa 2 — Booqit` when a sibling would read identically. */
   title: string;
   /** `3 Modules · CG-004 Wood · Leg 6" · Height 24"` — everything, unabridged. */
   spec: string;
@@ -288,6 +307,28 @@ export function composeSummary(args: {
   tokens.push(`${args.qty} ${unitLabel(args.category, args.qty)}`);
   if (args.spec) tokens.push(args.spec);
   return tokens.slice(0, 3).join(" · ");
+}
+
+/**
+ * What one physical thing is called, and the size a factory has to cut to.
+ *
+ * The size is read through `variantKind`, never off `variant` alone: the same
+ * column holds `King` on a mattress and `1A(LHF)` on a sofa module, and a part
+ * code printed under the word Size is an instruction, not a cosmetic slip.
+ * A build spanning two sizes reports none rather than the first — a wrong size
+ * is worse than a missing one, because only the missing one gets asked about.
+ */
+export function nameBuild(members: readonly { modelName: string | null; sku: string; variant: string | null; variantKind: string | null }[]): {
+  model: string;
+  size: string | null;
+  named: string;
+} {
+  const model = members[0].modelName ?? members[0].sku;
+  const sizes = new Set(
+    members.filter((m) => m.variantKind === "size" && m.variant).map((m) => m.variant as string),
+  );
+  const size = sizes.size === 1 ? [...sizes][0]! : null;
+  return { model, size, named: size ? `${model} ${size}` : model };
 }
 
 // ── Sorting ─────────────────────────────────────────────────────────────────
@@ -416,13 +457,36 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
       }
 
       const builds: ToOrderBuild[] = [];
+
+      // The ordinal (`Mattress 1`) exists to tell IDENTICAL siblings apart, and
+      // nothing else. It read as a QUANTITY (Loo, 2026-07-31) while the real
+      // quantity was on screen nowhere — 14 rows on a proposal the factory has
+      // to build 16 units for. So it is now earned, not automatic: a build
+      // names itself, and the ordinal is added only where a sibling of the same
+      // order would print the same words.
+      const nameCount = new Map<string, number>();
+      for (const members of byBuild.values()) {
+        const n = nameBuild(members).named;
+        nameCount.set(n, (nameCount.get(n) ?? 0) + 1);
+      }
+
       let i = 0;
       for (const [key, members] of byBuild) {
         i += 1;
-        const model = members[0].modelName ?? members[0].sku;
+        const { model, size, named } = nameBuild(members);
         builds.push({
           key,
-          title: `${unitLabel(category, 1)} ${i} — ${model}`,
+          model,
+          size,
+          // A sofa build IS one sofa however many module lines it has; every
+          // other category is one line whose own quantity is the answer.
+          qty: isOnePoPerOrder(category)
+            ? 1
+            : members.reduce((s, m) => s + (toOrderByLine.get(m.lineId) ?? m.qty), 0),
+          title:
+            (nameCount.get(named) ?? 0) > 1
+              ? `${unitLabel(category, 1)} ${i} — ${named}`
+              : named,
           spec: buildSpec(members),
           codes: members.map((m) => m.sku).join(" · "),
           lines: members.map((m) => ({
@@ -532,6 +596,10 @@ export interface ToOrderBuildRef {
   so: number | null;
   customer: string;
   title: string;
+  /** Units to make. The preview printed a line count and called it items. */
+  qty: number;
+  /** `King` · `Queen`, or null where the category has no size at all. */
+  size: string | null;
   lineIds: string[];
 }
 
@@ -561,6 +629,8 @@ export function toOrderBuilds(proposal: ToOrderProposal): ToOrderBuildRef[] {
         so: r.so,
         customer: r.customer,
         title: b.title,
+        qty: b.qty,
+        size: b.size,
         lineIds: b.lines.map((l) => l.lineId),
       });
     }

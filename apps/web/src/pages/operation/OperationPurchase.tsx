@@ -474,9 +474,20 @@ function PoBlock({
         <div className="px-3.5 pb-2.5 pl-[46px]">
           {doc.builds.map((b) => (
             <div key={b.buildKey} className="py-1.5 border-t border-base-100 first:border-t-0">
-              <div className="text-meta font-semibold text-base-900">
-                {b.customer}
-                {b.so != null ? ` · SO-${b.so}` : ""} · {b.title}
+              <div className="flex items-baseline gap-2 text-meta font-semibold text-base-900">
+                <span className="truncate">
+                  {b.customer}
+                  {b.so != null ? ` · SO-${b.so}` : ""} · {b.title}
+                </span>
+                {/* Units, not lines. A line of 2 read exactly like a line of 1
+                    until this shipped — the proposal said 14 where the factory
+                    had 16 to build. */}
+                <span
+                  className="ml-auto shrink-0 tabular-nums"
+                  data-testid={`to-order-build-qty-${b.buildKey}`}
+                >
+                  × {b.qty}
+                </span>
               </div>
               <div className="flex items-baseline gap-3 flex-wrap mt-0.5">
                 <button
