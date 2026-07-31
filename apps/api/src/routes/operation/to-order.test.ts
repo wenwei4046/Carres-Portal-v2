@@ -195,8 +195,38 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
   }
 
   const tableCalls: Record<string, number> = {};
+  /**
+   * `product_skus` is read TWICE and the two reads mean different things.
+   *
+   * The first pulls catalog facts; a fixture with a row removed simulates a
+   * SHORT read. The second asks only "does this SKU exist?" — and in the real
+   * database it still does, which is exactly what makes a short read alarming.
+   * So the existence read always answers from the FULL catalog.
+   */
+  const fullCatalog = (tables.__fullCatalog?.data ??
+    tables.product_skus?.data ??
+    []) as { sku: string }[];
+
   const from = vi.fn((table: string) => {
     tableCalls[table] = (tableCalls[table] ?? 0) + 1;
+    if (table === "product_skus") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const b: any = {};
+      let existenceRead = false;
+      b.select = vi.fn((cols: string) => {
+        existenceRead = cols.trim() === "sku";
+        return b;
+      });
+      for (const m of CHAIN.filter((x) => x !== "select")) b[m] = vi.fn(() => b);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      b.then = (res: any, rej: any) =>
+        Promise.resolve(
+          existenceRead
+            ? { data: fullCatalog.map((r) => ({ sku: r.sku })), error: null }
+            : (tables.product_skus ?? { data: [], error: null }),
+        ).then(res, rej);
+      return b;
+    }
     if (table === "purchasing_destinations") {
       return destBuilder(
         (tables.purchasing_destinations.data as { id: string; name: string }[]) ?? [],
@@ -453,12 +483,62 @@ describe("a requirement the catalog cannot answer for", () => {
   /** Drop one SKU from the catalog — exactly what a short read looks like. */
   function tablesMissingCatalogRow(sku: string) {
     const t = TABLES();
+    // The row still EXISTS — only the first read came back without it.
+    t.__fullCatalog = t.product_skus;
     t.product_skus = {
       data: (t.product_skus.data as { sku: string }[]).filter((r) => r.sku !== sku),
       error: null,
     };
     return t;
   }
+
+  it("says NOTHING about a line that was never a catalog product", async () => {
+    // `Transport Fees`, `Leg 4"`, an AutoCount free-text description — an
+    // order_line.sku is plain text with no foreign key, so plenty of them were
+    // never products. 95 live in prod. Treating those as an alarm blocked every
+    // issue on the page on 2026-07-31.
+    const t = TABLES();
+    t.order_lines = {
+      data: [
+        ...(t.order_lines.data as Record<string, unknown>[]),
+        {
+          id: "fee1", order_id: "o1", sku: "Transport Fees", qty: 1, attrs: null,
+          excluded_from_plan: false, exclude_from_plan_until: null,
+        },
+        {
+          id: "fee2", order_id: "o2", sku: 'Leg 4"', qty: 1, attrs: null,
+          excluded_from_plan: false, exclude_from_plan_until: null,
+        },
+      ],
+      error: null,
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    expect(body.unresolved).toEqual([]);
+  });
+
+  it("still lets those lines be issued rather than blocking the page", async () => {
+    const t = TABLES();
+    t.order_lines = {
+      data: [
+        ...(t.order_lines.data as Record<string, unknown>[]),
+        {
+          id: "fee1", order_id: "o1", sku: "Transport Fees", qty: 1, attrs: null,
+          excluded_from_plan: false, exclude_from_plan_until: null,
+        },
+      ],
+      error: null,
+    };
+    const sb = makeSb(t);
+    const plan = await defaultPlan(sb);
+    const res = await post({
+      supplierId: OHANA, category: "sofa", destinationId: KLANG, purchaseOrders: plan,
+    });
+    expect(res.status).toBe(200);
+  });
 
   it("is named on the read instead of vanishing", async () => {
     const sb = makeSb(tablesMissingCatalogRow("5539-CNR"));

@@ -186,20 +186,16 @@ async function loadToOrder(
   const seenMissing = new Set<string>();
   /** Demand the catalog could not answer for. Never dropped in silence. */
   const unresolved: { sku: string; orderId: string; so: number | null }[] = [];
+  /** Lines the main read did not answer for — alarming only if the SKU exists. */
+  const missed: { sku: string; orderId: string; so: number | null }[] = [];
 
   for (const l of lines) {
     const c = cat.get(l.sku as string);
 
-    // ⚠ THE LINE THE CATALOG DID NOT ANSWER FOR.
-    //
-    // Not the same as "this SKU is an accessory". A SKU the read did not return
-    // AT ALL is a requirement nobody has judged, and skipping it is how seven of
-    // them reached no purchase order on 2026-07-30 while the documents that were
-    // issued looked complete. It is recorded by name, and it stops `Issue`
-    // dead — a short purchase order is worse than none, because nothing
-    // downstream will ever say the goods are missing.
+    // The line the catalog read did not answer for. It is only ALARMING if the
+    // SKU actually exists — that is proved below, not assumed here.
     if (!c) {
-      unresolved.push({
+      missed.push({
         sku: l.sku as string,
         orderId: l.order_id as string,
         so: (orderById.get(l.order_id as string)?.so as number | null) ?? null,
@@ -275,6 +271,40 @@ async function loadToOrder(
       itemHeight: attr(attrs, "sofa_height"),
       cost: c?.cost ?? null,
     });
+  }
+
+  /**
+   * ⚠ THE DIFFERENCE BETWEEN A SHORT READ AND A LINE THAT IS NOT A PRODUCT.
+   *
+   * An order line's `sku` is plain text with no foreign key, so plenty of them
+   * were never catalog products at all: `Transport Fees`, `No Lift Per Floor
+   * Charge`, `Leg 4"`, and the free-text descriptions AutoCount imports. Those
+   * are not procurable and never were — 95 of them live in this database — and
+   * ignoring them is correct.
+   *
+   * A SKU that DOES exist in the catalog and still did not come back is the
+   * other thing entirely: the read was short, and on 2026-07-30 that put seven
+   * customer requirements on no purchase order at all.
+   *
+   * The first guard could not tell them apart and treated all 95 as the alarm,
+   * which blocked every issue on the page. So the question is asked directly,
+   * over the misses only: does this SKU exist? Coming back means the read was
+   * short. Not coming back means it was never a product.
+   */
+  if (missed.length > 0) {
+    const missedSkus = [...new Set(missed.map((m) => m.sku))];
+    const real = new Set<string>();
+    for (const batch of chunk(missedSkus)) {
+      // No `!inner` here on purpose: a SKU whose model is broken still EXISTS,
+      // and that is exactly the shape a short first read would leave behind.
+      const { data, error } = await sb.from("product_skus").select("sku").in("sku", batch);
+      if (error) {
+        const m = mapPgError(error);
+        return { ok: false, status: m.status, body: m.body };
+      }
+      for (const r of data ?? []) real.add(r.sku as string);
+    }
+    for (const m of missed) if (real.has(m.sku)) unresolved.push(m);
   }
 
   // Supply: what open POs already cover. A line already on a PO has left this
