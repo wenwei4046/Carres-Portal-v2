@@ -10,13 +10,19 @@
  *
  * Shape (Queue pattern wrapping the Review workspace):
  *
- *     queue rail 280px       which slice of purchasing · which purchase order
+ *     queue rail 320px       the Fiori-worklist rail (Loo, 2026-07-31):
+ *                            `Ready to issue` + total, then one COLLAPSED row
+ *                            per proposal — chevron · supplier · the COUNT is
+ *                            the big fact — expanding shows small `PO n` rows.
+ *                            The rail is scanned for numbers; a PO row is only
+ *                            the door to the workspace. Zero actions here.
  *     workspace              ONE purchase order fills the pane
  *       PO bar               include · PO 1 of N · customer · SO
- *       Header line          supplier · category ···· Order by date
+ *       Header line          ONE row of facts: supplier · category ····
+ *                            Order by · production days · Destination
  *       Items                the review itself — the largest region
  *     not on any PO          only when applicable — belongs to the arrangement
- *     Issue                  destination · count · the one blue-9 button
+ *     Issue                  count · the one blue-9 button · refusal reasons
  *
  * What is deliberately NOT here, each a ruling and not a gap:
  *
@@ -29,8 +35,10 @@
  *  · **No search box and no filter.** The old page's search was decoration —
  *    zero `<input>` in the entire file. The words stay in `TO_ORDER_WORDS` for
  *    the day the queue is long enough to need the real thing.
- *  · **Destination has ONE home: the Issue region**, where the operator
- *    confirms it before committing. The header line does not repeat it.
+ *  · **Destination has ONE home: the Header line** (Loo's frozen draft,
+ *    2026-07-31 — the header is the facts row, and Destination is a fact the
+ *    operator may change). The Issue region states only the count, the button
+ *    and why it refuses.
  *  · **The Header line is permanent, not collapsible.** Everything a header
  *    body would hold — the supplier's address, telephone, Attn, terms — has no
  *    column in `suppliers`, so there is nothing to open. It becomes collapsible
@@ -48,10 +56,14 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   TO_ORDER_WORDS as W,
+  countItems,
+  countOrders,
   issuedHeadline,
   itemsCount,
   moveToTarget,
   poIndexLabel,
+  poShortLabel,
+  productionDaysLabel,
   purchaseOrderCount,
   unitLabel,
   unresolvedHeadline,
@@ -134,8 +146,14 @@ export default function OperationToOrder() {
 
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [destId, setDestId] = useState<string | null>(null);
-  /** Which purchase order fills the workspace. Null = the first one. */
-  const [pickedDoc, setPickedDoc] = useState<string | null>(null);
+  /**
+   * Which purchase order fills the workspace — as a PAIR, so a pick can never
+   * outlive its proposal: a doc key from another supplier simply does not
+   * apply, and the pane falls back to the first document. Null = the first.
+   */
+  const [pickedDoc, setPickedDoc] = useState<{ proposal: string; doc: string } | null>(
+    null,
+  );
   const [issued, setIssued] = useState<IssueResponse | null>(null);
   /**
    * The arrangement. It lives here and nowhere else — a refresh drops it and
@@ -145,6 +163,14 @@ export default function OperationToOrder() {
   const [plan, setPlan] = useState<PreviewState | null>(null);
 
   const current = proposals.find((p) => p.key === pickedKey) ?? proposals[0] ?? null;
+
+  /**
+   * Which rail groups are open. The most urgent proposal (the sort puts it
+   * first) is opened for the operator, so the pane is never empty and the rail
+   * never starts fully shut; the rest stay collapsed — the rail is scanned for
+   * COUNTS first (Loo, 2026-07-31).
+   */
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
 
   // Follow the list when it changes under us — a proposal leaves once issued.
   useEffect(() => {
@@ -157,12 +183,20 @@ export default function OperationToOrder() {
     if (def) setDestId(def.id);
   }, [destinations, destId]);
 
-  // Rebuild the arrangement whenever the proposal underneath it changes.
+  // Rebuild the arrangement whenever the proposal underneath it changes. The
+  // picked document is NOT reset here — it is a pair, so a pick from another
+  // proposal simply stops applying (proven by the cross-supplier pick test:
+  // a reset here lands the pane on PO 1 instead of the row that was clicked).
   const currentKey = current?.key ?? null;
   useEffect(() => {
     setPlan(current ? initialState(current) : null);
-    setPickedDoc(null);
   }, [currentKey, current]);
+
+  // The current group always shows its rows.
+  useEffect(() => {
+    if (!currentKey) return;
+    setExpanded((s) => (s.has(currentKey) ? s : new Set(s).add(currentKey)));
+  }, [currentKey]);
 
   const docs = useMemo(
     () => (current && plan ? describeDocs(current, plan) : []),
@@ -172,7 +206,25 @@ export default function OperationToOrder() {
     () => (current && plan ? removedBuilds(current, plan) : []),
     [current, plan],
   );
-  const currentDoc = docs.find((d) => d.key === pickedDoc) ?? docs[0] ?? null;
+  const currentDoc =
+    (pickedDoc && pickedDoc.proposal === currentKey
+      ? docs.find((d) => d.key === pickedDoc.doc)
+      : undefined) ??
+    docs[0] ??
+    null;
+
+  /**
+   * The rail's rows per proposal: the CURRENT one shows the live arrangement
+   * (a split adds a row the moment it happens); every other expanded group
+   * shows the server's own suggestion, which is exactly what picking it loads.
+   */
+  const railDocs = useMemo(() => {
+    const m = new Map<string, PreviewDoc[]>();
+    for (const p of proposals) {
+      m.set(p.key, p.key === currentKey ? docs : describeDocs(p, initialState(p)));
+    }
+    return m;
+  }, [proposals, currentKey, docs]);
 
   const verdict = useMemo(
     () => (current && plan ? checkPlan(current, plan) : null),
@@ -214,12 +266,20 @@ export default function OperationToOrder() {
         <QueueRail
           proposals={proposals}
           currentKey={current?.key ?? null}
-          docs={docs}
+          railDocs={railDocs}
           currentDocKey={currentDoc?.key ?? null}
-          onPickDoc={setPickedDoc}
-          onPick={(k) => {
-            setPickedKey(k);
-            setPickedDoc(null);
+          expanded={expanded}
+          onToggle={(k) =>
+            setExpanded((s) => {
+              const n = new Set(s);
+              if (n.has(k)) n.delete(k);
+              else n.add(k);
+              return n;
+            })
+          }
+          onPickDoc={(proposalKey, docKey) => {
+            if (proposalKey !== currentKey) setPickedKey(proposalKey);
+            setPickedDoc({ proposal: proposalKey, doc: docKey });
             setIssued(null);
           }}
           loading={q.isLoading}
@@ -240,6 +300,9 @@ export default function OperationToOrder() {
                 doc={currentDoc}
                 index={docs.findIndex((d) => d.key === currentDoc.key) + 1}
                 total={docs.length}
+                destinations={destinations}
+                destId={destId}
+                onDest={setDestId}
                 onInclude={() =>
                   setPlan((st) => (st ? toggleInclude(st, currentDoc.key) : st))
                 }
@@ -296,9 +359,7 @@ export default function OperationToOrder() {
                 unresolved={unresolved}
                 count={verdict?.count ?? 0}
                 blockedReason={verdict && !verdict.ok ? (verdict.message ?? null) : null}
-                destinations={destinations}
-                destId={destId}
-                onDest={setDestId}
+                hasDestination={destId !== null}
                 pending={issue.isPending}
                 error={issue.error}
                 onIssue={() => issue.mutate()}
@@ -314,83 +375,96 @@ export default function OperationToOrder() {
 // ── Queue rail ──────────────────────────────────────────────────────────────
 
 /**
- * Which slice of purchasing, and which purchase order inside it. The documents
- * of the SELECTED proposal nest under it because the workspace shows one at a
- * time; splitting an item adds a row here the moment it happens.
+ * The Fiori-worklist rail (Loo, 2026-07-31). Three type sizes only: the COUNT
+ * is the big fact — the rail answers "how many purchase orders do I owe" at a
+ * glance — the supplier is the grouping, and a PO row is small because it is
+ * only the door to the workspace. The rail carries ZERO actions: expanding a
+ * group changes nothing, and only picking a PO row changes the pane.
  *
- * Page-local markup, tokens only — no kit component renders a two-line picking
- * list yet. It is extracted into the kit on its second occurrence, per the
- * kit's own law, not invented for its first.
+ * Page-local markup, tokens only — no kit component renders a picking list
+ * yet. It is extracted into the kit on its second occurrence, per the kit's
+ * own law, not invented for its first.
  */
 function QueueRail({
   proposals,
   currentKey,
-  docs,
+  railDocs,
   currentDocKey,
-  onPick,
+  expanded,
+  onToggle,
   onPickDoc,
   loading,
 }: {
   proposals: ToOrderProposal[];
   currentKey: string | null;
-  /** Documents of the CURRENT proposal only. */
-  docs: PreviewDoc[];
+  /** Rows per proposal — live for the current one, the default for the rest. */
+  railDocs: ReadonlyMap<string, PreviewDoc[]>;
   currentDocKey: string | null;
-  onPick: (key: string) => void;
-  onPickDoc: (key: string) => void;
+  expanded: ReadonlySet<string>;
+  onToggle: (key: string) => void;
+  onPickDoc: (proposalKey: string, docKey: string) => void;
   loading: boolean;
 }) {
+  const total = proposals.reduce((n, p) => n + p.poCount, 0);
   return (
     <aside
-      className="w-[280px] shrink-0 flex flex-col min-h-0 overflow-y-auto"
+      className="w-[320px] shrink-0 flex flex-col min-h-0 overflow-y-auto"
       data-testid="to-order-queue"
     >
+      <div className="flex items-baseline gap-2 px-2 pb-2">
+        <span className="text-label text-kit-slate-11">{W.readyToIssue}</span>
+        <span
+          className="ml-auto text-body font-semibold text-kit-slate-12 tabular-nums"
+          data-testid="to-order-queue-total"
+        >
+          {total}
+        </span>
+      </div>
+
       {loading && proposals.length === 0 ? (
         <div className="px-3 py-2">
           <Loading variant="skeleton" lines={3} label="Loading purchase orders" />
         </div>
       ) : (
         proposals.map((p) => {
-          const on = p.key === currentKey;
+          const open = expanded.has(p.key);
+          const docs = railDocs.get(p.key) ?? [];
           return (
             <div key={p.key}>
               <button
                 type="button"
-                onClick={() => onPick(p.key)}
+                onClick={() => onToggle(p.key)}
                 data-testid={`to-order-proposal-${p.key}`}
-                aria-current={on ? "true" : undefined}
-                className={[
-                  "block w-full text-left rounded-control px-3 pt-2 pb-2 mb-px",
-                  // §2.3 — selection is blue-3, hover the faint tint. Never grey.
-                  on ? "bg-kit-blue-3" : "hover:bg-kit-blue-3",
-                ].join(" ")}
+                aria-expanded={open}
+                className="flex w-full items-center gap-2 text-left rounded-control px-2 py-2 mb-px hover:bg-kit-blue-3"
               >
-                <div className="text-body font-medium text-kit-slate-12 truncate">
+                <span className="text-kit-slate-11">
+                  <Icon name={open ? "expand" : "forward"} size={16} />
+                </span>
+                <span className="text-body font-medium text-kit-slate-12 truncate">
                   {p.label}
-                </div>
-                <div className="text-meta text-kit-slate-11 truncate">
-                  {purchaseOrderCount(p.poCount)} ·{" "}
-                  {p.orderBy ? (
-                    <>
-                      Order by{" "}
-                      <span className="text-kit-slate-12 tabular-nums">
-                        {fmtDate(p.orderBy)}
-                      </span>
-                    </>
-                  ) : (
-                    W.noDeliveryDate
-                  )}
-                </div>
+                </span>
+                {/* The big fact. The full sentence rides the hover. */}
+                <span
+                  className="ml-auto text-body font-semibold text-kit-slate-12 tabular-nums"
+                  title={purchaseOrderCount(p.poCount)}
+                >
+                  {p.poCount}
+                </span>
+                <span className="text-meta text-kit-slate-11 whitespace-nowrap tabular-nums">
+                  · {p.orderBy ? fmtDate(p.orderBy) : W.noDeliveryDate}
+                </span>
               </button>
-              {on
+              {open
                 ? docs.map((d, i) => (
                     <DocRow
                       key={d.key}
                       doc={d}
                       index={i + 1}
-                      total={docs.length}
-                      on={d.key === currentDocKey}
-                      onPick={() => onPickDoc(d.key)}
+                      on={p.key === currentKey && d.key === currentDocKey}
+                      dimmed={p.key === currentKey && !d.include}
+                      onPick={() => onPickDoc(p.key, d.key)}
+                      testId={`to-order-doc-${p.key}-${d.key}`}
                     />
                   ))
                 : null}
@@ -402,44 +476,48 @@ function QueueRail({
   );
 }
 
-/** One purchase order in the queue, nested under its supplier. */
+/**
+ * One purchase order in the queue — one SMALL line: `PO 2 · PETER · 3 items`.
+ * A consolidated document has no single customer, so it counts them instead.
+ */
 function DocRow({
   doc,
   index,
-  total,
   on,
+  dimmed,
   onPick,
+  testId,
 }: {
   doc: PreviewDoc;
   index: number;
-  total: number;
   on: boolean;
+  dimmed: boolean;
   onPick: () => void;
+  testId: string;
 }) {
   const units = doc.builds.reduce((n, b) => n + b.qty, 0);
+  const orders = new Set(doc.builds.map((b) => b.orderId)).size;
   return (
     <button
       type="button"
       onClick={onPick}
-      data-testid={`to-order-doc-${doc.key}`}
+      data-testid={testId}
       aria-current={on ? "true" : undefined}
       className={[
-        "block w-full text-left rounded-control pl-6 pr-2 py-1.5 mb-px",
+        "flex w-full items-baseline gap-2 text-left rounded-control pl-8 pr-2 py-1.5 mb-px",
         on ? "bg-kit-blue-3" : "hover:bg-kit-blue-3",
-        doc.include ? "" : "opacity-40",
+        dimmed ? "opacity-40" : "",
       ].join(" ")}
     >
-      <div className="flex items-baseline gap-2">
-        <span className="text-meta font-medium text-kit-slate-12 whitespace-nowrap">
-          {poIndexLabel(index, total)}
-        </span>
-        {doc.customer != null ? (
-          <span className="text-meta text-kit-slate-11 truncate">{doc.customer}</span>
-        ) : null}
-        <span className="ml-auto text-meta text-kit-slate-11 whitespace-nowrap tabular-nums">
-          {itemsCount(doc.builds.length, units)}
-        </span>
-      </div>
+      <span className="text-meta font-medium text-kit-slate-12 whitespace-nowrap">
+        {poShortLabel(index)}
+      </span>
+      <span className="text-meta text-kit-slate-11 truncate">
+        {doc.customer ?? countOrders(orders)}
+      </span>
+      <span className="ml-auto text-meta text-kit-slate-11 whitespace-nowrap tabular-nums">
+        {countItems(units)}
+      </span>
     </button>
   );
 }
@@ -462,6 +540,9 @@ function Workspace({
   doc,
   index,
   total,
+  destinations,
+  destId,
+  onDest,
   moveTargets,
   onInclude,
   onRemove,
@@ -473,6 +554,9 @@ function Workspace({
   doc: PreviewDoc;
   index: number;
   total: number;
+  destinations: Destination[];
+  destId: string | null;
+  onDest: (id: string) => void;
   moveTargets: readonly MoveTarget[];
   onInclude: () => void;
   onRemove: (buildKey: string) => void;
@@ -610,15 +694,51 @@ function Workspace({
       ) : null}
 
       <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-kit-slate-6">
-        {/* ── Header — permanent line until `suppliers` has columns to open ─ */}
+        {/* ── Header — ONE row of facts (Loo's frozen draft, 2026-07-31):
+             supplier · category ···· Order by · production days · Destination.
+             Destination lives HERE and nowhere else — it is a fact of the
+             purchase order the operator may change, not part of the commit.
+             Permanent line until `suppliers` has columns to open. ── */}
         <section data-testid="to-order-header">
           <SectionHeader
             title={proposal.label}
             testId="to-order-header-line"
             meta={
-              proposal.orderBy ? (
-                <span className="tabular-nums">Order by {fmtDate(proposal.orderBy)}</span>
-              ) : undefined
+              <span className="flex items-baseline gap-3">
+                {proposal.orderBy ? (
+                  <span className="tabular-nums whitespace-nowrap">
+                    Order by {fmtDate(proposal.orderBy)}
+                  </span>
+                ) : null}
+                {proposal.productionDays != null ? (
+                  <span
+                    className="tabular-nums whitespace-nowrap"
+                    data-testid="to-order-production-days"
+                  >
+                    {productionDaysLabel(proposal.productionDays)}
+                  </span>
+                ) : null}
+              </span>
+            }
+            action={
+              <span className="flex items-center gap-2" data-testid="to-order-destination">
+                {/* htmlFor names the Radix trigger, so the compact control
+                    keeps its accessible name without a label row above it. */}
+                <label
+                  htmlFor="to-order-destination-select"
+                  className="text-meta text-kit-slate-11"
+                >
+                  {W.destination}
+                </label>
+                <span className="w-44">
+                  <Select
+                    id="to-order-destination-select"
+                    value={destId ?? undefined}
+                    onValueChange={onDest}
+                    options={destinations.map((d) => ({ value: d.id, label: d.name }))}
+                  />
+                </span>
+              </span>
             }
           />
         </section>
@@ -654,9 +774,7 @@ function IssueRegion({
   unresolved,
   count,
   blockedReason,
-  destinations,
-  destId,
-  onDest,
+  hasDestination,
   pending,
   error,
   onIssue,
@@ -667,9 +785,8 @@ function IssueRegion({
   count: number;
   /** Why the arrangement cannot be issued, in the operator's words. */
   blockedReason: string | null;
-  destinations: Destination[];
-  destId: string | null;
-  onDest: (id: string) => void;
+  /** Destination lives in the Header; this region only states its absence. */
+  hasDestination: boolean;
   pending: boolean;
   error: Error | null;
   onIssue: () => void;
@@ -708,6 +825,12 @@ function IssueRegion({
           <div className="mb-2 text-meta text-kit-slate-12" data-testid="to-order-plan-blocked">
             {blockedReason}
           </div>
+        ) : !hasDestination ? (
+          // Only when no destination is configured at all — the header's
+          // select defaults itself the moment one exists.
+          <div className="mb-2 text-meta text-kit-slate-12" data-testid="to-order-no-destination">
+            {W.destinationRequired}
+          </div>
         ) : null}
 
         {error ? (
@@ -716,20 +839,10 @@ function IssueRegion({
           </div>
         ) : null}
 
-        <div className="flex items-end gap-4 flex-wrap">
-          <div className="w-56" data-testid="to-order-destination">
-            <Select
-              id="to-order-destination-select"
-              label={W.destination}
-              value={destId ?? undefined}
-              onValueChange={onDest}
-              options={destinations.map((d) => ({ value: d.id, label: d.name }))}
-            />
-          </div>
-
+        <div className="flex items-center gap-4 flex-wrap">
           {/* The count follows the arrangement, not the system's first guess. */}
           <span
-            className="ml-auto pb-1.5 text-body font-medium text-kit-slate-12 tabular-nums whitespace-nowrap"
+            className="ml-auto text-body font-medium text-kit-slate-12 tabular-nums whitespace-nowrap"
             data-testid="to-order-count"
           >
             {purchaseOrderCount(count)}
@@ -738,7 +851,7 @@ function IssueRegion({
           <Button
             variant="primary"
             onClick={onIssue}
-            disabled={blocked || unread || badPlan || pending || !destId}
+            disabled={blocked || unread || badPlan || pending || !hasDestination}
             loading={pending}
             data-testid="to-order-issue"
           >

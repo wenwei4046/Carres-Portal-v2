@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   buildToOrder,
   composeSummary,
+  countItems,
+  countOrders,
   isToOrderCategory,
   nameBuild,
   pickSpecToken,
   planPurchaseOrders,
   poIndexLabel,
+  poShortLabel,
+  productionDaysLabel,
   purchaseOrderCount,
   sortToOrderRows,
   type ToOrderLine,
@@ -155,6 +159,18 @@ describe("the purchase-order boundary", () => {
     // Lived as a literal in the page's markup, twice; one word list now.
     expect(poIndexLabel(1, 3)).toBe("PO 1 of 3");
     expect(poIndexLabel(1, 1)).toBe("PO 1 of 1");
+  });
+
+  it("the queue rail keeps its words small — `PO 2`, counts, working days", () => {
+    // The rail is scanned for numbers (Loo, 2026-07-31); a row is the door,
+    // not the content, so its label drops the `of N`.
+    expect(poShortLabel(2)).toBe("PO 2");
+    expect(countOrders(1)).toBe("1 order");
+    expect(countOrders(2)).toBe("2 orders");
+    expect(countItems(1)).toBe("1 item");
+    expect(countItems(5)).toBe("5 items");
+    expect(productionDaysLabel(1)).toBe("1 working day");
+    expect(productionDaysLabel(7)).toBe("7 working days");
   });
 
   it("a non-sofa category merges every customer order into ONE document", () => {
@@ -409,6 +425,18 @@ describe("production days", () => {
   it("leaves a rated pair unblocked", () => {
     const [sofa] = run(PETER);
     expect(sofa.blocked).toBeNull();
+  });
+
+  it("a rated pair states its number — the header's fact", () => {
+    const [sofa] = run(PETER);
+    expect(sofa.productionDays).toBe(14);
+  });
+
+  it("a blocked pair states NO number — a fallback here is the silent 7", () => {
+    const [sofa] = run(PETER, {
+      missingProductionDays: [{ supplierId: OHANA, category: "sofa" }],
+    });
+    expect(sofa.productionDays).toBeNull();
   });
 });
 
