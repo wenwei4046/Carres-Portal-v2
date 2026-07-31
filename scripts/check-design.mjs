@@ -77,6 +77,14 @@ const REPORT = ARG.has("--report");
 /** §0.3 — the edition every kit artifact must declare. */
 const EDITION = "UI-KIT 2026-07-27";
 
+/**
+ * The Design System superseded `UI-KIT.md` on 2026-07-31, so a kit artifact may
+ * now declare EITHER law. Additive on purpose: a file already citing `UI-KIT §`
+ * still passes, so this moved no existing finding — a new file simply stopped
+ * being required to cite a document that has been retired.
+ */
+const DESIGN_SYSTEM = /0[123]-(?:design-tokens|components|page-patterns)/;
+
 const read = (p) => readFileSync(p, "utf8");
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -353,8 +361,14 @@ function scan(files, rec, words) {
     // would make these two rules structurally incapable of ever firing.
     if (isKit(f) || /lib\/design-standard\.ts$/.test(f) || /(^|\/)index\.css$/.test(f)) {
       const head = full.slice(0, 2000);
-      if (!head.includes(EDITION) && !/UI-KIT §/.test(head))
-        push("J", f, full, 0, `no kit edition declared — §0.3 asks for "${EDITION}"`);
+      if (!head.includes(EDITION) && !/UI-KIT §/.test(head) && !DESIGN_SYSTEM.test(head))
+        push(
+          "J",
+          f,
+          full,
+          0,
+          `no kit edition declared — cite 02-components.md, or "${EDITION}"`,
+        );
     }
     for (const m of full.matchAll(/\bv4 wins\b|\bthis file wins\b|\boverrides? (?:docs\/)?UI-KIT\b/gi)) {
       if (!/UI-KIT\.md$/.test(f)) push("K", f, full, m.index, "only docs/UI-KIT.md may claim to win (§0.3)");

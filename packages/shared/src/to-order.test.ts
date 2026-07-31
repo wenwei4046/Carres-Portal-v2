@@ -3,6 +3,7 @@ import {
   buildToOrder,
   composeSummary,
   isToOrderCategory,
+  nameBuild,
   pickSpecToken,
   planPurchaseOrders,
   purchaseOrderCount,
@@ -43,6 +44,7 @@ function line(over: Partial<ToOrderLine> & Pick<ToOrderLine, "lineId" | "sku">):
     customerName: "PETER",
     modelName: "Booqit",
     variant: null,
+    variantKind: null,
     buildKey: null,
     fabricName: null,
     legHeight: null,
@@ -247,6 +249,81 @@ describe("Summary", () => {
   it("uses the singular for one", () => {
     const [sofa] = run(ELLA);
     expect(sofa.rows[0].summary).toBe("Booqit · 1 Sofa · CG-004 Wood");
+  });
+});
+
+// ── The build names itself, and says how many ───────────────────────────────
+
+describe("Build name + quantity", () => {
+  /** One customer, one mattress line, King, two of them. */
+  const mattress = (over: Partial<ToOrderLine> = {}) =>
+    line({
+      lineId: "x1", sku: "B1201S-K", orderId: "ox", so: 1284, customerName: "LIM KUAN YANG",
+      category: "mattress", supplierId: NICE_FUTURE, leadDays: 7,
+      modelName: "B1201S", variant: "King", variantKind: "size", buildKey: null,
+      fabricName: null, legHeight: null, itemHeight: null, ...over,
+    });
+
+  it("carries the size a factory has to cut to", () => {
+    const [p] = run([mattress()]);
+    expect(p.rows[0].builds[0].size).toBe("King");
+    expect(p.rows[0].builds[0].title).toBe("B1201S King");
+  });
+
+  it("counts UNITS, not lines — a line of 2 is 2", () => {
+    const [p] = run([mattress({ qty: 2 })]);
+    expect(p.rows[0].builds[0].qty).toBe(2);
+  });
+
+  it("never lets a sofa part code become a size", () => {
+    // Live: all 138 sofa skus are variant_kind='part' with values like 1A(LHF).
+    // The fixture is a build of ONE module on purpose — a multi-module build
+    // would report no size anyway (its members disagree), so it would pass with
+    // the gate deleted and prove nothing.
+    const [p] = run([
+      line({
+        lineId: "s1", sku: "5539-1A(LHF)", orderId: "os", so: 1290, customerName: "solo",
+        buildKey: null, variant: "1A(LHF)", variantKind: "part",
+      }),
+    ]);
+    expect(p.rows[0].builds).toHaveLength(1);
+    expect(p.rows[0].builds[0].size).toBeNull();
+    expect(p.rows[0].builds[0].title).toBe("Booqit");
+  });
+
+  it("is ONE unit per sofa however many module lines it has", () => {
+    const [p] = run(PETER); // 5 module lines, 2 builds
+    expect(p.rows[0].builds.map((b) => b.qty)).toEqual([1, 1]);
+  });
+
+  it("drops the ordinal when the build already names itself", () => {
+    const [p] = run([mattress()]);
+    expect(p.rows[0].builds[0].title).not.toMatch(/Mattress \d/);
+  });
+
+  it("earns the ordinal back when a sibling would read identically", () => {
+    const [p] = run([mattress(), mattress({ lineId: "x2" })]);
+    expect(p.rows[0].builds.map((b) => b.title)).toEqual([
+      "Mattress 1 — B1201S King",
+      "Mattress 2 — B1201S King",
+    ]);
+  });
+
+  it("needs no ordinal when the SIZE already tells them apart", () => {
+    const [p] = run([
+      mattress(),
+      mattress({ lineId: "x2", sku: "B1201S-Q", variant: "Queen" }),
+    ]);
+    expect(p.rows[0].builds.map((b) => b.title)).toEqual(["B1201S King", "B1201S Queen"]);
+  });
+
+  it("reports NO size rather than the first when a build spans two", () => {
+    expect(
+      nameBuild([
+        { modelName: "B1201S", sku: "a", variant: "King", variantKind: "size" },
+        { modelName: "B1201S", sku: "b", variant: "Queen", variantKind: "size" },
+      ]).size,
+    ).toBeNull();
   });
 });
 

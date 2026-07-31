@@ -24,7 +24,11 @@
 > [`docs/ACTION-FLOW-STANDARD.md`](docs/ACTION-FLOW-STANDARD.md) — how actions are computed,
 > appear, close, and which one shows first ·
 > [`docs/COPY-STANDARD.md`](docs/COPY-STANDARD.md) — every visible word, the banned words,
-> the audit table · [`docs/UI-KIT.md`](docs/UI-KIT.md) — the shell ·
+> the audit table · **the DESIGN SYSTEM — [`docs/01-design-tokens.md`](docs/01-design-tokens.md) ·
+> [`docs/02-components.md`](docs/02-components.md) · [`docs/03-page-patterns.md`](docs/03-page-patterns.md)**
+> (⛔ `docs/UI-KIT.md` is SUPERSEDED 2026-07-31 — it holds only what is not yet
+> migrated, carries a migration ledger at its head, and is deleted when that
+> ledger empties. Nothing new goes into it.) ·
 > [`docs/execution-queues-index.md`](docs/execution-queues-index.md) — every line and card,
 > what is shipped, the lane rules.
 >

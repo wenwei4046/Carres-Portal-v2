@@ -143,6 +143,7 @@ async function loadToOrder(
       supplierId: string | null;
       cost: number | null;
       variant: string | null;
+      variantKind: string | null;
       category: string | undefined;
       modelName: string | null;
     }
@@ -168,7 +169,9 @@ async function loadToOrder(
    */
   const { data: skuRows, error: skuErr } = await sb
     .from("product_skus")
-    .select("sku, supplier_id, cost, variant, product_models!inner(category, name)");
+    .select(
+      "sku, supplier_id, cost, variant, variant_kind, product_models!inner(category, name)",
+    );
   if (skuErr) {
     const m = mapPgError(skuErr);
     return { ok: false, status: m.status, body: m.body };
@@ -179,6 +182,7 @@ async function loadToOrder(
       supplierId: (row.supplier_id as string | null) ?? null,
       cost: row.cost != null ? Number(row.cost) : null,
       variant: (row.variant as string | null) ?? null,
+      variantKind: (row.variant_kind as string | null) ?? null,
       category: (pm?.category as string | undefined) ?? undefined,
       modelName: (pm?.name as string | null) ?? null,
     });
@@ -266,6 +270,7 @@ async function loadToOrder(
       customerName: (order.customer_name as string | null) ?? null,
       modelName: c?.modelName ?? null,
       variant: c?.variant ?? null,
+      variantKind: c?.variantKind ?? null,
       buildKey: attr(attrs, "sofa_build_key"),
       fabricName: attr(attrs, "fabric_name"),
       legHeight: attr(attrs, "leg_height"),
