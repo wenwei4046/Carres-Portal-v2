@@ -173,8 +173,12 @@ the meaning is not in the union, it has not been ruled.
 
 **When NOT to use.** Navigation (that is a link) or status (that is a pill).
 
-**Variants.** Primary · secondary · tertiary · ghost · destructive.
-**Sizes.** sm 32 · md 40 · lg 48.
+**Variants.** Primary · neutral · ghost — three, and the ladder is a colour
+law: `blue-9` filled is the ONE action fill per block, neutral is every other
+action, ghost has no box. **There is no destructive variant** — red has one job
+(late · act now) and a red button paints intent onto a control; a destructive
+action is a neutral button whose WORD says what it does.
+**Sizes.** sm 24 · md 32.
 **States.** Default · hover · active · focus · disabled · loading.
 
 **Behaviour.** Forwards its ref — every `asChild` overlay anchors on the
@@ -187,14 +191,106 @@ tooltips open in the wrong place while React only warns.
 
 ---
 
+## Checkbox
+
+**Purpose.** A box, a tick, and a word.
+
+**Anatomy.** The whole row is the label — a bare box with a word beside it is a
+word that toggles nothing when clicked. Inside a table cell or a bar there is no
+visible label; `ariaLabel` is then required.
+
+**States.** Unchecked · checked · `indeterminate` — a real third value meaning
+*some, not none* (a select-all over a partial pick shows a DASH, so the
+difference survives greyscale).
+
+**Do.** Use it for a fact the operator flips, like `Include in this issue`.
+**Don't.** Use it as a status display nobody can change.
+
+**Used by.** To Order → the PO bar's `Include in this issue`; `DataTable`
+selection.
+
+---
+
+## Select
+
+**Purpose.** Pick one value from a short known list.
+
+**When NOT to use.** More than ~10 options (that needs search), or an action
+list (that is `DropdownMenu` — a Select CHOOSES, it never DOES).
+
+**Anatomy.** It wears the field skin (`field-recipe.ts`), so a Select and an
+Input in one row share height, hairline, focus ring and refusal red. Options
+are DATA, never children — a children API is how row appearance stops being the
+kit's within a week.
+
+**Accessibility.** Radix, not `<select>` — opens by keyboard; jsdom tests must
+open it by keyboard because a click-only test proves nothing.
+
+**Used by.** To Order → Issue region (`Destination`).
+
+---
+
+## Panel
+
+**Purpose.** A Card that has a title.
+
+**When to use.** The one question: does this surface need to say what it IS? If
+yes, Panel; if no, Card. Two components rather than an optional `title`, so a
+page cannot half-title a card.
+
+**Anatomy.** Title (`text-strong`) · optional `right` slot (one control — a
+count, a pill, a Button) · body. Header split by the STRONGER `slate-6`
+divider. **It does not collapse** — a collapsible region is `SectionHeader`.
+
+**Used by.** To Order → `Not on any purchase order` · the issued result.
+
+---
+
+## Card
+
+**Purpose.** The white surface.
+
+**Anatomy.** White fill · `slate-5` hairline · 10px radius · **no shadow**
+(depth as decoration is banned). `padding="none"` exists only for a body that
+must touch the edges — a table, an empty state.
+
+**Used by.** To Order → Issue region · the empty pane.
+
+---
+
+## EmptyState
+
+**Purpose.** What a region says when it holds nothing — an ANSWER, not an
+apology.
+
+**Anatomy.** Required `title` (the answer, one line) · optional `detail` ·
+optional single `action`. No illustration slot: art is decoration.
+
+**Used by.** `DataTable`'s empty row · To Order's empty pane.
+
+---
+
+## Loading
+
+**Purpose.** Two shapes for two questions: a **spinner** says *this control is
+busy* (inherits `currentColor`, so it is right inside a blue button without
+anybody choosing); a **skeleton** says *this region is arriving* (`slate-3`
+bars, the last one short so it cannot be mistaken for a table).
+
+**Behaviour.** No timing, no state — the caller knows whether anything is
+loading; this component only draws.
+
+**Used by.** `Button loading` · `DataTable` loading · To Order's queue rail.
+
+---
+
 # Built, not yet proven by a real page
 
 These exist in `components/kit/` and render on `/ui`. They are written up when a
 business page adopts one.
 
-`Input` · `Textarea` · `SearchInput` · `Card` · `Panel` · `Badge` ·
-`StatusPill` · `EmptyState` · `Loading` · `Modal` · `Drawer` · `Select` ·
-`Tooltip` · `Popover` · `Tabs` · `Checkbox` · `DatePicker` · `Toast` ·
+`Input` · `Textarea` · `SearchInput` · `Badge` · `StatusPill` · `Modal` ·
+`Drawer` · `Tooltip` · `Popover` · `Tabs` · `DatePicker` · `Toast` ·
 `PageShell` · `DetailShell`
 
 ---
