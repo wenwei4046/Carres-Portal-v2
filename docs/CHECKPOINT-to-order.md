@@ -1,36 +1,42 @@
 # CHECKPOINT — Purchasing · To Order
 
-> **Handover, written 2026-07-31.** Overwritten in place; there is never a
-> second version of this file.
+> **Handover, updated 2026-07-31 (second session).** Overwritten in place;
+> there is never a second version of this file.
 >
-> **Direction changed at the end of that session.** The page is to be rebuilt
-> from the Golden Template, NOT extended from what is on screen today. This
-> file is facts only — what survives, what does not, and what to read first.
+> **The rebuild is DONE in the repo.** `OperationToOrder.tsx` was written from
+> zero on the kit, the mount in `OperationApp.tsx` points at it, and
+> `OperationPurchase.tsx` + `purchase-order/*` were deleted whole — one change,
+> no window where the tab was missing. Deploy state is §15.
 
 ---
 
 ## 0 · What is actually on screen right now
 
-Live at `erp.carresofficial.com → Purchasing → To Order` (bundle
-`index-23Unfs6W.js`, main `4073d502`).
+**The rebuilt page** — `apps/web/src/pages/operation/OperationToOrder.tsx`,
+one file, assembly only. No hand-rolled shell survives: the queue rail is
+tokens-only page markup (no kit component renders a two-line picking list yet
+— extracted on its second occurrence), and every box is a kit component:
 
-**The accordion IS gone** — `Preview` and `PoBlock` were deleted, and
-`Purchase Order Preview` greps **0** in the live bundle. Five regions render.
-
-**What is still the 2026-07-30 page** is the SHELL around those regions, and
-that is the part the new direction replaces:
-
-| Still old | File · line |
+| Region | Rendered by |
 |---|---|
-| `Sidebar` — hand-rolled buttons, not a kit component | `OperationPurchase.tsx:295` |
-| `DocRow` — same | `:381` |
-| `StickyAction` — hand-rolled destination + button bar | `:435` |
-| `IssuedPanel` — the post-issue screen | `:544` |
-| `EmptyPanel` | `:584` |
-| The search box | **decoration — the file contains ZERO `<input>` for it** |
+| Queue rail (proposals + nested POs) | page-local, tokens only · `Loading` skeleton |
+| PO bar — include · `PO 1 of N` · customer · SO | `Checkbox` (kit) |
+| Header line — supplier · category ···· Order by | `SectionHeader` permanent |
+| Items | `SectionHeader` + `DataTable` + `DropdownMenu` + `Button` + `Icon` |
+| Not on any purchase order (when applicable) | `Panel` + ghost `Button` |
+| Issue — Destination · count · the one blue button | `Card` + `Select` + primary `Button` |
+| Issued result / empty / loading | `Panel` / `Card` + `EmptyState` / `Loading` |
 
-`PurchaseOrderWorkspace` and `ItemsSection` are new and Design-System-based,
-but they are mounted INSIDE that shell.
+**Absent by ruling, not by gap** (recorded in `03-page-patterns.md`):
+Supplier Communication and Notes to Supplier are NOT rendered — an unbuilt
+region is never an empty placeholder. The search box (decoration, zero
+`<input>` in the old file) is deleted, words kept in `TO_ORDER_WORDS`.
+Destination has ONE home: the Issue region. Selection is `blue-3` per
+`01 §2.3`; `blue-9` appears once, on Issue Purchase Order.
+
+**One defect fixed in the move**: the old Move menu numbered targets by the
+FILTERED list, so `PO 2 of 2` called itself `Purchase Order 1` in its own
+menu. Targets are now numbered by queue position.
 
 ---
 
@@ -86,10 +92,13 @@ documented in `02-components.md`:**
 | `Button` | forwards its ref, which every `asChild` overlay needs |
 | **`SectionHeader`** | **built this session** — collapsing is a discriminated union, so a permanent region has no chevron and no button at all |
 
+**Proven by the rebuilt To Order page (2026-07-31), written up in
+`02-components.md`:** `Checkbox` · `Select` · `Panel` · `Card` · `EmptyState`
+· `Loading`
+
 **Built, rendering on `/ui`, not yet proven by a business page:**
-`Input` · `Textarea` · `SearchInput` · `Card` · `Panel` · `Badge` ·
-`StatusPill` · `EmptyState` · `Loading` · `Modal` · `Drawer` · `Select` ·
-`Tooltip` · `Popover` · `Tabs` · `Checkbox` · `DatePicker` · `Toast` ·
+`Input` · `Textarea` · `SearchInput` · `Badge` · `StatusPill` · `Modal` ·
+`Drawer` · `Tooltip` · `Popover` · `Tabs` · `DatePicker` · `Toast` ·
 `PageShell` · `DetailShell` · `DialogFrame`
 
 **Kit house rules, enforced by `kit-source.test.ts`:** no raw hex · no
@@ -126,34 +135,19 @@ Example under the pattern it uses.
 
 ---
 
-## 4 · The method: build new, delete old. Do NOT amend.
+## 4 · The method: build new, delete old. Do NOT amend. — ✅ EXECUTED
 
-**This is the direction change (Loo, 2026-07-31).** The previous session took
-`OperationPurchase.tsx` and edited it region by region. The regions came out
-right and the SHELL never left, because a file you keep opening is a file whose
-shape you keep. That method is rejected.
+**Done 2026-07-31, exactly as written**: `OperationToOrder.tsx` written from
+zero; the mount changed and `OperationPurchase.tsx`, its 23 shell tests,
+`PurchaseOrderWorkspace.tsx` and `ItemsSection.tsx` deleted in the SAME change.
+The old file was read once for its state (`pickedKey` · `pickedDoc` · `destId`
+· `plan` · `issued`), the mutation body and the deep link — those survived as
+logic; not one line survived as markup.
 
-**What the next chat does instead:**
-
-1. Write a NEW page file from zero, composed from §1's business logic and §2's
-   kit components.
-2. Delete `apps/web/src/pages/operation/OperationPurchase.tsx` **in the same
-   change** that points the route at the new file.
-3. Never open the old file to edit it. Read it once, for the state it holds and
-   the props it passes — then close it.
-
-**Why deletion and replacement are one change, not two.** `To Order` is live on
-the operator's portal. Deleting the old page on its own takes the tab off the
-portal until the new one lands. One commit, one route, no window where the
-module is missing.
-
-**Nothing in the old file survives as markup.** Not the sidebar, not the sticky
-action bar, not the issued panel, not the empty panel, not the search box —
-which is decoration with zero `<input>` in the entire file.
-
-**What may be lifted, as logic and not as JSX:** the state the page holds
-(`pickedKey` · `pickedDoc` · `destId` · `plan` · `issued`), the mutation body,
-and the deep link `/operation/orders?order={orderId}`.
+**The method stands for every future rebuild**: a file you keep opening is a
+file whose shape you keep. R8's source scan (`purchasing-words.test.ts`) is the
+tripwire — deleting a lane file makes it fail by name, so a rename can never
+silently empty the suite.
 
 ## 5 · Commits to keep
 
@@ -293,7 +287,9 @@ Live on screen, ruled by Loo 2026-07-31, **not in Jess's dictionary**:
 `Items` · `Ref` · `Item` · `Size` · `Qty` · `More` ·
 `Create Another Purchase Order` · `Remove` · `Open Customer Order` ·
 `Move to Purchase Order {N}` · `Nothing on this purchase order.` ·
-`N lines · N units` · `Supplier Communication` · `Notes to Supplier`
+`N lines · N units` · `PO {i} of {N}` (now `poIndexLabel` in
+`packages/shared/src/to-order.ts` — was a literal typed twice in markup) ·
+`Supplier Communication` · `Notes to Supplier`
 
 Designed, not built: `Live Purchase Order` · `Review message` ·
 `Supplier acknowledged` · `Re-open WhatsApp group` · `Send revision` ·
@@ -334,25 +330,29 @@ purchase orders   7 live, all SHORT (issued while the `.in()` bug was live) —
 
 ---
 
-## 14 · Baselines
+## 14 · Baselines (re-measured after the rebuild, 2026-07-31)
 
 | | |
 |---|---|
-| shared | 2017 / 2017 |
+| shared | 2018 / 2018 (2017 + `poIndexLabel`) |
 | api | 3 pre-existing (`partner/pickups` ×1 · `supplier/pos` ×2) |
-| web | **16** — `OperationOrders` ×7 · `OhanaSofaTab` ×4 · `OrderCustomerCard` ×4 · `NiceFutureMattressTab` ×1 |
+| web | **16** — `OperationOrders` ×7 · `OhanaSofaTab` ×4 · `OrderCustomerCard` ×4 · `NiceFutureMattressTab` ×1. The new page's own suite is 16/16. |
 | tsc | web clean · api 4 (`rental-sell.test.ts`) |
-| design-standard | **8500** — the ratchet may never rise |
+| design-standard | **8438** — deleting the old shell dropped it 62; the ratchet may never rise |
 
-**The 17th failure under full-suite load is `OperationPurchase > names the real
-purchase orders…`** — proved pre-existing by stashing every change and getting
-the identical failure.
+**The 17th failure under full-suite load died with its file** —
+`OperationPurchase.test.tsx` was deleted whole in the rebuild.
+
+**Negative control, proven not assumed**: smuggling `sku` into the issue
+mutation body makes `posts the ARRANGEMENT and nothing else` fail (1/16);
+reverting restores 16/16.
 
 ## 15 · Deployed
 
 ```
-Main tip     4073d502
-Web bundle   index-23Unfs6W.js · 4,592,479 bytes · SERVICE_ROLE 0
-API Worker   c632a67e
+Rebuild      built + verified on branch, NOT yet merged/deployed —
+             awaiting Loo's review. Update this block after deploy.
+Last live    main 4073d502 · index-23Unfs6W.js · 4,592,479 bytes · SERVICE_ROLE 0
+API Worker   c632a67e (no api change in the rebuild — web only)
 Migration    none this session · prod applied tail 0308 · repo tail 0307
 ```

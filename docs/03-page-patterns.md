@@ -94,10 +94,12 @@ from the irreversible button.
 
 ### Carres Examples
 
-**Purchase Orders → To Order** *(frozen 2026-07-31, building section by section)*
+**Purchase Orders → To Order** *(region order frozen 2026-07-31; page rebuilt
+from zero on the kit the same day — `OperationToOrder.tsx`, the old shell
+deleted whole)*
 
 ```
-Header                    supplier · destination · dates      collapsed by default
+Header                    supplier · category · order-by date
 Supplier Communication    channels · WhatsApp + Email drafts   collapsed by default
 Items                     the review itself                    the largest region
 Notes to Supplier
@@ -109,16 +111,33 @@ sending.** Communication sits ABOVE Items and collapsed, because the real
 sequence is review-then-send, and a section at the bottom of a long table is a
 section that gets missed.
 
+Rulings this example added (Loo, 2026-07-31 — they bind every Review page):
+
+- **An unbuilt region is NOT rendered as an empty placeholder.** A chevron
+  that opens nothing is a dead control. The frozen region ORDER holds; a
+  region joins the page when its data exists, not before.
+- **A commit parameter has ONE operational home — beside the commit.**
+  Destination lives in the Issue region, where the operator confirms it, and
+  is repeated nowhere.
+- **A region with a one-line body is a permanent line, not a collapsible.**
+  The Header is a permanent `SectionHeader` (title `supplier · category`,
+  meta `Order by {date}`) until `suppliers` carries address / tel / attn /
+  terms — then it becomes collapsible, because there is something to open.
+
 Section status:
 
 | Section | State |
 |---|---|
-| Items | ✅ built 2026-07-31 — `DataTable`, Ref · Item · Size · Qty · `⋯` |
-| Items section header | next |
-| Header | blocked — `suppliers` has no address / tel / attn |
-| Supplier Communication | blocked — no `po_sends` table |
-| Notes to Supplier | blocked — no ruled word |
-| Issue | already live |
+| Items | ✅ `SectionHeader` (permanent) + `DataTable` — Ref · Item · Size · Qty · `⋯` |
+| Header | line only — body blocked on `suppliers` address / tel / attn / terms |
+| Supplier Communication | not rendered — blocked on `po_sends` |
+| Notes to Supplier | not rendered — no ruled word |
+| Issue | ✅ `Card` + `Select` (Destination) + the one primary `Button` |
+
+The page around the workspace is the Queue pattern: a 280px queue rail
+(proposals, with the current proposal's purchase orders nested under it) and
+the workspace as the detail panel. The rail is page-local markup, tokens only
+— extracted into the kit on its second occurrence, per `02`'s own law.
 
 Frozen rules this example depends on, owned by Business not by this file:
 one purchase order has exactly one fulfilment destination · a sofa purchase

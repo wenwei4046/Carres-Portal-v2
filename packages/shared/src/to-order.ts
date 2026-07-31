@@ -144,6 +144,16 @@ export function moveToTarget(target: string): string {
   return `Move to ${target}`;
 }
 
+/**
+ * `PO 1 of 3` — which document fills the workspace, and how many there are.
+ * Was a literal typed inside the page (twice — the queue row and the PO bar);
+ * moved here 2026-07-31 because a word that lives in markup is a word that
+ * drifts. Still owed a COPY-STANDARD row.
+ */
+export function poIndexLabel(i: number, total: number): string {
+  return `PO ${i} of ${total}`;
+}
+
 /** `{N} purchase orders issued to {supplier}` — the success line. */
 export function issuedHeadline(n: number, supplier: string): string {
   return `${n} purchase order${n === 1 ? "" : "s"} issued to ${supplier}`;

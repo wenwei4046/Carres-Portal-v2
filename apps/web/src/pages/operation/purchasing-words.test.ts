@@ -30,9 +30,12 @@ import { describe, expect, it } from "vitest";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB_SRC = join(HERE, "..", "..");
 
-/** The screens R8 owns. A file added here must pass every rule below. */
+/** The screens R8 owns. A file added here must pass every rule below.
+ *  `OperationToOrder.tsx` replaced `OperationPurchase.tsx` on 2026-07-31 —
+ *  the To Order page was rebuilt from the Golden Template and the old file
+ *  deleted whole; the lane rules bind the replacement the same way. */
 const LANE = [
-  "pages/operation/OperationPurchase.tsx",
+  "pages/operation/OperationToOrder.tsx",
   "pages/operation/OperationReceiving.tsx",
   "pages/operation/OperationSupplierClaims.tsx",
   "pages/operation/components/WarehouseReceiptsPanel.tsx",
@@ -121,12 +124,12 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
     // Not a word rule: the proof that the dead filters are gone whole, rather
     // than left as state with the chip removed (which is the same lie one level
     // down). Their tiles were deleted 2026-07-23/24.
-    const src = read("pages/operation/OperationPurchase.tsx");
+    const src = read("pages/operation/OperationToOrder.tsx");
     expect(src).not.toMatch(/\bsetAttn\b/);
     expect(src).not.toMatch(/\bsetSelectedDay\b/);
     expect(src).not.toMatch(/useState<Attn>/);
     // …and the clear chips that could never be reached went with them.
-    expect(visibleSource("pages/operation/OperationPurchase.tsx")).not.toMatch(
+    expect(visibleSource("pages/operation/OperationToOrder.tsx")).not.toMatch(
       /"Late only"|"No deadline"|Day: \$\{/,
     );
   });
@@ -144,7 +147,7 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
     for (const f of [
       "pages/operation/OperationSupplierClaims.tsx",
       "pages/operation/OperationReceiving.tsx",
-      "pages/operation/OperationPurchase.tsx",
+      "pages/operation/OperationToOrder.tsx",
     ]) {
       expect(read(f), f).not.toMatch(/function FacetRow\(/);
     }
@@ -172,7 +175,7 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
     // `Factory` is banned on the whole lane; the positive half only binds the
     // tabs that carry a facet rail (To Order stopped having one 2026-07-30).
     for (const f of [
-      "pages/operation/OperationPurchase.tsx",
+      "pages/operation/OperationToOrder.tsx",
       "pages/operation/OperationReceiving.tsx",
       "pages/operation/OperationSupplierClaims.tsx",
     ]) {
