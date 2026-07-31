@@ -65,7 +65,15 @@ export const TO_ORDER_WORDS = {
   noDeliveryDate: "No delivery date",
 
   destination: "Destination",
+  /** Voiced in the Issue region when no destination is configured at all. */
+  destinationRequired: "Destination not selected.",
   issue: "Issue Purchase Order",
+
+  /**
+   * The queue rail's own heading — what the left side IS. Ruled by Loo
+   * 2026-07-31 with the Fiori-worklist rail; still owed a COPY-STANDARD row.
+   */
+  readyToIssue: "Ready to issue",
 
   // The Preview — what pressing Issue would create, before it exists.
   preview: "Purchase Order Preview",
@@ -117,6 +125,30 @@ export const TO_ORDER_WORDS = {
 
   empty: "No purchase orders to issue.",
 } as const;
+
+/**
+ * `PO 2` — a queue-rail row. Small on purpose (Loo, 2026-07-31: the rail is
+ * scanned for COUNTS, and a row is only the door to the workspace, where the
+ * full `PO 2 of 3` still lives via `poIndexLabel`).
+ */
+export function poShortLabel(i: number): string {
+  return `PO ${i}`;
+}
+
+/** `2 orders` — customer orders on one purchase order. */
+export function countOrders(n: number): string {
+  return `${n} order${n === 1 ? "" : "s"}`;
+}
+
+/** `5 items` — physical units on one purchase order. */
+export function countItems(n: number): string {
+  return `${n} item${n === 1 ? "" : "s"}`;
+}
+
+/** `7 working days` — the pair's production time, as the header states it. */
+export function productionDaysLabel(n: number): string {
+  return `${n} working day${n === 1 ? "" : "s"}`;
+}
 
 /** `1 Purchase Order` / `7 Purchase Orders` — the sidebar and the button. */
 export function purchaseOrderCount(n: number): string {
@@ -308,6 +340,12 @@ export interface ToOrderProposal {
   rows: ToOrderRow[];
   /** Set when the pair has no production days — Issue is refused. */
   blocked: "production_days" | null;
+  /**
+   * The pair's production time in WORKING days — the number a manager set in
+   * Settings, read back off the demand lines (one pair, one number). `null`
+   * exactly when `blocked` — a missing number is never defaulted into a fact.
+   */
+  productionDays: number | null;
 }
 
 // ── Summary ─────────────────────────────────────────────────────────────────
@@ -596,6 +634,10 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
       poCount: isOnePoPerOrder(category) ? rows.length : 1,
       rows: sortToOrderRows(rows),
       blocked: missing.has(pairKey) ? "production_days" : null,
+      // Settings are per supplier × category, so every line in the pair
+      // carries the same number; a blocked pair gets NO number — showing a
+      // fallback here would be the silent 7 that P1 exists to refuse.
+      productionDays: missing.has(pairKey) ? null : (pairLines[0]?.leadDays ?? null),
     });
   }
 
