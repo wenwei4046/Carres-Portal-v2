@@ -1,12 +1,14 @@
 # CHECKPOINT — Purchasing · To Order
 
-> **Handover, updated 2026-07-31 (second session).** Overwritten in place;
-> there is never a second version of this file.
+> **Handover, updated 2026-07-31 (third session — step 1 of Loo's
+> deploy-one-by-one plan).** Overwritten in place; there is never a second
+> version of this file.
 >
-> **The rebuild is DONE in the repo.** `OperationToOrder.tsx` was written from
-> zero on the kit, the mount in `OperationApp.tsx` points at it, and
-> `OperationPurchase.tsx` + `purchase-order/*` were deleted whole — one change,
-> no window where the tab was missing. Deploy state is §15.
+> **The rebuild is DONE and step 1 of the frozen layout is LIVE.**
+> `OperationToOrder.tsx` was written from zero on the kit (second session);
+> the third session rebuilt the rail as Loo's Fiori worklist, made the header
+> the ONE row of facts and emptied the Issue region down to count + button.
+> Deploy state is §15.
 
 ---
 
@@ -14,29 +16,41 @@
 
 **The rebuilt page** — `apps/web/src/pages/operation/OperationToOrder.tsx`,
 one file, assembly only. No hand-rolled shell survives: the queue rail is
-tokens-only page markup (no kit component renders a two-line picking list yet
+tokens-only page markup (no kit component renders a picking list yet
 — extracted on its second occurrence), and every box is a kit component:
 
 | Region | Rendered by |
 |---|---|
-| Queue rail (proposals + nested POs) | page-local, tokens only · `Loading` skeleton |
+| Queue rail 320px — `Ready to issue` + total · one COLLAPSED one-line row per proposal (chevron · supplier · **count is the big fact** · order-by date) · expanding shows small `PO 2 · PETER · 3 items` rows | page-local, tokens only · `Icon` chevrons · `Loading` skeleton |
 | PO bar — include · `PO 1 of N` · customer · SO | `Checkbox` (kit) |
-| Header line — supplier · category ···· Order by | `SectionHeader` permanent |
+| Header line — ONE row of facts: supplier · category ···· Order by · `{n} working days` · **Destination** | `SectionHeader` permanent + `Select` in its `action` slot |
 | Items | `SectionHeader` + `DataTable` + `DropdownMenu` + `Button` + `Icon` |
 | Not on any purchase order (when applicable) | `Panel` + ghost `Button` |
-| Issue — Destination · count · the one blue button | `Card` + `Select` + primary `Button` |
+| Issue — count · the one blue button · refusal reasons (incl. `Destination not selected.`) | `Card` + primary `Button` |
 | Issued result / empty / loading | `Panel` / `Card` + `EmptyState` / `Loading` |
+
+**The rail's three laws (Loo, 2026-07-31)**: the rail is scanned for COUNTS —
+only the number is big; expanding a group is NOT selecting (only picking a PO
+row changes the pane, so the rail carries ZERO actions); the most urgent group
+opens itself and its first document fills the pane, so the pane is never
+empty. The reference shape is the SAP-Fiori worklist / Linear grouped list.
 
 **Absent by ruling, not by gap** (recorded in `03-page-patterns.md`):
 Supplier Communication and Notes to Supplier are NOT rendered — an unbuilt
 region is never an empty placeholder. The search box (decoration, zero
 `<input>` in the old file) is deleted, words kept in `TO_ORDER_WORDS`.
-Destination has ONE home: the Issue region. Selection is `blue-3` per
-`01 §2.3`; `blue-9` appears once, on Issue Purchase Order.
+**Destination has ONE home: the Header line** (Loo's frozen draft moved it out
+of the Issue region on 2026-07-31 — the header is the facts row, and
+Destination is a fact the operator may change; the Issue region only voices
+its absence). Selection is `blue-3` per `01 §2.3`; `blue-9` appears once, on
+Issue Purchase Order.
 
-**One defect fixed in the move**: the old Move menu numbered targets by the
-FILTERED list, so `PO 2 of 2` called itself `Purchase Order 1` in its own
-menu. Targets are now numbered by queue position.
+**Two defects fixed on the way**: the old Move menu numbered targets by the
+FILTERED list (`PO 2 of 2` called itself `Purchase Order 1`) — targets are
+numbered by queue position now. And the reset-on-proposal-change effect landed
+a cross-supplier pick on PO 1 instead of the clicked row — `pickedDoc` is a
+`{proposal, doc}` PAIR now, so a pick can never outlive its proposal; the
+negative control is proven (re-adding the reset fails exactly that test).
 
 ---
 
@@ -289,7 +303,11 @@ Live on screen, ruled by Loo 2026-07-31, **not in Jess's dictionary**:
 `Move to Purchase Order {N}` · `Nothing on this purchase order.` ·
 `N lines · N units` · `PO {i} of {N}` (now `poIndexLabel` in
 `packages/shared/src/to-order.ts` — was a literal typed twice in markup) ·
-`Supplier Communication` · `Notes to Supplier`
+`Supplier Communication` · `Notes to Supplier` ·
+**added 2026-07-31 (step 1, the rail + the facts header)**:
+`Ready to issue` · `Destination not selected.` · `PO {i}` (`poShortLabel`) ·
+`{n} orders` (`countOrders`) · `{n} items` (`countItems`) ·
+`{n} working days` (`productionDaysLabel`)
 
 Designed, not built: `Live Purchase Order` · `Review message` ·
 `Supplier acknowledged` · `Re-open WhatsApp group` · `Send revision` ·
@@ -330,44 +348,55 @@ purchase orders   7 live, all SHORT (issued while the `.in()` bug was live) —
 
 ---
 
-## 14 · Baselines (re-measured after the rebuild, 2026-07-31)
+## 14 · Baselines (re-measured after step 1, 2026-07-31)
 
 | | |
 |---|---|
-| shared | 2018 / 2018 (2017 + `poIndexLabel`) |
+| shared | **2021 / 2021** (2018 + `productionDays` ×2 + the rail composers) |
 | api | 3 pre-existing (`partner/pickups` ×1 · `supplier/pos` ×2) |
-| web | **16** — `OperationOrders` ×7 · `OhanaSofaTab` ×4 · `OrderCustomerCard` ×4 · `NiceFutureMattressTab` ×1. The new page's own suite is 16/16. |
+| web | **16** — `OperationOrders` ×7 · `OhanaSofaTab` ×4 · `OrderCustomerCard` ×4 · `NiceFutureMattressTab` ×1. The page's own suite is **20/20**. |
 | tsc | web clean · api 4 (`rental-sell.test.ts`) |
-| design-standard | **8438** — deleting the old shell dropped it 62; the ratchet may never rise |
+| design-standard | **8438** — unchanged; the ratchet may never rise |
 
-**The 17th failure under full-suite load died with its file** —
-`OperationPurchase.test.tsx` was deleted whole in the rebuild.
-
-**Negative control, proven not assumed**: smuggling `sku` into the issue
-mutation body makes `posts the ARRANGEMENT and nothing else` fail (1/16);
-reverting restores 16/16.
+**Negative controls, proven not assumed**: smuggling `sku` into the issue
+mutation body fails `posts the ARRANGEMENT and nothing else`; re-adding the
+old reset-on-proposal-change effect fails exactly
+`picking a PO row of another supplier switches the pane to exactly that
+document` (1/20) — that control caught a REAL live bug during the build, not
+after it.
 
 ## 15 · Deployed
 
 ```
-Main tip     0a99da12 (PR #534 — the rebuild)
-Web bundle   index-BTU4ZIV3.js · 4,610,515 bytes · SERVICE_ROLE 0
-             both Pages projects --branch=main · 4 canonicals converged on poll 2
-API Worker   c632a67e unchanged — web-only ship; apps/api untouched and the one
-             shared addition (poIndexLabel) has no api reader (checked)
-Migration    none · prod applied tail 0308 · repo tail 0307
+Main tip     2c37a1ae (PR #536 — step 1: the Fiori rail + the facts header)
+Web bundle   index-DjMYPzdc.js · 4,612,176 bytes · SERVICE_ROLE 0
+             carres-portal 7079c101 + carres-pos dcd4bc79, both --branch=main
+             4 canonicals converged on the FIRST poll
+             wrangler pages deployment list names Production/main source 2c37a1a
+API Worker   3824b9c7 — REQUIRED, not optional: the Worker imports buildToOrder
+             and computes the payload, so productionDays only reaches the wire
+             with an api deploy (the ask-what-the-api-IMPORTS rule again).
+             Bindings echoed: PUBLIC_WEB_URL=pos.carresofficial.com ·
+             api.carresofficial.com · cron 0 1 * * *. GET /health → 200 ok.
+Migration    none · prod applied tail 0308 · repo tail 0307 (prod ahead — the
+             harmless direction)
 ```
 
-**Bundle grep, both directions** (downloaded to a file first — a piped grep
-truncates): new — `to-order-workspace` · `to-order-queue` ·
-`to-order-header-line` · `to-order-putback-` · `to-order-destination-select`
-each 0→1, and `poIndexLabel`'s body is present as the template
-`` `PO ${e} of ${t}` `` — the composed sentence `PO 1 of` correctly greps 0,
-the template-literal form of the pick-markers-from-MOUNTED-components trap.
-Retired and now 0 — `to-order-sidebar` · `po-workspace` ·
-`po-region-communication` · `po-region-notes` · `po-items-header` ·
-`Purchase Order Preview`. `to-order-include-` survives at 1 ON PURPOSE: it is
-the new page's checkbox id, the identifier being the contract.
+**Bundle grep, both directions** (both files DOWNLOADED first; the first
+attempt fetched the predecessor from a wrong deployment URL and got the
+1,757-byte 404 page — the documented trap, caught by `wc -c` before any
+number was believed; the true predecessor `d6ddf7ea` serves
+`index-BTU4ZIV3.js` at its recorded 4,610,515 bytes):
+new — `Ready to issue` · `Destination not selected.` · `to-order-queue-total`
+· `to-order-production-days` · `to-order-no-destination` each **0→1** ·
+`working day` **20→21** · `productionDays` **7→9** · `w-[320px]` **2→3**;
+retired — `w-[280px]` **8→7**, the −1 being the old rail (the 7 survivors are
+other pages' own widths, correctly untouched). `SERVICE_ROLE` **0 in both**.
 
 **No authenticated screenshot** — the page sits behind an operation login and
 taking one would mean typing a password into a form; the grep is the proof.
+
+**Next steps in Loo's deploy-one-by-one plan** (each its own chat + deploy):
+step 2 = Notes to Supplier (needs the note-rides-the-Issue-POST decision);
+step 3 = the Purchase Orders tab detail reusing the same five-region document
+shape, where Supplier Communication lives (needs `po_sends`, §12).
