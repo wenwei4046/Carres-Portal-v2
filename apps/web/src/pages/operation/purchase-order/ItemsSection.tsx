@@ -31,33 +31,13 @@ import DropdownMenu, { type MenuItem } from "@/components/kit/DropdownMenu";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import SectionHeader from "@/components/kit/SectionHeader";
-import { unitLabel, type ToOrderBuildRef } from "@carres/shared";
-
-/** Ruled 2026-07-31. Owed a COPY-STANDARD row before this ships to Jess. */
-export const ITEMS_WORDS = {
-  heading: "Items",
-  colRef: "Ref",
-  colItem: "Item",
-  colSize: "Size",
-  colQty: "Qty",
-  /** The action column carries no header — the ⋯ names itself. */
-  colAction: "",
-  menuLabel: "More",
-  split: "Create Another Purchase Order",
-  remove: "Remove",
-  openOrder: "Open Customer Order",
-  /** `Move to Purchase Order 2` — the target is named, never a submenu. */
-  moveTo: (target: string) => `Move to ${target}`,
-  empty: "Nothing on this purchase order.",
-  tableLabel: "Items on this purchase order",
-} as const;
-
-/** `13 lines · 14 units` — the count the header printed as one number. */
-export function itemsCount(builds: readonly ToOrderBuildRef[], category: string): string {
-  const units = builds.reduce((s, b) => s + b.qty, 0);
-  const lines = builds.length;
-  return `${lines} line${lines === 1 ? "" : "s"} · ${units} ${unitLabel(category, units).toLowerCase()}`;
-}
+import {
+  TO_ORDER_WORDS as W,
+  itemsCount,
+  moveToTarget,
+  unitLabel,
+  type ToOrderBuildRef,
+} from "@carres/shared";
 
 export interface MoveTarget {
   key: string;
@@ -96,13 +76,13 @@ export default function ItemsSection({
   const columns: readonly Column<ToOrderBuildRef>[] = [
     {
       key: "ref",
-      label: ITEMS_WORDS.colRef,
+      label: W.itemsColRef,
       width: 16,
       cell: (b) => (b.so != null ? `SO-${b.so}` : "—"),
     },
     {
       key: "item",
-      label: ITEMS_WORDS.colItem,
+      label: W.itemsColItem,
       width: 44,
       // The ordinal only when a sibling would read identically — PETER's two
       // Booqits are different sofas and an operator removing one has to know
@@ -115,13 +95,13 @@ export default function ItemsSection({
       // Null where the category HAS no size, which is a different fact from
       // nobody having typed one — every sofa reads the dash for the first
       // reason and no mattress can read it for the second.
-      label: ITEMS_WORDS.colSize,
+      label: W.itemsColSize,
       width: 16,
       cell: (b) => b.size ?? "—",
     },
     {
       key: "qty",
-      label: ITEMS_WORDS.colQty,
+      label: W.itemsColQty,
       width: 12,
       align: "right",
       numeric: true,
@@ -129,17 +109,17 @@ export default function ItemsSection({
     },
     {
       key: "action",
-      label: ITEMS_WORDS.colAction,
+      label: W.itemsColAction,
       width: 12,
       align: "right",
       cell: (b) => (
         <DropdownMenu
-          label={ITEMS_WORDS.menuLabel}
+          label={W.itemsMenu}
           trigger={
             <Button
               variant="ghost"
               size="sm"
-              aria-label={ITEMS_WORDS.menuLabel}
+              aria-label={W.itemsMenu}
               data-testid={`items-menu-${b.buildKey}`}
             >
               {/* The kit's 40 meanings hold exactly one kebab, and it is
@@ -162,24 +142,24 @@ export default function ItemsSection({
       for (const t of moveTargets) {
         items.push({
           key: `move-${t.key}`,
-          label: ITEMS_WORDS.moveTo(t.label),
+          label: moveToTarget(t.label),
           onSelect: () => onMove(b.buildKey, t.key),
         });
       }
       items.push({
         key: "split",
-        label: ITEMS_WORDS.split,
+        label: W.itemsSplit,
         onSelect: () => onSplit(b.buildKey),
       });
     }
     items.push({
       key: "remove",
-      label: ITEMS_WORDS.remove,
+      label: W.itemsRemove,
       onSelect: () => onRemove(b.buildKey),
     });
     items.push({
       key: "open",
-      label: ITEMS_WORDS.openOrder,
+      label: W.itemsOpenOrder,
       separatorBefore: true,
       onSelect: () => onOpenOrder(b.orderId),
     });
@@ -192,11 +172,11 @@ export default function ItemsSection({
           review happens in, so it takes no `collapsible` and the component
           draws no chevron for it to not do anything. */}
       <SectionHeader
-        title={ITEMS_WORDS.heading}
+        title={W.itemsHeading}
         testId="po-items-header"
         meta={
           <span className="tabular-nums" data-testid="po-items-count">
-            {itemsCount(builds, category)}
+            {itemsCount(builds.length, builds.reduce((n, b) => n + b.qty, 0))}
           </span>
         }
       />
@@ -205,8 +185,8 @@ export default function ItemsSection({
         columns={columns}
         rowId={(b) => b.buildKey}
         loading={loading}
-        empty={ITEMS_WORDS.empty}
-        label={ITEMS_WORDS.tableLabel}
+        empty={W.itemsEmpty}
+        label={W.itemsTableLabel}
       />
     </section>
   );

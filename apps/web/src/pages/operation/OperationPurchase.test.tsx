@@ -223,7 +223,8 @@ describe("To Order — the Purchase Order Preview", () => {
     expect(items).toHaveTextContent("Cody");
     expect(items).toHaveTextContent("Queen");
     expect(items).toHaveTextContent("3");
-    expect(screen.getByTestId("po-items-count")).toHaveTextContent("1 line · 3 bedframes");
+    // UNITS, the word Loo froze — the goods are named in every row's Item cell.
+    expect(screen.getByTestId("po-items-count")).toHaveTextContent("1 line · 3 units");
   });
 
   it("has no Split or Move on sofa — a sofa PO carries one customer order", async () => {

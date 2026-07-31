@@ -81,6 +81,28 @@ export const TO_ORDER_WORDS = {
   removedHelp: "Still waiting to be ordered. It comes back on the next refresh.",
   putBack: "Put back",
 
+  // ── Items · the section an operator spends the review in ─────────────────
+  // Ruled by Loo 2026-07-31. Each is still owed a COPY-STANDARD row.
+  itemsHeading: "Items",
+  itemsColRef: "Ref",
+  itemsColItem: "Item",
+  itemsColSize: "Size",
+  itemsColQty: "Qty",
+  /** The action column carries no header word — the ⋯ names itself. */
+  itemsColAction: "",
+  itemsMenu: "More",
+  itemsSplit: "Create Another Purchase Order",
+  itemsRemove: "Remove",
+  /**
+   * `Open order` is what COPY-STANDARD:826 rules for leaving a module. Loo
+   * re-ruled it here on 2026-07-31: this page shows Purchase Orders, Sales
+   * Orders and Delivery Orders, and one word for three documents is the
+   * ambiguity that ruling exists to prevent.
+   */
+  itemsOpenOrder: "Open Customer Order",
+  itemsEmpty: "Nothing on this purchase order.",
+  itemsTableLabel: "Items on this purchase order",
+
   productionDaysRequired: "Production Days Required",
   productionDaysHelp: "Set production days in Settings.",
 
@@ -104,6 +126,22 @@ export function purchaseOrderCount(n: number): string {
 /** `3 items could not be read` — the count is the point, so it leads. */
 export function unresolvedHeadline(n: number): string {
   return `${n} item${n === 1 ? "" : "s"} could not be read`;
+}
+
+/**
+ * `13 lines · 14 units` — what the Items region holds.
+ *
+ * UNITS, not the category's own word. A line of 2 read exactly like a line of
+ * 1 until 2026-07-31, so the number is the point; naming the goods again here
+ * would repeat what every row already says in its own Item column.
+ */
+export function itemsCount(lines: number, units: number): string {
+  return `${lines} line${lines === 1 ? "" : "s"} · ${units} unit${units === 1 ? "" : "s"}`;
+}
+
+/** `Move to Purchase Order 2` — the target is named, never a submenu. */
+export function moveToTarget(target: string): string {
+  return `Move to ${target}`;
 }
 
 /** `{N} purchase orders issued to {supplier}` — the success line. */

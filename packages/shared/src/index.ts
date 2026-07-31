@@ -1785,6 +1785,8 @@ export {
   isOnePoPerOrder,
   isToOrderCategory,
   issuedHeadline,
+  itemsCount,
+  moveToTarget,
   pickSpecToken,
   planFromDocuments,
   planPurchaseOrders,
