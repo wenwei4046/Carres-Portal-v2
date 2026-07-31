@@ -134,7 +134,6 @@ async function loadToOrder(
     }
     lines.push(...((data ?? []) as Record<string, unknown>[]));
   }
-  const skus = [...new Set(lines.map((l) => l.sku as string))];
 
   // Catalog facts. No FK exists on order_lines.sku, so this is a second query
   // by sku rather than an embed (product_skus → product_models IS a real FK).
@@ -148,31 +147,41 @@ async function loadToOrder(
       modelName: string | null;
     }
   >();
-  const skuRows: Record<string, unknown>[] = [];
-  for (const batch of chunk(skus)) {
-    const { data, error } = await sb
-      .from("product_skus")
-      .select("sku, supplier_id, cost, variant, product_models!inner(category, name)")
-      .in("sku", batch);
-    if (error) {
-      const m = mapPgError(error);
-      return { ok: false, status: m.status, body: m.body };
-    }
-    skuRows.push(...((data ?? []) as Record<string, unknown>[]));
+  /**
+   * ⚠ THE CATALOG IS READ WHOLE, AND `.in()` IS NEVER USED ON A SKU.
+   *
+   * `order_lines.sku` is free text, and 16 live demand lines carry a DOUBLE
+   * QUOTE in the value — `Leg 4"`, `HK5531/28"(2 Seater + Lshape)/…`. PostgREST
+   * wraps a value holding reserved characters in double quotes, so a value that
+   * CONTAINS one breaks the filter it is put into and the server answers with
+   * whatever it managed to parse.
+   *
+   * That is the whole story of this module's two worst days: seven customer
+   * requirements on no purchase order (2026-07-30), then a guard reading the
+   * short answer as an alarm and blocking every issue (2026-07-31). Chunking
+   * did not help — the unparseable value is still inside one of the chunks.
+   *
+   * The catalog is 205 rows. Reading it whole costs nothing and removes the
+   * class: no list to quote, no length to exceed, nothing to chunk. A SKU
+   * absent from this map is then definitively not a product, so "does it
+   * exist?" needs no second query.
+   */
+  const { data: skuRows, error: skuErr } = await sb
+    .from("product_skus")
+    .select("sku, supplier_id, cost, variant, product_models!inner(category, name)");
+  if (skuErr) {
+    const m = mapPgError(skuErr);
+    return { ok: false, status: m.status, body: m.body };
   }
-  {
-    for (const s of skuRows) {
-      const pm = (s as Record<string, unknown>).product_models as
-        | { category?: string | null; name?: string | null }
-        | null;
-      cat.set(s.sku as string, {
-        supplierId: (s.supplier_id as string | null) ?? null,
-        cost: s.cost != null ? Number(s.cost) : null,
-        variant: (s.variant as string | null) ?? null,
-        category: (pm?.category as string | undefined) ?? undefined,
-        modelName: (pm?.name as string | null) ?? null,
-      });
-    }
+  for (const row of (skuRows ?? []) as Record<string, unknown>[]) {
+    const pm = row.product_models as { category?: string | null; name?: string | null } | null;
+    cat.set(row.sku as string, {
+      supplierId: (row.supplier_id as string | null) ?? null,
+      cost: row.cost != null ? Number(row.cost) : null,
+      variant: (row.variant as string | null) ?? null,
+      category: (pm?.category as string | undefined) ?? undefined,
+      modelName: (pm?.name as string | null) ?? null,
+    });
   }
 
   const { data: supRows, error: supErr } = await sb.from("suppliers").select("id, name");
@@ -186,22 +195,14 @@ async function loadToOrder(
   const seenMissing = new Set<string>();
   /** Demand the catalog could not answer for. Never dropped in silence. */
   const unresolved: { sku: string; orderId: string; so: number | null }[] = [];
-  /** Lines the main read did not answer for — alarming only if the SKU exists. */
-  const missed: { sku: string; orderId: string; so: number | null }[] = [];
 
   for (const l of lines) {
     const c = cat.get(l.sku as string);
 
-    // The line the catalog read did not answer for. It is only ALARMING if the
-    // SKU actually exists — that is proved below, not assumed here.
-    if (!c) {
-      missed.push({
-        sku: l.sku as string,
-        orderId: l.order_id as string,
-        so: (orderById.get(l.order_id as string)?.so as number | null) ?? null,
-      });
-      continue;
-    }
+    // Not a catalog product — `Transport Fees`, `Leg 4"`, an AutoCount
+    // description. 95 of them live here; never procurable, so nothing is said.
+    // The map above is the WHOLE catalog, so this is a fact, not a failed read.
+    if (!c) continue;
 
     const category = c.category;
     const supplierId = c.supplierId ?? null;
@@ -273,49 +274,15 @@ async function loadToOrder(
     });
   }
 
-  /**
-   * ⚠ THE DIFFERENCE BETWEEN A SHORT READ AND A LINE THAT IS NOT A PRODUCT.
-   *
-   * An order line's `sku` is plain text with no foreign key, so plenty of them
-   * were never catalog products at all: `Transport Fees`, `No Lift Per Floor
-   * Charge`, `Leg 4"`, and the free-text descriptions AutoCount imports. Those
-   * are not procurable and never were — 95 of them live in this database — and
-   * ignoring them is correct.
-   *
-   * A SKU that DOES exist in the catalog and still did not come back is the
-   * other thing entirely: the read was short, and on 2026-07-30 that put seven
-   * customer requirements on no purchase order at all.
-   *
-   * The first guard could not tell them apart and treated all 95 as the alarm,
-   * which blocked every issue on the page. So the question is asked directly,
-   * over the misses only: does this SKU exist? Coming back means the read was
-   * short. Not coming back means it was never a product.
-   */
-  if (missed.length > 0) {
-    const missedSkus = [...new Set(missed.map((m) => m.sku))];
-    const real = new Set<string>();
-    for (const batch of chunk(missedSkus)) {
-      // No `!inner` here on purpose: a SKU whose model is broken still EXISTS,
-      // and that is exactly the shape a short first read would leave behind.
-      const { data, error } = await sb.from("product_skus").select("sku").in("sku", batch);
-      if (error) {
-        const m = mapPgError(error);
-        return { ok: false, status: m.status, body: m.body };
-      }
-      for (const r of data ?? []) real.add(r.sku as string);
-    }
-    for (const m of missed) if (real.has(m.sku)) unresolved.push(m);
-  }
-
   // Supply: what open POs already cover. A line already on a PO has left this
   // workspace, so it must never appear as something still to buy.
-  const demandSkus = [...new Set(demand.map((d) => d.sku))];
+  // Every OPEN purchase order line, unfiltered — same reason as the catalog: a
+  // SKU may not go into an `.in()` list. Open POs are a small live slice.
   const openPoBySku: Record<string, number> = {};
-  if (demandSkus.length > 0) {
+  {
     const { data: poLines, error: poErr } = await sb
       .from("purchase_order_lines")
       .select("sku, qty, received_qty, purchase_orders!inner(status)")
-      .in("sku", demandSkus)
       .eq("purchase_orders.status", "open");
     if (poErr) {
       const m = mapPgError(poErr);

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import {
   SignJWT,
@@ -480,18 +483,6 @@ describe("POST …/to-order/issue", () => {
  * for is NAMED, and it stops every issue rather than quietly shrinking one.
  */
 describe("a requirement the catalog cannot answer for", () => {
-  /** Drop one SKU from the catalog — exactly what a short read looks like. */
-  function tablesMissingCatalogRow(sku: string) {
-    const t = TABLES();
-    // The row still EXISTS — only the first read came back without it.
-    t.__fullCatalog = t.product_skus;
-    t.product_skus = {
-      data: (t.product_skus.data as { sku: string }[]).filter((r) => r.sku !== sku),
-      error: null,
-    };
-    return t;
-  }
-
   it("says NOTHING about a line that was never a catalog product", async () => {
     // `Transport Fees`, `Leg 4"`, an AutoCount free-text description — an
     // order_line.sku is plain text with no foreign key, so plenty of them were
@@ -540,44 +531,26 @@ describe("a requirement the catalog cannot answer for", () => {
     expect(res.status).toBe(200);
   });
 
-  it("is named on the read instead of vanishing", async () => {
-    const sb = makeSb(tablesMissingCatalogRow("5539-CNR"));
-    vi.mocked(userClient).mockReturnValue(sb as never);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    expect(body.unresolved).toHaveLength(1);
-    expect(body.unresolved[0]).toMatchObject({ sku: "5539-CNR", so: 1207 });
-  });
-
-  it("stops EVERY issue, not just that supplier's, and writes nothing", async () => {
-    const sb = makeSb(tablesMissingCatalogRow("5539-CNR"));
-    vi.mocked(userClient).mockReturnValue(sb as never);
-
-    const res = await post({ supplierId: OHANA, category: "sofa", destinationId: KLANG, purchaseOrders: [{ key: "d1", include: true, buildKeys: ["x"] }] });
-    expect(res.status).toBe(409);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("demand_unresolved");
-    expect(body.unresolved).toHaveLength(1);
-    expect(sb.rpcCalls).toHaveLength(0);
-    expect(sb.updates).toHaveLength(0);
-  });
-
-  it("would have issued a SHORT purchase order before the guard existed", async () => {
-    // The proposal still forms — PETER keeps his other modules — which is
-    // precisely why the guard is at the door and not in the projection.
-    const sb = makeSb(tablesMissingCatalogRow("5539-CNR"));
-    vi.mocked(userClient).mockReturnValue(sb as never);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    const peter = body.proposals[0].rows.find((r: { so: number }) => r.so === 1207);
-    const skus = peter.builds.flatMap((b: { lines: { sku: string }[] }) => b.lines).map(
-      (l: { sku: string }) => l.sku,
+  it("never puts a SKU into a PostgREST `.in()` list", () => {
+    // THE root cause, turned into a rule the next hand cannot break.
+    //
+    // `order_lines.sku` is free text and 16 live demand lines carry a DOUBLE
+    // QUOTE — `Leg 4"`, `HK5531/28"(2 Seater + Lshape)/…`. PostgREST wraps a
+    // reserved-character value in double quotes, so a value containing one
+    // breaks the filter and the server answers with whatever it could parse.
+    // That is what put seven customer requirements on no purchase order on
+    // 2026-07-30 and what made the guard block every issue a day later.
+    //
+    // The catalog is 205 rows and every open PO line is a small slice, so both
+    // are read WHOLE. A render test cannot see this; only the source can.
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "to-order.ts"),
+      "utf8",
     );
-    expect(skus).not.toContain("5539-CNR");
-    expect(skus.length).toBeGreaterThan(0);
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    expect(code).not.toMatch(/\.in\(\s*["']sku["']/);
+    // order_id is a uuid — safe, and the one list that still earns its place.
+    expect(code).toMatch(/\.in\(\s*["']order_id["']/);
   });
 
   it("names a procurable SKU nobody has mapped to a supplier", async () => {
