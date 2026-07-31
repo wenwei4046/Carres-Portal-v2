@@ -23,6 +23,8 @@
 import {
   AlertCircle,
   ArrowLeft,
+  Bed,
+  BedDouble,
   CalendarDays,
   Check,
   ChevronDown,
@@ -53,6 +55,7 @@ import {
   Search,
   Settings,
   SlidersHorizontal,
+  Sofa,
   Trash2,
   Truck,
   User,
@@ -113,6 +116,11 @@ const GLYPH = {
   date: CalendarDays,
   note: Lightbulb,
   activity: ScrollText,
+  // The three made-to-order categories (Loo, 2026-07-31 — the To Order rail's
+  // category level). One meaning, one glyph; stroke stays the law's 2.
+  mattress: BedDouble,
+  bedframe: Bed,
+  sofa: Sofa,
 } as const;
 
 /** Every meaning the portal has. Not a Lucide name — a business meaning. */

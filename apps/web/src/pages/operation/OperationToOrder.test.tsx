@@ -163,21 +163,39 @@ beforeEach(() => {
   );
 });
 
-describe("the queue", () => {
-  it("is scanned for counts: the rail totals, and each group leads with its number", async () => {
-    render(wrap());
-    const sofa = await screen.findByTestId(`to-order-proposal-${OHANA}::sofa`);
-    expect(sofa).toHaveTextContent("Ohana · Sofa");
-    expect(sofa).toHaveTextContent(`· ${fmtDate("2026-07-15")}`);
-    // The big fact is the bare count; the full sentence rides the hover.
-    expect(screen.getByTitle("3 Purchase Orders")).toBeInTheDocument();
-    expect(screen.getByTitle("1 Purchase Order")).toBeInTheDocument();
+/** Expand Bedframe down to its PO rows: category first, then the supplier. */
+async function openBedframe() {
+  fireEvent.click(screen.getByTestId("to-order-category-bedframe"));
+  fireEvent.click(await screen.findByTestId(`to-order-proposal-${OHANA}::bedframe`));
+  return screen.findByTestId(`to-order-doc-${OHANA}::bedframe-d1`);
+}
 
+describe("the queue", () => {
+  it("is scanned for counts: the rail totals, and each level leads with its number", async () => {
+    render(wrap());
+    // Level 1 — the categories, most urgent first, each with its icon.
+    const sofaCat = await screen.findByTestId("to-order-category-sofa");
+    expect(sofaCat).toHaveTextContent("Sofa");
+    expect(sofaCat).toHaveTextContent(`· ${fmtDate("2026-07-15")}`);
+    expect(sofaCat.querySelector('[data-icon="sofa"]')).toBeInTheDocument();
+    expect(
+      screen
+        .getByTestId("to-order-category-bedframe")
+        .querySelector('[data-icon="bedframe"]'),
+    ).toBeInTheDocument();
+
+    // Level 2 — the supplier does NOT repeat what the category already said.
+    const sofa = screen.getByTestId(`to-order-proposal-${OHANA}::sofa`);
+    expect(sofa).toHaveTextContent("Ohana");
+    expect(sofa).not.toHaveTextContent("Ohana · Sofa");
+
+    // The big fact is the bare count; the full sentence rides the hover.
+    expect(screen.getAllByTitle("3 Purchase Orders").length).toBeGreaterThan(0);
     expect(screen.getByText(W.readyToIssue)).toBeInTheDocument();
     expect(screen.getByTestId("to-order-queue-total")).toHaveTextContent("4");
   });
 
-  it("opens the most urgent group by itself and keeps its PO rows small doors", async () => {
+  it("opens the most urgent path by itself and keeps its PO rows small doors", async () => {
     render(wrap());
     const d1 = await screen.findByTestId(`to-order-doc-${OHANA}::sofa-d1`);
 
@@ -187,33 +205,40 @@ describe("the queue", () => {
     const d2 = screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`);
     expect(d2).toHaveTextContent("PETER");
     expect(d2).toHaveTextContent("2 items");
-    // The collapsed group's documents are not on screen.
+    // The collapsed category shows neither its supplier nor its documents.
+    expect(screen.queryByTestId(`to-order-proposal-${OHANA}::bedframe`)).toBeNull();
     expect(screen.queryByTestId(`to-order-doc-${OHANA}::bedframe-d1`)).toBeNull();
   });
 
-  it("expanding a group is not a selection — the workspace does not move", async () => {
+  it("expanding is not a selection at either level — the workspace does not move", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
 
+    // Level 1 open shows the supplier, not the documents.
+    fireEvent.click(screen.getByTestId("to-order-category-bedframe"));
+    expect(
+      await screen.findByTestId(`to-order-proposal-${OHANA}::bedframe`),
+    ).toHaveTextContent("Ohana");
+    expect(screen.queryByTestId(`to-order-doc-${OHANA}::bedframe-d1`)).toBeNull();
+
+    // Level 2 open shows the documents…
     fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
-    // The rows appear…
     expect(
       await screen.findByTestId(`to-order-doc-${OHANA}::bedframe-d1`),
     ).toHaveTextContent("2 orders");
     // …and the pane still shows the sofa document it showed before.
     expect(screen.getByTestId("to-order-workspace")).toHaveTextContent("Ohana · Sofa");
 
-    // Toggling shut hides them again.
-    fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
-    expect(screen.queryByTestId(`to-order-doc-${OHANA}::bedframe-d1`)).toBeNull();
+    // Toggling the category shut hides the whole branch again.
+    fireEvent.click(screen.getByTestId("to-order-category-bedframe"));
+    expect(screen.queryByTestId(`to-order-proposal-${OHANA}::bedframe`)).toBeNull();
   });
 
   it("picking a PO row of another supplier switches the pane to exactly that document", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
 
-    fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
-    fireEvent.click(await screen.findByTestId(`to-order-doc-${OHANA}::bedframe-d1`));
+    fireEvent.click(await openBedframe());
     expect(screen.getByTestId("to-order-workspace")).toHaveTextContent("PO 1 of 1");
 
     // Back across, to a NON-first document — the pane must land on PO 2, not
@@ -283,8 +308,7 @@ describe("the workspace", () => {
   it("shows Size and Qty — the two facts the table exists to stop hiding", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
-    fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
-    fireEvent.click(await screen.findByTestId(`to-order-doc-${OHANA}::bedframe-d1`));
+    fireEvent.click(await openBedframe());
 
     const items = await screen.findByTestId("to-order-items");
     expect(within(items).getByText("Queen")).toBeInTheDocument();
@@ -347,8 +371,7 @@ describe("the row menu", () => {
   it("Move only exists after a split has made somewhere to move to", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
-    fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
-    fireEvent.click(await screen.findByTestId(`to-order-doc-${OHANA}::bedframe-d1`));
+    fireEvent.click(await openBedframe());
 
     await openMenu("l1");
     expect(screen.queryByText(/^Move to /)).toBeNull();

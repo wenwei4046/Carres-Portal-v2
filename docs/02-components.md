@@ -156,9 +156,12 @@ action last, after a divider.
 
 **Purpose.** One meaning, one glyph.
 
-**Behaviour.** `name` is a union of 40 meanings. A name outside it does not
-compile — which is the enforcement, not a convention. Sizes 14 · 16 · 18.
-Stroke is Lucide's 2 and there is no prop to change it.
+**Behaviour.** `name` is a union of 43 meanings — §5.3's 40 verbatim, plus the
+three made-to-order categories `mattress` · `bedframe` · `sofa` (Loo,
+2026-07-31, for the To Order rail's category level; Lucide `BedDouble` ·
+`Bed` · `Sofa`). A name outside it does not compile — which is the
+enforcement, not a convention. Sizes 14 · 16 · 18. Stroke is Lucide's 2 and
+there is no prop to change it.
 
 **Don't.** Reach for a glyph because it looks right. Reach for the MEANING; if
 the meaning is not in the union, it has not been ruled.
