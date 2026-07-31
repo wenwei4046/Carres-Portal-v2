@@ -1,8 +1,8 @@
 # CHECKPOINT — Purchasing · To Order
 
-> **Handover, updated 2026-07-31 (fourth session — the Golden Template
-> freeze).** Overwritten in place; there is never a second version of this
-> file.
+> **Handover, updated 2026-07-31 (fifth session — the whole frozen blueprint
+> ships and deploys).** Overwritten in place; there is never a second version
+> of this file.
 >
 > **⭐ LOO'S STANDING ORDER (2026-07-31): he is the boss of this page's
 > design. Older frozen rules are OVERWRITTEN by §0A below, not annotated.
@@ -76,22 +76,32 @@ READY TO ISSUE                 10      ← the number counts PO SHEETS (his pick
    commands (Move·Split·Remove·Put Back) live with Items, the one primary
    action (`Issue Purchase Order`) pinned last.
 
-## 0 · What is actually on screen right now (built through step 1b)
+## 0 · What is actually on screen right now (the whole approved blueprint, PR #542)
 
 `apps/web/src/pages/operation/OperationToOrder.tsx`, one file, assembly only.
-**Built**: the card Queue (category fold → supplier section → SO-titled cards,
-straight-bar selection, walking order, `Ready to issue · N`), the one-row
-Facts header (supplier · category ···· Order by · `{n} working days` ·
-Destination — Destination's ONE home), Items on `DataTable` with
-Move/Split/Remove/Put Back, the Issue region (count · button · refusal
-reasons incl. `Destination not selected.`), issued panel → Open Purchase
-Orders. Icons: kit `Icon` gained `mattress`·`bedframe`·`sofa` (43 meanings).
+**Built**: TIME BUCKETS as the queue's outermost split (Overdue red and
+always first · Today · Tomorrow · This week · Next week · Later; empty
+buckets never render; the bucket name carries WHEN, so no row below carries a
+date) · the card Queue inside them (category fold → supplier section reading
+`{supplier} · Customer Order` — Source on the rail → SO-titled ☑ cards,
+straight-bar selection, walking order, `Ready to issue · N`) · the COMMANDS
+layer (`Plan for {date}` · `Work out the plan again` = refetch ·
+`Create Proposal` visible but DISABLED — Loo's Office rule: the slot stays in
+the architecture, switched on when its card builds the manual entrance) · the
+one-row Facts header (supplier · category ···· Order by · `{n} working days`
+· Destination — Destination's ONE home) · region ② **Planning & Audit**
+(never communication; v1 states the one stored fact: `System generated from
+SO-… · SO-…`) · Items on `DataTable` with Move/Split/Remove/Put Back · the
+Issue region (count · button · refusal reasons incl. `Destination not
+selected.`) · issued panel → Open Purchase Orders. Default landing = top of
+the rail (bucket order, then walking order). Icons: kit `Icon` carries
+`mattress`·`bedframe`·`sofa` (43 meanings).
 
-**Blueprint-pending (build in this order, one card one deploy)**: time
-buckets · Source on the queue + Create Proposal + `Plan for {date}` /
-`Work out the plan again` commands · ☑ on cards · Facts gains Source ·
-Planning & Audit · Remarks · qty 🔒 · `Issue all` · the 12:00 alert ·
-breadcrumb in the workspace header.
+**Blueprint-pending (build in this order, one card one deploy)**: Create
+Proposal's real manual entrance (Source·Supplier·Category·Destination·Items·
+Qty·Reason — schema decided the day it is built) · Facts gains Source ·
+Remarks · qty 🔒 · `Issue all` · the 12:00 alert · breadcrumb in the
+workspace header.
 
 **Defects fixed on the way (keep the tests that pin them)**: the Move menu
 numbered targets by the filtered list; the reset-on-proposal-change effect
@@ -353,7 +363,11 @@ Live on screen, ruled by Loo 2026-07-31, **not in Jess's dictionary**:
 **added 2026-07-31 (step 1, the rail + the facts header)**:
 `Ready to issue` · `Destination not selected.` · `PO {i}` (`poShortLabel`) ·
 `{n} orders` (`countOrders`) · `{n} items` (`countItems`) ·
-`{n} working days` (`productionDaysLabel`)
+`{n} working days` (`productionDaysLabel`) ·
+**added 2026-07-31 (the whole blueprint, PR #542)**:
+`Overdue` · `Today` · `Tomorrow` · `This week` · `Next week` · `Later` ·
+`Customer Order` · `Plan for` · `Work out the plan again` ·
+`Create Proposal` · `Planning & Audit` · `System generated from`
 
 Designed, not built: `Live Purchase Order` · `Review message` ·
 `Supplier acknowledged` · `Re-open WhatsApp group` · `Send revision` ·
@@ -394,13 +408,13 @@ purchase orders   7 live, all SHORT (issued while the `.in()` bug was live) —
 
 ---
 
-## 14 · Baselines (re-measured after step 1, 2026-07-31)
+## 14 · Baselines (re-measured on the deployed tip `e2abbd60`, 2026-07-31)
 
 | | |
 |---|---|
-| shared | **2021 / 2021** (2018 + `productionDays` ×2 + the rail composers) |
+| shared | **2021 / 2021** (PR #542 added words only — no new shared tests) |
 | api | 3 pre-existing (`partner/pickups` ×1 · `supplier/pos` ×2) |
-| web | **16** — `OperationOrders` ×7 · `OhanaSofaTab` ×4 · `OrderCustomerCard` ×4 · `NiceFutureMattressTab` ×1. The page's own suite is **21/21**. |
+| web | **16** — `OperationOrders` ×7 · `OhanaSofaTab` ×4 · `OrderCustomerCard` ×4 · `NiceFutureMattressTab` ×1. The page's own suite is **26/26** (re-run on the deployed tip by the deploy session). |
 | tsc | web clean · api 4 (`rental-sell.test.ts`) |
 | design-standard | **8438** — unchanged; the ratchet may never rise |
 
@@ -414,44 +428,42 @@ after it.
 ## 15 · Deployed
 
 ```
-Main tip     9e462e22 (PR #540 — the card queue + the Golden Template freeze;
-             carries #538's tree/icons commit too, which was merged undeployed)
-Web bundle   index-BtHOwQVr.js · 4,613,351 bytes · SERVICE_ROLE 0
-             carres-portal e1312475 + carres-pos c7692ac4, both --branch=main
-             3 canonicals on the first poll; pos.carresofficial.com converged
-             on the next (the documented edge-cache lag, resolved by polling)
-             wrangler pages deployment list names Production/main source 9e462e2
-API Worker   3824b9c7 UNCHANGED — web-only ship, checked not assumed:
-             `git diff 2c37a1ae..HEAD -- apps/api packages/shared
-             supabase/migrations` is empty (the proposalsCount composer was
-             added and removed inside the session, net zero)
-Migration    none
-Bundle grep  both directions vs the live predecessor index-DjMYPzdc.js
-             (downloaded): `to-order-category-` 0→1 (the category fold's
-             testid — the one literal this ship introduces; card titles are
-             the `SO-${…}` template, the pick-markers-from-MOUNTED trap's
-             template form, so they cannot grep). SERVICE_ROLE 0 both sides.
-PR trail     #538 merged (tree version, never deployed alone) · #539 closed
-             (branch predated #538's squash → conflicts) · #540 is the clean
-             cut. Lesson: after a squash-merge, never push more work to the
-             same branch — cut a fresh branch from main.
+Main tip     e2abbd60 (PR #542 — the WHOLE frozen blueprint: time buckets ·
+             Source on the queue · ☑ cards · Commands · Planning & Audit)
+Web bundle   index-AKa9Ahbj.js · 4,616,348 bytes · SERVICE_ROLE 0
+             carres-portal 6cb9f2ca + carres-pos 39dd618f, both --branch=main
+             ALL 4 canonicals converged on the FIRST poll
+             live bundle md5-identical to the local build (c9d7172295…)
+API Worker   45424326 DEPLOYED with --env production — required by the
+             ask-what-the-api-IMPORTS rule: apps/api has zero file changes,
+             but packages/shared/to-order.ts gained the blueprint's 12 words
+             and the Worker imports buildToOrder (words only, payload
+             untouched — tip alignment, not behaviour). Bindings echoed:
+             PUBLIC_WEB_URL=pos.carresofficial.com + api.carresofficial.com
+             + the 09:00-MYT cron; GET /health → 200 {"ok":true}
+Migration    none (git diff 9e462e22..e2abbd60 -- supabase/migrations empty)
+Bundle grep  both directions vs the live predecessor index-BtHOwQVr.js —
+             DOWNLOADED at its recorded 4,613,351 bytes BEFORE this deploy
+             replaced it at the apex (the superseded-asset-404 trap, dodged
+             by sequencing instead of hunting deployment URLs). New:
+             `to-order-bucket-` · `to-order-commands` · `to-order-recompute`
+             · `System generated from` · `Work out the plan again` ·
+             `Create Proposal` · `Planning & Audit` · `Plan for` each 0→1 ·
+             `to-order-audit` 0→2 · `Customer Order` 1→2 (the +1 is the
+             rail's Source line; the survivor is another page's own string).
+             THIS SHIP RETIRES NO STRING — the PO bar's ☑ moved to the queue
+             card and `W.include` is the same literal in its new home; said
+             honestly rather than manufactured. SERVICE_ROLE 0 both sides.
+PR trail     #542 is the clean single PR (fresh branch from main, per the
+             after-a-squash lesson #539 taught).
 ```
-
-**Bundle grep, both directions** (both files DOWNLOADED first; the first
-attempt fetched the predecessor from a wrong deployment URL and got the
-1,757-byte 404 page — the documented trap, caught by `wc -c` before any
-number was believed; the true predecessor `d6ddf7ea` serves
-`index-BTU4ZIV3.js` at its recorded 4,610,515 bytes):
-new — `Ready to issue` · `Destination not selected.` · `to-order-queue-total`
-· `to-order-production-days` · `to-order-no-destination` each **0→1** ·
-`working day` **20→21** · `productionDays` **7→9** · `w-[320px]` **2→3**;
-retired — `w-[280px]` **8→7**, the −1 being the old rail (the 7 survivors are
-other pages' own widths, correctly untouched). `SERVICE_ROLE` **0 in both**.
 
 **No authenticated screenshot** — the page sits behind an operation login and
 taking one would mean typing a password into a form; the grep is the proof.
 
 **Next steps in Loo's deploy-one-by-one plan** (each its own chat + deploy):
-step 2 = Notes to Supplier (needs the note-rides-the-Issue-POST decision);
-step 3 = the Purchase Orders tab detail reusing the same five-region document
-shape, where Supplier Communication lives (needs `po_sends`, §12).
+first the remaining blueprint-pending cards in §0's order (Create Proposal's
+real manual entrance leads); then step 2 = Notes to Supplier (needs the
+note-rides-the-Issue-POST decision); step 3 = the Purchase Orders tab detail
+reusing the same five-region document shape, where Supplier Communication
+lives (needs `po_sends`, §12).
