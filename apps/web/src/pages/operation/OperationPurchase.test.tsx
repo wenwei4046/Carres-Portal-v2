@@ -171,21 +171,21 @@ describe("To Order — the sidebar", () => {
 
   it("switches the preview when another proposal is picked", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-preview");
-    expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(3);
+    await screen.findByTestId("po-workspace");
+    expect(screen.getAllByTestId(/^to-order-doc-d\d+$/)).toHaveLength(3);
 
     fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
     // Bedframe merges every customer order into ONE document.
-    await waitFor(() => expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(1));
-    expect(screen.getByTestId("to-order-preview")).toHaveTextContent("wong");
+    await waitFor(() => expect(screen.getAllByTestId(/^to-order-doc-d\d+$/)).toHaveLength(1));
+    expect(screen.getByTestId("po-workspace")).toHaveTextContent("wong");
   });
 });
 
-describe("To Order — the Purchase Order Preview", () => {
+describe("To Order — the Purchase Order Workspace", () => {
   it("shows one block per future purchase order", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-preview");
-    const blocks = screen.getAllByTestId(/^to-order-po-d\d+$/);
+    await screen.findByTestId("po-workspace");
+    const blocks = screen.getAllByTestId(/^to-order-doc-d\d+$/);
     expect(blocks).toHaveLength(3); // sofa: one document per customer order
     expect(blocks[0]).toHaveTextContent("PO 1 of 3");
     expect(blocks[0]).toHaveTextContent("ella");
@@ -196,30 +196,59 @@ describe("To Order — the Purchase Order Preview", () => {
    * region below counted UNITS — on Nice Future that is `14 items` sitting
    * directly above `14 lines · 16 units`, with the wrong number on top.
    */
-  it("states the count ONCE — the header yields to the region that owns it", async () => {
+  /**
+   * The count is stated by the region that OWNS it and by the queue row an
+   * operator scans — never twice inside one block. The old accordion header
+   * counted LINES and called them `items` directly above `14 lines · 16 units`.
+   */
+  it("states the count once inside the workspace, and the queue carries its own", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-preview");
+    await screen.findByTestId("po-workspace");
     fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
-    await waitFor(() => expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(1));
+    await waitFor(() => expect(screen.getAllByTestId(/^to-order-doc-d\d+$/)).toHaveLength(1));
 
-    // Closed: the block header is the only place the count can be seen.
-    expect(screen.getByTestId("to-order-po-d1")).toHaveTextContent("1 line · 3 units");
-    expect(screen.queryByTestId("po-items-count")).toBeNull();
-
-    fireEvent.click(screen.getByTestId("to-order-po-toggle-d1"));
-    await screen.findByTestId("po-items");
-    // Open: the Items region owns it, and the header has stopped speaking.
+    expect(screen.getByTestId("to-order-doc-d1")).toHaveTextContent("1 line · 3 units");
     expect(screen.getByTestId("po-items-count")).toHaveTextContent("1 line · 3 units");
-    const header = screen.getByTestId("to-order-po-toggle-d1");
-    expect(header.textContent).not.toMatch(/line|unit|item/i);
+    // and the document's identity bar says nothing about how many
+    const bar = screen.getByTestId("po-workspace").firstElementChild!;
+    expect(bar.textContent).not.toMatch(/line|unit|item/i);
   });
 
-  it("opens a document to its sofas", async () => {
+  /** The five regions, in the frozen order. STRUCTURE — two are empty by design. */
+  it("shows five regions in the order who → reach → what → notes → issue", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-preview");
-    expect(screen.queryByTestId("po-items")).toBeNull();
+    const ws = await screen.findByTestId("po-workspace");
+    for (const id of ["po-region-header", "po-region-communication", "po-items", "po-region-notes"]) {
+      expect(screen.getByTestId(id)).toBeInTheDocument();
+    }
+    const order = ["po-region-header", "po-region-communication", "po-items", "po-region-notes"].map(
+      (id) => [...ws.querySelectorAll("[data-testid]")].indexOf(screen.getByTestId(id)),
+    );
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    // Issue is outside the scrolling regions — it never leaves the screen.
+    expect(screen.getByTestId("to-order-issue")).toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByTestId("to-order-po-toggle-d2"));
+  it("Header and Supplier Communication collapse; Items does not", async () => {
+    render(wrap());
+    await screen.findByTestId("po-workspace");
+    expect(screen.getByTestId("po-header-toggle")).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByTestId("po-comms-toggle")).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByTestId("po-notes-toggle")).toHaveAttribute("aria-expanded", "false");
+    // Items has no toggle at all — SectionHeader draws none for a permanent region.
+    expect(screen.queryByTestId("po-items-header-toggle")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("po-header-toggle"));
+    expect(await screen.findByTestId("po-header-body")).toBeInTheDocument();
+  });
+
+  it("shows the picked document's sofas, and Items is never closed", async () => {
+    render(wrap());
+    await screen.findByTestId("po-workspace");
+    // The first document fills the pane without anything being opened.
+    expect(screen.getByTestId("po-items")).toHaveTextContent("Booqit");
+
+    fireEvent.click(screen.getByTestId("to-order-doc-d2"));
     const items = await screen.findByTestId("po-items");
     // PETER's order holds TWO sofa builds — the table is the unit an operator
     // points at, so both are rows, not one summary line.
@@ -235,11 +264,11 @@ describe("To Order — the Purchase Order Preview", () => {
    */
   it("prints how many units a line is, not just that a line exists", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-preview");
+    await screen.findByTestId("po-workspace");
     fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
-    await waitFor(() => expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(1));
+    await waitFor(() => expect(screen.getAllByTestId(/^to-order-doc-d\d+$/)).toHaveLength(1));
 
-    fireEvent.click(screen.getByTestId("to-order-po-toggle-d1"));
+    fireEvent.click(screen.getByTestId("to-order-doc-d1"));
     const items = await screen.findByTestId("po-items");
     // Size and quantity are their OWN columns — neither is inside a sentence
     // an operator has to parse.
@@ -252,8 +281,8 @@ describe("To Order — the Purchase Order Preview", () => {
 
   it("has no Split or Move on sofa — a sofa PO carries one customer order", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-preview");
-    fireEvent.click(screen.getByTestId("to-order-po-toggle-d2"));
+    await screen.findByTestId("po-workspace");
+    fireEvent.click(screen.getByTestId("to-order-doc-d2"));
     await screen.findByTestId("po-items");
 
     await openMenu("bk-b");
@@ -266,22 +295,23 @@ describe("To Order — the Purchase Order Preview", () => {
 
   it("leaving a document out changes the count and says it changes nothing else", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-preview");
+    await screen.findByTestId("po-workspace");
     expect(screen.getByTestId("to-order-count")).toHaveTextContent("3 Purchase Orders");
 
-    fireEvent.click(screen.getByTestId("to-order-include-d2"));
+    fireEvent.click(screen.getByTestId("to-order-doc-d2"));
+    fireEvent.click(await screen.findByTestId("to-order-include-d2"));
     await waitFor(() =>
       expect(screen.getByTestId("to-order-count")).toHaveTextContent("2 Purchase Orders"),
     );
-    expect(screen.getByTestId("to-order-po-d2")).toHaveTextContent(
+    expect(screen.getByTestId("po-workspace")).toHaveTextContent(
       "Not issued this time. Nothing about the order changes.",
     );
   });
 
   it("removing an item takes it off the document and keeps it visible", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-preview");
-    fireEvent.click(screen.getByTestId("to-order-po-toggle-d2"));
+    await screen.findByTestId("po-workspace");
+    fireEvent.click(screen.getByTestId("to-order-doc-d2"));
     await screen.findByTestId("po-items");
 
     await openMenu("bk-b");
@@ -294,8 +324,8 @@ describe("To Order — the Purchase Order Preview", () => {
 
   it("puts a removed item back", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-preview");
-    fireEvent.click(screen.getByTestId("to-order-po-toggle-d2"));
+    await screen.findByTestId("po-workspace");
+    fireEvent.click(screen.getByTestId("to-order-doc-d2"));
     await screen.findByTestId("po-items");
     await openMenu("bk-b");
     fireEvent.click(screen.getByText("Remove"));
@@ -307,8 +337,13 @@ describe("To Order — the Purchase Order Preview", () => {
 
   it("refuses to issue when nothing is included, and says so", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-preview");
-    for (const k of ["d1", "d2", "d3"]) fireEvent.click(screen.getByTestId(`to-order-include-${k}`));
+    await screen.findByTestId("po-workspace");
+    // The switch is on whichever document fills the pane, so each is picked
+    // and turned off in turn.
+    for (const k of ["d1", "d2", "d3"]) {
+      fireEvent.click(screen.getByTestId(`to-order-doc-${k}`));
+      fireEvent.click(await screen.findByTestId(`to-order-include-${k}`));
+    }
     await waitFor(() =>
       expect(screen.getByTestId("to-order-plan-blocked")).toHaveTextContent(
         "Nothing is selected to issue.",
@@ -319,16 +354,16 @@ describe("To Order — the Purchase Order Preview", () => {
 
   it("splits and moves on a category whose purchase orders may merge", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-preview");
+    await screen.findByTestId("po-workspace");
     fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
-    await waitFor(() => expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(1));
+    await waitFor(() => expect(screen.getAllByTestId(/^to-order-doc-d\d+$/)).toHaveLength(1));
 
-    fireEvent.click(screen.getByTestId("to-order-po-toggle-d1"));
+    fireEvent.click(screen.getByTestId("to-order-doc-d1"));
     await screen.findByTestId("po-items");
     await openMenu("l1");
     fireEvent.click(screen.getByText("Create Another Purchase Order"));
     // One build, split out of a one-build document, is still one document.
-    await waitFor(() => expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(1));
+    await waitFor(() => expect(screen.getAllByTestId(/^to-order-doc-d\d+$/)).toHaveLength(1));
   });
 });
 
