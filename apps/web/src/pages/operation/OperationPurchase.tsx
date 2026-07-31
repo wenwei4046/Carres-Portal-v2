@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Filter, Search } from "lucide-react";
+import { Filter, Search } from "lucide-react";
 import {
   TO_ORDER_WORDS as W,
   issuedHeadline,
+  itemsCount,
   purchaseOrderCount,
   unresolvedHeadline,
-  type ToOrderBuildRef,
   type ToOrderProposal,
 } from "@carres/shared";
 import {
@@ -24,7 +24,7 @@ import {
   type PreviewDoc,
   type PreviewState,
 } from "./to-order-preview";
-import ItemsSection from "./purchase-order/ItemsSection";
+import PurchaseOrderWorkspace from "./purchase-order/PurchaseOrderWorkspace";
 import PurchasingTabs from "./PurchasingTabs";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -110,7 +110,8 @@ export default function OperationPurchase() {
 
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [destId, setDestId] = useState<string | null>(null);
-  const [open, setOpen] = useState<Record<string, boolean>>({});
+  /** Which purchase order fills the workspace. Null = the first one. */
+  const [pickedDoc, setPickedDoc] = useState<string | null>(null);
   const [issued, setIssued] = useState<IssueResponse | null>(null);
   /**
    * The arrangement. It lives here and nowhere else — a refresh drops it and
@@ -136,7 +137,7 @@ export default function OperationPurchase() {
   const currentKey = current?.key ?? null;
   useEffect(() => {
     setPlan(current ? initialState(current) : null);
-    setOpen({});
+    setPickedDoc(null);
   }, [currentKey, current]);
 
   const docs = useMemo(
@@ -147,6 +148,8 @@ export default function OperationPurchase() {
     () => (current && plan ? removedBuilds(current, plan) : []),
     [current, plan],
   );
+  const currentDoc = docs.find((d) => d.key === pickedDoc) ?? docs[0] ?? null;
+
   const verdict = useMemo(
     () => (current && plan ? checkPlan(current, plan) : null),
     [current, plan],
@@ -174,7 +177,7 @@ export default function OperationPurchase() {
     onSuccess: (res) => {
       setIssued(res);
       setPickedKey(null);
-      setOpen({});
+      setPickedDoc(null);
       void qc.invalidateQueries({ queryKey: ["operation"] });
     },
   });
@@ -187,9 +190,12 @@ export default function OperationPurchase() {
         <Sidebar
           proposals={proposals}
           currentKey={current?.key ?? null}
+          docs={docs}
+          currentDocKey={currentDoc?.key ?? null}
+          onPickDoc={setPickedDoc}
           onPick={(k) => {
             setPickedKey(k);
-            setOpen({});
+            setPickedDoc(null);
             setIssued(null);
           }}
           loading={q.isLoading}
@@ -201,28 +207,62 @@ export default function OperationPurchase() {
               result={issued}
               onOpenPurchaseOrders={() => navigate("/operation/procurement")}
             />
-          ) : !current ? (
+          ) : !current || !currentDoc ? (
             <EmptyPanel loading={q.isLoading} error={q.error as Error | null} />
           ) : (
             <>
-              <Preview
-                proposal={current}
-                docs={docs}
-                removed={removed}
-                open={open}
-                onToggleOpen={(k) => setOpen((m) => ({ ...m, [k]: !m[k] }))}
-                onInclude={(k) => setPlan((st) => (st ? toggleInclude(st, k) : st))}
-                onRemove={(k) => setPlan((st) => (st ? removeBuild(st, k) : st))}
-                onRestore={(k) =>
-                  setPlan((st) => (st && current ? restoreBuild(st, current, k) : st))
+              <PurchaseOrderWorkspace
+                doc={currentDoc}
+                index={docs.findIndex((d) => d.key === currentDoc.key) + 1}
+                total={docs.length}
+                supplierLabel={current.label}
+                destinationName={destinations.find((d) => d.id === destId)?.name ?? null}
+                orderByLabel={current.orderBy ? `Order by ${fmtDate(current.orderBy)}` : null}
+                category={current.category}
+                canRearrange={canRearrange(current)}
+                moveTargets={docs
+                  .filter((d) => d.key !== currentDoc.key)
+                  .map((d, i) => ({ key: d.key, label: `Purchase Order ${i + 1}` }))}
+                onInclude={() =>
+                  setPlan((st) => (st ? toggleInclude(st, currentDoc.key) : st))
                 }
+                onRemove={(k) => setPlan((st) => (st ? removeBuild(st, k) : st))}
                 onSplit={(k) => setPlan((st) => (st ? splitOut(st, [k]) : st))}
                 onMove={(k, to) => setPlan((st) => (st ? moveBuild(st, k, to) : st))}
-                // The customer's order opens on the Orders page's own deep
-                // link. This page never renders an order — one record, one
-                // screen that owns it.
                 onOpenOrder={(orderId) => navigate(`/operation/orders?order=${orderId}`)}
               />
+
+              {/* Existing behaviour, deliberately preserved through the
+                  rebuild: an item taken off a document stays visible and can
+                  be put back. It is not one of the five regions — it belongs
+                  to the whole arrangement, not to one purchase order. */}
+              {removed.length > 0 ? (
+                <div
+                  className="shrink-0 mt-3 bg-white border border-base-200 rounded-[8px] px-4 py-3"
+                  data-testid="to-order-removed"
+                >
+                  <div className="text-meta font-semibold text-base-900">{W.removedHeading}</div>
+                  <div className="text-meta text-base-600 mb-1.5">{W.removedHelp}</div>
+                  {removed.map((b) => (
+                    <div key={b.buildKey} className="flex items-baseline gap-3 py-1">
+                      <span className="text-meta text-base-900">
+                        {b.so != null ? `SO-${b.so}` : "—"} · {b.customer}
+                      </span>
+                      <span className="text-meta text-base-600 truncate">{b.title}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPlan((st) => (st && current ? restoreBuild(st, current, b.buildKey) : st))
+                        }
+                        data-testid={`to-order-putback-${b.buildKey}`}
+                        className="ml-auto text-meta text-base-900 underline underline-offset-2"
+                      >
+                        {W.putBack}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <StickyAction
                 proposal={current}
                 unresolved={unresolved}
@@ -245,15 +285,29 @@ export default function OperationPurchase() {
 
 // ── Sidebar ─────────────────────────────────────────────────────────────────
 
+/**
+ * The queue — which slice of purchasing, and which document inside it.
+ *
+ * The purchase orders of the SELECTED supplier nest under it, because the
+ * workspace shows one document at a time and this is where an operator picks
+ * which. Splitting an item adds a row here the moment it happens.
+ */
 function Sidebar({
   proposals,
   currentKey,
+  docs,
+  currentDocKey,
   onPick,
+  onPickDoc,
   loading,
 }: {
   proposals: ToOrderProposal[];
   currentKey: string | null;
+  /** Documents of the CURRENT proposal only. */
+  docs: PreviewDoc[];
+  currentDocKey: string | null;
   onPick: (key: string) => void;
+  onPickDoc: (key: string) => void;
   loading: boolean;
 }) {
   return (
@@ -277,8 +331,8 @@ function Sidebar({
           proposals.map((p) => {
             const on = p.key === currentKey;
             return (
-              <button
-                key={p.key}
+              <div key={p.key}>
+                <button
                 type="button"
                 onClick={() => onPick(p.key)}
                 data-testid={`to-order-proposal-${p.key}`}
@@ -301,12 +355,67 @@ function Sidebar({
                     W.noDeliveryDate
                   )}
                 </div>
-              </button>
+                </button>
+                {on
+                  ? docs.map((d, i) => (
+                      <DocRow
+                        key={d.key}
+                        doc={d}
+                        index={i + 1}
+                        total={docs.length}
+                        on={d.key === currentDocKey}
+                        onPick={() => onPickDoc(d.key)}
+                      />
+                    ))
+                  : null}
+              </div>
             );
           })
         )}
       </div>
     </aside>
+  );
+}
+
+/** One purchase order in the queue, under its supplier. */
+function DocRow({
+  doc,
+  index,
+  total,
+  on,
+  onPick,
+}: {
+  doc: PreviewDoc;
+  index: number;
+  total: number;
+  on: boolean;
+  onPick: () => void;
+}) {
+  const units = doc.builds.reduce((n, b) => n + b.qty, 0);
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      data-testid={`to-order-doc-${doc.key}`}
+      aria-current={on ? "true" : undefined}
+      className={[
+        "block w-full text-left rounded-[6px] pl-6 pr-2.5 py-1.5 mb-px",
+        on ? "bg-base-200" : "hover:bg-base-100",
+        doc.include ? "" : "opacity-50",
+      ].join(" ")}
+    >
+      <div className="flex items-baseline gap-2">
+        <span className="text-meta font-semibold text-base-900 whitespace-nowrap">
+          PO {index} of {total}
+        </span>
+        {doc.customer != null ? (
+          <span className="text-meta text-base-600 truncate">{doc.customer}</span>
+        ) : null}
+        <span className="ml-auto text-meta text-base-600 whitespace-nowrap tabular-nums">
+          {itemsCount(doc.builds.length, units)}
+        </span>
+      </div>
+    </button>
   );
 }
 
@@ -321,185 +430,6 @@ function Sidebar({
  * touching the customer's order. Every one of these lives in this tab until the
  * page is refreshed.
  */
-function Preview({
-  proposal,
-  docs,
-  removed,
-  open,
-  onToggleOpen,
-  onInclude,
-  onRemove,
-  onRestore,
-  onSplit,
-  onMove,
-  onOpenOrder,
-}: {
-  proposal: ToOrderProposal;
-  docs: PreviewDoc[];
-  removed: ToOrderBuildRef[];
-  open: Record<string, boolean>;
-  onToggleOpen: (key: string) => void;
-  onInclude: (key: string) => void;
-  onRemove: (buildKey: string) => void;
-  onRestore: (buildKey: string) => void;
-  onSplit: (buildKey: string) => void;
-  onMove: (buildKey: string, toKey: string) => void;
-  onOpenOrder: (orderId: string) => void;
-}) {
-  const rearrange = canRearrange(proposal);
-
-  return (
-    <div className="flex-1 min-h-0 flex flex-col bg-white border border-base-200 rounded-[8px] overflow-hidden">
-      <div className="shrink-0 px-3.5 pt-2.5 pb-2.5 border-b border-base-200 flex items-baseline justify-between gap-4">
-        <span className="text-strong text-base-900">{W.preview}</span>
-        <span className="text-meta text-base-500 truncate">{proposal.label}</span>
-      </div>
-
-      <div className="flex-1 min-h-0 overflow-y-auto" data-testid="to-order-preview">
-        {docs.map((d, i) => (
-          <PoBlock
-            key={d.key}
-            doc={d}
-            index={i + 1}
-            total={docs.length}
-            others={docs.filter((x) => x.key !== d.key)}
-            rearrange={rearrange}
-            category={proposal.category}
-            onOpenOrder={onOpenOrder}
-            open={Boolean(open[d.key])}
-            onToggleOpen={() => onToggleOpen(d.key)}
-            onInclude={() => onInclude(d.key)}
-            onRemove={onRemove}
-            onSplit={onSplit}
-            onMove={onMove}
-          />
-        ))}
-
-        {removed.length > 0 ? (
-          <div className="border-t border-base-200 px-3.5 py-2.5" data-testid="to-order-removed">
-            <div className="text-meta font-semibold text-base-900">{W.removedHeading}</div>
-            <div className="text-meta text-base-600 mb-1.5">{W.removedHelp}</div>
-            {removed.map((b) => (
-              <div key={b.buildKey} className="flex items-baseline gap-3 py-1">
-                <span className="text-meta text-base-900">
-                  {b.so != null ? `SO-${b.so}` : "—"} · {b.customer}
-                </span>
-                <span className="text-meta text-base-600 truncate">{b.title}</span>
-                <button
-                  type="button"
-                  onClick={() => onRestore(b.buildKey)}
-                  data-testid={`to-order-putback-${b.buildKey}`}
-                  className="ml-auto text-meta text-base-900 underline underline-offset-2"
-                >
-                  {W.putBack}
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function PoBlock({
-  doc,
-  index,
-  total,
-  others,
-  rearrange,
-  category,
-  open,
-  onToggleOpen,
-  onInclude,
-  onRemove,
-  onSplit,
-  onMove,
-  onOpenOrder,
-}: {
-  doc: PreviewDoc;
-  index: number;
-  total: number;
-  others: PreviewDoc[];
-  rearrange: boolean;
-  /** Decides what one unit is called in the Items count. */
-  category: string;
-  open: boolean;
-  onToggleOpen: () => void;
-  onInclude: () => void;
-  onRemove: (buildKey: string) => void;
-  onSplit: (buildKey: string) => void;
-  onMove: (buildKey: string, toKey: string) => void;
-  onOpenOrder: (orderId: string) => void;
-}) {
-  const customers = new Set(doc.builds.map((b) => b.customer));
-  const who =
-    doc.customer ?? `${customers.size} customer order${customers.size === 1 ? "" : "s"}`;
-  const items = doc.builds.length;
-
-  return (
-    <div
-      className={[
-        "border-b border-base-100",
-        doc.include ? "" : "opacity-50",
-      ].join(" ")}
-      data-testid={`to-order-po-${doc.key}`}
-    >
-      <div className="flex items-center gap-2 h-9 px-3.5">
-        <input
-          type="checkbox"
-          checked={doc.include}
-          onChange={onInclude}
-          aria-label={W.include}
-          title={W.include}
-          data-testid={`to-order-include-${doc.key}`}
-          className="shrink-0"
-        />
-        <button
-          type="button"
-          onClick={onToggleOpen}
-          data-testid={`to-order-po-toggle-${doc.key}`}
-          className="flex-1 min-w-0 flex items-center gap-2 text-left"
-        >
-          <ChevronRight
-            size={12}
-            strokeWidth={2.2}
-            aria-hidden
-            className={["transition-transform", open ? "rotate-90 text-base-500" : "text-base-300"].join(" ")}
-          />
-          <span className="text-body font-semibold text-base-900 whitespace-nowrap">
-            PO {index} of {total}
-          </span>
-          <span className="text-body text-base-900 truncate">{who}</span>
-          {doc.so != null ? (
-            <span className="text-meta text-base-600 whitespace-nowrap">SO-{doc.so}</span>
-          ) : null}
-          <span className="ml-auto text-meta text-base-600 whitespace-nowrap tabular-nums">
-            {items} item{items === 1 ? "" : "s"}
-          </span>
-        </button>
-      </div>
-
-      {!doc.include ? (
-        <div className="px-3.5 pb-2 -mt-1 text-meta text-base-600">{W.includeOffHelp}</div>
-      ) : null}
-
-      {open ? (
-        <ItemsSection
-          builds={doc.builds}
-          category={category}
-          canRearrange={rearrange}
-          moveTargets={others.map((o, i) => ({ key: o.key, label: `Purchase Order ${i + 1}` }))}
-          onRemove={onRemove}
-          onSplit={onSplit}
-          onMove={onMove}
-          onOpenOrder={onOpenOrder}
-        />
-      ) : null}
-    </div>
-  );
-}
-
 // ── Sticky action ───────────────────────────────────────────────────────────
 
 function StickyAction({
