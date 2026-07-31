@@ -126,19 +126,34 @@ Example under the pattern it uses.
 
 ---
 
-## 4 · Old UI that must NOT be carried forward
+## 4 · The method: build new, delete old. Do NOT amend.
 
-1. **The whole page shell** listed in §0 — `Sidebar` · `DocRow` ·
-   `StickyAction` · `IssuedPanel` · `EmptyPanel`. Hand-rolled, pre-Design-System.
-2. **The 300px sidebar's search and filter** — decoration. Zero `<input>`.
-3. **`Purchase Order Preview` as a concept.** The right pane is a workspace
-   where an operator works, not a preview they read. The word is already gone
-   from the bundle; do not reintroduce it.
-4. **The accordion** — already deleted. Do not rebuild collapsible
-   purchase-order strips.
-5. **Anything in `docs/UI-KIT.md` §6 that a kit component now covers.**
+**This is the direction change (Loo, 2026-07-31).** The previous session took
+`OperationPurchase.tsx` and edited it region by region. The regions came out
+right and the SHELL never left, because a file you keep opening is a file whose
+shape you keep. That method is rejected.
 
----
+**What the next chat does instead:**
+
+1. Write a NEW page file from zero, composed from §1's business logic and §2's
+   kit components.
+2. Delete `apps/web/src/pages/operation/OperationPurchase.tsx` **in the same
+   change** that points the route at the new file.
+3. Never open the old file to edit it. Read it once, for the state it holds and
+   the props it passes — then close it.
+
+**Why deletion and replacement are one change, not two.** `To Order` is live on
+the operator's portal. Deleting the old page on its own takes the tab off the
+portal until the new one lands. One commit, one route, no window where the
+module is missing.
+
+**Nothing in the old file survives as markup.** Not the sidebar, not the sticky
+action bar, not the issued panel, not the empty panel, not the search box —
+which is decoration with zero `<input>` in the entire file.
+
+**What may be lifted, as logic and not as JSX:** the state the page holds
+(`pickedKey` · `pickedDoc` · `destId` · `plan` · `issued`), the mutation body,
+and the deep link `/operation/orders?order={orderId}`.
 
 ## 5 · Commits to keep
 
@@ -156,22 +171,31 @@ On `main`, this session:
 
 ## 6 · Work that should be discarded
 
-Only the page-level wiring, and only if the rebuild replaces it:
+**Discard as markup — every one of these is deleted with the old file:**
 
-- `OperationPurchase.tsx` — the shell in §4. The state it holds
-  (`pickedKey` · `pickedDoc` · `destId` · `plan` · `issued`) is correct and can
-  be lifted; the markup is not.
-- `OperationPurchase.test.tsx` — 23 tests. The assertions about business
-  behaviour are worth re-pointing; the ones anchored on `po-workspace`,
-  `to-order-doc-*` and `to-order-include-*` describe the current shell.
-- **Nothing in `packages/shared`, `components/kit` or `docs/` is discardable.**
+```
+OperationPurchase.tsx     the whole page shell
+  Sidebar · DocRow · StickyAction · IssuedPanel · EmptyPanel
+OperationPurchase.test.tsx   23 tests anchored on that shell
+```
 
-Open question the next chat must answer, not assume: whether
-`PurchaseOrderWorkspace.tsx` and `ItemsSection.tsx` survive the Golden Template
-rebuild or are rebuilt inside it. They are Design-System-based and tested; they
-are also shaped by the shell they currently sit in.
+**Discard the SHAPE, not the decisions.** `PurchaseOrderWorkspace.tsx` and
+`ItemsSection.tsx` were written inside the old shell and inherit its
+assumptions — a document header bar the shell needed, a `MoveTarget` list the
+shell composed, an `ItemsSection` that renders a `SectionHeader` because the
+shell had nowhere else to put one. **The next chat rebuilds both from the
+Golden Template rather than importing them.** What carries across is the
+decisions they encode, which are listed in §10 and in `03-page-patterns.md`,
+not the files.
 
----
+**Discard NOTHING from:**
+```
+packages/shared/           the projection, the state machine, the word list
+apps/web/src/components/kit/   27 components, house rules, tests
+docs/0*.md                 the Design System
+scripts/check-design.mjs   the scan and its ratchet
+apps/api/                  the read and the issue write
+```
 
 ## 7 · What the next chat must read before writing code
 
@@ -188,18 +212,19 @@ In this order:
 
 ## 8 · The first task for the next chat
 
-**Open the live page and report what is there. Change nothing.**
+**Draw the new page from the Golden Template, in ASCII, before writing a line
+of code.** `03-page-patterns.md` → Review → Carres Examples holds the frozen
+region order; §2 holds the components available to build it from; §12 holds the
+columns that do not exist and therefore cannot be drawn.
 
-```
-erp.carresofficial.com → Purchasing → To Order
-```
+Name, for each region, which kit component renders it and which of §1's
+functions feeds it. Where neither exists, say so — do not invent a component
+and do not invent a word.
 
-Then state, as facts: which parts are the five regions, which parts are the old
-shell from §0, and what the Golden Template requires that neither provides.
+**No code until that drawing is accepted.**
 
-**No code until that report is accepted.**
-
----
+Then, in ONE change: the new file, the route pointed at it, and
+`OperationPurchase.tsx` deleted.
 
 ## 9 · Rules that survive, and cost real money when broken
 
