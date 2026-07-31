@@ -188,7 +188,9 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
     return b;
   }
 
+  const tableCalls: Record<string, number> = {};
   const from = vi.fn((table: string) => {
+    tableCalls[table] = (tableCalls[table] ?? 0) + 1;
     if (table === "purchasing_destinations") {
       return destBuilder(
         (tables.purchasing_destinations.data as { id: string; name: string }[]) ?? [],
@@ -203,7 +205,7 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
     return { data: { id: `PO-${poSeq}`, line_count: 1 }, error: null };
   });
 
-  return { from, rpc, updates, rpcCalls };
+  return { from, rpc, updates, rpcCalls, tableCalls };
 }
 
 beforeAll(async () => {
@@ -393,5 +395,143 @@ describe("POST …/to-order/issue", () => {
       env,
     );
     expect(res.status).toBe(401);
+  });
+});
+
+/**
+ * 2026-07-30 — the regression that must never be possible again.
+ *
+ * Seven customer requirements across five customer orders reached no purchase
+ * order, and the documents that WERE issued looked complete. The cause was a
+ * catalog read coming back short and the loop skipping what it could not
+ * resolve, in silence.
+ *
+ * These pin the two halves of the fix: a requirement the catalog cannot answer
+ * for is NAMED, and it stops every issue rather than quietly shrinking one.
+ */
+describe("a requirement the catalog cannot answer for", () => {
+  /** Drop one SKU from the catalog — exactly what a short read looks like. */
+  function tablesMissingCatalogRow(sku: string) {
+    const t = TABLES();
+    t.product_skus = {
+      data: (t.product_skus.data as { sku: string }[]).filter((r) => r.sku !== sku),
+      error: null,
+    };
+    return t;
+  }
+
+  it("is named on the read instead of vanishing", async () => {
+    const sb = makeSb(tablesMissingCatalogRow("5539-CNR"));
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    expect(body.unresolved).toHaveLength(1);
+    expect(body.unresolved[0]).toMatchObject({ sku: "5539-CNR", so: 1207 });
+  });
+
+  it("stops EVERY issue, not just that supplier's, and writes nothing", async () => {
+    const sb = makeSb(tablesMissingCatalogRow("5539-CNR"));
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await post({ supplierId: OHANA, category: "sofa", destinationId: KLANG });
+    expect(res.status).toBe(409);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("demand_unresolved");
+    expect(body.unresolved).toHaveLength(1);
+    expect(sb.rpcCalls).toHaveLength(0);
+    expect(sb.updates).toHaveLength(0);
+  });
+
+  it("would have issued a SHORT purchase order before the guard existed", async () => {
+    // The proposal still forms — PETER keeps his other modules — which is
+    // precisely why the guard is at the door and not in the projection.
+    const sb = makeSb(tablesMissingCatalogRow("5539-CNR"));
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    const peter = body.proposals[0].rows.find((r: { so: number }) => r.so === 1207);
+    const skus = peter.builds.flatMap((b: { lines: { sku: string }[] }) => b.lines).map(
+      (l: { sku: string }) => l.sku,
+    );
+    expect(skus).not.toContain("5539-CNR");
+    expect(skus.length).toBeGreaterThan(0);
+  });
+
+  it("names a procurable SKU nobody has mapped to a supplier", async () => {
+    const t = TABLES();
+    t.product_skus = {
+      data: (t.product_skus.data as { sku: string; supplier_id: string | null }[]).map((r) =>
+        r.sku === "5539-CNR" ? { ...r, supplier_id: null } : r,
+      ),
+      error: null,
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    expect(body.unresolved.map((u: { sku: string }) => u.sku)).toEqual(["5539-CNR"]);
+  });
+
+  it("says nothing when every requirement resolves", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    expect(body.unresolved).toEqual([]);
+  });
+
+  it("still keeps an accessory out — that is a judgement, not a failure to read", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    expect(body.unresolved).toEqual([]);
+    const skus = body.proposals
+      .flatMap((p: { rows: { builds: { lines: { sku: string }[] }[] }[] }) => p.rows)
+      .flatMap((r: { builds: { lines: { sku: string }[] }[] }) => r.builds)
+      .flatMap((b: { lines: { sku: string }[] }) => b.lines)
+      .map((l: { sku: string }) => l.sku);
+    expect(skus).not.toContain("MEMORY-FOAM-PILLOW");
+  });
+});
+
+describe("the reads are chunked", () => {
+  it("asks the catalog in batches so one long URL cannot swallow a customer's goods", async () => {
+    const t = TABLES();
+    // 95 SKUs on one order line each — past the 40-per-batch chunk.
+    const many = Array.from({ length: 95 }, (_, i) => `BULK-${i}`);
+    t.order_lines = {
+      data: [
+        ...(t.order_lines.data as Record<string, unknown>[]),
+        ...many.map((sku, i) => ({
+          id: `b${i}`, order_id: "o2", sku, qty: 1, attrs: null,
+          excluded_from_plan: false, exclude_from_plan_until: null,
+        })),
+      ],
+      error: null,
+    };
+    t.product_skus = {
+      data: [
+        ...(t.product_skus.data as Record<string, unknown>[]),
+        ...many.map((sku) => ({
+          sku, supplier_id: OHANA, cost: 1, variant: null,
+          product_models: { category: "sofa", name: "Bulk" },
+        })),
+      ],
+      error: null,
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    // 78 + 95 distinct SKUs cannot ride one `.in()`; the catalog is asked more
+    // than once, and nothing is lost.
+    expect(sb.tableCalls.product_skus).toBeGreaterThan(1);
+    expect(body.unresolved).toEqual([]);
   });
 });

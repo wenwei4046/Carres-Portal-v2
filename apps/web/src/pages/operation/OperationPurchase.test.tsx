@@ -315,3 +315,50 @@ describe("To Order — nothing to do", () => {
     expect(screen.getByTestId("to-order-empty")).toBeInTheDocument();
   });
 });
+
+describe("To Order — a requirement the catalog could not read", () => {
+  function withUnresolved() {
+    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+      if (path.startsWith("/api/operation/purchase/to-order/issue")) return route(path, init);
+      if (path.startsWith("/api/operation/purchase/to-order")) {
+        return Promise.resolve({
+          ...TO_ORDER,
+          unresolved: [
+            { sku: "5539-CNR", orderId: "o1", so: 1207 },
+            { sku: "TELLUC-1S", orderId: "o4", so: 1282 },
+          ],
+        });
+      }
+      return route(path);
+    });
+  }
+
+  it("names what could not be read and refuses to issue", async () => {
+    withUnresolved();
+    render(wrap());
+    const panel = await screen.findByTestId("to-order-unresolved");
+    expect(panel).toHaveTextContent("2 items could not be read");
+    expect(panel).toHaveTextContent("Nothing can be issued until every item resolves.");
+    expect(panel).toHaveTextContent("SO-1207 · 5539-CNR");
+    expect(panel).toHaveTextContent("SO-1282 · TELLUC-1S");
+    expect(screen.getByTestId("to-order-issue")).toBeDisabled();
+  });
+
+  it("does not post even if the button is reached", async () => {
+    withUnresolved();
+    render(wrap());
+    await screen.findByTestId("to-order-unresolved");
+    fireEvent.click(screen.getByTestId("to-order-issue"));
+    await waitFor(() =>
+      expect(apiFetch.mock.calls.filter((c) => String(c[0]).endsWith("/issue"))).toHaveLength(0),
+    );
+  });
+
+  it("says nothing at all when every requirement resolves", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-action");
+    expect(screen.queryByTestId("to-order-unresolved")).toBeNull();
+    expect(screen.getByTestId("to-order-issue")).not.toBeDisabled();
+  });
+});
+
