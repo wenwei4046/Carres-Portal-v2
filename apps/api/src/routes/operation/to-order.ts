@@ -4,13 +4,15 @@ import {
   buildToOrder,
   isToOrderCategory,
   myHolidaySet,
-  planPurchaseOrders,
+  planFromDocuments,
   productionWorkingDaysFor,
   workWeekOffDaysFor,
   type ProductCategory,
+  type IssueDocument,
   type ToOrderLine,
   type ToOrderProposal,
 } from "@carres/shared";
+import { validateIssuePlan } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { mapPgError } from "../../lib/route-helpers";
@@ -350,10 +352,28 @@ toOrderRouter.get("/", requireOperation, async (c) => {
   });
 });
 
+/**
+ * The issue contract.
+ *
+ * The client posts an ARRANGEMENT — which builds go on which document — and
+ * nothing else. Quantities, SKUs and prices are never sent: the server reads
+ * them from its own recomputation, so a browser cannot invent a line, change a
+ * quantity or price a purchase order.
+ */
 const issueBody = z.object({
   supplierId: z.string().uuid(),
   category: z.string().min(1),
   destinationId: z.string().uuid(),
+  purchaseOrders: z
+    .array(
+      z.object({
+        key: z.string().min(1),
+        include: z.boolean(),
+        buildKeys: z.array(z.string().min(1)),
+      }),
+    )
+    .min(1)
+    .max(200),
 });
 
 toOrderRouter.post("/issue", requireOperation, async (c) => {
@@ -369,7 +389,7 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
-  const { supplierId, category, destinationId } = parsed.data;
+  const { supplierId, category, destinationId, purchaseOrders } = parsed.data;
 
   // Recompute. The operator's screen is a view; what gets issued is built from
   // the server's own reading, so a stale tab cannot order last hour's demand.
@@ -397,16 +417,31 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
     (p) => p.supplierId === supplierId && p.category === category,
   );
   if (!proposal || proposal.rows.length === 0) {
-    return c.json(
-      { error: "nothing_to_issue", code: "nothing_to_issue" },
-      409,
-    );
+    return c.json({ error: "nothing_to_issue", code: "nothing_to_issue" }, 409);
   }
   if (proposal.blocked === "production_days") {
     return c.json(
       { error: "production_days_required", code: "production_days_required" },
       422,
     );
+  }
+
+  // THE GATE. Every rule is asked against the proposal the server just built,
+  // never against what the client believes:
+  //   · a build already on a purchase order is not in it, so naming one fails
+  //   · a build belonging to another supplier or category is not in it either
+  //   · the same build twice, an empty document, a merged sofa and a batch past
+  //     the transaction's cap each have their own refusal
+  //   · demand that changed or was cancelled since the page loaded is simply
+  //     absent from the recomputation, and fails as `unknown_build`
+  const docs: IssueDocument[] = purchaseOrders.map((d) => ({
+    key: d.key,
+    include: d.include,
+    buildKeys: d.buildKeys,
+  }));
+  const check = validateIssuePlan(proposal, docs);
+  if (!check.ok) {
+    return c.json({ error: check.code, code: check.code, message: check.message }, 422);
   }
 
   const { data: dest, error: destErr } = await sb
@@ -438,14 +473,17 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
     return c.json({ error: "no_warehouse", code: "no_warehouse" }, 500);
   }
 
-  const plan = planPurchaseOrders(proposal);
-  const created: { id: string; customer: string }[] = [];
+  const plan = planFromDocuments(proposal, docs);
 
-  for (const po of plan) {
-    const { data, error } = await sb.rpc("operation_create_po", {
-      p_supplier_id: po.supplierId,
-      p_warehouse_id: warehouse.id as string,
-      p_lines: po.lines.map((l) => ({
+  // ONE transaction. `operation_create_pos_batch` is a single plpgsql function,
+  // so a failure on the seventh document rolls the first six back — there is no
+  // state where half an issue exists and nothing says so.
+  const { data: batch, error: batchErr } = await sb.rpc("operation_create_pos_batch", {
+    p_pos: plan.map((po) => ({
+      supplier_id: po.supplierId,
+      warehouse_id: warehouse.id as string,
+      so_refs: po.soRefs,
+      lines: po.lines.map((l) => ({
         sku: l.sku,
         qty: l.qty,
         // The purchase price is resolved from the catalog and never shown here
@@ -454,39 +492,33 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
         cost: l.cost ?? 0,
         cost_source: "catalog",
       })),
-      p_so: po.so,
-      p_so_refs: po.soRefs.length > 0 ? po.soRefs : null,
-    });
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(
-        { ...(m.body as object), issued: created },
-        m.status,
-      );
-    }
-    const id = (data as { id?: string } | null)?.id;
-    if (!id) {
-      return c.json({ error: "po_not_created", code: "po_not_created", issued: created }, 500);
-    }
+    })),
+  });
+  if (batchErr) {
+    const m = mapPgError(batchErr);
+    return c.json(m.body, m.status);
+  }
+  const ids = ((batch as { po_ids?: unknown } | null)?.po_ids ?? []) as string[];
+  if (ids.length !== plan.length) {
+    return c.json({ error: "po_not_created", code: "po_not_created" }, 500);
+  }
 
-    // Where the goods go. A fresh PO has received nothing, so the destination
-    // guard permits this for operation/principal; it freezes on first receipt.
-    const { error: upErr } = await sb
-      .from("purchase_orders")
-      .update({ destination_id: destinationId })
-      .eq("id", id);
-    if (upErr) {
-      const m = mapPgError(upErr);
-      return c.json({ ...(m.body as object), issued: created }, m.status);
-    }
-
-    created.push({ id, customer: po.customer });
+  // Where the goods go, in ONE statement over every document the batch made. A
+  // fresh purchase order has received nothing, so the destination guard permits
+  // it; it freezes on first receipt.
+  const { error: upErr } = await sb
+    .from("purchase_orders")
+    .update({ destination_id: destinationId })
+    .in("id", ids);
+  if (upErr) {
+    const m = mapPgError(upErr);
+    return c.json({ ...(m.body as object), issued: ids }, m.status);
   }
 
   return c.json({
     supplier: proposal.supplierName,
     destination: dest.name as string,
-    pos: created,
+    pos: ids.map((id, i) => ({ id, customer: plan[i]?.customer ?? proposal.supplierName })),
   });
 });
 

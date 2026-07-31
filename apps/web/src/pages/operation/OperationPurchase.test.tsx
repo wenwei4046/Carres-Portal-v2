@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import OperationPurchase from "./OperationPurchase";
@@ -34,7 +34,7 @@ const KLANG = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
 const AL = "818b420c-27f9-4707-a516-b91a6e03f343";
 
 function build(key: string, title: string, spec: string, codes: string) {
-  return { key, title, spec, codes, lines: [] };
+  return { key, title, spec, codes, lines: [{ lineId: `${key}-l1`, sku: codes, qty: 1, cost: null }] };
 }
 
 const TO_ORDER = {
@@ -133,12 +133,6 @@ beforeEach(() => {
   );
 });
 
-const grid = () => screen.getByTestId("to-order-grid");
-const dataRows = () =>
-  within(grid())
-    .getAllByRole("row")
-    .filter((r) => r.getAttribute("data-testid")?.startsWith("to-order-row-"));
-
 describe("To Order — the sidebar", () => {
   it("lists every proposal by how many purchase orders it will create", async () => {
     render(wrap());
@@ -153,84 +147,108 @@ describe("To Order — the sidebar", () => {
     expect(bed).not.toHaveTextContent("1 Purchase Orders");
   });
 
-  it("switches the grid when another proposal is picked", async () => {
+  it("switches the preview when another proposal is picked", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-grid");
-    expect(dataRows()).toHaveLength(3);
+    await screen.findByTestId("to-order-preview");
+    expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(3);
 
     fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
-    await waitFor(() => expect(dataRows()).toHaveLength(1));
-    expect(grid()).toHaveTextContent("wong");
+    // Bedframe merges every customer order into ONE document.
+    await waitFor(() => expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(1));
+    expect(screen.getByTestId("to-order-preview")).toHaveTextContent("wong");
   });
 });
 
-describe("To Order — the grid", () => {
-  it("opens on Stock ready, earliest first, with the dateless row last", async () => {
+describe("To Order — the Purchase Order Preview", () => {
+  it("shows one block per future purchase order", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-grid");
-    expect(dataRows().map((r) => r.getAttribute("data-testid"))).toEqual([
-      "to-order-row-1204",
-      "to-order-row-1207",
-      "to-order-row-1257",
-    ]);
+    await screen.findByTestId("to-order-preview");
+    const blocks = screen.getAllByTestId(/^to-order-po-d\d+$/);
+    expect(blocks).toHaveLength(3); // sofa: one document per customer order
+    expect(blocks[0]).toHaveTextContent("PO 1 of 3");
+    expect(blocks[0]).toHaveTextContent("ella");
   });
 
-  it("keeps the dateless row last when the sort is reversed", async () => {
+  it("opens a document to its sofas", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-grid");
-    fireEvent.click(screen.getByTestId("to-order-col-stockReady"));
+    await screen.findByTestId("to-order-preview");
+    expect(screen.queryByText("Sofa 2 — Booqit")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("to-order-po-toggle-d2"));
+    await screen.findByText(/Sofa 2 — Booqit/);
+  });
+
+  it("has no Split or Move on sofa — a sofa PO carries one customer order", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-preview");
+    fireEvent.click(screen.getByTestId("to-order-po-toggle-d2"));
+    await screen.findByText(/Sofa 2 — Booqit/);
+    expect(screen.queryByTestId(/^to-order-split-/)).toBeNull();
+    expect(screen.queryByTestId(/^to-order-move-/)).toBeNull();
+  });
+
+  it("leaving a document out changes the count and says it changes nothing else", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-preview");
+    expect(screen.getByTestId("to-order-count")).toHaveTextContent("3 Purchase Orders");
+
+    fireEvent.click(screen.getByTestId("to-order-include-d2"));
     await waitFor(() =>
-      expect(dataRows().map((r) => r.getAttribute("data-testid"))).toEqual([
-        "to-order-row-1207",
-        "to-order-row-1204",
-        "to-order-row-1257",
-      ]),
+      expect(screen.getByTestId("to-order-count")).toHaveTextContent("2 Purchase Orders"),
+    );
+    expect(screen.getByTestId("to-order-po-d2")).toHaveTextContent(
+      "Not issued this time. Nothing about the order changes.",
     );
   });
 
-  it("sorts by any column the operator clicks — and the dateless row still sinks", async () => {
+  it("removing an item takes it off the document and keeps it visible", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-grid");
-    fireEvent.click(screen.getByTestId("to-order-col-cust"));
+    await screen.findByTestId("to-order-preview");
+    fireEvent.click(screen.getByTestId("to-order-po-toggle-d2"));
+    await screen.findByText(/Sofa 2 — Booqit/);
+
+    fireEvent.click(screen.getByTestId("to-order-remove-bk-b"));
+    const removed = await screen.findByTestId("to-order-removed");
+    expect(removed).toHaveTextContent("Not on any purchase order");
+    expect(removed).toHaveTextContent("Still waiting to be ordered.");
+    expect(removed).toHaveTextContent("PETER");
+  });
+
+  it("puts a removed item back", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-preview");
+    fireEvent.click(screen.getByTestId("to-order-po-toggle-d2"));
+    await screen.findByText(/Sofa 2 — Booqit/);
+    fireEvent.click(screen.getByTestId("to-order-remove-bk-b"));
+    await screen.findByTestId("to-order-removed");
+
+    fireEvent.click(screen.getByTestId("to-order-putback-bk-b"));
+    await waitFor(() => expect(screen.queryByTestId("to-order-removed")).toBeNull());
+  });
+
+  it("refuses to issue when nothing is included, and says so", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-preview");
+    for (const k of ["d1", "d2", "d3"]) fireEvent.click(screen.getByTestId(`to-order-include-${k}`));
     await waitFor(() =>
-      expect(dataRows().map((r) => r.getAttribute("data-testid"))).toEqual([
-        "to-order-row-1204", // ella
-        "to-order-row-1207", // PETER
-        "to-order-row-1257", // kee tong — alphabetically second, but has no date
-      ]),
+      expect(screen.getByTestId("to-order-plan-blocked")).toHaveTextContent(
+        "Nothing is selected to issue.",
+      ),
     );
+    expect(screen.getByTestId("to-order-issue")).toBeDisabled();
   });
 
-  it("says No delivery date in the cell instead of lighting a status column", async () => {
+  it("splits and moves on a category whose purchase orders may merge", async () => {
     render(wrap());
-    await screen.findByTestId("to-order-grid");
-    expect(screen.getByTestId("to-order-row-1257")).toHaveTextContent("No delivery date");
-    // There is no status column at all.
-    expect(screen.queryByTestId("to-order-col-status")).toBeNull();
-    expect(grid()).not.toHaveTextContent("⚠");
-  });
+    await screen.findByTestId("to-order-preview");
+    fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
+    await waitFor(() => expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(1));
 
-  it("shows a customer's sofas only when the row is opened", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-grid");
-    expect(grid()).not.toHaveTextContent("Sofa 2 — Booqit");
-
-    fireEvent.click(screen.getByTestId("to-order-row-1207"));
-    await waitFor(() => expect(grid()).toHaveTextContent("Sofa 2 — Booqit"));
-    expect(grid()).toHaveTextContent("Sofa 1 — Booqit");
-    expect(grid()).toHaveTextContent("5539-1B(LHF) · 5539-CNR");
-
-    fireEvent.click(screen.getByTestId("to-order-row-1207"));
-    await waitFor(() => expect(grid()).not.toHaveTextContent("Sofa 2 — Booqit"));
-  });
-
-  it("keeps price and address off the page", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-grid");
-    fireEvent.click(screen.getByTestId("to-order-row-1207"));
-    await waitFor(() => expect(grid()).toHaveTextContent("Sofa 2 — Booqit"));
-    expect(grid()).not.toHaveTextContent("RM");
-    expect(grid()).not.toHaveTextContent("Address");
+    fireEvent.click(screen.getByTestId("to-order-po-toggle-d1"));
+    await screen.findByTestId("to-order-split-l1");
+    fireEvent.click(screen.getByTestId("to-order-split-l1"));
+    // One build, split out of a one-build document, is still one document.
+    await waitFor(() => expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(1));
   });
 });
 
@@ -238,7 +256,7 @@ describe("To Order — issuing", () => {
   it("shows the same count the sidebar does", async () => {
     render(wrap());
     await screen.findByTestId("to-order-action");
-    expect(screen.getByTestId("to-order-action")).toHaveTextContent("3 Purchase Orders");
+    expect(screen.getByTestId("to-order-count")).toHaveTextContent("3 Purchase Orders");
   });
 
   it("defaults the destination to Carres Klang", async () => {
@@ -256,11 +274,19 @@ describe("To Order — issuing", () => {
     await waitFor(() => {
       const call = apiFetch.mock.calls.find((c) => String(c[0]).endsWith("/issue"));
       expect(call).toBeTruthy();
-      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({
-        supplierId: OHANA,
-        category: "sofa",
-        destinationId: AL,
+      const sent = JSON.parse(String((call![1] as RequestInit).body));
+      expect(sent.supplierId).toBe(OHANA);
+      expect(sent.category).toBe("sofa");
+      expect(sent.destinationId).toBe(AL);
+      // The ARRANGEMENT only — never a SKU, a quantity or a price.
+      expect(sent.purchaseOrders).toHaveLength(3);
+      expect(sent.purchaseOrders[0]).toEqual({
+        key: "d1",
+        include: true,
+        buildKeys: ["bk-e"],
       });
+      expect(JSON.stringify(sent)).not.toContain("qty");
+      expect(JSON.stringify(sent)).not.toContain("cost");
     });
   });
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Filter, Search } from "lucide-react";
@@ -6,12 +6,24 @@ import {
   TO_ORDER_WORDS as W,
   issuedHeadline,
   purchaseOrderCount,
-  sortToOrderRows,
   unresolvedHeadline,
+  type ToOrderBuildRef,
   type ToOrderProposal,
-  type ToOrderRow,
-  type ToOrderSortKey,
 } from "@carres/shared";
+import {
+  canRearrange,
+  check as checkPlan,
+  describe as describeDocs,
+  initialState,
+  moveBuild,
+  removeBuild,
+  removedBuilds,
+  restoreBuild,
+  splitOut,
+  toggleInclude,
+  type PreviewDoc,
+  type PreviewState,
+} from "./to-order-preview";
 import PurchasingTabs from "./PurchasingTabs";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -97,12 +109,14 @@ export default function OperationPurchase() {
 
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [destId, setDestId] = useState<string | null>(null);
-  const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
-  // Sort resets on every open: the day's order is Stock ready, and a sort
-  // somebody left behind yesterday is not today's priority.
-  const [sortKey, setSortKey] = useState<ToOrderSortKey>("stockReady");
-  const [asc, setAsc] = useState(true);
+  const [open, setOpen] = useState<Record<string, boolean>>({});
   const [issued, setIssued] = useState<IssueResponse | null>(null);
+  /**
+   * The arrangement. It lives here and nowhere else — a refresh drops it and
+   * the server's own suggestion comes back, which is what keeps a Proposal a
+   * computed view rather than a stored draft.
+   */
+  const [plan, setPlan] = useState<PreviewState | null>(null);
 
   const current = proposals.find((p) => p.key === pickedKey) ?? proposals[0] ?? null;
 
@@ -117,38 +131,52 @@ export default function OperationPurchase() {
     if (def) setDestId(def.id);
   }, [destinations, destId]);
 
-  const rows = useMemo(
-    () => (current ? sortToOrderRows(current.rows, sortKey, asc) : []),
-    [current, sortKey, asc],
+  // Rebuild the arrangement whenever the proposal underneath it changes.
+  const currentKey = current?.key ?? null;
+  useEffect(() => {
+    setPlan(current ? initialState(current) : null);
+    setOpen({});
+  }, [currentKey, current]);
+
+  const docs = useMemo(
+    () => (current && plan ? describeDocs(current, plan) : []),
+    [current, plan],
+  );
+  const removed = useMemo(
+    () => (current && plan ? removedBuilds(current, plan) : []),
+    [current, plan],
+  );
+  const verdict = useMemo(
+    () => (current && plan ? checkPlan(current, plan) : null),
+    [current, plan],
   );
 
   const issue = useMutation<IssueResponse, Error, void>({
     mutationFn: () => {
-      if (!current || !destId) throw new Error("nothing to issue");
+      if (!current || !destId || !plan) throw new Error("nothing to issue");
       return apiFetch<IssueResponse>("/api/operation/purchase/to-order/issue", {
         method: "POST",
         body: JSON.stringify({
           supplierId: current.supplierId,
           category: current.category,
           destinationId: destId,
+          // The ARRANGEMENT only. No SKU, no quantity, no price — the server
+          // reads those from its own recomputation.
+          purchaseOrders: plan.docs.map((d) => ({
+            key: d.key,
+            include: d.include,
+            buildKeys: d.buildKeys,
+          })),
         }),
       });
     },
     onSuccess: (res) => {
       setIssued(res);
       setPickedKey(null);
-      setOpenRows({});
+      setOpen({});
       void qc.invalidateQueries({ queryKey: ["operation"] });
     },
   });
-
-  function toggleSort(k: ToOrderSortKey) {
-    if (k === sortKey) setAsc((v) => !v);
-    else {
-      setSortKey(k);
-      setAsc(true);
-    }
-  }
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-base-100">
@@ -160,7 +188,7 @@ export default function OperationPurchase() {
           currentKey={current?.key ?? null}
           onPick={(k) => {
             setPickedKey(k);
-            setOpenRows({});
+            setOpen({});
             setIssued(null);
           }}
           loading={q.isLoading}
@@ -176,18 +204,25 @@ export default function OperationPurchase() {
             <EmptyPanel loading={q.isLoading} error={q.error as Error | null} />
           ) : (
             <>
-              <Grid
+              <Preview
                 proposal={current}
-                rows={rows}
-                sortKey={sortKey}
-                asc={asc}
-                onSort={toggleSort}
-                openRows={openRows}
-                onToggleRow={(id) => setOpenRows((m) => ({ ...m, [id]: !m[id] }))}
+                docs={docs}
+                removed={removed}
+                open={open}
+                onToggleOpen={(k) => setOpen((m) => ({ ...m, [k]: !m[k] }))}
+                onInclude={(k) => setPlan((st) => (st ? toggleInclude(st, k) : st))}
+                onRemove={(k) => setPlan((st) => (st ? removeBuild(st, k) : st))}
+                onRestore={(k) =>
+                  setPlan((st) => (st && current ? restoreBuild(st, current, k) : st))
+                }
+                onSplit={(k) => setPlan((st) => (st ? splitOut(st, [k]) : st))}
+                onMove={(k, to) => setPlan((st) => (st ? moveBuild(st, k, to) : st))}
               />
               <StickyAction
                 proposal={current}
                 unresolved={unresolved}
+                count={verdict?.count ?? 0}
+                blockedReason={verdict && !verdict.ok ? (verdict.message ?? null) : null}
                 destinations={destinations}
                 destId={destId}
                 onDest={setDestId}
@@ -270,153 +305,225 @@ function Sidebar({
   );
 }
 
-// ── Grid ────────────────────────────────────────────────────────────────────
+// ── Purchase Order Preview ──────────────────────────────────────────────────
 
-const COLS: { key: ToOrderSortKey; label: string; numeric?: boolean; title?: string }[] = [
-  { key: "cust", label: W.colCustomer },
-  { key: "so", label: W.colSo },
-  { key: "qty", label: W.colQty, numeric: true },
-  { key: "summary", label: W.colSummary },
-  { key: "stockReady", label: W.colStockReady, numeric: true, title: W.stockReadyHelp },
-];
-
-function Grid({
+/**
+ * What pressing Issue would create — before it exists.
+ *
+ * One block per future purchase order. Nothing here is a status: `Include in
+ * this issue` decides whether a document goes out THIS time and nothing else,
+ * and `Remove from this Purchase Order` takes an item off a document without
+ * touching the customer's order. Every one of these lives in this tab until the
+ * page is refreshed.
+ */
+function Preview({
   proposal,
-  rows,
-  sortKey,
-  asc,
-  onSort,
-  openRows,
-  onToggleRow,
+  docs,
+  removed,
+  open,
+  onToggleOpen,
+  onInclude,
+  onRemove,
+  onRestore,
+  onSplit,
+  onMove,
 }: {
   proposal: ToOrderProposal;
-  rows: ToOrderRow[];
-  sortKey: ToOrderSortKey;
-  asc: boolean;
-  onSort: (k: ToOrderSortKey) => void;
-  openRows: Record<string, boolean>;
-  onToggleRow: (id: string) => void;
+  docs: PreviewDoc[];
+  removed: ToOrderBuildRef[];
+  open: Record<string, boolean>;
+  onToggleOpen: (key: string) => void;
+  onInclude: (key: string) => void;
+  onRemove: (buildKey: string) => void;
+  onRestore: (buildKey: string) => void;
+  onSplit: (buildKey: string) => void;
+  onMove: (buildKey: string, toKey: string) => void;
 }) {
-  const scroll = useRef<HTMLDivElement>(null);
+  const rearrange = canRearrange(proposal);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-white border border-base-200 rounded-[8px] overflow-hidden">
-      <div className="shrink-0 px-3.5 pt-2.5 pb-2.5 border-b border-base-200 text-strong text-base-900">
-        {proposal.label}
+      <div className="shrink-0 px-3.5 pt-2.5 pb-2.5 border-b border-base-200 flex items-baseline justify-between gap-4">
+        <span className="text-strong text-base-900">{W.preview}</span>
+        <span className="text-meta text-base-500 truncate">{proposal.label}</span>
       </div>
 
-      <div ref={scroll} className="flex-1 min-h-0 overflow-y-auto" data-testid="to-order-grid">
-        <table className="w-full table-fixed border-collapse">
-          <colgroup>
-            <col className="w-[26px]" />
-            <col className="w-[112px]" />
-            <col className="w-[78px]" />
-            <col className="w-[44px]" />
-            <col />
-            <col className="w-[126px]" />
-          </colgroup>
-          <thead className="sticky top-0 z-[1]">
-            <tr>
-              <th className="bg-base-50 border-b border-base-200 h-7" />
-              {COLS.map((c) => (
-                <th
-                  key={c.key}
-                  title={c.title}
-                  onClick={() => onSort(c.key)}
-                  className={[
-                    "bg-base-50 border-b border-base-200 h-7 px-2 text-label font-normal",
-                    "text-base-500 hover:text-base-900 cursor-pointer select-none whitespace-nowrap",
-                    c.numeric ? "text-right" : "text-left",
-                  ].join(" ")}
-                  data-testid={`to-order-col-${c.key}`}
+      <div className="flex-1 min-h-0 overflow-y-auto" data-testid="to-order-preview">
+        {docs.map((d, i) => (
+          <PoBlock
+            key={d.key}
+            doc={d}
+            index={i + 1}
+            total={docs.length}
+            others={docs.filter((x) => x.key !== d.key)}
+            rearrange={rearrange}
+            open={Boolean(open[d.key])}
+            onToggleOpen={() => onToggleOpen(d.key)}
+            onInclude={() => onInclude(d.key)}
+            onRemove={onRemove}
+            onSplit={onSplit}
+            onMove={onMove}
+          />
+        ))}
+
+        {removed.length > 0 ? (
+          <div className="border-t border-base-200 px-3.5 py-2.5" data-testid="to-order-removed">
+            <div className="text-meta font-semibold text-base-900">{W.removedHeading}</div>
+            <div className="text-meta text-base-600 mb-1.5">{W.removedHelp}</div>
+            {removed.map((b) => (
+              <div key={b.buildKey} className="flex items-baseline gap-3 py-1">
+                <span className="text-meta text-base-900">
+                  {b.so != null ? `SO-${b.so}` : "—"} · {b.customer}
+                </span>
+                <span className="text-meta text-base-600 truncate">{b.title}</span>
+                <button
+                  type="button"
+                  onClick={() => onRestore(b.buildKey)}
+                  data-testid={`to-order-putback-${b.buildKey}`}
+                  className="ml-auto text-meta text-base-900 underline underline-offset-2"
                 >
-                  {c.label}
-                  {sortKey === c.key ? <span className="ml-1">{asc ? "▲" : "▼"}</span> : null}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <RowPair
-                key={r.orderId}
-                row={r}
-                open={Boolean(openRows[r.orderId])}
-                onToggle={() => onToggleRow(r.orderId)}
-              />
+                  {W.putBack}
+                </button>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
-function RowPair({
-  row,
+function PoBlock({
+  doc,
+  index,
+  total,
+  others,
+  rearrange,
   open,
-  onToggle,
+  onToggleOpen,
+  onInclude,
+  onRemove,
+  onSplit,
+  onMove,
 }: {
-  row: ToOrderRow;
+  doc: PreviewDoc;
+  index: number;
+  total: number;
+  others: PreviewDoc[];
+  rearrange: boolean;
   open: boolean;
-  onToggle: () => void;
+  onToggleOpen: () => void;
+  onInclude: () => void;
+  onRemove: (buildKey: string) => void;
+  onSplit: (buildKey: string) => void;
+  onMove: (buildKey: string, toKey: string) => void;
 }) {
+  const customers = new Set(doc.builds.map((b) => b.customer));
+  const who =
+    doc.customer ?? `${customers.size} customer order${customers.size === 1 ? "" : "s"}`;
+  const items = doc.builds.length;
+
   return (
-    <>
-      <tr
-        onClick={onToggle}
-        data-testid={`to-order-row-${row.so ?? row.orderId}`}
-        className={[
-          "h-9 border-b border-base-100 cursor-pointer",
-          open ? "bg-base-100" : "hover:bg-base-50",
-        ].join(" ")}
-      >
-        <td className="px-2 align-middle">
+    <div
+      className={[
+        "border-b border-base-100",
+        doc.include ? "" : "opacity-50",
+      ].join(" ")}
+      data-testid={`to-order-po-${doc.key}`}
+    >
+      <div className="flex items-center gap-2 h-9 px-3.5">
+        <input
+          type="checkbox"
+          checked={doc.include}
+          onChange={onInclude}
+          aria-label={W.include}
+          title={W.include}
+          data-testid={`to-order-include-${doc.key}`}
+          className="shrink-0"
+        />
+        <button
+          type="button"
+          onClick={onToggleOpen}
+          data-testid={`to-order-po-toggle-${doc.key}`}
+          className="flex-1 min-w-0 flex items-center gap-2 text-left"
+        >
           <ChevronRight
             size={12}
             strokeWidth={2.2}
             aria-hidden
-            className={[
-              "transition-transform",
-              open ? "rotate-90 text-base-500" : "text-base-300",
-            ].join(" ")}
+            className={["transition-transform", open ? "rotate-90 text-base-500" : "text-base-300"].join(" ")}
           />
-        </td>
-        <td className="px-2 text-body font-semibold text-base-900 truncate">{row.customer}</td>
-        <td className="px-2 text-meta text-base-600 truncate">
-          {row.so != null ? `SO-${row.so}` : "—"}
-        </td>
-        <td className="px-2 text-body font-semibold text-right tabular-nums">{row.qty}</td>
-        <td className="px-2 text-meta text-base-600 truncate" title={row.summary}>
-          {row.summary}
-        </td>
-        {/* An exception takes over its own cell rather than lighting a status column. */}
-        <td
-          className={[
-            "px-2 text-right",
-            row.stockReady ? "text-body tabular-nums" : "text-meta text-base-900",
-          ].join(" ")}
-        >
-          {row.stockReady ? fmtDate(row.stockReady) : W.noDeliveryDate}
-        </td>
-      </tr>
-      {open ? (
-        <tr>
-          <td colSpan={6} className="border-b border-base-100 pl-[34px] pr-2 pb-2.5">
-            {row.builds.map((b, i) => (
-              <div
-                key={b.key}
-                className={i === 0 ? "pt-2" : "pt-2 mt-2 border-t border-base-100"}
-              >
-                <div className="text-meta font-semibold text-base-900">{b.title}</div>
-                <div className="text-meta text-base-600">{b.spec}</div>
-                <div className="font-mono text-label text-base-500">{b.codes}</div>
-              </div>
-            ))}
-          </td>
-        </tr>
+          <span className="text-body font-semibold text-base-900 whitespace-nowrap">
+            PO {index} of {total}
+          </span>
+          <span className="text-body text-base-900 truncate">{who}</span>
+          {doc.so != null ? (
+            <span className="text-meta text-base-600 whitespace-nowrap">SO-{doc.so}</span>
+          ) : null}
+          <span className="ml-auto text-meta text-base-600 whitespace-nowrap tabular-nums">
+            {items} item{items === 1 ? "" : "s"}
+          </span>
+        </button>
+      </div>
+
+      {!doc.include ? (
+        <div className="px-3.5 pb-2 -mt-1 text-meta text-base-600">{W.includeOffHelp}</div>
       ) : null}
-    </>
+
+      {open ? (
+        <div className="px-3.5 pb-2.5 pl-[46px]">
+          {doc.builds.map((b) => (
+            <div key={b.buildKey} className="py-1.5 border-t border-base-100 first:border-t-0">
+              <div className="text-meta font-semibold text-base-900">
+                {b.customer}
+                {b.so != null ? ` · SO-${b.so}` : ""} · {b.title}
+              </div>
+              <div className="flex items-baseline gap-3 flex-wrap mt-0.5">
+                <button
+                  type="button"
+                  onClick={() => onRemove(b.buildKey)}
+                  data-testid={`to-order-remove-${b.buildKey}`}
+                  className="text-meta text-base-900 underline underline-offset-2"
+                >
+                  {W.removeFromPo}
+                </button>
+                {rearrange ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onSplit(b.buildKey)}
+                      data-testid={`to-order-split-${b.buildKey}`}
+                      className="text-meta text-base-900 underline underline-offset-2"
+                    >
+                      {W.splitOut}
+                    </button>
+                    {others.length > 0 ? (
+                      <label className="text-meta text-base-600 flex items-center gap-1">
+                        {W.moveTo}
+                        <select
+                          value=""
+                          onChange={(e) => e.target.value && onMove(b.buildKey, e.target.value)}
+                          aria-label={W.moveTo}
+                          data-testid={`to-order-move-${b.buildKey}`}
+                          className="text-meta text-base-900 bg-transparent border-0 cursor-pointer"
+                        >
+                          <option value="">…</option>
+                          {others.map((o, i) => (
+                            <option key={o.key} value={o.key}>
+                              PO {i + 1}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -425,6 +532,8 @@ function RowPair({
 function StickyAction({
   proposal,
   unresolved,
+  count,
+  blockedReason,
   destinations,
   destId,
   onDest,
@@ -434,6 +543,10 @@ function StickyAction({
 }: {
   proposal: ToOrderProposal;
   unresolved: Unresolved[];
+  /** How many documents the arrangement would create, live. */
+  count: number;
+  /** Why the arrangement cannot be issued, in the operator's words. */
+  blockedReason: string | null;
   destinations: Destination[];
   destId: string | null;
   onDest: (id: string) => void;
@@ -446,6 +559,7 @@ function StickyAction({
   // particular — so it stops EVERY issue, not just this supplier's. Refusing at
   // the button beats refusing after the click.
   const unread = unresolved.length > 0;
+  const badPlan = blockedReason !== null;
 
   return (
     <div
@@ -469,6 +583,10 @@ function StickyAction({
         <div className="mb-1.5">
           <div className="text-body font-semibold text-base-900">{W.productionDaysRequired}</div>
           <div className="text-meta text-base-600">{W.productionDaysHelp}</div>
+        </div>
+      ) : badPlan ? (
+        <div className="mb-1.5 text-meta text-base-900" data-testid="to-order-plan-blocked">
+          {blockedReason}
         </div>
       ) : null}
 
@@ -496,14 +614,18 @@ function StickyAction({
           </select>
         </label>
 
-        <span className="ml-auto text-body font-semibold tabular-nums whitespace-nowrap">
-          {purchaseOrderCount(proposal.poCount)}
+        {/* The count follows the arrangement, not the system's first guess. */}
+        <span
+          className="ml-auto text-body font-semibold tabular-nums whitespace-nowrap"
+          data-testid="to-order-count"
+        >
+          {purchaseOrderCount(count)}
         </span>
 
         <button
           type="button"
           onClick={onIssue}
-          disabled={blocked || unread || pending || !destId}
+          disabled={blocked || unread || badPlan || pending || !destId}
           data-testid="to-order-issue"
           className="h-8 px-3.5 rounded-[6px] bg-kit-blue-9 text-white text-body font-medium disabled:opacity-40 disabled:cursor-not-allowed"
         >
