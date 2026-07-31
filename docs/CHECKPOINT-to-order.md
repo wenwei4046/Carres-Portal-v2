@@ -350,9 +350,24 @@ reverting restores 16/16.
 ## 15 · Deployed
 
 ```
-Rebuild      built + verified on branch, NOT yet merged/deployed —
-             awaiting Loo's review. Update this block after deploy.
-Last live    main 4073d502 · index-23Unfs6W.js · 4,592,479 bytes · SERVICE_ROLE 0
-API Worker   c632a67e (no api change in the rebuild — web only)
-Migration    none this session · prod applied tail 0308 · repo tail 0307
+Main tip     0a99da12 (PR #534 — the rebuild)
+Web bundle   index-BTU4ZIV3.js · 4,610,515 bytes · SERVICE_ROLE 0
+             both Pages projects --branch=main · 4 canonicals converged on poll 2
+API Worker   c632a67e unchanged — web-only ship; apps/api untouched and the one
+             shared addition (poIndexLabel) has no api reader (checked)
+Migration    none · prod applied tail 0308 · repo tail 0307
 ```
+
+**Bundle grep, both directions** (downloaded to a file first — a piped grep
+truncates): new — `to-order-workspace` · `to-order-queue` ·
+`to-order-header-line` · `to-order-putback-` · `to-order-destination-select`
+each 0→1, and `poIndexLabel`'s body is present as the template
+`` `PO ${e} of ${t}` `` — the composed sentence `PO 1 of` correctly greps 0,
+the template-literal form of the pick-markers-from-MOUNTED-components trap.
+Retired and now 0 — `to-order-sidebar` · `po-workspace` ·
+`po-region-communication` · `po-region-notes` · `po-items-header` ·
+`Purchase Order Preview`. `to-order-include-` survives at 1 ON PURPOSE: it is
+the new page's checkbox id, the identifier being the contract.
+
+**No authenticated screenshot** — the page sits behind an operation login and
+taking one would mean typing a password into a form; the grep is the proof.
