@@ -67,6 +67,23 @@ export const TO_ORDER_WORDS = {
   destination: "Destination",
   issue: "Issue Purchase Order",
 
+  // The Preview — what pressing Issue would create, before it exists.
+  preview: "Purchase Order Preview",
+  /**
+   * The per-document switch. Its meaning is frozen and narrow: whether this
+   * document goes out in THIS issue. It is not a hold, not an exclusion, not a
+   * cancellation and not a status — unchecking changes nothing about the
+   * customer's order, and a refresh puts it back.
+   */
+  include: "Include in this issue",
+  includeOffHelp: "Not issued this time. Nothing about the order changes.",
+  removeFromPo: "Remove from this Purchase Order",
+  removedHeading: "Not on any purchase order",
+  removedHelp: "Still waiting to be ordered. It comes back on the next refresh.",
+  putBack: "Put back",
+  splitOut: "Split into a new purchase order",
+  moveTo: "Move to",
+
   productionDaysRequired: "Production Days Required",
   productionDaysHelp: "Set production days in Settings.",
 
@@ -499,40 +516,216 @@ export interface PoToCreate {
  * is merged, so a factory reads one line per item.
  */
 export function planPurchaseOrders(proposal: ToOrderProposal): PoToCreate[] {
-  const fromRows = (rows: readonly ToOrderRow[]): PoToCreate["lines"] => {
-    const bySku = new Map<string, { sku: string; qty: number; cost: number | null }>();
-    for (const r of rows) {
-      for (const b of r.builds) {
-        for (const l of b.lines) {
-          const hit = bySku.get(l.sku);
-          if (hit) hit.qty += l.qty;
-          else bySku.set(l.sku, { sku: l.sku, qty: l.qty, cost: l.cost });
-        }
-      }
-    }
-    return [...bySku.values()];
-  };
+  return planFromDocuments(proposal, defaultDocuments(proposal));
+}
 
-  if (isOnePoPerOrder(proposal.category)) {
-    return proposal.rows.map((r) => ({
-      supplierId: proposal.supplierId,
-      so: r.so,
-      soRefs: r.so == null ? [] : [r.so],
-      customer: r.customer,
-      lines: fromRows([r]),
-    }));
+// ── The documents an operator arranges before issuing ───────────────────────
+
+/**
+ * One physical thing on a future purchase order — a sofa build, or a single
+ * line that stands alone. It is the unit an operator moves, splits and removes,
+ * because it is the unit they can point at: *that* sofa, not "line 3 of 5".
+ */
+export interface ToOrderBuildRef {
+  buildKey: string;
+  orderId: string;
+  so: number | null;
+  customer: string;
+  title: string;
+  lineIds: string[];
+}
+
+/**
+ * A document the operator is about to create.
+ *
+ * **It exists only in the browser, for the length of one visit.** Splitting,
+ * moving and removing rearrange these; a refresh throws them away and the
+ * server's own suggestion comes back. Nothing about an arrangement is ever
+ * stored, which is what keeps a Proposal a computed view rather than the Draft
+ * PO this module deleted on 2026-07-30.
+ */
+export interface IssueDocument {
+  key: string;
+  /** Left OUT of this issue when false. Not a hold, not a status — this visit only. */
+  include: boolean;
+  buildKeys: string[];
+}
+
+export function toOrderBuilds(proposal: ToOrderProposal): ToOrderBuildRef[] {
+  const out: ToOrderBuildRef[] = [];
+  for (const r of proposal.rows) {
+    for (const b of r.builds) {
+      out.push({
+        buildKey: b.key,
+        orderId: r.orderId,
+        so: r.so,
+        customer: r.customer,
+        title: b.title,
+        lineIds: b.lines.map((l) => l.lineId),
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * What the system suggests before anybody touches it: sofa one document per
+ * customer order, everything else the supplier's whole demand in one.
+ */
+export function defaultDocuments(proposal: ToOrderProposal): IssueDocument[] {
+  const builds = toOrderBuilds(proposal);
+  if (!isOnePoPerOrder(proposal.category)) {
+    if (builds.length === 0) return [];
+    return [{ key: "d1", include: true, buildKeys: builds.map((b) => b.buildKey) }];
+  }
+  const byOrder = new Map<string, string[]>();
+  for (const b of builds) {
+    const arr = byOrder.get(b.orderId);
+    if (arr) arr.push(b.buildKey);
+    else byOrder.set(b.orderId, [b.buildKey]);
+  }
+  return [...byOrder.values()].map((buildKeys, i) => ({
+    key: `d${i + 1}`,
+    include: true,
+    buildKeys,
+  }));
+}
+
+export type IssuePlanError =
+  | "no_documents"
+  | "empty_document"
+  | "duplicate_build"
+  | "unknown_build"
+  | "sofa_merge"
+  | "batch_too_large";
+
+export interface IssuePlanCheck {
+  ok: boolean;
+  code?: IssuePlanError;
+  message?: string;
+  /** How many documents the plan would create. */
+  count: number;
+}
+
+/**
+ * The batch RPC runs the whole issue in ONE transaction and caps it at 20.
+ * Splitting a bigger issue across calls would trade the guarantee for
+ * convenience, so a plan past the cap is refused rather than quietly chunked.
+ */
+export const ISSUE_BATCH_MAX = 20;
+
+/**
+ * The ONE rule both the button and the server ask.
+ *
+ * The server re-runs it against its OWN recomputation, so a browser left open
+ * since this morning cannot order goods that have since been bought — every
+ * build the plan names has to still be in the proposal the server just built.
+ */
+export function validateIssuePlan(
+  proposal: ToOrderProposal,
+  docs: readonly IssueDocument[],
+): IssuePlanCheck {
+  const live = new Map(toOrderBuilds(proposal).map((b) => [b.buildKey, b]));
+  const active = docs.filter((d) => d.include);
+
+  if (active.length === 0) {
+    return { ok: false, code: "no_documents", message: "Nothing is selected to issue.", count: 0 };
+  }
+  if (active.length > ISSUE_BATCH_MAX) {
+    return {
+      ok: false,
+      code: "batch_too_large",
+      message: `${active.length} purchase orders is past the ${ISSUE_BATCH_MAX} a single issue can create at once.`,
+      count: active.length,
+    };
   }
 
-  const soRefs = proposal.rows
-    .map((r) => r.so)
-    .filter((s): s is number => typeof s === "number");
-  return [
-    {
-      supplierId: proposal.supplierId,
-      so: soRefs.length === 1 ? soRefs[0] : null,
-      soRefs,
-      customer: proposal.supplierName,
-      lines: fromRows(proposal.rows),
-    },
-  ];
+  const seen = new Set<string>();
+  for (const d of active) {
+    if (d.buildKeys.length === 0) {
+      return {
+        ok: false,
+        code: "empty_document",
+        message: "A purchase order with nothing on it cannot be issued.",
+        count: active.length,
+      };
+    }
+    const orders = new Set<string>();
+    for (const k of d.buildKeys) {
+      if (seen.has(k)) {
+        return {
+          ok: false,
+          code: "duplicate_build",
+          message: "The same item is on two purchase orders.",
+          count: active.length,
+        };
+      }
+      seen.add(k);
+      const b = live.get(k);
+      if (!b) {
+        return {
+          ok: false,
+          code: "unknown_build",
+          message: "Something on this plan is no longer waiting to be ordered.",
+          count: active.length,
+        };
+      }
+      orders.add(b.orderId);
+    }
+    // A merged sofa purchase order is forbidden: fabric, size and configuration
+    // make one dangerous, so a sofa document may hold exactly one customer order.
+    if (isOnePoPerOrder(proposal.category) && orders.size > 1) {
+      return {
+        ok: false,
+        code: "sofa_merge",
+        message: "A sofa purchase order carries one customer order. Split them.",
+        count: active.length,
+      };
+    }
+  }
+
+  return { ok: true, count: active.length };
+}
+
+/** Turn an arrangement into what the batch RPC is sent. Included documents only. */
+export function planFromDocuments(
+  proposal: ToOrderProposal,
+  docs: readonly IssueDocument[],
+): PoToCreate[] {
+  const builds = new Map(toOrderBuilds(proposal).map((b) => [b.buildKey, b]));
+  const lineById = new Map<string, { sku: string; qty: number; cost: number | null }>();
+  for (const r of proposal.rows) {
+    for (const b of r.builds) {
+      for (const l of b.lines) lineById.set(l.lineId, { sku: l.sku, qty: l.qty, cost: l.cost });
+    }
+  }
+
+  return docs
+    .filter((d) => d.include && d.buildKeys.length > 0)
+    .map((d) => {
+      const bySku = new Map<string, { sku: string; qty: number; cost: number | null }>();
+      const soRefs = new Set<number>();
+      const customers = new Set<string>();
+      for (const k of d.buildKeys) {
+        const b = builds.get(k);
+        if (!b) continue;
+        if (b.so != null) soRefs.add(b.so);
+        customers.add(b.customer);
+        for (const id of b.lineIds) {
+          const l = lineById.get(id);
+          if (!l) continue;
+          const hit = bySku.get(l.sku);
+          if (hit) hit.qty += l.qty;
+          else bySku.set(l.sku, { ...l });
+        }
+      }
+      const refs = [...soRefs];
+      return {
+        supplierId: proposal.supplierId,
+        so: refs.length === 1 ? refs[0] : null,
+        soRefs: refs,
+        customer: customers.size === 1 ? [...customers][0] : proposal.supplierName,
+        lines: [...bySku.values()],
+      };
+    });
 }
