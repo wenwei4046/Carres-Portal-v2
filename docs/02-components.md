@@ -75,6 +75,51 @@ the indeterminate dash on a partial tick.
 
 ---
 
+## SectionHeader
+
+**Purpose.** Say what a region of a page IS, and what it holds right now.
+
+**When to use.** Every region of a multi-region page. A page whose regions
+label themselves in their own markup is a page where one region has a count and
+its neighbour has none.
+
+**When NOT to use.** A card's title — that is `Panel`, which owns a surface.
+`SectionHeader` draws no border and no background: it labels a region of a page,
+not a box.
+
+**Anatomy.** `[chevron] TITLE ······ meta · action`
+
+**Behaviour.**
+- **Collapsing is a TYPE, not an optional prop.** The two shapes are a
+  discriminated union. A permanent region has no `open`, no `onToggle`, and
+  **no chevron and no button at all** — a disabled control that can never do
+  anything is worse than no control, because a reader spends a moment finding
+  out.
+- **It renders the header, not the body.** The caller owns what is inside and
+  decides whether to mount it, so a collapsed region costs nothing to render and
+  this never becomes a layout box.
+- `open` is **controlled**. The page already knows which regions are open; a
+  second copy of that state is a second answer.
+- **It spells no word and composes no sentence.** `title` is the caller's, from
+  COPY-STANDARD; `meta` is a slot.
+
+**Anatomy notes.** The title is `text-label`, uppercase — a region eyebrow, not
+a heading. `meta` sits at the right edge and is omitted entirely when there is
+nothing to say, rather than rendering an empty span that still takes height.
+
+**Accessibility.** The collapsible form is a real `<button>` carrying
+`aria-expanded`. The permanent form carries neither.
+
+**Do.** Give a region a `meta` only when the fact changes — a count, a status.
+**Don't.** Put a module's word inside this file, or make a region collapsible
+because its neighbour is.
+
+**Used by.** Purchase Orders → Items (permanent, 2026-07-31). Header and
+Supplier Communication adopt the collapsible form as those sections are built;
+Notes may.
+
+---
+
 ## DropdownMenu
 
 **Purpose.** Actions on one row or one object, folded behind `⋯`.

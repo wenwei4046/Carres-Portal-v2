@@ -30,6 +30,7 @@ import DataTable, { type Column } from "@/components/kit/DataTable";
 import DropdownMenu, { type MenuItem } from "@/components/kit/DropdownMenu";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
+import SectionHeader from "@/components/kit/SectionHeader";
 import { unitLabel, type ToOrderBuildRef } from "@carres/shared";
 
 /** Ruled 2026-07-31. Owed a COPY-STANDARD row before this ships to Jess. */
@@ -187,12 +188,18 @@ export default function ItemsSection({
 
   return (
     <section data-testid="po-items">
-      <div className="flex items-baseline justify-between gap-3 px-4 py-2">
-        <span className="text-label uppercase tracking-wide">{ITEMS_WORDS.heading}</span>
-        <span className="text-meta tabular-nums" data-testid="po-items-count">
-          {itemsCount(builds, category)}
-        </span>
-      </div>
+      {/* Items is permanently expanded (Loo, 2026-07-31) — it is the region the
+          review happens in, so it takes no `collapsible` and the component
+          draws no chevron for it to not do anything. */}
+      <SectionHeader
+        title={ITEMS_WORDS.heading}
+        testId="po-items-header"
+        meta={
+          <span className="tabular-nums" data-testid="po-items-count">
+            {itemsCount(builds, category)}
+          </span>
+        }
+      />
       <DataTable
         rows={builds}
         columns={columns}

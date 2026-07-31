@@ -42,6 +42,7 @@ import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
 import PageShell from "@/components/kit/PageShell";
 import Panel from "@/components/kit/Panel";
+import SectionHeader from "@/components/kit/SectionHeader";
 import Popover from "@/components/kit/Popover";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
@@ -185,6 +186,7 @@ const MODULE_TABS = [
 export default function UiShowcase() {
   const [text, setText] = useState("SO-1256");
   const [modalOpen, setModalOpen] = useState(false);
+  const [shOpen, setShOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [carrier, setCarrier] = useState<string | undefined>(undefined);
   const [tab, setTab] = useState("to-order");
@@ -411,6 +413,28 @@ export default function UiShowcase() {
               </Sample>
             </div>
           </Card>
+        </Section>
+
+        <Section
+          id="section-header"
+          title="SectionHeader — 02"
+          note="A region's name and what it holds. Collapsing is a TYPE: a permanent region has no chevron to press."
+        >
+          <Grid>
+            <Card>
+              <div className="flex flex-col gap-4">
+                <SectionHeader title="Items" meta="13 lines · 14 units" />
+                <SectionHeader
+                  title="Supplier information"
+                  collapsible
+                  open={shOpen}
+                  onToggle={() => setShOpen((v) => !v)}
+                  meta={shOpen ? "expanded" : "collapsed"}
+                />
+                <SectionHeader title="Notes" />
+              </div>
+            </Card>
+          </Grid>
         </Section>
 
         <Section id="fields" title="Input · Textarea · SearchInput — §6" note="One skin, three shapes.">
