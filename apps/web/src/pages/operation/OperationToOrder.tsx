@@ -59,13 +59,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   TO_ORDER_WORDS as W,
   categoryLabel,
-  countItems,
   countOrders,
   issuedHeadline,
   itemsCount,
   moveToTarget,
   poIndexLabel,
-  poShortLabel,
   productionDaysLabel,
   purchaseOrderCount,
   unitLabel,
@@ -165,16 +163,24 @@ export default function OperationToOrder() {
    */
   const [plan, setPlan] = useState<PreviewState | null>(null);
 
-  const current = proposals.find((p) => p.key === pickedKey) ?? proposals[0] ?? null;
+  // The default pick follows Loo's WALKING order (mattress → bedframe → sofa),
+  // not urgency: the operator starts at the top of the rail and clears down.
+  const firstInSequence = useMemo(
+    () =>
+      [...proposals].sort(
+        (a, b) => categoryRank(a.category) - categoryRank(b.category),
+      )[0] ?? null,
+    [proposals],
+  );
+  const current = proposals.find((p) => p.key === pickedKey) ?? firstInSequence;
 
   /**
-   * Which rail levels are open — the rail is a three-level tree (Loo,
-   * 2026-07-31): category → supplier → purchase orders. The most urgent path
-   * opens itself so the pane is never empty; everything else stays collapsed —
-   * the rail is scanned for COUNTS first.
+   * Which categories are open. Category is the rail's ONLY fold (Loo,
+   * 2026-07-31): inside it the purchase orders are CARDS, all visible — the
+   * queue's job is to be cleared, and a card hidden behind a second fold is a
+   * purchase order nobody issues. The most urgent category opens itself.
    */
   const [expandedCats, setExpandedCats] = useState<ReadonlySet<string>>(new Set());
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
 
   // Follow the list when it changes under us — a proposal leaves once issued.
   useEffect(() => {
@@ -196,18 +202,18 @@ export default function OperationToOrder() {
     setPlan(current ? initialState(current) : null);
   }, [currentKey, current]);
 
-  // The current path always shows its rows — category and supplier both.
+  // The current document's category always shows its cards.
   useEffect(() => {
     if (!currentKey) return;
-    setExpanded((s) => (s.has(currentKey) ? s : new Set(s).add(currentKey)));
     const cat = proposals.find((p) => p.key === currentKey)?.category;
     if (cat) setExpandedCats((s) => (s.has(cat) ? s : new Set(s).add(cat)));
   }, [currentKey, proposals]);
 
   /**
-   * The category level: proposals grouped by what the goods ARE. Categories
-   * rank by their most urgent pair (a dateless one sinks), suppliers inside
-   * keep the proposals' own urgency order.
+   * The category level: proposals grouped by what the goods ARE, in Loo's
+   * FIXED walking order (2026-07-31): mattress → bedframe → sofa, and
+   * accessories take the fourth slot the day the reorder track joins this
+   * workspace. Suppliers inside keep the proposals' own urgency order.
    */
   const catGroups = useMemo(() => {
     const byCat = new Map<string, ToOrderProposal[]>();
@@ -226,14 +232,7 @@ export default function OperationToOrder() {
           null,
         ),
       }))
-      .sort((a, b) => {
-        if (a.earliest == null && b.earliest == null)
-          return a.category < b.category ? -1 : 1;
-        if (a.earliest == null) return 1;
-        if (b.earliest == null) return -1;
-        if (a.earliest !== b.earliest) return a.earliest < b.earliest ? -1 : 1;
-        return a.category < b.category ? -1 : 1;
-      });
+      .sort((a, b) => categoryRank(a.category) - categoryRank(b.category));
   }, [proposals]);
 
   const docs = useMemo(
@@ -308,20 +307,11 @@ export default function OperationToOrder() {
           railDocs={railDocs}
           currentDocKey={currentDoc?.key ?? null}
           expandedCats={expandedCats}
-          expanded={expanded}
           onToggleCat={(c) =>
             setExpandedCats((s) => {
               const n = new Set(s);
               if (n.has(c)) n.delete(c);
               else n.add(c);
-              return n;
-            })
-          }
-          onToggle={(k) =>
-            setExpanded((s) => {
-              const n = new Set(s);
-              if (n.has(k)) n.delete(k);
-              else n.add(k);
               return n;
             })
           }
@@ -430,6 +420,18 @@ const CATEGORY_ICON: Record<string, IconName> = {
 };
 
 /**
+ * Loo's fixed walking order (2026-07-31). Accessories (pillow · mattress
+ * protector) take the fourth slot when the reorder track joins To Order — an
+ * unknown category lands after the sequence rather than crashing the sort.
+ */
+const CATEGORY_SEQUENCE = ["mattress", "bedframe", "sofa", "accessory"];
+
+function categoryRank(c: string): number {
+  const i = CATEGORY_SEQUENCE.indexOf(c);
+  return i === -1 ? CATEGORY_SEQUENCE.length : i;
+}
+
+/**
  * The Fiori-worklist rail as a THREE-LEVEL tree (Loo, 2026-07-31):
  * category (icon) → supplier → purchase orders. Listing by listing — each
  * level opens the next, and only the deepest row selects. Three type sizes
@@ -449,9 +451,7 @@ function QueueRail({
   railDocs,
   currentDocKey,
   expandedCats,
-  expanded,
   onToggleCat,
-  onToggle,
   onPickDoc,
   loading,
 }: {
@@ -467,9 +467,7 @@ function QueueRail({
   railDocs: ReadonlyMap<string, PreviewDoc[]>;
   currentDocKey: string | null;
   expandedCats: ReadonlySet<string>;
-  expanded: ReadonlySet<string>;
   onToggleCat: (category: string) => void;
-  onToggle: (key: string) => void;
   onPickDoc: (proposalKey: string, docKey: string) => void;
   loading: boolean;
 }) {
@@ -478,7 +476,7 @@ function QueueRail({
       className="w-[320px] shrink-0 flex flex-col min-h-0 overflow-y-auto"
       data-testid="to-order-queue"
     >
-      <div className="flex items-baseline gap-2 px-2 pb-2">
+      <div className="flex items-baseline gap-2 px-2 pb-2 mb-1 border-b border-kit-slate-6">
         <span className="text-label text-kit-slate-11">{W.readyToIssue}</span>
         <span
           className="ml-auto text-body font-semibold text-kit-slate-12 tabular-nums"
@@ -496,14 +494,18 @@ function QueueRail({
         catGroups.map((g) => {
           const catOpen = expandedCats.has(g.category);
           return (
-            <div key={g.category}>
-              {/* ── Level 1 · the category ─────────────────────────────── */}
+            // Linear's section rhythm: air BETWEEN sections, none inside them.
+            <div key={g.category} className="pt-3 first:pt-0">
+              {/* ── Level 1 · the category — GitHub's sidebar voice (Loo,
+                   2026-07-31): every level reads the SAME dark size; the
+                   hierarchy is carried by the icon, the indent and the guide
+                   line, never by shrinking the word. ── */}
               <button
                 type="button"
                 onClick={() => onToggleCat(g.category)}
                 data-testid={`to-order-category-${g.category}`}
                 aria-expanded={catOpen}
-                className="flex w-full items-center gap-2 text-left rounded-control px-2 py-2 mb-px hover:bg-kit-blue-3"
+                className="flex w-full items-center gap-2 text-left rounded-control px-2 py-1.5 mb-px hover:bg-kit-blue-3"
               >
                 <span className="text-kit-slate-11">
                   <Icon name={catOpen ? "expand" : "forward"} size={16} />
@@ -511,68 +513,48 @@ function QueueRail({
                 <span className="text-kit-slate-11">
                   <Icon name={CATEGORY_ICON[g.category] ?? "goods"} size={16} />
                 </span>
+                {/* Icon + word and NOTHING else — no count, no date (Loo,
+                    2026-07-31: a second number on the title is what made the
+                    rail unreadable; urgency lives in the workspace header). */}
                 <span className="text-body font-medium text-kit-slate-12 truncate">
                   {categoryLabel(g.category)}
                 </span>
-                {/* The big fact. The full sentence rides the hover. */}
-                <span
-                  className="ml-auto text-body font-semibold text-kit-slate-12 tabular-nums"
-                  title={purchaseOrderCount(g.poCount)}
-                >
-                  {g.poCount}
-                </span>
-                <span className="text-meta text-kit-slate-11 whitespace-nowrap tabular-nums">
-                  · {g.earliest ? fmtDate(g.earliest) : W.noDeliveryDate}
-                </span>
               </button>
 
-              {/* ── Level 2 · the suppliers of this category ───────────── */}
+              {/* ── Inside an open category: supplier section headers + one
+                   CARD per purchase order, ALL visible (Loo, 2026-07-31: the
+                   queue is cleared card by card — no second fold). ──────── */}
               {catOpen
                 ? g.proposals.map((p) => {
-                    const open = expanded.has(p.key);
                     const docs = railDocs.get(p.key) ?? [];
                     return (
                       <div key={p.key}>
-                        <button
-                          type="button"
-                          onClick={() => onToggle(p.key)}
+                        <div
                           data-testid={`to-order-proposal-${p.key}`}
-                          aria-expanded={open}
-                          className="flex w-full items-center gap-2 text-left rounded-control pl-4 pr-2 py-1.5 mb-px hover:bg-kit-blue-3"
+                          className="flex items-center gap-2 px-2 pt-2 pb-1"
                         >
                           <span className="text-kit-slate-11">
-                            <Icon name={open ? "expand" : "forward"} size={16} />
+                            <Icon name="supplier" size={14} />
                           </span>
-                          {/* The category said what the goods are — the row
-                              does not repeat it. */}
-                          <span className="text-body text-kit-slate-12 truncate">
+                          {/* The category said what the goods are — the
+                              section says WHO makes them. Name only. */}
+                          <span className="text-meta font-medium text-kit-slate-11 truncate">
                             {p.supplierName}
                           </span>
-                          <span
-                            className="ml-auto text-body font-semibold text-kit-slate-12 tabular-nums"
-                            title={purchaseOrderCount(p.poCount)}
-                          >
-                            {p.poCount}
-                          </span>
-                          <span className="text-meta text-kit-slate-11 whitespace-nowrap tabular-nums">
-                            · {p.orderBy ? fmtDate(p.orderBy) : W.noDeliveryDate}
-                          </span>
-                        </button>
+                        </div>
 
-                        {/* ── Level 3 · the purchase orders ────────────── */}
-                        {open
-                          ? docs.map((d, i) => (
-                              <DocRow
-                                key={d.key}
-                                doc={d}
-                                index={i + 1}
-                                on={p.key === currentKey && d.key === currentDocKey}
-                                dimmed={p.key === currentKey && !d.include}
-                                onPick={() => onPickDoc(p.key, d.key)}
-                                testId={`to-order-doc-${p.key}-${d.key}`}
-                              />
-                            ))
-                          : null}
+                        <div className="flex flex-col gap-2 px-2 pb-1">
+                          {docs.map((d) => (
+                            <PoCard
+                              key={d.key}
+                              doc={d}
+                              on={p.key === currentKey && d.key === currentDocKey}
+                              dimmed={p.key === currentKey && !d.include}
+                              onPick={() => onPickDoc(p.key, d.key)}
+                              testId={`to-order-doc-${p.key}-${d.key}`}
+                            />
+                          ))}
+                        </div>
                       </div>
                     );
                   })
@@ -586,26 +568,34 @@ function QueueRail({
 }
 
 /**
- * One purchase order in the queue — one SMALL line: `PO 2 · PETER · 3 items`.
- * A consolidated document has no single customer, so it counts them instead.
+ * One purchase order = one CARD (Loo, 2026-07-31 — the queue is a card list
+ * cleared card by card). This page controls ORDERS, not customers, so the
+ * title is the SO number; a consolidated document spans many orders and has
+ * no number yet (nothing exists before Issue, by the 2026-07-30 ruling), so
+ * it is titled by its count — `12 orders` — and its second line READS the
+ * orders out: `SO-1203 · SO-1212 · +10`. No customer name, no date, no items.
+ * Where-you-are is GitHub's shape in the kit's colours: a STRAIGHT `blue-9`
+ * bar on the card's left edge + `blue-3` fill; only the right corners round.
  */
-function DocRow({
+function PoCard({
   doc,
-  index,
   on,
   dimmed,
   onPick,
   testId,
 }: {
   doc: PreviewDoc;
-  index: number;
   on: boolean;
   dimmed: boolean;
   onPick: () => void;
   testId: string;
 }) {
-  const units = doc.builds.reduce((n, b) => n + b.qty, 0);
+  // Counted by ORDER (an order can lack an SO number); the preview line reads
+  // only the numbers that exist.
   const orders = new Set(doc.builds.map((b) => b.orderId)).size;
+  const sos = [
+    ...new Set(doc.builds.map((b) => b.so).filter((s): s is number => s != null)),
+  ];
   return (
     <button
       type="button"
@@ -613,20 +603,31 @@ function DocRow({
       data-testid={testId}
       aria-current={on ? "true" : undefined}
       className={[
-        "flex w-full items-baseline gap-2 text-left rounded-control pl-8 pr-2 py-1.5 mb-px",
-        on ? "bg-kit-blue-3" : "hover:bg-kit-blue-3",
+        "relative block w-full text-left rounded-card border border-kit-slate-5 px-3 py-2",
+        on ? "bg-kit-blue-3" : "bg-white hover:bg-kit-blue-3",
         dimmed ? "opacity-40" : "",
       ].join(" ")}
     >
-      <span className="text-meta font-medium text-kit-slate-12 whitespace-nowrap">
-        {poShortLabel(index)}
-      </span>
-      <span className="text-meta text-kit-slate-11 truncate">
-        {doc.customer ?? countOrders(orders)}
-      </span>
-      <span className="ml-auto text-meta text-kit-slate-11 whitespace-nowrap tabular-nums">
-        {countItems(units)}
-      </span>
+      {/* The where-you-are bar — a STRAIGHT 2px line (GitHub's own shape:
+          inset from the corners, so the card's radius never curves it). */}
+      {on ? (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
+        />
+      ) : null}
+      <div className="text-body font-medium text-kit-slate-12 truncate tabular-nums">
+        {doc.so != null ? `SO-${doc.so}` : countOrders(orders)}
+      </div>
+      {doc.so == null && sos.length > 0 ? (
+        <div className="text-meta text-kit-slate-11 truncate tabular-nums">
+          {sos
+            .slice(0, 2)
+            .map((s) => `SO-${s}`)
+            .join(" · ")}
+          {sos.length > 2 ? ` · +${sos.length - 2}` : ""}
+        </div>
+      ) : null}
     </button>
   );
 }

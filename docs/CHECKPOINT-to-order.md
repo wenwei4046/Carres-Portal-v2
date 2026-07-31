@@ -1,56 +1,102 @@
 # CHECKPOINT — Purchasing · To Order
 
-> **Handover, updated 2026-07-31 (third session — step 1 of Loo's
-> deploy-one-by-one plan).** Overwritten in place; there is never a second
-> version of this file.
+> **Handover, updated 2026-07-31 (fourth session — the Golden Template
+> freeze).** Overwritten in place; there is never a second version of this
+> file.
 >
-> **The rebuild is DONE and step 1 of the frozen layout is LIVE.**
-> `OperationToOrder.tsx` was written from zero on the kit (second session);
-> the third session rebuilt the rail as Loo's Fiori worklist, made the header
-> the ONE row of facts and emptied the Issue region down to count + button.
-> Deploy state is §15.
+> **⭐ LOO'S STANDING ORDER (2026-07-31): he is the boss of this page's
+> design. Older frozen rules are OVERWRITTEN by §0A below, not annotated.
+> Every chat: discuss in ASCII FIRST, build only after he agrees, deploy one
+> step at a time, and give him the localhost preview BEFORE asking him to
+> merge.** Deploy state is §15.
 
 ---
 
-## 0 · What is actually on screen right now
+## 0A · THE FROZEN BLUEPRINT — Purchasing Golden Template (Loo, 2026-07-31)
 
-**The rebuilt page** — `apps/web/src/pages/operation/OperationToOrder.tsx`,
-one file, assembly only. No hand-rolled shell survives: the queue rail is
-tokens-only page markup (no kit component renders a picking list yet
-— extracted on its second occurrence), and every box is a kit component:
+**To Order's mission (his words): ALL purchasing demand is composed into
+Purchase Orders here and ISSUED from here.** Two entrances, one flow:
 
-| Region | Rendered by |
-|---|---|
-| Queue rail 320px — `Ready to issue` + total · one COLLAPSED one-line row per proposal (chevron · supplier · **count is the big fact** · order-by date) · expanding shows small `PO 2 · PETER · 3 items` rows | page-local, tokens only · `Icon` chevrons · `Loading` skeleton |
-| PO bar — include · `PO 1 of N` · customer · SO | `Checkbox` (kit) |
-| Header line — ONE row of facts: supplier · category ···· Order by · `{n} working days` · **Destination** | `SectionHeader` permanent + `Select` in its `action` slot |
-| Items | `SectionHeader` + `DataTable` + `DropdownMenu` + `Button` + `Icon` |
-| Not on any purchase order (when applicable) | `Panel` + ghost `Button` |
-| Issue — count · the one blue button · refusal reasons (incl. `Destination not selected.`) | `Card` + primary `Button` |
-| Issued result / empty / loading | `Panel` / `Card` + `EmptyState` / `Loading` |
+```
+Customer Orders  ──►  Planning Engine  ──►  Purchase Order Proposal
+Manual demand    ──►  (computed)            ──► Review ──► Issue Purchase Order
+(Create Proposal)
+```
 
-**The rail's three laws (Loo, 2026-07-31)**: the rail is scanned for COUNTS —
-only the number is big; expanding a group is NOT selecting (only picking a PO
-row changes the pane, so the rail carries ZERO actions); the most urgent group
-opens itself and its first document fills the pane, so the pane is never
-empty. The reference shape is the SAP-Fiori worklist / Linear grouped list.
+**The page skeleton — reusable later by Purchase Orders / Receiving / Claims:**
 
-**Absent by ruling, not by gap** (recorded in `03-page-patterns.md`):
-Supplier Communication and Notes to Supplier are NOT rendered — an unbuilt
-region is never an empty placeholder. The search box (decoration, zero
-`<input>` in the old file) is deleted, words kept in `TO_ORDER_WORDS`.
-**Destination has ONE home: the Header line** (Loo's frozen draft moved it out
-of the Issue region on 2026-07-31 — the header is the facts row, and
-Destination is a fact the operator may change; the Issue region only voices
-its absence). Selection is `blue-3` per `01 §2.3`; `blue-9` appears once, on
-Issue Purchase Order.
+```
+COMMANDS        Plan for {date} · [Work out the plan again] · [Create Proposal]
+QUEUE (left)    time bucket → category → supplier · Source → ☑ cards
+WORKSPACE       ① Purchase Order Facts   this Proposal 是什么
+(right,PayEm)   ② Planning & Audit       它怎么来的 · 谁改过 (NOT communication)
+                ③ Items                  买什么 (customer qty 🔒 · manual qty editable)
+                ④ Remarks                发 PO 时要告诉 supplier 什么 (有才显示)
+                ⑤ Issue Purchase Order   可以发了吗 (count · button · refusal reasons)
+```
 
-**Two defects fixed on the way**: the old Move menu numbered targets by the
-FILTERED list (`PO 2 of 2` called itself `Purchase Order 1`) — targets are
-numbered by queue position now. And the reset-on-proposal-change effect landed
-a cross-supplier pick on PO 1 instead of the clicked row — `pickedDoc` is a
-`{proposal, doc}` PAIR now, so a pick can never outlive its proposal; the
-negative control is proven (re-adding the reset fails exactly that test).
+**The Queue, exactly (70% Linear + 30% PayEm):**
+
+```
+READY TO ISSUE                 10      ← the number counts PO SHEETS (his pick: A)
+ 🔴 OVERDUE                          ← only when it exists, always first
+ TODAY                               ← the usual working set (policy: issue now, hold nothing)
+   ▾ 🛏 Mattress                     ← category fold — the rail's ONLY fold,
+      🏭 Nice Future · Customer Order   fixed walking order: mattress → bedframe
+      ┌───────────────────────────┐     → sofa → accessories (reserved)
+     ▌│ ☑ 12 orders               │  ← one card = one PO · title = SO number or
+      │   SO-1203 · SO-1212 · +10 │     `N orders` · ☑ = include in this issue ·
+      └───────────────────────────┘     straight blue bar = you are here
+ TOMORROW / THIS WEEK / NEXT WEEK    ← empty buckets are not rendered
+```
+
+**Rulings that bind every future chat (each ruled by Loo, 2026-07-31):**
+
+1. **No dates, no counts on category/supplier rows** — the TIME BUCKET carries
+   when, the rail-top total carries how many. One number, one meaning.
+2. **A card is titled by its SO number** (control ORDERS, not customers);
+   consolidated = `N orders` + a second line reading the SOs out.
+3. **Source is a first-class dimension**: Customer Order · Ready Stock ·
+   Display · Warranty · Spare Parts · Office (**Office disabled in v1, kept in
+   the architecture**). Shown on the supplier section line.
+4. **Create Proposal** = the manual entrance (Source·Supplier·Category·
+   Destination·Items·Qty·Reason) → lands in the QUEUE for review, never
+   straight to a PO. **Data model deliberately NOT decided** — this is UI
+   Architecture Phase; the schema is decided the day it is built.
+5. **Qty rule is drawn, not written**: customer-order qty shows `2 🔒`;
+   manual-source qty shows an editable field.
+6. **Planning & Audit replaces Supplier Communication** on this page: system-
+   generated-from SOs / created-manually + reason / stored, auditable changes.
+   **Communication, Confirm Ready Date, ETA, Send — ALL belong to the
+   Purchase Orders page**; nothing here may speak to a supplier.
+7. **Issue is bulk per supplier** (one press = the whole stack of ☑ cards);
+   `Issue all` across the queue is a future card. The 12:00-cutoff red alert
+   is a future card too (no duty name on it — Team/calendar already says who).
+8. **Commands are a LAYER, not a region** — page commands top, context
+   commands (Move·Split·Remove·Put Back) live with Items, the one primary
+   action (`Issue Purchase Order`) pinned last.
+
+## 0 · What is actually on screen right now (built through step 1b)
+
+`apps/web/src/pages/operation/OperationToOrder.tsx`, one file, assembly only.
+**Built**: the card Queue (category fold → supplier section → SO-titled cards,
+straight-bar selection, walking order, `Ready to issue · N`), the one-row
+Facts header (supplier · category ···· Order by · `{n} working days` ·
+Destination — Destination's ONE home), Items on `DataTable` with
+Move/Split/Remove/Put Back, the Issue region (count · button · refusal
+reasons incl. `Destination not selected.`), issued panel → Open Purchase
+Orders. Icons: kit `Icon` gained `mattress`·`bedframe`·`sofa` (43 meanings).
+
+**Blueprint-pending (build in this order, one card one deploy)**: time
+buckets · Source on the queue + Create Proposal + `Plan for {date}` /
+`Work out the plan again` commands · ☑ on cards · Facts gains Source ·
+Planning & Audit · Remarks · qty 🔒 · `Issue all` · the 12:00 alert ·
+breadcrumb in the workspace header.
+
+**Defects fixed on the way (keep the tests that pin them)**: the Move menu
+numbered targets by the filtered list; the reset-on-proposal-change effect
+landed a cross-supplier pick on PO 1 (fix: `pickedDoc` is a `{proposal, doc}`
+pair — negative control proven).
 
 ---
 
