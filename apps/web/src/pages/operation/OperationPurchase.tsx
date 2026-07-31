@@ -5,6 +5,7 @@ import { ChevronRight, Filter, Search } from "lucide-react";
 import {
   TO_ORDER_WORDS as W,
   issuedHeadline,
+  itemsCount,
   purchaseOrderCount,
   unresolvedHeadline,
   type ToOrderBuildRef,
@@ -435,7 +436,22 @@ function PoBlock({
   const customers = new Set(doc.builds.map((b) => b.customer));
   const who =
     doc.customer ?? `${customers.size} customer order${customers.size === 1 ? "" : "s"}`;
-  const items = doc.builds.length;
+  /**
+   * ONE fact, ONE place, at any moment.
+   *
+   * This header counted LINES and called them `items` while the Items region
+   * below counted UNITS — on Nice Future that read `14 items` directly above
+   * `14 lines · 16 units`, with the wrong number on top. Both now come from the
+   * same composer, and the header stops speaking the moment the region that
+   * owns the fact is open.
+   *
+   * When the accordion goes and one purchase order fills the pane, only the
+   * Items header is left and this behaviour needs no second decision.
+   */
+  const count = itemsCount(
+    doc.builds.length,
+    doc.builds.reduce((n, b) => n + b.qty, 0),
+  );
 
   return (
     <div
@@ -474,9 +490,11 @@ function PoBlock({
           {doc.so != null ? (
             <span className="text-meta text-base-600 whitespace-nowrap">SO-{doc.so}</span>
           ) : null}
-          <span className="ml-auto text-meta text-base-600 whitespace-nowrap tabular-nums">
-            {items} item{items === 1 ? "" : "s"}
-          </span>
+          {!open ? (
+            <span className="ml-auto text-meta text-base-600 whitespace-nowrap tabular-nums">
+              {count}
+            </span>
+          ) : null}
         </button>
       </div>
 

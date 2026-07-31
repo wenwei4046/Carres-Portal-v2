@@ -191,6 +191,29 @@ describe("To Order — the Purchase Order Preview", () => {
     expect(blocks[0]).toHaveTextContent("ella");
   });
 
+  /**
+   * The block header counted LINES and called them `items`, while the Items
+   * region below counted UNITS — on Nice Future that is `14 items` sitting
+   * directly above `14 lines · 16 units`, with the wrong number on top.
+   */
+  it("states the count ONCE — the header yields to the region that owns it", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-preview");
+    fireEvent.click(screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`));
+    await waitFor(() => expect(screen.getAllByTestId(/^to-order-po-d\d+$/)).toHaveLength(1));
+
+    // Closed: the block header is the only place the count can be seen.
+    expect(screen.getByTestId("to-order-po-d1")).toHaveTextContent("1 line · 3 units");
+    expect(screen.queryByTestId("po-items-count")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("to-order-po-toggle-d1"));
+    await screen.findByTestId("po-items");
+    // Open: the Items region owns it, and the header has stopped speaking.
+    expect(screen.getByTestId("po-items-count")).toHaveTextContent("1 line · 3 units");
+    const header = screen.getByTestId("to-order-po-toggle-d1");
+    expect(header.textContent).not.toMatch(/line|unit|item/i);
+  });
+
   it("opens a document to its sofas", async () => {
     render(wrap());
     await screen.findByTestId("to-order-preview");
