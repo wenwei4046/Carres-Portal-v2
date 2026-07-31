@@ -139,9 +139,16 @@ async function openMenu(buildKey: string) {
   await screen.findByRole("menu");
 }
 
-/** The workspace's include box — the only checkbox on the pane. */
-function includeBox() {
-  return screen.getByRole("checkbox", { name: W.include });
+/** A card is a div holding [☑, button] — this is the clickable half. */
+function cardButton(card: HTMLElement) {
+  return within(card).getByRole("button");
+}
+
+/** The ☑ on one card — include-in-this-issue lives on the card now. */
+function includeBoxOf(cardTestId: string) {
+  return within(screen.getByTestId(cardTestId)).getByRole("checkbox", {
+    name: W.include,
+  });
 }
 
 function wrap() {
@@ -173,6 +180,48 @@ async function openSofa() {
 }
 
 describe("the queue", () => {
+  it("splits by TIME first: both fixtures are past their order-by, so one red Overdue bucket", async () => {
+    render(wrap());
+    const overdue = await screen.findByTestId("to-order-bucket-overdue");
+    expect(overdue).toHaveTextContent(W.bucketOverdue);
+    expect(overdue).toHaveTextContent("4");
+    // Empty buckets are never rendered (Loo, 2026-07-31).
+    expect(screen.queryByTestId("to-order-bucket-today")).toBeNull();
+    expect(screen.queryByTestId("to-order-bucket-later")).toBeNull();
+  });
+
+  it("the supplier section names WHO makes it and WHY we buy — the Source", async () => {
+    render(wrap());
+    expect(
+      await screen.findByTestId(`to-order-proposal-${OHANA}::bedframe`),
+    ).toHaveTextContent(`Ohana · ${W.sourceCustomerOrder}`);
+  });
+
+  it("carries the COMMANDS layer: the plan's date, recompute, and the reserved Create Proposal", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-workspace");
+    const cmd = screen.getByTestId("to-order-commands");
+    expect(cmd).toHaveTextContent(`${W.planFor} ${fmtDate("2026-07-30")}`);
+    expect(screen.getByTestId("to-order-recompute")).toHaveTextContent(
+      W.workOutPlanAgain,
+    );
+    // In the architecture, disabled until its card (Loo's Office rule).
+    expect(screen.getByTestId("to-order-create-proposal")).toBeDisabled();
+  });
+
+  it("a ☑ pressed on a foreign card loads that proposal AND applies the untick", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-workspace");
+    await openSofa();
+
+    // Current proposal is still bedframe; the ☑ is on a sofa card.
+    fireEvent.click(includeBoxOf(`to-order-doc-${OHANA}::sofa-d1`));
+    const bar = screen.getByTestId("to-order-workspace");
+    expect(bar).toHaveTextContent("PO 1 of 3");
+    expect(screen.getByText(W.includeOffHelp)).toBeInTheDocument();
+    expect(screen.getByTestId("to-order-count")).toHaveTextContent("2 Purchase Orders");
+  });
+
   it("each rail level carries its NAME and nothing extra — one number, on the supplier", async () => {
     render(wrap());
     // Level 1 — icon + word ONLY: no count, no date (Loo, 2026-07-31 — a
@@ -265,18 +314,27 @@ describe("the queue", () => {
     // Across to a NON-first document — the pane must land on PO 2, not fall
     // back to PO 1 (the reset-effect regression this pins).
     await openSofa();
-    fireEvent.click(screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`));
+    fireEvent.click(cardButton(screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`)));
     const bar = screen.getByTestId("to-order-workspace");
     expect(bar).toHaveTextContent("PO 2 of 3");
     expect(bar).toHaveTextContent("PETER");
 
     // And back to the consolidated one.
-    fireEvent.click(screen.getByTestId(`to-order-doc-${OHANA}::bedframe-d1`));
+    fireEvent.click(cardButton(screen.getByTestId(`to-order-doc-${OHANA}::bedframe-d1`)));
     expect(screen.getByTestId("to-order-workspace")).toHaveTextContent("PO 1 of 1");
   });
 });
 
 describe("the workspace", () => {
+  it("states how the proposal came to be — Planning & Audit, never communication", async () => {
+    render(wrap());
+    await screen.findByTestId("to-order-workspace");
+    const audit = screen.getByTestId("to-order-audit");
+    expect(audit).toHaveTextContent(W.planningAudit);
+    expect(audit).toHaveTextContent(`${W.systemGeneratedFrom} SO-1300 · SO-1301`);
+    expect(screen.queryByText("Supplier Communication")).toBeNull();
+  });
+
   it("fills the pane with the walking order's first document and names it", async () => {
     render(wrap());
     const bar = await screen.findByTestId("to-order-workspace");
@@ -345,7 +403,7 @@ describe("the workspace", () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
     await openSofa();
-    fireEvent.click(screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`));
+    fireEvent.click(cardButton(screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`)));
 
     const items = await screen.findByTestId("to-order-items");
     expect(within(items).getByText("Sofa 1 — Booqit")).toBeInTheDocument();
@@ -357,10 +415,11 @@ describe("the workspace", () => {
   it("leaving a document out of this issue drops the count and says what it means", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
-    fireEvent.click(await openSofa());
+    fireEvent.click(cardButton(await openSofa()));
     expect(screen.getByTestId("to-order-count")).toHaveTextContent("3 Purchase Orders");
 
-    fireEvent.click(includeBox());
+    // The ☑ lives on the card now (PayEm's shape, Loo 2026-07-31).
+    fireEvent.click(includeBoxOf(`to-order-doc-${OHANA}::sofa-d1`));
     expect(screen.getByText(W.includeOffHelp)).toBeInTheDocument();
     expect(screen.getByTestId("to-order-count")).toHaveTextContent("2 Purchase Orders");
   });
@@ -368,11 +427,10 @@ describe("the workspace", () => {
   it("refuses an issue with nothing selected, in the operator's words", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
-    await openSofa();
+    fireEvent.click(cardButton(await openSofa()));
 
     for (const k of ["d1", "d2", "d3"]) {
-      fireEvent.click(screen.getByTestId(`to-order-doc-${OHANA}::sofa-${k}`));
-      fireEvent.click(includeBox());
+      fireEvent.click(includeBoxOf(`to-order-doc-${OHANA}::sofa-${k}`));
     }
     expect(screen.getByTestId("to-order-plan-blocked")).toHaveTextContent(
       "Nothing is selected to issue.",
@@ -385,7 +443,7 @@ describe("the row menu", () => {
   it("a sofa document can never split and never merge", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
-    fireEvent.click(await openSofa());
+    fireEvent.click(cardButton(await openSofa()));
     await openMenu("bk-e");
 
     // Three documents exist beside this one, and still no Move: a sofa
@@ -416,7 +474,7 @@ describe("the row menu", () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
     await openSofa();
-    fireEvent.click(screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`));
+    fireEvent.click(cardButton(screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`)));
 
     await openMenu("bk-b");
     fireEvent.click(screen.getByText(W.itemsRemove));
@@ -433,7 +491,7 @@ describe("the row menu", () => {
   it("Open Customer Order leaves for the order, and says which document it is", async () => {
     render(wrap());
     await screen.findByTestId("to-order-workspace");
-    fireEvent.click(await openSofa());
+    fireEvent.click(cardButton(await openSofa()));
     await openMenu("bk-e");
     fireEvent.click(screen.getByText(W.itemsOpenOrder));
     expect(navigate).toHaveBeenCalledWith("/operation/orders?order=o2");

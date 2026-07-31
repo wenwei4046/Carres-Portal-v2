@@ -75,6 +75,25 @@ export const TO_ORDER_WORDS = {
    */
   readyToIssue: "Ready to issue",
 
+  // ── The Golden Template's words — all ruled by Loo 2026-07-31 in the
+  //    blueprint session; each still owed a COPY-STANDARD row. ─────────────
+  /** Time buckets — the queue's outermost split. Empty buckets never render. */
+  bucketOverdue: "Overdue",
+  bucketToday: "Today",
+  bucketTomorrow: "Tomorrow",
+  bucketThisWeek: "This week",
+  bucketNextWeek: "Next week",
+  bucketLater: "Later",
+  /** The one live Source; the manual sources join with Create Proposal. */
+  sourceCustomerOrder: "Customer Order",
+  /** COMMANDS — the layer above the regions. */
+  planFor: "Plan for",
+  workOutPlanAgain: "Work out the plan again",
+  createProposal: "Create Proposal",
+  /** Region ② — how this proposal came to be. NOT communication. */
+  planningAudit: "Planning & Audit",
+  systemGeneratedFrom: "System generated from",
+
   // The Preview — what pressing Issue would create, before it exists.
   preview: "Purchase Order Preview",
   /**
