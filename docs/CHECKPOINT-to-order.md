@@ -400,7 +400,7 @@ purchase orders   7 live, all SHORT (issued while the `.in()` bug was live) —
 |---|---|
 | shared | **2021 / 2021** (2018 + `productionDays` ×2 + the rail composers) |
 | api | 3 pre-existing (`partner/pickups` ×1 · `supplier/pos` ×2) |
-| web | **16** — `OperationOrders` ×7 · `OhanaSofaTab` ×4 · `OrderCustomerCard` ×4 · `NiceFutureMattressTab` ×1. The page's own suite is **20/20**. |
+| web | **16** — `OperationOrders` ×7 · `OhanaSofaTab` ×4 · `OrderCustomerCard` ×4 · `NiceFutureMattressTab` ×1. The page's own suite is **21/21**. |
 | tsc | web clean · api 4 (`rental-sell.test.ts`) |
 | design-standard | **8438** — unchanged; the ratchet may never rise |
 
@@ -414,18 +414,27 @@ after it.
 ## 15 · Deployed
 
 ```
-Main tip     2c37a1ae (PR #536 — step 1: the Fiori rail + the facts header)
-Web bundle   index-DjMYPzdc.js · 4,612,176 bytes · SERVICE_ROLE 0
-             carres-portal 7079c101 + carres-pos dcd4bc79, both --branch=main
-             4 canonicals converged on the FIRST poll
-             wrangler pages deployment list names Production/main source 2c37a1a
-API Worker   3824b9c7 — REQUIRED, not optional: the Worker imports buildToOrder
-             and computes the payload, so productionDays only reaches the wire
-             with an api deploy (the ask-what-the-api-IMPORTS rule again).
-             Bindings echoed: PUBLIC_WEB_URL=pos.carresofficial.com ·
-             api.carresofficial.com · cron 0 1 * * *. GET /health → 200 ok.
-Migration    none · prod applied tail 0308 · repo tail 0307 (prod ahead — the
-             harmless direction)
+Main tip     9e462e22 (PR #540 — the card queue + the Golden Template freeze;
+             carries #538's tree/icons commit too, which was merged undeployed)
+Web bundle   index-BtHOwQVr.js · 4,613,351 bytes · SERVICE_ROLE 0
+             carres-portal e1312475 + carres-pos c7692ac4, both --branch=main
+             3 canonicals on the first poll; pos.carresofficial.com converged
+             on the next (the documented edge-cache lag, resolved by polling)
+             wrangler pages deployment list names Production/main source 9e462e2
+API Worker   3824b9c7 UNCHANGED — web-only ship, checked not assumed:
+             `git diff 2c37a1ae..HEAD -- apps/api packages/shared
+             supabase/migrations` is empty (the proposalsCount composer was
+             added and removed inside the session, net zero)
+Migration    none
+Bundle grep  both directions vs the live predecessor index-DjMYPzdc.js
+             (downloaded): `to-order-category-` 0→1 (the category fold's
+             testid — the one literal this ship introduces; card titles are
+             the `SO-${…}` template, the pick-markers-from-MOUNTED trap's
+             template form, so they cannot grep). SERVICE_ROLE 0 both sides.
+PR trail     #538 merged (tree version, never deployed alone) · #539 closed
+             (branch predated #538's squash → conflicts) · #540 is the clean
+             cut. Lesson: after a squash-merge, never push more work to the
+             same branch — cut a fresh branch from main.
 ```
 
 **Bundle grep, both directions** (both files DOWNLOADED first; the first
