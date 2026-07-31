@@ -1,209 +1,219 @@
 # CHECKPOINT — Purchasing · To Order
 
 > **Last written 2026-07-31.** Overwritten in place; there is never a second
-> version of this file. It is a handover, not a design doc — the design lives in
-> `docs/PURCHASING-WORKING-FLOW.md` + `docs/PURCHASING-INFORMATION-MODEL.md`.
+> version of this file.
 >
-> Read this before touching Purchasing.
+> **The page is being REBUILT section by section from the Design System.** The
+> previous checkpoint described the architecture this replaces; that text is
+> gone rather than annotated.
+>
+> Read this, then `docs/03-page-patterns.md` → Review → Carres Examples.
 
 ---
 
-## 🔴 FIRST JOB: nobody has seen the page work yet
+## 🔴 FIRST JOB: look at Items and say what is wrong with it
 
-The last fix (`74ec30aa`) landed minutes before the session ended. **No human
-has opened To Order since.** The operator's last report was *"still order don't
-have — should have 3 order"*, and that was against the code BEFORE the root
-cause was found.
-
-**Open it before doing anything else:**
+One section of the new page is live. Nobody has looked at it.
 
 ```
 https://erp.carresofficial.com  →  Purchasing  →  To Order
+→ pick a supplier → open a purchase order block
 ```
 
-**Hard-refresh** — the Worker changed, the browser has yesterday's answer cached.
-
-**What it should say.** Computed from live data on 2026-07-31, after the 7
-purchase orders already issued are netted off:
+What you should see:
 
 ```
-Nice Future · Mattress    1 Purchase Order     11 customer orders · 14 lines
-Ohana · Sofa              8 Purchase Orders     8 customer orders · 11 lines
-Ohana · Bedframe          1 Purchase Order      7 customer orders ·  7 lines
+ITEMS                                          13 lines · 14 units
+────────┬──────────────────────┬────────┬──────┬──────
+Ref     │ Item                 │ Size   │  Qty │
+────────┼──────────────────────┼────────┼──────┼──────
+SO-1203 │ L1201S               │ King   │    1 │  ⋯
+SO-1205 │ N1001S               │ Queen  │    2 │  ⋯
+SO-1207 │ Sofa 2 — Booqit      │ —      │    1 │  ⋯
 ```
 
-The two orders keyed in on 2026-07-31 are in there: **SO-1285 jimmy** (Ohana ·
-Lyyar sofa) and **SO-1284 LIM KUAN YANG** (Nice Future mattress). Mattress and
-bedframe merge into ONE document each, so adding a customer order does not move
-those counts — it adds a row inside the one document. **Only the sofa number
-moves.**
+`⋯` → `Create Another Purchase Order` · `Remove` · ─── · `Open Customer Order`.
+Sofa has neither of the first two. `Move to Purchase Order N` appears only after
+a split has made somewhere to move to.
 
-If it is still wrong, **report the exact words on screen** — blank, a message,
-or the wrong number. Three rounds were lost to guessing.
+**It is still nested inside the old accordion.** Taking it out is a LAYOUT
+change and layout is deliberately not started.
 
 ---
 
-## What went wrong, so nobody re-derives it
+## The page, frozen 2026-07-31
 
-**One root cause produced three different symptoms over two days.**
-
-`order_lines.sku` is free text with no foreign key, and **16 live demand lines
-carry a DOUBLE QUOTE** in the value:
+Order is deliberate: **who am I sending to → can I reach them → what am I sending.**
 
 ```
-Leg 4"
-HK5531/28"(2 Seater + Lshape)/M2402-4 Sand
-AM9053/30"(3 Seater)/M2402-4 Sand
+Header                    supplier · destination · dates       collapsed by default
+Supplier Communication    channels · WhatsApp + Email drafts    collapsed by default
+Items                     the review itself                     the largest region
+Notes to Supplier
+Issue Purchase Order      the one primary action
 ```
 
-PostgREST wraps a value holding reserved characters in double quotes, so a value
-that CONTAINS one breaks the filter it is put into, and the server answers with
-whatever it managed to parse.
-
-| | Symptom | What it really was |
+| Section | State | Blocked on |
 |---|---|---|
-| 07-30 | Seven customer requirements on no purchase order; the documents issued looked complete | the catalog read came back short |
-| 07-31 | A guard read the short answer as an alarm and disabled `Issue` for the whole page | same short read |
-| 07-31 | Two freshly keyed orders "did not appear" | same short read |
+| Items | ✅ built | — |
+| Header | not started | `suppliers` has no address · tel · attn |
+| Supplier Communication | not started | no `po_sends` table · unruled words |
+| Notes to Supplier | not started | no ruled word (`delivery_instructions` exists, unwritten) |
+| Issue | already live | — |
 
-**The chunking added in between did nothing** — the unparseable value is still
-inside one of the chunks. It was a fix aimed at the wrong cause.
-
-### The rule that replaced it
-
-> **A SKU may never go into a PostgREST `.in()` list.**
-
-The catalog is 205 rows and every open purchase-order line is a small live
-slice, so **both are read whole**. Nothing to quote, nothing to chunk. A SKU
-absent from the catalog map is then *definitively* not a product — `Transport
-Fees`, `No Lift Per Floor Charge`, `Leg 4"`, the AutoCount free-text
-descriptions, **95 of them** — and is passed over in silence, which the original
-route always did and was always right to do.
-
-**A source test enforces it** (`to-order.test.ts`): no `.in()` on a sku anywhere
-in the route. A render test cannot see this; only the source can.
-
-> ⚠ **`/today` — the OLD purchase route — still uses `.in("sku", …)`.**
-> `apps/api/src/routes/operation/purchase.ts` was not touched. If anything reads
-> from it, it has the same bug.
+**~80% of an operator's time on this page is READING.** It is a `Review`
+pattern, not a form.
 
 ---
 
-## What is live
+## Business rules frozen in this design (do not re-open)
 
-| | |
-|---|---|
-| Main | **`74ec30aa`** |
-| Web bundle | `index-z5-nGUg1.js` · all four canonicals converged · `SERVICE_ROLE` 0 |
-| API Worker | **`37d94086`** · `api.carresofficial.com` · `/health` 200 |
-| Migration | **none, the whole session** |
-| Prod data | 7 purchase orders (`PO-2031`…`PO-2037`), 18 lines, 23 `ops_stock_items` incoming |
+**Every Purchase Order has exactly one fulfilment destination.** Follows from
+arithmetic, not policy — one document, one drop-off point.
+- single-customer PO → warehouse · partner · **Customer Address**
+- multi-customer PO → warehouse · partner only
+- want one customer direct off a merged PO? **Split first.** Split is the door
+  to direct delivery, not just a rearrangement.
+- `Set all destinations` is a BULK DEFAULT; each PO may override its own.
+- ⚠ Needs one column that does not exist: a way to say *this PO's destination
+  is its own customer*. `destination_id` is an FK to `purchasing_destinations`
+  and the customer is not a row in it.
 
-Shipped this session, in order: `84213001` (#526) · `16da4802` (#527) ·
-`fbf30eda` (#528) · `74ec30aa` (#529).
+**Communication is an EVENT, never a Status.**
+```
+Business status:   Draft → Issued → Supplier Acknowledged
+Communication:     WhatsApp opened · Email opened      (events, outside status)
+```
+Adding SMS / LINE / a supplier portal later adds events and changes no status.
+
+**There is no `Sent` state, and there never will be.** The portal cannot observe
+WhatsApp. The button is `Open WhatsApp group` (COPY-STANDARD's own word), it
+does three things in one click — copy the message, download the PDF, open the
+group — and it records `Opened WhatsApp group`, never "sent".
+- `Send via WhatsApp` was proposed and **rejected**: a button claiming more than
+  the system knows is how `ops_order_control.balance` happened.
+- The hole this leaves — opened, never sent, nobody notices — is closed by a
+  DUE ACTION, not a button: *no supplier acknowledgement after N working days →
+  `Call {supplier} — confirm they received the purchase order`.*
+- `Supplier acknowledged` already has a home: `sup_status='acknowledged'`, and
+  `POST /api/supplier/pos/:id/acknowledge` is LIVE. Nice Future and Ohana both
+  have `portal_enabled=true` — the two suppliers we order from can acknowledge
+  themselves.
+
+**Two independent communication drafts, not one template.** WhatsApp short,
+Email formal with Subject. Both visible at once, side by side; one channel →
+that panel takes the full row; no channel → `Download PDF` + `Add a channel`,
+and **Issue is never blocked** by a missing phone number.
+
+**Version is `Rev 1 / Rev 2` only.** Draft and Issued are STATUS, not versions.
+A revision keeps the same PO number and must be refused once `received_qty > 0`.
+
+**The PO document.** No money — the `Total` on Carres's real POs is blank and
+purchasing does not need the figure. Line by line with a `Ref` column, so four
+identical `H1401S Queen` rows read as four jobs rather than a mistake. No
+signature block: `Prepared by {name} · {phone}` for the factory to call, plus
+`This purchase order is computer generated and is valid without a signature`.
+The sofa PO carries the plan-view drawing; the mattress PO carries no customer
+information at all.
+
+**Two rulings that OVERRIDE existing written law, on record:**
+1. `Open Customer Order` contradicts COPY-STANDARD:826, which rules `Open order`.
+   Loo re-ruled it — this page shows Purchase, Sales and Delivery Orders.
+2. Items is the FIRST business page to render kit components. CLAUDE.md records
+   D0.5c as components-only with adoption assigned to D6: *"that is a RULING,
+   not a gap."* Loo reversed it.
 
 ---
 
-## The architecture, frozen — do not reopen
-
-**Supplier is the work queue; the purchase order is the preview.**
+## The Design System is the law now
 
 ```
-LEFT  300px      Supplier × Category · {N} Purchase Orders · Order by {date}
-RIGHT            Purchase Order Preview — PO 1…N, each expandable
-                   Customer → Sofa/Item → Modules → SKU
-BOTTOM sticky    Destination ▾ · Issue {N} Purchase Orders
+docs/01-design-tokens.md     visual rules
+docs/02-components.md        components — documented only when a real page proves one
+docs/03-page-patterns.md     page shapes + Carres Examples (this page lives there)
 ```
 
-An operator manages a **supplier** — they WhatsApp Ohana, not PO-2037 — so a
-list of documents on the left would turn 3 rows into 90 and lose the supplier.
+**No module ever gets its own standards document.** A page's shape is a Carres
+Example under the pattern it uses — that is what stops `Receiving Page Standard`
+from existing.
 
-**Proposal is not a business object. It is a computed view.** No status, no
-hold, no audit, no lifecycle. Only a Purchase Order is real.
+**`docs/UI-KIT.md` is ⛔ SUPERSEDED and kept as a migration bridge**, with a
+ledger at its head. 2,020 lines, ten live pages, 8,504 lint findings keyed to
+its § numbers. It migrates one section at a time and is deleted when the ledger
+empties. Nothing new goes into it. Do not delete it early.
 
-**Four actions, all browser-session only.** A refresh throws the arrangement
-away and the server's suggestion comes back.
-
-| Action | Meaning |
-|---|---|
-| `Include in this issue` | whether a document goes out THIS time. Not a hold, not an exclusion, not a cancellation, not a status |
-| `Remove from this Purchase Order` | off this document; the customer's order is untouched and the next recomputation offers it again |
-| `Split` · `Move` | only where a PO may hold more than one customer order. **Never on sofa** — nothing to split, and moving would be the merge the boundary forbids |
-| `Merge` | **not built.** No legal use while no supplier carries two procurable categories |
-
-**Other frozen rules:** Qty counts sofas, not module lines · Summary is
-`Model · Qty · at most ONE spec`, three tokens, `Height 24"` never prints and no
-leg *height* prints · a dateless row sinks under every column in both directions
-· only mattress/bedframe/sofa enter, by a positive rule · four date names never
-mix (`Customer Delivery` · `Stock Ready` · `Supplier Ready Date` ·
-`Delivery Date`) · **blue appears once, on the primary button.**
-
-### The write
-
-```
-POST /api/operation/purchase/to-order/issue
-{ supplierId, category, destinationId,
-  purchaseOrders: [ { key, include, buildKeys } ] }
-```
-
-The client posts an **arrangement and nothing else** — no SKU, no quantity, no
-price. The server reads those from its own recomputation.
-
-`operation_create_pos_batch` is one plpgsql function, so the whole issue is **one
-transaction**: a failure on the seventh document rolls the first six back. Its
-1–20 cap is a refusal, never a quiet chunking. The destination lands in ONE
-statement over every id.
-
-Six refusals, each tested: `unknown_build` (not waiting to be ordered, another
-supplier's, or changed since the page loaded) · `duplicate_build` ·
-`empty_document` · `sofa_merge` · `batch_too_large` · `no_documents`. Plus
-`demand_unresolved` — a SKU in the catalog, in a procurable category, with no
-supplier.
+**Values carried across, not re-decided** (Loo: *the new Design System is the
+law; the existing implementation is the DEFAULT*): 8-step spacing · weights
+400/500/600 with no 700 · radius 4/6/10 · Lucide stroke 2 · 40 icon meanings.
+Three of those are Jess's frozen answers from 2026-07-28.
 
 ---
 
-## What is NOT built
+## Words owed to COPY-STANDARD
 
-### Ruled 2026-07-30/31, still owed
+Ruled by Loo 2026-07-31, live on screen, **not yet in Jess's dictionary**:
 
-1. The right pane's header duplicates the sidebar → make it `Review`.
-   *Watch: the identity then leaves the pane holding an irreversible button.*
-2. The success page is too empty → `✓ Purchase Order Created` / PO + supplier /
-   `Next Step — Confirm Supplier Ready Date` / button.
-3. The count should serve the button — `Issue 7 Purchase Orders`.
-4. **`Search…` is decoration.** No input, no filter. Make it real.
-5. Auto-advance to the next supplier after issuing.
-6. Column weight — Customer and Summary are what a reviewer reads.
+`Items` · `Ref` · `Item` · `Size` · `Qty` · `More` ·
+`Create Another Purchase Order` · `Remove` · `Open Customer Order` ·
+`Move to Purchase Order {N}` · `Nothing on this purchase order.` ·
+`N lines · N units`
 
-### Blocking gaps
+Designed, not yet built: `Live Purchase Order` · `Review message` ·
+`Supplier acknowledged` · `Re-open WhatsApp group` · `Send revision` ·
+`Edit header` · `Add note` · `I have sent it` (**rejected** — kept here so
+nobody rebuilds it).
 
-- 🔴 **The PO document has no screen.** `PoDocumentPreview.tsx` is orphaned —
-  nothing imports it, `purchasing_po_document` has no caller. **A purchase order
-  can be created and not sent.**
-- 🔴 **Nothing writes `purchase_orders.expected_ready_date`.** The success panel
-  points at Purchase Orders and Purchase Orders cannot record it.
-- 🟡 The Receiving journey is undesigned — `Issued → ? → Ready to Receive`.
-- 🟡 **The grey-hover ratchet enforces the OPPOSITE of the accent law.** UI-KIT
-  §3.5 says a row hovers blue; the ruling gives blue to the current thing and
-  the primary action only. Baseline moved 94 → 96 and the reason is written into
-  `scripts/check-design-standard.mjs`. §3.5 has to be rewritten.
-- 🟡 Every PO line costs 0 — 205 SKUs carry no cost. Ruled acceptable; fix in
-  SKU Master, no To Order change needed.
-- 🟡 PO days are retired in the design and still live in code —
-  `purchasing_settings.po_days`, `isPoDayMYT`, `nextPoDayMYT`,
-  `/line/push-next`, the PO-day cron.
-- 🟡 Exclusion has no button. `Exclude from Purchasing` /
-  `Exclude Until Resolved` are designed and unbuilt; they belong to Orders.
-- 🟡 `Stock ready` survives in the dictionary with nothing rendering it — the
-  column left with the grid. Dead word, safe, worth clearing.
-- 🟡 Destination reads `HOUZS` in the database, `HOUZS Balakong` in the spec.
+---
 
-### Known bad data, not a code problem
+## Columns and tables that do not exist yet
 
-The 7 purchase orders already in prod are **SHORT** — they were issued while the
-short read was live, so seven requirements are missing from them. Whether to
-cancel and re-issue, or raise the balance separately, is a business decision.
-**`PO-2031`…`PO-2037` should not be treated as a correct example of the output.**
+```
+po_sends                       v1/v2 · channel · opened_at · opened_by
+purchase_orders.approved_by    nothing records who issued a PO
+purchase_orders — revision     Rev N + a lock once received_qty > 0
+suppliers                      address · tel · attn · terms   (all four missing)
+suppliers.contact              10/10 NULL
+purchasing_destinations.address 3/3 NULL — column exists, data missing
+purchase_orders.expected_ready_date   column exists, nobody writes it
+a destination that means "this PO's customer"
+```
+
+`operation_create_pos_batch` writes **no audit row** — measured, `prosrc` does
+not mention `audit_log`.
+
+---
+
+## Live data facts (measured 2026-07-31)
+
+```
+sofa geometry        21/21 lines carry module_code · x · y · rot · sofa_height
+                     → the plan-view drawing is FREE, no migration
+sofa fabric          4/21 lines   ← a factory cannot start without colour
+sofa leg height      16/21 lines
+mattress demand      14 lines = 16 units   ← the count that used to say 14
+suppliers            2 of 10 have email · 5 have WhatsApp · 4 have neither
+```
+
+Fabric must become mandatory at the POS, with Issue refusing as a backstop —
+`order_lines` has four write doors and a guard on one is a guard three walk
+around. That is a POS card, not a To Order card.
+
+---
+
+## Rules that survive from the last rebuild
+
+**A SKU may never go into a PostgREST `.in()` list.** `order_lines.sku` is free
+text and 16 live lines contain a double quote. The catalog is read whole. A
+source test enforces it. ⚠ `apps/api/src/routes/operation/purchase.ts` (`/today`)
+still uses `.in("sku", …)` and has the same bug.
+
+**A number that surprises you is a measurement to check, not a fact to explain.**
+
+**A fix aimed at a cause you have not proved is a fix that hides the cause.**
+
+**A negative control that does not fail is a test measuring nothing.** Two
+caught in this session: a size-gate test that passed with the gate deleted, and
+a `stopPropagation` test one card earlier.
 
 ---
 
@@ -211,37 +221,12 @@ cancel and re-issue, or raise the balance separately, is a business decision.
 
 | | |
 |---|---|
-| shared | 2009 / 2009 |
+| shared | 2017 / 2017 |
 | api | 3 pre-existing (`partner/pickups` ×1 · `supplier/pos` ×2) |
-| web | 16 pre-existing (`OperationOrders` ×7 · `OhanaSofaTab` ×4 · `OrderCustomerCard` ×4 · `NiceFutureMattressTab` ×1) |
+| web | **16** pre-existing — `OperationOrders` ×7 · `OhanaSofaTab` ×4 · `OrderCustomerCard` ×4 · `NiceFutureMattressTab` ×1 |
 | tsc | web clean · api 4 (`rental-sell.test.ts`) |
+| design-standard | **8504** findings — the ratchet may never rise |
 
-**The web suite oscillates 16–17.** The extra failure emits no `FAIL` line and
-lands in the known-flaky `OperationOrders` drawer file. Count the `FAIL` lines,
-not the summary.
-
----
-
-## Where Loo wants to go next
-
-> *"Purchase Orders 长在 To Order 产出的 PO 上. 如果 Preview 的形状还没冻结，
-> Purchase Orders 一定会跟着重做."*
-
-The Preview architecture IS frozen (above). **To Order can be frozen the moment
-the page is confirmed working** — then Purchase Orders, which is the large
-module: a PO lives there for weeks waiting on a ready date, an ETA, a supplier
-delay, goods.
-
-**Do not start Purchase Orders before somebody has watched To Order issue a
-correct purchase order end to end.**
-
----
-
-## Two habits this session paid for
-
-**A number that surprises you is a measurement to check, not a fact to explain.**
-Three rounds were spent reasoning about why lines vanished; one query comparing
-what went into a read with what came out would have found it immediately.
-
-**A fix aimed at a cause you have not proved is a fix that hides the cause.**
-The chunking looked responsible, shipped clean, and changed nothing.
+**The 17th failure under full-suite load is `OperationPurchase > names the real
+purchase orders…`** — proved pre-existing by stashing every change and getting
+the identical failure. The old checkpoint blamed `OperationOrders`; it is this.
