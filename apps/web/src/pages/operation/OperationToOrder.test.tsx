@@ -4,16 +4,18 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TO_ORDER_WORDS as W } from "@carres/shared";
 import OperationToOrder from "./OperationToOrder";
-import { fmtDate } from "@/lib/fmt-date";
 
 /**
- * To Order — rebuilt from the Golden Template, 2026-07-31.
+ * To Order — the Excel grid (Loo's final division of responsibility,
+ * 2026-07-31): decide which customer orders become purchase orders today.
  *
- * What these pin is the page's ASSEMBLY, because the business rules are pinned
- * in `packages/shared` and the arrangement rules in `to-order-preview.test.ts`:
- * the queue counts match the button's count, the two blocked regions are ABSENT
- * rather than empty, the sofa menu cannot merge, the issue posts the
- * arrangement and nothing else, and the words on screen are `TO_ORDER_WORDS`'s.
+ * What these pin: the lenses are the engine's dates (Order today is the
+ * default and pre-selects the plan); the operator's ticks are DELTAS a view
+ * change cannot wash away; the groups are the future purchase orders and the
+ * batch bar's sentence never lies; the batch posts the ARRANGEMENT only, one
+ * POST per group, and the grid reports each group's outcome in place — rows
+ * never vanish on success. Un-plannable demand is named, never hidden, and
+ * never selectable.
  */
 
 const navigate = vi.fn();
@@ -29,23 +31,20 @@ vi.mock("@/lib/api", async () => {
 });
 
 const OHANA = "11111111-1111-1111-1111-111111111111";
+const NF = "33333333-3333-3333-3333-333333333333";
+const KK = "44444444-4444-4444-4444-444444444444";
 const KLANG = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
 const AL = "818b420c-27f9-4707-a516-b91a6e03f343";
 
-function build(key: string, title: string, spec: string, codes: string, qty = 1, size: string | null = null) {
-  // `Sofa 2 — Booqit` is the shape the projection produces when two siblings
-  // of one customer order would otherwise read identically.
-  const parts = title.split(" — ");
+function build(key: string, model: string, codes: string, qty = 1, size: string | null = null) {
   return {
-    key, title, spec, codes, qty, size,
-    model: parts.length > 1 ? parts[1] : title,
-    ordinal: parts.length > 1 ? Number(parts[0].split(" ")[1]) : null,
+    key, title: model, spec: "", codes, qty, size, model, ordinal: null,
     lines: [{ lineId: `${key}-l1`, sku: codes, qty, cost: null }],
   };
 }
 
 const TO_ORDER = {
-  today: "2026-07-30",
+  today: "2026-07-30", // a Thursday — the week runs to Sun 2 Aug
   destinations: [
     { id: KLANG, name: "Carres Klang", isDefault: true },
     { id: AL, name: "AL Sungai Buloh", isDefault: false },
@@ -57,28 +56,28 @@ const TO_ORDER = {
       supplierName: "Ohana",
       category: "sofa",
       label: "Ohana · Sofa",
-      orderBy: "2026-07-15",
+      orderBy: "2026-07-15", // OVERDUE — merges into today, red
       poCount: 3,
       blocked: null,
       productionDays: 14,
       rows: [
         {
           orderId: "o2", so: 1204, customer: "ella", qty: 1,
-          summary: "Booqit · 1 Sofa · CG-004 Wood", stockReady: "2026-07-31",
-          builds: [build("bk-e", "Sofa 1 — Booqit", '2 Modules · CG-004 Wood', "5539-1A(LHF)")],
+          summary: "Booqit · 1 Sofa", stockReady: "2026-07-20",
+          builds: [build("bk-e", "Booqit", "5539-1A(LHF)")],
         },
         {
           orderId: "o1", so: 1207, customer: "PETER", qty: 2,
           summary: "Booqit · 2 Sofas", stockReady: "2026-08-13",
           builds: [
-            build("bk-a", "Sofa 1 — Booqit", '3 Modules · Leg 6"', "5539-1B(LHF) · 5539-CNR"),
-            build("bk-b", "Sofa 2 — Booqit", '2 Modules · Leg 4"', "5539-1A(LHF)"),
+            build("bk-a", "Booqit", "5539-1B(LHF)"),
+            build("bk-b", "Booqit", "5539-1A(LHF)"),
           ],
         },
         {
           orderId: "o3", so: 1257, customer: "kee tong", qty: 2,
-          summary: "Booqit · 2 Sofas · CG-010 Gold", stockReady: null,
-          builds: [build("bk-k", "Sofa 1 — Booqit", "CG-010 Gold", "5539-2B(LHF)")],
+          summary: "Booqit · 2 Sofas", stockReady: null,
+          builds: [build("bk-k", "Booqit", "5539-2B(LHF)")],
         },
       ],
     },
@@ -88,38 +87,76 @@ const TO_ORDER = {
       supplierName: "Ohana",
       category: "bedframe",
       label: "Ohana · Bedframe",
-      orderBy: "2026-07-21",
+      orderBy: "2026-07-30", // due exactly today
       poCount: 1,
       blocked: null,
       productionDays: 7,
       rows: [
         {
           orderId: "o9", so: 1300, customer: "wong", qty: 3,
-          summary: "Cody · 3 Bedframes", stockReady: "2026-07-29",
-          // ONE line, THREE units — the case the old preview read as "1 item".
-          builds: [build("l1", "Cody Queen", "1 Module", "CODY-Q", 3, "Queen")],
+          summary: "Cody · 3 Bedframes", stockReady: "2026-08-06",
+          builds: [build("l1", "Cody", "CODY-Q", 3, "Queen")],
         },
         {
           orderId: "o8", so: 1301, customer: "lim", qty: 1,
-          summary: "Cody · 1 Bedframe", stockReady: "2026-07-30",
-          builds: [build("l2", "Cody King", "1 Module", "CODY-K", 1, "King")],
+          summary: "Cody · 1 Bedframe", stockReady: "2026-08-06",
+          builds: [build("l2", "Cody", "CODY-K", 1, "King")],
+        },
+      ],
+    },
+    {
+      key: `${NF}::mattress`,
+      supplierId: NF,
+      supplierName: "Nice Future",
+      category: "mattress",
+      label: "Nice Future · Mattress",
+      orderBy: "2026-08-01", // Saturday — THIS WEEK, not today
+      poCount: 1,
+      blocked: null,
+      productionDays: 7,
+      rows: [
+        {
+          orderId: "o20", so: 1400, customer: "amy", qty: 1,
+          summary: "Sonic · 1 Mattress", stockReady: "2026-08-20",
+          builds: [build("m1", "Sonic", "SONIC-Q", 1, "Queen")],
+        },
+      ],
+    },
+    {
+      key: `${KK}::mattress`,
+      supplierId: KK,
+      supplierName: "King Koil",
+      category: "mattress",
+      label: "King Koil · Mattress",
+      orderBy: null,
+      poCount: 1,
+      blocked: "production_days", // NEEDS SETUP — named, never hidden
+      productionDays: null,
+      rows: [
+        {
+          orderId: "o30", so: 1230, customer: "GHI", qty: 1,
+          summary: "Cloud · 1 Mattress", stockReady: null,
+          builds: [build("kk1", "Cloud", "CLOUD-Q", 1, "Queen")],
         },
       ],
     },
   ],
 };
 
-function route(path: string, body?: unknown) {
+/** Per-category issue results; bedframe can be told to fail. */
+let failCategories: Set<string>;
+
+function route(path: string, body?: { category?: string; purchaseOrders?: { key: string }[] }) {
   if (path.startsWith("/api/operation/purchase/to-order/issue")) {
+    const cat = body?.category ?? "?";
+    if (failCategories.has(cat)) return Promise.reject(new Error(`boom-${cat}`));
     return Promise.resolve({
-      supplier: "Ohana",
+      supplier: "x",
       destination: "Carres Klang",
-      pos: [
-        { id: "PO-2031", customer: "ella" },
-        { id: "PO-2032", customer: "PETER" },
-        { id: "PO-2033", customer: "kee tong" },
-      ],
-      _body: body,
+      pos: (body?.purchaseOrders ?? []).map((_d, i) => ({
+        id: `PO-${cat}-${i + 1}`,
+        customer: "c",
+      })),
     });
   }
   if (path.startsWith("/api/operation/purchase/to-order")) return Promise.resolve(TO_ORDER);
@@ -129,26 +166,8 @@ function route(path: string, body?: unknown) {
   return Promise.resolve({});
 }
 
-/**
- * Open a row's ⋯ menu — by KEYBOARD, not by click: jsdom has no
- * `PointerEvent`, so a click on a Radix trigger dispatches an event the
- * trigger never sees and the menu silently never opens (the D0.5b trap).
- */
-async function openMenu(buildKey: string) {
-  fireEvent.keyDown(screen.getByTestId(`items-menu-${buildKey}`), { key: "Enter" });
-  await screen.findByRole("menu");
-}
-
-/** A card is a div holding [☑, button] — this is the clickable half. */
-function cardButton(card: HTMLElement) {
-  return within(card).getByRole("button");
-}
-
-/** The ☑ on one card — include-in-this-issue lives on the card now. */
-function includeBoxOf(cardTestId: string) {
-  return within(screen.getByTestId(cardTestId)).getByRole("checkbox", {
-    name: W.include,
-  });
+function rowBox(proposalKey: string, orderId: string) {
+  return document.getElementById(`row-${proposalKey}-${orderId}`)!;
 }
 
 function wrap() {
@@ -165,351 +184,129 @@ function wrap() {
 beforeEach(() => {
   navigate.mockReset();
   apiFetch.mockReset();
+  failCategories = new Set();
   apiFetch.mockImplementation((path: string, init?: RequestInit) =>
     route(path, init?.body ? JSON.parse(String(init.body)) : undefined),
   );
 });
 
-/**
- * Open the Sofa category — the fixture has no mattress, so bedframe leads the
- * walking order and starts OPEN; sofa is the closed one to exercise.
- */
-async function openSofa() {
-  fireEvent.click(screen.getByTestId("to-order-category-sofa"));
-  return screen.findByTestId(`to-order-doc-${OHANA}::sofa-d1`);
+async function loaded() {
+  render(wrap());
+  await screen.findByTestId(`to-order-group-${OHANA}::sofa`);
 }
 
-describe("the queue", () => {
-  it("splits by TIME first: both fixtures are past their order-by, so one red Overdue bucket", async () => {
-    render(wrap());
-    const overdue = await screen.findByTestId("to-order-bucket-overdue");
-    expect(overdue).toHaveTextContent(W.bucketOverdue);
-    expect(overdue).toHaveTextContent("4");
-    // Empty buckets are never rendered (Loo, 2026-07-31).
-    expect(screen.queryByTestId("to-order-bucket-today")).toBeNull();
-    expect(screen.queryByTestId("to-order-bucket-later")).toBeNull();
+describe("the lenses — the engine's dates as filters", () => {
+  it("Order today is the default, overdue merged in, and the counts are the engine's", async () => {
+    await loaded();
+    const todayChip = screen.getByTestId("to-order-lens-today");
+    expect(todayChip).toHaveAttribute("aria-pressed", "true");
+    expect(todayChip).toHaveTextContent("5"); // 3 sofa + 2 bedframe SO
+    expect(todayChip).toHaveTextContent("3"); // the overdue tail
+    expect(screen.getByTestId("to-order-lens-week")).toHaveTextContent("1");
+    expect(screen.getByTestId("to-order-lens-all")).toHaveTextContent("6");
+    // Today's sheet holds no future group.
+    expect(screen.queryByTestId(`to-order-group-${NF}::mattress`)).toBeNull();
   });
 
-  it("the supplier section names WHO makes it and WHY we buy — the Source", async () => {
-    render(wrap());
-    expect(
-      await screen.findByTestId(`to-order-proposal-${OHANA}::bedframe`),
-    ).toHaveTextContent(`Ohana · ${W.sourceCustomerOrder}`);
+  it("switching lens changes the sheet, not the plan", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-lens-week"));
+    await screen.findByTestId(`to-order-group-${NF}::mattress`);
+    expect(screen.queryByTestId(`to-order-group-${OHANA}::sofa`)).toBeNull();
+    // The batch bar still speaks for the SELECTABLE sheet it can see.
+    fireEvent.click(screen.getByTestId("to-order-lens-today"));
+    await screen.findByTestId(`to-order-group-${OHANA}::sofa`);
   });
 
-  it("carries the COMMANDS layer: the plan's date, recompute, and the reserved Create Proposal", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    const cmd = screen.getByTestId("to-order-commands");
-    expect(cmd).toHaveTextContent(`${W.planFor} ${fmtDate("2026-07-30")}`);
-    expect(screen.getByTestId("to-order-recompute")).toHaveTextContent(
-      W.workOutPlanAgain,
-    );
-    // In the architecture, disabled until its card (Loo's Office rule).
-    expect(screen.getByTestId("to-order-create-proposal")).toBeDisabled();
-  });
-
-  it("a ☑ pressed on a foreign card loads that proposal AND applies the untick", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    await openSofa();
-
-    // Current proposal is still bedframe; the ☑ is on a sofa card.
-    fireEvent.click(includeBoxOf(`to-order-doc-${OHANA}::sofa-d1`));
-    const bar = screen.getByTestId("to-order-workspace");
-    expect(bar).toHaveTextContent("PO 1 of 3");
-    expect(screen.getByText(W.includeOffHelp)).toBeInTheDocument();
-    expect(screen.getByTestId("to-order-count")).toHaveTextContent("2 Purchase Orders");
-  });
-
-  it("each rail level carries its NAME and nothing extra — one number, on the supplier", async () => {
-    render(wrap());
-    // Level 1 — icon + word ONLY: no count, no date (Loo, 2026-07-31 — a
-    // second number on a title is what made the rail unreadable).
-    const sofaCat = await screen.findByTestId("to-order-category-sofa");
-    expect(sofaCat).toHaveTextContent("Sofa");
-    expect(sofaCat).not.toHaveTextContent(fmtDate("2026-07-15"));
-    expect(sofaCat).not.toHaveTextContent("3");
-    expect(sofaCat.querySelector('[data-icon="sofa"]')).toBeInTheDocument();
-    expect(
-      screen
-        .getByTestId("to-order-category-bedframe")
-        .querySelector('[data-icon="bedframe"]'),
-    ).toBeInTheDocument();
-
-    // Level 2 — the supplier's NAME and nothing else (Loo, 2026-07-31: the
-    // `N proposals` word came off too; the rail's only number is the total).
-    const bed = screen.getByTestId(`to-order-proposal-${OHANA}::bedframe`);
-    expect(bed).toHaveTextContent("Ohana");
-    expect(bed).not.toHaveTextContent("Ohana · Bedframe");
-    expect(bed).not.toHaveTextContent("proposal");
-    expect(bed).not.toHaveTextContent(fmtDate("2026-07-21"));
-
-    expect(screen.getByText(W.readyToIssue)).toBeInTheDocument();
-    expect(screen.getByTestId("to-order-queue-total")).toHaveTextContent("4");
-
-    // Loo's fixed walking order (2026-07-31): mattress → bedframe → sofa —
-    // NOT urgency order (sofa is the more urgent group in this fixture).
-    expect(
-      // eslint-disable-next-line no-bitwise
-      screen
-        .getByTestId("to-order-category-bedframe")
-        .compareDocumentPosition(sofaCat) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-
-  it("opens the FIRST category of the walking order by itself, cards visible at once", async () => {
-    render(wrap());
-    // Bedframe leads (no mattress in the fixture) — its card is on screen
-    // with no click, titled by its count, second line reading the SOs out.
-    const card = await screen.findByTestId(`to-order-doc-${OHANA}::bedframe-d1`);
-    expect(card).toHaveTextContent("2 orders");
-    expect(card).toHaveTextContent("SO-1300 · SO-1301");
-
-    // The later category starts closed: no supplier, no cards.
-    expect(screen.queryByTestId(`to-order-proposal-${OHANA}::sofa`)).toBeNull();
-    expect(screen.queryByTestId(`to-order-doc-${OHANA}::sofa-d1`)).toBeNull();
-  });
-
-  it("a sofa card is its SO number, nothing else", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    const d1 = await openSofa();
-
-    // This page controls ORDERS, not customers (Loo, 2026-07-31): the card's
-    // title is the SO number — no customer name, no `PO n`, no items count.
-    expect(d1).toHaveTextContent("SO-1204");
-    expect(d1).not.toHaveTextContent("ella");
-    expect(d1).not.toHaveTextContent("PO 1");
-    const d2 = screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`);
-    expect(d2).toHaveTextContent("SO-1207");
-    expect(d2).not.toHaveTextContent("items");
-  });
-
-  it("opening a category is not a selection — the workspace does not move", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-
-    // Opening shows the supplier section and ALL its cards at once — the
-    // category is the rail's only fold (Loo, 2026-07-31).
-    await openSofa();
-    expect(
-      screen.getByTestId(`to-order-proposal-${OHANA}::sofa`),
-    ).toHaveTextContent("Ohana");
-    // …and the pane still shows the bedframe document it showed before.
-    expect(screen.getByTestId("to-order-workspace")).toHaveTextContent(
-      "Ohana · Bedframe",
-    );
-
-    // Toggling the category shut hides the whole branch again.
-    fireEvent.click(screen.getByTestId("to-order-category-sofa"));
-    expect(screen.queryByTestId(`to-order-proposal-${OHANA}::sofa`)).toBeNull();
-  });
-
-  it("picking a card of another supplier switches the pane to exactly that document", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    expect(screen.getByTestId("to-order-workspace")).toHaveTextContent("PO 1 of 1");
-
-    // Across to a NON-first document — the pane must land on PO 2, not fall
-    // back to PO 1 (the reset-effect regression this pins).
-    await openSofa();
-    fireEvent.click(cardButton(screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`)));
-    const bar = screen.getByTestId("to-order-workspace");
-    expect(bar).toHaveTextContent("PO 2 of 3");
-    expect(bar).toHaveTextContent("PETER");
-
-    // And back to the consolidated one.
-    fireEvent.click(cardButton(screen.getByTestId(`to-order-doc-${OHANA}::bedframe-d1`)));
-    expect(screen.getByTestId("to-order-workspace")).toHaveTextContent("PO 1 of 1");
+  it("demand the engine cannot date is NAMED, never hidden — and never selectable", async () => {
+    await loaded();
+    const setupChip = screen.getByTestId("to-order-lens-setup");
+    expect(setupChip).toHaveTextContent(W.lensNeedsSetup);
+    expect(setupChip).toHaveTextContent("1");
+    fireEvent.click(setupChip);
+    const g = await screen.findByTestId(`to-order-group-${KK}::mattress`);
+    expect(g).toHaveTextContent(W.cannotBePlanned);
+    expect(g).toHaveTextContent(W.needsSetupHelp);
+    // No checkbox anywhere in the group — nothing un-issuable is selectable.
+    expect(within(g).queryAllByRole("checkbox")).toHaveLength(0);
   });
 });
 
-describe("the workspace", () => {
-  it("states how the proposal came to be — Planning & Audit, never communication", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    const audit = screen.getByTestId("to-order-audit");
-    expect(audit).toHaveTextContent(W.planningAudit);
-    expect(audit).toHaveTextContent(`${W.systemGeneratedFrom} SO-1300 · SO-1301`);
-    expect(screen.queryByText("Supplier Communication")).toBeNull();
+describe("pre-selection — the engine proposes, the operator overrides", () => {
+  it("today's plan arrives pre-selected and the batch bar tells the truth", async () => {
+    await loaded();
+    // 5 of 5 SO → sofa is one-per-order (3 docs) + bedframe merges (1 doc).
+    expect(screen.getByTestId("to-order-will-create")).toHaveTextContent(
+      "5 of 5 SO selected → will create 4 Purchase Orders",
+    );
+    // The promise lives in the batch bar ALONE — the group headers carry no
+    // `becomes N POs` echo (Loo, 2026-08-01: one fact, one home).
+    expect(screen.queryByTestId(`to-order-becomes-${OHANA}::sofa`)).toBeNull();
+    expect(screen.queryByText(/becomes \d/)).toBeNull();
   });
 
-  it("fills the pane with the walking order's first document and names it", async () => {
-    render(wrap());
-    const bar = await screen.findByTestId("to-order-workspace");
-    // Bedframe leads the walking order in this fixture — one consolidated
-    // document, so no single customer and no single SO on the bar.
-    expect(bar).toHaveTextContent("PO 1 of 1");
-    // The header is ONE row of facts (Loo's frozen draft): supplier ·
-    // category ···· Order by · production days · Destination.
-    const header = screen.getByTestId("to-order-header");
-    expect(header).toHaveTextContent("Ohana · Bedframe");
-    expect(header).toHaveTextContent(`Order by ${fmtDate("2026-07-21")}`);
-    expect(screen.getByTestId("to-order-production-days")).toHaveTextContent(
-      "7 working days",
+  it("an untick drops the count and the group box turns indeterminate", async () => {
+    await loaded();
+    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2"));
+    expect(screen.getByTestId("to-order-will-create")).toHaveTextContent(
+      "4 of 5 SO selected → will create 3 Purchase Orders",
     );
-    expect(within(header).getByTestId("to-order-destination")).toHaveTextContent(
-      "Carres Klang",
+    expect(document.getElementById(`group-${OHANA}::sofa`)!).toHaveAttribute(
+      "data-state",
+      "indeterminate",
     );
   });
 
-  it("the Issue region carries only the count, the button and its reasons", async () => {
-    // Destination moved to the header (Loo's frozen draft, 2026-07-31) — the
-    // footer never repeats it.
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    const action = screen.getByTestId("to-order-action");
-    expect(within(action).queryByText(W.destination)).toBeNull();
-    expect(within(action).getByTestId("to-order-count")).toHaveTextContent(
-      "1 Purchase Order",
+  it("the operator's overrides survive a view change — deltas, not snapshots", async () => {
+    await loaded();
+    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2"));
+    fireEvent.click(screen.getByTestId("to-order-lens-all"));
+    await screen.findByTestId(`to-order-group-${NF}::mattress`);
+    fireEvent.click(screen.getByTestId("to-order-lens-today"));
+    await screen.findByTestId(`to-order-group-${OHANA}::sofa`);
+    expect(screen.getByTestId("to-order-will-create")).toHaveTextContent(
+      "4 of 5 SO selected",
     );
   });
 
-  it("no destination configured at all is said out loud, not just a dead button", async () => {
-    apiFetch.mockImplementation((path: string) =>
-      path.endsWith("/to-order")
-        ? Promise.resolve({ ...TO_ORDER, destinations: [] })
-        : route(path),
+  it("a future row is NOT pre-selected — ticking it is a deliberate pull-forward", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-lens-all"));
+    await screen.findByTestId(`to-order-group-${NF}::mattress`);
+    const box = rowBox(`${NF}::mattress`, "o20");
+    expect(box).toHaveAttribute("data-state", "unchecked");
+    fireEvent.click(box);
+    expect(screen.getByTestId("to-order-will-create")).toHaveTextContent(
+      "6 of 6 SO selected → will create 5 Purchase Orders",
     );
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    expect(screen.getByTestId("to-order-no-destination")).toHaveTextContent(
-      W.destinationRequired,
+  });
+
+  it("the group ☑ takes the whole future PO off and back on", async () => {
+    await loaded();
+    fireEvent.click(document.getElementById(`group-${OHANA}::bedframe`)!);
+    expect(screen.getByTestId("to-order-will-create")).toHaveTextContent(
+      "3 of 5 SO selected → will create 3 Purchase Orders",
     );
-    expect(screen.getByTestId("to-order-issue")).toBeDisabled();
-  });
-
-  it("does not render the blocked regions as empty placeholders", async () => {
-    // `po_sends` does not exist and Notes has no ruled word — an unbuilt
-    // region is ABSENT, never an empty collapsed strip (Loo, 2026-07-31).
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    expect(screen.queryByText("Supplier Communication")).toBeNull();
-    expect(screen.queryByText("Notes to Supplier")).toBeNull();
-  });
-
-  it("shows Size and Qty — the two facts the table exists to stop hiding", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    // Bedframe is the default document — its items are already on the pane.
-    const items = await screen.findByTestId("to-order-items");
-    expect(within(items).getByText("Queen")).toBeInTheDocument();
-    expect(within(items).getByText("3")).toBeInTheDocument();
-    expect(screen.getByTestId("to-order-items-count")).toHaveTextContent("2 lines · 4 units");
-  });
-
-  it("tells identical siblings apart with an earned ordinal, and a sofa's Size is a dash", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    await openSofa();
-    fireEvent.click(cardButton(screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`)));
-
-    const items = await screen.findByTestId("to-order-items");
-    expect(within(items).getByText("Sofa 1 — Booqit")).toBeInTheDocument();
-    expect(within(items).getByText("Sofa 2 — Booqit")).toBeInTheDocument();
-    // Sofa has no size AS A CATEGORY — the dash is that fact, not missing data.
-    expect(within(items).getAllByText("—").length).toBeGreaterThan(0);
-  });
-
-  it("leaving a document out of this issue drops the count and says what it means", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    fireEvent.click(cardButton(await openSofa()));
-    expect(screen.getByTestId("to-order-count")).toHaveTextContent("3 Purchase Orders");
-
-    // The ☑ lives on the card now (PayEm's shape, Loo 2026-07-31).
-    fireEvent.click(includeBoxOf(`to-order-doc-${OHANA}::sofa-d1`));
-    expect(screen.getByText(W.includeOffHelp)).toBeInTheDocument();
-    expect(screen.getByTestId("to-order-count")).toHaveTextContent("2 Purchase Orders");
-  });
-
-  it("refuses an issue with nothing selected, in the operator's words", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    fireEvent.click(cardButton(await openSofa()));
-
-    for (const k of ["d1", "d2", "d3"]) {
-      fireEvent.click(includeBoxOf(`to-order-doc-${OHANA}::sofa-${k}`));
-    }
-    expect(screen.getByTestId("to-order-plan-blocked")).toHaveTextContent(
-      "Nothing is selected to issue.",
+    fireEvent.click(document.getElementById(`group-${OHANA}::bedframe`)!);
+    expect(screen.getByTestId("to-order-will-create")).toHaveTextContent(
+      "5 of 5 SO selected → will create 4 Purchase Orders",
     );
-    expect(screen.getByTestId("to-order-issue")).toBeDisabled();
   });
 });
 
-describe("the row menu", () => {
-  it("a sofa document can never split and never merge", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    fireEvent.click(cardButton(await openSofa()));
-    await openMenu("bk-e");
+describe("the batch — one POST per group, the grid is the progress bar", () => {
+  it("posts the ARRANGEMENT only, once per group, and reports each PO in place", async () => {
+    await loaded();
+    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2")); // leave ella out today
+    fireEvent.click(screen.getByTestId("to-order-create"));
 
-    // Three documents exist beside this one, and still no Move: a sofa
-    // purchase order carries ONE customer order, so moving would be the merge
-    // the boundary forbids and splitting has nothing to separate.
-    expect(screen.queryByText(/^Move to /)).toBeNull();
-    expect(screen.queryByText(W.itemsSplit)).toBeNull();
-    expect(screen.getByText(W.itemsRemove)).toBeInTheDocument();
-    expect(screen.getByText(W.itemsOpenOrder)).toBeInTheDocument();
-  });
+    await screen.findByTestId(`to-order-result-${OHANA}::sofa`);
+    await screen.findByTestId(`to-order-result-${OHANA}::bedframe`);
 
-  it("Move only exists after a split has made somewhere to move to", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    // Bedframe is the default document — its menu is directly reachable.
-    await openMenu("l1");
-    expect(screen.queryByText(/^Move to /)).toBeNull();
-    fireEvent.click(screen.getByText(W.itemsSplit));
-
-    // The split created Purchase Order 2 in the queue, and Move names it.
-    await screen.findByTestId(`to-order-doc-${OHANA}::bedframe-d2`);
-    expect(screen.getByTestId("to-order-count")).toHaveTextContent("2 Purchase Orders");
-    await openMenu("l2");
-    expect(screen.getByText("Move to Purchase Order 2")).toBeInTheDocument();
-  });
-
-  it("a removed item is not lost — it waits outside and can be put back", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    await openSofa();
-    fireEvent.click(cardButton(screen.getByTestId(`to-order-doc-${OHANA}::sofa-d2`)));
-
-    await openMenu("bk-b");
-    fireEvent.click(screen.getByText(W.itemsRemove));
-
-    const strip = await screen.findByTestId("to-order-removed");
-    expect(strip).toHaveTextContent(W.removedHeading);
-    expect(strip).toHaveTextContent("SO-1207 · PETER");
-    expect(screen.getByTestId("to-order-count")).toHaveTextContent("3 Purchase Orders");
-
-    fireEvent.click(screen.getByTestId("to-order-putback-bk-b"));
-    expect(screen.queryByTestId("to-order-removed")).toBeNull();
-  });
-
-  it("Open Customer Order leaves for the order, and says which document it is", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    fireEvent.click(cardButton(await openSofa()));
-    await openMenu("bk-e");
-    fireEvent.click(screen.getByText(W.itemsOpenOrder));
-    expect(navigate).toHaveBeenCalledWith("/operation/orders?order=o2");
-  });
-});
-
-describe("Issue Purchase Order", () => {
-  it("posts the ARRANGEMENT and nothing else — no SKU, no quantity, no price", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    fireEvent.click(screen.getByTestId("to-order-issue"));
-
-    await waitFor(() => {
-      const call = apiFetch.mock.calls.find(([p]) =>
-        String(p).endsWith("/to-order/issue"),
-      );
-      expect(call).toBeTruthy();
-      const body = JSON.parse(String((call![1] as RequestInit).body));
+    const calls = apiFetch.mock.calls.filter(([p]) => String(p).endsWith("/issue"));
+    expect(calls).toHaveLength(2);
+    for (const [, init] of calls) {
+      const body = JSON.parse(String((init as RequestInit).body));
       expect(Object.keys(body).sort()).toEqual([
         "category",
         "destinationId",
@@ -521,51 +318,138 @@ describe("Issue Purchase Order", () => {
         expect(Object.keys(po).sort()).toEqual(["buildKeys", "include", "key"]);
       }
       expect(JSON.stringify(body)).not.toMatch(/sku|qty|cost|price/);
+    }
+    // ella's untick reached the wire: the sofa batch carries 2 docs, not 3.
+    const sofaBody = JSON.parse(
+      String((calls.find(([, i]) => String((i as RequestInit).body).includes('"sofa"'))![1] as RequestInit).body),
+    );
+    expect(sofaBody.purchaseOrders).toHaveLength(2);
+    expect(JSON.stringify(sofaBody)).not.toContain("bk-e");
+
+    // The grid updated IN PLACE: PO numbers on the headers, rows still there.
+    expect(screen.getByTestId(`to-order-result-${OHANA}::sofa`)).toHaveTextContent("PO-sofa-1");
+    expect(screen.getByTestId(`to-order-result-${OHANA}::bedframe`)).toHaveTextContent(
+      "PO-bedframe-1",
+    );
+    expect(screen.getByTestId(`to-order-row-${OHANA}::bedframe-o9`)).toBeInTheDocument();
+    expect(screen.getByTestId("to-order-done-line")).toHaveTextContent(
+      "3 Purchase Orders created",
+    );
+  });
+
+  it("a failed group fails ALONE — ✗ on its header, Retry retries only it", async () => {
+    failCategories = new Set(["bedframe"]);
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-create"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId(`to-order-result-${OHANA}::bedframe`)).toHaveTextContent(
+        "boom-bedframe",
+      );
     });
+    // Sofa succeeded beside it.
+    expect(screen.getByTestId(`to-order-result-${OHANA}::sofa`)).toHaveTextContent("PO-sofa-1");
+
+    failCategories = new Set();
+    apiFetch.mockClear();
+    fireEvent.click(screen.getByTestId(`to-order-retry-${OHANA}::bedframe`));
+    await waitFor(() => {
+      expect(screen.getByTestId(`to-order-result-${OHANA}::bedframe`)).toHaveTextContent(
+        "PO-bedframe-1",
+      );
+    });
+    // ONLY the failed group was retried.
+    expect(apiFetch.mock.calls.filter(([p]) => String(p).endsWith("/issue"))).toHaveLength(1);
   });
 
-  it("success names the real purchase orders and leads to them", async () => {
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
-    fireEvent.click(screen.getByTestId("to-order-issue"));
-
-    const done = await screen.findByTestId("to-order-issued");
-    expect(done).toHaveTextContent("3 purchase orders issued to Ohana");
-    expect(done).toHaveTextContent("PO-2031");
-    expect(done).toHaveTextContent(W.nextStep);
-
-    fireEvent.click(screen.getByTestId("to-order-open-pos"));
-    expect(navigate).toHaveBeenCalledWith("/operation/procurement");
-  });
-
-  it("demand the catalog could not read stops EVERY issue, by name", async () => {
-    apiFetch.mockImplementation((path: string) =>
+  it("demand the catalog could not read stops the whole batch, by name", async () => {
+    apiFetch.mockImplementation((path: string, init?: RequestInit) =>
       path.endsWith("/to-order")
         ? Promise.resolve({
             ...TO_ORDER,
             unresolved: [{ sku: "M1401F-K", orderId: "ox", so: 1290 }],
           })
-        : route(path),
+        : route(path, init?.body ? JSON.parse(String(init.body)) : undefined),
     );
-    render(wrap());
-    await screen.findByTestId("to-order-workspace");
+    await loaded();
+    expect(screen.getByTestId("to-order-unresolved")).toBeInTheDocument();
+    expect(screen.getByTestId("to-order-create")).toBeDisabled();
+  });
+});
 
-    const block = screen.getByTestId("to-order-unresolved");
-    expect(block).toHaveTextContent("1 item could not be read");
-    expect(block).toHaveTextContent("SO-1290 · M1401F-K");
-    expect(screen.getByTestId("to-order-issue")).toBeDisabled();
+describe("the sheet", () => {
+  it("Group by None is the flat Excel — supplier · category ride the row", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-groupby-none"));
+    const flat = await screen.findByTestId("to-order-flat");
+    const row = within(flat).getByTestId(`to-order-row-${OHANA}::bedframe-o9`);
+    expect(row).toHaveTextContent("Ohana · Bedframe");
+    // No group headers in the flat view.
+    expect(screen.queryByTestId(`to-order-group-${OHANA}::sofa`)).toBeNull();
   });
 
-  it("an empty To Order is an answer, not a blank pane", async () => {
+  it("Destination lives on the GROUP — one purchase order, one destination", async () => {
+    await loaded();
+    const g = screen.getByTestId(`to-order-group-${OHANA}::bedframe`);
+    expect(within(g).getByText("Carres Klang")).toBeInTheDocument();
+    // The batch bar carries no destination control at all.
+    expect(within(screen.getByTestId("to-order-batch-bar")).queryByText(W.destination)).toBeNull();
+  });
+
+  it("an empty lens is an answer, not a blank sheet", async () => {
     apiFetch.mockImplementation((path: string) =>
       path.endsWith("/to-order")
         ? Promise.resolve({ ...TO_ORDER, proposals: [] })
         : route(path),
     );
     render(wrap());
-    // findByTEXT, not the testid — the pane carries the testid while it is
-    // still loading, and the skeleton is not the answer being asserted.
     await screen.findByText(W.empty);
     expect(screen.getByTestId("to-order-empty")).toHaveTextContent(W.empty);
+  });
+
+  it("the batch bar appears only when there is something to say", async () => {
+    await loaded();
+    // A selection exists → the bar is up.
+    expect(screen.getByTestId("to-order-batch-bar")).toBeInTheDocument();
+    // Take every group off — nothing to say, the height goes back to the grid.
+    fireEvent.click(document.getElementById(`group-${OHANA}::sofa`)!);
+    fireEvent.click(document.getElementById(`group-${OHANA}::bedframe`)!);
+    expect(screen.queryByTestId("to-order-batch-bar")).toBeNull();
+    // One tick brings it back.
+    fireEvent.click(rowBox(`${OHANA}::bedframe`, "o9"));
+    expect(screen.getByTestId("to-order-batch-bar")).toBeInTheDocument();
+  });
+
+  it("the top strip follows the Orders page; the panel holds Views · Group", async () => {
+    await loaded();
+    // The strip is the Orders page's own header shape: breadcrumb left,
+    // the shared icon cluster right — NO search anywhere (Loo, 2026-08-01:
+    // the views and the grid are the finding tools) and still no H1.
+    const strip = screen.getByTestId("to-order-header-strip");
+    expect(strip).toHaveTextContent("Purchasing");
+    expect(strip).toHaveTextContent("To Order");
+    expect(screen.queryByRole("searchbox")).toBeNull();
+    const panel = screen.getByTestId("to-order-panel");
+    expect(within(panel).getByTestId("to-order-lens-today")).toBeInTheDocument();
+    expect(within(panel).getByTestId("to-order-groupby-supplier")).toBeInTheDocument();
+    expect(within(panel).getByText(W.panelViews)).toBeInTheDocument();
+    expect(within(panel).getByText(W.panelGroup)).toBeInTheDocument();
+    // Gmail's rhythm: the grid starts immediately. No Refresh (ruled out
+    // again 2026-08-01 — the plan updates itself), and Create Proposal /
+    // Columns join once BUILT, never as dead controls.
+    expect(screen.queryByTestId("to-order-refresh")).toBeNull();
+    expect(screen.queryByText("Refresh")).toBeNull();
+    expect(screen.queryByTestId("to-order-create-proposal")).toBeNull();
+    expect(screen.queryByText(W.createProposal)).toBeNull();
+    // No H1 anywhere — the lit tab is the page identity (Loo's law).
+    expect(document.querySelector("h1")).toBeNull();
+  });
+
+  it("collapsing a group folds its rows to the one-line summary", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId(`to-order-collapse-${OHANA}::sofa`));
+    expect(screen.queryByTestId(`to-order-row-${OHANA}::sofa-o2`)).toBeNull();
+    // The header (with its counts) is still on screen.
+    expect(screen.getByTestId(`to-order-group-${OHANA}::sofa`)).toHaveTextContent("3 SO");
   });
 });

@@ -8,10 +8,14 @@ import {
   nameBuild,
   pickSpecToken,
   planPurchaseOrders,
+  ordersHeadline,
   poIndexLabel,
   poShortLabel,
   productionDaysLabel,
   purchaseOrderCount,
+  railItemLabel,
+  sizeShort,
+  soCountLabel,
   sortToOrderRows,
   type ToOrderLine,
   type ToOrderRow,
@@ -171,6 +175,31 @@ describe("the purchase-order boundary", () => {
     expect(countItems(5)).toBe("5 items");
     expect(productionDaysLabel(1)).toBe("1 working day");
     expect(productionDaysLabel(7)).toBe("7 working days");
+  });
+
+  it("the Planning Navigator's composers — natural word on top, system word below", () => {
+    // `Orders` on the header because it is what a purchaser SAYS ("今天有
+    // 12 单要下"); `SO` from the category rows down (Loo, 2026-07-31).
+    expect(ordersHeadline(1)).toBe("1 Order");
+    expect(ordersHeadline(12)).toBe("12 Orders");
+    expect(soCountLabel(1)).toBe("1 SO");
+    expect(soCountLabel(38)).toBe("38 SO");
+  });
+
+  it("a rail row's item label — the model plus the size LETTER, never the full word", () => {
+    // The rail is navigation: the letter disambiguates (`Sonic Q` vs
+    // `Sonic K`) without the width the full word costs. The Items table
+    // keeps `Queen` — a factory cuts to the word, an operator scans the letter.
+    expect(sizeShort("Queen")).toBe("Q");
+    expect(sizeShort("King")).toBe("K");
+    expect(sizeShort("Single")).toBe("S");
+    expect(sizeShort("Super Single")).toBe("SS");
+    expect(sizeShort(null)).toBeNull();
+    // An unmapped size passes through whole — a wrong letter is worse than a
+    // long word.
+    expect(sizeShort("Cot")).toBe("Cot");
+    expect(railItemLabel("Sonic", "Queen")).toBe("Sonic Q");
+    expect(railItemLabel("Booqit", null)).toBe("Booqit");
   });
 
   it("a non-sofa category merges every customer order into ONE document", () => {

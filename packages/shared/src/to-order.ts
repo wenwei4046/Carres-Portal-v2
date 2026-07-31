@@ -69,44 +69,54 @@ export const TO_ORDER_WORDS = {
   destinationRequired: "Destination not selected.",
   issue: "Issue Purchase Order",
 
-  /**
-   * The queue rail's own heading — what the left side IS. Ruled by Loo
-   * 2026-07-31 with the Fiori-worklist rail; still owed a COPY-STANDARD row.
-   */
-  readyToIssue: "Ready to issue",
-
-  // ── The Golden Template's words — all ruled by Loo 2026-07-31 in the
-  //    blueprint session; each still owed a COPY-STANDARD row. ─────────────
-  /** Time buckets — the queue's outermost split. Empty buckets never render. */
-  bucketOverdue: "Overdue",
-  bucketToday: "Today",
-  bucketTomorrow: "Tomorrow",
-  bucketThisWeek: "This week",
-  bucketNextWeek: "Next week",
-  bucketLater: "Later",
-  /** The one live Source; the manual sources join with Create Proposal. */
-  sourceCustomerOrder: "Customer Order",
-  /** COMMANDS — the layer above the regions. */
-  planFor: "Plan for",
-  workOutPlanAgain: "Work out the plan again",
+  // ── The Excel grid — Loo's final division of responsibility, 2026-07-31:
+  //    To Order DECIDES which customer orders become purchase orders today
+  //    (listing · filter · checkbox · batch create, nothing else); Purchase
+  //    Orders MANAGES the documents once they exist (preview · communication
+  //    · audit · PDF · WhatsApp · revision · ready date — ALL of it, there).
+  //    Each word still owed a COPY-STANDARD row. ───────────────────────────
+  /** The lenses — the engine's own dates as one-click filters. */
+  lensOrderToday: "Order today",
+  lensThisWeek: "This week",
+  lensAll: "All",
+  /** Demand the engine cannot date — a missing number, named, never hidden. */
+  lensNeedsSetup: "Needs setup",
+  cannotBePlanned: "cannot be planned",
+  needsSetupHelp: "No production days for this supplier × category. Set a number in Settings.",
+  // ── The Workspace Panel (frozen with Loo, 2026-08-01 — the Portal Grid
+  //    standard's left side, Gmail's rhythm): Search first, then VIEWS ·
+  //    FILTERS · GROUP · SORT in that order, default EXPANDED. A section
+  //    joins the panel when a page builds it. Above the grid there is NO
+  //    header today — page actions (Create Proposal · Columns · Export ·
+  //    Help, in that frozen order) appear only once built; Refresh was
+  //    ruled OUT again 2026-08-01 (the plan updates itself). ──────────────
+  panelViews: "Views",
+  panelGroup: "Group",
+  groupBy: "Group by",
+  groupBySupplier: "Supplier",
+  groupByNone: "None",
+  /** The ☑'s aria word — picking rows for THIS batch, nothing more. */
+  select: "Select",
+  /** The one primary action. Issue ≠ Send: sending lives in Purchase Orders. */
+  createPos: "Create Purchase Orders",
+  retry: "Retry",
+  createdOk: "created",
+  createFailed: "failed",
+  /** The manual entrance — in the architecture, switched on by its own card. */
   createProposal: "Create Proposal",
-  /** Region ② — how this proposal came to be. NOT communication. */
-  planningAudit: "Planning & Audit",
-  systemGeneratedFrom: "System generated from",
 
   // The Preview — what pressing Issue would create, before it exists.
   preview: "Purchase Order Preview",
   /**
-   * The per-document switch. Its meaning is frozen and narrow: whether this
-   * document goes out in THIS issue. It is not a hold, not an exclusion, not a
-   * cancellation and not a status — unchecking changes nothing about the
-   * customer's order, and a refresh puts it back.
+   * The ☑'s meaning is frozen and narrow: MEMBERSHIP of this purchase order —
+   * never a business decision (Loo, 2026-07-31: a checkbox that reads like
+   * Hold / Skip / Supplier-has-no-stock is a question it cannot answer). It
+   * is not a hold, not a cancellation and not a status — unticking changes
+   * nothing about the customer's order, and the next recomputation finds the
+   * demand still unordered and offers it again.
    */
-  include: "Include in this issue",
-  includeOffHelp: "Not issued this time. Nothing about the order changes.",
-  removedHeading: "Not on any purchase order",
-  removedHelp: "Still waiting to be ordered. It comes back on the next refresh.",
-  putBack: "Put back",
+  include: "Included in this Purchase Order",
+  includeOffHelp: "Not on this issue. Nothing about the order changes.",
 
   // ── Items · the section an operator spends the review in ─────────────────
   // Ruled by Loo 2026-07-31. Each is still owed a COPY-STANDARD row.
@@ -167,6 +177,65 @@ export function countItems(n: number): string {
 /** `7 working days` — the pair's production time, as the header states it. */
 export function productionDaysLabel(n: number): string {
   return `${n} working day${n === 1 ? "" : "s"}`;
+}
+
+/**
+ * `12 Orders` — the rail header's big fact: how many customer orders today's
+ * run covers. The natural word, because it is what a purchaser SAYS (Loo,
+ * 2026-07-31: "今天有 12 单要下"); the system word `SO` starts one level
+ * down, on the category rows.
+ */
+export function ordersHeadline(n: number): string {
+  return `${n} Order${n === 1 ? "" : "s"}`;
+}
+
+/** `5 SO` — a group header's count, and a future run's count. */
+export function soCountLabel(n: number): string {
+  return `${n} SO`;
+}
+
+/** `8 pcs` — physical units, the factory's own count. */
+export function pcsCount(n: number): string {
+  return `${n} pcs`;
+}
+
+/** `7 of 8 SO selected` — the batch bar's left half. */
+export function soSelectedLine(selected: number, total: number): string {
+  return `${selected} of ${total} SO selected`;
+}
+
+/**
+ * `will create 2 Purchase Orders` — the batch bar's promise. It must NEVER
+ * lie: the count is computed from the same shared projection the server
+ * recomputes on issue, and the button's meaning is exactly this sentence.
+ */
+export function willCreateLine(n: number): string {
+  return `will create ${purchaseOrderCount(n)}`;
+}
+
+
+/**
+ * `Queen` → `Q` — the rail row's size letter. The rail is navigation, not
+ * reading: the letter disambiguates (`Sonic Q` vs `Sonic K`) without the
+ * width the full word costs. The Items table keeps the full word — a factory
+ * cuts to `Queen`, an operator scans for `Q`.
+ */
+const SIZE_SHORT: Record<string, string> = {
+  Queen: "Q",
+  King: "K",
+  Single: "S",
+  "Super Single": "SS",
+};
+
+export function sizeShort(size: string | null): string | null {
+  if (size == null) return null;
+  return SIZE_SHORT[size] ?? size;
+}
+
+/** `Sonic Q` — a rail row's item label: model + size letter, nothing else. */
+export function railItemLabel(model: string, size: string | null): string {
+  const s = sizeShort(size);
+  return s ? `${model} ${s}` : model;
 }
 
 /** `1 Purchase Order` / `7 Purchase Orders` — the sidebar and the button. */
