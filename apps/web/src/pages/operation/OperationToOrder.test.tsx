@@ -368,18 +368,18 @@ describe("the Excel reflexes — header sort, per-column filters", () => {
     expect(sos[0]).toBe("SO-1350");
   });
 
-  it("the PO filter speaks business — Not Ordered / Ordered, never (Blanks)", async () => {
+  it("the PO filter speaks business — Yet to Order + the real numbers, never (Blanks)", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("table-filter-po"));
-    expect(screen.getByLabelText(W.filterNotOrdered)).toBeInTheDocument();
-    expect(screen.getByLabelText(W.filterOrdered)).toBeInTheDocument();
+    expect(screen.getByLabelText(W.yetToOrder)).toBeInTheDocument();
+    expect(screen.getByLabelText("PO-9001")).toBeInTheDocument();
     expect(screen.queryByText("(Blanks)")).toBeNull();
-    // `Ordered` narrows to the read-back PO row.
-    fireEvent.click(screen.getByLabelText(W.filterOrdered));
+    // A real number narrows to that document's rows.
+    fireEvent.click(screen.getByLabelText("PO-9001"));
     expect(screen.getByText("SO-1350")).toBeInTheDocument();
     expect(screen.queryByText("SO-1257")).toBeNull();
-    // Not Ordered joins in — Excel ORs a checklist.
-    fireEvent.click(screen.getByLabelText(W.filterNotOrdered));
+    // Yet to Order joins in — Excel ORs a checklist.
+    fireEvent.click(screen.getByLabelText(W.yetToOrder));
     expect(screen.getByText("SO-1257")).toBeInTheDocument();
   });
 
@@ -395,7 +395,10 @@ describe("the Excel reflexes — header sort, per-column filters", () => {
   it("there are no Status pills — the PO column IS the status door", async () => {
     await loaded();
     expect(screen.queryByText("Status")).toBeNull();
-    expect(screen.queryByText("Yet to Order")).toBeNull();
+    // The empty PO cell SAYS the work instead of a mute dash, and the
+    // footer counts what the sheet shows.
+    expect(screen.getAllByText(W.yetToOrder).length).toBeGreaterThan(0);
+    expect(screen.getByTestId("to-order-footer")).toHaveTextContent(/orders?$/);
   });
 });
 

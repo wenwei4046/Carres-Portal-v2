@@ -106,10 +106,11 @@ export const TO_ORDER_WORDS = {
    * stamp answers the one AutoCount anxiety ("am I looking at the latest?").
    */
   updated: "Updated",
-  // ── The PO column's Excel filter speaks BUSINESS, not Excel (Jess: our
-  //    users are not Excel experts — `(Blanks)` teaches nothing). ──────────
-  filterNotOrdered: "Not Ordered",
-  filterOrdered: "Ordered",
+  // ── The PO column speaks BUSINESS, not Excel (Jess, 2026-08-01, final):
+  //    an empty PO cell is not "no data" — it is WORK, and it says so. The
+  //    filter lists `Yet to Order` + the real PO numbers; `(Blanks)` and a
+  //    generic `Ordered` never appear (the number list IS ordered). ───────
+  yetToOrder: "Yet to Order",
   filterOverdue: "Overdue",
   /**
    * The empty state while a FILTER is narrowing — §8.2's law: no reachable

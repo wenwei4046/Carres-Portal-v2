@@ -49,7 +49,7 @@ import { Z_TABLE_HEADER } from "./overlay-layer";
  * column sorts by header click and filters by its ▼). The kit renders the
  * popover — a value checklist with an optional search — and NOTHING more: the
  * page owns which rows survive, exactly as it owns formatting. Option LABELS
- * are the caller's (COPY-STANDARD speaks business — `Not Ordered`, never
+ * are the caller's (COPY-STANDARD speaks business — `Yet to Order`, never
  * `(Blanks)`).
  */
 export interface ColumnFilter {
@@ -261,8 +261,16 @@ export default function DataTable<Row>({
                 }`}
               >
                 {/* The word first, its controls after — `Qty ▼`, never
-                 * `▼ Qty` (Jess, 2026-08-01), whatever the alignment. */}
-                <span className="inline-flex items-center gap-0.5">
+                 * `▼ Qty` (Jess, 2026-08-01), whatever the alignment. A
+                 * right-aligned column's cluster hugs the column edge so the
+                 * numbers line up under it. */}
+                <span
+                  className={
+                    c.align === "right"
+                      ? "flex w-full items-center justify-end gap-0.5"
+                      : "inline-flex items-center gap-0.5"
+                  }
+                >
                   {c.sortable && onSortChange ? (
                     /* Header click = sort, asc ⇄ desc — the Excel reflex.
                      * The kit shows the arrow; the PAGE reorders the rows. */
@@ -287,7 +295,7 @@ export default function DataTable<Row>({
                       ) : (
                         /* GitHub's whisper: the arrow appears on hover, so a
                          * sortable header announces itself before the click. */
-                        <span className="opacity-0 transition-opacity group-hover:opacity-60">
+                        <span className="hidden group-hover:inline-flex opacity-60">
                           <Icon name="expand" size={14} />
                         </span>
                       )}

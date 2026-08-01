@@ -48,6 +48,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   TO_ORDER_WORDS as W,
   categoryLabel,
+  countOrders,
   defaultDocuments,
   ordersHeadline,
   poScheduleBucket,
@@ -185,7 +186,6 @@ function properCase(name: string): string {
 const F_OVERDUE = "__overdue__";
 const F_NONE = "__none__";
 const F_NOT_ORDERED = "__not_ordered__";
-const F_ORDERED = "__ordered__";
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
@@ -391,11 +391,7 @@ export default function OperationToOrder() {
         return sel.has(String(r.qty));
       case "po": {
         const po = poOf(r);
-        return (
-          (sel.has(F_NOT_ORDERED) && !po) ||
-          (sel.has(F_ORDERED) && !!po) ||
-          (po != null && sel.has(po))
-        );
+        return (sel.has(F_NOT_ORDERED) && !po) || (po != null && sel.has(po));
       }
       default:
         return true;
@@ -703,8 +699,7 @@ export default function OperationToOrder() {
   const poOptions = useMemo(() => {
     const base = filteredExcept("po");
     const opts: { value: string; label: string }[] = [
-      { value: F_NOT_ORDERED, label: W.filterNotOrdered },
-      { value: F_ORDERED, label: W.filterOrdered },
+      { value: F_NOT_ORDERED, label: W.yetToOrder },
     ];
     const pos = [...new Set(base.map((r) => poOf(r)).filter(Boolean))] as string[];
     pos.sort();
@@ -777,7 +772,8 @@ export default function OperationToOrder() {
       filter: filterFor("po", poOptions),
       cell: (r) => {
         const po = poOf(r);
-        if (!po) return "—";
+        // Not "no data" — WORK. Muted, unclickable, filterable by name.
+        if (!po) return <span className="text-kit-slate-11">{W.yetToOrder}</span>;
         // The number is the receipt AND the door to the next step: it lands
         // on Purchase Orders with THIS document opened.
         const slug = PO_TAB_SLUG[r.category];
@@ -1041,25 +1037,38 @@ export default function OperationToOrder() {
                 </div>
               )
             ) : (
-              <DataTable
-                rows={visibleRows}
-                columns={columns}
-                rowId={(r) => r.key}
-                empty={W.empty}
-                label={W.itemsTableLabel}
-                sort={sort}
-                onSortChange={setSort}
-                selection={{
-                  selected: selectedKeys,
-                  onToggleRow: (id) => {
-                    const r = rowByKey.get(id);
-                    if (r) toggleRow(r);
-                  },
-                  onToggleAll: toggleAllVisible,
-                  label: W.select,
-                  selectable: (r) => !poOf(r),
-                }}
-              />
+              <>
+                <DataTable
+                  rows={visibleRows}
+                  columns={columns}
+                  rowId={(r) => r.key}
+                  empty={W.empty}
+                  label={W.itemsTableLabel}
+                  sort={sort}
+                  onSortChange={setSort}
+                  selection={{
+                    selected: selectedKeys,
+                    onToggleRow: (id) => {
+                      const r = rowByKey.get(id);
+                      if (r) toggleRow(r);
+                    },
+                    onToggleAll: toggleAllVisible,
+                    label: W.select,
+                    selectable: (r) => !poOf(r),
+                  }}
+                />
+                {/* The Orders page's own closing line: what am I looking at,
+                    counted. Orders, not rows — a build is not a unit of work
+                    a purchaser counts in. */}
+                <footer
+                  className="shrink-0 flex items-center gap-3 px-3 h-9 rounded-b-card border border-t-0 border-kit-slate-5 bg-white text-meta text-kit-slate-11"
+                  data-testid="to-order-footer"
+                >
+                  <span className="tabular-nums">
+                    {countOrders(new Set(visibleRows.map((r) => r.orderId ?? r.key)).size)}
+                  </span>
+                </footer>
+              </>
             )}
           </div>
 
