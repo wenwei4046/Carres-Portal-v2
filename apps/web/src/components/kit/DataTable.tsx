@@ -225,7 +225,7 @@ export default function DataTable<Row>({
         /* 40px FIXED rows. `whitespace-nowrap` kills the silent row-growers —
          * text WRAPPING inside a narrow fixed column is what makes one row
          * taller than the rest and the whole list stop being scannable. */
-        className="w-full table-fixed border-collapse text-body [&_td]:h-10 [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:align-middle"
+        className="w-full table-fixed border-separate border-spacing-0 text-body [&_td]:h-10 [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:align-middle"
       >
         {/* PERCENTAGE widths + `table-fixed` → the table is always exactly the
          *  container width, so it never scrolls sideways on a laptop. */}
@@ -237,10 +237,9 @@ export default function DataTable<Row>({
         </colgroup>
 
         <thead className={`sticky top-0 ${Z_TABLE_HEADER}`}>
-          {/* The wash and the rule live on the CELLS: with border-collapse a
-              sticky thead's row background stays behind while the cells
-              scroll — the classic see-through header (Jess caught it live,
-              2026-08-01). */}
+          {/* border-separate + cell-level wash: with border-collapse, Chrome
+              refuses to stick a thead's backgrounds at all — the classic
+              see-through header (Jess caught it live, 2026-08-01). */}
           <tr className="h-10">
             {selection && (
               <th className="px-2 bg-kit-slate-4 border-b border-kit-slate-6">
