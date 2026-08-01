@@ -48,7 +48,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   TO_ORDER_WORDS as W,
   categoryLabel,
-  countItems,
   defaultDocuments,
   ordersHeadline,
   poScheduleBucket,
@@ -119,11 +118,15 @@ type GroupResult =
   | { status: "done"; pos: string[] }
   | { status: "failed"; message: string };
 
-/** One grid row = one SO within one supplier×category proposal — or one
- *  already-ordered SO on a recent PO. */
+/** One grid row = one BUILD (a thing with a MODEL NAME — `2 items` is
+ *  banned from the Model column, Jess 2026-08-01) within one
+ *  supplier×category proposal — or one already-ordered build on a recent
+ *  PO. The ☑ stays build-level exactly as Loo froze it: membership of THIS
+ *  purchase order, nothing more. */
 interface GridRow {
   key: string;
   proposalKey: string | null;
+  buildKey: string | null;
   category: string;
   orderId: string | null;
   customer: string | null;
@@ -283,30 +286,30 @@ export default function OperationToOrder() {
     const rows: GridRow[] = [];
     for (const p of planned) {
       for (const r of p.rows) {
-        const b = r.builds;
-        rows.push({
-          key: `${p.key}:${r.orderId}`,
-          proposalKey: p.key,
-          category: p.category,
-          orderId: r.orderId,
-          customer: r.customer ?? null,
-          so: r.so,
-          delivery: r.delivery ?? null,
-          late: today != null && r.delivery != null && r.delivery < today,
-          model:
-            b.length === 1
-              ? railItemLabel(b[0]!.model, b[0]!.size ?? null)
-              : countItems(b.length),
-          qty: r.qty,
-          bucket:
-            today == null
-              ? "overdue"
-              : (() => {
-                  const b = poScheduleBucket(r.orderBy ?? null, poDays, today);
-                  return b.kind === "overdue" ? "overdue" : b.day;
-                })(),
-          orderedPo: null,
-        });
+        const bucket =
+          today == null
+            ? "overdue"
+            : (() => {
+                const b = poScheduleBucket(r.orderBy ?? null, poDays, today);
+                return b.kind === "overdue" ? "overdue" : b.day;
+              })();
+        for (const b of r.builds) {
+          rows.push({
+            key: `${p.key}:${r.orderId}:${b.key}`,
+            proposalKey: p.key,
+            buildKey: b.key,
+            category: p.category,
+            orderId: r.orderId,
+            customer: r.customer ?? null,
+            so: r.so,
+            delivery: r.delivery ?? null,
+            late: today != null && r.delivery != null && r.delivery < today,
+            model: railItemLabel(b.model, b.size ?? null),
+            qty: b.qty,
+            bucket,
+            orderedPo: null,
+          });
+        }
       }
     }
     const demandKeys = new Set(rows.map((r) => r.key));
@@ -316,6 +319,7 @@ export default function OperationToOrder() {
       rows.push({
         key,
         proposalKey: null,
+        buildKey: null,
         category: o.category,
         orderId: o.orderId,
         customer: o.customer ?? null,
@@ -507,15 +511,17 @@ export default function OperationToOrder() {
     });
   };
 
-  /** What the pill will do — per group, from the shared projection. */
+  /** What the pill will do — per group, from the shared projection. The ☑
+   *  is BUILD-level, exactly Loo's frozen meaning: membership of THIS
+   *  purchase order. An unticked build stays demand and is offered again. */
   const batch = useMemo(() => {
     const selectedByProposal = new Map<string, Set<string>>();
     let selectedRows = 0;
     for (const r of allRows) {
-      if (r.proposalKey == null || r.orderId == null || !isSelected(r)) continue;
+      if (r.proposalKey == null || r.buildKey == null || !isSelected(r)) continue;
       selectedRows += 1;
       const s = selectedByProposal.get(r.proposalKey) ?? new Set<string>();
-      s.add(r.orderId);
+      s.add(r.buildKey);
       selectedByProposal.set(r.proposalKey, s);
     }
     let poCount = 0;
@@ -532,7 +538,7 @@ export default function OperationToOrder() {
         .map((d) => ({
           key: d.key,
           include: true,
-          buildKeys: d.buildKeys.filter((k) => sel.has(orderOf.get(k) ?? "")),
+          buildKeys: d.buildKeys.filter((k) => sel.has(k)),
         }))
         .filter((d) => d.buildKeys.length > 0);
       if (docs.length === 0) continue;
@@ -584,12 +590,16 @@ export default function OperationToOrder() {
             pos: res.pos.map((x) => x.id),
           }),
         );
-        // The grid updates IN PLACE: each doc's orders take its PO number.
+        // The grid updates IN PLACE: each doc's builds take its PO number.
         setRowPo((m) => {
           const n = new Map(m);
-          t.orderIdsByDoc.forEach((orderIds, i) => {
+          const orderOf = new Map(
+            toOrderBuilds(t.proposal).map((b) => [b.buildKey, b.orderId]),
+          );
+          t.docs.forEach((d, i) => {
             const po = res.pos[i]?.id ?? res.pos[0]?.id ?? "PO";
-            for (const orderId of orderIds) n.set(`${t.proposal.key}:${orderId}`, po);
+            for (const k of d.buildKeys)
+              n.set(`${t.proposal.key}:${orderOf.get(k)}:${k}`, po);
           });
           return n;
         });

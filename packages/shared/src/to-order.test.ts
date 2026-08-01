@@ -547,8 +547,9 @@ describe("snapToPoDay", () => {
     expect(snapToPoDay("2026-08-09", MWF)).toBe("2026-08-07"); // Sun → Fri
   });
 
-  it("an empty configuration means order any day — the date stands", () => {
-    expect(snapToPoDay("2026-08-04", [])).toBe("2026-08-04");
+  it("an empty configuration means order any WORKING day — a weekend still snaps back", () => {
+    expect(snapToPoDay("2026-08-04", [])).toBe("2026-08-04"); // Tue stands
+    expect(snapToPoDay("2026-08-01", [])).toBe("2026-07-31"); // Sat → Fri
   });
 });
 
@@ -565,9 +566,10 @@ describe("poScheduleDays", () => {
     expect(poScheduleDays(MWF, "2026-08-03")[0]).toBe("2026-08-03");
   });
 
-  it("two configured days → two rows; none → the calendar collapses to today", () => {
+  it("two configured days → two rows; none → the next WORKING day, never a Saturday", () => {
     expect(poScheduleDays([2, 5], "2026-08-03")).toHaveLength(2);
-    expect(poScheduleDays([], "2026-08-04")).toEqual(["2026-08-04"]);
+    expect(poScheduleDays([], "2026-08-04")).toEqual(["2026-08-04"]); // Tue stands
+    expect(poScheduleDays([], "2026-08-01")).toEqual(["2026-08-03"]); // Sat → Mon
   });
 });
 

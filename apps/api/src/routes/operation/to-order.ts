@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   buildToOrder,
-  countItems,
   isToOrderCategory,
   myHolidaySet,
   planFromDocuments,
@@ -436,14 +435,12 @@ async function loadOrderedRows(
     }
   }
 
-  /** The label a demand row would print — one item names itself, many count. */
-  const labelOf = (ls: readonly { sku: string; qty: number }[]): string => {
-    if (ls.length === 1) {
-      const f = catalog.get(ls[0]!.sku);
-      const size = f?.variantKind === "size" ? f.variant : null;
-      return railItemLabel(f?.modelName ?? ls[0]!.sku, size);
-    }
-    return countItems(ls.length);
+  /** One build, one MODEL NAME — `2 items` is banned from the Model column
+   *  (Jess, 2026-08-01), so ordered rows split exactly like demand rows. */
+  const labelOf = (sku: string): string => {
+    const f = catalog.get(sku);
+    const size = f?.variantKind === "size" ? f.variant : null;
+    return railItemLabel(f?.modelName ?? sku, size);
   };
   const categoryOf = (skus: readonly string[]): ProductCategory | null => {
     for (const s of skus) {
@@ -463,18 +460,21 @@ async function loadOrderedRows(
     if (!category) continue; // not this page's goods (accessory restock etc.)
 
     if (refs.length === 0) {
-      rows.push({
-        poId: po.id as string,
-        placedAt,
-        category,
-        supplierId: (po.supplier_id as string | null) ?? "",
-        orderId: null,
-        customer: null,
-        so: null,
-        delivery: null,
-        model: labelOf(poLines),
-        qty: poLines.reduce((s, l) => s + l.qty, 0),
-      });
+      // A manual PO: one row per LINE, each naming its model.
+      for (const l of poLines) {
+        rows.push({
+          poId: po.id as string,
+          placedAt,
+          category,
+          supplierId: (po.supplier_id as string | null) ?? "",
+          orderId: null,
+          customer: null,
+          so: null,
+          delivery: null,
+          model: labelOf(l.sku),
+          qty: l.qty,
+        });
+      }
       continue;
     }
 
@@ -483,19 +483,8 @@ async function loadOrderedRows(
       const covered = order
         ? (orderLinesByOrder.get(order.id as string) ?? []).filter((l) => poSkus.has(l.sku))
         : [];
-      // Sofa counts builds, everything else counts pieces — the demand grid's
-      // own rule, so a row reads the same before and after it was ordered.
-      const qty =
-        category === "sofa"
-          ? Math.max(
-              new Set(
-                covered.map((l) => attr(l.attrs, "sofa_build_key") ?? `line::${l.sku}`),
-              ).size,
-              covered.length > 0 ? 1 : 0,
-            )
-          : covered.reduce((s, l) => s + l.qty, 0);
       const tbd = Boolean(order?.delivery_date_tbd);
-      rows.push({
+      const base = {
         poId: po.id as string,
         placedAt,
         category,
@@ -507,9 +496,29 @@ async function loadOrderedRows(
           !tbd && order?.delivery_date
             ? (order.delivery_date as string).slice(0, 10)
             : null,
-        model: covered.length > 0 ? labelOf(covered) : labelOf(poLines),
-        qty: qty > 0 ? qty : poLines.reduce((s, l) => s + l.qty, 0),
-      });
+      };
+      if (covered.length === 0) {
+        // Nothing matched — still one honest row per PO line.
+        for (const l of poLines) rows.push({ ...base, model: labelOf(l.sku), qty: l.qty });
+        continue;
+      }
+      // One row per BUILD — a sofa's modules collapse to one sofa; every
+      // other line stands alone, exactly the demand grid's grouping.
+      const byBuild = new Map<string, { sku: string; qty: number }[]>();
+      for (const l of covered) {
+        const k = attr(l.attrs, "sofa_build_key") ?? `line::${l.sku}`;
+        const arr = byBuild.get(k) ?? [];
+        arr.push({ sku: l.sku, qty: l.qty });
+        byBuild.set(k, arr);
+      }
+      for (const members of byBuild.values()) {
+        rows.push({
+          ...base,
+          model: labelOf(members[0]!.sku),
+          qty:
+            category === "sofa" ? 1 : members.reduce((sum, m) => sum + m.qty, 0),
+        });
+      }
     }
   }
   return rows;

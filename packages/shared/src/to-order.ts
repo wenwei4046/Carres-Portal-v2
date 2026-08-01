@@ -380,27 +380,35 @@ export function weekdayName(iso: IsoDate): string {
   return WEEKDAY_WORDS[weekdayOf(iso)]!;
 }
 
+/** Mon–Fri: the office's own week. Saturday/Sunday NEVER carry a PO run —
+ *  the Carres office does not work them (Jess, 2026-08-01). */
+const OFFICE_WEEKDAYS = [1, 2, 3, 4, 5] as const;
+
 /**
  * The next instance of each configured PO weekday, from today INCLUSIVE,
  * ascending — a Tuesday under Mon/Wed/Fri reads Wed · Fri · Mon. An empty
- * configuration means "order any day": the calendar collapses to today.
+ * configuration means "order any day": the calendar collapses to the next
+ * WORKING day — never a Saturday, whatever today is.
  */
 export function poScheduleDays(poDays: readonly number[], today: IsoDate): IsoDate[] {
-  if (poDays.length === 0) return [today];
+  const wanted = poDays.length === 0 ? OFFICE_WEEKDAYS : poDays;
+  const limit = poDays.length === 0 ? 1 : poDays.length;
   const days: IsoDate[] = [];
-  for (let i = 0; i < 7 && days.length < poDays.length; i += 1) {
+  for (let i = 0; i < 9 && days.length < limit; i += 1) {
     const d = addDaysIso(today, i);
-    if (poDays.includes(weekdayOf(d))) days.push(d);
+    if (wanted.includes(weekdayOf(d))) days.push(d);
   }
   return days;
 }
 
-/** The latest configured PO day ON OR BEFORE the raw date — never later. */
+/** The latest allowed PO day ON OR BEFORE the raw date — never later. An
+ *  empty configuration still refuses the weekend: a Saturday snaps to
+ *  Friday. */
 export function snapToPoDay(orderBy: IsoDate, poDays: readonly number[]): IsoDate {
-  if (poDays.length === 0) return orderBy;
+  const wanted = poDays.length === 0 ? OFFICE_WEEKDAYS : poDays;
   for (let i = 0; i < 7; i += 1) {
     const d = addDaysIso(orderBy, -i);
-    if (poDays.includes(weekdayOf(d))) return d;
+    if (wanted.includes(weekdayOf(d))) return d;
   }
   return orderBy;
 }

@@ -169,8 +169,8 @@ function route(path: string, body?: { category?: string; purchaseOrders?: { key:
   return Promise.resolve({});
 }
 
-function rowBox(proposalKey: string, orderId: string) {
-  return document.getElementById(`kit-table-row-${proposalKey}:${orderId}`)!;
+function rowBox(proposalKey: string, orderId: string, buildKey: string) {
+  return document.getElementById(`kit-table-row-${proposalKey}:${orderId}:${buildKey}`)!;
 }
 
 function wrap() {
@@ -282,11 +282,11 @@ describe("the grid — business language only", () => {
   it("rows arrive PRE-SELECTED and the toolbar pill tells the truth", async () => {
     await loaded();
     const pill = screen.getByTestId("to-order-issue-pill");
-    expect(pill).toHaveTextContent("5 selected");
-    // Sofa is one-per-order (3) + bedframe merges (1) — the promise lives ON
-    // the button, never in a caption beside it (Jess, 2026-08-01).
-    // Numbers are STATE (the caption); the button is the ACTION alone.
-    expect(pill).toHaveTextContent("5 selected");
+    // 6 BUILDS (PETER's order is two sofas = two rows now — `2 items` is
+    // banned from the Model column).
+    expect(pill).toHaveTextContent("6 selected");
+    // Sofa is one-per-order (3) + bedframe merges (1). Numbers are STATE
+    // (the caption); the button is the ACTION alone (Jess, 2026-08-01).
     expect(pill).toHaveTextContent("4 PO");
     expect(screen.getByTestId("to-order-issue")).toHaveTextContent(/^Issue PO$/);
     expect(pill.textContent).not.toContain("→");
@@ -295,29 +295,29 @@ describe("the grid — business language only", () => {
   it("the engine pre-ticks ONLY its own plan — a future row waits for a human", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-day-2026-08-03"));
-    const box = rowBox(`${NF}::mattress`, "o20");
+    const box = rowBox(`${NF}::mattress`, "o20", "m1");
     expect(box).not.toBeNull();
     expect(box.getAttribute("data-state")).not.toBe("checked");
     fireEvent.click(box);
-    // The tick joins the batch: 5 + amy = 6 SO, 4 + 1 = 5 Purchase Orders.
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("6 selected");
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("6 selected");
+    // The tick joins the batch: 6 + amy = 7 builds, 4 + 1 = 5 POs.
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("7 selected");
     expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 PO");
   });
 
   it("an untick drops the pill's promise; unticking everything removes the pill", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
-    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2"));
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 selected");
+    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2", "bk-e"));
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 selected");
     expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("3 PO");
-    for (const [p, o] of [
-      [`${OHANA}::sofa`, "o1"],
-      [`${OHANA}::sofa`, "o3"], // Friday's row is still on — union view
-      [`${OHANA}::bedframe`, "o9"],
-      [`${OHANA}::bedframe`, "o8"],
+    for (const [p, o, b] of [
+      [`${OHANA}::sofa`, "o1", "bk-a"],
+      [`${OHANA}::sofa`, "o1", "bk-b"],
+      [`${OHANA}::sofa`, "o3", "bk-k"], // Friday's row is still on — union view
+      [`${OHANA}::bedframe`, "o9", "l1"],
+      [`${OHANA}::bedframe`, "o8", "l2"],
     ] as const) {
-      fireEvent.click(rowBox(p, o));
+      fireEvent.click(rowBox(p, o, b));
     }
     expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
   });
@@ -325,10 +325,10 @@ describe("the grid — business language only", () => {
   it("the operator's ticks and unticks survive a view switch — deltas, not snapshots", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
-    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2"));
+    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2", "bk-e"));
     fireEvent.click(screen.getByTestId("to-order-cat-bedframe"));
     fireEvent.click(screen.getByTestId("to-order-cat-all"));
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 selected");
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 selected");
   });
 
   it("search narrows by SO or model", async () => {
@@ -354,7 +354,15 @@ describe("the Excel reflexes — header sort, per-column filters", () => {
     fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.click(screen.getByTestId("table-sort-so"));
     let sos = screen.getAllByText(/^SO-\d+$/).map((el) => el.textContent);
-    expect(sos).toEqual(["SO-1204", "SO-1207", "SO-1257", "SO-1300", "SO-1301", "SO-1350"]);
+    expect(sos).toEqual([
+      "SO-1204",
+      "SO-1207",
+      "SO-1207",
+      "SO-1257",
+      "SO-1300",
+      "SO-1301",
+      "SO-1350",
+    ]);
     fireEvent.click(screen.getByTestId("table-sort-so"));
     sos = screen.getAllByText(/^SO-\d+$/).map((el) => el.textContent);
     expect(sos[0]).toBe("SO-1350");
@@ -415,7 +423,7 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
   it("posts one ARRANGEMENT per group and updates rows in place — nothing vanishes", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
-    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2")); // leave ella out
+    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2", "bk-e")); // leave ella out
     fireEvent.click(screen.getByTestId("to-order-issue"));
 
     await screen.findByTestId("to-order-created-line");
@@ -441,12 +449,14 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
 
     // Rows updated IN PLACE: PO number a clickable door, checkbox gone,
     // unissued ella still visible with her ☑.
-    expect(screen.getByTestId(`row-po-${OHANA}::bedframe:o9`)).toHaveTextContent(
+    expect(screen.getByTestId(`row-po-${OHANA}::bedframe:o9:l1`)).toHaveTextContent(
       "PO-bedframe-1",
     );
-    expect(screen.getByTestId(`row-po-${OHANA}::sofa:o1`)).toHaveTextContent("PO-sofa-");
-    expect(document.getElementById(`kit-table-row-${OHANA}::bedframe:o9`)).toBeNull();
-    expect(document.getElementById(`kit-table-row-${OHANA}::sofa:o2`)).not.toBeNull();
+    expect(screen.getByTestId(`row-po-${OHANA}::sofa:o1:bk-a`)).toHaveTextContent("PO-sofa-");
+    expect(document.getElementById(`kit-table-row-${OHANA}::bedframe:o9:l1`)).toBeNull();
+    expect(
+      document.getElementById(`kit-table-row-${OHANA}::sofa:o2:bk-e`),
+    ).not.toBeNull();
 
     // The bar reports; the pill is gone (only ella remains, unticked).
     expect(screen.getByTestId("to-order-created-line")).toHaveTextContent(
@@ -461,10 +471,10 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
   it("a session-issued PO's number is the door to ITS channel tab", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
-    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2")); // leave ella out
+    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2", "bk-e")); // leave ella out
     fireEvent.click(screen.getByTestId("to-order-issue"));
     await screen.findByTestId("to-order-created-line");
-    fireEvent.click(screen.getByTestId(`row-po-${OHANA}::bedframe:o9`));
+    fireEvent.click(screen.getByTestId(`row-po-${OHANA}::bedframe:o9:l1`));
     expect(navigate).toHaveBeenCalledWith(
       "/operation/procurement/hookka-bedframe?po=PO-bedframe-1",
     );
@@ -477,14 +487,14 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
     await screen.findByTestId("to-order-failed-line");
     // Sofa succeeded beside it; the failure does not evaporate.
     fireEvent.click(screen.getByTestId("to-order-overdue"));
-    expect(screen.getByTestId(`row-po-${OHANA}::sofa:o2`)).toBeInTheDocument();
+    expect(screen.getByTestId(`row-po-${OHANA}::sofa:o2:bk-e`)).toBeInTheDocument();
     expect(screen.getByTestId("to-order-failed-line")).toHaveTextContent("1 failed");
 
     failCategories = new Set();
     apiFetch.mockClear();
     fireEvent.click(screen.getByTestId("to-order-retry"));
     await waitFor(() => {
-      expect(screen.getByTestId(`row-po-${OHANA}::bedframe:o9`)).toBeInTheDocument();
+      expect(screen.getByTestId(`row-po-${OHANA}::bedframe:o9:l1`)).toBeInTheDocument();
     });
     // ONLY the failed group was retried.
     expect(apiFetch.mock.calls.filter(([p]) => String(p).endsWith("/issue"))).toHaveLength(1);
@@ -545,7 +555,7 @@ describe("the seven fixes — Excel completeness", () => {
     fireEvent.click(document.getElementById("kit-table-select-all")!);
     expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
     fireEvent.click(document.getElementById("kit-table-select-all")!);
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 selected");
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("6 selected");
   });
 
   it("select-all works on a FILTERED sheet — the boss's 'tick all Nice Future'", async () => {
