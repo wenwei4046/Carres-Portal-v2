@@ -1802,7 +1802,7 @@ export {
   sizeShort,
   soCountLabel,
   selectedShort,
-  poShortCount,
+  issuePosShort,
   toOrderBuilds,
   posCreatedLine,
   validateIssuePlan,

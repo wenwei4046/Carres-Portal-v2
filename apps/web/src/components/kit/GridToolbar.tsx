@@ -8,7 +8,7 @@
  *   search — the left end. A `SearchInput` (pill shape) is the expected
  *            tenant; the kit does not force it.
  *   right  — batch state + actions. It appears and disappears with the
- *            work (`28 selected · [Issue 10 Purchase Orders]`);
+ *            work (`28 selected · [Issue 10 POs]`);
  *            an empty slot keeps the band quiet, which is the design: no
  *            action, no control.
  *   meta   — the far right, muted. Quiet facts only (`Updated 10:32 AM`);

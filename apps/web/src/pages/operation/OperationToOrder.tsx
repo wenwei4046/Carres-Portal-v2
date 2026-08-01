@@ -57,7 +57,7 @@ import {
   posCreatedLine,
   railItemLabel,
   selectedShort,
-  poShortCount,
+  issuePosShort,
   toOrderBuilds,
   unresolvedHeadline,
   type ToOrderOrderedRow,
@@ -924,9 +924,8 @@ export default function OperationToOrder() {
                   className="flex items-center gap-3"
                   data-testid="to-order-issue-pill"
                 >
-                  <span className="flex flex-col items-end leading-tight text-meta tabular-nums text-kit-slate-11 whitespace-nowrap">
-                    <span>{selectedShort(batch.selectedRows)}</span>
-                    <span>{poShortCount(batch.poCount)}</span>
+                  <span className="text-meta tabular-nums text-kit-slate-11 whitespace-nowrap">
+                    {selectedShort(batch.selectedRows)}
                   </span>
                   <Button
                     variant="primary"
@@ -935,7 +934,7 @@ export default function OperationToOrder() {
                     disabled={unread || batch.poCount === 0 || !defaultDest}
                     data-testid="to-order-issue"
                   >
-                    {W.issuePos}
+                    {batch.poCount > 0 ? issuePosShort(batch.poCount) : W.issuePos}
                   </Button>
                 </span>
               ) : null

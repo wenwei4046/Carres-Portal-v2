@@ -289,8 +289,7 @@ describe("the grid — business language only", () => {
     expect(pill).toHaveTextContent("5 selected");
     // Sofa is one-per-order (2 listed) + bedframe merges (1). Numbers are
     // STATE (the caption); the button is the ACTION alone.
-    expect(pill).toHaveTextContent("3 PO");
-    expect(screen.getByTestId("to-order-issue")).toHaveTextContent(/^Issue PO$/);
+    expect(screen.getByTestId("to-order-issue")).toHaveTextContent(/^Issue 3 POs$/);
     expect(pill.textContent).not.toContain("→");
   });
 
@@ -303,7 +302,7 @@ describe("the grid — business language only", () => {
     fireEvent.click(box);
     // The tick joins the batch: 5 + amy = 6 builds, 3 + 1 = 4 POs.
     expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("6 selected");
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 PO");
+    expect(screen.getByTestId("to-order-issue")).toHaveTextContent(/^Issue 4 POs$/);
   });
 
   it("an untick drops the pill's promise; unticking everything removes the pill", async () => {
@@ -311,7 +310,7 @@ describe("the grid — business language only", () => {
     fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.click(rowBox(`${OHANA}::sofa`, "o2", "bk-e"));
     expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 selected");
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("2 PO");
+    expect(screen.getByTestId("to-order-issue")).toHaveTextContent(/^Issue 2 POs$/);
     for (const [p, o, b] of [
       [`${OHANA}::sofa`, "o1", "bk-a"],
       [`${OHANA}::sofa`, "o1", "bk-b"],

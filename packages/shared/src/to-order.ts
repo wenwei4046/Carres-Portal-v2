@@ -256,13 +256,13 @@ export function selectedShort(n: number): string {
 }
 
 /**
- * `10 PO` — the caption's second line (Jess, 2026-08-01, final): NUMBERS
- * are state, stacked beside the button; the BUTTON carries only the action
- * (`Issue PO`). A button that recites its own arithmetic is a button
- * explaining its math.
+ * `Issue 2 POs` — the button (Jess, 2026-08-01, FINAL of three rounds):
+ * the caption says what is picked (`16 selected`), the button says what
+ * the click creates, in the trade's own shorthand. One line, no
+ * `Purchase Orders` spelt twice.
  */
-export function poShortCount(n: number): string {
-  return `${n} PO`;
+export function issuePosShort(n: number): string {
+  return `Issue ${n} PO${n === 1 ? "" : "s"}`;
 }
 
 /**
