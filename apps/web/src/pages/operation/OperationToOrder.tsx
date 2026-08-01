@@ -742,7 +742,10 @@ export default function OperationToOrder() {
               count={
                 view === "all"
                   ? null // All is all — the number adds nothing (Jess).
-                  : ordersHeadline(timeCounts.get(view)?.size ?? 0)
+                  : String(timeCounts.get(view)?.size ?? 0)
+              }
+              countWord={
+                view === "all" ? undefined : ordersHeadline(timeCounts.get(view)?.size ?? 0)
               }
             />
           ))}
@@ -945,19 +948,25 @@ export default function OperationToOrder() {
 
 // ── Pieces ──────────────────────────────────────────────────────────────────
 
-/** One rail row — Linear's shape: name, count under it, ~30px, ┃ active. */
+/**
+ * One rail row — Linear Sidebar, faithfully this time (Jess, 2026-08-01):
+ * ONE line, name left, the bare number right-aligned. The word (`21 Orders`)
+ * survives as the row's title for a hover and a screen reader.
+ */
 function NavRow({
   active,
   onClick,
   testId,
   name,
   count,
+  countWord,
 }: {
   active: boolean;
   onClick: () => void;
   testId: string;
   name: ReactNode;
   count: string | null;
+  countWord?: string;
 }) {
   return (
     <button
@@ -965,8 +974,9 @@ function NavRow({
       onClick={onClick}
       data-testid={testId}
       aria-current={active ? "true" : undefined}
+      title={countWord}
       className={[
-        "relative flex w-full flex-col px-2 py-1.5 rounded-control text-left mb-px",
+        "relative flex w-full items-center justify-between gap-2 px-2 py-1 rounded-control text-left mb-px",
         active ? "bg-kit-blue-3" : "hover:bg-kit-blue-3",
       ].join(" ")}
     >
@@ -975,14 +985,14 @@ function NavRow({
       ) : null}
       <span
         className={[
-          "text-body",
+          "text-body truncate",
           active ? "font-semibold text-kit-slate-12" : "font-medium text-kit-slate-12",
         ].join(" ")}
       >
         {name}
       </span>
       {count != null ? (
-        <span className="text-meta tabular-nums text-kit-slate-11">{count}</span>
+        <span className="text-meta tabular-nums text-kit-slate-11 shrink-0">{count}</span>
       ) : null}
     </button>
   );

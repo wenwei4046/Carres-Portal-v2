@@ -203,9 +203,11 @@ describe("the Work Queue — time above, category below, never mixed", () => {
     const nav = screen.getByTestId("to-order-nav");
     // 5 unique customer orders due (or overdue) today; the run ahead is not.
     expect(within(nav).getByTestId("to-order-time-today")).toHaveTextContent(W.navToday);
-    expect(within(nav).getByTestId("to-order-time-today")).toHaveTextContent("5 Orders");
-    expect(within(nav).getByTestId("to-order-time-tomorrow")).toHaveTextContent("0 Orders");
-    expect(within(nav).getByTestId("to-order-time-next_week")).toHaveTextContent("1 Order");
+    expect(within(nav).getByTestId("to-order-time-today")).toHaveTextContent("5");
+    // Linear rail: bare number on the row; the WORD survives as its title.
+    expect(within(nav).getByTestId("to-order-time-today")).toHaveAttribute("title", "5 Orders");
+    expect(within(nav).getByTestId("to-order-time-tomorrow")).toHaveTextContent("0");
+    expect(within(nav).getByTestId("to-order-time-next_week")).toHaveTextContent("1");
     // All is all — the number adds nothing (Jess).
     expect(within(nav).getByTestId("to-order-time-all")).not.toHaveTextContent("Orders");
     // CATEGORY is a WORK ORDER, not a scoreboard: heading + rows, no counts.
@@ -378,7 +380,7 @@ describe("ordered rows — the receipt stays on the sheet", () => {
     expect(document.getElementById("kit-table-row-po:PO-9001:o30")).toBeNull(); // no checkbox
     expect(screen.getByTestId("row-po-po:PO-9001:o30")).toHaveTextContent("PO-9001");
     // It is DONE work — it must not inflate the rail's counts.
-    expect(screen.getByTestId("to-order-time-today")).toHaveTextContent("5 Orders");
+    expect(screen.getByTestId("to-order-time-today")).toHaveAttribute("title", "5 Orders");
   });
 
   it("its PO No. lands on Purchase Orders with THAT document opened", async () => {
@@ -433,7 +435,7 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
     fireEvent.click(screen.getByTestId("to-order-continue"));
     expect(navigate).toHaveBeenCalledWith("/operation/procurement");
     // The rail's Today count fell with the work — only ella is left.
-    expect(screen.getByTestId("to-order-time-today")).toHaveTextContent("1 Order");
+    expect(screen.getByTestId("to-order-time-today")).toHaveAttribute("title", "1 Order");
   });
 
   it("a session-issued PO's number is the door to ITS channel tab", async () => {

@@ -137,7 +137,9 @@ function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter
         <Button
           size="sm"
           variant="ghost"
-          icon="filter"
+          /* Excel's own vocabulary: a quiet ▼ on every column, the funnel
+           * only while THIS column is narrowing. */
+          icon={active ? "filter" : "columnFilter"}
           aria-label={filter.label}
           data-testid={`table-filter-${colKey}`}
           data-active={active || undefined}
@@ -258,11 +260,9 @@ export default function DataTable<Row>({
                   c.align === "right" ? "text-right" : "text-left"
                 }`}
               >
-                <span
-                  className={`inline-flex items-center gap-0.5 ${
-                    c.align === "right" ? "flex-row-reverse" : ""
-                  }`}
-                >
+                {/* The word first, its controls after — `Qty ▼`, never
+                 * `▼ Qty` (Jess, 2026-08-01), whatever the alignment. */}
+                <span className="inline-flex items-center gap-0.5">
                   {c.sortable && onSortChange ? (
                     /* Header click = sort, asc ⇄ desc — the Excel reflex.
                      * The kit shows the arrow; the PAGE reorders the rows. */
