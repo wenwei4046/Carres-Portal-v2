@@ -170,6 +170,14 @@ function clockLabel(ms: number): string {
   return `${h12}:${String(d.getMinutes()).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
 
+/** `mee yee` → `Mee Yee`, `PETER` → `Peter` — display only, the record keeps
+ *  what was typed. */
+function properCase(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/(^|[\s\-\/])([a-z])/g, (_m, sep, ch) => sep + ch.toUpperCase());
+}
+
 /** Sentinels for filter options that are facts, not values. */
 const F_OVERDUE = "__overdue__";
 const F_NONE = "__none__";
@@ -671,7 +679,7 @@ export default function OperationToOrder() {
   const customerOptions = useMemo(() => {
     const base = filteredExcept("customer");
     const vals = [...new Set(base.map((r) => r.customer ?? F_NONE))].sort();
-    return vals.map((v) => ({ value: v, label: v === F_NONE ? "—" : v }));
+    return vals.map((v) => ({ value: v, label: v === F_NONE ? "—" : properCase(v) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters]);
 
@@ -709,7 +717,11 @@ export default function OperationToOrder() {
             r.late ? "text-kit-red-11 font-medium tabular-nums" : "tabular-nums"
           }
         >
-          {r.delivery ? fmtDate(r.delivery) : "—"}
+          {r.delivery ? (
+            fmtDate(r.delivery)
+          ) : (
+            <span className="text-kit-slate-11">{W.noDeliveryDate}</span>
+          )}
         </span>
       ),
     },
@@ -727,7 +739,7 @@ export default function OperationToOrder() {
       width: 16,
       sortable: true,
       filter: filterFor("customer", customerOptions, true),
-      cell: (r) => r.customer ?? "—",
+      cell: (r) => (r.customer ? properCase(r.customer) : "—"),
     },
     {
       key: "model",
@@ -836,7 +848,7 @@ export default function OperationToOrder() {
               active={viewSet.has(day)}
               onClick={() => toggleView(day)}
               testId={`to-order-day-${day}`}
-              name={day === today ? W.navToday : weekdayName(day)}
+              name={weekdayName(day)}
               count={String(timeCounts.get(day)?.size ?? 0)}
               countWord={`${ordersHeadline(timeCounts.get(day)?.size ?? 0)} · ${fmtDate(day)}`}
             />
