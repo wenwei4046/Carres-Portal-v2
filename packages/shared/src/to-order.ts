@@ -55,12 +55,15 @@ export const TO_ORDER_WORDS = {
   searchLabel: "Search supplier, customer or SO",
   filterLabel: "Filter",
 
-  colCustomer: "Customer",
-  colSo: "SO",
+  // ── The grid's six columns (Loo's frozen list, 2026-08-01): ☑ ·
+  //    Preferred Delivery · SO No. · Model · Qty · PO No. Category is NOT a
+  //    column (the left panel already said it) and Customer is not either
+  //    (Loo: noise). PO No. rightmost = "did today's order happen". ───────
+  colPreferred: "Preferred Delivery",
+  colSoNo: "SO No.",
+  colModel: "Model",
   colQty: "Qty",
-  colSummary: "Summary",
-  colStockReady: "Stock ready",
-  stockReadyHelp: "Required stock ready date before customer delivery.",
+  colPoNo: "PO No.",
 
   noDeliveryDate: "No delivery date",
 
@@ -69,41 +72,47 @@ export const TO_ORDER_WORDS = {
   destinationRequired: "Destination not selected.",
   issue: "Issue Purchase Order",
 
-  // ── The Excel grid — Loo's final division of responsibility, 2026-07-31:
-  //    To Order DECIDES which customer orders become purchase orders today
-  //    (listing · filter · checkbox · batch create, nothing else); Purchase
-  //    Orders MANAGES the documents once they exist (preview · communication
-  //    · audit · PDF · WhatsApp · revision · ready date — ALL of it, there).
+  // ── The Excel grid — Loo's final freeze, 2026-08-01: To Order DECIDES
+  //    which customer orders become purchase orders today; Purchase Orders
+  //    MANAGES the documents once they exist. Left panel = Action Launcher
+  //    (TODAY · the three categories · + Create Purchase), Linear's density;
+  //    right = the GitHub-Projects table, 40px rows; `Order By` NEVER
+  //    reaches the screen — the operator sees the CUSTOMER's date only.
   //    Each word still owed a COPY-STANDARD row. ───────────────────────────
-  /** The lenses — the engine's own dates as one-click filters. */
-  lensOrderToday: "Order today",
-  lensThisWeek: "This week",
-  lensAll: "All",
-  /** Demand the engine cannot date — a missing number, named, never hidden. */
-  lensNeedsSetup: "Needs setup",
-  cannotBePlanned: "cannot be planned",
-  needsSetupHelp: "No production days for this supplier × category. Set a number in Settings.",
-  // ── The Workspace Panel (frozen with Loo, 2026-08-01 — the Portal Grid
-  //    standard's left side, Gmail's rhythm): Search first, then VIEWS ·
-  //    FILTERS · GROUP · SORT in that order, default EXPANDED. A section
-  //    joins the panel when a page builds it. Above the grid there is NO
-  //    header today — page actions (Create Proposal · Columns · Export ·
-  //    Help, in that frozen order) appear only once built; Refresh was
-  //    ruled OUT again 2026-08-01 (the plan updates itself). ──────────────
-  panelViews: "Views",
-  panelGroup: "Group",
-  groupBy: "Group by",
-  groupBySupplier: "Supplier",
-  groupByNone: "None",
+  /** The left panel's first row — today's whole run, all categories. */
+  navToday: "Today",
   /** The ☑'s aria word — picking rows for THIS batch, nothing more. */
   select: "Select",
-  /** The one primary action. Issue ≠ Send: sending lives in Purchase Orders. */
-  createPos: "Create Purchase Orders",
+  /** The pill (`+ …`); appears only when something is selected. */
+  issuePos: "Issue Purchase Orders",
+  /** The bottom bar's states. It exists only while it has something to say. */
+  creatingPos: "Creating Purchase Orders…",
+  createdWord: "Created",
+  continueInPos: "Continue in Purchase Orders",
   retry: "Retry",
-  createdOk: "created",
   createFailed: "failed",
-  /** The manual entrance — in the architecture, switched on by its own card. */
-  createProposal: "Create Proposal",
+  /**
+   * The manual entrance — a real dialog from day one (Loo, 2026-08-01: the
+   * entrance may never be missing). Its SAVE arrives with the unified
+   * `purchase_demands` card; until then the Create button is disabled and
+   * says so.
+   */
+  createPurchase: "Create Purchase",
+  reason: "Reason",
+  reasonReadyStock: "Ready Stock",
+  reasonDisplay: "Display",
+  reasonWarranty: "Warranty",
+  reasonSpareParts: "Spare Parts",
+  reasonOffice: "Office",
+  reasonOther: "Other…",
+  supplierLabel: "Supplier",
+  itemLabel: "Item",
+  searchItem: "Search item…",
+  requiredBy: "Required By",
+  remark: "Remark",
+  cancel: "Cancel",
+  create: "Create",
+  nextUpdate: "Available in next update.",
 
   // The Preview — what pressing Issue would create, before it exists.
   preview: "Purchase Order Preview",
@@ -199,18 +208,18 @@ export function pcsCount(n: number): string {
   return `${n} pcs`;
 }
 
-/** `7 of 8 SO selected` — the batch bar's left half. */
-export function soSelectedLine(selected: number, total: number): string {
-  return `${selected} of ${total} SO selected`;
+/** `3 SO selected` — the Issue pill's first line. */
+export function soSelectedShort(n: number): string {
+  return `${n} SO selected`;
 }
 
 /**
- * `will create 2 Purchase Orders` — the batch bar's promise. It must NEVER
- * lie: the count is computed from the same shared projection the server
- * recomputes on issue, and the button's meaning is exactly this sentence.
+ * `3 Purchase Orders Created` — the bottom bar's completion line. The pill's
+ * `→ 2 Purchase Orders` promise and this line come from the same shared
+ * projection the server recomputes on issue — neither may ever lie.
  */
-export function willCreateLine(n: number): string {
-  return `will create ${purchaseOrderCount(n)}`;
+export function posCreatedLine(n: number): string {
+  return `${purchaseOrderCount(n)} Created`;
 }
 
 
@@ -411,6 +420,12 @@ export interface ToOrderRow {
   summary: string;
   /** `arriveBy` from the engine. `null` when the customer order has no date. */
   stockReady: IsoDate | null;
+  /**
+   * The CUSTOMER's delivery date — the one date an operator sees (Loo,
+   * 2026-08-01: the grid speaks business language; `Order By` is the
+   * engine's and never reaches the screen). `null` when TBD.
+   */
+  delivery: IsoDate | null;
   builds: ToOrderBuild[];
 }
 
@@ -693,6 +708,13 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
         orderId,
         so: orderLines[0].so,
         customer: orderLines[0].customerName ?? "—",
+        // The earliest customer deadline across the order's lines — the
+        // business date the operator sees (the engine's own dates never do).
+        delivery: orderLines.reduce<IsoDate | null>(
+          (min, l) =>
+            l.deadline != null && (min == null || l.deadline < min) ? l.deadline : min,
+          null,
+        ),
         qty,
         summary: composeSummary({
           model: orderLines[0].modelName,
