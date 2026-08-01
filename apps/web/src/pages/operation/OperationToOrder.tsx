@@ -55,9 +55,9 @@ import {
   orderedTimeBucket,
   ordersHeadline,
   posCreatedLine,
-  purchaseOrderCount,
   railItemLabel,
-  soSelectedShort,
+  selectedShort,
+  issuePosCount,
   toOrderBuilds,
   type ToOrderOrderedRow,
   type ToOrderProposal,
@@ -809,7 +809,7 @@ export default function OperationToOrder() {
                   data-testid="to-order-issue-pill"
                 >
                   <span className="text-meta tabular-nums text-kit-slate-11 whitespace-nowrap">
-                    {`${soSelectedShort(batch.selectedRows)} · → ${purchaseOrderCount(batch.poCount)}`}
+                    {selectedShort(batch.selectedRows)}
                   </span>
                   <Button
                     variant="primary"
@@ -818,7 +818,7 @@ export default function OperationToOrder() {
                     disabled={unread || batch.poCount === 0 || !defaultDest}
                     data-testid="to-order-issue"
                   >
-                    {`+ ${W.issuePos}`}
+                    {issuePosCount(batch.poCount)}
                   </Button>
                 </span>
               ) : null

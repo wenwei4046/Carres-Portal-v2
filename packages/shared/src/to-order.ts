@@ -237,9 +237,22 @@ export function pcsCount(n: number): string {
   return `${n} pcs`;
 }
 
-/** `3 SO selected` — the Issue pill's first line. */
-export function soSelectedShort(n: number): string {
-  return `${n} SO selected`;
+/**
+ * `28 selected` — the toolbar's quiet fact (Jess, 2026-08-01: the old
+ * `28 SO selected · → 10 Purchase Orders` was a formula, not a sentence —
+ * arrows are engine language). The CONSEQUENCE moved onto the button.
+ */
+export function selectedShort(n: number): string {
+  return `${n} selected`;
+}
+
+/**
+ * `Issue 10 Purchase Orders` — the primary action carries its own outcome
+ * count (the Shopify/GitHub pattern: the promise lives on the thing you
+ * click, never in a caption beside it).
+ */
+export function issuePosCount(n: number): string {
+  return `Issue ${purchaseOrderCount(n)}`;
 }
 
 /**

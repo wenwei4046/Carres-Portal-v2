@@ -269,9 +269,13 @@ describe("the grid — business language only", () => {
   it("rows arrive PRE-SELECTED and the toolbar pill tells the truth", async () => {
     await loaded();
     const pill = screen.getByTestId("to-order-issue-pill");
-    expect(pill).toHaveTextContent("5 SO selected");
-    // Sofa is one-per-order (3) + bedframe merges (1).
-    expect(pill).toHaveTextContent("4 Purchase Orders");
+    expect(pill).toHaveTextContent("5 selected");
+    // Sofa is one-per-order (3) + bedframe merges (1) — the promise lives ON
+    // the button, never in a caption beside it (Jess, 2026-08-01).
+    expect(screen.getByTestId("to-order-issue")).toHaveTextContent(
+      "Issue 4 Purchase Orders",
+    );
+    expect(pill.textContent).not.toContain("→");
   });
 
   it("the engine pre-ticks ONLY its own plan — a future row waits for a human", async () => {
@@ -282,15 +286,15 @@ describe("the grid — business language only", () => {
     expect(box.getAttribute("data-state")).not.toBe("checked");
     fireEvent.click(box);
     // The tick joins the batch: 5 + amy = 6 SO, 4 + 1 = 5 Purchase Orders.
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("6 SO selected");
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 Purchase Orders");
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("6 selected");
+    expect(screen.getByTestId("to-order-issue")).toHaveTextContent("Issue 5 Purchase Orders");
   });
 
   it("an untick drops the pill's promise; unticking everything removes the pill", async () => {
     await loaded();
     fireEvent.click(rowBox(`${OHANA}::sofa`, "o2"));
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 SO selected");
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("3 Purchase Orders");
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 selected");
+    expect(screen.getByTestId("to-order-issue")).toHaveTextContent("Issue 3 Purchase Orders");
     for (const [p, o] of [
       [`${OHANA}::sofa`, "o1"],
       [`${OHANA}::sofa`, "o3"],
@@ -307,7 +311,7 @@ describe("the grid — business language only", () => {
     fireEvent.click(rowBox(`${OHANA}::sofa`, "o2"));
     fireEvent.click(screen.getByTestId("to-order-cat-bedframe"));
     fireEvent.click(screen.getByTestId("to-order-cat-all"));
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 SO selected");
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 selected");
   });
 
   it("search narrows by SO or model", async () => {
@@ -514,7 +518,7 @@ describe("the seven fixes — Excel completeness", () => {
     fireEvent.click(document.getElementById("kit-table-select-all")!);
     expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
     fireEvent.click(document.getElementById("kit-table-select-all")!);
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 SO selected");
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 selected");
   });
 
   it("select-all works on a FILTERED sheet — the boss's 'tick all Nice Future'", async () => {
@@ -524,7 +528,7 @@ describe("the seven fixes — Excel completeness", () => {
     fireEvent.click(screen.getByTestId("to-order-time-all"));
     fireEvent.click(screen.getByTestId("to-order-cat-mattress"));
     fireEvent.click(document.getElementById("kit-table-select-all")!);
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("1 SO selected");
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("1 selected");
   });
 
   it("a filter that blanks the table names its cause and hands back the way out", async () => {

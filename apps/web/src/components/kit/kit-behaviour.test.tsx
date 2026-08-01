@@ -623,12 +623,12 @@ describe("GridToolbar", () => {
     render(
       <GridToolbar
         search={<input aria-label="s" />}
-        right={<span>28 SO selected</span>}
+        right={<span>28 selected</span>}
         meta={<span>Updated 10:32 AM</span>}
       />,
     );
     const bar = document.querySelector('[data-kit="grid-toolbar"]')!;
-    expect(bar.textContent).toContain("28 SO selected");
+    expect(bar.textContent).toContain("28 selected");
     expect(bar.textContent).toContain("Updated 10:32 AM");
   });
 });
