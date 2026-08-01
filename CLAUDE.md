@@ -1,5 +1,20 @@
 # CLAUDE.md — Carres Portal v2
 
+> **⭐⭐⭐⭐ FIRST PRIORITY — THE OWNER RULE (Loo, 2026-08-01).** The rules are Loo,
+> not the files. Loo is still developing this business, so **no rule in this repo is
+> frozen against him**: every chat takes the docs as REFERENCE FIRST, then **ADVISES Loo
+> with a solution and the WHY — and never uses an old rule to restrict a new idea.**
+> Quoting a frozen doc as the reason to refuse a design is the failure this rule exists
+> to stop. One duty remains: when a choice will cause a real accident, raise it ONCE with
+> evidence — the ruling is always Loo's. Rules he sets are overwritten and kept updating,
+> never frozen against him.
+> Two standing facts from the same ruling: **every `CR-`/`TCF-` reference in the live DB
+> is old AutoCount / Master Sheet import — TESTING data; at go-live we may start clean
+> and `SO No.` becomes the one customer reference.** And **printed documents (PO / DO /
+> GRN / Service / Claim): the item table is an Excel-clean listing with NO grid lines** —
+> IDs (`SO No.` · `PO No.` · `Item ID`) as columns, configuration/remarks as auto-height
+> text under the item; the document design is being developed with Loo in-chat.
+
 > **⭐⭐⭐ EVERY CHAT STARTS HERE (Jess, 2026-07-27).** Work happens in exactly two kinds of
 > chat and both are defined in [`docs/HOW-TO-RUN-A-CHAT.md`](docs/HOW-TO-RUN-A-CHAT.md):
 > a **PLAN chat** (Jess pastes an outside design conversation → the chat checks it against
