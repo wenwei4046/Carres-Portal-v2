@@ -249,6 +249,20 @@ describe("the PO Schedule — a purchase calendar, not a menu", () => {
     expect(screen.getByText("SO-1400")).toBeInTheDocument();
   });
 
+  it("clearing the whole time block lifts the time filter — the second way to place", async () => {
+    await loaded();
+    // Only Friday is lit; unticking it must be ALLOWED (nothing stays
+    // forced on) and means: no time narrowing at all.
+    fireEvent.click(screen.getByTestId("to-order-day-2026-07-31"));
+    expect(screen.getByText("SO-1204")).toBeInTheDocument(); // overdue
+    expect(screen.getByText("SO-1400")).toBeInTheDocument(); // Monday's run
+    expect(screen.getByText("SO-1350")).toBeInTheDocument(); // the receipt
+    // Category alone can now carve the sheet — browse ALL bedframes.
+    fireEvent.click(screen.getByTestId("to-order-cat-bedframe"));
+    expect(screen.getByText("SO-1300")).toBeInTheDocument();
+    expect(screen.queryByText("SO-1204")).toBeNull();
+  });
+
   it("clicking a category narrows within the calendar row; All restores", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));

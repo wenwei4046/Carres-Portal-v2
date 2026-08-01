@@ -219,13 +219,16 @@ export default function OperationToOrder() {
   // two categories — the grid is the union. Empty = the default.
   const rawView = searchParams.get("view");
   const viewSet = useMemo(() => {
-    const valid = new Set(
-      (rawView ?? "")
-        .split(",")
-        .filter((v) => v === "overdue" || scheduleDays.includes(v)),
-    );
-    if (valid.size === 0 && scheduleDays[0]) valid.add(scheduleDays[0]);
-    return valid as ReadonlySet<string>;
+    // No param = the engine's opening (first upcoming run). An EXPLICIT
+    // empty (`view=`) = the operator cleared the block: NO time narrowing
+    // at all — the second way to place (Jess, 2026-08-01: browse by
+    // category alone; nothing forces a run to stay lit).
+    if (rawView == null) {
+      return new Set(scheduleDays[0] ? [scheduleDays[0]] : []) as ReadonlySet<string>;
+    }
+    return new Set(
+      rawView.split(",").filter((v) => v === "overdue" || scheduleDays.includes(v)),
+    ) as ReadonlySet<string>;
   }, [rawView, scheduleDays]);
   const rawCat = searchParams.get("cat");
   const catSet = useMemo(
@@ -248,8 +251,7 @@ export default function OperationToOrder() {
     const n = new Set(viewSet);
     if (n.has(v)) n.delete(v);
     else n.add(v);
-    // Unticking the last run falls back to the default rather than a blank.
-    setParam("view", n.size === 0 ? (scheduleDays[0] ?? "") : [...n].join(","));
+    setParam("view", [...n].join(","));
   };
   const toggleCat = (c: string) => {
     const n = new Set(catSet);
@@ -368,7 +370,7 @@ export default function OperationToOrder() {
     () =>
       allRows.filter(
         (r) =>
-          viewSet.has(r.bucket) &&
+          (viewSet.size === 0 || viewSet.has(r.bucket)) &&
           (catSet.size === 0 || catSet.has(r.category)) &&
           (search.trim() === "" ||
             (r.so != null && `so-${r.so}`.includes(search.trim().toLowerCase())) ||
