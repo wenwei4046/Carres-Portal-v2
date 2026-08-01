@@ -46,6 +46,12 @@ const ICON_SIZE: Record<Size, 14 | 16> = { md: 16, sm: 14 };
 export type ButtonProps = {
   variant?: Variant;
   size?: Size;
+  /**
+   * `pill` = fully rounded ends (Jess, 2026-08-01 — the 2990 toolbar
+   * language). The default stays `rounded-control`; a pill is a SHAPE, never
+   * a fourth variant: colour and behaviour are untouched.
+   */
+  shape?: "control" | "pill";
   /** A §5.3 meaning, never a Lucide import — one meaning, one glyph. */
   icon?: IconName;
   /** Busy: the spinner replaces the icon and the button stops accepting input. */
@@ -65,6 +71,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
     variant = "neutral",
     size = "md",
+    shape = "control",
     icon,
     loading = false,
     disabled = false,
@@ -82,7 +89,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       aria-busy={loading || undefined}
       data-kit="button"
       className={
-        "inline-flex items-center justify-center whitespace-nowrap rounded-control text-body font-medium " +
+        `inline-flex items-center justify-center whitespace-nowrap ${shape === "pill" ? "rounded-full" : "rounded-control"} text-body font-medium ` +
         "transition-[filter,background-color] " +
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 focus-visible:ring-offset-1 " +
         "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 " +

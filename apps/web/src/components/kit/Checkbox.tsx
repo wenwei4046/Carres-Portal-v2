@@ -47,7 +47,7 @@ export default function Checkbox({
         data-kit="checkbox"
         className={
           "flex h-4 w-4 shrink-0 items-center justify-center rounded-pill border " +
-          "border-kit-slate-5 bg-white " +
+          "border-kit-slate-4 bg-white " +
           "data-[state=checked]:border-kit-blue-9 data-[state=checked]:bg-kit-blue-9 " +
           "data-[state=indeterminate]:border-kit-blue-9 data-[state=indeterminate]:bg-kit-blue-9 " +
           "disabled:opacity-40 disabled:cursor-not-allowed " +

@@ -34,24 +34,63 @@
  * **Nothing is migrated onto this in D0.5c.** The Orders table keeps its own
  * markup until **D6**, which is the card that re-lays that page out.
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import Button from "./Button";
 import Checkbox from "./Checkbox";
 import EmptyState from "./EmptyState";
+import Icon from "./Icon";
 import Loading from "./Loading";
+import Popover from "./Popover";
+import SearchInput from "./SearchInput";
 import { Z_TABLE_HEADER } from "./overlay-layer";
+
+/**
+ * A column's Excel filter (Jess, 2026-08-01 — the AutoCount workspace: every
+ * column sorts by header click and filters by its ▼). The kit renders the
+ * popover — a value checklist with an optional search — and NOTHING more: the
+ * page owns which rows survive, exactly as it owns formatting. Option LABELS
+ * are the caller's (COPY-STANDARD speaks business — `Yet to Order`, never
+ * `(Blanks)`).
+ */
+export interface ColumnFilter {
+  options: readonly { value: string; label: string }[];
+  /** Empty set = no filter — every row passes. */
+  selected: ReadonlySet<string>;
+  onChange: (next: ReadonlySet<string>) => void;
+  /** What the popover is, for a screen reader — e.g. `Filter Model`. */
+  label: string;
+  /** The clear action's word — the CALLER's, this file spells nothing. */
+  clearLabel: string;
+  /** Present = a search box above the checklist. The placeholder is the word. */
+  searchPlaceholder?: string;
+}
 
 export interface Column<Row> {
   key: string;
   /** The header word — typed ONCE, here. COPY-STANDARD owns it. */
   label: string;
-  /** Percentage of the table width. The set should sum to 100. */
-  width: number;
+  /**
+   * A number = percentage of the table width. A string = raw CSS width —
+   * fixed `"150px"` interior columns + one `"auto"` tail is the
+   * international recipe: content columns hug their content on ANY screen
+   * and the LAST column absorbs the slack (Jess, 2026-08-01 — percentage
+   * columns inflate on wide monitors and open holes between neighbours).
+   */
+  width: number | string;
   align?: "left" | "right";
   /** Tabular figures, so a column of numbers lines up (§2.3). */
   numeric?: boolean;
   /** A tooltip on the header only — never the only copy of a rule. */
   headerTitle?: string;
+  /** Header click sorts (asc ⇄ desc). Needs the table's `sort`/`onSortChange`. */
+  sortable?: boolean;
+  filter?: ColumnFilter;
   cell: (row: Row) => ReactNode;
+}
+
+export interface TableSort {
+  key: string;
+  dir: "asc" | "desc";
 }
 
 export interface DataTableProps<Row> {
@@ -68,12 +107,95 @@ export interface DataTableProps<Row> {
     onToggleAll: () => void;
     /** What the select-all box is called for a screen reader. */
     label: string;
+    /**
+     * Rows that can be picked at all. A row failing this renders an EMPTY
+     * cell (not a disabled box) and leaves the select-all arithmetic — a
+     * done row is not "unselected", it is out of the question.
+     */
+    selectable?: (row: Row) => boolean;
   };
   /** Shown INSTEAD of rows. §9: an empty state is an answer, not an apology. */
   empty: ReactNode;
   loading?: boolean;
   /** What the table is, for a screen reader. */
   label: string;
+  /** The active sort. The PAGE sorts the rows; the kit only shows the arrow.
+   *  A third click on the same header CLEARS it (`null`) — back to the
+   *  page's own default order. */
+  sort?: TableSort | null;
+  onSortChange?: (next: TableSort | null) => void;
+}
+
+/**
+ * One column's ▼ — an Excel AutoFilter as a checkbox popover. Lit blue while
+ * it is narrowing, because a filter you cannot see is a lie the table tells.
+ */
+function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter }) {
+  const [needle, setNeedle] = useState("");
+  const shown = needle.trim()
+    ? filter.options.filter((o) => o.label.toLowerCase().includes(needle.trim().toLowerCase()))
+    : filter.options;
+  const active = filter.selected.size > 0;
+  return (
+    <Popover
+      label={filter.label}
+      trigger={
+        /* A COMPACT 24px trigger, not a padded Button — on a narrow column
+         * the button's own padding is what pushed the header word off the
+         * numbers' edge (Jess, 2026-08-01). Excel's vocabulary stands: a
+         * quiet ▼ on the column, the funnel only while it is narrowing. */
+        <button
+          type="button"
+          aria-label={filter.label}
+          data-testid={`table-filter-${colKey}`}
+          data-active={active || undefined}
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-control text-kit-slate-11 hover:bg-kit-blue-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        >
+          <Icon name={active ? "filter" : "columnFilter"} size={14} />
+        </button>
+      }
+    >
+      <div className="flex w-56 flex-col gap-2" data-kit="table-filter">
+        {filter.searchPlaceholder != null ? (
+          <SearchInput
+            id={`table-filter-search-${colKey}`}
+            value={needle}
+            onChange={(e) => setNeedle(e.target.value)}
+            placeholder={filter.searchPlaceholder}
+            aria-label={filter.label}
+          />
+        ) : null}
+        <div className="max-h-64 overflow-y-auto flex flex-col gap-1">
+          {shown.map((o) => (
+            <label key={o.value} className="flex items-center gap-2 text-body text-kit-slate-12">
+              <Checkbox
+                id={`table-filter-${colKey}-${o.value.replace(/[^\w-]/g, "_")}`}
+                ariaLabel={o.label}
+                checked={filter.selected.has(o.value)}
+                onCheckedChange={() => {
+                  const next = new Set(filter.selected);
+                  if (next.has(o.value)) next.delete(o.value);
+                  else next.add(o.value);
+                  filter.onChange(next);
+                }}
+              />
+              <span className="truncate">{o.label}</span>
+            </label>
+          ))}
+        </div>
+        {active ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => filter.onChange(new Set())}
+            data-testid={`table-filter-clear-${colKey}`}
+          >
+            {filter.clearLabel}
+          </Button>
+        ) : null}
+      </div>
+    </Popover>
+  );
 }
 
 export default function DataTable<Row>({
@@ -85,11 +207,17 @@ export default function DataTable<Row>({
   empty,
   loading = false,
   label,
+  sort = null,
+  onSortChange,
 }: DataTableProps<Row>) {
+  const selectableRows = selection
+    ? rows.filter((r) => selection.selectable?.(r) ?? true)
+    : [];
   const selectedCount = selection
-    ? rows.filter((r) => selection.selected.has(rowId(r))).length
+    ? selectableRows.filter((r) => selection.selected.has(rowId(r))).length
     : 0;
-  const allSelected = selection != null && rows.length > 0 && selectedCount === rows.length;
+  const allSelected =
+    selection != null && selectableRows.length > 0 && selectedCount === selectableRows.length;
   const someSelected = selectedCount > 0 && !allSelected;
   const colSpan = columns.length + (selection ? 1 : 0);
 
@@ -103,21 +231,27 @@ export default function DataTable<Row>({
         /* 40px FIXED rows. `whitespace-nowrap` kills the silent row-growers —
          * text WRAPPING inside a narrow fixed column is what makes one row
          * taller than the rest and the whole list stop being scannable. */
-        className="w-full table-fixed border-collapse text-body [&_td]:h-10 [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:align-middle"
+        className="w-full table-fixed border-separate border-spacing-0 text-body [&_td]:h-10 [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:align-middle"
       >
         {/* PERCENTAGE widths + `table-fixed` → the table is always exactly the
          *  container width, so it never scrolls sideways on a laptop. */}
         <colgroup>
           {selection && <col style={{ width: "4%" }} />}
           {columns.map((c) => (
-            <col key={c.key} style={{ width: `${c.width}%` }} />
+            <col
+              key={c.key}
+              style={{ width: typeof c.width === "number" ? `${c.width}%` : c.width }}
+            />
           ))}
         </colgroup>
 
         <thead className={`sticky top-0 ${Z_TABLE_HEADER}`}>
-          <tr className="h-10 border-b border-kit-slate-5 bg-kit-slate-3">
+          {/* border-separate + cell-level wash: with border-collapse, Chrome
+              refuses to stick a thead's backgrounds at all — the classic
+              see-through header (Jess caught it live, 2026-08-01). */}
+          <tr className="h-10">
             {selection && (
-              <th className="px-2">
+              <th className="px-2 bg-kit-slate-4 border-b border-kit-slate-6">
                 <Checkbox
                   id="kit-table-select-all"
                   ariaLabel={selection.label}
@@ -130,11 +264,62 @@ export default function DataTable<Row>({
               <th
                 key={c.key}
                 title={c.headerTitle}
-                className={`px-2 text-label font-medium text-kit-slate-11 ${
+                aria-sort={
+                  sort?.key === c.key
+                    ? sort.dir === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : undefined
+                }
+                className={`px-2 bg-kit-slate-4 border-b border-kit-slate-6 text-label font-medium text-kit-slate-12 ${
                   c.align === "right" ? "text-right" : "text-left"
                 }`}
               >
-                {c.label}
+                {/* The word first, its controls after — `Qty ▼`, never
+                 * `▼ Qty` (Jess, 2026-08-01), whatever the alignment. A
+                 * right-aligned column's cluster hugs the column edge so the
+                 * numbers line up under it. */}
+                <span
+                  className={
+                    c.align === "right"
+                      ? "flex w-full items-center justify-end gap-0.5"
+                      : "inline-flex items-center gap-0.5"
+                  }
+                >
+                  {c.sortable && onSortChange ? (
+                    /* Header click = sort, asc ⇄ desc — the Excel reflex.
+                     * The kit shows the arrow; the PAGE reorders the rows. */
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onSortChange(
+                          sort?.key !== c.key
+                            ? { key: c.key, dir: "asc" }
+                            : sort.dir === "asc"
+                              ? { key: c.key, dir: "desc" }
+                              : null,
+                        )
+                      }
+                      aria-label={c.label}
+                      data-testid={`table-sort-${c.key}`}
+                      className="group inline-flex items-center gap-0.5"
+                    >
+                      {c.label}
+                      {sort?.key === c.key ? (
+                        <Icon name={sort.dir === "asc" ? "collapse" : "expand"} size={14} />
+                      ) : (
+                        /* GitHub's whisper: the arrow appears on hover, so a
+                         * sortable header announces itself before the click. */
+                        <span className="hidden group-hover:inline-flex opacity-60">
+                          <Icon name="expand" size={14} />
+                        </span>
+                      )}
+                    </button>
+                  ) : (
+                    c.label
+                  )}
+                  {c.filter ? <HeaderFilter colKey={c.key} filter={c.filter} /> : null}
+                </span>
               </th>
             ))}
           </tr>
@@ -167,19 +352,24 @@ export default function DataTable<Row>({
                   onClick={onRowOpen ? () => onRowOpen(row) : undefined}
                   /* §3.5 — one faint blue tint on hover, the stronger wash when
                    * selected. Never grey: grey reads as structure. */
+                  /* §3.5, finally honoured: hover is ONE STEP UNDER selected
+                   * (blue-2 vs blue-3) — they were identical until Jess caught
+                   * it on 2026-08-01. */
                   className={`border-b border-kit-slate-5 ${
-                    isSelected ? "bg-kit-blue-3" : "hover:bg-kit-blue-3"
+                    isSelected ? "bg-kit-blue-3" : "hover:bg-kit-blue-2"
                   } ${onRowOpen ? "cursor-pointer" : ""}`}
                 >
                   {selection && (
                     /* The checkbox must not open the record it is ticking. */
                     <td className="px-2" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        id={`kit-table-row-${id}`}
-                        ariaLabel={`Select ${id}`}
-                        checked={isSelected}
-                        onCheckedChange={() => selection.onToggleRow(id)}
-                      />
+                      {(selection.selectable?.(row) ?? true) ? (
+                        <Checkbox
+                          id={`kit-table-row-${id}`}
+                          ariaLabel={`Select ${id}`}
+                          checked={isSelected}
+                          onCheckedChange={() => selection.onToggleRow(id)}
+                        />
+                      ) : null}
                     </td>
                   )}
                   {columns.map((c) => (

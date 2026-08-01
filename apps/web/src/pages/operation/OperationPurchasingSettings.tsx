@@ -159,15 +159,18 @@ function DayPicker({
   canEdit,
   onChange,
   testId,
+  days = WEEKDAYS,
 }: {
   selected: readonly number[];
   canEdit: boolean;
   onChange: (days: number[]) => void;
   testId: string;
+  /** Which weekdays are OFFERED — the PO-days picker stops at Friday. */
+  days?: typeof WEEKDAYS;
 }) {
   return (
     <div className="flex items-center gap-1.5 flex-wrap" data-testid={testId}>
-      {WEEKDAYS.map((w) => {
+      {days.map((w) => {
         const on = selected.includes(w.day);
         return (
           <button
@@ -515,6 +518,11 @@ export default function OperationPurchasingSettings() {
                     canEdit={canEdit}
                     onChange={setPoDraft}
                     testId="po-days"
+                    /* Jess, 2026-08-01: the Carres OFFICE does not work
+                     * Saturday, and a PO run nobody is in the office to run
+                     * is a checkbox that lies. Supplier work weeks keep
+                     * their Saturday — Ohana works it. */
+                    days={WEEKDAYS.filter((w) => w.day <= 5)}
                   />
                   {canEdit && (
                     <button

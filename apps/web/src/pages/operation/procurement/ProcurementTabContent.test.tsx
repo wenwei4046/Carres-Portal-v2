@@ -695,3 +695,50 @@ describe("ProcurementTabContent — PoDetailModal (read-only PO detail)", () => 
     expect(screen.getByText(/Receive PO-4001/)).toBeInTheDocument();
   });
 });
+
+describe("ProcurementTabContent — ?po= deep link (To Order's PO No. door)", () => {
+  function wrapAt(url: string, node: React.ReactNode) {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return (
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={[url]}>{node}</MemoryRouter>
+      </QueryClientProvider>
+    );
+  }
+
+  it("?po= opens THAT document's detail without a click", () => {
+    setLoaded([makePo({ id: "PO-2090" }), makePo({ id: "PO-2091" })]);
+    render(
+      wrapAt(
+        "/operation/procurement/nice-future?po=PO-2091",
+        <ProcurementTabContent slug="nice-future" />,
+      ),
+    );
+    expect(screen.getByTestId("po-detail-modal")).toBeInTheDocument();
+    expect(screen.getByText(`#PO-${"PO-2091".slice(0, 8)}`)).toBeInTheDocument();
+  });
+
+  it("a received document still opens — the filter widens instead of hiding it", () => {
+    setLoaded([
+      makePo({
+        id: "PO-2092",
+        purchase_order_lines: [
+          { id: "99999999-9999-4999-9999-999999999999", sku: "x", qty: 1, received_qty: 1 },
+        ],
+      }),
+    ]);
+    render(
+      wrapAt(
+        "/operation/procurement/nice-future?po=PO-2092",
+        <ProcurementTabContent slug="nice-future" />,
+      ),
+    );
+    expect(screen.getByTestId("po-detail-modal")).toBeInTheDocument();
+  });
+
+  it("no ?po= → nothing opens uninvited", () => {
+    setLoaded([makePo({ id: "PO-2093" })]);
+    render(wrap(<ProcurementTabContent slug="nice-future" />));
+    expect(screen.queryByTestId("po-detail-modal")).not.toBeInTheDocument();
+  });
+});

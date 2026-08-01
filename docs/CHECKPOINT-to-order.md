@@ -26,6 +26,138 @@
 
 ## 0A · THE FROZEN RULINGS (Loo/Jess, 2026-07-31 → 08-01 — each layer OVERWRITES the older ones)
 
+### ⭐ LAYER 2026-08-01-PM (Jess) — THE PURCHASING FREEZE. Overrides everything below where they conflict.
+
+**The frozen sentence:** *"To Order is the work queue for all purchase
+demands, regardless of where the demand comes from."* Source is an
+ATTRIBUTE, never a workflow. And: *"Left = engine-guided navigation.
+Right = AutoCount-style operator freedom. Engine suggests where to start;
+it never limits what the operator can see, select or issue."*
+
+**ONE pipeline, many sources.** PROJECTED demand (computed live, never
+stored): Customer SO · Inventory (stock below reorder point → the gap).
+STORED demand (`purchase_demands`, v2 migration — only what a human types):
+Warranty · Display · Office · Manual. Fields frozen: Source · Purchase Item ·
+Supplier · Qty · Required By · Remark · Created By/At · Cancelled At/Reason.
+**NO status column** (derived: open/ordered/done from PO links; only
+cancellation is stored) · **NO partial qty** (one row = one issue; upgrade
+later if the business ever needs it) · **NO free-text items** — a
+**Purchase Item master** (kind: inventory_sku|service|expense|office|
+marketing, sku link, default supplier) so price/history/analytics share one
+identity. The A4-paper-three-ways disease dies at the door.
+
+**Purchase Engine (frozen).** Internal chain: customer preferred delivery −
+arrival buffer − production working days × supplier/company calendars ×
+holidays × PO days (optional) = **ORDER BY — the engine's ONE answer**. It
+is never printed as a date; it is WHERE the row sits (the rail bucket). The
+grid's one visible date stays Preferred Delivery. Banned concepts forever:
+PO Run · Suggested Run · Required Date on the grid (`Required By` lives only
+inside Create Purchase as the manual demand's input). Rules: R1 stock →
+open-PO netting · R2 the date math · R3 dateless → Today · R4 missing
+setting → blocked by name, never defaulted · R5 supplier×category grouping,
+sofa one-PO-per-customer-order · R6 non-catalog items get no engine date
+(Required By or Today) · R7 GOLDEN RULE — the engine suggests, never
+holds/skips/locks. **PO days, precisely:** *PO Days adjusts the raw Order By
+date to the latest allowed PO day ON OR BEFORE it. It never moves the date
+later. If that date has passed, the demand appears as overdue inside Today.*
+Settings-driven both ways (empty = order any day, today's behaviour; set =
+snap) — switching modes is a Settings edit, zero code. Issue is NEVER
+greyed because today is not a PO day.
+
+**THE PO SCHEDULE (superseded the time buckets the same day):** the rail's
+first block is a PURCHASE CALENDAR — one row per upcoming configured PO day,
+ROLLING from today (a past Monday never shows), labels are WEEKDAY NAMES
+only (never `Today`), heading `PO Schedule` to match Settings' PO Days
+(picker stops at Friday — the office does not work Saturday; supplier work
+weeks keep theirs). Snap rule, hers verbatim: *"Always snap to the nearest
+earlier PO day. Never move later."* Protection rule: a passed PO day sits in
+a red **Overdue** row ABOVE the calendar and the next run may never swallow
+it. Empty PO-days config = the calendar collapses to the next WORKING day
+(never a weekend). `Today/Tomorrow/This Week/Next Week/All` all retired.
+Ordered receipts sit on the current run's row (placed today) — older ones
+belong to Purchase Orders (14-day wire window). **A TBD order (no delivery
+date) is NOT LISTED AT ALL** — ruled three times: the engine cannot schedule
+it and pre-ticking a run with goods for an unconfirmed order is worse than
+not listing it; the projection brings it back the day the date is confirmed
+(chasing that is the Orders module's Call customer action).
+
+**BOTH rail blocks are toggles and both CLEAR ALL THE WAY** — empty = that
+dimension stops filtering (the implicit All); nothing is ever forced to stay
+lit; no param still opens on the engine's first run. CATEGORY = All ·
+Mattress · Bedframe · Sofa · **Pillow · Mattress Protector** (planned ahead
+of the inventory pipeline; sources never become rail rows).
+
+**Toolbar (FINAL of four rounds):** caption `16 selected` · button
+`Issue 2 POs` (the trade's shorthand; singular `Issue 1 PO`; `Issue PO` only
+as the 0-count disabled word) · quiet two-line `Updated / 4:21 PM` · 40%
+pill search. **THE BATCH IS VIEW-SCOPED — Excel's iron law**: Issue acts on
+the sheet in front of you; a tick hidden by any filter neither counts nor
+issues, and waits remembered. Hovering the button names the split
+(`Ohana · Bedframe — 1 PO …`) — why-N answered without a preview band.
+Retired wordings, never to return: `28 SO selected · → 10 Purchase Orders` ·
+`Issue Purchase Orders` · `Issue 10 Purchase Orders` · the stacked `2 PO`
+caption line.
+
+**The Work Queue rail:** time entries + CATEGORY (All · Mattress · Bedframe ·
+Sofa; Accessory joins WHEN inventory demand exists — deferred with the rest
+of the vetoed UI). Rows are Linear Sidebar faithful: ONE line, name left,
+bare number right (the word survives as the row title); All and category
+rows carry no number. Sources NEVER become rail rows.
+
+**Excel workspace (as deployed):** SEVEN columns — ☑ · Customer Delivery
+(was Preferred Delivery; the date is the customer's, so the column says so)
+· SO No. · Customer (Jess's ruling overrides Loo's `noise`; names render
+Proper Case, records keep what was typed) · Model · Qty · PO No. **One row =
+one BUILD** (`2 items` is banned from Model; a line of 2 identical pieces
+stays ONE row qty 2 — Qty stays: SAP/AutoCount grain, and Pillow ×200 would
+be 200 absurd rows without it). Every column header-click sorts (3rd click
+clears) and Excel-filters (quiet ▼, funnel while narrowing, word first);
+**the PO column's empty cell reads `Yet to Order`** — work, not missing
+data — and its filter lists `Yet to Order` + the real PO numbers (generic
+`Ordered` retired; `(Blanks)` banned); Qty carries NO filter caret (a 1·2·3
+checklist is not worth the button that pushed the word off its numbers).
+Column widths are FIXED PIXELS with the LAST column `auto` — percentage
+columns inflate on wide monitors (the Model↔Qty hole's real cause); the kit
+DataTable accepts raw CSS widths for exactly this. Header select-all over
+the visible sheet; search matches SO · model · customer · PO; sticky header
+paints on the TH cells over a border-separate table (border-collapse +
+sticky = Chrome's see-through header); grid is the ONLY scroll area
+(page h-full, not flex-1, inside the app's overflow-auto wrapper); footer =
+Orders' own closing line (`8 orders` = SOs shown) + a `Clear filters` chip
+whenever a column filter narrows silently. Engine pre-ticks ONLY its own
+plan (Overdue + the first run); future rows wait for a human tick; all
+overrides are deltas. Reports are TOP flash bands (GitHub flash): green
+success — dismissible, with PO numbers and Phase A's units slot · red
+failure — stays with Retry, may not be waved off · amber unresolved. The
+bottom bar is dead. PO No. links deep-open the document
+(`/operation/procurement/<slug>?po=`).
+
+**Ordered rows:** last 14 days of POs ride the wire (`ordered`), sit in
+their bucket, PO No. deep-links to `/operation/procurement/<slug>?po=` which
+opens that document. Real history belongs to Purchase Orders.
+
+**VETOED until the demand model proves out (do NOT build):** Source column ·
+Accessory rail row · Create Purchase morphing dialog. Built once and
+REVERTED 2026-08-01 (`git revert 90b7b434`) — business architecture first,
+UI second. The dialog still shows the old Reason list until then.
+
+**References (copy the PATTERN, never the business):** Layout=Linear
+Sidebar · Toolbar=2990 Delivery Planning · Table=GitHub Repository Files ·
+Filter=Excel AutoFilter · Dialog=GitHub New Issue · Audit=GitHub Issue
+Timeline · Comments=Linear. 2990 is a UI reference, NOT a business
+reference. Review method: ① who is the master? ② copy accuracy 🟢🔴 —
+fidelity scores + missing items, never taste. Development order: **prove →
+freeze → doc → shell → reuse** — 03-page-patterns.md and WorkQueueShell are
+written ONLY after Jess plays for days without wanting change.
+
+**Unit IDs (Phase A, queued):** every PO line already mints per-unit
+`incoming` stock rows with `id-xxx000000` codes at PO-open (0153/0154 —
+running silently since May). Phase A puts them ON SCREEN: Check-in lists
+units per line · PO PDF prints them · Print labels (human serial + QR;
+machine id in the QR) · a scan box on Receiving. Check-in BY unit (scan =
+receive) is Phase B (touches the hot receive RPC — its own card).
+
+
 **Division of responsibility:** To Order DECIDES which customer orders become
 purchase orders today. Purchase Orders MANAGES the documents once they exist
 (preview · communication · audit · PDF · WhatsApp · revision · ready date —
@@ -177,6 +309,15 @@ Bundle grep  vs live predecessor index-DrcPnNxZ.js (downloaded before the
              RETIRED: Order today · to-order-panel · to-order-batch-bar ·
              cannot be planned each 1→0.
 ```
+
+**Session 2026-08-01 CLOSED with Jess's `deploy` order — the branch merged
+and shipped (see §15). Final branch baselines: page 31/31 · kit 105 ·
+shared 2034 · api to-order 33 · ratchet 8436 (fell twice: two legacy brand
+aliases retired with the blue tab accent) · tsc 0. Two scanner traps met
+again and dodged: `rounded-b-card` reads as `rounded-b` (frame the sheet in
+a `rounded-card overflow-hidden` wrapper instead) and a dev server predating
+new Tailwind tokens serves DEAD classes — restart before debugging
+'transparent' anything.**
 
 **Next for the NEW chat (Jess), in her order — she will amend more:**
 1. Whatever she asks first — the page is hers to finish.

@@ -84,10 +84,10 @@ describe("closed sets", () => {
     expect(true).toBe(true);
   });
 
-  it("carries §5.3's 40 meanings + the 3 categories, and renders the mapped glyph", () => {
-    // 40 = §5.3 verbatim; +3 = mattress · bedframe · sofa, added by Loo
-    // 2026-07-31 for the To Order rail's category level.
-    expect(ICON_NAMES).toHaveLength(43);
+  it("carries §5.3's 40 meanings + the 4 additions, and renders the mapped glyph", () => {
+    // 40 = §5.3 verbatim; +3 = mattress · bedframe · sofa (Loo, 2026-07-31,
+    // the To Order rail); +1 = columnFilter (Jess, 2026-08-01, the Excel ▼).
+    expect(ICON_NAMES).toHaveLength(44);
     // one meaning, one glyph — `ready` and `confirm` deliberately share Check
     render(
       <>

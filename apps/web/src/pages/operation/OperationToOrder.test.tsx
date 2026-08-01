@@ -7,13 +7,19 @@ import OperationToOrder from "./OperationToOrder";
 import { fmtDate } from "@/lib/fmt-date";
 
 /**
- * To Order — the final freeze (Loo, 2026-08-01): LEFT is a Linear-style
- * Action Launcher (Today · the categories · + Create Purchase · the Issue
- * pill), RIGHT is a GitHub-Projects grid of exactly six columns speaking
- * business language only — `Order By` never reaches the screen. Rows arrive
- * pre-selected with delta memory; Issue posts one ARRANGEMENT per group,
- * updates the grid in place (rows never vanish), reports in the bottom bar
- * (no toast, no popup), and a partial failure stays until retried.
+ * To Order — the Work Queue + Excel Workspace (Jess's freeze, 2026-08-01).
+ *
+ * LEFT = time views (five DISJOINT sets, engine opens Today, overdue folds
+ * in) + CATEGORY (work order, no counts) + Create Purchase. RIGHT = the
+ * Excel grid: pill search · the Issue pill that exists only while something
+ * is selected · `Updated hh:mm` · header sort · per-column Excel filters
+ * whose PO options speak business (`Not Ordered` / `Ordered`, never
+ * `(Blanks)`). Ordered rows stay in their bucket; their PO No. is the door
+ * to Purchase Orders. Issue posts one ARRANGEMENT per group, updates the
+ * grid in place, reports in the bottom bar, and a partial failure stays.
+ *
+ * Fixture time: today = 2026-07-30 (Thursday). This week = Jul 27 → Aug 2;
+ * next week starts Aug 3.
  */
 
 const navigate = vi.fn();
@@ -40,8 +46,17 @@ function build(key: string, model: string, codes: string, qty = 1, size: string 
 }
 
 const TO_ORDER = {
-  today: "2026-07-30",
+  today: "2026-07-30", // Thursday — NOT a PO day; schedule = Fri 31 · Mon 3 · Wed 5
+  poDays: [1, 3, 5],
   destinations: [{ id: KLANG, name: "Carres Klang", isDefault: true }],
+  ordered: [
+    {
+      // A PO created TODAY — Today + `Ordered` must answer 今天已经下了哪些.
+      poId: "PO-9001", placedAt: "2026-07-30", category: "bedframe",
+      supplierId: OHANA, orderId: "o30", so: 1350,
+      delivery: "2026-08-10", model: "Cody K", qty: 1,
+    },
+  ],
   proposals: [
     {
       key: `${OHANA}::sofa`,
@@ -58,12 +73,14 @@ const TO_ORDER = {
           orderId: "o2", so: 1204, customer: "ella", qty: 1,
           summary: "Booqit · 1 Sofa", stockReady: "2026-07-20",
           delivery: "2026-07-20", // the CUSTOMER's date, already past → red
+          orderBy: "2026-07-15", // overdue → folds into Today
           builds: [build("bk-e", "Booqit", "5539-1A(LHF)")],
         },
         {
           orderId: "o1", so: 1207, customer: "PETER", qty: 2,
           summary: "Booqit · 2 Sofas", stockReady: "2026-08-13",
           delivery: "2026-08-13",
+          orderBy: "2026-07-30",
           builds: [
             build("bk-a", "Booqit", "5539-1B(LHF)"),
             build("bk-b", "Booqit", "5539-1A(LHF)"),
@@ -72,7 +89,8 @@ const TO_ORDER = {
         {
           orderId: "o3", so: 1257, customer: "kee tong", qty: 2,
           summary: "Booqit · 2 Sofas", stockReady: null,
-          delivery: null, // TBD — prints the dash, sinks in the sort
+          delivery: null, // TBD — NOT purchasable work: never listed (Jess)
+          orderBy: null,
           builds: [build("bk-k", "Booqit", "5539-2B(LHF)")],
         },
       ],
@@ -92,19 +110,21 @@ const TO_ORDER = {
           orderId: "o9", so: 1300, customer: "wong", qty: 3,
           summary: "Cody · 3 Bedframes", stockReady: "2026-08-06",
           delivery: "2026-08-15",
+          orderBy: "2026-07-30",
           builds: [build("l1", "Cody", "CODY-Q", 3, "Queen")],
         },
         {
           orderId: "o8", so: 1301, customer: "lim", qty: 1,
           summary: "Cody · 1 Bedframe", stockReady: "2026-08-06",
           delivery: "2026-08-15",
+          orderBy: "2026-07-30",
           builds: [build("l2", "Cody", "CODY-K", 1, "King")],
         },
       ],
     },
     {
-      // A run AHEAD — its order-by day has not come, so the page (which IS
-      // today) does not list it.
+      // A run AHEAD — its order-by day is next Monday, so it lives in the
+      // Next Week view: listed, visible, NOT pre-selected.
       key: `${NF}::mattress`,
       supplierId: NF,
       supplierName: "Nice Future",
@@ -119,6 +139,7 @@ const TO_ORDER = {
           orderId: "o20", so: 1400, customer: "amy", qty: 1,
           summary: "Sonic · 1 Mattress", stockReady: "2026-08-20",
           delivery: "2026-08-25",
+          orderBy: "2026-08-03",
           builds: [build("m1", "Sonic", "SONIC-Q", 1, "Queen")],
         },
       ],
@@ -148,8 +169,8 @@ function route(path: string, body?: { category?: string; purchaseOrders?: { key:
   return Promise.resolve({});
 }
 
-function rowBox(proposalKey: string, orderId: string) {
-  return document.getElementById(`row-${proposalKey}:${orderId}`)!;
+function rowBox(proposalKey: string, orderId: string, buildKey: string) {
+  return document.getElementById(`kit-table-row-${proposalKey}:${orderId}:${buildKey}`)!;
 }
 
 function wrap() {
@@ -174,47 +195,91 @@ beforeEach(() => {
 
 async function loaded() {
   render(wrap());
-  await screen.findByTestId("to-order-issue-pill");
+  // The calendar rows appear once data lands. The Issue pill may NOT be
+  // there yet: the batch is VIEW-SCOPED, and the default view can hold no
+  // selectable work (this fixture's Friday holds only a receipt).
+  await screen.findByTestId("to-order-day-2026-07-31");
 }
 
-describe("the Action Launcher", () => {
-  it("is Today · the categories · + Create Purchase — and nothing systemic", async () => {
+describe("the PO Schedule — a purchase calendar, not a menu", () => {
+  it("rolling upcoming PO days + a red Overdue on top; CATEGORY stays wordless", async () => {
     await loaded();
     const nav = screen.getByTestId("to-order-nav");
-    expect(within(nav).getByTestId("to-order-cat-today")).toHaveTextContent(W.navToday);
-    // 5 unique customer orders today; the run ahead is not counted.
-    expect(within(nav).getByTestId("to-order-cat-today")).toHaveTextContent("5 Orders");
-    expect(within(nav).getByTestId("to-order-cat-bedframe")).toHaveTextContent("2 Orders");
-    expect(within(nav).getByTestId("to-order-cat-sofa")).toHaveTextContent("3 Orders");
-    // Mattress exists only as a run ahead — the row is there, at zero.
-    expect(within(nav).getByTestId("to-order-cat-mattress")).toHaveTextContent("0 Orders");
+    expect(within(nav).getByText(W.poScheduleHeading)).toBeInTheDocument();
+    // 4 orders whose snapped PO day has PASSED — Overdue, red, on top;
+    // never swallowed by the next run.
+    expect(within(nav).getByTestId("to-order-overdue")).toHaveTextContent(W.filterOverdue);
+    expect(within(nav).getByTestId("to-order-overdue")).toHaveTextContent("4");
+    // Rolling from Thursday: Friday · Monday · Wednesday — 3 configured
+    // days, 3 rows, no Today (Thursday is not a PO day), no stale Monday.
+    expect(within(nav).getByTestId("to-order-day-2026-07-31")).toHaveTextContent("Friday");
+    expect(within(nav).getByTestId("to-order-day-2026-07-31")).toHaveTextContent("0");
+    expect(within(nav).getByTestId("to-order-day-2026-08-03")).toHaveTextContent("Monday");
+    expect(within(nav).getByTestId("to-order-day-2026-08-05")).toHaveTextContent("Wednesday");
+    expect(within(nav).queryByText(W.navToday)).toBeNull();
+    // The retired vocabulary stays retired.
+    expect(within(nav).queryByText("Tomorrow")).toBeNull();
+    expect(within(nav).queryByText("This Week")).toBeNull();
+    // CATEGORY is a WORK ORDER, not a scoreboard: heading + rows, no counts.
+    expect(within(nav).getByText(W.categoryHeading)).toBeInTheDocument();
+    expect(within(nav).getByTestId("to-order-cat-all")).not.toHaveTextContent("Orders");
     expect(within(nav).getByTestId("to-order-create-purchase")).toHaveTextContent(
       W.createPurchase,
     );
-    // No system words, no headings, no H1 anywhere.
-    expect(within(nav).queryByText("Views")).toBeNull();
-    expect(within(nav).queryByText("Group")).toBeNull();
-    expect(screen.queryByText("TO ORDER")).toBeNull();
     expect(document.querySelector("h1")).toBeNull();
   });
 
-  it("clicking a category filters the grid; Today shows everything", async () => {
+  it("calendar rows TOGGLE — pick two runs and the grid is the union", async () => {
     await loaded();
+    // The engine opens the first upcoming run (Friday): today's receipt
+    // lives there; overdue work does not leak in. And kee tong — no
+    // delivery date — is NOT LISTED AT ALL: not purchasable work (Jess).
+    expect(screen.getByText("SO-1350")).toBeInTheDocument();
+    expect(screen.queryByText("SO-1257")).toBeNull();
+    expect(screen.queryByText("SO-1204")).toBeNull();
+    // Ticking Overdue ADDS it — Friday stays on (multi-select, Jess).
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    expect(screen.getByText("SO-1204")).toBeInTheDocument();
+    expect(screen.getByText("SO-1350")).toBeInTheDocument();
+    // Unticking Friday leaves Overdue alone.
+    fireEvent.click(screen.getByTestId("to-order-day-2026-07-31"));
+    expect(screen.getByText("SO-1204")).toBeInTheDocument();
+    expect(screen.queryByText("SO-1350")).toBeNull();
+    fireEvent.click(screen.getByTestId("to-order-day-2026-08-03"));
+    expect(screen.getByText("SO-1400")).toBeInTheDocument();
+  });
+
+  it("clearing the whole time block lifts the time filter — the second way to place", async () => {
+    await loaded();
+    // Only Friday is lit; unticking it must be ALLOWED (nothing stays
+    // forced on) and means: no time narrowing at all.
+    fireEvent.click(screen.getByTestId("to-order-day-2026-07-31"));
+    expect(screen.getByText("SO-1204")).toBeInTheDocument(); // overdue
+    expect(screen.getByText("SO-1400")).toBeInTheDocument(); // Monday's run
+    expect(screen.getByText("SO-1350")).toBeInTheDocument(); // the receipt
+    // Category alone can now carve the sheet — browse ALL bedframes.
     fireEvent.click(screen.getByTestId("to-order-cat-bedframe"));
     expect(screen.getByText("SO-1300")).toBeInTheDocument();
     expect(screen.queryByText("SO-1204")).toBeNull();
-    fireEvent.click(screen.getByTestId("to-order-cat-today"));
+  });
+
+  it("clicking a category narrows within the calendar row; All restores", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    fireEvent.click(screen.getByTestId("to-order-cat-bedframe"));
+    expect(screen.getByText("SO-1300")).toBeInTheDocument();
+    expect(screen.queryByText("SO-1204")).toBeNull();
+    fireEvent.click(screen.getByTestId("to-order-cat-all"));
     expect(screen.getByText("SO-1204")).toBeInTheDocument();
   });
 });
 
 describe("the grid — business language only", () => {
-  it("has exactly Loo's six columns and none of the system's", async () => {
+  it("has exactly the frozen columns — Customer joined on Jess's word — and none of the system's", async () => {
     await loaded();
-    for (const label of [W.colPreferred, W.colSoNo, W.colModel, W.colQty, W.colPoNo]) {
+    for (const label of [W.colPreferred, W.colSoNo, W.colCustomer, W.colModel, W.colQty, W.colPoNo]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
-    expect(screen.queryByText("Customer")).toBeNull();
     expect(screen.queryByText("Category")).toBeNull();
     expect(screen.queryByText(/Order by/i)).toBeNull();
     expect(screen.queryByText("Stock ready")).toBeNull();
@@ -222,62 +287,170 @@ describe("the grid — business language only", () => {
 
   it("speaks the CUSTOMER's date — red when past, a dash when TBD, sorted soonest first", async () => {
     await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
     // ella's delivery is past → red overdue, sorted to the very top.
     const cells = screen.getAllByText(fmtDate("2026-07-20"));
     expect(cells[0]!.className).toContain("text-kit-red-11");
-    // kee tong has no date — the dash prints and the row sinks.
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    // A TBD order is not listed at all — no dateless row to sink.
+    expect(screen.queryByText("SO-1257")).toBeNull();
     // The engine's own dates never render.
     expect(screen.queryByText(fmtDate("2026-07-15"))).toBeNull(); // sofa orderBy
     expect(screen.queryByText(fmtDate("2026-08-06"))).toBeNull(); // bedframe stockReady
   });
 
-  it("rows arrive PRE-SELECTED and the pill tells the truth", async () => {
+  it("rows arrive PRE-SELECTED and the toolbar pill answers for the visible sheet", async () => {
     await loaded();
+    // Friday (default) holds only the receipt — nothing selectable, so the
+    // toolbar stays QUIET (view-scoped batch, Excel's iron law).
+    expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
     const pill = screen.getByTestId("to-order-issue-pill");
-    expect(pill).toHaveTextContent("5 SO selected");
-    // Sofa is one-per-order (3) + bedframe merges (1).
-    expect(pill).toHaveTextContent("4 Purchase Orders");
+    // 5 BUILDS (PETER's order is two sofas = two rows; kee tong's TBD
+    // order is not listed).
+    expect(pill).toHaveTextContent("5 selected");
+    // Sofa is one-per-order (2 listed) + bedframe merges (1). Numbers are
+    // STATE (the caption); the button is the ACTION alone.
+    expect(screen.getByTestId("to-order-issue")).toHaveTextContent(/^Issue 3 POs$/);
+    expect(pill.textContent).not.toContain("→");
+  });
+
+  it("the engine pre-ticks ONLY its own plan — a future row waits for a human", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-day-2026-08-03")); // Monday joins Friday
+    const box = rowBox(`${NF}::mattress`, "o20", "m1");
+    expect(box).not.toBeNull();
+    expect(box.getAttribute("data-state")).not.toBe("checked");
+    // Nothing pre-ticked in view → the toolbar is quiet until the human acts.
+    expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
+    fireEvent.click(box);
+    // The batch answers for the VISIBLE sheet: amy alone.
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("1 selected");
+    expect(screen.getByTestId("to-order-issue")).toHaveTextContent(/^Issue 1 PO$/);
   });
 
   it("an untick drops the pill's promise; unticking everything removes the pill", async () => {
     await loaded();
-    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2"));
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 SO selected");
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("3 Purchase Orders");
-    for (const [p, o] of [
-      [`${OHANA}::sofa`, "o1"],
-      [`${OHANA}::sofa`, "o3"],
-      [`${OHANA}::bedframe`, "o9"],
-      [`${OHANA}::bedframe`, "o8"],
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2", "bk-e"));
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 selected");
+    expect(screen.getByTestId("to-order-issue")).toHaveTextContent(/^Issue 2 POs$/);
+    for (const [p, o, b] of [
+      [`${OHANA}::sofa`, "o1", "bk-a"],
+      [`${OHANA}::sofa`, "o1", "bk-b"],
+      [`${OHANA}::bedframe`, "o9", "l1"],
+      [`${OHANA}::bedframe`, "o8", "l2"],
     ] as const) {
-      fireEvent.click(rowBox(p, o));
+      fireEvent.click(rowBox(p, o, b));
     }
     expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
   });
 
-  it("the operator's unticks survive a category switch — deltas, not snapshots", async () => {
+  it("the operator's ticks and unticks survive a view switch — deltas, not snapshots", async () => {
     await loaded();
-    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2"));
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2", "bk-e"));
     fireEvent.click(screen.getByTestId("to-order-cat-bedframe"));
-    fireEvent.click(screen.getByTestId("to-order-cat-today"));
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 SO selected");
+    fireEvent.click(screen.getByTestId("to-order-cat-all"));
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 selected");
   });
 
   it("search narrows by SO or model", async () => {
     await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.change(document.getElementById("to-order-search")!, {
       target: { value: "cody" },
     });
     expect(screen.getByText("SO-1300")).toBeInTheDocument();
     expect(screen.queryByText("SO-1204")).toBeNull();
   });
+
+  it("a quiet Updated stamp — never a Refresh button", async () => {
+    await loaded();
+    expect(screen.getByTestId("to-order-updated")).toHaveTextContent(/^Updated/);
+    expect(screen.queryByText("Refresh")).toBeNull();
+  });
+});
+
+describe("the Excel reflexes — header sort, per-column filters", () => {
+  it("a header click sorts by SO; a second click reverses", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    fireEvent.click(screen.getByTestId("table-sort-so"));
+    let sos = screen.getAllByText(/^SO-\d+$/).map((el) => el.textContent);
+    expect(sos).toEqual([
+      "SO-1204",
+      "SO-1207",
+      "SO-1207",
+      "SO-1300",
+      "SO-1301",
+      "SO-1350",
+    ]);
+    fireEvent.click(screen.getByTestId("table-sort-so"));
+    sos = screen.getAllByText(/^SO-\d+$/).map((el) => el.textContent);
+    expect(sos[0]).toBe("SO-1350");
+  });
+
+  it("the PO filter speaks business — Yet to Order + the real numbers, never (Blanks)", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue")); // union: Fri + Overdue
+    fireEvent.click(screen.getByTestId("table-filter-po"));
+    expect(screen.getByLabelText(W.yetToOrder)).toBeInTheDocument();
+    expect(screen.getByLabelText("PO-9001")).toBeInTheDocument();
+    expect(screen.queryByText("(Blanks)")).toBeNull();
+    // A real number narrows to that document's rows.
+    fireEvent.click(screen.getByLabelText("PO-9001"));
+    expect(screen.getByText("SO-1350")).toBeInTheDocument();
+    expect(screen.queryByText("SO-1204")).toBeNull();
+    // Yet to Order joins in — Excel ORs a checklist.
+    fireEvent.click(screen.getByLabelText(W.yetToOrder));
+    expect(screen.getByText("SO-1204")).toBeInTheDocument();
+  });
+
+  it("the delivery filter leads with Overdue and prints dates, not ISO", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    fireEvent.click(screen.getByTestId("table-filter-delivery"));
+    fireEvent.click(screen.getByLabelText(W.filterOverdue));
+    expect(screen.getByText("SO-1204")).toBeInTheDocument(); // ella, past date
+    expect(screen.queryByText("SO-1300")).toBeNull();
+  });
+
+  it("there are no Status pills — the PO column IS the status door", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    expect(screen.queryByText("Status")).toBeNull();
+    // The empty PO cell SAYS the work instead of a mute dash, and the
+    // footer counts what the sheet shows.
+    expect(screen.getAllByText(W.yetToOrder).length).toBeGreaterThan(0);
+    expect(screen.getByTestId("to-order-footer")).toHaveTextContent(/orders?$/);
+  });
+});
+
+describe("ordered rows — the receipt stays on the sheet", () => {
+  it("a PO created today sits on the current run's row, unticked, PO No. filled", async () => {
+    await loaded();
+    // The default view IS the first upcoming run — the receipt is already there.
+    expect(screen.getByText("SO-1350")).toBeInTheDocument();
+    expect(document.getElementById("kit-table-row-po:PO-9001:o30")).toBeNull(); // no checkbox
+    expect(screen.getByTestId("row-po-po:PO-9001:o30")).toHaveTextContent("PO-9001");
+    // It is DONE work — it must not inflate the rail's counts.
+    expect(screen.getByTestId("to-order-day-2026-07-31")).toHaveTextContent("0");
+  });
+
+  it("its PO No. lands on Purchase Orders with THAT document opened", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("row-po-po:PO-9001:o30"));
+    expect(navigate).toHaveBeenCalledWith(
+      "/operation/procurement/hookka-bedframe?po=PO-9001",
+    );
+  });
 });
 
 describe("Issue — the grid is the receipt, the bar is the report", () => {
   it("posts one ARRANGEMENT per group and updates rows in place — nothing vanishes", async () => {
     await loaded();
-    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2")); // leave ella out
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2", "bk-e")); // leave ella out
     fireEvent.click(screen.getByTestId("to-order-issue"));
 
     await screen.findByTestId("to-order-created-line");
@@ -298,42 +471,57 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
     const sofaBody = JSON.parse(
       String((calls.find(([, i]) => String((i as RequestInit).body).includes('"sofa"'))![1] as RequestInit).body),
     );
-    expect(sofaBody.purchaseOrders).toHaveLength(2);
+    expect(sofaBody.purchaseOrders).toHaveLength(1);
     expect(JSON.stringify(sofaBody)).not.toContain("bk-e");
 
     // Rows updated IN PLACE: PO number a clickable door, checkbox gone,
     // unissued ella still visible with her ☑.
-    expect(screen.getByTestId(`row-po-${OHANA}::bedframe:o9`)).toHaveTextContent(
+    expect(screen.getByTestId(`row-po-${OHANA}::bedframe:o9:l1`)).toHaveTextContent(
       "PO-bedframe-1",
     );
-    expect(screen.getByTestId(`row-po-${OHANA}::sofa:o1`)).toHaveTextContent("PO-sofa-");
-    expect(document.getElementById(`row-${OHANA}::bedframe:o9`)).toBeNull();
-    expect(document.getElementById(`row-${OHANA}::sofa:o2`)).not.toBeNull();
+    expect(screen.getByTestId(`row-po-${OHANA}::sofa:o1:bk-a`)).toHaveTextContent("PO-sofa-");
+    expect(document.getElementById(`kit-table-row-${OHANA}::bedframe:o9:l1`)).toBeNull();
+    expect(
+      document.getElementById(`kit-table-row-${OHANA}::sofa:o2:bk-e`),
+    ).not.toBeNull();
 
     // The bar reports; the pill is gone (only ella remains, unticked).
     expect(screen.getByTestId("to-order-created-line")).toHaveTextContent(
-      "3 Purchase Orders Created",
+      "2 Purchase Orders Created",
     );
     fireEvent.click(screen.getByTestId("to-order-continue"));
     expect(navigate).toHaveBeenCalledWith("/operation/procurement");
-    // The launcher counts fell with the work.
-    expect(screen.getByTestId("to-order-cat-bedframe")).toHaveTextContent("0 Orders");
+    // The rail's Overdue count fell with the work — only ella is left.
+    expect(screen.getByTestId("to-order-overdue")).toHaveTextContent("1");
+  });
+
+  it("a session-issued PO's number is the door to ITS channel tab", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2", "bk-e")); // leave ella out
+    fireEvent.click(screen.getByTestId("to-order-issue"));
+    await screen.findByTestId("to-order-created-line");
+    fireEvent.click(screen.getByTestId(`row-po-${OHANA}::bedframe:o9:l1`));
+    expect(navigate).toHaveBeenCalledWith(
+      "/operation/procurement/hookka-bedframe?po=PO-bedframe-1",
+    );
   });
 
   it("a failed group fails ALONE and stays in the bar until retried", async () => {
     failCategories = new Set(["bedframe"]);
     await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.click(screen.getByTestId("to-order-issue"));
     await screen.findByTestId("to-order-failed-line");
     // Sofa succeeded beside it; the failure does not evaporate.
-    expect(screen.getByTestId(`row-po-${OHANA}::sofa:o2`)).toBeInTheDocument();
+    expect(screen.getByTestId(`row-po-${OHANA}::sofa:o2:bk-e`)).toBeInTheDocument();
     expect(screen.getByTestId("to-order-failed-line")).toHaveTextContent("1 failed");
 
     failCategories = new Set();
     apiFetch.mockClear();
     fireEvent.click(screen.getByTestId("to-order-retry"));
     await waitFor(() => {
-      expect(screen.getByTestId(`row-po-${OHANA}::bedframe:o9`)).toBeInTheDocument();
+      expect(screen.getByTestId(`row-po-${OHANA}::bedframe:o9:l1`)).toBeInTheDocument();
     });
     // ONLY the failed group was retried.
     expect(apiFetch.mock.calls.filter(([p]) => String(p).endsWith("/issue"))).toHaveLength(1);
@@ -350,14 +538,17 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
         : route(path, init?.body ? JSON.parse(String(init.body)) : undefined),
     );
     await loaded();
-    expect(screen.getByTestId("to-order-unresolved")).toBeInTheDocument();
+    expect(screen.getByTestId("to-order-unresolved")).toHaveTextContent(
+      "1 item could not be read",
+    );
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
     expect(screen.getByTestId("to-order-issue")).toBeDisabled();
   });
 
   it("an empty To Order is an answer, not a blank sheet", async () => {
     apiFetch.mockImplementation((path: string) =>
       path.endsWith("/to-order")
-        ? Promise.resolve({ ...TO_ORDER, proposals: [] })
+        ? Promise.resolve({ ...TO_ORDER, proposals: [], ordered: [] })
         : route(path),
     );
     render(wrap());
@@ -382,5 +573,96 @@ describe("+ Create Purchase — the entrance is real, the save is next", () => {
     // is disabled and SAYS so, so the door teaches without pretending.
     expect(screen.getByTestId("to-order-create-submit")).toBeDisabled();
     expect(screen.getByText(W.nextUpdate)).toBeInTheDocument();
+  });
+});
+
+describe("the seven fixes — Excel completeness", () => {
+  it("header select-all unticks the visible sheet, and ticks it back", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue")); // union: Fri + Overdue
+    fireEvent.click(document.getElementById("kit-table-select-all")!);
+    expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
+    fireEvent.click(document.getElementById("kit-table-select-all")!);
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 selected");
+  });
+
+  it("select-all works on a FILTERED sheet — the boss's 'tick all Nice Future'", async () => {
+    await loaded();
+    // Untick everything, then add Monday's run and narrow to Mattress.
+    fireEvent.click(screen.getByTestId("to-order-overdue")); // union
+    fireEvent.click(document.getElementById("kit-table-select-all")!);
+    expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
+    fireEvent.click(screen.getByTestId("to-order-day-2026-08-03"));
+    fireEvent.click(screen.getByTestId("to-order-cat-mattress"));
+    fireEvent.click(document.getElementById("kit-table-select-all")!);
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("1 selected");
+  });
+
+  it("a filter that blanks the table names its cause and hands back the way out", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    fireEvent.click(screen.getByTestId("table-filter-model"));
+    fireEvent.click(screen.getByLabelText("Cody K"));
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    fireEvent.click(screen.getByTestId("table-filter-delivery"));
+    fireEvent.click(screen.getByLabelText(W.filterOverdue));
+    // Cody K is not overdue → zero rows, but never the lying empty state.
+    expect(screen.getByTestId("to-order-filters-empty")).toHaveTextContent(W.filtersEmpty);
+    fireEvent.click(screen.getByTestId("to-order-clear-filters"));
+    expect(screen.queryByTestId("to-order-filters-empty")).toBeNull();
+    expect(screen.getByText("SO-1204")).toBeInTheDocument();
+  });
+
+  it("a narrowing filter announces itself in the footer, with the way out", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    expect(screen.queryByTestId("to-order-footer-clear")).toBeNull();
+    fireEvent.click(screen.getByTestId("table-filter-model"));
+    fireEvent.click(screen.getByLabelText("Cody K"));
+    expect(screen.getByTestId("to-order-footer-clear")).toHaveTextContent(W.clearFilters);
+    fireEvent.click(screen.getByTestId("to-order-footer-clear"));
+    expect(screen.queryByTestId("to-order-footer-clear")).toBeNull();
+    expect(screen.getByText("SO-1204")).toBeInTheDocument();
+  });
+
+  it("search finds a PO number too — Ordered is this page's answer", async () => {
+    await loaded();
+    fireEvent.change(document.getElementById("to-order-search")!, {
+      target: { value: "po-9001" },
+    });
+    expect(screen.getByText("SO-1350")).toBeInTheDocument();
+    expect(screen.queryByText("SO-1204")).toBeNull();
+  });
+
+  it("the view lives in the URL — a refresh or a shared link keeps it", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <MemoryRouter initialEntries={["/?view=2026-08-03&cat=mattress"]}>
+        <QueryClientProvider client={qc}>
+          <OperationToOrder />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+    await screen.findByText("SO-1400");
+    expect(screen.queryByText("SO-1204")).toBeNull();
+  });
+
+  it("while Creating, the toolbar keeps talking instead of going blank", async () => {
+    let release: (() => void) | null = null;
+    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+      if (path.endsWith("/issue")) {
+        return new Promise((res) => {
+          release = () =>
+            res({ supplier: "x", destination: "d", pos: [{ id: "PO-1", customer: "c" }] });
+        });
+      }
+      return route(path, init?.body ? JSON.parse(String(init.body)) : undefined);
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    fireEvent.click(screen.getByTestId("to-order-issue"));
+    expect(await screen.findByTestId("to-order-creating")).toHaveTextContent(W.creatingPos);
+    expect(screen.queryByTestId("to-order-issue")).toBeNull();
+    expect(release).not.toBeNull();
   });
 });

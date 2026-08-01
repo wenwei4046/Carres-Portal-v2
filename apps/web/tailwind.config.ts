@@ -108,6 +108,7 @@ export default {
         kit: {
           slate: {
             3: slate.slate3, // page canvas (Q2, frozen)
+            4: slate.slate4, // table-header wash · quiet control border (Jess, 2026-08-01)
             5: slate.slate5, // hairline — table lines, card edge
             6: slate.slate6, // stronger divider — section split
             9: slate.slate9, // icon at rest · placeholder
@@ -115,7 +116,8 @@ export default {
             12: slate.slate12, // primary text
           },
           blue: {
-            3: blue.blue3, // selected row · hover tint · info fill
+            2: blue.blue2, // row HOVER — one step under selected (Jess, 2026-08-01)
+            3: blue.blue3, // selected row · info fill
             9: blue.blue9, // the one action fill · focus ring
             11: blue.blue11, // action ink
           },

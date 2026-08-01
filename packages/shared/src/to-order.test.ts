@@ -17,6 +17,10 @@ import {
   sizeShort,
   soCountLabel,
   sortToOrderRows,
+  poScheduleDays,
+  snapToPoDay,
+  poScheduleBucket,
+  weekdayName,
   type ToOrderLine,
   type ToOrderRow,
 } from "./to-order";
@@ -520,5 +524,114 @@ describe("proposal order", () => {
     ]);
     expect(ps[0].label).toBe("Nice Future · Mattress");
     expect(ps[1].orderBy).toBeNull();
+  });
+});
+
+// ── the PO Schedule (Jess's freeze, 2026-08-01) ─────────────────────────────
+//
+// The rail is a purchase calendar. Snap rule, verbatim hers: "Always snap to
+// the nearest earlier PO day. Never move later." And the protection rule: a
+// passed PO day is OVERDUE — never swallowed by the next run.
+
+const MWF = [1, 3, 5]; // Monday · Wednesday · Friday
+
+describe("snapToPoDay", () => {
+  it("her own table, row for row — always earlier, never later", () => {
+    // 2026-08-03 is a Monday.
+    expect(snapToPoDay("2026-08-03", MWF)).toBe("2026-08-03"); // Mon → Mon
+    expect(snapToPoDay("2026-08-04", MWF)).toBe("2026-08-03"); // Tue → Mon
+    expect(snapToPoDay("2026-08-05", MWF)).toBe("2026-08-05"); // Wed → Wed
+    expect(snapToPoDay("2026-08-06", MWF)).toBe("2026-08-05"); // Thu → Wed
+    expect(snapToPoDay("2026-08-07", MWF)).toBe("2026-08-07"); // Fri → Fri
+    expect(snapToPoDay("2026-08-08", MWF)).toBe("2026-08-07"); // Sat → Fri
+    expect(snapToPoDay("2026-08-09", MWF)).toBe("2026-08-07"); // Sun → Fri
+  });
+
+  it("an empty configuration means order any WORKING day — a weekend still snaps back", () => {
+    expect(snapToPoDay("2026-08-04", [])).toBe("2026-08-04"); // Tue stands
+    expect(snapToPoDay("2026-08-01", [])).toBe("2026-07-31"); // Sat → Fri
+  });
+});
+
+describe("poScheduleDays", () => {
+  it("rolls from today — a Tuesday reads Wed · Fri · Mon, never yesterday's Monday", () => {
+    expect(poScheduleDays(MWF, "2026-08-04")).toEqual([
+      "2026-08-05",
+      "2026-08-07",
+      "2026-08-10",
+    ]);
+  });
+
+  it("today counts when today IS a PO day", () => {
+    expect(poScheduleDays(MWF, "2026-08-03")[0]).toBe("2026-08-03");
+  });
+
+  it("two configured days → two rows; none → the next WORKING day, never a Saturday", () => {
+    expect(poScheduleDays([2, 5], "2026-08-03")).toHaveLength(2);
+    expect(poScheduleDays([], "2026-08-04")).toEqual(["2026-08-04"]); // Tue stands
+    expect(poScheduleDays([], "2026-08-01")).toEqual(["2026-08-03"]); // Sat → Mon
+  });
+});
+
+describe("poScheduleBucket", () => {
+  const TODAY = "2026-08-05"; // Wednesday
+
+  it("a due run today sits on today's row, not in Overdue", () => {
+    expect(poScheduleBucket("2026-08-05", MWF, TODAY)).toEqual({
+      kind: "day",
+      day: "2026-08-05",
+    });
+    // Thursday's demand snaps back to... Wednesday — today. Still on time.
+    expect(poScheduleBucket("2026-08-06", MWF, TODAY)).toEqual({
+      kind: "day",
+      day: "2026-08-05",
+    });
+  });
+
+  it("a passed PO day is OVERDUE — never silently rolled into the next run", () => {
+    // Should have gone out Monday; it is Wednesday. Not Friday's work.
+    expect(poScheduleBucket("2026-08-04", MWF, TODAY)).toEqual({ kind: "overdue" });
+    expect(poScheduleBucket("2026-07-20", MWF, TODAY)).toEqual({ kind: "overdue" });
+  });
+
+  it("a dateless demand lands on the FIRST upcoming row — a human decides at the next run", () => {
+    expect(poScheduleBucket(null, MWF, "2026-08-04")).toEqual({
+      kind: "day",
+      day: "2026-08-05",
+    });
+  });
+});
+
+describe("weekdayName", () => {
+  it("speaks the operator's word for the row", () => {
+    expect(weekdayName("2026-08-05")).toBe("Wednesday");
+    expect(weekdayName("2026-08-07")).toBe("Friday");
+  });
+});
+
+describe("the row's own orderBy", () => {
+  it("each row carries its ORDER's earliest raise-by, never a sibling's", () => {
+    const ps = run([
+      ...PETER,
+      line({ lineId: "m1", sku: "M1401S-Q", orderId: "o7", so: 1290, customerName: "ng",
+        category: "mattress", supplierId: NICE_FUTURE, leadDays: 7, modelName: "M1401S",
+        deadline: "2026-08-20", offDays: OFFICE_OFF_DAYS }),
+      line({ lineId: "m2", sku: "M1401S-K", orderId: "o8", so: 1291, customerName: "tan",
+        category: "mattress", supplierId: NICE_FUTURE, leadDays: 7, modelName: "M1401S",
+        deadline: "2026-09-20", offDays: OFFICE_OFF_DAYS }),
+    ]);
+    const nf = ps.find((p) => p.label === "Nice Future · Mattress")!;
+    const near = nf.rows.find((r) => r.so === 1290)!;
+    const far = nf.rows.find((r) => r.so === 1291)!;
+    expect(near.orderBy).not.toBeNull();
+    expect(far.orderBy).not.toBeNull();
+    expect(near.orderBy! < far.orderBy!).toBe(true);
+    // The pair-level orderBy is the earliest row's, unchanged by the split.
+    expect(nf.orderBy).toBe(near.orderBy);
+  });
+
+  it("a dateless order's row has no orderBy at all — never a defaulted one", () => {
+    const ps = run([...KEE_TONG]);
+    expect(ps[0].rows[0].orderBy).toBeNull();
   });
 });

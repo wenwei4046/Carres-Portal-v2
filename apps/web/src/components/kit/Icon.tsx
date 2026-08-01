@@ -98,6 +98,10 @@ const GLYPH = {
   back: ArrowLeft,
   forward: ChevronRight,
   expand: ChevronDown,
+  /** A column's Excel filter caret (Jess, 2026-08-01: GitHub/Excel's quiet
+   *  ▼, never a sliders glyph). Shares ChevronDown the way ready/confirm
+   *  share Check — one meaning still has one glyph. */
+  columnFilter: ChevronDown,
   collapse: ChevronUp,
   // STATUS (inside a pill only)
   ready: Check,

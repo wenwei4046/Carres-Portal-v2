@@ -59,7 +59,7 @@ export const TO_ORDER_WORDS = {
   //    Preferred Delivery · SO No. · Model · Qty · PO No. Category is NOT a
   //    column (the left panel already said it) and Customer is not either
   //    (Loo: noise). PO No. rightmost = "did today's order happen". ───────
-  colPreferred: "Preferred Delivery",
+  colPreferred: "Customer Delivery",
   colSoNo: "SO No.",
   colModel: "Model",
   colQty: "Qty",
@@ -81,10 +81,48 @@ export const TO_ORDER_WORDS = {
   //    Each word still owed a COPY-STANDARD row. ───────────────────────────
   /** The left panel's first row — today's whole run, all categories. */
   navToday: "Today",
+  // ── The Work Queue (Jess's freeze, 2026-08-01): time views are INDEPENDENT
+  //    sets, never cumulative — Today ⊄ Tomorrow. Combining windows is the
+  //    grid's Excel filter's job, never the rail's. `All` carries no count
+  //    (All is all; the number adds nothing). Each word owed a COPY-STANDARD
+  //    row. ────────────────────────────────────────────────────────────────
+  /**
+   * The rail's first block — the PURCHASE CALENDAR (Jess, 2026-08-01,
+   * final): rows are the UPCOMING PO days from Settings' PO Days, rolling
+   * from today, plus a red Overdue row that the next run may never swallow.
+   * Today/Tomorrow/This Week/Next Week retired the same day.
+   */
+  poScheduleHeading: "PO Schedule",
+  /** The rail's second block heading — work ORDER, not a filter bar. */
+  categoryHeading: "CATEGORY",
+  categoryAll: "All",
+  /** Accessory KINDS get their own rail rows (Jess, 2026-08-01) — planned
+   *  ahead of the inventory-demand pipeline that will fill them. */
+  categoryPillow: "Pillow",
+  categoryMattressProtector: "Mattress Protector",
+  colCustomer: "Customer",
+  /**
+   * `Updated 10:32 AM` — not a Refresh button. The plan updates itself; this
+   * stamp answers the one AutoCount anxiety ("am I looking at the latest?").
+   */
+  updated: "Updated",
+  // ── The PO column speaks BUSINESS, not Excel (Jess, 2026-08-01, final):
+  //    an empty PO cell is not "no data" — it is WORK, and it says so. The
+  //    filter lists `Yet to Order` + the real PO numbers; `(Blanks)` and a
+  //    generic `Ordered` never appear (the number list IS ordered). ───────
+  yetToOrder: "Yet to Order",
+  filterOverdue: "Overdue",
+  /**
+   * The empty state while a FILTER is narrowing — §8.2's law: no reachable
+   * click may blank the table into a dead end, so the blank names its cause
+   * and hands back the way out.
+   */
+  filtersEmpty: "No rows match the filters.",
+  clearFilters: "Clear filters",
   /** The ☑'s aria word — picking rows for THIS batch, nothing more. */
   select: "Select",
   /** The pill (`+ …`); appears only when something is selected. */
-  issuePos: "Issue Purchase Orders",
+  issuePos: "Issue PO",
   /** The bottom bar's states. It exists only while it has something to say. */
   creatingPos: "Creating Purchase Orders…",
   createdWord: "Created",
@@ -208,9 +246,23 @@ export function pcsCount(n: number): string {
   return `${n} pcs`;
 }
 
-/** `3 SO selected` — the Issue pill's first line. */
-export function soSelectedShort(n: number): string {
-  return `${n} SO selected`;
+/**
+ * `28 selected` — the toolbar's quiet fact (Jess, 2026-08-01: the old
+ * `28 SO selected · → 10 Purchase Orders` was a formula, not a sentence —
+ * arrows are engine language). The CONSEQUENCE moved onto the button.
+ */
+export function selectedShort(n: number): string {
+  return `${n} selected`;
+}
+
+/**
+ * `Issue 2 POs` — the button (Jess, 2026-08-01, FINAL of three rounds):
+ * the caption says what is picked (`16 selected`), the button says what
+ * the click creates, in the trade's own shorthand. One line, no
+ * `Purchase Orders` spelt twice.
+ */
+export function issuePosShort(n: number): string {
+  return `Issue ${n} PO${n === 1 ? "" : "s"}`;
 }
 
 /**
@@ -286,6 +338,96 @@ export function poIndexLabel(i: number, total: number): string {
 /** `{N} purchase orders issued to {supplier}` — the success line. */
 export function issuedHeadline(n: number, supplier: string): string {
   return `${n} purchase order${n === 1 ? "" : "s"} issued to ${supplier}`;
+}
+
+// ── The PO Schedule (Jess's freeze, 2026-08-01, replacing the time buckets) ─
+//
+// The rail is a PURCHASE CALENDAR: one row per upcoming configured PO day
+// (rolling from today — yesterday's Monday is never shown), plus OVERDUE.
+//
+// THE SNAP RULE, verbatim hers: *"Always snap to the nearest earlier PO day.
+// Never move later."* Ordering early costs a few days of warehouse space;
+// ordering late risks the customer's date.
+//
+// THE PROTECTION RULE: a demand whose snapped PO day has PASSED stays in
+// OVERDUE — it is never silently rolled into the next run, or the operator
+// reads "Friday" on work that is already two days late.
+
+/** Where a demand sits on the purchase calendar. */
+export type PoScheduleBucket = { kind: "overdue" } | { kind: "day"; day: IsoDate };
+
+function addDaysIso(iso: IsoDate, days: number): IsoDate {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function weekdayOf(iso: IsoDate): number {
+  return new Date(`${iso}T00:00:00Z`).getUTCDay();
+}
+
+const WEEKDAY_WORDS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+/** `Wednesday` — a schedule row's word. The full date rides the row title. */
+export function weekdayName(iso: IsoDate): string {
+  return WEEKDAY_WORDS[weekdayOf(iso)]!;
+}
+
+/** Mon–Fri: the office's own week. Saturday/Sunday NEVER carry a PO run —
+ *  the Carres office does not work them (Jess, 2026-08-01). */
+const OFFICE_WEEKDAYS = [1, 2, 3, 4, 5] as const;
+
+/**
+ * The next instance of each configured PO weekday, from today INCLUSIVE,
+ * ascending — a Tuesday under Mon/Wed/Fri reads Wed · Fri · Mon. An empty
+ * configuration means "order any day": the calendar collapses to the next
+ * WORKING day — never a Saturday, whatever today is.
+ */
+export function poScheduleDays(poDays: readonly number[], today: IsoDate): IsoDate[] {
+  const wanted = poDays.length === 0 ? OFFICE_WEEKDAYS : poDays;
+  const limit = poDays.length === 0 ? 1 : poDays.length;
+  const days: IsoDate[] = [];
+  for (let i = 0; i < 9 && days.length < limit; i += 1) {
+    const d = addDaysIso(today, i);
+    if (wanted.includes(weekdayOf(d))) days.push(d);
+  }
+  return days;
+}
+
+/** The latest allowed PO day ON OR BEFORE the raw date — never later. An
+ *  empty configuration still refuses the weekend: a Saturday snaps to
+ *  Friday. */
+export function snapToPoDay(orderBy: IsoDate, poDays: readonly number[]): IsoDate {
+  const wanted = poDays.length === 0 ? OFFICE_WEEKDAYS : poDays;
+  for (let i = 0; i < 7; i += 1) {
+    const d = addDaysIso(orderBy, -i);
+    if (wanted.includes(weekdayOf(d))) return d;
+  }
+  return orderBy;
+}
+
+/**
+ * Which calendar row a demand belongs to. A dateless demand lands on the
+ * FIRST upcoming row — the engine cannot schedule it, so a human decides at
+ * the next run, not never. A snapped day already past is OVERDUE, always.
+ */
+export function poScheduleBucket(
+  orderBy: IsoDate | null,
+  poDays: readonly number[],
+  today: IsoDate,
+): PoScheduleBucket {
+  if (orderBy == null) return { kind: "day", day: poScheduleDays(poDays, today)[0]! };
+  const snapped = snapToPoDay(orderBy, poDays);
+  if (snapped < today) return { kind: "overdue" };
+  return { kind: "day", day: snapped };
 }
 
 // ── Business units ──────────────────────────────────────────────────────────
@@ -426,7 +568,37 @@ export interface ToOrderRow {
    * engine's and never reaches the screen). `null` when TBD.
    */
   delivery: IsoDate | null;
+  /**
+   * THIS ORDER's earliest raise-by — the engine's own date, carried ONLY so
+   * the Work Queue can bucket the row into Today / Tomorrow / This Week /
+   * Next Week. It is NEVER rendered: the GOLDEN RULE stands, the operator
+   * sees the customer's date and nothing of the engine's arithmetic.
+   */
+  orderBy: IsoDate | null;
   builds: ToOrderBuild[];
+}
+
+/**
+ * A row that already became a purchase order — read back so the grid can
+ * answer "what did we order" without leaving the page (Jess, 2026-08-01:
+ * Today + PO filter `Ordered` = 今天已经下了哪些). The server composes the
+ * label in the same voice as the demand rows; recent only — real history
+ * belongs to Purchase Orders.
+ */
+export interface ToOrderOrderedRow {
+  /** `purchase_orders.id` — the PO number IS the primary key. */
+  poId: string;
+  /** The day the PO was created — the row's time bucket runs on this. */
+  placedAt: IsoDate;
+  category: ProductCategory;
+  supplierId: string;
+  orderId: string | null;
+  customer: string | null;
+  so: number | null;
+  /** The customer's date, same meaning as a demand row's. */
+  delivery: IsoDate | null;
+  model: string;
+  qty: number;
 }
 
 export interface ToOrderProposal {
@@ -699,9 +871,12 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
 
       const bundle = bundleByLine.get(orderLines[0].lineId);
       const stockReady = bundle?.arriveBy ?? null;
+      /** This ORDER's earliest raise-by — the row's own time bucket runs on it. */
+      let rowOrderBy: IsoDate | null = null;
       for (const l of orderLines) {
         const rb = bundleByLine.get(l.lineId)?.raiseBy ?? null;
         if (rb && (orderBy == null || rb < orderBy)) orderBy = rb;
+        if (rb && (rowOrderBy == null || rb < rowOrderBy)) rowOrderBy = rb;
       }
 
       rows.push({
@@ -715,6 +890,7 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
             l.deadline != null && (min == null || l.deadline < min) ? l.deadline : min,
           null,
         ),
+        orderBy: rowOrderBy,
         qty,
         summary: composeSummary({
           model: orderLines[0].modelName,

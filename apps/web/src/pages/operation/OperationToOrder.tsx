@@ -1,68 +1,73 @@
 /**
- * Purchasing → **To Order** — the final freeze (Loo, 2026-08-01, after five
- * redesigns in one day): LEFT is Linear, RIGHT is GitHub Projects.
+ * Purchasing → **To Order** — the Work Queue + Excel Workspace
+ * (Jess's freeze, 2026-08-01, over Loo's final freeze of the same day).
  *
- * MISSION: decide which customer orders become purchase orders today.
- * Purchase Orders MANAGES the documents once they exist (preview ·
- * communication · audit · PDF · WhatsApp · revision · ready date — there,
- * not here). **Issue ≠ Send**: pressing Issue creates POs in the system;
- * nothing reaches a factory until the Purchase Orders page's WhatsApp step —
- * which is why there is no confirm dialog and no toast.
+ * MISSION (one sentence, hers): decide which customer orders become purchase
+ * orders today. Purchase Orders MANAGES the documents once they exist.
  *
- * THE GOLDEN RULE: the planning engine owns the schedule; operators own the
- * purchase order. `Order By` is the engine's word and NEVER reaches the
- * screen — the operator sees the CUSTOMER's date (Preferred Delivery) and
- * trusts that whatever is on this page is what today requires. Hold · Skip ·
- * Next Run · Postpone do not exist and never may.
+ * THE PAGE IS TWO DIMENSIONS AND NOTHING ELSE:
  *
- * The LEFT PANEL is an ACTION LAUNCHER, not navigation (200px, Linear's
- * density, ~30px rows): Today · Mattress · Bedframe · Sofa (each with its
- * order count; clicking filters the grid) · `+ Create Purchase` (the manual
- * entrance — a real dialog from day one; its SAVE arrives with the unified
- * `purchase_demands` card, so the Create button is disabled and says so) ·
- * the Issue pill, which exists only while something is selected and states
- * exactly what the button will do. No VIEWS/GROUP/SORT labels, no system
- * words, no H1 anywhere — the lit tab is the page identity.
+ * LEFT = the WORK QUEUE (Linear's density). Two blocks:
+ *   · PO SCHEDULE — the PURCHASE CALENDAR (Jess, 2026-08-01): one row per
+ *     upcoming configured PO day, ROLLING from today (yesterday's Monday is
+ *     never shown), each demand snapped to the nearest EARLIER PO day —
+ *     never later. A red OVERDUE row sits above the calendar and the next
+ *     run may never swallow it. The engine opens the first upcoming run;
+ *     the operator roams freely.
+ *   · CATEGORY — All · Mattress · Bedframe · Sofa, the WORK ORDER (清完一类
+ *     再下一类), no counts (the grid answers the moment you click).
+ *   · `+ Create Purchase` — the manual entrance, may never be missing.
  *
- * The GRID is the only scroll area, GitHub-Projects density (40px kit rows),
- * SIX columns and no more: ☑ · Preferred Delivery · SO No. · Model · Qty ·
- * PO No. Category is NOT a column (the left panel already said it) and
- * Customer is not either (Loo: noise). PO No. rightmost answers "did
- * today's order happen" — `—` until Issue, then the number, in place; rows
- * never vanish. Today's rows arrive PRE-SELECTED; overrides are DELTAS a
- * refetch cannot overturn. Overdue (customer date past) is red and sorts
- * first, then Preferred Delivery ascending.
+ * RIGHT = the EXCEL WORKSPACE. One toolbar (2990's language: pill search ·
+ * selection state · the Issue pill, which EXISTS ONLY WHILE SOMETHING IS
+ * SELECTED · a quiet `Updated hh:mm` — never a Refresh). One grid, SIX frozen
+ * columns; every column sorts by header click and filters by its ▼ — and the
+ * PO filter speaks business: `Not Ordered` / `Ordered`, never `(Blanks)`.
+ * No Status pills (two filter doors for one fact is the Excel sin), no Sort
+ * By, no Group By.
  *
- * On Issue: the pill goes `Creating…`, one POST per supplier×category group
- * (the ARRANGEMENT only — no SKU, no qty, no price), the grid updates in
- * place (☑ gone, PO No. filled), the left counts drop, and the bottom bar —
- * which exists only while it has something to say — reads `N Purchase
- * Orders Created · Continue in Purchase Orders →`. A partial failure stays
- * in the bar with Retry until it succeeds. Zero popups. Destination is not
- * asked here: the engine uses the default; per-PO confirmation lives on the
- * generated documents (and per-PO destination arrives with v2's split).
+ * THE GOLDEN RULE STANDS: `Order By` never reaches the screen. Each row
+ * carries it ONLY to know its time bucket; the operator sees the CUSTOMER's
+ * date. Engine pre-selects exactly its own plan (orderBy ≤ today); rows in
+ * later buckets start unticked and a human ticks them — overrides are DELTAS
+ * a refetch cannot overturn.
+ *
+ * ORDERED rows (recent POs, one row per customer order) stay in the grid in
+ * their time bucket — `Today + Ordered` answers 今天已经下了哪些. Their PO No.
+ * is a link that lands on Purchase Orders with that PO opened: the receipt is
+ * the door to the next step. Real history belongs to Purchase Orders.
+ *
+ * On Issue: zero popups, zero toasts — the pill goes `Creating…`, one POST
+ * per supplier×category group (ARRANGEMENT only), rows update IN PLACE, the
+ * left counts fall, the bottom bar reports and a partial failure stays with
+ * Retry until it succeeds.
  */
 import { useMemo, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   TO_ORDER_WORDS as W,
   categoryLabel,
-  countItems,
+  countOrders,
   defaultDocuments,
   ordersHeadline,
+  poScheduleBucket,
+  poScheduleDays,
+  weekdayName,
   posCreatedLine,
-  purchaseOrderCount,
   railItemLabel,
-  soSelectedShort,
+  selectedShort,
+  issuePosShort,
   toOrderBuilds,
+  unresolvedHeadline,
+  type ToOrderOrderedRow,
   type ToOrderProposal,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import Card from "@/components/kit/Card";
-import Checkbox from "@/components/kit/Checkbox";
-import DataTable, { type Column } from "@/components/kit/DataTable";
+import DataTable, { type Column, type ColumnFilter, type TableSort } from "@/components/kit/DataTable";
 import EmptyState from "@/components/kit/EmptyState";
+import GridToolbar from "@/components/kit/GridToolbar";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
@@ -92,8 +97,12 @@ interface Unresolved {
 
 interface ToOrderResponse {
   today: string;
+  /** Settings' PO Days — the rail's purchase calendar runs on it. */
+  poDays?: number[];
   proposals: ToOrderProposal[];
   destinations: Destination[];
+  /** Recent POs read back — the grid's `Ordered` answer. */
+  ordered?: ToOrderOrderedRow[];
   /** Demand the catalog could not answer for. Empty is the only healthy value. */
   unresolved?: Unresolved[];
 }
@@ -110,24 +119,73 @@ type GroupResult =
   | { status: "done"; pos: string[] }
   | { status: "failed"; message: string };
 
-/** One grid row = one SO within one supplier×category proposal. */
+/** One grid row = one BUILD (a thing with a MODEL NAME — `2 items` is
+ *  banned from the Model column, Jess 2026-08-01) within one
+ *  supplier×category proposal — or one already-ordered build on a recent
+ *  PO. The ☑ stays build-level exactly as Loo froze it: membership of THIS
+ *  purchase order, nothing more. */
 interface GridRow {
   key: string;
-  proposalKey: string;
+  proposalKey: string | null;
+  buildKey: string | null;
   category: string;
-  orderId: string;
+  orderId: string | null;
+  customer: string | null;
   so: number | null;
   delivery: string | null;
   late: boolean;
   model: string;
   qty: number;
+  /**
+   * The calendar row this demand belongs to: `overdue` · a PO day's ISO
+   * date · `past` (an old ordered row — Purchase Orders' business). Built
+   * from the engine's orderBy, which itself never renders.
+   */
+  bucket: string;
+  /** Set on a row the server read back as already ordered. */
+  orderedPo: string | null;
 }
 
 /**
- * Loo's fixed walking order. Accessories join when their reorder track does —
- * an unknown category lands after the sequence rather than crashing the sort.
+ * The rail's CATEGORY rows — Loo's walking order, then the two accessory
+ * KINDS Jess planned ahead (2026-08-01): their demand arrives with the
+ * inventory pipeline; the rows exist so the layout never moves again.
  */
-const CATEGORY_SEQUENCE = ["mattress", "bedframe", "sofa", "accessory"];
+const RAIL_CATEGORIES: { key: string; word: string }[] = [
+  { key: "mattress", word: categoryLabel("mattress") },
+  { key: "bedframe", word: categoryLabel("bedframe") },
+  { key: "sofa", word: categoryLabel("sofa") },
+  { key: "pillow", word: W.categoryPillow },
+  { key: "mattress_protector", word: W.categoryMattressProtector },
+];
+
+/** Where a PO's document lives — the per-supplier channel tab. */
+const PO_TAB_SLUG: Record<string, string> = {
+  mattress: "nice-future",
+  sofa: "hookka-sofa",
+  bedframe: "hookka-bedframe",
+};
+
+/** `10:32 AM` — locale-free on purpose, so a CI node prints what Jess sees. */
+function clockLabel(ms: number): string {
+  const d = new Date(ms);
+  const h = d.getHours();
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(d.getMinutes()).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
+/** `mee yee` → `Mee Yee`, `PETER` → `Peter` — display only, the record keeps
+ *  what was typed. */
+function properCase(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/(^|[\s\-\/])([a-z])/g, (_m, sep, ch) => sep + ch.toUpperCase());
+}
+
+/** Sentinels for filter options that are facts, not values. */
+const F_OVERDUE = "__overdue__";
+const F_NONE = "__none__";
+const F_NOT_ORDERED = "__not_ordered__";
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
@@ -141,116 +199,338 @@ export default function OperationToOrder() {
   });
 
   const proposals = useMemo(() => q.data?.proposals ?? [], [q.data]);
+  const poDays = useMemo(() => q.data?.poDays ?? [], [q.data]);
+  const orderedRows = useMemo(() => q.data?.ordered ?? [], [q.data]);
   const destinations = useMemo(() => q.data?.destinations ?? [], [q.data]);
   const unresolved = useMemo(() => q.data?.unresolved ?? [], [q.data]);
   const today = q.data?.today ?? null;
 
-  /** The left panel's pick — Today (everything) or one category. */
-  const [cat, setCat] = useState<string>("today");
+  /**
+   * The Work Queue's two picks live in the URL, so a refresh or a shared
+   * link keeps the view (the 2990 habit). The engine still opens Today.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  /** The purchase calendar — one row per upcoming configured PO day. */
+  const scheduleDays = useMemo(
+    () => (today ? poScheduleDays(poDays, today) : []),
+    [poDays, today],
+  );
+  // Both rail blocks MULTI-SELECT (Jess, 2026-08-01): tick two runs, tick
+  // two categories — the grid is the union. Empty = the default.
+  const rawView = searchParams.get("view");
+  const viewSet = useMemo(() => {
+    // No param = the engine's opening (first upcoming run). An EXPLICIT
+    // empty (`view=`) = the operator cleared the block: NO time narrowing
+    // at all — the second way to place (Jess, 2026-08-01: browse by
+    // category alone; nothing forces a run to stay lit).
+    if (rawView == null) {
+      return new Set(scheduleDays[0] ? [scheduleDays[0]] : []) as ReadonlySet<string>;
+    }
+    return new Set(
+      rawView.split(",").filter((v) => v === "overdue" || scheduleDays.includes(v)),
+    ) as ReadonlySet<string>;
+  }, [rawView, scheduleDays]);
+  const rawCat = searchParams.get("cat");
+  const catSet = useMemo(
+    () =>
+      new Set(
+        (rawCat ?? "").split(",").filter((c) => RAIL_CATEGORIES.some((r) => r.key === c)),
+      ) as ReadonlySet<string>,
+    [rawCat],
+  );
+  const setParam = (key: "view" | "cat", value: string) =>
+    setSearchParams(
+      (prev) => {
+        const n = new URLSearchParams(prev);
+        n.set(key, value);
+        return n;
+      },
+      { replace: true },
+    );
+  const toggleView = (v: string) => {
+    const n = new Set(viewSet);
+    if (n.has(v)) n.delete(v);
+    else n.add(v);
+    setParam("view", [...n].join(","));
+  };
+  const toggleCat = (c: string) => {
+    const n = new Set(catSet);
+    if (n.has(c)) n.delete(c);
+    else n.add(c);
+    setParam("cat", [...n].join(","));
+  };
+  const clearCats = () => setParam("cat", "");
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<TableSort | null>(null);
+  /** Per-column Excel filters. An absent key = no filter. */
+  const [colFilters, setColFilters] = useState<ReadonlyMap<string, ReadonlySet<string>>>(
+    new Map(),
+  );
   /**
    * The operator's overrides, as DELTAS against the engine's default — never
    * an absolute set, so a refetch pre-ticks NEW rows and never overturns a
-   * human's untick (or tick) of a row it has seen before.
+   * human's untick (or tick) of a row it has seen before. Two sets because
+   * the default now differs by bucket: today's plan is ON, the future is OFF.
    */
   const [userOff, setUserOff] = useState<ReadonlySet<string>>(new Set());
+  const [userOn, setUserOn] = useState<ReadonlySet<string>>(new Set());
   /** PO numbers won this session, by row key — the grid updates in place. */
   const [rowPo, setRowPo] = useState<ReadonlyMap<string, string>>(new Map());
   const [results, setResults] = useState<ReadonlyMap<string, GroupResult>>(new Map());
   const [creating, setCreating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  /**
-   * TODAY'S plan only — the page IS today (Loo: whatever appears here is what
-   * today requires; the engine already filtered). Demand the engine cannot
-   * plan (`blocked`) cannot be issued and is not listed — its home is the
-   * Settings gap it names, and surfacing it here again is a next-card call.
-   */
-  const todays = useMemo(
-    () =>
-      proposals.filter(
-        (p) =>
-          p.blocked == null && (today == null || p.orderBy == null || p.orderBy <= today),
-      ),
-    [proposals, today],
-  );
+  /** Demand the engine cannot plan (`blocked`) cannot be issued — not listed. */
+  const planned = useMemo(() => proposals.filter((p) => p.blocked == null), [proposals]);
 
-  /** The grid rows — flat, business language only. */
+  /** Every grid row — demand first, then what was already ordered. */
   const allRows = useMemo<GridRow[]>(() => {
     const rows: GridRow[] = [];
-    for (const p of todays) {
+    for (const p of planned) {
       for (const r of p.rows) {
-        const b = r.builds;
-        rows.push({
-          key: `${p.key}:${r.orderId}`,
-          proposalKey: p.key,
-          category: p.category,
-          orderId: r.orderId,
-          so: r.so,
-          delivery: r.delivery ?? null,
-          late: today != null && r.delivery != null && r.delivery < today,
-          model:
-            b.length === 1
-              ? railItemLabel(b[0]!.model, b[0]!.size ?? null)
-              : countItems(b.length),
-          qty: r.qty,
-        });
+        // NO delivery date = NOT purchasable work (Jess, 2026-08-01, ruled
+        // three times over my objection — she is right): the engine cannot
+        // schedule it, and pre-ticking a run with goods for an unconfirmed
+        // order is worse than hiding them. NOT lost demand: the moment the
+        // date is confirmed the projection brings the order straight back,
+        // and chasing that confirmation is the Orders module's own Call
+        // customer action. Ordered rows (receipts) are unaffected.
+        if (r.delivery == null) continue;
+        const bucket =
+          today == null
+            ? "overdue"
+            : (() => {
+                const b = poScheduleBucket(r.orderBy ?? null, poDays, today);
+                return b.kind === "overdue" ? "overdue" : b.day;
+              })();
+        for (const b of r.builds) {
+          rows.push({
+            key: `${p.key}:${r.orderId}:${b.key}`,
+            proposalKey: p.key,
+            buildKey: b.key,
+            category: p.category,
+            orderId: r.orderId,
+            customer: r.customer ?? null,
+            so: r.so,
+            delivery: r.delivery ?? null,
+            late: today != null && r.delivery != null && r.delivery < today,
+            model: railItemLabel(b.model, b.size ?? null),
+            qty: b.qty,
+            bucket,
+            orderedPo: null,
+          });
+        }
       }
     }
-    // Overdue first (the customer's date is PAST), then soonest customer
-    // date; undated sink. The engine's own dates never sort the screen.
-    rows.sort(
-      (a, b) =>
-        (b.late ? 1 : 0) - (a.late ? 1 : 0) ||
-        (a.delivery ?? "9999-12-31").localeCompare(b.delivery ?? "9999-12-31") ||
-        (a.so ?? 0) - (b.so ?? 0),
-    );
-    return rows;
-  }, [todays, today]);
-
-  /** Left-panel counts — unissued work, so they fall as POs are created. */
-  const catCounts = useMemo(() => {
-    const m = new Map<string, number>();
-    const orders = new Set<string>();
-    for (const r of allRows) {
-      if (rowPo.has(r.key)) continue;
-      m.set(r.category, (m.get(r.category) ?? 0) + 1);
-      orders.add(r.orderId);
+    const demandKeys = new Set(rows.map((r) => r.key));
+    for (const o of orderedRows) {
+      const key = `po:${o.poId}:${o.orderId ?? o.so ?? "manual"}`;
+      if (demandKeys.has(key)) continue;
+      rows.push({
+        key,
+        proposalKey: null,
+        buildKey: null,
+        category: o.category,
+        orderId: o.orderId,
+        customer: o.customer ?? null,
+        so: o.so,
+        delivery: o.delivery,
+        late: today != null && o.delivery != null && o.delivery < today,
+        model: o.model,
+        qty: o.qty,
+        // Ordered TODAY sits on the current run's row (今天下了哪些);
+        // older receipts belong to Purchase Orders, not this calendar.
+        bucket: o.placedAt === today ? (scheduleDays[0] ?? "past") : "past",
+        orderedPo: o.poId,
+      });
     }
-    return { byCat: m, todayOrders: orders.size };
+    return rows;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planned, orderedRows, today, poDays, scheduleDays]);
+
+  /** A row's PO, whichever way it got one — this session or the server. */
+  const poOf = (r: GridRow) => rowPo.get(r.key) ?? r.orderedPo;
+
+  /** The rail's counts — unissued work per calendar row, falling as POs land. */
+  const timeCounts = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const r of allRows) {
+      if (poOf(r)) continue;
+      const s = m.get(r.bucket) ?? new Set<string>();
+      s.add(r.orderId ?? r.key);
+      m.set(r.bucket, s);
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allRows, rowPo]);
 
-  const visibleRows = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    return allRows.filter(
-      (r) =>
-        (cat === "today" || r.category === cat) &&
-        (needle === "" ||
-          (r.so != null && `so-${r.so}`.includes(needle)) ||
-          r.model.toLowerCase().includes(needle)),
-    );
-  }, [allRows, cat, search]);
+  // ── The Excel pipeline: view → category → search → column filters → sort ──
 
-  const isSelected = (r: GridRow) => !rowPo.has(r.key) && !userOff.has(r.key);
+  const inView = useMemo(
+    () =>
+      allRows.filter(
+        (r) =>
+          (viewSet.size === 0 || viewSet.has(r.bucket)) &&
+          (catSet.size === 0 || catSet.has(r.category)) &&
+          (search.trim() === "" ||
+            (r.so != null && `so-${r.so}`.includes(search.trim().toLowerCase())) ||
+            r.model.toLowerCase().includes(search.trim().toLowerCase()) ||
+            (r.customer ?? "").toLowerCase().includes(search.trim().toLowerCase()) ||
+            (poOf(r) ?? "").toLowerCase().includes(search.trim().toLowerCase())),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allRows, viewSet, catSet, search, rowPo],
+  );
+
+  /** Does a row pass ONE column's filter? Sentinels are facts, not values. */
+  function passes(r: GridRow, colKey: string, sel: ReadonlySet<string>): boolean {
+    if (sel.size === 0) return true;
+    switch (colKey) {
+      case "delivery":
+        return (
+          (sel.has(F_OVERDUE) && r.late) ||
+          sel.has(r.delivery ?? F_NONE)
+        );
+      case "so":
+        return sel.has(r.so != null ? String(r.so) : F_NONE);
+      case "model":
+        return sel.has(r.model);
+      case "customer":
+        return sel.has(r.customer ?? F_NONE);
+      case "qty":
+        return sel.has(String(r.qty));
+      case "po": {
+        const po = poOf(r);
+        return (sel.has(F_NOT_ORDERED) && !po) || (po != null && sel.has(po));
+      }
+      default:
+        return true;
+    }
+  }
+
+  /** Rows passing every column filter EXCEPT `except` — Excel's cascade. */
+  const filteredExcept = (except: string | null) =>
+    inView.filter((r) =>
+      [...colFilters.entries()].every(
+        ([k, sel]) => k === except || passes(r, k, sel),
+      ),
+    );
+
+  const visibleRows = useMemo(() => {
+    const rows = filteredExcept(null);
+    const dir = sort?.dir === "desc" ? -1 : 1;
+    const cmpNull = <T,>(a: T | null, b: T | null, cmp: (x: T, y: T) => number) => {
+      if (a == null && b == null) return 0;
+      if (a == null) return 1; // nulls sink under BOTH directions
+      if (b == null) return -1;
+      return cmp(a, b) * dir;
+    };
+    const sorted = [...rows];
+    if (sort == null) {
+      // The frozen default: overdue first, then the customer's soonest date.
+      sorted.sort(
+        (a, b) =>
+          (b.late ? 1 : 0) - (a.late ? 1 : 0) ||
+          (a.delivery ?? "9999-12-31").localeCompare(b.delivery ?? "9999-12-31") ||
+          (a.so ?? 0) - (b.so ?? 0),
+      );
+    } else {
+      sorted.sort((a, b) => {
+        switch (sort.key) {
+          case "delivery":
+            return cmpNull(a.delivery, b.delivery, (x, y) => x.localeCompare(y));
+          case "so":
+            return cmpNull(a.so, b.so, (x, y) => x - y);
+          case "model":
+            return a.model.localeCompare(b.model) * dir;
+          case "customer":
+            return cmpNull(a.customer, b.customer, (x, y) => x.localeCompare(y));
+          case "qty":
+            return (a.qty - b.qty) * dir;
+          case "po":
+            return cmpNull(poOf(a), poOf(b), (x, y) => x.localeCompare(y));
+          default:
+            return 0;
+        }
+      });
+    }
+    return sorted;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, colFilters, sort, rowPo]);
+
+  // ── Selection: the engine pre-ticks ITS plan, a human ticks the rest ──────
+
+  const defaultOn = (r: GridRow) =>
+    (r.bucket === "overdue" || r.bucket === scheduleDays[0]) && !poOf(r);
+  const isSelected = (r: GridRow) =>
+    !poOf(r) && (defaultOn(r) ? !userOff.has(r.key) : userOn.has(r.key));
   const toggleRow = (r: GridRow) => {
-    if (rowPo.has(r.key)) return;
+    if (poOf(r)) return;
+    if (defaultOn(r)) {
+      setUserOff((s) => {
+        const n = new Set(s);
+        if (n.has(r.key)) n.delete(r.key);
+        else n.add(r.key);
+        return n;
+      });
+    } else {
+      setUserOn((s) => {
+        const n = new Set(s);
+        if (n.has(r.key)) n.delete(r.key);
+        else n.add(r.key);
+        return n;
+      });
+    }
+  };
+
+  const selectedKeys = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of allRows) if (isSelected(r)) s.add(r.key);
+    return s;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRows, userOff, userOn, rowPo]);
+
+  const rowByKey = useMemo(() => new Map(allRows.map((r) => [r.key, r])), [allRows]);
+
+  /** Header select-all — over the rows the operator can SEE, Excel's rule. */
+  const toggleAllVisible = () => {
+    const vis = visibleRows.filter((r) => !poOf(r));
+    if (vis.length === 0) return;
+    const allSel = vis.every(isSelected);
     setUserOff((s) => {
       const n = new Set(s);
-      if (n.has(r.key)) n.delete(r.key);
-      else n.add(r.key);
+      for (const r of vis) {
+        if (!defaultOn(r)) continue;
+        if (allSel) n.add(r.key);
+        else n.delete(r.key);
+      }
+      return n;
+    });
+    setUserOn((s) => {
+      const n = new Set(s);
+      for (const r of vis) {
+        if (defaultOn(r)) continue;
+        if (allSel) n.delete(r.key);
+        else n.add(r.key);
+      }
       return n;
     });
   };
 
-  /** What the pill will do — per group, from the shared projection. */
+  /** What the pill will do — per group, from the shared projection. The ☑
+   *  is BUILD-level, exactly Loo's frozen meaning: membership of THIS
+   *  purchase order. And the batch is VIEW-SCOPED (Jess, 2026-08-01,
+   *  Excel's iron law): Issue acts on the sheet in front of you — a tick
+   *  hidden by a filter neither counts nor issues; it waits, remembered,
+   *  for when its view is back. */
   const batch = useMemo(() => {
     const selectedByProposal = new Map<string, Set<string>>();
     let selectedRows = 0;
-    for (const r of allRows) {
-      if (!isSelected(r)) continue;
+    for (const r of visibleRows) {
+      if (r.proposalKey == null || r.buildKey == null || !isSelected(r)) continue;
       selectedRows += 1;
       const s = selectedByProposal.get(r.proposalKey) ?? new Set<string>();
-      s.add(r.orderId);
+      s.add(r.buildKey);
       selectedByProposal.set(r.proposalKey, s);
     }
     let poCount = 0;
@@ -259,7 +539,7 @@ export default function OperationToOrder() {
       docs: { key: string; include: boolean; buildKeys: string[] }[];
       orderIdsByDoc: string[][];
     }[] = [];
-    for (const p of todays) {
+    for (const p of planned) {
       const sel = selectedByProposal.get(p.key);
       if (!sel || sel.size === 0) continue;
       const orderOf = new Map(toOrderBuilds(p).map((b) => [b.buildKey, b.orderId]));
@@ -267,7 +547,7 @@ export default function OperationToOrder() {
         .map((d) => ({
           key: d.key,
           include: true,
-          buildKeys: d.buildKeys.filter((k) => sel.has(orderOf.get(k) ?? "")),
+          buildKeys: d.buildKeys.filter((k) => sel.has(k)),
         }))
         .filter((d) => d.buildKeys.length > 0);
       if (docs.length === 0) continue;
@@ -282,7 +562,7 @@ export default function OperationToOrder() {
     }
     return { selectedRows, poCount, targets };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allRows, userOff, rowPo, todays]);
+  }, [visibleRows, userOff, userOn, rowPo, planned]);
 
   const defaultDest = destinations.find((d) => d.isDefault) ?? destinations[0] ?? null;
 
@@ -319,12 +599,16 @@ export default function OperationToOrder() {
             pos: res.pos.map((x) => x.id),
           }),
         );
-        // The grid updates IN PLACE: each doc's orders take its PO number.
+        // The grid updates IN PLACE: each doc's builds take its PO number.
         setRowPo((m) => {
           const n = new Map(m);
-          t.orderIdsByDoc.forEach((orderIds, i) => {
+          const orderOf = new Map(
+            toOrderBuilds(t.proposal).map((b) => [b.buildKey, b.orderId]),
+          );
+          t.docs.forEach((d, i) => {
             const po = res.pos[i]?.id ?? res.pos[0]?.id ?? "PO";
-            for (const orderId of orderIds) n.set(`${t.proposal.key}:${orderId}`, po);
+            for (const k of d.buildKeys)
+              n.set(`${t.proposal.key}:${orderOf.get(k)}:${k}`, po);
           });
           return n;
         });
@@ -353,60 +637,166 @@ export default function OperationToOrder() {
     (n, r) => (r.status === "done" ? n + r.pos.length : n),
     0,
   );
+  const donePoIds = useMemo(
+    () => [...results.values()].flatMap((r) => (r.status === "done" ? r.pos : [])),
+    [results],
+  );
+  /** ✕ on the success band — done entries clear; failures may NOT be waved off. */
+  const dismissDone = () =>
+    setResults((m) => new Map([...m].filter(([, r]) => r.status !== "done")));
   const unread = unresolved.length > 0;
   const barHasSomething = creating || donePoCount > 0 || failedKeys.size > 0 || unread;
 
-  // ── Grid columns — Loo's frozen six, and not one more ────────────────────
+  // ── Column filters — every column, Excel's shape, business words ─────────
+
+  const setColFilter = (key: string) => (next: ReadonlySet<string>) =>
+    setColFilters((m) => {
+      const n = new Map(m);
+      if (next.size === 0) n.delete(key);
+      else n.set(key, next);
+      return n;
+    });
+
+  const filterFor = (key: string, options: ColumnFilter["options"], searchable = false): ColumnFilter => ({
+    options,
+    selected: colFilters.get(key) ?? new Set(),
+    onChange: setColFilter(key),
+    label: `${W.filterLabel} ${key}`,
+    clearLabel: W.cancel,
+    ...(searchable ? { searchPlaceholder: W.searchPlaceholder } : {}),
+  });
+
+  const deliveryOptions = useMemo(() => {
+    const base = filteredExcept("delivery");
+    const opts: { value: string; label: string }[] = [
+      { value: F_OVERDUE, label: W.filterOverdue },
+    ];
+    const dates = [...new Set(base.map((r) => r.delivery).filter(Boolean))] as string[];
+    dates.sort();
+    for (const d of dates) opts.push({ value: d, label: fmtDate(d) });
+    if (base.some((r) => r.delivery == null))
+      opts.push({ value: F_NONE, label: W.noDeliveryDate });
+    return opts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, colFilters]);
+
+  const soOptions = useMemo(() => {
+    const base = filteredExcept("so");
+    const sos = [...new Set(base.map((r) => r.so).filter((x) => x != null))] as number[];
+    sos.sort((a, b) => a - b);
+    return sos.map((s) => ({ value: String(s), label: `SO-${s}` }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, colFilters]);
+
+  const modelOptions = useMemo(() => {
+    const base = filteredExcept("model");
+    const models = [...new Set(base.map((r) => r.model))].sort();
+    return models.map((m) => ({ value: m, label: m }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, colFilters]);
+
+  const customerOptions = useMemo(() => {
+    const base = filteredExcept("customer");
+    const vals = [...new Set(base.map((r) => r.customer ?? F_NONE))].sort();
+    return vals.map((v) => ({ value: v, label: v === F_NONE ? "—" : properCase(v) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, colFilters]);
+
+  const poOptions = useMemo(() => {
+    const base = filteredExcept("po");
+    const opts: { value: string; label: string }[] = [
+      { value: F_NOT_ORDERED, label: W.yetToOrder },
+    ];
+    const pos = [...new Set(base.map((r) => poOf(r)).filter(Boolean))] as string[];
+    pos.sort();
+    for (const p of pos) opts.push({ value: p, label: p });
+    return opts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, colFilters, rowPo]);
+
+  // ── Grid columns — Loo's frozen six, now with the Excel reflexes ─────────
   const columns: readonly Column<GridRow>[] = [
-    {
-      key: "sel",
-      label: "",
-      width: 6,
-      cell: (r) =>
-        rowPo.has(r.key) ? null : (
-          <Checkbox
-            id={`row-${r.key}`}
-            ariaLabel={W.select}
-            checked={isSelected(r)}
-            onCheckedChange={() => toggleRow(r)}
-          />
-        ),
-    },
     {
       key: "delivery",
       label: W.colPreferred,
       width: 20,
+      sortable: true,
+      filter: filterFor("delivery", deliveryOptions),
       cell: (r) => (
         <span
           className={
             r.late ? "text-kit-red-11 font-medium tabular-nums" : "tabular-nums"
           }
         >
-          {r.delivery ? fmtDate(r.delivery) : "—"}
+          {r.delivery ? (
+            fmtDate(r.delivery)
+          ) : (
+            <span className="text-kit-slate-11">{W.noDeliveryDate}</span>
+          )}
         </span>
       ),
     },
     {
       key: "so",
       label: W.colSoNo,
-      width: 14,
+      width: "104px",
+      sortable: true,
+      filter: filterFor("so", soOptions, true),
       cell: (r) => (r.so != null ? `SO-${r.so}` : "—"),
     },
-    { key: "model", label: W.colModel, width: 36, cell: (r) => r.model },
-    { key: "qty", label: W.colQty, width: 10, align: "right", numeric: true, cell: (r) => r.qty },
+    {
+      key: "customer",
+      label: W.colCustomer,
+      width: "150px",
+      sortable: true,
+      filter: filterFor("customer", customerOptions, true),
+      cell: (r) => (r.customer ? properCase(r.customer) : "—"),
+    },
+    {
+      key: "model",
+      label: W.colModel,
+      width: "170px",
+      sortable: true,
+      filter: filterFor("model", modelOptions, true),
+      cell: (r) => r.model,
+    },
+    {
+      key: "qty",
+      label: W.colQty,
+      width: "64px",
+      align: "right",
+      numeric: true,
+      sortable: true,
+      // NO filter caret here (Jess, 2026-08-01): a distinct-value list of
+      // 1·2·3 filters nothing worth the button, and on a narrow numeric
+      // column the caret is what pushed the word off the numbers' edge.
+      cell: (r) => r.qty,
+    },
     {
       key: "po",
       label: W.colPoNo,
-      width: 14,
+      width: "auto",
+      sortable: true,
+      filter: filterFor("po", poOptions),
       cell: (r) => {
-        const po = rowPo.get(r.key);
-        if (!po) return "—";
-        // The number is the receipt AND the door to the next step.
+        const po = poOf(r);
+        // Not "no data" — WORK. Muted, unclickable, filterable by name.
+        if (!po) return <span className="text-kit-slate-11">{W.yetToOrder}</span>;
+        // The number is the receipt AND the door to the next step: it lands
+        // on Purchase Orders with THIS document opened.
+        const slug = PO_TAB_SLUG[r.category];
         return (
           <button
             type="button"
+            title="Open Purchase Order →"
             className="text-kit-blue-11 tabular-nums hover:underline"
-            onClick={() => navigate("/operation/procurement")}
+            onClick={() =>
+              navigate(
+                slug
+                  ? `/operation/procurement/${slug}?po=${encodeURIComponent(po)}`
+                  : "/operation/procurement",
+              )
+            }
             data-testid={`row-po-${r.key}`}
           >
             {po}
@@ -416,8 +806,14 @@ export default function OperationToOrder() {
     },
   ];
 
+  const updatedMs = q.dataUpdatedAt;
+
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-kit-slate-3">
+    /* h-full, not flex-1: the app wrapper is overflow-auto, so a page that
+     * GROWS makes the whole page scroll. Filling the frame instead keeps the
+     * header strip and toolbar still — the grid is the only scroll area
+     * (the Orders page's own behaviour). */
+    <div className="h-full min-h-0 flex flex-col bg-kit-slate-3">
       {/* ── The top strip — the Orders page's own shape: breadcrumb + the
            shared icon cluster. No H1, no search here. ─────────────────── */}
       <div
@@ -435,27 +831,63 @@ export default function OperationToOrder() {
       <PurchasingTabs />
 
       <div className="flex-1 min-h-0 flex overflow-hidden">
-        {/* ── The ACTION LAUNCHER (Linear's density; no heading — we are
-             already at To Order, and the lit tab says so). ─────────────── */}
+        {/* ── The WORK QUEUE (Linear's density; no heading — we are already
+             at To Order, and the lit tab says so). Two blocks: TIME, then
+             CATEGORY — never mixed (Jess: 上半部 = 时间视角, 下半部 = 商品
+             类别). ────────────────────────────────────────────────────── */}
         <aside
           className="w-[200px] shrink-0 min-h-0 overflow-y-auto border-r border-kit-slate-5 px-3 py-3 flex flex-col"
           data-testid="to-order-nav"
         >
-          <NavRow
-            active={cat === "today"}
-            onClick={() => setCat("today")}
-            testId="to-order-cat-today"
-            name={W.navToday}
-            count={ordersHeadline(catCounts.todayOrders)}
-          />
-          {CATEGORY_SEQUENCE.slice(0, 3).map((c) => (
+          <span className="px-2 pb-1 text-label font-medium uppercase text-kit-slate-11">
+            {W.poScheduleHeading}
+          </span>
+          {/* The protection rule: a passed PO day is OVERDUE, red, ABOVE the
+              calendar — never swallowed by the next run. Rendered only when
+              it has something to say. */}
+          {(timeCounts.get("overdue")?.size ?? 0) > 0 ? (
             <NavRow
-              key={c}
-              active={cat === c}
-              onClick={() => setCat(c)}
-              testId={`to-order-cat-${c}`}
-              name={categoryLabel(c)}
-              count={ordersHeadline(catCounts.byCat.get(c) ?? 0)}
+              active={viewSet.has("overdue")}
+              onClick={() => toggleView("overdue")}
+              testId="to-order-overdue"
+              name={W.filterOverdue}
+              tone="danger"
+              count={String(timeCounts.get("overdue")?.size ?? 0)}
+              countWord={ordersHeadline(timeCounts.get("overdue")?.size ?? 0)}
+            />
+          ) : null}
+          {scheduleDays.map((day) => (
+            <NavRow
+              key={day}
+              active={viewSet.has(day)}
+              onClick={() => toggleView(day)}
+              testId={`to-order-day-${day}`}
+              name={weekdayName(day)}
+              count={String(timeCounts.get(day)?.size ?? 0)}
+              countWord={`${ordersHeadline(timeCounts.get(day)?.size ?? 0)} · ${fmtDate(day)}`}
+            />
+          ))}
+
+          <div className="my-2 border-t border-kit-slate-6" />
+
+          <span className="px-2 pb-1 text-label font-medium uppercase text-kit-slate-11">
+            {W.categoryHeading}
+          </span>
+          <NavRow
+            active={catSet.size === 0}
+            onClick={clearCats}
+            testId="to-order-cat-all"
+            name={W.categoryAll}
+            count={null}
+          />
+          {RAIL_CATEGORIES.map((c) => (
+            <NavRow
+              key={c.key}
+              active={catSet.has(c.key)}
+              onClick={() => toggleCat(c.key)}
+              testId={`to-order-cat-${c.key}`}
+              name={c.word}
+              count={null}
             />
           ))}
 
@@ -472,44 +904,120 @@ export default function OperationToOrder() {
           >
             + {W.createPurchase}
           </button>
-
-          {/* The Issue pill — exists only while something is selected, and
-              says exactly what the button will do. */}
-          {batch.selectedRows > 0 && !creating ? (
-            <div
-              className="mt-3 rounded-card border border-kit-slate-5 bg-white p-3 flex flex-col gap-1"
-              data-testid="to-order-issue-pill"
-            >
-              <span className="text-meta tabular-nums text-kit-slate-11">
-                {soSelectedShort(batch.selectedRows)}
-              </span>
-              <span className="text-meta tabular-nums text-kit-slate-11">
-                → {purchaseOrderCount(batch.poCount)}
-              </span>
-              <Button
-                variant="primary"
-                onClick={() => void issueAll()}
-                disabled={unread || batch.poCount === 0 || !defaultDest}
-                data-testid="to-order-issue"
-              >
-                {`+ ${W.issuePos}`}
-              </Button>
-            </div>
-          ) : null}
         </aside>
 
-        {/* ── The right column: the grid IS the page. ──────────────────── */}
+        {/* ── The Excel Workspace: one toolbar, one grid. ───────────────── */}
         <div className="flex-1 min-w-0 flex flex-col min-h-0 gap-2 px-4 pt-2 pb-3">
-          <span className="w-64 block shrink-0">
-            <SearchInput
-              id="to-order-search"
-              pill
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={W.searchPlaceholder}
-              aria-label={W.searchLabel}
-            />
-          </span>
+          <GridToolbar
+            search={
+              <SearchInput
+                id="to-order-search"
+                pill
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={W.searchPlaceholder}
+                aria-label={W.searchLabel}
+              />
+            }
+            right={
+              creating ? (
+                <span className="text-meta text-kit-slate-11" data-testid="to-order-creating">
+                  {W.creatingPos}
+                </span>
+              ) : batch.selectedRows > 0 ? (
+                <span
+                  className="flex items-center gap-3"
+                  data-testid="to-order-issue-pill"
+                >
+                  <span className="text-meta tabular-nums text-kit-slate-11 whitespace-nowrap">
+                    {selectedShort(batch.selectedRows)}
+                  </span>
+                  <Button
+                    variant="primary"
+                    shape="pill"
+                    onClick={() => void issueAll()}
+                    disabled={unread || batch.poCount === 0 || !defaultDest}
+                    /* Why N POs? One per factory × category (sofa one per
+                       customer). The hover names the split — the click's
+                       result is still the real receipt. */
+                    title={batch.targets
+                      .map((t) => `${t.proposal.label} — ${t.docs.length} PO`)
+                      .join("\n")}
+                    data-testid="to-order-issue"
+                  >
+                    {batch.poCount > 0 ? issuePosShort(batch.poCount) : W.issuePos}
+                  </Button>
+                </span>
+              ) : null
+            }
+            meta={
+              updatedMs > 0 ? (
+                <span data-testid="to-order-updated" className="flex flex-col items-end leading-tight">
+                  <span>{W.updated}</span>
+                  <span className="tabular-nums">{clockLabel(updatedMs)}</span>
+                </span>
+              ) : null
+            }
+          />
+
+          {/* ── FLASH BANDS (GitHub's flash, not a toast): the report sits
+               at the TOP, right under the button that caused it. Success is
+               dismissible; a failure STAYS with Retry until it succeeds
+               (the law survives the move); a warning stays until resolved.
+               Anatomy leaves room for Phase A: `· 5 units [Print labels]`
+               joins the success band without a redesign. ─────────────── */}
+          {barHasSomething ? (
+            <div className="flex shrink-0 flex-col gap-1" data-testid="to-order-bar">
+              {unread ? (
+                <div className="flex items-center gap-3 rounded-card bg-kit-amber-3 px-3 py-1.5 text-body text-kit-amber-11">
+                  <span data-testid="to-order-unresolved">
+                    {`⚠ ${unresolvedHeadline(unresolved.length)} — ${W.unresolvedHelp}`}
+                  </span>
+                </div>
+              ) : null}
+              {!creating && donePoCount > 0 ? (
+                <div className="flex items-center gap-3 rounded-card bg-kit-green-3 px-3 py-1.5 text-body text-kit-green-11">
+                  <span className="tabular-nums" data-testid="to-order-created-line">
+                    {`✓ ${posCreatedLine(donePoCount)}`}
+                    {donePoIds.length > 0 && donePoIds.length <= 3
+                      ? ` — ${donePoIds.join(" · ")}`
+                      : ""}
+                  </span>
+                  <span className="ml-auto flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => navigate("/operation/procurement")}
+                      data-testid="to-order-continue"
+                    >
+                      {`${W.continueInPos} →`}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon="close"
+                      aria-label={W.cancel}
+                      onClick={dismissDone}
+                      data-testid="to-order-flash-dismiss"
+                    />
+                  </span>
+                </div>
+              ) : null}
+              {!creating && failedKeys.size > 0 ? (
+                <div className="flex items-center gap-3 rounded-card bg-kit-red-3 px-3 py-1.5 text-body text-kit-red-11">
+                  <span data-testid="to-order-failed-line">{`✗ ${failedKeys.size} ${W.createFailed}`}</span>
+                  <span className="ml-auto">
+                    <Button
+                      variant="neutral"
+                      onClick={() => void issueAll(failedKeys)}
+                      data-testid="to-order-retry"
+                    >
+                      {W.retry}
+                    </Button>
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="flex-1 min-h-0 flex flex-col" data-testid="to-order-sheet">
             {q.isLoading && allRows.length === 0 ? (
@@ -517,72 +1025,82 @@ export default function OperationToOrder() {
                 <Loading variant="skeleton" lines={4} label="Loading today's plan" />
               </Card>
             ) : visibleRows.length === 0 ? (
-              <div data-testid="to-order-empty">
-                <Card padding="none">
-                  <EmptyState title={q.error ? (q.error as Error).message : W.empty} />
-                </Card>
-              </div>
+              colFilters.size > 0 ? (
+                /* §8.2 — a click that blanks the table must name its cause
+                 * and hand back the way out. */
+                <div data-testid="to-order-filters-empty">
+                  <Card>
+                    <span className="flex items-center gap-3">
+                      <span className="text-body text-kit-slate-11">{W.filtersEmpty}</span>
+                      <Button
+                        variant="neutral"
+                        onClick={() => setColFilters(new Map())}
+                        data-testid="to-order-clear-filters"
+                      >
+                        {W.clearFilters}
+                      </Button>
+                    </span>
+                  </Card>
+                </div>
+              ) : (
+                <div data-testid="to-order-empty">
+                  <Card padding="none">
+                    <EmptyState title={q.error ? (q.error as Error).message : W.empty} />
+                  </Card>
+                </div>
+              )
             ) : (
-              <DataTable
-                rows={visibleRows}
-                columns={columns}
-                rowId={(r) => r.key}
-                empty={W.empty}
-                label={W.itemsTableLabel}
-              />
+              <div className="flex-1 min-h-0 flex flex-col rounded-card overflow-hidden">
+                <DataTable
+                  rows={visibleRows}
+                  columns={columns}
+                  rowId={(r) => r.key}
+                  empty={W.empty}
+                  label={W.itemsTableLabel}
+                  sort={sort}
+                  onSortChange={setSort}
+                  selection={{
+                    selected: selectedKeys,
+                    onToggleRow: (id) => {
+                      const r = rowByKey.get(id);
+                      if (r) toggleRow(r);
+                    },
+                    onToggleAll: toggleAllVisible,
+                    label: W.select,
+                    selectable: (r) => !poOf(r),
+                  }}
+                />
+                {/* The Orders page's own closing line: what am I looking at,
+                    counted. Orders, not rows — a build is not a unit of work
+                    a purchaser counts in. */}
+                <footer
+                  className="shrink-0 flex items-center gap-3 px-3 h-10 border border-t-0 border-kit-slate-5 bg-white text-meta text-kit-slate-11"
+                  data-testid="to-order-footer"
+                >
+                  <span className="tabular-nums">
+                    {countOrders(new Set(visibleRows.map((r) => r.orderId ?? r.key)).size)}
+                  </span>
+                  {/* A column filter narrows SILENTLY (the ▼ turns funnel, and
+                      that is all) — so whenever one is on, the footer says so
+                      and hands back the way out. Jess's "why 6 orders?" is
+                      exactly the question this answers. */}
+                  {colFilters.size > 0 ? (
+                    <span className="ml-auto">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setColFilters(new Map())}
+                        data-testid="to-order-footer-clear"
+                      >
+                        {W.clearFilters}
+                      </Button>
+                    </span>
+                  ) : null}
+                </footer>
+              </div>
             )}
           </div>
 
-          {/* ── The bottom bar — exists only while it has something to say
-               (progress · result · a failure that may not evaporate). ── */}
-          {barHasSomething ? (
-            <div
-              className="shrink-0 flex items-center gap-4 flex-wrap bg-white border border-kit-slate-5 rounded-card px-4 py-2"
-              data-testid="to-order-bar"
-            >
-              {unread ? (
-                <span className="text-meta text-kit-slate-12" data-testid="to-order-unresolved">
-                  {`${unresolved.length} item${unresolved.length === 1 ? "" : "s"} could not be read — ${W.unresolvedHelp}`}
-                </span>
-              ) : null}
-              {creating ? (
-                <span className="text-meta text-kit-slate-11">{W.creatingPos}</span>
-              ) : null}
-              {!creating && donePoCount > 0 ? (
-                <span
-                  className="text-body font-medium text-kit-slate-12 tabular-nums"
-                  data-testid="to-order-created-line"
-                >
-                  {posCreatedLine(donePoCount)}
-                </span>
-              ) : null}
-              {!creating && failedKeys.size > 0 ? (
-                <span className="text-meta text-kit-red-11" data-testid="to-order-failed-line">
-                  {`${failedKeys.size} ${W.createFailed}`}
-                </span>
-              ) : null}
-              <span className="ml-auto flex items-center gap-2">
-                {!creating && failedKeys.size > 0 ? (
-                  <Button
-                    variant="neutral"
-                    onClick={() => void issueAll(failedKeys)}
-                    data-testid="to-order-retry"
-                  >
-                    {W.retry}
-                  </Button>
-                ) : null}
-                {!creating && donePoCount > 0 ? (
-                  <Button
-                    variant="ghost"
-                    onClick={() => navigate("/operation/procurement")}
-                    data-testid="to-order-continue"
-                  >
-                    {`${W.continueInPos} →`}
-                  </Button>
-                ) : null}
-              </span>
-            </div>
-          ) : null}
         </div>
       </div>
 
@@ -593,19 +1111,28 @@ export default function OperationToOrder() {
 
 // ── Pieces ──────────────────────────────────────────────────────────────────
 
-/** One launcher row — Linear's shape: name, count under it, ~30px, ┃ active. */
+/**
+ * One rail row — Linear Sidebar, faithfully this time (Jess, 2026-08-01):
+ * ONE line, name left, the bare number right-aligned. The word (`21 Orders`)
+ * survives as the row's title for a hover and a screen reader.
+ */
 function NavRow({
   active,
   onClick,
   testId,
   name,
   count,
+  countWord,
+  tone,
 }: {
   active: boolean;
   onClick: () => void;
   testId: string;
   name: ReactNode;
-  count: string;
+  count: string | null;
+  countWord?: string;
+  /** `danger` = the Overdue row — late work wears red, nothing else does. */
+  tone?: "danger";
 }) {
   return (
     <button
@@ -613,8 +1140,9 @@ function NavRow({
       onClick={onClick}
       data-testid={testId}
       aria-current={active ? "true" : undefined}
+      title={countWord}
       className={[
-        "relative flex w-full flex-col px-2 py-1.5 rounded-control text-left mb-px",
+        "relative flex w-full items-center justify-between gap-2 px-2 py-1 rounded-control text-left mb-px",
         active ? "bg-kit-blue-3" : "hover:bg-kit-blue-3",
       ].join(" ")}
     >
@@ -623,13 +1151,23 @@ function NavRow({
       ) : null}
       <span
         className={[
-          "uppercase text-body",
-          active ? "font-semibold text-kit-slate-12" : "font-medium text-kit-slate-12",
+          "text-body truncate",
+          active ? "font-semibold" : "font-medium",
+          tone === "danger" ? "text-kit-red-11" : "text-kit-slate-12",
         ].join(" ")}
       >
         {name}
       </span>
-      <span className="text-meta tabular-nums text-kit-slate-11">{count}</span>
+      {count != null ? (
+        <span
+          className={[
+            "text-meta tabular-nums shrink-0",
+            tone === "danger" ? "text-kit-red-11" : "text-kit-slate-11",
+          ].join(" ")}
+        >
+          {count}
+        </span>
+      ) : null}
     </button>
   );
 }
