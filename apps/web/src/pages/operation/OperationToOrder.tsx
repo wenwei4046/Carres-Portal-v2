@@ -43,7 +43,7 @@
  * Retry until it succeeds.
  */
 import { useMemo, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   TO_ORDER_WORDS as W,
@@ -66,7 +66,6 @@ import {
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import Card from "@/components/kit/Card";
-import Checkbox from "@/components/kit/Checkbox";
 import DataTable, { type Column, type ColumnFilter, type TableSort } from "@/components/kit/DataTable";
 import EmptyState from "@/components/kit/EmptyState";
 import GridToolbar from "@/components/kit/GridToolbar";
@@ -189,9 +188,28 @@ export default function OperationToOrder() {
   const unresolved = useMemo(() => q.data?.unresolved ?? [], [q.data]);
   const today = q.data?.today ?? null;
 
-  /** The Work Queue's two picks. The engine opens Today; the operator roams. */
-  const [timeView, setTimeView] = useState<ToOrderTimeView>("today");
-  const [cat, setCat] = useState<string>("all");
+  /**
+   * The Work Queue's two picks live in the URL, so a refresh or a shared
+   * link keeps the view (the 2990 habit). The engine still opens Today.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawView = searchParams.get("view");
+  const timeView: ToOrderTimeView = TIME_VIEWS.some((t) => t.view === rawView)
+    ? (rawView as ToOrderTimeView)
+    : "today";
+  const rawCat = searchParams.get("cat");
+  const cat = rawCat && ["all", ...CATEGORY_SEQUENCE].includes(rawCat) ? rawCat : "all";
+  const setParam = (key: "view" | "cat", value: string) =>
+    setSearchParams(
+      (prev) => {
+        const n = new URLSearchParams(prev);
+        n.set(key, value);
+        return n;
+      },
+      { replace: true },
+    );
+  const setTimeView = (v: ToOrderTimeView) => setParam("view", v);
+  const setCat = (c: string) => setParam("cat", c);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<TableSort | null>(null);
   /** Per-column Excel filters. An absent key = no filter. */
@@ -286,9 +304,11 @@ export default function OperationToOrder() {
           (cat === "all" || r.category === cat) &&
           (search.trim() === "" ||
             (r.so != null && `so-${r.so}`.includes(search.trim().toLowerCase())) ||
-            r.model.toLowerCase().includes(search.trim().toLowerCase())),
+            r.model.toLowerCase().includes(search.trim().toLowerCase()) ||
+            (poOf(r) ?? "").toLowerCase().includes(search.trim().toLowerCase())),
       ),
-    [allRows, timeView, cat, search],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allRows, timeView, cat, search, rowPo],
   );
 
   /** Does a row pass ONE column's filter? Sentinels are facts, not values. */
@@ -389,6 +409,40 @@ export default function OperationToOrder() {
         return n;
       });
     }
+  };
+
+  const selectedKeys = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of allRows) if (isSelected(r)) s.add(r.key);
+    return s;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRows, userOff, userOn, rowPo]);
+
+  const rowByKey = useMemo(() => new Map(allRows.map((r) => [r.key, r])), [allRows]);
+
+  /** Header select-all — over the rows the operator can SEE, Excel's rule. */
+  const toggleAllVisible = () => {
+    const vis = visibleRows.filter((r) => !poOf(r));
+    if (vis.length === 0) return;
+    const allSel = vis.every(isSelected);
+    setUserOff((s) => {
+      const n = new Set(s);
+      for (const r of vis) {
+        if (!defaultOn(r)) continue;
+        if (allSel) n.add(r.key);
+        else n.delete(r.key);
+      }
+      return n;
+    });
+    setUserOn((s) => {
+      const n = new Set(s);
+      for (const r of vis) {
+        if (defaultOn(r)) continue;
+        if (allSel) n.delete(r.key);
+        else n.add(r.key);
+      }
+      return n;
+    });
   };
 
   /** What the pill will do — per group, from the shared projection. */
@@ -532,7 +586,8 @@ export default function OperationToOrder() {
     const dates = [...new Set(base.map((r) => r.delivery).filter(Boolean))] as string[];
     dates.sort();
     for (const d of dates) opts.push({ value: d, label: fmtDate(d) });
-    if (base.some((r) => r.delivery == null)) opts.push({ value: F_NONE, label: "—" });
+    if (base.some((r) => r.delivery == null))
+      opts.push({ value: F_NONE, label: W.noDeliveryDate });
     return opts;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters]);
@@ -575,20 +630,6 @@ export default function OperationToOrder() {
   // ── Grid columns — Loo's frozen six, now with the Excel reflexes ─────────
   const columns: readonly Column<GridRow>[] = [
     {
-      key: "sel",
-      label: "",
-      width: 6,
-      cell: (r) =>
-        poOf(r) ? null : (
-          <Checkbox
-            id={`row-${r.key}`}
-            ariaLabel={W.select}
-            checked={isSelected(r)}
-            onCheckedChange={() => toggleRow(r)}
-          />
-        ),
-    },
-    {
       key: "delivery",
       label: W.colPreferred,
       width: 20,
@@ -615,7 +656,7 @@ export default function OperationToOrder() {
     {
       key: "model",
       label: W.colModel,
-      width: 34,
+      width: 36,
       sortable: true,
       filter: filterFor("model", modelOptions, true),
       cell: (r) => r.model,
@@ -758,7 +799,11 @@ export default function OperationToOrder() {
               />
             }
             right={
-              batch.selectedRows > 0 && !creating ? (
+              creating ? (
+                <span className="text-meta text-kit-slate-11" data-testid="to-order-creating">
+                  {W.creatingPos}
+                </span>
+              ) : batch.selectedRows > 0 ? (
                 <span
                   className="flex items-center gap-3"
                   data-testid="to-order-issue-pill"
@@ -793,11 +838,30 @@ export default function OperationToOrder() {
                 <Loading variant="skeleton" lines={4} label="Loading today's plan" />
               </Card>
             ) : visibleRows.length === 0 ? (
-              <div data-testid="to-order-empty">
-                <Card padding="none">
-                  <EmptyState title={q.error ? (q.error as Error).message : W.empty} />
-                </Card>
-              </div>
+              colFilters.size > 0 ? (
+                /* §8.2 — a click that blanks the table must name its cause
+                 * and hand back the way out. */
+                <div data-testid="to-order-filters-empty">
+                  <Card>
+                    <span className="flex items-center gap-3">
+                      <span className="text-body text-kit-slate-11">{W.filtersEmpty}</span>
+                      <Button
+                        variant="neutral"
+                        onClick={() => setColFilters(new Map())}
+                        data-testid="to-order-clear-filters"
+                      >
+                        {W.clearFilters}
+                      </Button>
+                    </span>
+                  </Card>
+                </div>
+              ) : (
+                <div data-testid="to-order-empty">
+                  <Card padding="none">
+                    <EmptyState title={q.error ? (q.error as Error).message : W.empty} />
+                  </Card>
+                </div>
+              )
             ) : (
               <DataTable
                 rows={visibleRows}
@@ -807,6 +871,16 @@ export default function OperationToOrder() {
                 label={W.itemsTableLabel}
                 sort={sort}
                 onSortChange={setSort}
+                selection={{
+                  selected: selectedKeys,
+                  onToggleRow: (id) => {
+                    const r = rowByKey.get(id);
+                    if (r) toggleRow(r);
+                  },
+                  onToggleAll: toggleAllVisible,
+                  label: W.select,
+                  selectable: (r) => !poOf(r),
+                }}
               />
             )}
           </div>

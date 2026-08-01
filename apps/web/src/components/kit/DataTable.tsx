@@ -101,15 +101,23 @@ export interface DataTableProps<Row> {
     onToggleAll: () => void;
     /** What the select-all box is called for a screen reader. */
     label: string;
+    /**
+     * Rows that can be picked at all. A row failing this renders an EMPTY
+     * cell (not a disabled box) and leaves the select-all arithmetic — a
+     * done row is not "unselected", it is out of the question.
+     */
+    selectable?: (row: Row) => boolean;
   };
   /** Shown INSTEAD of rows. §9: an empty state is an answer, not an apology. */
   empty: ReactNode;
   loading?: boolean;
   /** What the table is, for a screen reader. */
   label: string;
-  /** The active sort. The PAGE sorts the rows; the kit only shows the arrow. */
+  /** The active sort. The PAGE sorts the rows; the kit only shows the arrow.
+   *  A third click on the same header CLEARS it (`null`) — back to the
+   *  page's own default order. */
   sort?: TableSort | null;
-  onSortChange?: (next: TableSort) => void;
+  onSortChange?: (next: TableSort | null) => void;
 }
 
 /**
@@ -150,7 +158,7 @@ function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter
           {shown.map((o) => (
             <label key={o.value} className="flex items-center gap-2 text-body text-kit-slate-12">
               <Checkbox
-                id={`table-filter-${colKey}-${o.value}`}
+                id={`table-filter-${colKey}-${o.value.replace(/[^\w-]/g, "_")}`}
                 ariaLabel={o.label}
                 checked={filter.selected.has(o.value)}
                 onCheckedChange={() => {
@@ -191,10 +199,14 @@ export default function DataTable<Row>({
   sort = null,
   onSortChange,
 }: DataTableProps<Row>) {
+  const selectableRows = selection
+    ? rows.filter((r) => selection.selectable?.(r) ?? true)
+    : [];
   const selectedCount = selection
-    ? rows.filter((r) => selection.selected.has(rowId(r))).length
+    ? selectableRows.filter((r) => selection.selected.has(rowId(r))).length
     : 0;
-  const allSelected = selection != null && rows.length > 0 && selectedCount === rows.length;
+  const allSelected =
+    selection != null && selectableRows.length > 0 && selectedCount === selectableRows.length;
   const someSelected = selectedCount > 0 && !allSelected;
   const colSpan = columns.length + (selection ? 1 : 0);
 
@@ -257,10 +269,13 @@ export default function DataTable<Row>({
                     <button
                       type="button"
                       onClick={() =>
-                        onSortChange({
-                          key: c.key,
-                          dir: sort?.key === c.key && sort.dir === "asc" ? "desc" : "asc",
-                        })
+                        onSortChange(
+                          sort?.key !== c.key
+                            ? { key: c.key, dir: "asc" }
+                            : sort.dir === "asc"
+                              ? { key: c.key, dir: "desc" }
+                              : null,
+                        )
                       }
                       aria-label={c.label}
                       data-testid={`table-sort-${c.key}`}
@@ -315,12 +330,14 @@ export default function DataTable<Row>({
                   {selection && (
                     /* The checkbox must not open the record it is ticking. */
                     <td className="px-2" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        id={`kit-table-row-${id}`}
-                        ariaLabel={`Select ${id}`}
-                        checked={isSelected}
-                        onCheckedChange={() => selection.onToggleRow(id)}
-                      />
+                      {(selection.selectable?.(row) ?? true) ? (
+                        <Checkbox
+                          id={`kit-table-row-${id}`}
+                          ariaLabel={`Select ${id}`}
+                          checked={isSelected}
+                          onCheckedChange={() => selection.onToggleRow(id)}
+                        />
+                      ) : null}
                     </td>
                   )}
                   {columns.map((c) => (

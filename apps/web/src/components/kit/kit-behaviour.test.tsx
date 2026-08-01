@@ -483,6 +483,50 @@ describe("DataTable sort + filter", () => {
     expect(onSortChange).toHaveBeenLastCalledWith({ key: "model", dir: "desc" });
   });
 
+  it("a third click on the same header CLEARS the sort — back to the page's default", () => {
+    const onSortChange = vi.fn();
+    render(
+      <DataTable
+        rows={rows}
+        columns={[{ ...baseCol, key: "model", label: "Model", sortable: true }]}
+        rowId={(r) => r.id}
+        empty="none"
+        label="t"
+        sort={{ key: "model", dir: "desc" }}
+        onSortChange={onSortChange}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("table-sort-model"));
+    expect(onSortChange).toHaveBeenCalledWith(null);
+  });
+
+  it("an unselectable row gets NO checkbox and leaves the select-all arithmetic", () => {
+    const onToggleAll = vi.fn();
+    render(
+      <DataTable
+        rows={rows}
+        columns={[{ ...baseCol, key: "model", label: "Model" }]}
+        rowId={(r) => r.id}
+        empty="none"
+        label="t"
+        selection={{
+          selected: new Set(["a"]),
+          onToggleRow: () => {},
+          onToggleAll,
+          label: "Select all",
+          selectable: (r) => r.id === "a",
+        }}
+      />,
+    );
+    // Row b is done work — no box at all, not a disabled one.
+    expect(document.getElementById("kit-table-row-a")).not.toBeNull();
+    expect(document.getElementById("kit-table-row-b")).toBeNull();
+    // With b out of the question, a alone selected = ALL selected (checked).
+    expect(
+      document.getElementById("kit-table-select-all")!.getAttribute("data-state"),
+    ).toBe("checked");
+  });
+
   it("a column without sortable renders no sort button — the kit adds nothing uninvited", () => {
     render(
       <DataTable

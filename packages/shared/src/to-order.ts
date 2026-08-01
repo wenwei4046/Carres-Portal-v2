@@ -103,6 +103,13 @@ export const TO_ORDER_WORDS = {
   filterNotOrdered: "Not Ordered",
   filterOrdered: "Ordered",
   filterOverdue: "Overdue",
+  /**
+   * The empty state while a FILTER is narrowing — §8.2's law: no reachable
+   * click may blank the table into a dead end, so the blank names its cause
+   * and hands back the way out.
+   */
+  filtersEmpty: "No rows match the filters.",
+  clearFilters: "Clear filters",
   /** The ☑'s aria word — picking rows for THIS batch, nothing more. */
   select: "Select",
   /** The pill (`+ …`); appears only when something is selected. */

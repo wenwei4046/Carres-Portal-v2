@@ -169,7 +169,7 @@ function route(path: string, body?: { category?: string; purchaseOrders?: { key:
 }
 
 function rowBox(proposalKey: string, orderId: string) {
-  return document.getElementById(`row-${proposalKey}:${orderId}`)!;
+  return document.getElementById(`kit-table-row-${proposalKey}:${orderId}`)!;
 }
 
 function wrap() {
@@ -371,7 +371,7 @@ describe("ordered rows — the receipt stays on the sheet", () => {
   it("a PO created today sits in Today, unticked and untickable, PO No. filled", async () => {
     await loaded();
     expect(screen.getByText("SO-1350")).toBeInTheDocument();
-    expect(document.getElementById("row-po:PO-9001:o30")).toBeNull(); // no checkbox
+    expect(document.getElementById("kit-table-row-po:PO-9001:o30")).toBeNull(); // no checkbox
     expect(screen.getByTestId("row-po-po:PO-9001:o30")).toHaveTextContent("PO-9001");
     // It is DONE work — it must not inflate the rail's counts.
     expect(screen.getByTestId("to-order-time-today")).toHaveTextContent("5 Orders");
@@ -419,8 +419,8 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
       "PO-bedframe-1",
     );
     expect(screen.getByTestId(`row-po-${OHANA}::sofa:o1`)).toHaveTextContent("PO-sofa-");
-    expect(document.getElementById(`row-${OHANA}::bedframe:o9`)).toBeNull();
-    expect(document.getElementById(`row-${OHANA}::sofa:o2`)).not.toBeNull();
+    expect(document.getElementById(`kit-table-row-${OHANA}::bedframe:o9`)).toBeNull();
+    expect(document.getElementById(`kit-table-row-${OHANA}::sofa:o2`)).not.toBeNull();
 
     // The bar reports; the pill is gone (only ella remains, unticked).
     expect(screen.getByTestId("to-order-created-line")).toHaveTextContent(
@@ -505,5 +505,79 @@ describe("+ Create Purchase — the entrance is real, the save is next", () => {
     // is disabled and SAYS so, so the door teaches without pretending.
     expect(screen.getByTestId("to-order-create-submit")).toBeDisabled();
     expect(screen.getByText(W.nextUpdate)).toBeInTheDocument();
+  });
+});
+
+describe("the seven fixes — Excel completeness", () => {
+  it("header select-all unticks the visible sheet, and ticks it back", async () => {
+    await loaded();
+    fireEvent.click(document.getElementById("kit-table-select-all")!);
+    expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
+    fireEvent.click(document.getElementById("kit-table-select-all")!);
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 SO selected");
+  });
+
+  it("select-all works on a FILTERED sheet — the boss's 'tick all Nice Future'", async () => {
+    await loaded();
+    // Untick everything, then All view + mattress only, tick the header.
+    fireEvent.click(document.getElementById("kit-table-select-all")!);
+    fireEvent.click(screen.getByTestId("to-order-time-all"));
+    fireEvent.click(screen.getByTestId("to-order-cat-mattress"));
+    fireEvent.click(document.getElementById("kit-table-select-all")!);
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("1 SO selected");
+  });
+
+  it("a filter that blanks the table names its cause and hands back the way out", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("table-filter-model"));
+    fireEvent.click(screen.getByLabelText("Cody K"));
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    fireEvent.click(screen.getByTestId("table-filter-delivery"));
+    fireEvent.click(screen.getByLabelText(W.filterOverdue));
+    // Cody K is not overdue → zero rows, but never the lying empty state.
+    expect(screen.getByTestId("to-order-filters-empty")).toHaveTextContent(W.filtersEmpty);
+    fireEvent.click(screen.getByTestId("to-order-clear-filters"));
+    expect(screen.queryByTestId("to-order-filters-empty")).toBeNull();
+    expect(screen.getByText("SO-1204")).toBeInTheDocument();
+  });
+
+  it("search finds a PO number too — Ordered is this page's answer", async () => {
+    await loaded();
+    fireEvent.change(document.getElementById("to-order-search")!, {
+      target: { value: "po-9001" },
+    });
+    expect(screen.getByText("SO-1350")).toBeInTheDocument();
+    expect(screen.queryByText("SO-1204")).toBeNull();
+  });
+
+  it("the view lives in the URL — a refresh or a shared link keeps it", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <MemoryRouter initialEntries={["/?view=next_week&cat=mattress"]}>
+        <QueryClientProvider client={qc}>
+          <OperationToOrder />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+    await screen.findByText("SO-1400");
+    expect(screen.queryByText("SO-1204")).toBeNull();
+  });
+
+  it("while Creating, the toolbar keeps talking instead of going blank", async () => {
+    let release: (() => void) | null = null;
+    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+      if (path.endsWith("/issue")) {
+        return new Promise((res) => {
+          release = () =>
+            res({ supplier: "x", destination: "d", pos: [{ id: "PO-1", customer: "c" }] });
+        });
+      }
+      return route(path, init?.body ? JSON.parse(String(init.body)) : undefined);
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-issue"));
+    expect(await screen.findByTestId("to-order-creating")).toHaveTextContent(W.creatingPos);
+    expect(screen.queryByTestId("to-order-issue")).toBeNull();
+    expect(release).not.toBeNull();
   });
 });
