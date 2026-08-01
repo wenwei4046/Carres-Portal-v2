@@ -208,8 +208,10 @@ describe("the Work Queue — time above, category below, never mixed", () => {
     expect(within(nav).getByTestId("to-order-time-today")).toHaveAttribute("title", "5 Orders");
     expect(within(nav).getByTestId("to-order-time-tomorrow")).toHaveTextContent("0");
     expect(within(nav).getByTestId("to-order-time-next_week")).toHaveTextContent("1");
-    // All is all — the number adds nothing (Jess).
-    expect(within(nav).getByTestId("to-order-time-all")).not.toHaveTextContent("Orders");
+    // The time block is headed AUTO PLAN and holds ONLY the four plan
+    // views — All left the block (Jess, 2026-08-01).
+    expect(within(nav).getByText(W.autoPlanHeading)).toBeInTheDocument();
+    expect(within(nav).queryByTestId("to-order-time-all")).toBeNull();
     // CATEGORY is a WORK ORDER, not a scoreboard: heading + rows, no counts.
     expect(within(nav).getByText(W.categoryHeading)).toBeInTheDocument();
     expect(within(nav).getByTestId("to-order-cat-all")).not.toHaveTextContent("Orders");
@@ -229,9 +231,6 @@ describe("the Work Queue — time above, category below, never mixed", () => {
     fireEvent.click(screen.getByTestId("to-order-time-next_week"));
     expect(screen.getByText("SO-1400")).toBeInTheDocument();
     expect(screen.queryByText("SO-1204")).toBeNull(); // Today's stayed home
-    fireEvent.click(screen.getByTestId("to-order-time-all"));
-    expect(screen.getByText("SO-1400")).toBeInTheDocument();
-    expect(screen.getByText("SO-1204")).toBeInTheDocument();
   });
 
   it("clicking a category narrows within the time view; All restores", async () => {
@@ -530,9 +529,9 @@ describe("the seven fixes — Excel completeness", () => {
 
   it("select-all works on a FILTERED sheet — the boss's 'tick all Nice Future'", async () => {
     await loaded();
-    // Untick everything, then All view + mattress only, tick the header.
+    // Untick everything, then Next Week + mattress only, tick the header.
     fireEvent.click(document.getElementById("kit-table-select-all")!);
-    fireEvent.click(screen.getByTestId("to-order-time-all"));
+    fireEvent.click(screen.getByTestId("to-order-time-next_week"));
     fireEvent.click(screen.getByTestId("to-order-cat-mattress"));
     fireEvent.click(document.getElementById("kit-table-select-all")!);
     expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("1 selected");

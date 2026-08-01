@@ -86,6 +86,9 @@ export const TO_ORDER_WORDS = {
   //    grid's Excel filter's job, never the rail's. `All` carries no count
   //    (All is all; the number adds nothing). Each word owed a COPY-STANDARD
   //    row. ────────────────────────────────────────────────────────────────
+  /** The time block's heading — these four are the ENGINE's plan
+   *  views, and the heading says so (Jess, 2026-08-01). */
+  autoPlanHeading: "Auto Plan",
   navTomorrow: "Tomorrow",
   navThisWeek: "This Week",
   navNextWeek: "Next Week",

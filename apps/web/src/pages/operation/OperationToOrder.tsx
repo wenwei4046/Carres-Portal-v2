@@ -151,12 +151,16 @@ const PO_TAB_SLUG: Record<string, string> = {
   bedframe: "hookka-bedframe",
 };
 
-const TIME_VIEWS: { view: ToOrderTimeView; word: string }[] = [
+/**
+ * The AUTO PLAN block — the engine's four plan views, and ONLY those
+ * (Jess, 2026-08-01: `All` left the block; it was an aggregate entry, not a
+ * plan, and the heading made that visible).
+ */
+const TIME_VIEWS: { view: Exclude<ToOrderTimeView, "all">; word: string }[] = [
   { view: "today", word: W.navToday },
   { view: "tomorrow", word: W.navTomorrow },
   { view: "this_week", word: W.navThisWeek },
   { view: "next_week", word: W.navNextWeek },
-  { view: "all", word: W.navAll },
 ];
 
 /** `10:32 AM` — locale-free on purpose, so a CI node prints what Jess sees. */
@@ -742,6 +746,9 @@ export default function OperationToOrder() {
           className="w-[200px] shrink-0 min-h-0 overflow-y-auto border-r border-kit-slate-5 px-3 py-3 flex flex-col"
           data-testid="to-order-nav"
         >
+          <span className="px-2 pb-1 text-label font-medium uppercase text-kit-slate-11">
+            {W.autoPlanHeading}
+          </span>
           {TIME_VIEWS.map(({ view, word }) => (
             <NavRow
               key={view}
@@ -749,14 +756,8 @@ export default function OperationToOrder() {
               onClick={() => setTimeView(view)}
               testId={`to-order-time-${view}`}
               name={word}
-              count={
-                view === "all"
-                  ? null // All is all — the number adds nothing (Jess).
-                  : String(timeCounts.get(view)?.size ?? 0)
-              }
-              countWord={
-                view === "all" ? undefined : ordersHeadline(timeCounts.get(view)?.size ?? 0)
-              }
+              count={String(timeCounts.get(view)?.size ?? 0)}
+              countWord={ordersHeadline(timeCounts.get(view)?.size ?? 0)}
             />
           ))}
 
