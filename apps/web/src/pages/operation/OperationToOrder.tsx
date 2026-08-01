@@ -75,7 +75,6 @@ import Modal from "@/components/kit/Modal";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
-import DatePicker from "@/components/kit/DatePicker";
 import Icon from "@/components/kit/Icon";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -135,13 +134,6 @@ interface GridRow {
   bucket: ToOrderTimeBucket;
   /** Set on a row the server read back as already ordered. */
   orderedPo: string | null;
-  /**
-   * WHERE the demand came from — an ATTRIBUTE, never a workflow (Jess's
-   * freeze, 2026-08-01). Customer today; Inventory/Warranty/… arrive with
-   * `purchase_demands`, which will store it. `null` = unknown (a manual PO
-   * predating the demand table).
-   */
-  source: string | null;
 }
 
 /**
@@ -262,7 +254,6 @@ export default function OperationToOrder() {
           qty: r.qty,
           bucket: today == null ? "today" : demandTimeBucket(r.orderBy ?? null, today),
           orderedPo: null,
-          source: W.sourceCustomer,
         });
       }
     }
@@ -282,9 +273,6 @@ export default function OperationToOrder() {
         qty: o.qty,
         bucket: today == null ? "later" : orderedTimeBucket(o.placedAt, today),
         orderedPo: o.poId,
-        // An SO-backed PO was customer demand; a bare one predates the
-        // demand table, and unknown prints a dash rather than a guess.
-        source: o.so != null ? W.sourceCustomer : null,
       });
     }
     return rows;
@@ -336,8 +324,6 @@ export default function OperationToOrder() {
         return sel.has(r.so != null ? String(r.so) : F_NONE);
       case "model":
         return sel.has(r.model);
-      case "source":
-        return sel.has(r.source ?? F_NONE);
       case "qty":
         return sel.has(String(r.qty));
       case "po": {
@@ -388,8 +374,6 @@ export default function OperationToOrder() {
             return cmpNull(a.so, b.so, (x, y) => x - y);
           case "model":
             return a.model.localeCompare(b.model) * dir;
-          case "source":
-            return cmpNull(a.source, b.source, (x, y) => x.localeCompare(y));
           case "qty":
             return (a.qty - b.qty) * dir;
           case "po":
@@ -623,13 +607,6 @@ export default function OperationToOrder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters]);
 
-  const sourceOptions = useMemo(() => {
-    const base = filteredExcept("source");
-    const vals = [...new Set(base.map((r) => r.source ?? F_NONE))].sort();
-    return vals.map((v) => ({ value: v, label: v === F_NONE ? "—" : v }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inView, colFilters]);
-
   const qtyOptions = useMemo(() => {
     const base = filteredExcept("qty");
     const qs = [...new Set(base.map((r) => r.qty))].sort((a, b) => a - b);
@@ -655,7 +632,7 @@ export default function OperationToOrder() {
     {
       key: "delivery",
       label: W.colPreferred,
-      width: 18,
+      width: 20,
       sortable: true,
       filter: filterFor("delivery", deliveryOptions),
       cell: (r) => (
@@ -669,17 +646,9 @@ export default function OperationToOrder() {
       ),
     },
     {
-      key: "source",
-      label: W.colSource,
-      width: 10,
-      sortable: true,
-      filter: filterFor("source", sourceOptions),
-      cell: (r) => r.source ?? "—",
-    },
-    {
       key: "so",
       label: W.colSoNo,
-      width: 13,
+      width: 14,
       sortable: true,
       filter: filterFor("so", soOptions, true),
       cell: (r) => (r.so != null ? `SO-${r.so}` : "—"),
@@ -687,7 +656,7 @@ export default function OperationToOrder() {
     {
       key: "model",
       label: W.colModel,
-      width: 29,
+      width: 36,
       sortable: true,
       filter: filterFor("model", modelOptions, true),
       cell: (r) => r.model,
@@ -793,7 +762,7 @@ export default function OperationToOrder() {
             name={W.categoryAll}
             count={null}
           />
-          {CATEGORY_SEQUENCE.map((c) => (
+          {CATEGORY_SEQUENCE.slice(0, 3).map((c) => (
             <NavRow
               key={c}
               active={cat === c}
@@ -1045,13 +1014,10 @@ function CreatePurchaseDialog({
   onOpenChange: (open: boolean) => void;
   proposals: ToOrderProposal[];
 }) {
-  const [source, setSource] = useState("customer");
+  const [reason, setReason] = useState("ready_stock");
   const [supplier, setSupplier] = useState<string | undefined>(undefined);
-  const [customer, setCustomer] = useState("");
-  const [so, setSo] = useState("");
   const [item, setItem] = useState("");
   const [qty, setQty] = useState("1");
-  const [requiredBy, setRequiredBy] = useState<string | null>(null);
   const [remark, setRemark] = useState("");
 
   const suppliers = useMemo(() => {
@@ -1059,13 +1025,6 @@ function CreatePurchaseDialog({
     for (const p of proposals) m.set(p.supplierId, p.supplierName);
     return [...m.entries()].map(([value, label]) => ({ value, label }));
   }, [proposals]);
-
-  /** Which fields this SOURCE needs — the form morphs, the door stays ONE. */
-  const wants = {
-    customer: source === "warranty",
-    so: source === "customer" || source === "warranty",
-    requiredBy: source === "inventory",
-  };
 
   return (
     <Modal
@@ -1085,24 +1044,21 @@ function CreatePurchaseDialog({
       }
     >
       <div className="flex flex-col gap-3" data-testid="to-order-create-dialog">
-        {/* ONE pipeline, many demand sources (Jess, 2026-08-01). The source
-            is the FIRST question, and the form shapes itself to the answer —
-            never a second page, never a second workflow. */}
         <div>
-          <label htmlFor="cp-source" className="text-meta text-kit-slate-11">
-            {W.sourceLabel}
+          <label htmlFor="cp-reason" className="text-meta text-kit-slate-11">
+            {W.reason}
           </label>
           <Select
-            id="cp-source"
-            value={source}
-            onValueChange={setSource}
+            id="cp-reason"
+            value={reason}
+            onValueChange={setReason}
             options={[
-              { value: "customer", label: W.sourceCustomer },
-              { value: "inventory", label: W.sourceInventory },
-              { value: "display", label: W.sourceDisplay },
-              { value: "warranty", label: W.sourceWarranty },
-              { value: "office", label: W.sourceOffice },
-              { value: "other", label: W.sourceOther },
+              { value: "ready_stock", label: W.reasonReadyStock },
+              { value: "display", label: W.reasonDisplay },
+              { value: "warranty", label: W.reasonWarranty },
+              { value: "spare_parts", label: W.reasonSpareParts },
+              { value: "office", label: W.reasonOffice },
+              { value: "other", label: W.reasonOther },
             ]}
           />
         </div>
@@ -1117,17 +1073,6 @@ function CreatePurchaseDialog({
             options={suppliers}
           />
         </div>
-        {wants.customer ? (
-          <Input
-            id="cp-customer"
-            label={W.customerLabel}
-            value={customer}
-            onChange={(e) => setCustomer(e.target.value)}
-          />
-        ) : null}
-        {wants.so ? (
-          <Input id="cp-so" label={W.soLabel} value={so} onChange={(e) => setSo(e.target.value)} />
-        ) : null}
         <div>
           <label htmlFor="cp-item" className="text-meta text-kit-slate-11">
             {W.itemLabel}
@@ -1145,14 +1090,6 @@ function CreatePurchaseDialog({
           value={qty}
           onChange={(e) => setQty(e.target.value)}
         />
-        {wants.requiredBy ? (
-          <div data-testid="cp-required-by">
-            <label htmlFor="cp-required" className="text-meta text-kit-slate-11">
-              {W.requiredBy}
-            </label>
-            <DatePicker id="cp-required" value={requiredBy} onChange={setRequiredBy} />
-          </div>
-        ) : null}
         <Textarea
           id="cp-remark"
           label={W.remark}
