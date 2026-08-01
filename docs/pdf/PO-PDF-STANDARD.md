@@ -60,33 +60,41 @@ present but whispered. Money is ABSENT: the supplier-facing PO prints no RM valu
 any kind; the figure is absent from the payload (`purchasing_po_document`, migration
 0307), not hidden by the template.
 
-## 3 · Header
+## 3 · Header (final form approved by Loo, 2026-08-01 evening session)
 
-**Purpose** — identify the document within three seconds, at minimum height.
+**Purpose** — identify the document within three seconds, at minimum height. The header
+has exactly three voices: whisper (labels) · print (dates) · hero (the PO number).
 
 ```
-[CARRES logo]                              PURCHASE ORDER      10pt caps grey ls+1.5
-                                           PO-2044             15.5pt / 700
-Issued by Shasha · Sat, 1 Aug 26     Supplier Delivery By Wed, 12 Aug 26
-────────────────────────────────────────────────────────────── 0.8pt ink rule
+[CARRES logo]                                    PURCHASE ORDER   10pt caps grey ls+1.5
+SUPPLIER DELIVERY BY   WED, 12 AUG 26                 PO-2044     18pt / 700 — the hero
+PO ISSUED DATE         SAT, 1 AUG 26
+───────────────────────────────────────────────────────────────── 0.8pt ink rule
 ```
 
 Rules:
-- The Carres logo is the ORIGINAL wordmark image (`carres-wordmark` asset), height
-  6.5mm. Never typeset, never a different logo.
-- `PURCHASE ORDER` 10pt grey caps; `PO-2044` 15.5pt/700 below it — the number is the
-  first eye-catch but must not overpower the page (18pt was rejected as too heavy).
-- `Supplier Delivery By {Ddd, D Mmm YY}` — ONE line, 8.5pt, right side, date 600.
-- `Issued by {name} · {Ddd, D Mmm YY}` — same row, left side, 7.5pt all grey
-  (audit whisper). Why: the supplier doesn't act on it; demoting it keeps the
-  operational facts loud.
-- Dates print weekday + short date (`Wed, 12 Aug 26`); the weekday is computed from the
-  date, never typed.
+- The Carres logo is the ORIGINAL wordmark image (`carres-wordmark` asset), height 6mm.
+  Never typeset, never a different logo, never enlarged — a stamp.
+- Left, under the logo: a **35mm label-gutter** (Muji): labels `SUPPLIER DELIVERY BY` /
+  `PO ISSUED DATE` at 6.5pt `#9A9288` caps, letter-spaced, one X; **dates in ALL CAPS at
+  7pt/700 ink, letter-spaced, both identical, on one shared X.** The two dates are
+  equally important; hierarchy against the labels is carried by TONE + WEIGHT only,
+  never by size — one size class, two voices. The gutter is widened before a label is
+  ever allowed to wrap (a wrapped label is a defect).
+- Right: `PURCHASE ORDER` 10pt grey caps over `PO-2044` 18pt/700 — **the only
+  bold-black element in the header.** The block is BOTTOM-aligned with the left stack
+  so both columns breathe equally above the rule; the spare air sits top-right.
+- The person who issued is NOT in the header — the header carries only `PO ISSUED
+  DATE`; the name lives in the footer (§8).
+- Dates print weekday + short date; the weekday is computed from the date, never typed.
 - **No page number in the header.** The footer owns it.
 
 **Rejected** — `Required Delivery` (ambiguous: whose requirement?) → `Supplier Delivery
-By`. Centered identity stacks, SAP-corner metadata, tall PO numbers: all rejected for
-height or for burying the number.
+By`, frozen. The 6-section flat header grid and the metadata-as-third-card layout were
+both built, reviewed and rejected on 2026-08-01 ("getting worse") — the two Information
+Cards below the rule are frozen and metadata never joins them. Centered identity
+stacks, SAP-corner metadata: rejected. Dates at 8.5pt/600 rejected as noisy — two bold
+lines under the logo fought the PO number.
 
 ## 4 · Supplier Block
 
@@ -105,7 +113,25 @@ is another PO.
 
 ## 6 · Item Table
 
-Columns: `# · Sales Order · Item ID · Description · Qty`.
+Columns: `# · Sales Order · Item ID · Description · Qty` (sofa / per-order documents).
+
+### 6.1 · Consolidated (bulk) PO listing — mattress / bedframe (Loo, 2026-08-01)
+
+A bulk PO speaks the supplier's language: **model first, quantity summed.**
+
+- **Group by model**: the same SKU (with identical configuration) is ONE row and its
+  quantity is the SUM. The supplier never reads line-by-line by SO.
+- **The `SO No.` column lists every owning SO** (`SO-1256 ×2`, stacked in the column) —
+  it exists for Carres reference, not for the supplier.
+- **`Item ID` is NOT the SKU.** It is the per-unit goods id the system auto-generates
+  at the moment the PO is issued (one id per physical unit, scannable). The column is
+  reserved; the system fills it on Issue.
+- **Description = the SKU (bold) + the size (grey)** — `B1201F-K — King`. No category
+  word (`Mattress`) — the whole PO is one category and the word is noise. Model name
+  and SKU are two different things; where they differ (`Forte` / `FORTE-K`) the SKU is
+  what prints.
+- The **TOTAL QUANTITY summary row** closes a bulk table (the sofa PO has none — one
+  set per page makes a total meaningless).
 
 - **The paper's own number is never a column** — it is the header. Related documents'
   numbers (the SO) come in as columns so the papers chain.
@@ -148,27 +174,32 @@ UOM column (furniture is always `pc`; meaningless).
 - Why a drawing: LHF/RHF words alone get sofas built mirror-reversed; the picture is
   the contract.
 
-## 8 · Footer
+## 8 · Footer (amended 2026-08-01: issuer in, repeated PO number out)
 
-Fixed 15mm, identical on every page, and FROZEN — nothing may be added:
+Fixed 15mm, identical on every page:
 
 ```
 Computer-generated document.
 No signature required.
-PO-2044                                                    Page 2 of 2
+Issued by Shasha                                           Page 2 of 2
 ```
 
-No signature boxes anywhere on the document — the portal's audit trail (issued-by,
-timestamps) is the record. No company address repeat, no E.&O.E., no "Generated from"
-line (IT language; PDF metadata already carries it).
+- **The PO number does NOT repeat in the footer** — the header already carries it, and
+  a repeated number is noise (Loo, 2026-08-01, amending the original baseline).
+- **`Issued by {name}` lives here** — the person is audit information and sits with the
+  legal lines, 7.5pt grey; the header carries only the date.
+- No signature boxes anywhere on the document — the portal's audit trail is the record.
+  No company address repeat, no E.&O.E., no "Generated from" line (IT language; PDF
+  metadata already carries it).
 
 ## 9 · Typography
 
 - **Font**: Noto Sans SC — chinese-simplified subset (ASCII + CJK in ONE file; two
   registered files split by script corrupts CJK glyphs). Weights 400 / 500 / 600 / 700
   all registered — CJK bold must be a real weight file, never faux-bold.
-- **Sizes**: 15.5 (PO number) · 10 (title, Qty) · 9.5 (primary info) · 9 (content) ·
-  8.5 (meta values, remark text) · 7.5 (labels, audit, footer).
+- **Sizes**: 18 (PO number — amended from the baseline's 15.5 after print review) ·
+  10 (title, Qty) · 9.5 (primary info) · 9 (content) · 8.5 (remark text) · 7.5 (labels,
+  audit, footer) · header micro-pair: 6.5 (labels) / 7 caps 700 (header dates).
 - **Colours**: ink `#1A1714` · grey `#7A7268` · hairline `#CFC9C0`. Grey lives in TYPE,
   never in backgrounds. The logo image carries the only brand colour; everything else
   must survive pure greyscale.
@@ -204,3 +235,4 @@ line (IT language; PDF metadata already carries it).
 | Date | Change | Approved |
 |---|---|---|
 | 2026-08-01 | Initial baseline — full design session: header shape, Supplier Delivery By naming, frameless cards, no-grid-line table, Item Grammar, one-set-per-page sofa layout with drawing, quiet footer, no signature, no money, no End line, no sofa total row. | Loo |
+| 2026-08-01 (evening) | Header final: 35mm label-gutter under the logo; `SUPPLIER DELIVERY BY` + `PO ISSUED DATE` labels 6.5pt light-grey caps; both dates ALL CAPS 7pt/700 ink on one X, equal weight; PO number 18pt (supersedes 15.5); doc block bottom-aligned. Footer: `Issued by {name}` added, repeated PO number removed. §6.1 bulk-PO listing rules (group by model, SO refs in column, Item ID = per-unit auto id, SKU as description, TOTAL QUANTITY row). 6-section grid + metadata-card headers rejected on review. | Loo |
