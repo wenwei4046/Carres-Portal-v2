@@ -32,6 +32,12 @@
 > [`docs/execution-queues-index.md`](docs/execution-queues-index.md) — every line and card,
 > what is shipped, the lane rules.
 >
+> **PRINTED DOCUMENTS (PO · DO · GRN · Service · Claim · any PDF/paper): read
+> [`docs/DOCUMENT-FRAMEWORK.md`](docs/DOCUMENT-FRAMEWORK.md) FIRST.** It is Loo's living
+> notebook — overwritten in place, kept updating. Its §0 owner rule governs that domain:
+> the old screen laws do not restrict paper; a chat ADVISES Loo with a solution and the
+> why, and never uses a frozen doc to refuse a design.
+>
 > **PLUS the ONE working-flow file of the module being touched** — e.g.
 > [`docs/ORDERS-WORKING-FLOW.md`](docs/ORDERS-WORKING-FLOW.md): every action of that module
 > with its trigger, checklist, completion, due and owner; which one shows first; the gates;
