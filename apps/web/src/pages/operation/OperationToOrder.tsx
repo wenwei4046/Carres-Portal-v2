@@ -8,8 +8,9 @@
  * THE PAGE IS TWO DIMENSIONS AND NOTHING ELSE:
  *
  * LEFT = the WORK QUEUE (Linear's density). Two blocks:
- *   · TIME — Today · Tomorrow · This Week · Next Week · All. FIVE DISJOINT
- *     SETS, never cumulative (her counts prove it: 21+8+42+15 = 86 = All).
+ *   · TIME — FOUR disjoint planning buckets (Today, overdue folded in ·
+ *     Tomorrow · This Week · Next Week) + All, the aggregate view of every
+ *     bucket and later demand. Never cumulative between buckets.
  *     The ENGINE decides the default view (Today, overdue folded in); the
  *     operator switches freely — *"Engine decides the default view, not the
  *     operator's limit."* Combining windows is the grid's Excel filter's
@@ -56,8 +57,7 @@ import {
   ordersHeadline,
   posCreatedLine,
   railItemLabel,
-  selectedShort,
-  issuePosCount,
+  selectionSummary,
   toOrderBuilds,
   type ToOrderOrderedRow,
   type ToOrderProposal,
@@ -812,7 +812,7 @@ export default function OperationToOrder() {
                   data-testid="to-order-issue-pill"
                 >
                   <span className="text-meta tabular-nums text-kit-slate-11 whitespace-nowrap">
-                    {selectedShort(batch.selectedRows)}
+                    {selectionSummary(batch.selectedRows, batch.poCount)}
                   </span>
                   <Button
                     variant="primary"
@@ -821,7 +821,7 @@ export default function OperationToOrder() {
                     disabled={unread || batch.poCount === 0 || !defaultDest}
                     data-testid="to-order-issue"
                   >
-                    {issuePosCount(batch.poCount)}
+                    {W.issuePos}
                   </Button>
                 </span>
               ) : null

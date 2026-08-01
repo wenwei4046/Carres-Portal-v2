@@ -113,7 +113,7 @@ export const TO_ORDER_WORDS = {
   /** The ☑'s aria word — picking rows for THIS batch, nothing more. */
   select: "Select",
   /** The pill (`+ …`); appears only when something is selected. */
-  issuePos: "Issue Purchase Orders",
+  issuePos: "Issue PO",
   /** The bottom bar's states. It exists only while it has something to say. */
   creatingPos: "Creating Purchase Orders…",
   createdWord: "Created",
@@ -247,12 +247,13 @@ export function selectedShort(n: number): string {
 }
 
 /**
- * `Issue 10 Purchase Orders` — the primary action carries its own outcome
- * count (the Shopify/GitHub pattern: the promise lives on the thing you
- * click, never in a caption beside it).
+ * `26 selected · 10 PO` — the toolbar caption (Jess, 2026-08-01, final):
+ * NUMBERS are state and live in the caption; the BUTTON carries only the
+ * action (`Issue PO`). Her ruling closed the round-trip: a button that
+ * recites its own arithmetic is a button explaining its math.
  */
-export function issuePosCount(n: number): string {
-  return `Issue ${purchaseOrderCount(n)}`;
+export function selectionSummary(rows: number, pos: number): string {
+  return `${selectedShort(rows)} · ${pos} PO`;
 }
 
 /**
@@ -332,9 +333,11 @@ export function issuedHeadline(n: number, supplier: string): string {
 
 // ── The Work Queue's time buckets (Jess's freeze, 2026-08-01) ───────────────
 //
-// FIVE DISJOINT SETS, never cumulative — her own counts prove the shape:
-// 21 + 8 + 42 + 15 = 86 = All. Combining windows ("today AND tomorrow") is
-// the grid's Excel filter's job; the rail only ever shows one bucket.
+// FOUR DISJOINT PLANNING BUCKETS (Today · Tomorrow · This Week · Next
+// Week) plus `later`; the rail's fifth entry, All, is the AGGREGATE view of
+// every bucket and later demand — an entry point, not a bucket (Jess,
+// 2026-08-01). Combining windows ("today AND tomorrow") is the grid's Excel
+// filter's job; the rail only ever shows one bucket.
 //
 //   Today     = orderBy ≤ today. OVERDUE FOLDS IN — a bucket that hides a
 //               missed order-by day would be an accident factory. An undated
