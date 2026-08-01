@@ -416,7 +416,7 @@ async function loadOrderedRows(
     for (const batch of chunk(soRefs)) {
       const { data, error } = await sb
         .from("orders")
-        .select("id, so, delivery_date, delivery_date_tbd")
+        .select("id, so, customer_name, delivery_date, delivery_date_tbd")
         .in("so", batch);
       if (error) return [];
       for (const o of data ?? []) orderBySo.set(Number(o.so), o as Record<string, unknown>);
@@ -469,6 +469,7 @@ async function loadOrderedRows(
         category,
         supplierId: (po.supplier_id as string | null) ?? "",
         orderId: null,
+        customer: null,
         so: null,
         delivery: null,
         model: labelOf(poLines),
@@ -500,6 +501,7 @@ async function loadOrderedRows(
         category,
         supplierId: (po.supplier_id as string | null) ?? "",
         orderId: (order?.id as string | null) ?? null,
+        customer: (order?.customer_name as string | null) ?? null,
         so: Number(so),
         delivery:
           !tbd && order?.delivery_date

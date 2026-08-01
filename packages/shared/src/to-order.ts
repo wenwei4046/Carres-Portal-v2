@@ -96,6 +96,11 @@ export const TO_ORDER_WORDS = {
   /** The rail's second block heading — work ORDER, not a filter bar. */
   categoryHeading: "CATEGORY",
   categoryAll: "All",
+  /** Accessory KINDS get their own rail rows (Jess, 2026-08-01) — planned
+   *  ahead of the inventory-demand pipeline that will fill them. */
+  categoryPillow: "Pillow",
+  categoryMattressProtector: "Mattress Protector",
+  colCustomer: "Customer",
   /**
    * `Updated 10:32 AM` — not a Refresh button. The plan updates itself; this
    * stamp answers the one AutoCount anxiety ("am I looking at the latest?").
@@ -579,6 +584,7 @@ export interface ToOrderOrderedRow {
   category: ProductCategory;
   supplierId: string;
   orderId: string | null;
+  customer: string | null;
   so: number | null;
   /** The customer's date, same meaning as a demand row's. */
   delivery: IsoDate | null;

@@ -226,13 +226,18 @@ describe("the PO Schedule — a purchase calendar, not a menu", () => {
     expect(document.querySelector("h1")).toBeNull();
   });
 
-  it("each calendar row shows ONLY its run; Overdue is its own place", async () => {
+  it("calendar rows TOGGLE — pick two runs and the grid is the union", async () => {
     await loaded();
     // The engine opens the first upcoming run (Friday): kee tong's dateless
     // order waits there; overdue work does not leak in.
     expect(screen.getByText("SO-1257")).toBeInTheDocument();
     expect(screen.queryByText("SO-1204")).toBeNull();
+    // Ticking Overdue ADDS it — Friday stays on (multi-select, Jess).
     fireEvent.click(screen.getByTestId("to-order-overdue"));
+    expect(screen.getByText("SO-1204")).toBeInTheDocument();
+    expect(screen.getByText("SO-1257")).toBeInTheDocument();
+    // Unticking Friday leaves Overdue alone.
+    fireEvent.click(screen.getByTestId("to-order-day-2026-07-31"));
     expect(screen.getByText("SO-1204")).toBeInTheDocument();
     expect(screen.queryByText("SO-1257")).toBeNull();
     fireEvent.click(screen.getByTestId("to-order-day-2026-08-03"));
@@ -251,12 +256,11 @@ describe("the PO Schedule — a purchase calendar, not a menu", () => {
 });
 
 describe("the grid — business language only", () => {
-  it("has exactly Loo's six columns and none of the system's", async () => {
+  it("has exactly the frozen columns — Customer joined on Jess's word — and none of the system's", async () => {
     await loaded();
-    for (const label of [W.colPreferred, W.colSoNo, W.colModel, W.colQty, W.colPoNo]) {
+    for (const label of [W.colPreferred, W.colSoNo, W.colCustomer, W.colModel, W.colQty, W.colPoNo]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
-    expect(screen.queryByText("Customer")).toBeNull();
     expect(screen.queryByText("Category")).toBeNull();
     expect(screen.queryByText(/Order by/i)).toBeNull();
     expect(screen.queryByText("Stock ready")).toBeNull();
@@ -309,14 +313,12 @@ describe("the grid — business language only", () => {
     expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("3 PO");
     for (const [p, o] of [
       [`${OHANA}::sofa`, "o1"],
+      [`${OHANA}::sofa`, "o3"], // Friday's row is still on — union view
       [`${OHANA}::bedframe`, "o9"],
       [`${OHANA}::bedframe`, "o8"],
     ] as const) {
       fireEvent.click(rowBox(p, o));
     }
-    // kee tong waits on Friday's row — the last tick lives there.
-    fireEvent.click(screen.getByTestId("to-order-day-2026-07-31"));
-    fireEvent.click(rowBox(`${OHANA}::sofa`, "o3"));
     expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
   });
 
@@ -352,10 +354,10 @@ describe("the Excel reflexes — header sort, per-column filters", () => {
     fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.click(screen.getByTestId("table-sort-so"));
     let sos = screen.getAllByText(/^SO-\d+$/).map((el) => el.textContent);
-    expect(sos).toEqual(["SO-1204", "SO-1207", "SO-1300", "SO-1301"]);
+    expect(sos).toEqual(["SO-1204", "SO-1207", "SO-1257", "SO-1300", "SO-1301", "SO-1350"]);
     fireEvent.click(screen.getByTestId("table-sort-so"));
     sos = screen.getAllByText(/^SO-\d+$/).map((el) => el.textContent);
-    expect(sos[0]).toBe("SO-1301");
+    expect(sos[0]).toBe("SO-1350");
   });
 
   it("the PO filter speaks business — Not Ordered / Ordered, never (Blanks)", async () => {
@@ -539,20 +541,17 @@ describe("+ Create Purchase — the entrance is real, the save is next", () => {
 describe("the seven fixes — Excel completeness", () => {
   it("header select-all unticks the visible sheet, and ticks it back", async () => {
     await loaded();
-    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    fireEvent.click(screen.getByTestId("to-order-overdue")); // union: Fri + Overdue
     fireEvent.click(document.getElementById("kit-table-select-all")!);
-    // The four overdue rows untick; Friday's kee tong is still on.
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("1 selected");
+    expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
     fireEvent.click(document.getElementById("kit-table-select-all")!);
     expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 selected");
   });
 
   it("select-all works on a FILTERED sheet — the boss's 'tick all Nice Future'", async () => {
     await loaded();
-    // Untick everything, then Monday's run + mattress only, tick the header.
-    fireEvent.click(screen.getByTestId("to-order-overdue"));
-    fireEvent.click(document.getElementById("kit-table-select-all")!);
-    fireEvent.click(screen.getByTestId("to-order-day-2026-07-31"));
+    // Untick everything, then add Monday's run and narrow to Mattress.
+    fireEvent.click(screen.getByTestId("to-order-overdue")); // union
     fireEvent.click(document.getElementById("kit-table-select-all")!);
     expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
     fireEvent.click(screen.getByTestId("to-order-day-2026-08-03"));

@@ -126,6 +126,7 @@ interface GridRow {
   proposalKey: string | null;
   category: string;
   orderId: string | null;
+  customer: string | null;
   so: number | null;
   delivery: string | null;
   late: boolean;
@@ -142,10 +143,17 @@ interface GridRow {
 }
 
 /**
- * Loo's fixed walking order. Accessories join when their reorder track does —
- * an unknown category lands after the sequence rather than crashing the sort.
+ * The rail's CATEGORY rows — Loo's walking order, then the two accessory
+ * KINDS Jess planned ahead (2026-08-01): their demand arrives with the
+ * inventory pipeline; the rows exist so the layout never moves again.
  */
-const CATEGORY_SEQUENCE = ["mattress", "bedframe", "sofa", "accessory"];
+const RAIL_CATEGORIES: { key: string; word: string }[] = [
+  { key: "mattress", word: categoryLabel("mattress") },
+  { key: "bedframe", word: categoryLabel("bedframe") },
+  { key: "sofa", word: categoryLabel("sofa") },
+  { key: "pillow", word: W.categoryPillow },
+  { key: "mattress_protector", word: W.categoryMattressProtector },
+];
 
 /** Where a PO's document lives — the per-supplier channel tab. */
 const PO_TAB_SLUG: Record<string, string> = {
@@ -196,13 +204,26 @@ export default function OperationToOrder() {
     () => (today ? poScheduleDays(poDays, today) : []),
     [poDays, today],
   );
+  // Both rail blocks MULTI-SELECT (Jess, 2026-08-01): tick two runs, tick
+  // two categories — the grid is the union. Empty = the default.
   const rawView = searchParams.get("view");
-  const timeView =
-    rawView === "overdue" || (rawView != null && scheduleDays.includes(rawView))
-      ? rawView
-      : (scheduleDays[0] ?? "");
+  const viewSet = useMemo(() => {
+    const valid = new Set(
+      (rawView ?? "")
+        .split(",")
+        .filter((v) => v === "overdue" || scheduleDays.includes(v)),
+    );
+    if (valid.size === 0 && scheduleDays[0]) valid.add(scheduleDays[0]);
+    return valid as ReadonlySet<string>;
+  }, [rawView, scheduleDays]);
   const rawCat = searchParams.get("cat");
-  const cat = rawCat && ["all", ...CATEGORY_SEQUENCE].includes(rawCat) ? rawCat : "all";
+  const catSet = useMemo(
+    () =>
+      new Set(
+        (rawCat ?? "").split(",").filter((c) => RAIL_CATEGORIES.some((r) => r.key === c)),
+      ) as ReadonlySet<string>,
+    [rawCat],
+  );
   const setParam = (key: "view" | "cat", value: string) =>
     setSearchParams(
       (prev) => {
@@ -212,8 +233,20 @@ export default function OperationToOrder() {
       },
       { replace: true },
     );
-  const setTimeView = (v: string) => setParam("view", v);
-  const setCat = (c: string) => setParam("cat", c);
+  const toggleView = (v: string) => {
+    const n = new Set(viewSet);
+    if (n.has(v)) n.delete(v);
+    else n.add(v);
+    // Unticking the last run falls back to the default rather than a blank.
+    setParam("view", n.size === 0 ? (scheduleDays[0] ?? "") : [...n].join(","));
+  };
+  const toggleCat = (c: string) => {
+    const n = new Set(catSet);
+    if (n.has(c)) n.delete(c);
+    else n.add(c);
+    setParam("cat", [...n].join(","));
+  };
+  const clearCats = () => setParam("cat", "");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<TableSort | null>(null);
   /** Per-column Excel filters. An absent key = no filter. */
@@ -248,6 +281,7 @@ export default function OperationToOrder() {
           proposalKey: p.key,
           category: p.category,
           orderId: r.orderId,
+          customer: r.customer ?? null,
           so: r.so,
           delivery: r.delivery ?? null,
           late: today != null && r.delivery != null && r.delivery < today,
@@ -276,6 +310,7 @@ export default function OperationToOrder() {
         proposalKey: null,
         category: o.category,
         orderId: o.orderId,
+        customer: o.customer ?? null,
         so: o.so,
         delivery: o.delivery,
         late: today != null && o.delivery != null && o.delivery < today,
@@ -313,15 +348,16 @@ export default function OperationToOrder() {
     () =>
       allRows.filter(
         (r) =>
-          r.bucket === timeView &&
-          (cat === "all" || r.category === cat) &&
+          viewSet.has(r.bucket) &&
+          (catSet.size === 0 || catSet.has(r.category)) &&
           (search.trim() === "" ||
             (r.so != null && `so-${r.so}`.includes(search.trim().toLowerCase())) ||
             r.model.toLowerCase().includes(search.trim().toLowerCase()) ||
+            (r.customer ?? "").toLowerCase().includes(search.trim().toLowerCase()) ||
             (poOf(r) ?? "").toLowerCase().includes(search.trim().toLowerCase())),
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allRows, timeView, cat, search, rowPo],
+    [allRows, viewSet, catSet, search, rowPo],
   );
 
   /** Does a row pass ONE column's filter? Sentinels are facts, not values. */
@@ -337,6 +373,8 @@ export default function OperationToOrder() {
         return sel.has(r.so != null ? String(r.so) : F_NONE);
       case "model":
         return sel.has(r.model);
+      case "customer":
+        return sel.has(r.customer ?? F_NONE);
       case "qty":
         return sel.has(String(r.qty));
       case "po": {
@@ -387,6 +425,8 @@ export default function OperationToOrder() {
             return cmpNull(a.so, b.so, (x, y) => x - y);
           case "model":
             return a.model.localeCompare(b.model) * dir;
+          case "customer":
+            return cmpNull(a.customer, b.customer, (x, y) => x.localeCompare(y));
           case "qty":
             return (a.qty - b.qty) * dir;
           case "po":
@@ -628,6 +668,13 @@ export default function OperationToOrder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters]);
 
+  const customerOptions = useMemo(() => {
+    const base = filteredExcept("customer");
+    const vals = [...new Set(base.map((r) => r.customer ?? F_NONE))].sort();
+    return vals.map((v) => ({ value: v, label: v === F_NONE ? "—" : v }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, colFilters]);
+
   const qtyOptions = useMemo(() => {
     const base = filteredExcept("qty");
     const qs = [...new Set(base.map((r) => r.qty))].sort((a, b) => a - b);
@@ -669,15 +716,23 @@ export default function OperationToOrder() {
     {
       key: "so",
       label: W.colSoNo,
-      width: 14,
+      width: 12,
       sortable: true,
       filter: filterFor("so", soOptions, true),
       cell: (r) => (r.so != null ? `SO-${r.so}` : "—"),
     },
     {
+      key: "customer",
+      label: W.colCustomer,
+      width: 16,
+      sortable: true,
+      filter: filterFor("customer", customerOptions, true),
+      cell: (r) => r.customer ?? "—",
+    },
+    {
       key: "model",
       label: W.colModel,
-      width: 36,
+      width: 22,
       sortable: true,
       filter: filterFor("model", modelOptions, true),
       cell: (r) => r.model,
@@ -728,7 +783,11 @@ export default function OperationToOrder() {
   const updatedMs = q.dataUpdatedAt;
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-kit-slate-3">
+    /* h-full, not flex-1: the app wrapper is overflow-auto, so a page that
+     * GROWS makes the whole page scroll. Filling the frame instead keeps the
+     * header strip and toolbar still — the grid is the only scroll area
+     * (the Orders page's own behaviour). */
+    <div className="h-full min-h-0 flex flex-col bg-kit-slate-3">
       {/* ── The top strip — the Orders page's own shape: breadcrumb + the
            shared icon cluster. No H1, no search here. ─────────────────── */}
       <div
@@ -762,8 +821,8 @@ export default function OperationToOrder() {
               it has something to say. */}
           {(timeCounts.get("overdue")?.size ?? 0) > 0 ? (
             <NavRow
-              active={timeView === "overdue"}
-              onClick={() => setTimeView("overdue")}
+              active={viewSet.has("overdue")}
+              onClick={() => toggleView("overdue")}
               testId="to-order-overdue"
               name={W.filterOverdue}
               tone="danger"
@@ -774,8 +833,8 @@ export default function OperationToOrder() {
           {scheduleDays.map((day) => (
             <NavRow
               key={day}
-              active={timeView === day}
-              onClick={() => setTimeView(day)}
+              active={viewSet.has(day)}
+              onClick={() => toggleView(day)}
               testId={`to-order-day-${day}`}
               name={day === today ? W.navToday : weekdayName(day)}
               count={String(timeCounts.get(day)?.size ?? 0)}
@@ -789,19 +848,19 @@ export default function OperationToOrder() {
             {W.categoryHeading}
           </span>
           <NavRow
-            active={cat === "all"}
-            onClick={() => setCat("all")}
+            active={catSet.size === 0}
+            onClick={clearCats}
             testId="to-order-cat-all"
             name={W.categoryAll}
             count={null}
           />
-          {CATEGORY_SEQUENCE.slice(0, 3).map((c) => (
+          {RAIL_CATEGORIES.map((c) => (
             <NavRow
-              key={c}
-              active={cat === c}
-              onClick={() => setCat(c)}
-              testId={`to-order-cat-${c}`}
-              name={categoryLabel(c)}
+              key={c.key}
+              active={catSet.has(c.key)}
+              onClick={() => toggleCat(c.key)}
+              testId={`to-order-cat-${c.key}`}
+              name={c.word}
               count={null}
             />
           ))}
