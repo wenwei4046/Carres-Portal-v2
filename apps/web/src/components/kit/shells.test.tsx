@@ -457,6 +457,8 @@ describe("DataTable", () => {
     );
     const rows = document.querySelectorAll('[data-kit="data-row"]');
     expect(rows[0]).toHaveClass("bg-kit-blue-3");
-    expect(rows[1]).toHaveClass("hover:bg-kit-blue-3");
+    // Hover is ONE STEP UNDER selected (blue-2 vs blue-3) — they were the
+    // same value until Jess caught it, 2026-08-01. Still never grey.
+    expect(rows[1]).toHaveClass("hover:bg-kit-blue-2");
   });
 });

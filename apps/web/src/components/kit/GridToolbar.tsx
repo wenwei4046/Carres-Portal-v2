@@ -31,7 +31,7 @@ export default function GridToolbar({
 }) {
   return (
     <div data-kit="grid-toolbar" className="flex shrink-0 items-center gap-3">
-      {search ? <span className="w-64 shrink-0">{search}</span> : null}
+      {search ? <span className="w-2/5 min-w-64 max-w-xl shrink-0">{search}</span> : null}
       <span className="ml-auto flex items-center gap-3">{right}</span>
       {meta ? <span className="shrink-0 text-meta text-kit-slate-11">{meta}</span> : null}
     </div>

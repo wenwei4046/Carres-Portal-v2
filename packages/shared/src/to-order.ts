@@ -247,13 +247,13 @@ export function selectedShort(n: number): string {
 }
 
 /**
- * `26 selected · 10 PO` — the toolbar caption (Jess, 2026-08-01, final):
- * NUMBERS are state and live in the caption; the BUTTON carries only the
- * action (`Issue PO`). Her ruling closed the round-trip: a button that
- * recites its own arithmetic is a button explaining its math.
+ * `10 PO` — the caption's second line (Jess, 2026-08-01, final): NUMBERS
+ * are state, stacked beside the button; the BUTTON carries only the action
+ * (`Issue PO`). A button that recites its own arithmetic is a button
+ * explaining its math.
  */
-export function selectionSummary(rows: number, pos: number): string {
-  return `${selectedShort(rows)} · ${pos} PO`;
+export function poShortCount(n: number): string {
+  return `${n} PO`;
 }
 
 /**

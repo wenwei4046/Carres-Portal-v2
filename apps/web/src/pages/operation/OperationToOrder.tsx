@@ -57,8 +57,10 @@ import {
   ordersHeadline,
   posCreatedLine,
   railItemLabel,
-  selectionSummary,
+  selectedShort,
+  poShortCount,
   toOrderBuilds,
+  unresolvedHeadline,
   type ToOrderOrderedRow,
   type ToOrderProposal,
   type ToOrderTimeBucket,
@@ -556,6 +558,13 @@ export default function OperationToOrder() {
     (n, r) => (r.status === "done" ? n + r.pos.length : n),
     0,
   );
+  const donePoIds = useMemo(
+    () => [...results.values()].flatMap((r) => (r.status === "done" ? r.pos : [])),
+    [results],
+  );
+  /** ✕ on the success band — done entries clear; failures may NOT be waved off. */
+  const dismissDone = () =>
+    setResults((m) => new Map([...m].filter(([, r]) => r.status !== "done")));
   const unread = unresolved.length > 0;
   const barHasSomething = creating || donePoCount > 0 || failedKeys.size > 0 || unread;
 
@@ -686,6 +695,7 @@ export default function OperationToOrder() {
         return (
           <button
             type="button"
+            title="Open Purchase Order →"
             className="text-kit-blue-11 tabular-nums hover:underline"
             onClick={() =>
               navigate(
@@ -811,8 +821,9 @@ export default function OperationToOrder() {
                   className="flex items-center gap-3"
                   data-testid="to-order-issue-pill"
                 >
-                  <span className="text-meta tabular-nums text-kit-slate-11 whitespace-nowrap">
-                    {selectionSummary(batch.selectedRows, batch.poCount)}
+                  <span className="flex flex-col items-end leading-tight text-meta tabular-nums text-kit-slate-11 whitespace-nowrap">
+                    <span>{selectedShort(batch.selectedRows)}</span>
+                    <span>{poShortCount(batch.poCount)}</span>
                   </span>
                   <Button
                     variant="primary"
@@ -828,12 +839,72 @@ export default function OperationToOrder() {
             }
             meta={
               updatedMs > 0 ? (
-                <span data-testid="to-order-updated">
-                  {`${W.updated} ${clockLabel(updatedMs)}`}
+                <span data-testid="to-order-updated" className="flex flex-col items-end leading-tight">
+                  <span>{W.updated}</span>
+                  <span className="tabular-nums">{clockLabel(updatedMs)}</span>
                 </span>
               ) : null
             }
           />
+
+          {/* ── FLASH BANDS (GitHub's flash, not a toast): the report sits
+               at the TOP, right under the button that caused it. Success is
+               dismissible; a failure STAYS with Retry until it succeeds
+               (the law survives the move); a warning stays until resolved.
+               Anatomy leaves room for Phase A: `· 5 units [Print labels]`
+               joins the success band without a redesign. ─────────────── */}
+          {barHasSomething ? (
+            <div className="flex shrink-0 flex-col gap-1" data-testid="to-order-bar">
+              {unread ? (
+                <div className="flex items-center gap-3 rounded-card bg-kit-amber-3 px-3 py-1.5 text-body text-kit-amber-11">
+                  <span data-testid="to-order-unresolved">
+                    {`⚠ ${unresolvedHeadline(unresolved.length)} — ${W.unresolvedHelp}`}
+                  </span>
+                </div>
+              ) : null}
+              {!creating && donePoCount > 0 ? (
+                <div className="flex items-center gap-3 rounded-card bg-kit-green-3 px-3 py-1.5 text-body text-kit-green-11">
+                  <span className="tabular-nums" data-testid="to-order-created-line">
+                    {`✓ ${posCreatedLine(donePoCount)}`}
+                    {donePoIds.length > 0 && donePoIds.length <= 3
+                      ? ` — ${donePoIds.join(" · ")}`
+                      : ""}
+                  </span>
+                  <span className="ml-auto flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => navigate("/operation/procurement")}
+                      data-testid="to-order-continue"
+                    >
+                      {`${W.continueInPos} →`}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon="close"
+                      aria-label={W.cancel}
+                      onClick={dismissDone}
+                      data-testid="to-order-flash-dismiss"
+                    />
+                  </span>
+                </div>
+              ) : null}
+              {!creating && failedKeys.size > 0 ? (
+                <div className="flex items-center gap-3 rounded-card bg-kit-red-3 px-3 py-1.5 text-body text-kit-red-11">
+                  <span data-testid="to-order-failed-line">{`✗ ${failedKeys.size} ${W.createFailed}`}</span>
+                  <span className="ml-auto">
+                    <Button
+                      variant="neutral"
+                      onClick={() => void issueAll(failedKeys)}
+                      data-testid="to-order-retry"
+                    >
+                      {W.retry}
+                    </Button>
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="flex-1 min-h-0 flex flex-col" data-testid="to-order-sheet">
             {q.isLoading && allRows.length === 0 ? (
@@ -888,56 +959,6 @@ export default function OperationToOrder() {
             )}
           </div>
 
-          {/* ── The bottom bar — exists only while it has something to say
-               (progress · result · a failure that may not evaporate). ── */}
-          {barHasSomething ? (
-            <div
-              className="shrink-0 flex items-center gap-4 flex-wrap bg-white border border-kit-slate-5 rounded-card px-4 py-2"
-              data-testid="to-order-bar"
-            >
-              {unread ? (
-                <span className="text-meta text-kit-slate-12" data-testid="to-order-unresolved">
-                  {`${unresolved.length} item${unresolved.length === 1 ? "" : "s"} could not be read — ${W.unresolvedHelp}`}
-                </span>
-              ) : null}
-              {creating ? (
-                <span className="text-meta text-kit-slate-11">{W.creatingPos}</span>
-              ) : null}
-              {!creating && donePoCount > 0 ? (
-                <span
-                  className="text-body font-medium text-kit-slate-12 tabular-nums"
-                  data-testid="to-order-created-line"
-                >
-                  {posCreatedLine(donePoCount)}
-                </span>
-              ) : null}
-              {!creating && failedKeys.size > 0 ? (
-                <span className="text-meta text-kit-red-11" data-testid="to-order-failed-line">
-                  {`${failedKeys.size} ${W.createFailed}`}
-                </span>
-              ) : null}
-              <span className="ml-auto flex items-center gap-2">
-                {!creating && failedKeys.size > 0 ? (
-                  <Button
-                    variant="neutral"
-                    onClick={() => void issueAll(failedKeys)}
-                    data-testid="to-order-retry"
-                  >
-                    {W.retry}
-                  </Button>
-                ) : null}
-                {!creating && donePoCount > 0 ? (
-                  <Button
-                    variant="ghost"
-                    onClick={() => navigate("/operation/procurement")}
-                    data-testid="to-order-continue"
-                  >
-                    {`${W.continueInPos} →`}
-                  </Button>
-                ) : null}
-              </span>
-            </div>
-          ) : null}
         </div>
       </div>
 

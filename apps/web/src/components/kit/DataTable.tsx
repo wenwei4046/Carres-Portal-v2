@@ -234,7 +234,7 @@ export default function DataTable<Row>({
         </colgroup>
 
         <thead className={`sticky top-0 ${Z_TABLE_HEADER}`}>
-          <tr className="h-10 border-b border-kit-slate-5 bg-kit-slate-3">
+          <tr className="h-10 border-b border-kit-slate-6 bg-kit-slate-4">
             {selection && (
               <th className="px-2">
                 <Checkbox
@@ -256,7 +256,7 @@ export default function DataTable<Row>({
                       : "descending"
                     : undefined
                 }
-                className={`px-2 text-label font-medium text-kit-slate-11 ${
+                className={`px-2 text-label font-medium text-kit-slate-12 ${
                   c.align === "right" ? "text-right" : "text-left"
                 }`}
               >
@@ -279,12 +279,18 @@ export default function DataTable<Row>({
                       }
                       aria-label={c.label}
                       data-testid={`table-sort-${c.key}`}
-                      className="inline-flex items-center gap-0.5 hover:text-kit-slate-12"
+                      className="group inline-flex items-center gap-0.5"
                     >
                       {c.label}
                       {sort?.key === c.key ? (
                         <Icon name={sort.dir === "asc" ? "collapse" : "expand"} size={14} />
-                      ) : null}
+                      ) : (
+                        /* GitHub's whisper: the arrow appears on hover, so a
+                         * sortable header announces itself before the click. */
+                        <span className="opacity-0 transition-opacity group-hover:opacity-60">
+                          <Icon name="expand" size={14} />
+                        </span>
+                      )}
                     </button>
                   ) : (
                     c.label
@@ -323,8 +329,11 @@ export default function DataTable<Row>({
                   onClick={onRowOpen ? () => onRowOpen(row) : undefined}
                   /* §3.5 — one faint blue tint on hover, the stronger wash when
                    * selected. Never grey: grey reads as structure. */
+                  /* §3.5, finally honoured: hover is ONE STEP UNDER selected
+                   * (blue-2 vs blue-3) — they were identical until Jess caught
+                   * it on 2026-08-01. */
                   className={`border-b border-kit-slate-5 ${
-                    isSelected ? "bg-kit-blue-3" : "hover:bg-kit-blue-3"
+                    isSelected ? "bg-kit-blue-3" : "hover:bg-kit-blue-2"
                   } ${onRowOpen ? "cursor-pointer" : ""}`}
                 >
                   {selection && (

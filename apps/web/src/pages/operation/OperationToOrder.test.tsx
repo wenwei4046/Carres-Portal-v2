@@ -275,7 +275,8 @@ describe("the grid — business language only", () => {
     // Sofa is one-per-order (3) + bedframe merges (1) — the promise lives ON
     // the button, never in a caption beside it (Jess, 2026-08-01).
     // Numbers are STATE (the caption); the button is the ACTION alone.
-    expect(pill).toHaveTextContent("5 selected · 4 PO");
+    expect(pill).toHaveTextContent("5 selected");
+    expect(pill).toHaveTextContent("4 PO");
     expect(screen.getByTestId("to-order-issue")).toHaveTextContent(/^Issue PO$/);
     expect(pill.textContent).not.toContain("→");
   });
@@ -289,14 +290,16 @@ describe("the grid — business language only", () => {
     fireEvent.click(box);
     // The tick joins the batch: 5 + amy = 6 SO, 4 + 1 = 5 Purchase Orders.
     expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("6 selected");
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("6 selected · 5 PO");
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("6 selected");
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 PO");
   });
 
   it("an untick drops the pill's promise; unticking everything removes the pill", async () => {
     await loaded();
     fireEvent.click(rowBox(`${OHANA}::sofa`, "o2"));
     expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 selected");
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 selected · 3 PO");
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 selected");
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("3 PO");
     for (const [p, o] of [
       [`${OHANA}::sofa`, "o1"],
       [`${OHANA}::sofa`, "o3"],
@@ -327,7 +330,7 @@ describe("the grid — business language only", () => {
 
   it("a quiet Updated stamp — never a Refresh button", async () => {
     await loaded();
-    expect(screen.getByTestId("to-order-updated")).toHaveTextContent(/^Updated \d/);
+    expect(screen.getByTestId("to-order-updated")).toHaveTextContent(/^Updated/);
     expect(screen.queryByText("Refresh")).toBeNull();
   });
 });
@@ -479,7 +482,9 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
         : route(path, init?.body ? JSON.parse(String(init.body)) : undefined),
     );
     await loaded();
-    expect(screen.getByTestId("to-order-unresolved")).toBeInTheDocument();
+    expect(screen.getByTestId("to-order-unresolved")).toHaveTextContent(
+      "1 item could not be read",
+    );
     expect(screen.getByTestId("to-order-issue")).toBeDisabled();
   });
 
