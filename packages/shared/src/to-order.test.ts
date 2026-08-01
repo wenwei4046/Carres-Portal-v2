@@ -17,6 +17,9 @@ import {
   sizeShort,
   soCountLabel,
   sortToOrderRows,
+  demandTimeBucket,
+  orderedTimeBucket,
+  bucketInView,
   type ToOrderLine,
   type ToOrderRow,
 } from "./to-order";
@@ -520,5 +523,112 @@ describe("proposal order", () => {
     ]);
     expect(ps[0].label).toBe("Nice Future · Mattress");
     expect(ps[1].orderBy).toBeNull();
+  });
+});
+
+// ── the Work Queue's time buckets (Jess's freeze, 2026-08-01) ───────────────
+//
+// FIVE DISJOINT SETS, never cumulative — her own counts prove the shape:
+// 21 + 8 + 42 + 15 = 86 = All. 2026-08-05 is a Wednesday, so this week runs
+// Mon 03 → Sun 09 and next week Mon 10 → Sun 16.
+
+describe("demandTimeBucket", () => {
+  const TODAY = "2026-08-05"; // Wednesday
+
+  it("overdue folds into Today — a bucket that hides a missed day is an accident factory", () => {
+    expect(demandTimeBucket("2026-08-01", TODAY)).toBe("today");
+    expect(demandTimeBucket(TODAY, TODAY)).toBe("today");
+  });
+
+  it("an undated row lands in Today — the engine cannot schedule it, so a human sees it now", () => {
+    expect(demandTimeBucket(null, TODAY)).toBe("today");
+  });
+
+  it("Tomorrow is exactly tomorrow, never cumulative", () => {
+    expect(demandTimeBucket("2026-08-06", TODAY)).toBe("tomorrow");
+    expect(demandTimeBucket("2026-08-07", TODAY)).not.toBe("tomorrow");
+  });
+
+  it("This Week is the day after tomorrow through Sunday", () => {
+    expect(demandTimeBucket("2026-08-07", TODAY)).toBe("this_week");
+    expect(demandTimeBucket("2026-08-09", TODAY)).toBe("this_week");
+  });
+
+  it("Next Week is next Monday through next Sunday", () => {
+    expect(demandTimeBucket("2026-08-10", TODAY)).toBe("next_week");
+    expect(demandTimeBucket("2026-08-16", TODAY)).toBe("next_week");
+  });
+
+  it("beyond next week is later — visible only under All", () => {
+    expect(demandTimeBucket("2026-08-17", TODAY)).toBe("later");
+  });
+
+  it("the five buckets partition every date — no gap, no overlap", () => {
+    // Every day for a month lands in exactly one bucket (a partition needs no
+    // second assertion: demandTimeBucket returns exactly one value per date).
+    const seen = new Set<string>();
+    for (let i = -3; i <= 30; i += 1) {
+      const d = new Date(Date.UTC(2026, 7, 5 + i)).toISOString().slice(0, 10);
+      seen.add(demandTimeBucket(d, TODAY));
+    }
+    expect([...seen].sort()).toEqual(["later", "next_week", "this_week", "today", "tomorrow"]);
+  });
+
+  it("a Sunday's tomorrow is next week's Monday, and Tomorrow still wins", () => {
+    // 2026-08-09 is a Sunday; Monday 10th is BOTH tomorrow and next week.
+    expect(demandTimeBucket("2026-08-10", "2026-08-09")).toBe("tomorrow");
+  });
+});
+
+describe("orderedTimeBucket", () => {
+  const TODAY = "2026-08-05"; // Wednesday
+
+  it("a PO created today is Today's answer to 'what did we order'", () => {
+    expect(orderedTimeBucket(TODAY, TODAY)).toBe("today");
+  });
+
+  it("a PO created earlier this week is This Week's", () => {
+    expect(orderedTimeBucket("2026-08-03", TODAY)).toBe("this_week");
+  });
+
+  it("an older PO is visible only under All — real history belongs to Purchase Orders", () => {
+    expect(orderedTimeBucket("2026-08-02", TODAY)).toBe("later"); // last week's Sunday
+    expect(orderedTimeBucket("2026-07-24", TODAY)).toBe("later");
+  });
+});
+
+describe("bucketInView", () => {
+  it("All shows everything; the other views show only their own bucket", () => {
+    expect(bucketInView("later", "all")).toBe(true);
+    expect(bucketInView("today", "today")).toBe(true);
+    expect(bucketInView("today", "tomorrow")).toBe(false); // NEVER cumulative
+    expect(bucketInView("tomorrow", "this_week")).toBe(false);
+  });
+});
+
+describe("the row's own orderBy", () => {
+  it("each row carries its ORDER's earliest raise-by, never a sibling's", () => {
+    const ps = run([
+      ...PETER,
+      line({ lineId: "m1", sku: "M1401S-Q", orderId: "o7", so: 1290, customerName: "ng",
+        category: "mattress", supplierId: NICE_FUTURE, leadDays: 7, modelName: "M1401S",
+        deadline: "2026-08-20", offDays: OFFICE_OFF_DAYS }),
+      line({ lineId: "m2", sku: "M1401S-K", orderId: "o8", so: 1291, customerName: "tan",
+        category: "mattress", supplierId: NICE_FUTURE, leadDays: 7, modelName: "M1401S",
+        deadline: "2026-09-20", offDays: OFFICE_OFF_DAYS }),
+    ]);
+    const nf = ps.find((p) => p.label === "Nice Future · Mattress")!;
+    const near = nf.rows.find((r) => r.so === 1290)!;
+    const far = nf.rows.find((r) => r.so === 1291)!;
+    expect(near.orderBy).not.toBeNull();
+    expect(far.orderBy).not.toBeNull();
+    expect(near.orderBy! < far.orderBy!).toBe(true);
+    // The pair-level orderBy is the earliest row's, unchanged by the split.
+    expect(nf.orderBy).toBe(near.orderBy);
+  });
+
+  it("a dateless order's row has no orderBy at all — never a defaulted one", () => {
+    const ps = run([...KEE_TONG]);
+    expect(ps[0].rows[0].orderBy).toBeNull();
   });
 });

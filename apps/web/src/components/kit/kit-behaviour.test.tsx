@@ -20,7 +20,9 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import Button from "./Button";
 import Checkbox from "./Checkbox";
+import DataTable from "./DataTable";
 import DatePicker from "./DatePicker";
+import GridToolbar from "./GridToolbar";
 import Drawer from "./Drawer";
 import DropdownMenu from "./DropdownMenu";
 import Modal from "./Modal";
@@ -437,5 +439,152 @@ describe("controlled by the page", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * DataTable — the Excel reflexes (Jess's freeze, 2026-08-01)
+ * ────────────────────────────────────────────────────────────────────────── */
+
+describe("DataTable sort + filter", () => {
+  const rows = [
+    { id: "a", so: 2, model: "Sonic K" },
+    { id: "b", so: 1, model: "Fenrir K" },
+  ];
+  const baseCol = { width: 50, cell: (r: { model: string }) => r.model };
+
+  it("a header click asks asc, a second click on the same column asks desc", () => {
+    const onSortChange = vi.fn();
+    const { rerender } = render(
+      <DataTable
+        rows={rows}
+        columns={[{ ...baseCol, key: "model", label: "Model", sortable: true }]}
+        rowId={(r) => r.id}
+        empty="none"
+        label="t"
+        sort={null}
+        onSortChange={onSortChange}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("table-sort-model"));
+    expect(onSortChange).toHaveBeenCalledWith({ key: "model", dir: "asc" });
+    rerender(
+      <DataTable
+        rows={rows}
+        columns={[{ ...baseCol, key: "model", label: "Model", sortable: true }]}
+        rowId={(r) => r.id}
+        empty="none"
+        label="t"
+        sort={{ key: "model", dir: "asc" }}
+        onSortChange={onSortChange}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("table-sort-model"));
+    expect(onSortChange).toHaveBeenLastCalledWith({ key: "model", dir: "desc" });
+  });
+
+  it("a column without sortable renders no sort button — the kit adds nothing uninvited", () => {
+    render(
+      <DataTable
+        rows={rows}
+        columns={[{ ...baseCol, key: "model", label: "Model" }]}
+        rowId={(r) => r.id}
+        empty="none"
+        label="t"
+        sort={null}
+        onSortChange={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId("table-sort-model")).toBeNull();
+  });
+
+  it("the ▼ opens a checklist; a tick narrows, the caller's clear word empties", () => {
+    const onChange = vi.fn();
+    render(
+      <DataTable
+        rows={rows}
+        columns={[
+          {
+            ...baseCol,
+            key: "model",
+            label: "Model",
+            filter: {
+              options: [
+                { value: "Sonic K", label: "Sonic K" },
+                { value: "Fenrir K", label: "Fenrir K" },
+              ],
+              selected: new Set(["Sonic K"]),
+              onChange,
+              label: "Filter Model",
+              clearLabel: "Clear",
+            },
+          },
+        ]}
+        rowId={(r) => r.id}
+        empty="none"
+        label="t"
+      />,
+    );
+    openPopover(screen.getByTestId("table-filter-model"));
+    fireEvent.click(screen.getByLabelText("Fenrir K"));
+    expect(onChange).toHaveBeenCalledWith(new Set(["Sonic K", "Fenrir K"]));
+    fireEvent.click(screen.getByTestId("table-filter-clear-model"));
+    expect(onChange).toHaveBeenLastCalledWith(new Set());
+  });
+
+  it("an active filter marks its trigger — a filter you cannot see is a lie", () => {
+    const col = (selected: Set<string>) => [
+      {
+        ...baseCol,
+        key: "model",
+        label: "Model",
+        filter: {
+          options: [{ value: "Sonic K", label: "Sonic K" }],
+          selected,
+          onChange: () => {},
+          label: "Filter Model",
+          clearLabel: "Clear",
+        },
+      },
+    ];
+    const { rerender } = render(
+      <DataTable rows={rows} columns={col(new Set())} rowId={(r) => r.id} empty="none" label="t" />,
+    );
+    expect(screen.getByTestId("table-filter-model").dataset.active).toBeUndefined();
+    rerender(
+      <DataTable
+        rows={rows}
+        columns={col(new Set(["Sonic K"]))}
+        rowId={(r) => r.id}
+        empty="none"
+        label="t"
+      />,
+    );
+    expect(screen.getByTestId("table-filter-model").dataset.active).toBe("true");
+  });
+});
+
+describe("Button pill shape", () => {
+  it("pill rounds fully; the default keeps the control radius — shape, never a variant", () => {
+    const { rerender } = render(<Button shape="pill">Issue Purchase Orders</Button>);
+    expect(screen.getByRole("button").className).toContain("rounded-full");
+    rerender(<Button>Issue Purchase Orders</Button>);
+    expect(screen.getByRole("button").className).toContain("rounded-control");
+    expect(screen.getByRole("button").className).not.toContain("rounded-full");
+  });
+});
+
+describe("GridToolbar", () => {
+  it("holds its three slots and spells no word of its own", () => {
+    render(
+      <GridToolbar
+        search={<input aria-label="s" />}
+        right={<span>28 SO selected</span>}
+        meta={<span>Updated 10:32 AM</span>}
+      />,
+    );
+    const bar = document.querySelector('[data-kit="grid-toolbar"]')!;
+    expect(bar.textContent).toContain("28 SO selected");
+    expect(bar.textContent).toContain("Updated 10:32 AM");
   });
 });

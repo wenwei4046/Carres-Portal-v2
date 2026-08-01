@@ -2,14 +2,17 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   buildToOrder,
+  countItems,
   isToOrderCategory,
   myHolidaySet,
   planFromDocuments,
   productionWorkingDaysFor,
+  railItemLabel,
   workWeekOffDaysFor,
   type ProductCategory,
   type IssueDocument,
   type ToOrderLine,
+  type ToOrderOrderedRow,
   type ToOrderProposal,
 } from "@carres/shared";
 import { validateIssuePlan } from "@carres/shared";
@@ -74,11 +77,22 @@ function attr(attrs: unknown, key: string): string | null {
 
 type Unresolved = { sku: string; orderId: string; so: number | null };
 
+type CatalogFact = {
+  supplierId: string | null;
+  cost: number | null;
+  variant: string | null;
+  variantKind: string | null;
+  category: string | undefined;
+  modelName: string | null;
+};
+
 type Loaded = {
   proposals: ToOrderProposal[];
   today: string;
   /** Demand the catalog could not answer for. Empty is the only healthy value. */
   unresolved: Unresolved[];
+  /** The whole catalog, read once — the ordered read reuses it. */
+  catalog: Map<string, CatalogFact>;
 };
 
 /**
@@ -119,7 +133,10 @@ async function loadToOrder(
   const orderIds = orders.map((o) => o.id as string);
 
   if (orderIds.length === 0) {
-    return { ok: true, data: { proposals: [], today: todayIso(), unresolved: [] } };
+    return {
+      ok: true,
+      data: { proposals: [], today: todayIso(), unresolved: [], catalog: new Map() },
+    };
   }
 
   const lines: Record<string, unknown>[] = [];
@@ -137,17 +154,7 @@ async function loadToOrder(
 
   // Catalog facts. No FK exists on order_lines.sku, so this is a second query
   // by sku rather than an embed (product_skus → product_models IS a real FK).
-  const cat = new Map<
-    string,
-    {
-      supplierId: string | null;
-      cost: number | null;
-      variant: string | null;
-      variantKind: string | null;
-      category: string | undefined;
-      modelName: string | null;
-    }
-  >();
+  const cat = new Map<string, CatalogFact>();
   /**
    * ⚠ THE CATALOG IS READ WHOLE, AND `.in()` IS NEVER USED ON A SKU.
    *
@@ -322,7 +329,180 @@ async function loadToOrder(
     missingProductionDays,
   });
 
-  return { ok: true, data: { proposals, today, unresolved } };
+  return { ok: true, data: { proposals, today, unresolved, catalog: cat } };
+}
+
+/** How far back the grid answers "what did we order". Older → Purchase Orders. */
+const ORDERED_WINDOW_DAYS = 14;
+
+/**
+ * Rows that already became purchase orders — the grid's `Ordered` answer
+ * (Jess, 2026-08-01: Today + PO filter `Ordered` = 今天已经下了哪些).
+ *
+ * RECENT ONLY, on purpose: real history belongs to Purchase Orders, so this
+ * reads the last {@link ORDERED_WINDOW_DAYS} days and nothing more. A row is
+ * one PO × one customer order; its lines are matched by SKU against the
+ * customer's own order lines, so the quantity is what THAT customer ordered —
+ * the same voice as a demand row. A PO with no SO refs (a manual purchase)
+ * still gets one row: it was ordered, and ordered work must be answerable.
+ *
+ * Failures here degrade to an empty list rather than failing the page — the
+ * demand half is the work; the ordered half is the receipt.
+ */
+async function loadOrderedRows(
+  sb: ReturnType<typeof userClient>,
+  today: string,
+  catalog: Map<string, CatalogFact>,
+): Promise<ToOrderOrderedRow[]> {
+  const since = new Date(`${today}T00:00:00Z`);
+  since.setUTCDate(since.getUTCDate() - ORDERED_WINDOW_DAYS);
+  const sinceIso = since.toISOString().slice(0, 10);
+
+  const { data: poRows, error: poErr } = await sb
+    .from("purchase_orders")
+    .select("id, supplier_id, placed_at, so_refs")
+    .gte("placed_at", sinceIso)
+    .order("placed_at", { ascending: false });
+  if (poErr || !poRows || poRows.length === 0) return [];
+
+  // The catalog arrives from loadToOrder — but its no-open-orders early
+  // return carries an EMPTY map, and recent POs can outlive their orders.
+  // Read it here in that one case, whole, same rule as loadToOrder (§: a SKU
+  // never goes into an `.in()`).
+  if (catalog.size === 0) {
+    const { data: skuRows } = await sb
+      .from("product_skus")
+      .select("sku, supplier_id, cost, variant, variant_kind, product_models!inner(category, name)");
+    for (const row of (skuRows ?? []) as Record<string, unknown>[]) {
+      const pm = row.product_models as { category?: string | null; name?: string | null } | null;
+      catalog.set(row.sku as string, {
+        supplierId: (row.supplier_id as string | null) ?? null,
+        cost: row.cost != null ? Number(row.cost) : null,
+        variant: (row.variant as string | null) ?? null,
+        variantKind: (row.variant_kind as string | null) ?? null,
+        category: (pm?.category as string | undefined) ?? undefined,
+        modelName: (pm?.name as string | null) ?? null,
+      });
+    }
+  }
+
+  const poIds = poRows.map((p) => p.id as string);
+  const linesByPo = new Map<string, { sku: string; qty: number }[]>();
+  for (const batch of chunk(poIds)) {
+    const { data, error } = await sb
+      .from("purchase_order_lines")
+      .select("po_id, sku, qty")
+      .in("po_id", batch);
+    if (error) return [];
+    for (const l of data ?? []) {
+      const arr = linesByPo.get(l.po_id as string) ?? [];
+      arr.push({ sku: l.sku as string, qty: Number(l.qty ?? 0) });
+      linesByPo.set(l.po_id as string, arr);
+    }
+  }
+
+  const soRefs = [...new Set(poRows.flatMap((p) => (p.so_refs as number[] | null) ?? []))];
+  const orderBySo = new Map<number, Record<string, unknown>>();
+  const orderLinesByOrder = new Map<string, { sku: string; qty: number; attrs: unknown }[]>();
+  if (soRefs.length > 0) {
+    for (const batch of chunk(soRefs)) {
+      const { data, error } = await sb
+        .from("orders")
+        .select("id, so, delivery_date, delivery_date_tbd")
+        .in("so", batch);
+      if (error) return [];
+      for (const o of data ?? []) orderBySo.set(Number(o.so), o as Record<string, unknown>);
+    }
+    const orderIds = [...orderBySo.values()].map((o) => o.id as string);
+    for (const batch of chunk(orderIds)) {
+      const { data, error } = await sb
+        .from("order_lines")
+        .select("order_id, sku, qty, attrs")
+        .in("order_id", batch);
+      if (error) return [];
+      for (const l of data ?? []) {
+        const arr = orderLinesByOrder.get(l.order_id as string) ?? [];
+        arr.push({ sku: l.sku as string, qty: Number(l.qty ?? 0), attrs: l.attrs });
+        orderLinesByOrder.set(l.order_id as string, arr);
+      }
+    }
+  }
+
+  /** The label a demand row would print — one item names itself, many count. */
+  const labelOf = (ls: readonly { sku: string; qty: number }[]): string => {
+    if (ls.length === 1) {
+      const f = catalog.get(ls[0]!.sku);
+      const size = f?.variantKind === "size" ? f.variant : null;
+      return railItemLabel(f?.modelName ?? ls[0]!.sku, size);
+    }
+    return countItems(ls.length);
+  };
+  const categoryOf = (skus: readonly string[]): ProductCategory | null => {
+    for (const s of skus) {
+      const c = catalog.get(s)?.category;
+      if (c && isToOrderCategory(c)) return c;
+    }
+    return null;
+  };
+
+  const rows: ToOrderOrderedRow[] = [];
+  for (const po of poRows) {
+    const poLines = linesByPo.get(po.id as string) ?? [];
+    const poSkus = new Set(poLines.map((l) => l.sku));
+    const refs = (po.so_refs as number[] | null) ?? [];
+    const placedAt = ((po.placed_at as string | null) ?? today).slice(0, 10);
+    const category = categoryOf([...poSkus]);
+    if (!category) continue; // not this page's goods (accessory restock etc.)
+
+    if (refs.length === 0) {
+      rows.push({
+        poId: po.id as string,
+        placedAt,
+        category,
+        supplierId: (po.supplier_id as string | null) ?? "",
+        orderId: null,
+        so: null,
+        delivery: null,
+        model: labelOf(poLines),
+        qty: poLines.reduce((s, l) => s + l.qty, 0),
+      });
+      continue;
+    }
+
+    for (const so of refs) {
+      const order = orderBySo.get(Number(so));
+      const covered = order
+        ? (orderLinesByOrder.get(order.id as string) ?? []).filter((l) => poSkus.has(l.sku))
+        : [];
+      // Sofa counts builds, everything else counts pieces — the demand grid's
+      // own rule, so a row reads the same before and after it was ordered.
+      const qty =
+        category === "sofa"
+          ? Math.max(
+              new Set(
+                covered.map((l) => attr(l.attrs, "sofa_build_key") ?? `line::${l.sku}`),
+              ).size,
+              covered.length > 0 ? 1 : 0,
+            )
+          : covered.reduce((s, l) => s + l.qty, 0);
+      const tbd = Boolean(order?.delivery_date_tbd);
+      rows.push({
+        poId: po.id as string,
+        placedAt,
+        category,
+        supplierId: (po.supplier_id as string | null) ?? "",
+        orderId: (order?.id as string | null) ?? null,
+        so: Number(so),
+        delivery:
+          !tbd && order?.delivery_date
+            ? (order.delivery_date as string).slice(0, 10)
+            : null,
+        model: covered.length > 0 ? labelOf(covered) : labelOf(poLines),
+        qty: qty > 0 ? qty : poLines.reduce((s, l) => s + l.qty, 0),
+      });
+    }
+  }
+  return rows;
 }
 
 toOrderRouter.get("/", requireOperation, async (c) => {
@@ -342,10 +522,13 @@ toOrderRouter.get("/", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
+  const ordered = await loadOrderedRows(sb, res.data.today, res.data.catalog);
+
   return c.json({
     today: res.data.today,
     proposals: res.data.proposals,
     unresolved: res.data.unresolved,
+    ordered,
     destinations: (destRows ?? []).map((d) => ({
       id: d.id as string,
       name: d.name as string,

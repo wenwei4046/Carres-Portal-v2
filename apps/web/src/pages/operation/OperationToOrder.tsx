@@ -1,68 +1,75 @@
 /**
- * Purchasing → **To Order** — the final freeze (Loo, 2026-08-01, after five
- * redesigns in one day): LEFT is Linear, RIGHT is GitHub Projects.
+ * Purchasing → **To Order** — the Work Queue + Excel Workspace
+ * (Jess's freeze, 2026-08-01, over Loo's final freeze of the same day).
  *
- * MISSION: decide which customer orders become purchase orders today.
- * Purchase Orders MANAGES the documents once they exist (preview ·
- * communication · audit · PDF · WhatsApp · revision · ready date — there,
- * not here). **Issue ≠ Send**: pressing Issue creates POs in the system;
- * nothing reaches a factory until the Purchase Orders page's WhatsApp step —
- * which is why there is no confirm dialog and no toast.
+ * MISSION (one sentence, hers): decide which customer orders become purchase
+ * orders today. Purchase Orders MANAGES the documents once they exist.
  *
- * THE GOLDEN RULE: the planning engine owns the schedule; operators own the
- * purchase order. `Order By` is the engine's word and NEVER reaches the
- * screen — the operator sees the CUSTOMER's date (Preferred Delivery) and
- * trusts that whatever is on this page is what today requires. Hold · Skip ·
- * Next Run · Postpone do not exist and never may.
+ * THE PAGE IS TWO DIMENSIONS AND NOTHING ELSE:
  *
- * The LEFT PANEL is an ACTION LAUNCHER, not navigation (200px, Linear's
- * density, ~30px rows): Today · Mattress · Bedframe · Sofa (each with its
- * order count; clicking filters the grid) · `+ Create Purchase` (the manual
- * entrance — a real dialog from day one; its SAVE arrives with the unified
- * `purchase_demands` card, so the Create button is disabled and says so) ·
- * the Issue pill, which exists only while something is selected and states
- * exactly what the button will do. No VIEWS/GROUP/SORT labels, no system
- * words, no H1 anywhere — the lit tab is the page identity.
+ * LEFT = the WORK QUEUE (Linear's density). Two blocks:
+ *   · TIME — Today · Tomorrow · This Week · Next Week · All. FIVE DISJOINT
+ *     SETS, never cumulative (her counts prove it: 21+8+42+15 = 86 = All).
+ *     The ENGINE decides the default view (Today, overdue folded in); the
+ *     operator switches freely — *"Engine decides the default view, not the
+ *     operator's limit."* Combining windows is the grid's Excel filter's
+ *     job, never the rail's. `All` carries no count.
+ *   · CATEGORY — All · Mattress · Bedframe · Sofa, the WORK ORDER (清完一类
+ *     再下一类), no counts (the grid answers the moment you click).
+ *   · `+ Create Purchase` — the manual entrance, may never be missing.
  *
- * The GRID is the only scroll area, GitHub-Projects density (40px kit rows),
- * SIX columns and no more: ☑ · Preferred Delivery · SO No. · Model · Qty ·
- * PO No. Category is NOT a column (the left panel already said it) and
- * Customer is not either (Loo: noise). PO No. rightmost answers "did
- * today's order happen" — `—` until Issue, then the number, in place; rows
- * never vanish. Today's rows arrive PRE-SELECTED; overrides are DELTAS a
- * refetch cannot overturn. Overdue (customer date past) is red and sorts
- * first, then Preferred Delivery ascending.
+ * RIGHT = the EXCEL WORKSPACE. One toolbar (2990's language: pill search ·
+ * selection state · the Issue pill, which EXISTS ONLY WHILE SOMETHING IS
+ * SELECTED · a quiet `Updated hh:mm` — never a Refresh). One grid, SIX frozen
+ * columns; every column sorts by header click and filters by its ▼ — and the
+ * PO filter speaks business: `Not Ordered` / `Ordered`, never `(Blanks)`.
+ * No Status pills (two filter doors for one fact is the Excel sin), no Sort
+ * By, no Group By.
  *
- * On Issue: the pill goes `Creating…`, one POST per supplier×category group
- * (the ARRANGEMENT only — no SKU, no qty, no price), the grid updates in
- * place (☑ gone, PO No. filled), the left counts drop, and the bottom bar —
- * which exists only while it has something to say — reads `N Purchase
- * Orders Created · Continue in Purchase Orders →`. A partial failure stays
- * in the bar with Retry until it succeeds. Zero popups. Destination is not
- * asked here: the engine uses the default; per-PO confirmation lives on the
- * generated documents (and per-PO destination arrives with v2's split).
+ * THE GOLDEN RULE STANDS: `Order By` never reaches the screen. Each row
+ * carries it ONLY to know its time bucket; the operator sees the CUSTOMER's
+ * date. Engine pre-selects exactly its own plan (orderBy ≤ today); rows in
+ * later buckets start unticked and a human ticks them — overrides are DELTAS
+ * a refetch cannot overturn.
+ *
+ * ORDERED rows (recent POs, one row per customer order) stay in the grid in
+ * their time bucket — `Today + Ordered` answers 今天已经下了哪些. Their PO No.
+ * is a link that lands on Purchase Orders with that PO opened: the receipt is
+ * the door to the next step. Real history belongs to Purchase Orders.
+ *
+ * On Issue: zero popups, zero toasts — the pill goes `Creating…`, one POST
+ * per supplier×category group (ARRANGEMENT only), rows update IN PLACE, the
+ * left counts fall, the bottom bar reports and a partial failure stays with
+ * Retry until it succeeds.
  */
 import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   TO_ORDER_WORDS as W,
+  bucketInView,
   categoryLabel,
   countItems,
   defaultDocuments,
+  demandTimeBucket,
+  orderedTimeBucket,
   ordersHeadline,
   posCreatedLine,
   purchaseOrderCount,
   railItemLabel,
   soSelectedShort,
   toOrderBuilds,
+  type ToOrderOrderedRow,
   type ToOrderProposal,
+  type ToOrderTimeBucket,
+  type ToOrderTimeView,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import Card from "@/components/kit/Card";
 import Checkbox from "@/components/kit/Checkbox";
-import DataTable, { type Column } from "@/components/kit/DataTable";
+import DataTable, { type Column, type ColumnFilter, type TableSort } from "@/components/kit/DataTable";
 import EmptyState from "@/components/kit/EmptyState";
+import GridToolbar from "@/components/kit/GridToolbar";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
@@ -94,6 +101,8 @@ interface ToOrderResponse {
   today: string;
   proposals: ToOrderProposal[];
   destinations: Destination[];
+  /** Recent POs read back — the grid's `Ordered` answer. */
+  ordered?: ToOrderOrderedRow[];
   /** Demand the catalog could not answer for. Empty is the only healthy value. */
   unresolved?: Unresolved[];
 }
@@ -110,17 +119,22 @@ type GroupResult =
   | { status: "done"; pos: string[] }
   | { status: "failed"; message: string };
 
-/** One grid row = one SO within one supplier×category proposal. */
+/** One grid row = one SO within one supplier×category proposal — or one
+ *  already-ordered SO on a recent PO. */
 interface GridRow {
   key: string;
-  proposalKey: string;
+  proposalKey: string | null;
   category: string;
-  orderId: string;
+  orderId: string | null;
   so: number | null;
   delivery: string | null;
   late: boolean;
   model: string;
   qty: number;
+  /** The engine's date — bucket arithmetic ONLY, never rendered. */
+  bucket: ToOrderTimeBucket;
+  /** Set on a row the server read back as already ordered. */
+  orderedPo: string | null;
 }
 
 /**
@@ -128,6 +142,35 @@ interface GridRow {
  * an unknown category lands after the sequence rather than crashing the sort.
  */
 const CATEGORY_SEQUENCE = ["mattress", "bedframe", "sofa", "accessory"];
+
+/** Where a PO's document lives — the per-supplier channel tab. */
+const PO_TAB_SLUG: Record<string, string> = {
+  mattress: "nice-future",
+  sofa: "hookka-sofa",
+  bedframe: "hookka-bedframe",
+};
+
+const TIME_VIEWS: { view: ToOrderTimeView; word: string }[] = [
+  { view: "today", word: W.navToday },
+  { view: "tomorrow", word: W.navTomorrow },
+  { view: "this_week", word: W.navThisWeek },
+  { view: "next_week", word: W.navNextWeek },
+  { view: "all", word: W.navAll },
+];
+
+/** `10:32 AM` — locale-free on purpose, so a CI node prints what Jess sees. */
+function clockLabel(ms: number): string {
+  const d = new Date(ms);
+  const h = d.getHours();
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(d.getMinutes()).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
+/** Sentinels for filter options that are facts, not values. */
+const F_OVERDUE = "__overdue__";
+const F_NONE = "__none__";
+const F_NOT_ORDERED = "__not_ordered__";
+const F_ORDERED = "__ordered__";
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
@@ -141,44 +184,41 @@ export default function OperationToOrder() {
   });
 
   const proposals = useMemo(() => q.data?.proposals ?? [], [q.data]);
+  const orderedRows = useMemo(() => q.data?.ordered ?? [], [q.data]);
   const destinations = useMemo(() => q.data?.destinations ?? [], [q.data]);
   const unresolved = useMemo(() => q.data?.unresolved ?? [], [q.data]);
   const today = q.data?.today ?? null;
 
-  /** The left panel's pick — Today (everything) or one category. */
-  const [cat, setCat] = useState<string>("today");
+  /** The Work Queue's two picks. The engine opens Today; the operator roams. */
+  const [timeView, setTimeView] = useState<ToOrderTimeView>("today");
+  const [cat, setCat] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<TableSort | null>(null);
+  /** Per-column Excel filters. An absent key = no filter. */
+  const [colFilters, setColFilters] = useState<ReadonlyMap<string, ReadonlySet<string>>>(
+    new Map(),
+  );
   /**
    * The operator's overrides, as DELTAS against the engine's default — never
    * an absolute set, so a refetch pre-ticks NEW rows and never overturns a
-   * human's untick (or tick) of a row it has seen before.
+   * human's untick (or tick) of a row it has seen before. Two sets because
+   * the default now differs by bucket: today's plan is ON, the future is OFF.
    */
   const [userOff, setUserOff] = useState<ReadonlySet<string>>(new Set());
+  const [userOn, setUserOn] = useState<ReadonlySet<string>>(new Set());
   /** PO numbers won this session, by row key — the grid updates in place. */
   const [rowPo, setRowPo] = useState<ReadonlyMap<string, string>>(new Map());
   const [results, setResults] = useState<ReadonlyMap<string, GroupResult>>(new Map());
   const [creating, setCreating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  /**
-   * TODAY'S plan only — the page IS today (Loo: whatever appears here is what
-   * today requires; the engine already filtered). Demand the engine cannot
-   * plan (`blocked`) cannot be issued and is not listed — its home is the
-   * Settings gap it names, and surfacing it here again is a next-card call.
-   */
-  const todays = useMemo(
-    () =>
-      proposals.filter(
-        (p) =>
-          p.blocked == null && (today == null || p.orderBy == null || p.orderBy <= today),
-      ),
-    [proposals, today],
-  );
+  /** Demand the engine cannot plan (`blocked`) cannot be issued — not listed. */
+  const planned = useMemo(() => proposals.filter((p) => p.blocked == null), [proposals]);
 
-  /** The grid rows — flat, business language only. */
+  /** Every grid row — demand first, then what was already ordered. */
   const allRows = useMemo<GridRow[]>(() => {
     const rows: GridRow[] = [];
-    for (const p of todays) {
+    for (const p of planned) {
       for (const r of p.rows) {
         const b = r.builds;
         rows.push({
@@ -194,52 +234,161 @@ export default function OperationToOrder() {
               ? railItemLabel(b[0]!.model, b[0]!.size ?? null)
               : countItems(b.length),
           qty: r.qty,
+          bucket: today == null ? "today" : demandTimeBucket(r.orderBy ?? null, today),
+          orderedPo: null,
         });
       }
     }
-    // Overdue first (the customer's date is PAST), then soonest customer
-    // date; undated sink. The engine's own dates never sort the screen.
-    rows.sort(
-      (a, b) =>
-        (b.late ? 1 : 0) - (a.late ? 1 : 0) ||
-        (a.delivery ?? "9999-12-31").localeCompare(b.delivery ?? "9999-12-31") ||
-        (a.so ?? 0) - (b.so ?? 0),
-    );
-    return rows;
-  }, [todays, today]);
-
-  /** Left-panel counts — unissued work, so they fall as POs are created. */
-  const catCounts = useMemo(() => {
-    const m = new Map<string, number>();
-    const orders = new Set<string>();
-    for (const r of allRows) {
-      if (rowPo.has(r.key)) continue;
-      m.set(r.category, (m.get(r.category) ?? 0) + 1);
-      orders.add(r.orderId);
+    const demandKeys = new Set(rows.map((r) => r.key));
+    for (const o of orderedRows) {
+      const key = `po:${o.poId}:${o.orderId ?? o.so ?? "manual"}`;
+      if (demandKeys.has(key)) continue;
+      rows.push({
+        key,
+        proposalKey: null,
+        category: o.category,
+        orderId: o.orderId,
+        so: o.so,
+        delivery: o.delivery,
+        late: today != null && o.delivery != null && o.delivery < today,
+        model: o.model,
+        qty: o.qty,
+        bucket: today == null ? "later" : orderedTimeBucket(o.placedAt, today),
+        orderedPo: o.poId,
+      });
     }
-    return { byCat: m, todayOrders: orders.size };
+    return rows;
+  }, [planned, orderedRows, today]);
+
+  /** A row's PO, whichever way it got one — this session or the server. */
+  const poOf = (r: GridRow) => rowPo.get(r.key) ?? r.orderedPo;
+
+  /** The rail's counts — unissued work per time bucket, falling as POs land. */
+  const timeCounts = useMemo(() => {
+    const m = new Map<ToOrderTimeBucket, Set<string>>();
+    for (const r of allRows) {
+      if (poOf(r)) continue;
+      const s = m.get(r.bucket) ?? new Set<string>();
+      s.add(r.orderId ?? r.key);
+      m.set(r.bucket, s);
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allRows, rowPo]);
 
-  const visibleRows = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    return allRows.filter(
-      (r) =>
-        (cat === "today" || r.category === cat) &&
-        (needle === "" ||
-          (r.so != null && `so-${r.so}`.includes(needle)) ||
-          r.model.toLowerCase().includes(needle)),
-    );
-  }, [allRows, cat, search]);
+  // ── The Excel pipeline: view → category → search → column filters → sort ──
 
-  const isSelected = (r: GridRow) => !rowPo.has(r.key) && !userOff.has(r.key);
+  const inView = useMemo(
+    () =>
+      allRows.filter(
+        (r) =>
+          bucketInView(r.bucket, timeView) &&
+          (cat === "all" || r.category === cat) &&
+          (search.trim() === "" ||
+            (r.so != null && `so-${r.so}`.includes(search.trim().toLowerCase())) ||
+            r.model.toLowerCase().includes(search.trim().toLowerCase())),
+      ),
+    [allRows, timeView, cat, search],
+  );
+
+  /** Does a row pass ONE column's filter? Sentinels are facts, not values. */
+  function passes(r: GridRow, colKey: string, sel: ReadonlySet<string>): boolean {
+    if (sel.size === 0) return true;
+    switch (colKey) {
+      case "delivery":
+        return (
+          (sel.has(F_OVERDUE) && r.late) ||
+          sel.has(r.delivery ?? F_NONE)
+        );
+      case "so":
+        return sel.has(r.so != null ? String(r.so) : F_NONE);
+      case "model":
+        return sel.has(r.model);
+      case "qty":
+        return sel.has(String(r.qty));
+      case "po": {
+        const po = poOf(r);
+        return (
+          (sel.has(F_NOT_ORDERED) && !po) ||
+          (sel.has(F_ORDERED) && !!po) ||
+          (po != null && sel.has(po))
+        );
+      }
+      default:
+        return true;
+    }
+  }
+
+  /** Rows passing every column filter EXCEPT `except` — Excel's cascade. */
+  const filteredExcept = (except: string | null) =>
+    inView.filter((r) =>
+      [...colFilters.entries()].every(
+        ([k, sel]) => k === except || passes(r, k, sel),
+      ),
+    );
+
+  const visibleRows = useMemo(() => {
+    const rows = filteredExcept(null);
+    const dir = sort?.dir === "desc" ? -1 : 1;
+    const cmpNull = <T,>(a: T | null, b: T | null, cmp: (x: T, y: T) => number) => {
+      if (a == null && b == null) return 0;
+      if (a == null) return 1; // nulls sink under BOTH directions
+      if (b == null) return -1;
+      return cmp(a, b) * dir;
+    };
+    const sorted = [...rows];
+    if (sort == null) {
+      // The frozen default: overdue first, then the customer's soonest date.
+      sorted.sort(
+        (a, b) =>
+          (b.late ? 1 : 0) - (a.late ? 1 : 0) ||
+          (a.delivery ?? "9999-12-31").localeCompare(b.delivery ?? "9999-12-31") ||
+          (a.so ?? 0) - (b.so ?? 0),
+      );
+    } else {
+      sorted.sort((a, b) => {
+        switch (sort.key) {
+          case "delivery":
+            return cmpNull(a.delivery, b.delivery, (x, y) => x.localeCompare(y));
+          case "so":
+            return cmpNull(a.so, b.so, (x, y) => x - y);
+          case "model":
+            return a.model.localeCompare(b.model) * dir;
+          case "qty":
+            return (a.qty - b.qty) * dir;
+          case "po":
+            return cmpNull(poOf(a), poOf(b), (x, y) => x.localeCompare(y));
+          default:
+            return 0;
+        }
+      });
+    }
+    return sorted;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, colFilters, sort, rowPo]);
+
+  // ── Selection: the engine pre-ticks ITS plan, a human ticks the rest ──────
+
+  const defaultOn = (r: GridRow) => r.bucket === "today" && !poOf(r);
+  const isSelected = (r: GridRow) =>
+    !poOf(r) && (defaultOn(r) ? !userOff.has(r.key) : userOn.has(r.key));
   const toggleRow = (r: GridRow) => {
-    if (rowPo.has(r.key)) return;
-    setUserOff((s) => {
-      const n = new Set(s);
-      if (n.has(r.key)) n.delete(r.key);
-      else n.add(r.key);
-      return n;
-    });
+    if (poOf(r)) return;
+    if (defaultOn(r)) {
+      setUserOff((s) => {
+        const n = new Set(s);
+        if (n.has(r.key)) n.delete(r.key);
+        else n.add(r.key);
+        return n;
+      });
+    } else {
+      setUserOn((s) => {
+        const n = new Set(s);
+        if (n.has(r.key)) n.delete(r.key);
+        else n.add(r.key);
+        return n;
+      });
+    }
   };
 
   /** What the pill will do — per group, from the shared projection. */
@@ -247,7 +396,7 @@ export default function OperationToOrder() {
     const selectedByProposal = new Map<string, Set<string>>();
     let selectedRows = 0;
     for (const r of allRows) {
-      if (!isSelected(r)) continue;
+      if (r.proposalKey == null || r.orderId == null || !isSelected(r)) continue;
       selectedRows += 1;
       const s = selectedByProposal.get(r.proposalKey) ?? new Set<string>();
       s.add(r.orderId);
@@ -259,7 +408,7 @@ export default function OperationToOrder() {
       docs: { key: string; include: boolean; buildKeys: string[] }[];
       orderIdsByDoc: string[][];
     }[] = [];
-    for (const p of todays) {
+    for (const p of planned) {
       const sel = selectedByProposal.get(p.key);
       if (!sel || sel.size === 0) continue;
       const orderOf = new Map(toOrderBuilds(p).map((b) => [b.buildKey, b.orderId]));
@@ -282,7 +431,7 @@ export default function OperationToOrder() {
     }
     return { selectedRows, poCount, targets };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allRows, userOff, rowPo, todays]);
+  }, [allRows, userOff, userOn, rowPo, planned]);
 
   const defaultDest = destinations.find((d) => d.isDefault) ?? destinations[0] ?? null;
 
@@ -356,14 +505,81 @@ export default function OperationToOrder() {
   const unread = unresolved.length > 0;
   const barHasSomething = creating || donePoCount > 0 || failedKeys.size > 0 || unread;
 
-  // ── Grid columns — Loo's frozen six, and not one more ────────────────────
+  // ── Column filters — every column, Excel's shape, business words ─────────
+
+  const setColFilter = (key: string) => (next: ReadonlySet<string>) =>
+    setColFilters((m) => {
+      const n = new Map(m);
+      if (next.size === 0) n.delete(key);
+      else n.set(key, next);
+      return n;
+    });
+
+  const filterFor = (key: string, options: ColumnFilter["options"], searchable = false): ColumnFilter => ({
+    options,
+    selected: colFilters.get(key) ?? new Set(),
+    onChange: setColFilter(key),
+    label: `${W.filterLabel} ${key}`,
+    clearLabel: W.cancel,
+    ...(searchable ? { searchPlaceholder: W.searchPlaceholder } : {}),
+  });
+
+  const deliveryOptions = useMemo(() => {
+    const base = filteredExcept("delivery");
+    const opts: { value: string; label: string }[] = [
+      { value: F_OVERDUE, label: W.filterOverdue },
+    ];
+    const dates = [...new Set(base.map((r) => r.delivery).filter(Boolean))] as string[];
+    dates.sort();
+    for (const d of dates) opts.push({ value: d, label: fmtDate(d) });
+    if (base.some((r) => r.delivery == null)) opts.push({ value: F_NONE, label: "—" });
+    return opts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, colFilters]);
+
+  const soOptions = useMemo(() => {
+    const base = filteredExcept("so");
+    const sos = [...new Set(base.map((r) => r.so).filter((x) => x != null))] as number[];
+    sos.sort((a, b) => a - b);
+    return sos.map((s) => ({ value: String(s), label: `SO-${s}` }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, colFilters]);
+
+  const modelOptions = useMemo(() => {
+    const base = filteredExcept("model");
+    const models = [...new Set(base.map((r) => r.model))].sort();
+    return models.map((m) => ({ value: m, label: m }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, colFilters]);
+
+  const qtyOptions = useMemo(() => {
+    const base = filteredExcept("qty");
+    const qs = [...new Set(base.map((r) => r.qty))].sort((a, b) => a - b);
+    return qs.map((n) => ({ value: String(n), label: String(n) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, colFilters]);
+
+  const poOptions = useMemo(() => {
+    const base = filteredExcept("po");
+    const opts: { value: string; label: string }[] = [
+      { value: F_NOT_ORDERED, label: W.filterNotOrdered },
+      { value: F_ORDERED, label: W.filterOrdered },
+    ];
+    const pos = [...new Set(base.map((r) => poOf(r)).filter(Boolean))] as string[];
+    pos.sort();
+    for (const p of pos) opts.push({ value: p, label: p });
+    return opts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, colFilters, rowPo]);
+
+  // ── Grid columns — Loo's frozen six, now with the Excel reflexes ─────────
   const columns: readonly Column<GridRow>[] = [
     {
       key: "sel",
       label: "",
       width: 6,
       cell: (r) =>
-        rowPo.has(r.key) ? null : (
+        poOf(r) ? null : (
           <Checkbox
             id={`row-${r.key}`}
             ariaLabel={W.select}
@@ -376,6 +592,8 @@ export default function OperationToOrder() {
       key: "delivery",
       label: W.colPreferred,
       width: 20,
+      sortable: true,
+      filter: filterFor("delivery", deliveryOptions),
       cell: (r) => (
         <span
           className={
@@ -390,23 +608,51 @@ export default function OperationToOrder() {
       key: "so",
       label: W.colSoNo,
       width: 14,
+      sortable: true,
+      filter: filterFor("so", soOptions, true),
       cell: (r) => (r.so != null ? `SO-${r.so}` : "—"),
     },
-    { key: "model", label: W.colModel, width: 36, cell: (r) => r.model },
-    { key: "qty", label: W.colQty, width: 10, align: "right", numeric: true, cell: (r) => r.qty },
+    {
+      key: "model",
+      label: W.colModel,
+      width: 34,
+      sortable: true,
+      filter: filterFor("model", modelOptions, true),
+      cell: (r) => r.model,
+    },
+    {
+      key: "qty",
+      label: W.colQty,
+      width: 10,
+      align: "right",
+      numeric: true,
+      sortable: true,
+      filter: filterFor("qty", qtyOptions),
+      cell: (r) => r.qty,
+    },
     {
       key: "po",
       label: W.colPoNo,
-      width: 14,
+      width: 16,
+      sortable: true,
+      filter: filterFor("po", poOptions),
       cell: (r) => {
-        const po = rowPo.get(r.key);
+        const po = poOf(r);
         if (!po) return "—";
-        // The number is the receipt AND the door to the next step.
+        // The number is the receipt AND the door to the next step: it lands
+        // on Purchase Orders with THIS document opened.
+        const slug = PO_TAB_SLUG[r.category];
         return (
           <button
             type="button"
             className="text-kit-blue-11 tabular-nums hover:underline"
-            onClick={() => navigate("/operation/procurement")}
+            onClick={() =>
+              navigate(
+                slug
+                  ? `/operation/procurement/${slug}?po=${encodeURIComponent(po)}`
+                  : "/operation/procurement",
+              )
+            }
             data-testid={`row-po-${r.key}`}
           >
             {po}
@@ -415,6 +661,8 @@ export default function OperationToOrder() {
       },
     },
   ];
+
+  const updatedMs = q.dataUpdatedAt;
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-kit-slate-3">
@@ -435,18 +683,40 @@ export default function OperationToOrder() {
       <PurchasingTabs />
 
       <div className="flex-1 min-h-0 flex overflow-hidden">
-        {/* ── The ACTION LAUNCHER (Linear's density; no heading — we are
-             already at To Order, and the lit tab says so). ─────────────── */}
+        {/* ── The WORK QUEUE (Linear's density; no heading — we are already
+             at To Order, and the lit tab says so). Two blocks: TIME, then
+             CATEGORY — never mixed (Jess: 上半部 = 时间视角, 下半部 = 商品
+             类别). ────────────────────────────────────────────────────── */}
         <aside
           className="w-[200px] shrink-0 min-h-0 overflow-y-auto border-r border-kit-slate-5 px-3 py-3 flex flex-col"
           data-testid="to-order-nav"
         >
+          {TIME_VIEWS.map(({ view, word }) => (
+            <NavRow
+              key={view}
+              active={timeView === view}
+              onClick={() => setTimeView(view)}
+              testId={`to-order-time-${view}`}
+              name={word}
+              count={
+                view === "all"
+                  ? null // All is all — the number adds nothing (Jess).
+                  : ordersHeadline(timeCounts.get(view)?.size ?? 0)
+              }
+            />
+          ))}
+
+          <div className="my-2 border-t border-kit-slate-6" />
+
+          <span className="px-2 pb-1 text-label font-medium uppercase text-kit-slate-11">
+            {W.categoryHeading}
+          </span>
           <NavRow
-            active={cat === "today"}
-            onClick={() => setCat("today")}
-            testId="to-order-cat-today"
-            name={W.navToday}
-            count={ordersHeadline(catCounts.todayOrders)}
+            active={cat === "all"}
+            onClick={() => setCat("all")}
+            testId="to-order-cat-all"
+            name={W.categoryAll}
+            count={null}
           />
           {CATEGORY_SEQUENCE.slice(0, 3).map((c) => (
             <NavRow
@@ -455,7 +725,7 @@ export default function OperationToOrder() {
               onClick={() => setCat(c)}
               testId={`to-order-cat-${c}`}
               name={categoryLabel(c)}
-              count={ordersHeadline(catCounts.byCat.get(c) ?? 0)}
+              count={null}
             />
           ))}
 
@@ -472,44 +742,50 @@ export default function OperationToOrder() {
           >
             + {W.createPurchase}
           </button>
-
-          {/* The Issue pill — exists only while something is selected, and
-              says exactly what the button will do. */}
-          {batch.selectedRows > 0 && !creating ? (
-            <div
-              className="mt-3 rounded-card border border-kit-slate-5 bg-white p-3 flex flex-col gap-1"
-              data-testid="to-order-issue-pill"
-            >
-              <span className="text-meta tabular-nums text-kit-slate-11">
-                {soSelectedShort(batch.selectedRows)}
-              </span>
-              <span className="text-meta tabular-nums text-kit-slate-11">
-                → {purchaseOrderCount(batch.poCount)}
-              </span>
-              <Button
-                variant="primary"
-                onClick={() => void issueAll()}
-                disabled={unread || batch.poCount === 0 || !defaultDest}
-                data-testid="to-order-issue"
-              >
-                {`+ ${W.issuePos}`}
-              </Button>
-            </div>
-          ) : null}
         </aside>
 
-        {/* ── The right column: the grid IS the page. ──────────────────── */}
+        {/* ── The Excel Workspace: one toolbar, one grid. ───────────────── */}
         <div className="flex-1 min-w-0 flex flex-col min-h-0 gap-2 px-4 pt-2 pb-3">
-          <span className="w-64 block shrink-0">
-            <SearchInput
-              id="to-order-search"
-              pill
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={W.searchPlaceholder}
-              aria-label={W.searchLabel}
-            />
-          </span>
+          <GridToolbar
+            search={
+              <SearchInput
+                id="to-order-search"
+                pill
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={W.searchPlaceholder}
+                aria-label={W.searchLabel}
+              />
+            }
+            right={
+              batch.selectedRows > 0 && !creating ? (
+                <span
+                  className="flex items-center gap-3"
+                  data-testid="to-order-issue-pill"
+                >
+                  <span className="text-meta tabular-nums text-kit-slate-11 whitespace-nowrap">
+                    {`${soSelectedShort(batch.selectedRows)} · → ${purchaseOrderCount(batch.poCount)}`}
+                  </span>
+                  <Button
+                    variant="primary"
+                    shape="pill"
+                    onClick={() => void issueAll()}
+                    disabled={unread || batch.poCount === 0 || !defaultDest}
+                    data-testid="to-order-issue"
+                  >
+                    {`+ ${W.issuePos}`}
+                  </Button>
+                </span>
+              ) : null
+            }
+            meta={
+              updatedMs > 0 ? (
+                <span data-testid="to-order-updated">
+                  {`${W.updated} ${clockLabel(updatedMs)}`}
+                </span>
+              ) : null
+            }
+          />
 
           <div className="flex-1 min-h-0 flex flex-col" data-testid="to-order-sheet">
             {q.isLoading && allRows.length === 0 ? (
@@ -529,6 +805,8 @@ export default function OperationToOrder() {
                 rowId={(r) => r.key}
                 empty={W.empty}
                 label={W.itemsTableLabel}
+                sort={sort}
+                onSortChange={setSort}
               />
             )}
           </div>
@@ -593,7 +871,7 @@ export default function OperationToOrder() {
 
 // ── Pieces ──────────────────────────────────────────────────────────────────
 
-/** One launcher row — Linear's shape: name, count under it, ~30px, ┃ active. */
+/** One rail row — Linear's shape: name, count under it, ~30px, ┃ active. */
 function NavRow({
   active,
   onClick,
@@ -605,7 +883,7 @@ function NavRow({
   onClick: () => void;
   testId: string;
   name: ReactNode;
-  count: string;
+  count: string | null;
 }) {
   return (
     <button
@@ -623,13 +901,15 @@ function NavRow({
       ) : null}
       <span
         className={[
-          "uppercase text-body",
+          "text-body",
           active ? "font-semibold text-kit-slate-12" : "font-medium text-kit-slate-12",
         ].join(" ")}
       >
         {name}
       </span>
-      <span className="text-meta tabular-nums text-kit-slate-11">{count}</span>
+      {count != null ? (
+        <span className="text-meta tabular-nums text-kit-slate-11">{count}</span>
+      ) : null}
     </button>
   );
 }

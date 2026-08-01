@@ -7,13 +7,19 @@ import OperationToOrder from "./OperationToOrder";
 import { fmtDate } from "@/lib/fmt-date";
 
 /**
- * To Order — the final freeze (Loo, 2026-08-01): LEFT is a Linear-style
- * Action Launcher (Today · the categories · + Create Purchase · the Issue
- * pill), RIGHT is a GitHub-Projects grid of exactly six columns speaking
- * business language only — `Order By` never reaches the screen. Rows arrive
- * pre-selected with delta memory; Issue posts one ARRANGEMENT per group,
- * updates the grid in place (rows never vanish), reports in the bottom bar
- * (no toast, no popup), and a partial failure stays until retried.
+ * To Order — the Work Queue + Excel Workspace (Jess's freeze, 2026-08-01).
+ *
+ * LEFT = time views (five DISJOINT sets, engine opens Today, overdue folds
+ * in) + CATEGORY (work order, no counts) + Create Purchase. RIGHT = the
+ * Excel grid: pill search · the Issue pill that exists only while something
+ * is selected · `Updated hh:mm` · header sort · per-column Excel filters
+ * whose PO options speak business (`Not Ordered` / `Ordered`, never
+ * `(Blanks)`). Ordered rows stay in their bucket; their PO No. is the door
+ * to Purchase Orders. Issue posts one ARRANGEMENT per group, updates the
+ * grid in place, reports in the bottom bar, and a partial failure stays.
+ *
+ * Fixture time: today = 2026-07-30 (Thursday). This week = Jul 27 → Aug 2;
+ * next week starts Aug 3.
  */
 
 const navigate = vi.fn();
@@ -42,6 +48,14 @@ function build(key: string, model: string, codes: string, qty = 1, size: string 
 const TO_ORDER = {
   today: "2026-07-30",
   destinations: [{ id: KLANG, name: "Carres Klang", isDefault: true }],
+  ordered: [
+    {
+      // A PO created TODAY — Today + `Ordered` must answer 今天已经下了哪些.
+      poId: "PO-9001", placedAt: "2026-07-30", category: "bedframe",
+      supplierId: OHANA, orderId: "o30", so: 1350,
+      delivery: "2026-08-10", model: "Cody K", qty: 1,
+    },
+  ],
   proposals: [
     {
       key: `${OHANA}::sofa`,
@@ -58,12 +72,14 @@ const TO_ORDER = {
           orderId: "o2", so: 1204, customer: "ella", qty: 1,
           summary: "Booqit · 1 Sofa", stockReady: "2026-07-20",
           delivery: "2026-07-20", // the CUSTOMER's date, already past → red
+          orderBy: "2026-07-15", // overdue → folds into Today
           builds: [build("bk-e", "Booqit", "5539-1A(LHF)")],
         },
         {
           orderId: "o1", so: 1207, customer: "PETER", qty: 2,
           summary: "Booqit · 2 Sofas", stockReady: "2026-08-13",
           delivery: "2026-08-13",
+          orderBy: "2026-07-30",
           builds: [
             build("bk-a", "Booqit", "5539-1B(LHF)"),
             build("bk-b", "Booqit", "5539-1A(LHF)"),
@@ -73,6 +89,7 @@ const TO_ORDER = {
           orderId: "o3", so: 1257, customer: "kee tong", qty: 2,
           summary: "Booqit · 2 Sofas", stockReady: null,
           delivery: null, // TBD — prints the dash, sinks in the sort
+          orderBy: null, // undated → a human must see it NOW, not in All
           builds: [build("bk-k", "Booqit", "5539-2B(LHF)")],
         },
       ],
@@ -92,19 +109,21 @@ const TO_ORDER = {
           orderId: "o9", so: 1300, customer: "wong", qty: 3,
           summary: "Cody · 3 Bedframes", stockReady: "2026-08-06",
           delivery: "2026-08-15",
+          orderBy: "2026-07-30",
           builds: [build("l1", "Cody", "CODY-Q", 3, "Queen")],
         },
         {
           orderId: "o8", so: 1301, customer: "lim", qty: 1,
           summary: "Cody · 1 Bedframe", stockReady: "2026-08-06",
           delivery: "2026-08-15",
+          orderBy: "2026-07-30",
           builds: [build("l2", "Cody", "CODY-K", 1, "King")],
         },
       ],
     },
     {
-      // A run AHEAD — its order-by day has not come, so the page (which IS
-      // today) does not list it.
+      // A run AHEAD — its order-by day is next Monday, so it lives in the
+      // Next Week view: listed, visible, NOT pre-selected.
       key: `${NF}::mattress`,
       supplierId: NF,
       supplierName: "Nice Future",
@@ -119,6 +138,7 @@ const TO_ORDER = {
           orderId: "o20", so: 1400, customer: "amy", qty: 1,
           summary: "Sonic · 1 Mattress", stockReady: "2026-08-20",
           delivery: "2026-08-25",
+          orderBy: "2026-08-03",
           builds: [build("m1", "Sonic", "SONIC-Q", 1, "Queen")],
         },
       ],
@@ -177,33 +197,47 @@ async function loaded() {
   await screen.findByTestId("to-order-issue-pill");
 }
 
-describe("the Action Launcher", () => {
-  it("is Today · the categories · + Create Purchase — and nothing systemic", async () => {
+describe("the Work Queue — time above, category below, never mixed", () => {
+  it("five time views with counts (All bare), CATEGORY without numbers, + Create Purchase", async () => {
     await loaded();
     const nav = screen.getByTestId("to-order-nav");
-    expect(within(nav).getByTestId("to-order-cat-today")).toHaveTextContent(W.navToday);
-    // 5 unique customer orders today; the run ahead is not counted.
-    expect(within(nav).getByTestId("to-order-cat-today")).toHaveTextContent("5 Orders");
-    expect(within(nav).getByTestId("to-order-cat-bedframe")).toHaveTextContent("2 Orders");
-    expect(within(nav).getByTestId("to-order-cat-sofa")).toHaveTextContent("3 Orders");
-    // Mattress exists only as a run ahead — the row is there, at zero.
-    expect(within(nav).getByTestId("to-order-cat-mattress")).toHaveTextContent("0 Orders");
+    // 5 unique customer orders due (or overdue) today; the run ahead is not.
+    expect(within(nav).getByTestId("to-order-time-today")).toHaveTextContent(W.navToday);
+    expect(within(nav).getByTestId("to-order-time-today")).toHaveTextContent("5 Orders");
+    expect(within(nav).getByTestId("to-order-time-tomorrow")).toHaveTextContent("0 Orders");
+    expect(within(nav).getByTestId("to-order-time-next_week")).toHaveTextContent("1 Order");
+    // All is all — the number adds nothing (Jess).
+    expect(within(nav).getByTestId("to-order-time-all")).not.toHaveTextContent("Orders");
+    // CATEGORY is a WORK ORDER, not a scoreboard: heading + rows, no counts.
+    expect(within(nav).getByText(W.categoryHeading)).toBeInTheDocument();
+    expect(within(nav).getByTestId("to-order-cat-all")).not.toHaveTextContent("Orders");
+    expect(within(nav).getByTestId("to-order-cat-mattress")).not.toHaveTextContent("Orders");
     expect(within(nav).getByTestId("to-order-create-purchase")).toHaveTextContent(
       W.createPurchase,
     );
     // No system words, no headings, no H1 anywhere.
     expect(within(nav).queryByText("Views")).toBeNull();
     expect(within(nav).queryByText("Group")).toBeNull();
-    expect(screen.queryByText("TO ORDER")).toBeNull();
     expect(document.querySelector("h1")).toBeNull();
   });
 
-  it("clicking a category filters the grid; Today shows everything", async () => {
+  it("time views are DISJOINT sets — Next Week holds the run ahead, Today does not", async () => {
+    await loaded();
+    expect(screen.queryByText("SO-1400")).toBeNull(); // not cumulative
+    fireEvent.click(screen.getByTestId("to-order-time-next_week"));
+    expect(screen.getByText("SO-1400")).toBeInTheDocument();
+    expect(screen.queryByText("SO-1204")).toBeNull(); // Today's stayed home
+    fireEvent.click(screen.getByTestId("to-order-time-all"));
+    expect(screen.getByText("SO-1400")).toBeInTheDocument();
+    expect(screen.getByText("SO-1204")).toBeInTheDocument();
+  });
+
+  it("clicking a category narrows within the time view; All restores", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-cat-bedframe"));
     expect(screen.getByText("SO-1300")).toBeInTheDocument();
     expect(screen.queryByText("SO-1204")).toBeNull();
-    fireEvent.click(screen.getByTestId("to-order-cat-today"));
+    fireEvent.click(screen.getByTestId("to-order-cat-all"));
     expect(screen.getByText("SO-1204")).toBeInTheDocument();
   });
 });
@@ -232,12 +266,24 @@ describe("the grid — business language only", () => {
     expect(screen.queryByText(fmtDate("2026-08-06"))).toBeNull(); // bedframe stockReady
   });
 
-  it("rows arrive PRE-SELECTED and the pill tells the truth", async () => {
+  it("rows arrive PRE-SELECTED and the toolbar pill tells the truth", async () => {
     await loaded();
     const pill = screen.getByTestId("to-order-issue-pill");
     expect(pill).toHaveTextContent("5 SO selected");
     // Sofa is one-per-order (3) + bedframe merges (1).
     expect(pill).toHaveTextContent("4 Purchase Orders");
+  });
+
+  it("the engine pre-ticks ONLY its own plan — a future row waits for a human", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-time-next_week"));
+    const box = rowBox(`${NF}::mattress`, "o20");
+    expect(box).not.toBeNull();
+    expect(box.getAttribute("data-state")).not.toBe("checked");
+    fireEvent.click(box);
+    // The tick joins the batch: 5 + amy = 6 SO, 4 + 1 = 5 Purchase Orders.
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("6 SO selected");
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 Purchase Orders");
   });
 
   it("an untick drops the pill's promise; unticking everything removes the pill", async () => {
@@ -256,11 +302,11 @@ describe("the grid — business language only", () => {
     expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
   });
 
-  it("the operator's unticks survive a category switch — deltas, not snapshots", async () => {
+  it("the operator's ticks and unticks survive a view switch — deltas, not snapshots", async () => {
     await loaded();
     fireEvent.click(rowBox(`${OHANA}::sofa`, "o2"));
     fireEvent.click(screen.getByTestId("to-order-cat-bedframe"));
-    fireEvent.click(screen.getByTestId("to-order-cat-today"));
+    fireEvent.click(screen.getByTestId("to-order-cat-all"));
     expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 SO selected");
   });
 
@@ -271,6 +317,72 @@ describe("the grid — business language only", () => {
     });
     expect(screen.getByText("SO-1300")).toBeInTheDocument();
     expect(screen.queryByText("SO-1204")).toBeNull();
+  });
+
+  it("a quiet Updated stamp — never a Refresh button", async () => {
+    await loaded();
+    expect(screen.getByTestId("to-order-updated")).toHaveTextContent(/^Updated \d/);
+    expect(screen.queryByText("Refresh")).toBeNull();
+  });
+});
+
+describe("the Excel reflexes — header sort, per-column filters", () => {
+  it("a header click sorts by SO; a second click reverses", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("table-sort-so"));
+    let sos = screen.getAllByText(/^SO-\d+$/).map((el) => el.textContent);
+    expect(sos).toEqual(["SO-1204", "SO-1207", "SO-1257", "SO-1300", "SO-1301", "SO-1350"]);
+    fireEvent.click(screen.getByTestId("table-sort-so"));
+    sos = screen.getAllByText(/^SO-\d+$/).map((el) => el.textContent);
+    expect(sos[0]).toBe("SO-1350");
+  });
+
+  it("the PO filter speaks business — Not Ordered / Ordered, never (Blanks)", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("table-filter-po"));
+    expect(screen.getByLabelText(W.filterNotOrdered)).toBeInTheDocument();
+    expect(screen.getByLabelText(W.filterOrdered)).toBeInTheDocument();
+    expect(screen.queryByText("(Blanks)")).toBeNull();
+    // `Ordered` narrows to the read-back PO row.
+    fireEvent.click(screen.getByLabelText(W.filterOrdered));
+    expect(screen.getByText("SO-1350")).toBeInTheDocument();
+    expect(screen.queryByText("SO-1204")).toBeNull();
+    // Not Ordered joins in — Excel ORs a checklist.
+    fireEvent.click(screen.getByLabelText(W.filterNotOrdered));
+    expect(screen.getByText("SO-1204")).toBeInTheDocument();
+  });
+
+  it("the delivery filter leads with Overdue and prints dates, not ISO", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("table-filter-delivery"));
+    fireEvent.click(screen.getByLabelText(W.filterOverdue));
+    expect(screen.getByText("SO-1204")).toBeInTheDocument(); // ella, past date
+    expect(screen.queryByText("SO-1300")).toBeNull();
+  });
+
+  it("there are no Status pills — the PO column IS the status door", async () => {
+    await loaded();
+    expect(screen.queryByText("Status")).toBeNull();
+    expect(screen.queryByText("Yet to Order")).toBeNull();
+  });
+});
+
+describe("ordered rows — the receipt stays on the sheet", () => {
+  it("a PO created today sits in Today, unticked and untickable, PO No. filled", async () => {
+    await loaded();
+    expect(screen.getByText("SO-1350")).toBeInTheDocument();
+    expect(document.getElementById("row-po:PO-9001:o30")).toBeNull(); // no checkbox
+    expect(screen.getByTestId("row-po-po:PO-9001:o30")).toHaveTextContent("PO-9001");
+    // It is DONE work — it must not inflate the rail's counts.
+    expect(screen.getByTestId("to-order-time-today")).toHaveTextContent("5 Orders");
+  });
+
+  it("its PO No. lands on Purchase Orders with THAT document opened", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("row-po-po:PO-9001:o30"));
+    expect(navigate).toHaveBeenCalledWith(
+      "/operation/procurement/hookka-bedframe?po=PO-9001",
+    );
   });
 });
 
@@ -316,8 +428,19 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
     );
     fireEvent.click(screen.getByTestId("to-order-continue"));
     expect(navigate).toHaveBeenCalledWith("/operation/procurement");
-    // The launcher counts fell with the work.
-    expect(screen.getByTestId("to-order-cat-bedframe")).toHaveTextContent("0 Orders");
+    // The rail's Today count fell with the work — only ella is left.
+    expect(screen.getByTestId("to-order-time-today")).toHaveTextContent("1 Order");
+  });
+
+  it("a session-issued PO's number is the door to ITS channel tab", async () => {
+    await loaded();
+    fireEvent.click(rowBox(`${OHANA}::sofa`, "o2")); // leave ella out
+    fireEvent.click(screen.getByTestId("to-order-issue"));
+    await screen.findByTestId("to-order-created-line");
+    fireEvent.click(screen.getByTestId(`row-po-${OHANA}::bedframe:o9`));
+    expect(navigate).toHaveBeenCalledWith(
+      "/operation/procurement/hookka-bedframe?po=PO-bedframe-1",
+    );
   });
 
   it("a failed group fails ALONE and stays in the bar until retried", async () => {
@@ -357,7 +480,7 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
   it("an empty To Order is an answer, not a blank sheet", async () => {
     apiFetch.mockImplementation((path: string) =>
       path.endsWith("/to-order")
-        ? Promise.resolve({ ...TO_ORDER, proposals: [] })
+        ? Promise.resolve({ ...TO_ORDER, proposals: [], ordered: [] })
         : route(path),
     );
     render(wrap());

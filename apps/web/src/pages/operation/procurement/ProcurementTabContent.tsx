@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useProcurementTab, useCatalog, useOperationSuppliers, useOperationWarehouse } from "@/lib/queries";
 import type { operationPoListRow, SupplierRow } from "@/lib/queries";
 import { purchasingActionButton } from "@carres/shared";
@@ -98,6 +99,24 @@ export default function ProcurementTabContent({
   const catalogQ = useCatalog();
 
   const pos = tabQ.data?.pos ?? [];
+
+  /**
+   * `?po=` — To Order's PO No. link lands HERE with that document opened
+   * (Jess, 2026-08-01: the receipt is the door to the next step). Once, on
+   * the first load that can answer; the filter widens to `all` so a
+   * received or cancelled document still opens.
+   */
+  const [searchParams] = useSearchParams();
+  const wantedPo = searchParams.get("po");
+  const openedWanted = useRef(false);
+  useEffect(() => {
+    if (!wantedPo || openedWanted.current || pos.length === 0) return;
+    const hit = pos.find((p) => p.id === wantedPo);
+    if (!hit) return;
+    openedWanted.current = true;
+    setFilter("all");
+    setDetailPo(hit);
+  }, [wantedPo, pos]);
   const suppliers = suppliersQ.data?.suppliers ?? [];
   const warehouses = warehouseQ.data?.warehouses ?? [];
 

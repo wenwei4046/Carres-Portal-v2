@@ -140,7 +140,7 @@ const TABLES = (): Tbl => ({
 
 /** Records what every table saw, plus every rpc + update call. */
 function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
-  const CHAIN = ["select", "in", "or", "eq", "neq", "ilike", "not", "is", "order", "limit"];
+  const CHAIN = ["select", "in", "or", "eq", "neq", "gte", "ilike", "not", "is", "order", "limit"];
   const updates: { table: string; patch: unknown; id: unknown }[] = [];
   const rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
   let poSeq = 2030;
@@ -344,6 +344,70 @@ describe("GET /api/operation/purchase/to-order", () => {
       .flatMap((b: { lines: { sku: string }[] }) => b.lines)
       .map((l: { sku: string }) => l.sku);
     expect(skus).not.toContain("MEMORY-FOAM-PILLOW");
+  });
+
+  it("reads back what was already ordered — recent POs, one row per customer order", async () => {
+    const t = TABLES();
+    const todayIsoStr = new Date().toISOString().slice(0, 10);
+    t.purchase_orders = {
+      data: [
+        { id: "PO-2001", supplier_id: OHANA, placed_at: `${todayIsoStr}T09:00:00Z`, so_refs: [1207] },
+      ],
+      error: null,
+    };
+    // received in full so the SUPPLY read subtracts nothing and the demand
+    // half of the fixture stays byte-identical.
+    t.purchase_order_lines = {
+      data: [{ po_id: "PO-2001", sku: "5539-1B(LHF)", qty: 1, received_qty: 1 }],
+      error: null,
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+
+    expect(body.ordered).toHaveLength(1);
+    expect(body.ordered[0]).toMatchObject({
+      poId: "PO-2001",
+      placedAt: todayIsoStr,
+      category: "sofa",
+      so: 1207,
+      orderId: "o1",
+      delivery: "2026-08-22",
+      model: "Booqit",
+      qty: 1,
+    });
+  });
+
+  it("a manual PO with no SO still gets a row — ordered work must be answerable", async () => {
+    const t = TABLES();
+    const todayIsoStr = new Date().toISOString().slice(0, 10);
+    t.purchase_orders = {
+      data: [
+        { id: "PO-2002", supplier_id: OHANA, placed_at: `${todayIsoStr}T09:00:00Z`, so_refs: [] },
+      ],
+      error: null,
+    };
+    t.purchase_order_lines = {
+      data: [{ po_id: "PO-2002", sku: "5539-1A(LHF)", qty: 2, received_qty: 2 }],
+      error: null,
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    expect(body.ordered).toHaveLength(1);
+    expect(body.ordered[0]).toMatchObject({ poId: "PO-2002", so: null, orderId: null, qty: 2 });
+  });
+
+  it("each demand row carries its ORDER's own orderBy for the Work Queue — never rendered", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    for (const r of body.proposals[0].rows) {
+      expect(r.orderBy === null || /^\d{4}-\d{2}-\d{2}$/.test(r.orderBy)).toBe(true);
+    }
   });
 });
 
@@ -589,6 +653,70 @@ describe("a requirement the catalog cannot answer for", () => {
       .flatMap((b: { lines: { sku: string }[] }) => b.lines)
       .map((l: { sku: string }) => l.sku);
     expect(skus).not.toContain("MEMORY-FOAM-PILLOW");
+  });
+
+  it("reads back what was already ordered — recent POs, one row per customer order", async () => {
+    const t = TABLES();
+    const todayIsoStr = new Date().toISOString().slice(0, 10);
+    t.purchase_orders = {
+      data: [
+        { id: "PO-2001", supplier_id: OHANA, placed_at: `${todayIsoStr}T09:00:00Z`, so_refs: [1207] },
+      ],
+      error: null,
+    };
+    // received in full so the SUPPLY read subtracts nothing and the demand
+    // half of the fixture stays byte-identical.
+    t.purchase_order_lines = {
+      data: [{ po_id: "PO-2001", sku: "5539-1B(LHF)", qty: 1, received_qty: 1 }],
+      error: null,
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+
+    expect(body.ordered).toHaveLength(1);
+    expect(body.ordered[0]).toMatchObject({
+      poId: "PO-2001",
+      placedAt: todayIsoStr,
+      category: "sofa",
+      so: 1207,
+      orderId: "o1",
+      delivery: "2026-08-22",
+      model: "Booqit",
+      qty: 1,
+    });
+  });
+
+  it("a manual PO with no SO still gets a row — ordered work must be answerable", async () => {
+    const t = TABLES();
+    const todayIsoStr = new Date().toISOString().slice(0, 10);
+    t.purchase_orders = {
+      data: [
+        { id: "PO-2002", supplier_id: OHANA, placed_at: `${todayIsoStr}T09:00:00Z`, so_refs: [] },
+      ],
+      error: null,
+    };
+    t.purchase_order_lines = {
+      data: [{ po_id: "PO-2002", sku: "5539-1A(LHF)", qty: 2, received_qty: 2 }],
+      error: null,
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    expect(body.ordered).toHaveLength(1);
+    expect(body.ordered[0]).toMatchObject({ poId: "PO-2002", so: null, orderId: null, qty: 2 });
+  });
+
+  it("each demand row carries its ORDER's own orderBy for the Work Queue — never rendered", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    for (const r of body.proposals[0].rows) {
+      expect(r.orderBy === null || /^\d{4}-\d{2}-\d{2}$/.test(r.orderBy)).toBe(true);
+    }
   });
 });
 

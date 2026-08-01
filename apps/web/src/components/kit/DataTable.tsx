@@ -34,11 +34,36 @@
  * **Nothing is migrated onto this in D0.5c.** The Orders table keeps its own
  * markup until **D6**, which is the card that re-lays that page out.
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import Button from "./Button";
 import Checkbox from "./Checkbox";
 import EmptyState from "./EmptyState";
+import Icon from "./Icon";
 import Loading from "./Loading";
+import Popover from "./Popover";
+import SearchInput from "./SearchInput";
 import { Z_TABLE_HEADER } from "./overlay-layer";
+
+/**
+ * A column's Excel filter (Jess, 2026-08-01 — the AutoCount workspace: every
+ * column sorts by header click and filters by its ▼). The kit renders the
+ * popover — a value checklist with an optional search — and NOTHING more: the
+ * page owns which rows survive, exactly as it owns formatting. Option LABELS
+ * are the caller's (COPY-STANDARD speaks business — `Not Ordered`, never
+ * `(Blanks)`).
+ */
+export interface ColumnFilter {
+  options: readonly { value: string; label: string }[];
+  /** Empty set = no filter — every row passes. */
+  selected: ReadonlySet<string>;
+  onChange: (next: ReadonlySet<string>) => void;
+  /** What the popover is, for a screen reader — e.g. `Filter Model`. */
+  label: string;
+  /** The clear action's word — the CALLER's, this file spells nothing. */
+  clearLabel: string;
+  /** Present = a search box above the checklist. The placeholder is the word. */
+  searchPlaceholder?: string;
+}
 
 export interface Column<Row> {
   key: string;
@@ -51,7 +76,15 @@ export interface Column<Row> {
   numeric?: boolean;
   /** A tooltip on the header only — never the only copy of a rule. */
   headerTitle?: string;
+  /** Header click sorts (asc ⇄ desc). Needs the table's `sort`/`onSortChange`. */
+  sortable?: boolean;
+  filter?: ColumnFilter;
   cell: (row: Row) => ReactNode;
+}
+
+export interface TableSort {
+  key: string;
+  dir: "asc" | "desc";
 }
 
 export interface DataTableProps<Row> {
@@ -74,6 +107,76 @@ export interface DataTableProps<Row> {
   loading?: boolean;
   /** What the table is, for a screen reader. */
   label: string;
+  /** The active sort. The PAGE sorts the rows; the kit only shows the arrow. */
+  sort?: TableSort | null;
+  onSortChange?: (next: TableSort) => void;
+}
+
+/**
+ * One column's ▼ — an Excel AutoFilter as a checkbox popover. Lit blue while
+ * it is narrowing, because a filter you cannot see is a lie the table tells.
+ */
+function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter }) {
+  const [needle, setNeedle] = useState("");
+  const shown = needle.trim()
+    ? filter.options.filter((o) => o.label.toLowerCase().includes(needle.trim().toLowerCase()))
+    : filter.options;
+  const active = filter.selected.size > 0;
+  return (
+    <Popover
+      label={filter.label}
+      trigger={
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="filter"
+          aria-label={filter.label}
+          data-testid={`table-filter-${colKey}`}
+          data-active={active || undefined}
+        />
+      }
+    >
+      <div className="flex w-56 flex-col gap-2" data-kit="table-filter">
+        {filter.searchPlaceholder != null ? (
+          <SearchInput
+            id={`table-filter-search-${colKey}`}
+            value={needle}
+            onChange={(e) => setNeedle(e.target.value)}
+            placeholder={filter.searchPlaceholder}
+            aria-label={filter.label}
+          />
+        ) : null}
+        <div className="max-h-64 overflow-y-auto flex flex-col gap-1">
+          {shown.map((o) => (
+            <label key={o.value} className="flex items-center gap-2 text-body text-kit-slate-12">
+              <Checkbox
+                id={`table-filter-${colKey}-${o.value}`}
+                ariaLabel={o.label}
+                checked={filter.selected.has(o.value)}
+                onCheckedChange={() => {
+                  const next = new Set(filter.selected);
+                  if (next.has(o.value)) next.delete(o.value);
+                  else next.add(o.value);
+                  filter.onChange(next);
+                }}
+              />
+              <span className="truncate">{o.label}</span>
+            </label>
+          ))}
+        </div>
+        {active ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => filter.onChange(new Set())}
+            data-testid={`table-filter-clear-${colKey}`}
+          >
+            {filter.clearLabel}
+          </Button>
+        ) : null}
+      </div>
+    </Popover>
+  );
 }
 
 export default function DataTable<Row>({
@@ -85,6 +188,8 @@ export default function DataTable<Row>({
   empty,
   loading = false,
   label,
+  sort = null,
+  onSortChange,
 }: DataTableProps<Row>) {
   const selectedCount = selection
     ? rows.filter((r) => selection.selected.has(rowId(r))).length
@@ -130,11 +235,47 @@ export default function DataTable<Row>({
               <th
                 key={c.key}
                 title={c.headerTitle}
+                aria-sort={
+                  sort?.key === c.key
+                    ? sort.dir === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : undefined
+                }
                 className={`px-2 text-label font-medium text-kit-slate-11 ${
                   c.align === "right" ? "text-right" : "text-left"
                 }`}
               >
-                {c.label}
+                <span
+                  className={`inline-flex items-center gap-0.5 ${
+                    c.align === "right" ? "flex-row-reverse" : ""
+                  }`}
+                >
+                  {c.sortable && onSortChange ? (
+                    /* Header click = sort, asc ⇄ desc — the Excel reflex.
+                     * The kit shows the arrow; the PAGE reorders the rows. */
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onSortChange({
+                          key: c.key,
+                          dir: sort?.key === c.key && sort.dir === "asc" ? "desc" : "asc",
+                        })
+                      }
+                      aria-label={c.label}
+                      data-testid={`table-sort-${c.key}`}
+                      className="inline-flex items-center gap-0.5 hover:text-kit-slate-12"
+                    >
+                      {c.label}
+                      {sort?.key === c.key ? (
+                        <Icon name={sort.dir === "asc" ? "collapse" : "expand"} size={14} />
+                      ) : null}
+                    </button>
+                  ) : (
+                    c.label
+                  )}
+                  {c.filter ? <HeaderFilter colKey={c.key} filter={c.filter} /> : null}
+                </span>
               </th>
             ))}
           </tr>

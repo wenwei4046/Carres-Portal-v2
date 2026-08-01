@@ -81,6 +81,28 @@ export const TO_ORDER_WORDS = {
   //    Each word still owed a COPY-STANDARD row. ───────────────────────────
   /** The left panel's first row — today's whole run, all categories. */
   navToday: "Today",
+  // ── The Work Queue (Jess's freeze, 2026-08-01): time views are INDEPENDENT
+  //    sets, never cumulative — Today ⊄ Tomorrow. Combining windows is the
+  //    grid's Excel filter's job, never the rail's. `All` carries no count
+  //    (All is all; the number adds nothing). Each word owed a COPY-STANDARD
+  //    row. ────────────────────────────────────────────────────────────────
+  navTomorrow: "Tomorrow",
+  navThisWeek: "This Week",
+  navNextWeek: "Next Week",
+  navAll: "All",
+  /** The rail's second block heading — work ORDER, not a filter bar. */
+  categoryHeading: "CATEGORY",
+  categoryAll: "All",
+  /**
+   * `Updated 10:32 AM` — not a Refresh button. The plan updates itself; this
+   * stamp answers the one AutoCount anxiety ("am I looking at the latest?").
+   */
+  updated: "Updated",
+  // ── The PO column's Excel filter speaks BUSINESS, not Excel (Jess: our
+  //    users are not Excel experts — `(Blanks)` teaches nothing). ──────────
+  filterNotOrdered: "Not Ordered",
+  filterOrdered: "Ordered",
+  filterOverdue: "Overdue",
   /** The ☑'s aria word — picking rows for THIS batch, nothing more. */
   select: "Select",
   /** The pill (`+ …`); appears only when something is selected. */
@@ -288,6 +310,64 @@ export function issuedHeadline(n: number, supplier: string): string {
   return `${n} purchase order${n === 1 ? "" : "s"} issued to ${supplier}`;
 }
 
+// ── The Work Queue's time buckets (Jess's freeze, 2026-08-01) ───────────────
+//
+// FIVE DISJOINT SETS, never cumulative — her own counts prove the shape:
+// 21 + 8 + 42 + 15 = 86 = All. Combining windows ("today AND tomorrow") is
+// the grid's Excel filter's job; the rail only ever shows one bucket.
+//
+//   Today     = orderBy ≤ today. OVERDUE FOLDS IN — a bucket that hides a
+//               missed order-by day would be an accident factory. An undated
+//               row (TBD delivery) also lands here: the engine cannot
+//               schedule it, so a human must see it now, not find it in All.
+//   Tomorrow  = exactly tomorrow.
+//   This Week = the day after tomorrow … this Sunday (Monday-start week).
+//   Next Week = next Monday … next Sunday.
+//   later     = beyond — visible only under All.
+//
+// Ordered rows bucket by the day the PO was CREATED: made today → Today;
+// made earlier this week → This Week; older → All only. A PO cannot be
+// created tomorrow, so those buckets never hold one.
+
+export type ToOrderTimeView = "today" | "tomorrow" | "this_week" | "next_week" | "all";
+
+export type ToOrderTimeBucket = "today" | "tomorrow" | "this_week" | "next_week" | "later";
+
+function addDaysIso(iso: IsoDate, days: number): IsoDate {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** The Monday of the ISO week holding `iso` (weeks start Monday). */
+function mondayOf(iso: IsoDate): IsoDate {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return addDaysIso(iso, -((d.getUTCDay() + 6) % 7));
+}
+
+/** Which bucket a DEMAND row belongs to, off the engine's raise-by date. */
+export function demandTimeBucket(orderBy: IsoDate | null, today: IsoDate): ToOrderTimeBucket {
+  if (orderBy == null || orderBy <= today) return "today";
+  if (orderBy === addDaysIso(today, 1)) return "tomorrow";
+  const thisSunday = addDaysIso(mondayOf(today), 6);
+  if (orderBy <= thisSunday) return "this_week";
+  if (orderBy <= addDaysIso(thisSunday, 7)) return "next_week";
+  return "later";
+}
+
+/** Which bucket an ORDERED row belongs to, off the day the PO was created. */
+export function orderedTimeBucket(placedAt: IsoDate, today: IsoDate): ToOrderTimeBucket {
+  if (placedAt === today) return "today";
+  const monday = mondayOf(today);
+  if (placedAt >= monday && placedAt < today) return "this_week";
+  return "later";
+}
+
+/** Does a bucket show under a view? `all` shows everything; the rest match. */
+export function bucketInView(bucket: ToOrderTimeBucket, view: ToOrderTimeView): boolean {
+  return view === "all" || bucket === view;
+}
+
 // ── Business units ──────────────────────────────────────────────────────────
 
 /**
@@ -426,7 +506,36 @@ export interface ToOrderRow {
    * engine's and never reaches the screen). `null` when TBD.
    */
   delivery: IsoDate | null;
+  /**
+   * THIS ORDER's earliest raise-by — the engine's own date, carried ONLY so
+   * the Work Queue can bucket the row into Today / Tomorrow / This Week /
+   * Next Week. It is NEVER rendered: the GOLDEN RULE stands, the operator
+   * sees the customer's date and nothing of the engine's arithmetic.
+   */
+  orderBy: IsoDate | null;
   builds: ToOrderBuild[];
+}
+
+/**
+ * A row that already became a purchase order — read back so the grid can
+ * answer "what did we order" without leaving the page (Jess, 2026-08-01:
+ * Today + PO filter `Ordered` = 今天已经下了哪些). The server composes the
+ * label in the same voice as the demand rows; recent only — real history
+ * belongs to Purchase Orders.
+ */
+export interface ToOrderOrderedRow {
+  /** `purchase_orders.id` — the PO number IS the primary key. */
+  poId: string;
+  /** The day the PO was created — the row's time bucket runs on this. */
+  placedAt: IsoDate;
+  category: ProductCategory;
+  supplierId: string;
+  orderId: string | null;
+  so: number | null;
+  /** The customer's date, same meaning as a demand row's. */
+  delivery: IsoDate | null;
+  model: string;
+  qty: number;
 }
 
 export interface ToOrderProposal {
@@ -699,9 +808,12 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
 
       const bundle = bundleByLine.get(orderLines[0].lineId);
       const stockReady = bundle?.arriveBy ?? null;
+      /** This ORDER's earliest raise-by — the row's own time bucket runs on it. */
+      let rowOrderBy: IsoDate | null = null;
       for (const l of orderLines) {
         const rb = bundleByLine.get(l.lineId)?.raiseBy ?? null;
         if (rb && (orderBy == null || rb < orderBy)) orderBy = rb;
+        if (rb && (rowOrderBy == null || rb < rowOrderBy)) rowOrderBy = rb;
       }
 
       rows.push({
@@ -715,6 +827,7 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
             l.deadline != null && (min == null || l.deadline < min) ? l.deadline : min,
           null,
         ),
+        orderBy: rowOrderBy,
         qty,
         summary: composeSummary({
           model: orderLines[0].modelName,
