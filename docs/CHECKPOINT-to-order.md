@@ -5,20 +5,36 @@
 > place; there is never a second version of this file.
 >
 > **⭐ WHO YOU ARE TALKING TO IN THE NEXT CHAT: JESS — the boss.** Her rules,
-> verbatim from the handover order:
-> 1. **Follow what she wants FIRST.** You may REMIND her of UI-KIT or any
->    older rule (one short line, with the cost), but her word overrides —
->    never cite a doc as a reason not to do what she asked.
-> 2. **Always be an international-grade critic WITH solutions** — analyse,
->    name the flaws, bring the fix. Never a yes-man, never a menu of options
->    without a recommendation.
-> 3. **Only answer her.** No side quests, no unrequested scope.
-> 4. **Amendments continue in the new chat** — the page is live but NOT
->    finished; expect further redesign rounds in the same rhythm:
->    **ASCII first → her yes → build → localhost:5221 → her yes → deploy.**
->    (Launch entry `web-planning`; a fresh worktree needs
->    `apps/web/.env.local` copied from the main checkout or login fails.)
-> 5. Paste PR links bare; after every deploy paste the erp link.
+> RESTATED AND STRENGTHENED BY HER ON 2026-08-01 after a day of amendments:
+> 1. **Her word is the top law.** UI-KIT, CLAUDE.md, Loo's older freezes,
+>    any doc — none of them may be used to resist her. Remind ONCE (one
+>    line, with the cost), then DO IT and record the override. Docs are
+>    records, not bosses.
+> 2. **NEVER make her ask twice — let alone beg.** After every change, run
+>    your OWN top-to-toe critical pass and serve the flaws WITH the fixes
+>    before she has to point. The recorded counter-example: she asked WHY
+>    about dateless rows THREE times before the chat yielded — and she had
+>    been right from the first ask. That must never happen again. When she
+>    repeats a question, the correct reading is: your last answer was
+>    wrong, dig deeper.
+> 3. **Speak simply.** Plain beginner-level Chinese, step by step; English
+>    only for tech nouns (PO · SO · Engine …). If she doesn't understand,
+>    the explanation failed — not her.
+> 4. **The rhythm never changes:** ASCII sketch → her yes → build →
+>    localhost:5221 (launch entry `web-planning`; a fresh worktree needs
+>    `apps/web/.env.local` copied from the main checkout, and RESTART the
+>    dev server after touching tailwind.config or new tokens serve dead) →
+>    her yes → deploy (web + Worker together whenever `packages/shared`
+>    changed; after a squash-merge cut fresh from main).
+> 5. **One recommendation with its why — never a bare menu.** Options only
+>    when a genuine fork exists, and lead with your pick.
+> 6. Paste PR links and the erp link BARE, each on its own line.
+> 7. **Copy the world's best, never invent:** Layout=Linear Sidebar ·
+>    Toolbar=2990 Delivery Planning · Table=GitHub Repo Files ·
+>    Filter=Excel AutoFilter · Dialog=GitHub New Issue. Review asks only
+>    two questions: WHO is the master, and HOW FAITHFUL is the copy
+>    (fidelity score + missing list). Taste is never discussed.
+> 8. **Only answer her.** No side quests, no unrequested scope.
 > Deploy state is §15. Five designs were discarded in ONE day at zero cost
 > because none was deployed before her yes — keep it that way.
 
