@@ -86,13 +86,13 @@ export const TO_ORDER_WORDS = {
   //    grid's Excel filter's job, never the rail's. `All` carries no count
   //    (All is all; the number adds nothing). Each word owed a COPY-STANDARD
   //    row. ────────────────────────────────────────────────────────────────
-  /** The time block's heading — these four are the ENGINE's plan
-   *  views, and the heading says so (Jess, 2026-08-01). */
-  autoPlanHeading: "Auto Plan",
-  navTomorrow: "Tomorrow",
-  navThisWeek: "This Week",
-  navNextWeek: "Next Week",
-  navAll: "All",
+  /**
+   * The rail's first block — the PURCHASE CALENDAR (Jess, 2026-08-01,
+   * final): rows are the UPCOMING PO days from Settings' PO Days, rolling
+   * from today, plus a red Overdue row that the next run may never swallow.
+   * Today/Tomorrow/This Week/Next Week retired the same day.
+   */
+  poScheduleHeading: "PO Schedule",
   /** The rail's second block heading — work ORDER, not a filter bar. */
   categoryHeading: "CATEGORY",
   categoryAll: "All",
@@ -334,30 +334,21 @@ export function issuedHeadline(n: number, supplier: string): string {
   return `${n} purchase order${n === 1 ? "" : "s"} issued to ${supplier}`;
 }
 
-// ── The Work Queue's time buckets (Jess's freeze, 2026-08-01) ───────────────
+// ── The PO Schedule (Jess's freeze, 2026-08-01, replacing the time buckets) ─
 //
-// FOUR DISJOINT PLANNING BUCKETS (Today · Tomorrow · This Week · Next
-// Week) plus `later`; the rail's fifth entry, All, is the AGGREGATE view of
-// every bucket and later demand — an entry point, not a bucket (Jess,
-// 2026-08-01). Combining windows ("today AND tomorrow") is the grid's Excel
-// filter's job; the rail only ever shows one bucket.
+// The rail is a PURCHASE CALENDAR: one row per upcoming configured PO day
+// (rolling from today — yesterday's Monday is never shown), plus OVERDUE.
 //
-//   Today     = orderBy ≤ today. OVERDUE FOLDS IN — a bucket that hides a
-//               missed order-by day would be an accident factory. An undated
-//               row (TBD delivery) also lands here: the engine cannot
-//               schedule it, so a human must see it now, not find it in All.
-//   Tomorrow  = exactly tomorrow.
-//   This Week = the day after tomorrow … this Sunday (Monday-start week).
-//   Next Week = next Monday … next Sunday.
-//   later     = beyond — visible only under All.
+// THE SNAP RULE, verbatim hers: *"Always snap to the nearest earlier PO day.
+// Never move later."* Ordering early costs a few days of warehouse space;
+// ordering late risks the customer's date.
 //
-// Ordered rows bucket by the day the PO was CREATED: made today → Today;
-// made earlier this week → This Week; older → All only. A PO cannot be
-// created tomorrow, so those buckets never hold one.
+// THE PROTECTION RULE: a demand whose snapped PO day has PASSED stays in
+// OVERDUE — it is never silently rolled into the next run, or the operator
+// reads "Friday" on work that is already two days late.
 
-export type ToOrderTimeView = "today" | "tomorrow" | "this_week" | "next_week" | "all";
-
-export type ToOrderTimeBucket = "today" | "tomorrow" | "this_week" | "next_week" | "later";
+/** Where a demand sits on the purchase calendar. */
+export type PoScheduleBucket = { kind: "overdue" } | { kind: "day"; day: IsoDate };
 
 function addDaysIso(iso: IsoDate, days: number): IsoDate {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -365,33 +356,64 @@ function addDaysIso(iso: IsoDate, days: number): IsoDate {
   return d.toISOString().slice(0, 10);
 }
 
-/** The Monday of the ISO week holding `iso` (weeks start Monday). */
-function mondayOf(iso: IsoDate): IsoDate {
-  const d = new Date(`${iso}T00:00:00Z`);
-  return addDaysIso(iso, -((d.getUTCDay() + 6) % 7));
+function weekdayOf(iso: IsoDate): number {
+  return new Date(`${iso}T00:00:00Z`).getUTCDay();
 }
 
-/** Which bucket a DEMAND row belongs to, off the engine's raise-by date. */
-export function demandTimeBucket(orderBy: IsoDate | null, today: IsoDate): ToOrderTimeBucket {
-  if (orderBy == null || orderBy <= today) return "today";
-  if (orderBy === addDaysIso(today, 1)) return "tomorrow";
-  const thisSunday = addDaysIso(mondayOf(today), 6);
-  if (orderBy <= thisSunday) return "this_week";
-  if (orderBy <= addDaysIso(thisSunday, 7)) return "next_week";
-  return "later";
+const WEEKDAY_WORDS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+/** `Wednesday` — a schedule row's word. The full date rides the row title. */
+export function weekdayName(iso: IsoDate): string {
+  return WEEKDAY_WORDS[weekdayOf(iso)]!;
 }
 
-/** Which bucket an ORDERED row belongs to, off the day the PO was created. */
-export function orderedTimeBucket(placedAt: IsoDate, today: IsoDate): ToOrderTimeBucket {
-  if (placedAt === today) return "today";
-  const monday = mondayOf(today);
-  if (placedAt >= monday && placedAt < today) return "this_week";
-  return "later";
+/**
+ * The next instance of each configured PO weekday, from today INCLUSIVE,
+ * ascending — a Tuesday under Mon/Wed/Fri reads Wed · Fri · Mon. An empty
+ * configuration means "order any day": the calendar collapses to today.
+ */
+export function poScheduleDays(poDays: readonly number[], today: IsoDate): IsoDate[] {
+  if (poDays.length === 0) return [today];
+  const days: IsoDate[] = [];
+  for (let i = 0; i < 7 && days.length < poDays.length; i += 1) {
+    const d = addDaysIso(today, i);
+    if (poDays.includes(weekdayOf(d))) days.push(d);
+  }
+  return days;
 }
 
-/** Does a bucket show under a view? `all` shows everything; the rest match. */
-export function bucketInView(bucket: ToOrderTimeBucket, view: ToOrderTimeView): boolean {
-  return view === "all" || bucket === view;
+/** The latest configured PO day ON OR BEFORE the raw date — never later. */
+export function snapToPoDay(orderBy: IsoDate, poDays: readonly number[]): IsoDate {
+  if (poDays.length === 0) return orderBy;
+  for (let i = 0; i < 7; i += 1) {
+    const d = addDaysIso(orderBy, -i);
+    if (poDays.includes(weekdayOf(d))) return d;
+  }
+  return orderBy;
+}
+
+/**
+ * Which calendar row a demand belongs to. A dateless demand lands on the
+ * FIRST upcoming row — the engine cannot schedule it, so a human decides at
+ * the next run, not never. A snapped day already past is OVERDUE, always.
+ */
+export function poScheduleBucket(
+  orderBy: IsoDate | null,
+  poDays: readonly number[],
+  today: IsoDate,
+): PoScheduleBucket {
+  if (orderBy == null) return { kind: "day", day: poScheduleDays(poDays, today)[0]! };
+  const snapped = snapToPoDay(orderBy, poDays);
+  if (snapped < today) return { kind: "overdue" };
+  return { kind: "day", day: snapped };
 }
 
 // ── Business units ──────────────────────────────────────────────────────────

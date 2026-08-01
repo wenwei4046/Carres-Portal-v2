@@ -89,6 +89,8 @@ type CatalogFact = {
 type Loaded = {
   proposals: ToOrderProposal[];
   today: string;
+  /** Settings' PO Days — the rail's purchase calendar runs on it. */
+  poDays: readonly number[];
   /** Demand the catalog could not answer for. Empty is the only healthy value. */
   unresolved: Unresolved[];
   /** The whole catalog, read once — the ordered read reuses it. */
@@ -135,7 +137,13 @@ async function loadToOrder(
   if (orderIds.length === 0) {
     return {
       ok: true,
-      data: { proposals: [], today: todayIso(), unresolved: [], catalog: new Map() },
+      data: {
+        proposals: [],
+        today: todayIso(),
+        poDays: settings.poDays,
+        unresolved: [],
+        catalog: new Map(),
+      },
     };
   }
 
@@ -329,7 +337,7 @@ async function loadToOrder(
     missingProductionDays,
   });
 
-  return { ok: true, data: { proposals, today, unresolved, catalog: cat } };
+  return { ok: true, data: { proposals, today, poDays: settings.poDays, unresolved, catalog: cat } };
 }
 
 /** How far back the grid answers "what did we order". Older → Purchase Orders. */
@@ -526,6 +534,7 @@ toOrderRouter.get("/", requireOperation, async (c) => {
 
   return c.json({
     today: res.data.today,
+    poDays: res.data.poDays,
     proposals: res.data.proposals,
     unresolved: res.data.unresolved,
     ordered,

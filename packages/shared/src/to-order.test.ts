@@ -17,9 +17,10 @@ import {
   sizeShort,
   soCountLabel,
   sortToOrderRows,
-  demandTimeBucket,
-  orderedTimeBucket,
-  bucketInView,
+  poScheduleDays,
+  snapToPoDay,
+  poScheduleBucket,
+  weekdayName,
   type ToOrderLine,
   type ToOrderRow,
 } from "./to-order";
@@ -526,83 +527,83 @@ describe("proposal order", () => {
   });
 });
 
-// ── the Work Queue's time buckets (Jess's freeze, 2026-08-01) ───────────────
+// ── the PO Schedule (Jess's freeze, 2026-08-01) ─────────────────────────────
 //
-// FIVE DISJOINT SETS, never cumulative — her own counts prove the shape:
-// 21 + 8 + 42 + 15 = 86 = All. 2026-08-05 is a Wednesday, so this week runs
-// Mon 03 → Sun 09 and next week Mon 10 → Sun 16.
+// The rail is a purchase calendar. Snap rule, verbatim hers: "Always snap to
+// the nearest earlier PO day. Never move later." And the protection rule: a
+// passed PO day is OVERDUE — never swallowed by the next run.
 
-describe("demandTimeBucket", () => {
-  const TODAY = "2026-08-05"; // Wednesday
+const MWF = [1, 3, 5]; // Monday · Wednesday · Friday
 
-  it("overdue folds into Today — a bucket that hides a missed day is an accident factory", () => {
-    expect(demandTimeBucket("2026-08-01", TODAY)).toBe("today");
-    expect(demandTimeBucket(TODAY, TODAY)).toBe("today");
+describe("snapToPoDay", () => {
+  it("her own table, row for row — always earlier, never later", () => {
+    // 2026-08-03 is a Monday.
+    expect(snapToPoDay("2026-08-03", MWF)).toBe("2026-08-03"); // Mon → Mon
+    expect(snapToPoDay("2026-08-04", MWF)).toBe("2026-08-03"); // Tue → Mon
+    expect(snapToPoDay("2026-08-05", MWF)).toBe("2026-08-05"); // Wed → Wed
+    expect(snapToPoDay("2026-08-06", MWF)).toBe("2026-08-05"); // Thu → Wed
+    expect(snapToPoDay("2026-08-07", MWF)).toBe("2026-08-07"); // Fri → Fri
+    expect(snapToPoDay("2026-08-08", MWF)).toBe("2026-08-07"); // Sat → Fri
+    expect(snapToPoDay("2026-08-09", MWF)).toBe("2026-08-07"); // Sun → Fri
   });
 
-  it("an undated row lands in Today — the engine cannot schedule it, so a human sees it now", () => {
-    expect(demandTimeBucket(null, TODAY)).toBe("today");
-  });
-
-  it("Tomorrow is exactly tomorrow, never cumulative", () => {
-    expect(demandTimeBucket("2026-08-06", TODAY)).toBe("tomorrow");
-    expect(demandTimeBucket("2026-08-07", TODAY)).not.toBe("tomorrow");
-  });
-
-  it("This Week is the day after tomorrow through Sunday", () => {
-    expect(demandTimeBucket("2026-08-07", TODAY)).toBe("this_week");
-    expect(demandTimeBucket("2026-08-09", TODAY)).toBe("this_week");
-  });
-
-  it("Next Week is next Monday through next Sunday", () => {
-    expect(demandTimeBucket("2026-08-10", TODAY)).toBe("next_week");
-    expect(demandTimeBucket("2026-08-16", TODAY)).toBe("next_week");
-  });
-
-  it("beyond next week is later — visible only under All", () => {
-    expect(demandTimeBucket("2026-08-17", TODAY)).toBe("later");
-  });
-
-  it("the five buckets partition every date — no gap, no overlap", () => {
-    // Every day for a month lands in exactly one bucket (a partition needs no
-    // second assertion: demandTimeBucket returns exactly one value per date).
-    const seen = new Set<string>();
-    for (let i = -3; i <= 30; i += 1) {
-      const d = new Date(Date.UTC(2026, 7, 5 + i)).toISOString().slice(0, 10);
-      seen.add(demandTimeBucket(d, TODAY));
-    }
-    expect([...seen].sort()).toEqual(["later", "next_week", "this_week", "today", "tomorrow"]);
-  });
-
-  it("a Sunday's tomorrow is next week's Monday, and Tomorrow still wins", () => {
-    // 2026-08-09 is a Sunday; Monday 10th is BOTH tomorrow and next week.
-    expect(demandTimeBucket("2026-08-10", "2026-08-09")).toBe("tomorrow");
+  it("an empty configuration means order any day — the date stands", () => {
+    expect(snapToPoDay("2026-08-04", [])).toBe("2026-08-04");
   });
 });
 
-describe("orderedTimeBucket", () => {
-  const TODAY = "2026-08-05"; // Wednesday
-
-  it("a PO created today is Today's answer to 'what did we order'", () => {
-    expect(orderedTimeBucket(TODAY, TODAY)).toBe("today");
+describe("poScheduleDays", () => {
+  it("rolls from today — a Tuesday reads Wed · Fri · Mon, never yesterday's Monday", () => {
+    expect(poScheduleDays(MWF, "2026-08-04")).toEqual([
+      "2026-08-05",
+      "2026-08-07",
+      "2026-08-10",
+    ]);
   });
 
-  it("a PO created earlier this week is This Week's", () => {
-    expect(orderedTimeBucket("2026-08-03", TODAY)).toBe("this_week");
+  it("today counts when today IS a PO day", () => {
+    expect(poScheduleDays(MWF, "2026-08-03")[0]).toBe("2026-08-03");
   });
 
-  it("an older PO is visible only under All — real history belongs to Purchase Orders", () => {
-    expect(orderedTimeBucket("2026-08-02", TODAY)).toBe("later"); // last week's Sunday
-    expect(orderedTimeBucket("2026-07-24", TODAY)).toBe("later");
+  it("two configured days → two rows; none → the calendar collapses to today", () => {
+    expect(poScheduleDays([2, 5], "2026-08-03")).toHaveLength(2);
+    expect(poScheduleDays([], "2026-08-04")).toEqual(["2026-08-04"]);
   });
 });
 
-describe("bucketInView", () => {
-  it("All shows everything; the other views show only their own bucket", () => {
-    expect(bucketInView("later", "all")).toBe(true);
-    expect(bucketInView("today", "today")).toBe(true);
-    expect(bucketInView("today", "tomorrow")).toBe(false); // NEVER cumulative
-    expect(bucketInView("tomorrow", "this_week")).toBe(false);
+describe("poScheduleBucket", () => {
+  const TODAY = "2026-08-05"; // Wednesday
+
+  it("a due run today sits on today's row, not in Overdue", () => {
+    expect(poScheduleBucket("2026-08-05", MWF, TODAY)).toEqual({
+      kind: "day",
+      day: "2026-08-05",
+    });
+    // Thursday's demand snaps back to... Wednesday — today. Still on time.
+    expect(poScheduleBucket("2026-08-06", MWF, TODAY)).toEqual({
+      kind: "day",
+      day: "2026-08-05",
+    });
+  });
+
+  it("a passed PO day is OVERDUE — never silently rolled into the next run", () => {
+    // Should have gone out Monday; it is Wednesday. Not Friday's work.
+    expect(poScheduleBucket("2026-08-04", MWF, TODAY)).toEqual({ kind: "overdue" });
+    expect(poScheduleBucket("2026-07-20", MWF, TODAY)).toEqual({ kind: "overdue" });
+  });
+
+  it("a dateless demand lands on the FIRST upcoming row — a human decides at the next run", () => {
+    expect(poScheduleBucket(null, MWF, "2026-08-04")).toEqual({
+      kind: "day",
+      day: "2026-08-05",
+    });
+  });
+});
+
+describe("weekdayName", () => {
+  it("speaks the operator's word for the row", () => {
+    expect(weekdayName("2026-08-05")).toBe("Wednesday");
+    expect(weekdayName("2026-08-07")).toBe("Friday");
   });
 });
 

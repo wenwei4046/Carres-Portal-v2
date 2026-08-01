@@ -8,13 +8,12 @@
  * THE PAGE IS TWO DIMENSIONS AND NOTHING ELSE:
  *
  * LEFT = the WORK QUEUE (Linear's density). Two blocks:
- *   · TIME — FOUR disjoint planning buckets (Today, overdue folded in ·
- *     Tomorrow · This Week · Next Week) + All, the aggregate view of every
- *     bucket and later demand. Never cumulative between buckets.
- *     The ENGINE decides the default view (Today, overdue folded in); the
- *     operator switches freely — *"Engine decides the default view, not the
- *     operator's limit."* Combining windows is the grid's Excel filter's
- *     job, never the rail's. `All` carries no count.
+ *   · PO SCHEDULE — the PURCHASE CALENDAR (Jess, 2026-08-01): one row per
+ *     upcoming configured PO day, ROLLING from today (yesterday's Monday is
+ *     never shown), each demand snapped to the nearest EARLIER PO day —
+ *     never later. A red OVERDUE row sits above the calendar and the next
+ *     run may never swallow it. The engine opens the first upcoming run;
+ *     the operator roams freely.
  *   · CATEGORY — All · Mattress · Bedframe · Sofa, the WORK ORDER (清完一类
  *     再下一类), no counts (the grid answers the moment you click).
  *   · `+ Create Purchase` — the manual entrance, may never be missing.
@@ -48,13 +47,13 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   TO_ORDER_WORDS as W,
-  bucketInView,
   categoryLabel,
   countItems,
   defaultDocuments,
-  demandTimeBucket,
-  orderedTimeBucket,
   ordersHeadline,
+  poScheduleBucket,
+  poScheduleDays,
+  weekdayName,
   posCreatedLine,
   railItemLabel,
   selectedShort,
@@ -63,8 +62,6 @@ import {
   unresolvedHeadline,
   type ToOrderOrderedRow,
   type ToOrderProposal,
-  type ToOrderTimeBucket,
-  type ToOrderTimeView,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import Card from "@/components/kit/Card";
@@ -100,6 +97,8 @@ interface Unresolved {
 
 interface ToOrderResponse {
   today: string;
+  /** Settings' PO Days — the rail's purchase calendar runs on it. */
+  poDays?: number[];
   proposals: ToOrderProposal[];
   destinations: Destination[];
   /** Recent POs read back — the grid's `Ordered` answer. */
@@ -132,8 +131,12 @@ interface GridRow {
   late: boolean;
   model: string;
   qty: number;
-  /** The engine's date — bucket arithmetic ONLY, never rendered. */
-  bucket: ToOrderTimeBucket;
+  /**
+   * The calendar row this demand belongs to: `overdue` · a PO day's ISO
+   * date · `past` (an old ordered row — Purchase Orders' business). Built
+   * from the engine's orderBy, which itself never renders.
+   */
+  bucket: string;
   /** Set on a row the server read back as already ordered. */
   orderedPo: string | null;
 }
@@ -150,18 +153,6 @@ const PO_TAB_SLUG: Record<string, string> = {
   sofa: "hookka-sofa",
   bedframe: "hookka-bedframe",
 };
-
-/**
- * The AUTO PLAN block — the engine's four plan views, and ONLY those
- * (Jess, 2026-08-01: `All` left the block; it was an aggregate entry, not a
- * plan, and the heading made that visible).
- */
-const TIME_VIEWS: { view: Exclude<ToOrderTimeView, "all">; word: string }[] = [
-  { view: "today", word: W.navToday },
-  { view: "tomorrow", word: W.navTomorrow },
-  { view: "this_week", word: W.navThisWeek },
-  { view: "next_week", word: W.navNextWeek },
-];
 
 /** `10:32 AM` — locale-free on purpose, so a CI node prints what Jess sees. */
 function clockLabel(ms: number): string {
@@ -189,6 +180,7 @@ export default function OperationToOrder() {
   });
 
   const proposals = useMemo(() => q.data?.proposals ?? [], [q.data]);
+  const poDays = useMemo(() => q.data?.poDays ?? [], [q.data]);
   const orderedRows = useMemo(() => q.data?.ordered ?? [], [q.data]);
   const destinations = useMemo(() => q.data?.destinations ?? [], [q.data]);
   const unresolved = useMemo(() => q.data?.unresolved ?? [], [q.data]);
@@ -199,10 +191,16 @@ export default function OperationToOrder() {
    * link keeps the view (the 2990 habit). The engine still opens Today.
    */
   const [searchParams, setSearchParams] = useSearchParams();
+  /** The purchase calendar — one row per upcoming configured PO day. */
+  const scheduleDays = useMemo(
+    () => (today ? poScheduleDays(poDays, today) : []),
+    [poDays, today],
+  );
   const rawView = searchParams.get("view");
-  const timeView: ToOrderTimeView = TIME_VIEWS.some((t) => t.view === rawView)
-    ? (rawView as ToOrderTimeView)
-    : "today";
+  const timeView =
+    rawView === "overdue" || (rawView != null && scheduleDays.includes(rawView))
+      ? rawView
+      : (scheduleDays[0] ?? "");
   const rawCat = searchParams.get("cat");
   const cat = rawCat && ["all", ...CATEGORY_SEQUENCE].includes(rawCat) ? rawCat : "all";
   const setParam = (key: "view" | "cat", value: string) =>
@@ -214,7 +212,7 @@ export default function OperationToOrder() {
       },
       { replace: true },
     );
-  const setTimeView = (v: ToOrderTimeView) => setParam("view", v);
+  const setTimeView = (v: string) => setParam("view", v);
   const setCat = (c: string) => setParam("cat", c);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<TableSort | null>(null);
@@ -258,7 +256,13 @@ export default function OperationToOrder() {
               ? railItemLabel(b[0]!.model, b[0]!.size ?? null)
               : countItems(b.length),
           qty: r.qty,
-          bucket: today == null ? "today" : demandTimeBucket(r.orderBy ?? null, today),
+          bucket:
+            today == null
+              ? "overdue"
+              : (() => {
+                  const b = poScheduleBucket(r.orderBy ?? null, poDays, today);
+                  return b.kind === "overdue" ? "overdue" : b.day;
+                })(),
           orderedPo: null,
         });
       }
@@ -277,19 +281,22 @@ export default function OperationToOrder() {
         late: today != null && o.delivery != null && o.delivery < today,
         model: o.model,
         qty: o.qty,
-        bucket: today == null ? "later" : orderedTimeBucket(o.placedAt, today),
+        // Ordered TODAY sits on the current run's row (今天下了哪些);
+        // older receipts belong to Purchase Orders, not this calendar.
+        bucket: o.placedAt === today ? (scheduleDays[0] ?? "past") : "past",
         orderedPo: o.poId,
       });
     }
     return rows;
-  }, [planned, orderedRows, today]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planned, orderedRows, today, poDays, scheduleDays]);
 
   /** A row's PO, whichever way it got one — this session or the server. */
   const poOf = (r: GridRow) => rowPo.get(r.key) ?? r.orderedPo;
 
-  /** The rail's counts — unissued work per time bucket, falling as POs land. */
+  /** The rail's counts — unissued work per calendar row, falling as POs land. */
   const timeCounts = useMemo(() => {
-    const m = new Map<ToOrderTimeBucket, Set<string>>();
+    const m = new Map<string, Set<string>>();
     for (const r of allRows) {
       if (poOf(r)) continue;
       const s = m.get(r.bucket) ?? new Set<string>();
@@ -306,7 +313,7 @@ export default function OperationToOrder() {
     () =>
       allRows.filter(
         (r) =>
-          bucketInView(r.bucket, timeView) &&
+          r.bucket === timeView &&
           (cat === "all" || r.category === cat) &&
           (search.trim() === "" ||
             (r.so != null && `so-${r.so}`.includes(search.trim().toLowerCase())) ||
@@ -395,7 +402,8 @@ export default function OperationToOrder() {
 
   // ── Selection: the engine pre-ticks ITS plan, a human ticks the rest ──────
 
-  const defaultOn = (r: GridRow) => r.bucket === "today" && !poOf(r);
+  const defaultOn = (r: GridRow) =>
+    (r.bucket === "overdue" || r.bucket === scheduleDays[0]) && !poOf(r);
   const isSelected = (r: GridRow) =>
     !poOf(r) && (defaultOn(r) ? !userOff.has(r.key) : userOn.has(r.key));
   const toggleRow = (r: GridRow) => {
@@ -747,17 +755,31 @@ export default function OperationToOrder() {
           data-testid="to-order-nav"
         >
           <span className="px-2 pb-1 text-label font-medium uppercase text-kit-slate-11">
-            {W.autoPlanHeading}
+            {W.poScheduleHeading}
           </span>
-          {TIME_VIEWS.map(({ view, word }) => (
+          {/* The protection rule: a passed PO day is OVERDUE, red, ABOVE the
+              calendar — never swallowed by the next run. Rendered only when
+              it has something to say. */}
+          {(timeCounts.get("overdue")?.size ?? 0) > 0 ? (
             <NavRow
-              key={view}
-              active={timeView === view}
-              onClick={() => setTimeView(view)}
-              testId={`to-order-time-${view}`}
-              name={word}
-              count={String(timeCounts.get(view)?.size ?? 0)}
-              countWord={ordersHeadline(timeCounts.get(view)?.size ?? 0)}
+              active={timeView === "overdue"}
+              onClick={() => setTimeView("overdue")}
+              testId="to-order-overdue"
+              name={W.filterOverdue}
+              tone="danger"
+              count={String(timeCounts.get("overdue")?.size ?? 0)}
+              countWord={ordersHeadline(timeCounts.get("overdue")?.size ?? 0)}
+            />
+          ) : null}
+          {scheduleDays.map((day) => (
+            <NavRow
+              key={day}
+              active={timeView === day}
+              onClick={() => setTimeView(day)}
+              testId={`to-order-day-${day}`}
+              name={day === today ? W.navToday : weekdayName(day)}
+              count={String(timeCounts.get(day)?.size ?? 0)}
+              countWord={`${ordersHeadline(timeCounts.get(day)?.size ?? 0)} · ${fmtDate(day)}`}
             />
           ))}
 
@@ -982,6 +1004,7 @@ function NavRow({
   name,
   count,
   countWord,
+  tone,
 }: {
   active: boolean;
   onClick: () => void;
@@ -989,6 +1012,8 @@ function NavRow({
   name: ReactNode;
   count: string | null;
   countWord?: string;
+  /** `danger` = the Overdue row — late work wears red, nothing else does. */
+  tone?: "danger";
 }) {
   return (
     <button
@@ -1008,13 +1033,21 @@ function NavRow({
       <span
         className={[
           "text-body truncate",
-          active ? "font-semibold text-kit-slate-12" : "font-medium text-kit-slate-12",
+          active ? "font-semibold" : "font-medium",
+          tone === "danger" ? "text-kit-red-11" : "text-kit-slate-12",
         ].join(" ")}
       >
         {name}
       </span>
       {count != null ? (
-        <span className="text-meta tabular-nums text-kit-slate-11 shrink-0">{count}</span>
+        <span
+          className={[
+            "text-meta tabular-nums shrink-0",
+            tone === "danger" ? "text-kit-red-11" : "text-kit-slate-11",
+          ].join(" ")}
+        >
+          {count}
+        </span>
       ) : null}
     </button>
   );
