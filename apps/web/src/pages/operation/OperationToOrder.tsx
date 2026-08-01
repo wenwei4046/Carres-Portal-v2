@@ -286,6 +286,14 @@ export default function OperationToOrder() {
     const rows: GridRow[] = [];
     for (const p of planned) {
       for (const r of p.rows) {
+        // NO delivery date = NOT purchasable work (Jess, 2026-08-01, ruled
+        // three times over my objection — she is right): the engine cannot
+        // schedule it, and pre-ticking a run with goods for an unconfirmed
+        // order is worse than hiding them. NOT lost demand: the moment the
+        // date is confirmed the projection brings the order straight back,
+        // and chasing that confirmation is the Orders module's own Call
+        // customer action. Ordered rows (receipts) are unaffected.
+        if (r.delivery == null) continue;
         const bucket =
           today == null
             ? "overdue"
