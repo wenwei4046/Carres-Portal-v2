@@ -1069,6 +1069,22 @@ export default function OperationToOrder() {
                   <span className="tabular-nums">
                     {countOrders(new Set(visibleRows.map((r) => r.orderId ?? r.key)).size)}
                   </span>
+                  {/* A column filter narrows SILENTLY (the ▼ turns funnel, and
+                      that is all) — so whenever one is on, the footer says so
+                      and hands back the way out. Jess's "why 6 orders?" is
+                      exactly the question this answers. */}
+                  {colFilters.size > 0 ? (
+                    <span className="ml-auto">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setColFilters(new Map())}
+                        data-testid="to-order-footer-clear"
+                      >
+                        {W.clearFilters}
+                      </Button>
+                    </span>
+                  ) : null}
                 </footer>
               </div>
             )}

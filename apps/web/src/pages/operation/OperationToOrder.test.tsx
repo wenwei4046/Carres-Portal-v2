@@ -589,6 +589,18 @@ describe("the seven fixes — Excel completeness", () => {
     expect(screen.getByText("SO-1204")).toBeInTheDocument();
   });
 
+  it("a narrowing filter announces itself in the footer, with the way out", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    expect(screen.queryByTestId("to-order-footer-clear")).toBeNull();
+    fireEvent.click(screen.getByTestId("table-filter-model"));
+    fireEvent.click(screen.getByLabelText("Cody K"));
+    expect(screen.getByTestId("to-order-footer-clear")).toHaveTextContent(W.clearFilters);
+    fireEvent.click(screen.getByTestId("to-order-footer-clear"));
+    expect(screen.queryByTestId("to-order-footer-clear")).toBeNull();
+    expect(screen.getByText("SO-1204")).toBeInTheDocument();
+  });
+
   it("search finds a PO number too — Ordered is this page's answer", async () => {
     await loaded();
     fireEvent.change(document.getElementById("to-order-search")!, {
