@@ -742,7 +742,7 @@ export default function OperationToOrder() {
     {
       key: "customer",
       label: W.colCustomer,
-      width: 15,
+      width: 14,
       sortable: true,
       filter: filterFor("customer", customerOptions, true),
       cell: (r) => (r.customer ? properCase(r.customer) : "—"),
@@ -750,7 +750,7 @@ export default function OperationToOrder() {
     {
       key: "model",
       label: W.colModel,
-      width: 18,
+      width: 15,
       sortable: true,
       filter: filterFor("model", modelOptions, true),
       cell: (r) => r.model,
@@ -770,7 +770,7 @@ export default function OperationToOrder() {
     {
       key: "po",
       label: W.colPoNo,
-      width: 18,
+      width: 32,
       sortable: true,
       filter: filterFor("po", poOptions),
       cell: (r) => {
@@ -932,6 +932,12 @@ export default function OperationToOrder() {
                     shape="pill"
                     onClick={() => void issueAll()}
                     disabled={unread || batch.poCount === 0 || !defaultDest}
+                    /* Why N POs? One per factory × category (sofa one per
+                       customer). The hover names the split — the click's
+                       result is still the real receipt. */
+                    title={batch.targets
+                      .map((t) => `${t.proposal.label} — ${t.docs.length} PO`)
+                      .join("\n")}
                     data-testid="to-order-issue"
                   >
                     {batch.poCount > 0 ? issuePosShort(batch.poCount) : W.issuePos}
