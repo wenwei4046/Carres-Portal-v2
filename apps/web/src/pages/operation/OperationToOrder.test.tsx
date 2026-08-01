@@ -195,7 +195,10 @@ beforeEach(() => {
 
 async function loaded() {
   render(wrap());
-  await screen.findByTestId("to-order-issue-pill");
+  // The calendar rows appear once data lands. The Issue pill may NOT be
+  // there yet: the batch is VIEW-SCOPED, and the default view can hold no
+  // selectable work (this fixture's Friday holds only a receipt).
+  await screen.findByTestId("to-order-day-2026-07-31");
 }
 
 describe("the PO Schedule — a purchase calendar, not a menu", () => {
@@ -281,8 +284,12 @@ describe("the grid — business language only", () => {
     expect(screen.queryByText(fmtDate("2026-08-06"))).toBeNull(); // bedframe stockReady
   });
 
-  it("rows arrive PRE-SELECTED and the toolbar pill tells the truth", async () => {
+  it("rows arrive PRE-SELECTED and the toolbar pill answers for the visible sheet", async () => {
     await loaded();
+    // Friday (default) holds only the receipt — nothing selectable, so the
+    // toolbar stays QUIET (view-scoped batch, Excel's iron law).
+    expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
     const pill = screen.getByTestId("to-order-issue-pill");
     // 5 BUILDS (PETER's order is two sofas = two rows; kee tong's TBD
     // order is not listed).
@@ -295,14 +302,16 @@ describe("the grid — business language only", () => {
 
   it("the engine pre-ticks ONLY its own plan — a future row waits for a human", async () => {
     await loaded();
-    fireEvent.click(screen.getByTestId("to-order-day-2026-08-03"));
+    fireEvent.click(screen.getByTestId("to-order-day-2026-08-03")); // Monday joins Friday
     const box = rowBox(`${NF}::mattress`, "o20", "m1");
     expect(box).not.toBeNull();
     expect(box.getAttribute("data-state")).not.toBe("checked");
+    // Nothing pre-ticked in view → the toolbar is quiet until the human acts.
+    expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
     fireEvent.click(box);
-    // The tick joins the batch: 5 + amy = 6 builds, 3 + 1 = 4 POs.
-    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("6 selected");
-    expect(screen.getByTestId("to-order-issue")).toHaveTextContent(/^Issue 4 POs$/);
+    // The batch answers for the VISIBLE sheet: amy alone.
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("1 selected");
+    expect(screen.getByTestId("to-order-issue")).toHaveTextContent(/^Issue 1 PO$/);
   });
 
   it("an untick drops the pill's promise; unticking everything removes the pill", async () => {
@@ -487,10 +496,10 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
   it("a failed group fails ALONE and stays in the bar until retried", async () => {
     failCategories = new Set(["bedframe"]);
     await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.click(screen.getByTestId("to-order-issue"));
     await screen.findByTestId("to-order-failed-line");
     // Sofa succeeded beside it; the failure does not evaporate.
-    fireEvent.click(screen.getByTestId("to-order-overdue"));
     expect(screen.getByTestId(`row-po-${OHANA}::sofa:o2:bk-e`)).toBeInTheDocument();
     expect(screen.getByTestId("to-order-failed-line")).toHaveTextContent("1 failed");
 
@@ -518,6 +527,7 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
     expect(screen.getByTestId("to-order-unresolved")).toHaveTextContent(
       "1 item could not be read",
     );
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
     expect(screen.getByTestId("to-order-issue")).toBeDisabled();
   });
 
@@ -635,6 +645,7 @@ describe("the seven fixes — Excel completeness", () => {
       return route(path, init?.body ? JSON.parse(String(init.body)) : undefined);
     });
     await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.click(screen.getByTestId("to-order-issue"));
     expect(await screen.findByTestId("to-order-creating")).toHaveTextContent(W.creatingPos);
     expect(screen.queryByTestId("to-order-issue")).toBeNull();

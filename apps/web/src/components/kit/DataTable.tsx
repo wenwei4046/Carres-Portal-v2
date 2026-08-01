@@ -69,8 +69,14 @@ export interface Column<Row> {
   key: string;
   /** The header word — typed ONCE, here. COPY-STANDARD owns it. */
   label: string;
-  /** Percentage of the table width. The set should sum to 100. */
-  width: number;
+  /**
+   * A number = percentage of the table width. A string = raw CSS width —
+   * fixed `"150px"` interior columns + one `"auto"` tail is the
+   * international recipe: content columns hug their content on ANY screen
+   * and the LAST column absorbs the slack (Jess, 2026-08-01 — percentage
+   * columns inflate on wide monitors and open holes between neighbours).
+   */
+  width: number | string;
   align?: "left" | "right";
   /** Tabular figures, so a column of numbers lines up (§2.3). */
   numeric?: boolean;
@@ -232,7 +238,10 @@ export default function DataTable<Row>({
         <colgroup>
           {selection && <col style={{ width: "4%" }} />}
           {columns.map((c) => (
-            <col key={c.key} style={{ width: `${c.width}%` }} />
+            <col
+              key={c.key}
+              style={{ width: typeof c.width === "number" ? `${c.width}%` : c.width }}
+            />
           ))}
         </colgroup>
 

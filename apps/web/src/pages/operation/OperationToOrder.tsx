@@ -517,11 +517,14 @@ export default function OperationToOrder() {
 
   /** What the pill will do — per group, from the shared projection. The ☑
    *  is BUILD-level, exactly Loo's frozen meaning: membership of THIS
-   *  purchase order. An unticked build stays demand and is offered again. */
+   *  purchase order. And the batch is VIEW-SCOPED (Jess, 2026-08-01,
+   *  Excel's iron law): Issue acts on the sheet in front of you — a tick
+   *  hidden by a filter neither counts nor issues; it waits, remembered,
+   *  for when its view is back. */
   const batch = useMemo(() => {
     const selectedByProposal = new Map<string, Set<string>>();
     let selectedRows = 0;
-    for (const r of allRows) {
+    for (const r of visibleRows) {
       if (r.proposalKey == null || r.buildKey == null || !isSelected(r)) continue;
       selectedRows += 1;
       const s = selectedByProposal.get(r.proposalKey) ?? new Set<string>();
@@ -557,7 +560,7 @@ export default function OperationToOrder() {
     }
     return { selectedRows, poCount, targets };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allRows, userOff, userOn, rowPo, planned]);
+  }, [visibleRows, userOff, userOn, rowPo, planned]);
 
   const defaultDest = destinations.find((d) => d.isDefault) ?? destinations[0] ?? null;
 
@@ -734,7 +737,7 @@ export default function OperationToOrder() {
     {
       key: "so",
       label: W.colSoNo,
-      width: 11,
+      width: "104px",
       sortable: true,
       filter: filterFor("so", soOptions, true),
       cell: (r) => (r.so != null ? `SO-${r.so}` : "—"),
@@ -742,7 +745,7 @@ export default function OperationToOrder() {
     {
       key: "customer",
       label: W.colCustomer,
-      width: 14,
+      width: "150px",
       sortable: true,
       filter: filterFor("customer", customerOptions, true),
       cell: (r) => (r.customer ? properCase(r.customer) : "—"),
@@ -750,7 +753,7 @@ export default function OperationToOrder() {
     {
       key: "model",
       label: W.colModel,
-      width: 15,
+      width: "170px",
       sortable: true,
       filter: filterFor("model", modelOptions, true),
       cell: (r) => r.model,
@@ -758,7 +761,7 @@ export default function OperationToOrder() {
     {
       key: "qty",
       label: W.colQty,
-      width: 6,
+      width: "64px",
       align: "right",
       numeric: true,
       sortable: true,
@@ -770,7 +773,7 @@ export default function OperationToOrder() {
     {
       key: "po",
       label: W.colPoNo,
-      width: 32,
+      width: "auto",
       sortable: true,
       filter: filterFor("po", poOptions),
       cell: (r) => {
