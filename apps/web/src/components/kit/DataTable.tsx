@@ -237,9 +237,13 @@ export default function DataTable<Row>({
         </colgroup>
 
         <thead className={`sticky top-0 ${Z_TABLE_HEADER}`}>
-          <tr className="h-10 border-b border-kit-slate-6 bg-kit-slate-4">
+          {/* The wash and the rule live on the CELLS: with border-collapse a
+              sticky thead's row background stays behind while the cells
+              scroll — the classic see-through header (Jess caught it live,
+              2026-08-01). */}
+          <tr className="h-10">
             {selection && (
-              <th className="px-2">
+              <th className="px-2 bg-kit-slate-4 border-b border-kit-slate-6">
                 <Checkbox
                   id="kit-table-select-all"
                   ariaLabel={selection.label}
@@ -259,7 +263,7 @@ export default function DataTable<Row>({
                       : "descending"
                     : undefined
                 }
-                className={`px-2 text-label font-medium text-kit-slate-12 ${
+                className={`px-2 bg-kit-slate-4 border-b border-kit-slate-6 text-label font-medium text-kit-slate-12 ${
                   c.align === "right" ? "text-right" : "text-left"
                 }`}
               >

@@ -59,7 +59,7 @@ export const TO_ORDER_WORDS = {
   //    Preferred Delivery · SO No. · Model · Qty · PO No. Category is NOT a
   //    column (the left panel already said it) and Customer is not either
   //    (Loo: noise). PO No. rightmost = "did today's order happen". ───────
-  colPreferred: "Preferred Delivery",
+  colPreferred: "Customer Delivery",
   colSoNo: "SO No.",
   colModel: "Model",
   colQty: "Qty",

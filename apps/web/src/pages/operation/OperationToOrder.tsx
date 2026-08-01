@@ -734,7 +734,7 @@ export default function OperationToOrder() {
     {
       key: "so",
       label: W.colSoNo,
-      width: 12,
+      width: 11,
       sortable: true,
       filter: filterFor("so", soOptions, true),
       cell: (r) => (r.so != null ? `SO-${r.so}` : "—"),
@@ -742,7 +742,7 @@ export default function OperationToOrder() {
     {
       key: "customer",
       label: W.colCustomer,
-      width: 16,
+      width: 15,
       sortable: true,
       filter: filterFor("customer", customerOptions, true),
       cell: (r) => (r.customer ? properCase(r.customer) : "—"),
@@ -750,7 +750,7 @@ export default function OperationToOrder() {
     {
       key: "model",
       label: W.colModel,
-      width: 22,
+      width: 18,
       sortable: true,
       filter: filterFor("model", modelOptions, true),
       cell: (r) => r.model,
@@ -758,7 +758,7 @@ export default function OperationToOrder() {
     {
       key: "qty",
       label: W.colQty,
-      width: 10,
+      width: 6,
       align: "right",
       numeric: true,
       sortable: true,
@@ -770,7 +770,7 @@ export default function OperationToOrder() {
     {
       key: "po",
       label: W.colPoNo,
-      width: 16,
+      width: 18,
       sortable: true,
       filter: filterFor("po", poOptions),
       cell: (r) => {
@@ -1040,7 +1040,7 @@ export default function OperationToOrder() {
                 </div>
               )
             ) : (
-              <>
+              <div className="flex-1 min-h-0 flex flex-col rounded-card overflow-hidden">
                 <DataTable
                   rows={visibleRows}
                   columns={columns}
@@ -1071,7 +1071,7 @@ export default function OperationToOrder() {
                     {countOrders(new Set(visibleRows.map((r) => r.orderId ?? r.key)).size)}
                   </span>
                 </footer>
-              </>
+              </div>
             )}
           </div>
 
