@@ -689,13 +689,6 @@ export default function OperationToOrder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters]);
 
-  const qtyOptions = useMemo(() => {
-    const base = filteredExcept("qty");
-    const qs = [...new Set(base.map((r) => r.qty))].sort((a, b) => a - b);
-    return qs.map((n) => ({ value: String(n), label: String(n) }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inView, colFilters]);
-
   const poOptions = useMemo(() => {
     const base = filteredExcept("po");
     const opts: { value: string; label: string }[] = [
@@ -761,7 +754,9 @@ export default function OperationToOrder() {
       align: "right",
       numeric: true,
       sortable: true,
-      filter: filterFor("qty", qtyOptions),
+      // NO filter caret here (Jess, 2026-08-01): a distinct-value list of
+      // 1·2·3 filters nothing worth the button, and on a narrow numeric
+      // column the caret is what pushed the word off the numbers' edge.
       cell: (r) => r.qty,
     },
     {

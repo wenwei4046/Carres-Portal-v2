@@ -134,16 +134,19 @@ function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter
     <Popover
       label={filter.label}
       trigger={
-        <Button
-          size="sm"
-          variant="ghost"
-          /* Excel's own vocabulary: a quiet ▼ on every column, the funnel
-           * only while THIS column is narrowing. */
-          icon={active ? "filter" : "columnFilter"}
+        /* A COMPACT 24px trigger, not a padded Button — on a narrow column
+         * the button's own padding is what pushed the header word off the
+         * numbers' edge (Jess, 2026-08-01). Excel's vocabulary stands: a
+         * quiet ▼ on the column, the funnel only while it is narrowing. */
+        <button
+          type="button"
           aria-label={filter.label}
           data-testid={`table-filter-${colKey}`}
           data-active={active || undefined}
-        />
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-control text-kit-slate-11 hover:bg-kit-blue-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        >
+          <Icon name={active ? "filter" : "columnFilter"} size={14} />
+        </button>
       }
     >
       <div className="flex w-56 flex-col gap-2" data-kit="table-filter">
