@@ -333,6 +333,26 @@ button.pos-wordmark { background: none; border: 0; padding: 0; cursor: pointer; 
   gap: 20px;
 }
 
+/* Category bands (Loo 2026-08-01, 2990s parity) — the wall reads one family at
+   a time instead of one river of cards whose badge changes mid-row. Each band
+   reuses .cat-grid above, so the columns line up vertically across bands:
+   grouping must not cost the wall its alignment. The chip mirrors
+   .prod-card__badge (same font / size / tracking / burnt) so it reads as that
+   badge promoted to a heading, with a border to carry it off the photo. */
+.cat-section + .cat-section { margin-top: 28px; }
+.cat-section__head { display: flex; align-items: baseline; gap: 10px; padding: 0 0 12px; }
+.cat-section__chip {
+  font-family: var(--font-button); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--c-burnt); background: var(--pos-panel, #fff);
+  border: 1px solid var(--line-strong);
+  padding: 5px 10px; border-radius: 999px;
+}
+.cat-section__count {
+  font-family: var(--font-button); font-size: 12px; font-weight: 600;
+  color: var(--fg-muted);
+}
+
 .prod-card {
   background: var(--pos-panel, #fff);
   border-radius: 16px;

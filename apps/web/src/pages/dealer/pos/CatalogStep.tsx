@@ -13,6 +13,7 @@ import type {
   PwpDiscoverDto,
 } from "@carres/shared";
 import { explodeBundle, guaranteeAttrs } from "@carres/shared";
+import { CATEGORY_LABEL } from "@/pages/catalog/components/atoms";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { type DraftLine, type WizardDraft } from "../new-order/draft";
 import { lockedCategoriesFor, newLocalId } from "../new-order/configurators";
@@ -27,6 +28,7 @@ import {
   mixRefusalMessage,
 } from "./rental-cart";
 import RentalConfigurePage, { type RentalOfferCard } from "./RentalConfigurePage";
+import CatalogSection, { railLabelOf } from "./CatalogSection";
 import BundleCard from "./BundleCard";
 import BundleConfigurePage from "./BundleConfigurePage";
 import { assembleBundleLines, bundleNeedsConfig, type BundleSlotPick } from "./bundle-flow";
@@ -39,7 +41,16 @@ import AddonsPanel, { offerableAddons } from "./AddonsPanel";
 import FloatingCartButton from "./FloatingCartButton";
 import GuaranteePickerModal from "./GuaranteePickerModal";
 
-const CARD_ORDER: ProductCategory[] = [
+/** The families that render as cards on the wall. Narrower than
+ *  `ProductCategory` (which also carries `service`, whose models back the
+ *  add-ons list and have no card) — and every member is also a `RailKey`, so a
+ *  band can always ask the rail for its own word. */
+type CardCategory = Extract<
+  ProductCategory,
+  "mattress" | "bedframe" | "sofa" | "accessory" | "guarantee"
+>;
+
+const CARD_ORDER: CardCategory[] = [
   "mattress",
   "bedframe",
   "sofa",
@@ -343,20 +354,24 @@ export default function CatalogStep({
         )
       : [];
 
-  // Models to render, filtered by rail + search, ordered category-first
-  // (mattress → bedframe → sofa) inside the single CARRES series group.
-  const shownCats = activeRail === "all" ? CARD_ORDER : [activeRail as ProductCategory];
-  const shownModels = shownCats
-    .filter((cat) => CARD_ORDER.includes(cat))
-    .flatMap((cat) =>
-      index.productModels.filter((m) => {
+  // Models to render, filtered by rail + search, in CARD_ORDER (mattress →
+  // bedframe → sofa → accessory → guarantee).
+  //
+  // Loo 2026-08-01 — kept AS BANDS, never flattened: the wall renders one band
+  // per family (2990s parity), and every "how many cards are on this wall"
+  // question reads this one list instead of counting the cards a second time.
+  const shownByCat = CARD_ORDER.filter((cat) => activeRail === "all" || activeRail === cat)
+    .map((cat) => ({
+      cat,
+      models: index.productModels.filter((m) => {
         if (m.category !== cat) return false;
         if (!search) return true;
         return index.meta.get(m.id)?.searchBlob.includes(search) ?? false;
       }),
-    );
+    }))
+    .filter((band) => band.models.length > 0);
 
-  const shownModelCount = shownModels.length;
+  const shownModelCount = shownByCat.reduce((n, band) => n + band.models.length, 0);
 
   // 0239 — bundle cards show first in "All open" and alone under the Bundles
   // rail; the search box matches bundle name + component SKU codes.
@@ -364,6 +379,21 @@ export default function CatalogStep({
     activeRail === "all" || activeRail === "bundles"
       ? bundleInfo.filter((info) => !search || info.blob.includes(search))
       : [];
+
+  // How many bands the wall holds: bundles lead (0239), then the families,
+  // then rentals (which only ever appear alone, under their own rail).
+  const bandCount =
+    (shownBundles.length > 0 ? 1 : 0) + shownByCat.length + (shownRentals.length > 0 ? 1 : 0);
+  // A single band is already named by the rail AND by the toolbar count — a
+  // third copy of the same word above the same cards is noise, so the header
+  // appears only once there is something to tell apart.
+  const withHeader = bandCount > 1;
+
+  // The wall's own piece count. Rentals are cards like any other and were
+  // counted NOWHERE, so the Rental rail printed "0 pieces" over a wall of
+  // cards; under every other rail `shownRentals` is empty and this is the
+  // number the toolbar already showed.
+  const shownPieceCount = shownModelCount + shownRentals.length;
 
   // Sofa ↔ mattress/bedframe exclusivity, for the banner above the grid.
   // Sofa in cart locks the mattress+bedframe rails; either of those locks sofa.
@@ -562,7 +592,7 @@ export default function CatalogStep({
               ? `${activeAddons.length} add-on${activeAddons.length === 1 ? "" : "s"}`
               : activeRail === "bundles"
                 ? `${shownBundles.length} bundle${shownBundles.length === 1 ? "" : "s"}`
-                : `${shownModelCount} piece${shownModelCount === 1 ? "" : "s"}`}
+                : `${shownPieceCount} piece${shownPieceCount === 1 ? "" : "s"}`}
           </span>
         </div>
 
@@ -595,7 +625,7 @@ export default function CatalogStep({
 
           {activeRail === "addons" ? (
             <AddonsPanel addons={activeAddons} draft={draft} onChange={onChange} />
-          ) : shownModels.length === 0 && shownBundles.length === 0 ? (
+          ) : bandCount === 0 ? (
             <div className="cat-empty">
               <h4>No pieces match.</h4>
               <p>Try clearing the search or pick a different category.</p>
@@ -611,52 +641,79 @@ export default function CatalogStep({
               )}
             </div>
           ) : (
-            <div className="cat-grid">
-              {/* 0239 — bundle offers lead the grid. */}
-              {shownBundles.map(({ bundle, missing, cats, catalogTotal }) => {
-                const mutexLocked = [...cats].some((cat) => lockedCats.has(cat));
-                return (
-                  <BundleCard
-                    key={bundle.id}
-                    bundle={bundle}
-                    catalog={catalog}
-                    catalogTotal={catalogTotal}
-                    locked={missing || mutexLocked}
-                    lockedReason={
-                      missing
-                        ? "An item in this bundle is off sale right now"
-                        : "Locked — this order already has a conflicting product family"
-                    }
-                    inCart={draft.lines.some(
-                      (l) => (l.attrs as Record<string, unknown> | null)?.bundle_key === bundle.id,
-                    )}
-                    onAdd={() => handleBundleTap(bundle)}
-                  />
-                );
-              })}
-              {shownModels.map((model) => (
-                <ProductCard
-                  key={model.id}
-                  model={model}
-                  meta={index.meta.get(model.id)!}
-                  locked={lockedCats.has(model.category) || outrightRailsLocked}
-                  inCart={modelIdsInCart.has(model.id)}
-                  onConfigure={() => handleConfigure(model)}
-                />
+            <>
+              {/* 0239 — bundle offers lead the wall. */}
+              {shownBundles.length > 0 && (
+                <CatalogSection
+                  label={railLabelOf(railEntries, "bundles", "Bundles")}
+                  count={shownBundles.length}
+                  noun="bundle"
+                  withHeader={withHeader}
+                >
+                  {shownBundles.map(({ bundle, missing, cats, catalogTotal }) => {
+                    const mutexLocked = [...cats].some((cat) => lockedCats.has(cat));
+                    return (
+                      <BundleCard
+                        key={bundle.id}
+                        bundle={bundle}
+                        catalog={catalog}
+                        catalogTotal={catalogTotal}
+                        locked={missing || mutexLocked}
+                        lockedReason={
+                          missing
+                            ? "An item in this bundle is off sale right now"
+                            : "Locked — this order already has a conflicting product family"
+                        }
+                        inCart={draft.lines.some(
+                          (l) =>
+                            (l.attrs as Record<string, unknown> | null)?.bundle_key === bundle.id,
+                        )}
+                        onAdd={() => handleBundleTap(bundle)}
+                      />
+                    );
+                  })}
+                </CatalogSection>
+              )}
+              {shownByCat.map(({ cat, models }) => (
+                <CatalogSection
+                  key={cat}
+                  label={railLabelOf(railEntries, cat, CATEGORY_LABEL[cat])}
+                  count={models.length}
+                  withHeader={withHeader}
+                >
+                  {models.map((model) => (
+                    <ProductCard
+                      key={model.id}
+                      model={model}
+                      meta={index.meta.get(model.id)!}
+                      locked={lockedCats.has(model.category) || outrightRailsLocked}
+                      inCart={modelIdsInCart.has(model.id)}
+                      onConfigure={() => handleConfigure(model)}
+                    />
+                  ))}
+                </CatalogSection>
               ))}
               {/* Rental cards — the SAME ProductCard as everything else, which
                   is the whole point: renting must not look like another app. */}
-              {shownRentals.map((card) => (
-                <ProductCard
-                  key={`rental-${card.model.id}`}
-                  model={card.model}
-                  meta={index.meta.get(card.model.id)!}
-                  locked={rentalRailLocked}
-                  inCart={modelIdsInCart.has(card.model.id)}
-                  onConfigure={() => setRentalCardId(card.model.id)}
-                />
-              ))}
-            </div>
+              {shownRentals.length > 0 && (
+                <CatalogSection
+                  label={railLabelOf(railEntries, "rental", "Rental")}
+                  count={shownRentals.length}
+                  withHeader={withHeader}
+                >
+                  {shownRentals.map((card) => (
+                    <ProductCard
+                      key={`rental-${card.model.id}`}
+                      model={card.model}
+                      meta={index.meta.get(card.model.id)!}
+                      locked={rentalRailLocked}
+                      inCart={modelIdsInCart.has(card.model.id)}
+                      onConfigure={() => setRentalCardId(card.model.id)}
+                    />
+                  ))}
+                </CatalogSection>
+              )}
+            </>
           )}
         </div>
       </main>
