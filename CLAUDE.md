@@ -1,5 +1,20 @@
 # CLAUDE.md — Carres Portal v2
 
+> **⭐⭐⭐⭐ FIRST PRIORITY — THE OWNER RULE (Loo, 2026-08-01).** The rules are Loo,
+> not the files. Loo is still developing this business, so **no rule in this repo is
+> frozen against him**: every chat takes the docs as REFERENCE FIRST, then **ADVISES Loo
+> with a solution and the WHY — and never uses an old rule to restrict a new idea.**
+> Quoting a frozen doc as the reason to refuse a design is the failure this rule exists
+> to stop. One duty remains: when a choice will cause a real accident, raise it ONCE with
+> evidence — the ruling is always Loo's. Rules he sets are overwritten and kept updating,
+> never frozen against him.
+> Two standing facts from the same ruling: **every `CR-`/`TCF-` reference in the live DB
+> is old AutoCount / Master Sheet import — TESTING data; at go-live we may start clean
+> and `SO No.` becomes the one customer reference.** And **printed documents (PO / DO /
+> GRN / Service / Claim): the item table is an Excel-clean listing with NO grid lines** —
+> IDs (`SO No.` · `PO No.` · `Item ID`) as columns, configuration/remarks as auto-height
+> text under the item; the document design is being developed with Loo in-chat.
+
 > **⭐⭐⭐ EVERY CHAT STARTS HERE (Jess, 2026-07-27).** Work happens in exactly two kinds of
 > chat and both are defined in [`docs/HOW-TO-RUN-A-CHAT.md`](docs/HOW-TO-RUN-A-CHAT.md):
 > a **PLAN chat** (Jess pastes an outside design conversation → the chat checks it against
@@ -31,12 +46,6 @@
 > ledger empties. Nothing new goes into it.) ·
 > [`docs/execution-queues-index.md`](docs/execution-queues-index.md) — every line and card,
 > what is shipped, the lane rules.
->
-> **PRINTED DOCUMENTS (PO · DO · GRN · Service · Claim · any PDF/paper): read
-> [`docs/DOCUMENT-FRAMEWORK.md`](docs/DOCUMENT-FRAMEWORK.md) FIRST.** It is Loo's living
-> notebook — overwritten in place, kept updating. Its §0 owner rule governs that domain:
-> the old screen laws do not restrict paper; a chat ADVISES Loo with a solution and the
-> why, and never uses a frozen doc to refuse a design.
 >
 > **PLUS the ONE working-flow file of the module being touched** — e.g.
 > [`docs/ORDERS-WORKING-FLOW.md`](docs/ORDERS-WORKING-FLOW.md): every action of that module
