@@ -1061,7 +1061,7 @@ export default function OperationToOrder() {
                     counted. Orders, not rows — a build is not a unit of work
                     a purchaser counts in. */}
                 <footer
-                  className="shrink-0 flex items-center gap-3 px-3 h-9 rounded-b-card border border-t-0 border-kit-slate-5 bg-white text-meta text-kit-slate-11"
+                  className="shrink-0 flex items-center gap-3 px-3 h-10 rounded-b-card border border-t-0 border-kit-slate-5 bg-white text-meta text-kit-slate-11"
                   data-testid="to-order-footer"
                 >
                   <span className="tabular-nums">
