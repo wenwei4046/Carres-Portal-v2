@@ -250,7 +250,7 @@ describe("the grid — business language only", () => {
     for (const label of [W.colPreferred, W.colSoNo, W.colModel, W.colQty, W.colPoNo]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
-    expect(screen.queryByText("Customer")).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "Customer" })).toBeNull();
     expect(screen.queryByText("Category")).toBeNull();
     expect(screen.queryByText(/Order by/i)).toBeNull();
     expect(screen.queryByText("Stock ready")).toBeNull();
@@ -495,14 +495,17 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
   });
 });
 
-describe("+ Create Purchase — the entrance is real, the save is next", () => {
-  it("opens the dialog with Reason · Supplier · Item · Qty · Remark and no Category", async () => {
+describe("+ Create Purchase — ONE door, many demand sources", () => {
+  it("Source leads; the customer form shows SO; Category is never asked", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-create-purchase"));
     const dialog = await screen.findByTestId("to-order-create-dialog");
-    expect(screen.getByText(W.reason)).toBeInTheDocument();
-    expect(within(dialog).getByText(W.reasonReadyStock)).toBeInTheDocument();
+    expect(within(dialog).getByText(W.sourceLabel)).toBeInTheDocument();
+    expect(within(dialog).getByText(W.sourceCustomer)).toBeInTheDocument();
     expect(screen.getByText(W.supplierLabel)).toBeInTheDocument();
+    // Customer source → an SO field, no Required By, no Customer name.
+    expect(within(dialog).getByLabelText(W.soLabel)).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("cp-required-by")).toBeNull();
     expect(screen.getByText(W.itemLabel)).toBeInTheDocument();
     expect(screen.getByText(W.remark)).toBeInTheDocument();
     // Category is never asked — it comes from the item (Loo, 2026-08-01).
@@ -511,6 +514,39 @@ describe("+ Create Purchase — the entrance is real, the save is next", () => {
     // is disabled and SAYS so, so the door teaches without pretending.
     expect(screen.getByTestId("to-order-create-submit")).toBeDisabled();
     expect(screen.getByText(W.nextUpdate)).toBeInTheDocument();
+  });
+
+  it("the form morphs by source — Inventory asks Required By, Warranty asks the customer", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-create-purchase"));
+    const dialog = await screen.findByTestId("to-order-create-dialog");
+    const sourceSelect = within(dialog).getByLabelText(W.sourceLabel);
+    // Radix Select opens on keyboard in jsdom (no PointerEvent there).
+    fireEvent.keyDown(sourceSelect, { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: W.sourceInventory }));
+    expect(within(dialog).getByTestId("cp-required-by")).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText(W.soLabel)).toBeNull();
+
+    fireEvent.keyDown(within(dialog).getByLabelText(W.sourceLabel), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: W.sourceWarranty }));
+    expect(within(dialog).getByLabelText(W.customerLabel)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(W.soLabel)).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("cp-required-by")).toBeNull();
+  });
+});
+
+describe("the Source column — an attribute, never a workflow", () => {
+  it("prints where the demand came from, and the rail gains no source rows", async () => {
+    await loaded();
+    expect(screen.getByText(W.colSource)).toBeInTheDocument();
+    // Every live demand row is customer demand today.
+    expect(screen.getAllByText(W.sourceCustomer).length).toBeGreaterThan(0);
+    // Sources NEVER become rail rows (Jess: not a category, not navigation).
+    const nav = screen.getByTestId("to-order-nav");
+    expect(within(nav).queryByText(W.sourceInventory)).toBeNull();
+    expect(within(nav).queryByText("Ready Stock")).toBeNull();
+    // Accessory IS a category, and it is on the rail.
+    expect(within(nav).getByTestId("to-order-cat-accessory")).toBeInTheDocument();
   });
 });
 

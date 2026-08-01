@@ -127,13 +127,20 @@ export const TO_ORDER_WORDS = {
    * says so.
    */
   createPurchase: "Create Purchase",
-  reason: "Reason",
-  reasonReadyStock: "Ready Stock",
-  reasonDisplay: "Display",
-  reasonWarranty: "Warranty",
-  reasonSpareParts: "Spare Parts",
-  reasonOffice: "Office",
-  reasonOther: "Other…",
+  // ── ONE purchasing pipeline, many demand SOURCES (Jess's freeze,
+  //    2026-08-01: "To Order is the work queue for all purchase demands,
+  //    regardless of where the demand comes from"). Source is an ATTRIBUTE
+  //    on the demand — never a workflow, never a rail item. ───────────────
+  colSource: "Source",
+  sourceLabel: "Source",
+  sourceCustomer: "Customer",
+  sourceInventory: "Inventory",
+  sourceDisplay: "Display",
+  sourceWarranty: "Warranty",
+  sourceOffice: "Office",
+  sourceOther: "Other…",
+  customerLabel: "Customer",
+  soLabel: "SO",
   supplierLabel: "Supplier",
   itemLabel: "Item",
   searchItem: "Search item…",
