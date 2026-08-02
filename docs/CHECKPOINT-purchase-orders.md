@@ -100,6 +100,20 @@ po-template) → 4 Supplier Updates (3A business freeze, THEN 3B write door) →
 Business before Data, Data before UI, UI before Write Door. Tests ride EVERY
 step, never queue at the end.
 
+**COMPACT PASS (v5) — ✅ BUILT 2026-08-02, after the merge of main
+(PR 560/561 — SHELL LAW):**
+- origin/main MERGED (one conflict in api pos.ts, resolved: kept our
+  /:id/units route + main's new 0307 print-data comment). The page's own
+  breadcrumb strip + TopBarIcons DELETED — PurchasingTabs IS the whole 44px
+  header now (壳画头; pages never draw a header). Browser tab titles come
+  from the shell.
+- Workspace compacted (Jess): the status Badge back on the SAME ROW as the
+  PO number · the old header block and PURCHASE ORDER merged into ONE
+  untitled PO block (Supplier · Deliver To · PO Issued at top, then items)
+  · Current Action moved INTO SUPPLIER (it is supplier work) as the
+  section's opening hero. Categories now: PO block → SUPPLIER (action +
+  Goods Arriving At + Open Actions) → ACTIVITY → RECEIVING.
+
 **POLISH PASS (v4) — ✅ BUILT 2026-08-02, Jess's "freeze before Print" pass.
 Only rhythm/typography/spacing/hierarchy moved; zero function change:**
 - Header reads identity → status → action, STACKED (PO no., then the state

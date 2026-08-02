@@ -19,7 +19,6 @@ import {
   type SupplierCallPo,
 } from "@carres/shared";
 import PurchasingTabs from "./PurchasingTabs";
-import { TopBarIcons } from "./components/GlobalTopBar";
 import Badge from "@/components/kit/Badge";
 import DataTable, {
   type Column,
@@ -836,22 +835,10 @@ export default function OperationPurchaseOrders() {
       className="h-full min-h-0 flex flex-col bg-kit-canvas"
       data-testid="purchase-orders-workspace"
     >
-      {/* The top strip — To Order's own shape: breadcrumb + shared icons.
-          No grey of its own (Jess, 2026-08-02 polish: too many greys were
-          competing) — the canvas shows through; the ONE mid grey on this
-          page is the table header. */}
-      <div
-        className="shrink-0 flex items-center justify-between gap-3 px-6 pt-3 pb-1"
-        data-testid="po-header-strip"
-      >
-        <div className="min-w-0 flex items-center gap-1.5 text-meta text-kit-slate-11">
-          <span>Purchasing</span>
-          <Icon name="forward" size={14} />
-          <span className="text-kit-slate-12">Purchase Orders</span>
-        </div>
-        <TopBarIcons />
-      </div>
-
+      {/* SHELL LAW (Loo, 2026-08-02 — PR 560/561, "壳画头"): the shell
+          draws the header, pages never do. PurchasingTabs IS the whole 44px
+          row (module word · tabs · global icons); this page draws no
+          breadcrumb, no title, no icons of its own. */}
       <PurchasingTabs />
 
       <div className="flex-1 min-h-0 flex overflow-hidden">
@@ -1165,57 +1152,33 @@ function WorkspaceBody({
       {/* ── WORK HEADER — identity → status → action, stacked (Jess,
            2026-08-02 polish): the eye reads WHO, then WHERE IT STANDS, then
            WHAT TO DO — never all three fighting on one line. */}
-      <div data-testid="po-working-header">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onCollapse}
-            title="Hide purchase order"
-            aria-label="Hide purchase order"
-            data-testid="po-workspace-collapse"
-            className={PANE_BTN}
-          >
-            <Icon name="forward" size={14} />
-          </button>
-          <span className="text-page font-semibold font-mono text-kit-slate-12">
-            {po.id}
-          </span>
-        </div>
-        <div className="mt-1" data-testid="po-work-state">
+      <div
+        className="flex items-center gap-2"
+        data-testid="po-working-header"
+      >
+        <button
+          type="button"
+          onClick={onCollapse}
+          title="Hide purchase order"
+          aria-label="Hide purchase order"
+          data-testid="po-workspace-collapse"
+          className={PANE_BTN}
+        >
+          <Icon name="forward" size={14} />
+        </button>
+        <span className="text-page font-semibold font-mono text-kit-slate-12">
+          {po.id}
+        </span>
+        <span className="ml-auto" data-testid="po-work-state">
           <Badge>{WORK_STATE_LABEL[state]}</Badge>
-        </div>
+        </span>
       </div>
-      {actionWord && (
-        /* Typography only (Jess: start with LESS visual weight — a
-           highlighted container only if live use proves this too quiet). */
-        <div className="mt-2" data-testid="po-current-action">
-          <div className="text-label text-kit-slate-9">Current Action</div>
-          <div
-            className={[
-              "text-body font-semibold",
-              actionLate ? "text-kit-red-11" : "text-kit-slate-12",
-            ].join(" ")}
-          >
-            {actionWord}
-          </div>
-          {actionDue && (
-            <div
-              className={[
-                "text-label",
-                actionLate ? "text-kit-red-11" : "text-kit-slate-9",
-              ].join(" ")}
-            >
-              {actionDue === today ? "Due Today" : `Due ${fmtDateShort(actionDue)}`}
-            </div>
-          )}
-        </div>
-      )}
-      {/* ── PURCHASE ORDER — "What is this PO?" (mission: Reference).
-           PO Issued lives HERE (Jess's polish: the header carries identity ·
-           status · action, nothing else; each fact goes to its section). */}
-      <section className={SECTION} data-testid="po-reference">
-        <h3 className={SECTION_TITLE}>Purchase Order</h3>
-        <div className="mt-2">
+      {/* ── The PO block — identity row above, facts + items as ONE compact
+           panel (Jess, this pass: the old header block and the PURCHASE
+           ORDER section merged — same information, one home; PO Issued at
+           the top with the rest). No section title: this IS the PO. */}
+      <section className="mt-2" data-testid="po-reference">
+        <div>
           <Prop label="Supplier">{supplierName}</Prop>
           <Prop label="Deliver To">{warehouse?.name ?? "—"}</Prop>
           <Prop label="PO Issued">
@@ -1272,6 +1235,31 @@ function WorkspaceBody({
            write. */}
       <section className={SECTION} data-testid="po-supplier">
         <h3 className={SECTION_TITLE}>Supplier</h3>
+        {actionWord && (
+          /* Current Action is SUPPLIER work (Jess, this pass), so it leads
+             this section — typography only, the one bold line on the page. */
+          <div className="mt-2" data-testid="po-current-action">
+            <div className="text-label text-kit-slate-9">Current Action</div>
+            <div
+              className={[
+                "text-body font-semibold",
+                actionLate ? "text-kit-red-11" : "text-kit-slate-12",
+              ].join(" ")}
+            >
+              {actionWord}
+            </div>
+            {actionDue && (
+              <div
+                className={[
+                  "text-label",
+                  actionLate ? "text-kit-red-11" : "text-kit-slate-9",
+                ].join(" ")}
+              >
+                {actionDue === today ? "Due Today" : `Due ${fmtDateShort(actionDue)}`}
+              </div>
+            )}
+          </div>
+        )}
         <div className="mt-2">
           <Prop label="Goods Arriving At">
             {eta.date ? (
