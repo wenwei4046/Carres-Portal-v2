@@ -30,6 +30,12 @@ vi.mock("@/lib/api", async () => {
 const OHANA = "11111111-1111-1111-1111-111111111111";
 const NF = "33333333-3333-3333-3333-333333333333";
 const WH = "44444444-4444-4444-4444-444444444444";
+const KLANG = "55555555-5555-5555-5555-555555555555";
+const AL = "66666666-6666-6666-6666-666666666666";
+const DESTINATIONS = [
+  { id: KLANG, name: "Carres Klang", is_default: true },
+  { id: AL, name: "AL Sungai Buloh", is_default: false },
+];
 
 /** Today in MYT — PO-9003 arrives today, so the engine opens its
  *  tomorrow's-delivery call (the Open Actions fixture). */
@@ -65,6 +71,7 @@ const POS = [
     id: "PO-9003",
     supplier_id: OHANA,
     warehouse_id: WH,
+    destination_id: KLANG,
     status: "open",
     sup_status: "confirmed",
     so: 1300,
@@ -168,7 +175,8 @@ beforeEach(() => {
   apiFetch.mockReset();
   apiFetch.mockImplementation((url: string) => {
     if (url.includes("/units")) return Promise.resolve({ units: [] });
-    if (url.startsWith("/api/operation/pos")) return Promise.resolve({ pos: POS });
+    if (url.startsWith("/api/operation/pos"))
+      return Promise.resolve({ pos: POS, destinations: DESTINATIONS });
     if (url === "/api/operation/suppliers")
       return Promise.resolve({
         suppliers: [
@@ -412,8 +420,9 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
     // Line a1 covers TWO sales orders → two rows, never one stacked cell.
     expect(items.getByText("SO-1300")).toBeInTheDocument();
     expect(items.getByText("SO-1301")).toBeInTheDocument();
-    // The salesperson's remark flows over, read-only.
-    expect(items.getByText("No drilling")).toBeInTheDocument();
+    // The salesperson's remark flows over, read-only, LABELLED as theirs —
+    // purchasing's own note is a separate line marked Ops.
+    expect(items.getByText("Sales: No drilling")).toBeInTheDocument();
     expect(items.getByText("Recv")).toBeInTheDocument();
     expect(items.getByText("Total")).toBeInTheDocument();
   });
@@ -422,9 +431,9 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
     await mountLoaded();
     expect(screen.queryByTestId("po-item-extend")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("po-item-row-1"));
-    expect(
-      within(screen.getByTestId("po-item-extend")).getByText("Destination"),
-    ).toBeInTheDocument();
+    const ext = within(screen.getByTestId("po-item-extend"));
+    expect(ext.getByText("Destination")).toBeInTheDocument();
+    expect(ext.getByText("Ops remark")).toBeInTheDocument();
   });
 
   it("quantities live on the rows — no Receiving panel AND no door", async () => {
@@ -553,5 +562,76 @@ describe("the supplier's date history, numbered (SAP's shape)", () => {
     fireEvent.change(input, { target: { value: "2099-12-30" } });
     expect(screen.getByTestId("po-date-effect").textContent).toMatch(/Same date/);
     expect(screen.queryByTestId("po-date-reason")).not.toBeInTheDocument();
+  });
+});
+
+describe("where each line goes (0311, Jess 2026-08-02)", () => {
+  it("changing the destination for the WHOLE line posts /destination", async () => {
+    await mountLoaded();
+    fireEvent.click(listing().getByText("PO-9003"));
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("po-working-header")).getByText("PO-9003"),
+      ).toBeInTheDocument(),
+    );
+    // Row 3 is a qty-1 line, so there is nothing to split.
+    fireEvent.click(screen.getByTestId("po-item-row-3"));
+    fireEvent.change(screen.getByTestId("po-line-destination"), {
+      target: { value: AL },
+    });
+    expect(screen.getByTestId("po-line-effect").textContent).toMatch(/All 1 move/);
+    fireEvent.click(screen.getByTestId("po-line-destination-save"));
+    await waitFor(() =>
+      expect(
+        apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/destination")),
+      ).toBe(true),
+    );
+  });
+
+  it("moving PART of a line SPLITS it — the PO stays one document", async () => {
+    await mountLoaded();
+    fireEvent.click(listing().getByText("PO-9001"));
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("po-working-header")).getByText("PO-9001"),
+      ).toBeInTheDocument(),
+    );
+    // PO-9001's only line is qty 3 → Move appears.
+    fireEvent.click(screen.getByTestId("po-item-row-1"));
+    fireEvent.change(screen.getByTestId("po-line-destination"), {
+      target: { value: AL },
+    });
+    fireEvent.change(screen.getByTestId("po-line-move-qty"), {
+      target: { value: "1" },
+    });
+    expect(screen.getByTestId("po-line-effect").textContent).toMatch(
+      /1 of 3 move; 2 stay/,
+    );
+    expect(screen.getByTestId("po-line-destination-save").textContent).toBe("Split");
+    fireEvent.click(screen.getByTestId("po-line-destination-save"));
+    await waitFor(() =>
+      expect(apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/split"))).toBe(
+        true,
+      ),
+    );
+    const call = apiFetch.mock.calls.find((c) => String(c[0]).endsWith("/split"))!;
+    expect(JSON.parse(String((call[1] as { body: string }).body))).toMatchObject({
+      moveQty: 1,
+      destinationId: AL,
+    });
+  });
+
+  it("the ops remark is purchasing's own — internal, and it says so", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-item-row-1"));
+    const input = screen.getByTestId("po-line-ops-remark") as HTMLInputElement;
+    expect(input.placeholder).toMatch(/never printed/i);
+    fireEvent.change(input, { target: { value: "AL collects Friday" } });
+    fireEvent.click(screen.getByTestId("po-line-ops-save"));
+    await waitFor(() =>
+      expect(
+        apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/ops-remark")),
+      ).toBe(true),
+    );
   });
 });

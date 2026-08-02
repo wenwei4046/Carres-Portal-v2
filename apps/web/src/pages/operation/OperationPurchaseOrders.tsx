@@ -43,6 +43,7 @@ import {
   useCatalog,
   useOperationPos,
   useOperationSuppliers,
+  usePoLineAction,
   useRecordSupplierDate,
   useOperationWarehouse,
   usePurchasingSettings,
@@ -186,6 +187,11 @@ export default function OperationPurchaseOrders() {
 
   const today = todayMYT();
   const pos = useMemo(() => posQ.data?.pos ?? [], [posQ.data]);
+  // 0311's registry — the per-line picker's options, off the same read.
+  const destinations = useMemo(
+    () => posQ.data?.destinations ?? [],
+    [posQ.data],
+  );
 
   const supplierById = useMemo(() => {
     const m = new Map<string, SupplierRow>();
@@ -1006,6 +1012,7 @@ export default function OperationPurchaseOrders() {
               sizeOf={(raw) => skuBySku.get(raw)?.variant ?? null}
               eta={etaOf(selected)}
               today={today}
+              destinations={destinations}
             />
           ) : (
             !posQ.isLoading &&
@@ -1067,6 +1074,7 @@ function WorkspaceBody({
   sizeOf,
   eta,
   today,
+  destinations,
 }: {
   po: operationPoListRow;
   supplier: SupplierRow | undefined;
@@ -1075,6 +1083,7 @@ function WorkspaceBody({
   sizeOf: (sku: string) => string | null;
   eta: { date: string | null; confirmed: boolean };
   today: string;
+  destinations: { id: string; name: string; is_default: boolean }[];
 }) {
   const supplierName = supplier?.name ?? po.supplier_id;
   const progress = poReceivingProgress(po.purchase_order_lines);
@@ -1095,6 +1104,8 @@ function WorkspaceBody({
       qty: number;
       received: number;
       remark: string | null;
+      destinationId: string | null;
+      opsRemark: string | null;
     }[] = [];
     for (const l of po.purchase_order_lines) {
       const parts =
@@ -1114,11 +1125,16 @@ function WorkspaceBody({
           qty: r.qty,
           received: got,
           remark: r.remark,
+          destinationId: l.destination_id ?? null,
+          opsRemark: l.ops_remark ?? null,
         });
       });
     }
     return out;
   }, [po, sizeOf]);
+
+  const destName = (id: string) =>
+    destinations.find((d) => d.id === id)?.name ?? "—";
 
   // The supplier's date history, numbered — SAP's shape (first promise vs the
   // one they stand on now, plus the slip), read out of the append-only ledger.
@@ -1259,7 +1275,6 @@ function WorkspaceBody({
           <span className="flex-1 font-medium">Description</span>
           <span className="w-8 text-right font-medium">Qty</span>
           <span className="w-10 text-right font-medium">Recv</span>
-          <span className="w-20 font-medium">Remark</span>
         </div>
         {rows.map((r, i) => (
           <div key={r.key}>
@@ -1283,6 +1298,24 @@ function WorkspaceBody({
                     {r.size}
                   </span>
                 )}
+                {/* TWO remarks, two owners (Jess, 2026-08-02): the SALES one
+                    came over from the sales order and prints for the factory;
+                    the OPS one is purchasing's own and never prints. */}
+                {r.remark && (
+                  <span className="block text-label text-kit-slate-11">
+                    Sales: {r.remark}
+                  </span>
+                )}
+                {r.destinationId && (
+                  <span className="block text-label text-kit-blue-11">
+                    → {destName(r.destinationId)}
+                  </span>
+                )}
+                {r.opsRemark && (
+                  <span className="block text-label text-kit-slate-9">
+                    Ops: {r.opsRemark}
+                  </span>
+                )}
               </span>
               <span className="w-8 text-right text-kit-slate-12 tabular-nums">
                 {r.qty}
@@ -1290,19 +1323,22 @@ function WorkspaceBody({
               <span className="w-10 text-right tabular-nums text-kit-slate-9">
                 {r.received}
               </span>
-              <span
-                className="w-20 truncate text-label text-kit-slate-11"
-                title={r.remark ?? undefined}
-              >
-                {r.remark ?? ""}
-              </span>
             </button>
             {openLine === r.key && (
               <div
                 className="pl-6 py-1.5 border-b border-kit-slate-4 bg-kit-slate-3"
                 data-testid="po-item-extend"
               >
-                <Prop label="Destination">{warehouse?.name ?? "—"}</Prop>
+                <LineWork
+                  lineId={r.lineId}
+                  qty={r.qty}
+                  received={r.received}
+                  destinationId={r.destinationId}
+                  poDestinationId={po.destination_id ?? null}
+                  opsRemark={r.opsRemark}
+                  destinations={destinations}
+                  fallbackName={warehouse?.name ?? "—"}
+                />
               </div>
             )}
           </div>
@@ -1319,7 +1355,6 @@ function WorkspaceBody({
           <span className="w-10 text-right font-semibold text-kit-slate-12 tabular-nums">
             {progress.received}
           </span>
-          <span className="w-20" />
         </div>
         {/* No door to Receiving (Jess, 2026-08-02): the warehouse checks the
             goods in over there and the Recv column moves BY ITSELF — a link
@@ -1337,6 +1372,144 @@ function WorkspaceBody({
   );
 }
 
+
+/**
+ * The line's work surface (Jess, 2026-08-02 — 0311). Purchasing's only
+ * per-line job is WHERE THIS PIECE GOES, so that is what opens under the row:
+ * a destination picker and purchasing's own note.
+ *
+ * When only PART of the quantity goes elsewhere the LINE splits — the PO
+ * stays one document with one supplier (her frozen law). Only the un-received
+ * remainder can move: goods a warehouse already holds cannot be re-routed by
+ * editing a document.
+ */
+function LineWork({
+  lineId,
+  qty,
+  received,
+  destinationId,
+  poDestinationId,
+  opsRemark,
+  destinations,
+  fallbackName,
+}: {
+  lineId: string;
+  qty: number;
+  received: number;
+  destinationId: string | null;
+  poDestinationId: string | null;
+  opsRemark: string | null;
+  destinations: { id: string; name: string; is_default: boolean }[];
+  fallbackName: string;
+}) {
+  const act = usePoLineAction(lineId);
+  const current = destinationId ?? poDestinationId ?? "";
+  const [dest, setDest] = useState(current);
+  const [moveQty, setMoveQty] = useState("");
+  const [note, setNote] = useState(opsRemark ?? "");
+  const [err, setErr] = useState<string | null>(null);
+  const free = Math.max(0, qty - received);
+  const moving = Number(moveQty || 0);
+  const changed = dest !== "" && dest !== current;
+  const willSplit = changed && moving >= 1 && moving < free;
+
+  const run = (path: "destination" | "split" | "ops-remark", body: Record<string, unknown>) => {
+    setErr(null);
+    act.mutate(
+      { path, body },
+      { onError: (e) => setErr(e instanceof Error ? e.message : String(e)) },
+    );
+  };
+
+  return (
+    <div data-testid="po-line-work">
+      <div className="flex items-center gap-2 text-body leading-6">
+        <span className="w-24 shrink-0 text-label text-kit-slate-9">
+          Destination
+        </span>
+        <select
+          value={dest}
+          onChange={(e) => setDest(e.target.value)}
+          aria-label="Destination"
+          data-testid="po-line-destination"
+          className="h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12"
+        >
+          {destinations.length === 0 && <option value="">{fallbackName}</option>}
+          {destinations.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </select>
+        {changed && free > 1 && (
+          <>
+            <span className="text-label text-kit-slate-9">Move</span>
+            <input
+              type="number"
+              min={1}
+              max={free}
+              value={moveQty}
+              onChange={(e) => setMoveQty(e.target.value)}
+              placeholder={`${free}`}
+              aria-label="Move how many"
+              data-testid="po-line-move-qty"
+              className="h-8 w-16 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 tabular-nums"
+            />
+            <span className="text-label text-kit-slate-9">of {free}</span>
+          </>
+        )}
+        <button
+          type="button"
+          disabled={!changed || act.isPending}
+          onClick={() =>
+            willSplit
+              ? run("split", { moveQty: moving, destinationId: dest })
+              : run("destination", { destinationId: dest })
+          }
+          data-testid="po-line-destination-save"
+          className={`${DOC_BTN} disabled:opacity-40`}
+        >
+          {act.isPending ? "Saving…" : willSplit ? "Split" : "Save"}
+        </button>
+      </div>
+      {changed && (
+        <div className="text-label text-kit-slate-9" data-testid="po-line-effect">
+          {willSplit
+            ? `${moving} of ${free} move; ${free - moving} stay.`
+            : `All ${free} move.`}
+        </div>
+      )}
+      <div className="mt-1 flex items-center gap-2 text-body leading-6">
+        <span className="w-24 shrink-0 text-label text-kit-slate-9">
+          Ops remark
+        </span>
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Internal — never printed"
+          aria-label="Ops remark"
+          data-testid="po-line-ops-remark"
+          className="h-8 flex-1 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12"
+        />
+        <button
+          type="button"
+          disabled={note === (opsRemark ?? "") || act.isPending}
+          onClick={() => run("ops-remark", { text: note })}
+          data-testid="po-line-ops-save"
+          className={`${DOC_BTN} disabled:opacity-40`}
+        >
+          Save
+        </button>
+      </div>
+      {err && (
+        <div className="text-label text-kit-red-11" data-testid="po-line-error">
+          {err}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * The supplier-date form (Jess, 2026-08-02) — ONE door for her whole cycle.

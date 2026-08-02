@@ -97,6 +97,13 @@ describe("GET /api/operation/pos", () => {
     const skusIn = vi.fn().mockResolvedValue({ data: skuRows, error: null });
     const skusSelect = vi.fn(() => ({ in: skusIn }));
 
+    // 0311's destination registry rides the list so the per-line picker has
+    // its options without a second call.
+    const destOrder2 = vi.fn().mockResolvedValue({ data: [], error: null });
+    const destOrder1 = vi.fn(() => ({ order: destOrder2 }));
+    const destEq = vi.fn(() => ({ order: destOrder1 }));
+    const destSelect = vi.fn(() => ({ eq: destEq }));
+
     // The Excel-row derivation reads the covered SOs' own lines (Jess,
     // 2026-08-02): one grid row per SO × SKU, carrying the salesperson's
     // remark. Empty here — the rows fall back to one per PO line.
@@ -109,6 +116,7 @@ describe("GET /api/operation/pos", () => {
         if (table === "orders") return { select: ordersSelect };
         if (table === "product_skus") return { select: skusSelect };
         if (table === "order_lines") return { select: solSelect };
+        if (table === "purchasing_destinations") return { select: destSelect };
         return { select };
       }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -187,7 +195,7 @@ describe("GET /api/operation/pos", () => {
 
   // ── Register (Jess, 2026-08-02) · the listing's enrichments ───────────────
   it("speaks MODEL per line, carries the customer + EARLIEST delivery, and flags a revised arrival", async () => {
-    const twoSo = {
+    const twoSo: Record<string, unknown> = {
       ...PO_ROW,
       so: 4001,
       so_refs: [4002],
@@ -197,7 +205,7 @@ describe("GET /api/operation/pos", () => {
       ],
     };
     const { ordersIn, skusIn } = mockPosList(
-      [twoSo],
+      [twoSo as typeof PO_ROW],
       [
         // TWO different arrival dates answered about → (revised).
         { po_id: "PO-2030", po_line_id: null, kind: "tomorrow_delivery", about_date: "2026-09-15", recorded_at: "2026-09-02T00:00:00Z" },

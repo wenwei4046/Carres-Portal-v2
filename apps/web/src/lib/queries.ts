@@ -2627,6 +2627,8 @@ export interface operationOpenPoRow {
   id: string;
   supplier_id: string;
   warehouse_id: string;
+  /** The PO's own destination (0307). A line with none follows it. */
+  destination_id?: string | null;
   status: string;
   sup_status: string;
   eta_date: string | null;
@@ -3083,6 +3085,8 @@ export interface operationPoListRow {
   id: string;
   supplier_id: string;
   warehouse_id: string;
+  /** The PO's own destination (0307). A line with none follows it. */
+  destination_id?: string | null;
   status: "open" | "received" | "cancelled";
   sup_status: string;
   so: number | null;
@@ -3120,6 +3124,10 @@ export interface operationPoListRow {
      *  to print the code). OPTIONAL: an older Worker degrades to the code. */
     model_name?: string | null;
     size?: string | null;
+    /** Where THIS line goes (0311) — null = wherever the PO goes. */
+    destination_id?: string | null;
+    /** Purchasing's own internal note; never printed on the PO. */
+    ops_remark?: string | null;
     /** Register (Jess, 2026-08-02) — the EXCEL rows this PO line becomes:
      *  one entry per SO × SKU, each carrying the SALESPERSON's remark from
      *  the sales order. Derived server-side; a quantity no SO claims comes
@@ -3171,6 +3179,8 @@ export interface operationPoListRow {
 }
 export interface operationPosListResponse {
   pos: operationPoListRow[];
+  /** The active destination registry (0307) — the per-line picker's options. */
+  destinations?: { id: string; name: string; is_default: boolean }[];
 }
 
 /** Pipeline v2 (C4) — re-export the zod-derived drill-down shape so consumers
@@ -3939,6 +3949,28 @@ export function useRecordSupplierDate(poId: string | null) {
       ),
     onSuccess: () => {
       // Every PO list view — the register reads one, the workspace another.
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+/**
+ * The per-line doors (0311, Jess 2026-08-02): set where a line goes · SPLIT
+ * part of it to somewhere else · keep purchasing's own internal note. One
+ * hook, three paths — they invalidate the same list.
+ */
+export function usePoLineAction(lineId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      path: "destination" | "split" | "ops-remark";
+      body: Record<string, unknown>;
+    }) =>
+      apiFetch<{ ok: true; result: unknown }>(
+        `/api/operation/pos/lines/${encodeURIComponent(lineId ?? "")}/${input.path}`,
+        { method: "POST", body: JSON.stringify(input.body) },
+      ),
+    onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
     },
   });

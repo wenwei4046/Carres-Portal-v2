@@ -73,6 +73,27 @@ export const recordTomorrowDeliveryInput = z.discriminatedUnion('answer', [
 export type RecordTomorrowDeliveryInput = z.infer<typeof recordTomorrowDeliveryInput>;
 
 /**
+ * Where each LINE goes (Jess, 2026-08-02) — the three per-line write doors
+ * (0311). Purchasing's only per-line job is the destination; the ops remark
+ * is its own internal note and never prints.
+ */
+export const setLineDestinationInput = z.object({
+  destinationId: z.string().uuid(),
+}).strict();
+export type SetLineDestinationInput = z.infer<typeof setLineDestinationInput>;
+
+export const splitLineDestinationInput = z.object({
+  moveQty: z.number().int().min(1),
+  destinationId: z.string().uuid(),
+}).strict();
+export type SplitLineDestinationInput = z.infer<typeof splitLineDestinationInput>;
+
+export const setLineOpsRemarkInput = z.object({
+  text: z.string().max(500),
+}).strict();
+export type SetLineOpsRemarkInput = z.infer<typeof setLineOpsRemarkInput>;
+
+/**
  * P3 · `recordBalanceDateInput` —
  * POST /api/operation/pos/lines/:poLineId/balance-date.
  * Maps to `purchasing_record_balance_date(po_line_id, new_date, reason)` (0306).

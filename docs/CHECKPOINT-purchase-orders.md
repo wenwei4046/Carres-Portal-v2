@@ -149,6 +149,40 @@ SO × SKU, salesperson remark read-only) with a TOTAL row + `Open
 Receiving →` (the Receiving PANEL is gone — quantities live on the rows) ·
 row click extends in place (Destination fact today; [Change] = Phase 4/5's
 Split/Revision door) · ACTIVITY unchanged. 25 page tests green.
+**STEP 1 OF HER THREE ✅ SHIPPED 2026-08-02 — WHERE EACH LINE GOES
+(migration 0311_where_each_line_goes APPLIED to prod).** Her words:
+*"operation under item due to we need key in destination, you forgot
+again"* — purchasing's ONLY per-line job, deferred by me three times and
+now built.
+- `purchase_order_lines.destination_id` (NULL = wherever the PO goes, so no
+  backfill exists) + `ops_remark`. **ops_remark is a COLUMN, not an attrs
+  key, precisely so it can never print**: `purchasing_po_document`
+  allowlists attrs keys and selects named columns, and 0311's own sanity
+  block FAILS the migration if that function ever mentions it.
+- Three write doors, gated by the existing `purchasing_supplier_call_gate`
+  (same person, same job, same document — no new duty key):
+  set a line's destination · SPLIT part of it · set the ops remark.
+  **The split is her frozen law**: the LINE splits, the PO never does — one
+  document, one supplier. **Received quantity NEVER moves**; only the
+  un-received remainder can be re-routed (0257's discipline), and moving
+  the whole line is refused as "not a split — set its destination instead".
+- UI: the row extends in place → `Destination ▾` + `Move [n] of [free]`
+  (appears only when the destination changed and more than one is free) +
+  `Ops remark` with the placeholder `Internal — never printed`. The effect
+  line states the outcome before the press (`1 of 3 move; 2 stay.`). Under
+  the description the row now prints `Sales: …` (theirs, prints on the PO),
+  `→ AL Sungai Buloh` (only when re-routed) and `Ops: …` (ours, never
+  prints) — the REMARK column was dropped, too narrow for either.
+- Verified: dry run in a rolled-back transaction on prod (6 assertions incl.
+  every door refusing an ungated caller and the printed-PO guard), rollback
+  verified total, applied, then 2 columns · 3 doors · authenticated true /
+  anon false · 0 lines re-routed · 33 lines untouched.
+- STILL OWED of her three: **step 2** (editable WhatsApp draft · ONE
+  company-wide template · `po_sends` so `Nothing sent yet.` can change ·
+  Email via **mailto**, her pick — the portal has NO email sender and a
+  `mailto:` needs only `suppliers.email`) and **step 3** (Revision
+  snapshots, so the supplier always holds one current version).
+
 **LIVE-TEST PASS 2 (Jess at the screen, 2026-08-02): the date field starts
 EMPTY.** She read the pre-filled field as "I am editing the existing date"
 and the sentence under it (`Supplier still on 19 Aug 26.`) as nonsense —

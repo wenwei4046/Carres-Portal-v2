@@ -11,6 +11,9 @@ import {
   receivePoWithDoInput,
   recordBalanceDateInput,
   recordTomorrowDeliveryInput,
+  setLineDestinationInput,
+  setLineOpsRemarkInput,
+  splitLineDestinationInput,
   type AwaitingStockShortageResponse,
 } from "@carres/shared";
 import { resolveCurrentPoDuty } from "./po-duty";
@@ -113,7 +116,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // P3 (0306): `short_since` is the balance call's Due anchor — the day the
       // line last took a short delivery, stamped by a trigger so every door
       // that writes `received_qty` stamps it.
-      "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs)",
+      "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, placed_at, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs, destination_id, ops_remark)",
     );
 
   if (status !== "all") q = q.eq("status", status);
@@ -338,6 +341,19 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     }
   }
 
+  // The destination registry rides the list so the workspace's per-line picker
+  // has its options without a second call (To Order reads it the same way).
+  const { data: destRows, error: destErr } = await sb
+    .from("purchasing_destinations")
+    .select("id, name, is_default")
+    .eq("active", true)
+    .order("is_default", { ascending: false })
+    .order("name");
+  if (destErr) {
+    const m = mapPgError(destErr);
+    return c.json(m.body, m.status);
+  }
+
   const withAnswers = pos.map((p) => {
     const row = p as Record<string, unknown>;
     const lines = (row.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [];
@@ -358,7 +374,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     };
   });
 
-  return c.json({ pos: withAnswers });
+  return c.json({ pos: withAnswers, destinations: destRows ?? [] });
 });
 
 // ----- GET /awaiting-stock-shortage -----
@@ -1398,6 +1414,48 @@ operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, async (c) =>
         : (parsed.data.firstDate ?? null),
     p_reason: parsed.data.reason ?? null,
     ...extras,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+// ----- POST /lines/:lineId/destination · /split · /ops-remark -----
+// Where each LINE goes (Jess, 2026-08-02 — 0311). Purchasing's only per-line
+// job: ten to Klang, one to AL. A whole line moves; a PART of a line SPLITS
+// (the PO stays one document with one supplier — her frozen law). The ops
+// remark is internal and, by 0311's own sanity check, can never print.
+operationPosRouter.post("/lines/:lineId/destination", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, setLineDestinationInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_set_line_destination", {
+    p_line_id: c.req.param("lineId"),
+    p_destination_id: parsed.data.destinationId,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+operationPosRouter.post("/lines/:lineId/split", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, splitLineDestinationInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_split_line_destination", {
+    p_line_id: c.req.param("lineId"),
+    p_move_qty: parsed.data.moveQty,
+    p_destination_id: parsed.data.destinationId,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+operationPosRouter.post("/lines/:lineId/ops-remark", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, setLineOpsRemarkInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_set_line_ops_remark", {
+    p_line_id: c.req.param("lineId"),
+    p_text: parsed.data.text,
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });

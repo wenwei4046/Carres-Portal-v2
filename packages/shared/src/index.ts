@@ -411,6 +411,9 @@ export {
   chasePoEventInput,
   // P3 (0306) — the two supplier calls' answer bodies.
   recordTomorrowDeliveryInput,
+  setLineDestinationInput,
+  setLineOpsRemarkInput,
+  splitLineDestinationInput,
   recordBalanceDateInput,
   attachDoInput,
   receivePoWithDoInput,
