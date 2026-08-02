@@ -151,3 +151,98 @@ export function poCurrentActionOf(
   if (calls.length > 0) return { kind: "call", call: calls[0] };
   return { kind: "state", key: state, word: PO_STATE_ACTION_WORD[state] };
 }
+
+/**
+ * The supplier's date HISTORY, numbered (Jess, 2026-08-02 — "1st, 2nd, 3rd").
+ *
+ * The international shape is not four columns (2990s' `_2 _3 _4` runs out at
+ * the fifth answer). It is SAP's pair: the ORIGINAL promise beside the current
+ * one, plus how far it has slipped — those two numbers are what judge a
+ * supplier. Our append-only ledger already holds every answer, so this is
+ * pure reading: oldest first, numbered, with the slip measured from the FIRST
+ * date the supplier ever gave (never from the engine's estimate — an estimate
+ * is our guess, not their promise).
+ */
+export interface PoDatePromise {
+  kind: string;
+  answer: string;
+  about_date: string | null;
+  previous_date: string | null;
+  new_date: string | null;
+  reason: string | null;
+  remarks?: string | null;
+  recorded_at: string;
+}
+
+export interface PoDateHistoryEntry {
+  /** 1-based: `1st`, `2nd`, `3rd` … */
+  ordinal: number;
+  /** The date the supplier named at that point. */
+  date: string;
+  reason: string | null;
+  remarks: string | null;
+  recordedAt: string;
+}
+
+export interface PoDateHistory {
+  entries: PoDateHistoryEntry[];
+  /** The first date the supplier ever gave, or null if they never have. */
+  firstDate: string | null;
+  /** The date they stand on now. */
+  currentDate: string | null;
+  /** Calendar days between the first promise and the current one; 0 when
+   *  they have never moved. Null when there is nothing to compare. */
+  slipDays: number | null;
+}
+
+export function poDateHistoryOf(
+  promises: readonly PoDatePromise[] | null | undefined,
+): PoDateHistory {
+  const rows = (promises ?? [])
+    .filter((p) => p.kind === "tomorrow_delivery")
+    .slice()
+    .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
+  const entries: PoDateHistoryEntry[] = [];
+  for (const r of rows) {
+    // A delay names the NEW date; a confirmation names the date it was about.
+    const date = r.answer === "delayed" ? r.new_date : r.about_date;
+    if (!date) continue;
+    // A repeated confirmation of the SAME date is not a new date — it is the
+    // same promise restated, so it never earns an ordinal.
+    if (entries.length > 0 && entries[entries.length - 1].date === date) continue;
+    entries.push({
+      ordinal: entries.length + 1,
+      date,
+      reason: r.reason ?? null,
+      remarks: r.remarks ?? null,
+      recordedAt: r.recorded_at,
+    });
+  }
+  const firstDate = entries[0]?.date ?? null;
+  const currentDate = entries[entries.length - 1]?.date ?? null;
+  const slipDays =
+    firstDate && currentDate
+      ? Math.round(
+          (Date.parse(`${currentDate}T00:00:00Z`) -
+            Date.parse(`${firstDate}T00:00:00Z`)) /
+            86_400_000,
+        )
+      : null;
+  return { entries, firstDate, currentDate, slipDays };
+}
+
+/** `1st` · `2nd` · `3rd` · `4th` … */
+export function ordinalLabel(n: number): string {
+  const rem100 = n % 100;
+  if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}

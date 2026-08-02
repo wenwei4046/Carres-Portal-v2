@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   addWorkingDays,
   myHolidaySet,
+  ordinalLabel,
+  poDateHistoryOf,
   PO_DELAY_REASONS,
   PO_STATE_ACTION_SHORT,
   PO_WORK_STATES,
@@ -1118,10 +1120,9 @@ function WorkspaceBody({
     return out;
   }, [po, sizeOf]);
 
-  const history = useMemo(
-    () => (po.promises ?? []).filter((p) => p.kind === "tomorrow_delivery"),
-    [po.promises],
-  );
+  // The supplier's date history, numbered — SAP's shape (first promise vs the
+  // one they stand on now, plus the slip), read out of the append-only ledger.
+  const hist = useMemo(() => poDateHistoryOf(po.promises), [po.promises]);
 
   return (
     <div className="px-4 py-4" data-testid="po-document">
@@ -1170,6 +1171,13 @@ function WorkspaceBody({
           ) : (
             <span className="text-kit-slate-9">—</span>
           )}
+          {hist.entries.length > 1 && (
+            <span className="text-kit-slate-9" data-testid="po-date-nth">
+              {"  "}
+              {ordinalLabel(hist.entries.length)} date
+              {hist.slipDays ? ` · ${hist.slipDays} days later` : ""}
+            </span>
+          )}
           {overdue != null && (
             <span className="text-kit-red-11" data-testid="po-overdue">
               {"  "}⚠ Overdue by {overdue} day{overdue === 1 ? "" : "s"}
@@ -1207,26 +1215,37 @@ function WorkspaceBody({
               )}
             </div>
           ))}
-          {history.length === 0 ? (
+          {hist.entries.length === 0 ? (
             <div className="text-label text-kit-slate-9 leading-6">
               No date from {supplierName} yet.
             </div>
           ) : (
-            history.map((h) => (
-              <div key={h.recorded_at} className="text-body leading-6">
-                <span className="text-label text-kit-slate-9 tabular-nums">
-                  {fmtDateShort(h.recorded_at.slice(0, 10))}{"  "}
-                </span>
-                <span className="text-kit-slate-12">
-                  {h.answer === "delayed"
-                    ? `moved ${fmtDateShort(h.previous_date ?? "")} → ${fmtDateShort(h.new_date ?? "")}`
-                    : `confirmed ${fmtDateShort(h.about_date ?? "")}`}
-                </span>
-                {h.reason && (
-                  <span className="text-kit-slate-9"> · {h.reason}</span>
-                )}
-              </div>
-            ))
+            /* Numbered oldest first — `1st` is the date the supplier FIRST
+               gave (never the engine's estimate: an estimate is our guess,
+               not their promise). One date earns no number. */
+            <div data-testid="po-date-history">
+              {hist.entries.map((e) => (
+                <div
+                  key={e.recordedAt}
+                  className="flex items-baseline gap-2 text-body leading-6"
+                >
+                  {hist.entries.length > 1 && (
+                    <span className="w-8 shrink-0 text-label text-kit-slate-9">
+                      {ordinalLabel(e.ordinal)}
+                    </span>
+                  )}
+                  <span className="w-20 shrink-0 tabular-nums text-kit-slate-12">
+                    {fmtDateShort(e.date)}
+                  </span>
+                  <span className="min-w-0 text-kit-slate-9 truncate">
+                    {[e.reason, e.remarks].filter(Boolean).join(" · ")}
+                  </span>
+                  <span className="ml-auto shrink-0 text-label text-kit-slate-9 tabular-nums">
+                    {fmtDateShort(e.recordedAt.slice(0, 10))}
+                  </span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -1302,20 +1321,14 @@ function WorkspaceBody({
           </span>
           <span className="w-20" />
         </div>
-        <div className="mt-1 flex items-center gap-3">
-          {progress.issueQty > 0 && (
-            <span className="text-body text-kit-red-11">
-              {progress.issueQty} with a problem
-            </span>
-          )}
-          <Link
-            to="/operation?tab=receiving"
-            className="ml-auto text-body font-medium text-kit-blue-11 hover:underline"
-            data-testid="po-open-receiving"
-          >
-            Open Receiving
-          </Link>
-        </div>
+        {/* No door to Receiving (Jess, 2026-08-02): the warehouse checks the
+            goods in over there and the Recv column moves BY ITSELF — a link
+            that only navigates is a step purchasing never needs to take. */}
+        {progress.issueQty > 0 && (
+          <div className="mt-1 text-body text-kit-red-11">
+            {progress.issueQty} with a problem
+          </div>
+        )}
       </div>
 
       {/* ── ③ ACTIVITY — tools + the business timeline. ───────────────── */}
@@ -1420,6 +1433,22 @@ function SupplierDateForm({
         data-testid="po-date-remarks"
         className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
       />
+      {/* Say what Save will record BEFORE it is pressed — a Reason picker
+          that only appears on a changed date is invisible until it appears
+          (Jess caught it live). */}
+      <div className="mt-1 text-label text-kit-slate-9" data-testid="po-date-effect">
+        {held == null
+          ? "First date from the supplier."
+          : moved
+            ? `Delay ${Math.max(
+                0,
+                Math.round(
+                  (Date.parse(`${date}T00:00:00Z`) - Date.parse(`${held}T00:00:00Z`)) /
+                    86400000,
+                ),
+              )} days from ${fmtDateShort(held)}.`
+            : `Supplier still on ${fmtDateShort(held)}.`}
+      </div>
       {err && (
         <div className="mt-1 text-label text-kit-red-11" data-testid="po-date-error">
           {err}
@@ -1536,20 +1565,18 @@ function ActivityDesk({
         </pre>
       )}
 
-      {/* The timeline — tools above, hairline, then the entries: date over
-          event (Jess's polish: one flowing timeline, not two blocks). Each
-          store that opens (sends · notes · receiving) adds its entries. */}
-      <ul
-        className="mt-3 pt-2 border-t border-kit-slate-4 flex flex-col gap-2"
+      {/* The timeline — what we have SENT this supplier. `PO issued` was
+          deleted (Jess, 2026-08-02): the header already states that date, and
+          a timeline whose only entry repeats the header teaches nothing. The
+          supplier's date answers live beside the date, not here. Empty until
+          a sending store exists (po_sends · po_notes, Phase 3/4) — an honest
+          empty beats a padded one. */}
+      <div
+        className="mt-3 pt-2 border-t border-kit-slate-4 text-label text-kit-slate-9"
         data-testid="po-history"
       >
-        <li>
-          <div className="text-label text-kit-slate-9 tabular-nums">
-            {fmtDateShort((po.placed_at ?? "").slice(0, 10))}
-          </div>
-          <div className="text-body text-kit-slate-12">PO issued</div>
-        </li>
-      </ul>
+        Nothing sent yet.
+      </div>
     </section>
   );
 }

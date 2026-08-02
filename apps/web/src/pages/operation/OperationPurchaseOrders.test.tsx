@@ -111,6 +111,27 @@ const POS = [
     purchase_order_lines: [line("b1", "SKU-SONIC-K", 3, "Sonic", "King")],
   },
   {
+    // Three answers from the supplier → 1st / 2nd / 3rd, slip 11 days.
+    id: "PO-9005",
+    supplier_id: OHANA,
+    warehouse_id: WH,
+    status: "open",
+    sup_status: "confirmed",
+    so: 1500,
+    so_refs: null,
+    eta_date: "2099-11-11",
+    placed_at: "2026-04-01T08:00:00Z",
+    customer_delivery: null,
+    eta_revised: true,
+    orders: [],
+    promises: [
+      { kind: "tomorrow_delivery", answer: "shipping", about_date: "2099-10-31", previous_date: null, new_date: null, reason: null, recorded_at: "2026-04-02T02:00:00Z" },
+      { kind: "tomorrow_delivery", answer: "delayed", about_date: "2099-10-31", previous_date: "2099-10-31", new_date: "2099-11-05", reason: "Production Delay", recorded_at: "2026-04-09T02:00:00Z" },
+      { kind: "tomorrow_delivery", answer: "delayed", about_date: "2099-11-05", previous_date: "2099-11-05", new_date: "2099-11-11", reason: "Transport Delay", recorded_at: "2026-04-16T02:00:00Z" },
+    ],
+    purchase_order_lines: [line("e1", "SKU-SONIC-K", 1, "Sonic", "King")],
+  },
+  {
     // The date PASSED and nothing arrived → Overdue, action Contact Supplier.
     id: "PO-9004",
     supplier_id: OHANA,
@@ -249,7 +270,7 @@ describe("the default order — PO Issued, oldest first", () => {
       .map((el) => el.textContent);
     // 10 Jan (9004) → 5 Jan… wait: issued dates are 9004 10-Jan, 9001 5-Jan,
     // 9002 1-Feb, 9003 1-Mar → oldest first, never the PO number.
-    expect(cells).toEqual(["PO-9001", "PO-9004", "PO-9002", "PO-9003"]);
+    expect(cells).toEqual(["PO-9001", "PO-9004", "PO-9002", "PO-9003", "PO-9005"]);
   });
 });
 
@@ -282,7 +303,8 @@ describe("what the row states", () => {
   it("a revised arriving date says (revised)", async () => {
     await mountLoaded();
     fireEvent.click(screen.getByTestId("po-workspace-toggle"));
-    expect(screen.getByText("(revised)")).toBeInTheDocument();
+    // Two POs now carry a revised date (9001, 9005) — the marker is per row.
+    expect(listing().getAllByText("(revised)").length).toBe(2);
   });
 });
 
@@ -344,8 +366,6 @@ describe("the PO Issued ▼ — Excel's date menu", () => {
 });
 
 describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
-  const workspace = () => within(screen.getByTestId("po-document"));
-
   it("the fixed header: labels left, PO number right, no letterhead, no badge", async () => {
     await mountLoaded();
     expect(document.querySelector('img[alt="Carres"]')).toBeNull();
@@ -363,8 +383,7 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
     expect(screen.queryByTestId("po-date-extend")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("po-date-row"));
     const ext = within(screen.getByTestId("po-date-extend"));
-    // PO-9001's ledger says the supplier confirmed, then moved the date.
-    expect(ext.getByText(/moved/)).toBeInTheDocument();
+    // PO-9001's ledger holds ONE answer → one dated line, no ordinal yet.
     expect(ext.getByText(/Production Delay/)).toBeInTheDocument();
   });
 
@@ -408,10 +427,13 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
     ).toBeInTheDocument();
   });
 
-  it("quantities live on the rows — the Receiving PANEL is gone, the door stays", async () => {
+  it("quantities live on the rows — no Receiving panel AND no door", async () => {
     await mountLoaded();
     expect(screen.queryByTestId("po-receiving-summary")).not.toBeInTheDocument();
-    expect(workspace().getByTestId("po-open-receiving")).toBeInTheDocument();
+    // The warehouse checks in over there and Recv moves by itself (Jess,
+    // 2026-08-02) — purchasing never navigates to do it.
+    expect(screen.queryByTestId("po-open-receiving")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("po-doc-items")).getByText("Recv")).toBeInTheDocument();
   });
 
   it("Activity holds the tools and the business timeline", async () => {
@@ -419,7 +441,8 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
     const activity = within(screen.getByTestId("po-activity"));
     expect(activity.getByText("Activity")).toBeInTheDocument();
     expect(activity.getByTestId("po-copy-message")).toBeInTheDocument();
-    expect(within(screen.getByTestId("po-history")).getByText("PO issued")).toBeInTheDocument();
+    // `PO issued` was deleted: the header already states it (Jess).
+    expect(screen.getByTestId("po-history").textContent).toBe("Nothing sent yet.");
   });
 
   it("the WhatsApp draft is ONE line until opened — Copy works either way", async () => {
@@ -434,7 +457,7 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
 describe("the ONE Current Action source (Law 7)", () => {
   it("the register's column reads the shared engine — no dashes on live work", async () => {
     await mountLoaded();
-    expect(listing().getByText("Waiting for Goods")).toBeInTheDocument();
+    expect(listing().getAllByText("Waiting for Goods").length).toBeGreaterThan(0);
     const cancelled = listing().getByText("PO-9002").closest("tr")!;
     expect(within(cancelled as HTMLElement).getByText("—")).toBeInTheDocument();
   });
@@ -488,5 +511,37 @@ describe("the supplier-date door (Jess's cycle, one form)", () => {
     });
     // The reason is the countable CATEGORY, never free text.
     expect(PO_DELAY_REASONS_FOR_TEST).toContain(body.reason);
+  });
+});
+
+describe("the supplier's date history, numbered (SAP's shape)", () => {
+  it("counts the dates and prints the slip once there is more than one", async () => {
+    await mountLoaded();
+    fireEvent.click(listing().getByText("PO-9005"));
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("po-working-header")).getByText("PO-9005"),
+      ).toBeInTheDocument(),
+    );
+    // Three answers → `3rd date · 11 days later` beside the date.
+    expect(screen.getByTestId("po-date-nth").textContent).toMatch(/3rd date/);
+    expect(screen.getByTestId("po-date-nth").textContent).toMatch(/11 days later/);
+    fireEvent.click(screen.getByTestId("po-date-row"));
+    const h = within(screen.getByTestId("po-date-history"));
+    expect(h.getByText("1st")).toBeInTheDocument();
+    expect(h.getByText("2nd")).toBeInTheDocument();
+    expect(h.getByText("3rd")).toBeInTheDocument();
+  });
+
+  it("the form says what Save will record before it is pressed", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-date-row"));
+    expect(screen.getByTestId("po-date-effect").textContent).toMatch(
+      /still on|First date/,
+    );
+    fireEvent.change(screen.getByTestId("po-date-input"), {
+      target: { value: "2099-12-31" },
+    });
+    expect(screen.getByTestId("po-date-effect").textContent).toMatch(/^Delay \d+ days from/);
   });
 });

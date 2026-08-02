@@ -149,6 +149,33 @@ SO × SKU, salesperson remark read-only) with a TOTAL row + `Open
 Receiving →` (the Receiving PANEL is gone — quantities live on the rows) ·
 row click extends in place (Destination fact today; [Change] = Phase 4/5's
 Split/Revision door) · ACTIVITY unchanged. 25 page tests green.
+**LIVE-TEST PASS (Jess at the screen, 2026-08-02):**
+- The date HISTORY is numbered, SAP's shape not 2990s' four columns
+  (`_2 _3 _4` runs out at the fifth answer; our ledger never does):
+  the row reads `25 Aug 26 · 3rd date · 6 days later`, the extend lists
+  `1st / 2nd / 3rd` oldest-first with reason + who + when. **1st = the
+  first date the SUPPLIER gave**, never the engine's estimate (an estimate
+  is our guess, not their promise); one date earns no ordinal; a repeated
+  confirmation of the same date is not a new date. `slipDays` = current −
+  first, which is the number R5's supplier scorecard will read. Shared
+  `poDateHistoryOf` + `ordinalLabel`, 4 tests. ZERO migration — pure
+  reading of 0306's ledger.
+- The form SAYS what Save will record before it is pressed (`First date
+  from the supplier.` / `Supplier still on 19 Aug 26.` / `Delay 6 days
+  from 19 Aug 26.`) — the Reason picker only appears on a changed date,
+  and a picker you cannot see until it appears is invisible (she caught
+  it live).
+- `Open Receiving` DELETED: the warehouse checks in over there and the
+  Recv column moves BY ITSELF — a link that only navigates is a step
+  purchasing never takes.
+- ACTIVITY's `PO issued` DELETED (the header already states that date; a
+  timeline whose only entry repeats the header teaches nothing). It reads
+  `Nothing sent yet.` until a sending store exists — an honest empty.
+- REMARK column ruled SALES-owned and read-only: it prints for the factory
+  and it is what the salesperson keyed on the SO. Purchasing's own channels
+  are the DESTINATION (per line) and the WhatsApp draft — one column, one
+  owner.
+
 DATE DOOR ✅ SHIPPED 2026-08-02: migration **0310_supplier_date_door
 APPLIED to prod** (tracker tail was 0309 — read there, never off `ls`, since
 the repo's file tail is 0307 and a parallel lane holds 0308/0309). `remarks`

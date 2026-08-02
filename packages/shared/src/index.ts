@@ -879,10 +879,15 @@ export {
   PO_STATE_ACTION_WORD,
   PO_WORK_STATES,
   PO_WORK_STATE_LABEL,
+  ordinalLabel,
   poCurrentActionOf,
+  poDateHistoryOf,
   poOverdueDays,
   poWorkStateOf,
   type PoCurrentAction,
+  type PoDateHistory,
+  type PoDateHistoryEntry,
+  type PoDatePromise,
   type PoWorkState,
 } from "./po-workspace";
 

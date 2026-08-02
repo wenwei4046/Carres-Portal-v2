@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  ordinalLabel,
+  poDateHistoryOf,
   PO_DELAY_REASONS,
   PO_STATE_ACTION_SHORT,
   PO_STATE_ACTION_WORD,
@@ -164,6 +166,56 @@ describe("the listing's short spellings", () => {
       "Waiting Customer Confirmation",
       "Factory Closed",
       "Other",
+    ]);
+  });
+});
+
+describe("poDateHistoryOf — the supplier's numbered dates (SAP's shape)", () => {
+  const P = (answer: string, about: string, nd: string | null, at: string, reason: string | null = null) => ({
+    kind: "tomorrow_delivery",
+    answer,
+    about_date: about,
+    previous_date: nd ? about : null,
+    new_date: nd,
+    reason,
+    recorded_at: at,
+  });
+
+  it("numbers oldest first and measures the slip from the FIRST promise", () => {
+    const h = poDateHistoryOf([
+      P("delayed", "2026-10-31", "2026-11-05", "2026-04-09T00:00:00Z", "Production Delay"),
+      P("shipping", "2026-10-31", null, "2026-04-02T00:00:00Z"),
+      P("delayed", "2026-11-05", "2026-11-11", "2026-04-16T00:00:00Z", "Transport Delay"),
+    ]);
+    expect(h.entries.map((e) => [e.ordinal, e.date])).toEqual([
+      [1, "2026-10-31"],
+      [2, "2026-11-05"],
+      [3, "2026-11-11"],
+    ]);
+    expect(h.firstDate).toBe("2026-10-31");
+    expect(h.currentDate).toBe("2026-11-11");
+    expect(h.slipDays).toBe(11);
+  });
+
+  it("a repeated confirmation of the SAME date is not a new date", () => {
+    const h = poDateHistoryOf([
+      P("shipping", "2026-10-31", null, "2026-04-02T00:00:00Z"),
+      P("shipping", "2026-10-31", null, "2026-04-05T00:00:00Z"),
+    ]);
+    expect(h.entries).toHaveLength(1);
+    expect(h.slipDays).toBe(0);
+  });
+
+  it("no answers = no history, and nothing invented", () => {
+    const h = poDateHistoryOf([]);
+    expect(h.entries).toHaveLength(0);
+    expect(h.firstDate).toBeNull();
+    expect(h.slipDays).toBeNull();
+  });
+
+  it("ordinalLabel speaks English, including the teens", () => {
+    expect([1, 2, 3, 4, 11, 12, 13, 21].map(ordinalLabel)).toEqual([
+      "1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st",
     ]);
   });
 });
