@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   ClipboardCheck,
+  ShoppingBag,
   ShoppingCart,
   PackageCheck,
   AlertTriangle,
@@ -85,6 +86,17 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
   const canEditSettings = settingsQ.data?.canEdit ?? false;
   const tabs = TABS.filter((t) => t.key !== "purchasing-settings" || canEditSettings);
 
+  // The browser tab answers "where am I" too — Loo keeps many tabs open, and
+  // "Carres Portal" × 8 tells him nothing. Restored on unmount so leaving the
+  // module never strands a stale title.
+  const activeLabel = TABS.find((t) => t.key === active)?.label ?? "Purchasing";
+  useEffect(() => {
+    document.title = `${activeLabel} · Purchasing — Carres`;
+    return () => {
+      document.title = "Carres Portal";
+    };
+  }, [activeLabel]);
+
   return (
     <div
       className="shrink-0 bg-white border-b border-base-200 px-6"
@@ -93,13 +105,17 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
       data-testid="purchasing-tabs"
     >
       <div className="flex items-center gap-4 h-11">
-        {/* Module word — a coordinate, not a title. Small, grey, never bold. */}
+        {/* The NAMEPLATE — module icon + word + divider. It is the wall sign,
+            not a button: no hover, no click, cursor stays default. Same icon
+            as the sidebar item so the module has ONE face (Loo 2026-08-02). */}
         <span
-          className="shrink-0 text-meta font-medium text-base-500 select-none"
+          className="shrink-0 flex items-center gap-1.5 text-body font-medium text-base-700 select-none cursor-default"
           data-testid="purchasing-module-word"
         >
+          <ShoppingBag size={15} strokeWidth={2} className="text-base-500" />
           Purchasing
         </span>
+        <div className="shrink-0 h-4 w-px bg-base-200" aria-hidden="true" />
         <div className="flex gap-1 h-full min-w-0 overflow-x-auto">
           {tabs.map((t) => {
             const isActive = t.key === active;

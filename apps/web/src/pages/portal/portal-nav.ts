@@ -1,7 +1,7 @@
 import {
   LayoutDashboard,
   ClipboardList,
-  ClipboardCheck,
+  ShoppingBag,
   Boxes,
   Repeat,
   Wallet,
@@ -134,7 +134,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       {
         key: "purchasing",
         label: "Purchasing",
-        icon: ClipboardCheck,
+        // ShoppingBag = the MODULE's one face (sidebar + header nameplate,
+        // Loo 2026-08-02); ClipboardCheck stays the To Order TAB's icon —
+        // the two used to share one icon and read as the same thing.
+        icon: ShoppingBag,
         tab: "purchase",
         activeFor: [
           "tab:purchase",
