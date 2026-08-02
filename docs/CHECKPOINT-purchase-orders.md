@@ -149,6 +149,24 @@ SO × SKU, salesperson remark read-only) with a TOTAL row + `Open
 Receiving →` (the Receiving PANEL is gone — quantities live on the rows) ·
 row click extends in place (Destination fact today; [Change] = Phase 4/5's
 Split/Revision door) · ACTIVITY unchanged. 25 page tests green.
+**LIVE-TEST PASS 2 (Jess at the screen, 2026-08-02): the date field starts
+EMPTY.** She read the pre-filled field as "I am editing the existing date"
+and the sentence under it (`Supplier still on 19 Aug 26.`) as nonsense —
+both were right. A date already given can NEVER be edited: the ledger only
+ever gains a row. So the field is empty, labelled `New date` (or `Date` on
+a PO with none), Save is disabled until something is keyed, and the effect
+sentence stays SILENT until then — with nothing keyed there is nothing to
+record, and a sentence about that is noise. Once keyed it says exactly one
+of: `First date from {supplier}.` · `Delay N days from {date}.` ·
+`Earlier by N days than {date}.` · `Same date — the supplier confirms
+{date}.` The field clears itself after a save.
+**REPORTED, not invented**: an EARLIER date is recorded with the answer word
+`delayed`, because 0306's CHECK gives this call exactly two answers
+(`shipping` | `delayed`) and a supplier pulling a date IN has no honest word
+yet. The screen says `Earlier by N days`; the ledger says `delayed`. Ruling
+that needs a word is Jess's — a third answer would be a CHECK + engine
+change, not a label.
+
 **LIVE-TEST PASS (Jess at the screen, 2026-08-02):**
 - The date HISTORY is numbered, SAP's shape not 2990s' four columns
   (`_2 _3 _4` runs out at the fifth answer; our ledger never does):

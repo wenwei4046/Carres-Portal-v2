@@ -533,15 +533,25 @@ describe("the supplier's date history, numbered (SAP's shape)", () => {
     expect(h.getByText("3rd")).toBeInTheDocument();
   });
 
-  it("the form says what Save will record before it is pressed", async () => {
+  it("the field starts EMPTY — a date already given can never be edited", async () => {
     await mountLoaded();
     fireEvent.click(screen.getByTestId("po-date-row"));
-    expect(screen.getByTestId("po-date-effect").textContent).toMatch(
-      /still on|First date/,
-    );
-    fireEvent.change(screen.getByTestId("po-date-input"), {
-      target: { value: "2099-12-31" },
-    });
-    expect(screen.getByTestId("po-date-effect").textContent).toMatch(/^Delay \d+ days from/);
+    const input = screen.getByTestId("po-date-input") as HTMLInputElement;
+    expect(input.value).toBe("");
+    // Nothing keyed = nothing to record = no sentence about it.
+    expect(screen.queryByTestId("po-date-effect")).not.toBeInTheDocument();
+    expect(screen.getByTestId("po-date-save")).toBeDisabled();
+  });
+
+  it("once a date is keyed it says exactly what Save will record", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-date-row"));
+    const input = screen.getByTestId("po-date-input");
+    fireEvent.change(input, { target: { value: "2099-12-31" } });
+    expect(screen.getByTestId("po-date-effect").textContent).toMatch(/^Delay \d+ day/);
+    // The same date is a confirmation, not a delay — and asks no reason.
+    fireEvent.change(input, { target: { value: "2099-12-30" } });
+    expect(screen.getByTestId("po-date-effect").textContent).toMatch(/Same date/);
+    expect(screen.queryByTestId("po-date-reason")).not.toBeInTheDocument();
   });
 });

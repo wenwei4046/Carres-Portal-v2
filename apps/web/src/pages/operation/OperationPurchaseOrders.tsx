@@ -1192,7 +1192,7 @@ function WorkspaceBody({
           className="mt-1 ml-32 pl-2 border-l-2 border-kit-blue-9"
           data-testid="po-date-extend"
         >
-          <SupplierDateForm po={po} current={eta.date} confirmed={eta.confirmed} />
+          <SupplierDateForm po={po} confirmed={eta.confirmed} supplierName={supplierName} />
           {calls.map((c) => (
             <div
               key={c.poLineId ?? c.key}
@@ -1352,22 +1352,33 @@ function WorkspaceBody({
  */
 function SupplierDateForm({
   po,
-  current,
   confirmed,
+  supplierName,
 }: {
   po: operationPoListRow;
-  current: string | null;
   confirmed: boolean;
+  supplierName: string;
 }) {
+  const supplierNameFallback = supplierName;
   const held = confirmed ? (po.eta_date ?? null) : null;
-  const [date, setDate] = useState(current ?? "");
+  // The field starts EMPTY (Jess, 2026-08-02): a date already given can never
+  // be edited — the ledger only ever gains a row — so pre-filling it invites
+  // exactly the wrong idea. You record the NEXT date, never the last one.
+  const [date, setDate] = useState("");
   const [reason, setReason] = useState<string>(PO_DELAY_REASONS[0]);
   const [remarks, setRemarks] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const save = useRecordSupplierDate(po.id);
 
-  const moved = held != null && date !== held;
+  const moved = held != null && date !== "" && date !== held;
   const canSave = date !== "" && !save.isPending;
+  const shiftDays =
+    held && date
+      ? Math.round(
+          (Date.parse(`${date}T00:00:00Z`) - Date.parse(`${held}T00:00:00Z`)) /
+            86_400_000,
+        )
+      : 0;
 
   function submit() {
     setErr(null);
@@ -1383,7 +1394,10 @@ function SupplierDateForm({
             }
           : { answer: "shipping" as const, remarks: remarks || undefined };
     save.mutate(body, {
-      onSuccess: () => setRemarks(""),
+      onSuccess: () => {
+        setRemarks("");
+        setDate("");
+      },
       onError: (e) => setErr(e instanceof Error ? e.message : String(e)),
     });
   }
@@ -1391,11 +1405,14 @@ function SupplierDateForm({
   return (
     <div className="py-1" data-testid="po-date-form">
       <div className="flex items-center gap-2">
+        <span className="w-16 shrink-0 text-label text-kit-slate-9">
+          {held == null ? "Date" : "New date"}
+        </span>
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          aria-label="Supplier delivery date"
+          aria-label={held == null ? "Supplier delivery date" : "New supplier delivery date"}
           data-testid="po-date-input"
           className="h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
         />
@@ -1433,22 +1450,21 @@ function SupplierDateForm({
         data-testid="po-date-remarks"
         className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
       />
-      {/* Say what Save will record BEFORE it is pressed — a Reason picker
-          that only appears on a changed date is invisible until it appears
-          (Jess caught it live). */}
-      <div className="mt-1 text-label text-kit-slate-9" data-testid="po-date-effect">
-        {held == null
-          ? "First date from the supplier."
-          : moved
-            ? `Delay ${Math.max(
-                0,
-                Math.round(
-                  (Date.parse(`${date}T00:00:00Z`) - Date.parse(`${held}T00:00:00Z`)) /
-                    86400000,
-                ),
-              )} days from ${fmtDateShort(held)}.`
-            : `Supplier still on ${fmtDateShort(held)}.`}
-      </div>
+      {/* Say what Save will record BEFORE it is pressed — a Reason picker that
+          only appears on a changed date is invisible until it appears (Jess
+          caught it live). Silent until a date is picked: with nothing keyed
+          there is nothing to record, and a sentence about that is noise. */}
+      {date !== "" && (
+        <div className="mt-1 text-label text-kit-slate-9" data-testid="po-date-effect">
+          {held == null
+            ? `First date from ${supplierNameFallback}.`
+            : shiftDays > 0
+              ? `Delay ${shiftDays} day${shiftDays === 1 ? "" : "s"} from ${fmtDateShort(held)}.`
+              : shiftDays < 0
+                ? `Earlier by ${-shiftDays} day${shiftDays === -1 ? "" : "s"} than ${fmtDateShort(held)}.`
+                : `Same date — the supplier confirms ${fmtDateShort(held)}.`}
+        </div>
+      )}
       {err && (
         <div className="mt-1 text-label text-kit-red-11" data-testid="po-date-error">
           {err}
