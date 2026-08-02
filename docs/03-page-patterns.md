@@ -13,6 +13,58 @@ define typography, colour, spacing or component styles.
 **One purpose per page. One primary action. Business logic belongs to modules,
 never to a pattern.**
 
+**One obvious reading path** (`UI_KIT_MASTER` §5, Loo 2026-08-02). Within three
+seconds the operator knows: where they are · what needs attention · what to do
+next.
+
+**Vertical chrome is economical** (`UI_KIT_MASTER` §11, Loo 2026-08-02). Never
+stack breadcrumb + title + tabs + summary + toolbar + filters + table header
+without proving every layer earns its height. The active tab is never repeated
+as a second page title unless the title adds information the tab does not.
+When a pattern's workspace model scrolls its regions independently, the PAGE
+itself does not scroll.
+
+---
+
+# Shell — the fixed module header (Loo, 2026-08-02)
+
+**The shell draws the header; pages never do** (壳画头). A module's header is
+ONE component rendered as the page's first child. A page draws no breadcrumb,
+no title, no global icons of its own — it structurally cannot forget or
+mis-draw the header, because it never draws one.
+
+**One row · 44px · white · never scrolls.** Screens are wide and short, so the
+header spends width, not height. White with a 1px bottom hairline; the only
+colour allowed above the content is the blue active underline and a red count
+badge — never a brand colour, except the logo.
+
+```
+Module word │ Tab  Tab  Tab  Tab │ ····· page-meta │ 🔔 ❓ ⚙
+─────────────────────────────────────────────────────────────
+page content — the only scroll area
+```
+
+**The five slots.** Any future function is placed by asking ONE question —
+*who is it for?* — and the answer is final:
+
+| It is for… | Slot |
+|---|---|
+| every page in the portal | **A** — global icon cluster (Bell · Help · Settings; ⌘K later) |
+| the workload of one tab | **B** — a count badge on the tab word |
+| this page only | **C** — the page's own toolbar row, right end |
+| a selection | **D** — the batch bar, rendered only while something is selected |
+| one record's identity | **E** — the Detail page title block (title + StatusPill + one meta line) |
+
+A list page never repeats the lit tab as a title (that is Slot E's job on a
+Detail page, where the title is the RECORD's name). Nothing else may enter the
+header — an H1, a description, a search box, a page action or a KPI in the
+header is a defect, not a variant.
+
+**Carres Example.** Purchasing — `PurchasingTabs` is the module's shell row
+(module word · 5 tabs · page-meta slot · global icons); To Order, Purchase
+Orders, Receiving, Claims and Settings all render it first and draw nothing
+above their own toolbar.
+
 ---
 
 ## Pattern standard

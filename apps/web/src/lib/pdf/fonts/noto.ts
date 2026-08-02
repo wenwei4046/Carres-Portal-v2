@@ -45,6 +45,8 @@ export const NOTO_SANS_SC_FAMILY = "Noto Sans SC";
 // comment for why we don't combine separate latin + CJK files.
 const FONTSOURCE_BASE = "https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-sc@latest";
 const NOTO_SANS_SC_400 = `${FONTSOURCE_BASE}/chinese-simplified-400-normal.ttf`;
+const NOTO_SANS_SC_500 = `${FONTSOURCE_BASE}/chinese-simplified-500-normal.ttf`;
+const NOTO_SANS_SC_600 = `${FONTSOURCE_BASE}/chinese-simplified-600-normal.ttf`;
 const NOTO_SANS_SC_700 = `${FONTSOURCE_BASE}/chinese-simplified-700-normal.ttf`;
 
 let registered = false;
@@ -55,7 +57,7 @@ let registered = false;
  * Idempotent — safe to call on every render. The library deduplicates by
  * family name internally, but we add an extra guard to avoid the work.
  *
- * Registers chinese-simplified TTFs at 400 and 700 weights — that single
+ * Registers chinese-simplified TTFs at 400/500/600/700 weights — that single
  * subset covers both ASCII and CJK glyphs needed for the DO/PO templates.
  */
 export function registerNotoSansSC(): void {
@@ -64,6 +66,11 @@ export function registerNotoSansSC(): void {
     family: NOTO_SANS_SC_FAMILY,
     fonts: [
       { src: NOTO_SANS_SC_400, fontWeight: 400 },
+      // 500/600 added with the PO-PDF-STANDARD template (2026-08-02): a faux
+      // CJK bold is a wrong glyph, so every weight the templates use is a
+      // real file. Fetched lazily per weight on first use, same as 400/700.
+      { src: NOTO_SANS_SC_500, fontWeight: 500 },
+      { src: NOTO_SANS_SC_600, fontWeight: 600 },
       { src: NOTO_SANS_SC_700, fontWeight: 700 },
     ],
   });

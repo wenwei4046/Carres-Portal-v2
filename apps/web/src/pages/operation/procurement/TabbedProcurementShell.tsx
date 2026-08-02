@@ -101,43 +101,23 @@ export default function TabbedProcurementShell() {
   const ActiveTab = TAB_COMPONENTS[rawSlug];
 
   return (
-    <div className="pb-14" data-testid="tabbed-procurement-shell">
-      {/* Purchasing module bar — merges the three procurement rails (To Order /
-          Purchase Orders / Receiving) into one module; sits above this shell's
-          own per-supplier channel tabs. */}
+    /* h-full flex column: the two header rows stay put, only the tab body
+       scrolls — the page itself never scrolls (Shell pattern, Loo
+       2026-08-02). The kicker + <h1> + description that used to sit here
+       repeated the word already lit in the tab bar and cost ~110px of
+       height; deleted per §8.3 / UI_KIT_MASTER §11. */
+    <div
+      className="h-full min-h-0 flex flex-col"
+      data-testid="tabbed-procurement-shell"
+    >
+      {/* The module header — the shell's ONE 44px row (tabs + global icons).
+          This page draws no header of its own. */}
       <PurchasingTabs />
-      {/* Page header — persists across tabs so the procurement section feels
-          coherent. Mirrors the kicker/title from operationProcurement.tsx.
-          The "+ New PO" button lives in the header (T42-C2 restore) rather
-          than per-tab so it's visible regardless of which channel the user
-          is currently viewing. */}
-      <div className="px-9 pt-7 pb-3 flex justify-between items-start gap-4">
-        <div>
-          <div className="kicker">Procurement</div>
-          <h1 className="text-page font-display mt-1.5 text-base-900">
-            Purchase orders
-          </h1>
-          <div className="font-body text-body text-base-600 mt-1 max-w-[780px]">
-            Per-supplier channels for purchase orders. Each tab loads its own PO
-            list (server-filtered by supplier slug + category) so the view stays
-            focused on the channel the user is working on.
-          </div>
-        </div>
-        <button
-          type="button"
-          className="btn-hero text-meta"
-          onClick={() => setCreatePrefill({})}
-          data-testid="new-po-button"
-        >
-          + New PO
-        </button>
-      </div>
 
-      {/* Tab strip — sticks to the warm-linen palette per CLAUDE.md §10. The
-          active tab gets a stronger underline + bolder weight; inactive tabs
-          read like quiet section toggles. */}
+      {/* Channel tab strip — the page's toolbar row. "+ New PO" (the page's
+          action) lives HERE, not in the header: header = whole-portal only. */}
       <div
-        className="px-9 border-b border-base-200"
+        className="shrink-0 px-9 border-b border-base-200 bg-white flex items-center justify-between gap-4"
         role="tablist"
         aria-label="Procurement channel"
         data-testid="procurement-tab-strip"
@@ -152,7 +132,7 @@ export default function TabbedProcurementShell() {
               data-testid={`procurement-tab-link-${slug}`}
               className={({ isActive }) =>
                 [
-                  "relative px-4 py-3 text-body font-body transition-colors",
+                  "relative px-4 py-3 text-body font-body transition-colors whitespace-nowrap",
                   "border-b-2 -mb-px",
                   isActive
                     ? "border-accent text-base-900 font-semibold"
@@ -164,11 +144,21 @@ export default function TabbedProcurementShell() {
             </NavLink>
           ))}
         </div>
+        <button
+          type="button"
+          className="btn-hero text-meta whitespace-nowrap"
+          onClick={() => setCreatePrefill({})}
+          data-testid="new-po-button"
+        >
+          + New PO
+        </button>
       </div>
 
-      {/* Active tab body — child mounts on slug change so each tab's
-          TanStack query runs against its own slug-keyed cache. */}
-      <ActiveTab />
+      {/* Active tab body — the ONLY scroll area. Child mounts on slug change
+          so each tab's TanStack query runs against its own slug-keyed cache. */}
+      <div className="flex-1 min-h-0 overflow-y-auto pb-14">
+        <ActiveTab />
+      </div>
 
       {/* T42-C2 — CreatePOModal mount. Empty prefill (`{}`) opens the modal
           in its default mode: user can tick stockpile, paste lines manually,

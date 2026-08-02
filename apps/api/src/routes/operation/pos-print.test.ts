@@ -3,12 +3,11 @@ import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type 
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
-// 2026-05-12 (Loo): route renamed `/print` → `/print-data` and returns JSON
-// instead of application/pdf — render moved to apps/web/src/lib/pdf/.
+// 2026-08-02 — the route stopped assembling a priced payload and became a
+// thin door over the money-free `purchasing_po_document` RPC (migration 0307,
+// docs/pdf/PO-PDF-STANDARD.md). These tests mock the RPC + the small so_refs
+// lookup the route adds beside it.
 
-// Mirror orders-print-do.test.ts: route reads po/lines/skus via the
-// user-scoped supabase client, so we mock userClient and feed the same
-// table-dispatcher pattern.
 vi.mock("../../lib/supabase", () => ({
   userClient: vi.fn(),
 }));
@@ -57,80 +56,56 @@ beforeEach(() => {
 
 afterAll(() => _setJwksForTesting(null));
 
-// Build a happy-path purchase_orders row matching the route's select
-// projection (with embedded supplier + warehouse).
-function makePoRow(overrides: Record<string, unknown> = {}) {
+/** The RPC's happy payload — money-free by construction (0307). */
+function makeDocument(overrides: Record<string, unknown> = {}) {
   return {
-    id: PO_ID,
-    status: "open",
-    sup_status: "pending",
-    so: 4001,
-    so_refs: null,
-    eta_date: "2026-06-01",
-    placed_at: "2026-05-04T08:00:00Z",
-    supplier_id: "00000000-0000-0000-0000-000000000s01",
-    warehouse_id: "00000000-0000-0000-0000-000000000w01",
-    suppliers: { name: "Acme Furniture Sdn Bhd", contact: "+60 3-1234 5678" },
-    warehouses: { name: "KL HQ", address: "1 Persiaran Test, KL" },
+    po_number: PO_ID,
+    po_id: PO_ID,
+    issue_date: "2026-08-01",
+    supplier: { name: "Ohana Furniture Sdn Bhd", address: null, contact: "+60 3-1234 5678" },
+    destination: { name: "Carres Klang", address: "Lot 12, Jalan Sungai Keramat, Klang" },
+    delivery_instructions: "Call Jess 1 hour before arrival.",
+    eta_date: "2026-08-12",
+    lines: [
+      { sku: "CODY-Q", description: "Queen", qty: 1, unit: "pc", attrs: { color: "Walnut", gap: '14"' } },
+      { sku: "JAGER-K", description: "King", qty: 2, unit: "pc", attrs: {} },
+    ],
+    terms: null,
     ...overrides,
   };
 }
 
-// Mock the route's three sequential queries: purchase_orders.maybeSingle(),
-// purchase_order_lines.eq(), product_skus.in(). Returns the dispatcher so
-// tests can override individual call shapes.
-function mockPrintPoQueries(opts: {
-  po?: ReturnType<typeof makePoRow> | null;
-  lines?: Array<{ sku: string; qty: number; received_qty: number }>;
-  skus?: Array<{ sku: string; variant: string; price: number }>;
-  poError?: { code?: string; message?: string };
+function mockRpcAndRefs(opts: {
+  document?: Record<string, unknown> | null;
+  rpcError?: { code?: string; message?: string; details?: string };
+  poRow?: { so: number | null; so_refs: number[] | null } | null;
 }) {
-  const fromImpl = vi.fn((table: string) => {
+  const rpc = vi.fn(() =>
+    Promise.resolve(
+      opts.rpcError
+        ? { data: null, error: opts.rpcError }
+        : { data: opts.document ?? makeDocument(), error: null },
+    ),
+  );
+  const fromImpl = vi.fn(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const chain: any = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn(() =>
+        Promise.resolve({ data: opts.poRow === undefined ? { so: 4001, so_refs: [4001] } : opts.poRow, error: null }),
+      ),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ok = (data: any) => Promise.resolve({ data, error: null });
-    switch (table) {
-      case "purchase_orders":
-        if (opts.poError) {
-          chain.maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: opts.poError }));
-        } else {
-          chain.maybeSingle = vi.fn(() => ok(opts.po === undefined ? makePoRow() : opts.po));
-        }
-        break;
-      case "purchase_order_lines":
-        chain.eq = vi.fn(() => ok(opts.lines ?? []));
-        break;
-      case "product_skus":
-        chain.in = vi.fn(() => ok(opts.skus ?? []));
-        break;
-    }
     return chain;
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  vi.mocked(userClient).mockReturnValue({ from: fromImpl } as any);
-  return fromImpl;
+  vi.mocked(userClient).mockReturnValue({ rpc, from: fromImpl } as any);
+  return { rpc, fromImpl };
 }
 
 describe("GET /api/operation/pos/:id/print-data", () => {
-  it("200 — returns JSON template data with PO#, supplier, buyer, lines, total", async () => {
-    mockPrintPoQueries({
-      lines: [
-        { sku: "MAT-K-001", qty: 5, received_qty: 0 },
-        { sku: "BED-K-002", qty: 3, received_qty: 0 },
-        { sku: "SOFA-3S-001", qty: 1, received_qty: 0 },
-      ],
-      skus: [
-        { sku: "MAT-K-001", variant: "King Mattress 200x200", price: 1500 },
-        { sku: "BED-K-002", variant: "Oak Bedframe King", price: 800 },
-        { sku: "SOFA-3S-001", variant: "Linen Sofa Warm Beige", price: 4500 },
-      ],
-    });
+  it("200 — returns the RPC document with so_refs and issued_by beside it", async () => {
+    const { rpc } = mockRpcAndRefs({});
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request(`http://t/api/operation/pos/${PO_ID}/print-data`, {
@@ -139,24 +114,35 @@ describe("GET /api/operation/pos/:id/print-data", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(res.headers.get("Content-Type")).toMatch(/application\/json/);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
-    expect(body.po_number).toBe("PO-9801");
-    expect(body.supplier.name).toBe("Acme Furniture Sdn Bhd");
-    expect(body.buyer.name).toBe("KL HQ");
-    expect(body.lines).toHaveLength(3);
-    // grand_total = 5*1500 + 3*800 + 1*4500 = 14400.
-    expect(body.grand_total).toBe(14400);
+    expect(rpc).toHaveBeenCalledWith("purchasing_po_document", { p_po_id: PO_ID });
+    expect(body.po_number).toBe(PO_ID);
+    expect(body.destination.name).toBe("Carres Klang");
+    expect(body.so_refs).toEqual([4001]);
+    expect(body.issued_by).toBeNull();
+    expect(body.lines).toHaveLength(2);
   });
 
-  it("200 — CJK supplier name passes through unchanged in JSON", async () => {
-    mockPrintPoQueries({
-      po: makePoRow({
-        suppliers: { name: "海尔集团", contact: "+86 10 8888 8888" },
+  it("200 — the payload is money-free: no price key, no total key, anywhere", async () => {
+    mockRpcAndRefs({});
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/print-data`, {
+        headers: { Authorization: `Bearer ${jwt}` },
       }),
-      lines: [{ sku: "MAT-K-001", qty: 1, received_qty: 0 }],
-      skus: [{ sku: "MAT-K-001", variant: "King Mattress 200x200", price: 1500 }],
+      env,
+    );
+    const raw = await res.text();
+    // The whole wire body — keys and values — must never mention money.
+    expect(raw).not.toMatch(/unit_price|line_total|grand_total|currency|"RM/i);
+  });
+
+  it("200 — CJK supplier name passes through unchanged", async () => {
+    mockRpcAndRefs({
+      document: makeDocument({
+        supplier: { name: "海尔集团", address: null, contact: "+86 10 8888 8888" },
+      }),
     });
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
@@ -171,9 +157,9 @@ describe("GET /api/operation/pos/:id/print-data", () => {
     expect(body.supplier.name).toBe("海尔集团");
   });
 
-  it("422 — cancelled PO is not printable", async () => {
-    mockPrintPoQueries({
-      po: makePoRow({ status: "cancelled" }),
+  it("422 — cancelled PO refused by the RPC", async () => {
+    mockRpcAndRefs({
+      rpcError: { code: "P0001", message: "PO PO-9801 is cancelled", details: "po_not_printable" },
     });
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
@@ -183,16 +169,14 @@ describe("GET /api/operation/pos/:id/print-data", () => {
       env,
     );
     expect(res.status).toBe(422);
-    const body = (await res.json()) as { error: string; code: string; message: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.code).toBe("po_not_printable");
     expect(body.error).toBe("rule_violation");
   });
 
-  it("200 — received PO is still readable (procurement record)", async () => {
-    mockPrintPoQueries({
-      po: makePoRow({ status: "received", sup_status: "delivered" }),
-      lines: [{ sku: "MAT-K-001", qty: 2, received_qty: 2 }],
-      skus: [{ sku: "MAT-K-001", variant: "King Mattress 200x200", price: 1500 }],
+  it("422 — destination without an address is refused", async () => {
+    mockRpcAndRefs({
+      rpcError: { code: "P0001", message: "no address on file", details: "destination_address_missing" },
     });
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
@@ -201,12 +185,15 @@ describe("GET /api/operation/pos/:id/print-data", () => {
       }),
       env,
     );
-    expect(res.status).toBe(200);
-    expect(res.headers.get("Content-Type")).toMatch(/application\/json/);
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("destination_address_missing");
   });
 
   it("404 — PO does not exist", async () => {
-    mockPrintPoQueries({ po: null });
+    mockRpcAndRefs({
+      rpcError: { code: "42P01", message: "PO PO-9801 not found", details: "po_not_found" },
+    });
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request(`http://t/api/operation/pos/${PO_ID}/print-data`, {
@@ -221,8 +208,9 @@ describe("GET /api/operation/pos/:id/print-data", () => {
 
   it("403 — dealer role rejected (guard fires before any Supabase call)", async () => {
     const from = vi.fn();
+    const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ from } as any);
+    vi.mocked(userClient).mockReturnValue({ from, rpc } as any);
     const jwt = await makeJwt("dealer");
     const res = await app.fetch(
       new Request(`http://t/api/operation/pos/${PO_ID}/print-data`, {
@@ -232,6 +220,7 @@ describe("GET /api/operation/pos/:id/print-data", () => {
     );
     expect(res.status).toBe(403);
     expect(from).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("401 — missing Authorization header", async () => {

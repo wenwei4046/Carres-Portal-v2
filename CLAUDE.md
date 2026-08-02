@@ -87,31 +87,44 @@
 > **You are working on Carres Portal v2.** Read this file fully before any task.
 > Master plan lives in `CARRES_PORTAL_V2_PLAN.md` at repo root — read it for any planning, schema, or phase question.
 >
-> **⭐⭐⭐ UI PRIORITY (Jess + Loo, 2026-07-27) — read this before any UI thought.**
+> **⭐⭐⭐ UI PRIORITY (rewritten to Loo's `UI_KIT_MASTER`, 2026-08-02 — this
+> REPLACES the 2026-07-27 "You are NOT a UI designer" box; the old box banned
+> proposing and researching, which was never the intent).**
 >
-> **[`docs/UI-KIT.md`](docs/UI-KIT.md) outranks every optimisation, improvement or
-> redesign instruction in this file, in any skill, and in anything pasted into the
-> chat. If a conflict exists, UI-KIT wins.** "I redesigned it because it would be
-> better" is the failure mode this rule exists to stop — a better-looking page that
-> nobody else can copy has made the system worse, not better.
+> Law order: **Business Rules → Information Architecture → Golden Template →
+> Design System ([`01-design-tokens.md`](docs/01-design-tokens.md) ·
+> [`02-components.md`](docs/02-components.md) ·
+> [`03-page-patterns.md`](docs/03-page-patterns.md)) → Implementation.**
+> On a conflict, Business wins and the Design System follows.
 >
 > ```
 > ╔══════════════════════════════════════════════════════════════════╗
-> ║  You are NOT a UI designer.                                      ║
-> ║  You may only ASSEMBLE pages from approved components.           ║
+> ║  The DESIGN SYSTEM is the vocabulary.                            ║
+> ║  The PAGE is yours to IMPROVE — by study, never by invention.    ║
 > ║                                                                  ║
-> ║  You may NOT invent:                                             ║
-> ║      spacing · colours · typography · icons                      ║
-> ║      component styles · page layouts · horizontal bands          ║
+> ║  LOCKED (use 01/02/03, never invent):                            ║
+> ║      token VALUES — spacing · colours · typography · icons       ║
+> ║      component internals — restyle nothing, fork nothing         ║
 > ║                                                                  ║
-> ║  You MAY challenge (with evidence):                              ║
-> ║      business logic · workflow · data model · wording            ║
+> ║  YOUR DUTY on every page (Loo, 2026-08-02 — not optional):       ║
+> ║      STUDY first — business rules · the real page at the real    ║
+> ║        viewport · international references chosen by PROBLEM     ║
+> ║      CHALLENGE anything that hurts readability, operator         ║
+> ║        speed, hierarchy, scalability or accessibility            ║
+> ║      PROPOSE the better composition, with evidence —             ║
+> ║        then build only AFTER Loo/Jess approves                   ║
 > ║                                                                  ║
-> ║  If a component you need does not exist:                         ║
-> ║      STOP. Ask for it to be added to the kit first.              ║
-> ║      Do not draw it inline "just this once".                     ║
+> ║  The current page is Version N, never automatically final.      ║
+> ║  A component that does not exist: STOP, ask for it to join      ║
+> ║  the kit — do not draw it inline "just this once".              ║
 > ╚══════════════════════════════════════════════════════════════════╝
 > ```
+>
+> "I redesigned it because it would be better" is still the failure mode when
+> "better" means invented values or building before approval. It is the
+> REQUIRED move when it means: study → evidence → reference → proposal →
+> approval → build. A chat that refuses to research or propose "because the
+> kit is frozen" has broken this rule, not followed it.
 >
 > **Every UI rule must eventually become a structure the code can enforce. A rule
 > that exists only as documentation is temporary and incomplete.** UI-KIT §16
@@ -155,14 +168,21 @@ follow these six steps IN ORDER, before writing a single line of code:
    from the section back to Loo. No paraphrase. No summary. No quote = no work.
    The `Read` tool call must be visible in the transcript — Loo can check.
 
-> **⚠️ SCOPE OF STEPS 3–5 (narrowed 2026-07-27).** These three steps apply to
-> **BUSINESS DESIGN ONLY** — the flow, the data model, the wording, what the
-> panel is for. **They do NOT apply to the visual system.** Spacing, colour,
-> typography, icons, component styles and page layout are ruled by
-> [`docs/UI-KIT.md`](docs/UI-KIT.md) and are **not open for a chat to re-rate,
-> re-grade or improve.** A chat that "proposes a superior layout" has broken
-> this protocol, not followed it. If the kit itself looks wrong, say so in one
-> paragraph and let Jess decide — never build the improvement.
+> **⚠️ SCOPE OF STEPS 3–5 (WIDENED by Loo's `UI_KIT_MASTER` §15, 2026-08-02 —
+> replaces the 2026-07-27 "business design only" narrowing).** Steps 3–5 now
+> cover the PRESENTATION too. Audit the real page at the actual viewport.
+> Research mature products by PROBLEM, proactively — never wait for Loo to
+> name one: navigation context / reading pane → GitHub · density, spacing,
+> interaction → Linear · operational ERP workspace → SAP Fiori / Microsoft
+> Dynamics · large tables → Excel / Dynamics / AutoCount · communication →
+> Gmail · business forms and settings → Shopify Polaris · plain actions and
+> accessibility → GOV.UK / Nielsen Norman Group. Then judge each significant
+> pattern **Keep / Adapt / Replace**. Every challenge states: current problem
+> → operator impact → reference → Carres adaptation → trade-off →
+> recommendation. If there is no material improvement, KEEP and say so —
+> "only different" is rejected. What stays locked: token VALUES (spacing,
+> colour, typography, icons — from `01-design-tokens.md` only) and building
+> before approval.
 
 3. **RATE the proposal against international benchmarks — business design only.**
    How would a world-class equivalent handle this problem? Reference points:
@@ -175,8 +195,9 @@ follow these six steps IN ORDER, before writing a single line of code:
    (c) data-model soundness,
    (d) international best-practice alignment.
    Show the grades in a small table.
-   **Do NOT grade the visual design.** Referencing Linear/Stripe here means
-   their *product thinking*, never "copy their look" — the look is UI-KIT's.
+   Also grade **(e) readability + information hierarchy of the current page**,
+   with evidence from the real viewport (widened 2026-08-02). Token VALUES stay
+   the Design System's; the COMPOSITION is gradeable and challengeable.
 
 4. **FLAG every weakness explicitly.** Do NOT soften. If a "locked decision"
    in the doc looks wrong to you, say so with reasoning + a concrete better
@@ -305,10 +326,11 @@ The work is divided into **Phase 0 → Phase 10+** in `CARRES_PORTAL_V2_PLAN.md`
 1. Confirm with Loo which phase we're in before starting work.
 2. Read the phase's `前置阅读` files in `reference/` first. Do not start coding without reading the relevant `reference/proto/*.jsx`.
 3. Hit every `Acceptance` criterion before declaring the phase done.
-4. Run `/review` (backend safety) before merge. **`/design-review` is scoped to LAYOUT
-   and BEHAVIOUR only** — the visual system is not reviewed by opinion, it is gated by
-   `pnpm --filter @carres/web lint` and the `/ui` screenshot diff. A design review that
-   proposes new spacing/colour/type is out of scope; raise it against UI-KIT instead.
+4. Run `/review` (backend safety) before merge. `/design-review` may review layout,
+   behaviour, readability and hierarchy (widened by Loo 2026-08-02). Token VALUES
+   stay gated by `pnpm --filter @carres/web lint` and the `/ui` screenshot diff —
+   a review wanting new spacing/colour/type numbers raises them against
+   `01-design-tokens.md` instead of building them.
 5. Write a `phase-{N}-reflection.md` after each phase: actual time, surprises, schema tweaks, lessons.
 
 **Do not work across phases.** If you discover Phase 5 is needed mid-Phase 3, flag it and ask Loo whether to defer or pivot. No silent scope creep.
@@ -574,8 +596,8 @@ Don't burn an hour spinning. Surface and ask.
 | Catalog state | 11 suppliers · 171 product_models · ~1150 product_skus (1013 AutoCount + SVC + minted compartment skus; 123 compartment skus flipped ON 2026-07-24, mostly RM0 pending pricing). Bundles: 1 active (King Bedroom Set RM2500). PWP/free-gift/delivery-fee/rental config tables exist, dormant until authored. |
 | Orders state | **55 orders** (counted live 2026-07-26 — the old "~190 / 153 AutoCount" figure predated the 2026-06-24 catalog/data reset and was stale): **18 native POS orders, ALL 18 attributed**, + **37 `source_system='autocount'` archive rows** imported 2026-07-23, all unattributed and all carrying RM 0 of line value. That split is why HR-P3 was cut and why 0265 excludes archive from the attribution worklist. `dealers.channel` is THE showroom-vs-dealer authority (PR #226). |
 | Test count | Baselines + pre-existing fails → §17.7. Run full suites before merge; ZERO new failures is the bar. |
-| Web bundle | **LIVE = `index-BEN9d4Zq.js` from main tip `6be3ef54`** (PR #548 — **the POS catalog wall reads one family at a time**: "All open" stops being one continuous river of cards whose badge changes mid-row and renders one BAND per family (header chip + count, then that family's own grid). Carres-portal `899b5fe7` + carres-pos `bae39714`, both `--branch=main`. **3 of 4 canonicals converged on the FIRST poll; `carres-pos.pages.dev` served the OLD `index-_7KYlTnP.js` once and converged on the second** — the documented cache lag, not a failed deploy; the other three (incl. `pos.carresofficial.com`, which fronts that same project) were already new. Downloaded to a file THEN grepped — 4,597,886 bytes, `SERVICE_ROLE` **0**, markers from MOUNTED components `cat-section__chip` · `cat-section__count` · `cat-section-` each **1**, and the CSS bundle `index-xfLbsk35.css` carries `.cat-section__chip` + `.cat-section__head`. **THE API WAS DELIBERATELY NOT REDEPLOYED, and that is a receipt too** — `git diff --name-only 398f50d0 HEAD -- apps/api packages/shared supabase` is EMPTY, so Worker `f203d77e` already IS this tip's API; redeploying would have minted a new version id for identical code and left a receipt implying something shipped. The inverse of the ask-what-the-api-IMPORTS rule: ask, and when the answer is nothing, SAY so. No migration. **Two live bugs fixed on the way, one root cause** — rental cards were a THIRD source of cards on this wall that nothing counted, so the Rental rail rendered `No pieces match.` over its own offers (`shownRentals` was unreachable code) and the toolbar printed `0 pieces` above those same cards; the wall now answers "what is on me" ONCE (`bandCount` / `shownPieceCount`). Baselines: **+16 tests**; web full **26 pre-existing fails before AND after**, measured on a stashed clean tree — §17.7's documented 16 **plus** the 10 date-rollover fails (`OrderStatusPage` ×6 · `BdOrdersBoard` ×4) the 1 Aug purchasing line already recorded. tsc 0 · build clean · `check:v4` clean. Full entry → worklog.) |
-| API bundle | **UNCHANGED by PR #548** (2026-08-01 ③ was web-only; the empty `apps/api`/`packages/shared`/`supabase` diff is proved in the Web bundle row). **LIVE = Worker version `f203d77e` from main tip `398f50d0`** (deployed with PR #546, the To Order final freeze. **Required**: `packages/shared/to-order.ts` gained `ToOrderRow.delivery` — the Worker computes the payload via `buildToOrder`, so a web-only ship would have left the Preferred Delivery column permanently blank (the ask-what-the-api-IMPORTS trap, again). No migration. Deployed `--env production`; bindings echoed; `GET /health` **200**.) Prior: **Worker version `ff17e0d1` from main tip `11480656`** (deployed with PR #544, the Excel-grid To Order ship. **Required by the ask-what-the-api-IMPORTS rule**: `apps/api` has zero file changes, but `packages/shared/to-order.ts` changed substantially (words, composers, and the projection helpers the Worker imports via `buildToOrder`), so a web-only ship would have split the tips. No migration. Deployed `--env production` (never bare); wrangler echoed the bindings: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron; `GET https://api.carresofficial.com/health` returns **200 `{"ok":true}`**. The 401 test is still NOT used — auth runs before routing.) Prior: **Worker version `45424326` from main tip `e2abbd60`** (deployed with PR #542, the whole-blueprint To Order ship. **Required by the ask-what-the-api-IMPORTS rule, and by the tip's own commit message**: `apps/api` has zero file changes, but `packages/shared/to-order.ts` gained the Golden Template's 12 words and the Worker imports `buildToOrder` — words only, payload untouched, so the deploy is tip alignment, not behaviour; a web-only ship would have left the Worker on a stale shared module. No migration in the tip. Deployed `--env production` (never bare); wrangler echoed the bindings: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron; `GET https://api.carresofficial.com/health` returns **200 `{"ok":true}`**. The 401 test is still NOT used — auth runs before routing.) Prior: **Worker version `3824b9c7` from main tip `2c37a1ae`** (deployed with PR #536, To Order step 1. **Required, not optional, and `git diff -- apps/api` says otherwise** — that diff is empty, but `packages/shared/to-order.ts` gained `productionDays` and the Worker computes the To Order payload via `buildToOrder`, so a web-only ship would have left the header's `{n} working days` fact permanently blank — the same ask-what-the-api-IMPORTS trap R8 recorded. No migration in the tip (repo tail 0307, prod applied 0308 — prod ahead, harmless). Deployed `--env production` (never bare); wrangler echoed the bindings: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron; `GET https://api.carresofficial.com/health` returns **200 `{"ok":true}`**. NOTE for parallel lines: #534's web-only ship left the Worker at `c632a67e`/`0bd5d544`-era code; this deploy carries #531–#536 whole. The 401 test is still NOT used — auth runs before routing.) Prior: **LIVE = Worker version `0bd5d544` from main tip `9537020c`** (deployed with PR #506, Purchasing P3. **The api deploy was REQUIRED and the reason is the one R8 recorded: ask what the api IMPORTS, not only what it CONTAINS.** P3 adds two routes to `apps/api/src/routes/operation/pos.ts` AND a second read on the PO list, but the load-bearing half is `packages/shared` — `purchasing-supplier-calls.ts` plus the two zod bodies the Worker validates with. **Safe on the migration rule, checked before deploying**: 0306 was applied and verified on prod BEFORE the merge and the tracker tail reads it back, so the union tip carries nothing unapplied. Wrangler echoed the bindings: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron; `GET https://api.carresofficial.com/health` returns **200 `{"ok":true}`**. The 401 test is still NOT used — auth runs before routing, so an unauthenticated 401 proves nothing about a route existing.) Prior: **LIVE = Worker version `0b2640bc` from main tip `aa70cd45`** (deployed with PR #499, R8. **The api deploy was REQUIRED and `git diff -- apps/api` said otherwise** — that diff is empty, and a chat trusting it would have shipped web-only. R8 changes `packages/shared/supplier-claim.ts`, and `claimNextMove` is computed **server-side** by `apps/api/src/routes/operation/supplier-claims.ts`, which puts `next_move.label` on the wire; the Claims row would have kept saying `confirm what they will do` under a tile saying `Confirm what happens next`. **The rule this makes concrete: ask what the api IMPORTS, not only what it CONTAINS** — the same trap #435 nearly hit with `commissionReadiness`. **Safe on the migration rule**: the tip changes no migration and the repo tail is 0305, unchanged. Wrangler echoed the bindings: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron; `GET /health` through the custom domain returns **200 `{"ok":true}`**. The 401 test is still NOT used — auth runs before routing. PR #500 needed no api deploy: `git diff aa70cd45..611e7c1c -- apps/api packages/shared supabase/migrations` is empty.) Prior: **LIVE = Worker version `a698fa7c` from main tip `9c3697a9`** (deployed with PR #498 D0.5a. **D0.5a changes no `apps/api` file — this Worker is C8b's code, re-deployed from a newer tip that contains it**, so nothing about the api behaviour moved. **A CORRECTION, because I got the reason wrong at the time and the wrong reason is the dangerous part**: I deployed it believing C8b's Worker was still undeployed, because `git diff 23acbebd..HEAD -- apps/api` was non-empty against the tip **this row then named as live**. That row was STALE, not wrong-forever — C8b had already deployed Worker `611ab79f` and recorded it in a docs commit that landed on `main` a few minutes later. **The lesson is a sequencing one: this row is written AFTER the deploy it describes, so a parallel line's deploy is invisible here for minutes.** `wrangler deployments list` (or the Pages deployment list for web) is the live fact; the row is a record of it. The deploy was harmless — same code, newer tip — but it was taken on a premise that a one-command check would have refuted. **Safe on the migration rule, and that half WAS checked properly**: `list_migrations` on prod read back tail **0305_delay_detected_stamp**, the same as the repo's, so the union tip carried nothing unapplied. Wrangler echoed the bindings: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron; `GET /health` through the custom domain returns **200 `{"ok":true}`**. The 401 test is still NOT used — auth runs before routing, so an unauthenticated 401 proves nothing about a route existing.) Prior: **LIVE = Worker version `611ab79f` from main tip `031051ab`** (deployed with PR #497 C8b, which starts selecting `delay_detected_at` + `delay_detected_eta` on both the control read and the Orders list. **Safe on the migration rule, checked before deploying**: 0305 was applied and verified on prod BEFORE the merge (dry run in a rolled-back transaction first, md5 reconciled after), and the tracker tail read back 0305 = the repo tail, so the union tip carries nothing unapplied. Wrangler echoed the bindings: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron; `GET /health` through the custom domain returns 200. The 401 test is still NOT used — auth runs before routing, so an unauthenticated 401 proves nothing about a route existing.) Prior: **LIVE = Worker version `6db16d5d` from main tip `23acbebd`** (deployed with PR #493 C8, which adds `POST /api/operation/orders/:id/delay-decision` and starts selecting `delay_decision` + `delay_decision_eta` on both the control read and the Orders list. **Safe on the migration rule, checked before deploying**: migration **0304 was applied to prod and verified BEFORE the merge** (dry run in a rolled-back transaction first), and the tracker tail read back 0304 = the repo tail, so the union tip carries nothing unapplied. Wrangler echoed the bindings: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron; `GET /health` through the custom domain returns 200. **The 401 test was NOT used** — the correction recorded one row below stands: auth runs before routing, so an unauthenticated 401 proves nothing about a route existing. What proves it is wrangler's version id + the echoed bindings against a source tip git shows contains the route.) Prior: **LIVE = Worker version `9b92a6e3` from main tip `b1508e9d`** (deployed with PR #489 C7, which adds `POST /api/operation/orders/:id/delivery-order` and stops `POST /booking/confirm` refusing on goods or money. **Safe on the migration rule, checked before deploying**: the repo tail on that tip was 0303 and so was the tracker's, so the union tip carried nothing unapplied — and 0301/0302, applied by the in-flight R6, are prod being AHEAD of the repo, which is the harmless direction. Wrangler echoed the bindings back: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron. `GET /health` through the custom domain returns 200, and **the new route answers 401 unauthenticated, not 404** — which is what proves it is on the live Worker rather than only in a bundle. R6 (#490) merged and deployed minutes later and CONTAINS this tip, so its Worker carries C7 too; the 401 was re-checked after that deploy and still holds.) Prior: **LIVE = Worker version `85e6e7ff` from main tip `a1e9a452`** (deployed with PR #488 Purchasing-P1, which adds `GET/PUT /api/operation/purchasing/settings` and re-points the ordering engine, the earliest-sell gate, the catalog bundle and the PO-day cron at `purchasing_settings`. **Safe because Jess applied and verified migration 0303 on prod BEFORE the merge** — the repo's migration tail is 0303 and so is the applied tail, so the union tip carries nothing unapplied. Wrangler's receipt read back: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron; `GET /health` through the custom domain returns 200. **A correction to the method this row used to record**: "the new route answers 401, not 404, which proves it is live" is WRONG and was measured wrong this time — the auth middleware runs BEFORE routing, so `/api/operation/purchasing/nonsense` also answers 401. An unauthenticated 401 proves nothing about a route's existence. What proves this deploy is wrangler's own version id + the bindings it echoed, against a source tip git can show contains the route.) Prior: `ace384c3` from `b464257c` (PR #474 S5) · `739d4be8` from `bc92e4cc` (PR #466). **The api deploy is `wrangler deploy --env production`, NEVER bare `wrangler deploy`** — both stanzas share `name = "carres-portal-v2-api"`, so a bare deploy overwrites production with the default env: `PUBLIC_WEB_URL=http://localhost:5173` and NO `api.carresofficial.com` route. Done by accident once and corrected within a minute; **wrangler echoes the bindings it deployed — read them, they are the receipt.** Same union-tip rule as web. |
+| Web bundle | **LIVE = `index-Br8IjJK-.js` from main tip `33bcbad2`** (PR #557 — **the PO PDF prints by the Law**: `po-template.tsx` rebuilt to `docs/pdf/PO-PDF-STANDARD.md` and `/print-data` re-pointed at the money-free `purchasing_po_document` RPC (0307's FIRST caller) — the supplier-facing PO stops leaking retail prices to suppliers and pickup partners. Carres-portal `424b16ca` + carres-pos `0dceb844`, both `--branch=main`; **all 4 canonicals converged on the FIRST poll**. Downloaded to a file THEN grepped — 4,619,577 bytes: `SERVICE_ROLE` **0** · `SUPPLIER DELIVERY BY` **1** · `PO ISSUED DATE` **1** · the sofa-layout caption **1** · the old template's `"Buyer"` label **0**; `/carres-wordmark.png` serves PNG 2000×474 (react-pdf reads no webp). No migration. **The merge itself is the durable lesson**: #555/#556 both read MERGED while main had received DOCS-only squashes — a deploy off the PR badge would have shipped the old leaking template believing otherwise; what caught it was verifying the MAIN TREE (`git diff origin/main <feat-commit>` = empty) before building, and the code re-landed clean as #557 by cherry-pick. Baselines: web full **2303 passed / 16 pre-existing before AND after** · api 2059 / 3 · tsc, lint, `check:v4` clean. Full entry → worklog.) |
+| API bundle | **LIVE = Worker version `9842c40d` from main tip `33bcbad2`** (deployed with PR #557. **Required**: `apps/api/src/routes/operation/pos.ts`'s `/print-data` becomes a thin door over `purchasing_po_document` (0307) with the 404/422 refusal mapping — a web-only ship would have left the live route still hand-assembling a PRICED payload under the new template's types. Deployed `--env production` (never bare); wrangler echoed the bindings: `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron; `GET https://api.carresofficial.com/health` returns **200 `{"ok":true}`**. No migration in the tip — 0307 was applied 2026-07-29. The 401 test is still NOT used — auth runs before routing.) |
 
 ### 17.2 Phase timeline
 
@@ -640,6 +662,7 @@ Don't burn an hour spinning. Surface and ask.
 > entries shipped before 2026-07-25 whose full text never made it into the worklog are preserved verbatim in
 > `docs/claude-md-archive-2026-07-25.md`. **New sessions: append the full entry to the worklog doc + ONE index line here.**
 
+- **2026-08-02** · **The PO prints by the Law — money-free payload + PO-PDF-STANDARD template** (PR #557 merge `33bcbad2`, **no migration**, web `index-Br8IjJK-.js` + Worker `9842c40d` — DEPLOYED) — `/print-data` becomes 0307's FIRST caller (RM absent from the wire, not hidden by a template; the supplier-facing PO stops leaking retail prices to suppliers and pickup partners); `po-template.tsx` rebuilt to `docs/pdf/PO-PDF-STANDARD.md` (label-gutter header with the PO number as the only hero · frameless cards · no-grid-line table, items never split · sofa plan-view layout drawing per module model · one-row 8mm footer); api wire-body money scan + web source scan pin the ship to the Law. **The merge taught the lesson**: #555/#556 both read MERGED while main had received docs-only squashes — caught by the deploy checklist's tree-diff (`git diff origin/main <commit>` = empty), never the PR badge; re-landed clean as #557. Full entry → worklog.
 - **2026-08-01 ③** · **The POS catalog wall reads one family at a time** (PR #548 merge `6be3ef54`, **no migration**, web `index-BEN9d4Zq.js` — DEPLOYED; **the api deliberately NOT redeployed**, its diff against the live Worker's source commit is empty) — Loo put his 2990s POS next to Carres's: theirs is banded per family, ours was one river of 34 cards whose badge changed mid-row. **The literal port was unbuildable and `CatalogStep.tsx`'s own comment already said why** — 2990s groups on a `branding` column Carres does not have, and one brand collapses that to a single band called CARRES; **category is the only grouping key Carres has**, and it was already the badge, the rail and `CARD_ORDER`, which is why this needed no migration and no new concept. Two departures from the reference, both structural: the header takes the **LEFT RAIL's own word** (`railLabelOf` off `railEntries`, so wall and rail cannot drift — 2990s reads a column no rail knows about), and it is **hidden when there is one band** (the rail and the toolbar already name it; 2990s always draws it). Every band reuses the same `.cat-grid` so the columns still line up down the page. **Zero new visible words.** **Two live bugs, one root cause**: rental cards were a third source of cards nothing counted — the Rental rail rendered `No pieces match.` over its own offers (`shownRentals` unreachable since PR #347) and the toolbar printed `0 pieces` above them. **A prediction recorded as wrong**: I expected the 1-2 card tails to read as broken sparse rows; rendered, the header is exactly what gives a short row a reason to exist, so `CARD_ORDER` survived untouched. Full entry → worklog.
 - **2026-08-01 ②** · **To Order FINAL freeze deploys — Action Launcher · business-language grid · Create Purchase dialog; the page is handed to Jess to finish** (PR #546 merge `398f50d0`, no migration, web `index-_7KYlTnP.js` + Worker `f203d77e` — DEPLOYED) — the day's fifth redesign: left = Linear-density Action Launcher (Today + categories with live counts · `+ Create Purchase` real dialog with disabled Save · Issue pill only-when-selected); right = six frozen columns, `Order By` banned from the screen (`ToOrderRow.delivery` = the customer's date, new on the wire); Issue = zero popups (rows update in place, bottom bar reports, partial failure persists with Retry); v2 ruling = ONE unified `purchase_demands` table so Customer Order and Manual purchasing share one engine. New-chat rules recorded in the checkpoint header: user = Jess, follow-first-then-remind, international critic with solutions, only answer her. Full entry → worklog.
 - **2026-08-01** · **To Order becomes the EXCEL GRID, and the Portal Grid Workspace standard freezes** (PR #544 merge `11480656`, no migration, web `index-DrcPnNxZ.js` + Worker `ff17e0d1` — DEPLOYED on Loo's explicit order) — five full redesigns in one sitting, all in ASCII before code, so four discarded directions cost zero dead code. Frozen: the To Order / Purchase Orders **division of responsibility** (decide vs manage) · the **GOLDEN RULE** (the engine owns the schedule, operators own the PO — Hold/Skip/Next-Run/Postpone banned forever; the exceptions are `Change Required Date` + `Cancel Purchase`, v4, stored-state) · the **Portal Grid Workspace standard** (Orders' own top strip + shared `TopBarIcons` · NO H1 · Workspace Panel 200px VIEWS→FILTERS→GROUP→SORT default expanded · grid = only scroll area · page actions appear only once built · batch bar only when it has something to say). The grid: groups = the future POs, per-group Destination, pre-selected `Order today` with DELTA memory, one POST per group with per-group ✓/✗+Retry, rows never vanish, wire contract untouched. Kit: `SearchInput` pill shape. Found + spawned: 10 date-rollover test fails in two board files (July-fused fixtures). Full entry → worklog; the whole ruling set → `docs/CHECKPOINT-to-order.md` §0A.
@@ -925,11 +948,12 @@ Key routing rules:
 - Code review, check my diff → invoke review
 - Update docs after shipping → invoke document-release
 - Weekly retro → invoke retro
-- Design system, brand → **do NOT invoke design-consultation. Read [`docs/UI-KIT.md`](docs/UI-KIT.md).**
-  The design system is decided; a consultation skill would propose a second one.
-- Visual audit, design polish → **do NOT invoke design-review for the visual system.**
-  Run `pnpm --filter @carres/web lint` and check `/ui`. The skill is allowed for
-  LAYOUT and BEHAVIOUR only (see §6.4).
+- Design system, brand → **do NOT invoke design-consultation. Read
+  `docs/01-design-tokens.md` · `02-components.md` · `03-page-patterns.md`.**
+  The token values are decided; a consultation skill would propose a second set.
+- Visual audit, design polish → design-review IS allowed for layout, behaviour,
+  readability and hierarchy (Loo, 2026-08-02). Token VALUES are still gated by
+  `pnpm --filter @carres/web lint` and `/ui`, never by opinion (see §6.4).
 - Architecture review → invoke plan-eng-review
 - Save progress, checkpoint, resume → invoke checkpoint
 - Code quality, health check → invoke health

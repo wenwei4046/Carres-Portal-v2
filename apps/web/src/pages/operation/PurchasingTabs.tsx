@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   ClipboardCheck,
+  ShoppingBag,
   ShoppingCart,
   PackageCheck,
   AlertTriangle,
@@ -9,36 +10,38 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { usePurchasingSettings } from "@/lib/queries";
+import ModuleHeader from "./components/ModuleHeader";
 
 /**
- * PurchasingTabs — the shared top tab bar for the merged Purchasing module
- * (NAV/IA merge 2026-07-21).
+ * PurchasingTabs — the ONE fixed header row of the Purchasing module
+ * (Shell pattern, Loo 2026-08-02: "壳画头" — the shell draws the header,
+ * pages never do).
  *
- * The three procurement rails used to be three separate sidebar items; they are
- * now ONE "Purchasing" sidebar entry. This bar renders at the top of all three
- * pages (`OperationPurchase` / `TabbedProcurementShell` / `OperationReceiving`)
- * so switching between them feels like one module with three tabs:
- *   • To Order        → `/operation?tab=purchase`   (OperationPurchase)
+ * ONE white 44px row, never scrolls, and it is the WHOLE header:
+ *   module word · tabs · (page meta slot) · global icons (🔔 ❓ ⚙)
+ *
+ * Pages render <PurchasingTabs /> as their first child and draw NO header of
+ * their own — no breadcrumb strip, no H1, no TopBarIcons. That is the point:
+ * a page structurally cannot forget the header, because it never draws one.
+ *
+ * Colour law (Loo 2026-08-02): the header is white, flat and quiet — the only
+ * things allowed to speak are the blue active underline and (later) red count
+ * badges. No brand colour above the content, ever, except the logo.
+ *
+ * Tabs:
+ *   • To Order        → `/operation?tab=purchase`   (OperationToOrder)
  *   • Purchase Orders → `/operation/procurement`    (TabbedProcurementShell)
  *   • Receiving       → `/operation?tab=receiving`  (OperationReceiving)
  *   • Claims          → `/operation?tab=claims`     (OperationSupplierClaims)
- *
- * R2 (2026-07-27) added Claims as a SIBLING tab rather than a sidebar entry —
- * the receiving & claim queue doc's rule is "no new menu item", and a claim is
- * what a receiving produces, so it belongs next to it.
+ *   • Settings        → manager-only (server-gated)
  *
  * The active tab is derived from the current location: the Purchase Orders path
- * wins first (a nested route), otherwise the `?tab=` value selects To Order vs
- * Receiving. It links via React Router (Link) exactly the way the sidebar +
- * OperationApp navigate between these routes.
+ * wins first (a nested route), otherwise the `?tab=` value selects the rest.
  *
- * A `right` slot renders a right-aligned cluster on the tab bar itself — used
- * by pages under this bar to host the freshness stamp + refresh icon that
- * would otherwise live in the ListPageShell header. This is how module-tab
- * pages avoid duplicating the tab as a breadcrumb / big title (Jess 2026-07-22,
- * UI-KIT §A0 "Module-tab law").
+ * The `right` slot is the page-meta slot (freshness stamp / refresh) — it sits
+ * BEFORE the global icons so the cluster order is stable on every tab.
  *
- * UI-KIT v4: token classes only (no raw hex), Lucide icons, English copy.
+ * UI-KIT: token classes only (no raw hex), Lucide icons, English copy.
  */
 
 type PurchasingTab =
@@ -82,51 +85,47 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
           : "to-order";
   const canEditSettings = settingsQ.data?.canEdit ?? false;
   const tabs = TABS.filter((t) => t.key !== "purchasing-settings" || canEditSettings);
+  const activeLabel = TABS.find((t) => t.key === active)?.label ?? "Purchasing";
 
   return (
-    <div
-      className="shrink-0 bg-white border-b border-base-200 px-6"
-      role="tablist"
-      aria-label="Purchasing"
-      data-testid="purchasing-tabs"
+    <ModuleHeader
+      testId="purchasing-tabs"
+      icon={ShoppingBag}
+      word="Purchasing"
+      docTitle={`${activeLabel} · Purchasing — Carres`}
+      right={right}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex gap-1">
-          {tabs.map((t) => {
-            const isActive = t.key === active;
-            return (
-              <Link
-                key={t.key}
-                to={t.to}
-                role="tab"
-                aria-selected={isActive}
-                data-testid={`purchasing-tab-${t.key}`}
-                className={[
-                  "relative flex items-center gap-1.5 px-4 py-3 text-body transition-colors border-b-2 -mb-px",
-                  isActive
-                    ? "border-kit-blue-9 text-base-900 font-semibold"
-                    : "border-transparent text-base-600 font-medium hover:text-base-900",
-                ].join(" ")}
-              >
-                <t.icon
-                  size={14}
-                  strokeWidth={2}
-                  className={isActive ? "text-kit-blue-9" : "text-base-400"}
-                />
-                {t.label}
-              </Link>
-            );
-          })}
-        </div>
-        {right && (
-          <div
-            className="shrink-0 flex items-center gap-2 pr-1"
-            data-testid="purchasing-tabs-right"
-          >
-            {right}
-          </div>
-        )}
+      <div
+        className="flex gap-1 h-full min-w-0 overflow-x-auto"
+        role="tablist"
+        aria-label="Purchasing"
+      >
+        {tabs.map((t) => {
+          const isActive = t.key === active;
+          return (
+            <Link
+              key={t.key}
+              to={t.to}
+              role="tab"
+              aria-selected={isActive}
+              data-testid={`purchasing-tab-${t.key}`}
+              className={[
+                "relative flex items-center gap-1.5 px-4 h-full whitespace-nowrap text-body transition-colors border-b-2 -mb-px",
+                isActive
+                  ? "border-kit-blue-9 text-base-900 font-semibold"
+                  : "border-transparent text-base-600 font-medium hover:text-base-900",
+              ].join(" ")}
+            >
+              <t.icon
+                size={14}
+                strokeWidth={2}
+                className={isActive ? "text-kit-blue-9" : "text-base-400"}
+              />
+              {t.label}
+            </Link>
+          );
+        })}
       </div>
-    </div>
+    </ModuleHeader>
   );
 }

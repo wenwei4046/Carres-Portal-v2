@@ -74,12 +74,10 @@ import Modal from "@/components/kit/Modal";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
-import Icon from "@/components/kit/Icon";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { qk } from "@/lib/queries";
 import PurchasingTabs from "./PurchasingTabs";
-import { TopBarIcons } from "./components/GlobalTopBar";
 
 // ── Wire types ──────────────────────────────────────────────────────────────
 
@@ -814,20 +812,9 @@ export default function OperationToOrder() {
      * header strip and toolbar still — the grid is the only scroll area
      * (the Orders page's own behaviour). */
     <div className="h-full min-h-0 flex flex-col bg-kit-slate-3">
-      {/* ── The top strip — the Orders page's own shape: breadcrumb + the
-           shared icon cluster. No H1, no search here. ─────────────────── */}
-      <div
-        className="shrink-0 flex items-center justify-between gap-3 px-6 pt-3 pb-1"
-        data-testid="to-order-header-strip"
-      >
-        <div className="min-w-0 flex items-center gap-1.5 text-meta text-kit-slate-11">
-          <span>Purchasing</span>
-          <Icon name="forward" size={14} />
-          <span className="text-kit-slate-12">To Order</span>
-        </div>
-        <TopBarIcons />
-      </div>
-
+      {/* ── The header is the SHELL's (PurchasingTabs) — one 44px row with
+           the module word, the tabs and the global icons. This page draws
+           no header of its own (Shell pattern, Loo 2026-08-02). ───────── */}
       <PurchasingTabs />
 
       <div className="flex-1 min-h-0 flex overflow-hidden">
