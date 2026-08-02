@@ -1,12 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   addWorkingDays,
   myHolidaySet,
+  PO_WORK_STATES,
+  PO_WORK_STATE_LABEL,
+  poCurrentActionOf,
   poReceivingProgress,
+  poWorkStateOf,
   purchasingActionQueue,
   purchasingSupplierCallsOf,
   railItemLabel,
+  type PoCurrentAction,
+  type PoWorkState,
   type ProductSkuDto,
   type PurchasingOpenCall,
   type SupplierCallPo,
@@ -117,43 +123,29 @@ function soRefsOf(po: operationPoListRow): number[] {
   return [...set].sort((a, b) => a - b);
 }
 
-/**
- * The four WORK states (Jess, 2026-08-02): how the operator finds work, not
- * how the database stores it. DERIVED from quantities + the engine — never a
- * column. A cancelled PO files under Completed (the work is over) and the
- * naming split, if wanted, is a dictionary-phase call.
- */
-type WorkState =
-  | "need_confirmation"
-  | "waiting"
-  | "ready"
-  | "completed"
-  | "cancelled";
-
-const WORK_STATE_LABEL: Record<WorkState, string> = {
-  need_confirmation: "Need Confirmation",
-  waiting: "Waiting Goods",
-  ready: "Ready to Receive",
-  completed: "Completed",
-  cancelled: "Cancelled",
-};
-const WORK_STATES: readonly WorkState[] = [
-  "need_confirmation",
-  "waiting",
-  "ready",
-  "completed",
-  "cancelled",
-];
+// The work-state vocabulary + the ONE Current Action source live in
+// packages/shared (`po-workspace.ts`) — Law 7: a page-local word table would
+// be a second action engine, and the header could disagree with the column.
+type WorkState = PoWorkState;
+const WORK_STATE_LABEL = PO_WORK_STATE_LABEL;
+const WORK_STATES = PO_WORK_STATES;
 
 function workStateOf(po: operationPoListRow, today: string): WorkState {
-  const p = poReceivingProgress(po.purchase_order_lines);
-  if (po.status === "cancelled") return "cancelled";
-  if (po.status !== "open") return "completed";
-  if (p.ordered > 0 && p.received >= p.ordered) return "completed";
-  // Goods have arrived: something is checked in, or the confirmed day has come.
-  if (p.received > 0 || (po.eta_date && po.eta_date <= today)) return "ready";
-  if (!po.eta_date) return "need_confirmation";
-  return "waiting";
+  return poWorkStateOf(
+    {
+      status: po.status,
+      etaDateIso: po.eta_date,
+      lines: po.purchase_order_lines.map((l) => ({
+        id: l.id,
+        sku: l.sku,
+        qty: l.qty,
+        receivedQty: l.received_qty,
+        shortSinceIso: l.short_since ?? null,
+        balanceAnswerAboutQty: l.balance_answer_about_qty ?? null,
+      })),
+    },
+    today,
+  );
 }
 
 // The Excel date ▼ machinery lives in ONE lib (`excel-date-filter.ts`) so
@@ -310,6 +302,22 @@ export default function OperationPurchaseOrders() {
 
   const callsOf = (po: operationPoListRow) => callsByPo.get(po.id) ?? [];
 
+  // ── The ONE Current Action per PO (shared `poCurrentActionOf`, Law 7):
+  //    engine call first, state word only when the engine is quiet. The
+  //    header's hero and this column read the SAME map — they cannot drift.
+  const actionByPo = useMemo(() => {
+    const m = new Map<string, PoCurrentAction | null>();
+    for (const po of pos) {
+      m.set(po.id, poCurrentActionOf(callPoOf(po), { todayIso: today }));
+    }
+    return m;
+  }, [pos, today]);
+  const actionOf = (po: operationPoListRow) => actionByPo.get(po.id) ?? null;
+  const actionKeyOf = (a: PoCurrentAction | null): string =>
+    a == null ? F_NONE : a.kind === "call" ? a.call.key : a.key;
+  const actionWordOf = (a: PoCurrentAction): string =>
+    a.kind === "call" ? purchasingActionQueue(a.call.key) : a.word;
+
   // ── The pipeline: search → rail (calls × work status) → column filters →
   //    sort. Every rail count is computed with the OTHER dimensions applied,
   //    so a visible number always matches the rows its click produces. ─────
@@ -368,10 +376,8 @@ export default function OperationPurchaseOrders() {
         const pr = poReceivingProgress(po.purchase_order_lines);
         return sel.has(`${pr.received} / ${pr.ordered}`);
       }
-      case "action": {
-        const top = callsOf(po)[0];
-        return sel.has(top ? top.key : F_NONE);
-      }
+      case "action":
+        return sel.has(actionKeyOf(actionOf(po)));
       default:
         return true;
     }
@@ -406,8 +412,10 @@ export default function OperationPurchaseOrders() {
             const pr = poReceivingProgress(p.purchase_order_lines);
             return String(pr.received).padStart(6, "0");
           }
-          case "action":
-            return callsOf(p)[0]?.key ?? "zzz";
+          case "action": {
+            const a = actionOf(p);
+            return a ? actionWordOf(a) : "zzz";
+          }
           default:
             return "";
         }
@@ -597,21 +605,20 @@ export default function OperationPurchaseOrders() {
 
   const actionOptions = useMemo(() => {
     const base = searched.filter((p) => passesAllCols(p, "action"));
-    const keys = new Set<string>();
+    const byKey = new Map<string, string>();
     let none = false;
     for (const p of base) {
-      const top = callsOf(p)[0];
-      if (top) keys.add(top.key);
+      const a = actionOf(p);
+      if (a) byKey.set(actionKeyOf(a), actionWordOf(a));
       else none = true;
     }
-    const opts = [...keys].sort().map((k) => ({
-      value: k,
-      label: purchasingActionQueue(k as PurchasingOpenCall["key"]),
-    }));
+    const opts = [...byKey.entries()]
+      .sort((x, y) => x[1].localeCompare(y[1]))
+      .map(([value, label]) => ({ value, label }));
     if (none) opts.push({ value: F_NONE, label: "—" });
     return opts;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searched, colFilters, callsByPo]);
+  }, [searched, colFilters, actionByPo]);
 
   // ── The listing — fixed px interiors, one auto tail (the frozen recipe) ──
 
@@ -772,11 +779,21 @@ export default function OperationPurchaseOrders() {
       sortable: true,
       filter: filterFor("action", actionOptions),
       cell: (p) => {
-        const top = callsOf(p)[0];
-        if (!top) return <span className="text-kit-slate-9">—</span>;
+        const a = actionOf(p);
+        if (!a) return <span className="text-kit-slate-9">—</span>;
+        const late = a.kind === "call" && a.call.late;
+        const quiet = a.kind === "state" && a.key === "waiting";
         return (
-          <span className={top.late ? "text-kit-red-11" : "text-kit-slate-12"}>
-            {purchasingActionQueue(top.key)}
+          <span
+            className={
+              late
+                ? "text-kit-red-11"
+                : quiet
+                  ? "text-kit-slate-9"
+                  : "text-kit-slate-12"
+            }
+          >
+            {actionWordOf(a)}
           </span>
         );
       },
@@ -1040,8 +1057,10 @@ export default function OperationPurchaseOrders() {
               supplier={supplierById.get(selected.supplier_id)}
               warehouse={warehouseById.get(selected.warehouse_id)}
               calls={callsOf(selected)}
+              action={actionOf(selected)}
               sizeOf={(raw) => skuBySku.get(raw)?.variant ?? null}
               eta={etaOf(selected)}
+              today={today}
               onCollapse={() => setWorkspaceOpen(false)}
             />
           ) : (
@@ -1058,56 +1077,86 @@ export default function OperationPurchaseOrders() {
   );
 }
 
-/* ── The Supplier Workspace for ONE Purchase Order (Jess, 2026-08-02 v2).
+/* ── The Supplier Workspace for ONE Purchase Order (Jess, 2026-08-02 FINAL).
  *
- * Frozen architecture — the same language every Document Workspace (PO,
- * GRN, Claim) will speak:
+ * WORKSPACE LAW — every section answers ONE operator question, and a future
+ * field that answers none of them does not belong here:
  *
- *   WORKING HEADER          identity + work state + the three facts
- *   REFERENCE LAYER         no section title — the whole panel IS the PO.
- *                           Answers "what is this PO?", nothing more:
- *                           Supplier · Deliver To (names only) + the items
- *                           (Sales Order · Description · Qty). No phone, no
- *                           address (Open WhatsApp is the phone), no Item ID
- *                           (that answers what the WAREHOUSE receives —
- *                           Receiving's workspace owns it).
- *   SUPPLIER FOLLOW-UP      work — the field + ITS OWN history beside it
- *                           (never down in Activity) + the engine's Open
- *                           Actions. The edit door is Phase 4.
- *   RECEIVING SUMMARY       read only — Receiving owns Receiving.
- *   ACTIVITY                communication tools + the BUSINESS timeline
- *                           (read-time merge of the real stores; never a
- *                           master activity table, never field changes).
+ *   WORK HEADER       identity + work state + CURRENT ACTION (typography
+ *                     only — quiet first; a highlighted container only if
+ *                     live use proves it does not stand out) + PO Issued ·
+ *                     Received. Expected Arrival deliberately NOT here — it
+ *                     lives in SUPPLIER with its history.
+ *   PURCHASE ORDER    "What is this PO?"          (mission: Reference —
+ *                     read only, always the CURRENT revision; edits happen
+ *                     in SUPPLIER. UI speaks business, not "Reference".)
+ *   SUPPLIER          "What must I do with the supplier?"  (mission: manage
+ *                     supplier execution — Goods Arriving At + its history
+ *                     beside it, Open Actions; grows forever: DO · Revision
+ *                     · Change/Split Deliver To · Claims links.)
+ *   ACTIVITY          "What have we communicated?" (mission: record and
+ *                     perform business communication — tools + the business
+ *                     timeline, a read-time merge of the real stores.)
+ *   RECEIVING         "What has happened after arrival?"  (mission: hand
+ *                     over to warehouse operation — summary + door only.)
  *
- * The paper look (logo · "PURCHASE ORDER" letterhead) belongs to the
- * PRINTED 0307 document, never to this working panel. */
+ * Rhythm = CARRES WORKSPACE RHYTHM v1: one continuous working document,
+ * hairline + small-caps sections, 24px property rows, ONE loud element
+ * (the Current Action), no cards, no letterhead (the paper look belongs to
+ * the printed 0307 document). */
+
+const SECTION = "mt-3 pt-3 border-t border-kit-slate-5";
+const SECTION_TITLE =
+  "text-label font-semibold uppercase tracking-wide text-kit-slate-9";
+
+/** The Linear property row: label + value, ONE 24px line, never stacked. */
+function Prop({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-2 text-body leading-6">
+      <span className="w-32 shrink-0 text-label text-kit-slate-9">{label}</span>
+      <span className="min-w-0 text-kit-slate-12">{children}</span>
+    </div>
+  );
+}
 
 function WorkspaceBody({
   po,
   supplier,
   warehouse,
   calls,
+  action,
   sizeOf,
   eta,
+  today,
   onCollapse,
 }: {
   po: operationPoListRow;
   supplier: SupplierRow | undefined;
   warehouse: { name: string; address: string | null } | undefined;
   calls: PurchasingOpenCall[];
+  action: PoCurrentAction | null;
   sizeOf: (sku: string) => string | null;
   eta: { date: string | null; confirmed: boolean };
+  today: string;
   onCollapse: () => void;
 }) {
   const supplierName = supplier?.name ?? po.supplier_id;
   const progress = poReceivingProgress(po.purchase_order_lines);
-  const state = workStateOf(po, todayMYT());
+  const state = workStateOf(po, today);
   const late = calls.some((c) => c.late);
   const sos = soRefsOf(po);
+  const actionWord =
+    action == null
+      ? null
+      : action.kind === "call"
+        ? purchasingActionQueue(action.call.key)
+        : action.word;
+  const actionLate = action?.kind === "call" && action.call.late;
+  const actionDue = action?.kind === "call" ? action.call.dueIso : null;
 
   return (
     <div className="px-4 py-4" data-testid="po-document">
-      {/* ── WORKING HEADER — dense, zero ceremony: who + state + facts. ── */}
+      {/* ── WORK HEADER — identity, state, and the one thing to do now. ── */}
       <div className="flex items-center gap-2" data-testid="po-working-header">
         <button
           type="button"
@@ -1126,63 +1175,53 @@ function WorkspaceBody({
           <Badge>{WORK_STATE_LABEL[state]}</Badge>
         </span>
       </div>
-      <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-body">
-        <span className="text-kit-slate-9">PO Issued</span>
-        <span className="text-kit-slate-12 tabular-nums">
-          {fmtDateShort((po.placed_at ?? "").slice(0, 10))}
-        </span>
-        <span aria-hidden className="text-kit-slate-9">
-          ·
-        </span>
-        <span className="text-kit-slate-9">Goods Arriving At</span>
-        {eta.date ? (
-          <span
+      {actionWord && (
+        /* Typography only (Jess: start with LESS visual weight — a
+           highlighted container only if live use proves this too quiet). */
+        <div className="mt-2" data-testid="po-current-action">
+          <div className="text-label text-kit-slate-9">Current Action</div>
+          <div
             className={[
-              "tabular-nums",
-              late
-                ? "text-kit-red-11"
-                : eta.confirmed
-                  ? "text-kit-slate-12"
-                  : "text-kit-slate-9",
+              "text-body font-semibold",
+              actionLate ? "text-kit-red-11" : "text-kit-slate-12",
             ].join(" ")}
-            title={eta.confirmed ? undefined : "Expected — supplier has not confirmed"}
           >
-            {fmtDateShort(eta.date)}
+            {actionWord}
+          </div>
+          {actionDue && (
+            <div
+              className={[
+                "text-label",
+                actionLate ? "text-kit-red-11" : "text-kit-slate-9",
+              ].join(" ")}
+            >
+              {actionDue === today ? "Due Today" : `Due ${fmtDateShort(actionDue)}`}
+            </div>
+          )}
+        </div>
+      )}
+      <div className="mt-3 pt-3 border-t border-kit-slate-5">
+        <Prop label="PO Issued">
+          <span className="tabular-nums">
+            {fmtDateShort((po.placed_at ?? "").slice(0, 10))}
           </span>
-        ) : (
-          <span className="text-kit-slate-9">—</span>
-        )}
-        <span aria-hidden className="text-kit-slate-9">
-          ·
-        </span>
-        <span className="text-kit-slate-9">Received</span>
-        <span className="text-kit-slate-12 tabular-nums">
-          {progress.received} / {progress.ordered}
-        </span>
+        </Prop>
+        <Prop label="Received">
+          <span className="tabular-nums">
+            {progress.received} / {progress.ordered}
+          </span>
+        </Prop>
       </div>
 
-      {/* ── REFERENCE LAYER — no section title: the whole panel IS the PO.
-           "What is this PO?" — identity + items, and nothing else. ────── */}
-      <div className="mt-3 pt-3 border-t border-kit-slate-6 grid grid-cols-2 gap-x-4">
-        <div>
-          <div className="text-label uppercase tracking-widest text-kit-slate-9">
-            Supplier
-          </div>
-          <div className="mt-1 text-body font-semibold text-kit-slate-12">
-            {supplierName}
-          </div>
+      {/* ── PURCHASE ORDER — "What is this PO?" (mission: Reference). ─── */}
+      <section className={SECTION} data-testid="po-reference">
+        <h3 className={SECTION_TITLE}>Purchase Order</h3>
+        <div className="mt-2">
+          <Prop label="Supplier">{supplierName}</Prop>
+          <Prop label="Deliver To">{warehouse?.name ?? "—"}</Prop>
         </div>
-        <div>
-          <div className="text-label uppercase tracking-widest text-kit-slate-9">
-            Deliver To
-          </div>
-          <div className="mt-1 text-body font-semibold text-kit-slate-12">
-            {warehouse?.name ?? "—"}
-          </div>
-        </div>
-      </div>
 
-      <div className="mt-3" data-testid="po-doc-items">
+      <div className="mt-2" data-testid="po-doc-items">
         <div className="flex gap-2 text-label uppercase tracking-wide text-kit-slate-9 border-y border-kit-slate-5 py-1">
           <span className="w-16 font-medium">Sales Order</span>
           <span className="flex-1 font-medium">Description</span>
@@ -1219,40 +1258,37 @@ function WorkspaceBody({
           );
         })}
       </div>
+      </section>
 
-      {/* ── SUPPLIER FOLLOW-UP — what to do with the supplier, and the
-           field's OWN history beside the field (never down in Activity).
+      {/* ── SUPPLIER — "What must I do with the supplier?" A field's OWN
+           history lives beside the field (never down in Activity).
            Read-only today; the edit door is Phase 4's promise-ledger
            write. */}
-      <section
-        className="mt-4 pt-3 border-t border-kit-slate-5"
-        data-testid="po-followup"
-      >
-        <h3 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
-          Supplier Follow-up
-        </h3>
-        <div className="mt-2 flex items-baseline gap-2 text-body">
-          <span className="text-kit-slate-9">Goods Arriving At</span>
-          {eta.date ? (
-            <span
-              className={[
-                "tabular-nums",
-                late
-                  ? "text-kit-red-11"
-                  : eta.confirmed
-                    ? "text-kit-slate-12"
-                    : "text-kit-slate-9",
-              ].join(" ")}
-            >
-              {fmtDateShort(eta.date)}
-              <span className="text-kit-slate-9">
-                {" "}
-                · {eta.confirmed ? "supplier confirmed" : "expected, not confirmed"}
+      <section className={SECTION} data-testid="po-supplier">
+        <h3 className={SECTION_TITLE}>Supplier</h3>
+        <div className="mt-2">
+          <Prop label="Goods Arriving At">
+            {eta.date ? (
+              <span
+                className={[
+                  "tabular-nums",
+                  late
+                    ? "text-kit-red-11"
+                    : eta.confirmed
+                      ? "text-kit-slate-12"
+                      : "text-kit-slate-9",
+                ].join(" ")}
+              >
+                {fmtDateShort(eta.date)}
+                <span className="text-kit-slate-9">
+                  {" "}
+                  · {eta.confirmed ? "supplier confirmed" : "expected, not confirmed"}
+                </span>
               </span>
-            </span>
-          ) : (
-            <span className="text-kit-slate-9">— supplier has not confirmed</span>
-          )}
+            ) : (
+              <span className="text-kit-slate-9">— supplier has not confirmed</span>
+            )}
+          </Prop>
         </div>
         {/* This field's history mounts HERE when the promise ledger has
             entries to show — today's wire carries only the latest answer's
@@ -1294,15 +1330,14 @@ function WorkspaceBody({
         )}
       </section>
 
-      {/* ── RECEIVING SUMMARY — read only. Receiving owns Receiving. ──── */}
-      <section
-        className="mt-4 pt-3 border-t border-kit-slate-5"
-        data-testid="po-receiving-summary"
-      >
-        <h3 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
-          Receiving Summary
-        </h3>
-        <div className="mt-2 flex items-baseline gap-2 text-body">
+      {/* ── ACTIVITY — "What have we communicated?" tools + timeline. ─── */}
+      <ActivityDesk po={po} supplier={supplier} />
+
+      {/* ── RECEIVING — "What has happened after arrival?" Purchasing ends
+           here; the work lives in the Receiving module. ONE line. ─────── */}
+      <section className={SECTION} data-testid="po-receiving-summary">
+        <h3 className={SECTION_TITLE}>Receiving</h3>
+        <div className="mt-2 flex items-baseline gap-2 text-body leading-6">
           <span className="text-kit-slate-9">Received</span>
           <span className="text-kit-slate-12 tabular-nums">
             {progress.received} / {progress.ordered}
@@ -1314,25 +1349,25 @@ function WorkspaceBody({
           <span className="text-kit-slate-12 tabular-nums">
             {progress.ordered - progress.received}
           </span>
-        </div>
-        <div className="mt-2 flex items-center gap-3">
           {progress.issueQty > 0 && (
-            <span className="text-body text-kit-red-11">
-              {progress.issueQty} with a problem
-            </span>
+            <>
+              <span aria-hidden className="text-kit-slate-9">
+                ·
+              </span>
+              <span className="text-kit-red-11">
+                {progress.issueQty} with a problem
+              </span>
+            </>
           )}
           <Link
             to="/operation?tab=receiving"
-            className="text-body font-medium text-kit-blue-11 hover:underline"
+            className="ml-auto text-body font-medium text-kit-blue-11 hover:underline shrink-0"
             data-testid="po-open-receiving"
           >
             Open Receiving
           </Link>
         </div>
       </section>
-
-      {/* ── ACTIVITY — communication tools + the business timeline. ───── */}
-      <ActivityDesk po={po} supplier={supplier} />
     </div>
   );
 }
@@ -1354,6 +1389,9 @@ function ActivityDesk({
   supplier: SupplierRow | undefined;
 }) {
   const [copied, setCopied] = useState(false);
+  // Rhythm spec DO: collapse long tools — the draft is ONE line until
+  // opened. Copy works without expanding (it copies the full draft).
+  const [draftOpen, setDraftOpen] = useState(false);
 
   const message = useMemo(() => {
     const items = po.purchase_order_lines
@@ -1401,15 +1439,17 @@ function ActivityDesk({
         )}
       </div>
 
-      <div className="mt-2 text-label text-kit-slate-9">WhatsApp message</div>
-      <pre
-        className="mt-1 whitespace-pre-wrap rounded-card bg-kit-slate-3 px-3 py-2 text-body font-body text-kit-slate-12"
-        data-testid="po-wa-message"
-      >
-        {message}
-      </pre>
-
       <div className="mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setDraftOpen((o) => !o)}
+          aria-expanded={draftOpen}
+          data-testid="po-wa-toggle"
+          className="inline-flex items-center gap-1 text-label text-kit-slate-9 hover:text-kit-slate-12"
+        >
+          <Icon name={draftOpen ? "collapse" : "expand"} size={14} />
+          WhatsApp message
+        </button>
         <button
           type="button"
           onClick={() => void copyMessage()}
@@ -1430,6 +1470,14 @@ function ActivityDesk({
           </a>
         )}
       </div>
+      {draftOpen && (
+        <pre
+          className="mt-2 whitespace-pre-wrap rounded-card bg-kit-slate-3 px-3 py-2 text-body font-body text-kit-slate-12"
+          data-testid="po-wa-message"
+        >
+          {message}
+        </pre>
+      )}
 
       <div className="mt-3 pt-2 border-t border-kit-slate-4">
         <div className="text-label text-kit-slate-9">History</div>

@@ -331,7 +331,7 @@ describe("the Supplier Workspace v2 (Jess, 2026-08-02)", () => {
     expect(items.getByText("Qty")).toBeInTheDocument();
   });
 
-  it("the engine's calls sit under Open Actions inside Supplier Follow-up", async () => {
+  it("the engine's calls sit under Open Actions inside SUPPLIER", async () => {
     await mountLoaded();
     fireEvent.click(listing().getByText("PO-9003"));
     await waitFor(() =>
@@ -339,16 +339,16 @@ describe("the Supplier Workspace v2 (Jess, 2026-08-02)", () => {
         within(screen.getByTestId("po-working-header")).getByText("PO-9003"),
       ).toBeInTheDocument(),
     );
-    const followup = within(screen.getByTestId("po-followup"));
-    expect(followup.getByText("Supplier Follow-up")).toBeInTheDocument();
-    expect(followup.getByText("Open Actions")).toBeInTheDocument();
+    const supplier = within(screen.getByTestId("po-supplier"));
+    expect(supplier.getByText("Supplier")).toBeInTheDocument();
+    expect(supplier.getByText("Open Actions")).toBeInTheDocument();
     expect(screen.getByTestId("po-open-calls")).toBeInTheDocument();
   });
 
-  it("Receiving Summary is read-only and shows Remaining", async () => {
+  it("RECEIVING is one read-only line with Remaining and the door", async () => {
     await mountLoaded();
     const recv = within(screen.getByTestId("po-receiving-summary"));
-    expect(recv.getByText("Receiving Summary")).toBeInTheDocument();
+    expect(recv.getByText("Receiving")).toBeInTheDocument();
     expect(recv.getByText("Remaining")).toBeInTheDocument();
     expect(recv.getByTestId("po-open-receiving")).toBeInTheDocument();
     expect(recv.queryByRole("button")).not.toBeInTheDocument();
@@ -361,5 +361,55 @@ describe("the Supplier Workspace v2 (Jess, 2026-08-02)", () => {
     expect(activity.getByTestId("po-copy-message")).toBeInTheDocument();
     const history = within(screen.getByTestId("po-history"));
     expect(history.getByText("PO issued")).toBeInTheDocument();
+  });
+
+  it("the WhatsApp draft is ONE line until opened — Copy works either way", async () => {
+    await mountLoaded();
+    expect(screen.queryByTestId("po-wa-message")).not.toBeInTheDocument();
+    expect(screen.getByTestId("po-copy-message")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("po-wa-toggle"));
+    expect(screen.getByTestId("po-wa-message")).toBeInTheDocument();
+  });
+
+  it("the section order is Jess's four categories", async () => {
+    await mountLoaded();
+    const doc = screen.getByTestId("po-document");
+    const order = ["po-reference", "po-supplier", "po-activity", "po-receiving-summary"]
+      .map((id) => Array.from(doc.querySelectorAll("section")).findIndex(
+        (el) => el.getAttribute("data-testid") === id,
+      ));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(order.every((i) => i >= 0)).toBe(true);
+  });
+});
+
+describe("the ONE Current Action source (Law 7)", () => {
+  it("the header hero speaks the state word when the engine is quiet", async () => {
+    await mountLoaded();
+    // PO-9001 auto-selects: future date, nothing received → Waiting for Goods.
+    const hero = within(screen.getByTestId("po-current-action"));
+    expect(hero.getByText("Current Action")).toBeInTheDocument();
+    expect(hero.getByText("Waiting for Goods")).toBeInTheDocument();
+  });
+
+  it("the listing's Current Action column reads the SAME source — no more dashes on live work", async () => {
+    await mountLoaded();
+    // PO-9001 (waiting) and PO-9002 (cancelled → the only honest dash).
+    expect(listing().getByText("Waiting for Goods")).toBeInTheDocument();
+    const cancelled = listing().getByText("PO-9002").closest("tr")!;
+    expect(within(cancelled as HTMLElement).getByText("—")).toBeInTheDocument();
+  });
+
+  it("an open engine call BEATS the state word in the hero", async () => {
+    await mountLoaded();
+    fireEvent.click(listing().getByText("PO-9003"));
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("po-working-header")).getByText("PO-9003"),
+      ).toBeInTheDocument(),
+    );
+    const hero = within(screen.getByTestId("po-current-action"));
+    // Arriving today → the tomorrow's-delivery call leads, not "Open Receiving".
+    expect(hero.getByText(/tomorrow/i)).toBeInTheDocument();
   });
 });

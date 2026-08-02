@@ -870,6 +870,19 @@ export {
   type SupplierCallPo,
 } from "./purchasing-supplier-calls";
 
+// Supplier Workspace (Jess, 2026-08-02) — the ONE Current Action source
+// (Law 7: engine first, state word only when the engine is quiet) + the
+// work-state vocabulary the register's rail counts by.
+export {
+  PO_STATE_ACTION_WORD,
+  PO_WORK_STATES,
+  PO_WORK_STATE_LABEL,
+  poCurrentActionOf,
+  poWorkStateOf,
+  type PoCurrentAction,
+  type PoWorkState,
+} from "./po-workspace";
+
 // C6 · What closes one action — the steps, each of them one of the portal's own
 // actions, each measured from the signals the ladder already reads.
 export {

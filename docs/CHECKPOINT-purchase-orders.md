@@ -100,6 +100,41 @@ po-template) → 4 Supplier Updates (3A business freeze, THEN 3B write door) →
 Business before Data, Data before UI, UI before Write Door. Tests ride EVERY
 step, never queue at the end.
 
+**STEP 2 FINAL (v3) — ✅ BUILT 2026-08-02, supersedes the v2 text below.**
+Jess re-ruled the workspace around WORKFLOW, then froze:
+
+- **WORKSPACE LAW** (stronger than Mission — the review rule for every
+  future Workspace: PO, GRN, Claims, Payments): *every section answers ONE
+  operator question; a field that answers none does not belong.*
+  `PURCHASE ORDER` "What is this PO?" (UI speaks business — never
+  "Reference"; Reference stays the internal mission name) · `SUPPLIER`
+  "What must I do with the supplier?" (largest, grows forever) · `ACTIVITY`
+  "What have we communicated?" (bigger than Communication — keeps the name)
+  · `RECEIVING` "What has happened after arrival?" (one line + door).
+  Order: Header → Purchase Order → Supplier → Activity → Receiving.
+- **WORK HEADER**: PO no. + state Badge + **Current Action as the hero —
+  TYPOGRAPHY ONLY** (Jess: start with less visual weight; a highlighted
+  container only if live use proves it too quiet; no GitHub blue box yet)
+  + PO Issued · Received. **Expected Arrival deliberately NOT in the
+  header** — it lives in SUPPLIER with its history.
+- **ONE action source (Law 7)**: `packages/shared/po-workspace.ts` —
+  `poCurrentActionOf()` asks the ENGINE's calls first, falls back to the
+  state words Jess ruled: `Confirm Goods Arriving Date` ·
+  `Waiting for Goods` (never "No Action Today" — today's nothing is
+  tomorrow's something) · `Open Receiving` (the system is not a person —
+  no "Hand to") · completed/cancelled = no hero. The header hero AND the
+  register's Current Action column read the SAME function — the 19 dashes
+  are gone. Found while testing: a partially-received PO's action is the
+  BALANCE call (engine outranks "Open Receiving") — correct business.
+- **CARRES WORKSPACE RHYTHM v1** (delivered in-chat 2026-08-02; flows into
+  the token/UI-KIT files after her live review — NO new doc, her rule):
+  one continuous working document · hairline + small-caps sections (24px
+  gap) · 24px label-value property rows (label col 128px, never stacked) ·
+  document table 28px rows / 24px caps header · ONE loud element ·
+  timeline rows 20px · WhatsApp draft collapsed to one line until opened.
+  Masters: Linear property rows · GitHub one-loud-element + timeline ·
+  AutoCount density; colours never copied, tokens only.
+
 **STEP 2 · SUPPLIER WORKSPACE v2 — ✅ IA FROZEN AND BUILT 2026-08-02.**
 Her frozen architecture (the SAME language every Document Workspace — PO,
 GRN, Claim — will speak):
