@@ -107,22 +107,26 @@ export type InvoiceTemplateData = {
 };
 
 export type PoTemplateData = {
+  // Money-free payload of `purchasing_po_document` (migration 0307) — the
+  // supplier-facing PO carries no RM figure (docs/pdf/PO-PDF-STANDARD.md §2).
   po_number: string;
-  issue_date: string;
   po_id: string;
+  issue_date: string;
   supplier: { name: string; address: string | null; contact: string | null };
-  buyer: { name: string; contact: string | null };
+  destination: { name: string; address: string };
+  delivery_instructions: string | null;
+  eta_date: string | null;
+  /** PO-level sales-order refs (route-added beside the RPC payload). */
+  so_refs?: number[] | null;
+  /** Audit name for the footer; null until the portal records an issuer. */
+  issued_by?: string | null;
   lines: Array<{
     sku: string;
     description: string;
     qty: number;
     unit: string;
-    unit_price: number;
-    line_total: number;
     attrs?: Record<string, unknown> | null;
   }>;
-  grand_total: number;
-  currency: string;
   terms: string | null;
 };
 
