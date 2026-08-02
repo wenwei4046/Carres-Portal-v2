@@ -145,10 +145,9 @@ function mount() {
 async function mountLoaded() {
   const r = mount();
   await waitFor(() => expect(screen.getByText("PO-9001")).toBeInTheDocument());
-  // The workspace mounts only after the first row AUTO-selects (?po= effect) —
-  // wait for its collapse control or a fast run beats the effect.
+  // The workspace mounts only after the first row AUTO-selects (?po= effect).
   await waitFor(() =>
-    expect(screen.getByTestId("po-workspace-collapse")).toBeInTheDocument(),
+    expect(screen.getByTestId("po-working-header")).toBeInTheDocument(),
   );
   return r;
 }
@@ -177,7 +176,7 @@ describe("the eight frozen columns", () => {
 
   it("collapsing the workspace shows all eight, in her order", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-collapse"));
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     expect(headerTexts()).toEqual([
       "PO Issued",
       "Supplier",
@@ -192,16 +191,16 @@ describe("the eight frozen columns", () => {
 
   it("Customer Delivery's header says it is the EARLIEST date on a merged PO", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-collapse"));
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     const th = screen.getByRole("columnheader", { name: /Customer Delivery/ });
     expect(th.getAttribute("title")).toMatch(/Earliest customer delivery/);
   });
 
   it("HONESTY GUARD — a sorted column stays visible in compact mode", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-collapse"));
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     fireEvent.click(screen.getByTestId("table-sort-arriving"));
-    fireEvent.click(screen.getByTestId("po-workspace-expand"));
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     expect(headerTexts()).toContain("Goods Arriving At");
   });
 });
@@ -245,7 +244,7 @@ describe("what the row states", () => {
 
   it("a revised arriving date says (revised)", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-collapse"));
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     expect(screen.getByText("(revised)")).toBeInTheDocument();
   });
 });
@@ -326,7 +325,7 @@ describe("the Supplier Workspace v2 (Jess, 2026-08-02)", () => {
     expect(workspace().queryByText("Item ID")).not.toBeInTheDocument();
     expect(workspace().queryByText("0123456789")).not.toBeInTheDocument();
     const items = within(screen.getByTestId("po-doc-items"));
-    expect(items.getByText("Sales Order")).toBeInTheDocument();
+    expect(items.getByText("SO No.")).toBeInTheDocument();
     expect(items.getByText("Description")).toBeInTheDocument();
     expect(items.getByText("Qty")).toBeInTheDocument();
   });

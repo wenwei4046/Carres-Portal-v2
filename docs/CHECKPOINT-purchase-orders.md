@@ -100,6 +100,21 @@ po-template) → 4 Supplier Updates (3A business freeze, THEN 3B write door) →
 Business before Data, Data before UI, UI before Write Door. Tests ride EVERY
 step, never queue at the end.
 
+**SLIM PASS (v6) — ✅ BUILT 2026-08-02 (Jess caught the arrows):**
+- The three pane-collapse arrows + their leftover strips were MY invention
+  (no master grows arrows on panels — rule 7 breach, admitted). Gone:
+  rail and listing no longer hide (overrides her 8/2-morning "all three
+  panes hide" — reminded once, she confirmed); ONE toggle survives — the
+  workspace open/close that drives Gmail compact mode — and it lives in
+  the SHELL's page-meta slot beside the search.
+- Search moved into the shell header's page-meta slot (Gmail: search lives
+  in the header, zero body height — "i dont have tall"); the listing's
+  whole toolbar row deleted, the register now starts at the table.
+  NOTE for Loo's five-slot law: the page-meta slot doc says "freshness /
+  refresh" — a page-scoped search there is an extension, flagged not
+  hidden.
+- Items header `Sales Order` → `SO No.` (hers).
+
 **COMPACT PASS (v5) — ✅ BUILT 2026-08-02, after the merge of main
 (PR 560/561 — SHELL LAW):**
 - origin/main MERGED (one conflict in api pos.ts, resolved: kept our

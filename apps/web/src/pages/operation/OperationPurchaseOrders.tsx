@@ -174,10 +174,10 @@ export default function OperationPurchaseOrders() {
     new Map(),
   );
   const [stateSel, setStateSel] = useState<WorkState | null>(null);
-  // All three panes hide and expand (Jess, 2026-08-02 — amends her earlier
-  // "nav never collapses").
-  const [navOpen, setNavOpen] = useState(true);
-  const [listingOpen, setListingOpen] = useState(true);
+  // ONE pane toggle survives (Jess, 2026-08-02 late — overrides her earlier
+  // "all three panes hide"): the workspace open/close, which drives Gmail's
+  // reading-pane compact mode. Its control lives in the SHELL's page-meta
+  // slot, not in a pane corner — no master grows arrows on panels.
   const [workspaceOpen, setWorkspaceOpen] = useState(true);
 
   const today = todayMYT();
@@ -839,32 +839,43 @@ export default function OperationPurchaseOrders() {
           draws the header, pages never do. PurchasingTabs IS the whole 44px
           row (module word · tabs · global icons); this page draws no
           breadcrumb, no title, no icons of its own. */}
-      <PurchasingTabs />
+      <PurchasingTabs
+        right={
+          <div className="flex items-center gap-2">
+            {/* Gmail's answer to "search with no height": it lives in the
+                HEADER. Cross-field find: PO / Supplier / SKU / Model / SO /
+                Customer. */}
+            <div className="w-56">
+              <SearchInput
+                id="po-search"
+                placeholder="Search"
+                pill
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setWorkspaceOpen((o) => !o)}
+              aria-pressed={workspaceOpen}
+              title={workspaceOpen ? "Hide purchase order" : "Show purchase order"}
+              aria-label={workspaceOpen ? "Hide purchase order" : "Show purchase order"}
+              data-testid="po-workspace-toggle"
+              className={PANE_BTN}
+            >
+              <Icon name={workspaceOpen ? "forward" : "back"} size={14} />
+            </button>
+          </div>
+        }
+      />
 
       <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* ── NAVIGATION · 200px — the Register's business filter (Jess:
              "Business filters live in the left navigation; column-specific
              filters remain native Excel filters."). One group: SUPPLIER
              PROGRESS — what to do with the supplier, never a data status. ── */}
-        {!navOpen && (
-          <div className="shrink-0 border-r border-kit-slate-5 bg-white flex flex-col items-center pt-3 px-1">
-            <button
-              type="button"
-              onClick={() => setNavOpen(true)}
-              title="Show filters"
-              aria-label="Show filters"
-              data-testid="po-rail-expand"
-              className={PANE_BTN}
-            >
-              <Icon name="forward" size={14} />
-            </button>
-          </div>
-        )}
         <nav
-          className={[
-            "w-[200px] shrink-0 min-h-0 overflow-y-auto border-r border-kit-slate-5 px-3 py-3 flex-col gap-4 bg-white",
-            navOpen ? "flex" : "hidden",
-          ].join(" ")}
+          className="w-[200px] shrink-0 min-h-0 overflow-y-auto border-r border-kit-slate-5 px-3 py-3 flex flex-col gap-4 bg-white"
           aria-label="Purchase order register"
           data-testid="po-rail"
         >
@@ -873,16 +884,6 @@ export default function OperationPurchaseOrders() {
               <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
                 Supplier Progress
               </span>
-              <button
-                type="button"
-                onClick={() => setNavOpen(false)}
-                title="Hide filters"
-                aria-label="Hide filters"
-                data-testid="po-rail-collapse"
-                className={`ml-auto ${PANE_BTN} !p-1`}
-              >
-                <Icon name="back" size={14} />
-              </button>
             </div>
             <div className="mt-1 flex flex-col gap-0.5">
               <button
@@ -940,48 +941,10 @@ export default function OperationPurchaseOrders() {
         </nav>
 
         {/* ── LISTING — the AutoCount work listing (kit DataTable) ──────── */}
-        {!listingOpen && (
-          <div className="shrink-0 border-r border-kit-slate-5 bg-white flex flex-col items-center pt-3 px-1">
-            <button
-              type="button"
-              onClick={() => setListingOpen(true)}
-              title="Show listing"
-              aria-label="Show listing"
-              data-testid="po-listing-expand"
-              className={PANE_BTN}
-            >
-              <Icon name="forward" size={14} />
-            </button>
-          </div>
-        )}
         <div
-          className={[
-            "flex-1 min-w-0 min-h-0 flex-col border-r border-kit-slate-5 bg-white",
-            listingOpen ? "flex" : "hidden",
-          ].join(" ")}
+          className="flex-1 min-w-0 min-h-0 flex flex-col border-r border-kit-slate-5 bg-white"
           data-testid="po-listing"
         >
-          <div className="shrink-0 px-3 pt-3 pb-2 flex items-center gap-2">
-            <div className="flex-1 max-w-[420px]">
-              <SearchInput
-                id="po-search"
-                placeholder="Search"
-                pill
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => setListingOpen(false)}
-              title="Hide listing"
-              aria-label="Hide listing"
-              data-testid="po-listing-collapse"
-              className={`ml-auto ${PANE_BTN}`}
-            >
-              <Icon name="back" size={14} />
-            </button>
-          </div>
           {/* Excel's own answer to eight columns in half a screen: the
               LISTING region scrolls horizontally (the page never does).
               min-width = the frozen column set at full size. */}
@@ -1023,24 +986,10 @@ export default function OperationPurchaseOrders() {
 
         {/* ── WORKSPACE — ONE live Purchase Order. Collapsible; when the
              listing is hidden it takes the whole stage. ─────────────────── */}
-        {!workspaceOpen && (
-          <div className="shrink-0 bg-white flex flex-col items-center pt-3 px-1 border-l border-kit-slate-5">
-            <button
-              type="button"
-              onClick={() => setWorkspaceOpen(true)}
-              title="Show purchase order"
-              aria-label="Show purchase order"
-              data-testid="po-workspace-expand"
-              className={PANE_BTN}
-            >
-              <Icon name="back" size={14} />
-            </button>
-          </div>
-        )}
         <main
           className={[
             "shrink-0 min-h-0 overflow-y-auto bg-white",
-            workspaceOpen ? (listingOpen ? "w-[400px]" : "flex-1 min-w-0") : "hidden",
+            workspaceOpen ? "w-[400px]" : "hidden",
           ].join(" ")}
           data-testid="po-workspace"
         >
@@ -1054,7 +1003,6 @@ export default function OperationPurchaseOrders() {
               sizeOf={(raw) => skuBySku.get(raw)?.variant ?? null}
               eta={etaOf(selected)}
               today={today}
-              onCollapse={() => setWorkspaceOpen(false)}
             />
           ) : (
             !posQ.isLoading &&
@@ -1121,7 +1069,6 @@ function WorkspaceBody({
   sizeOf,
   eta,
   today,
-  onCollapse,
 }: {
   po: operationPoListRow;
   supplier: SupplierRow | undefined;
@@ -1131,7 +1078,6 @@ function WorkspaceBody({
   sizeOf: (sku: string) => string | null;
   eta: { date: string | null; confirmed: boolean };
   today: string;
-  onCollapse: () => void;
 }) {
   const supplierName = supplier?.name ?? po.supplier_id;
   const progress = poReceivingProgress(po.purchase_order_lines);
@@ -1156,16 +1102,6 @@ function WorkspaceBody({
         className="flex items-center gap-2"
         data-testid="po-working-header"
       >
-        <button
-          type="button"
-          onClick={onCollapse}
-          title="Hide purchase order"
-          aria-label="Hide purchase order"
-          data-testid="po-workspace-collapse"
-          className={PANE_BTN}
-        >
-          <Icon name="forward" size={14} />
-        </button>
         <span className="text-page font-semibold font-mono text-kit-slate-12">
           {po.id}
         </span>
@@ -1190,7 +1126,7 @@ function WorkspaceBody({
 
       <div className="mt-2" data-testid="po-doc-items">
         <div className="flex gap-2 text-label uppercase tracking-wide text-kit-slate-9 border-y border-kit-slate-5 py-1">
-          <span className="w-16 font-medium">Sales Order</span>
+          <span className="w-16 font-medium">SO No.</span>
           <span className="flex-1 font-medium">Description</span>
           <span className="w-10 text-right font-medium">Qty</span>
         </div>
