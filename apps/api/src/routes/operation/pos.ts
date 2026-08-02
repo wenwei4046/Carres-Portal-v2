@@ -143,6 +143,12 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   const poIds = pos.map((p) => (p as Record<string, unknown>).id as string);
   const tomorrowAboutByPo = new Map<string, string | null>();
   const balanceAboutByLine = new Map<string, number | null>();
+  // Register (Jess, 2026-08-02) — `(revised)`: the arriving date has been
+  // answered about MORE THAN ONE expected arrival, so what the listing shows
+  // is not the first date the supplier named. Read from the promise ledger
+  // (0306) — the only arrival history that exists; the Phase-4 write door
+  // appends to the same ledger, so this flag starts working the day it ships.
+  const arrivalDatesByPo = new Map<string, Set<string>>();
   if (poIds.length > 0) {
     const { data: promiseRows, error: promiseErr } = await sb
       .from("po_supplier_promises")
@@ -160,6 +166,11 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         const key = row.po_id as string;
         if (!tomorrowAboutByPo.has(key)) {
           tomorrowAboutByPo.set(key, (row.about_date as string | null) ?? null);
+        }
+        if (row.about_date != null) {
+          const set = arrivalDatesByPo.get(key) ?? new Set<string>();
+          set.add(row.about_date as string);
+          arrivalDatesByPo.set(key, set);
         }
       } else if (row.kind === "balance_delivery" && row.po_line_id) {
         const key = row.po_line_id as string;
@@ -184,10 +195,14 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     for (const r of (row.so_refs as number[] | null) ?? []) soSet.add(Number(r));
   }
   const deliveryBySo = new Map<number, string | null>();
+  // Register (Jess, 2026-08-02) — the customer's NAME rides along so the
+  // listing's search answers "which PO carries Ah Hock's goods" without a
+  // second read. Same bounded IN() as the date.
+  const customerBySo = new Map<number, string | null>();
   if (soSet.size > 0) {
     const { data: orderRows, error: orderErr } = await sb
       .from("orders")
-      .select("so, delivery_date")
+      .select("so, delivery_date, customer_name")
       .in("so", [...soSet]);
     if (orderErr) {
       const m = mapPgError(orderErr);
@@ -196,6 +211,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     for (const r of orderRows ?? []) {
       const row = r as Record<string, unknown>;
       deliveryBySo.set(Number(row.so), (row.delivery_date as string | null) ?? null);
+      customerBySo.set(Number(row.so), (row.customer_name as string | null) ?? null);
     }
   }
   const customerDeliveryOf = (row: Record<string, unknown>): string | null => {
@@ -208,6 +224,50 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       .sort();
     return dates[0] ?? null;
   };
+  const ordersOf = (row: Record<string, unknown>) => {
+    const sos: number[] = [];
+    if (row.so != null) sos.push(Number(row.so));
+    for (const r of (row.so_refs as number[] | null) ?? []) sos.push(Number(r));
+    return sos
+      .filter((n) => deliveryBySo.has(n) || customerBySo.has(n))
+      .map((n) => ({
+        so: n,
+        customer_name: customerBySo.get(n) ?? "",
+        delivery_date: deliveryBySo.get(n) ?? null,
+      }));
+  };
+
+  // ── The Items column's words (Jess, 2026-08-02): the listing speaks MODEL,
+  // never the raw SKU code. The browser used to translate via its POS catalog
+  // and printed the code whenever the catalog missed — so the name is resolved
+  // HERE, where every SKU can be looked up, and rides the wire per line.
+  // `purchase_order_lines.sku` has no FK PostgREST can traverse (schema note
+  // at /:id/print-data), so one bounded IN() over the page's distinct SKUs.
+  const skuSet = new Set<string>();
+  for (const p of pos) {
+    const row = p as Record<string, unknown>;
+    const lines = (row.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [];
+    for (const l of lines) skuSet.add(l.sku as string);
+  }
+  const modelBySku = new Map<string, { model_name: string | null; size: string | null }>();
+  if (skuSet.size > 0) {
+    const { data: skuRows, error: skuErr } = await sb
+      .from("product_skus")
+      .select("sku, variant, product_models(name)")
+      .in("sku", [...skuSet]);
+    if (skuErr) {
+      const m = mapPgError(skuErr);
+      return c.json(m.body, m.status);
+    }
+    for (const r of skuRows ?? []) {
+      const row = r as Record<string, unknown>;
+      const model = row.product_models as { name?: string | null } | null;
+      modelBySku.set(row.sku as string, {
+        model_name: model?.name ?? null,
+        size: (row.variant as string | null) ?? null,
+      });
+    }
+  }
 
   const withAnswers = pos.map((p) => {
     const row = p as Record<string, unknown>;
@@ -216,9 +276,13 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       ...row,
       tomorrow_answer_about_date: tomorrowAboutByPo.get(row.id as string) ?? null,
       customer_delivery: customerDeliveryOf(row),
+      orders: ordersOf(row),
+      eta_revised: (arrivalDatesByPo.get(row.id as string)?.size ?? 0) > 1,
       purchase_order_lines: lines.map((l) => ({
         ...l,
         balance_answer_about_qty: balanceAboutByLine.get(l.id as string) ?? null,
+        model_name: modelBySku.get(l.sku as string)?.model_name ?? null,
+        size: modelBySku.get(l.sku as string)?.size ?? null,
       })),
     };
   });

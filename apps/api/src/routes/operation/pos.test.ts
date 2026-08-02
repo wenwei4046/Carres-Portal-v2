@@ -69,14 +69,18 @@ describe("GET /api/operation/pos", () => {
   };
 
   /**
-   * The list route makes TWO reads, and the mock has to know which is which:
-   * the POs themselves, then P3's `po_supplier_promises` (0306) for the latest
-   * answer per PO / per line. A single shared chain would let the second read
-   * silently consume the first one's resolution.
+   * The list route makes FOUR reads, and the mock has to know which is which:
+   * the POs themselves, P3's `po_supplier_promises` (0306) for the latest
+   * answer per PO / per line, then the Register's two enrichments (Jess,
+   * 2026-08-02): `orders` for the customer's date + name, and `product_skus`
+   * for the MODEL name each line speaks instead of its code. A single shared
+   * chain would let one read silently consume another's resolution.
    */
   function mockPosList(
     rows: typeof PO_ROW[],
     promises: Record<string, unknown>[] = [],
+    orderRows: Record<string, unknown>[] = [],
+    skuRows: Record<string, unknown>[] = [],
   ) {
     const eq = vi.fn().mockReturnThis();
     const order = vi.fn().mockReturnThis();
@@ -87,15 +91,22 @@ describe("GET /api/operation/pos", () => {
     const promiseIn = vi.fn(() => ({ order: promiseOrder }));
     const promiseSelect = vi.fn(() => ({ in: promiseIn }));
 
+    const ordersIn = vi.fn().mockResolvedValue({ data: orderRows, error: null });
+    const ordersSelect = vi.fn(() => ({ in: ordersIn }));
+
+    const skusIn = vi.fn().mockResolvedValue({ data: skuRows, error: null });
+    const skusSelect = vi.fn(() => ({ in: skusIn }));
+
     vi.mocked(userClient).mockReturnValue({
-      from: vi.fn((table: string) =>
-        table === "po_supplier_promises"
-          ? { select: promiseSelect }
-          : { select },
-      ),
+      from: vi.fn((table: string) => {
+        if (table === "po_supplier_promises") return { select: promiseSelect };
+        if (table === "orders") return { select: ordersSelect };
+        if (table === "product_skus") return { select: skusSelect };
+        return { select };
+      }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-    return { eq, order, limit, promiseIn, promiseSelect };
+    return { eq, order, limit, promiseIn, promiseSelect, ordersIn, skusIn };
   }
 
   it("returns POs for operation with default 'all' status", async () => {
@@ -165,6 +176,80 @@ describe("GET /api/operation/pos", () => {
     expect(body.pos[0]?.tomorrow_answer_about_date).toBeNull();
     for (const l of body.pos[0]?.purchase_order_lines ?? [])
       expect(l.balance_answer_about_qty).toBeNull();
+  });
+
+  // ── Register (Jess, 2026-08-02) · the listing's enrichments ───────────────
+  it("speaks MODEL per line, carries the customer + EARLIEST delivery, and flags a revised arrival", async () => {
+    const twoSo = {
+      ...PO_ROW,
+      so: 4001,
+      so_refs: [4002],
+      purchase_order_lines: [
+        { id: "line-a", sku: "MAT-K-001", qty: 2, received_qty: 0, short_since: null },
+        { id: "line-b", sku: "UNKNOWN-SKU", qty: 1, received_qty: 0, short_since: null },
+      ],
+    };
+    const { ordersIn, skusIn } = mockPosList(
+      [twoSo],
+      [
+        // TWO different arrival dates answered about → (revised).
+        { po_id: "PO-2030", po_line_id: null, kind: "tomorrow_delivery", about_date: "2026-09-15", recorded_at: "2026-09-02T00:00:00Z" },
+        { po_id: "PO-2030", po_line_id: null, kind: "tomorrow_delivery", about_date: "2026-08-01", recorded_at: "2026-08-01T00:00:00Z" },
+      ],
+      [
+        { so: 4001, delivery_date: "2026-09-20", customer_name: "Ah Hock" },
+        { so: 4002, delivery_date: "2026-09-05", customer_name: "Mei Ling" },
+      ],
+      [{ sku: "MAT-K-001", variant: "King", product_models: { name: "Cody" } }],
+    );
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      pos: {
+        customer_delivery: string | null;
+        eta_revised: boolean;
+        orders: { so: number; customer_name: string }[];
+        purchase_order_lines: { id: string; model_name: string | null; size: string | null }[];
+      }[];
+    };
+    expect(ordersIn).toHaveBeenCalledWith("so", expect.arrayContaining([4001, 4002]));
+    expect(skusIn).toHaveBeenCalledWith(
+      "sku",
+      expect.arrayContaining(["MAT-K-001", "UNKNOWN-SKU"]),
+    );
+    const po = body.pos[0]!;
+    // EARLIEST across the merged PO's SOs — never the first, never the last.
+    expect(po.customer_delivery).toBe("2026-09-05");
+    expect(po.orders.map((o) => o.customer_name).sort()).toEqual(["Ah Hock", "Mei Ling"]);
+    expect(po.eta_revised).toBe(true);
+    const lineA = po.purchase_order_lines.find((l) => l.id === "line-a");
+    const lineB = po.purchase_order_lines.find((l) => l.id === "line-b");
+    expect(lineA?.model_name).toBe("Cody");
+    expect(lineA?.size).toBe("King");
+    // A SKU the catalog does not know stays honest: null, never an invention.
+    expect(lineB?.model_name).toBeNull();
+  });
+
+  it("ONE answered arrival date is not (revised)", async () => {
+    mockPosList(
+      [PO_ROW],
+      [{ po_id: "PO-2030", po_line_id: null, kind: "tomorrow_delivery", about_date: "2026-09-15", recorded_at: "2026-09-02T00:00:00Z" }],
+    );
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    const body = (await res.json()) as { pos: { eta_revised: boolean }[] };
+    expect(body.pos[0]?.eta_revised).toBe(false);
   });
 
   it("filters by status when query param provided", async () => {

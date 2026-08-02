@@ -45,33 +45,71 @@
   (v1 tree → v2 worklist → v3 split → v4 shell-copy → v5 REGISTER — read it, do not
   re-litigate). Related: `docs/CHECKPOINT-grn.md` (the GRN page, queued after this).
 
-## 2 · HER LAST TWO RULINGS — EXECUTE FIRST, they arrived as the session died
+## 2 · THE PLAN AND THE LAWS — Jess re-ruled the whole sequence, 2026-08-02 (chat 2)
 
-**① Listing columns, FINAL (replaces the current 8):**
+**STEP 1 · LISTING FREEZE — ✅ EXECUTED 2026-08-02.** Her FINAL columns (this
+version supersedes the earlier 6-column ruling — she put `Customer Delivery`
+back and moved `PO Issued` to 1st, both hers):
 ```
-PO No. · Supplier · PO Issued · Goods Arriving At · Received · Current Action
+PO Issued · Supplier · PO No. · Items · Customer Delivery ·
+Goods Arriving At · Received · Current Action
 ```
-- `Customer Delivery` LEAVES the listing (currently 2nd — remove).
-- `Issued Date` renames to **`PO Issued`** and moves from 1st to 3rd. Her why, keep it
-  in the code comment: it is the official date the supplier receives the PO · it starts
-  the supplier lead time · it matches the PDF · operators say "the PO we issued last
-  week", never "the record we created".
-- `PO Issued` ▼ = Today · Yesterday · This Week · Last Week · This Month · Last Month ·
-  month buckets (Jan 2026, Dec 2025 …) · **Custom Date Range…** ← the preset machinery
-  exists (`arrivingMatches` + `dateOptionsFor`); Custom Range needs a small two-date
-  popover the kit ColumnFilter does not have — build it or propose the shape first.
+- `PO Issued`, never `Created` — the official date the supplier receives the
+  PO · starts the lead time · matches the PDF · operators say "the PO we
+  issued last week". A system Created date, if ever wanted, goes in the
+  workspace's details block, never the listing.
+- **LISTING LAW (hers, long-term for Purchasing):** the listing is AutoCount —
+  for FINDING (sort · filter · search), never for working; the work happens in
+  the right workspace. **Default order = `PO Issued` OLDEST first** (the buyer
+  chases the longest-waiting PO, never the biggest number). Every column has
+  Excel ▼ + header sort + search-inside; filters combine and persist until
+  Clear. Sticky header, one vertical scroll, no pagination feel.
+- `Customer Delivery` = the **EARLIEST** date across a merged PO's SOs, and the
+  header tooltip says so — until P5 allocation upgrades it to line-level.
+- Items speaks **MODEL** (server-resolved `model_name` on the wire — the
+  browser catalog missed non-active SKUs and printed codes), `×N` only when
+  N ≥ 2. `Cody Q · +2` · `Sonic K ×3`.
+- Compact (workspace open) = `PO Issued · Supplier · PO No. · Items · Current
+  Action`; HONESTY GUARD unchanged.
+- Search stays beside the ▼s (two jobs): PO / Supplier / SKU / Model / SO /
+  Customer (customer names now ride `orders[]` on the global list).
+- Built with it: kit `ColumnFilter.range` (Custom Date Range… two-date pair +
+  Apply) · kit `rowMuted` (cancelled rows grey — 2990s) · `(revised)` on Goods
+  Arriving At (≥2 distinct answered arrival dates in the 0306 promise ledger;
+  quiet today, the Phase-4 write door feeds it) · `lib/excel-date-filter.ts`
+  (ONE date-▼ machine, built to flow back portal-wide) · first test files
+  (page 15 + date-filter 9 + api register test).
 
-**② The workspace panel stops pretending to be paper:**
-- Her words: *"we said no pdf view but it a concept to fill up detail — stupid to show
-  carres logo and wasting space — never think this panel what can help us."*
-- DELETE the CARRES wordmark + "PURCHASE ORDER" letterhead decoration from the panel.
-  The PDF-standard look belongs to the PRINTED document (the 0307 renderer card),
-  not to this working panel.
-- Rebuild the panel top as a WORKING header: PO number · supplier · Supplier Progress
-  status · the dates — dense, zero ceremony. Then ask of every block: *what does this
-  help the operator DO?* (her three actions: update supplier progress · communicate ·
-  hand to Receiving). A block that only "shows data" gets cut. Sketch ASCII → her yes
-  → build.
+**SURFACE LAW (Jess, 2026-08-02 — ran here first, review then flow back):**
+grey is CHROME, white is every working surface. Tokens in tailwind config:
+`kit-canvas` (app bg) · `kit-strip` (header strip, slate-2) · table header =
+`kit-slate-3` (DataTable thead moved off slate-4). Three greys per page, max.
+Copy masters by STRUCTURE never colour: GitHub = layout/reading pane/timeline ·
+Excel+AutoCount = tables · Linear = density/microcopy (70%) · SAP Fiori =
+business documents (10%) · Gmail = communication. **No Inspiration Board doc
+yet** — her call: prove the tokens live first, then write back into the
+existing token/UI law files.
+
+**HER PHASE ORDER (replaces the old step list):**
+```
+1 Listing (✅) → 2 Live Purchase Order IA FREEZE → 3 Batch Print +
+Communication (core, not enhancement — wire the 0307 renderer, never the old
+po-template) → 4 Supplier Updates (3A business freeze, THEN 3B write door) →
+5 Receiving Integration → 6 Relationship Map (enhancement, last)
+```
+Business before Data, Data before UI, UI before Write Door. Tests ride EVERY
+step, never queue at the end.
+
+**STEP 2 · LIVE PURCHASE ORDER — NEXT, and it is an IA FREEZE, not a header
+patch.** Her words: the right pane is NOT a PO preview. Delete the CARRES
+wordmark + "PURCHASE ORDER" letterhead (the paper look belongs to the printed
+0307 document). Then freeze the IA: which sections exist · each section's
+mission · what is editable · what is forever read-only · what belongs to
+Receiving. Every block answers *what does this help the operator DO* (update
+supplier progress · communicate · hand to Receiving) — a block that only shows
+data gets cut. ASCII → her yes → build. From 2990s only three copies are
+approved: `(revised)` ✅ · cancelled-grey ✅ · plain-words error messages (owed
+to Phase 4's refusals).
 
 ## 3 · WHAT IS BUILT AND VERIFIED (do not rebuild)
 

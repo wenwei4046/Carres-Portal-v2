@@ -3114,6 +3114,12 @@ export interface operationPoListRow {
      *  A second short delivery changes `received_qty`, the two stop matching,
      *  and the call re-opens by itself (S4 / C8's discipline). */
     balance_answer_about_qty?: number | null;
+    /** Register (Jess, 2026-08-02) — the listing speaks MODEL, never the raw
+     *  SKU code, and the name is resolved SERVER-side where every SKU can be
+     *  looked up (the browser's POS catalog misses non-active SKUs and used
+     *  to print the code). OPTIONAL: an older Worker degrades to the code. */
+    model_name?: string | null;
+    size?: string | null;
     // 0073 cascade picker (Loo 2026-05-09). Null for mattress + legacy
     // pre-0073 lines; bedframe carries {color, gap}; sofa carries
     // {fabric_id, fabric_name, fabric_surcharge}.
@@ -3128,11 +3134,15 @@ export interface operationPoListRow {
    *  every SO this PO covers; null for stockpile POs. OPTIONAL so a browser
    *  on this build against an older Worker degrades instead of crashing. */
   customer_delivery?: string | null;
-  /** 2026-05-18 (Loo C+D) — per-source-SO enrichment from
-   *  /api/operation/procurement/:slug. One entry per SO this PO serves
-   *  (po.so for single, po.so_refs[] for bundle). Empty for stockpile POs
-   *  or non-procurement-tabs endpoints (the global /api/operation/pos still
-   *  returns the bare row without this field — treat as []). */
+  /** Register (Jess, 2026-08-02) — the arriving date has been answered about
+   *  MORE THAN ONE expected arrival (promise-ledger history, 0306), so the
+   *  listing marks it `(revised)`. OPTIONAL — older Worker degrades to false. */
+  eta_revised?: boolean;
+  /** 2026-05-18 (Loo C+D) — per-source-SO enrichment. One entry per SO this
+   *  PO serves (po.so for single, po.so_refs[] for bundle). Empty for
+   *  stockpile POs. Since 2026-08-02 the global /api/operation/pos fills it
+   *  too (the Register's search answers the CUSTOMER's name); older Workers
+   *  omit it — treat as []. */
   orders?: {
     so: number;
     customer_name: string;

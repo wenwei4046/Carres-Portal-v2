@@ -21,6 +21,13 @@ import DataTable, {
 import EmptyState from "@/components/kit/EmptyState";
 import Icon from "@/components/kit/Icon";
 import SearchInput from "@/components/kit/SearchInput";
+import {
+  F_NONE,
+  dateFilterMatches,
+  datePresetOptions,
+  monthLabel,
+  rangeValue,
+} from "@/lib/excel-date-filter";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import {
   useCatalog,
@@ -48,10 +55,16 @@ import {
  *                  Ready to Receive · Completed    (work states, not data
  *                  states — derived, never stored)
  *
- *   LISTING (kit DataTable — the AutoCount work listing)
- *     PO No. · Supplier · Items · Goods Arriving At · Received ·
- *     Current Action. Header sorts, ▼ AutoFilters, search — To Order's own
- *     reflexes. A row answers "which PO is this?" without opening it.
+ *   LISTING (kit DataTable — the AutoCount register; Jess's Purchasing law,
+ *     2026-08-02: the listing is for FINDING — sort, filter, search; the
+ *     work happens in the workspace). Eight frozen columns, her order:
+ *     PO Issued · Supplier · PO No. · Items · Customer Delivery ·
+ *     Goods Arriving At · Received · Current Action. Default order =
+ *     PO Issued OLDEST first (the buyer chases the longest-waiting PO,
+ *     never the biggest number). Every column sorts by header click and
+ *     filters by its ▼ (dates: Excel presets + month buckets + Custom Date
+ *     Range); the top Search finds across PO/Supplier/SKU/Model/SO/Customer
+ *     — two different jobs, both stay.
  *
  *   WORKSPACE (400px right) — ONE live Purchase Order. It reads as a PO,
  *     not an ERP form: document head, items, the supplier's date, receiving
@@ -143,64 +156,9 @@ function workStateOf(po: operationPoListRow, today: string): WorkState {
   return "waiting";
 }
 
-const F_NONE = "__none__";
-// Goods Arriving At ▼ — Excel's own preset vocabulary (Jess, 2026-08-02).
-const F_TODAY = "__today__";
-const F_YESTERDAY = "__yesterday__";
-const F_THIS_WEEK = "__this_week__";
-const F_LAST_WEEK = "__last_week__";
-const F_THIS_MONTH = "__this_month__";
-const F_LAST_MONTH = "__last_month__";
-
-function addDaysIso(iso: string, n: number): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-/** Monday of the ISO week `iso` falls in. */
-function weekStartIso(iso: string): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  const dow = (d.getUTCDay() + 6) % 7;
-  return addDaysIso(iso, -dow);
-}
-function inRange(v: string, from: string, to: string): boolean {
-  return v >= from && v <= to;
-}
-/** Does an arriving date hit one Excel preset / month / sentinel value? */
-function arrivingMatches(eta: string | null, value: string, today: string): boolean {
-  if (value === F_NONE) return eta == null;
-  if (eta == null) return false;
-  const ws = weekStartIso(today);
-  switch (value) {
-    case F_TODAY:
-      return eta === today;
-    case F_YESTERDAY:
-      return eta === addDaysIso(today, -1);
-    case F_THIS_WEEK:
-      return inRange(eta, ws, addDaysIso(ws, 6));
-    case F_LAST_WEEK:
-      return inRange(eta, addDaysIso(ws, -7), addDaysIso(ws, -1));
-    case F_THIS_MONTH:
-      return eta.slice(0, 7) === today.slice(0, 7);
-    case F_LAST_MONTH: {
-      const d = new Date(`${today.slice(0, 7)}-01T00:00:00Z`);
-      d.setUTCMonth(d.getUTCMonth() - 1);
-      return eta.slice(0, 7) === d.toISOString().slice(0, 7);
-    }
-    default:
-      // `m:2026-08` — one month bucket; anything else is an exact day.
-      if (value.startsWith("m:")) return eta.slice(0, 7) === value.slice(2);
-      return eta === value;
-  }
-}
-function monthLabel(ym: string): string {
-  const d = new Date(`${ym}-01T00:00:00Z`);
-  return d.toLocaleDateString("en-MY", {
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
+// The Excel date ▼ machinery lives in ONE lib (`excel-date-filter.ts`) so
+// every date column — here and, after Jess's live review, portal-wide —
+// speaks the same presets and the same Custom Date Range.
 
 /** The document's quiet control — one recipe, spelled once (§6.6). */
 /** Pane hide/expand chevron — one recipe, spelled once (§6.6). */
@@ -270,17 +228,30 @@ export default function OperationPurchaseOrders() {
     const model = modelNameById.get(sku.modelId);
     return railItemLabel(model ?? raw, sku.variant);
   };
-  /** `Carres Cloud · King ×2 · +1` — identify the PO without opening it. */
+  /** The Items words (Jess, 2026-08-02): the listing speaks MODEL — To Order's
+   *  own `railItemLabel` over the SERVER-resolved name, so a non-catalog SKU
+   *  never prints its code. The catalog lookup survives only as the fallback
+   *  for an older Worker that has not sent `model_name` yet. */
+  const lineLabel = (
+    l: operationPoListRow["purchase_order_lines"][number],
+  ): string =>
+    l.model_name
+      ? railItemLabel(l.model_name, l.size ?? null)
+      : friendlySku(l.sku);
+  /** `×N` only when N says something — `Cody Q`, `Sonic K ×3`, never `×1`
+   *  (Jess, 2026-08-02: a marker on every row is noise, not information). */
+  const lineText = (
+    l: operationPoListRow["purchase_order_lines"][number],
+  ): string => (l.qty >= 2 ? `${lineLabel(l)} ×${l.qty}` : lineLabel(l));
+  /** `Cody Q · +2` — identify the PO without opening it. */
   const itemsPreviewOf = (po: operationPoListRow): string => {
     const ls = po.purchase_order_lines;
     if (ls.length === 0) return "—";
-    const head = `${friendlySku(ls[0].sku)} ×${ls[0].qty}`;
+    const head = lineText(ls[0]);
     return ls.length > 1 ? `${head} · +${ls.length - 1}` : head;
   };
   const itemsTitleOf = (po: operationPoListRow): string =>
-    po.purchase_order_lines
-      .map((l) => `${friendlySku(l.sku)} ×${l.qty}`)
-      .join("\n");
+    po.purchase_order_lines.map(lineText).join("\n");
 
   const prodDaysByPair = useMemo(() => {
     const m = new Map<string, number>();
@@ -343,6 +314,9 @@ export default function OperationPurchaseOrders() {
   //    sort. Every rail count is computed with the OTHER dimensions applied,
   //    so a visible number always matches the rows its click produces. ─────
 
+  // Cross-field find (Jess, 2026-08-02): PO No. · Supplier · SKU · Model ·
+  // Sales Order No. · Customer. The column ▼ is the precise narrow; this box
+  // is "which PO carries it" — two different jobs, both stay.
   const searched = useMemo(() => {
     const s = search.trim().toLowerCase();
     if (s === "") return pos;
@@ -351,10 +325,14 @@ export default function OperationPurchaseOrders() {
         p.id.toLowerCase().includes(s) ||
         supplierNameOf(p.supplier_id).toLowerCase().includes(s) ||
         soRefsOf(p).some((n) => `so-${n}`.includes(s)) ||
+        (p.orders ?? []).some((o) =>
+          o.customer_name.toLowerCase().includes(s),
+        ) ||
         p.purchase_order_lines.some(
           (l) =>
             l.sku.toLowerCase().includes(s) ||
-            friendlySku(l.sku).toLowerCase().includes(s),
+            (l.model_name ?? "").toLowerCase().includes(s) ||
+            lineLabel(l).toLowerCase().includes(s),
         ),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -372,16 +350,24 @@ export default function OperationPurchaseOrders() {
     switch (colKey) {
       case "supplier":
         return sel.has(po.supplier_id);
+      case "po":
+        return sel.has(po.id);
+      case "items":
+        return po.purchase_order_lines.some((l) => sel.has(lineLabel(l)));
       case "issued":
         return [...sel].some((v) =>
-          arrivingMatches((po.placed_at ?? "").slice(0, 10) || null, v, today),
+          dateFilterMatches((po.placed_at ?? "").slice(0, 10) || null, v, today),
         );
       case "custdel":
         return [...sel].some((v) =>
-          arrivingMatches(po.customer_delivery ?? null, v, today),
+          dateFilterMatches(po.customer_delivery ?? null, v, today),
         );
       case "arriving":
-        return [...sel].some((v) => arrivingMatches(etaOf(po).date, v, today));
+        return [...sel].some((v) => dateFilterMatches(etaOf(po).date, v, today));
+      case "received": {
+        const pr = poReceivingProgress(po.purchase_order_lines);
+        return sel.has(`${pr.received} / ${pr.ordered}`);
+      }
       case "action": {
         const top = callsOf(po)[0];
         return sel.has(top ? top.key : F_NONE);
@@ -399,14 +385,6 @@ export default function OperationPurchaseOrders() {
     const base = searched.filter(
       (p) => passesState(p, stateSel) && passesAllCols(p),
     );
-    const rank = (p: operationPoListRow) => {
-      const st = workStateOf(p, today);
-      if (st === "completed" || st === "cancelled") return 4;
-      const calls = callsOf(p);
-      if (calls.some((c) => c.late)) return 0;
-      if (calls.length > 0) return 1;
-      return 2;
-    };
     const sorted = [...base];
     if (sort) {
       const dir = sort.dir === "asc" ? 1 : -1;
@@ -436,15 +414,15 @@ export default function OperationPurchaseOrders() {
       };
       sorted.sort((a, b) => dir * val(a).localeCompare(val(b)));
     } else {
-      // The engine's own order: late → open call → quiet → done.
+      // The Register's default order (Jess's Purchasing law, 2026-08-02):
+      // PO Issued, OLDEST first — the buyer's day starts at the PO that has
+      // been waiting the longest, never at the biggest number. Business
+      // priority, not document numbering; PO No. ▼ still sorts by number
+      // when someone asks. Clearing a header sort returns here.
       sorted.sort((a, b) => {
-        const ra = rank(a);
-        const rb = rank(b);
-        if (ra !== rb) return ra - rb;
-        const ea = a.eta_date ?? "9999-12-31";
-        const eb = b.eta_date ?? "9999-12-31";
-        if (ea !== eb) return ea.localeCompare(eb);
-        return (b.placed_at ?? "").localeCompare(a.placed_at ?? "");
+        const pa = (a.placed_at ?? "").localeCompare(b.placed_at ?? "");
+        if (pa !== 0) return pa;
+        return a.id.localeCompare(b.id);
       });
     }
     return sorted;
@@ -513,15 +491,39 @@ export default function OperationPurchaseOrders() {
   const filterFor = (
     key: string,
     options: ColumnFilter["options"],
-    searchable = false,
-  ): ColumnFilter => ({
-    options,
-    selected: colFilters.get(key) ?? new Set(),
-    onChange: setColFilter(key),
-    label: `Filter ${key}`,
-    clearLabel: "Clear",
-    ...(searchable ? { searchPlaceholder: "Search" } : {}),
-  });
+    opts: { searchable?: boolean; range?: boolean } = {},
+  ): ColumnFilter => {
+    const selected = colFilters.get(key) ?? new Set<string>();
+    const current = [...selected].find((v) => v.startsWith("r:")) ?? null;
+    const [, curFrom, curTo] = current?.split(":") ?? [];
+    return {
+      options,
+      selected,
+      onChange: setColFilter(key),
+      label: `Filter ${key}`,
+      clearLabel: "Clear",
+      ...(opts.searchable ? { searchPlaceholder: "Search" } : {}),
+      ...(opts.range
+        ? {
+            range: {
+              label: "Custom Date Range…",
+              applyLabel: "Apply",
+              from: curFrom ?? null,
+              to: curTo ?? null,
+              // ONE range at a time (Excel's own behaviour): a new pair
+              // replaces the old pair, presets already ticked stay.
+              onApply: (from: string, to: string) => {
+                const next = new Set(
+                  [...selected].filter((v) => !v.startsWith("r:")),
+                );
+                next.add(rangeValue(from, to));
+                setColFilter(key)(next);
+              },
+            },
+          }
+        : {}),
+    };
+  };
 
   const supplierOptions = useMemo(() => {
     const ids = [
@@ -543,14 +545,7 @@ export default function OperationPurchaseOrders() {
     getter: (p: operationPoListRow) => string | null,
   ): { value: string; label: string }[] => {
     const base = searched.filter((p) => passesAllCols(p, colKey));
-    const opts: { value: string; label: string }[] = [
-      { value: F_TODAY, label: "Today" },
-      { value: F_YESTERDAY, label: "Yesterday" },
-      { value: F_THIS_WEEK, label: "This Week" },
-      { value: F_LAST_WEEK, label: "Last Week" },
-      { value: F_THIS_MONTH, label: "This Month" },
-      { value: F_LAST_MONTH, label: "Last Month" },
-    ];
+    const opts: { value: string; label: string }[] = datePresetOptions();
     const months = [
       ...new Set(
         base
@@ -582,6 +577,33 @@ export default function OperationPurchaseOrders() {
     [searched, colFilters],
   );
 
+  // Every column carries its ▼ (Jess's Purchasing law, 2026-08-02 — the
+  // AutoCount reflex: each column filters by its own values). These three
+  // list the DISTINCT cell values the current view holds, nothing invented.
+  const poOptions = useMemo(() => {
+    const ids = [
+      ...new Set(searched.filter((p) => passesAllCols(p, "po")).map((p) => p.id)),
+    ].sort();
+    return ids.map((id) => ({ value: id, label: id }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searched, colFilters]);
+  const itemsOptions = useMemo(() => {
+    const labels = new Set<string>();
+    for (const p of searched.filter((r) => passesAllCols(r, "items")))
+      for (const l of p.purchase_order_lines) labels.add(lineLabel(l));
+    return [...labels].sort().map((v) => ({ value: v, label: v }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searched, colFilters, skuBySku, modelNameById]);
+  const receivedOptions = useMemo(() => {
+    const vals = new Set<string>();
+    for (const p of searched.filter((r) => passesAllCols(r, "received"))) {
+      const pr = poReceivingProgress(p.purchase_order_lines);
+      vals.add(`${pr.received} / ${pr.ordered}`);
+    }
+    return [...vals].sort().map((v) => ({ value: v, label: v }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searched, colFilters]);
+
   const actionOptions = useMemo(() => {
     const base = searched.filter((p) => passesAllCols(p, "action"));
     const keys = new Set<string>();
@@ -602,13 +624,21 @@ export default function OperationPurchaseOrders() {
 
   // ── The listing — fixed px interiors, one auto tail (the frozen recipe) ──
 
+  // The eight columns, in Jess's frozen order (2026-08-02):
+  //   PO Issued · Supplier · PO No. · Items · Customer Delivery ·
+  //   Goods Arriving At · Received · Current Action
   const columns: readonly Column<operationPoListRow>[] = [
     {
       key: "issued",
-      label: "Issued Date",
+      // `PO Issued`, never `Created` (Jess, 2026-08-02): the official date
+      // the supplier receives the PO — it starts the lead time, it is the
+      // date on the PDF, and operators say "the PO we issued last week",
+      // never "the record we created". A system Created date, if ever
+      // wanted, belongs in the workspace's details block, not here.
+      label: "PO Issued",
       width: "88px",
       sortable: true,
-      filter: filterFor("issued", issuedOptions),
+      filter: filterFor("issued", issuedOptions, { range: true }),
       cell: (p) => (
         <span className="tabular-nums">
           {fmtDateShort((p.placed_at ?? "").slice(0, 10))}
@@ -616,29 +646,19 @@ export default function OperationPurchaseOrders() {
       ),
     },
     {
-      key: "custdel",
-      label: "Customer Delivery",
-      width: "96px",
+      key: "supplier",
+      label: "Supplier",
+      width: "104px",
       sortable: true,
-      filter: filterFor("custdel", custdelOptions),
-      cell: (p) => {
-        const d = p.customer_delivery ?? null;
-        if (!d) return <span className="text-kit-slate-9">—</span>;
-        const st = workStateOf(p, today);
-        const late =
-          d < today && st !== "completed" && st !== "cancelled";
-        return (
-          <span className={late ? "text-kit-red-11 tabular-nums" : "tabular-nums"}>
-            {fmtDateShort(d)}
-          </span>
-        );
-      },
+      filter: filterFor("supplier", supplierOptions, { searchable: true }),
+      cell: (p) => supplierNameOf(p.supplier_id),
     },
     {
       key: "po",
       label: "PO No.",
       width: "104px",
       sortable: true,
+      filter: filterFor("po", poOptions, { searchable: true }),
       cell: (p) => {
         const calls = callsOf(p);
         const late = calls.some((c) => c.late);
@@ -674,18 +694,11 @@ export default function OperationPurchaseOrders() {
       },
     },
     {
-      key: "supplier",
-      label: "Supplier",
-      width: "104px",
-      sortable: true,
-      filter: filterFor("supplier", supplierOptions, true),
-      cell: (p) => supplierNameOf(p.supplier_id),
-    },
-    {
       key: "items",
       label: "Items",
       width: "150px",
       sortable: true,
+      filter: filterFor("items", itemsOptions, { searchable: true }),
       cell: (p) => (
         <span className="block truncate" title={itemsTitleOf(p)}>
           {itemsPreviewOf(p)}
@@ -693,11 +706,35 @@ export default function OperationPurchaseOrders() {
       ),
     },
     {
+      key: "custdel",
+      label: "Customer Delivery",
+      // A merged PO carries several customers' dates; until P5's allocation
+      // splits them, this column is the EARLIEST — and says so (Jess,
+      // 2026-08-02: never let staff read it as the whole PO's only date).
+      headerTitle:
+        "Earliest customer delivery across this PO's sales orders — a merged PO carries more than one",
+      width: "96px",
+      sortable: true,
+      filter: filterFor("custdel", custdelOptions, { range: true }),
+      cell: (p) => {
+        const d = p.customer_delivery ?? null;
+        if (!d) return <span className="text-kit-slate-9">—</span>;
+        const st = workStateOf(p, today);
+        const late =
+          d < today && st !== "completed" && st !== "cancelled";
+        return (
+          <span className={late ? "text-kit-red-11 tabular-nums" : "tabular-nums"}>
+            {fmtDateShort(d)}
+          </span>
+        );
+      },
+    },
+    {
       key: "arriving",
       label: "Goods Arriving At",
       width: "96px",
       sortable: true,
-      filter: filterFor("arriving", arrivingOptions),
+      filter: filterFor("arriving", arrivingOptions, { range: true }),
       cell: (p) => {
         const eta = etaOf(p);
         if (!eta.date) return <span className="text-kit-slate-9">—</span>;
@@ -715,6 +752,11 @@ export default function OperationPurchaseOrders() {
             title={eta.confirmed ? undefined : "Expected — supplier has not confirmed"}
           >
             {fmtDateShort(eta.date)}
+            {p.eta_revised && (
+              /* 2990s' own marker: the date shown is not the first date the
+                 supplier named — the history lives in the promise ledger. */
+              <span className="text-kit-slate-9"> (revised)</span>
+            )}
           </span>
         );
       },
@@ -726,6 +768,7 @@ export default function OperationPurchaseOrders() {
       align: "right",
       numeric: true,
       sortable: true,
+      filter: filterFor("received", receivedOptions),
       cell: (p) => {
         const pr = poReceivingProgress(p.purchase_order_lines);
         return `${pr.received} / ${pr.ordered}`;
@@ -749,20 +792,14 @@ export default function OperationPurchaseOrders() {
     },
   ];
 
-  /** Gmail's reading-pane recipe (Jess, 2026-08-02): while the document pane
-   *  is open the listing keeps the IDENTIFY columns, every one at full size;
-   *  collapse the pane and the full register returns. Two honesty guards:
-   *  Customer Delivery stays in the compact set (it is WHY a PO is chased),
-   *  and a column carrying an ACTIVE filter or sort can never be hidden — a
-   *  filter you cannot see is a lie the table tells (P2's own law). */
-  const COMPACT_KEYS = new Set([
-    "custdel",
-    "po",
-    "supplier",
-    "items",
-    "arriving",
-    "received",
-  ]);
+  /** Gmail's reading-pane recipe, compact set re-ruled with the 8 columns
+   *  (Jess, 2026-08-02): PO Issued (when) · Supplier (with whom) · PO No.
+   *  (which document) · Items (which goods) · Current Action (what now).
+   *  Customer Delivery / Goods Arriving At / Received read off the open Live
+   *  PO beside them. HONESTY GUARD unchanged: a column carrying an ACTIVE
+   *  filter or sort can never be hidden — a filter you cannot see is a lie
+   *  the table tells (P2's own law). */
+  const COMPACT_KEYS = new Set(["issued", "supplier", "po", "items", "action"]);
   const visibleColumns = workspaceOpen
     ? columns.filter(
         (c) =>
@@ -780,12 +817,17 @@ export default function OperationPurchaseOrders() {
 
   return (
     <div
-      className="h-full min-h-0 flex flex-col bg-kit-slate-3"
+      /* SURFACE LAW (Jess, 2026-08-02): the kit-canvas token — grey is
+       * chrome, every working surface below is white. Runs here first,
+       * flows back portal-wide after her live review. */
+      className="h-full min-h-0 flex flex-col bg-kit-canvas"
       data-testid="purchase-orders-workspace"
     >
-      {/* The top strip — To Order's own shape: breadcrumb + shared icons. */}
+      {/* The top strip — To Order's own shape: breadcrumb + shared icons.
+          The kit-strip token, one whisper above the canvas — Linear's header
+          recipe: so close to the page that the data always wins the eye. */}
       <div
-        className="shrink-0 flex items-center justify-between gap-3 px-6 pt-3 pb-1"
+        className="shrink-0 flex items-center justify-between gap-3 px-6 pt-3 pb-1 bg-kit-strip"
         data-testid="po-header-strip"
       >
         <div className="min-w-0 flex items-center gap-1.5 text-meta text-kit-slate-11">
@@ -952,6 +994,7 @@ export default function OperationPurchaseOrders() {
               sort={sort}
               onSortChange={setSort}
               loading={posQ.isLoading}
+              rowMuted={(p) => p.status === "cancelled"}
               label="Purchase orders"
               empty={
                 <EmptyState
