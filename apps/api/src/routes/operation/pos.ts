@@ -15,7 +15,6 @@ import {
 } from "@carres/shared";
 import { resolveCurrentPoDuty } from "./po-duty";
 // renderPoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
-import type { PoTemplateData } from "../../lib/pdf/types";
 import { requireOperation } from "../../lib/auth-guards";
 import { hasDuty } from "../../lib/duties";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
@@ -592,147 +591,68 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
 });
 
 // ----- GET /:id/print -----
-// Server-side PO PDF (spec §18.4 F6). Mirrors GET /orders/:id/print-do.
-// Printable for any non-cancelled PO (open or received). The PDF is what
-// operation hands to the supplier as the procurement document.
+// Server-side PO PDF payload — the money-free `purchasing_po_document` RPC
+// (migration 0307). The RM figures are ABSENT FROM THE PAYLOAD, not hidden by
+// the template, so no client can print what it never receives
+// (docs/pdf/PO-PDF-STANDARD.md §2 — Loo 2026-07-29 / 2026-08-01). The RPC also
+// enforces the role gate, refuses a cancelled PO and refuses a destination
+// with no address on file.
 //
-// Note: the schema's `purchase_order_lines` table only stores (po_id, sku,
-// qty, received_qty) — there is no per-line cost. Unit price comes from
-// product_skus.price (our reference price, not supplier COGS). Same query
-// also supplies the SKU description (variant text). When a line's SKU isn't
-// found in product_skus (legacy PO), unit_price falls back to 0 and the SKU
-// itself is used as the description — the PDF still renders.
-// 2026-05-12 (Loo): renamed `/print` → `/print-data`. Returns JSON;
-// browser renders @react-pdf locally (Workers WASM ban — see render.ts
-// note in apps/web/src/lib/pdf/).
+// The route adds two facts the document layer needs and the RPC does not
+// carry: `so_refs` (the Sales Order column — per-line attribution does not
+// exist in the schema, so the template prints the SO only when the PO covers
+// exactly one) and `issued_by` (null until the portal records an issuer).
+// 2026-05-12 (Loo): browser renders @react-pdf locally (Workers WASM ban —
+// see render.ts note in apps/web/src/lib/pdf/).
 operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
   const poId = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  // Fetch PO + supplier + warehouse via embedded resources. supplier and
-  // warehouse are FK'd from purchase_orders so PostgREST auto-detects the
-  // join. purchase_order_lines is FK'd by po_id, also auto-detected.
-  // suppliers has no `address` column (0001_init.sql:89-97), only contact.
-  const { data: po, error: e1 } = await sb
-    .from("purchase_orders")
-    .select(
-      "id, status, sup_status, so, so_refs, eta_date, placed_at, supplier_id, warehouse_id, suppliers(name, contact), warehouses(name, address)",
-    )
-    .eq("id", poId)
-    .maybeSingle();
-  if (e1) {
-    const m = mapPgError(e1);
+  const { data: doc, error } = await sb.rpc("purchasing_po_document", { p_po_id: poId });
+  if (error) {
+    // The RPC raises with a machine-readable `detail` (PostgREST → .details).
+    const details = String((error as { details?: string }).details ?? "");
+    if (details === "po_not_found" || error.code === "42P01") {
+      return c.json({ error: "not_found", code: "not_found", message: "PO not found" }, 404);
+    }
+    if (details === "po_not_printable") {
+      return c.json(
+        { error: "rule_violation", code: "po_not_printable", message: "Cancelled POs cannot be printed" },
+        422,
+      );
+    }
+    if (details === "destination_address_missing") {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "destination_address_missing",
+          message: "No address on file for this PO's destination",
+        },
+        422,
+      );
+    }
+    const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  if (!po) {
-    return c.json({ error: "not_found", code: "not_found", message: "PO not found" }, 404);
-  }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const poRow: any = po;
-  // Status gate: only cancelled POs are unprintable. open + received are both
-  // valid procurement records the supplier may want a PDF for. (po_status
-  // enum is 'open' | 'received' | 'cancelled' — see 0001_init.sql:29.)
-  if (poRow.status === "cancelled") {
-    return c.json(
-      { error: "rule_violation", code: "po_not_printable", message: "Cancelled POs cannot be printed" },
-      422,
-    );
-  }
-
-  // Lines.
-  const { data: lines, error: e2 } = await sb
-    .from("purchase_order_lines")
-    .select("sku, qty, received_qty, attrs")
-    .eq("po_id", poId);
+  const { data: po, error: e2 } = await sb
+    .from("purchase_orders")
+    .select("so, so_refs")
+    .eq("id", poId)
+    .maybeSingle();
   if (e2) {
     const m = mapPgError(e2);
     return c.json(m.body, m.status);
   }
-  const lineRows = lines ?? [];
-
-  // SKU descriptions + reference prices. Same pattern as orders' /print-do —
-  // purchase_order_lines.sku has no FK to product_skus, so a separate lookup.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const skus: string[] = lineRows.map((l: any) => l.sku);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const skuMetaBySku: Record<string, { variant: string; price: number }> = {};
-  if (skus.length > 0) {
-    const { data: skuRows, error: e3 } = await sb
-      .from("product_skus")
-      .select("sku, variant, price")
-      .in("sku", skus);
-    if (e3) {
-      const m = mapPgError(e3);
-      return c.json(m.body, m.status);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const r of skuRows ?? []) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const row = r as any;
-      skuMetaBySku[row.sku] = { variant: row.variant, price: Number(row.price) };
-    }
-  }
+  const poRow: any = po ?? {};
+  const soRefs: number[] = Array.isArray(poRow.so_refs)
+    ? poRow.so_refs
+    : poRow.so != null
+      ? [Number(poRow.so)]
+      : [];
 
-  // Build PoTemplateData. po.id IS the po_number (text PK like 'PO-2031');
-  // there is no separate po_number column. issue_date prefers placed_at
-  // (when the PO was issued) and falls back to today. ISO yyyy-mm-dd.
-  const issueIso = poRow.placed_at ?? new Date().toISOString();
-  const issueDate = String(issueIso).slice(0, 10);
-
-  const supplierRow = poRow.suppliers ?? null;
-  const warehouseRow = poRow.warehouses ?? null;
-
-  const pdfLines = lineRows.map(
-    (l: { sku: string; qty: number; received_qty: number; attrs?: Record<string, unknown> | null }) => {
-      const meta = skuMetaBySku[l.sku];
-      const qty = Number(l.qty);
-      const unitPrice = meta?.price ?? 0;
-      return {
-        sku: String(l.sku),
-        description: meta?.variant ?? String(l.sku),
-        qty,
-        unit: "pc",
-        unit_price: unitPrice,
-        line_total: qty * unitPrice,
-        // 0076 / 0077: thread the cascade picker payload into the PDF so the
-        // supplier sees "Walnut · gap 14"" right under the description and
-        // doesn't have to guess which variant.
-        attrs: l.attrs ?? null,
-      };
-    },
-  );
-  const grandTotal = pdfLines.reduce((s, ln) => s + ln.line_total, 0);
-
-  const templateData: PoTemplateData = {
-    // po.id is already in the canonical 'PO-NNNN' format, so it doubles as
-    // the doc number on the PDF.
-    po_number: String(poRow.id),
-    issue_date: issueDate,
-    po_id: String(poRow.id),
-    supplier: {
-      name: supplierRow?.name ?? "Supplier",
-      // suppliers.address column does not exist in the schema; suppliers
-      // ship from a known factory and we don't track that physical address
-      // here. Pass null so the template hides the line.
-      address: null,
-      contact: supplierRow?.contact ?? null,
-    },
-    buyer: {
-      // Buyer = Carres HQ side. Use the receiving warehouse name + address
-      // as the ship-to block, so the supplier knows where to send the goods.
-      name: warehouseRow?.name ?? "Carres HQ",
-      contact: warehouseRow?.address ?? null,
-    },
-    lines: pdfLines,
-    grand_total: grandTotal,
-    currency: "MYR",
-    // No `terms` column on purchase_orders — pass null. The template hides
-    // the block when null.
-    terms: null,
-  };
-
-  return c.json(templateData);
+  return c.json({ ...(doc as Record<string, unknown>), so_refs: soRefs, issued_by: null });
 });
 
 // ----- GET /:id/source-orders -----
