@@ -35,7 +35,7 @@ import { orderBookingDay, orderControlOf } from "@/lib/order-booking";
 import { personLabel, personInitials, avatarColor } from "@/lib/staff-avatar";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import type { OrderJourneySignals } from "./components/OrderJourneyHeader";
-import { TopBarIcons } from "./components/GlobalTopBar";
+import ModuleHeader from "./components/ModuleHeader";
 import FollowUpForm from "./components/FollowUpForm";
 import ImportStockEtaDialog from "./components/ImportStockEtaDialog";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
@@ -93,6 +93,7 @@ import {
   RefreshCw,
   ChevronRight,
   ChevronsLeft,
+  ClipboardList,
   Clock,
   Inbox,
   LayoutGrid,
@@ -2713,52 +2714,38 @@ export default function OperationOrdersControl({ onImport }: Props) {
   void poDutyTitleChips;
 
   return (
-    <>
+    /* Shell pattern (Loo 2026-08-02, applied to Orders on his order — this
+       replaces Jess's 2026-07-18 two-row header, recorded in the PR): ONE
+       fixed 44px ModuleHeader, the list below is the only scroll area.
+       Search moved to the toolbar row (it searches THIS page's data). */
+    <div className="h-full min-h-0 flex flex-col">
+      <ModuleHeader
+        testId="orders-header"
+        icon={ClipboardList}
+        word="Orders"
+        docTitle="Orders — Carres"
+        right={
+          latestIn ? (
+            <span className="inline-flex items-center gap-1.5 text-meta font-normal text-base-400">
+              <span className="tabular-nums" title="Most recent order / import">
+                Synced {fmtDate(latestIn)}
+              </span>
+              <button
+                type="button"
+                onClick={() => void refetch()}
+                title="Refresh"
+                aria-label="Refresh orders"
+                className="p-0.5 rounded hover:text-base-900 hover:bg-hovertint transition-colors"
+              >
+                <RefreshCw size={13} strokeWidth={2} />
+              </button>
+            </span>
+          ) : undefined
+        }
+      />
+      <div className="flex-1 min-h-0">
       <ListPageShell
         testId="operation-orders-control"
-        breadcrumb={
-          <>
-            <span>Operations</span>
-            <ChevronRight size={12} className="text-base-300" />
-            <span className="text-base-600">Orders</span>
-          </>
-        }
-        title={
-          <span className="inline-flex items-baseline gap-3">
-            <span>Orders</span>
-            {latestIn && (
-              <span className="inline-flex items-center gap-1.5 text-meta font-normal text-base-400">
-                <span className="tabular-nums" title="Most recent order / import">
-                  Synced {fmtDate(latestIn)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void refetch()}
-                  title="Refresh"
-                  aria-label="Refresh orders"
-                  className="p-0.5 rounded hover:text-base-900 hover:bg-hovertint transition-colors"
-                >
-                  <RefreshCw size={13} strokeWidth={2} />
-                </button>
-              </span>
-            )}
-          </span>
-        }
-        titleRight={undefined}
-        actions={
-          /* Header right cluster (ONE white header surface): search → Bell →
-             HelpCircle → Settings. Search lives HERE now, not in the toolbar. */
-          <>
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="SO number or customer…"
-              className="w-[230px] px-4 py-1.5 border border-base-200 rounded-full text-body bg-white outline-none focus:border-base-700"
-            />
-            <TopBarIcons />
-          </>
-        }
         facetOpen={kanbanOpen}
         onFacetToggle={() => setKanbanOpen((v) => !v)}
         toolbar={
@@ -2775,10 +2762,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
           />
         }
         toolbarRight={
-          /* ONE-row toolbar, right cluster: + Master · + AutoCount · ⋮. The
-             "N of M" counter is GONE (Jess 2026-07-18: it floated in the air
-             and duplicated the footer count + the Loading-more sentinel). */
+          /* ONE-row toolbar, right cluster: search · + Master · + AutoCount ·
+             ⋮. Search moved here from the deleted header row (Shell pattern:
+             it searches THIS page's data, so it is the page's, not the
+             shell's). The "N of M" counter is GONE (Jess 2026-07-18: it
+             floated in the air and duplicated the footer count + the
+             Loading-more sentinel). */
           <>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="SO number or customer…"
+              className="w-[230px] px-4 py-1.5 border border-base-200 rounded-full text-body bg-white outline-none focus:border-base-700"
+            />
             <button
               type="button"
               onClick={() => setEtaImportOpen(true)}
@@ -3542,6 +3539,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
         </table>
           </div>
       </ListPageShell>
+      </div>
 
       {/* Consolidated Raise-PO review (Option A cards, 0236) — from the bulk
           bar's selection or the PO-day banner's waiting set. */}
@@ -3596,7 +3594,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           onClose={() => setComposeOrder(null)}
         />
       )}
-    </>
+    </div>
   );
 }
 
