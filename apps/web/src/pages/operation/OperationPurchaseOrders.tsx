@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   addWorkingDays,
   myHolidaySet,
+  PO_DELAY_REASONS,
   PO_STATE_ACTION_SHORT,
   PO_WORK_STATES,
   PO_WORK_STATE_LABEL,
@@ -40,6 +41,7 @@ import {
   useCatalog,
   useOperationPos,
   useOperationSuppliers,
+  useRecordSupplierDate,
   useOperationWarehouse,
   usePurchasingSettings,
   type operationPoListRow,
@@ -1182,6 +1184,7 @@ function WorkspaceBody({
           className="mt-1 ml-32 pl-2 border-l-2 border-kit-blue-9"
           data-testid="po-date-extend"
         >
+          <SupplierDateForm po={po} current={eta.date} confirmed={eta.confirmed} />
           {calls.map((c) => (
             <div
               key={c.poLineId ?? c.key}
@@ -1321,6 +1324,110 @@ function WorkspaceBody({
   );
 }
 
+
+/**
+ * The supplier-date form (Jess, 2026-08-02) — ONE door for her whole cycle.
+ *
+ * The operator keys a DATE and nothing else about the answer: the SAME date
+ * the PO already holds means the promise stands (`shipping`), a different one
+ * is a delay and must carry a reason. Situation A (the supplier told us early)
+ * and situation B (nobody told us, we phoned) are the same act, so they are
+ * the same form — the only difference is whether a date was there before.
+ *
+ * Reason is the countable CATEGORY; Remarks is the free-text story. Two
+ * fields, never folded: a category that swallows prose cannot be counted.
+ */
+function SupplierDateForm({
+  po,
+  current,
+  confirmed,
+}: {
+  po: operationPoListRow;
+  current: string | null;
+  confirmed: boolean;
+}) {
+  const held = confirmed ? (po.eta_date ?? null) : null;
+  const [date, setDate] = useState(current ?? "");
+  const [reason, setReason] = useState<string>(PO_DELAY_REASONS[0]);
+  const [remarks, setRemarks] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const save = useRecordSupplierDate(po.id);
+
+  const moved = held != null && date !== held;
+  const canSave = date !== "" && !save.isPending;
+
+  function submit() {
+    setErr(null);
+    const body =
+      held == null
+        ? { answer: "shipping" as const, firstDate: date, remarks: remarks || undefined }
+        : moved
+          ? {
+              answer: "delayed" as const,
+              newDate: date,
+              reason,
+              remarks: remarks || undefined,
+            }
+          : { answer: "shipping" as const, remarks: remarks || undefined };
+    save.mutate(body, {
+      onSuccess: () => setRemarks(""),
+      onError: (e) => setErr(e instanceof Error ? e.message : String(e)),
+    });
+  }
+
+  return (
+    <div className="py-1" data-testid="po-date-form">
+      <div className="flex items-center gap-2">
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          aria-label="Supplier delivery date"
+          data-testid="po-date-input"
+          className="h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        />
+        {moved && (
+          <select
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            aria-label="Reason"
+            data-testid="po-date-reason"
+            className="h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12"
+          >
+            {PO_DELAY_REASONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        )}
+        <button
+          type="button"
+          onClick={submit}
+          disabled={!canSave}
+          data-testid="po-date-save"
+          className={`${DOC_BTN} disabled:opacity-40`}
+        >
+          {save.isPending ? "Saving…" : "Save"}
+        </button>
+      </div>
+      <input
+        type="text"
+        value={remarks}
+        onChange={(e) => setRemarks(e.target.value)}
+        placeholder="Remarks"
+        aria-label="Remarks"
+        data-testid="po-date-remarks"
+        className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+      />
+      {err && (
+        <div className="mt-1 text-label text-kit-red-11" data-testid="po-date-error">
+          {err}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * ACTIVITY — Work + History (Jess, 2026-08-02, renamed from Communication):

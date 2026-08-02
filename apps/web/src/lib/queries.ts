@@ -3913,6 +3913,37 @@ export function usePurchasingSettings(
 /** Every settings write returns the whole settings object and blows the
  *  purchase plan away with it — a changed production time moves an order-by
  *  date, which is the card's own Done-when. */
+/**
+ * The supplier-date door (Jess, 2026-08-02) — POST
+ * /api/operation/pos/:id/tomorrow-delivery, the ONE write for both
+ * situations: the supplier tells us early, or nobody told us and we phoned.
+ * The operator keys a DATE; the answer word is derived — the same date the
+ * PO already holds is `shipping` (the promise stands), a different one is
+ * `delayed` and must carry a reason. 0306/0310's RPC does the rest in one
+ * transaction: ledger row · the PO's date · the push into Delay planning ·
+ * the history sentence.
+ */
+export function useRecordSupplierDate(poId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      answer: "shipping" | "delayed";
+      firstDate?: string;
+      newDate?: string;
+      reason?: string;
+      remarks?: string;
+    }) =>
+      apiFetch<{ ok: true; result: unknown }>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/tomorrow-delivery`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      // Every PO list view — the register reads one, the workspace another.
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
 function usePurchasingSettingsMutation<TInput>(path: string) {
   const qc = useQueryClient();
   return useMutation({

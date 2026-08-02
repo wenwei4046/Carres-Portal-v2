@@ -149,7 +149,24 @@ SO × SKU, salesperson remark read-only) with a TOTAL row + `Open
 Receiving →` (the Receiving PANEL is gone — quantities live on the rows) ·
 row click extends in place (Destination fact today; [Change] = Phase 4/5's
 Split/Revision door) · ACTIVITY unchanged. 25 page tests green.
-STILL OWED: the date FORM (key a new date + Reason ▾ + Remarks) — it needs
+DATE DOOR ✅ SHIPPED 2026-08-02: migration **0310_supplier_date_door
+APPLIED to prod** (tracker tail was 0309 — read there, never off `ls`, since
+the repo's file tail is 0307 and a parallel lane holds 0308/0309). `remarks`
+on the ledger + a FIRST-CONFIRM branch in `purchasing_record_tomorrow_delivery`
+(old 4-arg dropped first — a defaulted param mints a second signature).
+Dry-run in a rolled-back transaction on prod first, rollback verified TOTAL,
+and the harness was proved able to FAIL. Post-apply: remarks col 1 · exactly
+1 function, 5 args · `authenticated` true / `anon` false · 0 rows touched.
+**A defect in MY OWN harness, caught before it lied**: the first "is the old
+arity gone?" assertion CALLED the 4-arg form — which now resolves to the
+5-arg function with `p_remarks` defaulted, hits the role gate, and is
+swallowed by `when others`, so it could never fail. Rewritten to read
+`pg_proc.pronargs`.
+The FORM is live in the workspace: ONE date field — the same date the PO
+holds means the promise stands (`shipping`), a different one is `delayed`
+and the Reason ▾ appears; Remarks is free text beside it. 27 page tests.
+
+WAS OWED (now done): the date FORM (key a new date + Reason ▾ + Remarks) — it needs
 the migration below, so today the extend shows facts and history only, no
 dead Save button.
 

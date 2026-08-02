@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PO_DELAY_REASONS } from "@carres/shared";
 import OperationPurchaseOrders from "./OperationPurchaseOrders";
+
+const PO_DELAY_REASONS_FOR_TEST: readonly string[] = PO_DELAY_REASONS;
 
 /**
  * Purchase Orders — the Register's Step-1 freeze (Jess, 2026-08-02):
@@ -439,5 +442,51 @@ describe("the ONE Current Action source (Law 7)", () => {
   it("an overdue PO's column says Contact Supplier, never Confirm again", async () => {
     await mountLoaded();
     expect(listing().getByText("Contact Supplier")).toBeInTheDocument();
+  });
+});
+
+describe("the supplier-date door (Jess's cycle, one form)", () => {
+  it("a PO with NO date takes its FIRST date — no reason asked", async () => {
+    await mountLoaded();
+    fireEvent.click(listing().getByText("PO-9002"));
+    // PO-9002 is cancelled; use the one with no date instead.
+    fireEvent.click(screen.getByTestId("po-date-row"));
+    const form = within(screen.getByTestId("po-date-form"));
+    expect(form.getByTestId("po-date-input")).toBeInTheDocument();
+    // No date held → nothing to delay → the reason picker stays away.
+    expect(form.queryByTestId("po-date-reason")).not.toBeInTheDocument();
+  });
+
+  it("keying a DIFFERENT date asks for a reason and posts a delay", async () => {
+    await mountLoaded();
+    // PO-9001 holds a supplier-confirmed date (its ledger says so).
+    fireEvent.click(screen.getByTestId("po-date-row"));
+    const input = screen.getByTestId("po-date-input");
+    fireEvent.change(input, { target: { value: "2099-12-31" } });
+    expect(screen.getByTestId("po-date-reason")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("po-date-remarks"), {
+      target: { value: "factory said Tuesday" },
+    });
+    fireEvent.click(screen.getByTestId("po-date-save"));
+    await waitFor(() =>
+      expect(
+        apiFetch.mock.calls.some(
+          (c) =>
+            String(c[0]).includes("/tomorrow-delivery") &&
+            String((c[1] as { body?: string })?.body).includes('"delayed"'),
+        ),
+      ).toBe(true),
+    );
+    const call = apiFetch.mock.calls.find((c) =>
+      String(c[0]).includes("/tomorrow-delivery"),
+    )!;
+    const body = JSON.parse(String((call[1] as { body: string }).body));
+    expect(body).toMatchObject({
+      answer: "delayed",
+      newDate: "2099-12-31",
+      remarks: "factory said Tuesday",
+    });
+    // The reason is the countable CATEGORY, never free text.
+    expect(PO_DELAY_REASONS_FOR_TEST).toContain(body.reason);
   });
 });
