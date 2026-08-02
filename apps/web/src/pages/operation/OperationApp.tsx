@@ -28,6 +28,7 @@ import OperationToOrder from "./OperationToOrder";
 import OperationWarehouse from "./OperationWarehouse";
 import OperationMovements from "./OperationMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
+import OperationPurchaseOrders from "./OperationPurchaseOrders";
 // P3 (Jess redesign Q3a=B) — GRN receiving station, split out from the
 // Purchase Order (procurement) menu.
 import OperationReceiving from "./OperationReceiving";
@@ -258,10 +259,11 @@ export default function OperationApp() {
         {isUrlDriven ? (
           // Nested route table for the URL-driven sections.
           //
-          // Procurement (`/operation/procurement[/:slug]`) — both the bare and
-          // slugged paths mount `TabbedProcurementShell`; the shell dispatches
-          // internally on `useParams<{ slug? }>()` and `<Navigate replace>`
-          // sends invalid/missing slugs to the default tab (`nice-future`).
+          // Procurement — the BARE path (`/operation/procurement`) mounts the
+          // Purchase Execution Workspace (Jess's 2026-08-01 architecture
+          // freeze). The slugged paths keep the legacy per-supplier shell so
+          // every existing `?po=` deep link from To Order still opens the
+          // document it names.
           //
           // Orders (`/operation/orders[/:stage]`) — both paths mount the
           // unified `OperationOrdersControl` table (Jess redesign step 2). The
@@ -278,7 +280,7 @@ export default function OperationApp() {
           // fail to match here even though the URL string is identical — the
           // result is the main area renders nothing while the URL stays put.
           <Routes>
-            <Route path="procurement" element={<TabbedProcurementShell />} />
+            <Route path="procurement" element={<OperationPurchaseOrders />} />
             <Route
               path="procurement/:slug"
               element={<TabbedProcurementShell />}

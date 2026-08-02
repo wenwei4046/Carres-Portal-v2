@@ -435,6 +435,9 @@ export const qk = {
     pos:       (filters?: operationPoFilters) =>
       ["operation", "pos", filters ?? {}] as const,
     po:        (id: string) => ["operation", "pos", id] as const,
+    /** The per-unit goods ids a PO minted at Issue (0153) — the PO-PDF
+     *  standard's Item ID column. Nested under "pos" for blunt invalidation. */
+    poUnits:   (id: string) => ["operation", "pos", id, "units"] as const,
     /** Loo 2026-05-16 — per-source-order ETA list for the PO detail modal.
      *  Nested under "pos" so a blunt `["operation","pos"]` invalidation after
      *  a PO mutation also clears these. Cheap (1-row-per-SO select), and the
@@ -3121,6 +3124,10 @@ export interface operationPoListRow {
    *  answer about nothing, and the call re-opens. OPTIONAL for the same
    *  degrade-don't-crash reason as `short_since`. */
   tomorrow_answer_about_date?: string | null;
+  /** Register (2026-08-02) — the EARLIEST promised customer delivery across
+   *  every SO this PO covers; null for stockpile POs. OPTIONAL so a browser
+   *  on this build against an older Worker degrades instead of crashing. */
+  customer_delivery?: string | null;
   /** 2026-05-18 (Loo C+D) — per-source-SO enrichment from
    *  /api/operation/procurement/:slug. One entry per SO this PO serves
    *  (po.so for single, po.so_refs[] for bundle). Empty for stockpile POs
@@ -4010,6 +4017,34 @@ export interface operationPoSourceOrder {
 export interface operationPoSourceOrdersResponse {
   orders: operationPoSourceOrder[];
 }
+/** GET /api/operation/pos/:id/units — the Item ID column's real data:
+ *  `unit_code` per physical piece (0153), keyed back to lines by sku. */
+export interface operationPoUnitRow {
+  unit_code: string;
+  sku: string;
+  status: string;
+}
+export interface operationPoUnitsResponse {
+  units: operationPoUnitRow[];
+}
+export function useOperationPoUnits(
+  poId: string | null,
+  opts?: Partial<UseQueryOptions<operationPoUnitsResponse>>,
+) {
+  return useQuery({
+    queryKey: poId
+      ? qk.operation.poUnits(poId)
+      : (["operation", "pos", "null", "units"] as const),
+    queryFn: () =>
+      apiFetch<operationPoUnitsResponse>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/units`,
+      ),
+    enabled: !!poId,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 export function useOperationPoSourceOrders(
   poId: string | null,
   opts?: Partial<UseQueryOptions<operationPoSourceOrdersResponse>>,

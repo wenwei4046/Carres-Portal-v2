@@ -173,12 +173,49 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     }
   }
 
+  // ── The customer's date — the earliest promised delivery across every SO
+  // this PO covers. The Register's second column (Jess, 2026-08-02): the PO
+  // exists to make a customer date, so the listing shows it beside the day
+  // the PO was issued. One bounded IN() read over the page's SOs.
+  const soSet = new Set<number>();
+  for (const p of pos) {
+    const row = p as Record<string, unknown>;
+    if (row.so != null) soSet.add(Number(row.so));
+    for (const r of (row.so_refs as number[] | null) ?? []) soSet.add(Number(r));
+  }
+  const deliveryBySo = new Map<number, string | null>();
+  if (soSet.size > 0) {
+    const { data: orderRows, error: orderErr } = await sb
+      .from("orders")
+      .select("so, delivery_date")
+      .in("so", [...soSet]);
+    if (orderErr) {
+      const m = mapPgError(orderErr);
+      return c.json(m.body, m.status);
+    }
+    for (const r of orderRows ?? []) {
+      const row = r as Record<string, unknown>;
+      deliveryBySo.set(Number(row.so), (row.delivery_date as string | null) ?? null);
+    }
+  }
+  const customerDeliveryOf = (row: Record<string, unknown>): string | null => {
+    const sos: number[] = [];
+    if (row.so != null) sos.push(Number(row.so));
+    for (const r of (row.so_refs as number[] | null) ?? []) sos.push(Number(r));
+    const dates = sos
+      .map((n) => deliveryBySo.get(n) ?? null)
+      .filter((d): d is string => d != null)
+      .sort();
+    return dates[0] ?? null;
+  };
+
   const withAnswers = pos.map((p) => {
     const row = p as Record<string, unknown>;
     const lines = (row.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [];
     return {
       ...row,
       tomorrow_answer_about_date: tomorrowAboutByPo.get(row.id as string) ?? null,
+      customer_delivery: customerDeliveryOf(row),
       purchase_order_lines: lines.map((l) => ({
         ...l,
         balance_answer_about_qty: balanceAboutByLine.get(l.id as string) ?? null,
@@ -605,6 +642,28 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
 // 2026-05-12 (Loo): renamed `/print` → `/print-data`. Returns JSON;
 // browser renders @react-pdf locally (Workers WASM ban — see render.ts
 // note in apps/web/src/lib/pdf/).
+/**
+ * GET /api/operation/pos/:id/units — the per-unit goods ids this PO minted at
+ * Issue (0153/0154: one `id-abc123456` unit_code per physical piece, status
+ * 'incoming' until the warehouse receives). The PO-PDF-STANDARD's Item ID
+ * column is THESE ids, never the SKU — this read is what lets the workspace
+ * (and later the printed document) fill that column with real data.
+ * Own-warehouse POs only ever mint units; a PO with none returns [].
+ */
+operationPosRouter.get("/:id/units", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("ops_stock_items")
+    .select("unit_code, sku, status")
+    .eq("po_no", c.req.param("id"))
+    .order("unit_code", { ascending: true });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ units: data ?? [] });
+});
+
 operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
   const poId = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
