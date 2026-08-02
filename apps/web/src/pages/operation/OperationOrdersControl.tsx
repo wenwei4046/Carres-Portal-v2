@@ -2725,21 +2725,19 @@ export default function OperationOrdersControl({ onImport }: Props) {
         word="Orders"
         docTitle="Orders — Carres"
         right={
+          /* The sync SENTENCE is read once a week; the FACT rides the ⟳'s
+             hover instead of spending header width on it (Loo 2026-08-02:
+             words out, action stays). */
           latestIn ? (
-            <span className="inline-flex items-center gap-1.5 text-meta font-normal text-base-400">
-              <span className="tabular-nums" title="Most recent order / import">
-                Synced {fmtDate(latestIn)}
-              </span>
-              <button
-                type="button"
-                onClick={() => void refetch()}
-                title="Refresh"
-                aria-label="Refresh orders"
-                className="p-0.5 rounded hover:text-base-900 hover:bg-hovertint transition-colors"
-              >
-                <RefreshCw size={13} strokeWidth={2} />
-              </button>
-            </span>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              title={`Synced ${fmtDate(latestIn)} — click to refresh`}
+              aria-label="Refresh orders"
+              className="p-0.5 rounded text-base-400 hover:text-base-900 hover:bg-hovertint transition-colors"
+            >
+              <RefreshCw size={13} strokeWidth={2} />
+            </button>
           ) : undefined
         }
       />
