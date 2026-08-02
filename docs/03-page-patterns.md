@@ -13,6 +13,17 @@ define typography, colour, spacing or component styles.
 **One purpose per page. One primary action. Business logic belongs to modules,
 never to a pattern.**
 
+**One obvious reading path** (`UI_KIT_MASTER` §5, Loo 2026-08-02). Within three
+seconds the operator knows: where they are · what needs attention · what to do
+next.
+
+**Vertical chrome is economical** (`UI_KIT_MASTER` §11, Loo 2026-08-02). Never
+stack breadcrumb + title + tabs + summary + toolbar + filters + table header
+without proving every layer earns its height. The active tab is never repeated
+as a second page title unless the title adds information the tab does not.
+When a pattern's workspace model scrolls its regions independently, the PAGE
+itself does not scroll.
+
 ---
 
 ## Pattern standard

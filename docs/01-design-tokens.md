@@ -206,5 +206,9 @@ on a screen. The dictionary is `docs/COPY-STANDARD.md`.
 **Banned:** `Pending` · `Exception` · `Chase` · `Soon` · `Maybe` · `Scheduled` ·
 `Appointment Pending` · `Booking Pending` · `POD`.
 
+A banned DISPLAY word may still exist as a database or API value where
+compatibility requires it. Never rename a stored value silently — the screen
+translates; the store keeps its contract (§0's label-vs-identifier rule).
+
 **Every word answers one question: who · what · next.** No decoration, no
 marketing language, no unnecessary explanation.
