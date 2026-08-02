@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   ClipboardCheck,
+  ShoppingBag,
   ShoppingCart,
   PackageCheck,
   AlertTriangle,
@@ -9,7 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { usePurchasingSettings } from "@/lib/queries";
-import { TopBarIcons } from "./components/GlobalTopBar";
+import ModuleHeader from "./components/ModuleHeader";
 
 /**
  * PurchasingTabs — the ONE fixed header row of the Purchasing module
@@ -84,62 +85,47 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
           : "to-order";
   const canEditSettings = settingsQ.data?.canEdit ?? false;
   const tabs = TABS.filter((t) => t.key !== "purchasing-settings" || canEditSettings);
+  const activeLabel = TABS.find((t) => t.key === active)?.label ?? "Purchasing";
 
   return (
-    <div
-      className="shrink-0 bg-white border-b border-base-200 px-6"
-      role="tablist"
-      aria-label="Purchasing"
-      data-testid="purchasing-tabs"
+    <ModuleHeader
+      testId="purchasing-tabs"
+      icon={ShoppingBag}
+      word="Purchasing"
+      docTitle={`${activeLabel} · Purchasing — Carres`}
+      right={right}
     >
-      <div className="flex items-center gap-4 h-11">
-        {/* Module word — a coordinate, not a title. Small, grey, never bold. */}
-        <span
-          className="shrink-0 text-meta font-medium text-base-500 select-none"
-          data-testid="purchasing-module-word"
-        >
-          Purchasing
-        </span>
-        <div className="flex gap-1 h-full min-w-0 overflow-x-auto">
-          {tabs.map((t) => {
-            const isActive = t.key === active;
-            return (
-              <Link
-                key={t.key}
-                to={t.to}
-                role="tab"
-                aria-selected={isActive}
-                data-testid={`purchasing-tab-${t.key}`}
-                className={[
-                  "relative flex items-center gap-1.5 px-4 h-full whitespace-nowrap text-body transition-colors border-b-2 -mb-px",
-                  isActive
-                    ? "border-kit-blue-9 text-base-900 font-semibold"
-                    : "border-transparent text-base-600 font-medium hover:text-base-900",
-                ].join(" ")}
-              >
-                <t.icon
-                  size={14}
-                  strokeWidth={2}
-                  className={isActive ? "text-kit-blue-9" : "text-base-400"}
-                />
-                {t.label}
-              </Link>
-            );
-          })}
-        </div>
-        <div className="flex-1" />
-        {right && (
-          <div
-            className="shrink-0 flex items-center gap-2"
-            data-testid="purchasing-tabs-right"
-          >
-            {right}
-          </div>
-        )}
-        {/* Global icons — the shell's, on every tab, so the Bell never
-            disappears when the operator switches pages. */}
-        <TopBarIcons />
+      <div
+        className="flex gap-1 h-full min-w-0 overflow-x-auto"
+        role="tablist"
+        aria-label="Purchasing"
+      >
+        {tabs.map((t) => {
+          const isActive = t.key === active;
+          return (
+            <Link
+              key={t.key}
+              to={t.to}
+              role="tab"
+              aria-selected={isActive}
+              data-testid={`purchasing-tab-${t.key}`}
+              className={[
+                "relative flex items-center gap-1.5 px-4 h-full whitespace-nowrap text-body transition-colors border-b-2 -mb-px",
+                isActive
+                  ? "border-kit-blue-9 text-base-900 font-semibold"
+                  : "border-transparent text-base-600 font-medium hover:text-base-900",
+              ].join(" ")}
+            >
+              <t.icon
+                size={14}
+                strokeWidth={2}
+                className={isActive ? "text-kit-blue-9" : "text-base-400"}
+              />
+              {t.label}
+            </Link>
+          );
+        })}
       </div>
-    </div>
+    </ModuleHeader>
   );
 }
