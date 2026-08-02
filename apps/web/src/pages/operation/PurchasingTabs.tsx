@@ -108,11 +108,14 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
         {/* The NAMEPLATE — module icon + word + divider. It is the wall sign,
             not a button: no hover, no click, cursor stays default. Same icon
             as the sidebar item so the module has ONE face (Loo 2026-08-02). */}
+        {/* GitHub's own weighting: the context name is SEMIBOLD and dark at
+            the SAME size as the tabs — weight, never size, or it becomes the
+            H1 this row exists to kill. */}
         <span
-          className="shrink-0 flex items-center gap-1.5 text-body font-medium text-base-700 select-none cursor-default"
+          className="shrink-0 flex items-center gap-1.5 text-body font-semibold text-base-900 select-none cursor-default"
           data-testid="purchasing-module-word"
         >
-          <ShoppingBag size={15} strokeWidth={2} className="text-base-500" />
+          <ShoppingBag size={15} strokeWidth={2} className="text-base-700" />
           Purchasing
         </span>
         <div className="shrink-0 h-4 w-px bg-base-200" aria-hidden="true" />
