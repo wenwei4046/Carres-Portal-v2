@@ -149,6 +149,15 @@ SO × SKU, salesperson remark read-only) with a TOTAL row + `Open
 Receiving →` (the Receiving PANEL is gone — quantities live on the rows) ·
 row click extends in place (Destination fact today; [Change] = Phase 4/5's
 Split/Revision door) · ACTIVITY unchanged. 25 page tests green.
+**INLINE EDIT (Jess, 2026-08-02: "it always show like that?").** The line's
+work surface was a form standing open on every row with a Save that is grey
+most of the time — furniture. Now it is Linear's/Notion's manner: a value is
+TEXT until clicked, then it becomes a control; **Enter saves, Esc cancels,
+and there is no Save button anywhere on the surface**. Quiet state reads
+`Destination Carres Klang` / `Ops remark Add a note…` — two lines, no
+widgets. Esc restores and posts nothing (tested). The same lesson as the
+date field one hour earlier: the quiet state must LOOK quiet.
+
 **STEP 1 OF HER THREE ✅ SHIPPED 2026-08-02 — WHERE EACH LINE GOES
 (migration 0311_where_each_line_goes APPLIED to prod).** Her words:
 *"operation under item due to we need key in destination, you forgot

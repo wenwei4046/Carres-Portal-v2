@@ -1383,6 +1383,21 @@ function WorkspaceBody({
  * remainder can move: goods a warehouse already holds cannot be re-routed by
  * editing a document.
  */
+/**
+ * The line's work surface (Jess, 2026-08-02 — 0311). Purchasing's only
+ * per-line job is WHERE THIS PIECE GOES, so that is what opens under the row.
+ *
+ * INLINE EDIT, Linear's/Notion's manner (Jess, 2026-08-02: "it always show
+ * like that?"): a value is TEXT until you click it. A form standing open on
+ * every row, with a Save that is grey most of the time, is furniture — the
+ * quiet state must look quiet. Enter saves, Esc cancels; there is no Save
+ * button anywhere.
+ *
+ * When only PART of the quantity goes elsewhere the LINE splits — the PO
+ * stays one document with one supplier (her frozen law). Only the un-received
+ * remainder can move: goods a warehouse already holds cannot be re-routed by
+ * editing a document.
+ */
 function LineWork({
   lineId,
   qty,
@@ -1404,22 +1419,48 @@ function LineWork({
 }) {
   const act = usePoLineAction(lineId);
   const current = destinationId ?? poDestinationId ?? "";
+  const currentName =
+    destinations.find((d) => d.id === current)?.name ?? fallbackName;
+  const [editing, setEditing] = useState<null | "dest" | "note">(null);
   const [dest, setDest] = useState(current);
   const [moveQty, setMoveQty] = useState("");
   const [note, setNote] = useState(opsRemark ?? "");
   const [err, setErr] = useState<string | null>(null);
+
   const free = Math.max(0, qty - received);
   const moving = Number(moveQty || 0);
   const changed = dest !== "" && dest !== current;
   const willSplit = changed && moving >= 1 && moving < free;
 
-  const run = (path: "destination" | "split" | "ops-remark", body: Record<string, unknown>) => {
+  const close = () => {
+    setEditing(null);
+    setDest(current);
+    setMoveQty("");
+    setNote(opsRemark ?? "");
+    setErr(null);
+  };
+  const run = (
+    path: "destination" | "split" | "ops-remark",
+    body: Record<string, unknown>,
+  ) => {
     setErr(null);
     act.mutate(
       { path, body },
-      { onError: (e) => setErr(e instanceof Error ? e.message : String(e)) },
+      {
+        onSuccess: () => setEditing(null),
+        onError: (e) => setErr(e instanceof Error ? e.message : String(e)),
+      },
     );
   };
+  const saveDestination = () => {
+    if (!changed) return close();
+    if (willSplit) run("split", { moveQty: moving, destinationId: dest });
+    else run("destination", { destinationId: dest });
+  };
+
+  const EDIT_TEXT =
+    "border-b border-dashed border-kit-slate-5 text-left hover:text-kit-slate-12";
+  const KEYS = "text-label text-kit-slate-9";
 
   return (
     <div data-testid="po-line-work">
@@ -1427,80 +1468,112 @@ function LineWork({
         <span className="w-24 shrink-0 text-label text-kit-slate-9">
           Destination
         </span>
-        <select
-          value={dest}
-          onChange={(e) => setDest(e.target.value)}
-          aria-label="Destination"
-          data-testid="po-line-destination"
-          className="h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12"
-        >
-          {destinations.length === 0 && <option value="">{fallbackName}</option>}
-          {destinations.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </select>
-        {changed && free > 1 && (
+        {editing === "dest" ? (
           <>
-            <span className="text-label text-kit-slate-9">Move</span>
-            <input
-              type="number"
-              min={1}
-              max={free}
-              value={moveQty}
-              onChange={(e) => setMoveQty(e.target.value)}
-              placeholder={`${free}`}
-              aria-label="Move how many"
-              data-testid="po-line-move-qty"
-              className="h-8 w-16 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 tabular-nums"
-            />
-            <span className="text-label text-kit-slate-9">of {free}</span>
+            <select
+              value={dest}
+              autoFocus
+              onChange={(e) => setDest(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveDestination();
+                if (e.key === "Escape") close();
+              }}
+              aria-label="Destination"
+              data-testid="po-line-destination"
+              className="h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12"
+            >
+              {destinations.length === 0 && (
+                <option value="">{fallbackName}</option>
+              )}
+              {destinations.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+            {changed && free > 1 && (
+              <>
+                <span className="text-label text-kit-slate-9">Move</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={free}
+                  value={moveQty}
+                  onChange={(e) => setMoveQty(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveDestination();
+                    if (e.key === "Escape") close();
+                  }}
+                  placeholder={`${free}`}
+                  aria-label="Move how many"
+                  data-testid="po-line-move-qty"
+                  className="h-8 w-14 rounded-control border border-kit-slate-5 bg-white px-2 text-right text-body text-kit-slate-12 tabular-nums"
+                />
+                <span className="text-label text-kit-slate-9">of {free}</span>
+              </>
+            )}
+            <span className={KEYS}>
+              {act.isPending ? "Saving…" : "Enter save · Esc cancel"}
+            </span>
           </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditing("dest")}
+            data-testid="po-line-destination-open"
+            className={`${EDIT_TEXT} text-kit-slate-12`}
+          >
+            {currentName}
+          </button>
         )}
-        <button
-          type="button"
-          disabled={!changed || act.isPending}
-          onClick={() =>
-            willSplit
-              ? run("split", { moveQty: moving, destinationId: dest })
-              : run("destination", { destinationId: dest })
-          }
-          data-testid="po-line-destination-save"
-          className={`${DOC_BTN} disabled:opacity-40`}
-        >
-          {act.isPending ? "Saving…" : willSplit ? "Split" : "Save"}
-        </button>
       </div>
-      {changed && (
-        <div className="text-label text-kit-slate-9" data-testid="po-line-effect">
+      {editing === "dest" && changed && (
+        <div
+          className="ml-24 pl-2 text-label text-kit-slate-9"
+          data-testid="po-line-effect"
+        >
           {willSplit
             ? `${moving} of ${free} move; ${free - moving} stay.`
             : `All ${free} move.`}
         </div>
       )}
+
       <div className="mt-1 flex items-center gap-2 text-body leading-6">
         <span className="w-24 shrink-0 text-label text-kit-slate-9">
           Ops remark
         </span>
-        <input
-          type="text"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Internal — never printed"
-          aria-label="Ops remark"
-          data-testid="po-line-ops-remark"
-          className="h-8 flex-1 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12"
-        />
-        <button
-          type="button"
-          disabled={note === (opsRemark ?? "") || act.isPending}
-          onClick={() => run("ops-remark", { text: note })}
-          data-testid="po-line-ops-save"
-          className={`${DOC_BTN} disabled:opacity-40`}
-        >
-          Save
-        </button>
+        {editing === "note" ? (
+          <>
+            <input
+              type="text"
+              value={note}
+              autoFocus
+              onChange={(e) => setNote(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") run("ops-remark", { text: note });
+                if (e.key === "Escape") close();
+              }}
+              placeholder="Internal — never printed"
+              aria-label="Ops remark"
+              data-testid="po-line-ops-remark"
+              className="h-8 flex-1 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12"
+            />
+            <span className={KEYS}>
+              {act.isPending ? "Saving…" : "Enter save · Esc cancel"}
+            </span>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditing("note")}
+            data-testid="po-line-ops-open"
+            className={`${EDIT_TEXT} ${
+              opsRemark ? "text-kit-slate-12" : "text-kit-slate-9"
+            }`}
+          >
+            {opsRemark ?? "Add a note…"}
+          </button>
+        )}
       </div>
       {err && (
         <div className="text-label text-kit-red-11" data-testid="po-line-error">

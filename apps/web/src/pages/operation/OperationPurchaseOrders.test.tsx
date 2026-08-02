@@ -434,6 +434,11 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
     const ext = within(screen.getByTestId("po-item-extend"));
     expect(ext.getByText("Destination")).toBeInTheDocument();
     expect(ext.getByText("Ops remark")).toBeInTheDocument();
+    // QUIET by default (Jess, "it always show like that?"): values are TEXT,
+    // no control and no Save button until something is clicked.
+    expect(ext.queryByTestId("po-line-destination")).not.toBeInTheDocument();
+    expect(ext.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(ext.getByText("Add a note…")).toBeInTheDocument();
   });
 
   it("quantities live on the rows — no Receiving panel AND no door", async () => {
@@ -576,11 +581,14 @@ describe("where each line goes (0311, Jess 2026-08-02)", () => {
     );
     // Row 3 is a qty-1 line, so there is nothing to split.
     fireEvent.click(screen.getByTestId("po-item-row-3"));
+    fireEvent.click(screen.getByTestId("po-line-destination-open"));
     fireEvent.change(screen.getByTestId("po-line-destination"), {
       target: { value: AL },
     });
     expect(screen.getByTestId("po-line-effect").textContent).toMatch(/All 1 move/);
-    fireEvent.click(screen.getByTestId("po-line-destination-save"));
+    // Enter saves — there is no Save button anywhere.
+    expect(screen.queryByTestId("po-line-destination-save")).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByTestId("po-line-destination"), { key: "Enter" });
     await waitFor(() =>
       expect(
         apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/destination")),
@@ -598,6 +606,7 @@ describe("where each line goes (0311, Jess 2026-08-02)", () => {
     );
     // PO-9001's only line is qty 3 → Move appears.
     fireEvent.click(screen.getByTestId("po-item-row-1"));
+    fireEvent.click(screen.getByTestId("po-line-destination-open"));
     fireEvent.change(screen.getByTestId("po-line-destination"), {
       target: { value: AL },
     });
@@ -607,8 +616,7 @@ describe("where each line goes (0311, Jess 2026-08-02)", () => {
     expect(screen.getByTestId("po-line-effect").textContent).toMatch(
       /1 of 3 move; 2 stay/,
     );
-    expect(screen.getByTestId("po-line-destination-save").textContent).toBe("Split");
-    fireEvent.click(screen.getByTestId("po-line-destination-save"));
+    fireEvent.keyDown(screen.getByTestId("po-line-move-qty"), { key: "Enter" });
     await waitFor(() =>
       expect(apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/split"))).toBe(
         true,
@@ -624,14 +632,33 @@ describe("where each line goes (0311, Jess 2026-08-02)", () => {
   it("the ops remark is purchasing's own — internal, and it says so", async () => {
     await mountLoaded();
     fireEvent.click(screen.getByTestId("po-item-row-1"));
+    fireEvent.click(screen.getByTestId("po-line-ops-open"));
     const input = screen.getByTestId("po-line-ops-remark") as HTMLInputElement;
     expect(input.placeholder).toMatch(/never printed/i);
     fireEvent.change(input, { target: { value: "AL collects Friday" } });
-    fireEvent.click(screen.getByTestId("po-line-ops-save"));
+    fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() =>
       expect(
         apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/ops-remark")),
       ).toBe(true),
     );
+  });
+});
+
+describe("inline edit — Esc puts it back", () => {
+  it("opening, changing and pressing Esc records nothing", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-item-row-1"));
+    fireEvent.click(screen.getByTestId("po-line-destination-open"));
+    fireEvent.change(screen.getByTestId("po-line-destination"), {
+      target: { value: AL },
+    });
+    fireEvent.keyDown(screen.getByTestId("po-line-destination"), { key: "Escape" });
+    // Back to plain text, and nothing was posted.
+    expect(screen.queryByTestId("po-line-destination")).not.toBeInTheDocument();
+    expect(screen.getByTestId("po-line-destination-open")).toBeInTheDocument();
+    expect(
+      apiFetch.mock.calls.some((c) => String(c[0]).includes("/lines/")),
+    ).toBe(false);
   });
 });
