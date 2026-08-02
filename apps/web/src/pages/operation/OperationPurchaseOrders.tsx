@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   addWorkingDays,
   myHolidaySet,
+  PO_STATE_ACTION_SHORT,
   PO_WORK_STATES,
   PO_WORK_STATE_LABEL,
   poCurrentActionOf,
@@ -315,8 +316,12 @@ export default function OperationPurchaseOrders() {
   const actionOf = (po: operationPoListRow) => actionByPo.get(po.id) ?? null;
   const actionKeyOf = (a: PoCurrentAction | null): string =>
     a == null ? F_NONE : a.kind === "call" ? a.call.key : a.key;
-  const actionWordOf = (a: PoCurrentAction): string =>
-    a.kind === "call" ? purchasingActionQueue(a.call.key) : a.word;
+  // The register's short spelling (Jess: 19 identical seven-word rows are
+  // wallpaper) — the workspace hero keeps the full wording.
+  const actionListWordOf = (a: PoCurrentAction): string =>
+    a.kind === "call"
+      ? purchasingActionQueue(a.call.key)
+      : PO_STATE_ACTION_SHORT[a.key];
 
   // ── The pipeline: search → rail (calls × work status) → column filters →
   //    sort. Every rail count is computed with the OTHER dimensions applied,
@@ -414,7 +419,7 @@ export default function OperationPurchaseOrders() {
           }
           case "action": {
             const a = actionOf(p);
-            return a ? actionWordOf(a) : "zzz";
+            return a ? actionListWordOf(a) : "zzz";
           }
           default:
             return "";
@@ -609,7 +614,7 @@ export default function OperationPurchaseOrders() {
     let none = false;
     for (const p of base) {
       const a = actionOf(p);
-      if (a) byKey.set(actionKeyOf(a), actionWordOf(a));
+      if (a) byKey.set(actionKeyOf(a), actionListWordOf(a));
       else none = true;
     }
     const opts = [...byKey.entries()]
@@ -793,7 +798,7 @@ export default function OperationPurchaseOrders() {
                   : "text-kit-slate-12"
             }
           >
-            {actionWordOf(a)}
+            {actionListWordOf(a)}
           </span>
         );
       },
@@ -832,10 +837,11 @@ export default function OperationPurchaseOrders() {
       data-testid="purchase-orders-workspace"
     >
       {/* The top strip — To Order's own shape: breadcrumb + shared icons.
-          The kit-strip token, one whisper above the canvas — Linear's header
-          recipe: so close to the page that the data always wins the eye. */}
+          No grey of its own (Jess, 2026-08-02 polish: too many greys were
+          competing) — the canvas shows through; the ONE mid grey on this
+          page is the table header. */}
       <div
-        className="shrink-0 flex items-center justify-between gap-3 px-6 pt-3 pb-1 bg-kit-strip"
+        className="shrink-0 flex items-center justify-between gap-3 px-6 pt-3 pb-1"
         data-testid="po-header-strip"
       >
         <div className="min-w-0 flex items-center gap-1.5 text-meta text-kit-slate-11">
@@ -1156,24 +1162,28 @@ function WorkspaceBody({
 
   return (
     <div className="px-4 py-4" data-testid="po-document">
-      {/* ── WORK HEADER — identity, state, and the one thing to do now. ── */}
-      <div className="flex items-center gap-2" data-testid="po-working-header">
-        <button
-          type="button"
-          onClick={onCollapse}
-          title="Hide purchase order"
-          aria-label="Hide purchase order"
-          data-testid="po-workspace-collapse"
-          className={PANE_BTN}
-        >
-          <Icon name="forward" size={14} />
-        </button>
-        <span className="text-page font-semibold font-mono text-kit-slate-12">
-          {po.id}
-        </span>
-        <span className="ml-auto" data-testid="po-work-state">
+      {/* ── WORK HEADER — identity → status → action, stacked (Jess,
+           2026-08-02 polish): the eye reads WHO, then WHERE IT STANDS, then
+           WHAT TO DO — never all three fighting on one line. */}
+      <div data-testid="po-working-header">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onCollapse}
+            title="Hide purchase order"
+            aria-label="Hide purchase order"
+            data-testid="po-workspace-collapse"
+            className={PANE_BTN}
+          >
+            <Icon name="forward" size={14} />
+          </button>
+          <span className="text-page font-semibold font-mono text-kit-slate-12">
+            {po.id}
+          </span>
+        </div>
+        <div className="mt-1" data-testid="po-work-state">
           <Badge>{WORK_STATE_LABEL[state]}</Badge>
-        </span>
+        </div>
       </div>
       {actionWord && (
         /* Typography only (Jess: start with LESS visual weight — a
@@ -1200,25 +1210,19 @@ function WorkspaceBody({
           )}
         </div>
       )}
-      <div className="mt-3 pt-3 border-t border-kit-slate-5">
-        <Prop label="PO Issued">
-          <span className="tabular-nums">
-            {fmtDateShort((po.placed_at ?? "").slice(0, 10))}
-          </span>
-        </Prop>
-        <Prop label="Received">
-          <span className="tabular-nums">
-            {progress.received} / {progress.ordered}
-          </span>
-        </Prop>
-      </div>
-
-      {/* ── PURCHASE ORDER — "What is this PO?" (mission: Reference). ─── */}
+      {/* ── PURCHASE ORDER — "What is this PO?" (mission: Reference).
+           PO Issued lives HERE (Jess's polish: the header carries identity ·
+           status · action, nothing else; each fact goes to its section). */}
       <section className={SECTION} data-testid="po-reference">
         <h3 className={SECTION_TITLE}>Purchase Order</h3>
         <div className="mt-2">
           <Prop label="Supplier">{supplierName}</Prop>
           <Prop label="Deliver To">{warehouse?.name ?? "—"}</Prop>
+          <Prop label="PO Issued">
+            <span className="tabular-nums">
+              {fmtDateShort((po.placed_at ?? "").slice(0, 10))}
+            </span>
+          </Prop>
         </div>
 
       <div className="mt-2" data-testid="po-doc-items">
@@ -1227,14 +1231,16 @@ function WorkspaceBody({
           <span className="flex-1 font-medium">Description</span>
           <span className="w-10 text-right font-medium">Qty</span>
         </div>
+        {/* Description is the HERO (Jess's polish) — the answer to "what
+            exactly did I buy"; Sales Order and Qty read quiet beside it. */}
         {po.purchase_order_lines.map((l, i) => {
           const sku = l.sku;
           return (
             <div
               key={l.id}
-              className="flex gap-2 py-1.5 text-body border-b border-kit-slate-4"
+              className="flex gap-2 py-2 text-body border-b border-kit-slate-4"
             >
-              <span className="w-16 text-kit-slate-12 tabular-nums">
+              <span className="w-16 text-label text-kit-slate-11 tabular-nums">
                 {i === 0 && sos.length > 0
                   ? sos.map((n) => (
                       <span key={n} className="block">{`SO-${n}`}</span>
@@ -1251,7 +1257,7 @@ function WorkspaceBody({
                   </span>
                 )}
               </span>
-              <span className="w-10 text-right font-semibold text-kit-slate-12 tabular-nums">
+              <span className="w-10 text-right text-kit-slate-12 tabular-nums">
                 {l.qty}
               </span>
             </div>
@@ -1479,17 +1485,20 @@ function ActivityDesk({
         </pre>
       )}
 
-      <div className="mt-3 pt-2 border-t border-kit-slate-4">
-        <div className="text-label text-kit-slate-9">History</div>
-        <ul className="mt-1 flex flex-col gap-1 text-body" data-testid="po-history">
-          <li className="flex items-baseline gap-2">
-            <span className="text-kit-slate-9 tabular-nums shrink-0">
-              {fmtDateShort((po.placed_at ?? "").slice(0, 10))}
-            </span>
-            <span className="text-kit-slate-12">PO issued</span>
-          </li>
-        </ul>
-      </div>
+      {/* The timeline — tools above, hairline, then the entries: date over
+          event (Jess's polish: one flowing timeline, not two blocks). Each
+          store that opens (sends · notes · receiving) adds its entries. */}
+      <ul
+        className="mt-3 pt-2 border-t border-kit-slate-4 flex flex-col gap-2"
+        data-testid="po-history"
+      >
+        <li>
+          <div className="text-label text-kit-slate-9 tabular-nums">
+            {fmtDateShort((po.placed_at ?? "").slice(0, 10))}
+          </div>
+          <div className="text-body text-kit-slate-12">PO issued</div>
+        </li>
+      </ul>
     </section>
   );
 }

@@ -100,6 +100,28 @@ po-template) → 4 Supplier Updates (3A business freeze, THEN 3B write door) →
 Business before Data, Data before UI, UI before Write Door. Tests ride EVERY
 step, never queue at the end.
 
+**POLISH PASS (v4) — ✅ BUILT 2026-08-02, Jess's "freeze before Print" pass.
+Only rhythm/typography/spacing/hierarchy moved; zero function change:**
+- Header reads identity → status → action, STACKED (PO no., then the state
+  Badge on its own line, then the Current Action hero) — never three things
+  fighting on one line. PO Issued moved into PURCHASE ORDER, Received lives
+  only in RECEIVING: the header carries identity · status · action, nothing
+  else.
+- Items table breathes: taller rows, DESCRIPTION is the hero, Sales Order +
+  Qty read quiet.
+- ACTIVITY is ONE timeline: tools row → hairline → date-over-event entries
+  (the "History" sub-label deleted — the divider is the cut).
+- LISTING speaks short: `PO_STATE_ACTION_SHORT` — `Confirm Arrival` (her
+  `Confirm ETA` candidate REFUSED: the Business Date Dictionary bans "ETA";
+  reminded once, compliant option of her two taken). Full wording stays in
+  the workspace hero — C1's two-string discipline.
+- Greys cut to: canvas · table-header slate-3 · hairlines. The header
+  strip's own grey RETIRED (kit `strip` token removed) — too many greys
+  were competing.
+- HER RULING: this Workspace is the TEMPLATE for Receiving/Claims; Batch
+  Print & Communication (Phase 3) does NOT start until she freezes this
+  polish live.
+
 **STEP 2 FINAL (v3) — ✅ BUILT 2026-08-02, supersedes the v2 text below.**
 Jess re-ruled the workspace around WORKFLOW, then froze:
 

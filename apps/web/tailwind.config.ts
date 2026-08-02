@@ -113,7 +113,8 @@ export default {
            * close to white the data always outweighs them. Runs on Purchase
            * Orders first; flows back portal-wide after she reviews it live. */
           canvas: "#F7F8FA", // app background (Jess, 2026-08-02 — not a Radix step; her exact number)
-          strip: slate.slate2, // header strip #F8F9FA — one whisper above canvas
+          // `strip` retired the same day (Jess's polish: too many greys were
+          // competing) — the header strip sits on the canvas, no grey of its own.
           slate: {
             3: slate.slate3, // table header #F1F3F5 (Jess, 2026-08-02) · page canvas on unmigrated pages (Q2)
             4: slate.slate4, // quiet control border (Jess, 2026-08-01; thead moved to slate-3, 2026-08-02)

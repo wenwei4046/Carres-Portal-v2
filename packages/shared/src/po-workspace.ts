@@ -56,6 +56,20 @@ export const PO_STATE_ACTION_WORD = {
   ready: "Open Receiving",
 } as const;
 
+/**
+ * The LISTING's short spellings (Jess, 2026-08-02): 19 rows repeating a
+ * seven-word sentence becomes wallpaper — a column wants a scannable verb,
+ * the workspace hero keeps the full wording. C1's own two-string discipline
+ * (queue word vs row line), applied to the register. `Confirm Arrival`
+ * rather than her other candidate `Confirm ETA` — the Business Date
+ * Dictionary bans "ETA" outright.
+ */
+export const PO_STATE_ACTION_SHORT = {
+  need_confirmation: "Confirm Arrival",
+  waiting: "Waiting for Goods",
+  ready: "Open Receiving",
+} as const;
+
 export function poWorkStateOf(
   po: Pick<SupplierCallPo, "status" | "etaDateIso" | "lines">,
   todayIso: string,

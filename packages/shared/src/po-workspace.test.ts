@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  PO_STATE_ACTION_SHORT,
   PO_STATE_ACTION_WORD,
   poCurrentActionOf,
   poWorkStateOf,
@@ -109,5 +110,19 @@ describe("poCurrentActionOf — ONE action, engine first", () => {
     expect(
       poCurrentActionOf(po({ status: "cancelled" }), { todayIso: TODAY }),
     ).toBeNull();
+  });
+});
+
+describe("the listing's short spellings", () => {
+  it("every state action has a short word, and none of them says ETA", () => {
+    for (const key of Object.keys(PO_STATE_ACTION_WORD) as Array<
+      keyof typeof PO_STATE_ACTION_WORD
+    >) {
+      expect(PO_STATE_ACTION_SHORT[key]).toBeTruthy();
+      // The Business Date Dictionary bans "ETA" on any screen.
+      expect(PO_STATE_ACTION_SHORT[key]).not.toMatch(/\bETA\b/i);
+      expect(PO_STATE_ACTION_WORD[key]).not.toMatch(/\bETA\b/i);
+    }
+    expect(PO_STATE_ACTION_SHORT.need_confirmation).toBe("Confirm Arrival");
   });
 });
