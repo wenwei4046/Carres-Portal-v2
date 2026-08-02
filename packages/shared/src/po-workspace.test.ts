@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  PO_DELAY_REASONS,
   PO_STATE_ACTION_SHORT,
   PO_STATE_ACTION_WORD,
   poCurrentActionOf,
+  poOverdueDays,
   poWorkStateOf,
 } from "./po-workspace";
 import type { SupplierCallPo } from "./purchasing-supplier-calls";
@@ -15,6 +17,8 @@ import type { SupplierCallPo } from "./purchasing-supplier-calls";
  */
 
 const TODAY = "2026-08-05"; // a Wednesday
+import { PO_WORK_STATE_LABEL } from "./po-workspace";
+const PO_WORK_STATE_LABEL_NEED = PO_WORK_STATE_LABEL.need_confirmation;
 
 function po(over: Partial<SupplierCallPo> = {}): SupplierCallPo {
   return {
@@ -38,19 +42,32 @@ function po(over: Partial<SupplierCallPo> = {}): SupplierCallPo {
 }
 
 describe("poWorkStateOf — the SUPPLIER PROGRESS vocabulary", () => {
-  it("no supplier date → Need Confirmation", () => {
+  it("no supplier date → Waiting Supplier Date", () => {
     expect(poWorkStateOf(po(), TODAY)).toBe("need_confirmation");
+    expect(PO_WORK_STATE_LABEL_NEED).toBe("Waiting Supplier Date");
   });
 
-  it("a future supplier date → Waiting Goods", () => {
+  it("a future supplier date → Waiting for Goods", () => {
     expect(poWorkStateOf(po({ etaDateIso: "2026-09-01" }), TODAY)).toBe("waiting");
   });
 
-  it("the day came, or something checked in → Ready to Receive", () => {
-    expect(poWorkStateOf(po({ etaDateIso: TODAY }), TODAY)).toBe("ready");
+  it("READY means goods ARRIVED — a date merely passing is NOT arrival", () => {
+    // Jess's state machine (2026-08-02): the day passing without goods is
+    // OVERDUE, a sub-state of waiting — never Ready.
+    expect(poWorkStateOf(po({ etaDateIso: "2026-08-01" }), TODAY)).toBe("waiting");
     const partial = po({ etaDateIso: "2026-09-01" });
     partial.lines[0].receivedQty = 1;
     expect(poWorkStateOf(partial, TODAY)).toBe("ready");
+  });
+
+  it("poOverdueDays counts only a PASSED date with nothing arrived", () => {
+    expect(poOverdueDays(po({ etaDateIso: "2026-08-01" }), TODAY)).toBe(4);
+    expect(poOverdueDays(po({ etaDateIso: TODAY }), TODAY)).toBeNull();
+    expect(poOverdueDays(po({ etaDateIso: "2026-09-01" }), TODAY)).toBeNull();
+    expect(poOverdueDays(po(), TODAY)).toBeNull();
+    const arrived = po({ etaDateIso: "2026-08-01" });
+    arrived.lines[0].receivedQty = 2;
+    expect(poOverdueDays(arrived, TODAY)).toBeNull();
   });
 
   it("everything received → Completed; cancelled stays its own bucket", () => {
@@ -83,20 +100,32 @@ describe("poCurrentActionOf — ONE action, engine first", () => {
   });
 
   it("ready hands over with Open Receiving — the system is not a person", () => {
-    // The ONE quiet-ready shape: the day came AND the supplier already
-    // answered about THIS date (call closed). A partial receipt instead
-    // keeps the BALANCE call open — chasing the balance outranks the
-    // handover word, and that is Law 7 working, not a gap.
-    const a = poCurrentActionOf(
-      po({ etaDateIso: TODAY, tomorrowAnswerAboutDateIso: TODAY }),
-      { todayIso: TODAY },
-    );
+    // Quiet-ready: goods partially in AND the balance answer still names the
+    // current received qty (call closed). An unanswered shortfall keeps the
+    // BALANCE call open and outranks the handover word — Law 7 working.
+    const ready = po({ etaDateIso: "2026-09-01" });
+    ready.lines[0].receivedQty = 1;
+    ready.lines[0].balanceAnswerAboutQty = 1;
+    const a = poCurrentActionOf(ready, { todayIso: TODAY });
     expect(a).toEqual({ kind: "state", key: "ready", word: "Open Receiving" });
   });
 
-  it("LAW 7 — the engine's open call BEATS the state word", () => {
-    // Arriving today → the tomorrow's-delivery call is open; the header must
-    // carry the CALL, never the quieter state word.
+  it("OVERDUE outranks everything — the confirmed date is spent, so the word is Contact Supplier", () => {
+    // The date passed, nothing arrived: even though the engine's late call is
+    // open, the cycle's word is Contact Supplier — never Confirm again.
+    const a = poCurrentActionOf(po({ etaDateIso: "2026-08-01" }), {
+      todayIso: TODAY,
+    });
+    expect(a).toEqual({
+      kind: "state",
+      key: "overdue",
+      word: "Contact Supplier",
+    });
+  });
+
+  it("LAW 7 — the engine's open call BEATS the quiet state word", () => {
+    // Arriving tomorrow → the tomorrow's-delivery call is open; the header
+    // must carry the CALL, never the quieter Waiting for Goods.
     const a = poCurrentActionOf(po({ etaDateIso: "2026-08-06" }), {
       todayIso: TODAY,
     });
@@ -124,5 +153,17 @@ describe("the listing's short spellings", () => {
       expect(PO_STATE_ACTION_WORD[key]).not.toMatch(/\bETA\b/i);
     }
     expect(PO_STATE_ACTION_SHORT.need_confirmation).toBe("Confirm Arrival");
+    expect(PO_STATE_ACTION_SHORT.overdue).toBe("Contact Supplier");
+  });
+
+  it("the delay-reason dropdown is Jess's six, and Remarks is NOT one of them", () => {
+    expect([...PO_DELAY_REASONS]).toEqual([
+      "Production Delay",
+      "Material Shortage",
+      "Transport Delay",
+      "Waiting Customer Confirmation",
+      "Factory Closed",
+      "Other",
+    ]);
   });
 });

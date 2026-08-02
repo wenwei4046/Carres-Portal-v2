@@ -198,10 +198,11 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   // listing's search answers "which PO carries Ah Hock's goods" without a
   // second read. Same bounded IN() as the date.
   const customerBySo = new Map<number, string | null>();
+  const orderIdBySo = new Map<number, string>();
   if (soSet.size > 0) {
     const { data: orderRows, error: orderErr } = await sb
       .from("orders")
-      .select("so, delivery_date, customer_name")
+      .select("id, so, delivery_date, customer_name")
       .in("so", [...soSet]);
     if (orderErr) {
       const m = mapPgError(orderErr);
@@ -211,8 +212,67 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       const row = r as Record<string, unknown>;
       deliveryBySo.set(Number(row.so), (row.delivery_date as string | null) ?? null);
       customerBySo.set(Number(row.so), (row.customer_name as string | null) ?? null);
+      orderIdBySo.set(Number(row.so), row.id as string);
     }
   }
+
+  // ── The Items grid speaks EXCEL rows (Jess, 2026-08-02): one row per
+  // SO × SKU, each with the SALESPERSON's remark flowing over from the sales
+  // order — operation never keys it. Derived by matching the covered SOs'
+  // order_lines to each PO line's SKU and dealing the PO qty out in SO order;
+  // a quantity no SO claims stays an unattributed row (so: null). This is a
+  // DISPLAY attribution — P5's allocation will make it structural.
+  const soLinesByOrderId = new Map<
+    string,
+    { sku: string; qty: number; remark: string | null }[]
+  >();
+  if (orderIdBySo.size > 0) {
+    const { data: solRows, error: solErr } = await sb
+      .from("order_lines")
+      .select("order_id, sku, qty, attrs")
+      .in("order_id", [...orderIdBySo.values()]);
+    if (solErr) {
+      const m = mapPgError(solErr);
+      return c.json(m.body, m.status);
+    }
+    for (const r of solRows ?? []) {
+      const row = r as Record<string, unknown>;
+      const attrs = (row.attrs as Record<string, unknown> | null) ?? {};
+      const remark =
+        typeof attrs.remark === "string" && attrs.remark.trim() !== ""
+          ? (attrs.remark as string)
+          : null;
+      const arr = soLinesByOrderId.get(row.order_id as string) ?? [];
+      arr.push({ sku: row.sku as string, qty: Number(row.qty ?? 0), remark });
+      soLinesByOrderId.set(row.order_id as string, arr);
+    }
+  }
+  /** Deal one PO line's qty out across its covered SOs, in SO order. */
+  const soRowsOf = (
+    row: Record<string, unknown>,
+    sku: string,
+    qty: number,
+  ): { so: number | null; qty: number; remark: string | null }[] => {
+    const sos: number[] = [];
+    if (row.so != null) sos.push(Number(row.so));
+    for (const r of (row.so_refs as number[] | null) ?? []) sos.push(Number(r));
+    const out: { so: number | null; qty: number; remark: string | null }[] = [];
+    let left = qty;
+    for (const so of [...new Set(sos)].sort((a, b) => a - b)) {
+      if (left <= 0) break;
+      const oid = orderIdBySo.get(so);
+      if (!oid) continue;
+      for (const ol of soLinesByOrderId.get(oid) ?? []) {
+        if (left <= 0) break;
+        if (ol.sku !== sku) continue;
+        const take = Math.min(left, ol.qty);
+        if (take > 0) out.push({ so, qty: take, remark: ol.remark });
+        left -= take;
+      }
+    }
+    if (left > 0) out.push({ so: null, qty: left, remark: null });
+    return out;
+  };
   const customerDeliveryOf = (row: Record<string, unknown>): string | null => {
     const sos: number[] = [];
     if (row.so != null) sos.push(Number(row.so));
@@ -282,6 +342,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         balance_answer_about_qty: balanceAboutByLine.get(l.id as string) ?? null,
         model_name: modelBySku.get(l.sku as string)?.model_name ?? null,
         size: modelBySku.get(l.sku as string)?.size ?? null,
+        so_rows: soRowsOf(row, l.sku as string, Number(l.qty ?? 0)),
       })),
     };
   });
@@ -1312,11 +1373,20 @@ operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, async (c) =>
   const parsed = await parseJsonBody(c, recordTomorrowDeliveryInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
+  // Remarks + the first-confirm date ride the extended RPC (draft migration —
+  // until it is applied this door serves the 0306 signature only, which is why
+  // the extras are omitted when absent rather than sent as nulls).
+  const extras: Record<string, unknown> = {};
+  if (parsed.data.remarks != null) extras.p_remarks = parsed.data.remarks;
   const { data, error } = await sb.rpc("purchasing_record_tomorrow_delivery", {
     p_po_id: c.req.param("id"),
     p_answer: parsed.data.answer,
-    p_new_date: parsed.data.answer === "delayed" ? parsed.data.newDate : null,
+    p_new_date:
+      parsed.data.answer === "delayed"
+        ? parsed.data.newDate
+        : (parsed.data.firstDate ?? null),
     p_reason: parsed.data.reason ?? null,
+    ...extras,
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });

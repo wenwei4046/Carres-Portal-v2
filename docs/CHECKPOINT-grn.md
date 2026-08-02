@@ -201,3 +201,45 @@ supplier DO number.
   gains the check-in flow? (Phase 3 — put the fork to her with ONE recommendation)
 - The `Check in` words on ReceivePOModal (five spellings) — sweep when this page
   rebuilds the flow. (Phase 7)
+
+---
+
+## ⭐ ADDENDUM 2026-08-02 LATE — laws frozen on the PO page AFTER this file was
+## written. The Receiving page INHERITS all of them. Read before §1.
+
+1. **SHELL LAW (Loo, PR 560/561)**: the shell draws the header, pages never
+   do. `<PurchasingTabs />` is the WHOLE 44px row (module word · tabs ·
+   page-meta slot · global icons). No breadcrumb, no H1, no icons of your
+   own. Page-scoped search lives in the header's page-meta slot (`right`
+   prop) — Gmail's zero-height answer. NO pane-collapse arrows anywhere
+   (they were an invention; masters don't grow arrows on panels).
+2. **SURFACE LAW (Jess)**: grey is chrome — `kit-canvas` app bg + ONE
+   table-header grey (kit-slate-3) + hairlines; every working surface white.
+3. **LISTING LAW (Jess)**: the register is AutoCount — for FINDING only;
+   work happens in the right workspace. Default order = business priority
+   (oldest first), never document number. Every column: header sort + Excel
+   ▼ (dates get presets + month buckets + Custom Date Range — machinery in
+   `apps/web/src/lib/excel-date-filter.ts`). Sticky header. `rowMuted` greys
+   dead rows. Search = cross-field, in the shell slot.
+4. **WORKSPACE TEMPLATE (Jess — the PO page is the master copy)**:
+   `WORK HEADER (fixed info block: labels left · doc number right, ~5 rows,
+   NEVER grows) → the document's EXCEL items grid (one row per real row ·
+   read-only columns from the source documents · row click EXTENDS in place,
+   no drill-in, no modal) → ACTIVITY (collapsed tools + business timeline)`.
+   Every section answers ONE operator question (WORKSPACE LAW); a field that
+   answers none does not belong. Facts live where they happen (quantities on
+   rows, not summary panels). GRN speaks the same shape: GRN Header → Goods
+   rows → Inspection/Exception as extends → ACTIVITY.
+5. **GOODS LIFECYCLE STATE MACHINE (Jess — shared `po-workspace.ts`)**:
+   Waiting Supplier Date → Waiting for Goods (⚠ Overdue = sub-state, day
+   count, action `Contact Supplier`) → Ready to Receive = goods ARRIVED
+   (received > 0) → Completed. States describe GOODS, actions describe the
+   person. ONE action source: `poCurrentActionOf` (Law 7 — never a second
+   word table in a page).
+6. **Reason vs Remarks**: countable category (`PO_DELAY_REASONS`) + free
+   text, two fields. Supplier-facing note ≠ internal note — never mixed.
+7. **PO page state**: v6 committed and live on localhost; v7 (final
+   workspace + date door) frozen, shared+api half built, page parked — the
+   PO chat resumes it. Do NOT touch `OperationPurchaseOrders.tsx` from the
+   Receiving chat (one worktree per workstream; this branch =
+   `claude/jess-workflow-setup-1585a7`, worktree carres-portal-planning-e29002).

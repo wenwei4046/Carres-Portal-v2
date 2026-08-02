@@ -100,6 +100,76 @@ po-template) → 4 Supplier Updates (3A business freeze, THEN 3B write door) →
 Business before Data, Data before UI, UI before Write Door. Tests ride EVERY
 step, never queue at the end.
 
+**v7 — SUPPLIER DATE STATE MACHINE + FINAL WORKSPACE, FROZEN 2026-08-02
+LATE. Shared + api HALF BUILT, page NOT YET — parked mid-build when Jess
+opened the Receiving chat. THE NEXT PO SESSION EXECUTES THIS FIRST.**
+
+FROZEN (hers, this order of authority):
+- **Goods lifecycle state machine** (states describe the GOODS, actions
+  describe the person): `Waiting Supplier Date` (renamed from Need
+  Confirmation) → `Waiting for Goods` → (⚠ Overdue, a SUB-STATE of waiting,
+  NEVER its own rail bucket) → back to Waiting on a new date → `Ready to
+  Receive` = goods ARRIVED (received > 0 — a date merely passing is NOT
+  ready; her machine corrected the old rule) → Completed. Rail stays 5
+  buckets; Waiting for Goods may show a red ⚠ n tail.
+- **Actions**: Waiting Supplier Date → `Confirm Goods Arriving Date`
+  (short `Confirm Arrival`) · overdue → `Contact Supplier` (outranks the
+  engine's call — the confirmed date is SPENT, never Confirm again) ·
+  waiting → `Waiting for Goods` · ready → `Open Receiving`.
+- **The date door** (situations A supplier tells early / B nobody told us —
+  same door): click the SUPPLIER DELIVERY DATE row in the workspace header →
+  extend in place → key new date + Reason ▾ + Remarks → Save = ONE
+  transaction (0306 RPC: ledger row + eta moves + delay planning push +
+  history sentence). Repeatable forever, append-only, history rows under.
+- **Reason vs Remarks, two fields never folded**: Reason = countable
+  category `PO_DELAY_REASONS` (Production Delay · Material Shortage ·
+  Transport Delay · Waiting Customer Confirmation · Factory Closed ·
+  Other); Remarks = free-text real story.
+- **Final workspace ASCII (3 zones)**: ① FIXED HEADER — PO ISSUED ·
+  DELIVERY TO · SUPPLIER · SUPPLIER DELIVERY DATE (+ ⚠ Overdue by N days) ·
+  PO No. right; date row extends (A first-confirm form / B history / C
+  delay form). NO status badge (rail owns progress), NO Current Action
+  hero (the register column + extend carry it). ② ITEMS — EXCEL rows: one
+  row per SO × SKU (never the paper's stacked cells) · # · SO NO. ·
+  DESCRIPTION · SIZE · QTY · RECEIVED · REMARK(read-only, the SALESPERSON's,
+  flows from the SO — operation never keys it) · TOTAL row + `Open
+  Receiving →` (the RECEIVING panel was folded in here — quantities live on
+  the rows). Row click extends in place: DESTINATION fact (+ [Change] when
+  Phase 4/5 opens the Split/Revision door) + unit ids + problems.
+  ③ ACTIVITY — collapsed WhatsApp draft + tools + business timeline.
+  Supplier-facing note ≠ internal note: REMARK column prints for the
+  supplier; "why it is urgent" NEVER (it goes to po_notes/ACTIVITY later).
+
+BUILT ALREADY (committed): shared `po-workspace.ts` v7 (lifecycle labels ·
+poOverdueDays · Contact Supplier · PO_DELAY_REASONS · ready=arrived fix,
+13 tests) · api list now derives `so_rows` per line (SO × SKU dealing +
+salesperson remark from order_lines.attrs.remark) · zod
+recordTomorrowDeliveryInput gained firstDate + remarks · route passes both.
+
+NOT BUILT YET (the next PO session's first job): the page — header 5-row
+fixed block · date-row extend forms (A/B/C) · Excel items grid off
+`so_rows` with RECEIVED + TOTAL + row-extend · rail ⚠ tail · listing
+⚠ Nd marker · ACTIVITY unchanged · tests. Plus THE MIGRATION below —
+Jess approves, tracker-tail numbering, apply BEFORE merge.
+
+MIGRATION DRAFT (guardrail 8 — lives HERE, never in supabase/migrations
+until approved). Purpose: ① `remarks` column on the ledger ② the FIRST
+confirm (eta NULL) through the same RPC:
+```sql
+-- draft: supplier date door — remarks + first confirm
+alter table public.po_supplier_promises add column if not exists remarks text;
+comment on column public.po_supplier_promises.remarks is
+  'Free-text story beside the countable reason category (Jess 2026-08-02).';
+-- rule 8: defaulted params mint a SECOND signature — drop the old one first
+drop function if exists public.purchasing_record_tomorrow_delivery(text, text, date, text);
+-- recreate = 0306''s body with: + p_remarks param written to the new column;
+-- + first-confirm branch: when v_po.eta_date IS NULL, only answer=''shipping''
+--   with p_new_date is legal; v_about := p_new_date; insert row (about_date =
+--   the given date, previous_date null, new_date null); update eta_date;
+--   purchasing_push_supplier_date; history ''%s confirmed the delivery for %s''.
+-- assert exactly ONE signature survives; dry-run in a rolled-back txn on prod.
+```
+
 **SLIM PASS (v6) — ✅ BUILT 2026-08-02 (Jess caught the arrows):**
 - The three pane-collapse arrows + their leftover strips were MY invention
   (no master grows arrows on panels — rule 7 breach, admitted). Gone:

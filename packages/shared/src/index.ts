@@ -874,11 +874,13 @@ export {
 // (Law 7: engine first, state word only when the engine is quiet) + the
 // work-state vocabulary the register's rail counts by.
 export {
+  PO_DELAY_REASONS,
   PO_STATE_ACTION_SHORT,
   PO_STATE_ACTION_WORD,
   PO_WORK_STATES,
   PO_WORK_STATE_LABEL,
   poCurrentActionOf,
+  poOverdueDays,
   poWorkStateOf,
   type PoCurrentAction,
   type PoWorkState,

@@ -315,8 +315,9 @@ describe("the Supplier Workspace v2 (Jess, 2026-08-02)", () => {
     expect(screen.queryByTestId("po-doc-delivery-by")).not.toBeInTheDocument();
     const header = within(screen.getByTestId("po-working-header"));
     expect(header.getByText("PO-9001")).toBeInTheDocument();
-    // PO-9001 has a supplier date on file → Waiting Goods.
-    expect(header.getByText("Waiting Goods")).toBeInTheDocument();
+    // PO-9001 has a supplier date on file → Waiting for Goods (the goods
+    // lifecycle words, Jess 2026-08-02).
+    expect(header.getByText("Waiting for Goods")).toBeInTheDocument();
     expect(workspace().getByText("PO Issued")).toBeInTheDocument();
   });
 
