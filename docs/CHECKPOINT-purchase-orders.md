@@ -149,6 +149,48 @@ SO × SKU, salesperson remark read-only) with a TOTAL row + `Open
 Receiving →` (the Receiving PANEL is gone — quantities live on the rows) ·
 row click extends in place (Destination fact today; [Change] = Phase 4/5's
 Split/Revision door) · ACTIVITY unchanged. 25 page tests green.
+**STEPS 2 + 3 ✅ SHIPPED 2026-08-02 — WHAT WE SENT, AND WHICH VERSION
+(migrations 0312 + 0313 applied to prod).** Jess: *"it cannot said sent due
+to download only"* and *"why you keep asking me which you should finish the
+job"* — both fair; this is the whole of her step 2 and step 3.
+- **The ACT records itself.** Opening WhatsApp or the mail client IS the
+  send, so there is NO `I've sent` button — a record somebody must remember
+  to make afterwards is a record that will be wrong. **Copy records
+  nothing**: copying words is not sending them (guarded by a test).
+  The channel written is the one actually used.
+- **The draft is EDITABLE** (a textarea, not a `<pre>`), and `Save as
+  template` stores it as ONE company-wide text with the placeholders put
+  BACK (`{supplier} {po} {items} {date}`) — otherwise the next PO would
+  inherit this one's number. Per-supplier templates refused: eleven
+  templates are eleven places to edit; a special instruction is a remark.
+- **Email = `mailto:`** (her pick): subject + body pre-filled, sent by the
+  operator's own client. The portal has NO email sender and does not
+  pretend to; a supplier with no address gets the sentence `No email on
+  file for {supplier}`, never a dead button.
+- **Revision** (`po_revisions`): a send freezes a SNAPSHOT of what the
+  supplier was given — the date, the destination, every line. A send mints a
+  new revision **only when the document changed since the last**, so
+  re-sending an unchanged PO is the same Revision N: the supplier is not
+  being asked to replace anything. The timeline reads
+  `2 Aug 26 · sent via whatsapp · Revision 1`.
+- **Duplicates collapse**: same day + same channel + same revision is ONE
+  line with a `2×` count — opening WhatsApp twice in a morning is one send
+  (she caught the double row).
+- `po_sends` + `po_revisions` carry a SELECT policy and **no write policy at
+  all**, so the RPC is the only door (0303's discipline).
+- **A defect of MY OWN, caught and undone in the same session**: 0312 added
+  `suppliers.email` when `contact_email` had existed since the supplier
+  portal and TWO of ten suppliers already filled it — two columns for one
+  fact is `ops_order_control.balance`'s disease. **0313 drops it**, behind a
+  guard that refuses to drop a column holding rows. The mailto reads
+  `contact_email`.
+
+**⋮ ROW MENU (Jess: "why so fragile?").** The line's actions were reached by
+clicking the ROW and then clicking a WORD — three steps, and a mis-click
+collapsed it. Now every row ends in a `⋮` and the row itself toggles nothing:
+Excel right-clicks, Gmail and Linear use a ⋮, and a row action must be a
+control with a NAME rather than a word you happen to hit.
+
 **INLINE EDIT (Jess, 2026-08-02: "it always show like that?").** The line's
 work surface was a form standing open on every row with a Save that is grey
 most of the time — furniture. Now it is Linear's/Notion's manner: a value is

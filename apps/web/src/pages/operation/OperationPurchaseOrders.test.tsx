@@ -136,6 +136,20 @@ const POS = [
       { kind: "tomorrow_delivery", answer: "delayed", about_date: "2099-10-31", previous_date: "2099-10-31", new_date: "2099-11-05", reason: "Production Delay", recorded_at: "2026-04-09T02:00:00Z" },
       { kind: "tomorrow_delivery", answer: "delayed", about_date: "2099-11-05", previous_date: "2099-11-05", new_date: "2099-11-11", reason: "Transport Delay", recorded_at: "2026-04-16T02:00:00Z" },
     ],
+    sends: [
+      {
+        channel: "whatsapp",
+        note: null,
+        sent_at: "2026-04-16T03:00:00Z",
+        po_revisions: { rev_no: 2 },
+      },
+      {
+        channel: "whatsapp",
+        note: null,
+        sent_at: "2026-04-16T05:00:00Z",
+        po_revisions: { rev_no: 2 },
+      },
+    ],
     purchase_order_lines: [line("e1", "SKU-SONIC-K", 1, "Sonic", "King")],
   },
   {
@@ -176,12 +190,22 @@ beforeEach(() => {
   apiFetch.mockImplementation((url: string) => {
     if (url.includes("/units")) return Promise.resolve({ units: [] });
     if (url.startsWith("/api/operation/pos"))
-      return Promise.resolve({ pos: POS, destinations: DESTINATIONS });
+      return Promise.resolve({
+        pos: POS,
+        destinations: DESTINATIONS,
+        messageTemplate: null,
+      });
     if (url === "/api/operation/suppliers")
       return Promise.resolve({
         suppliers: [
           { id: OHANA, name: "Ohana", contact: null, whatsapp_group_url: null },
-          { id: NF, name: "Nice Future", contact: "0123456789", whatsapp_group_url: null },
+          {
+            id: NF,
+            name: "Nice Future",
+            contact: "0123456789",
+            contact_email: "sales@nicefuture.example",
+            whatsapp_group_url: null,
+          },
         ],
       });
     if (url === "/api/operation/warehouse")
@@ -427,10 +451,10 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
     expect(items.getByText("Total")).toBeInTheDocument();
   });
 
-  it("a row extends IN PLACE — no drill-in, no modal", async () => {
+  it("the row's ⋮ opens its actions IN PLACE — no drill-in, no modal", async () => {
     await mountLoaded();
     expect(screen.queryByTestId("po-item-extend")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("po-item-row-1"));
+    fireEvent.click(screen.getByTestId("po-item-menu-1"));
     const ext = within(screen.getByTestId("po-item-extend"));
     expect(ext.getByText("Destination")).toBeInTheDocument();
     expect(ext.getByText("Ops remark")).toBeInTheDocument();
@@ -488,6 +512,7 @@ describe("the supplier-date door (Jess's cycle, one form)", () => {
     fireEvent.click(listing().getByText("PO-9002"));
     // PO-9002 is cancelled; use the one with no date instead.
     fireEvent.click(screen.getByTestId("po-date-row"));
+    fireEvent.click(screen.getByTestId("po-date-open"));
     const form = within(screen.getByTestId("po-date-form"));
     expect(form.getByTestId("po-date-input")).toBeInTheDocument();
     // No date held → nothing to delay → the reason picker stays away.
@@ -498,9 +523,11 @@ describe("the supplier-date door (Jess's cycle, one form)", () => {
     await mountLoaded();
     // PO-9001 holds a supplier-confirmed date (its ledger says so).
     fireEvent.click(screen.getByTestId("po-date-row"));
+    fireEvent.click(screen.getByTestId("po-date-open"));
     const input = screen.getByTestId("po-date-input");
     fireEvent.change(input, { target: { value: "2099-12-31" } });
     expect(screen.getByTestId("po-date-reason")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("po-date-remarks-open"));
     fireEvent.change(screen.getByTestId("po-date-remarks"), {
       target: { value: "factory said Tuesday" },
     });
@@ -542,24 +569,50 @@ describe("the supplier's date history, numbered (SAP's shape)", () => {
     expect(screen.getByTestId("po-date-nth").textContent).toMatch(/11 days later/);
     fireEvent.click(screen.getByTestId("po-date-row"));
     const h = within(screen.getByTestId("po-date-history"));
+    // No "told" column — two answers keyed the same day printed the same
+    // date twice and read as a second delivery date.
+    expect(h.queryByText(/told/)).not.toBeInTheDocument();
     expect(h.getByText("1st")).toBeInTheDocument();
     expect(h.getByText("2nd")).toBeInTheDocument();
     expect(h.getByText("3rd")).toBeInTheDocument();
   });
 
-  it("the field starts EMPTY — a date already given can never be edited", async () => {
+  it("the extend is QUIET — no form until you ask to record something", async () => {
     await mountLoaded();
     fireEvent.click(screen.getByTestId("po-date-row"));
+    // History and a quiet trigger; no date box, no Remarks box standing open.
+    expect(screen.queryByTestId("po-date-form")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("po-date-remarks")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("po-date-open"));
     const input = screen.getByTestId("po-date-input") as HTMLInputElement;
+    // A date already given can never be edited — you record the NEXT one.
     expect(input.value).toBe("");
-    // Nothing keyed = nothing to record = no sentence about it.
     expect(screen.queryByTestId("po-date-effect")).not.toBeInTheDocument();
+    // A multi-field form gets a real Save (Jess: "i cant save?"); Remarks is
+    // the exception and stays folded until asked for.
     expect(screen.getByTestId("po-date-save")).toBeDisabled();
+    expect(screen.queryByTestId("po-date-remarks")).not.toBeInTheDocument();
+    expect(screen.getByTestId("po-date-remarks-open")).toBeInTheDocument();
+  });
+
+  it("Esc closes the date form and records nothing", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-date-row"));
+    fireEvent.click(screen.getByTestId("po-date-open"));
+    fireEvent.change(screen.getByTestId("po-date-input"), {
+      target: { value: "2099-12-31" },
+    });
+    fireEvent.keyDown(screen.getByTestId("po-date-input"), { key: "Escape" });
+    expect(screen.queryByTestId("po-date-form")).not.toBeInTheDocument();
+    expect(
+      apiFetch.mock.calls.some((c) => String(c[0]).includes("/tomorrow-delivery")),
+    ).toBe(false);
   });
 
   it("once a date is keyed it says exactly what Save will record", async () => {
     await mountLoaded();
     fireEvent.click(screen.getByTestId("po-date-row"));
+    fireEvent.click(screen.getByTestId("po-date-open"));
     const input = screen.getByTestId("po-date-input");
     fireEvent.change(input, { target: { value: "2099-12-31" } });
     expect(screen.getByTestId("po-date-effect").textContent).toMatch(/^Delay \d+ day/);
@@ -580,15 +633,15 @@ describe("where each line goes (0311, Jess 2026-08-02)", () => {
       ).toBeInTheDocument(),
     );
     // Row 3 is a qty-1 line, so there is nothing to split.
-    fireEvent.click(screen.getByTestId("po-item-row-3"));
+    fireEvent.click(screen.getByTestId("po-item-menu-3"));
     fireEvent.click(screen.getByTestId("po-line-destination-open"));
     fireEvent.change(screen.getByTestId("po-line-destination"), {
       target: { value: AL },
     });
     expect(screen.getByTestId("po-line-effect").textContent).toMatch(/All 1 move/);
-    // Enter saves — there is no Save button anywhere.
-    expect(screen.queryByTestId("po-line-destination-save")).not.toBeInTheDocument();
-    fireEvent.keyDown(screen.getByTestId("po-line-destination"), { key: "Enter" });
+    // A picker changed with the MOUSE needs a button (Jess: "i cant save for
+    // AL") — Enter is a keyboard gesture nobody reaches for here.
+    fireEvent.click(screen.getByTestId("po-line-destination-save"));
     await waitFor(() =>
       expect(
         apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/destination")),
@@ -605,7 +658,7 @@ describe("where each line goes (0311, Jess 2026-08-02)", () => {
       ).toBeInTheDocument(),
     );
     // PO-9001's only line is qty 3 → Move appears.
-    fireEvent.click(screen.getByTestId("po-item-row-1"));
+    fireEvent.click(screen.getByTestId("po-item-menu-1"));
     fireEvent.click(screen.getByTestId("po-line-destination-open"));
     fireEvent.change(screen.getByTestId("po-line-destination"), {
       target: { value: AL },
@@ -616,7 +669,8 @@ describe("where each line goes (0311, Jess 2026-08-02)", () => {
     expect(screen.getByTestId("po-line-effect").textContent).toMatch(
       /1 of 3 move; 2 stay/,
     );
-    fireEvent.keyDown(screen.getByTestId("po-line-move-qty"), { key: "Enter" });
+    expect(screen.getByTestId("po-line-destination-save").textContent).toBe("Split");
+    fireEvent.click(screen.getByTestId("po-line-destination-save"));
     await waitFor(() =>
       expect(apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/split"))).toBe(
         true,
@@ -631,12 +685,12 @@ describe("where each line goes (0311, Jess 2026-08-02)", () => {
 
   it("the ops remark is purchasing's own — internal, and it says so", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-item-row-1"));
+    fireEvent.click(screen.getByTestId("po-item-menu-1"));
     fireEvent.click(screen.getByTestId("po-line-ops-open"));
     const input = screen.getByTestId("po-line-ops-remark") as HTMLInputElement;
     expect(input.placeholder).toMatch(/never printed/i);
     fireEvent.change(input, { target: { value: "AL collects Friday" } });
-    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.click(screen.getByTestId("po-line-ops-save"));
     await waitFor(() =>
       expect(
         apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/ops-remark")),
@@ -648,7 +702,7 @@ describe("where each line goes (0311, Jess 2026-08-02)", () => {
 describe("inline edit — Esc puts it back", () => {
   it("opening, changing and pressing Esc records nothing", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-item-row-1"));
+    fireEvent.click(screen.getByTestId("po-item-menu-1"));
     fireEvent.click(screen.getByTestId("po-line-destination-open"));
     fireEvent.change(screen.getByTestId("po-line-destination"), {
       target: { value: AL },
@@ -660,5 +714,91 @@ describe("inline edit — Esc puts it back", () => {
     expect(
       apiFetch.mock.calls.some((c) => String(c[0]).includes("/lines/")),
     ).toBe(false);
+  });
+});
+
+describe("what we sent the supplier (0312)", () => {
+  it("the draft is EDITABLE, and Save as template puts the placeholders back", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-wa-toggle"));
+    const box = screen.getByTestId("po-wa-message") as HTMLTextAreaElement;
+    expect(box.tagName).toBe("TEXTAREA");
+    expect(box.value).toContain("PO-9001");
+    fireEvent.change(box, { target: { value: "Hi Nice Future,\n\nPO-9001 please rush" } });
+    fireEvent.click(screen.getByTestId("po-save-template"));
+    await waitFor(() =>
+      expect(
+        apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/message-template")),
+      ).toBe(true),
+    );
+    const call = apiFetch.mock.calls.find((c) =>
+      String(c[0]).endsWith("/message-template"),
+    )!;
+    const body = JSON.parse(String((call[1] as { body: string }).body));
+    // The PO's own number and the supplier's name go back to placeholders, or
+    // the next PO would inherit this one's.
+    expect(body.text).toContain("{po}");
+    expect(body.text).toContain("{supplier}");
+    expect(body.text).not.toContain("PO-9001");
+  });
+
+  it("Email is a mailto: — the portal has no sender, and says so when there is no address", async () => {
+    await mountLoaded();
+    // PO-9001 is Nice Future, which has an address on file.
+    const mail = screen.getByTestId("po-open-email") as HTMLAnchorElement;
+    expect(mail.getAttribute("href")).toMatch(/^mailto:sales%40nicefuture\.example\?subject=/);
+    // Ohana has none — the panel states the absence instead of a dead button.
+    fireEvent.click(listing().getByText("PO-9003"));
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("po-working-header")).getByText("PO-9003"),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("po-open-email")).not.toBeInTheDocument();
+    expect(screen.getByTestId("po-no-email").textContent).toMatch(/No email on file/);
+  });
+
+  it("the ACT records itself — no I've sent button to remember afterwards", async () => {
+    await mountLoaded();
+    expect(screen.getByTestId("po-history").textContent).toBe("Nothing sent yet.");
+    expect(screen.queryByTestId("po-sent")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("po-open-email"));
+    await waitFor(() =>
+      expect(apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/sends"))).toBe(
+        true,
+      ),
+    );
+    const call = apiFetch.mock.calls.find((c) => String(c[0]).endsWith("/sends"))!;
+    // The channel is the one actually used, not a guess.
+    expect(JSON.parse(String((call[1] as { body: string }).body))).toMatchObject({
+      channel: "email",
+    });
+  });
+
+  it("COPY does not record — copying words is not sending them", async () => {
+    // jsdom has no clipboard; the assertion is that copying posts NOTHING,
+    // which holds whether the write resolves or is refused.
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-copy-message"));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/sends"))).toBe(
+      false,
+    );
+  });
+
+  it("a PO that HAS been sent shows the channel and the revision it carried", async () => {
+    await mountLoaded();
+    fireEvent.click(listing().getByText("PO-9005"));
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("po-working-header")).getByText("PO-9005"),
+      ).toBeInTheDocument(),
+    );
+    const h = within(screen.getByTestId("po-history"));
+    expect(h.getByText(/sent via whatsapp/)).toBeInTheDocument();
+    expect(h.getByText(/Revision 2/)).toBeInTheDocument();
+    // Opening WhatsApp twice on one morning is ONE send with a count.
+    expect(h.getByText(/2×/)).toBeInTheDocument();
+    expect(h.getAllByText(/sent via/).length).toBe(1);
   });
 });

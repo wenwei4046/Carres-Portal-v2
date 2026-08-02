@@ -73,6 +73,23 @@ export const recordTomorrowDeliveryInput = z.discriminatedUnion('answer', [
 export type RecordTomorrowDeliveryInput = z.infer<typeof recordTomorrowDeliveryInput>;
 
 /**
+ * What we SENT the supplier (0312, Jess 2026-08-02). The channel is the fact;
+ * the revision is derived server-side (a send mints one only when the document
+ * changed since the last).
+ */
+export const recordSendInput = z.object({
+  channel: z.enum(["whatsapp", "email", "print"]),
+  note: z.string().max(300).optional(),
+}).strict();
+export type RecordSendInput = z.infer<typeof recordSendInput>;
+
+/** ONE company-wide supplier-message template. */
+export const setMessageTemplateInput = z.object({
+  text: z.string().max(2000),
+}).strict();
+export type SetMessageTemplateInput = z.infer<typeof setMessageTemplateInput>;
+
+/**
  * Where each LINE goes (Jess, 2026-08-02) — the three per-line write doors
  * (0311). Purchasing's only per-line job is the destination; the ops remark
  * is its own internal note and never prints.

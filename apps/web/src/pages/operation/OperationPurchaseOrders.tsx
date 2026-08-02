@@ -44,7 +44,9 @@ import {
   useOperationPos,
   useOperationSuppliers,
   usePoLineAction,
+  useRecordSend,
   useRecordSupplierDate,
+  useSetMessageTemplate,
   useOperationWarehouse,
   usePurchasingSettings,
   type operationPoListRow,
@@ -192,6 +194,7 @@ export default function OperationPurchaseOrders() {
     () => posQ.data?.destinations ?? [],
     [posQ.data],
   );
+  const messageTemplate = posQ.data?.messageTemplate ?? null;
 
   const supplierById = useMemo(() => {
     const m = new Map<string, SupplierRow>();
@@ -1013,6 +1016,7 @@ export default function OperationPurchaseOrders() {
               eta={etaOf(selected)}
               today={today}
               destinations={destinations}
+              messageTemplate={messageTemplate}
             />
           ) : (
             !posQ.isLoading &&
@@ -1075,6 +1079,7 @@ function WorkspaceBody({
   eta,
   today,
   destinations,
+  messageTemplate,
 }: {
   po: operationPoListRow;
   supplier: SupplierRow | undefined;
@@ -1084,6 +1089,7 @@ function WorkspaceBody({
   eta: { date: string | null; confirmed: boolean };
   today: string;
   destinations: { id: string; name: string; is_default: boolean }[];
+  messageTemplate: string | null;
 }) {
   const supplierName = supplier?.name ?? po.supplier_id;
   const progress = poReceivingProgress(po.purchase_order_lines);
@@ -1256,9 +1262,10 @@ function WorkspaceBody({
                   <span className="min-w-0 text-kit-slate-9 truncate">
                     {[e.reason, e.remarks].filter(Boolean).join(" · ")}
                   </span>
-                  <span className="ml-auto shrink-0 text-label text-kit-slate-9 tabular-nums">
-                    {fmtDateShort(e.recordedAt.slice(0, 10))}
-                  </span>
+                  {/* No "told" column (Jess, 2026-08-02): every answer keyed
+                      on the same day printed the same date twice, and a second
+                      date beside a delivery date reads as another delivery
+                      date. What the row must answer is WHICH date and WHY. */}
                 </div>
               ))}
             </div>
@@ -1275,15 +1282,17 @@ function WorkspaceBody({
           <span className="flex-1 font-medium">Description</span>
           <span className="w-8 text-right font-medium">Qty</span>
           <span className="w-10 text-right font-medium">Recv</span>
+          <span className="w-6 shrink-0" />
         </div>
         {rows.map((r, i) => (
           <div key={r.key}>
-            <button
-              type="button"
-              onClick={() => setOpenLine(openLine === r.key ? null : r.key)}
-              aria-expanded={openLine === r.key}
+            {/* ⋮ opens NAMED actions (Jess, 2026-08-02: "why so fragile?").
+                Excel right-clicks, Gmail and Linear use a ⋮ — a row action
+                must be a control with a name, never a word you happen to
+                click. The row itself no longer toggles anything. */}
+            <div
               data-testid={`po-item-row-${i + 1}`}
-              className="w-full flex gap-2 py-1.5 text-body text-left border-b border-kit-slate-4 hover:bg-kit-blue-2"
+              className="w-full flex gap-2 py-1.5 text-body border-b border-kit-slate-4"
             >
               <span className="w-4 text-kit-slate-9 tabular-nums">{i + 1}</span>
               <span className="w-16 text-label text-kit-slate-11 tabular-nums">
@@ -1323,7 +1332,21 @@ function WorkspaceBody({
               <span className="w-10 text-right tabular-nums text-kit-slate-9">
                 {r.received}
               </span>
-            </button>
+              <span className="w-6 shrink-0 text-right">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenLine(openLine === r.key ? null : r.key)
+                  }
+                  aria-expanded={openLine === r.key}
+                  aria-label={`Actions for line ${i + 1}`}
+                  data-testid={`po-item-menu-${i + 1}`}
+                  className="px-1 rounded text-kit-slate-9 hover:text-kit-slate-12 hover:bg-kit-slate-3"
+                >
+                  ⋮
+                </button>
+              </span>
+            </div>
             {openLine === r.key && (
               <div
                 className="pl-6 py-1.5 border-b border-kit-slate-4 bg-kit-slate-3"
@@ -1355,6 +1378,7 @@ function WorkspaceBody({
           <span className="w-10 text-right font-semibold text-kit-slate-12 tabular-nums">
             {progress.received}
           </span>
+          <span className="w-6 shrink-0" />
         </div>
         {/* No door to Receiving (Jess, 2026-08-02): the warehouse checks the
             goods in over there and the Recv column moves BY ITSELF — a link
@@ -1367,7 +1391,7 @@ function WorkspaceBody({
       </div>
 
       {/* ── ③ ACTIVITY — tools + the business timeline. ───────────────── */}
-      <ActivityDesk po={po} supplier={supplier} />
+      <ActivityDesk po={po} supplier={supplier} template={messageTemplate} />
     </div>
   );
 }
@@ -1512,9 +1536,23 @@ function LineWork({
                 <span className="text-label text-kit-slate-9">of {free}</span>
               </>
             )}
-            <span className={KEYS}>
-              {act.isPending ? "Saving…" : "Enter save · Esc cancel"}
-            </span>
+            <button
+              type="button"
+              onClick={saveDestination}
+              disabled={!changed || act.isPending}
+              data-testid="po-line-destination-save"
+              className={`${DOC_BTN} disabled:opacity-40`}
+            >
+              {act.isPending ? "Saving…" : willSplit ? "Split" : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={close}
+              data-testid="po-line-destination-cancel"
+              className={`${KEYS} hover:text-kit-slate-12`}
+            >
+              Cancel
+            </button>
           </>
         ) : (
           <button
@@ -1558,9 +1596,23 @@ function LineWork({
               data-testid="po-line-ops-remark"
               className="h-8 flex-1 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12"
             />
-            <span className={KEYS}>
-              {act.isPending ? "Saving…" : "Enter save · Esc cancel"}
-            </span>
+            <button
+              type="button"
+              onClick={() => run("ops-remark", { text: note })}
+              disabled={note === (opsRemark ?? "") || act.isPending}
+              data-testid="po-line-ops-save"
+              className={`${DOC_BTN} disabled:opacity-40`}
+            >
+              {act.isPending ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={close}
+              data-testid="po-line-ops-cancel"
+              className={`${KEYS} hover:text-kit-slate-12`}
+            >
+              Cancel
+            </button>
           </>
         ) : (
           <button
@@ -1605,19 +1657,23 @@ function SupplierDateForm({
   confirmed: boolean;
   supplierName: string;
 }) {
-  const supplierNameFallback = supplierName;
   const held = confirmed ? (po.eta_date ?? null) : null;
-  // The field starts EMPTY (Jess, 2026-08-02): a date already given can never
-  // be edited — the ledger only ever gains a row — so pre-filling it invites
-  // exactly the wrong idea. You record the NEXT date, never the last one.
+  // INLINE EDIT, the same manner as the line surface (Jess, 2026-08-02): the
+  // extend is QUIET until you ask to record something. A Remarks box standing
+  // open on a panel nobody is editing is furniture, and a Reason picker that
+  // only appears once a date differs is invisible until then — so the whole
+  // form appears together, on one click, and Enter saves it.
+  const [open, setOpen] = useState(false);
   const [date, setDate] = useState("");
   const [reason, setReason] = useState<string>(PO_DELAY_REASONS[0]);
   const [remarks, setRemarks] = useState("");
+  // Remarks is the EXCEPTION, not the rule (Jess, 2026-08-02) — most answers
+  // are a date and a reason. It stays folded until asked for.
+  const [remarksOpen, setRemarksOpen] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const save = useRecordSupplierDate(po.id);
 
   const moved = held != null && date !== "" && date !== held;
-  const canSave = date !== "" && !save.isPending;
   const shiftDays =
     held && date
       ? Math.round(
@@ -1626,38 +1682,55 @@ function SupplierDateForm({
         )
       : 0;
 
+  const close = () => {
+    setOpen(false);
+    setDate("");
+    setRemarks("");
+    setRemarksOpen(false);
+    setErr(null);
+  };
+
   function submit() {
+    if (date === "" || save.isPending) return;
     setErr(null);
     const body =
       held == null
         ? { answer: "shipping" as const, firstDate: date, remarks: remarks || undefined }
         : moved
-          ? {
-              answer: "delayed" as const,
-              newDate: date,
-              reason,
-              remarks: remarks || undefined,
-            }
+          ? { answer: "delayed" as const, newDate: date, reason, remarks: remarks || undefined }
           : { answer: "shipping" as const, remarks: remarks || undefined };
     save.mutate(body, {
-      onSuccess: () => {
-        setRemarks("");
-        setDate("");
-      },
+      onSuccess: close,
       onError: (e) => setErr(e instanceof Error ? e.message : String(e)),
     });
+  }
+  const keys = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") submit();
+    if (e.key === "Escape") close();
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        data-testid="po-date-open"
+        className="text-body text-kit-slate-9 border-b border-dashed border-kit-slate-5 hover:text-kit-slate-12"
+      >
+        {held == null ? "Record the supplier's date…" : "Record a new date…"}
+      </button>
+    );
   }
 
   return (
     <div className="py-1" data-testid="po-date-form">
-      <div className="flex items-center gap-2">
-        <span className="w-16 shrink-0 text-label text-kit-slate-9">
-          {held == null ? "Date" : "New date"}
-        </span>
+      <div className="flex flex-wrap items-center gap-2">
         <input
           type="date"
           value={date}
+          autoFocus
           onChange={(e) => setDate(e.target.value)}
+          onKeyDown={keys}
           aria-label={held == null ? "Supplier delivery date" : "New supplier delivery date"}
           data-testid="po-date-input"
           className="h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
@@ -1666,6 +1739,7 @@ function SupplierDateForm({
           <select
             value={reason}
             onChange={(e) => setReason(e.target.value)}
+            onKeyDown={keys}
             aria-label="Reason"
             data-testid="po-date-reason"
             className="h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12"
@@ -1677,33 +1751,55 @@ function SupplierDateForm({
             ))}
           </select>
         )}
+        {remarksOpen ? (
+          <input
+            type="text"
+            value={remarks}
+            autoFocus
+            onChange={(e) => setRemarks(e.target.value)}
+            onKeyDown={keys}
+            placeholder="Remarks"
+            aria-label="Remarks"
+            data-testid="po-date-remarks"
+            className="h-8 flex-1 min-w-[8rem] rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setRemarksOpen(true)}
+            data-testid="po-date-remarks-open"
+            className="text-label text-kit-slate-9 border-b border-dashed border-kit-slate-5 hover:text-kit-slate-12"
+          >
+            + Remarks
+          </button>
+        )}
+        {/* A MULTI-field form needs a button (Jess: "i cant save?"). Enter-to-
+            save is an inline-edit gesture for ONE value; here it is a hint at
+            best, and a hidden control at worst. Esc still cancels. */}
         <button
           type="button"
           onClick={submit}
-          disabled={!canSave}
+          disabled={date === "" || save.isPending}
           data-testid="po-date-save"
           className={`${DOC_BTN} disabled:opacity-40`}
         >
           {save.isPending ? "Saving…" : "Save"}
         </button>
+        <button
+          type="button"
+          onClick={close}
+          data-testid="po-date-cancel"
+          className="text-label text-kit-slate-9 hover:text-kit-slate-12"
+        >
+          Cancel
+        </button>
       </div>
-      <input
-        type="text"
-        value={remarks}
-        onChange={(e) => setRemarks(e.target.value)}
-        placeholder="Remarks"
-        aria-label="Remarks"
-        data-testid="po-date-remarks"
-        className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
-      />
-      {/* Say what Save will record BEFORE it is pressed — a Reason picker that
-          only appears on a changed date is invisible until it appears (Jess
-          caught it live). Silent until a date is picked: with nothing keyed
-          there is nothing to record, and a sentence about that is noise. */}
+      {/* Say what Save will record BEFORE it happens; silent until a date is
+          keyed, because with nothing keyed there is nothing to record. */}
       {date !== "" && (
-        <div className="mt-1 text-label text-kit-slate-9" data-testid="po-date-effect">
+        <div className="text-label text-kit-slate-9" data-testid="po-date-effect">
           {held == null
-            ? `First date from ${supplierNameFallback}.`
+            ? `First date from ${supplierName}.`
             : shiftDays > 0
               ? `Delay ${shiftDays} day${shiftDays === 1 ? "" : "s"} from ${fmtDateShort(held)}.`
               : shiftDays < 0
@@ -1729,38 +1825,88 @@ function SupplierDateForm({
  * events join in Phase 3/4 with their own stores. Field CHANGES never
  * appear here — a field's history lives beside the field, in its section.
  */
+/** Same day + same channel + same revision = ONE send with a count. */
+function groupSends(
+  sends: NonNullable<operationPoListRow["sends"]>,
+): { key: string; day: string; channel: string; revNo: number | null; count: number }[] {
+  const out: {
+    key: string;
+    day: string;
+    channel: string;
+    revNo: number | null;
+    count: number;
+  }[] = [];
+  for (const s of sends) {
+    const day = s.sent_at.slice(0, 10);
+    const revNo = s.po_revisions?.rev_no ?? null;
+    const key = `${day}|${s.channel}|${revNo ?? "-"}`;
+    const hit = out.find((g) => g.key === key);
+    if (hit) hit.count += 1;
+    else out.push({ key, day, channel: s.channel, revNo, count: 1 });
+  }
+  return out;
+}
+
 function ActivityDesk({
   po,
   supplier,
+  template,
 }: {
   po: operationPoListRow;
   supplier: SupplierRow | undefined;
+  template: string | null;
 }) {
   const [copied, setCopied] = useState(false);
-  // Rhythm spec DO: collapse long tools — the draft is ONE line until
-  // opened. Copy works without expanding (it copies the full draft).
   const [draftOpen, setDraftOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const send = useRecordSend(po.id);
+  const saveTemplate = useSetMessageTemplate();
 
-  const message = useMemo(() => {
-    const items = po.purchase_order_lines
-      .map((l) => `${l.sku} ×${l.qty}`)
-      .join("\n");
-    const arriving = po.eta_date
-      ? `Goods Arriving At: ${fmtDate(po.eta_date)}`
-      : "Please confirm the arrival date.";
-    return `Hi ${supplier?.name ?? "supplier"},\n\n${po.id}\n${items}\n\n${arriving}\n\n— Carres`;
+  const supplierName = supplier?.name ?? "supplier";
+  const items = po.purchase_order_lines
+    .map((l) => `${l.sku} ×${l.qty}`)
+    .join("\n");
+  const arriving = po.eta_date
+    ? `Goods Arriving At: ${fmtDate(po.eta_date)}`
+    : "Please confirm the arrival date.";
+
+  /** The ONE company-wide draft, filled in. A template with no placeholders
+   *  still works — it is simply sent as written. */
+  const fill = (t: string) =>
+    t
+      .replaceAll("{supplier}", supplierName)
+      .replaceAll("{po}", po.id)
+      .replaceAll("{items}", items)
+      .replaceAll("{date}", arriving);
+
+  const DEFAULT_TEMPLATE =
+    "Hi {supplier},\n\n{po}\n{items}\n\n{date}\n\n— Carres";
+
+  // EDITABLE (Jess, 2026-08-02): the draft is a starting point, not a rule.
+  // It re-fills when the PO changes, and any edit stays until sent.
+  const [text, setText] = useState(() => fill(template ?? DEFAULT_TEMPLATE));
+  useEffect(() => {
+    setText(fill(template ?? DEFAULT_TEMPLATE));
+    setDraftOpen(false);
+    setSaved(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [po, supplier]);
+  }, [po.id, template]);
 
   const waUrl = useMemo(() => {
     if (supplier?.whatsapp_group_url) return supplier.whatsapp_group_url;
     const digits = (supplier?.contact ?? "").replace(/\D/g, "");
     return digits ? `https://wa.me/${digits}` : null;
   }, [supplier]);
+  const email = supplier?.contact_email ?? null;
+  const mailto = email
+    ? `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(
+        `${po.id} — Carres Purchase Order`,
+      )}&body=${encodeURIComponent(text)}`
+    : null;
 
   async function copyMessage() {
     try {
-      await navigator.clipboard.writeText(message);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
@@ -1768,26 +1914,27 @@ function ActivityDesk({
     }
   }
 
+  const sends = po.sends ?? [];
+
   return (
-    <section
-      className="mt-4 pt-3 border-t border-kit-slate-5"
-      data-testid="po-activity"
-    >
+    <section className="mt-3 pt-3 border-t border-kit-slate-5" data-testid="po-activity">
       <div className="flex items-center gap-2">
         <h3 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
           Activity
         </h3>
         {copied && (
-          <span
-            className="text-label font-medium text-kit-green-11"
-            data-testid="po-copied"
-          >
+          <span className="text-label font-medium text-kit-green-11" data-testid="po-copied">
             Copied
+          </span>
+        )}
+        {saved && (
+          <span className="text-label font-medium text-kit-green-11" data-testid="po-template-saved">
+            Template saved
           </span>
         )}
       </div>
 
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => setDraftOpen((o) => !o)}
@@ -1796,8 +1943,13 @@ function ActivityDesk({
           className="inline-flex items-center gap-1 text-label text-kit-slate-9 hover:text-kit-slate-12"
         >
           <Icon name={draftOpen ? "collapse" : "expand"} size={14} />
-          WhatsApp message
+          Message
         </button>
+        {/* The ACT records itself (Jess, 2026-08-02): opening WhatsApp or the
+            mail client IS the send, so there is no "I've sent" to remember
+            afterwards — a button somebody must press after the fact is a
+            record that will be wrong. Copy does NOT record: copying is not
+            sending, it is taking the words somewhere else. */}
         <button
           type="button"
           onClick={() => void copyMessage()}
@@ -1811,34 +1963,108 @@ function ActivityDesk({
             href={waUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => send.mutate({ channel: "whatsapp" })}
             data-testid="po-open-whatsapp"
             className={`${DOC_BTN} font-medium`}
           >
-            Open WhatsApp
+            WhatsApp
           </a>
         )}
+        {/* The portal has NO email sender (Jess picked mailto): the operator's
+            own client sends it, with the subject and body already filled. */}
+        {mailto ? (
+          <a
+            href={mailto}
+            onClick={() => send.mutate({ channel: "email" })}
+            data-testid="po-open-email"
+            className={`${DOC_BTN} font-medium`}
+          >
+            Email
+          </a>
+        ) : (
+          <span className="text-label text-kit-slate-9" data-testid="po-no-email">
+            No email on file for {supplierName}
+          </span>
+        )}
+        {send.isPending && (
+          <span className="text-label text-kit-slate-9">Recording…</span>
+        )}
       </div>
+
       {draftOpen && (
-        <pre
-          className="mt-2 whitespace-pre-wrap rounded-card bg-kit-slate-3 px-3 py-2 text-body font-body text-kit-slate-12"
-          data-testid="po-wa-message"
-        >
-          {message}
-        </pre>
+        <div className="mt-2">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={8}
+            aria-label="Message"
+            data-testid="po-wa-message"
+            className="w-full rounded-card border border-kit-slate-5 bg-white px-3 py-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+          />
+          <div className="mt-1 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                // Saved with the PLACEHOLDERS back in, or the next PO would
+                // inherit this one's number and items.
+                const generic = text
+                  .replaceAll(po.id, "{po}")
+                  .replaceAll(supplierName, "{supplier}")
+                  .replaceAll(items, "{items}")
+                  .replaceAll(arriving, "{date}");
+                saveTemplate.mutate(
+                  { text: generic },
+                  { onSuccess: () => setSaved(true) },
+                );
+              }}
+              disabled={saveTemplate.isPending}
+              data-testid="po-save-template"
+              className={`${DOC_BTN} disabled:opacity-40`}
+            >
+              {saveTemplate.isPending ? "Saving…" : "Save as template"}
+            </button>
+            <span className="text-label text-kit-slate-9">
+              Used for every supplier · {"{supplier} {po} {items} {date}"}
+            </span>
+          </div>
+        </div>
       )}
 
-      {/* The timeline — what we have SENT this supplier. `PO issued` was
-          deleted (Jess, 2026-08-02): the header already states that date, and
-          a timeline whose only entry repeats the header teaches nothing. The
-          supplier's date answers live beside the date, not here. Empty until
-          a sending store exists (po_sends · po_notes, Phase 3/4) — an honest
-          empty beats a padded one. */}
-      <div
-        className="mt-3 pt-2 border-t border-kit-slate-4 text-label text-kit-slate-9"
-        data-testid="po-history"
-      >
-        Nothing sent yet.
-      </div>
+      {/* The timeline — what we have SENT. `PO issued` is the header's fact,
+          never repeated here; a supplier's date answers live beside the date. */}
+      {sends.length === 0 ? (
+        <div
+          className="mt-3 pt-2 border-t border-kit-slate-4 text-label text-kit-slate-9"
+          data-testid="po-history"
+        >
+          Nothing sent yet.
+        </div>
+      ) : (
+        <ul
+          className="mt-3 pt-2 border-t border-kit-slate-4 flex flex-col gap-1"
+          data-testid="po-history"
+        >
+          {/* Opening WhatsApp twice in a morning is ONE send, not two: same
+              day, same channel, same revision collapses to a line with a
+              count (Jess caught the duplicate). */}
+          {groupSends(sends).map((g) => (
+            <li key={g.key} className="flex items-baseline gap-2 text-body">
+              <span className="text-label text-kit-slate-9 tabular-nums shrink-0">
+                {fmtDateShort(g.day)}
+              </span>
+              <span className="text-kit-slate-12">
+                sent via {g.channel}
+                {g.revNo != null ? (
+                  <span className="text-kit-slate-9"> · Revision {g.revNo}</span>
+                ) : null}
+                {g.count > 1 ? (
+                  <span className="text-kit-slate-9"> · {g.count}×</span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

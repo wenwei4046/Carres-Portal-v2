@@ -11,6 +11,8 @@ import {
   receivePoWithDoInput,
   recordBalanceDateInput,
   recordTomorrowDeliveryInput,
+  recordSendInput,
+  setMessageTemplateInput,
   setLineDestinationInput,
   setLineOpsRemarkInput,
   splitLineDestinationInput,
@@ -354,6 +356,33 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
+  // What we have SENT (0312) — the Activity timeline reads it, and the
+  // supplier's own version number comes with it.
+  const sendsByPo = new Map<string, Record<string, unknown>[]>();
+  if (poIds.length > 0) {
+    const { data: sendRows, error: sendErr } = await sb
+      .from("po_sends")
+      .select("po_id, channel, note, sent_at, po_revisions(rev_no)")
+      .in("po_id", poIds)
+      .order("sent_at", { ascending: false });
+    if (sendErr) {
+      const m = mapPgError(sendErr);
+      return c.json(m.body, m.status);
+    }
+    for (const r of sendRows ?? []) {
+      const row = r as Record<string, unknown>;
+      const arr = sendsByPo.get(row.po_id as string) ?? [];
+      arr.push(row);
+      sendsByPo.set(row.po_id as string, arr);
+    }
+  }
+
+  const { data: tmplRow } = await sb
+    .from("purchasing_settings")
+    .select("supplier_message_template")
+    .eq("id", 1)
+    .maybeSingle();
+
   const withAnswers = pos.map((p) => {
     const row = p as Record<string, unknown>;
     const lines = (row.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [];
@@ -364,6 +393,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       orders: ordersOf(row),
       eta_revised: (arrivalDatesByPo.get(row.id as string)?.size ?? 0) > 1,
       promises: promisesByPo.get(row.id as string) ?? [],
+      sends: sendsByPo.get(row.id as string) ?? [],
       purchase_order_lines: lines.map((l) => ({
         ...l,
         balance_answer_about_qty: balanceAboutByLine.get(l.id as string) ?? null,
@@ -374,7 +404,13 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     };
   });
 
-  return c.json({ pos: withAnswers, destinations: destRows ?? [] });
+  return c.json({
+    pos: withAnswers,
+    destinations: destRows ?? [],
+    messageTemplate:
+      (tmplRow as { supplier_message_template?: string | null } | null)
+        ?.supplier_message_template ?? null,
+  });
 });
 
 // ----- GET /awaiting-stock-shortage -----
@@ -1414,6 +1450,36 @@ operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, async (c) =>
         : (parsed.data.firstDate ?? null),
     p_reason: parsed.data.reason ?? null,
     ...extras,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+// ----- POST /:id/sends -----
+// What LEFT Carres (0312). The channel is the operator's fact; the REVISION is
+// the server's — a send mints one only when the document changed since the
+// last, because re-sending an unchanged PO asks the supplier to replace
+// nothing.
+operationPosRouter.post("/:id/sends", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, recordSendInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_record_send", {
+    p_po_id: c.req.param("id"),
+    p_channel: parsed.data.channel,
+    p_note: parsed.data.note ?? null,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+// ----- PUT /message-template -----
+operationPosRouter.put("/message-template", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, setMessageTemplateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_set_message_template", {
+    p_text: parsed.data.text,
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });

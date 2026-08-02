@@ -99,6 +99,15 @@ describe("GET /api/operation/pos", () => {
 
     // 0311's destination registry rides the list so the per-line picker has
     // its options without a second call.
+    // 0312: the sends read + the settings singleton (message template).
+    const sendsOrder = vi.fn().mockResolvedValue({ data: [], error: null });
+    const sendsIn = vi.fn(() => ({ order: sendsOrder }));
+    const sendsSelect = vi.fn(() => ({ in: sendsIn }));
+
+    const tmplSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    const tmplEq = vi.fn(() => ({ maybeSingle: tmplSingle }));
+    const tmplSelect = vi.fn(() => ({ eq: tmplEq }));
+
     const destOrder2 = vi.fn().mockResolvedValue({ data: [], error: null });
     const destOrder1 = vi.fn(() => ({ order: destOrder2 }));
     const destEq = vi.fn(() => ({ order: destOrder1 }));
@@ -117,6 +126,8 @@ describe("GET /api/operation/pos", () => {
         if (table === "product_skus") return { select: skusSelect };
         if (table === "order_lines") return { select: solSelect };
         if (table === "purchasing_destinations") return { select: destSelect };
+        if (table === "po_sends") return { select: sendsSelect };
+        if (table === "purchasing_settings") return { select: tmplSelect };
         return { select };
       }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

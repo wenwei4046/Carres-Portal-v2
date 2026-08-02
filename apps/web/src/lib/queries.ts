@@ -2700,6 +2700,8 @@ export interface SupplierRow {
   lead_time: string | null;
   contact: string | null;
   whatsapp_group_url: string | null;
+  /** The mailto: door's address (0313 — the ONE email column). */
+  contact_email?: string | null;
 }
 export interface SuppliersListResponse {
   suppliers: SupplierRow[];
@@ -3152,6 +3154,13 @@ export interface operationPoListRow {
    *  MORE THAN ONE expected arrival (promise-ledger history, 0306), so the
    *  listing marks it `(revised)`. OPTIONAL — older Worker degrades to false. */
   eta_revised?: boolean;
+  /** What LEFT Carres for this supplier (0312), newest first. */
+  sends?: {
+    channel: string;
+    note: string | null;
+    sent_at: string;
+    po_revisions: { rev_no: number } | null;
+  }[];
   /** The supplier-date field's own history (0306 ledger, newest first) —
    *  it renders BESIDE the field, never in the Activity timeline. */
   promises?: {
@@ -3181,6 +3190,8 @@ export interface operationPosListResponse {
   pos: operationPoListRow[];
   /** The active destination registry (0307) — the per-line picker's options. */
   destinations?: { id: string; name: string; is_default: boolean }[];
+  /** ONE company-wide supplier-message draft (0312). */
+  messageTemplate?: string | null;
 }
 
 /** Pipeline v2 (C4) — re-export the zod-derived drill-down shape so consumers
@@ -3970,6 +3981,39 @@ export function usePoLineAction(lineId: string | null) {
         `/api/operation/pos/lines/${encodeURIComponent(lineId ?? "")}/${input.path}`,
         { method: "POST", body: JSON.stringify(input.body) },
       ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+/**
+ * What LEFT Carres (0312) — one POST per send. The REVISION comes back from
+ * the server: a send mints one only when the document changed since the last.
+ */
+export function useRecordSend(poId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { channel: "whatsapp" | "email" | "print"; note?: string }) =>
+      apiFetch<{ ok: true; result: { revision: number } }>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/sends`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+/** ONE company-wide supplier-message template. */
+export function useSetMessageTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { text: string }) =>
+      apiFetch<{ ok: true }>("/api/operation/pos/message-template", {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
     },
