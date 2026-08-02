@@ -158,6 +158,24 @@ receiving_events (append-only, one writer: the engine's doors)
   during first entry`.
 - There is no second history mechanism anywhere in Receiving.
 
+### 6.1 Event Payload Dictionary (frozen — no RPC invents its own field names)
+
+Every event's payload uses ONLY these keys, spelled exactly so. A new key
+enters this table before it enters any payload.
+
+| Key | Type | Used by | Meaning |
+|---|---|---|---|
+| `do_number` | string | submitted · resubmitted · posted | the supplier DO this act was about |
+| `goods_received_at` | date | submitted · resubmitted | the business date as entered |
+| `units_counted` | int | submitted · resubmitted | good + damaged + wrong across all lines |
+| `reason` | string | returned · voided · amended | the human's stated why |
+| `claims_linked` | int | posted | supplier claims this posting opened |
+| `changes` | array | amended | `[{sku, from, to}]` — exactly what was added |
+
+Event names themselves are business facts and closed:
+`submitted · returned · resubmitted · posted · voided · amended`
+(`resubmitted` is a first-class event — never `submitted` with a flag.)
+
 ---
 
 ## 7 · Working rules already frozen (recorded here so no chat re-litigates)
