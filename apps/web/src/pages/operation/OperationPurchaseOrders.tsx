@@ -13,6 +13,7 @@ import {
 } from "@carres/shared";
 import PurchasingTabs from "./PurchasingTabs";
 import { TopBarIcons } from "./components/GlobalTopBar";
+import Badge from "@/components/kit/Badge";
 import DataTable, {
   type Column,
   type ColumnFilter,
@@ -32,7 +33,6 @@ import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import {
   useCatalog,
   useOperationPos,
-  useOperationPoUnits,
   useOperationSuppliers,
   useOperationWarehouse,
   usePurchasingSettings,
@@ -66,11 +66,11 @@ import {
  *     Range); the top Search finds across PO/Supplier/SKU/Model/SO/Customer
  *     — two different jobs, both stay.
  *
- *   WORKSPACE (400px right) — ONE live Purchase Order. It reads as a PO,
- *     not an ERP form: document head, items, the supplier's date, receiving
- *     line — and the supplier COMMUNICATION desk at the bottom (draft the
- *     WhatsApp from live data → copy → open the group). Real PDF only on
- *     [Print PDF].
+ *   WORKSPACE (400px right) — the Supplier Workspace for ONE PO (Jess's
+ *     v2 freeze, 2026-08-02): WORKING HEADER → REFERENCE LAYER (untitled —
+ *     the panel IS the PO) → SUPPLIER FOLLOW-UP → RECEIVING SUMMARY →
+ *     ACTIVITY (tools + business timeline). See WorkspaceBody's comment
+ *     for the full architecture; GRN and Claim will speak the same shape.
  *
  * Mission: pick today's supplier PO → update supplier progress → talk to the
  * supplier → hand over to Receiving.
@@ -448,18 +448,9 @@ export default function OperationPurchaseOrders() {
     () => pos.find((p) => p.id === selectedId) ?? null,
     [pos, selectedId],
   );
-  // The Item ID column's real data — the per-unit goods ids minted at Issue
-  // (0153). Grouped by sku; WorkspaceBody deals them out line by line.
-  const unitsQ = useOperationPoUnits(selected?.id ?? null);
-  const unitCodesBySku = useMemo(() => {
-    const m = new Map<string, string[]>();
-    for (const u of unitsQ.data?.units ?? []) {
-      const arr = m.get(u.sku) ?? [];
-      arr.push(u.unit_code);
-      m.set(u.sku, arr);
-    }
-    return m;
-  }, [unitsQ.data]);
+  // The per-unit Item IDs left the Reference Layer (Jess, 2026-08-02): they
+  // answer "what does the WAREHOUSE receive", not "what is this PO" — they
+  // belong to the Receiving/GRN workspace. GET /:id/units stays for it.
   useEffect(() => {
     if (selected || posQ.isLoading || rows.length === 0) return;
     setParams(
@@ -1050,7 +1041,6 @@ export default function OperationPurchaseOrders() {
               warehouse={warehouseById.get(selected.warehouse_id)}
               calls={callsOf(selected)}
               sizeOf={(raw) => skuBySku.get(raw)?.variant ?? null}
-              unitCodesBySku={unitCodesBySku}
               eta={etaOf(selected)}
               onCollapse={() => setWorkspaceOpen(false)}
             />
@@ -1068,7 +1058,29 @@ export default function OperationPurchaseOrders() {
   );
 }
 
-/* ── The live Purchase Order — reads as a PO, ends in the desk ─────────── */
+/* ── The Supplier Workspace for ONE Purchase Order (Jess, 2026-08-02 v2).
+ *
+ * Frozen architecture — the same language every Document Workspace (PO,
+ * GRN, Claim) will speak:
+ *
+ *   WORKING HEADER          identity + work state + the three facts
+ *   REFERENCE LAYER         no section title — the whole panel IS the PO.
+ *                           Answers "what is this PO?", nothing more:
+ *                           Supplier · Deliver To (names only) + the items
+ *                           (Sales Order · Description · Qty). No phone, no
+ *                           address (Open WhatsApp is the phone), no Item ID
+ *                           (that answers what the WAREHOUSE receives —
+ *                           Receiving's workspace owns it).
+ *   SUPPLIER FOLLOW-UP      work — the field + ITS OWN history beside it
+ *                           (never down in Activity) + the engine's Open
+ *                           Actions. The edit door is Phase 4.
+ *   RECEIVING SUMMARY       read only — Receiving owns Receiving.
+ *   ACTIVITY                communication tools + the BUSINESS timeline
+ *                           (read-time merge of the real stores; never a
+ *                           master activity table, never field changes).
+ *
+ * The paper look (logo · "PURCHASE ORDER" letterhead) belongs to the
+ * PRINTED 0307 document, never to this working panel. */
 
 function WorkspaceBody({
   po,
@@ -1076,7 +1088,6 @@ function WorkspaceBody({
   warehouse,
   calls,
   sizeOf,
-  unitCodesBySku,
   eta,
   onCollapse,
 }: {
@@ -1085,92 +1096,74 @@ function WorkspaceBody({
   warehouse: { name: string; address: string | null } | undefined;
   calls: PurchasingOpenCall[];
   sizeOf: (sku: string) => string | null;
-  unitCodesBySku: Map<string, string[]>;
   eta: { date: string | null; confirmed: boolean };
   onCollapse: () => void;
 }) {
   const supplierName = supplier?.name ?? po.supplier_id;
   const progress = poReceivingProgress(po.purchase_order_lines);
   const state = workStateOf(po, todayMYT());
-  const unitCodesByLine = useMemo(() => {
-    const cursor = new Map<string, number>();
-    const out = new Map<string, string[]>();
-    for (const l of po.purchase_order_lines) {
-      const all = unitCodesBySku.get(l.sku) ?? [];
-      const from = cursor.get(l.sku) ?? 0;
-      out.set(l.id, all.slice(from, from + l.qty));
-      cursor.set(l.sku, from + l.qty);
-    }
-    return out;
-  }, [po, unitCodesBySku]);
+  const late = calls.some((c) => c.late);
   const sos = soRefsOf(po);
 
   return (
     <div className="px-4 py-4" data-testid="po-document">
-      <button
-        type="button"
-        onClick={onCollapse}
-        title="Hide purchase order"
-        aria-label="Hide purchase order"
-        data-testid="po-workspace-collapse"
-        className={`mb-2 ${PANE_BTN}`}
-      >
-        <Icon name="forward" size={14} />
-      </button>
-      {/* ── The document — PO-PDF-STANDARD's own shape, live data. §3: the
-           logo is the wordmark IMAGE, never typeset. The label-gutter pair
-           carries the two dates; the PO number is the only hero. ───────── */}
-      <div className="flex items-end justify-between gap-2">
-        <div className="min-w-0">
-          <img src="/carres-wordmark.webp" alt="Carres" className="h-6 w-auto" />
-          <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 items-baseline">
-            <span className="text-label uppercase tracking-widest text-kit-slate-9">
-              Supplier Delivery By
-            </span>
-            <span
-              className={[
-                "text-label font-semibold uppercase tracking-wide",
-                eta.confirmed ? "text-kit-slate-12" : "text-kit-slate-9",
-              ].join(" ")}
-              data-testid="po-doc-delivery-by"
-            >
-              {eta.date ? fmtDate(eta.date).toUpperCase() : "—"}
-            </span>
-            <span className="text-label uppercase tracking-widest text-kit-slate-9">
-              PO Issued Date
-            </span>
-            <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-12">
-              {fmtDate(po.placed_at).toUpperCase()}
-            </span>
-          </div>
-        </div>
-        <div className="text-right shrink-0">
-          <div className="text-label uppercase tracking-widest text-kit-slate-9">
-            Purchase Order
-          </div>
-          <div className="text-page font-semibold font-mono text-kit-slate-12">
-            {po.id}
-          </div>
-        </div>
+      {/* ── WORKING HEADER — dense, zero ceremony: who + state + facts. ── */}
+      <div className="flex items-center gap-2" data-testid="po-working-header">
+        <button
+          type="button"
+          onClick={onCollapse}
+          title="Hide purchase order"
+          aria-label="Hide purchase order"
+          data-testid="po-workspace-collapse"
+          className={PANE_BTN}
+        >
+          <Icon name="forward" size={14} />
+        </button>
+        <span className="text-page font-semibold font-mono text-kit-slate-12">
+          {po.id}
+        </span>
+        <span className="ml-auto" data-testid="po-work-state">
+          <Badge>{WORK_STATE_LABEL[state]}</Badge>
+        </span>
       </div>
-      <div className="mt-2 border-b border-kit-slate-6" />
-
-      {/* The summary strip — what the operator asks first (Jess: Status ·
-          Goods Arriving At · Received), then the paper continues below. */}
-      <div className="mt-2 pb-2 border-b border-kit-slate-5 grid grid-cols-3 gap-x-4">
-        <Fact label="Status" value={WORK_STATE_LABEL[state]} />
-        <Fact
-          label="Goods Arriving At"
-          value={eta.date ? fmtDateShort(eta.date) : "—"}
-        />
-        <Fact
-          label="Received"
-          value={`${progress.received} / ${progress.ordered}`}
-        />
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-body">
+        <span className="text-kit-slate-9">PO Issued</span>
+        <span className="text-kit-slate-12 tabular-nums">
+          {fmtDateShort((po.placed_at ?? "").slice(0, 10))}
+        </span>
+        <span aria-hidden className="text-kit-slate-9">
+          ·
+        </span>
+        <span className="text-kit-slate-9">Goods Arriving At</span>
+        {eta.date ? (
+          <span
+            className={[
+              "tabular-nums",
+              late
+                ? "text-kit-red-11"
+                : eta.confirmed
+                  ? "text-kit-slate-12"
+                  : "text-kit-slate-9",
+            ].join(" ")}
+            title={eta.confirmed ? undefined : "Expected — supplier has not confirmed"}
+          >
+            {fmtDateShort(eta.date)}
+          </span>
+        ) : (
+          <span className="text-kit-slate-9">—</span>
+        )}
+        <span aria-hidden className="text-kit-slate-9">
+          ·
+        </span>
+        <span className="text-kit-slate-9">Received</span>
+        <span className="text-kit-slate-12 tabular-nums">
+          {progress.received} / {progress.ordered}
+        </span>
       </div>
 
-      {/* §4 · §5 — frameless Supplier / Deliver To cards. */}
-      <div className="mt-3 grid grid-cols-2 gap-x-4">
+      {/* ── REFERENCE LAYER — no section title: the whole panel IS the PO.
+           "What is this PO?" — identity + items, and nothing else. ────── */}
+      <div className="mt-3 pt-3 border-t border-kit-slate-6 grid grid-cols-2 gap-x-4">
         <div>
           <div className="text-label uppercase tracking-widest text-kit-slate-9">
             Supplier
@@ -1178,9 +1171,6 @@ function WorkspaceBody({
           <div className="mt-1 text-body font-semibold text-kit-slate-12">
             {supplierName}
           </div>
-          {supplier?.contact && (
-            <div className="text-body text-kit-slate-11">{supplier.contact}</div>
-          )}
         </div>
         <div>
           <div className="text-label uppercase tracking-widest text-kit-slate-9">
@@ -1189,21 +1179,12 @@ function WorkspaceBody({
           <div className="mt-1 text-body font-semibold text-kit-slate-12">
             {warehouse?.name ?? "—"}
           </div>
-          {warehouse?.address && (
-            <div className="text-body text-kit-slate-11">{warehouse.address}</div>
-          )}
         </div>
       </div>
 
-      {/* §6 — the item table: # · Sales Order · Item ID · Description · Qty.
-           Zero grid lines. Item ID is NOT the SKU — it is the per-unit goods
-           id minted at Issue (0153/0154); the ids are not on this wire yet,
-           so the reserved column states the absence rather than faking it. */}
-      <div className="mt-4" data-testid="po-doc-items">
+      <div className="mt-3" data-testid="po-doc-items">
         <div className="flex gap-2 text-label uppercase tracking-wide text-kit-slate-9 border-y border-kit-slate-5 py-1">
-          <span className="w-4 font-medium">#</span>
           <span className="w-16 font-medium">Sales Order</span>
-          <span className="w-14 font-medium">Item ID</span>
           <span className="flex-1 font-medium">Description</span>
           <span className="w-10 text-right font-medium">Qty</span>
         </div>
@@ -1214,28 +1195,12 @@ function WorkspaceBody({
               key={l.id}
               className="flex gap-2 py-1.5 text-body border-b border-kit-slate-4"
             >
-              <span className="w-4 text-kit-slate-9 tabular-nums">{i + 1}</span>
               <span className="w-16 text-kit-slate-12 tabular-nums">
                 {i === 0 && sos.length > 0
                   ? sos.map((n) => (
                       <span key={n} className="block">{`SO-${n}`}</span>
                     ))
                   : "—"}
-              </span>
-              <span className="w-14 min-w-0">
-                {(unitCodesByLine.get(l.id) ?? []).length > 0 ? (
-                  (unitCodesByLine.get(l.id) ?? []).map((code) => (
-                    <span
-                      key={code}
-                      className="block font-mono text-label text-kit-slate-11 truncate"
-                      title={code}
-                    >
-                      {code}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-kit-slate-9">—</span>
-                )}
               </span>
               <span className="flex-1 min-w-0">
                 <span className="block font-semibold font-mono text-kit-slate-12 truncate">
@@ -1255,76 +1220,133 @@ function WorkspaceBody({
         })}
       </div>
 
-      {/* Receiving — summary only; the work lives behind the door. */}
-      <div className="mt-3 pt-3 border-t border-kit-slate-5 grid grid-cols-2 gap-x-4 gap-y-2">
-        <Fact
-          label="Received"
-          value={`${progress.received} / ${progress.ordered}`}
-        />
-      </div>
-      <div className="mt-2 flex items-center gap-3">
-        {progress.issueQty > 0 && (
-          <span className="text-body text-kit-red-11">
-            {progress.issueQty} with a problem
-          </span>
-        )}
-        <Link
-          to="/operation?tab=receiving"
-          className="text-body font-medium text-kit-blue-11 hover:underline"
-          data-testid="po-open-receiving"
-        >
-          Open Receiving
-        </Link>
-      </div>
-
-      {/* The engine's open calls on THIS document. */}
-      {calls.length > 0 && (
-        <ul
-          className="mt-3 pt-3 border-t border-kit-slate-5 flex flex-col gap-1.5"
-          data-testid="po-open-calls"
-        >
-          {calls.map((c) => (
-            <li
-              key={c.poLineId ?? c.key}
-              className="flex items-baseline gap-2 text-body"
+      {/* ── SUPPLIER FOLLOW-UP — what to do with the supplier, and the
+           field's OWN history beside the field (never down in Activity).
+           Read-only today; the edit door is Phase 4's promise-ledger
+           write. */}
+      <section
+        className="mt-4 pt-3 border-t border-kit-slate-5"
+        data-testid="po-followup"
+      >
+        <h3 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+          Supplier Follow-up
+        </h3>
+        <div className="mt-2 flex items-baseline gap-2 text-body">
+          <span className="text-kit-slate-9">Goods Arriving At</span>
+          {eta.date ? (
+            <span
+              className={[
+                "tabular-nums",
+                late
+                  ? "text-kit-red-11"
+                  : eta.confirmed
+                    ? "text-kit-slate-12"
+                    : "text-kit-slate-9",
+              ].join(" ")}
             >
-              <span
-                aria-hidden
-                className={[
-                  "w-1.5 h-1.5 rounded-full shrink-0 self-center",
-                  c.late ? "bg-kit-red-9" : "bg-kit-amber-9",
-                ].join(" ")}
-              />
-              <span className="text-kit-slate-12 min-w-0">
-                {purchasingActionQueue(c.key)}
-                {c.sku ? <span className="text-kit-slate-9"> · {c.sku}</span> : null}
+              {fmtDateShort(eta.date)}
+              <span className="text-kit-slate-9">
+                {" "}
+                · {eta.confirmed ? "supplier confirmed" : "expected, not confirmed"}
               </span>
-              {c.dueIso && (
-                <span className="ml-auto text-label text-kit-slate-9 shrink-0">
-                  due {fmtDateShort(c.dueIso)}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+            </span>
+          ) : (
+            <span className="text-kit-slate-9">— supplier has not confirmed</span>
+          )}
+        </div>
+        {/* This field's history mounts HERE when the promise ledger has
+            entries to show — today's wire carries only the latest answer's
+            about-date; the Phase-4 ledger read fills the list. */}
+        {calls.length > 0 && (
+          <div className="mt-2">
+            <div className="text-label text-kit-slate-9">Open Actions</div>
+            <ul
+              className="mt-1 flex flex-col gap-1.5"
+              data-testid="po-open-calls"
+            >
+              {calls.map((c) => (
+                <li
+                  key={c.poLineId ?? c.key}
+                  className="flex items-baseline gap-2 text-body"
+                >
+                  <span
+                    aria-hidden
+                    className={[
+                      "w-1.5 h-1.5 rounded-full shrink-0 self-center",
+                      c.late ? "bg-kit-red-9" : "bg-kit-amber-9",
+                    ].join(" ")}
+                  />
+                  <span className="text-kit-slate-12 min-w-0">
+                    {purchasingActionQueue(c.key)}
+                    {c.sku ? (
+                      <span className="text-kit-slate-9"> · {c.sku}</span>
+                    ) : null}
+                  </span>
+                  {c.dueIso && (
+                    <span className="ml-auto text-label text-kit-slate-9 shrink-0">
+                      due {fmtDateShort(c.dueIso)}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
 
-      {/* ── Communication — the supplier desk, the bottom of the document. */}
-      <CommunicationDesk po={po} supplier={supplier} />
+      {/* ── RECEIVING SUMMARY — read only. Receiving owns Receiving. ──── */}
+      <section
+        className="mt-4 pt-3 border-t border-kit-slate-5"
+        data-testid="po-receiving-summary"
+      >
+        <h3 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+          Receiving Summary
+        </h3>
+        <div className="mt-2 flex items-baseline gap-2 text-body">
+          <span className="text-kit-slate-9">Received</span>
+          <span className="text-kit-slate-12 tabular-nums">
+            {progress.received} / {progress.ordered}
+          </span>
+          <span aria-hidden className="text-kit-slate-9">
+            ·
+          </span>
+          <span className="text-kit-slate-9">Remaining</span>
+          <span className="text-kit-slate-12 tabular-nums">
+            {progress.ordered - progress.received}
+          </span>
+        </div>
+        <div className="mt-2 flex items-center gap-3">
+          {progress.issueQty > 0 && (
+            <span className="text-body text-kit-red-11">
+              {progress.issueQty} with a problem
+            </span>
+          )}
+          <Link
+            to="/operation?tab=receiving"
+            className="text-body font-medium text-kit-blue-11 hover:underline"
+            data-testid="po-open-receiving"
+          >
+            Open Receiving
+          </Link>
+        </div>
+      </section>
+
+      {/* ── ACTIVITY — communication tools + the business timeline. ───── */}
+      <ActivityDesk po={po} supplier={supplier} />
     </div>
   );
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-label text-kit-slate-9">{label}</div>
-      <div className="text-body text-kit-slate-12">{value}</div>
-    </div>
-  );
-}
-
-function CommunicationDesk({
+/**
+ * ACTIVITY — Work + History (Jess, 2026-08-02, renamed from Communication):
+ * the communication tools on top, the unified BUSINESS timeline below.
+ * The timeline is a READ-TIME MERGE of the real stores — never a master
+ * `activity` table, never a copy. Today the only store on this wire is the
+ * PO itself (issued); sends (`po_sends`) · notes (`po_notes`) · receiving
+ * events join in Phase 3/4 with their own stores. Field CHANGES never
+ * appear here — a field's history lives beside the field, in its section.
+ */
+function ActivityDesk({
   po,
   supplier,
 }: {
@@ -1363,11 +1385,11 @@ function CommunicationDesk({
   return (
     <section
       className="mt-4 pt-3 border-t border-kit-slate-5"
-      data-testid="po-communication"
+      data-testid="po-activity"
     >
       <div className="flex items-center gap-2">
         <h3 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
-          Communication
+          Activity
         </h3>
         {copied && (
           <span
@@ -1407,6 +1429,18 @@ function CommunicationDesk({
             Open WhatsApp
           </a>
         )}
+      </div>
+
+      <div className="mt-3 pt-2 border-t border-kit-slate-4">
+        <div className="text-label text-kit-slate-9">History</div>
+        <ul className="mt-1 flex flex-col gap-1 text-body" data-testid="po-history">
+          <li className="flex items-baseline gap-2">
+            <span className="text-kit-slate-9 tabular-nums shrink-0">
+              {fmtDateShort((po.placed_at ?? "").slice(0, 10))}
+            </span>
+            <span className="text-kit-slate-12">PO issued</span>
+          </li>
+        </ul>
       </div>
     </section>
   );

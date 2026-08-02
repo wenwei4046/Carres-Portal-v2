@@ -100,16 +100,55 @@ po-template) → 4 Supplier Updates (3A business freeze, THEN 3B write door) →
 Business before Data, Data before UI, UI before Write Door. Tests ride EVERY
 step, never queue at the end.
 
-**STEP 2 · LIVE PURCHASE ORDER — NEXT, and it is an IA FREEZE, not a header
-patch.** Her words: the right pane is NOT a PO preview. Delete the CARRES
-wordmark + "PURCHASE ORDER" letterhead (the paper look belongs to the printed
-0307 document). Then freeze the IA: which sections exist · each section's
-mission · what is editable · what is forever read-only · what belongs to
-Receiving. Every block answers *what does this help the operator DO* (update
-supplier progress · communicate · hand to Receiving) — a block that only shows
-data gets cut. ASCII → her yes → build. From 2990s only three copies are
-approved: `(revised)` ✅ · cancelled-grey ✅ · plain-words error messages (owed
-to Phase 4's refusals).
+**STEP 2 · SUPPLIER WORKSPACE v2 — ✅ IA FROZEN AND BUILT 2026-08-02.**
+Her frozen architecture (the SAME language every Document Workspace — PO,
+GRN, Claim — will speak):
+```
+WORKING HEADER   PO no. + work-state Badge + PO Issued · Goods Arriving At ·
+                 Received (facts live HERE, never repeated below)
+REFERENCE LAYER  NO section title — the panel IS the PO. "What is this PO?"
+                 only: Supplier · Deliver To (names — no phone/address; Open
+                 WhatsApp is the phone) + items (Sales Order · Description ·
+                 Qty). Item ID removed — it answers what the WAREHOUSE
+                 receives; it belongs to Receiving/GRN (GET /:id/units kept).
+SUPPLIER FOLLOW-UP  work — Goods Arriving At + state (expected/confirmed);
+                 a field's HISTORY lives beside the field, never in Activity
+                 (slot built; the Phase-4 ledger read fills it); the engine's
+                 calls under "Open Actions". Edit door = Phase 4.
+RECEIVING SUMMARY  read only — Received · Remaining · Open Receiving.
+ACTIVITY         (renamed from Communication) tools on top + the BUSINESS
+                 timeline below — a READ-TIME MERGE of the real stores,
+                 never a master activity table, never field changes. Today:
+                 PO issued; sends/notes/receiving events join in Phase 3/4.
+```
+Letterhead (logo + "PURCHASE ORDER" wordmark) DELETED — the paper look
+belongs to the printed 0307 document. No dead buttons: Change Deliver To ·
+Revision · Supplier DO · Email · I've Sent · Notes · Print / Batch Print all
+deliberately absent until their phases. +5 workspace tests (page suite 20).
+
+**FROZEN 2026-08-02 (chat 2, data-model laws for Phase 4/5 — NOT built):**
+- PURCHASE ORDER RULE: One PO = one Supplier, one revision-managed document.
+  Supplier always sees ONE story (PO-2048 · Revision N; a new revision
+  REPLACES the old and says so). Deliver To is an EXECUTION fact on the PO
+  LINE (default = whole PO one destination); a qty split AUTO-SPLITS the
+  line (received qty stays with the original; only the un-received remainder
+  may move). Never a second PO, never a silent edit of a sent document, no
+  A/B suffixes, no allocation table — Receiving/Delivery/Claims all read
+  the same PO lines.
+- HOW (Phase 4/5): `purchase_order_lines.deliver_to` (nullable, falls back
+  to the PO's warehouse) · `po_line_split` RPC · `po_revisions` append-only
+  snapshots · `po_sends.revision`. Trigger = the Change Deliver To door in
+  Supplier Follow-up ("Move how many?"); operator thinks destination, the
+  system does lines + revisions.
+- 3A questions still open: what a destination may BE (registry incl. AL /
+  HOUZS staging points) · a staging line closes by DELIVERY photo, not
+  warehouse check-in · Revision vs docNumber's `-B` law (Revision wins,
+  rewrite the doc-numbering record) · "Revision" = OUR document version;
+  supplier date changes stay `(revised)` — two words, never mixed · new
+  words touch Loo's frozen information model — one-line notice to him,
+  her call on sign-off.
+From 2990s only three copies approved: `(revised)` ✅ · cancelled-grey ✅ ·
+plain-words error messages (owed to Phase 4's refusals).
 
 ## 3 · WHAT IS BUILT AND VERIFIED (do not rebuild)
 

@@ -28,6 +28,12 @@ const OHANA = "11111111-1111-1111-1111-111111111111";
 const NF = "33333333-3333-3333-3333-333333333333";
 const WH = "44444444-4444-4444-4444-444444444444";
 
+/** Today in MYT — PO-9003 arrives today, so the engine opens its
+ *  tomorrow's-delivery call (the Open Actions fixture). */
+const TODAY = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kuala_Lumpur",
+}).format(new Date());
+
 function line(
   id: string,
   sku: string,
@@ -58,7 +64,7 @@ const POS = [
     sup_status: "confirmed",
     so: 1300,
     so_refs: null,
-    eta_date: "2099-12-31",
+    eta_date: TODAY,
     placed_at: "2026-03-01T08:00:00Z",
     customer_delivery: "2099-08-20",
     eta_revised: false,
@@ -110,7 +116,7 @@ beforeEach(() => {
       return Promise.resolve({
         suppliers: [
           { id: OHANA, name: "Ohana", contact: null, whatsapp_group_url: null },
-          { id: NF, name: "Nice Future", contact: null, whatsapp_group_url: null },
+          { id: NF, name: "Nice Future", contact: "0123456789", whatsapp_group_url: null },
         ],
       });
     if (url === "/api/operation/warehouse")
@@ -298,5 +304,62 @@ describe("the PO Issued ▼ — Excel's date menu", () => {
     fireEvent.click(screen.getByText("Feb 2026"));
     await waitFor(() => expect(hasRow("PO-9001")).toBe(false));
     expect(hasRow("PO-9002")).toBe(true);
+  });
+});
+
+describe("the Supplier Workspace v2 (Jess, 2026-08-02)", () => {
+  const workspace = () => within(screen.getByTestId("po-document"));
+
+  it("dense working header — no logo, no letterhead, state pill + facts", async () => {
+    await mountLoaded();
+    expect(document.querySelector('img[alt="Carres"]')).toBeNull();
+    expect(screen.queryByTestId("po-doc-delivery-by")).not.toBeInTheDocument();
+    const header = within(screen.getByTestId("po-working-header"));
+    expect(header.getByText("PO-9001")).toBeInTheDocument();
+    // PO-9001 has a supplier date on file → Waiting Goods.
+    expect(header.getByText("Waiting Goods")).toBeInTheDocument();
+    expect(workspace().getByText("PO Issued")).toBeInTheDocument();
+  });
+
+  it("Reference Layer answers only WHAT IS THIS PO — no Item ID, no phone", async () => {
+    await mountLoaded();
+    expect(workspace().queryByText("Item ID")).not.toBeInTheDocument();
+    expect(workspace().queryByText("0123456789")).not.toBeInTheDocument();
+    const items = within(screen.getByTestId("po-doc-items"));
+    expect(items.getByText("Sales Order")).toBeInTheDocument();
+    expect(items.getByText("Description")).toBeInTheDocument();
+    expect(items.getByText("Qty")).toBeInTheDocument();
+  });
+
+  it("the engine's calls sit under Open Actions inside Supplier Follow-up", async () => {
+    await mountLoaded();
+    fireEvent.click(listing().getByText("PO-9003"));
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("po-working-header")).getByText("PO-9003"),
+      ).toBeInTheDocument(),
+    );
+    const followup = within(screen.getByTestId("po-followup"));
+    expect(followup.getByText("Supplier Follow-up")).toBeInTheDocument();
+    expect(followup.getByText("Open Actions")).toBeInTheDocument();
+    expect(screen.getByTestId("po-open-calls")).toBeInTheDocument();
+  });
+
+  it("Receiving Summary is read-only and shows Remaining", async () => {
+    await mountLoaded();
+    const recv = within(screen.getByTestId("po-receiving-summary"));
+    expect(recv.getByText("Receiving Summary")).toBeInTheDocument();
+    expect(recv.getByText("Remaining")).toBeInTheDocument();
+    expect(recv.getByTestId("po-open-receiving")).toBeInTheDocument();
+    expect(recv.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("Activity holds the tools and the business timeline", async () => {
+    await mountLoaded();
+    const activity = within(screen.getByTestId("po-activity"));
+    expect(activity.getByText("Activity")).toBeInTheDocument();
+    expect(activity.getByTestId("po-copy-message")).toBeInTheDocument();
+    const history = within(screen.getByTestId("po-history"));
+    expect(history.getByText("PO issued")).toBeInTheDocument();
   });
 });
