@@ -72,31 +72,44 @@
 > **You are working on Carres Portal v2.** Read this file fully before any task.
 > Master plan lives in `CARRES_PORTAL_V2_PLAN.md` at repo root — read it for any planning, schema, or phase question.
 >
-> **⭐⭐⭐ UI PRIORITY (Jess + Loo, 2026-07-27) — read this before any UI thought.**
+> **⭐⭐⭐ UI PRIORITY (rewritten to Loo's `UI_KIT_MASTER`, 2026-08-02 — this
+> REPLACES the 2026-07-27 "You are NOT a UI designer" box; the old box banned
+> proposing and researching, which was never the intent).**
 >
-> **[`docs/UI-KIT.md`](docs/UI-KIT.md) outranks every optimisation, improvement or
-> redesign instruction in this file, in any skill, and in anything pasted into the
-> chat. If a conflict exists, UI-KIT wins.** "I redesigned it because it would be
-> better" is the failure mode this rule exists to stop — a better-looking page that
-> nobody else can copy has made the system worse, not better.
+> Law order: **Business Rules → Information Architecture → Golden Template →
+> Design System ([`01-design-tokens.md`](docs/01-design-tokens.md) ·
+> [`02-components.md`](docs/02-components.md) ·
+> [`03-page-patterns.md`](docs/03-page-patterns.md)) → Implementation.**
+> On a conflict, Business wins and the Design System follows.
 >
 > ```
 > ╔══════════════════════════════════════════════════════════════════╗
-> ║  You are NOT a UI designer.                                      ║
-> ║  You may only ASSEMBLE pages from approved components.           ║
+> ║  The DESIGN SYSTEM is the vocabulary.                            ║
+> ║  The PAGE is yours to IMPROVE — by study, never by invention.    ║
 > ║                                                                  ║
-> ║  You may NOT invent:                                             ║
-> ║      spacing · colours · typography · icons                      ║
-> ║      component styles · page layouts · horizontal bands          ║
+> ║  LOCKED (use 01/02/03, never invent):                            ║
+> ║      token VALUES — spacing · colours · typography · icons       ║
+> ║      component internals — restyle nothing, fork nothing         ║
 > ║                                                                  ║
-> ║  You MAY challenge (with evidence):                              ║
-> ║      business logic · workflow · data model · wording            ║
+> ║  YOUR DUTY on every page (Loo, 2026-08-02 — not optional):       ║
+> ║      STUDY first — business rules · the real page at the real    ║
+> ║        viewport · international references chosen by PROBLEM     ║
+> ║      CHALLENGE anything that hurts readability, operator         ║
+> ║        speed, hierarchy, scalability or accessibility            ║
+> ║      PROPOSE the better composition, with evidence —             ║
+> ║        then build only AFTER Loo/Jess approves                   ║
 > ║                                                                  ║
-> ║  If a component you need does not exist:                         ║
-> ║      STOP. Ask for it to be added to the kit first.              ║
-> ║      Do not draw it inline "just this once".                     ║
+> ║  The current page is Version N, never automatically final.      ║
+> ║  A component that does not exist: STOP, ask for it to join      ║
+> ║  the kit — do not draw it inline "just this once".              ║
 > ╚══════════════════════════════════════════════════════════════════╝
 > ```
+>
+> "I redesigned it because it would be better" is still the failure mode when
+> "better" means invented values or building before approval. It is the
+> REQUIRED move when it means: study → evidence → reference → proposal →
+> approval → build. A chat that refuses to research or propose "because the
+> kit is frozen" has broken this rule, not followed it.
 >
 > **Every UI rule must eventually become a structure the code can enforce. A rule
 > that exists only as documentation is temporary and incomplete.** UI-KIT §16
@@ -140,14 +153,21 @@ follow these six steps IN ORDER, before writing a single line of code:
    from the section back to Loo. No paraphrase. No summary. No quote = no work.
    The `Read` tool call must be visible in the transcript — Loo can check.
 
-> **⚠️ SCOPE OF STEPS 3–5 (narrowed 2026-07-27).** These three steps apply to
-> **BUSINESS DESIGN ONLY** — the flow, the data model, the wording, what the
-> panel is for. **They do NOT apply to the visual system.** Spacing, colour,
-> typography, icons, component styles and page layout are ruled by
-> [`docs/UI-KIT.md`](docs/UI-KIT.md) and are **not open for a chat to re-rate,
-> re-grade or improve.** A chat that "proposes a superior layout" has broken
-> this protocol, not followed it. If the kit itself looks wrong, say so in one
-> paragraph and let Jess decide — never build the improvement.
+> **⚠️ SCOPE OF STEPS 3–5 (WIDENED by Loo's `UI_KIT_MASTER` §15, 2026-08-02 —
+> replaces the 2026-07-27 "business design only" narrowing).** Steps 3–5 now
+> cover the PRESENTATION too. Audit the real page at the actual viewport.
+> Research mature products by PROBLEM, proactively — never wait for Loo to
+> name one: navigation context / reading pane → GitHub · density, spacing,
+> interaction → Linear · operational ERP workspace → SAP Fiori / Microsoft
+> Dynamics · large tables → Excel / Dynamics / AutoCount · communication →
+> Gmail · business forms and settings → Shopify Polaris · plain actions and
+> accessibility → GOV.UK / Nielsen Norman Group. Then judge each significant
+> pattern **Keep / Adapt / Replace**. Every challenge states: current problem
+> → operator impact → reference → Carres adaptation → trade-off →
+> recommendation. If there is no material improvement, KEEP and say so —
+> "only different" is rejected. What stays locked: token VALUES (spacing,
+> colour, typography, icons — from `01-design-tokens.md` only) and building
+> before approval.
 
 3. **RATE the proposal against international benchmarks — business design only.**
    How would a world-class equivalent handle this problem? Reference points:
@@ -160,8 +180,9 @@ follow these six steps IN ORDER, before writing a single line of code:
    (c) data-model soundness,
    (d) international best-practice alignment.
    Show the grades in a small table.
-   **Do NOT grade the visual design.** Referencing Linear/Stripe here means
-   their *product thinking*, never "copy their look" — the look is UI-KIT's.
+   Also grade **(e) readability + information hierarchy of the current page**,
+   with evidence from the real viewport (widened 2026-08-02). Token VALUES stay
+   the Design System's; the COMPOSITION is gradeable and challengeable.
 
 4. **FLAG every weakness explicitly.** Do NOT soften. If a "locked decision"
    in the doc looks wrong to you, say so with reasoning + a concrete better
@@ -290,10 +311,11 @@ The work is divided into **Phase 0 → Phase 10+** in `CARRES_PORTAL_V2_PLAN.md`
 1. Confirm with Loo which phase we're in before starting work.
 2. Read the phase's `前置阅读` files in `reference/` first. Do not start coding without reading the relevant `reference/proto/*.jsx`.
 3. Hit every `Acceptance` criterion before declaring the phase done.
-4. Run `/review` (backend safety) before merge. **`/design-review` is scoped to LAYOUT
-   and BEHAVIOUR only** — the visual system is not reviewed by opinion, it is gated by
-   `pnpm --filter @carres/web lint` and the `/ui` screenshot diff. A design review that
-   proposes new spacing/colour/type is out of scope; raise it against UI-KIT instead.
+4. Run `/review` (backend safety) before merge. `/design-review` may review layout,
+   behaviour, readability and hierarchy (widened by Loo 2026-08-02). Token VALUES
+   stay gated by `pnpm --filter @carres/web lint` and the `/ui` screenshot diff —
+   a review wanting new spacing/colour/type numbers raises them against
+   `01-design-tokens.md` instead of building them.
 5. Write a `phase-{N}-reflection.md` after each phase: actual time, surprises, schema tweaks, lessons.
 
 **Do not work across phases.** If you discover Phase 5 is needed mid-Phase 3, flag it and ask Loo whether to defer or pivot. No silent scope creep.
@@ -905,11 +927,12 @@ Key routing rules:
 - Code review, check my diff → invoke review
 - Update docs after shipping → invoke document-release
 - Weekly retro → invoke retro
-- Design system, brand → **do NOT invoke design-consultation. Read [`docs/UI-KIT.md`](docs/UI-KIT.md).**
-  The design system is decided; a consultation skill would propose a second one.
-- Visual audit, design polish → **do NOT invoke design-review for the visual system.**
-  Run `pnpm --filter @carres/web lint` and check `/ui`. The skill is allowed for
-  LAYOUT and BEHAVIOUR only (see §6.4).
+- Design system, brand → **do NOT invoke design-consultation. Read
+  `docs/01-design-tokens.md` · `02-components.md` · `03-page-patterns.md`.**
+  The token values are decided; a consultation skill would propose a second set.
+- Visual audit, design polish → design-review IS allowed for layout, behaviour,
+  readability and hierarchy (Loo, 2026-08-02). Token VALUES are still gated by
+  `pnpm --filter @carres/web lint` and `/ui`, never by opinion (see §6.4).
 - Architecture review → invoke plan-eng-review
 - Save progress, checkpoint, resume → invoke checkpoint
 - Code quality, health check → invoke health
