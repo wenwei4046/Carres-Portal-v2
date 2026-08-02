@@ -140,6 +140,19 @@ FROZEN (hers, this order of authority):
   Supplier-facing note ≠ internal note: REMARK column prints for the
   supplier; "why it is urgent" NEVER (it goes to po_notes/ACTIVITY later).
 
+**PAGE BUILT 2026-08-02 (this session, after the checkpoint):** header 4
+label-rows + PO No. right (NO badge — the rail owns progress) · the
+SUPPLIER DELIVERY DATE row opens IN PLACE (engine calls + the ledger's own
+history; `promises` now rides the list wire) · ITEMS is the EXCEL grid off
+`so_rows` (# · SO No. · Description · Qty · Recv · Remark, one row per
+SO × SKU, salesperson remark read-only) with a TOTAL row + `Open
+Receiving →` (the Receiving PANEL is gone — quantities live on the rows) ·
+row click extends in place (Destination fact today; [Change] = Phase 4/5's
+Split/Revision door) · ACTIVITY unchanged. 25 page tests green.
+STILL OWED: the date FORM (key a new date + Reason ▾ + Remarks) — it needs
+the migration below, so today the extend shows facts and history only, no
+dead Save button.
+
 BUILT ALREADY (committed): shared `po-workspace.ts` v7 (lifecycle labels ·
 poOverdueDays · Contact Supplier · PO_DELAY_REASONS · ready=arrived fix,
 13 tests) · api list now derives `so_rows` per line (SO × SKU dealing +

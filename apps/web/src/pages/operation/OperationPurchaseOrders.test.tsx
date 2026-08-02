@@ -40,6 +40,7 @@ function line(
   qty: number,
   model: string | null,
   size: string | null,
+  so_rows?: { so: number | null; qty: number; remark: string | null }[],
 ) {
   return {
     id,
@@ -49,6 +50,7 @@ function line(
     model_name: model,
     size,
     attrs: null,
+    so_rows: so_rows ?? [{ so: null, qty, remark: null }],
   };
 }
 
@@ -70,7 +72,11 @@ const POS = [
     eta_revised: false,
     orders: [{ so: 1300, customer_name: "Ah Hock", delivery_date: "2099-08-20" }],
     purchase_order_lines: [
-      line("a1", "SKU-CODY-Q", 1, "Cody", "Queen"),
+      // ONE line covering TWO sales orders → the grid must show TWO rows.
+      line("a1", "SKU-CODY-Q", 2, "Cody", "Queen", [
+        { so: 1300, qty: 1, remark: "No drilling" },
+        { so: 1301, qty: 1, remark: null },
+      ]),
       line("a2", "SKU-SONIC-K", 1, "Sonic", "King"),
       line("a3", "SKU-ONYX-L", 1, "Onyx", null),
     ],
@@ -88,7 +94,34 @@ const POS = [
     customer_delivery: null,
     eta_revised: true,
     orders: [{ so: 1200, customer_name: "Mei Ling", delivery_date: null }],
+    promises: [
+      {
+        kind: "tomorrow_delivery",
+        answer: "delayed",
+        about_date: "2099-12-20",
+        previous_date: "2099-12-20",
+        new_date: "2099-12-30",
+        reason: "Production Delay",
+        recorded_at: "2026-08-01T02:00:00Z",
+      },
+    ],
     purchase_order_lines: [line("b1", "SKU-SONIC-K", 3, "Sonic", "King")],
+  },
+  {
+    // The date PASSED and nothing arrived → Overdue, action Contact Supplier.
+    id: "PO-9004",
+    supplier_id: OHANA,
+    warehouse_id: WH,
+    status: "open",
+    sup_status: "confirmed",
+    so: 1400,
+    so_refs: null,
+    eta_date: "2026-01-20",
+    placed_at: "2026-01-10T08:00:00Z",
+    customer_delivery: null,
+    eta_revised: false,
+    orders: [],
+    purchase_order_lines: [line("d1", "SKU-CODY-Q", 1, "Cody", "Queen")],
   },
   {
     id: "PO-9002",
@@ -211,15 +244,16 @@ describe("the default order — PO Issued, oldest first", () => {
     const cells = listing()
       .getAllByText(/^PO-9\d{3}$/)
       .map((el) => el.textContent);
-    // Jan (9001) → Feb (9002) → Mar (9003), though 9003 > 9002 > 9001 by number.
-    expect(cells).toEqual(["PO-9001", "PO-9002", "PO-9003"]);
+    // 10 Jan (9004) → 5 Jan… wait: issued dates are 9004 10-Jan, 9001 5-Jan,
+    // 9002 1-Feb, 9003 1-Mar → oldest first, never the PO number.
+    expect(cells).toEqual(["PO-9001", "PO-9004", "PO-9002", "PO-9003"]);
   });
 });
 
 describe("the Items words", () => {
   it("speaks MODEL from the wire, first line + how many more", async () => {
     await mountLoaded();
-    expect(screen.getByText("Cody Q · +2")).toBeInTheDocument();
+    expect(listing().getByText("Cody Q ×2 · +2")).toBeInTheDocument();
   });
 
   it("shows ×N only when N ≥ 2 — never ×1", async () => {
@@ -306,32 +340,45 @@ describe("the PO Issued ▼ — Excel's date menu", () => {
   });
 });
 
-describe("the Supplier Workspace v2 (Jess, 2026-08-02)", () => {
+describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
   const workspace = () => within(screen.getByTestId("po-document"));
 
-  it("dense working header — no logo, no letterhead, state pill + facts", async () => {
+  it("the fixed header: labels left, PO number right, no letterhead, no badge", async () => {
     await mountLoaded();
     expect(document.querySelector('img[alt="Carres"]')).toBeNull();
-    expect(screen.queryByTestId("po-doc-delivery-by")).not.toBeInTheDocument();
     const header = within(screen.getByTestId("po-working-header"));
+    expect(header.getByText("PO Issued")).toBeInTheDocument();
+    expect(header.getByText("Delivery To")).toBeInTheDocument();
+    expect(header.getByText("Supplier")).toBeInTheDocument();
     expect(header.getByText("PO-9001")).toBeInTheDocument();
-    // PO-9001 has a supplier date on file → Waiting for Goods (the goods
-    // lifecycle words, Jess 2026-08-02).
-    expect(header.getByText("Waiting for Goods")).toBeInTheDocument();
-    expect(workspace().getByText("PO Issued")).toBeInTheDocument();
+    // Progress belongs to the rail — the header never repeats it.
+    expect(screen.queryByTestId("po-work-state")).not.toBeInTheDocument();
   });
 
-  it("Reference Layer answers only WHAT IS THIS PO — no Item ID, no phone", async () => {
+  it("the supplier-date row opens IN PLACE and carries the field's own history", async () => {
     await mountLoaded();
-    expect(workspace().queryByText("Item ID")).not.toBeInTheDocument();
-    expect(workspace().queryByText("0123456789")).not.toBeInTheDocument();
-    const items = within(screen.getByTestId("po-doc-items"));
-    expect(items.getByText("SO No.")).toBeInTheDocument();
-    expect(items.getByText("Description")).toBeInTheDocument();
-    expect(items.getByText("Qty")).toBeInTheDocument();
+    expect(screen.queryByTestId("po-date-extend")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("po-date-row"));
+    const ext = within(screen.getByTestId("po-date-extend"));
+    // PO-9001's ledger says the supplier confirmed, then moved the date.
+    expect(ext.getByText(/moved/)).toBeInTheDocument();
+    expect(ext.getByText(/Production Delay/)).toBeInTheDocument();
   });
 
-  it("the engine's calls sit under Open Actions inside SUPPLIER", async () => {
+  it("OVERDUE is printed beside the date, never a second bucket", async () => {
+    await mountLoaded();
+    fireEvent.click(listing().getByText("PO-9004"));
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("po-working-header")).getByText("PO-9004"),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("po-overdue").textContent).toMatch(/Overdue by \d+ day/);
+    // The rail still has five buckets — Contact Supplier is an ACTION.
+    expect(screen.queryByTestId("po-rail-state-overdue")).not.toBeInTheDocument();
+  });
+
+  it("ITEMS is an Excel grid: one row per SO × SKU, with the SO's remark", async () => {
     await mountLoaded();
     fireEvent.click(listing().getByText("PO-9003"));
     await waitFor(() =>
@@ -339,19 +386,29 @@ describe("the Supplier Workspace v2 (Jess, 2026-08-02)", () => {
         within(screen.getByTestId("po-working-header")).getByText("PO-9003"),
       ).toBeInTheDocument(),
     );
-    const supplier = within(screen.getByTestId("po-supplier"));
-    expect(supplier.getByText("Supplier")).toBeInTheDocument();
-    expect(supplier.getByText("Open Actions")).toBeInTheDocument();
-    expect(screen.getByTestId("po-open-calls")).toBeInTheDocument();
+    const items = within(screen.getByTestId("po-doc-items"));
+    // Line a1 covers TWO sales orders → two rows, never one stacked cell.
+    expect(items.getByText("SO-1300")).toBeInTheDocument();
+    expect(items.getByText("SO-1301")).toBeInTheDocument();
+    // The salesperson's remark flows over, read-only.
+    expect(items.getByText("No drilling")).toBeInTheDocument();
+    expect(items.getByText("Recv")).toBeInTheDocument();
+    expect(items.getByText("Total")).toBeInTheDocument();
   });
 
-  it("RECEIVING is one read-only line with Remaining and the door", async () => {
+  it("a row extends IN PLACE — no drill-in, no modal", async () => {
     await mountLoaded();
-    const recv = within(screen.getByTestId("po-receiving-summary"));
-    expect(recv.getByText("Receiving")).toBeInTheDocument();
-    expect(recv.getByText("Remaining")).toBeInTheDocument();
-    expect(recv.getByTestId("po-open-receiving")).toBeInTheDocument();
-    expect(recv.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("po-item-extend")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("po-item-row-1"));
+    expect(
+      within(screen.getByTestId("po-item-extend")).getByText("Destination"),
+    ).toBeInTheDocument();
+  });
+
+  it("quantities live on the rows — the Receiving PANEL is gone, the door stays", async () => {
+    await mountLoaded();
+    expect(screen.queryByTestId("po-receiving-summary")).not.toBeInTheDocument();
+    expect(workspace().getByTestId("po-open-receiving")).toBeInTheDocument();
   });
 
   it("Activity holds the tools and the business timeline", async () => {
@@ -359,8 +416,7 @@ describe("the Supplier Workspace v2 (Jess, 2026-08-02)", () => {
     const activity = within(screen.getByTestId("po-activity"));
     expect(activity.getByText("Activity")).toBeInTheDocument();
     expect(activity.getByTestId("po-copy-message")).toBeInTheDocument();
-    const history = within(screen.getByTestId("po-history"));
-    expect(history.getByText("PO issued")).toBeInTheDocument();
+    expect(within(screen.getByTestId("po-history")).getByText("PO issued")).toBeInTheDocument();
   });
 
   it("the WhatsApp draft is ONE line until opened — Copy works either way", async () => {
@@ -370,46 +426,18 @@ describe("the Supplier Workspace v2 (Jess, 2026-08-02)", () => {
     fireEvent.click(screen.getByTestId("po-wa-toggle"));
     expect(screen.getByTestId("po-wa-message")).toBeInTheDocument();
   });
-
-  it("the section order is Jess's four categories", async () => {
-    await mountLoaded();
-    const doc = screen.getByTestId("po-document");
-    const order = ["po-reference", "po-supplier", "po-activity", "po-receiving-summary"]
-      .map((id) => Array.from(doc.querySelectorAll("section")).findIndex(
-        (el) => el.getAttribute("data-testid") === id,
-      ));
-    expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(order.every((i) => i >= 0)).toBe(true);
-  });
 });
 
 describe("the ONE Current Action source (Law 7)", () => {
-  it("the header hero speaks the state word when the engine is quiet", async () => {
+  it("the register's column reads the shared engine — no dashes on live work", async () => {
     await mountLoaded();
-    // PO-9001 auto-selects: future date, nothing received → Waiting for Goods.
-    const hero = within(screen.getByTestId("po-current-action"));
-    expect(hero.getByText("Current Action")).toBeInTheDocument();
-    expect(hero.getByText("Waiting for Goods")).toBeInTheDocument();
-  });
-
-  it("the listing's Current Action column reads the SAME source — no more dashes on live work", async () => {
-    await mountLoaded();
-    // PO-9001 (waiting) and PO-9002 (cancelled → the only honest dash).
     expect(listing().getByText("Waiting for Goods")).toBeInTheDocument();
     const cancelled = listing().getByText("PO-9002").closest("tr")!;
     expect(within(cancelled as HTMLElement).getByText("—")).toBeInTheDocument();
   });
 
-  it("an open engine call BEATS the state word in the hero", async () => {
+  it("an overdue PO's column says Contact Supplier, never Confirm again", async () => {
     await mountLoaded();
-    fireEvent.click(listing().getByText("PO-9003"));
-    await waitFor(() =>
-      expect(
-        within(screen.getByTestId("po-working-header")).getByText("PO-9003"),
-      ).toBeInTheDocument(),
-    );
-    const hero = within(screen.getByTestId("po-current-action"));
-    // Arriving today → the tomorrow's-delivery call leads, not "Open Receiving".
-    expect(hero.getByText(/tomorrow/i)).toBeInTheDocument();
+    expect(listing().getByText("Contact Supplier")).toBeInTheDocument();
   });
 });

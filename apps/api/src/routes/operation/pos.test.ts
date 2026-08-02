@@ -97,11 +97,18 @@ describe("GET /api/operation/pos", () => {
     const skusIn = vi.fn().mockResolvedValue({ data: skuRows, error: null });
     const skusSelect = vi.fn(() => ({ in: skusIn }));
 
+    // The Excel-row derivation reads the covered SOs' own lines (Jess,
+    // 2026-08-02): one grid row per SO × SKU, carrying the salesperson's
+    // remark. Empty here — the rows fall back to one per PO line.
+    const solIn = vi.fn().mockResolvedValue({ data: [], error: null });
+    const solSelect = vi.fn(() => ({ in: solIn }));
+
     vi.mocked(userClient).mockReturnValue({
       from: vi.fn((table: string) => {
         if (table === "po_supplier_promises") return { select: promiseSelect };
         if (table === "orders") return { select: ordersSelect };
         if (table === "product_skus") return { select: skusSelect };
+        if (table === "order_lines") return { select: solSelect };
         return { select };
       }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

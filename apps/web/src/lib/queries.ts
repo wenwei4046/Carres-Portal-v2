@@ -3120,6 +3120,12 @@ export interface operationPoListRow {
      *  to print the code). OPTIONAL: an older Worker degrades to the code. */
     model_name?: string | null;
     size?: string | null;
+    /** Register (Jess, 2026-08-02) — the EXCEL rows this PO line becomes:
+     *  one entry per SO × SKU, each carrying the SALESPERSON's remark from
+     *  the sales order. Derived server-side; a quantity no SO claims comes
+     *  back with `so: null`. OPTIONAL — an older Worker degrades to one row
+     *  per line. */
+    so_rows?: { so: number | null; qty: number; remark: string | null }[];
     // 0073 cascade picker (Loo 2026-05-09). Null for mattress + legacy
     // pre-0073 lines; bedframe carries {color, gap}; sofa carries
     // {fabric_id, fabric_name, fabric_surcharge}.
@@ -3138,6 +3144,17 @@ export interface operationPoListRow {
    *  MORE THAN ONE expected arrival (promise-ledger history, 0306), so the
    *  listing marks it `(revised)`. OPTIONAL — older Worker degrades to false. */
   eta_revised?: boolean;
+  /** The supplier-date field's own history (0306 ledger, newest first) —
+   *  it renders BESIDE the field, never in the Activity timeline. */
+  promises?: {
+    kind: string;
+    answer: string;
+    about_date: string | null;
+    previous_date: string | null;
+    new_date: string | null;
+    reason: string | null;
+    recorded_at: string;
+  }[];
   /** 2026-05-18 (Loo C+D) — per-source-SO enrichment. One entry per SO this
    *  PO serves (po.so for single, po.so_refs[] for bundle). Empty for
    *  stockpile POs. Since 2026-08-02 the global /api/operation/pos fills it

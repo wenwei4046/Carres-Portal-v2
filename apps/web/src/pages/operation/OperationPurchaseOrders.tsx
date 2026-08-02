@@ -7,6 +7,7 @@ import {
   PO_WORK_STATES,
   PO_WORK_STATE_LABEL,
   poCurrentActionOf,
+  poOverdueDays,
   poReceivingProgress,
   poWorkStateOf,
   purchasingActionQueue,
@@ -19,7 +20,6 @@ import {
   type SupplierCallPo,
 } from "@carres/shared";
 import PurchasingTabs from "./PurchasingTabs";
-import Badge from "@/components/kit/Badge";
 import DataTable, {
   type Column,
   type ColumnFilter,
@@ -999,7 +999,6 @@ export default function OperationPurchaseOrders() {
               supplier={supplierById.get(selected.supplier_id)}
               warehouse={warehouseById.get(selected.warehouse_id)}
               calls={callsOf(selected)}
-              action={actionOf(selected)}
               sizeOf={(raw) => skuBySku.get(raw)?.variant ?? null}
               eta={etaOf(selected)}
               today={today}
@@ -1046,10 +1045,6 @@ export default function OperationPurchaseOrders() {
  * (the Current Action), no cards, no letterhead (the paper look belongs to
  * the printed 0307 document). */
 
-const SECTION = "mt-3 pt-3 border-t border-kit-slate-5";
-const SECTION_TITLE =
-  "text-label font-semibold uppercase tracking-wide text-kit-slate-9";
-
 /** The Linear property row: label + value, ONE 24px line, never stacked. */
 function Prop({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -1065,7 +1060,6 @@ function WorkspaceBody({
   supplier,
   warehouse,
   calls,
-  action,
   sizeOf,
   eta,
   today,
@@ -1074,233 +1068,259 @@ function WorkspaceBody({
   supplier: SupplierRow | undefined;
   warehouse: { name: string; address: string | null } | undefined;
   calls: PurchasingOpenCall[];
-  action: PoCurrentAction | null;
   sizeOf: (sku: string) => string | null;
   eta: { date: string | null; confirmed: boolean };
   today: string;
 }) {
   const supplierName = supplier?.name ?? po.supplier_id;
   const progress = poReceivingProgress(po.purchase_order_lines);
-  const state = workStateOf(po, today);
-  const late = calls.some((c) => c.late);
-  const sos = soRefsOf(po);
-  const actionWord =
-    action == null
-      ? null
-      : action.kind === "call"
-        ? purchasingActionQueue(action.call.key)
-        : action.word;
-  const actionLate = action?.kind === "call" && action.call.late;
-  const actionDue = action?.kind === "call" ? action.call.dueIso : null;
+  const overdue = poOverdueDays(callPoOf(po), today);
+  const [dateOpen, setDateOpen] = useState(false);
+  const [openLine, setOpenLine] = useState<string | null>(null);
+
+  /** The EXCEL rows: one per SO × SKU (never the paper's stacked cells).
+   *  Received is dealt across a line's rows in the same SO order the
+   *  quantities were — a DISPLAY attribution until P5's allocation. */
+  const rows = useMemo(() => {
+    const out: {
+      key: string;
+      lineId: string;
+      so: number | null;
+      sku: string;
+      size: string | null;
+      qty: number;
+      received: number;
+      remark: string | null;
+    }[] = [];
+    for (const l of po.purchase_order_lines) {
+      const parts =
+        l.so_rows && l.so_rows.length > 0
+          ? l.so_rows
+          : [{ so: null, qty: l.qty, remark: null }];
+      let recvLeft = l.received_qty;
+      parts.forEach((r, i) => {
+        const got = Math.min(recvLeft, r.qty);
+        recvLeft -= got;
+        out.push({
+          key: `${l.id}-${i}`,
+          lineId: l.id,
+          so: r.so,
+          sku: l.sku,
+          size: sizeOf(l.sku),
+          qty: r.qty,
+          received: got,
+          remark: r.remark,
+        });
+      });
+    }
+    return out;
+  }, [po, sizeOf]);
+
+  const history = useMemo(
+    () => (po.promises ?? []).filter((p) => p.kind === "tomorrow_delivery"),
+    [po.promises],
+  );
 
   return (
     <div className="px-4 py-4" data-testid="po-document">
-      {/* ── WORK HEADER — identity → status → action, stacked (Jess,
-           2026-08-02 polish): the eye reads WHO, then WHERE IT STANDS, then
-           WHAT TO DO — never all three fighting on one line. */}
-      <div
-        className="flex items-center gap-2"
-        data-testid="po-working-header"
-      >
-        <span className="text-page font-semibold font-mono text-kit-slate-12">
-          {po.id}
-        </span>
-        <span className="ml-auto" data-testid="po-work-state">
-          <Badge>{WORK_STATE_LABEL[state]}</Badge>
-        </span>
-      </div>
-      {/* ── The PO block — identity row above, facts + items as ONE compact
-           panel (Jess, this pass: the old header block and the PURCHASE
-           ORDER section merged — same information, one home; PO Issued at
-           the top with the rest). No section title: this IS the PO. */}
-      <section className="mt-2" data-testid="po-reference">
-        <div>
-          <Prop label="Supplier">{supplierName}</Prop>
-          <Prop label="Deliver To">{warehouse?.name ?? "—"}</Prop>
+      {/* ── ① FIXED HEADER — labels left, the document number right. It
+           carries identity + the supplier's date, and NEVER grows. ───── */}
+      <div className="flex items-start gap-2" data-testid="po-working-header">
+        <div className="min-w-0 flex-1">
           <Prop label="PO Issued">
             <span className="tabular-nums">
               {fmtDateShort((po.placed_at ?? "").slice(0, 10))}
             </span>
           </Prop>
+          <Prop label="Delivery To">{warehouse?.name ?? "—"}</Prop>
+          <Prop label="Supplier">{supplierName}</Prop>
         </div>
+        <span className="text-page font-semibold font-mono text-kit-slate-12 shrink-0">
+          {po.id}
+        </span>
+      </div>
 
-      <div className="mt-2" data-testid="po-doc-items">
+      {/* The supplier's date — the ONE row that opens a form. Overdue is a
+          fact printed beside it (Jess's cycle), never a second bucket. */}
+      <button
+        type="button"
+        onClick={() => setDateOpen((o) => !o)}
+        aria-expanded={dateOpen}
+        data-testid="po-date-row"
+        className="mt-0.5 w-full flex items-baseline gap-2 text-body leading-6 text-left hover:bg-kit-blue-2 rounded-control"
+      >
+        <span className="w-32 shrink-0 text-label text-kit-slate-9">
+          Supplier Delivery Date
+        </span>
+        <span className="min-w-0 flex-1">
+          {eta.date ? (
+            <span
+              className={[
+                "tabular-nums",
+                eta.confirmed ? "text-kit-slate-12" : "text-kit-slate-9",
+              ].join(" ")}
+            >
+              {fmtDateShort(eta.date)}
+              {!eta.confirmed && (
+                <span className="text-kit-slate-9"> · expected</span>
+              )}
+            </span>
+          ) : (
+            <span className="text-kit-slate-9">—</span>
+          )}
+          {overdue != null && (
+            <span className="text-kit-red-11" data-testid="po-overdue">
+              {"  "}⚠ Overdue by {overdue} day{overdue === 1 ? "" : "s"}
+            </span>
+          )}
+        </span>
+        <Icon name={dateOpen ? "collapse" : "forward"} size={14} />
+      </button>
+
+      {dateOpen && (
+        <div
+          className="mt-1 ml-32 pl-2 border-l-2 border-kit-blue-9"
+          data-testid="po-date-extend"
+        >
+          {calls.map((c) => (
+            <div
+              key={c.poLineId ?? c.key}
+              className="flex items-baseline gap-2 text-body leading-6"
+            >
+              <span
+                aria-hidden
+                className={[
+                  "w-1.5 h-1.5 rounded-full shrink-0 self-center",
+                  c.late ? "bg-kit-red-9" : "bg-kit-amber-9",
+                ].join(" ")}
+              />
+              <span className="text-kit-slate-12">
+                {purchasingActionQueue(c.key)}
+              </span>
+              {c.dueIso && (
+                <span className="ml-auto text-label text-kit-slate-9">
+                  due {fmtDateShort(c.dueIso)}
+                </span>
+              )}
+            </div>
+          ))}
+          {history.length === 0 ? (
+            <div className="text-label text-kit-slate-9 leading-6">
+              No date from {supplierName} yet.
+            </div>
+          ) : (
+            history.map((h) => (
+              <div key={h.recorded_at} className="text-body leading-6">
+                <span className="text-label text-kit-slate-9 tabular-nums">
+                  {fmtDateShort(h.recorded_at.slice(0, 10))}{"  "}
+                </span>
+                <span className="text-kit-slate-12">
+                  {h.answer === "delayed"
+                    ? `moved ${fmtDateShort(h.previous_date ?? "")} → ${fmtDateShort(h.new_date ?? "")}`
+                    : `confirmed ${fmtDateShort(h.about_date ?? "")}`}
+                </span>
+                {h.reason && (
+                  <span className="text-kit-slate-9"> · {h.reason}</span>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ── ② ITEMS — the Excel grid. Quantities live on the rows, so there
+           is no Receiving panel: the total row hands over. ────────────── */}
+      <div className="mt-3" data-testid="po-doc-items">
         <div className="flex gap-2 text-label uppercase tracking-wide text-kit-slate-9 border-y border-kit-slate-5 py-1">
+          <span className="w-4 font-medium">#</span>
           <span className="w-16 font-medium">SO No.</span>
           <span className="flex-1 font-medium">Description</span>
-          <span className="w-10 text-right font-medium">Qty</span>
+          <span className="w-8 text-right font-medium">Qty</span>
+          <span className="w-10 text-right font-medium">Recv</span>
+          <span className="w-20 font-medium">Remark</span>
         </div>
-        {/* Description is the HERO (Jess's polish) — the answer to "what
-            exactly did I buy"; Sales Order and Qty read quiet beside it. */}
-        {po.purchase_order_lines.map((l, i) => {
-          const sku = l.sku;
-          return (
-            <div
-              key={l.id}
-              className="flex gap-2 py-2 text-body border-b border-kit-slate-4"
+        {rows.map((r, i) => (
+          <div key={r.key}>
+            <button
+              type="button"
+              onClick={() => setOpenLine(openLine === r.key ? null : r.key)}
+              aria-expanded={openLine === r.key}
+              data-testid={`po-item-row-${i + 1}`}
+              className="w-full flex gap-2 py-1.5 text-body text-left border-b border-kit-slate-4 hover:bg-kit-blue-2"
             >
+              <span className="w-4 text-kit-slate-9 tabular-nums">{i + 1}</span>
               <span className="w-16 text-label text-kit-slate-11 tabular-nums">
-                {i === 0 && sos.length > 0
-                  ? sos.map((n) => (
-                      <span key={n} className="block">{`SO-${n}`}</span>
-                    ))
-                  : "—"}
+                {r.so != null ? `SO-${r.so}` : "—"}
               </span>
               <span className="flex-1 min-w-0">
                 <span className="block font-semibold font-mono text-kit-slate-12 truncate">
-                  {sku}
+                  {r.sku}
                 </span>
-                {sizeOf(sku) && (
+                {r.size && (
                   <span className="block text-label text-kit-slate-9">
-                    {sizeOf(sku)}
+                    {r.size}
                   </span>
                 )}
               </span>
-              <span className="w-10 text-right text-kit-slate-12 tabular-nums">
-                {l.qty}
+              <span className="w-8 text-right text-kit-slate-12 tabular-nums">
+                {r.qty}
               </span>
-            </div>
-          );
-        })}
-      </div>
-      </section>
-
-      {/* ── SUPPLIER — "What must I do with the supplier?" A field's OWN
-           history lives beside the field (never down in Activity).
-           Read-only today; the edit door is Phase 4's promise-ledger
-           write. */}
-      <section className={SECTION} data-testid="po-supplier">
-        <h3 className={SECTION_TITLE}>Supplier</h3>
-        {actionWord && (
-          /* Current Action is SUPPLIER work (Jess, this pass), so it leads
-             this section — typography only, the one bold line on the page. */
-          <div className="mt-2" data-testid="po-current-action">
-            <div className="text-label text-kit-slate-9">Current Action</div>
-            <div
-              className={[
-                "text-body font-semibold",
-                actionLate ? "text-kit-red-11" : "text-kit-slate-12",
-              ].join(" ")}
-            >
-              {actionWord}
-            </div>
-            {actionDue && (
-              <div
-                className={[
-                  "text-label",
-                  actionLate ? "text-kit-red-11" : "text-kit-slate-9",
-                ].join(" ")}
+              <span className="w-10 text-right tabular-nums text-kit-slate-9">
+                {r.received}
+              </span>
+              <span
+                className="w-20 truncate text-label text-kit-slate-11"
+                title={r.remark ?? undefined}
               >
-                {actionDue === today ? "Due Today" : `Due ${fmtDateShort(actionDue)}`}
+                {r.remark ?? ""}
+              </span>
+            </button>
+            {openLine === r.key && (
+              <div
+                className="pl-6 py-1.5 border-b border-kit-slate-4 bg-kit-slate-3"
+                data-testid="po-item-extend"
+              >
+                <Prop label="Destination">{warehouse?.name ?? "—"}</Prop>
               </div>
             )}
           </div>
-        )}
-        <div className="mt-2">
-          <Prop label="Goods Arriving At">
-            {eta.date ? (
-              <span
-                className={[
-                  "tabular-nums",
-                  late
-                    ? "text-kit-red-11"
-                    : eta.confirmed
-                      ? "text-kit-slate-12"
-                      : "text-kit-slate-9",
-                ].join(" ")}
-              >
-                {fmtDateShort(eta.date)}
-                <span className="text-kit-slate-9">
-                  {" "}
-                  · {eta.confirmed ? "supplier confirmed" : "expected, not confirmed"}
-                </span>
-              </span>
-            ) : (
-              <span className="text-kit-slate-9">— supplier has not confirmed</span>
-            )}
-          </Prop>
+        ))}
+        <div className="flex gap-2 py-1.5 text-body border-b border-kit-slate-5">
+          <span className="w-4" />
+          <span className="w-16" />
+          <span className="flex-1 text-label uppercase tracking-wide text-kit-slate-9">
+            Total
+          </span>
+          <span className="w-8 text-right font-semibold text-kit-slate-12 tabular-nums">
+            {progress.ordered}
+          </span>
+          <span className="w-10 text-right font-semibold text-kit-slate-12 tabular-nums">
+            {progress.received}
+          </span>
+          <span className="w-20" />
         </div>
-        {/* This field's history mounts HERE when the promise ledger has
-            entries to show — today's wire carries only the latest answer's
-            about-date; the Phase-4 ledger read fills the list. */}
-        {calls.length > 0 && (
-          <div className="mt-2">
-            <div className="text-label text-kit-slate-9">Open Actions</div>
-            <ul
-              className="mt-1 flex flex-col gap-1.5"
-              data-testid="po-open-calls"
-            >
-              {calls.map((c) => (
-                <li
-                  key={c.poLineId ?? c.key}
-                  className="flex items-baseline gap-2 text-body"
-                >
-                  <span
-                    aria-hidden
-                    className={[
-                      "w-1.5 h-1.5 rounded-full shrink-0 self-center",
-                      c.late ? "bg-kit-red-9" : "bg-kit-amber-9",
-                    ].join(" ")}
-                  />
-                  <span className="text-kit-slate-12 min-w-0">
-                    {purchasingActionQueue(c.key)}
-                    {c.sku ? (
-                      <span className="text-kit-slate-9"> · {c.sku}</span>
-                    ) : null}
-                  </span>
-                  {c.dueIso && (
-                    <span className="ml-auto text-label text-kit-slate-9 shrink-0">
-                      due {fmtDateShort(c.dueIso)}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
-
-      {/* ── ACTIVITY — "What have we communicated?" tools + timeline. ─── */}
-      <ActivityDesk po={po} supplier={supplier} />
-
-      {/* ── RECEIVING — "What has happened after arrival?" Purchasing ends
-           here; the work lives in the Receiving module. ONE line. ─────── */}
-      <section className={SECTION} data-testid="po-receiving-summary">
-        <h3 className={SECTION_TITLE}>Receiving</h3>
-        <div className="mt-2 flex items-baseline gap-2 text-body leading-6">
-          <span className="text-kit-slate-9">Received</span>
-          <span className="text-kit-slate-12 tabular-nums">
-            {progress.received} / {progress.ordered}
-          </span>
-          <span aria-hidden className="text-kit-slate-9">
-            ·
-          </span>
-          <span className="text-kit-slate-9">Remaining</span>
-          <span className="text-kit-slate-12 tabular-nums">
-            {progress.ordered - progress.received}
-          </span>
+        <div className="mt-1 flex items-center gap-3">
           {progress.issueQty > 0 && (
-            <>
-              <span aria-hidden className="text-kit-slate-9">
-                ·
-              </span>
-              <span className="text-kit-red-11">
-                {progress.issueQty} with a problem
-              </span>
-            </>
+            <span className="text-body text-kit-red-11">
+              {progress.issueQty} with a problem
+            </span>
           )}
           <Link
             to="/operation?tab=receiving"
-            className="ml-auto text-body font-medium text-kit-blue-11 hover:underline shrink-0"
+            className="ml-auto text-body font-medium text-kit-blue-11 hover:underline"
             data-testid="po-open-receiving"
           >
             Open Receiving
           </Link>
         </div>
-      </section>
+      </div>
+
+      {/* ── ③ ACTIVITY — tools + the business timeline. ───────────────── */}
+      <ActivityDesk po={po} supplier={supplier} />
     </div>
   );
 }
+
 
 /**
  * ACTIVITY — Work + History (Jess, 2026-08-02, renamed from Communication):

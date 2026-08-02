@@ -148,10 +148,16 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   // (0306) — the only arrival history that exists; the Phase-4 write door
   // appends to the same ledger, so this flag starts working the day it ships.
   const arrivalDatesByPo = new Map<string, Set<string>>();
+  // The supplier-date FIELD's own history (Jess, 2026-08-02: a field's
+  // history lives beside the field, never down in Activity). Same bounded
+  // read — no extra round-trip.
+  const promisesByPo = new Map<string, Record<string, unknown>[]>();
   if (poIds.length > 0) {
     const { data: promiseRows, error: promiseErr } = await sb
       .from("po_supplier_promises")
-      .select("po_id, po_line_id, kind, about_date, about_qty, recorded_at")
+      .select(
+        "po_id, po_line_id, kind, answer, about_date, previous_date, new_date, reason, recorded_at",
+      )
       .in("po_id", poIds)
       .order("recorded_at", { ascending: false });
     if (promiseErr) {
@@ -161,6 +167,10 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     // Newest first, so the FIRST row seen for a key is the current answer.
     for (const r of promiseRows ?? []) {
       const row = r as Record<string, unknown>;
+      const pid = row.po_id as string;
+      const hist = promisesByPo.get(pid) ?? [];
+      hist.push(row);
+      promisesByPo.set(pid, hist);
       if (row.kind === "tomorrow_delivery") {
         const key = row.po_id as string;
         if (!tomorrowAboutByPo.has(key)) {
@@ -337,6 +347,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       customer_delivery: customerDeliveryOf(row),
       orders: ordersOf(row),
       eta_revised: (arrivalDatesByPo.get(row.id as string)?.size ?? 0) > 1,
+      promises: promisesByPo.get(row.id as string) ?? [],
       purchase_order_lines: lines.map((l) => ({
         ...l,
         balance_answer_about_qty: balanceAboutByLine.get(l.id as string) ?? null,
