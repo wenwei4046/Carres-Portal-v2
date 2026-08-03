@@ -115,10 +115,20 @@ a Claims form · Receiving Photos table · Inventory correction · dropping
 
 ## 2.1 · What the NEXT chat should know
 
-- **A third door still exists and was deliberately not touched**:
-  `OrderDetailDrawer.tsx:2619` still opens `ReceivePOModal`, which books stock
-  and opens NO Session. Different module, 7,000-line contested file — killing
-  it needs Jess's word.
+- ~~A third door still exists~~ — **CLOSED 2026-08-03, Cards C1 + C1b.**
+  `ReceivePOModal`, the legacy `POST /:id/receive` route and the direct
+  PostgREST write are all gone. The proof is a guard, not a paragraph:
+  `apps/web/src/pages/operation/receiving-one-door.test.ts` (9) + 2 api route
+  tests, all negative-controlled. **Do not add a receiving door without making
+  that guard pass.**
+- **Still open on `purchase_order_lines`, reported and NOT fixed** (outside
+  C1b's frozen scope): `INSERT` and `DELETE` are granted to `authenticated` in
+  exactly the same way `UPDATE` was. Delete-then-insert reaches the same place
+  the UPDATE hole did. Jess's call.
+- The `partner/pickups` route calls `operation_receive_po_with_do` directly and
+  opens no Session. It is the PARTNER leg, not an Office path, so C1 left it —
+  the guard names it so the next chat inherits the fact instead of re-deriving
+  it. It becomes wrong the day a partner receipt has to be auditable.
 - **There is no GRN register yet.** Nothing lists all Receiving Sessions
   (2990's `GoodsReceivedList` is the master to copy). Its own card.
 - `purchase_orders.do_file_path` is still overwritten by the shared receive

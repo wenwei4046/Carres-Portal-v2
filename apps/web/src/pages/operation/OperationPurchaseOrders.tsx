@@ -40,6 +40,9 @@ import {
   rangeValue,
 } from "@/lib/excel-date-filter";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { apiFetch } from "@/lib/api";
+import { renderPoPdf } from "@/lib/pdf/render";
+import type { PoTemplateData } from "@/lib/pdf/types";
 import {
   useCatalog,
   useOperationPos,
@@ -1940,13 +1943,31 @@ function SupplierDateForm({
  * events join in Phase 3/4 with their own stores. Field CHANGES never
  * appear here — a field's history lives beside the field, in its section.
  */
-/** Same day + same channel + same revision = ONE send with a count. */
+/**
+ * Same day + same channel + same revision = ONE row with a count.
+ *
+ * **The row prints the FIRST press, never the latest** (Jess, 2026-08-03):
+ * *"Timeline 每一行代表一个事件，不是最新状态."* The row's meaning is *this
+ * revision left the Portal at this moment*, and that became true on the first
+ * press; every later press is what `×2` says. Printing the latest time would
+ * walk a moment that never moved.
+ *
+ * The earliest is computed by MIN rather than taken from the input order — the
+ * api sends `sent_at desc` today, and a row whose meaning depends on an api's
+ * ORDER BY is a row that changes meaning when somebody tunes a query.
+ */
 function groupSends(
   sends: NonNullable<operationPoListRow["sends"]>,
-): { key: string; day: string; channel: string; revNo: number | null; count: number }[] {
+): {
+  key: string;
+  firstAt: string;
+  channel: string;
+  revNo: number | null;
+  count: number;
+}[] {
   const out: {
     key: string;
-    day: string;
+    firstAt: string;
     channel: string;
     revNo: number | null;
     count: number;
@@ -1956,10 +1977,49 @@ function groupSends(
     const revNo = s.po_revisions?.rev_no ?? null;
     const key = `${day}|${s.channel}|${revNo ?? "-"}`;
     const hit = out.find((g) => g.key === key);
-    if (hit) hit.count += 1;
-    else out.push({ key, day, channel: s.channel, revNo, count: 1 });
+    if (hit) {
+      hit.count += 1;
+      if (s.sent_at < hit.firstAt) hit.firstAt = s.sent_at;
+    } else {
+      out.push({ key, firstAt: s.sent_at, channel: s.channel, revNo, count: 1 });
+    }
   }
   return out;
+}
+
+/**
+ * The door a send went out of, named as the operator knows it.
+ *
+ * The stored `channel` is plumbing (`whatsapp` · `email`); the screen says
+ * `WhatsApp opened` · `Email opened` — ONE shape for every door, so
+ * `Supplier Portal opened` joins it later without a new sentence (Jess,
+ * 2026-08-03). **It names what the Portal OBSERVED**, never what reached the
+ * supplier.
+ */
+function doorLabel(channel: string): string {
+  if (channel === "whatsapp") return "WhatsApp";
+  if (channel === "email") return "Email";
+  return channel;
+}
+
+/**
+ * One concern, one labelled band (Jess, 2026-08-03). `Document` ·
+ * `Communication` · `Communication History` are three CONCERNS, so
+ * `Download PDF`, `Supplier Portal`, Teams or WeCom each join an existing
+ * band later without the structure moving.
+ *
+ * Small-caps label over a hairline — the workspace rhythm already in use in
+ * this file, spelled once (§6.6) rather than three times.
+ */
+function DeskBand({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <h3 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+        {children}
+      </h3>
+      <div className="mt-1 border-t border-kit-slate-4" />
+    </>
+  );
 }
 
 function ActivityDesk({
@@ -1974,6 +2034,8 @@ function ActivityDesk({
   const [copied, setCopied] = useState(false);
   const [draftOpen, setDraftOpen] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [printFailed, setPrintFailed] = useState<string | null>(null);
   const send = useRecordSend(po.id);
   const saveTemplate = useSetMessageTemplate();
 
@@ -2019,6 +2081,49 @@ function ActivityDesk({
       )}&body=${encodeURIComponent(text)}`
     : null;
 
+  /**
+   * `Print PDF` — produce the document, and record NOTHING.
+   *
+   * Jess froze the boundary on 2026-08-03: **printing is producing, not
+   * delivering.** So this writes no history, moves no status, mints no
+   * revision, and may be pressed any number of times. The act that the
+   * Portal records is the DOOR being opened, one section below.
+   *
+   * The pipeline is the portal's existing one, not a new one: the server
+   * assembles the money-free payload (`purchasing_po_document`, migration
+   * 0307) and the browser renders it, because Cloudflare Workers block the
+   * WASM that @react-pdf needs. Copied from `AssignPickupDialog`, which has
+   * been the only caller of this route until now.
+   */
+  async function printPdf() {
+    setPrinting(true);
+    setPrintFailed(null);
+    try {
+      const data = await apiFetch<PoTemplateData>(
+        `/api/operation/pos/${po.id}/print-data`,
+      );
+      const blob = await renderPoPdf(data);
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank", "noopener,noreferrer");
+      if (!win) {
+        // Pop-up blocked — hand the operator the file instead of nothing.
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${po.id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (e) {
+      // Stated in the section, not in a toast that leaves: the operator is
+      // mid-task and the reason has to still be there when they look back.
+      setPrintFailed(e instanceof Error ? e.message : "Could not open the PDF.");
+    } finally {
+      setPrinting(false);
+    }
+  }
+
   async function copyMessage() {
     try {
       await navigator.clipboard.writeText(text);
@@ -2033,10 +2138,32 @@ function ActivityDesk({
 
   return (
     <section className="mt-3 pt-3 border-t border-kit-slate-5" data-testid="po-activity">
-      <div className="flex items-center gap-2">
-        <h3 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
-          Activity
-        </h3>
+      {/* ① DOCUMENT — the thing itself. Communication starts from the
+          document, never from the register (Jess's design principle,
+          2026-08-03), so the document is the band above the doors. */}
+      <DeskBand>Document</DeskBand>
+      <div className="mt-2">
+        <button
+          type="button"
+          onClick={() => void printPdf()}
+          disabled={printing}
+          data-testid="po-print-pdf"
+          className={`${DOC_BTN} font-medium disabled:opacity-40`}
+        >
+          {printing ? "Opening…" : "Print PDF"}
+        </button>
+        {printFailed && (
+          <p className="mt-1 text-label text-kit-red-11" data-testid="po-print-failed">
+            {printFailed}
+          </p>
+        )}
+      </div>
+
+      {/* ② COMMUNICATION — the doors out of the Portal. */}
+      <div className="mt-4">
+        <DeskBand>Communication</DeskBand>
+      </div>
+      <div className="mt-1 flex items-center gap-2">
         {copied && (
           <span className="text-label font-medium text-kit-green-11" data-testid="po-copied">
             Copied
@@ -2145,37 +2272,51 @@ function ActivityDesk({
         </div>
       )}
 
-      {/* The timeline — what we have SENT. `PO issued` is the header's fact,
-          never repeated here; a supplier's date answers live beside the date. */}
+      {/* ③ COMMUNICATION HISTORY — what the Portal OBSERVED, and nothing
+          more. Deliberately NOT called `History`: the PO's real history will
+          later carry revisions, ETA changes, Goods Arrival changes, notes and
+          claims, and that name is being kept for it (Jess, 2026-08-03 —
+          overriding her own 2026-08-02 `ACTIVITY`, whose reason was that the
+          section would hold the business timeline; it holds only the doors).
+
+          An internal act — `Print PDF`, and `Download PDF` when it comes —
+          never lands here: this band is communication WITH THE SUPPLIER. */}
+      <div className="mt-4">
+        <DeskBand>Communication History</DeskBand>
+      </div>
       {sends.length === 0 ? (
-        <div
-          className="mt-3 pt-2 border-t border-kit-slate-4 text-label text-kit-slate-9"
-          data-testid="po-history"
-        >
-          Nothing sent yet.
+        <div className="mt-2 text-label text-kit-slate-9" data-testid="po-history">
+          No communication yet.
         </div>
       ) : (
-        <ul
-          className="mt-3 pt-2 border-t border-kit-slate-4 flex flex-col gap-1"
-          data-testid="po-history"
-        >
-          {/* Opening WhatsApp twice in a morning is ONE send, not two: same
-              day, same channel, same revision collapses to a line with a
-              count (Jess caught the duplicate). */}
+        <ul className="mt-2 flex flex-col gap-2" data-testid="po-history">
+          {/* Opening WhatsApp twice in a morning is ONE event that happened
+              twice — same day, same channel, same revision collapse into one
+              row (Jess caught the duplicate). `×2` does NOT mean "sent twice";
+              it means the same Portal action was observed twice, which is what
+              answers an operator who says "I definitely pressed it again". */}
           {groupSends(sends).map((g) => (
-            <li key={g.key} className="flex items-baseline gap-2 text-body">
-              <span className="text-label text-kit-slate-9 tabular-nums shrink-0">
-                {fmtDateShort(g.day)}
-              </span>
-              <span className="text-kit-slate-12">
-                sent via {g.channel}
-                {g.revNo != null ? (
-                  <span className="text-kit-slate-9"> · Revision {g.revNo}</span>
-                ) : null}
+            <li key={g.key} data-testid="po-history-row">
+              <div className="flex items-baseline gap-2 text-body">
+                <span className="text-kit-slate-12 min-w-0">
+                  {doorLabel(g.channel)} opened
+                  {g.revNo != null ? (
+                    <span className="text-kit-slate-9"> · Revision {g.revNo}</span>
+                  ) : null}
+                </span>
                 {g.count > 1 ? (
-                  <span className="text-kit-slate-9"> · {g.count}×</span>
+                  <span
+                    className="ml-auto shrink-0 text-label text-kit-slate-9 tabular-nums"
+                    data-testid="po-history-count"
+                  >
+                    ×{g.count}
+                  </span>
                 ) : null}
-              </span>
+              </div>
+              {/* The FIRST press, never the latest — see `groupSends`. */}
+              <div className="text-label text-kit-slate-9 tabular-nums">
+                {fmtDate(g.firstAt, { time: true })}
+              </div>
             </li>
           ))}
         </ul>

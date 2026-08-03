@@ -647,13 +647,36 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
     expect(within(screen.getByTestId("po-doc-items")).getByText("Recv")).toBeInTheDocument();
   });
 
-  it("Activity holds the tools and the business timeline", async () => {
+  // Jess, 2026-08-03: three CONCERNS, three bands — Document · Communication ·
+  // Communication History. `Download PDF`, `Supplier Portal`, Teams or WeCom
+  // each join an existing band later without the structure moving. `ACTIVITY`
+  // is retired (her 2026-08-02 word), and `History` is deliberately NOT taken:
+  // the PO's real history will later carry revisions, ETA changes, Goods
+  // Arrival changes, notes and claims.
+  it("the desk is three bands — Document · Communication · Communication History", async () => {
     await mountLoaded();
     const activity = within(screen.getByTestId("po-activity"));
-    expect(activity.getByText("Activity")).toBeInTheDocument();
+    expect(activity.getByText("Document")).toBeInTheDocument();
+    expect(activity.getByText("Communication")).toBeInTheDocument();
+    expect(activity.getByText("Communication History")).toBeInTheDocument();
+    expect(activity.queryByText("Activity")).not.toBeInTheDocument();
+    expect(activity.getByTestId("po-print-pdf")).toBeInTheDocument();
     expect(activity.getByTestId("po-copy-message")).toBeInTheDocument();
     // `PO issued` was deleted: the header already states it (Jess).
-    expect(screen.getByTestId("po-history").textContent).toBe("Nothing sent yet.");
+    expect(screen.getByTestId("po-history").textContent).toBe("No communication yet.");
+  });
+
+  // PRINT ≠ ISSUE (Jess, 2026-08-03), and it is four separate promises:
+  // printing writes no history, moves no status, mints no revision, and has no
+  // limit. The button is therefore never disabled by a send, and pressing it
+  // can never put a row in the Communication History.
+  it("Print PDF records nothing — no history row, and it is always available", async () => {
+    await mountLoaded();
+    const btn = screen.getByTestId("po-print-pdf");
+    expect(btn).toHaveTextContent("Print PDF");
+    expect(btn).not.toBeDisabled();
+    expect(screen.getByTestId("po-history").textContent).toBe("No communication yet.");
+    expect(screen.queryByTestId("po-history-row")).not.toBeInTheDocument();
   });
 
   it("the WhatsApp draft is ONE line until opened — Copy works either way", async () => {
@@ -937,7 +960,7 @@ describe("what we sent the supplier (0312)", () => {
 
   it("the ACT records itself — no I've sent button to remember afterwards", async () => {
     await mountLoaded();
-    expect(screen.getByTestId("po-history").textContent).toBe("Nothing sent yet.");
+    expect(screen.getByTestId("po-history").textContent).toBe("No communication yet.");
     expect(screen.queryByTestId("po-sent")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("po-open-email"));
     await waitFor(() =>
@@ -972,10 +995,20 @@ describe("what we sent the supplier (0312)", () => {
       ).toBeInTheDocument(),
     );
     const h = within(screen.getByTestId("po-history"));
-    expect(h.getByText(/sent via whatsapp/)).toBeInTheDocument();
+    // The row names the DOOR the Portal observed being opened — never a send,
+    // never a receipt (Jess, 2026-08-03). `sent` is banned from this band.
+    expect(h.getByText(/WhatsApp opened/)).toBeInTheDocument();
     expect(h.getByText(/Revision 2/)).toBeInTheDocument();
-    // Opening WhatsApp twice on one morning is ONE send with a count.
-    expect(h.getByText(/2×/)).toBeInTheDocument();
-    expect(h.getAllByText(/sent via/).length).toBe(1);
+    expect(h.queryByText(/sent/i)).not.toBeInTheDocument();
+    // Opening WhatsApp twice on one morning is ONE event that happened twice.
+    expect(h.getByTestId("po-history-count")).toHaveTextContent("×2");
+    expect(h.getAllByTestId("po-history-row").length).toBe(1);
+    // THE FIRST PRESS, NEVER THE LATEST (Jess, 2026-08-03): a row is an EVENT,
+    // not a latest state. The fixture's two presses are 03:00Z and 05:00Z on
+    // one day — 11:00 and 13:00 in the app's zone. The row must read 11:00:
+    // the moment this revision left the Portal never moved, and the second
+    // press is what `×2` already says.
+    expect(h.getByText(/11:00/)).toBeInTheDocument();
+    expect(h.queryByText(/13:00/)).not.toBeInTheDocument();
   });
 });
