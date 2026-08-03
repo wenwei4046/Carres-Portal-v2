@@ -1,7 +1,7 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   poReceivingProgress,
-  purchasingActionButton,
   purchasingActionQueue,
   purchasingSupplierCallsOf,
   type PoReceivingState,
@@ -15,137 +15,110 @@ import {
   type operationPoListRow,
   type SupplierRow,
 } from "@/lib/queries";
-import { fmtDate } from "@/lib/fmt-date";
-import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
-import { SectionCard, SectionBand } from "@/components/SectionPanel";
-import FacetRow, { EmptyFacetHint } from "@/components/FacetRow";
-import ReceivePOModal from "./components/ReceivePOModal";
-import RecordSupplierAnswerModal from "./components/RecordSupplierAnswerModal";
+import { fmtDateShort } from "@/lib/fmt-date";
+import DataTable, {
+  type Column,
+  type TableSort,
+} from "@/components/kit/DataTable";
+import EmptyState from "@/components/kit/EmptyState";
+import Icon from "@/components/kit/Icon";
+import SearchInput from "@/components/kit/SearchInput";
 import WarehouseReceiptsPanel from "./components/WarehouseReceiptsPanel";
+import ReceivingWorkspace from "./components/ReceivingWorkspace";
 import PurchasingTabs from "./PurchasingTabs";
 
 /**
- * OperationReceiving — the GRN (goods-received) station (P3 of
- * project-orders-control-spec; Jess redesign Q3a=B menu split).
+ * OperationReceiving — the Receiving Workspace (Slice B, Jess 2026-08-03).
  *
- * Splits the old "Receiving"(=Procurement) menu in two: PO create/manage stays
- * on the **Purchase Order** menu (TabbedProcurementShell), and THIS page is the
- * pure **待收 queue** — open POs whose goods come into Carres Klang. The
- * operator finds the PO, hits Check in, and books the units in via the existing
- * ReceivePOModal (per-line tick + DO upload + signed checkbox → the v3
- * operation_receive_po_with_do RPC; ops_stock_items incoming→free + stock_balances).
+ * **Copy the Purchase Orders page shell 1:1 — the Purchasing module has ONE
+ * Workspace template** (Jess's Purchasing law, 2026-08-01/02). Same header
+ * strip, same 200px navigation rail, same kit-DataTable listing, same 400px
+ * workspace pane, same scrolling. Only the CONTENT differs:
  *
- * GRN scope: goods INTO Carres Klang only. AL/HOUZS goods (mattress→HOUZS
- * Balakong, sofa→at OHANA) never hit Klang, so they're tracked by Stock
- * Location, not a Klang GRN. Current master data has Carres Klang as the only
- * own warehouse, so every open PO shown here is Klang-bound; when multi-location
- * lands (P4) this list filters to own-warehouse POs.
+ *   NAVIGATION (200px)
+ *     RECEIVING PROGRESS   the four states this page already computes
+ *                          (`poReceivingProgress`) — where the DELIVERY is,
+ *                          which is this tab's question. The PO tab's rail
+ *                          asks where the SUPPLIER CONVERSATION is; two tabs,
+ *                          two questions, and neither borrows the other's.
+ *     SUPPLIER             per factory
  *
- * 2026-07-27 (R1 of the receiving & claim queue): the row stops being a binary
- * "Receive → / Done". A PROGRESS column reads the four per-line numbers through
- * the shared `poReceivingProgress` and says, in words, where the delivery is —
- * In transit · Partially received (8/10) · Fully received · Receiving issue —
- * with the outstanding qty underneath it ("2 units pending delivery").
+ *   LISTING (kit DataTable) — for FINDING. Seven columns:
+ *     PO Issued · Supplier · PO No. · Items · Goods Arrival · Received ·
+ *     Current Action. Default order = PO Issued OLDEST first, the register's
+ *     own law: the operator starts at the delivery that has been waiting
+ *     longest, never at the biggest number.
  *
- * 2026-07-28 (card P2, the Receiving half): this tab gets the facet rail and
- * the §8.2 interaction law it has never had.
+ *   WORKSPACE (400px) — ONE PO's Receiving Session work. Read Mode →
+ *     Start Receiving → Receiving Mode → Save → Posted. See
+ *     `ReceivingWorkspace`.
  *
- * **Which of §8.2's two shapes is this page?** A QUEUE-TILE page, not a stage
- * picker. The test §8.2 gives is the empty state, not the look: To Order is a
- * stage page because clearing its stage renders a blank screen — there is no
- * "all three at once" body. Receiving renders ONE table for every combination
- * of filters, and "nothing selected" is the `All` tab, which is a legal and
- * genuinely useful view (it is how an operator finds one PO). So every tile
- * here toggles, and every pick is an ✕-able chip.
+ * **What this replaces, and why the old door is gone.** Receiving used to be a
+ * list whose row opened `ReceivePOModal`. That modal called
+ * `operation_receive_po_with_do` directly, so an Office receive produced NO
+ * Receiving Session, NO event and no GRN record — measured 2026-08-03: 19 POs,
+ * 0 `warehouse_receipts`, 0 `receiving_events`. The Workspace calls
+ * `office_receive_post` (0315) instead, which opens the Session, posts it, and
+ * writes ONE `posted` event, all through the same validator and the same
+ * receive engine. Two doors onto one act is the thing this slice removes.
  *
- * The rail carries three groups, in §8.4's order — the module's own queue name
- * first, danger first inside a group:
+ * **Receiving Mode takes the stage** rather than opening an overlay: it is the
+ * master's own `workspaceOpen` mechanism (a pane that hides the listing when
+ * the work needs the room), and a delivery of five lines with three numbers
+ * each does not fit in 400px. The rail stays — the operator has not left the
+ * queue, they are working inside it.
  *
- *   Today's work  ·  Check in            the ONE action of PURCHASING-WORKING-FLOW
- *                                        §7 that lives on this tab. Counted from
- *                                        QUANTITIES (§9), never from a status word
- *   Progress      ·  the R1 states       facts this page already computes
- *   Supplier      ·  per factory         the same facet the To Order tab carries
- *
- * 2026-07-28 (card **R8**, the banned-verb sweep): the row's action button said
- * `Receive →` while the R6 panel directly above it said `Check in` — the same
- * act, two words, on one screen. COPY-STANDARD bans `Receive` as a verb outright
- * ("Log goods arrival — the ACT: **Check in**"), so this was lag, not a
- * decision. The button, the facet tile and its chip now all read
- * `purchasingActionQueue`/`Button("check_in")`; nothing else on the page moved.
+ * Deliberately NOT here (later slices, not oversights): Warehouse Review's
+ * own screen · Amend · Void · a Claims form · session photos beyond the
+ * signed DO. `WarehouseReceiptsPanel` (R6) is untouched and still renders
+ * above the listing — it costs zero pixels when nothing is waiting.
  */
 
-type Tab = "to_receive" | "received" | "all";
+// design-standard: not-a-list-page — this is the Receiving Workspace (the
+// Purchase Orders shell with a Workspace pane); its listing renders through
+// the kit DataTable.
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: "to_receive", label: "To receive" },
-  { key: "received", label: "Received" },
-  { key: "all", label: "All" },
-];
-
-/** Humanise a PO sup_status into a short stage label for the queue. */
-const SUP_STATUS_LABEL: Record<string, string> = {
-  pending: "Pending",
-  in_production: "In production",
-  ready_confirm_sent: "Awaiting accept",
-  ready_for_pickup: "Ready",
-  partially_shipped: "Partial",
-  delivered: "Arrived",
-  reassign_needed: "Reassign",
-};
-
-function supStatusLabel(s: string): string {
-  return (
-    SUP_STATUS_LABEL[s] ??
-    s.replace(/_/g, " ").replace(/^\w/, (m) => m.toUpperCase())
-  );
+/** Today in MYT — the app's zone, never the browser's. */
+function todayMYT(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+  }).format(new Date());
 }
 
-/** PO sup_status → v17 pill. pending/in_production = amber (waiting);
- *  ready_for_pickup/delivered = green; reassign = red. */
-const SUP_STATUS_PILL: Record<string, string> = {
-  pending: "pill-warning",
-  in_production: "pill-warning",
-  ready_confirm_sent: "pill-sent",
-  ready_for_pickup: "pill-confirmed",
-  partially_shipped: "pill-collected",
-  delivered: "pill-confirmed",
-  reassign_needed: "pill-overdue",
-};
-function supStatusPill(s: string): string {
-  return SUP_STATUS_PILL[s] ?? "pill-neutral";
+/** The list row → the supplier-call engine's own shape. ONE mapping, so the
+ *  rail counts and the Current Action column can never read a PO two ways. */
+export function supplierCallPoOf(po: operationPoListRow): SupplierCallPo {
+  return {
+    poId: po.id,
+    supplierId: po.supplier_id,
+    status: po.status,
+    etaDateIso: po.eta_date,
+    tomorrowAnswerAboutDateIso: po.tomorrow_answer_about_date ?? null,
+    lines: (po.purchase_order_lines ?? []).map((l) => ({
+      id: l.id,
+      sku: l.sku,
+      qty: Number(l.qty ?? 0),
+      receivedQty: Number(l.received_qty ?? 0),
+      shortSinceIso: l.short_since ?? null,
+      balanceAnswerAboutQty: l.balance_answer_about_qty ?? null,
+    })),
+  };
 }
-
-/** R1 — progress state → v17 pill. Grey while nothing has landed, amber while
- *  half-landed, green when settled, red when something is wrong. Colour lives
- *  here (design is the web's job); the shared module owns the state + words. */
-const PROGRESS_PILL: Record<PoReceivingState, string> = {
-  in_transit: "pill-neutral",
-  partially_received: "pill-warning",
-  fully_received: "pill-confirmed",
-  receiving_issue: "pill-overdue",
-};
 
 /**
- * P2 — the PROGRESS facet rows. Same four state words the row's pill already
- * prints; the row adds `(8/10)` because it is talking about ONE PO, and a facet
- * holds many, so it names the state bare. Nothing new is invented here — the
- * words are `packages/shared/po-receiving.ts`'s own.
- *
- * Order is §8.4's: the danger group first. A receiving issue is the only one of
- * the four where the supplier still owes good units AND something has already
- * gone wrong, so it leads.
+ * The rail's states, in §8.4's order — danger first. The words are
+ * `packages/shared/po-receiving.ts`'s own; nothing is invented here.
  */
-const PROGRESS_FACETS: {
+const PROGRESS_STATES: {
   state: PoReceivingState;
   label: string;
-  tone?: "danger";
+  danger?: boolean;
   title: string;
 }[] = [
   {
     state: "receiving_issue",
     label: "Receiving issue",
-    tone: "danger",
+    danger: true,
     title:
       "Something arrived damaged or as the wrong item, and the supplier still owes good units.",
   },
@@ -166,108 +139,46 @@ const PROGRESS_FACETS: {
   },
 ];
 
-function toggleInSet<T>(cur: Set<T>, v: T): Set<T> {
-  const next = new Set(cur);
-  if (next.has(v)) next.delete(v);
-  else next.add(v);
-  return next;
-}
-
-/** Everything the drawer must give back on close (§8.2, last line). */
-interface ReceivingListState {
-  tab: Tab;
-  search: string;
-  checkInOnly: boolean;
-  tomorrowOnly: boolean;
-  balanceOnly: boolean;
-  progressFilter: Set<PoReceivingState>;
-  supplierFilter: Set<string>;
-  facetScrollTop: number;
-}
-
-/** Today, as a local ISO date — the engine takes it as a parameter so a test
- *  can stand on any weekday and nothing drifts with the machine's clock. */
-function todayIso(): string {
-  const d = new Date();
-  const m = `${d.getMonth() + 1}`.padStart(2, "0");
-  const day = `${d.getDate()}`.padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
-}
-
-/** The list row → the P3 engine's own shape. ONE mapping, so the facet counts
- *  and the row buttons can never read a PO two different ways. */
-export function supplierCallPoOf(po: operationPoListRow): SupplierCallPo {
-  return {
-    poId: po.id,
-    supplierId: po.supplier_id,
-    status: po.status,
-    etaDateIso: po.eta_date,
-    tomorrowAnswerAboutDateIso: po.tomorrow_answer_about_date ?? null,
-    lines: (po.purchase_order_lines ?? []).map((l) => ({
-      id: l.id,
-      sku: l.sku,
-      qty: Number(l.qty ?? 0),
-      receivedQty: Number(l.received_qty ?? 0),
-      shortSinceIso: l.short_since ?? null,
-      balanceAnswerAboutQty: l.balance_answer_about_qty ?? null,
-    })),
-  };
-}
+const PANE_BTN =
+  "p-2 rounded text-kit-slate-9 hover:text-kit-slate-12 hover:bg-kit-slate-3";
 
 export default function OperationReceiving() {
-  const [tab, setTab] = useState<Tab>("to_receive");
-  const [search, setSearch] = useState("");
-  const [receivePoId, setReceivePoId] = useState<string | null>(null);
-
-  // P2 — the facet rail this tab has never had.
-  const [facetOpen, setFacetOpen] = useState(true);
-  const [checkInOnly, setCheckInOnly] = useState(false);
-  // P3 — the two supplier calls this band was reserved for by P2-Receiving.
-  const [tomorrowOnly, setTomorrowOnly] = useState(false);
-  const [balanceOnly, setBalanceOnly] = useState(false);
-  const [answerFor, setAnswerFor] = useState<
-    { kind: "tomorrow" | "balance"; poId: string; poLineId?: string } | null
-  >(null);
-  const [progressFilter, setProgressFilter] = useState<Set<PoReceivingState>>(
-    () => new Set(),
-  );
-  const [supplierFilter, setSupplierFilter] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [collapsedFacet, setCollapsedFacet] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const toggleFacet = (key: string) =>
-    setCollapsedFacet((cur) => toggleInSet(cur, key));
-
-  const { data, isLoading, isError, error, refetch } = useOperationPos();
+  const posQ = useOperationPos();
   const suppliersQ = useOperationSuppliers();
   const warehouseQ = useOperationWarehouse();
+  const [params, setParams] = useSearchParams();
+
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<TableSort | null>(null);
+  const [stateSel, setStateSel] = useState<PoReceivingState | null>(null);
+  const [supplierSel, setSupplierSel] = useState<string | null>(null);
+  const [workspaceOpen, setWorkspaceOpen] = useState(true);
+  /** Receiving Mode. Held HERE, not in the workspace, because it decides the
+   *  whole stage: the listing steps aside while a delivery is being counted. */
+  const [receiving, setReceiving] = useState(false);
+
+  const today = todayMYT();
+  const pos = useMemo(() => posQ.data?.pos ?? [], [posQ.data]);
 
   const supplierById = useMemo(() => {
     const m = new Map<string, SupplierRow>();
     for (const s of suppliersQ.data?.suppliers ?? []) m.set(s.id, s);
     return m;
   }, [suppliersQ.data]);
+  const supplierNameOf = (id: string) => supplierById.get(id)?.name ?? id;
 
   const warehouseById = useMemo(() => {
-    const m = new Map<string, { id: string; name: string; address: string | null }>();
-    for (const w of warehouseQ.data?.warehouses ?? []) m.set(w.id, w);
+    const m = new Map<string, { name: string; owning_partner_id?: string | null }>();
+    for (const w of warehouseQ.data?.warehouses ?? [])
+      m.set(w.id, { name: w.name, owning_partner_id: w.owning_partner_id });
     return m;
   }, [warehouseQ.data]);
 
-  // P4 (multi-location) — GRN only covers goods INTO an OWN warehouse
-  // (owning_partner_id NULL, e.g. Carres Klang). LP-owned warehouses (HOUZS
+  // GRN scope: goods INTO an OWN warehouse only. LP-owned warehouses (HOUZS
   // Balakong, OHANA) never hit a Klang GRN — goods there are tracked by the
-  // order's Stock Location instead. The own-WH filter only activates once an
-  // LP-owned warehouse actually exists; until then every PO is own-WH so the
-  // queue is unchanged (current master data has no LP warehouse).
-  const ownWarehouseIds = useMemo(() => {
-    const s = new Set<string>();
-    for (const w of warehouseQ.data?.warehouses ?? [])
-      if (w.owning_partner_id == null) s.add(w.id);
-    return s;
-  }, [warehouseQ.data]);
+  // order's Stock Location. The filter only activates once an LP-owned
+  // warehouse actually exists, so today (one own warehouse, measured) the
+  // queue is unchanged.
   const hasLpWarehouse = useMemo(
     () =>
       (warehouseQ.data?.warehouses ?? []).some(
@@ -275,750 +186,500 @@ export default function OperationReceiving() {
       ),
     [warehouseQ.data],
   );
-
-  const pos = useMemo(() => data?.pos ?? [], [data]);
-
-  // Cancelled POs never belong in a receive queue; then narrow to own-warehouse
-  // POs (GRN scope) once any LP-owned warehouse exists.
   const live = useMemo(() => {
     const notCancelled = pos.filter((p) => p.status !== "cancelled");
     return hasLpWarehouse
-      ? notCancelled.filter((p) => ownWarehouseIds.has(p.warehouse_id))
+      ? notCancelled.filter(
+          (p) => warehouseById.get(p.warehouse_id)?.owning_partner_id == null,
+        )
       : notCancelled;
-  }, [pos, hasLpWarehouse, ownWarehouseIds]);
+  }, [pos, hasLpWarehouse, warehouseById]);
 
-  const counts = useMemo(() => {
-    const c: Record<Tab, number> = { to_receive: 0, received: 0, all: live.length };
-    for (const p of live) {
-      if (p.status === "received") c.received += 1;
-      else c.to_receive += 1;
-    }
-    return c;
-  }, [live]);
-
-  /** Every PO's R1 progress, computed once — the facet counts and the row's
-   *  own pill read the SAME object, so a queue count and its list cannot
-   *  disagree (`docs/PURCHASING-WORKING-FLOW.md` §3). */
+  /** Every PO's progress, computed ONCE — the rail counts, the Received
+   *  column and the workspace's Summary all read the same object. */
   const progressById = useMemo(() => {
     const m = new Map<string, ReturnType<typeof poReceivingProgress>>();
     for (const p of live) m.set(p.id, poReceivingProgress(p.purchase_order_lines));
     return m;
   }, [live]);
 
-  /** The rows the status TAB scopes — the facet counts are taken over exactly
-   *  this set, so clicking a tile always shows the number it printed. */
-  const tabScoped = useMemo(
-    () =>
-      live.filter((p) => {
-        if (tab === "to_receive" && p.status === "received") return false;
-        if (tab === "received" && p.status !== "received") return false;
-        return true;
-      }),
-    [live, tab],
-  );
-
-  // ── Facet counts ───────────────────────────────────────────────────────────
-  //
-  // `Check in` is the one action of PURCHASING-WORKING-FLOW §7 that lives on
-  // this tab, and §9 is explicit about how it is counted: "A PO is finished by
-  // QUANTITY, never by the existence of a receiving record." So the tile counts
-  // POs that still owe units, read off `poReceivingProgress`, and NOT the
-  // `status` word the tabs read.
-  const checkInCount = useMemo(
-    () =>
-      tabScoped.filter((p) => (progressById.get(p.id)?.pendingDelivery ?? 0) > 0)
-        .length,
-    [tabScoped, progressById],
-  );
-
-  // ── P3 · the two supplier calls ────────────────────────────────────────────
-  //
-  // Computed ONCE per PO and read by the tiles, the row buttons and nothing
-  // else, so a queue count and its list structurally cannot disagree — the same
-  // rule `progressById` follows one block up.
-  //
-  // `Confirm balance delivery date` is counted per PO LINE (§3), and this tab's
-  // ROW is a PO. The tile therefore prints the number of POs it will show —
-  // P2-Claims' honesty rule, a visible cell above zero always returns at least
-  // that many rows — and the ROW names its lines. The per-line figure is not
-  // lost: it is the number of buttons on the row.
   const callsById = useMemo(() => {
-    const today = todayIso();
     const m = new Map<string, PurchasingOpenCall[]>();
-    for (const p of live) {
-      m.set(
-        p.id,
-        purchasingSupplierCallsOf(supplierCallPoOf(p), { todayIso: today }),
-      );
-    }
+    for (const p of live)
+      m.set(p.id, purchasingSupplierCallsOf(supplierCallPoOf(p), { todayIso: today }));
     return m;
-  }, [live]);
+  }, [live, today]);
 
-  const tomorrowCount = useMemo(
-    () =>
-      tabScoped.filter((p) =>
-        (callsById.get(p.id) ?? []).some(
-          (a) => a.key === "confirm_tomorrows_delivery",
+  const searched = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    if (s === "") return live;
+    return live.filter(
+      (p) =>
+        p.id.toLowerCase().includes(s) ||
+        supplierNameOf(p.supplier_id).toLowerCase().includes(s) ||
+        (p.purchase_order_lines ?? []).some((l) =>
+          l.sku.toLowerCase().includes(s),
         ),
-      ).length,
-    [tabScoped, callsById],
-  );
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live, search, supplierById]);
 
-  const balancePoCount = useMemo(
-    () =>
-      tabScoped.filter((p) =>
-        (callsById.get(p.id) ?? []).some(
-          (a) => a.key === "confirm_balance_delivery_date",
-        ),
-      ).length,
-    [tabScoped, callsById],
-  );
+  const rows = useMemo(() => {
+    const base = searched.filter(
+      (p) =>
+        (stateSel === null || progressById.get(p.id)?.state === stateSel) &&
+        (supplierSel === null || p.supplier_id === supplierSel),
+    );
+    const sorted = [...base];
+    if (sort) {
+      const dir = sort.dir === "asc" ? 1 : -1;
+      const val = (p: operationPoListRow): string => {
+        switch (sort.key) {
+          case "issued":
+            return (p.placed_at ?? "").slice(0, 10);
+          case "supplier":
+            return supplierNameOf(p.supplier_id);
+          case "po":
+            return p.id;
+          case "items":
+            return itemsPreviewOf(p);
+          case "arriving":
+            return p.eta_date ?? "9999-12-31";
+          case "received":
+            return String(progressById.get(p.id)?.received ?? 0).padStart(6, "0");
+          case "action":
+            return actionWordOf(p) ?? "zzz";
+          default:
+            return "";
+        }
+      };
+      sorted.sort((a, b) => dir * val(a).localeCompare(val(b)));
+    } else {
+      // PO Issued, OLDEST first — the delivery that has been waiting longest
+      // is where the day starts.
+      sorted.sort((a, b) => {
+        const pa = (a.placed_at ?? "").localeCompare(b.placed_at ?? "");
+        return pa !== 0 ? pa : a.id.localeCompare(b.id);
+      });
+    }
+    return sorted;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searched, stateSel, supplierSel, sort, progressById, callsById]);
 
-  const progressCounts = useMemo(() => {
+  /** Rail counts are taken with the OTHER dimension applied, so a visible
+   *  number always matches the rows its click produces. */
+  const stateCounts = useMemo(() => {
     const m = new Map<PoReceivingState, number>();
-    for (const p of tabScoped) {
+    for (const p of searched) {
+      if (supplierSel !== null && p.supplier_id !== supplierSel) continue;
       const st = progressById.get(p.id)?.state;
       if (st) m.set(st, (m.get(st) ?? 0) + 1);
     }
     return m;
-  }, [tabScoped, progressById]);
+  }, [searched, supplierSel, progressById]);
 
-  const supplierFacets = useMemo(() => {
+  const supplierCounts = useMemo(() => {
     const m = new Map<string, number>();
-    for (const p of tabScoped) m.set(p.supplier_id, (m.get(p.supplier_id) ?? 0) + 1);
-    return [...m.entries()]
-      .map(([id, n]) => ({ id, n, name: supplierById.get(id)?.name ?? "—" }))
-      .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
-  }, [tabScoped, supplierById]);
-
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return tabScoped.filter((p) => {
-      const progress = progressById.get(p.id);
-      const calls = callsById.get(p.id) ?? [];
-      if (checkInOnly && (progress?.pendingDelivery ?? 0) <= 0) return false;
-      if (
-        tomorrowOnly &&
-        !calls.some((a) => a.key === "confirm_tomorrows_delivery")
-      )
-        return false;
-      if (
-        balanceOnly &&
-        !calls.some((a) => a.key === "confirm_balance_delivery_date")
-      )
-        return false;
-      if (progressFilter.size > 0 && (!progress || !progressFilter.has(progress.state)))
-        return false;
-      if (supplierFilter.size > 0 && !supplierFilter.has(p.supplier_id)) return false;
-      if (!q) return true;
-      const supName = supplierById.get(p.supplier_id)?.name ?? "";
-      return (
-        p.id.toLowerCase().includes(q) || supName.toLowerCase().includes(q)
-      );
-    });
-  }, [
-    tabScoped,
-    progressById,
-    callsById,
-    checkInOnly,
-    tomorrowOnly,
-    balanceOnly,
-    progressFilter,
-    supplierFilter,
-    search,
-    supplierById,
-  ]);
-
-  // ── Active-filter chips (§8.2: two tiles picked → two ✕-able chips) ────────
-  const activeChips: ActiveChip[] = [];
-  if (checkInOnly)
-    activeChips.push({
-      label: purchasingActionQueue("check_in"),
-      onClear: () => setCheckInOnly(false),
-    });
-  if (tomorrowOnly)
-    activeChips.push({
-      label: purchasingActionQueue("confirm_tomorrows_delivery"),
-      onClear: () => setTomorrowOnly(false),
-    });
-  if (balanceOnly)
-    activeChips.push({
-      label: purchasingActionQueue("confirm_balance_delivery_date"),
-      onClear: () => setBalanceOnly(false),
-    });
-  for (const f of PROGRESS_FACETS)
-    if (progressFilter.has(f.state))
-      activeChips.push({
-        label: f.label,
-        onClear: () =>
-          setProgressFilter((cur) => toggleInSet(cur, f.state)),
-      });
-  for (const id of supplierFilter)
-    activeChips.push({
-      label: `Supplier: ${supplierById.get(id)?.name ?? "—"}`,
-      onClear: () => setSupplierFilter((cur) => toggleInSet(cur, id)),
-    });
-
-  const anyFilter =
-    checkInOnly ||
-    tomorrowOnly ||
-    balanceOnly ||
-    progressFilter.size > 0 ||
-    supplierFilter.size > 0 ||
-    search.trim() !== "";
-  const resetFilters = () => {
-    setCheckInOnly(false);
-    setTomorrowOnly(false);
-    setBalanceOnly(false);
-    setProgressFilter(new Set());
-    setSupplierFilter(new Set());
-    setSearch("");
-  };
-
-  // ── §8.2 · closing the drawer gives the list back ──────────────────────────
-  //
-  // The one overlay this tab opens is ReceivePOModal (the Check in form). It
-  // closes by invalidating the PO list, which re-renders the facet rail — and a
-  // shorter rail makes the browser clamp its scrollTop before React has
-  // finished. Same shape as the To Order half, written here rather than shared:
-  // the behaviour belongs in `PageShell` / `DataTable` and that is D0.5c on
-  // line ⑧, which the P2 card explicitly reserves.
-  const facetInnerRef = useRef<HTMLDivElement | null>(null);
-  const getFacetScroller = () =>
-    facetInnerRef.current?.closest<HTMLElement>(
-      '[data-testid="listshell-facet"]',
-    ) ?? null;
-  const listStateBeforeDrawer = useRef<ReceivingListState | null>(null);
-  const pendingFacetScroll = useRef<number | null>(null);
-
-  const snapshotList = () => {
-    listStateBeforeDrawer.current = {
-      tab,
-      search,
-      checkInOnly,
-      tomorrowOnly,
-      balanceOnly,
-      progressFilter,
-      supplierFilter,
-      facetScrollTop: getFacetScroller()?.scrollTop ?? 0,
-    };
-  };
-
-  /** §8.2's last line, and it applies to EVERY overlay this tab opens — the
-   *  Check in form and P3's two record-answer forms alike. One snapshot/restore
-   *  pair, so a third overlay cannot be added that forgets to give the list
-   *  back. */
-  const restoreList = () => {
-    const s = listStateBeforeDrawer.current;
-    listStateBeforeDrawer.current = null;
-    if (!s) return;
-    setTab(s.tab);
-    setSearch(s.search);
-    setCheckInOnly(s.checkInOnly);
-    setTomorrowOnly(s.tomorrowOnly);
-    setBalanceOnly(s.balanceOnly);
-    setProgressFilter(s.progressFilter);
-    setSupplierFilter(s.supplierFilter);
-    pendingFacetScroll.current = s.facetScrollTop;
-  };
-
-  const openReceive = (poId: string) => {
-    snapshotList();
-    setReceivePoId(poId);
-  };
-
-  const closeReceive = () => {
-    setReceivePoId(null);
-    restoreList();
-  };
-
-  const openAnswer = (
-    kind: "tomorrow" | "balance",
-    poId: string,
-    poLineId?: string,
-  ) => {
-    snapshotList();
-    setAnswerFor({ kind, poId, poLineId });
-  };
-
-  const closeAnswer = () => {
-    setAnswerFor(null);
-    restoreList();
-  };
-
-  // Re-apply the scroll after every render until it sticks. One assignment is
-  // not enough: the refetch that runs on close lands a frame or two later and
-  // re-lays the rail out underneath it. Gives up once the rail is too short to
-  // hold the old position — a PO that was fully received is genuinely gone.
-  useLayoutEffect(() => {
-    const want = pendingFacetScroll.current;
-    if (want == null) return;
-    const el = getFacetScroller();
-    if (!el) return;
-    el.scrollTop = want;
-    if (el.scrollTop === want || el.scrollHeight - el.clientHeight <= want) {
-      pendingFacetScroll.current = null;
+    for (const p of searched) {
+      if (stateSel !== null && progressById.get(p.id)?.state !== stateSel) continue;
+      m.set(p.supplier_id, (m.get(p.supplier_id) ?? 0) + 1);
     }
-  });
+    return [...m.entries()]
+      .map(([id, n]) => ({ id, n, name: supplierNameOf(id) }))
+      .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searched, stateSel, progressById, supplierById]);
 
-  const receivePo = receivePoId
-    ? live.find((p) => p.id === receivePoId) ?? null
-    : null;
-
-  const answerPo = answerFor
-    ? live.find((p) => p.id === answerFor.poId) ?? null
-    : null;
-
-  if (isLoading) {
-    return (
-      <>
-        <PurchasingTabs />
-        <div className="px-9 py-8 pb-14">
-        <div data-testid="operation-receiving-skeleton">
-          <div className="h-9 w-1/3 bg-base-100 rounded animate-pulse mb-6" />
-          <div className="bg-white border border-base-200 rounded">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-14 border-b border-base-100 animate-pulse bg-base-50/40"
-              />
-            ))}
-          </div>
-        </div>
-        </div>
-      </>
-    );
+  /** `Cody Q · +2` — identify the PO without opening it. */
+  function itemsPreviewOf(p: operationPoListRow): string {
+    const ls = p.purchase_order_lines ?? [];
+    if (ls.length === 0) return "—";
+    const head = ls[0].qty >= 2 ? `${ls[0].sku} ×${ls[0].qty}` : ls[0].sku;
+    return ls.length > 1 ? `${head} · +${ls.length - 1}` : head;
   }
 
-  if (isError) {
-    return (
-      <>
-        <PurchasingTabs />
-        <div className="px-9 py-8 pb-14">
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
-          <div className="text-destructive font-semibold mb-2">
-            Couldn&rsquo;t load purchase orders
-          </div>
-          <div className="text-meta text-base-700 mb-3">
-            {(error as Error | undefined)?.message ?? "Unknown error"}
-          </div>
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            className="btn-secondary text-label py-1.5 px-3"
+  /**
+   * The row's Current Action, from the words this module already owns: the
+   * engine's open supplier calls first, then `Check in` while the PO still
+   * owes units. Counted from QUANTITIES, never from a status word somebody
+   * typed (PURCHASING-WORKING-FLOW §9).
+   */
+  function actionWordOf(p: operationPoListRow): string | null {
+    const calls = callsById.get(p.id) ?? [];
+    if (calls.length > 0) return purchasingActionQueue(calls[0].key);
+    if ((progressById.get(p.id)?.pendingDelivery ?? 0) > 0)
+      return purchasingActionQueue("check_in");
+    return null;
+  }
+
+  // ── Selection: ?po= is the one source; the first row auto-selects. ───────
+  const selectedId = params.get("po");
+  const selected = useMemo(
+    () => live.find((p) => p.id === selectedId) ?? null,
+    [live, selectedId],
+  );
+  useEffect(() => {
+    if (selected || posQ.isLoading || rows.length === 0) return;
+    setParams(
+      (prev) => {
+        const n = new URLSearchParams(prev);
+        n.set("po", rows[0].id);
+        return n;
+      },
+      { replace: true },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, posQ.isLoading, rows]);
+
+  const openPo = (id: string) => {
+    // Switching PO while counting would silently throw the count away.
+    if (receiving) return;
+    setParams((prev) => {
+      const n = new URLSearchParams(prev);
+      n.set("po", id);
+      return n;
+    });
+  };
+
+  const columns: readonly Column<operationPoListRow>[] = [
+    {
+      key: "issued",
+      label: "PO Issued",
+      width: "88px",
+      sortable: true,
+      cell: (p) => (
+        <span className="tabular-nums">
+          {fmtDateShort((p.placed_at ?? "").slice(0, 10))}
+        </span>
+      ),
+    },
+    {
+      key: "supplier",
+      label: "Supplier",
+      width: workspaceOpen ? "92px" : "104px",
+      sortable: true,
+      cell: (p) => supplierNameOf(p.supplier_id),
+    },
+    {
+      key: "po",
+      label: "PO No.",
+      width: "104px",
+      sortable: true,
+      cell: (p) => (
+        <span className="flex items-center gap-1.5">
+          {p.id === selectedId && (
+            <span aria-hidden className="w-0.5 h-4 bg-kit-blue-9 shrink-0" />
+          )}
+          <span
+            className={
+              p.id === selectedId
+                ? "font-mono font-semibold text-kit-blue-11"
+                : "font-mono"
+            }
           >
-            Retry
-          </button>
-        </div>
-        </div>
-      </>
-    );
-  }
+            {p.id}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: "items",
+      label: "Items",
+      width: "150px",
+      sortable: true,
+      cell: (p) => (
+        <span
+          className="block truncate"
+          title={(p.purchase_order_lines ?? [])
+            .map((l) => `${l.sku} ×${l.qty}`)
+            .join("\n")}
+        >
+          {itemsPreviewOf(p)}
+        </span>
+      ),
+    },
+    {
+      key: "arriving",
+      label: "Goods Arrival",
+      width: "104px",
+      sortable: true,
+      cell: (p) =>
+        p.eta_date ? (
+          <span className="tabular-nums">{fmtDateShort(p.eta_date)}</span>
+        ) : (
+          <span className="text-kit-slate-9">—</span>
+        ),
+    },
+    {
+      key: "received",
+      label: "Received",
+      width: "72px",
+      align: "right",
+      numeric: true,
+      sortable: true,
+      cell: (p) => {
+        const pr = progressById.get(p.id);
+        return `${pr?.received ?? 0} / ${pr?.ordered ?? 0}`;
+      },
+    },
+    {
+      key: "action",
+      label: "Current Action",
+      width: "auto",
+      sortable: true,
+      cell: (p) => {
+        const w = actionWordOf(p);
+        if (!w) return <span className="text-kit-slate-9">—</span>;
+        const late = (callsById.get(p.id) ?? []).some((c) => c.late);
+        return (
+          <span className={late ? "text-kit-red-11" : "text-kit-slate-12"}>
+            {w}
+          </span>
+        );
+      },
+    },
+  ];
 
-  const total = visible.length;
+  /** Gmail's reading-pane compact set. HONESTY GUARD: a column carrying an
+   *  active sort can never be hidden — a sort you cannot see is a lie the
+   *  table tells. */
+  const COMPACT_KEYS = new Set(["issued", "supplier", "po", "items", "action"]);
+  const visibleColumns = workspaceOpen
+    ? columns.filter((c) => COMPACT_KEYS.has(c.key) || sort?.key === c.key)
+    : columns;
+
+  const filtered = stateSel !== null || supplierSel !== null;
 
   return (
-    <div className="h-full flex flex-col">
-      <PurchasingTabs />
-      <div className="flex-1 min-h-0">
-        {/* UI-KIT §8.3 module-tab law — the tab bar above IS the title, so the
-            shell renders no breadcrumb and no page title. The kicker + <h1>
-            this page used to draw were ~80px of a 200px list budget spent
-            repeating the word already lit in the tab bar. */}
-        <ListPageShell
-          testId="operation-receiving"
-          facetOpen={facetOpen}
-          onFacetToggle={() => setFacetOpen((v) => !v)}
-          facetToggleTitle="Show filters"
-          toolbar={
-            <div
-              className="flex gap-1 p-1 bg-base-100 rounded w-fit max-w-full overflow-auto"
-              role="tablist"
-              aria-label="Receiving status"
+    <div
+      className="h-full min-h-0 flex flex-col bg-kit-canvas"
+      data-testid="receiving-workspace-page"
+    >
+      {/* SHELL LAW: the shell draws the header, pages never do. */}
+      <PurchasingTabs
+        right={
+          <div className="flex items-center gap-2">
+            <div className="w-56">
+              <SearchInput
+                id="receiving-search"
+                placeholder="Search"
+                pill
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setWorkspaceOpen((o) => !o)}
+              aria-pressed={workspaceOpen}
+              title={workspaceOpen ? "Hide receiving" : "Show receiving"}
+              aria-label={workspaceOpen ? "Hide receiving" : "Show receiving"}
+              data-testid="receiving-workspace-toggle"
+              className={PANE_BTN}
             >
-              {TABS.map((t) => {
-                const active = tab === t.key;
-                return (
-                  <button
-                    key={t.key}
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setTab(t.key)}
-                    className={`px-3 py-1.5 text-meta rounded cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                      active
-                        ? "bg-white text-base-900 font-semibold shadow-sm"
-                        : "text-base-600 font-medium hover:text-base-900"
-                    }`}
-                  >
-                    <span>{t.label}</span>
-                    <span
-                      className={`text-label font-mono px-1.5 py-px rounded-full ${
-                        active
-                          ? "bg-base-100 text-base-700"
-                          : "bg-base-200 text-base-500"
-                      }`}
-                    >
-                      {counts[t.key]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          }
-          toolbarRight={
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="PO number or supplier…"
-              className="w-[230px] px-3 py-1.5 border border-base-200 rounded-full text-body bg-white outline-none focus:border-base-700"
-            />
-          }
-          activeChips={activeChips}
-          footer={
-            <>
-              <span className="tabular-nums">
-                {total} {total === 1 ? "PO" : "POs"}
-              </span>
-              {anyFilter && (
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="hover:text-base-900 transition-colors"
-                >
-                  Reset filters
-                </button>
-              )}
-            </>
-          }
-          facet={
-            <div ref={facetInnerRef} className="flex flex-col gap-2 min-h-0 flex-1">
-              <SectionCard>
-                {/* TODAY'S WORK — the module's own queue name, first (§8.4).
-                    Only ONE of §7's six actions is computable on this tab:
-                    `Check in`. The other five are the To Order tab's, the
-                    Claims tab's, or P3's, and a tile for an action nothing can
-                    count would be a number nobody wrote. The band hides itself
-                    when the count is zero — on the `Received` tab there is by
-                    definition nothing to check in. */}
-                {(checkInCount > 0 || tomorrowCount > 0 || balancePoCount > 0) && (
-                  <>
-                    <SectionBand
-                      title="Today's work"
-                      strong
-                      collapsed={collapsedFacet.has("today")}
-                      onToggle={() => toggleFacet("today")}
-                    />
-                    {!collapsedFacet.has("today") && (
-                      <div>
-                        {/* §4's display order, top rung first: the tomorrow call
-                            and Check in are both "today's run"; the balance call
-                            is rung 4, cleaning up a part-delivery. Each band row
-                            hides at zero — a reassuring `0` is not a fact worth
-                            permanent height. */}
-                        {tomorrowCount > 0 && (
-                          <FacetRow
-                            testId="receiving-facet-tomorrow"
-                            label={purchasingActionQueue(
-                              "confirm_tomorrows_delivery",
-                            )}
-                            count={tomorrowCount}
-                            active={tomorrowOnly}
-                            onClick={() => setTomorrowOnly((v) => !v)}
-                          />
-                        )}
-                        {checkInCount > 0 && (
-                          <FacetRow
-                            testId="receiving-facet-checkin"
-                            label={purchasingActionQueue("check_in")}
-                            count={checkInCount}
-                            active={checkInOnly}
-                            title="A PO that still owes units — counted from the quantities booked in, never from a status word somebody typed."
-                            onClick={() => setCheckInOnly((v) => !v)}
-                          />
-                        )}
-                        {balancePoCount > 0 && (
-                          <FacetRow
-                            testId="receiving-facet-balance"
-                            label={purchasingActionQueue(
-                              "confirm_balance_delivery_date",
-                            )}
-                            count={balancePoCount}
-                            active={balanceOnly}
-                            onClick={() => setBalanceOnly((v) => !v)}
-                          />
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
+              <Icon name={workspaceOpen ? "forward" : "back"} size={14} />
+            </button>
+          </div>
+        }
+      />
 
-                {/* PROGRESS — the page's own column, as a filter. Facts, so
-                    they are multi-select: "show me the issues AND the
-                    part-deliveries" is one question, not two. */}
-                <SectionBand
-                  title="Progress"
-                  strong
-                  collapsed={collapsedFacet.has("progress")}
-                  onToggle={() => toggleFacet("progress")}
-                />
-                {!collapsedFacet.has("progress") && (
-                  <div>
-                    {PROGRESS_FACETS.every(
-                      (f) => (progressCounts.get(f.state) ?? 0) === 0,
-                    ) ? (
-                      <EmptyFacetHint text="Nothing here" />
-                    ) : (
-                      PROGRESS_FACETS.map((f) =>
-                        (progressCounts.get(f.state) ?? 0) > 0 ? (
-                          <FacetRow
-                            key={f.state}
-                            testId={`receiving-facet-progress-${f.state}`}
-                            label={f.label}
-                            count={progressCounts.get(f.state) ?? 0}
-                            tone={f.tone}
-                            title={f.title}
-                            active={progressFilter.has(f.state)}
-                            onClick={() =>
-                              setProgressFilter((cur) => toggleInSet(cur, f.state))
-                            }
-                          />
-                        ) : null,
-                      )
-                    )}
-                  </div>
-                )}
-
-                {/* SUPPLIER — the same facet the To Order tab carries, counted
-                    in POs here because a PO is this tab's row. */}
-                <SectionBand
-                  title="Supplier"
-                  strong
-                  collapsed={collapsedFacet.has("supplier")}
-                  onToggle={() => toggleFacet("supplier")}
-                />
-                {!collapsedFacet.has("supplier") && (
-                  <div>
-                    {supplierFacets.length === 0 ? (
-                      <EmptyFacetHint text="Nothing here" />
-                    ) : (
-                      supplierFacets.map((f) => (
-                        <FacetRow
-                          key={f.id}
-                          testId={`receiving-facet-supplier-${f.id}`}
-                          label={f.name}
-                          count={f.n}
-                          active={supplierFilter.has(f.id)}
-                          onClick={() =>
-                            setSupplierFilter((cur) => toggleInSet(cur, f.id))
-                          }
-                        />
-                      ))
-                    )}
-                  </div>
-                )}
-              </SectionCard>
-            </div>
-          }
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* ── NAVIGATION · 200px ─────────────────────────────────────────── */}
+        <nav
+          className="w-[200px] shrink-0 min-h-0 overflow-y-auto border-r border-kit-slate-5 px-3 py-3 flex flex-col gap-4 bg-white"
+          aria-label="Receiving register"
+          data-testid="receiving-rail"
         >
-          {/* R6 — what the warehouse counted and Carres has not checked in yet.
-              Renders NOTHING when nothing is waiting, so it costs zero permanent
-              pixels and cannot be scrolled past out of habit. It sits above the
-              queue because a count already on file is work the operator can
-              finish in one click, while every row below still needs the goods in
-              front of them. */}
-          <div className="shrink-0">
-            <WarehouseReceiptsPanel />
-          </div>
+          <RailGroup title="Receiving Progress">
+            <RailItem
+              label="All"
+              active={stateSel === null}
+              onClick={() => setStateSel(null)}
+              testId="receiving-rail-state-all"
+            />
+            {PROGRESS_STATES.map((s) => {
+              const n = stateCounts.get(s.state) ?? 0;
+              if (n === 0) return null;
+              return (
+                <RailItem
+                  key={s.state}
+                  label={s.label}
+                  count={n}
+                  title={s.title}
+                  danger={s.danger}
+                  active={stateSel === s.state}
+                  onClick={() =>
+                    setStateSel(stateSel === s.state ? null : s.state)
+                  }
+                  testId={`receiving-rail-state-${s.state}`}
+                />
+              );
+            })}
+          </RailGroup>
 
-          {/* Table */}
-          <div className="flex-1 min-h-0 bg-white border border-base-200 rounded-t-[12px] rounded-b-none shadow-sm overflow-auto">
-            <table
-              className="w-full border-collapse text-body [&_tbody_tr:nth-child(even)]:bg-base-100/70"
-              style={{ minWidth: 920 }}
-            >
-              <thead className="bg-base-700 border-b-2 border-primary text-white sticky top-0 z-10">
-                <tr>
-                  <Th>PO</Th>
-                  <Th>Supplier</Th>
-                  <Th>Warehouse</Th>
-                  <Th>Progress</Th>
-                  <Th>ETA</Th>
-                  <Th>Stage</Th>
-                  <Th> </Th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="p-12 text-center text-meta text-base-500"
-                    >
-                      No purchase orders in this tab.
-                    </td>
-                  </tr>
-                )}
-                {visible.map((po) => {
-                  const progress =
-                    progressById.get(po.id) ??
-                    poReceivingProgress(po.purchase_order_lines);
-                  const supName = supplierById.get(po.supplier_id)?.name ?? "—";
-                  const whName = warehouseById.get(po.warehouse_id)?.name ?? "—";
-                  const done = po.status === "received";
-                  return (
-                    <tr
-                      key={po.id}
-                      className="border-t border-base-100 align-top hover:bg-primary/5"
-                      data-testid="receiving-row"
-                    >
-                      <td className="px-4 py-3 whitespace-nowrap font-mono font-semibold text-base-900">
-                        {po.id}
-                      </td>
-                      <td className="px-4 py-3 text-base-800">{supName}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-base-700">
-                        {whName}
-                      </td>
-                      {/* R1 — the whole point of the card: what still has to
-                          arrive is readable here, without opening anything. */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`pill ${PROGRESS_PILL[progress.state]}`}
-                          data-testid={`receiving-progress-${po.id}`}
-                        >
-                          {progress.label}
-                        </span>
-                        {progress.pendingLabel && (
-                          <div className="text-label text-base-600 mt-1">
-                            {progress.pendingLabel}
-                          </div>
-                        )}
-                        {progress.issueLabel && (
-                          <div className="text-label text-danger mt-0.5">
-                            {progress.issueLabel}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-base-700">
-                        {po.eta_date ? (
-                          fmtDate(po.eta_date)
-                        ) : (
-                          <span className="text-base-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`pill ${done ? "pill-confirmed" : supStatusPill(po.sup_status)}`}
-                        >
-                          {done ? "Received" : supStatusLabel(po.sup_status)}
-                        </span>
-                      </td>
-                      {/* P3 — every open action of this PO, never just the top
-                          one: Law 1 says one action may not suppress another,
-                          and a PO delivered short on Monday genuinely carries
-                          its balance call AND its next tomorrow call at once.
-                          Order is §4's. */}
-                      <td className="px-4 py-3 whitespace-nowrap text-right">
-                        {done ? (
-                          <span className="inline-flex items-center gap-1 text-meta text-success">
-                            <span className="w-[7px] h-[7px] rounded-full bg-success" />
-                            Done
-                          </span>
-                        ) : (
-                          <div className="inline-flex flex-col items-end gap-1">
-                            {(callsById.get(po.id) ?? [])
-                              .filter(
-                                (a) => a.key === "confirm_tomorrows_delivery",
-                              )
-                              .map((a) => (
-                                <button
-                                  key={a.key}
-                                  type="button"
-                                  onClick={() => openAnswer("tomorrow", po.id)}
-                                  className={`text-label py-1.5 px-3 ${
-                                    a.late ? "btn-danger" : "btn-secondary"
-                                  }`}
-                                  title={purchasingActionQueue(
-                                    "confirm_tomorrows_delivery",
-                                  )}
-                                  data-testid={`tomorrow-${po.id}`}
-                                >
-                                  {purchasingActionButton(
-                                    "confirm_tomorrows_delivery",
-                                  )}
-                                </button>
-                              ))}
-                            <button
-                              type="button"
-                              onClick={() => openReceive(po.id)}
-                              className="btn-primary text-label py-1.5 px-3"
-                              data-testid={`receive-${po.id}`}
-                            >
-                              {purchasingActionButton("check_in")}
-                            </button>
-                            {(callsById.get(po.id) ?? [])
-                              .filter(
-                                (a) =>
-                                  a.key === "confirm_balance_delivery_date",
-                              )
-                              .map((a) => (
-                                <button
-                                  key={a.poLineId}
-                                  type="button"
-                                  onClick={() =>
-                                    openAnswer("balance", po.id, a.poLineId)
-                                  }
-                                  className={`text-label py-1.5 px-3 ${
-                                    a.late ? "btn-danger" : "btn-secondary"
-                                  }`}
-                                  title={`${a.sku} · ${purchasingActionQueue(
-                                    "confirm_balance_delivery_date",
-                                  )}`}
-                                  data-testid={`balance-${a.poLineId}`}
-                                >
-                                  {purchasingActionButton(
-                                    "confirm_balance_delivery_date",
-                                  )}
-                                </button>
-                              ))}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <RailGroup title="Supplier">
+            <RailItem
+              label="All"
+              active={supplierSel === null}
+              onClick={() => setSupplierSel(null)}
+              testId="receiving-rail-supplier-all"
+            />
+            {supplierCounts.map((s) => (
+              <RailItem
+                key={s.id}
+                label={s.name}
+                count={s.n}
+                active={supplierSel === s.id}
+                onClick={() =>
+                  setSupplierSel(supplierSel === s.id ? null : s.id)
+                }
+                testId={`receiving-rail-supplier-${s.id}`}
+              />
+            ))}
+          </RailGroup>
+        </nav>
+
+        {/* ── LISTING — hidden while a delivery is being counted ──────────── */}
+        <div
+          className={[
+            "flex-1 min-w-0 min-h-0 flex-col border-r border-kit-slate-5 bg-white",
+            receiving ? "hidden" : "flex",
+          ].join(" ")}
+          data-testid="receiving-listing"
+        >
+          {/* R6 — what the warehouse counted and Carres has not checked in
+              yet. Renders NOTHING when nothing is waiting, so it costs zero
+              permanent pixels. Untouched by this slice. */}
+          <WarehouseReceiptsPanel />
+
+          <div className="flex-1 min-h-0 overflow-auto">
+            <div className={workspaceOpen ? "" : "min-w-[880px]"}>
+              <DataTable<operationPoListRow>
+                rows={rows}
+                columns={visibleColumns}
+                rowId={(p) => p.id}
+                onRowOpen={(p) => openPo(p.id)}
+                sort={sort}
+                onSortChange={setSort}
+                loading={posQ.isLoading}
+                label="Receiving"
+                empty={
+                  <EmptyState
+                    title="No purchase orders."
+                    detail="Issue one from To Order."
+                  />
+                }
+              />
+            </div>
           </div>
-        </ListPageShell>
+          <div className="shrink-0 flex items-center gap-3 px-3 h-10 border-t border-kit-slate-5 text-meta text-kit-slate-11">
+            <span>
+              {rows.length} purchase order{rows.length === 1 ? "" : "s"}
+            </span>
+            {filtered && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStateSel(null);
+                  setSupplierSel(null);
+                }}
+                data-testid="receiving-clear-filters"
+                className="px-2 py-0.5 rounded-full bg-kit-slate-3 text-kit-slate-11 hover:text-kit-slate-12"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── WORKSPACE — ONE live PO. Takes the whole stage in Receiving
+             Mode: five lines × three numbers do not fit in 400px. ────────── */}
+        <main
+          className={[
+            "min-h-0 overflow-y-auto bg-white",
+            receiving ? "flex-1" : workspaceOpen ? "shrink-0 w-[400px]" : "hidden",
+          ].join(" ")}
+          data-testid="receiving-workspace-pane"
+        >
+          {selected ? (
+            <ReceivingWorkspace
+              po={selected}
+              supplier={supplierById.get(selected.supplier_id)}
+              warehouseName={warehouseById.get(selected.warehouse_id)?.name ?? "—"}
+              calls={callsById.get(selected.id) ?? []}
+              receiving={receiving}
+              onReceiving={setReceiving}
+            />
+          ) : (
+            !posQ.isLoading &&
+            live.length === 0 && (
+              <div className="h-full flex items-center justify-center">
+                <EmptyState title="No purchase orders." />
+              </div>
+            )
+          )}
+        </main>
       </div>
-
-      {receivePo && (
-        <ReceivePOModal
-          po={receivePo}
-          supplier={supplierById.get(receivePo.supplier_id)}
-          warehouse={warehouseById.get(receivePo.warehouse_id)}
-          onClose={closeReceive}
-        />
-      )}
-
-      {answerPo && answerFor && (
-        <RecordSupplierAnswerModal
-          kind={answerFor.kind}
-          po={answerPo}
-          supplierName={supplierById.get(answerPo.supplier_id)?.name ?? ""}
-          poLineId={answerFor.poLineId}
-          onClose={closeAnswer}
-        />
-      )}
     </div>
   );
 }
 
-function Th({ children }: { children: React.ReactNode }) {
+function RailGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <th className="px-4 py-2.5 text-label font-semibold uppercase tracking-[0.02em] text-white text-left">
-      {children}
-    </th>
+    <div>
+      <div className="flex items-center px-1.5">
+        <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+          {title}
+        </span>
+      </div>
+      <div className="mt-1 flex flex-col gap-0.5">{children}</div>
+    </div>
+  );
+}
+
+function RailItem({
+  label,
+  count,
+  active,
+  onClick,
+  title,
+  danger,
+  testId,
+}: {
+  label: string;
+  count?: number;
+  active: boolean;
+  onClick: () => void;
+  title?: string;
+  danger?: boolean;
+  testId: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={title}
+      data-testid={testId}
+      className={[
+        "relative flex items-center gap-2 px-2 py-1.5 rounded-control text-left text-body w-full",
+        active
+          ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
+          : "text-kit-slate-11 hover:bg-kit-blue-3",
+      ].join(" ")}
+    >
+      {active && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
+        />
+      )}
+      <span className={`flex-1 truncate ${danger && !active ? "text-kit-red-11" : ""}`}>
+        {label}
+      </span>
+      {count != null && (
+        <span className="tabular-nums text-label text-kit-slate-9">{count}</span>
+      )}
+    </button>
   );
 }

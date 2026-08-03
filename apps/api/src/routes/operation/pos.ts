@@ -9,6 +9,7 @@ import {
   normalizeSkuKey,
   reassignPoWarehouseInput,
   receivePoWithDoInput,
+  officeReceiveInput,
   recordBalanceDateInput,
   recordTomorrowDeliveryInput,
   type AwaitingStockShortageResponse,
@@ -927,6 +928,135 @@ operationPosRouter.post("/:id/receive", requireOperation, async (c) => {
     console.error("post-receive auto-reserve failed (non-fatal):", e);
   }
   return c.json(data);
+});
+
+// ----- POST /:id/office-receive -----
+//
+// Slice B — the Office Receiving Workspace's ONE write door (migration 0315
+// `office_receive_post`). A thin door: every rule lives in the RPC, which
+// shares `warehouse_receipt_validate_lines` with the warehouse's door and
+// hands the stock movement to the same `operation_receive_po_with_do`.
+//
+// What this route does that `/receive` above does NOT: it opens a **Receiving
+// Session** — one physical delivery, one record, one `posted` event. Ops
+// receiving through `/receive` leaves no document at all, which is why the
+// Workspace never calls it.
+//
+// Reshape at the boundary, the same discipline as `/receive`: the wire is
+// camelCase, `p_lines` is snake_case. `received_now` is a DELTA here, not a
+// new total — the Session stores what THIS delivery brought and the engine
+// derives the cumulative figure (RECEIVING-INFORMATION-MODEL §7.1).
+operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, officeReceiveInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("office_receive_post", {
+    p_po_id: c.req.param("id"),
+    p_do_number: parsed.data.doNumber,
+    p_do_file_path: parsed.data.doFilePath,
+    p_note: parsed.data.note ?? null,
+    // Omitted → the RPC stamps today in MYT. The browser's clock never
+    // decides a business date.
+    p_goods_received_at: parsed.data.goodsReceivedAt ?? null,
+    p_lines: parsed.data.lines.map((l) => ({
+      id: l.id,
+      received_now: l.receivedNow,
+      damaged_qty: l.damagedQty ?? 0,
+      wrong_item_qty: l.wrongItemQty ?? 0,
+      damaged_photos: l.damagedPhotos ?? [],
+      wrong_item_claim_type: l.wrongItemClaimType ?? null,
+      wrong_item_photos: l.wrongItemPhotos ?? [],
+    })),
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  // The SAME post-receive step `/receive` runs. Without it, goods booked in
+  // through the Workspace would sit unreserved while goods booked in through
+  // the old modal were reserved — one act, two outcomes, decided by which
+  // screen the operator happened to use.
+  try {
+    await autoReserveReceivedToSourceOrder(sb, c.req.param("id"));
+  } catch (e) {
+    console.error("post-receive auto-reserve failed (non-fatal):", e);
+  }
+  return c.json(data);
+});
+
+// ----- GET /:id/receiving -----
+//
+// What the Receiving Workspace reads: this PO's Receiving Sessions, newest
+// first, each with its events. The Activity section reads the EVENT LEDGER and
+// nothing else (RECEIVING-INFORMATION-MODEL §6), so the events ride here
+// rather than being re-derived from the session's columns — a second
+// derivation's only power is to disagree with the first.
+operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const poId = c.req.param("id");
+
+  const { data: rows, error } = await sb
+    .from("warehouse_receipts")
+    .select(
+      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, return_reason",
+    )
+    .eq("po_id", poId)
+    .order("goods_received_at", { ascending: false })
+    .order("submitted_at", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const sessions = (rows ?? []) as Array<Record<string, unknown>>;
+  const ids = sessions.map((s) => s.id as string);
+
+  const { data: evs } = ids.length
+    ? await sb
+        .from("receiving_events")
+        .select("id, receipt_id, event, actor_id, event_at, payload")
+        .in("receipt_id", ids)
+        .order("event_at", { ascending: false })
+    : { data: [] as Array<Record<string, unknown>> };
+  const events = (evs ?? []) as Array<Record<string, unknown>>;
+
+  // Names are resolved here, never stored on the event: the ledger records WHO
+  // by id so it survives a rename, and the screen needs the name as it stands
+  // today.
+  const userIds = [
+    ...new Set(
+      [
+        ...sessions.flatMap((s) => [s.submitted_by, s.posted_by]),
+        ...events.map((e) => e.actor_id),
+      ].filter((v): v is string => typeof v === "string" && v.length > 0),
+    ),
+  ];
+  const userNames = new Map<string, string>();
+  if (userIds.length > 0) {
+    const { data: users } = await sb
+      .from("app_users")
+      .select("id, name")
+      .in("id", userIds);
+    for (const u of users ?? [])
+      userNames.set(u.id as string, u.name as string);
+  }
+
+  return c.json({
+    sessions: sessions.map((s) => ({
+      ...s,
+      posted_by_name: s.posted_by
+        ? (userNames.get(s.posted_by as string) ?? null)
+        : null,
+      submitted_by_name: s.submitted_by
+        ? (userNames.get(s.submitted_by as string) ?? null)
+        : null,
+    })),
+    events: events.map((e) => ({
+      ...e,
+      actor_name: e.actor_id
+        ? (userNames.get(e.actor_id as string) ?? null)
+        : null,
+    })),
+  });
 });
 
 /**

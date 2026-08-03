@@ -414,6 +414,8 @@ export {
   recordBalanceDateInput,
   attachDoInput,
   receivePoWithDoInput,
+  // Slice B (0315) — the Office Receiving Workspace's one write door.
+  officeReceiveInput,
   adjustStockInput,
   abandonOrderInput,
   createPoInput,
@@ -450,6 +452,7 @@ export {
   type RecordBalanceDateInput,
   type AttachDoInput,
   type ReceivePoWithDoInput,
+  type OfficeReceiveInput,
   type AdjustStockInput,
   type AbandonOrderInput,
   type CreatePoInput,

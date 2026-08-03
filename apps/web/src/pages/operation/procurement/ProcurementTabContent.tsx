@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useProcurementTab, useCatalog, useOperationSuppliers, useOperationWarehouse } from "@/lib/queries";
 import type { operationPoListRow, SupplierRow } from "@/lib/queries";
 import { purchasingActionButton } from "@carres/shared";
@@ -9,7 +9,6 @@ import AssignPickupDialog from "../components/AssignPickupDialog";
 import ReassignWarehouseDialog from "../components/ReassignWarehouseDialog";
 import LpInboundConfirmDialog from "../components/LpInboundConfirmDialog";
 import PoDetailModal from "../components/PoDetailModal";
-import ReceivePOModal from "../components/ReceivePOModal";
 
 /**
  * ProcurementTabContent — Phase 4.5 Chunk 2 Sprint F Task 34.
@@ -87,7 +86,17 @@ export default function ProcurementTabContent({
   slug,
 }: ProcurementTabContentProps) {
   const [filter, setFilter] = useState<FilterKey>("open");
-  const [receivePoId, setReceivePoId] = useState<string | null>(null);
+  /**
+   * Slice B (Jess, 2026-08-03: "不要两个入口") — `Check in` no longer opens a
+   * modal here. It hands over to the Receiving Workspace, which is the ONE
+   * door that opens a Receiving Session. The modal it used to open wrote
+   * `received_qty` and left no record of the delivery at all, so two buttons
+   * spelling one act produced two different outcomes depending on which screen
+   * the operator happened to be standing on.
+   */
+  const navigate = useNavigate();
+  const goReceiving = (poId: string) =>
+    navigate(`/operation?tab=receiving&po=${encodeURIComponent(poId)}`);
   const [assignPickupPoId, setAssignPickupPoId] = useState<string | null>(null);
   const [reassignPoId, setReassignPoId] = useState<string | null>(null);
   const [lpInboundFor, setLpInboundFor] = useState<string | null>(null);
@@ -380,7 +389,7 @@ export default function ProcurementTabContent({
               <div className="text-right flex flex-col items-end gap-1">
                 <ActionCell
                   po={po}
-                  onReceive={() => setReceivePoId(po.id)}
+                  onReceive={() => goReceiving(po.id)}
                   onAssignPickup={() => setAssignPickupPoId(po.id)}
                   onLpInboundConfirm={() => setLpInboundFor(po.id)}
                   onReassign={() => setReassignPoId(po.id)}
@@ -399,19 +408,6 @@ export default function ProcurementTabContent({
         )}
       </div>
 
-      {receivePoId &&
-        (() => {
-          const po = pos.find((p) => p.id === receivePoId);
-          if (!po) return null;
-          return (
-            <ReceivePOModal
-              po={po}
-              supplier={supplierById.get(po.supplier_id)}
-              warehouse={warehouseById.get(po.warehouse_id)}
-              onClose={() => setReceivePoId(null)}
-            />
-          );
-        })()}
       {assignPickupPoId &&
         (() => {
           const po = pos.find((p) => p.id === assignPickupPoId);
@@ -457,7 +453,7 @@ export default function ProcurementTabContent({
           onReceive={() => {
             const id = detailPo.id;
             setDetailPo(null);
-            setReceivePoId(id);
+            goReceiving(id);
           }}
         />
       )}
