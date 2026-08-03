@@ -413,3 +413,162 @@ describe("OperationReceiving — Receiving Mode", () => {
     );
   });
 });
+
+/**
+ * Card C2 · the `Goods Received` register (Jess, 2026-08-03).
+ *
+ * Her five architecture rulings, each as an assertion rather than a comment:
+ * a historical register only · no Activity block · no Status column (the rail
+ * says it) · Supplier/Date primary and Source secondary · and it is a
+ * Receiving QUEUE, not a sixth Purchasing tab.
+ */
+const RECORDS = [
+  {
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    po_id: "PO-2001",
+    supplier_name: "Nice Future",
+    do_number: "DO-5512",
+    status: "posted",
+    submitted_from: "office",
+    goods_received_at: "2026-08-02",
+    submitted_at: "2026-08-02T02:00:00Z",
+    posted_by_name: "Shasha",
+    do_file_url: "https://example.test/do.pdf",
+    note: null,
+    reviewed_at: null,
+    return_reason: null,
+    lines: [
+      { id: "l1", sku: "MS01", received_now: 3, damaged_qty: 0, wrong_item_qty: 0, wrong_item_claim_type: null },
+      { id: "l2", sku: "BF01", received_now: 2, damaged_qty: 1, wrong_item_qty: 0, wrong_item_claim_type: null },
+    ],
+  },
+  {
+    id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    po_id: "PO-2002",
+    supplier_name: "Ohana",
+    do_number: "DO-7001",
+    status: "posted",
+    submitted_from: "warehouse",
+    goods_received_at: "2026-06-01",
+    submitted_at: "2026-06-01T02:00:00Z",
+    posted_by_name: "Li Ching",
+    do_file_url: null,
+    note: null,
+    reviewed_at: null,
+    return_reason: null,
+    lines: [
+      { id: "l3", sku: "SF02", received_now: 4, damaged_qty: 0, wrong_item_qty: 0, wrong_item_claim_type: null },
+    ],
+  },
+];
+
+async function openRegister() {
+  wrap();
+  await ready();
+  fireEvent.click(screen.getByTestId("receiving-queue-received"));
+  await waitFor(() =>
+    expect(listing().getByText(/GRN-020826-/)).toBeInTheDocument(),
+  );
+}
+
+/** The number as the LISTING prints it. Never hardcoded: the tail is hashed
+ *  from the session id, so a literal here would be asserting my arithmetic
+ *  rather than the page's. What matters is the SHAPE, and that the open record
+ *  prints the very same string — one function, two places, one number. */
+const grnInList = (match: RegExp) => listing().getByText(match).textContent!;
+
+describe("OperationReceiving — the Goods Received register", () => {
+  beforeEach(() => {
+    const base = apiFetchMock.getMockImplementation()!;
+    apiFetchMock.mockImplementation((path: string, ...rest: unknown[]) => {
+      if (typeof path === "string" && path.includes("/warehouse-receipts"))
+        return Promise.resolve({ receipts: RECORDS, counts: { waiting: 0 } });
+      return (base as (...a: unknown[]) => unknown)(path, ...rest);
+    });
+  });
+
+  it("is a Receiving QUEUE, not a sixth Purchasing tab", async () => {
+    wrap();
+    await ready();
+    // Both queues live in the rail, and both are always clickable — a switch
+    // hidden at zero is a page nobody can reach.
+    expect(screen.getByTestId("receiving-queue-to-receive")).toBeInTheDocument();
+    expect(screen.getByTestId("receiving-queue-received")).toBeInTheDocument();
+    // The tab bar is untouched.
+    expect(screen.queryByRole("tab", { name: /Goods Received/ })).not.toBeInTheDocument();
+  });
+
+  it("lists records with a DERIVED GRN number, and no Status column", async () => {
+    await openRegister();
+    // PREFIX-DDMMYY-NNNN off the BUSINESS date, with no counter in it.
+    expect(grnInList(/GRN-020826-/)).toMatch(/^GRN-020826-\d{4}$/);
+    // Ruling 3: the rail carries status, so the table must not repeat it.
+    expect(listing().queryByText("Status")).not.toBeInTheDocument();
+    expect(listing().queryByText("Posted")).not.toBeInTheDocument();
+    // Six columns, ending in Units — the count of UNITS, not product lines.
+    expect(listing().getByText("Units")).toBeInTheDocument();
+    expect(listing().getByText("5")).toBeInTheDocument();
+  });
+
+  it("the record is read-only history — no Activity, no buttons, no Claims door", async () => {
+    await openRegister();
+    const no = grnInList(/GRN-020826-/);
+    fireEvent.click(listing().getByText(no));
+    const rec = await screen.findByTestId("receiving-record");
+    // Ruling 2: a historical register does not carry another history block.
+    expect(within(rec).queryByText(/Activity/i)).not.toBeInTheDocument();
+    // Ruling 1: no review, no exception handling, nothing to press.
+    expect(within(rec).queryAllByRole("button")).toEqual([]);
+    expect(within(rec).queryByText(/Claims/i)).not.toBeInTheDocument();
+    // What it DOES carry: the facts, and the paper.
+    // The list and the open record cannot print two numbers for one delivery.
+    expect(within(rec).getByTestId("receiving-record-no")).toHaveTextContent(no);
+    expect(within(rec).getByTestId("receiving-record-do")).toHaveAttribute(
+      "href",
+      "https://example.test/do.pdf",
+    );
+    expect(rec).toHaveTextContent("Office");
+    expect(rec).toHaveTextContent("Shasha");
+  });
+
+  it("says which fact is missing rather than printing a dead link", async () => {
+    await openRegister();
+    fireEvent.click(listing().getByText(/GRN-010626-/));
+    const rec = await screen.findByTestId("receiving-record");
+    expect(within(rec).queryByTestId("receiving-record-do")).not.toBeInTheDocument();
+    expect(rec).toHaveTextContent("Not on file");
+  });
+
+  it("filters by date and by supplier, and Source comes last", async () => {
+    await openRegister();
+    // Supplier and Date are primary (ruling 4) — both in the rail.
+    expect(screen.getByTestId("receiving-rail-bucket-earlier")).toBeInTheDocument();
+    expect(screen.getByTestId("receiving-rail-rec-supplier-Ohana")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("receiving-rail-rec-supplier-Ohana"));
+    await waitFor(() =>
+      expect(listing().queryByText(/GRN-020826-/)).not.toBeInTheDocument(),
+    );
+    expect(listing().getByText(/GRN-010626-/)).toBeInTheDocument();
+  });
+
+  it("the search box finds a record by its GRN, PO or supplier DO number", async () => {
+    await openRegister();
+    fireEvent.change(screen.getByPlaceholderText("Search"), {
+      target: { value: "DO-7001" },
+    });
+    await waitFor(() =>
+      expect(listing().queryByText(/GRN-020826-/)).not.toBeInTheDocument(),
+    );
+    expect(listing().getByText(/GRN-010626-/)).toBeInTheDocument();
+  });
+
+  it("the work queue's own furniture stays out of the register", async () => {
+    await openRegister();
+    // R6's waiting-count panel is a WORKLIST; a filing cabinet does not carry
+    // one. The progress facets belong to the other queue too.
+    expect(screen.queryByTestId("warehouse-receipts-panel")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("receiving-rail-state-in_transit"),
+    ).not.toBeInTheDocument();
+  });
+});
