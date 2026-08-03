@@ -5629,39 +5629,11 @@ export function useCreatePosBatch(
  * `operation_receive_po_with_do` (migration 0045) per Phase 4.5 Chunk 1
  * carry-forward `phase-4.5-chunk-1-receive-rpc-v3-swap`.
  */
-export function useReceivePoWithDoMutation(
-  poId: string,
-  opts?: Partial<
-    UseMutationOptions<operationReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<operationReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>({
-    mutationFn: (input) =>
-      apiFetch<operationReceivePoWithDoResponse>(
-        `/api/operation/pos/${poId}/receive`,
-        { method: "POST", body: JSON.stringify(input) },
-      ),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.po(poId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
-      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
-      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
-      // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
-      // R2 — a receive is the door that opens supplier claims; the Claims tab
-      // must not still be showing yesterday's queue.
-      await qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] });
-      // Receiving stock can unblock in_production orders → invalidate orders.
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
+/* `useReceivePoWithDoMutation` was deleted on 2026-08-03 (Card C1). It posted
+ * to the Office's legacy `/receive` route, which moved stock and opened NO
+ * Receiving Session. `useOfficeReceiveMutation` below is the Office's one
+ * receiving door. The PARTNER variant further down is a different leg — the
+ * partner confirming goods at a warehouse — and is untouched. */
 
 /* ── Slice B · the Office Receiving Workspace ────────────────────────────── */
 
@@ -5734,7 +5706,7 @@ export function usePoReceiving(poId: string | null) {
 /**
  * POST /api/operation/pos/:id/office-receive — Save, in Receiving Mode.
  *
- * Invalidates exactly what `useReceivePoWithDoMutation` invalidates (the same
+ * Invalidates exactly what the retired `/receive` mutation invalidated (the same
  * engine moved the same stock and opened the same claims) PLUS this PO's
  * Receiving Sessions, so the Workspace's Activity shows the new entry without
  * a reload.
@@ -5767,7 +5739,9 @@ export function useOfficeReceiveMutation(
 }
 
 /**
- * Partner-side variant of useReceivePoWithDoMutation — Loo 2026-05-11.
+ * The PARTNER leg of receiving — a partner confirming goods at a warehouse.
+ * (Was "the partner-side variant of useReceivePoWithDoMutation"; that Office
+ * hook was retired 2026-08-03, Card C1.) Loo 2026-05-11.
  *
  * Posts to /api/partner/pickups/:id/receive, which calls the SAME
  * `operation_receive_po_with_do` RPC under the hood (the RPC's role gate

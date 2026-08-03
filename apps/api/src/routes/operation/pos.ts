@@ -8,7 +8,6 @@ import {
   listPurchaseOrdersQuery,
   normalizeSkuKey,
   reassignPoWarehouseInput,
-  receivePoWithDoInput,
   officeReceiveInput,
   recordBalanceDateInput,
   recordTomorrowDeliveryInput,
@@ -1108,74 +1107,22 @@ operationPosRouter.post("/batch", requireOperation, async (c) => {
   return c.json({ poIds: out?.po_ids ?? [] });
 });
 
-// ----- POST /:id/receive -----
+// ----- POST /:id/receive — RETIRED 2026-08-03 (Card C1, Jess) -----
 //
-// Phase 4.5 Chunk 1 carry-forward `phase-4.5-chunk-1-receive-rpc-v3-swap` —
-// the API now calls v3 batched RPC `operation_receive_po_with_do` (migration
-// 0045:614) which persists the uploaded DO file path and DO number on the PO
-// row in the same transaction as the per-line received_qty bumps. The legacy
-// v2 `operation_receive_po_line` RPC is still in the DB but unused from this
-// route — the Sofa Reject branch and thread/stock advancement live entirely
-// inside the v3 RPC.
+// This was the Office's receiving door and it opened NO Receiving Session:
+// it called `operation_receive_po_with_do` directly, so stock moved and the
+// delivery left no record, no event and no GRN. `POST /:id/office-receive`
+// below is the one Office door now, and it goes through `office_receive_post`
+// (0315) — Session, event and stock in one transaction.
 //
-// Body shape: { doNumber, doFilePath, lines: [{sku, receivedQty}] }. The
-// `receivedQty` field is the NEW TOTAL received_qty for that line (not a
-// delta) — the modal reshapes existing.received_qty + recv[sku] before
-// sending. The RPC computes delta internally and rejects decreases with
-// P0001 detail='received_qty_decrease'.
+// Deleted rather than left standing: with `ReceivePOModal` gone this route had
+// zero callers, and a live route with no caller is a bypass one curl away. A
+// browser still holding the old bundle now meets a loud 404 instead of quietly
+// writing a receive nobody can trace.
 //
-// Reshape at the boundary: the wire schema is camelCase to match every other
-// route, but `p_lines` jsonb expects snake_case `received_qty` (RPC reads
-// `v_line->>'received_qty'` at 0045:688). Same pattern as POST /batch
-// reshapes camelCase → snake_case for the RPC payload.
-operationPosRouter.post("/:id/receive", requireOperation, async (c) => {
-  const parsed = await parseJsonBody(c, receivePoWithDoInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("operation_receive_po_with_do", {
-    p_po_id: c.req.param("id"),
-    p_do_file_path: parsed.data.doFilePath,
-    p_do_number: parsed.data.doNumber,
-    p_lines: parsed.data.lines.map((l) => ({
-      // 0076 (2026-05-10): RPC v3 keys WHERE/UPDATE on the line UUID `id`,
-      // not (po_id, sku), so multi-variant lines with the same SKU are
-      // disambiguated. Snake-case key matches the v_line->>'id' read in the
-      // RPC body.
-      id: l.id,
-      received_qty: l.receivedQty,
-      // R1 (0284): what this DO found wrong. Snake-case to match the RPC's
-      // `v_line->>'damaged_qty'` read. Omitted keys are 0 inside the RPC, so a
-      // clean delivery sends the same payload it always did. NOTE the mixed
-      // semantics, which the RPC comments spell out: received_qty is the NEW
-      // TOTAL, these two are what THIS delivery found (they accumulate).
-      damaged_qty: l.damagedQty ?? 0,
-      wrong_item_qty: l.wrongItemQty ?? 0,
-      // R2 (0288): the claim's evidence rides with the report, because the RPC
-      // mints the claim in the SAME transaction that moves the counters — a
-      // guard trigger refuses the counters otherwise. Empty arrays are fine to
-      // send: the RPC only demands photos for a line that actually reported a
-      // problem.
-      damaged_photos: l.damagedPhotos ?? [],
-      wrong_item_claim_type: l.wrongItemClaimType ?? null,
-      wrong_item_photos: l.wrongItemPhotos ?? [],
-    })),
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  // Auto-reserve the received goods to the PO's source order (Jess 2026-06-30).
-  // Once a PO is received its units are free stock; if the PO was raised for an
-  // order, reserve matching free units to that order's SO so the operator doesn't
-  // have to. Best-effort + fail-safe: the receive already committed, so a hiccup
-  // here is logged and swallowed (the order-drawer Ready picker is the fallback).
-  try {
-    await autoReserveReceivedToSourceOrder(sb, c.req.param("id"));
-  } catch (e) {
-    console.error("post-receive auto-reserve failed (non-fatal):", e);
-  }
-  return c.json(data);
-});
+// The RPC itself stays — it is the ONE receive engine, called by
+// `office_receive_post`, `warehouse_receipt_check_in` and the partner's
+// arrive-at-warehouse route.
 
 // ----- POST /:id/office-receive -----
 //
