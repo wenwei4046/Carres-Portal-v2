@@ -672,23 +672,17 @@ describe("the seven fixes — Excel completeness", () => {
 });
 
 /**
- * The two additions of 2026-08-03, each answering a question the page could
- * not answer before:
- *   · WHO makes it — supplier × category decides how many purchase orders
- *     `Issue` produces, and that fact lived only in a `title` tooltip, which
- *     a keyboard cannot reach (`01-design-tokens.md` §9).
- *   · WHICH SLICE am I in — the navigator narrows two dimensions at once and
- *     the grid said nothing about either.
+ * 2026-08-03 — WHO makes it. Supplier × category decides how many purchase
+ * orders `Issue` produces, and that fact lived only in the button's `title`
+ * tooltip, which a keyboard cannot reach (`01-design-tokens.md` §9).
+ *
+ * A scope line (`which slice am I in`) shipped beside it and was REMOVED the
+ * same day: the navigator is permanently on screen with its active row lit, so
+ * the line repeated what was already visible — and it printed the weekday
+ * twice. It was designed from reading code instead of from looking at the page.
+ * There is deliberately no test for it, because there is deliberately no line.
  */
-/** The scope lives in the KIT toolbar, so it is found by the kit's own
- *  attribute rather than a test id the component would only carry for tests. */
-const scopeEl = () => {
-  const el = document.querySelector('[data-kit="grid-scope"]');
-  if (!el) throw new Error("no scope line rendered");
-  return el as HTMLElement;
-};
-
-describe("Supplier on the row, and the scope on the toolbar", () => {
+describe("Supplier on the row", () => {
   it("the grid names the factory on every row, demand AND already-ordered", async () => {
     await loaded();
     // Clear the time narrowing so both a demand row and the receipt are in view.
@@ -703,23 +697,6 @@ describe("Supplier on the row, and the scope on the toolbar", () => {
     expect(within(sheet).getByTestId("row-po-po:PO-9001:o30")).toBeInTheDocument();
   });
 
-  it("the scope names every lit rail row, and is ABSENT when nothing is narrowed", async () => {
-    await loaded();
-    // The engine opens the first upcoming run → the scope states that day.
-    expect(scopeEl()).toHaveTextContent(fmtDate("2026-07-31"));
-
-    // Add a category: both dimensions are named, in the rail's own words.
-    fireEvent.click(screen.getByTestId("to-order-cat-sofa"));
-    const withCat = scopeEl();
-    expect(withCat).toHaveTextContent(fmtDate("2026-07-31"));
-    expect(withCat).toHaveTextContent("Sofa");
-
-    // Clear both → nothing is narrowed → the line is GONE, not blank. An empty
-    // scope means EVERYTHING, which is an answer, not a label with no value.
-    fireEvent.click(screen.getByTestId("to-order-cat-sofa"));
-    fireEvent.click(screen.getByTestId("to-order-day-2026-07-31"));
-    expect(document.querySelector('[data-kit="grid-scope"]')).toBeNull();
-  });
 
   it("the flash bands draw kit icons, never a unicode glyph", async () => {
     await loaded();

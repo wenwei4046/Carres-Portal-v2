@@ -56,7 +56,6 @@ import {
   weekdayName,
   posCreatedLine,
   railItemLabel,
-  scopeLine,
   selectedShort,
   issuePosShort,
   toOrderBuilds,
@@ -942,22 +941,18 @@ export default function OperationToOrder() {
                 aria-label={W.searchLabel}
               />
             }
-            /* WHICH SLICE am I standing in (Loo, 2026-08-03). The navigator
-             * narrows two dimensions at once and the grid said nothing about
-             * either, so a filtered sheet and the whole day looked identical.
-             * Every part is a word the rail itself already shows — the two
-             * can never drift — and the whole line disappears when nothing is
-             * narrowed, because that state means EVERYTHING, which is an
-             * answer rather than a blank label. Not a title: `03` bans
-             * repeating the lit tab as a heading. */
-            scope={scopeLine([
-              ...[...viewSet].map((v) =>
-                v === "overdue" ? W.filterOverdue : `${weekdayName(v)} ${fmtDate(v)}`,
-              ),
-              ...[...catSet].map(
-                (c) => RAIL_CATEGORIES.find((r) => r.key === c)?.word ?? c,
-              ),
-            ])}
+            /* THERE IS NO SCOPE LINE, and that is a ruling rather than a gap
+             * (Loo, 2026-08-03). One was built and REMOVED the same day: the
+             * navigator is permanently on screen with the active row lit, so
+             * a line beside the search box repeats what the rail already says
+             * 200px to its left — and the first build even printed the weekday
+             * twice (`Monday Mon, 3 Aug 26`), because `fmtDate` already names
+             * the day.
+             *
+             * The lesson is worth more than the feature: it was designed from
+             * READING THE CODE, never from looking at the page. On the real
+             * screen the problem it fixed does not exist. A UX problem that
+             * has not been observed is not a problem. */
             right={
               creating ? (
                 <span className="text-meta text-kit-slate-11" data-testid="to-order-creating">

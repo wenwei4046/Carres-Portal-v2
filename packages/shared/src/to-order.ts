@@ -248,25 +248,6 @@ export function ordersHeadline(n: number): string {
   return `${n} Order${n === 1 ? "" : "s"}`;
 }
 
-/**
- * `Wednesday 6 Aug · Sofa` — WHICH SLICE the operator is standing in
- * (Loo, 2026-08-03). The navigator can narrow two dimensions at once and the
- * grid said nothing about either, so a filtered sheet and the whole day looked
- * identical.
- *
- * It is NOT a page title and must never become one: `03-page-patterns.md`
- * bans repeating the lit tab as a heading. This states the FILTER, lives in
- * the toolbar's scope slot, and disappears entirely when nothing is narrowed —
- * an empty scope is a real answer (everything), not a blank label.
- *
- * Word-free by construction: every part is composed by the caller from words
- * that are already ruled.
- */
-export function scopeLine(parts: readonly (string | null | undefined)[]): string | null {
-  const kept = parts.filter((p): p is string => typeof p === "string" && p.length > 0);
-  return kept.length > 0 ? kept.join(" · ") : null;
-}
-
 /** `5 SO` — a group header's count, and a future run's count. */
 export function soCountLabel(n: number): string {
   return `${n} SO`;

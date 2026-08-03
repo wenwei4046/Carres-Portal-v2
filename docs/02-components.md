@@ -89,6 +89,11 @@ column filters, never a second toolbar row.
 **Anatomy.** `[ search ] ······ [ right ] [ meta ]` — three slots, all
 optional, all the caller's content. It composes no sentence and spells no word.
 
+**There is no `scope` slot** ("which slice am I looking at"). One was built and
+removed on 2026-08-03: a Workspace keeps its navigator permanently on screen
+with the active row lit, so the line repeated what was already visible beside
+it. Recorded because the idea is an obvious one to have twice.
+
 **Behaviour.**
 - **`right` is rendered only when it has something to say.** The primary action
   exists while a selection exists, and vanishes with it — a permanently visible
