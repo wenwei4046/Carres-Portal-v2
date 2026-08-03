@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
 import { receivingRecordNo, type WarehouseReceiptRow } from "@carres/shared";
 import { fmtDateShort } from "@/lib/fmt-date";
+import { DOC_TH, DocSection, Prop } from "./workspace-doc";
 
 /**
  * ReceivingRecord — one entry of the `Goods Received` register (Card C2,
@@ -33,16 +33,6 @@ import { fmtDateShort } from "@/lib/fmt-date";
  * Nothing is built for it now; the shape simply leaves room.
  */
 
-/** The Linear property row: label + value, ONE 24px line, never stacked. */
-function Prop({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-baseline gap-2 text-body leading-6">
-      <span className="w-36 shrink-0 text-label text-kit-slate-9">{label}</span>
-      <span className="min-w-0 text-kit-slate-12">{children}</span>
-    </div>
-  );
-}
-
 export default function ReceivingRecord({ record }: { record: WarehouseReceiptRow }) {
   const lines = record.lines ?? [];
   const total = lines.reduce(
@@ -67,21 +57,21 @@ export default function ReceivingRecord({ record }: { record: WarehouseReceiptRo
       </div>
 
       <div className="mt-2">
-        <Prop label="Goods Received At">
+        <Prop labelWidth="w-36" label="Goods Received At">
           <span className="tabular-nums">
             {record.goods_received_at
               ? fmtDateShort(record.goods_received_at)
               : "—"}
           </span>
         </Prop>
-        <Prop label="Supplier">{record.supplier_name ?? "—"}</Prop>
-        <Prop label="PO No.">
+        <Prop labelWidth="w-36" label="Supplier">{record.supplier_name ?? "—"}</Prop>
+        <Prop labelWidth="w-36" label="PO No.">
           <span className="font-mono">{record.po_id}</span>
         </Prop>
-        <Prop label="Supplier DO No.">
+        <Prop labelWidth="w-36" label="Supplier DO No.">
           <span className="font-mono">{record.do_number}</span>
         </Prop>
-        <Prop label="Signed DO">
+        <Prop labelWidth="w-36" label="Signed DO">
           {record.do_file_url ? (
             <a
               href={record.do_file_url}
@@ -99,24 +89,21 @@ export default function ReceivingRecord({ record }: { record: WarehouseReceiptRo
             <span className="text-kit-slate-9">Not on file</span>
           )}
         </Prop>
-        <Prop label="Posted by">{record.posted_by_name ?? "—"}</Prop>
-        <Prop label="Source">
+        <Prop labelWidth="w-36" label="Posted by">{record.posted_by_name ?? "—"}</Prop>
+        <Prop labelWidth="w-36" label="Source">
           {record.submitted_from === "warehouse"
             ? "Warehouse"
             : record.submitted_from === "office"
               ? "Office"
               : "—"}
         </Prop>
-        {record.note && <Prop label="Note">{record.note}</Prop>}
+        {record.note && <Prop labelWidth="w-36" label="Note">{record.note}</Prop>}
       </div>
 
-      <section className="mt-3 pt-3 border-t border-kit-slate-5">
-        <h3 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
-          Items
-        </h3>
+      <DocSection title="Items">
         {/* This delivery's own numbers — the DELTA the Session stores, never a
             running total. The PO's cumulative figure lives on the PO. */}
-        <div className="mt-1.5 flex gap-2 text-label uppercase tracking-wide text-kit-slate-9 border-y border-kit-slate-5 py-1">
+        <div className={DOC_TH}>
           <span className="flex-1 font-medium">Description</span>
           <span className="w-12 text-right font-medium">Recv</span>
           {anyProblem && <span className="w-12 text-right font-medium">Dmgd</span>}
@@ -172,7 +159,7 @@ export default function ReceivingRecord({ record }: { record: WarehouseReceiptRo
             </span>
           )}
         </div>
-      </section>
+      </DocSection>
     </div>
   );
 }

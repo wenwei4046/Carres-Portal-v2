@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import {
   caseProductCategory,
   poLineReportable,
@@ -20,6 +20,7 @@ import {
 } from "@/lib/queries";
 import DOFileUploadField from "@/components/DOFileUploadField";
 import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
+import { DOC_BTN, DOC_TH, DocSection as Section, Prop } from "./workspace-doc";
 import RecordSupplierAnswerModal from "./RecordSupplierAnswerModal";
 
 /**
@@ -64,29 +65,6 @@ import RecordSupplierAnswerModal from "./RecordSupplierAnswerModal";
  * three items would do nothing.
  */
 
-/** The Linear property row: label + value, ONE 24px line, never stacked. */
-function Prop({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-baseline gap-2 text-body leading-6">
-      <span className="w-32 shrink-0 text-label text-kit-slate-9">{label}</span>
-      <span className="min-w-0 text-kit-slate-12">{children}</span>
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="mt-3 pt-3 border-t border-kit-slate-5">
-      <h3 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
-        {title}
-      </h3>
-      <div className="mt-1.5">{children}</div>
-    </section>
-  );
-}
-
-const DOC_BTN =
-  "px-3 py-1 rounded border border-kit-slate-5 text-body text-kit-slate-11 hover:text-kit-slate-12";
 
 /** Today in MYT — the app's zone, never the browser's. The SERVER still owns
  *  the bounds; this only seeds the field. */
@@ -309,7 +287,7 @@ function ReadMode({
       </Section>
 
       <Section title="Items">
-        <div className="flex gap-2 text-label uppercase tracking-wide text-kit-slate-9 border-y border-kit-slate-5 py-1">
+        <div className={DOC_TH}>
           <span className="w-4 font-medium">#</span>
           <span className="flex-1 font-medium">Description</span>
           <span className="w-12 text-right font-medium">Ordered</span>
@@ -630,7 +608,7 @@ function ReceivingMode({
       </Section>
 
       <Section title="Items">
-        <div className="flex gap-2 text-label uppercase tracking-wide text-kit-slate-9 border-y border-kit-slate-5 py-1">
+        <div className={DOC_TH}>
           <span className="flex-1 font-medium">Description</span>
           <span className="w-10 text-right font-medium">Ord</span>
           <span className="w-10 text-right font-medium">Recv</span>
