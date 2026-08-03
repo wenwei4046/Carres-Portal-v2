@@ -4,7 +4,9 @@
 --
 -- ⚠ HOW TO APPLY
 --   1. Read the migration tracker's TAIL and number this file from it — never
---      from `ls supabase/migrations`. The repo tail is 0317 as this is written.
+--      from `ls supabase/migrations`. RENUMBERED 0318 -> 0319 on 2026-08-03:
+--      main took 0317 and 0318 while this branch was open, and an UNAPPLIED
+--      draft is renumbered rather than defended (guardrail #8).
 --   2. Paste the whole file into the Supabase SQL editor and run it once.
 --      Idempotent; the sanity block aborts everything if anything is off.
 --   3. Run the VERIFY queries at the bottom.
