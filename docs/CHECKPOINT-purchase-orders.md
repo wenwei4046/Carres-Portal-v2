@@ -1,8 +1,30 @@
 # CHECKPOINT — Purchasing · Purchase Orders (Supplier Execution Register)
 
-> **Handover, 2026-08-02 session end.** The next chat CONTINUES an unfinished page.
-> Jess's own words for the state: half-done, corrections pending. Read this whole
-> file, quote her rules back in ONE line, execute §2 FIRST, then wait for her.
+> **⭐ FROZEN 2026-08-03 by Jess.** *"现在批准这一个 checkpoint。不要继续加功能。"*
+> The Workspace is DONE. **The next chat does NOT keep polishing this page** — her
+> words: *"再继续改只会开始进入无限微调."* Read this whole file, quote her rules
+> back in ONE line, then go to **Phase 3 — Batch Print & Communication** (§2's
+> phase order), and wait for her.
+>
+> **Two things are deliberately NOT done, both hers, neither a gap to be filled
+> by a chat that finds them:**
+> - **The date-history redesign** (`Confirmed / Changed` + the recorded date +
+>   reason, replacing `1st / 2nd / 3rd`) — she designed it, then ruled it OUT of
+>   this checkpoint: *"History is a separate UI concern … a dedicated UI refinement
+>   AFTER the Purchase Orders page is frozen. Do not mix it into this checkpoint."*
+>   It needs no migration and no api change — `recorded_at` and the `shipping` /
+>   `delayed` answer are already on the wire.
+> - **The 50–100-line layout stress test** — she requires a REAL historical PO and
+>   refuses synthetic data (*"假的 80 行"* would be `Booqit` × 80 and would expose
+>   nothing). **MEASURED ON PROD 2026-08-03: not one of her six criteria exists** —
+>   biggest real PO **4 lines** (biggest order 8), lines carrying a salesperson
+>   remark **3**, longest remark **24 chars**, max PO qty **2**, lines with
+>   `received_qty > 0` **ZERO**, revisions **1**. The test is correct and it is
+>   BLOCKED until real POs run; it may never be satisfied by inventing data.
+>
+> **Prior handover, 2026-08-02 session end** (kept because §2's build history is
+> still the record of how the page got here): the page was half-done with
+> corrections pending; §2's steps have since been executed.
 
 ---
 
@@ -46,6 +68,58 @@
   re-litigate). Related: `docs/CHECKPOINT-grn.md` (the GRN page, queued after this).
 
 ## 2 · THE PLAN AND THE LAWS — Jess re-ruled the whole sequence, 2026-08-02 (chat 2)
+
+**FREEZE PASS (v8) — ✅ BUILT AND APPROVED 2026-08-03. Commits `0dede78f` +
+`59ff1091`. This is the last change to the Workspace before Phase 3.**
+
+- **`Goods Arriving At` → `Goods Arrival`, everywhere** (hers): `At` carries no
+  information, and the column beside it is `Customer Delivery` — two dates of
+  the same kind, and they now read as a pair. It is also the word
+  `ORDERS-WORKING-FLOW.md` already used (`Waiting Goods Arrival`), so
+  Purchasing stopped speaking its own dialect. The state action followed:
+  `Confirm Goods Arrival Date`. Column order unchanged.
+- **THE GAP AGAINST THE CUSTOMER'S DATE.** The register held both dates side by
+  side and left the subtraction to the operator's head. **Measured on live prod:
+  EIGHT of nineteen POs were already landing after the customer's date and two
+  on the very day** — and most of those arrival dates are still our own
+  estimate, so we knew before we had even phoned. `poArrivalGapOf` is ONE shared
+  rule feeding the register column AND the workspace, so they cannot disagree.
+  It rides the ARRIVAL date, never the customer's: the arrival is the number a
+  phone call can still move. **SILENCE MEANS FINE** — room to spare says
+  nothing; `same day` speaks amber because no room for one hiccup is not fine;
+  a finished or cancelled PO stays quiet, its gap being history, not work.
+  Listing prints `8d late` plain, the workspace prints `⚠ 8d late` (the page's
+  own Overdue marker).
+- **Current Action stopped living nowhere.** Two correct rules had combined into
+  a broken screen: v7 removed the hero because the register's column carries it,
+  and in compact that column was 119px against a 126px `Waiting for Goods` —
+  clipped with `text-overflow: clip`, so not even an ellipsis said so. Compact
+  now measures out **141px** (Supplier and Items lent 12 and 10 of their own
+  MEASURED slack). **No workspace row was added**: `Next — Waiting for Goods`
+  was built and then deleted by her — a STATUS wearing an action's label, in a
+  slot that carries a real ACTION on a PO with an open call. One label cannot be
+  true of both.
+- **The header carries ONE thing beside the date.** `2nd date · 6 days later`
+  was history squeezed into a header, and it was what made that row wrap.
+- **ONE product name on both surfaces.** The list said `Cody Q`, the document
+  said `SKU-CODY-Q`. The register's OWN naming function is now passed down to
+  the workspace, so they are structurally unable to drift apart again rather
+  than two rules that agree today. The variant sub-line went with it
+  (`Booqit 1B(LHF)` already carries it). The code identifies rather than
+  describes, so it moved to hover and to the row's ⋮ surface as `Item ID`.
+- Also: the date history's reason stopped being cut (`Production Delay`
+  overflowed by 3px and printed `Production Del…`); the ordinal and date gave
+  back 20px. The company-wide supplier template's typo `com**f**irm` → `confirm`
+  was fixed in `purchasing_settings` (it goes out to every supplier).
+- **WIDTHS ARE MEASURED, NEVER ESTIMATED** — and this is the durable rule:
+  jsdom has no widths, so a page test structurally CANNOT catch a truncation.
+  `Goods Arrival` was set to 160px, then measured against the worst line the
+  cell can hold (`25 Aug 26  8d late (revised)` = 189px) and corrected to 192.
+  Only the browser can prove this; the test suite must never be trusted for it.
+- Verified: web tsc 0 · page tests **51** · shared **23** · negative controls
+  fire (drop the finished-PO guard → the silence test; put the SKU code back →
+  the two naming tests). **check-design UNCHANGED — proven by linting the
+  pre-change tree, which also reports 8445; §4's "8440" was stale.**
 
 **STEP 1 · LISTING FREEZE — ✅ EXECUTED 2026-08-02.** Her FINAL columns (this
 version supersedes the earlier 6-column ruling — she put `Customer Delivery`
@@ -481,7 +555,7 @@ plain-words error messages (owed to Phase 4's refusals).
   §2① changes which columns exist — re-derive the compact set WITH her.
 - All three panes hide/expand (nav included — she amended her own earlier rule).
 - Workspace: real per-unit **Item IDs** (id-xxx…, qty 2 = 2 ids, verified on PO-2037) ·
-  Sales Order stacked list on merged POs · **Goods Arriving At auto-default** =
+  Sales Order stacked list on merged POs · **Goods Arrival auto-default** =
   placed_at + production days on the supplier's own week (0303 settings; no setting →
   no default, P1's law; grey = expected, ink = supplier-confirmed) · Received + Open
   Receiving · engine calls list · **Communication desk** (WhatsApp draft from live
@@ -490,18 +564,47 @@ plain-words error messages (owed to Phase 4's refusals).
   PO-PDF-STANDARD §2. The real renderer wires to 0307 `purchasing_po_document` —
   its own card. Never re-add the old button.
 
-## 4 · GATES (state at handover)
+## 4 · GATES (state at the 2026-08-03 freeze)
 
-web tsc 0 · api tsc 4 pre-existing (`rental-sell.test.ts`) · check-design 8440 total
-with **I +3 over baseline — verbatim To Order class copies** (the copy-the-master vs
-§6.6 conflict; reported to Jess, resolves at shell extraction; do not "fix" by
-reshuffling classes) · design-standard gate ✓ · OperationApp routing tests 8/8.
-The page has NO test file of its own yet — the next build slice should start one.
+web tsc 0 · api tsc 4 pre-existing (`rental-sell.test.ts`) · **check-design 8445
+total, category G `▲ +6 over baseline 683`** · design-standard gate ✓ ·
+OperationApp routing tests 8/8 · **`OperationPurchaseOrders.test.tsx` 51** ·
+`po-workspace.test.ts` 23.
+
+**The 8445 and the G +6 are NOT this page's doing, and that was PROVED rather
+than assumed**: the changed files were set aside, the pre-change tree was
+linted, and it reports the identical 8445 / G +6. The old note here ("8440 with
+I +3") was stale — I now reads `▼ −2`. **Method for the next chat: never quote a
+lint delta without linting the tree WITHOUT your change.**
+
+**A gate this page cannot have**: jsdom has no widths, so no page test can
+catch a truncated cell. Every column width here is measured in a real browser
+against the worst line the cell can hold. A chat that changes a width and runs
+only the suite has verified nothing.
 
 ## 5 · KNOWN GAPS (report, never silently build)
 
-- Supplier "confirm Goods Arriving At" WRITE door (promise ledger kind `arriving`) —
+- Supplier "confirm Goods Arrival" WRITE door (promise ledger kind `arriving`) —
   without it Waiting Goods stays 0 forever. The next real slice after §2.
+- **The date HISTORY redesign** — hers, designed 2026-08-03 and deliberately kept
+  out of this checkpoint (see the header). `Confirmed / Changed` + the recorded
+  date + the reason, replacing the `1st / 2nd / 3rd` ordinals. Zero migration,
+  zero api change: `recorded_at` and the `shipping` / `delayed` answer already
+  ride the wire. Do NOT fold it into a Phase 3 card.
+- **The 50–100-line layout stress test** — hers, and BLOCKED, not forgotten.
+  Real PO only; she refuses synthetic data. Prod ceiling measured 2026-08-03:
+  4-line biggest PO · 3 remarks · 24-char longest · max qty 2 · zero received ·
+  1 revision. Re-measure before claiming it can run.
+- Two surfaces still spell one thing two ways, both REPORTED and not fixed:
+  ACTIVITY prints `sent via whatsapp` beside a `WhatsApp` button, and the grey
+  vs ink `Goods Arrival` (our estimate vs the supplier's own word) carries no
+  tooltip while `Customer Delivery` does.
+- Supplier contact data is thin, measured: **2 of 10 suppliers hold an email and
+  both are `@carres.com`** (the Email button would write to ourselves); 5 of 10
+  hold a WhatsApp group. Phase 3 depends on this.
+- The date history prints no WHO and no WHEN. `recorded_by` is on the row but is
+  a uuid — printing a name needs an api join, which is why it was reported
+  rather than half-built.
 - Missing stores: `po_sends` (I've Sent + history) · `suppliers.email` · PO notes ·
   supplier DO number/file. Per-line SO attribution = P5 allocation (accepted).
 - Words owed to COPY-STANDARD: section titles · work-state names · `PO Issued` ·
