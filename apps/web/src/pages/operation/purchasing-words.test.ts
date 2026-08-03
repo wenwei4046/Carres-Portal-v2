@@ -45,6 +45,13 @@ const LANE = [
   // calendar renders the same three purchasing lenses, and C1 had re-pointed
   // only `chase`. The rail beside the To Order tab was still saying `Receive`.
   "pages/operation/components/rail/CalendarPanel.tsx",
+  // Added by the Communication Truthfulness card (2026-08-03). The Purchase
+  // Orders workspace was built AFTER R8 and was never added here, which is
+  // exactly why this suite could not see it: it shipped `sent via whatsapp`
+  // to production, and to the SUPPLIER's own dashboard, while every rule below
+  // was green. A lane list that does not grow with the lane is a lane list
+  // that quietly stops being one.
+  "pages/operation/OperationPurchaseOrders.tsx",
 ];
 
 const read = (rel: string) => readFileSync(join(WEB_SRC, rel), "utf8");
@@ -64,7 +71,7 @@ function visibleSource(rel: string): string {
 
 describe("R8 · the Purchasing lane speaks the dictionary", () => {
   it("scans every lane file (a rename must not silently empty this suite)", () => {
-    expect(LANE.length).toBe(7);
+    expect(LANE.length).toBe(8);
     for (const f of LANE) expect(read(f).length, f).toBeGreaterThan(500);
   });
 
@@ -201,5 +208,64 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
       visibleSource("pages/operation/OperationReceiving.tsx"),
       "Receiving must still call the facet Supplier",
     ).toMatch(/RailGroup title="Supplier"/);
+  });
+});
+
+/**
+ * The Observation Law on the Purchase Orders workspace (Jess, 2026-08-03).
+ *
+ * `docs/ACTION-FLOW-STANDARD.md` Law 8: the portal records only facts it
+ * directly observes, and *opening an external application, copying text, or
+ * generating a file does not prove that the external outcome occurred.*
+ *
+ * A SOURCE scan rather than a render test, and that is the whole reason this
+ * defect reached production: the page has 51 render tests and every one of them
+ * passed while the timeline printed `sent via whatsapp`. A render test only
+ * sees the branches its fixture reaches; these rules are true of the file or
+ * they are not true at all.
+ */
+describe("Communication Truthfulness · the PO workspace claims only what it saw", () => {
+  const PO = "pages/operation/OperationPurchaseOrders.tsx";
+
+  it("never claims a send — no `sent via`, no `sent to`", () => {
+    const src = visibleSource(PO);
+    expect(src, "the timeline may not say a message was sent").not.toMatch(/sent via/i);
+    expect(src, "the timeline may not name a recipient it never reached").not.toMatch(
+      /sent to /i,
+    );
+  });
+
+  it("says Snapshot, never Revision, to the operator", () => {
+    // `purchase_orders` is never edited by this path (proved 2026-08-03: the
+    // only writer of `po_revisions` is `purchasing_record_send`, and it only
+    // ever SELECTs the PO). Every other tool an operator has used — Git,
+    // Google Docs, Office, any ERP — means "the document changed" by
+    // `Revision`, so the word would keep manufacturing a belief that is false.
+    //
+    // The STORE keeps its names: `po_revisions` and `rev_no` are internal, and
+    // an internal name never defines UI truth (Jess, 2026-08-03). The scan
+    // therefore bans the visible word, not the identifiers.
+    const visibleWord = visibleSource(PO)
+      .replace(/po_revisions/g, " ")
+      .replace(/rev_no/g, " ");
+    expect(visibleWord, "the operator must read Snapshot").not.toMatch(/Revision/);
+    expect(visibleSource(PO)).toMatch(/· Snapshot \{/);
+  });
+
+  it("labels every door by what the click opens", () => {
+    const src = visibleSource(PO);
+    // COPY-STANDARD's WhatsApp table, verbatim — plus `Open email`, which Jess
+    // ruled on 2026-08-03 into the same shape: the button says which
+    // application opens, never what we hope happens afterwards.
+    expect(src).toMatch(/>\s*Copy message\s*</);
+    expect(src).toMatch(/Open WhatsApp group/);
+    expect(src).toMatch(/Open WhatsApp"/);
+    expect(src).toMatch(/>\s*Open email\s*</);
+    // The bare labels are what shipped to production. They must not come back.
+    expect(src, "`Copy` alone does not say what it copies").not.toMatch(
+      />\s*Copy\s*</,
+    );
+    expect(src, "`WhatsApp` alone names no door").not.toMatch(/>\s*WhatsApp\s*</);
+    expect(src, "`Email` alone reads as an outcome").not.toMatch(/>\s*Email\s*</);
   });
 });
