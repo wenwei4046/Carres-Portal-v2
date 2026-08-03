@@ -269,3 +269,67 @@ describe("Communication Truthfulness · the PO workspace claims only what it saw
     expect(src, "`Email` alone reads as an outcome").not.toMatch(/>\s*Email\s*</);
   });
 });
+
+/**
+ * The Observation Law reaches the WRITER, not just the screen (2026-08-03).
+ *
+ * The UI scan above proves no page RENDERS a claim of sending. It cannot prove
+ * that the thing WRITING `po_history` and `audit_log` has stopped making one —
+ * and those two rows are the ones a SUPPLIER reads (`po_history_read`, 0002,
+ * admits a supplier to their own PO's rows).
+ *
+ * So the migration that owns the sentence is asserted directly. Comments are
+ * stripped first: 0317's header QUOTES the retired wording so the next reader
+ * knows what changed, and a scan that counted the quotation would fail the file
+ * that fixed the problem. (Third time that trap has been paid for; it is now
+ * the default in every scan this repo writes.)
+ */
+describe("the record's WRITER claims only what it saw", () => {
+  const MIG = join(
+    WEB_SRC, "..", "..", "..",
+    "supabase/migrations/0317_the_record_stops_claiming_a_send.sql",
+  );
+  const executable = () =>
+    readFileSync(MIG, "utf8")
+      .replace(/--.*$/gm, " ")
+      .replace(/\/\*[\s\S]*?\*\//g, " ");
+
+  it("writes what was OBSERVED — a door opening, and which snapshot", () => {
+    expect(executable()).toMatch(/opened · Snapshot/);
+  });
+
+  /**
+   * The SENTENCES the migration writes — the `insert into … values (…)` bodies,
+   * not the whole file.
+   *
+   * A blunt file-wide scan is wrong here and failed on its own first run: 0317
+   * carries a SANITY BLOCK that asserts the deployed function does not contain
+   * `sent to` / `sent via`, so the banned phrase appears in the file precisely
+   * BECAUSE the file bans it. What must be clean is what gets written.
+   */
+  const writtenSentences = () => {
+    const sql = executable();
+    return [...sql.matchAll(/insert\s+into\s+(po_history|audit_log)\b[\s\S]*?;/gi)]
+      .map((m) => m[0])
+      .join("\n");
+  };
+
+  it("never writes a send into po_history or audit_log", () => {
+    const written = writtenSentences();
+    expect(written.length, "the inserts must be findable at all").toBeGreaterThan(80);
+    expect(written, "the writer may not claim a message was sent").not.toMatch(
+      /sent\s+(via|to)\b/i,
+    );
+    // `Revision` is the STORE's word (`po_revisions`, `rev_no`) and stays;
+    // what may never reach a written sentence is the operator-facing one.
+    expect(written, "a written sentence may not say Revision").not.toMatch(
+      /Revision/i,
+    );
+  });
+
+  it("names both tables it writes, so neither can be quietly reintroduced", () => {
+    const sql = executable();
+    expect(sql).toMatch(/insert into po_history/i);
+    expect(sql).toMatch(/insert into audit_log/i);
+  });
+});
