@@ -713,7 +713,26 @@ describe("POST /api/rental/agreements/:id/stripe/checkout (0255 subscription lin
     );
     expect(admin.calls.updates.some((u) => u.table === "customers")).toBe(true);
 
-    const createArgs = stripe.checkout.sessions.create.mock.calls[0]![0] as Record<string, unknown>;
+    /**
+     * Typed to the SHAPE this test asserts, not to `Record<string, unknown>`.
+     * Under the loose cast every `line_items` assertion below was reaching
+     * through `unknown` — tsc flagged three of them and the suite still passed,
+     * which means the checkout payload's structure was never actually checked.
+     */
+    const createArgs = stripe.checkout.sessions.create.mock.calls[0]![0] as {
+      mode: string;
+      customer: string;
+      success_url: string;
+      line_items: Array<{
+        price?: string;
+        quantity: number;
+        price_data?: {
+          currency: string;
+          unit_amount: number;
+          product_data: { name: string };
+        };
+      }>;
+    };
     expect(createArgs.mode).toBe("subscription");
     expect(createArgs.customer).toBe("cus_test_1");
     // 0281 — TWO lines now. The recurring price carries months 2..N on the
@@ -725,8 +744,8 @@ describe("POST /api/rental/agreements/:id/stripe/checkout (0255 subscription lin
       quantity: 1,
       price_data: { currency: "myr", unit_amount: 5900 },
     });
-    expect(createArgs.line_items[1].price_data.product_data.name).toMatch(/first month/i);
-    expect((createArgs.success_url as string).startsWith("https://pos.test/pay/success?ra=RA-1001")).toBe(true);
+    expect(createArgs.line_items[1].price_data!.product_data.name).toMatch(/first month/i);
+    expect(createArgs.success_url.startsWith("https://pos.test/pay/success?ra=RA-1001")).toBe(true);
 
     const insert = admin.calls.inserts.find((i) => i.table === "stripe_checkout_sessions");
     expect(insert?.payload).toMatchObject({
@@ -805,17 +824,11 @@ describe("GET /api/rental/agreements/:id/stripe/checkout/:sid (poll + live recon
 });
 
 describe("POST /stripe/webhook — subscription-mode branch (0255)", () => {
-  async function fireEvent(type: string, obj: Record<string, unknown>) {
-    const stripe = makeStripe();
-    stripe.webhooks.constructEventAsync.mockResolvedValue({ type, data: { object: obj } });
-    vi.mocked(stripeClient).mockReturnValue(stripe);
-    const res = await request(
-      "/stripe/webhook",
-      { method: "POST", headers: { "stripe-signature": "t=1,v1=x" }, body: "{}" },
-      env,
-    );
-    return { res, stripe };
-  }
+  // `fireEvent` lived here as a type-taking generalisation of `fireWebhook`
+  // that no test ever adopted — every one of them fires
+  // `checkout.session.completed`. Deleted 2026-08-03: a helper nobody calls is
+  // not coverage, and it was the only thing standing between this file and a
+  // clean typecheck.
 
   async function fireWebhook(sessionObj: Record<string, unknown>) {
     const stripe = makeStripe();

@@ -30,6 +30,7 @@ import WarehouseReceiptsPanel from "./components/WarehouseReceiptsPanel";
 import ReceivingWorkspace from "./components/ReceivingWorkspace";
 import ReceivingRecord from "./components/ReceivingRecord";
 import PurchasingTabs from "./PurchasingTabs";
+import { RailGroup, RailItem } from "./components/workspace-rail";
 
 /**
  * OperationReceiving — the Receiving Workspace (Slice B, Jess 2026-08-03).
@@ -981,62 +982,3 @@ export default function OperationReceiving() {
   );
 }
 
-function RailGroup({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="flex items-center px-1.5">
-        <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
-          {title}
-        </span>
-      </div>
-      <div className="mt-1 flex flex-col gap-0.5">{children}</div>
-    </div>
-  );
-}
-
-function RailItem({
-  label,
-  count,
-  active,
-  onClick,
-  title,
-  danger,
-  testId,
-}: {
-  label: string;
-  count?: number;
-  active: boolean;
-  onClick: () => void;
-  title?: string;
-  danger?: boolean;
-  testId: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      title={title}
-      data-testid={testId}
-      className={[
-        "relative flex items-center gap-2 px-2 py-1.5 rounded-control text-left text-body w-full",
-        active
-          ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
-          : "text-kit-slate-11 hover:bg-kit-slate-3",
-      ].join(" ")}
-    >
-      {active && (
-        <span
-          aria-hidden
-          className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
-        />
-      )}
-      <span className={`flex-1 truncate ${danger && !active ? "text-kit-red-11" : ""}`}>
-        {label}
-      </span>
-      {count != null && (
-        <span className="tabular-nums text-label text-kit-slate-9">{count}</span>
-      )}
-    </button>
-  );
-}
