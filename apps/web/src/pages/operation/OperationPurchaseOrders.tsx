@@ -93,9 +93,15 @@ import {
  * supplier → hand over to Receiving.
  *
  * Deliberately absent until their stores exist (dead controls are banned):
- * Email window (`suppliers.email`) · I've Sent + History (`po_sends`) ·
  * Notes (no store) · Supplier DO (no store) · editable Goods Arrival
  * (Phase 6 — writes the promise ledger through its own door).
+ *
+ * Two entries LEFT this list and the correction is worth keeping: the Email
+ * door and the send history are BUILT (`po_sends` / `po_revisions`, 0312), and
+ * the address is read from `suppliers.contact_email` — **`suppliers.email` no
+ * longer exists**, dropped by 0313 because it was a second column for a fact
+ * `contact_email` already held. A comment naming a dropped column sends the
+ * next reader looking for it.
  */
 
 // design-standard: not-a-list-page — this is the Supplier Execution Workspace
