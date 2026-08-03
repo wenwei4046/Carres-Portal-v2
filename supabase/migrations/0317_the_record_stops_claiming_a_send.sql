@@ -169,8 +169,21 @@ begin
        where n.nspname = 'public' and p.proname = 'purchasing_record_send') <> 1 then
     raise exception '0317: exactly ONE signature must survive';
   end if;
-  -- NO BACKFILL: the historical rows stay exactly as they were written.
-  if (select count(*) from po_history where text like 'sent to %') <> 2 then
-    raise exception '0317: a historical row was rewritten — this card backfills nothing';
-  end if;
+  -- NO BACKFILL. It is asserted STRUCTURALLY — this migration contains no
+  -- `update`, `delete` or `insert` against `po_history` or `audit_log`, so it
+  -- is incapable of touching a historical row.
+  --
+  -- ⚠️ A DEFECT OF MY OWN, CAUGHT AFTER APPLYING AND CORRECTED HERE. The
+  -- payload applied to production carried a stricter guard in this slot:
+  --     if (select count(*) from po_history where text like 'sent to %') <> 2
+  -- It passed on production, where exactly two such rows exist. It would FAIL
+  -- on a fresh `supabase db reset`, where none do — so this file would have
+  -- broken every new clone, which is the very disease the 0312/0313 recovery
+  -- was written to cure. **A migration may never assert a production ROW
+  -- COUNT**: schema is what a migration owns, data is what it walks past.
+  -- The no-backfill claim is verified where it belongs — in the pre-apply dry
+  -- run recorded in the header, which asserted the two rows survived intact.
+  -- The applied FUNCTION is unaffected: it reconciles byte-identical to this
+  -- file (md5 `d42fdde8…`, 2725 chars); only this guard block differs, and a
+  -- `do $$` block leaves nothing behind to differ about.
 end $$;
