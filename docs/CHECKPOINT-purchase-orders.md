@@ -564,6 +564,23 @@ plain-words error messages (owed to Phase 4's refusals).
   PO-PDF-STANDARD §2. The real renderer wires to 0307 `purchasing_po_document` —
   its own card. Never re-add the old button.
 
+  > **UPDATE 2026-08-03 — the sentence above was true when written and is no
+  > longer true of the code.** Kept, not deleted, on Jess's ruling: a checkpoint
+  > records what was believed at the time, and deleting it hides why the button
+  > was removed. **Measured this day, by reading the file rather than trusting
+  > this record**: `apps/web/src/lib/pdf/po-template.tsx` was REBUILT to
+  > `docs/pdf/PO-PDF-STANDARD.md` on 2026-08-02 (PR #557). Its payload is the
+  > money-free `purchasing_po_document` (0307) — a money scan over the file
+  > returns **zero** matches for `unit_price|line_total|grand_total|currency|
+  > formatMoney` and for `\bRM\b`, and `po-template.test.ts` guards that it stays
+  > so. **`renderPoPdf` is therefore already lawful**, and it is reachable today
+  > from three older surfaces (`PoDetailModal` · `AssignPickupDialog` ·
+  > `OrderDetailDrawer`) — the ONE place it cannot be reached from is this
+  > Workspace. **Phase 3's Print work is WIRING, not writing a renderer**, and a
+  > chat that reads only the paragraph above will waste a day rebuilding
+  > something that exists. The instruction that survives unchanged: never re-add
+  > a button that prints money.
+
 ## 4 · GATES (state at the 2026-08-03 freeze)
 
 web tsc 0 · api tsc 4 pre-existing (`rental-sell.test.ts`) · **check-design 8445

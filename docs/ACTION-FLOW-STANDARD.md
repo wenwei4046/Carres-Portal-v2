@@ -286,6 +286,55 @@ This is not a restriction on follow-ups. They are how a human passes something t
 human, which the engine cannot do and should not try to. They keep their own home, their own
 words and their own way of closing.
 
+## Law 8 — the Observation Law
+
+**Ruled by Jess, 2026-08-03.** Portal-wide, not Purchasing's.
+
+```text
+THE OBSERVATION LAW
+
+The portal records only facts it directly observes.
+It never records outcomes that happen outside the portal
+unless they are explicitly confirmed inside the portal.
+```
+
+The boundary, in her words:
+
+```text
+Opening an external application, copying text, or generating a file
+does not prove that the external outcome occurred.
+```
+
+**Why it is a law and not a Purchasing rule.** It was written because the Purchase Order
+workspace claimed `sent via whatsapp` when all it had watched was a click on a link — and
+that claim reached `po_history`, which `po_history_read` lets the SUPPLIER read and
+`SupplierDashboard.tsx` prints raw. But the same trap is waiting in Print, SMS, Telegram,
+Calendar, Google Maps, Waze, a payment gateway and a phone call. Ruling it once per module
+means inventing it eight more times, and getting it wrong at least once.
+
+| The portal may record | The portal may NOT record |
+|---|---|
+| `PDF generated` | `PO sent to {supplier}` |
+| `Message copied` | `Supplier received the PO` |
+| `WhatsApp opened` | `Sent via WhatsApp` |
+| `Email client opened` | `Supplier emailed` |
+
+**Copying writes no business event at all** — taking words somewhere else is not
+communication, and a record of it would be a record of nothing.
+
+**"Explicitly confirmed inside the portal"** means a human answered a question the portal
+asked, or an external system called back and the portal stored what it said. A checkbox
+somebody ticks afterwards is not confirmation of the outcome — it is confirmation that
+somebody remembered, which is a different fact and must be worded as one.
+
+**An internal table name, column name or route name never defines UI truth** (Jess, same
+ruling). `po_sends` is a store; it does not license the screen to say `sent`.
+
+**This law binds the RECORD, not only the screen.** A false sentence written into
+`po_history`, `audit_log`, an event payload or a document is worse than one on a page — the
+page can be re-rendered, the record cannot be un-written, and both are read by people
+outside Carres.
+
 ## What this replaces
 
 - The single next-action ladder as a business rule (it stays as Layer 2 input).

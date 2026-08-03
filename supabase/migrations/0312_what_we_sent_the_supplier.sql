@@ -126,6 +126,29 @@ comment on column public.purchasing_settings.supplier_message_template is
   'ONE company-wide draft for supplier messages (Jess 2026-08-02). Placeholders: {supplier} {po} {items} {date}. Per-supplier templates were refused: eleven templates are eleven places to edit, and a special instruction is a remark.';
 
 -- ---------------------------------------------------------------------------
+-- 3b · suppliers.email — THE MISTAKE, REPRODUCED ON PURPOSE
+-- ---------------------------------------------------------------------------
+-- This column was 0312's own defect: `contact_email` had existed on this table
+-- since the supplier portal and TWO of ten suppliers had already filled it, so
+-- this is a second column for one fact — `ops_order_control.balance`'s disease.
+-- 0313 drops it a few minutes later.
+--
+-- IT IS REPRODUCED RATHER THAN OMITTED, on Jess's ruling (2026-08-03): *"复原
+-- migration 必须忠实复原历史步骤 … 否则它不是恢复原 migration，而是重新设计了一条
+-- 等价终态路径."* An earlier draft of this recovery skipped the column and let
+-- 0313 become a no-op — same end state, fewer steps, and WRONG: a recovery that
+-- reaches the right destination by a road history never took is a redesign
+-- wearing a recovery's filename, and it makes the pair untestable as a pair.
+-- Because it is created here, 0313's guard and its drop are now genuinely
+-- exercised on every fresh `supabase db reset`, not skipped.
+--
+-- `text`, nullable, no default — matching `contact_email` (verified on prod
+-- 2026-08-03). The column is gone from production, so its exact original
+-- definition is unrecoverable; this is the honest reconstruction, and nothing
+-- can depend on the difference because 0313 removes it before any code runs.
+alter table public.suppliers add column if not exists email text;
+
+-- ---------------------------------------------------------------------------
 -- 4 · the two doors
 -- ---------------------------------------------------------------------------
 create or replace function public.purchasing_record_send(
