@@ -564,6 +564,23 @@ plain-words error messages (owed to Phase 4's refusals).
   PO-PDF-STANDARD §2. The real renderer wires to 0307 `purchasing_po_document` —
   its own card. Never re-add the old button.
 
+  > **UPDATE 2026-08-03 — the sentence above was true when written and is no
+  > longer true of the code.** Kept, not deleted, on Jess's ruling: a checkpoint
+  > records what was believed at the time, and deleting it hides why the button
+  > was removed. **Measured this day, by reading the file rather than trusting
+  > this record**: `apps/web/src/lib/pdf/po-template.tsx` was REBUILT to
+  > `docs/pdf/PO-PDF-STANDARD.md` on 2026-08-02 (PR #557). Its payload is the
+  > money-free `purchasing_po_document` (0307) — a money scan over the file
+  > returns **zero** matches for `unit_price|line_total|grand_total|currency|
+  > formatMoney` and for `\bRM\b`, and `po-template.test.ts` guards that it stays
+  > so. **`renderPoPdf` is therefore already lawful**, and it is reachable today
+  > from three older surfaces (`PoDetailModal` · `AssignPickupDialog` ·
+  > `OrderDetailDrawer`) — the ONE place it cannot be reached from is this
+  > Workspace. **Phase 3's Print work is WIRING, not writing a renderer**, and a
+  > chat that reads only the paragraph above will waste a day rebuilding
+  > something that exists. The instruction that survives unchanged: never re-add
+  > a button that prints money.
+
 ## 4 · GATES (state at the 2026-08-03 freeze)
 
 web tsc 0 · api tsc 4 pre-existing (`rental-sell.test.ts`) · **check-design 8445
@@ -887,7 +904,20 @@ study's findings live in the chat until an evidence set is complete.
   screens collected so far, AutoCount shows no supplier-received status or timeline.* Carres's
   own rule — the Portal records only what it observed — needs no external endorsement.
 
-### 2026-08-03 · BLOCKED by Jess — the Communication wording waits for the repository
+### 2026-08-03 · BLOCKED, then UNBLOCKED and SHIPPED the same day
+
+> **CLOSED.** G1 was completed (`docs/execution-queues-index.md`) — 0312 + 0313 are in the
+> repository and repository ↔ production parity is proved by REBUILD. Jess then ruled
+> the wording forward in one pass: *"The latest ruling in this chat overrides the earlier
+> BLOCK for this case."* All four words shipped TOGETHER, as this section required —
+> `Copy message` · `Open WhatsApp` / `Open WhatsApp group` · `Open email` · `Snapshot N`
+> — plus migration **0317** rewriting the `po_history` and `audit_log` sentences to
+> `{Channel} opened · Snapshot N`. **The block did its job**: it is the reason the four
+> words shipped as one vocabulary instead of `Open email` going alone.
+>
+> The record of WHY it was blocked is kept below, unedited.
+
+#### The original block (kept as written)
 
 **Her ruling, verbatim:** *"Do not query production to reconstruct missing migrations. This is
 a repository governance issue, not a development task … Production is not the source of truth
