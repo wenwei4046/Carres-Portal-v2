@@ -904,7 +904,20 @@ study's findings live in the chat until an evidence set is complete.
   screens collected so far, AutoCount shows no supplier-received status or timeline.* Carres's
   own rule — the Portal records only what it observed — needs no external endorsement.
 
-### 2026-08-03 · BLOCKED by Jess — the Communication wording waits for the repository
+### 2026-08-03 · BLOCKED, then UNBLOCKED and SHIPPED the same day
+
+> **CLOSED.** G1 was completed (`docs/execution-queues-index.md`) — 0312 + 0313 are in the
+> repository and repository ↔ production parity is proved by REBUILD. Jess then ruled
+> the wording forward in one pass: *"The latest ruling in this chat overrides the earlier
+> BLOCK for this case."* All four words shipped TOGETHER, as this section required —
+> `Copy message` · `Open WhatsApp` / `Open WhatsApp group` · `Open email` · `Snapshot N`
+> — plus migration **0317** rewriting the `po_history` and `audit_log` sentences to
+> `{Channel} opened · Snapshot N`. **The block did its job**: it is the reason the four
+> words shipped as one vocabulary instead of `Open email` going alone.
+>
+> The record of WHY it was blocked is kept below, unedited.
+
+#### The original block (kept as written)
 
 **Her ruling, verbatim:** *"Do not query production to reconstruct missing migrations. This is
 a repository governance issue, not a development task … Production is not the source of truth

@@ -28,7 +28,7 @@
 
 | Card | Goal | State |
 |---|---|---|
-| **G1 · Restore the missing migrations** | `0312` + `0313` exist in production and have **no `.sql` in any branch**. Restore them into the repository and verify repository ↔ production parity. | 🔴 OPEN — **blocking** Purchase Orders Phase 3's Communication wording |
+| **G1 · Restore the missing migrations** | `0312` + `0313` exist in production and have **no `.sql` in any branch**. Restore them into the repository and verify repository ↔ production parity. | ✅ **CLOSED 2026-08-03** — both files committed and parity proved by REBUILD (see below). The Communication wording is unblocked and shipped in the same pass. |
 
 ### G1 · Restore missing migrations (0312 / 0313) — opened 2026-08-03 by Jess
 
@@ -64,11 +64,57 @@ permanently downstream of it. **Restore first, then develop.**
 3. The parity method is written down, because 0312/0313 will not be the last time.
 4. Carry-forward `migrations-0312-0313-have-no-file-in-any-branch` is closed with how.
 
-**Then, and only then:** Purchase Orders Phase 3's Communication wording changes in ONE pass —
-`Snapshot` · `Open WhatsApp` / `Open WhatsApp group` · `Open email` · `Copy message`, plus the
-`po_history` and `audit_log` sentences. All four words together; a half-vocabulary is worse
-than the old one.
+**CLOSED 2026-08-03 — how, and the one defect the closing found.**
 
+1. **Both files are committed** (`0312_what_we_sent_the_supplier.sql` ·
+   `0313_email_already_had_a_home.sql`) as a **reviewed reconstruction, labelled as one in its
+   own header** — never presented as the original. Jess reviewed it in-chat and REJECTED one
+   departure: an earlier draft skipped `suppliers.email` (0312 created it, 0313 dropped it)
+   because the end state is identical with fewer steps. Her ruling: *"复原 migration 必须忠实
+   复原历史步骤 … 否则它不是恢复原 migration，而是重新设计了一条等价终态路径."* Corrected — and
+   the mechanical cost of the shortcut is the durable lesson: **a pair that never creates what
+   it drops can never TEST the drop**, so 0313's guard would have shipped un-exercised forever.
+
+2. **Parity is proved by REBUILD, not by reading — and that is the method this card was really
+   about.** Reading production's catalogue and writing a file that matches it cannot see what is
+   MISSING: on production `create table if not exists` is a no-op, so the create path is never
+   exercised. The parity method is therefore:
+
+   > In ONE rolled-back transaction on production: capture every catalogue fact into a temp
+   > table · DROP the objects · replay the recovery files from empty · diff the two sets BOTH
+   > WAYS · roll back. Anything appearing on only one side is a divergence.
+
+   Run on 2026-08-03 it returned **"IDENTICAL — a rebuild reproduces production exactly"**
+   across columns, defaults, constraints, indexes, policies, grants, RLS, comments and function
+   grants. En route, the rebuilt `purchasing_record_send` came out at `md5(prosrc)`
+   **262f2462…**, byte-identical to what production held before 0317 — the strongest available
+   evidence that the recovered file IS the original.
+
+3. **The defect only a rebuild could find.** The first rebuild differed in twelve rows, all of
+   one shape:
+
+   ```
+   ONLY IN REBUILD →  GRANT:po_sends:authenticated:INSERT | UPDATE | DELETE
+   ONLY IN REBUILD →  GRANT:po_revisions:anon:INSERT | UPDATE | DELETE
+   ```
+
+   Supabase's `alter default privileges` grants ALL on every new table in `public`; production
+   holds only SELECT, so the original 0312 revoked the rest and the recovery had missed it. Now
+   revoked, with a sanity assertion that fails the migration if a write grant is ever present.
+   Defence in depth rather than a live hole — RLS is on and there is no write policy — but
+   *"the RPC is the only door"* is a claim about TWO locks and a rebuilt database carried one.
+
+4. **Carry-forward `migrations-0312-0313-have-no-file-in-any-branch` is closed** by this card.
+   Related and still open: **0308 and 0309 are also absent from main** — their files DO exist,
+   on unmerged branches, so that is a merge and not a recovery. `0309` lived on one machine
+   and was pushed to `origin/claude/purchase-demands-migration-a0914c` (`dc302bda`) on Jess's
+   word — push only, no merge, `0308` untouched.
+
+**Also recorded:** main carries a SECOND `0317_*` file — `0317_po_birth_certificate.sql`,
+Loo's hand-applied recovery, which holds no tracker row. The tracker names
+`20260803105141 · 0317_the_record_stops_claiming_a_send`. Both are kept, matching the recorded
+precedent for the three `0267_*` files: the tracker keys on the timestamp, so a duplicate
+prefix is cosmetic, and renaming either one would make a filename disagree with a record.
 
 ---
 
