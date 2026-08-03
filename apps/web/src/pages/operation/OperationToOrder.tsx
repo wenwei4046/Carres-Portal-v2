@@ -48,7 +48,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   TO_ORDER_WORDS as W,
   categoryLabel,
-  countOrders,
+  countItems,
   defaultDocuments,
   ordersHeadline,
   poScheduleBucket,
@@ -736,7 +736,7 @@ export default function OperationToOrder() {
    * ── Grid columns — ONE WIDTH SYSTEM, and the order Loo named ─────────────
    *
    * ORDER (Loo, 2026-08-03, on the real page):
-   *   Supplier · Customer Delivery · SO No. · Customer · Model · Qty · PO No.
+   *   Supplier · Customer Delivery · SO No. · Customer · Qty · Model · PO No.
    * The factory comes FIRST because it is what the operator groups by in his
    * head — everything to its right describes that factory's work.
    *
@@ -754,8 +754,14 @@ export default function OperationToOrder() {
    * the longest variable content — Model — not to whichever column is last.
    *
    *   4  ☑ (DataTable's own)     13  Supplier      16  Customer Delivery
-   *   10 SO No.                  14  Customer      25  Model  ← takes the slack
-   *   6  Qty                     12  PO No.                    ── 100
+   *   10 SO No.                  14  Customer       6  Qty
+   *   25 Model ← takes the slack  12  PO No.                    ── 100
+   *
+   * QTY SITS BEFORE MODEL (Loo, 2026-08-03, on the real page). Right-aligned
+   * in a 6%% column BETWEEN Model and PO No., the number was pushed to the far
+   * side of a wide column and read as though it belonged to neither. Before
+   * Model it lands directly against the model name — `2 │ Cody K` — which is
+   * how a quantity reads on every invoice and in AutoCount.
    *
    * MEASURED in a real browser, not estimated (2026-08-03): at every viewport
    * from a 13-inch MacBook Air (776px of table) to a 2560 desktop, no column
@@ -814,16 +820,6 @@ export default function OperationToOrder() {
       cell: (r) => (r.customer ? properCase(r.customer) : "—"),
     },
     {
-      // The widest column on purpose: model names are the longest and most
-      // variable text on the page, so the table's spare width belongs here.
-      key: "model",
-      label: W.colModel,
-      width: 25,
-      sortable: true,
-      filter: filterFor("model", modelOptions, true),
-      cell: (r) => r.model,
-    },
-    {
       key: "qty",
       label: W.colQty,
       width: 6,
@@ -834,6 +830,16 @@ export default function OperationToOrder() {
       // 1·2·3 filters nothing worth the button, and on a narrow numeric
       // column the caret is what pushed the word off the numbers' edge.
       cell: (r) => r.qty,
+    },
+    {
+      // The widest column on purpose: model names are the longest and most
+      // variable text on the page, so the table's spare width belongs here.
+      key: "model",
+      label: W.colModel,
+      width: 25,
+      sortable: true,
+      filter: filterFor("model", modelOptions, true),
+      cell: (r) => r.model,
     },
     {
       key: "po",
@@ -1127,6 +1133,13 @@ export default function OperationToOrder() {
                   label={W.itemsTableLabel}
                   sort={sort}
                   onSortChange={setSort}
+                  /* q3 (Loo, 2026-08-03): the rail lights `Overdue` in red
+                   * while every date ON the row is still comfortably in the
+                   * future — because overdue means the ORDER-BY date has
+                   * passed, and that date never renders (the GOLDEN RULE).
+                   * The bar states the STATE, not the date, so the rule holds
+                   * and the row stops looking calm. */
+                  rowLate={(r) => r.bucket === "overdue"}
                   selection={{
                     selected: selectedKeys,
                     onToggleRow: (id) => {
@@ -1138,15 +1151,21 @@ export default function OperationToOrder() {
                     selectable: (r) => !poOf(r),
                   }}
                 />
-                {/* The Orders page's own closing line: what am I looking at,
-                    counted. Orders, not rows — a build is not a unit of work
-                    a purchaser counts in. */}
+                {/* q1 (Loo, 2026-08-03). The footer counted customer ORDERS
+                    while the toolbar counted ROWS and the button counted
+                    PURCHASE ORDERS — three numbers, three units, on one
+                    screen, and nothing said how they convert (`5 selected ·
+                    Issue 3 POs · 3 orders`). His ruling: operations does not
+                    work in customer orders; the pair that matters is what I
+                    ticked and how many purchase orders it becomes. So the
+                    footer counts what is actually on screen, and the customer
+                    -order count is gone rather than reworded. */}
                 <footer
                   className="shrink-0 flex items-center gap-3 px-3 h-10 border border-t-0 border-kit-slate-5 bg-white text-meta text-kit-slate-11"
                   data-testid="to-order-footer"
                 >
                   <span className="tabular-nums">
-                    {countOrders(new Set(visibleRows.map((r) => r.orderId ?? r.key)).size)}
+                    {countItems(visibleRows.length)}
                   </span>
                   {/* A column filter narrows SILENTLY (the ▼ turns funnel, and
                       that is all) — so whenever one is on, the footer says so

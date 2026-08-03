@@ -124,6 +124,24 @@ export interface DataTableProps<Row> {
    *  page's own default order. */
   sort?: TableSort | null;
   onSortChange?: (next: TableSort | null) => void;
+  /**
+   * A 2px bar down the left edge of a row: THIS ROW IS LATE.
+   *
+   * It exists because a page can know a row is late for a reason that never
+   * reaches a cell. To Order is the case that asked for it (Loo, 2026-08-03):
+   * its rail lights `Overdue` in red while every visible date on the row is
+   * still comfortably in the future — because "overdue" means the ORDER-BY
+   * date has passed, and the order-by date deliberately never renders. The
+   * row therefore stated its urgency nowhere.
+   *
+   * ONE tone on purpose. Red already has exactly one job in this portal
+   * (late · act now); a second tone here would turn the accent into
+   * decoration, which `01-design-tokens.md` §2.2 bans.
+   *
+   * Rows without it get a TRANSPARENT bar of the same width, so nothing on
+   * the table shifts when one row is late and its neighbour is not.
+   */
+  rowLate?: (row: Row) => boolean;
 }
 
 /**
@@ -209,6 +227,7 @@ export default function DataTable<Row>({
   label,
   sort = null,
   onSortChange,
+  rowLate,
 }: DataTableProps<Row>) {
   const selectableRows = selection
     ? rows.filter((r) => selection.selectable?.(r) ?? true)
@@ -344,24 +363,30 @@ export default function DataTable<Row>({
             rows.map((row) => {
               const id = rowId(row);
               const isSelected = selection?.selected.has(id) ?? false;
+              const late = rowLate?.(row) ?? false;
               return (
                 <tr
                   key={id}
                   data-kit="data-row"
                   data-selected={isSelected || undefined}
                   onClick={onRowOpen ? () => onRowOpen(row) : undefined}
-                  /* §3.5 — one faint blue tint on hover, the stronger wash when
-                   * selected. Never grey: grey reads as structure. */
-                  /* §3.5, finally honoured: hover is ONE STEP UNDER selected
-                   * (blue-2 vs blue-3) — they were identical until Jess caught
-                   * it on 2026-08-01. */
+                  /* HOVER IS GREY, SELECTION IS BLUE (Loo, 2026-08-03).
+                   * Hover says "the mouse is here" — one second long, no
+                   * meaning — so it may not spend the accent. Selection is a
+                   * lasting state with a consequence, and keeps blue-3.
+                   * (This row was still blue-2 after the portal-wide sweep,
+                   * because the sweep looked for blue-3 — found by reading
+                   * this file, not by the lint.) */
                   className={`border-b border-kit-slate-5 ${
-                    isSelected ? "bg-kit-blue-3" : "hover:bg-kit-blue-2"
+                    isSelected ? "bg-kit-blue-3" : "hover:bg-kit-slate-3"
                   } ${onRowOpen ? "cursor-pointer" : ""}`}
                 >
                   {selection && (
                     /* The checkbox must not open the record it is ticking. */
-                    <td className="px-2" onClick={(e) => e.stopPropagation()}>
+                    <td
+                      className={`px-2 border-l-2 ${late ? "border-kit-red-9" : "border-transparent"}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {(selection.selectable?.(row) ?? true) ? (
                         <Checkbox
                           id={`kit-table-row-${id}`}
@@ -372,10 +397,14 @@ export default function DataTable<Row>({
                       ) : null}
                     </td>
                   )}
-                  {columns.map((c) => (
+                  {columns.map((c, i) => (
                     <td
                       key={c.key}
-                      className={`px-2 text-kit-slate-12 ${c.align === "right" ? "text-right" : ""} ${
+                      className={`px-2 text-kit-slate-12 ${
+                        !selection && i === 0
+                          ? `border-l-2 ${late ? "border-kit-red-9" : "border-transparent"}`
+                          : ""
+                      } ${c.align === "right" ? "text-right" : ""} ${
                         c.numeric ? "tabular-nums" : ""
                       }`}
                     >

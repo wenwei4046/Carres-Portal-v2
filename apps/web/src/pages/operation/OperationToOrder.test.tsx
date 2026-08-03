@@ -422,7 +422,40 @@ describe("the Excel reflexes — header sort, per-column filters", () => {
     // The empty PO cell SAYS the work instead of a mute dash, and the
     // footer counts what the sheet shows.
     expect(screen.getAllByText(W.yetToOrder).length).toBeGreaterThan(0);
-    expect(screen.getByTestId("to-order-footer")).toHaveTextContent(/orders?$/);
+    // ITEMS, not customer orders (Loo, 2026-08-03 — q1). The footer used to
+    // count orders while the toolbar counted rows and the button counted POs:
+    // three units on one screen with no conversion stated anywhere.
+    expect(screen.getByTestId("to-order-footer")).toHaveTextContent(/items?$/);
+  });
+});
+
+/**
+ * q3 (Loo, 2026-08-03). `Overdue` is red in the rail, and on the row every
+ * date was still comfortably in the future — because overdue means the
+ * ORDER-BY date has passed and that date never renders. The row said nothing.
+ */
+describe("an overdue row says so on the row", () => {
+  it("wears a red left bar; a row that is not overdue keeps a transparent one", async () => {
+    await loaded();
+    // The rail MULTI-selects, so the engine's opening day has to come OFF
+    // before Overdue is the only thing in view — clicking Overdue alone shows
+    // both, which is correct behaviour and a useless fixture for this test.
+    fireEvent.click(screen.getByTestId("to-order-day-2026-07-31"));
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    const bars = [...document.querySelectorAll('[data-kit="data-row"] td:first-child')];
+    expect(bars.length).toBeGreaterThan(0);
+    for (const b of bars) expect(b.className).toContain("border-kit-red-9");
+
+    // Swap to the first upcoming run — NOT overdue, same table, no red.
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    fireEvent.click(screen.getByTestId("to-order-day-2026-07-31"));
+    const calm = [...document.querySelectorAll('[data-kit="data-row"] td:first-child')];
+    expect(calm.length).toBeGreaterThan(0);
+    for (const b of calm) {
+      expect(b.className).toContain("border-transparent");
+      expect(b.className).not.toContain("border-kit-red-9");
+    }
   });
 });
 
@@ -736,7 +769,7 @@ describe("the grid's width system", () => {
     expect(total).toBe(100);
   });
 
-  it("reads Supplier · Customer Delivery · SO No. · Customer · Model · Qty · PO No.", async () => {
+  it("reads Supplier · Customer Delivery · SO No. · Customer · Qty · Model · PO No.", async () => {
     await loaded();
     const heads = [...document.querySelectorAll("thead th")]
       .map((th) => (th.textContent ?? "").trim())
@@ -746,8 +779,8 @@ describe("the grid's width system", () => {
       W.colPreferred,
       W.colSoNo,
       W.colCustomer,
-      W.colModel,
       W.colQty,
+      W.colModel,
       W.colPoNo,
     ]);
   });
