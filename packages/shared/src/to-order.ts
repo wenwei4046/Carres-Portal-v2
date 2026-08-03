@@ -111,6 +111,17 @@ export const TO_ORDER_WORDS = {
   //    filter lists `Yet to Order` + the real PO numbers; `(Blanks)` and a
   //    generic `Ordered` never appear (the number list IS ordered). ───────
   yetToOrder: "Yet to Order",
+  /**
+   * The group header of a customer order that has SOME of its items on a
+   * purchase order and some still to buy (Loo, 2026-08-03, from AutoCount's
+   * own `Partial`). It is an ORDER-level fact and could never be said on a
+   * row: a single item either has a purchase order or it does not.
+   *
+   * A fully-ordered group says nothing — its purchase-order numbers are
+   * printed right beside it, and a word repeating what a number already
+   * proves is noise.
+   */
+  partlyOrdered: "Partly ordered",
   filterOverdue: "Overdue",
   /**
    * The empty state while a FILTER is narrowing — §8.2's law: no reachable

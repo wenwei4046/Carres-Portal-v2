@@ -275,10 +275,18 @@ describe("the PO Schedule — a purchase calendar, not a menu", () => {
 });
 
 describe("the grid — business language only", () => {
-  it("has exactly the frozen columns — Customer joined on Jess's word — and none of the system's", async () => {
+  it("carries only what belongs to an ITEM — the order's own facts moved to the group", async () => {
     await loaded();
-    for (const label of [W.colPreferred, W.colSoNo, W.colCustomer, W.colModel, W.colQty, W.colPoNo]) {
+    // Supplier · Qty · Model · PO No. — what is true of one piece of goods.
+    for (const label of [W.supplierLabel, W.colModel, W.colQty, W.colPoNo]) {
       expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    // SO No. · Customer · Customer Delivery are facts about the ORDER, so they
+    // are stated ONCE on the group header and are no longer column headers
+    // (Loo, 2026-08-03 — AutoCount's own shape).
+    const heads = [...document.querySelectorAll("thead th")].map((t) => t.textContent ?? "");
+    for (const gone of [W.colSoNo, W.colCustomer, W.colPreferred]) {
+      expect(heads.some((h) => h.includes(gone))).toBe(false);
     }
     expect(screen.queryByText("Category")).toBeNull();
     expect(screen.queryByText(/Order by/i)).toBeNull();
@@ -372,22 +380,19 @@ describe("the grid — business language only", () => {
 });
 
 describe("the Excel reflexes — header sort, per-column filters", () => {
-  it("a header click sorts by SO; a second click reverses", async () => {
+  it("a header click sorts by Model; a second click reverses", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
-    fireEvent.click(screen.getByTestId("table-sort-so"));
-    let sos = screen.getAllByText(/^SO-\d+$/).map((el) => el.textContent);
-    expect(sos).toEqual([
-      "SO-1204",
-      "SO-1207",
-      "SO-1207",
-      "SO-1300",
-      "SO-1301",
-      "SO-1350",
-    ]);
-    fireEvent.click(screen.getByTestId("table-sort-so"));
-    sos = screen.getAllByText(/^SO-\d+$/).map((el) => el.textContent);
-    expect(sos[0]).toBe("SO-1350");
+    // SO No. is no longer a column — it is the group header's first fact — so
+    // this asserts a sort on something an ITEM actually carries.
+    const models = () =>
+      [...document.querySelectorAll('[data-kit="data-row"]')].map(
+        (tr) => tr.querySelectorAll("td")[3]?.textContent ?? "",
+      );
+    fireEvent.click(screen.getByTestId("table-sort-model"));
+    const asc = models();
+    fireEvent.click(screen.getByTestId("table-sort-model"));
+    expect(models()).toEqual([...asc].reverse());
   });
 
   it("the PO filter speaks business — Yet to Order + the real numbers, never (Blanks)", async () => {
@@ -406,13 +411,15 @@ describe("the Excel reflexes — header sort, per-column filters", () => {
     expect(screen.getByText("SO-1204")).toBeInTheDocument();
   });
 
-  it("the delivery filter leads with Overdue and prints dates, not ISO", async () => {
+  // THE DELIVERY ▼ IS GONE, with its column (Loo, 2026-08-03). The date moved
+  // onto the group header, and filtering to ONE specific delivery date is the
+  // single capability this page lost — recorded here rather than quietly
+  // dropped, so that if it is missed it comes back as its own decision.
+  it("no column filter survives for a fact that now lives on the group header", async () => {
     await loaded();
-    fireEvent.click(screen.getByTestId("to-order-overdue"));
-    fireEvent.click(screen.getByTestId("table-filter-delivery"));
-    fireEvent.click(screen.getByLabelText(W.filterOverdue));
-    expect(screen.getByText("SO-1204")).toBeInTheDocument(); // ella, past date
-    expect(screen.queryByText("SO-1300")).toBeNull();
+    expect(document.querySelector('[data-testid="table-filter-delivery"]')).toBeNull();
+    expect(document.querySelector('[data-testid="table-filter-so"]')).toBeNull();
+    expect(document.querySelector('[data-testid="table-filter-customer"]')).toBeNull();
   });
 
   it("there are no Status pills — the PO column IS the status door", async () => {
@@ -638,17 +645,22 @@ describe("the seven fixes — Excel completeness", () => {
 
   it("a filter that blanks the table names its cause and hands back the way out", async () => {
     await loaded();
-    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    // TWO COLUMN FILTERS CAN NEVER CONTRADICT EACH OTHER, and that is the
+    // page's design: the options cascade (Excel's own behaviour), so a value
+    // that would blank the sheet is never offered. The reachable blank is a
+    // filter that survives a change of RUN — pick a model, then walk to a day
+    // it does not appear on.
+    fireEvent.click(screen.getByTestId("to-order-day-2026-08-03"));
     fireEvent.click(screen.getByTestId("table-filter-model"));
-    fireEvent.click(screen.getByLabelText("Cody K"));
+    fireEvent.click(screen.getByLabelText("Sonic Q"));
     fireEvent.keyDown(document.body, { key: "Escape" });
-    fireEvent.click(screen.getByTestId("table-filter-delivery"));
-    fireEvent.click(screen.getByLabelText(W.filterOverdue));
-    // Cody K is not overdue → zero rows, but never the lying empty state.
+    fireEvent.click(screen.getByTestId("to-order-day-2026-08-03"));
+    // Sonic Q's run is Monday; walking back to Friday leaves the filter on and
+    // nothing to show.
     expect(screen.getByTestId("to-order-filters-empty")).toHaveTextContent(W.filtersEmpty);
     fireEvent.click(screen.getByTestId("to-order-clear-filters"));
     expect(screen.queryByTestId("to-order-filters-empty")).toBeNull();
-    expect(screen.getByText("SO-1204")).toBeInTheDocument();
+    expect(screen.getByTestId("to-order-sheet")).toBeInTheDocument();
   });
 
   it("a narrowing filter announces itself in the footer, with the way out", async () => {
@@ -763,26 +775,69 @@ describe("the grid's width system", () => {
   it("every column is a PERCENTAGE and the set sums to 100 with the checkbox", async () => {
     await loaded();
     const cols = [...document.querySelectorAll("colgroup col")] as HTMLElement[];
-    expect(cols.length).toBe(8); // ☑ + the seven
+    expect(cols.length).toBe(5); // ☑ + Supplier · Qty · Model · PO No.
 
     for (const c of cols) expect(c.style.width).toMatch(/^\d+(\.\d+)?%$/); // no px, no auto
     const total = cols.reduce((s, c) => s + parseFloat(c.style.width), 0);
     expect(total).toBe(100);
   });
 
-  it("reads Supplier · Customer Delivery · SO No. · Customer · Qty · Model · PO No.", async () => {
+  it("reads Supplier · Qty · Model · PO No. — the order's own facts left", async () => {
     await loaded();
     const heads = [...document.querySelectorAll("thead th")]
       .map((th) => (th.textContent ?? "").trim())
       .filter((t) => t.length > 0);
-    expect(heads).toEqual([
-      W.supplierLabel,
-      W.colPreferred,
-      W.colSoNo,
-      W.colCustomer,
-      W.colQty,
-      W.colModel,
-      W.colPoNo,
-    ]);
+    expect(heads).toEqual([W.supplierLabel, W.colQty, W.colModel, W.colPoNo]);
+  });
+});
+
+/**
+ * ONE LINE PER CUSTOMER ORDER — AutoCount's shape (Loo, 2026-08-03, from its
+ * own `SO Batch Posting` screen).
+ *
+ * Before this, a customer buying three pieces printed their name three times,
+ * and there was NOWHERE to say "this order is already partly ordered" —
+ * because that is a fact about the ORDER, and every row was one item.
+ */
+describe("the group header — one line per customer order", () => {
+  it("states the order ONCE: SO, customer, the customer's date", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    // ella's order has one build; PETER's has two — and PETER is named ONCE.
+    const groups = [...document.querySelectorAll('[data-kit="data-group"]')];
+    expect(groups.length).toBeGreaterThan(0);
+    const peter = groups.find((g) => /Peter/.test(g.textContent ?? ""));
+    expect(peter).toBeTruthy();
+    expect(peter!.textContent).toContain("SO-1207");
+    expect(peter!.textContent).toContain(fmtDate("2026-08-13"));
+    // …and the whole sheet says his name exactly once, not once per piece.
+    const sheet = screen.getByTestId("to-order-sheet");
+    expect((sheet.textContent ?? "").match(/Peter/g)?.length).toBe(1);
+  });
+
+  it("says `Partly ordered` only when SOME of the order is on a purchase order", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    // Nothing in this fixture is half-ordered, so the word must be ABSENT —
+    // a status that appears when it is not true is worse than none.
+    expect(screen.queryByText(W.partlyOrdered)).toBeNull();
+
+    // The receipt's group is FULLY ordered: it shows its PO number and no word
+    // (a word repeating what a number already proves is noise).
+    const groups = [...document.querySelectorAll('[data-kit="data-group"]')];
+    const receipt = groups.find((g) => /PO-9001/.test(g.textContent ?? ""));
+    expect(receipt).toBeTruthy();
+    expect(receipt!.textContent).not.toContain(W.partlyOrdered);
+  });
+
+  it("a group opens ONCE however many items it holds", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    const groups = [...document.querySelectorAll('[data-kit="data-group"]')];
+    const rows = [...document.querySelectorAll('[data-kit="data-row"]')];
+    // Strictly fewer headers than rows: at least one order carries two pieces.
+    expect(groups.length).toBeLessThan(rows.length);
   });
 });

@@ -34,7 +34,7 @@
  * **Nothing is migrated onto this in D0.5c.** The Orders table keeps its own
  * markup until **D6**, which is the card that re-lays that page out.
  */
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import Button from "./Button";
 import Checkbox from "./Checkbox";
 import EmptyState from "./EmptyState";
@@ -168,6 +168,26 @@ export interface DataTableProps<Row> {
    * honestly be both, but the kit does not police that — the page knows.
    */
   rowMuted?: (row: Row) => boolean;
+  /**
+   * Rows that belong together get ONE header line above them, and the facts
+   * that would otherwise repeat down the sheet move onto it.
+   *
+   * AutoCount's own shape (Loo, 2026-08-03, from its `SO Batch Posting`
+   * screen): its row IS the customer order and the items open underneath, so
+   * the customer's name, the order number and the date are stated once. Our
+   * grid was one row per ITEM, so a customer with three pieces printed their
+   * name three times and there was nowhere to say "this order is already
+   * partly ordered" — that fact belongs to the order, not to any one piece.
+   *
+   * `keyOf` decides where a group ends: the header is emitted whenever the key
+   * changes from the previous row, so the PAGE's own sort decides grouping and
+   * the kit never re-orders anything.
+   */
+  group?: {
+    keyOf: (row: Row) => string;
+    /** Rendered inside one full-width cell. The caller owns every word. */
+    header: (row: Row) => ReactNode;
+  };
 }
 
 /**
@@ -295,6 +315,7 @@ export default function DataTable<Row>({
   onSortChange,
   rowLate,
   rowMuted,
+  group,
 }: DataTableProps<Row>) {
   const selectableRows = selection
     ? rows.filter((r) => selection.selectable?.(r) ?? true)
@@ -429,11 +450,25 @@ export default function DataTable<Row>({
             </tr>
           )}
           {!loading &&
-            rows.map((row) => {
+            rows.map((row, rowIndex) => {
               const id = rowId(row);
               const isSelected = selection?.selected.has(id) ?? false;
               const late = rowLate?.(row) ?? false;
+              // A header is emitted whenever the key CHANGES from the row
+              // above — so the PAGE's sort decides where groups begin and the
+              // kit re-orders nothing of its own.
+              const opensGroup =
+                group != null &&
+                (rowIndex === 0 || group.keyOf(row) !== group.keyOf(rows[rowIndex - 1]!));
               return (
+                <Fragment key={`grp-${id}`}>
+                {opensGroup ? (
+                  <tr data-kit="data-group" className="border-b border-kit-slate-5">
+                    <td colSpan={colSpan} className="px-2 h-9 bg-kit-slate-2 align-middle">
+                      {group!.header(row)}
+                    </td>
+                  </tr>
+                ) : null}
                 <tr
                   key={id}
                   data-kit="data-row"
@@ -483,7 +518,8 @@ export default function DataTable<Row>({
                       {c.cell(row)}
                     </td>
                   ))}
-                </tr>
+                  </tr>
+                </Fragment>
               );
             })}
         </tbody>

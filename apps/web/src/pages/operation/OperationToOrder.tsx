@@ -675,28 +675,18 @@ export default function OperationToOrder() {
     clearLabel: W.cancel,
     ...(searchable ? { searchPlaceholder: W.searchPlaceholder } : {}),
   });
-
-  const deliveryOptions = useMemo(() => {
-    const base = filteredExcept("delivery");
-    const opts: { value: string; label: string }[] = [
-      { value: F_OVERDUE, label: W.filterOverdue },
-    ];
-    const dates = [...new Set(base.map((r) => r.delivery).filter(Boolean))] as string[];
-    dates.sort();
-    for (const d of dates) opts.push({ value: d, label: fmtDate(d) });
-    if (base.some((r) => r.delivery == null))
-      opts.push({ value: F_NONE, label: W.noDeliveryDate });
-    return opts;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inView, colFilters]);
-
-  const soOptions = useMemo(() => {
-    const base = filteredExcept("so");
-    const sos = [...new Set(base.map((r) => r.so).filter((x) => x != null))] as number[];
-    sos.sort((a, b) => a - b);
-    return sos.map((s) => ({ value: String(s), label: `SO-${s}` }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inView, colFilters]);
+  /**
+   * THREE COLUMN FILTERS LEFT WITH THEIR COLUMNS (Loo, 2026-08-03).
+   *
+   * `Customer Delivery`, `SO No.` and `Customer` moved onto the group header,
+   * so their ▼ went with them rather than being re-homed somewhere nobody
+   * would look. Most of what they did survives: the toolbar search already
+   * matches SO · model · customer · PO, and the rail already narrows by time.
+   *
+   * What is genuinely LOST is filtering to one specific delivery date.
+   * Reported rather than replaced by a control nobody asked for — if it turns
+   * out to be missed, it comes back as its own decision.
+   */
 
   const supplierOptions = useMemo(() => {
     const base = filteredExcept("supplier");
@@ -712,13 +702,6 @@ export default function OperationToOrder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters]);
 
-  const customerOptions = useMemo(() => {
-    const base = filteredExcept("customer");
-    const vals = [...new Set(base.map((r) => r.customer ?? F_NONE))].sort();
-    return vals.map((v) => ({ value: v, label: v === F_NONE ? "—" : properCase(v) }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inView, colFilters]);
-
   const poOptions = useMemo(() => {
     const base = filteredExcept("po");
     const opts: { value: string; label: string }[] = [
@@ -730,6 +713,64 @@ export default function OperationToOrder() {
     return opts;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters, rowPo]);
+  /**
+   * ── The GROUP: one line per customer order ────────────────────────────────
+   *
+   * AutoCount's shape (Loo, 2026-08-03, from its `SO Batch Posting` screen —
+   * its own version of this page). Its row IS the customer order and the items
+   * open underneath, so the customer's name, the order number and the date are
+   * stated ONCE. Ours was one row per item, so a customer buying three pieces
+   * printed their name three times.
+   *
+   * Two facts move onto the header because they belong to the ORDER and could
+   * never honestly sit on a row: whether the order is PARTLY ordered, and the
+   * purchase-order numbers it has already produced — one customer order can
+   * carry several, because SO-1286 goes to two factories and that is two
+   * documents.
+   *
+   * Computed from ALL rows, never from the visible ones: an order is partly
+   * ordered whether or not the ordered half happens to pass today's filter,
+   * and a status that changed when you filtered would be a status nobody could
+   * trust.
+   */
+  const groupFacts = useMemo(() => {
+    const m = new Map<
+      string,
+      {
+        so: number | null;
+        customer: string | null;
+        delivery: string | null;
+        late: boolean;
+        total: number;
+        ordered: number;
+        pos: string[];
+      }
+    >();
+    for (const r of allRows) {
+      const k = r.orderId ?? r.key;
+      const g =
+        m.get(k) ??
+        {
+          so: r.so,
+          customer: r.customer,
+          delivery: r.delivery,
+          late: r.late,
+          total: 0,
+          ordered: 0,
+          pos: [] as string[],
+        };
+      g.total += 1;
+      const po = poOf(r);
+      if (po) {
+        g.ordered += 1;
+        if (!g.pos.includes(po)) g.pos.push(po);
+      }
+      m.set(k, g);
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRows, rowPo]);
+
 
   /**
    * ── Grid columns — ONE WIDTH SYSTEM, and the order Loo named ─────────────
@@ -777,57 +818,21 @@ export default function OperationToOrder() {
        */
       key: "supplier",
       label: W.supplierLabel,
-      width: 13,
+      width: 22,
       sortable: true,
       filter: filterFor("supplier", supplierOptions, true),
       cell: (r) => r.supplier ?? "—",
     },
     {
-      key: "delivery",
-      label: W.colPreferred,
-      width: 16,
-      sortable: true,
-      filter: filterFor("delivery", deliveryOptions),
-      cell: (r) => (
-        <span
-          className={
-            r.late ? "text-kit-red-11 font-medium tabular-nums" : "tabular-nums"
-          }
-        >
-          {r.delivery ? (
-            fmtDate(r.delivery)
-          ) : (
-            <span className="text-kit-slate-11">{W.noDeliveryDate}</span>
-          )}
-        </span>
-      ),
-    },
-    {
-      key: "so",
-      label: W.colSoNo,
-      width: 10,
-      sortable: true,
-      filter: filterFor("so", soOptions, true),
-      cell: (r) => (r.so != null ? `SO-${r.so}` : "—"),
-    },
-    {
-      key: "customer",
-      label: W.colCustomer,
-      width: 14,
-      sortable: true,
-      filter: filterFor("customer", customerOptions, true),
-      cell: (r) => (r.customer ? properCase(r.customer) : "—"),
-    },
-    {
       key: "qty",
       label: W.colQty,
-      width: 6,
+      width: 8,
       align: "right",
       numeric: true,
       sortable: true,
-      // NO filter caret here (Jess, 2026-08-01): a distinct-value list of
-      // 1·2·3 filters nothing worth the button, and on a narrow numeric
-      // column the caret is what pushed the word off the numbers' edge.
+      // NO filter caret (Jess, 2026-08-01): a distinct-value list of 1·2·3
+      // filters nothing worth the button, and on a narrow numeric column the
+      // caret is what pushed the word off the numbers' edge.
       cell: (r) => r.qty,
     },
     {
@@ -835,7 +840,7 @@ export default function OperationToOrder() {
       // variable text on the page, so the table's spare width belongs here.
       key: "model",
       label: W.colModel,
-      width: 25,
+      width: 46,
       sortable: true,
       filter: filterFor("model", modelOptions, true),
       cell: (r) => r.model,
@@ -843,7 +848,7 @@ export default function OperationToOrder() {
     {
       key: "po",
       label: W.colPoNo,
-      width: 12,
+      width: 20,
       sortable: true,
       filter: filterFor("po", poOptions),
       cell: (r) => {
@@ -1139,6 +1144,52 @@ export default function OperationToOrder() {
                    * The bar states the STATE, not the date, so the rule holds
                    * and the row stops looking calm. */
                   rowLate={(r) => r.bucket === "overdue"}
+                  /* ONE line per customer order — AutoCount's own shape. The
+                   * facts that used to repeat down every row of an order live
+                   * here now, plus the two that could only ever be true of an
+                   * ORDER: partly ordered, and the purchase orders it has
+                   * already produced. */
+                  group={{
+                    keyOf: (r) => r.orderId ?? r.key,
+                    header: (r) => {
+                      const g = groupFacts.get(r.orderId ?? r.key);
+                      const partly = g != null && g.ordered > 0 && g.ordered < g.total;
+                      return (
+                        <span
+                          className="flex items-center gap-2 text-body"
+                          data-testid={`to-order-group-${r.orderId ?? r.key}`}
+                        >
+                          <span className="font-semibold text-kit-slate-12 tabular-nums">
+                            {r.so != null ? `SO-${r.so}` : "—"}
+                          </span>
+                          {r.customer ? (
+                            <span className="text-kit-slate-12 truncate">
+                              {properCase(r.customer)}
+                            </span>
+                          ) : null}
+                          <span
+                            className={
+                              r.late
+                                ? "text-kit-red-11 font-medium tabular-nums"
+                                : "text-kit-slate-11 tabular-nums"
+                            }
+                          >
+                            {r.delivery ? fmtDate(r.delivery) : W.noDeliveryDate}
+                          </span>
+                          {partly ? (
+                            <span className="rounded-pill bg-kit-amber-3 px-2 py-0.5 text-label text-kit-amber-11">
+                              {W.partlyOrdered}
+                            </span>
+                          ) : null}
+                          {g && g.pos.length > 0 ? (
+                            <span className="ml-auto text-kit-blue-11 tabular-nums truncate">
+                              {g.pos.join(" · ")}
+                            </span>
+                          ) : null}
+                        </span>
+                      );
+                    },
+                  }}
                   selection={{
                     selected: selectedKeys,
                     onToggleRow: (id) => {
