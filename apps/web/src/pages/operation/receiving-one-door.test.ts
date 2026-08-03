@@ -124,3 +124,74 @@ describe("Card C1 · the Office has exactly ONE receiving door", () => {
     ]);
   });
 });
+
+/**
+ * Card C1b (Jess, 2026-08-03) — the database half of the same door.
+ *
+ * C1 removed the last Office BUTTON. The audit it required then found a wider
+ * hole: `purchase_order_lines` granted table-level UPDATE to `authenticated`,
+ * so an Office login could PATCH `received_qty` straight through PostgREST —
+ * proven on prod in a rolled-back transaction (received_qty 0 → 1, Sessions 0,
+ * events 0, no stock movement).
+ *
+ * **Jess corrected the fix**: a column-level revoke cannot subtract from a
+ * table-level grant in PostgreSQL, so 0316 revokes the TABLE grant and grants
+ * nothing back — the audit found ZERO legitimate client writers.
+ *
+ * A test cannot reach prod, so what it guards is the thing that could undo the
+ * fix: a LATER migration handing the privilege back. The assertions she asked
+ * for permanently — table UPDATE false, and the three quantities false — live
+ * inside 0316's own sanity block, which runs at apply time.
+ */
+describe("Card C1b · a PO line's quantities are RPC-only", () => {
+  const MIGRATIONS = join(REPO, "supabase/migrations");
+  const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort();
+  const FIX = "0316_po_lines_quantities_are_rpc_only.sql";
+
+  /** SQL comments stripped: 0316's own header QUOTES the rejected column-level
+   *  revoke so the next reader knows why it is wrong, and a naive scan reads
+   *  that quotation as the shipped statement. (This guard failed on its own
+   *  first run for exactly that reason — the second time today.) */
+  const sqlOf = (f: string) =>
+    readFileSync(join(MIGRATIONS, f), "utf8")
+      .replace(/--.*$/gm, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("0316 revokes the TABLE grant, not a column subset", () => {
+    const sql = sqlOf(FIX);
+    expect(sql).toMatch(
+      /revoke\s+update\s+on\s+public\.purchase_order_lines\s+from[^;]*authenticated/i,
+    );
+    expect(sql).toMatch(/revoke\s+update\s+on[^;]*anon/i);
+    // The correction itself: a column-scoped revoke would be a no-op against
+    // the table grant, and shipping one would have looked like a fix.
+    expect(sql).not.toMatch(/revoke\s+update\s*\(/i);
+  });
+
+  it("no later migration hands client roles UPDATE on purchase_order_lines back", () => {
+    const after = files.filter((f) => f > FIX);
+    const offenders = after.filter((f) => {
+      const sql = readFileSync(join(MIGRATIONS, f), "utf8")
+        .replace(/--.*$/gm, "")
+        .replace(/\/\*[\s\S]*?\*\//g, "");
+      return /grant[^;]*update[^;]*\bpurchase_order_lines\b[^;]*\b(authenticated|anon|public)\b/is.test(
+        sql,
+      );
+    });
+    expect(
+      offenders,
+      `these migrations re-open the hole 0316 closed:\n${offenders.join("\n")}\n` +
+        "A PO line's quantities may only change inside an RPC that carries the " +
+        "full business side-effects.",
+    ).toEqual([]);
+  });
+
+  it("0316 keeps the reads and the service key — it closes a door, it does not brick the portal", () => {
+    const sql = readFileSync(join(MIGRATIONS, FIX), "utf8");
+    expect(sql).toMatch(/has_table_privilege\('authenticated'[^)]*'SELECT'\)/);
+    expect(sql).toMatch(/has_table_privilege\('service_role'[^)]*'UPDATE'\)/);
+    for (const col of ["received_qty", "damaged_qty", "wrong_item_qty"]) {
+      expect(sql, `${col} must be asserted by name`).toMatch(new RegExp(col));
+    }
+  });
+});
