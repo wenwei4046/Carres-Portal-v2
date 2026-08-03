@@ -27,6 +27,30 @@
 
 ---
 
+## 0.5 · PROOF OF HOMEWORK — no evidence = no work (Jess, 2026-08-02)
+
+Jess cannot and will not check whether you studied. So the transcript must
+PROVE it, the same way CLAUDE.md §0 proves a doc was read. Before proposing
+ANYTHING (a layout, a flow, a field, a word), in order:
+
+1. **Read the sources with the `Read` tool — the calls must be visible in the
+   transcript**: `docs/RECEIVING-INFORMATION-MODEL.md` · the master pages
+   (`OperationPurchaseOrders.tsx` is the Workspace master copy — read, never
+   edit) · the relevant 2990 files (`/Users/chaichiewlim/Desktop/2990s/apps/
+   backend/src/pages/GrnNew.tsx` · `GrnFromPo.tsx` · `GoodsReceivedList.tsx`).
+2. **Quote 2-3 VERBATIM lines** from what you read, in a blockquote. No
+   paraphrase. No quote = you did not read it = no work.
+3. **Name the master for every design move** (SAP / 2990 / Excel / Linear /
+   the PO page) and judge Keep / Adapt / Replace. "I think it would be nice"
+   is not a source. Inventing when a master exists is the failure mode.
+4. **Every critique arrives WITH its solution attached** — top-to-toe, ranked,
+   before she asks. A wall of text with no homework behind it is worse than
+   silence; if you have not studied, say "I have not studied X yet" and go study.
+
+Jess's check is mechanical: are the `Read` calls in the transcript, and are
+the quotes verbatim? Either both are present or the chat skipped the homework,
+regardless of what it claims.
+
 ## 1 · WHAT IS FROZEN (Slice A — closed 2026-08-02, do not reopen)
 
 The full model: `docs/RECEIVING-INFORMATION-MODEL.md`. Headlines:
