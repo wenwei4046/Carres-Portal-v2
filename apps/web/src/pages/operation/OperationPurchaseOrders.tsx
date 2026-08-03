@@ -93,9 +93,15 @@ import {
  * supplier → hand over to Receiving.
  *
  * Deliberately absent until their stores exist (dead controls are banned):
- * Email window (`suppliers.email`) · I've Sent + History (`po_sends`) ·
  * Notes (no store) · Supplier DO (no store) · editable Goods Arrival
  * (Phase 6 — writes the promise ledger through its own door).
+ *
+ * Two entries LEFT this list and the correction is worth keeping: the Email
+ * door and the send history are BUILT (`po_sends` / `po_revisions`, 0312), and
+ * the address is read from `suppliers.contact_email` — **`suppliers.email` no
+ * longer exists**, dropped by 0313 because it was a second column for a fact
+ * `contact_email` already held. A comment naming a dropped column sends the
+ * next reader looking for it.
  */
 
 // design-standard: not-a-list-page — this is the Supplier Execution Workspace
@@ -2069,10 +2075,21 @@ function ActivityDesk({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [po.id, template]);
 
-  const waUrl = useMemo(() => {
-    if (supplier?.whatsapp_group_url) return supplier.whatsapp_group_url;
+  /**
+   * The WhatsApp door, and WHICH door it is.
+   *
+   * COPY-STANDARD (Loo, 2026-07-28) gives this button two labels, not one:
+   * `Open WhatsApp group` for the supplier's saved group link, `Open WhatsApp`
+   * for a `wa.me/` chat with one named party. The word follows the BEHAVIOUR —
+   * a label naming a door the click does not open is worse than a vague one,
+   * because the operator learns to stop reading it. The label is therefore
+   * resolved at render time from what is on file, never a third blended word.
+   */
+  const wa = useMemo(() => {
+    if (supplier?.whatsapp_group_url)
+      return { url: supplier.whatsapp_group_url, isGroup: true };
     const digits = (supplier?.contact ?? "").replace(/\D/g, "");
-    return digits ? `https://wa.me/${digits}` : null;
+    return digits ? { url: `https://wa.me/${digits}`, isGroup: false } : null;
   }, [supplier]);
   const email = supplier?.contact_email ?? null;
   const mailto = email
@@ -2187,29 +2204,39 @@ function ActivityDesk({
           <Icon name={draftOpen ? "collapse" : "expand"} size={14} />
           Message
         </button>
-        {/* The ACT records itself (Jess, 2026-08-02): opening WhatsApp or the
-            mail client IS the send, so there is no "I've sent" to remember
-            afterwards — a button somebody must press after the fact is a
-            record that will be wrong. Copy does NOT record: copying is not
-            sending, it is taking the words somewhere else. */}
+        {/* Every label names the DOOR it opens, never the outcome it hopes for
+            — `docs/ACTION-FLOW-STANDARD.md` Law 8, the Observation Law (Jess,
+            2026-08-03): *opening an external application, copying text, or
+            generating a file does not prove that the external outcome
+            occurred.* The portal watches a link be clicked; it never watches a
+            message leave, so no button here may say `Send`.
+
+            This REPLACES the 2026-08-02 note that said "opening WhatsApp IS
+            the send". There is still no "I've sent" button, and the reason is
+            unchanged and good — a record somebody must remember to make
+            afterwards is a record that will be wrong. What changed is the
+            claim: opening a door is not the same act as a message arriving.
+
+            Copy still records NOTHING (guarded by a test): copying is taking
+            the words somewhere else, not communicating them. */}
         <button
           type="button"
           onClick={() => void copyMessage()}
           data-testid="po-copy-message"
           className={DOC_BTN}
         >
-          Copy
+          Copy message
         </button>
-        {waUrl && (
+        {wa && (
           <a
-            href={waUrl}
+            href={wa.url}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => send.mutate({ channel: "whatsapp" })}
             data-testid="po-open-whatsapp"
             className={`${DOC_BTN} font-medium`}
           >
-            WhatsApp
+            {wa.isGroup ? "Open WhatsApp group" : "Open WhatsApp"}
           </a>
         )}
         {/* The portal has NO email sender (Jess picked mailto): the operator's
@@ -2221,7 +2248,7 @@ function ActivityDesk({
             data-testid="po-open-email"
             className={`${DOC_BTN} font-medium`}
           >
-            Email
+            Open email
           </a>
         ) : (
           <span className="text-label text-kit-slate-9" data-testid="po-no-email">
@@ -2301,7 +2328,7 @@ function ActivityDesk({
                 <span className="text-kit-slate-12 min-w-0">
                   {doorLabel(g.channel)} opened
                   {g.revNo != null ? (
-                    <span className="text-kit-slate-9"> · Revision {g.revNo}</span>
+                    <span className="text-kit-slate-9"> · Snapshot {g.revNo}</span>
                   ) : null}
                 </span>
                 {g.count > 1 ? (

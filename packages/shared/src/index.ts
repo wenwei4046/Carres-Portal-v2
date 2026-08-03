@@ -1013,6 +1013,8 @@ export {
   WAREHOUSE_RECEIPT_PROBLEM_TEXT,
   WAREHOUSE_DO_NUMBER_MIN,
   warehouseReceiptStatusLabel,
+  // C2 — the Receiving Record's derived document number.
+  receivingRecordNo,
   warehouseReceiptProblems,
   warehouseReceiptProblemText,
   warehouseReceiptTotals,

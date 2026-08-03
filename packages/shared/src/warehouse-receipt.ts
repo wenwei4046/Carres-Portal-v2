@@ -28,6 +28,7 @@
  *
  * PURE — no I/O, no clock.
  */
+import { docNumber } from "./doc-number";
 import {
   receiveLineClaimProblems,
   RECEIVE_LINE_CLAIM_PROBLEM_TEXT,
@@ -38,17 +39,33 @@ import type { CaseProductCategory } from "./service-case-intake";
 // ── Where a receipt is ───────────────────────────────────────────────────────
 
 /**
- * Three states, and no fourth.
+ * FIVE states — the Receiving Session's lifecycle
+ * (`docs/RECEIVING-INFORMATION-MODEL.md` §4, frozen by Jess 2026-08-02).
  *
+ * `draft`     — being counted. The OFFICE's draft lives in the browser and is
+ *               discarded if the operator walks away, so this value is the
+ *               column default and no door persists it today.
  * `submitted` — the warehouse has counted; goods have NOT moved.
- * `checked_in` — ops replayed it through the receive engine; stock moved then.
- * `returned` — ops sent it back with a reason; the warehouse counts again.
+ * `returned`  — ops sent it back with a reason; the warehouse counts again.
+ *               A REAL business state, never "draft again": it means *was
+ *               submitted, was reviewed, was sent back*.
+ * `posted`    — it hit the books; stock moved then.
+ * `voided`    — reversed after posting. Nothing writes it yet (Void is its own
+ *               later slice) and history never deletes, so a voided record must
+ *               still appear wherever a posted one does.
  *
- * There is deliberately no `draft`: a count that was never sent is a form the
- * warehouse has not finished, and a row nobody is waiting on would sit in the
- * ops queue looking like work.
+ * This block said "Three states, and no fourth" until 2026-08-03 (Card C2). It
+ * was wrong twice over: 0314 made the lifecycle five, and renamed `checked_in`
+ * to `posted` — because `checked_in` named the ACT (`Check in`) while the
+ * status has to name the STATE, and COPY-STANDARD lets one word do only one of
+ * those. The data was migrated by 0314; this file was the lag.
  */
-export type WarehouseReceiptStatus = "submitted" | "checked_in" | "returned";
+export type WarehouseReceiptStatus =
+  | "draft"
+  | "submitted"
+  | "returned"
+  | "posted"
+  | "voided";
 
 /** The words on screen. `Waiting Carres check` names WHO the receipt is waiting
  *  for — "Pending" would leave a warehouse clerk wondering whether they still
@@ -57,9 +74,11 @@ export const WAREHOUSE_RECEIPT_STATUS_LABEL: Record<
   WarehouseReceiptStatus,
   string
 > = {
+  draft: "Not sent yet",
   submitted: "Waiting Carres check",
-  checked_in: "Checked in by Carres",
   returned: "Sent back to recount",
+  posted: "Checked in by Carres",
+  voided: "Reversed",
 };
 
 export function warehouseReceiptStatusLabel(
@@ -283,6 +302,22 @@ export interface WarehouseReceiptRow {
   submitted_at: string;
   reviewed_at: string | null;
   return_reason: string | null;
+  /** C2 — what the `Goods Received` register reads. OPTIONAL, so a browser on
+   *  this build against an older Worker degrades to a quieter row instead of
+   *  crashing (the same discipline P3's `short_since` follows). */
+  submitted_from?: "office" | "warehouse";
+  /** The BUSINESS date: when the goods physically arrived. Friday's truck keyed
+   *  in on Monday reads Received Friday, Submitted Monday — both true. */
+  goods_received_at?: string;
+  posted_at?: string | null;
+  posted_by_name?: string | null;
+  do_file_path?: string | null;
+  /** A short-lived signed URL for the signed DO, batch-signed by the list route
+   *  the same way `supplier-claims` signs its claim photos. Null when there is
+   *  no file, or when storage refused to sign it — the record says which
+   *  rather than printing a dead link. */
+  do_file_url?: string | null;
+  warehouse_name?: string | null;
   claims?: Array<{
     claim_no: string;
     claim_type: string;
@@ -319,4 +354,29 @@ export interface WarehouseIncomingPo {
 export interface WarehouseIncomingResponse {
   warehouse: { id: string; name: string } | null;
   pos: WarehouseIncomingPo[];
+}
+
+/**
+ * The Receiving Record's document number — `GRN-020826-4417`.
+ *
+ * DERIVED, never stored, so it needs no migration and no counter: the tail is
+ * hashed from the session id, which keeps our monthly volume private (a
+ * counter tells a supplier how many deliveries we take) and makes a reprint
+ * match the original. Card C2 (Jess, 2026-08-03).
+ *
+ * ONE function, so the register's column and the open record can never print
+ * two different numbers for one delivery. `revision` is here for Amend's `-B`
+ * suffix in its own later slice; nothing passes it today.
+ *
+ * `GRN` is the DOCUMENT's noun and is allowed by COPY-STANDARD — "a word may
+ * name the piece of paper, the act, or neither — never both". The act stays
+ * `Check in`; the queue that lists these is `Goods Received`.
+ */
+export function receivingRecordNo(
+  r: { id: string; goods_received_at?: string; submitted_at?: string },
+  revision = 0,
+): string {
+  const date = r.goods_received_at ?? (r.submitted_at ?? "").slice(0, 10);
+  if (!date) return "—";
+  return docNumber({ prefix: "GRN", date, seed: r.id, revision });
 }

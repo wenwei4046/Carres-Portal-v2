@@ -564,6 +564,23 @@ plain-words error messages (owed to Phase 4's refusals).
   PO-PDF-STANDARD §2. The real renderer wires to 0307 `purchasing_po_document` —
   its own card. Never re-add the old button.
 
+  > **UPDATE 2026-08-03 — the sentence above was true when written and is no
+  > longer true of the code.** Kept, not deleted, on Jess's ruling: a checkpoint
+  > records what was believed at the time, and deleting it hides why the button
+  > was removed. **Measured this day, by reading the file rather than trusting
+  > this record**: `apps/web/src/lib/pdf/po-template.tsx` was REBUILT to
+  > `docs/pdf/PO-PDF-STANDARD.md` on 2026-08-02 (PR #557). Its payload is the
+  > money-free `purchasing_po_document` (0307) — a money scan over the file
+  > returns **zero** matches for `unit_price|line_total|grand_total|currency|
+  > formatMoney` and for `\bRM\b`, and `po-template.test.ts` guards that it stays
+  > so. **`renderPoPdf` is therefore already lawful**, and it is reachable today
+  > from three older surfaces (`PoDetailModal` · `AssignPickupDialog` ·
+  > `OrderDetailDrawer`) — the ONE place it cannot be reached from is this
+  > Workspace. **Phase 3's Print work is WIRING, not writing a renderer**, and a
+  > chat that reads only the paragraph above will waste a day rebuilding
+  > something that exists. The instruction that survives unchanged: never re-add
+  > a button that prints money.
+
 ## 4 · GATES (state at the 2026-08-03 freeze)
 
 web tsc 0 · api tsc 4 pre-existing (`rental-sell.test.ts`) · **check-design 8445
@@ -886,3 +903,69 @@ study's findings live in the chat until an evidence set is complete.
   standard.** Screenshots cannot prove backend behaviour. The honest statement is: *in the
   screens collected so far, AutoCount shows no supplier-received status or timeline.* Carres's
   own rule — the Portal records only what it observed — needs no external endorsement.
+
+### 2026-08-03 · BLOCKED, then UNBLOCKED and SHIPPED the same day
+
+> **CLOSED AND DEPLOYED 2026-08-03.** G1 was completed (`docs/execution-queues-index.md`) — 0312 + 0313
+> are in the repository and repository ↔ production parity is proved by REBUILD. Jess then ruled the
+> wording forward: *"The latest ruling in this chat overrides the earlier BLOCK for this case."*
+>
+> **All four words shipped TOGETHER, which is exactly what this block existed to force** —
+> `Copy message` · `Open WhatsApp group` / `Open WhatsApp` · `Open email` · `Snapshot N` — plus
+> migration **0317**, which rewrites the `po_history` and `audit_log` sentences to
+> `{Channel} opened · Snapshot N`. Without the block, `Open email` would have gone alone.
+>
+> **Deployment facts.** main `ed044070` (PR #571) + `b7c555a0` (PR #573, G1) · migration **0317
+> applied**, tracker `20260803105141`, `md5(prosrc)` **`d42fdde8…`** reconciled byte-identical to the
+> file · web **`index-C7nLHy6_.js`** (carres-portal `fdc99e25` + carres-pos `b36805f6`), all 4
+> canonicals converged, live md5 **`7d67e551…`** identical to the local build, `SERVICE_ROLE` 0,
+> `sent via` 0, `Revision` 0 · **Worker NOT redeployed and that is the record**: zero `apps/api`
+> diff, and the only `packages/shared` diff is another lane's inert display word.
+>
+> **A parallel lane clobbered half the deploy mid-ship** — `index-DB7_PnR-.js` from a pre-merge tip
+> landed on erp + carres-pos. Caught by DOWNLOADING that file and grepping it (`Revision` 1, none of
+> the four words), never by the deployment log; rebuilt from the merged tip and redeployed. **Four
+> canonicals are not a formality when two chats deploy in the same minute.**
+>
+> The record of WHY it was blocked is kept below, unedited.
+
+#### The original block (kept as written)
+
+**Her ruling, verbatim:** *"Do not query production to reconstruct missing migrations. This is
+a repository governance issue, not a development task … Production is not the source of truth
+for architecture."*
+
+**What was asked and is NOT built.** Four timeline words — `Snapshot` · `Open WhatsApp` /
+`Open WhatsApp group` · `Open email` · `Copy message` — plus the sentences written to
+`po_history` and `audit_log`.
+
+**Why every one of them is blocked, measured rather than assumed:**
+
+| The word | What it needs | Where that lives |
+|---|---|---|
+| `Open WhatsApp` vs `Open WhatsApp group` | the send must RECORD which door was opened; the stored `channel` is `whatsapp` for both | `purchasing_record_send` (0312) |
+| `Copy message` | a copy must be recorded at all; today it records nothing | a store + `purchasing_record_send` |
+| `Snapshot` | a revision's own timestamp on the wire | `po_revisions` — its DDL is in 0312/0313 |
+| the `po_history` sentence | rewriting what the function writes | `purchasing_record_send` |
+| the `audit_log` sentence | same | same |
+
+**`0312` and `0313` have no `.sql` in any branch**, so those objects' source cannot be read
+from the repository. **A chat proposed reading them out of production and Jess refused it** —
+correctly: reconstructing architecture from a running database makes production the source of
+truth, which inverts the repository's whole purpose. The refusal is the durable lesson here,
+not the blockage.
+
+**The wording is left ENTIRELY unchanged, including the one word that WAS repo-supported.**
+`Open email` is a pure display string and could have shipped alone — it is deliberately not
+shipped, because these four are ONE vocabulary with one shape (`{door} opened`, Jess's own
+rule of the same day). Renaming one of four would put two grammars on one list and would have
+to be undone. **A half-vocabulary is worse than an old one.**
+
+**What IS shipped and stays** (deployed 2026-08-03, web `index-CJzLlf_n.js` + Worker
+`844ee1dd`, main `7a36f1cb`): `Print PDF`, the three bands, `{door} opened · Revision n`, the
+FIRST-press rule, the quiet `×2`, and `No communication yet.` — none of them depend on a
+missing file.
+
+**Unblocked by:** governance card **G1** (`docs/execution-queues-index.md`) — restore 0312 /
+0313 into the repository and verify repository ↔ production parity. **After the repository is
+complete the wording changes in ONE pass**, all four words together.
