@@ -490,6 +490,61 @@ This makes React Router 7 client-side routes work on direct URL access.
 
 After every phase, tag: `git tag phase-{N}-complete`.
 
+
+### 13.1 Engineer-Owned Delivery (Jess, 2026-08-03 — non-negotiable)
+
+After Jess approves a build or says `deploy`, **the engineer owns the complete
+delivery process** and does not return routine engineering questions to her.
+
+The engineer must automatically:
+
+1. fetch and inspect the latest `main`;
+2. rebase the work;
+3. resolve routine conflicts;
+4. run all applicable checks;
+5. perform a top-to-toe review;
+6. fix bugs, regressions, overflow, truncation, spelling, lint and test failures;
+7. repeat verification until clean;
+8. commit and push;
+9. open and merge the PR;
+10. apply approved migrations when required;
+11. deploy every affected service;
+12. verify the real production result;
+13. update the canonical checkpoint and deployment record.
+
+**A discovered engineering fault is an instruction to fix and continue, not a
+reason to ask Jess whether it should be fixed.**
+
+The engineer stops ONLY when the remaining decision would change business
+meaning, architecture, irreversible production data, or an unapproved
+user-facing rule. **Do not disguise an engineering decision as a business
+decision.**
+
+Specifically, do NOT ask Jess to approve or perform: push · PR creation ·
+rebase · merge · deploy · routine conflict resolution · test repairs · lint
+repairs · migration verification · correcting a defect already discovered ·
+whether to continue after a routine technical failure.
+
+**Default Deployment.** An approved change is deployed by default. Localhost
+review is a PRODUCT-review tool, not a mandatory delivery gate after every
+small amendment. When Jess has already approved the business behaviour, the
+engineer completes checks, merges, deploys and verifies without asking again.
+A new review is required only when the implementation exposes a new business,
+architectural or user-facing decision.
+
+**Migration Delivery Order.** The normal order is:
+
+```
+Draft → Review business impact → Commit the exact migration file
+      → Merge-ready verification → Apply migration
+      → Deploy dependent code → Production verification
+```
+
+**Never leave an applied production migration absent from the repository.**
+**Never retype a migration during apply — execute the exact reviewed repository
+file.** When an applied migration is found missing from the repo, recovering it
+to `origin` outranks tidiness: push first, review second.
+
 ---
 
 ## 14. Red lines (inherited from global CLAUDE.md, restated for project)
