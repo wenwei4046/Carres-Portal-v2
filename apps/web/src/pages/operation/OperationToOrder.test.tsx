@@ -711,3 +711,44 @@ describe("Supplier on the row", () => {
     expect(band?.querySelector('[data-icon="confirm"]')).not.toBeNull();
   });
 });
+
+/**
+ * ONE WIDTH SYSTEM (Loo, 2026-08-03, looking at the real page: *"why all this
+ * table not align and all column no equal? no standard at all?"*).
+ *
+ * He was right and it was measurable: the grid mixed ONE percentage, five raw
+ * pixel strings and a final `auto`. Three units means nothing is proportional
+ * to anything, and `auto` on the last column hands every spare pixel to the
+ * shortest content on the page — the empty right-hand third he saw.
+ *
+ * `02-components.md` already ruled it ("give every column a width; the set sums
+ * to 100"); the page was simply breaking its own kit's law. These two tests are
+ * the enforcement, so it cannot drift back by hand.
+ */
+describe("the grid's width system", () => {
+  it("every column is a PERCENTAGE and the set sums to 100 with the checkbox", async () => {
+    await loaded();
+    const cols = [...document.querySelectorAll("colgroup col")] as HTMLElement[];
+    expect(cols.length).toBe(8); // ☑ + the seven
+
+    for (const c of cols) expect(c.style.width).toMatch(/^\d+(\.\d+)?%$/); // no px, no auto
+    const total = cols.reduce((s, c) => s + parseFloat(c.style.width), 0);
+    expect(total).toBe(100);
+  });
+
+  it("reads Supplier · Customer Delivery · SO No. · Customer · Model · Qty · PO No.", async () => {
+    await loaded();
+    const heads = [...document.querySelectorAll("thead th")]
+      .map((th) => (th.textContent ?? "").trim())
+      .filter((t) => t.length > 0);
+    expect(heads).toEqual([
+      W.supplierLabel,
+      W.colPreferred,
+      W.colSoNo,
+      W.colCustomer,
+      W.colModel,
+      W.colQty,
+      W.colPoNo,
+    ]);
+  });
+});

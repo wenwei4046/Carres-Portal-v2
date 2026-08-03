@@ -732,12 +732,55 @@ export default function OperationToOrder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters, rowPo]);
 
-  // ── Grid columns — Loo's frozen six, now with the Excel reflexes ─────────
+  /**
+   * ── Grid columns — ONE WIDTH SYSTEM, and the order Loo named ─────────────
+   *
+   * ORDER (Loo, 2026-08-03, on the real page):
+   *   Supplier · Customer Delivery · SO No. · Customer · Model · Qty · PO No.
+   * The factory comes FIRST because it is what the operator groups by in his
+   * head — everything to its right describes that factory's work.
+   *
+   * WIDTHS ARE ALL PERCENTAGES AND THEY SUM TO 100 (with `DataTable`'s own 4%
+   * checkbox). That is `02-components.md`'s DataTable law — *"Give every
+   * column a width; the set sums to 100"* — and this page was breaking it:
+   * ONE percentage (20), five raw pixel strings, and a final `auto`. Mixing
+   * three units means nothing is proportional to anything, and `auto` on the
+   * LAST column hands every spare pixel to the narrowest content on the page,
+   * which is the empty right-hand third Loo saw.
+   *
+   * The 2026-08-01 checkpoint's "fixed pixels with the last column auto" is
+   * RETIRED by this. It was written to cure percentage columns inflating on a
+   * wide monitor; the real cure is that the slack belongs to the column with
+   * the longest variable content — Model — not to whichever column is last.
+   *
+   *   4  ☑ (DataTable's own)     13  Supplier      16  Customer Delivery
+   *   10 SO No.                  14  Customer      25  Model  ← takes the slack
+   *   6  Qty                     12  PO No.                    ── 100
+   *
+   * MEASURED in a real browser, not estimated (2026-08-03): at every viewport
+   * from a 13-inch MacBook Air (776px of table) to a 2560 desktop, no column
+   * truncates and the table NEVER scrolls sideways. The first split had
+   * Customer Delivery at 14 and it fell 10px short of `Fri, 21 Aug 26` on the
+   * 13-inch — the 2%% came from Customer, whose names are shorter.
+   */
   const columns: readonly Column<GridRow>[] = [
+    {
+      /**
+       * Supplier — the column that answers "why 3 POs?" on the ROW. It is not
+       * the same fact as the rail's category, and it stops being derivable
+       * from it the day a second mattress supplier exists (September).
+       */
+      key: "supplier",
+      label: W.supplierLabel,
+      width: 13,
+      sortable: true,
+      filter: filterFor("supplier", supplierOptions, true),
+      cell: (r) => r.supplier ?? "—",
+    },
     {
       key: "delivery",
       label: W.colPreferred,
-      width: 20,
+      width: 16,
       sortable: true,
       filter: filterFor("delivery", deliveryOptions),
       cell: (r) => (
@@ -757,7 +800,7 @@ export default function OperationToOrder() {
     {
       key: "so",
       label: W.colSoNo,
-      width: "104px",
+      width: 10,
       sortable: true,
       filter: filterFor("so", soOptions, true),
       cell: (r) => (r.so != null ? `SO-${r.so}` : "—"),
@@ -765,30 +808,17 @@ export default function OperationToOrder() {
     {
       key: "customer",
       label: W.colCustomer,
-      width: "150px",
+      width: 14,
       sortable: true,
       filter: filterFor("customer", customerOptions, true),
       cell: (r) => (r.customer ? properCase(r.customer) : "—"),
     },
     {
-      /**
-       * Supplier — the column that answers "why 2 POs?" on the ROW (Loo,
-       * 2026-08-03). It sits immediately before Model: who makes it, then
-       * what they make. It is not the same fact as the rail's category, and
-       * it stops being derivable from it the day a second mattress supplier
-       * exists (September).
-       */
-      key: "supplier",
-      label: W.supplierLabel,
-      width: "130px",
-      sortable: true,
-      filter: filterFor("supplier", supplierOptions, true),
-      cell: (r) => r.supplier ?? "—",
-    },
-    {
+      // The widest column on purpose: model names are the longest and most
+      // variable text on the page, so the table's spare width belongs here.
       key: "model",
       label: W.colModel,
-      width: "170px",
+      width: 25,
       sortable: true,
       filter: filterFor("model", modelOptions, true),
       cell: (r) => r.model,
@@ -796,7 +826,7 @@ export default function OperationToOrder() {
     {
       key: "qty",
       label: W.colQty,
-      width: "64px",
+      width: 6,
       align: "right",
       numeric: true,
       sortable: true,
@@ -808,7 +838,7 @@ export default function OperationToOrder() {
     {
       key: "po",
       label: W.colPoNo,
-      width: "auto",
+      width: 12,
       sortable: true,
       filter: filterFor("po", poOptions),
       cell: (r) => {
