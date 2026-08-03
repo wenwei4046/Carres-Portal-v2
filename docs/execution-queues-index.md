@@ -20,6 +20,58 @@
 >   (fetch → `log HEAD..origin/main` empty → build from union → both Pages projects →
 >   poll 4 canonicals). A "different hash" moment during polling is normal — it resolves.
 
+## Governance cards
+
+> **Not a business line.** These cards fix the REPOSITORY, not a module. They carry no
+> customer-visible behaviour and no queue of their own — they exist because a lane's work
+> cannot be trusted while the repository cannot describe itself.
+
+| Card | Goal | State |
+|---|---|---|
+| **G1 · Restore the missing migrations** | `0312` + `0313` exist in production and have **no `.sql` in any branch**. Restore them into the repository and verify repository ↔ production parity. | 🔴 OPEN — **blocking** Purchase Orders Phase 3's Communication wording |
+
+### G1 · Restore missing migrations (0312 / 0313) — opened 2026-08-03 by Jess
+
+**Why it exists.** `po_sends`, `po_revisions` and `purchasing_record_send` were applied to
+production on 2026-08-02 and their migration files were never committed. Verified with
+`git log --all --diff-filter=A -- "supabase/migrations/0312*" "supabase/migrations/0313*"`,
+which returns nothing — the same probe DOES find 0308/0309 on other branches, so the probe
+works. Full context: carry-forward `migrations-0312-0313-have-no-file-in-any-branch`.
+
+**What it costs while open.** A database rebuilt from `supabase/migrations` would have no send
+history, no revision snapshots and no `purchasing_record_send`. Nothing breaks at runtime —
+this is a RECORD gap, not a behaviour gap — but no chat can change what those objects do,
+because no chat can read what they do.
+
+**THE RULE THAT CREATED THIS CARD, and it outranks the convenience of finishing a feature
+(Jess, 2026-08-03):**
+
+> *"Do not query production to reconstruct missing migrations. This is a repository governance
+> issue, not a development task … Production is not the source of truth for architecture."*
+
+A chat proposed reading the function bodies out of production to unblock a wording change. That
+is forbidden: it would make the running database the authority and leave the repository
+permanently downstream of it. **Restore first, then develop.**
+
+**Done when:**
+
+1. `0312_*.sql` and `0313_*.sql` are committed, from a source that is authoritative — the
+   original authoring session's draft, or a reviewed reconstruction Jess signs off — **never a
+   silent dump presented as the original.**
+2. Repository ↔ production parity is verified object by object: every function's
+   `md5(prosrc)` + length reconciled against the FILE, every table's columns, constraints and
+   policies compared. A mismatch is reported, never quietly reconciled toward production.
+3. The parity method is written down, because 0312/0313 will not be the last time.
+4. Carry-forward `migrations-0312-0313-have-no-file-in-any-branch` is closed with how.
+
+**Then, and only then:** Purchase Orders Phase 3's Communication wording changes in ONE pass —
+`Snapshot` · `Open WhatsApp` / `Open WhatsApp group` · `Open email` · `Copy message`, plus the
+`po_history` and `audit_log` sentences. All four words together; a half-vocabulary is worse
+than the old one.
+
+
+---
+
 ## The seven lines
 
 | Line | Doc | Cards | State |

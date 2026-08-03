@@ -886,3 +886,44 @@ study's findings live in the chat until an evidence set is complete.
   standard.** Screenshots cannot prove backend behaviour. The honest statement is: *in the
   screens collected so far, AutoCount shows no supplier-received status or timeline.* Carres's
   own rule — the Portal records only what it observed — needs no external endorsement.
+
+### 2026-08-03 · BLOCKED by Jess — the Communication wording waits for the repository
+
+**Her ruling, verbatim:** *"Do not query production to reconstruct missing migrations. This is
+a repository governance issue, not a development task … Production is not the source of truth
+for architecture."*
+
+**What was asked and is NOT built.** Four timeline words — `Snapshot` · `Open WhatsApp` /
+`Open WhatsApp group` · `Open email` · `Copy message` — plus the sentences written to
+`po_history` and `audit_log`.
+
+**Why every one of them is blocked, measured rather than assumed:**
+
+| The word | What it needs | Where that lives |
+|---|---|---|
+| `Open WhatsApp` vs `Open WhatsApp group` | the send must RECORD which door was opened; the stored `channel` is `whatsapp` for both | `purchasing_record_send` (0312) |
+| `Copy message` | a copy must be recorded at all; today it records nothing | a store + `purchasing_record_send` |
+| `Snapshot` | a revision's own timestamp on the wire | `po_revisions` — its DDL is in 0312/0313 |
+| the `po_history` sentence | rewriting what the function writes | `purchasing_record_send` |
+| the `audit_log` sentence | same | same |
+
+**`0312` and `0313` have no `.sql` in any branch**, so those objects' source cannot be read
+from the repository. **A chat proposed reading them out of production and Jess refused it** —
+correctly: reconstructing architecture from a running database makes production the source of
+truth, which inverts the repository's whole purpose. The refusal is the durable lesson here,
+not the blockage.
+
+**The wording is left ENTIRELY unchanged, including the one word that WAS repo-supported.**
+`Open email` is a pure display string and could have shipped alone — it is deliberately not
+shipped, because these four are ONE vocabulary with one shape (`{door} opened`, Jess's own
+rule of the same day). Renaming one of four would put two grammars on one list and would have
+to be undone. **A half-vocabulary is worse than an old one.**
+
+**What IS shipped and stays** (deployed 2026-08-03, web `index-CJzLlf_n.js` + Worker
+`844ee1dd`, main `7a36f1cb`): `Print PDF`, the three bands, `{door} opened · Revision n`, the
+FIRST-press rule, the quiet `×2`, and `No communication yet.` — none of them depend on a
+missing file.
+
+**Unblocked by:** governance card **G1** (`docs/execution-queues-index.md`) — restore 0312 /
+0313 into the repository and verify repository ↔ production parity. **After the repository is
+complete the wording changes in ONE pass**, all four words together.
