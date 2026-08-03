@@ -247,3 +247,51 @@
 - `purchasing-balance-date-hits-every-customer-on-a-merged-po` — Purchasing P3 (2026-07-29, PR #506, 0306). **ACCEPTED BY LOO, NOT A DEFECT TO BE QUIETLY FIXED.** He ruled that a new BALANCE delivery date enters Delay planning exactly as a delayed tomorrow's-delivery answer does, because *"the portal must surface every known risk that may affect the Customer Delivery Window"*. The date therefore reaches `ops_order_control.line_etas` for **every customer order the PO covers** — and a PO line MERGES several customers' quantities (`PURCHASING-WORKING-FLOW.md` §3: *"ten customers' bed frames from Ohana is one PO"*) while **nothing in the data says whose units are the short ones**. So on a merged PO, customers whose own goods are not short are still flagged for a Delay planning decision. **His reasoning, recorded so nobody re-litigates it:** *"Today, without allocation, this may over-report on merged POs. That limitation belongs to P5 (allocation), not P3."* The trade is not close: over-reporting costs one operator answer per order (`We can still make the promised date`, and Delay planning is a DECISION, never a customer call), while under-reporting costs a missed customer promise. **It is also consistent with what the engine already believes** — 0299's receive RPC advances a customer thread only on `bool_and(received_qty >= qty)`, so a short PO line already leaves every linked customer waiting. **Unreachable today**: 0 purchase orders, 0 lines, 0 promises. **Firm fix, and it is P5's**: purchasing needs an allocation — which units of a merged PO line belong to which customer order line — and the push then narrows to the orders genuinely short. **Nobody may narrow the push before that allocation exists.** A rule that guesses which customer is affected is worse than one that over-says and is known to; P3 chose the loud one deliberately, and a chat that "tidies" it has overturned a ruling rather than fixed a bug.
 
 - `po-stock-functions-executable-by-anon` — measured by P4's pre-flight (2026-07-29) and **deliberately NOT fixed in P4** (Loo: *"Do not fix the other six broad `anon` grants in P4 … Do not create or schedule another card now."*). Six SECURITY DEFINER functions that write purchase orders and/or the stock register carry `EXECUTE` for **both `anon` and `authenticated`**: `operation_receive_po_with_do` · `operation_create_po` · `operation_create_pos_batch` · `_operation_create_po_inner` · `operation_issue_pos_for_order` · `operation_cancel_po`. (`operation_receive_po_line` and `po_receive` were on this list and are revoked by P4/0307 — they had zero call sites and could post inventory outside the truthful destination path.) **What presently limits them is the guard INSIDE each body, not the grant**: every one resolves `public.app_role()` first and raises `42501` for a role that is not operation/principal, and `app_role()` returns NULL for an unauthenticated caller and for a disabled account (0266/0267). So an `anon` call fails — but it fails on a check written in plpgsql, one edit away from being weakened, rather than on a privilege the database would refuse to hand out. `_operation_create_po_inner` is the sharpest of the six: it is an INTERNAL helper (the `_` prefix says so), it is called only by the two create doors, and it has no reason to be reachable over PostgREST at all. **Recommended future review** (its own card, when Loo schedules one — not now): revoke `EXECUTE` from `anon` on all six, keep `authenticated` only where a browser genuinely calls the RPC, and add a sanity block asserting both directions the way 0303 and 0306 do — a `revoke … from public` alone does not drop `anon` on Supabase, which is why this has to be asserted rather than assumed. **Nothing here is exploitable today**; it is defence-in-depth that the portal already applies everywhere else.
+
+### `po-history-two-legacy-send-claims` — CLOSED AS "KEEP", 2026-08-03
+
+**Decision: the two rows stay. Do not rewrite them, do not delete them.** This
+is recorded so the next chat that finds them does not "fix" them.
+
+`po_history` holds two rows on **PO-2032**, written 2026-08-02 59 seconds apart
+by one operator clicking WhatsApp twice:
+
+```
+sent to Ohana via whatsapp (Revision 1)
+```
+
+`audit_log` holds the matching pair. Both predate 0317, which stopped the
+writer claiming a send. They are supplier-visible: `po_history_read` (0002)
+admits a supplier to their own PO's rows, and Ohana has one active login.
+
+**Why keeping them is the right engineering answer, not the lazy one:**
+
+1. **Both tables are append-only BY DESIGN.** Measured: `po_history` and
+   `audit_log` each have ZERO update and ZERO delete policies — only INSERT and
+   SELECT. Correcting a row means reaching past RLS with `service_role` to
+   defeat a constraint somebody deliberately built. The precedent — *history
+   may be rewritten when it embarrasses us* — costs more than two rows.
+2. **`audit_log`'s entire job is to record what happened, including the bug.**
+   Editing it destroys the evidence that the defect existed and was fixed. It
+   is internal-read only, so nothing outside Carres reads it anyway.
+3. **The set is CLOSED and provably so.** Zero rows written since 0317, and the
+   live `purchasing_record_send` cannot produce another (verified: its body
+   contains `opened · Snapshot` and no `sent`). A guard in
+   `purchasing-words.test.ts` now asserts the WRITER, not just the screen, so a
+   future migration cannot quietly reintroduce the sentence.
+4. **They are test data.** CLAUDE.md's standing rule: every row today is test
+   data and the database starts CLEAN at go-live. PO-2032 and the Ohana login
+   are seeded rows; no real supplier will ever read them.
+
+**What was rejected and why:** an in-place UPDATE (defeats the append-only
+design and erases the record) · a DELETE (irreversible production-data loss for
+a cosmetic gain) · a correcting APPEND (leaves the false sentence visible AND
+adds a contradicting one, which is worse for a low-English reader) · a
+display-layer rewrite (a reader that edits stored text is a lie in the other
+direction, and it would mask a genuine future row).
+
+**Re-open this only if** the database does NOT start clean at go-live, or a
+real supplier account is pointed at PO-2032 before then. In either case the
+answer is still not an UPDATE — it is to void the PO's test history wholesale
+with the rest of the seed data.
+
