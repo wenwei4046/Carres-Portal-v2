@@ -230,7 +230,16 @@ beforeEach(() => {
     if (url === "/api/operation/suppliers")
       return Promise.resolve({
         suppliers: [
-          { id: OHANA, name: "Ohana", contact: null, whatsapp_group_url: null },
+          // Ohana holds a GROUP link and no phone; Nice Future holds a phone
+          // and no group. Not decoration — it is what makes both WhatsApp
+          // labels reachable. COPY-STANDARD gives that button two words, and a
+          // fixture carrying only one kind of supplier can only ever prove one.
+          {
+            id: OHANA,
+            name: "Ohana",
+            contact: null,
+            whatsapp_group_url: "https://chat.whatsapp.com/ohana",
+          },
           {
             id: NF,
             name: "Nice Future",
@@ -958,7 +967,11 @@ describe("what we sent the supplier (0312)", () => {
     expect(screen.getByTestId("po-no-email").textContent).toMatch(/No email on file/);
   });
 
-  it("the ACT records itself — no I've sent button to remember afterwards", async () => {
+  // Renamed 2026-08-03 (Law 8). It used to read "the ACT records itself",
+  // which was the 2026-08-02 framing that opening WhatsApp IS the send. The
+  // BEHAVIOUR it asserts is unchanged and still right — the door records
+  // itself opening, so nobody has to remember afterwards. Only the claim moved.
+  it("the DOOR records itself opening — no I've sent button to remember afterwards", async () => {
     await mountLoaded();
     expect(screen.getByTestId("po-history").textContent).toBe("No communication yet.");
     expect(screen.queryByTestId("po-sent")).not.toBeInTheDocument();
@@ -986,7 +999,7 @@ describe("what we sent the supplier (0312)", () => {
     );
   });
 
-  it("a PO that HAS been sent shows the channel and the revision it carried", async () => {
+  it("a PO whose door was opened shows the channel and the snapshot it carried", async () => {
     await mountLoaded();
     fireEvent.click(listing().getByText("PO-9005"));
     await waitFor(() =>
@@ -998,7 +1011,11 @@ describe("what we sent the supplier (0312)", () => {
     // The row names the DOOR the Portal observed being opened — never a send,
     // never a receipt (Jess, 2026-08-03). `sent` is banned from this band.
     expect(h.getByText(/WhatsApp opened/)).toBeInTheDocument();
-    expect(h.getByText(/Revision 2/)).toBeInTheDocument();
+    // SNAPSHOT, never Revision (Jess, 2026-08-03). `purchase_orders` is never
+    // edited by this path, and every other tool an operator has used means
+    // "the document changed" by the word Revision.
+    expect(h.getByText(/Snapshot 2/)).toBeInTheDocument();
+    expect(h.queryByText(/Revision/)).not.toBeInTheDocument();
     expect(h.queryByText(/sent/i)).not.toBeInTheDocument();
     // Opening WhatsApp twice on one morning is ONE event that happened twice.
     expect(h.getByTestId("po-history-count")).toHaveTextContent("×2");
@@ -1010,5 +1027,47 @@ describe("what we sent the supplier (0312)", () => {
     // press is what `×2` already says.
     expect(h.getByText(/11:00/)).toBeInTheDocument();
     expect(h.queryByText(/13:00/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * Every door says which application it opens (Jess, 2026-08-03) —
+   * COPY-STANDARD's WhatsApp table plus her `Open email` ruling. The label
+   * follows the BEHAVIOUR: a button naming a door the click does not open is
+   * worse than a vague one, because the operator learns to stop reading it.
+   */
+  it("labels each door by what it opens — group vs direct chat vs mail client", async () => {
+    await mountLoaded();
+    // PO-9001 is Nice Future: a phone on file and no group, so the click opens
+    // a `wa.me/` chat with ONE named party.
+    const wa = screen.getByTestId("po-open-whatsapp") as HTMLAnchorElement;
+    expect(wa).toHaveTextContent("Open WhatsApp");
+    expect(wa).not.toHaveTextContent("group");
+    expect(wa.getAttribute("href")).toMatch(/^https:\/\/wa\.me\//);
+    expect(screen.getByTestId("po-open-email")).toHaveTextContent("Open email");
+    expect(screen.getByTestId("po-copy-message")).toHaveTextContent("Copy message");
+
+    // PO-9003 is Ohana: a saved GROUP link, so the same button says `group`.
+    fireEvent.click(listing().getByText("PO-9003"));
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("po-working-header")).getByText("PO-9003"),
+      ).toBeInTheDocument(),
+    );
+    const grp = screen.getByTestId("po-open-whatsapp") as HTMLAnchorElement;
+    expect(grp).toHaveTextContent("Open WhatsApp group");
+    expect(grp.getAttribute("href")).toBe("https://chat.whatsapp.com/ohana");
+  });
+
+  it("no button anywhere in the desk claims an outcome the Portal cannot see", async () => {
+    // The whole band, read as text. This is the assertion that would have
+    // caught what shipped: `sent via whatsapp` sat one line under a button
+    // called `WhatsApp`, and 51 render tests were green.
+    await mountLoaded();
+    const desk = screen.getByTestId("po-activity").textContent ?? "";
+    for (const banned of [/\bsent\b/i, /\bSend\b/, /Revision/, /received/i]) {
+      expect(desk, `the desk may not say ${banned}`).not.toMatch(banned);
+    }
+    // And the bare Phase-3 labels must not come back.
+    expect(desk).not.toMatch(/(^|\W)Copy(\W|$)/);
   });
 });
