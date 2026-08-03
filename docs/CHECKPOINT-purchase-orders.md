@@ -611,3 +611,278 @@ only the suite has verified nothing.
   Communication desk words · the grey-date tooltip.
 - ETA-model reminder: Loo froze "settle after real POs" — Jess overrode 2026-08-01
   (ledger = only write door). Recorded; optional Loo sign-off is her call.
+
+---
+
+## 6 · UPDATES — append only (Jess, 2026-08-03)
+
+> **Her rule, given when a chat proposed rewriting §3:** *"Checkpoint 是当时为什么这样决定。
+> 不是现在发现后来变了。"* Nothing above this line is ever edited to match a later fact.
+> A later fact is a NEW dated entry here, and the reader compares the two themselves.
+
+### 2026-08-03 · Update — the PO PDF renderer already exists
+
+**What §3 says** (correct as at the moment it was written, and left untouched):
+*"Print PDF REMOVED on purpose: the old `po-template.tsx` prints money, violating
+PO-PDF-STANDARD §2 … Never re-add the old button."*
+
+**What has since happened, measured 2026-08-03 on `origin/main`:**
+
+- `apps/web/src/lib/pdf/po-template.tsx` was **rebuilt to `docs/pdf/PO-PDF-STANDARD.md`**
+  by PR #557 (merge `33bcbad2`, 2026-08-02) and is money-free — its own header comment
+  reads *"no RM figure ever reaches this component, so nothing here can print one."*
+- `GET /api/operation/pos/:id/print-data` is already a thin door over the money-free
+  `purchasing_po_document` RPC (migration 0307).
+- `renderPoPdf` is exported from `apps/web/src/lib/pdf/render.ts`.
+- **It has exactly ONE caller in the whole web app, and it is not this page**:
+  `apps/web/src/pages/operation/components/AssignPickupDialog.tsx` (the pickup-partner
+  dialog). So the buyer who owns the PO still has no way to print it.
+
+**Both sentences of §3 therefore stay true and one is now narrower:** the OLD money-printing
+template is still never to be re-added — it no longer exists. The renderer that replaced it
+is the one Phase 3 wires up. **Phase 3 does not build a PDF; it builds the door to one.**
+
+### 2026-08-03 · Update — 0312 / 0313 are a separate repository task
+
+`po_sends` + `po_revisions` are live in prod and their `.sql` files exist in no branch.
+**Jess ruled this repository governance, not a Phase 3 blocker** — registered as carry-forward
+`migrations-0312-0313-have-no-file-in-any-branch`. Phase 3 continues; it needs no migration.
+
+### 2026-08-03 · FROZEN by Jess — the operator journey for ONE Purchase Order
+
+**Her ruling, verbatim:** *"Printing a PDF does NOT mean the Purchase Order has been issued.
+Printing only generates the document. The business event happens only after the operator
+delivers the PO to the supplier. Freeze the operator journey for one Purchase Order first.
+Do not start with Batch."*
+
+**The journey — seven moments. This is business, not UI. No button word is decided here.**
+
+```
+  ①  Operator opens the PO          register · PO Issued oldest first
+  ②  Review                         destination · lines · dates
+  ③  Print PDF                      the document now exists on paper / as a file
+  ④  Open WhatsApp                  the door out of the portal
+  ⑤  Copy message                   the words travel with the document
+  ⑥  The PO leaves the portal      ← the last moment the system can SEE
+  ⑦  History records what we KNOW  the click + the revision current at that click
+```
+
+**PRINT ≠ ISSUE — frozen, and it is four separate promises:**
+
+| Print does NOT | Why |
+|---|---|
+| write History | printing is producing, not delivering |
+| change Status | `po_sup_status` has no "we sent it" value; its next value, `acknowledged`, is the SUPPLIER's act |
+| mint a Revision | a revision is what the supplier was GIVEN, and ③ gives them nothing |
+| have a limit | printing to check the layout is printing; it may happen any number of times |
+
+This follows the law Jess froze 2026-08-02 — **the act records itself** — and is the same
+ruling already applied to `Copy`: taking the words out of the portal is not sending them.
+**There is no "I've sent" button, and none may be added.**
+
+**Where the record actually happens today** (measured, and unchanged by this freeze): the
+WhatsApp anchor fires `send.mutate({ channel: "whatsapp" })` on click, so ⑥ and ⑦ are ONE
+event — the operator never confirms anything after the fact. The revision is computed
+server-side by `purchasing_record_send`, and a re-send of an unchanged document stays the
+same revision.
+
+**TWO POINTS LEFT OPEN INSIDE THIS FROZEN JOURNEY — neither may be resolved by a chat:**
+
+1. **⑥ has no name yet, and the obvious one is already taken.** `Issue PO` is Loo's frozen
+   To Order action that CREATES the PO (2026-07-30: *"Raising a purchase order is ONE
+   action, never two … Only `Issue PO` mints the PO number"*). Using it again for "the
+   supplier now holds it" is one word for two moments. `Send` is retired and banned from
+   reuse (COPY-STANDARD, 2026-07-29). So ⑥ needs a word that exists in neither place —
+   Jess's call, in the words step.
+2. **④ has no door for some suppliers.** The WhatsApp button renders only when the supplier
+   has a saved group link OR a usable contact number; otherwise it does not render at all,
+   and Email is unusable (2 of 10 suppliers hold an email and both are `@carres.com`).
+   Measured 2026-08-03: 5 of 10 suppliers hold a WhatsApp group. **How many of the other
+   five carry a usable phone is NOT measured** — that number decides whether ④ is a rare
+   gap or a routine one, and it is the first thing to measure when Phase 3 resumes.
+
+**Order of work, hers:** freeze the journey (this entry) → button words · what History says
+→ ASCII → review → build → test → **then** Batch. *"Do not let Batch drive the
+architecture. One PO must be complete first."*
+
+### 2026-08-03 · CORRECTION by Jess — History records facts, never assumptions
+
+**Her ruling, verbatim:** *"Do not record: 'Supplier received the PO'. The system cannot know
+that. Record only the action the system actually knows happened … Never record events the
+system cannot verify. Keep the operator journey unchanged. Only adjust the wording of the
+history event."*
+
+**What changed above:** moments ⑥ and ⑦ of the frozen journey were rewritten under her name
+(they previously read `Supplier receives the PO` / `History records it`). **The seven moments
+themselves are unchanged** — this is a wording correction, not a re-design.
+
+**The correction reaches further than the journey, and this was MEASURED, not assumed.** The
+live timeline already prints `sent via whatsapp · Revision 1`. `sent` is a claim the system
+cannot verify: all it observed is that an anchor was clicked. The operator may have opened
+the wrong group, cancelled, or never pressed send at all. **So the shipped string carries the
+same defect the correction was written to stop**, and Phase 3's words step must settle it
+rather than inherit it.
+
+**What the system genuinely knows, and nothing more:**
+
+| Observed fact | Not observed |
+|---|---|
+| the WhatsApp/mail door was opened, at a timestamp | that a message was sent |
+| the message was copied to the clipboard | that it was pasted anywhere |
+| which revision was current at that moment | that the supplier read it, or holds that revision |
+| the PDF was rendered | that it was printed, attached, or delivered |
+
+**`Supplier received the PO` may only ever be written by something that watched the supplier
+receive it** — a supplier portal, a read receipt, or an API. None exists. Until one does,
+that sentence is banned from the screen.
+
+**TWO CONSEQUENCES, both open, neither resolvable by a chat:**
+
+1. **Is `PO shared with supplier` true of Carres?** Jess allowed it *"only if this matches our
+   SOP"*. It is a claim about the operator's habit, not about the system: if pressing the
+   WhatsApp door always means it goes out within the minute, the sentence is honest; if the
+   door is sometimes opened to look something up, it is not. **Only Jess can answer that**,
+   and the answer decides whether ⑥ is `PO shared with supplier` or only `WhatsApp opened`.
+2. **Recording `Copied supplier message` reverses a rule she froze on 2026-08-02** — *"Copy
+   records nothing: copying words is not sending them"*, and there is a test guarding it.
+   The two rules are reconcilable and the reconciliation is the point: the old rule said Copy
+   is not a SEND; the new rule says record what happened. So a copy may be recorded **as a
+   copy**, and may never enter `po_sends`, whose rows carry a channel and drive the revision
+   logic — a copy landing there would inflate the send history and dilute what a revision
+   means. **BLOCKED on a real dependency**: `po_sends` / `po_revisions` were applied to prod
+   as migrations 0312 + 0313 and their `.sql` files exist in no branch (carry-forward
+   `migrations-0312-0313-have-no-file-in-any-branch`), so the table's CHECK constraints and
+   the RPC's body cannot be read from the repo. **This is the first time that gap actually
+   blocks work**, and adding an event kind by guessing the constraint is exactly the
+   "95% right looks authoritative" failure that carry-forward warns about.
+
+### 2026-08-03 · FROZEN by Jess — where the portal stops knowing
+
+**Her ruling.** Opening WhatsApp does not mean the PO went out. **Four strings are banned
+from the screen**, and one of them was mine from an hour earlier:
+
+```
+✗  Supplier received the PO      ✗  sent via WhatsApp
+✗  PO shared with supplier       ✗  The PO leaves the portal
+```
+
+**The journey, re-frozen with her boundary and her order.** Note ④ and ⑤ swapped: her
+sketch reads *"Print PDF → Copy message → Open WhatsApp → Portal stops knowing"*, which is
+also the real sequence (copy the words, then open the app and paste).
+
+```
+  ①  Operator opens the PO       register · PO Issued oldest first
+  ②  Review                      destination · lines · dates
+  ③  Print PDF                   the document exists — records nothing, no limit
+  ④  Copy message                records NOTHING (her 2026-08-02 rule, re-confirmed)
+  ⑤  Open WhatsApp               the last thing the portal can observe
+  ─────────────────────────────  PORTAL STOPS KNOWING (her line, verbatim)
+  ⑥  …the supplier's world       unobservable: sent · read · acted on
+  ⑦  History records the CLICK   never the send · with the revision current at it
+```
+
+**The live string is corrected by her, in her words** — Phase 3's words step ships it:
+
+```
+  was:  3 Aug 26 · sent via whatsapp · Revision 1
+  now:  3 Aug 26 · WhatsApp action recorded · Revision 1
+```
+
+**A real send/receive event may be recorded only when something actually watched it** — a
+WhatsApp API, a supplier portal, a read receipt, **or Jess re-approving a manual confirmation
+step**. That last door is hers to re-open; nobody else may.
+
+**THE FLOOD SHE NAMED IS ALREADY PREVENTED, and this was measured rather than promised.**
+Her worry — *"Timeline 会被无结果的点击灌满"* — is answered by the duplicate collapse she
+herself caught on 2026-08-02: same day + same channel + same revision renders as ONE line
+with a `2×` count (`groupSends`). So the row stays (it carries the revision, which is the
+one fact worth keeping), the word changes, and repeated clicking cannot flood the timeline.
+**Open, for the words step**: whether the `2×` count still earns its place — under this
+ruling it advertises how many times an unverifiable action was taken, which may be noise
+rather than information. Jess's call, not a chat's.
+
+**`Copy` is confirmed unchanged and needs nothing built.** It writes no business History, so
+it needs no event kind, no new table, and — importantly — it is **NOT blocked by the missing
+0312 / 0313 files**. The block reported earlier applied only to recording a copy, and she
+ruled that away. Carry-forward `migrations-0312-0313-have-no-file-in-any-branch` therefore
+blocks nothing in Phase 3 and stays a repository-governance task.
+
+**THE STORE KEEPS ITS NAME — decided, with the reason, so it is not re-opened.** `po_sends`,
+`POST /:id/sends`, `purchasing_record_send` and the wire's `sends` all say "send", which is
+the very claim this entry bans. They are **not renamed**: COPY-STANDARD governs words that
+appear ON SCREEN, and the portal already runs internal identifiers that may never print
+(`ops_remark` is a column precisely so it cannot reach paper). Renaming a live store, a
+route and an RPC to fix a word nobody sees would spend a migration — on the two objects whose
+`.sql` files are missing — to change nothing an operator reads. The screen word changes; the
+plumbing keeps its name and a comment records why.
+
+### 2026-08-03 · FROZEN by Jess — the Phase 3 words, and where Communication lives
+
+**THE DESIGN PRINCIPLE (hers, and it outranks the three words below):**
+
+> **Communication starts from the DOCUMENT, never from the register.**
+
+Her reason is the operator's own sequence, not another product's: *Review → Preview / Print
+PDF → confirm the document is right → Communication → WhatsApp / Email.* It matches the
+journey already frozen above. The consequence is long-lived: `Print PDF` · `Download PDF` ·
+`WhatsApp` · `Email` (later) · `Supplier Portal` (later) all grow in **one place**, anchored
+on the document — so none of them ever needs re-homing.
+
+**THE THREE WORDS — frozen, no chat may respell them:**
+
+| | Word | Her reason |
+|---|---|---|
+| 1 | **`Print PDF`** — never bare `Print` | The same place will later hold `Download PDF`, `WhatsApp`, `Email`, `Supplier Portal`. **Naming the object from day one is cheaper than renaming later.** Measured against the portal's existing spellings: `Print DO` and `Print PO` are already live elsewhere, so `Print PDF` is a THIRD spelling of one act — reported below, not resolved here |
+| 2 | **`{door} opened · Revision {n}`** | `WhatsApp opened` · `Email opened` · `Supplier Portal opened` — one shape for every door, forever. **It describes the action the Portal OBSERVED, never what happened in the real world.** Her rejection of `WhatsApp action recorded`: still too technical; what the operator cares about is *when did I start sending this PO out of the Portal* |
+| 3 | **`×2` KEPT, but quiet** | Right-aligned and faint. **Its meaning is not "sent twice" — it is "the same Portal action happened twice."** Her worked case: a staff member says *"I definitely pressed it again"*, and the timeline can answer *"yes, the Portal recorded the second press too."* |
+
+**The frozen shape:**
+
+```
+[ Print PDF ]
+
+Timeline
+WhatsApp opened · Revision 1                                   ×2
+2 Aug 2026 14:36
+Email opened · Revision 2
+```
+
+**Words are CLOSED.** Her instruction: *"我建议停止 Words。因为再往下已经不是 wording，而是
+UI."* Next is the ASCII layout, drawing only `Print PDF` · Communication (WhatsApp) ·
+Timeline. Not Batch. Not Relationship Map. Not code.
+
+**Three facts recorded with the freeze, none of them a challenge to it:**
+
+1. **`Print PDF` is a third spelling.** The portal already renders `Print DO`
+   (`OrderDetailDrawer`) and `Print PO` (`PoDetailModal`) for the same act on other
+   documents. COPY-STANDARD has no ruled word for any of the three. Jess's reasoning —
+   name the object because the block will grow — applies equally to those two, so the
+   consistent end-state is a single ruled pattern rather than three. **Reported, not acted
+   on**: renaming a live button on another page is not Phase 3's.
+2. **An entry is now TWO lines** (event, then timestamp), where today it is one. With N
+   distinct sends that is 2N lines of permanent height in the workspace. Stated so the ASCII
+   step can show her the real cost rather than discover it later.
+3. **The timestamp now carries a TIME, and the rows are COLLAPSED by day.** Same day + same
+   channel + same revision renders as ONE row, so a collapsed row has several real times and
+   the drawing must say which one it prints. Raised in the ASCII step.
+
+### 2026-08-03 · Jess closed the AutoCount study
+
+*"Study 已经够了."* No reference document is written — she refused it twice, the second time
+with the reason: a doc written mid-collection becomes half-research, half-decision. The
+study's findings live in the chat until an evidence set is complete.
+
+**Two corrections she made to that study, kept because they are rulings about CARRES:**
+
+- **`Transfer To` (the downstream document number) does NOT enter the Purchase Orders
+  register.** The register answers *"what must I do with this PO today?"* — not *"what did
+  this document later become."* `Received 2 / 5` stays; a GRN / Session number belongs in the
+  workspace's Receiving row or in the later Relationship Map.
+- **AutoCount's `View Flow` is a REFERENCE CASE, not a specification.** It draws ACCOUNTING
+  documents (Invoice · AR Payment · PI · AP Payment); Carres must draw a BUSINESS JOURNEY —
+  `Customer Order → (Purchase Order → Receiving | Claim)` and `→ (Delivery → Logistics |
+  POD)`. The two are already different pictures.
+- **The absence of a visible "sent" history in AutoCount is not evidence of an industry
+  standard.** Screenshots cannot prove backend behaviour. The honest statement is: *in the
+  screens collected so far, AutoCount shows no supplier-received status or timeline.* Carres's
+  own rule — the Portal records only what it observed — needs no external endorsement.
