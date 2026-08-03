@@ -158,6 +158,7 @@ import {
   type ProcurementTabSlug,
   type ReassignPoWarehouseInput,
   type ReceivePoWithDoInput,
+  type OfficeReceiveInput,
   type RefundCreateInput,
   type RefundPayInput,
   type ReservedDrilldownResponse,
@@ -479,6 +480,11 @@ export const qk = {
      *  and this queue all move together. */
     warehouseReceipts: (status: string) =>
       ["operation", "warehouse-receipts", status] as const,
+    /** Slice B — one PO's Receiving Sessions + their event ledger. The
+     *  Workspace's Summary and Activity both read this ONE call, so the two
+     *  sections can never describe the same delivery differently. */
+    poReceiving: (poId: string) =>
+      ["operation", "pos", poId, "receiving"] as const,
     supplierClaimPhotos: (id: string) =>
       ["operation", "supplier-claims", "photos", id] as const,
     warehouse: () => ["operation", "warehouse"] as const,
@@ -5650,6 +5656,109 @@ export function useReceivePoWithDoMutation(
       // must not still be showing yesterday's queue.
       await qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] });
       // Receiving stock can unblock in_production orders → invalidate orders.
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/* ── Slice B · the Office Receiving Workspace ────────────────────────────── */
+
+/** One line of a stored Receiving Session — the DELTA this delivery brought. */
+export interface ReceivingSessionLine {
+  id: string;
+  sku: string;
+  received_now: number;
+  damaged_qty: number;
+  wrong_item_qty: number;
+  wrong_item_claim_type: string | null;
+}
+
+/** A Receiving Session as the Workspace reads it. */
+export interface ReceivingSession {
+  id: string;
+  po_id: string;
+  do_number: string | null;
+  do_file_path: string | null;
+  note: string | null;
+  lines: ReceivingSessionLine[];
+  status: "draft" | "submitted" | "returned" | "posted" | "voided";
+  submitted_from: "office" | "warehouse";
+  goods_received_at: string;
+  submitted_at: string | null;
+  posted_at: string | null;
+  posted_by_name: string | null;
+  submitted_by_name: string | null;
+  return_reason: string | null;
+}
+
+/** One entry of the ONE history (RECEIVING-INFORMATION-MODEL §6). */
+export interface ReceivingEvent {
+  id: string;
+  receipt_id: string;
+  event:
+    | "submitted"
+    | "returned"
+    | "resubmitted"
+    | "posted"
+    | "voided"
+    | "amended";
+  event_at: string;
+  actor_name: string | null;
+  payload: {
+    do_number?: string;
+    goods_received_at?: string;
+    units_counted?: number;
+    entry_source?: "office" | "warehouse";
+    claims_linked?: number;
+    reason?: string;
+  };
+}
+
+export interface PoReceivingResponse {
+  sessions: ReceivingSession[];
+  events: ReceivingEvent[];
+}
+
+/** GET /api/operation/pos/:id/receiving — the Workspace's Summary + Activity. */
+export function usePoReceiving(poId: string | null) {
+  return useQuery<PoReceivingResponse>({
+    queryKey: qk.operation.poReceiving(poId ?? ""),
+    queryFn: () =>
+      apiFetch<PoReceivingResponse>(`/api/operation/pos/${poId}/receiving`),
+    enabled: !!poId,
+  });
+}
+
+/**
+ * POST /api/operation/pos/:id/office-receive — Save, in Receiving Mode.
+ *
+ * Invalidates exactly what `useReceivePoWithDoMutation` invalidates (the same
+ * engine moved the same stock and opened the same claims) PLUS this PO's
+ * Receiving Sessions, so the Workspace's Activity shows the new entry without
+ * a reload.
+ */
+export function useOfficeReceiveMutation(
+  poId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, OfficeReceiveInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, OfficeReceiveInput>({
+    mutationFn: (input) =>
+      apiFetch<unknown>(`/api/operation/pos/${poId}/office-receive`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.poReceiving(poId) });
+      await qc.invalidateQueries({ queryKey: qk.operation.po(poId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
+      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));

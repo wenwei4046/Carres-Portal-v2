@@ -127,6 +127,13 @@ Status: Draft · Submitted · Returned · Posted · Voided   (five, exactly)
   added. The engine re-derives totals.
 - Whether Draft→Posted may skip Submitted is a PERMISSION of the submitter
   (Manual = direct; Warehouse = review until trusted), never a module switch.
+- **An event records what happened in the BUSINESS world, not the steps the
+  system walked (Jess, 2026-08-03).** The Warehouse flow is two people, two
+  acts, two times, so its ledger reads `submitted` then `posted`. The Office
+  is one operator pressing Save once, so its ledger reads `posted` and nothing
+  else — a `submitted` event there would name an act nobody performed. When a
+  one-act flow leaves a payload short, the Event Payload Dictionary is widened
+  (§6.1); an artificial event is never manufactured to carry the fields.
 
 ---
 
@@ -166,11 +173,19 @@ enters this table before it enters any payload.
 | Key | Type | Used by | Meaning |
 |---|---|---|---|
 | `do_number` | string | submitted · resubmitted · posted | the supplier DO this act was about |
-| `goods_received_at` | date | submitted · resubmitted | the business date as entered |
-| `units_counted` | int | submitted · resubmitted | good + damaged + wrong across all lines |
+| `goods_received_at` | date | submitted · resubmitted · posted | the business date as entered |
+| `units_counted` | int | submitted · resubmitted · posted | good + damaged + wrong across all lines |
+| `entry_source` | string | posted | `office` \| `warehouse` — which desk keyed the count |
 | `reason` | string | returned · voided · amended | the human's stated why |
 | `claims_linked` | int | posted | supplier claims this posting opened |
 | `changes` | array | amended | `[{sku, from, to}]` — exactly what was added |
+
+**`posted` carries the business date, the count and the source (Jess,
+2026-08-03).** The Office posts in ONE act, so its Session has no `submitted`
+event to read those facts off — and the answer is to widen the payload, never
+to write an event nobody performed (see §4). Both doors write the same five
+keys, so a report over the ledger reads the same regardless of which desk
+keyed the count.
 
 Event names themselves are business facts and closed:
 `submitted · returned · resubmitted · posted · voided · amended`

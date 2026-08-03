@@ -215,6 +215,51 @@ export const receivePoWithDoInput = z.object({
 export type ReceivePoWithDoInput = z.infer<typeof receivePoWithDoInput>;
 
 /**
+ * `officeReceiveInput` — POST /api/operation/pos/:id/office-receive
+ * (Slice B of the Receiving Workspace; migration 0315 `office_receive_post`).
+ *
+ * This is NOT a second spelling of `receivePoWithDoInput`. That body books a
+ * receive and leaves no record of the delivery; this one opens a **Receiving
+ * Session** — one physical delivery, one document, one `posted` event — and
+ * the shape follows the frozen model rather than the old RPC:
+ *
+ *   · `receivedNow` is the DELTA counted on THIS delivery, never the running
+ *     total (RECEIVING-INFORMATION-MODEL §7.1: "The form asks 'Receive this
+ *     time', never 'total so far'"). The engine derives the cumulative figure;
+ *     no client does arithmetic on a quantity it did not count.
+ *   · `goodsReceivedAt` is the BUSINESS date — when the goods physically
+ *     arrived, which is not when somebody keyed them in (§5). Optional: the
+ *     server defaults to today in MYT, and refuses a future date or one before
+ *     the PO date. The browser never decides what "today" is.
+ *   · `doNumber` is the SUPPLIER's document number, so it has no default and
+ *     no suggestion — a number we invent is a reference the supplier has never
+ *     heard of, and it would defeat the duplicate guard it feeds.
+ *   · `doFilePath` is the signed DO photo, required past Draft by the store
+ *     itself (0314 `wr_do_required_past_draft`).
+ *
+ * Damage / wrong-item evidence rides the same keys as the older body because
+ * both end up in the SAME validator (`warehouse_receipt_validate_lines`) —
+ * one copy of the counting and evidence law, two doors.
+ */
+export const officeReceiveInput = z.object({
+  doNumber: z.string().min(3).max(60),
+  doFilePath: z.string().min(1).max(400),
+  // ISO yyyy-mm-dd. Bounds are the server's — a browser clock is not evidence.
+  goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  note: z.string().max(500).optional(),
+  lines: z.array(z.object({
+    id: z.string().uuid(),
+    receivedNow: z.number().int().nonnegative(),
+    damagedQty: z.number().int().nonnegative().optional(),
+    wrongItemQty: z.number().int().nonnegative().optional(),
+    damagedPhotos: CLAIM_PHOTO_PATHS.optional(),
+    wrongItemClaimType: z.string().min(1).max(40).optional(),
+    wrongItemPhotos: CLAIM_PHOTO_PATHS.optional(),
+  })).min(1),
+}).strict();
+export type OfficeReceiveInput = z.infer<typeof officeReceiveInput>;
+
+/**
  * `adjustStockInput` — POST /api/operation/warehouse/adjust.
  * Maps to `operation_adjust_stock(sku, warehouse_id, delta, reason)` RPC.
  * `delta` is signed (positive for ad-hoc inbound, negative for damage/loss);
