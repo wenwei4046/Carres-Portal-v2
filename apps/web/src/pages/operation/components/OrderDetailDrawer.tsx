@@ -46,7 +46,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -115,7 +115,6 @@ import {
   type OrderPaymentRow,
   type operationOrderDetailLine,
   type operationOrderDetailPo,
-  type operationPoListRow,
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
@@ -176,7 +175,6 @@ import ConfirmProceedDialog from "./ConfirmProceedDialog";
 import TransferReadyDialog from "./TransferReadyDialog";
 import StockPickerGrid from "./StockPickerGrid";
 import FollowUpForm from "./FollowUpForm";
-import ReceivePOModal from "./ReceivePOModal";
 import AnnotationTimeline from "./AnnotationTimeline";
 import ChangeRequestsPanel from "./ChangeRequestsPanel";
 import OrderDocuments, {
@@ -1354,7 +1352,7 @@ function DrawerBody({
   onServiceNoteClick,
   onFollowUpClick,
 }: DrawerBodyProps) {
-  const { order, lines, addons, total, warehouse, pos } = data;
+  const { order, lines, addons, total, pos } = data;
   // Defensive default: an API build that predates freeUnits (web can deploy
   // ahead of the Worker) must not crash the drawer — just no picker until then.
   const freeUnits = data.freeUnits ?? [];
@@ -1393,7 +1391,6 @@ function DrawerBody({
   // §10 Generate invoice — the full-screen charges + live-preview overlay.
   const [invoiceOverlayOpen, setInvoiceOverlayOpen] = useState(false);
   // GRN — receive an open linked PO right here (Jess: receive in the order).
-  const [receivePo, setReceivePo] = useState<operationOrderDetailPo | null>(null);
   // GRN per-line partial receive (migration 0208) — the "Book in" stepper target.
   const [receiveLine, setReceiveLine] = useState<{
     sku: string;
@@ -2615,30 +2612,6 @@ function DrawerBody({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {receivePo && (
-        <ReceivePOModal
-          po={{
-            id: receivePo.id,
-            supplier_id: receivePo.supplier_id,
-            warehouse_id: receivePo.warehouse_id,
-            status: receivePo.status as operationPoListRow["status"],
-            sup_status: receivePo.sup_status,
-            so: receivePo.so,
-            so_refs: receivePo.so_refs,
-            eta_date: receivePo.eta_date,
-            placed_at: "",
-            purchase_order_lines: receivePo.lines.map((l) => ({
-              id: l.id,
-              sku: l.sku,
-              qty: l.qty,
-              received_qty: l.received_qty,
-            })),
-          }}
-          supplier={undefined}
-          warehouse={warehouse ?? undefined}
-          onClose={() => setReceivePo(null)}
-        />
-      )}
       {receiveLine && (
         <ReceiveLineModal
           orderId={order.id}
@@ -3591,7 +3564,7 @@ function DrawerBody({
                   <div className="label mb-1">Linked POs</div>
                   <div className="border border-base-100 rounded-[6px]">
                     {pos.map((po, i) => (
-                      <PoRow key={po.id} po={po} divider={i > 0} onReceive={setReceivePo} />
+                      <PoRow key={po.id} po={po} divider={i > 0} />
                     ))}
                   </div>
                 </div>
@@ -7623,15 +7596,7 @@ function ActionsMenu({
   );
 }
 
-function PoRow({
-  po,
-  divider,
-  onReceive,
-}: {
-  po: operationOrderDetailPo;
-  divider: boolean;
-  onReceive: (po: operationOrderDetailPo) => void;
-}) {
+function PoRow({ po, divider }: { po: operationOrderDetailPo; divider: boolean }) {
   const totalQty = po.lines.reduce((s, l) => s + Number(l.qty || 0), 0);
   const got = po.lines.reduce((s, l) => s + Number(l.received_qty || 0), 0);
   /* v4 §6 — status = FILLED pill (soft tint + dark same-hue); the outline
@@ -7666,14 +7631,24 @@ function PoRow({
           {po.status}
         </span>
         {po.status !== "received" && po.status !== "cancelled" && (
-          <Btn
-            size="sm"
-            icon={PackagePlus}
-            onClick={() => onReceive(po)}
-            title="Goods arrived from this PO — books them in as ready stock and records the GRN"
+          /* Card C1 (Jess, 2026-08-03 — DATA INTEGRITY, not UX). This was the
+             LAST door that moved `received_qty` without opening a Receiving
+             Session: it opened `ReceivePOModal`, which called
+             `operation_receive_po_with_do` straight — stock moved, and the
+             delivery left no record at all. Its own tooltip promised
+             "records the GRN", which was simply untrue.
+
+             It hands over to the Receiving Workspace now, the same way the
+             Purchase Orders tab does. One act, one door, one record. */
+          <Link
+            to={`/operation?tab=receiving&po=${encodeURIComponent(po.id)}`}
+            className="inline-flex items-center gap-1.5 text-meta font-semibold px-2 py-1 rounded border border-base-200 hover:bg-base-50"
+            title="Open this purchase order in Receiving"
+            data-testid={`drawer-check-in-${po.id}`}
           >
+            <PackagePlus size={14} />
             {purchasingActionButton("check_in")}
-          </Btn>
+          </Link>
         )}
       </div>
     </div>

@@ -561,6 +561,30 @@ transition (0098) — a day too late to give logistics the paper they ask for th
 before. Card C7 moves the stamp to customer confirmation. Nobody ever authors a delivery
 order by hand.
 
+### The Receiving Workspace's own words (locked 2026-08-03, Slice B)
+
+`Check in` above is the ACT and stays the queue word. These are the words the
+Office Receiving Workspace puts on screen while performing it — they name
+sections, fields and the state of the Save button, so they are not actions and
+do not take the five-string shape.
+
+| Word | Where | Why this word |
+|---|---|---|
+| `Receiving Summary` | workspace section | **Never `Progress`** (Jess): the section answers *what has this PO taken in*, a count, not a stage. |
+| `Received` · `Outstanding` | the summary's two rows | Outstanding is PRINTED, not left as `5 − 3`. An operator should never subtract to learn what is still owed. |
+| `Start Receiving` | primary action | A PRIMARY ACTION, never a section — the operator's whole job here is one press. |
+| `Receiving Details` | the strip Receiving Mode adds | What this delivery was, as opposed to what was on it. |
+| `Goods Received At` | field | The Business Date Dictionary's own word — when the goods PHYSICALLY arrived, which is not when they were keyed in. |
+| `Supplier DO No.` | field | **Theirs, not ours.** It has no default and no suggestion; a number we invent is a reference the supplier never issued. |
+| `Signed DO photo` | field | The evidence, named by what it is a photo OF. |
+| `Receive now` | per-line input | *"Receive this time"*, never *"total so far"* — the column beside it already says `Received`. |
+| `What kind of wrong?` | per-line picker | Plain words. The claim needs the kind before it can be filed. |
+| `Save Receiving` | the Save button, when nothing is missing | |
+| `Save — {what is missing}` | the Save button otherwise | The button NAMES the gap: `Save — add a DO number` · `Save — upload signed DO` · `Save — count at least one unit`. A grey button that will not say why is a puzzle. |
+| `Remaining after save: {n} (stays on this PO)` | beside Save | Quiet, never a popup: a short receipt is normal, and routine confirms train people to click OK. |
+| `No receiving activity yet.` | Activity empty state | **Never `Nothing received yet`** (Jess, 2026-08-03) — that reads as *the goods have not come*, which is a different fact and usually a false one. What is empty is the RECORD. |
+| `Open in Claims` | Exceptions section | A DOOR, never a form. The claim already exists; the receive that recorded the problem opened it. |
+
 ### Receiving and supplier-exception words (locked 2026-07-27)
 
 One vocabulary for every module that waits on a supplier. Never invent a synonym.

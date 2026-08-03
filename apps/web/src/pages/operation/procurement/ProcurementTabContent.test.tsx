@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import ProcurementTabContent from "./ProcurementTabContent";
 import type { CatalogResponse } from "@carres/shared";
 import type {
@@ -78,12 +78,37 @@ vi.mock("@/lib/queries", async () => {
   };
 });
 
+/** Where the router actually went — Slice B turned `Check in` into a handover
+ *  to the Receiving Workspace, so the assertion is a URL, not a modal. */
+function LocationProbe() {
+  const loc = useLocation();
+  return <div data-testid="location">{`${loc.pathname}${loc.search}`}</div>;
+}
+
+/**
+ * Real routes, not a bare MemoryRouter (Slice B). `Check in` now NAVIGATES to
+ * `/operation?tab=receiving&po=…`; with no <Routes> the procurement page never
+ * unmounts, and its OWN `?po=` deep-link effect — which means "open this
+ * document's detail" on this screen — fires on the receiving URL and opens a
+ * modal the operator would never see in the app.
+ */
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/operation/procurement/nice-future"]}>
-        {node}
+        <Routes>
+          <Route
+            path="/operation/procurement/*"
+            element={
+              <>
+                {node}
+                <LocationProbe />
+              </>
+            }
+          />
+          <Route path="*" element={<LocationProbe />} />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>
   );
@@ -337,8 +362,20 @@ describe("ProcurementTabContent — list rendering + filter chips", () => {
   });
 });
 
-describe("ProcurementTabContent — Receive button + ReceivePOModal", () => {
-  it("clicking 'Receive →' opens ReceivePOModal", () => {
+describe("ProcurementTabContent — Check in hands over to the Receiving Workspace", () => {
+  /**
+   * Slice B (Jess, 2026-08-03: "不要两个入口"). This button used to open
+   * `ReceivePOModal`, which called the receive RPC directly and produced NO
+   * Receiving Session, NO event and no GRN record. The Workspace is the one
+   * door that opens a Session, so the button hands over to it instead.
+   *
+   * The three tests that used to live here drove the MODAL's own internals
+   * (Receive-all-pending, the batched submit). They were not deleted so much
+   * as relocated: the modal keeps its own suite in `ReceivePOModal.test.tsx`,
+   * and the act this button performs is now covered end-to-end in
+   * `OperationReceiving.test.tsx`.
+   */
+  it("Check in navigates to the Receiving Workspace with the PO open", () => {
     setLoaded([
       makePo({
         id: "PO-2050",
@@ -355,104 +392,14 @@ describe("ProcurementTabContent — Receive button + ReceivePOModal", () => {
     ]);
     render(wrap(<ProcurementTabContent slug="nice-future" />));
     fireEvent.click(screen.getByTestId("receive-po-PO-2050"));
-    expect(screen.getByText(/Receive PO-2050/)).toBeInTheDocument();
-    expect(screen.getByTestId("receive-po-lines-table")).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/operation?tab=receiving&po=PO-2050",
+    );
+    // And it opens nothing here — a second receiving surface is the thing
+    // this slice removed.
+    expect(screen.queryByTestId("receive-po-lines-table")).not.toBeInTheDocument();
   });
 
-  it("ReceivePOModal 'Receive all pending' presets each line qty to its pending value", () => {
-    setLoaded([
-      makePo({
-        id: "PO-2050",
-        sup_status: "delivered",
-        purchase_order_lines: [
-          {
-            id: "55555555-5555-4555-8555-555555555555",
-            sku: "sofa:nordic:3s",
-            qty: 3,
-            received_qty: 1,
-          },
-        ],
-      }),
-    ]);
-    render(wrap(<ProcurementTabContent slug="nice-future" />));
-    fireEvent.click(screen.getByTestId("receive-po-PO-2050"));
-    // Pending delivery = 3 - 1 = 2. R1 (0284): the footer counts three things
-    // now (received · damaged · wrong item), so it says "received", not "units".
-    fireEvent.click(screen.getByRole("button", { name: /Clear/ }));
-    expect(screen.getByText(/Σ 0 received this DO/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Receive all pending/ }));
-    expect(screen.getByText(/Σ 2 received this DO/)).toBeInTheDocument();
-  });
-
-  it("ReceivePOModal submit fires one batched mutation call carrying every ticked line", async () => {
-    setLoaded([
-      makePo({
-        id: "PO-2051",
-        sup_status: "delivered",
-        purchase_order_lines: [
-          {
-            id: "66666666-6666-4666-8666-666666666666",
-            sku: "sofa:nordic:3s",
-            qty: 2,
-            received_qty: 0,
-          },
-          {
-            id: "77777777-7777-4777-8777-777777777777",
-            sku: "mattress:carres-cloud:King",
-            qty: 1,
-            received_qty: 0,
-          },
-        ],
-      }),
-    ]);
-    // Drive the DO upload deterministically by mocking sign-upload.
-    // 2026-05-15 (Task 12): ReceivePOModal also fetches per-thread state for
-    // own_logistics suppliers via GET /api/operation/pos/:poId/threads — that
-    // hook hits the same apiFetch mock. Route by URL so the threads call gets
-    // an empty array (the per-thread section then auto-hides on length === 0)
-    // and the upload call gets the { token, path } pair it needs.
-    vi.mocked(apiFetch).mockImplementation((url: string) => {
-      if (typeof url === "string" && url.includes("/threads")) {
-        return Promise.resolve([]) as ReturnType<typeof apiFetch>;
-      }
-      return Promise.resolve({
-        token: "sign-tok",
-        path: "PO-2051/abc-DO-1.pdf",
-      }) as ReturnType<typeof apiFetch>;
-    });
-    render(wrap(<ProcurementTabContent slug="nice-future" />));
-    fireEvent.click(screen.getByTestId("receive-po-PO-2051"));
-    // Tick the signed checkbox (DO# is auto-suggested already)
-    const signedLabel = screen.getByText(
-      /Goods inspected and DO signed by warehouse/,
-    );
-    fireEvent.click(signedLabel.previousSibling as Element);
-    // Upload a valid PDF — populates doFilePath state and unblocks Submit.
-    const file = new File(["%PDF-1.4"], "do.pdf", { type: "application/pdf" });
-    fireEvent.change(screen.getByLabelText(/^do file$/i), {
-      target: { files: [file] },
-    });
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: /Mark received/ }),
-      ).not.toBeDisabled(),
-    );
-    fireEvent.click(screen.getByRole("button", { name: /Mark received/ }));
-    await waitFor(() => {
-      expect(receiveMutateAsync).toHaveBeenCalledTimes(1);
-    });
-    const payload = receiveMutateAsync.mock.calls[0]?.[0];
-    expect(payload).toMatchObject({
-      doFilePath: "PO-2051/abc-DO-1.pdf",
-      // 0076: payload keys by line UUID `id` (not sku) — see ReceivePOModal
-      // submit() comments and packages/shared receivePoWithDoInput schema.
-      lines: expect.arrayContaining([
-        { id: "66666666-6666-4666-8666-666666666666", receivedQty: 2 },
-        { id: "77777777-7777-4777-8777-777777777777", receivedQty: 1 },
-      ]),
-    });
-    expect(payload.doNumber).toMatch(/^DO-\d+/);
-  });
 
   // v3-S2.2 catch-all — every non-pickup-flight sup_status renders the
   // catch-all "Receive →" button. Consolidates 4 single-state guards into one
@@ -576,7 +523,7 @@ describe("ProcurementTabContent — PoDetailModal (read-only PO detail)", () => 
     expect(screen.queryByTestId("po-detail-modal")).not.toBeInTheDocument();
   });
 
-  it("clicking 'Receive →' button does NOT open PoDetailModal (stopPropagation)", () => {
+  it("Check in does NOT open PoDetailModal (stopPropagation)", () => {
     setLoaded([
       makePo({
         id: "PO-2072",
@@ -593,7 +540,11 @@ describe("ProcurementTabContent — PoDetailModal (read-only PO detail)", () => 
     ]);
     render(wrap(<ProcurementTabContent slug="nice-future" />));
     fireEvent.click(screen.getByTestId("receive-po-PO-2072"));
-    expect(screen.getByText(/Receive PO-2072/)).toBeInTheDocument();
+    // It hands over to the Receiving Workspace (Slice B) and, crucially for
+    // this guard, the row's own click never fires underneath it.
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/operation?tab=receiving&po=PO-2072",
+    );
     expect(screen.queryByTestId("po-detail-modal")).not.toBeInTheDocument();
   });
 
@@ -667,7 +618,7 @@ describe("ProcurementTabContent — PoDetailModal (read-only PO detail)", () => 
     }
   });
 
-  it("v3-S2.3: clicking Receive PO inside PoDetailModal opens ReceivePOModal for same PO", () => {
+  it("v3-S2.3: Check in inside PoDetailModal hands the SAME PO to Receiving", () => {
     setLoaded([
       makePo({
         id: "PO-4001",
@@ -689,10 +640,13 @@ describe("ProcurementTabContent — PoDetailModal (read-only PO detail)", () => 
     // The Receive button is visible inside the detail modal
     const receiveBtn = screen.getByTestId("po-detail-receive-button");
     expect(receiveBtn).toBeInTheDocument();
-    // Click it: detail modal closes, ReceivePOModal opens for the same PO
+    // Click it: the detail modal closes and the Receiving Workspace opens on
+    // the SAME document.
     fireEvent.click(receiveBtn);
     expect(screen.queryByTestId("po-detail-modal")).not.toBeInTheDocument();
-    expect(screen.getByText(/Receive PO-4001/)).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/operation?tab=receiving&po=PO-4001",
+    );
   });
 });
 

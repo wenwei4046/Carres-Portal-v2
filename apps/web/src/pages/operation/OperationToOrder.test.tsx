@@ -422,10 +422,11 @@ describe("the Excel reflexes — header sort, per-column filters", () => {
     // The empty PO cell SAYS the work instead of a mute dash, and the
     // footer counts what the sheet shows.
     expect(screen.getAllByText(W.yetToOrder).length).toBeGreaterThan(0);
-    // ITEMS, not customer orders (Loo, 2026-08-03 — q1). The footer used to
-    // count orders while the toolbar counted rows and the button counted POs:
-    // three units on one screen with no conversion stated anywhere.
-    expect(screen.getByTestId("to-order-footer")).toHaveTextContent(/items?$/);
+    // NO COUNT AT ALL (Loo, 2026-08-03).  read as a third number in
+    // a third unit — and  already means something else on this screen,
+    // in the Qty column. His pair stands: what I ticked, and how many purchase
+    // orders it becomes. The footer keeps only the way OUT of a filter.
+    expect(screen.getByTestId("to-order-footer")).not.toHaveTextContent(/[0-9]/);
   });
 });
 

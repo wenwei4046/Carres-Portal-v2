@@ -81,22 +81,54 @@ Migration **0314_receiving_session_upgrade** is APPLIED to prod (tracker tail
 dry-run + negative control passed; all row counts unchanged (receipts 0 · POs
 19 · lines 33 · received 0).
 
-## 2 · SLICE B — the ONLY scope (Jess, 2026-08-02)
+## 2 · SLICE B — ✅ SHIPPED 2026-08-03 (PR #566, migration 0315)
 
 ```
 Office Receiving Workspace
   Read Mode → [ Start Receiving ] → Receiving Mode → Save → Posted
 ```
 
-Office ONLY. **Not in Slice B** (later slices, do not touch):
-Warehouse Review · Amend · Void · Claims integration · Receiving Photos table ·
-Inventory correction workflow · dropping `reviewed_*`.
+Live: web `index-QY1qWVmb.js` (all four canonicals) + Worker `26b67243`.
+**0315 `office_receive_post`** — Draft → Posted in ONE act,
+`submitted_from='office'`, through the SAME `warehouse_receipt_validate_lines`
+and the SAME receive engine. 32 assertions across two rolled-back transactions
+on prod, both with a negative control that fired; `md5(prosrc)` reconciled
+byte-identical to the file on both functions.
 
-What Slice B therefore needs that does not exist yet:
-- **The Office door RPC** (create+post in one act, `submitted_from='office'`,
-  Draft→Posted allowed by permission — its dry-run must cover Draft→Posted,
-  which Slice A could not test). Same validation helper, same event writes.
-- The Workspace UI on the Receiving tab (Phase 3-6 already approved, see §3).
+**Jess's one change to the proposal, and it is now law (§4 of the model):**
+the Office writes **exactly one `posted` event**. An event records what
+happened in the BUSINESS world, not the steps the system walked — the
+Warehouse flow is two people and two acts, the Office is one operator pressing
+Save once, so a `submitted` event there would name an act nobody performed.
+The Event Payload Dictionary was widened instead (`posted` gains
+`goods_received_at` · `units_counted` · `entry_source`), and the WAREHOUSE
+door writes the same five keys so a report over the ledger cannot silently
+under-count half the sessions.
+
+Also closed by the same slice: `ReceivePOModal` retired from the Purchasing
+lane (Jess: 不要两个入口) — the Purchase Orders tab's `Check in` hands over to
+the Workspace.
+
+**Still NOT built** (later slices, unchanged): Warehouse Review · Amend · Void ·
+a Claims form · Receiving Photos table · Inventory correction · dropping
+`reviewed_*`.
+
+## 2.1 · What the NEXT chat should know
+
+- **A third door still exists and was deliberately not touched**:
+  `OrderDetailDrawer.tsx:2619` still opens `ReceivePOModal`, which books stock
+  and opens NO Session. Different module, 7,000-line contested file — killing
+  it needs Jess's word.
+- **There is no GRN register yet.** Nothing lists all Receiving Sessions
+  (2990's `GoodsReceivedList` is the master to copy). Its own card.
+- `purchase_orders.do_file_path` is still overwritten by the shared receive
+  RPC — the second truck's DO erases the first ON THE PO. Nothing is lost (the
+  Session holds the evidence); retiring the column is a later slice.
+- **`RailItem` / `RailGroup` are inline in `OperationReceiving.tsx`.** PR #565
+  landed the Purchase Orders workspace on main the same day, so its rail is now
+  the SECOND inline copy — UI-KIT §6.1 makes the extraction due.
+- `?po=` means "open the detail modal" on Purchase Orders and "select the
+  workspace PO" on Receiving. Safe today (different routes); worth one card.
 
 ## 3 · THE APPROVED INTERACTION (Phase 6, frozen with 5 corrections)
 

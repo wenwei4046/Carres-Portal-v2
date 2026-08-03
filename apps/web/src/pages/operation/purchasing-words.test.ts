@@ -151,12 +151,19 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
     ]) {
       expect(read(f), f).not.toMatch(/function FacetRow\(/);
     }
-    for (const f of [
-      "pages/operation/OperationSupplierClaims.tsx",
-      "pages/operation/OperationReceiving.tsx",
-    ]) {
+    for (const f of ["pages/operation/OperationSupplierClaims.tsx"]) {
       expect(read(f), f).toMatch(/from "@\/components\/FacetRow"/);
     }
+    // Receiving left this list on 2026-08-03 (Slice B): it is no longer a
+    // facet-rail list page, it is the Purchasing module's WORKSPACE template —
+    // 200px navigation rail + kit DataTable + a 400px workspace pane, copied
+    // from Purchase Orders because the module has ONE Workspace template
+    // (Jess). The law the shared FacetRow protects is "one rail row, one
+    // recipe"; what still binds here is that the page does not fork its own
+    // copy of the shared component.
+    expect(read("pages/operation/OperationReceiving.tsx")).not.toMatch(
+      /function FacetRow\(/,
+    );
   });
 
   it("Claims renders no explanatory paragraph above the list (§1.1 · §1.3)", () => {
@@ -183,11 +190,16 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
         /`Factory: /,
       );
     }
-    for (const f of [
-      "pages/operation/OperationReceiving.tsx",
-      "pages/operation/OperationSupplierClaims.tsx",
-    ]) {
-      expect(visibleSource(f), f).toMatch(/Supplier: /);
-    }
+    // Claims still names the facet on its ✕-able chip.
+    expect(
+      visibleSource("pages/operation/OperationSupplierClaims.tsx"),
+    ).toMatch(/Supplier: /);
+    // Receiving names it as the RAIL GROUP's title instead — the Workspace
+    // template has a navigation rail, not filter chips, so the word moved but
+    // the law did not: it is `Supplier`, never `Factory`.
+    expect(
+      visibleSource("pages/operation/OperationReceiving.tsx"),
+      "Receiving must still call the facet Supplier",
+    ).toMatch(/RailGroup title="Supplier"/);
   });
 });

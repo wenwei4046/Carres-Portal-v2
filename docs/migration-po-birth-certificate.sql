@@ -283,7 +283,6 @@ end $$;
 --                       'purchasing_record_ready_date');
 --
 -- d) grants — BOTH directions asserted
---    select p.proname,
 --           has_function_privilege('anon',          p.oid, 'execute') as anon,
 --           has_function_privilege('authenticated', p.oid, 'execute') as auth
 --      from pg_proc p join pg_namespace n on n.oid = p.pronamespace

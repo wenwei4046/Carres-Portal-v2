@@ -48,7 +48,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   TO_ORDER_WORDS as W,
   categoryLabel,
-  countItems,
   defaultDocuments,
   ordersHeadline,
   poScheduleBucket,
@@ -1164,9 +1163,6 @@ export default function OperationToOrder() {
                   className="shrink-0 flex items-center gap-3 px-3 h-10 border border-t-0 border-kit-slate-5 bg-white text-meta text-kit-slate-11"
                   data-testid="to-order-footer"
                 >
-                  <span className="tabular-nums">
-                    {countItems(visibleRows.length)}
-                  </span>
                   {/* A column filter narrows SILENTLY (the ▼ turns funnel, and
                       that is all) — so whenever one is on, the footer says so
                       and hands back the way out. Jess's "why 6 orders?" is

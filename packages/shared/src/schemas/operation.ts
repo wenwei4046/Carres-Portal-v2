@@ -53,15 +53,62 @@ export type ChasePoEventInput = z.infer<typeof chasePoEventInput>;
 export const recordTomorrowDeliveryInput = z.discriminatedUnion('answer', [
   z.object({
     answer: z.literal('shipping'),
+    // Supplier-date door (Jess, 2026-08-02): a PO with NO date yet takes its
+    // FIRST confirmed date through the same door — `firstDate` is required by
+    // the RPC exactly when `eta_date` is null, refused otherwise (draft
+    // migration extends 0306's RPC; see docs/CHECKPOINT-purchase-orders.md).
+    firstDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'firstDate must be YYYY-MM-DD').optional(),
     reason: z.string().max(300).optional(),
+    // Reason = the countable CATEGORY (PO_DELAY_REASONS); Remarks = the real
+    // story, free text. Two fields, never folded (Jess, 2026-08-02).
+    remarks: z.string().max(500).optional(),
   }).strict(),
   z.object({
     answer: z.literal('delayed'),
     newDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'newDate must be YYYY-MM-DD'),
     reason: z.string().max(300).optional(),
+    remarks: z.string().max(500).optional(),
   }).strict(),
 ]);
 export type RecordTomorrowDeliveryInput = z.infer<typeof recordTomorrowDeliveryInput>;
+
+/**
+ * What we SENT the supplier (0312, Jess 2026-08-02). The channel is the fact;
+ * the revision is derived server-side (a send mints one only when the document
+ * changed since the last).
+ */
+export const recordSendInput = z.object({
+  channel: z.enum(["whatsapp", "email", "print"]),
+  note: z.string().max(300).optional(),
+}).strict();
+export type RecordSendInput = z.infer<typeof recordSendInput>;
+
+/** ONE company-wide supplier-message template. */
+export const setMessageTemplateInput = z.object({
+  text: z.string().max(2000),
+}).strict();
+export type SetMessageTemplateInput = z.infer<typeof setMessageTemplateInput>;
+
+/**
+ * Where each LINE goes (Jess, 2026-08-02) — the three per-line write doors
+ * (0311). Purchasing's only per-line job is the destination; the ops remark
+ * is its own internal note and never prints.
+ */
+export const setLineDestinationInput = z.object({
+  destinationId: z.string().uuid(),
+}).strict();
+export type SetLineDestinationInput = z.infer<typeof setLineDestinationInput>;
+
+export const splitLineDestinationInput = z.object({
+  moveQty: z.number().int().min(1),
+  destinationId: z.string().uuid(),
+}).strict();
+export type SplitLineDestinationInput = z.infer<typeof splitLineDestinationInput>;
+
+export const setLineOpsRemarkInput = z.object({
+  text: z.string().max(500),
+}).strict();
+export type SetLineOpsRemarkInput = z.infer<typeof setLineOpsRemarkInput>;
 
 /**
  * P3 · `recordBalanceDateInput` —
@@ -166,6 +213,51 @@ export const receivePoWithDoInput = z.object({
   })).min(1),
 }).strict();
 export type ReceivePoWithDoInput = z.infer<typeof receivePoWithDoInput>;
+
+/**
+ * `officeReceiveInput` — POST /api/operation/pos/:id/office-receive
+ * (Slice B of the Receiving Workspace; migration 0315 `office_receive_post`).
+ *
+ * This is NOT a second spelling of `receivePoWithDoInput`. That body books a
+ * receive and leaves no record of the delivery; this one opens a **Receiving
+ * Session** — one physical delivery, one document, one `posted` event — and
+ * the shape follows the frozen model rather than the old RPC:
+ *
+ *   · `receivedNow` is the DELTA counted on THIS delivery, never the running
+ *     total (RECEIVING-INFORMATION-MODEL §7.1: "The form asks 'Receive this
+ *     time', never 'total so far'"). The engine derives the cumulative figure;
+ *     no client does arithmetic on a quantity it did not count.
+ *   · `goodsReceivedAt` is the BUSINESS date — when the goods physically
+ *     arrived, which is not when somebody keyed them in (§5). Optional: the
+ *     server defaults to today in MYT, and refuses a future date or one before
+ *     the PO date. The browser never decides what "today" is.
+ *   · `doNumber` is the SUPPLIER's document number, so it has no default and
+ *     no suggestion — a number we invent is a reference the supplier has never
+ *     heard of, and it would defeat the duplicate guard it feeds.
+ *   · `doFilePath` is the signed DO photo, required past Draft by the store
+ *     itself (0314 `wr_do_required_past_draft`).
+ *
+ * Damage / wrong-item evidence rides the same keys as the older body because
+ * both end up in the SAME validator (`warehouse_receipt_validate_lines`) —
+ * one copy of the counting and evidence law, two doors.
+ */
+export const officeReceiveInput = z.object({
+  doNumber: z.string().min(3).max(60),
+  doFilePath: z.string().min(1).max(400),
+  // ISO yyyy-mm-dd. Bounds are the server's — a browser clock is not evidence.
+  goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  note: z.string().max(500).optional(),
+  lines: z.array(z.object({
+    id: z.string().uuid(),
+    receivedNow: z.number().int().nonnegative(),
+    damagedQty: z.number().int().nonnegative().optional(),
+    wrongItemQty: z.number().int().nonnegative().optional(),
+    damagedPhotos: CLAIM_PHOTO_PATHS.optional(),
+    wrongItemClaimType: z.string().min(1).max(40).optional(),
+    wrongItemPhotos: CLAIM_PHOTO_PATHS.optional(),
+  })).min(1),
+}).strict();
+export type OfficeReceiveInput = z.infer<typeof officeReceiveInput>;
 
 /**
  * `adjustStockInput` — POST /api/operation/warehouse/adjust.

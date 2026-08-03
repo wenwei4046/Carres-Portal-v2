@@ -54,8 +54,8 @@ function settings(over: Partial<PurchasingSettingsResponse> = {}): PurchasingSet
     logisticsCallWorkingDays: 1,
     poDays: [1, 3, 5],
     suppliers: [
-      { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6] },
-      { id: OHANA, name: "Ohana", categories: ["bedframe", "sofa"], offDays: [0] },
+      { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1 },
+      { id: OHANA, name: "Ohana", categories: ["bedframe", "sofa"], offDays: [0], transitDays: 1 },
     ],
     productionDays: [
       { supplierId: NICE, category: "mattress", workingDays: 7 },

@@ -69,14 +69,18 @@ describe("GET /api/operation/pos", () => {
   };
 
   /**
-   * The list route makes TWO reads, and the mock has to know which is which:
-   * the POs themselves, then P3's `po_supplier_promises` (0306) for the latest
-   * answer per PO / per line. A single shared chain would let the second read
-   * silently consume the first one's resolution.
+   * The list route makes FOUR reads, and the mock has to know which is which:
+   * the POs themselves, P3's `po_supplier_promises` (0306) for the latest
+   * answer per PO / per line, then the Register's two enrichments (Jess,
+   * 2026-08-02): `orders` for the customer's date + name, and `product_skus`
+   * for the MODEL name each line speaks instead of its code. A single shared
+   * chain would let one read silently consume another's resolution.
    */
   function mockPosList(
     rows: typeof PO_ROW[],
     promises: Record<string, unknown>[] = [],
+    orderRows: Record<string, unknown>[] = [],
+    skuRows: Record<string, unknown>[] = [],
   ) {
     const eq = vi.fn().mockReturnThis();
     const order = vi.fn().mockReturnThis();
@@ -87,15 +91,48 @@ describe("GET /api/operation/pos", () => {
     const promiseIn = vi.fn(() => ({ order: promiseOrder }));
     const promiseSelect = vi.fn(() => ({ in: promiseIn }));
 
+    const ordersIn = vi.fn().mockResolvedValue({ data: orderRows, error: null });
+    const ordersSelect = vi.fn(() => ({ in: ordersIn }));
+
+    const skusIn = vi.fn().mockResolvedValue({ data: skuRows, error: null });
+    const skusSelect = vi.fn(() => ({ in: skusIn }));
+
+    // 0311's destination registry rides the list so the per-line picker has
+    // its options without a second call.
+    // 0312: the sends read + the settings singleton (message template).
+    const sendsOrder = vi.fn().mockResolvedValue({ data: [], error: null });
+    const sendsIn = vi.fn(() => ({ order: sendsOrder }));
+    const sendsSelect = vi.fn(() => ({ in: sendsIn }));
+
+    const tmplSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    const tmplEq = vi.fn(() => ({ maybeSingle: tmplSingle }));
+    const tmplSelect = vi.fn(() => ({ eq: tmplEq }));
+
+    const destOrder2 = vi.fn().mockResolvedValue({ data: [], error: null });
+    const destOrder1 = vi.fn(() => ({ order: destOrder2 }));
+    const destEq = vi.fn(() => ({ order: destOrder1 }));
+    const destSelect = vi.fn(() => ({ eq: destEq }));
+
+    // The Excel-row derivation reads the covered SOs' own lines (Jess,
+    // 2026-08-02): one grid row per SO × SKU, carrying the salesperson's
+    // remark. Empty here — the rows fall back to one per PO line.
+    const solIn = vi.fn().mockResolvedValue({ data: [], error: null });
+    const solSelect = vi.fn(() => ({ in: solIn }));
+
     vi.mocked(userClient).mockReturnValue({
-      from: vi.fn((table: string) =>
-        table === "po_supplier_promises"
-          ? { select: promiseSelect }
-          : { select },
-      ),
+      from: vi.fn((table: string) => {
+        if (table === "po_supplier_promises") return { select: promiseSelect };
+        if (table === "orders") return { select: ordersSelect };
+        if (table === "product_skus") return { select: skusSelect };
+        if (table === "order_lines") return { select: solSelect };
+        if (table === "purchasing_destinations") return { select: destSelect };
+        if (table === "po_sends") return { select: sendsSelect };
+        if (table === "purchasing_settings") return { select: tmplSelect };
+        return { select };
+      }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-    return { eq, order, limit, promiseIn, promiseSelect };
+    return { eq, order, limit, promiseIn, promiseSelect, ordersIn, skusIn };
   }
 
   it("returns POs for operation with default 'all' status", async () => {
@@ -165,6 +202,80 @@ describe("GET /api/operation/pos", () => {
     expect(body.pos[0]?.tomorrow_answer_about_date).toBeNull();
     for (const l of body.pos[0]?.purchase_order_lines ?? [])
       expect(l.balance_answer_about_qty).toBeNull();
+  });
+
+  // ── Register (Jess, 2026-08-02) · the listing's enrichments ───────────────
+  it("speaks MODEL per line, carries the customer + EARLIEST delivery, and flags a revised arrival", async () => {
+    const twoSo: Record<string, unknown> = {
+      ...PO_ROW,
+      so: 4001,
+      so_refs: [4002],
+      purchase_order_lines: [
+        { id: "line-a", sku: "MAT-K-001", qty: 2, received_qty: 0, short_since: null },
+        { id: "line-b", sku: "UNKNOWN-SKU", qty: 1, received_qty: 0, short_since: null },
+      ],
+    };
+    const { ordersIn, skusIn } = mockPosList(
+      [twoSo as typeof PO_ROW],
+      [
+        // TWO different arrival dates answered about → (revised).
+        { po_id: "PO-2030", po_line_id: null, kind: "tomorrow_delivery", about_date: "2026-09-15", recorded_at: "2026-09-02T00:00:00Z" },
+        { po_id: "PO-2030", po_line_id: null, kind: "tomorrow_delivery", about_date: "2026-08-01", recorded_at: "2026-08-01T00:00:00Z" },
+      ],
+      [
+        { so: 4001, delivery_date: "2026-09-20", customer_name: "Ah Hock" },
+        { so: 4002, delivery_date: "2026-09-05", customer_name: "Mei Ling" },
+      ],
+      [{ sku: "MAT-K-001", variant: "King", product_models: { name: "Cody" } }],
+    );
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      pos: {
+        customer_delivery: string | null;
+        eta_revised: boolean;
+        orders: { so: number; customer_name: string }[];
+        purchase_order_lines: { id: string; model_name: string | null; size: string | null }[];
+      }[];
+    };
+    expect(ordersIn).toHaveBeenCalledWith("so", expect.arrayContaining([4001, 4002]));
+    expect(skusIn).toHaveBeenCalledWith(
+      "sku",
+      expect.arrayContaining(["MAT-K-001", "UNKNOWN-SKU"]),
+    );
+    const po = body.pos[0]!;
+    // EARLIEST across the merged PO's SOs — never the first, never the last.
+    expect(po.customer_delivery).toBe("2026-09-05");
+    expect(po.orders.map((o) => o.customer_name).sort()).toEqual(["Ah Hock", "Mei Ling"]);
+    expect(po.eta_revised).toBe(true);
+    const lineA = po.purchase_order_lines.find((l) => l.id === "line-a");
+    const lineB = po.purchase_order_lines.find((l) => l.id === "line-b");
+    expect(lineA?.model_name).toBe("Cody");
+    expect(lineA?.size).toBe("King");
+    // A SKU the catalog does not know stays honest: null, never an invention.
+    expect(lineB?.model_name).toBeNull();
+  });
+
+  it("ONE answered arrival date is not (revised)", async () => {
+    mockPosList(
+      [PO_ROW],
+      [{ po_id: "PO-2030", po_line_id: null, kind: "tomorrow_delivery", about_date: "2026-09-15", recorded_at: "2026-09-02T00:00:00Z" }],
+    );
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    const body = (await res.json()) as { pos: { eta_revised: boolean }[] };
+    expect(body.pos[0]?.eta_revised).toBe(false);
   });
 
   it("filters by status when query param provided", async () => {
@@ -559,378 +670,78 @@ describe("POST /api/operation/pos", () => {
   });
 });
 
-describe("POST /api/operation/pos/:id/receive", () => {
-  const PO_ID = "PO-2030";
-  const LINE_ID = "11111111-1111-4111-8111-111111111111";
-  const VALID_BODY = {
-    doNumber: "DO-5210",
-    doFilePath: `${PO_ID}/abc-DO-5210.pdf`,
-    // 0076 (Loo 2026-05-10): payload keys by line UUID `id` so multi-variant
-    // POs (same SKU, different attrs) can be addressed unambiguously.
-    lines: [{ id: LINE_ID, receivedQty: 2 }],
-  };
+/**
+ * The Office's legacy receiving door — RETIRED 2026-08-03 (Card C1, Jess).
+ *
+ * `POST /:id/receive` called `operation_receive_po_with_do` directly, so stock
+ * moved and the delivery left NO Receiving Session, no event and no GRN. Jess
+ * framed the card as **Data Integrity, not UX**, and required proof that no
+ * Office path can move `received_qty` without opening a Session.
+ *
+ * These are that proof, as a guard rather than a paragraph: the route is gone,
+ * and the ONE Office door left goes through `office_receive_post` (0315).
+ */
+describe("the Office has exactly ONE receiving door", () => {
+  const LINE = "11111111-1111-4111-8111-111111111111";
 
-  it("returns 200 on success and calls v3 RPC with snake_case-reshaped lines", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: {
-        po_id: PO_ID,
-        do_file_path: VALID_BODY.doFilePath,
-        do_number: VALID_BODY.doNumber,
-        lines_updated: 1,
-        threads_advanced: 0,
-        po_status: "received",
-        sup_status: "delivered",
-        was_relocated: false,
-      },
-      error: null,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(VALID_BODY),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("operation_receive_po_with_do", {
-      p_po_id: PO_ID,
-      p_do_file_path: VALID_BODY.doFilePath,
-      p_do_number: VALID_BODY.doNumber,
-      // jsonb payload uses snake_case received_qty (RPC reads
-      // v_line->>'received_qty' at 0045:688). camelCase → snake_case
-      // reshape happens at the route boundary. 0076 (2026-05-10): `id` is
-      // already snake-case (single token), no reshape needed.
-      // R1 (0284): the two inspection counters ride every line explicitly —
-      // a clean delivery states "nothing was wrong" rather than staying
-      // silent about it. The RPC would read an absent key as 0 either way.
-      // R2 (0288): the claim's evidence rides with the report. A clean line
-      // states "nothing wrong, nothing to prove" explicitly — the RPC only
-      // demands photos for a line that actually reported a problem.
-      p_lines: [
-        {
-          id: LINE_ID,
-          received_qty: 2,
-          damaged_qty: 0,
-          wrong_item_qty: 0,
-          damaged_photos: [],
-          wrong_item_claim_type: null,
-          wrong_item_photos: [],
-        },
-      ],
-    });
-    assertRpcCallShape(rpc, "operation_receive_po_with_do", [
-      "p_po_id",
-      "p_do_file_path",
-      "p_do_number",
-      "p_lines",
-    ]);
-  });
-
-  it("returns 422 when receivedQty is negative", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...VALID_BODY,
-          lines: [{ id: LINE_ID, receivedQty: -1 }],
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("returns 422 when line id is not a valid UUID", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...VALID_BODY,
-          lines: [{ id: "not-a-uuid", receivedQty: 2 }],
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("returns 422 when doNumber is too short", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ ...VALID_BODY, doNumber: "DO" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("returns 422 when lines is empty", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ ...VALID_BODY, lines: [] }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("maps P0001 over_received → 422 with code", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: { code: "P0001", message: "over receipt", details: "over_received" },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...VALID_BODY,
-          lines: [{ id: LINE_ID, receivedQty: 99 }],
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("over_received");
-  });
-
-  it("returns 403 for non-operation (no rpc)", async () => {
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("dealer");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(VALID_BODY),
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  // --- R1 (0284): receiving is an inspection ---------------------------------
-
-  it("R1 — forwards damaged + wrong-item qty as snake_case to the RPC", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: { po_id: PO_ID, po_status: "open", damaged_qty: 1, wrong_item_qty: 2 },
-      error: null,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...VALID_BODY,
-          lines: [{ id: LINE_ID, receivedQty: 2, damagedQty: 1, wrongItemQty: 2 }],
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith(
-      "operation_receive_po_with_do",
-      expect.objectContaining({
-        p_lines: [
-          {
-            id: LINE_ID,
-            received_qty: 2,
-            damaged_qty: 1,
-            wrong_item_qty: 2,
-            damaged_photos: [],
-            wrong_item_claim_type: null,
-            wrong_item_photos: [],
-          },
-        ],
-      }),
-    );
-  });
-
-  it("R1 — rejects a negative damagedQty", async () => {
+  it("the legacy POST /:id/receive is gone — a caller meets 404, never a silent receive", async () => {
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
-      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
+      new Request("http://t/api/operation/pos/PO-2050/receive", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...VALID_BODY,
-          lines: [{ id: LINE_ID, receivedQty: 2, damagedQty: -1 }],
+          doNumber: "DO-1234",
+          doFilePath: "x/y.pdf",
+          lines: [{ id: LINE, receivedQty: 1 }],
         }),
       }),
       env,
     );
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(404);
+    // The point of the card: nothing moved on the way to that 404.
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  // --- R2 (0288): the problem becomes a supplier claim -----------------------
-
-  it("R2 — forwards the claim's evidence (photos + kind) to the RPC", async () => {
+  it("the surviving Office door goes through office_receive_post, never the bare receive engine", async () => {
     const rpc = vi.fn().mockResolvedValue({
-      data: { po_id: PO_ID, po_status: "open", claims_created: 2 },
+      data: { receipt_id: "r1", status: "posted", units_counted: 1 },
       error: null,
     });
+    // The route also runs the post-receive auto-reserve, which reads tables.
+    const from = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+      }),
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
-      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
+      new Request("http://t/api/operation/pos/PO-2050/office-receive", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...VALID_BODY,
-          lines: [
-            {
-              id: LINE_ID,
-              receivedQty: 2,
-              damagedQty: 1,
-              damagedPhotos: ["PO-1/a-claim-DO-1.jpg"],
-              wrongItemQty: 1,
-              wrongItemClaimType: "wrong_colour",
-              wrongItemPhotos: ["PO-1/b-claim-DO-1.jpg"],
-            },
-          ],
+          doNumber: "DO-1234",
+          doFilePath: "x/y.pdf",
+          lines: [{ id: LINE, receivedNow: 1 }],
         }),
       }),
       env,
     );
     expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith(
-      "operation_receive_po_with_do",
-      expect.objectContaining({
-        p_lines: [
-          {
-            id: LINE_ID,
-            received_qty: 2,
-            damaged_qty: 1,
-            wrong_item_qty: 1,
-            damaged_photos: ["PO-1/a-claim-DO-1.jpg"],
-            wrong_item_claim_type: "wrong_colour",
-            wrong_item_photos: ["PO-1/b-claim-DO-1.jpg"],
-          },
-        ],
-      }),
-    );
-  });
-
-  it("R2 — surfaces the RPC's evidence refusal as a 422 the operator can read", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: {
-        code: "P0001",
-        message: "damaged units on MS01-K need at least one photo",
-        details: "claim_evidence_required",
-      },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...VALID_BODY,
-          lines: [{ id: LINE_ID, receivedQty: 2, damagedQty: 1 }],
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("claim_evidence_required");
-  });
-
-  it("R2 — refuses an absurd number of photo paths before it reaches the DB", async () => {
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...VALID_BODY,
-          lines: [
-            {
-              id: LINE_ID,
-              receivedQty: 2,
-              damagedQty: 1,
-              damagedPhotos: Array.from({ length: 13 }, (_, i) => `PO-1/${i}.jpg`),
-            },
-          ],
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("R1 — maps the RPC's report_exceeds_ordered refusal to a 422 code", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: {
-        code: "P0001",
-        message: "reported 14 units on a line of 10",
-        details: "report_exceeds_ordered",
-      },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/pos/${PO_ID}/receive`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...VALID_BODY,
-          lines: [{ id: LINE_ID, receivedQty: 9, damagedQty: 5 }],
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("report_exceeds_ordered");
+    expect(rpc.mock.calls[0][0]).toBe("office_receive_post");
+    // DATA INTEGRITY (Jess): the Office may never reach the receive engine
+    // directly — that is the path that moves stock and opens no Session.
+    expect(
+      rpc.mock.calls.some((c: unknown[]) => c[0] === "operation_receive_po_with_do"),
+    ).toBe(false);
   });
 });
 
