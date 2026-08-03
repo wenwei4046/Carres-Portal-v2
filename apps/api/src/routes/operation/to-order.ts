@@ -7,6 +7,7 @@ import {
   myHolidaySet,
   planFromDocuments,
   productionWorkingDaysFor,
+  toOrderBuilds,
   transitDaysFor,
   railItemLabel,
   workWeekOffDaysFor,
@@ -300,6 +301,89 @@ async function loadToOrder(
       itemHeight: attr(attrs, "sofa_height"),
       cost: c?.cost ?? null,
     });
+  }
+
+  /**
+   * READY STOCK — demand a human typed (Jess, 2026-08-03).
+   *
+   * It joins the customer requirements as ordinary `ToOrderLine`s, which is
+   * the whole ruling: *"ONE unified demand table. Customer Orders flow in,
+   * Create Purchase flows in, ONE engine eats it, no second pipeline ever."*
+   * So the order-by date, the supplier×category grouping and Issue all work on
+   * it without knowing it came from a person rather than a customer.
+   *
+   * Its `orderId` is `demand:<uuid>` so it groups alone on the grid — a ready
+   * stock buy has no customer to sit under — and so the issue path can map a
+   * created purchase order back to the row that asked for it.
+   *
+   * Open only: a demand already on a purchase order has left this workspace,
+   * exactly as a covered customer line has.
+   */
+  {
+    const { data: demandRows, error: demandErr } = await sb
+      .from("purchase_demands")
+      .select("id, purpose, sku, supplier_id, destination_id, qty, required_by, remark")
+      .is("po_id", null)
+      .is("cancelled_at", null);
+    if (demandErr) {
+      const m = mapPgError(demandErr);
+      return { ok: false, status: m.status, body: m.body };
+    }
+    const destName = new Map<string, string>();
+    if ((demandRows ?? []).length > 0) {
+      const { data: destRows } = await sb
+        .from("purchasing_destinations")
+        .select("id, name");
+      for (const d of destRows ?? []) destName.set(d.id as string, (d.name as string) ?? "");
+    }
+    for (const d of (demandRows ?? []) as Record<string, unknown>[]) {
+      const c = cat.get(d.sku as string);
+      const category = c?.category;
+      const supplierId = (d.supplier_id as string | null) ?? c?.supplierId ?? null;
+      // A demand whose SKU left the catalog, or whose pair has no production
+      // time, is held out exactly as a customer line would be — never planned
+      // on a guessed number.
+      if (!category || !isToOrderCategory(category) || !supplierId) continue;
+      const leadDays = productionWorkingDaysFor(
+        settings,
+        supplierId,
+        category as ProductCategory,
+      );
+      if (leadDays == null) {
+        const k = `${supplierId}::${category}`;
+        if (!seenMissing.has(k)) {
+          seenMissing.add(k);
+          missingProductionDays.push({ supplierId, category });
+        }
+        continue;
+      }
+      const id = d.id as string;
+      demand.push({
+        lineId: `demand:${id}`,
+        orderId: `demand:${id}`,
+        sku: d.sku as string,
+        category: category as ProductCategory,
+        supplierId,
+        qty: Number(d.qty ?? 0),
+        deadline: (d.required_by as string | null) ?? null,
+        leadDays,
+        offDays: workWeekOffDaysFor(settings, supplierId),
+        placedAt: todayIso(),
+        committed: true,
+        so: null,
+        customerName: null,
+        modelName: c?.modelName ?? null,
+        variant: c?.variant ?? null,
+        variantKind: c?.variantKind ?? null,
+        buildKey: null,
+        fabricName: null,
+        legHeight: null,
+        itemHeight: null,
+        cost: c?.cost ?? null,
+        readyStock: true,
+        destinationName: destName.get(d.destination_id as string) ?? null,
+      });
+    }
   }
 
   // Supply: what open POs already cover. A line already on a PO has left this
@@ -787,6 +871,40 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
   }
 
   /**
+   * A READY STOCK DEMAND THAT JUST BECAME A PURCHASE ORDER STOPS BEING DEMAND.
+   *
+   * The table carries no status column on purpose (Jess, 2026-08-01): open /
+   * ordered / done are DERIVED from `po_id`. So the ONE thing the issue path
+   * owes a demand is that link — without it the row sits on To Order for ever
+   * and gets ordered twice.
+   *
+   * The map is EXACT rather than by supplier: each document names the builds it
+   * carried, and a build knows its `orderId`, which for a ready stock demand is
+   * `demand:<uuid>`. So a demand is stamped with the purchase order that
+   * actually took it, never with "one of today's".
+   */
+  const buildRef = new Map(toOrderBuilds(proposal).map((b) => [b.buildKey, b]));
+  const included = docs.filter((d) => d.include && d.buildKeys.length > 0);
+  for (const [i, d] of included.entries()) {
+    const poId = ids[i];
+    if (!poId) continue;
+    for (const k of d.buildKeys) {
+      const m = /^demand:(.+)$/.exec(buildRef.get(k)?.orderId ?? "");
+      if (!m) continue;
+      const { error: stampErr } = await sb
+        .from("purchase_demands")
+        .update({ po_id: poId, ordered_at: new Date().toISOString() })
+        .eq("id", m[1]!);
+      if (stampErr) {
+        // The purchase orders exist and the supplier is about to be sent them.
+        // Failing the whole issue now would destroy real work to protect a
+        // link; the demand reappearing is visible and recoverable.
+        console.error("purchase_demands stamp failed", m[1], stampErr.message);
+      }
+    }
+  }
+
+  /**
    * WHO RAISED IT. Measured 2026-08-01: `operation_create_pos_batch` writes no
    * audit row of any kind, so a purchase order could not say who issued it or
    * when. `po_history` has existed since 0001 for exactly this, so nothing new
@@ -810,6 +928,61 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
     destination: dest.name as string,
     pos: ids.map((id, i) => ({ id, customer: plan[i]?.customer ?? proposal.supplierName })),
   });
+});
+
+/**
+ * `+ Create Purchase` — the manual entrance (Jess, 2026-08-03).
+ *
+ * V1 buys READY STOCK and nothing else. Display begins at the Dealer/Sales
+ * portal as a Display Request and Office at a future internal request
+ * workflow; both will reach purchasing through this same table, and neither
+ * starts here — so neither appears in this body, and there is no disabled
+ * option anywhere to suggest otherwise.
+ *
+ * THE PURPOSE IS SENT EXPLICITLY, not inferred from the absence of others
+ * (her correction, same day). The CLIENT cannot choose it: it is written here,
+ * so a browser can never file a demand as something else.
+ *
+ * THE SUPPLIER IS NOT IN THE BODY EITHER — the RPC derives it from the SKU. A
+ * product has one factory, and a demand pointed at the wrong one becomes a
+ * purchase order pointed at the wrong one.
+ */
+const demandBody = z.object({
+  sku: z.string().min(1),
+  qty: z.number().int().min(1),
+  destinationId: z.string().uuid(),
+  requiredBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+  remark: z.string().max(500).nullish(),
+});
+
+toOrderRouter.post("/demand", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
+  }
+  const parsed = demandBody.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  }
+  const { sku, qty, destinationId, requiredBy, remark } = parsed.data;
+
+  const { data, error } = await sb.rpc("purchasing_create_demand", {
+    p_sku: sku,
+    p_qty: qty,
+    p_destination_id: destinationId,
+    p_required_by: requiredBy ?? null,
+    p_remark: remark ?? null,
+    p_purpose: "ready_stock",
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data ?? { ok: true });
 });
 
 export default toOrderRouter;

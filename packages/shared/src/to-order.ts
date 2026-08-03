@@ -110,6 +110,8 @@ export const TO_ORDER_WORDS = {
   //    an empty PO cell is not "no data" — it is WORK, and it says so. The
   //    filter lists `Yet to Order` + the real PO numbers; `(Blanks)` and a
   //    generic `Ordered` never appear (the number list IS ordered). ───────
+  /** The group header of demand a human typed rather than a customer order. */
+  readyStockGroup: "Ready Stock",
   yetToOrder: "Yet to Order",
   /**
    * The group header of a customer order that has SOME of its items on a
@@ -526,6 +528,18 @@ export interface ToOrderLine extends DemandLine {
   itemHeight: string | null;
   /** Resolved server-side. Never shown; the PO write needs it. */
   cost: number | null;
+  /**
+   * TRUE when this line is a READY STOCK demand a human typed, not a customer
+   * requirement (Jess, 2026-08-03). It rides the SAME engine on purpose — her
+   * frozen ruling is "ONE unified demand table … ONE engine eats it, no second
+   * pipeline ever" — so everything downstream (the order-by date, the PO
+   * grouping, Issue) works on it without knowing it is different.
+   *
+   * The flag exists so the SCREEN can say whose it is. Nothing else reads it.
+   */
+  readyStock?: boolean;
+  /** Where the ready stock goes — the destination the buyer chose. */
+  destinationName?: string | null;
 }
 
 export interface ToOrderSupplier {
@@ -580,6 +594,10 @@ export interface ToOrderRow {
   orderId: string;
   so: number | null;
   customer: string;
+  /** TRUE = a Ready Stock demand, not a customer order. */
+  readyStock?: boolean;
+  /** The chosen destination, on a Ready Stock row only. */
+  destination?: string | null;
   /** Business unit: sofas, mattresses, bedframes — never module lines. */
   qty: number;
   summary: string;
@@ -913,6 +931,10 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
         orderId,
         so: orderLines[0].so,
         customer: orderLines[0].customerName ?? "—",
+        // A Ready Stock row has no customer and no SO; what it HAS is a
+        // destination, and that is what the group header says instead.
+        readyStock: orderLines[0].readyStock === true ? true : undefined,
+        destination: orderLines[0].destinationName ?? undefined,
         // The earliest customer deadline across the order's lines — the
         // business date the operator sees (the engine's own dates never do).
         delivery: orderLines.reduce<IsoDate | null>(

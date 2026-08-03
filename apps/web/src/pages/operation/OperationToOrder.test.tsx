@@ -599,25 +599,38 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
 });
 
 describe("+ Create Purchase — the entrance is real, the save is next", () => {
-  it("opens the dialog with Reason · Supplier · Item · Qty · Remark and no Category", async () => {
+  it("asks FIVE things and offers no purpose, no supplier, nothing disabled", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-create-purchase"));
     const dialog = await screen.findByTestId("to-order-create-dialog");
-    // Scoped to the dialog on purpose: `Supplier` is ALSO a grid column header
-    // since 2026-08-03 (one word, one home — `TO_ORDER_WORDS.supplierLabel`
-    // serves both), so a page-wide query finds two and proves nothing about
-    // this form.
-    expect(within(dialog).getByText(W.reason)).toBeInTheDocument();
-    expect(within(dialog).getByText(W.reasonReadyStock)).toBeInTheDocument();
-    expect(within(dialog).getByText(W.supplierLabel)).toBeInTheDocument();
-    expect(within(dialog).getByText(W.itemLabel)).toBeInTheDocument();
-    expect(within(dialog).getByText(W.remark)).toBeInTheDocument();
-    // Category is never asked — it comes from the item (Loo, 2026-08-01).
+
+    // Item · Quantity · Deliver To · Required By · Remark (Jess, 2026-08-03).
+    for (const w of [W.itemLabel, W.itemsColQty, W.destination, W.requiredBy, W.remark]) {
+      expect(within(dialog).getByText(w)).toBeInTheDocument();
+    }
+
+    // NO purpose picker: V1 buys one thing, so choosing is not a question.
+    expect(within(dialog).queryByText(W.reason)).toBeNull();
+    expect(within(dialog).queryByText(W.reasonReadyStock)).toBeNull();
+    // NO supplier picker: a product has one factory and the server derives it.
+    expect(within(dialog).queryByText(W.supplierLabel)).toBeNull();
+    // Category was never asked and still is not.
     expect(within(dialog).queryByText("Category")).toBeNull();
-    // The save arrives with the unified purchase_demands card — the button
-    // is disabled and SAYS so, so the door teaches without pretending.
+
+    // NOTHING DISABLED AND NO PLACEHOLDER — Display and Office begin at other
+    // portals, and a greyed control here would promise this page owns them.
+    expect(screen.queryByText(W.nextUpdate)).toBeNull();
+    expect(within(dialog).queryByText(/Display|Office/)).toBeNull();
+  });
+
+  it("Save is refused until an item is picked, then posts what the server needs", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-create-purchase"));
+    await screen.findByTestId("to-order-create-dialog");
+
+    // No item yet → the commit is refused. A demand with no product is not a
+    // demand, and the button says so by being unavailable rather than failing.
     expect(screen.getByTestId("to-order-create-submit")).toBeDisabled();
-    expect(screen.getByText(W.nextUpdate)).toBeInTheDocument();
   });
 });
 

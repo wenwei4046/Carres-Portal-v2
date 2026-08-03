@@ -26,9 +26,9 @@ const SETTINGS: PurchasingSettings = {
   logisticsCallWorkingDays: 1,
   poDays: [1, 3, 5],
   suppliers: [
-    { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6] },
-    { id: OHANA, name: "Ohana", categories: ["bedframe", "sofa"], offDays: [0] },
-    { id: NOBODY, name: "No SKUs", categories: [], offDays: null },
+    { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1 },
+    { id: OHANA, name: "Ohana", categories: ["bedframe", "sofa"], offDays: [0], transitDays: 1 },
+    { id: NOBODY, name: "No SKUs", categories: [], offDays: null, transitDays: null },
   ],
   productionDays: [
     { supplierId: NICE, category: "mattress", workingDays: 7 },
