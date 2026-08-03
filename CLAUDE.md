@@ -491,48 +491,87 @@ This makes React Router 7 client-side routes work on direct URL access.
 After every phase, tag: `git tag phase-{N}-complete`.
 
 
-### 13.1 Engineer-Owned Delivery (Jess, 2026-08-03 — non-negotiable)
+### 13.1 Engineer-Owned Delivery (Jess, 2026-08-03 — PERMANENT, non-negotiable)
 
-After Jess approves a build or says `deploy`, **the engineer owns the complete
-delivery process** and does not return routine engineering questions to her.
+> Ratified twice in one evening. First after a chat delivered a finished, tested,
+> approved change and handed push · PR · rebase · merge · deploy back as an A/B/C
+> menu. Then again, in her own words, after the same chat kept narrating each
+> engineering discovery instead of fixing it: *"Do not live-report routine
+> engineering work anymore. Find it. Fix it. Verify it. Continue."*
 
-The engineer must automatically:
+After a feature is approved, **engineering owns delivery until production is
+verified.** Routine engineering work must NEVER be returned to Jess for approval.
 
-1. fetch and inspect the latest `main`;
-2. rebase the work;
-3. resolve routine conflicts;
-4. run all applicable checks;
-5. perform a top-to-toe review;
-6. fix bugs, regressions, overflow, truncation, spelling, lint and test failures;
-7. repeat verification until clean;
-8. commit and push;
-9. open and merge the PR;
-10. apply approved migrations when required;
-11. deploy every affected service;
-12. verify the real production result;
-13. update the canonical checkpoint and deployment record.
+The engineer is responsible for:
 
-**A discovered engineering fault is an instruction to fix and continue, not a
-reason to ask Jess whether it should be fixed.**
+```
+implementation · testing · self-review · automatic top-to-toe UI review
+fixing discovered issues · merge · deployment · production verification
+conflict resolution · rebase · infrastructure fixes · infrastructure validation
+deployment validation
+```
 
-The engineer stops ONLY when the remaining decision would change business
-meaning, architecture, irreversible production data, or an unapproved
-user-facing rule. **Do not disguise an engineering decision as a business
-decision.**
+Concretely, the engineer runs the whole chain without asking: fetch and inspect
+latest `main` · rebase · resolve routine conflicts · run every applicable check ·
+top-to-toe review · fix bugs, regressions, overflow, truncation, spelling, lint
+and test failures · repeat until clean · commit and push · open and merge the PR ·
+apply approved migrations · deploy every affected service · verify the real
+production result · update the canonical checkpoint and deployment record.
 
-Specifically, do NOT ask Jess to approve or perform: push · PR creation ·
-rebase · merge · deploy · routine conflict resolution · test repairs · lint
-repairs · migration verification · correcting a defect already discovered ·
-whether to continue after a routine technical failure.
+**Do NOT stop to ask about any of these** — they are Engineer-Owned Delivery:
 
-**Default Deployment.** An approved change is deployed by default. Localhost
-review is a PRODUCT-review tool, not a mandatory delivery gate after every
-small amendment. When Jess has already approved the business behaviour, the
-engineer completes checks, merges, deploys and verifies without asking again.
-A new review is required only when the implementation exposes a new business,
-architectural or user-facing decision.
+```
+merge · rebase · deploy · lint · gates · rollback · bundle hashes · cache
+Pages · Workers · canonical verification · routine conflicts · infrastructure fixes
+test repairs · migration verification · correcting a defect already discovered
+whether to continue after a routine technical failure
+```
 
-**Migration Delivery Order.** The normal order is:
+**A discovered engineering fault is an instruction to fix and continue**, not a
+reason to ask whether it should be fixed. **Do not stop because you found another
+engineering issue.** Find it · fix it · verify it · continue.
+
+**Do not disguise an engineering decision as a business decision.**
+
+### The ONLY four reasons to interrupt Jess
+
+1. A new **business rule** is required.
+2. An approved **UI / workflow / copy** must change *(and COPY-STANDARD's own law
+   still binds: a word that is not in it may not appear on screen — that is a
+   business decision, not a routine fix)*.
+3. **Production data** must be modified irreversibly.
+4. Long-term **architecture** must change.
+
+§14's red lines sit above all four and are never waived by this section.
+
+### Default Deployment Rule
+
+Unless Jess explicitly says **"do not deploy"**, **"keep in branch"** or
+**"draft only"**, every approved feature automatically proceeds:
+
+```
+Build → Test → Merge → Deploy → Production Verification
+```
+
+— without asking again. Localhost review is a PRODUCT-review tool, not a
+mandatory delivery gate after every small amendment. A new review is required
+only when the implementation exposes a new business, architectural or
+user-facing decision.
+
+### The final report — the ONLY thing that comes back
+
+```
+Repo status
+Migration status (if applicable)
+Deployment status
+Production verification
+Remaining business decisions (if any)
+```
+
+**No engineering diary. No step-by-step live updates. No repeated approval
+requests.**
+
+### Migration Delivery Order
 
 ```
 Draft → Review business impact → Commit the exact migration file
@@ -545,7 +584,22 @@ Draft → Review business impact → Commit the exact migration file
 file.** When an applied migration is found missing from the repo, recovering it
 to `origin` outranks tidiness: push first, review second.
 
----
+**A migration may never assert a production ROW COUNT.** Schema is what a
+migration owns; data is what it walks past. (Learned 2026-08-03: 0317 shipped an
+assertion that was true of production and false of every fresh `supabase db
+reset`, which would have broken every new clone.)
+
+### Two deployment rules learned the hard way, 2026-08-03
+
+- **An api diff is measured against the LIVE WORKER'S SOURCE COMMIT at the moment
+  of deploying**, never against your own branch's scope. A card that changes no
+  `apps/api` file can still REQUIRE a Worker deploy, because another lane's api
+  half may have merged while you were building.
+- **A bundle row naming ONE hash is only true if all four canonicals were polled
+  when it was written.** Two lanes deploying minutes apart split the canonicals
+  twice in one evening; both times it was caught by DOWNLOADING the foreign
+  bundle and grepping it, never by a deployment log. The fix is always: rebuild
+  from latest `main` and deploy BOTH Pages projects.
 
 ## 14. Red lines (inherited from global CLAUDE.md, restated for project)
 
@@ -839,6 +893,7 @@ than kept — Law 0A).
 
 **MEDIUM** (touch the area → read the full entry first):
 
+- `supplier-contact-data-is-thin` — **measured 2026-08-03 after Jess supplied the real values.** WhatsApp: **5 of 10** suppliers hold a group link (Armani · Dorsettloft · Nice Future · Ohana · Todern); the other five (Carres Internal · Laveo · NB Furniture · Red Sofa · Rennes) hold NEITHER a group nor a phone, and the workspace shows them **no button and no sentence** — the Email door at least states `No email on file for {supplier}`. **Jess approved filling the gap and the links have not been supplied yet**, so it is waiting on data, not on a decision. Email: **Ohana = `hookka.manufacturing@gmail.com`** (real, live); **Nice Future does not use email** and its address is now NULL, which makes `No email on file for Nice Future` reachable in production for the first time. **Phone: 0 of 10**, so the `Open WhatsApp` direct-chat label can never render on live data — it is unit-tested only. **The asymmetric empty state is an OPEN BUSINESS DECISION**: Jess answered *"i dont know"* on 2026-08-03, so no sentence was invented. COPY-STANDARD's law binds — a word not in it may not appear on screen — and the obvious symmetric string (`No WhatsApp group on file for {supplier}`) is hers to rule, not a routine fix.
 - `po-history-two-legacy-send-claims` — **CLOSED AS "KEEP" (2026-08-03), recorded so nobody re-opens it by tidying.** Two pre-0317 rows on PO-2032 say `sent to Ohana via whatsapp (Revision 1)`, and they are supplier-visible. They stay: `po_history` and `audit_log` have ZERO update/delete policies (append-only by design, so a correction means defeating RLS with `service_role`), `audit_log`'s job is to record the bug, the set is CLOSED (0 rows since 0317, and the live RPC provably cannot write another), and they are test data the clean start removes. An in-place UPDATE, a DELETE, a correcting append and a display-layer rewrite were each considered and each rejected — reasons in the doc.
 
 - ✅ **CLOSED 2026-08-03 · `migrations-0312-0313-have-no-file-in-any-branch`** — both files are in the repository (`0312_what_we_sent_the_supplier.sql` · `0313_email_already_had_a_home.sql`) as a **reviewed reconstruction, labelled as one**, and repository ↔ production parity is proved by REBUILD rather than by reading: in one rolled-back transaction on prod the objects were captured, DROPPED, replayed from the files, and diffed both ways — **"IDENTICAL — a rebuild reproduces production exactly"**. The rebuilt `purchasing_record_send` came out byte-identical to pre-0317 prod (`md5 262f2462…`). **The rebuild found a defect that reading never could**: Supabase's default privileges hand `anon`/`authenticated` INSERT/UPDATE/DELETE on every new `public` table, prod holds only SELECT, and the recovery had missed the REVOKE — now present with an assertion. Full method + closure: governance card **G1**, `docs/execution-queues-index.md`. **Still open and NOT this**: 0308 + 0309 are absent from main too, but their files EXIST on unmerged branches — a merge, not a recovery; 0309 was pushed to `origin/claude/purchase-demands-migration-a0914c` (`dc302bda`) so it no longer lives on one machine.
