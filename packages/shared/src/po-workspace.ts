@@ -53,7 +53,12 @@ export const PO_WORK_STATE_LABEL: Record<PoWorkState, string> = {
  * person — no "Hand to".
  */
 export const PO_STATE_ACTION_WORD = {
-  need_confirmation: "Confirm Goods Arriving Date",
+  // `Goods Arrival`, never `Goods Arriving At` (Jess, 2026-08-03): `At` adds
+  // no information, and the column beside it is `Customer Delivery` — the two
+  // dates are the same kind of fact and now read as a pair. It is also the
+  // word `ORDERS-WORKING-FLOW.md` already uses (`Waiting Goods Arrival`), so
+  // Purchasing stops speaking its own dialect.
+  need_confirmation: "Confirm Goods Arrival Date",
   waiting: "Waiting for Goods",
   overdue: "Contact Supplier",
   ready: "Open Receiving",
@@ -87,6 +92,47 @@ export const PO_DELAY_REASONS = [
   "Factory Closed",
   "Other",
 ] as const;
+
+/**
+ * How the goods' arrival stands against what we promised the CUSTOMER
+ * (Jess, 2026-08-03).
+ *
+ * The register put `Customer Delivery` and `Goods Arrival` side by side and
+ * left the subtraction to the operator's head. Measured on the live 19 POs:
+ * EIGHT were already landing after the customer's date, two on the very day,
+ * and the page said nothing — and most of those arrival dates are still our
+ * own estimate, so we knew before we had even phoned.
+ *
+ * It rides the ARRIVAL date, never the customer's: the arrival is the number
+ * a phone call can still move; the promise to the customer cannot. (The
+ * customer's own cell keeps its separate red for a date that has already
+ * PASSED — a different fact, and two reds on one row would blur both.)
+ *
+ * SILENCE MEANS FINE, so a gap with room to spare returns null. Only two
+ * things speak: `late` (the goods land after the promise) and `tight` (the
+ * same day — no room at all for one hiccup, which is not "fine").
+ */
+export type PoArrivalGap = {
+  /** Calendar days the arrival falls AFTER the customer's date; 0 = same day. */
+  days: number;
+  tone: "late" | "tight";
+  label: string;
+};
+
+export function poArrivalGapOf(
+  customerDeliveryIso: string | null | undefined,
+  arrivalIso: string | null | undefined,
+): PoArrivalGap | null {
+  if (!customerDeliveryIso || !arrivalIso) return null;
+  const days = Math.round(
+    (Date.parse(`${arrivalIso}T00:00:00Z`) -
+      Date.parse(`${customerDeliveryIso}T00:00:00Z`)) /
+      86_400_000,
+  );
+  if (days < 0) return null;
+  if (days === 0) return { days: 0, tone: "tight", label: "same day" };
+  return { days, tone: "late", label: `${days}d late` };
+}
 
 export function poWorkStateOf(
   po: Pick<SupplierCallPo, "status" | "etaDateIso" | "lines">,

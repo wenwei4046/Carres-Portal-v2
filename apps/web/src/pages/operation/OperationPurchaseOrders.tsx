@@ -7,8 +7,10 @@ import {
   poDateHistoryOf,
   PO_DELAY_REASONS,
   PO_STATE_ACTION_SHORT,
+  PO_STATE_ACTION_WORD,
   PO_WORK_STATES,
   PO_WORK_STATE_LABEL,
+  poArrivalGapOf,
   poCurrentActionOf,
   poOverdueDays,
   poReceivingProgress,
@@ -72,7 +74,7 @@ import {
  *     2026-08-02: the listing is for FINDING — sort, filter, search; the
  *     work happens in the workspace). Eight frozen columns, her order:
  *     PO Issued · Supplier · PO No. · Items · Customer Delivery ·
- *     Goods Arriving At · Received · Current Action. Default order =
+ *     Goods Arrival · Received · Current Action. Default order =
  *     PO Issued OLDEST first (the buyer chases the longest-waiting PO,
  *     never the biggest number). Every column sorts by header click and
  *     filters by its ▼ (dates: Excel presets + month buckets + Custom Date
@@ -90,7 +92,7 @@ import {
  *
  * Deliberately absent until their stores exist (dead controls are banned):
  * Email window (`suppliers.email`) · I've Sent + History (`po_sends`) ·
- * Notes (no store) · Supplier DO (no store) · editable Goods Arriving At
+ * Notes (no store) · Supplier DO (no store) · editable Goods Arrival
  * (Phase 6 — writes the promise ledger through its own door).
  */
 
@@ -641,7 +643,7 @@ export default function OperationPurchaseOrders() {
 
   // The eight columns, in Jess's frozen order (2026-08-02):
   //   PO Issued · Supplier · PO No. · Items · Customer Delivery ·
-  //   Goods Arriving At · Received · Current Action
+  //   Goods Arrival · Received · Current Action
   const columns: readonly Column<operationPoListRow>[] = [
     {
       key: "issued",
@@ -663,7 +665,9 @@ export default function OperationPurchaseOrders() {
     {
       key: "supplier",
       label: "Supplier",
-      width: "104px",
+      // Compact (workspace open) buys the Current Action tail its last 12px.
+      // Measured, not guessed: the widest supplier name needs 87px.
+      width: workspaceOpen ? "92px" : "104px",
       sortable: true,
       filter: filterFor("supplier", supplierOptions, { searchable: true }),
       cell: (p) => supplierNameOf(p.supplier_id),
@@ -711,7 +715,9 @@ export default function OperationPurchaseOrders() {
     {
       key: "items",
       label: "Items",
-      width: "150px",
+      // Same 10px loan as Supplier, and the widest label measures 135px, so
+      // nothing here truncates that did not truncate before.
+      width: workspaceOpen ? "140px" : "150px",
       sortable: true,
       filter: filterFor("items", itemsOptions, { searchable: true }),
       cell: (p) => (
@@ -746,14 +752,32 @@ export default function OperationPurchaseOrders() {
     },
     {
       key: "arriving",
-      label: "Goods Arriving At",
-      width: "96px",
+      // `Goods Arrival`, never `Goods Arriving At` (Jess, 2026-08-03): `At`
+      // carries no information, and this column's neighbour is `Customer
+      // Delivery` — two dates of the same kind, so they now read as a pair.
+      // It is also the word ORDERS-WORKING-FLOW.md already uses.
+      label: "Goods Arrival",
+      // Wider than the 96px it carried as a bare date: the gap tail rides
+      // here, and a truncated warning is worse than no warning. 192 is
+      // MEASURED against the worst line the cell can hold — `25 Aug 26  8d
+      // late (revised)` needs 189 — never estimated: jsdom has no widths, so
+      // the page tests structurally cannot catch this and only the browser
+      // can. Compact keeps the old 96: there this column appears only when
+      // the HONESTY GUARD forces it, and six columns have never fitted 565px.
+      width: workspaceOpen ? "96px" : "192px",
       sortable: true,
       filter: filterFor("arriving", arrivingOptions, { range: true }),
       cell: (p) => {
         const eta = etaOf(p);
         if (!eta.date) return <span className="text-kit-slate-9">—</span>;
         const late = callsOf(p).some((c) => c.late);
+        const st = workStateOf(p, today);
+        // The subtraction the operator used to do in their head. Closed and
+        // cancelled POs stay silent — their gap is history, not work.
+        const gap =
+          st === "completed" || st === "cancelled"
+            ? null
+            : poArrivalGapOf(p.customer_delivery ?? null, eta.date);
         return (
           <span
             className={[
@@ -767,6 +791,24 @@ export default function OperationPurchaseOrders() {
             title={eta.confirmed ? undefined : "Expected — supplier has not confirmed"}
           >
             {fmtDateShort(eta.date)}
+            {gap && (
+              <span
+                data-testid="po-arrival-gap"
+                className={
+                  gap.tone === "late"
+                    ? " text-kit-red-11"
+                    : " text-kit-amber-11"
+                }
+                title={
+                  gap.tone === "late"
+                    ? "The goods land after the date promised to the customer"
+                    : "The goods land on the customer's own date — no day to spare"
+                }
+              >
+                {"  "}
+                {gap.label}
+              </span>
+            )}
             {p.eta_revised && (
               /* 2990s' own marker: the date shown is not the first date the
                  supplier named — the history lives in the promise ledger. */
@@ -800,8 +842,10 @@ export default function OperationPurchaseOrders() {
         if (!a) return <span className="text-kit-slate-9">—</span>;
         const late = a.kind === "call" && a.call.late;
         const quiet = a.kind === "state" && a.key === "waiting";
+        const word = actionListWordOf(a);
         return (
           <span
+            title={word}
             className={
               late
                 ? "text-kit-red-11"
@@ -810,7 +854,7 @@ export default function OperationPurchaseOrders() {
                   : "text-kit-slate-12"
             }
           >
-            {actionListWordOf(a)}
+            {word}
           </span>
         );
       },
@@ -820,7 +864,7 @@ export default function OperationPurchaseOrders() {
   /** Gmail's reading-pane recipe, compact set re-ruled with the 8 columns
    *  (Jess, 2026-08-02): PO Issued (when) · Supplier (with whom) · PO No.
    *  (which document) · Items (which goods) · Current Action (what now).
-   *  Customer Delivery / Goods Arriving At / Received read off the open Live
+   *  Customer Delivery / Goods Arrival / Received read off the open Live
    *  PO beside them. HONESTY GUARD unchanged: a column carrying an ACTIVE
    *  filter or sort can never be hidden — a filter you cannot see is a lie
    *  the table tells (P2's own law). */
@@ -1046,7 +1090,7 @@ export default function OperationPurchaseOrders() {
  *                     read only, always the CURRENT revision; edits happen
  *                     in SUPPLIER. UI speaks business, not "Reference".)
  *   SUPPLIER          "What must I do with the supplier?"  (mission: manage
- *                     supplier execution — Goods Arriving At + its history
+ *                     supplier execution — Goods Arrival + its history
  *                     beside it, Open Actions; grows forever: DO · Revision
  *                     · Change/Split Deliver To · Claims links.)
  *   ACTIVITY          "What have we communicated?" (mission: record and
@@ -1094,6 +1138,19 @@ function WorkspaceBody({
   const supplierName = supplier?.name ?? po.supplier_id;
   const progress = poReceivingProgress(po.purchase_order_lines);
   const overdue = poOverdueDays(callPoOf(po), today);
+  const workState = poWorkStateOf(callPoOf(po), today);
+  /** The gap the register now prints, read by the SAME shared rule — the
+   *  delay is RECORDED here, so this is where the operator most needs to know
+   *  the promise they are about to break. */
+  const gap =
+    workState === "completed" || workState === "cancelled"
+      ? null
+      : poArrivalGapOf(po.customer_delivery ?? null, eta.date);
+  /** Law 7's one action source. v7 took the big hero out (the rail owns
+   *  progress) and the register's column was meant to carry it — but with the
+   *  workspace open that column is the only place it lives, and it was being
+   *  clipped. One quiet property row, same size as its neighbours. */
+  const action = poCurrentActionOf(callPoOf(po), { todayIso: today });
   const [dateOpen, setDateOpen] = useState(false);
   const [openLine, setOpenLine] = useState<string | null>(null);
 
@@ -1159,6 +1216,19 @@ function WorkspaceBody({
           </Prop>
           <Prop label="Delivery To">{warehouse?.name ?? "—"}</Prop>
           <Prop label="Supplier">{supplierName}</Prop>
+          {/* The date we promised the CUSTOMER — the one number the supplier
+              date has to be judged against, and it was not on this panel at
+              all (Jess, 2026-08-03). Read-only here: purchasing cannot move
+              a customer's promise. */}
+          <Prop label="Customer Delivery">
+            {po.customer_delivery ? (
+              <span className="tabular-nums" data-testid="po-customer-delivery">
+                {fmtDateShort(po.customer_delivery)}
+              </span>
+            ) : (
+              <span className="text-kit-slate-9">—</span>
+            )}
+          </Prop>
         </div>
         <span className="text-page font-semibold font-mono text-kit-slate-12 shrink-0">
           {po.id}
@@ -1175,7 +1245,7 @@ function WorkspaceBody({
         className="mt-0.5 w-full flex items-baseline gap-2 text-body leading-6 text-left hover:bg-kit-blue-2 rounded-control"
       >
         <span className="w-32 shrink-0 text-label text-kit-slate-9">
-          Supplier Delivery Date
+          Goods Arrival
         </span>
         <span className="min-w-0 flex-1">
           {eta.date ? (
@@ -1193,6 +1263,20 @@ function WorkspaceBody({
           ) : (
             <span className="text-kit-slate-9">—</span>
           )}
+          {/* The customer gap comes FIRST and loudest: `6 days later` is the
+              supplier moving against themselves, `8d late` is the promise we
+              made to a person. Same rule as the register's column. */}
+          {gap && (
+            <span
+              data-testid="po-arrival-gap"
+              className={
+                gap.tone === "late" ? "text-kit-red-11" : "text-kit-amber-11"
+              }
+            >
+              {"  "}
+              {gap.label}
+            </span>
+          )}
           {hist.entries.length > 1 && (
             <span className="text-kit-slate-9" data-testid="po-date-nth">
               {"  "}
@@ -1208,6 +1292,19 @@ function WorkspaceBody({
         </span>
         <Icon name={dateOpen ? "collapse" : "forward"} size={14} />
       </button>
+
+      {/* What to do about all of the above. It sits AFTER the dates because
+          that is the reading order — facts, then the move. Completed and
+          cancelled POs carry none: the work is over. */}
+      {action && (
+        <div data-testid="po-next-action">
+          <Prop label="Next">
+            {action.kind === "call"
+              ? purchasingActionQueue(action.call.key)
+              : PO_STATE_ACTION_WORD[action.key]}
+          </Prop>
+        </div>
+      )}
 
       {dateOpen && (
         <div
@@ -1252,14 +1349,20 @@ function WorkspaceBody({
                   className="flex items-baseline gap-2 text-body leading-6"
                 >
                   {hist.entries.length > 1 && (
-                    <span className="w-8 shrink-0 text-label text-kit-slate-9">
+                    <span className="w-7 shrink-0 text-label text-kit-slate-9">
                       {ordinalLabel(e.ordinal)}
                     </span>
                   )}
-                  <span className="w-20 shrink-0 tabular-nums text-kit-slate-12">
+                  <span className="w-[68px] shrink-0 tabular-nums text-kit-slate-12">
                     {fmtDateShort(e.date)}
                   </span>
-                  <span className="min-w-0 text-kit-slate-9 truncate">
+                  {/* Not `truncate`: `Production Delay` overflowed by 3px and
+                      printed `Production Del…` — a reason category clipped is
+                      a reason nobody can count. The ordinal and the date gave
+                      back 20px so the five short reasons sit on ONE line; the
+                      one long one wraps, which is the honest way to run out
+                      of room. */}
+                  <span className="min-w-0 text-kit-slate-9">
                     {[e.reason, e.remarks].filter(Boolean).join(" · ")}
                   </span>
                   {/* No "told" column (Jess, 2026-08-02): every answer keyed
@@ -1867,7 +1970,7 @@ function ActivityDesk({
     .map((l) => `${l.sku} ×${l.qty}`)
     .join("\n");
   const arriving = po.eta_date
-    ? `Goods Arriving At: ${fmtDate(po.eta_date)}`
+    ? `Goods Arrival: ${fmtDate(po.eta_date)}`
     : "Please confirm the arrival date.";
 
   /** The ONE company-wide draft, filled in. A template with no placeholders

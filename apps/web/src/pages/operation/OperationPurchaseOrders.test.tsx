@@ -11,7 +11,7 @@ const PO_DELAY_REASONS_FOR_TEST: readonly string[] = PO_DELAY_REASONS;
  * Purchase Orders — the Register's Step-1 freeze (Jess, 2026-08-02):
  *
  *   · eight columns, her order: PO Issued · Supplier · PO No. · Items ·
- *     Customer Delivery · Goods Arriving At · Received · Current Action;
+ *     Customer Delivery · Goods Arrival · Received · Current Action;
  *   · default order = PO Issued OLDEST first (business priority, never the
  *     document number);
  *   · Items speaks MODEL off the wire (`model_name`), `×N` only when N ≥ 2;
@@ -101,9 +101,11 @@ const POS = [
     so_refs: null,
     eta_date: "2099-12-30",
     placed_at: "2026-01-05T08:00:00Z",
-    customer_delivery: null,
+    // 8 days AFTER what we promised the customer — and this PO also carries
+    // `(revised)`, so it is the crowded case: date + gap + marker on one line.
+    customer_delivery: "2099-12-22",
     eta_revised: true,
-    orders: [{ so: 1200, customer_name: "Mei Ling", delivery_date: null }],
+    orders: [{ so: 1200, customer_name: "Mei Ling", delivery_date: "2099-12-22" }],
     promises: [
       {
         kind: "tomorrow_delivery",
@@ -128,7 +130,8 @@ const POS = [
     so_refs: null,
     eta_date: "2099-11-11",
     placed_at: "2026-04-01T08:00:00Z",
-    customer_delivery: null,
+    // The goods land on the customer's own day — no room for one hiccup.
+    customer_delivery: "2099-11-11",
     eta_revised: true,
     orders: [],
     promises: [
@@ -182,6 +185,35 @@ const POS = [
     eta_revised: false,
     orders: [],
     purchase_order_lines: [line("c1", "RAW-UNKNOWN-1", 1, null, null)],
+  },
+  {
+    // FULLY RECEIVED → the work is over. Its goods landed 10 days after the
+    // customer's date, and it must stay SILENT: a closed PO's gap is history,
+    // not work, and a register that shouts about the past teaches nobody.
+    id: "PO-9006",
+    supplier_id: OHANA,
+    warehouse_id: WH,
+    status: "open",
+    sup_status: "confirmed",
+    so: 1600,
+    so_refs: null,
+    eta_date: "2026-05-20",
+    placed_at: "2026-05-01T08:00:00Z",
+    customer_delivery: "2026-05-10",
+    eta_revised: false,
+    orders: [],
+    purchase_order_lines: [
+      {
+        id: "f1",
+        sku: "SKU-CODY-Q",
+        qty: 2,
+        received_qty: 2,
+        model_name: "Cody",
+        size: "Queen",
+        attrs: null,
+        so_rows: [{ so: 1600, qty: 2, remark: null }],
+      },
+    ],
   },
 ];
 
@@ -272,7 +304,7 @@ describe("the eight frozen columns", () => {
       "PO No.",
       "Items",
       "Customer Delivery",
-      "Goods Arriving At",
+      "Goods Arrival",
       "Received",
       "Current Action",
     ]);
@@ -290,7 +322,7 @@ describe("the eight frozen columns", () => {
     fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     fireEvent.click(screen.getByTestId("table-sort-arriving"));
     fireEvent.click(screen.getByTestId("po-workspace-toggle"));
-    expect(headerTexts()).toContain("Goods Arriving At");
+    expect(headerTexts()).toContain("Goods Arrival");
   });
 });
 
@@ -302,7 +334,14 @@ describe("the default order — PO Issued, oldest first", () => {
       .map((el) => el.textContent);
     // 10 Jan (9004) → 5 Jan… wait: issued dates are 9004 10-Jan, 9001 5-Jan,
     // 9002 1-Feb, 9003 1-Mar → oldest first, never the PO number.
-    expect(cells).toEqual(["PO-9001", "PO-9004", "PO-9002", "PO-9003", "PO-9005"]);
+    expect(cells).toEqual([
+      "PO-9001",
+      "PO-9004",
+      "PO-9002",
+      "PO-9003",
+      "PO-9005",
+      "PO-9006",
+    ]);
   });
 });
 
@@ -337,6 +376,110 @@ describe("what the row states", () => {
     fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     // Two POs now carry a revised date (9001, 9005) — the marker is per row.
     expect(listing().getAllByText("(revised)").length).toBe(2);
+  });
+});
+
+/** Jess, 2026-08-03 — the register put Customer Delivery and Goods Arrival
+ *  side by side and left the subtraction to the operator's head. Measured on
+ *  live prod: 8 of 19 POs were already landing after the customer's date. */
+describe("the gap against the customer's date", () => {
+  /** Scoped to the LISTING on purpose: a collapsed workspace is `hidden`, not
+   *  unmounted, so its own gap is still in the document. */
+  const gaps = () =>
+    listing()
+      .queryAllByTestId("po-arrival-gap")
+      .map((el) => el.textContent?.trim());
+
+  it("a PO landing after the promise says how many days late", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
+    const row = listing().getByText("PO-9001").closest("tr")!;
+    expect(
+      within(row as HTMLElement).getByTestId("po-arrival-gap"),
+    ).toHaveTextContent("8d late");
+  });
+
+  it("landing ON the customer's own day is not fine — it says same day", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
+    const row = listing().getByText("PO-9005").closest("tr")!;
+    expect(
+      within(row as HTMLElement).getByTestId("po-arrival-gap"),
+    ).toHaveTextContent("same day");
+  });
+
+  it("room to spare says NOTHING — silence has to mean fine", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
+    // PO-9003 arrives today against a 2099 promise: acres of room.
+    const row = listing().getByText("PO-9003").closest("tr")!;
+    expect(
+      within(row as HTMLElement).queryByTestId("po-arrival-gap"),
+    ).toBeNull();
+  });
+
+  it("a finished PO stays silent — its gap is history, not work", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
+    // PO-9006 landed 10 days after the promise and is fully received.
+    const row = listing().getByText("PO-9006").closest("tr")!;
+    expect(
+      within(row as HTMLElement).queryByTestId("po-arrival-gap"),
+    ).toBeNull();
+    // …and exactly the two live ones speak, nobody else.
+    expect(gaps()).toEqual(["8d late", "same day"]);
+  });
+
+  it("the gap survives beside (revised) — the warning is never the thing cut", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
+    const row = listing().getByText("PO-9001").closest("tr")!;
+    const cell = within(row as HTMLElement);
+    expect(cell.getByTestId("po-arrival-gap")).toBeInTheDocument();
+    expect(cell.getByText("(revised)")).toBeInTheDocument();
+  });
+
+  it("the workspace prints the customer's date and the gap where the delay is RECORDED", async () => {
+    await mountLoaded();
+    fireEvent.click(listing().getByText("PO-9001"));
+    expect(screen.getByTestId("po-customer-delivery")).toBeInTheDocument();
+    const header = screen.getByTestId("po-document");
+    expect(
+      within(header).getAllByTestId("po-arrival-gap").length,
+    ).toBeGreaterThan(0);
+  });
+});
+
+/** Jess, 2026-08-03 — v7 took the Current Action hero out because the
+ *  register's column carries it; with the workspace open that column was
+ *  being CLIPPED, so the action lived nowhere. Both halves are fixed. */
+describe("Current Action survives the workspace being open", () => {
+  it("the workspace states the next move as a quiet property row", async () => {
+    await mountLoaded();
+    fireEvent.click(listing().getByText("PO-9004"));
+    const next = within(screen.getByTestId("po-next-action"));
+    expect(next.getByText("Next")).toBeInTheDocument();
+    // Overdue outranks the engine — the confirmed date is spent.
+    expect(next.getByText("Contact Supplier")).toBeInTheDocument();
+  });
+
+  it("the workspace speaks the FULL word where the column speaks short", async () => {
+    await mountLoaded();
+    fireEvent.click(listing().getByText("PO-9002"));
+    // Cancelled carries no action at all — the work is over.
+    expect(screen.queryByTestId("po-next-action")).toBeNull();
+    fireEvent.click(listing().getByText("PO-9003"));
+    const next = within(screen.getByTestId("po-next-action"));
+    expect(next.queryByText("Confirm Arrival")).toBeNull();
+  });
+
+  it("compact mode fits the longest action word without cutting it", async () => {
+    await mountLoaded();
+    // Compact is the default. The word must be present ENTIRE — the bug was a
+    // silent `clip`, so a partial match would have passed all along.
+    expect(listing().getAllByText("Waiting for Goods").length).toBeGreaterThan(0);
+    const cell = listing().getAllByText("Waiting for Goods")[0];
+    expect(cell.getAttribute("title")).toBe("Waiting for Goods");
   });
 });
 

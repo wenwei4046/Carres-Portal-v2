@@ -5,6 +5,7 @@ import {
   PO_DELAY_REASONS,
   PO_STATE_ACTION_SHORT,
   PO_STATE_ACTION_WORD,
+  poArrivalGapOf,
   poCurrentActionOf,
   poOverdueDays,
   poWorkStateOf,
@@ -81,7 +82,7 @@ describe("poWorkStateOf — the SUPPLIER PROGRESS vocabulary", () => {
 });
 
 describe("poCurrentActionOf — ONE action, engine first", () => {
-  it("a quiet PO with no date says Confirm Goods Arriving Date", () => {
+  it("a quiet PO with no date says Confirm Goods Arrival Date", () => {
     const a = poCurrentActionOf(po(), { todayIso: TODAY });
     expect(a).toEqual({
       kind: "state",
@@ -217,5 +218,46 @@ describe("poDateHistoryOf — the supplier's numbered dates (SAP's shape)", () =
     expect([1, 2, 3, 4, 11, 12, 13, 21].map(ordinalLabel)).toEqual([
       "1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st",
     ]);
+  });
+});
+
+/**
+ * The gap against the CUSTOMER's date (Jess, 2026-08-03). The register held
+ * both dates and said nothing about the distance between them.
+ */
+describe("poArrivalGapOf", () => {
+  it("the goods land after the promise — it says how many days", () => {
+    expect(poArrivalGapOf("2026-08-17", "2026-08-25")).toEqual({
+      days: 8,
+      tone: "late",
+      label: "8d late",
+    });
+  });
+
+  it("one day late is still late, and reads singular-safe", () => {
+    expect(poArrivalGapOf("2026-08-17", "2026-08-18")?.label).toBe("1d late");
+  });
+
+  it("the same day is NOT fine — no room for one hiccup", () => {
+    expect(poArrivalGapOf("2026-08-18", "2026-08-18")).toEqual({
+      days: 0,
+      tone: "tight",
+      label: "same day",
+    });
+  });
+
+  it("room to spare says nothing at all — silence has to mean fine", () => {
+    expect(poArrivalGapOf("2026-08-22", "2026-08-15")).toBeNull();
+  });
+
+  it("a missing date on either side can prove nothing, so it says nothing", () => {
+    expect(poArrivalGapOf(null, "2026-08-15")).toBeNull();
+    expect(poArrivalGapOf("2026-08-15", null)).toBeNull();
+    expect(poArrivalGapOf(null, null)).toBeNull();
+  });
+
+  it("counts CALENDAR days — a customer does not care that it is a Sunday", () => {
+    // 31 Aug → 1 Sep crosses a month end; the arithmetic must not care.
+    expect(poArrivalGapOf("2026-08-31", "2026-09-02")?.days).toBe(2);
   });
 });
