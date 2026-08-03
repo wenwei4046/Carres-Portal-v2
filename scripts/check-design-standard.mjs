@@ -295,6 +295,31 @@ for (const f of files) {
     }
   }
 
+  // RULE J — HOVER IS GREY (Loo, 2026-08-03). A hover tint says "the mouse is
+  // here": true for one second, carrying no meaning, so it may not spend the
+  // accent. Blue marks exactly TWO things on any screen — the primary action
+  // and the current SELECTION, which is a lasting state with a consequence.
+  //
+  // NOT ratcheted, because the count is 0 the day this rule is written and a
+  // baseline would only let it climb back. `01-design-tokens.md` §2.3 is the
+  // law; this is what makes a new chat obey it without having read the file.
+  //
+  // `hover:bg-kit-blue-10` is DELIBERATELY legal: that is a filled blue button
+  // going a step darker, which is the control's own state and not a row tint.
+  if (f.endsWith(".tsx") && !f.includes(".test.")) {
+    // ONLY the blue tint steps. `hover:bg-hovertint` is the token that now
+    // RESOLVES to grey (`--hover-tint`, index.css) and is the preferred form;
+    // banning it here would ban the very thing the law asks for. The legacy
+    // `base-50/100` greys are also legal now — grey IS the ruling.
+    const HOVER_TINT_RE = /hover:bg-kit-blue-[23]\b/g;
+    let m;
+    while ((m = HOVER_TINT_RE.exec(src))) {
+      errors.push(
+        `RULE J · hover tint — ${f}:${lineOf(src, m.index)} uses \`${m[0]}\`; a row/nav/chip hovers GREY (\`hover:bg-kit-slate-3\`). Blue is for the primary action and the SELECTED row only (docs/01-design-tokens.md §2.3, ruled 2026-08-03).`,
+      );
+    }
+  }
+
   if (!KIT_FILES.has(f)) continue;
 
   // RULE C — Lucide icon sizes.

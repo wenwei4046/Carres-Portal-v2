@@ -665,7 +665,7 @@ function RailItem({
         "relative flex items-center gap-2 px-2 py-1.5 rounded-control text-left text-body w-full",
         active
           ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
-          : "text-kit-slate-11 hover:bg-kit-blue-3",
+          : "text-kit-slate-11 hover:bg-kit-slate-3",
       ].join(" ")}
     >
       {active && (

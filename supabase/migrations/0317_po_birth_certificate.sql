@@ -2,7 +2,19 @@
 -- THE PO'S BIRTH CERTIFICATE                          approved by Loo 2026-08-03
 -- ============================================================================
 --
--- ⚠ HOW TO APPLY (read before pasting)
+-- ⚠ ALREADY APPLIED TO PRODUCTION — 2026-08-03, BY HAND, BY LOO.
+--
+--   It went in through the Supabase SQL editor rather than the migration
+--   mechanism, so prod carries it while the repo did not. This file is that
+--   copy, numbered 0317 (main carried 0316 at the time), so a database rebuilt
+--   from zero gets it too. Everything below is idempotent — re-running it on
+--   the live database changes nothing.
+--
+--   Jess: reconcile against the tracker tail when convenient. If the tracker
+--   never saw it, the number here is the repo's truth and the tracker is what
+--   needs the entry — not the other way round.
+--
+-- ⚠ HOW IT WAS APPLIED (kept for the next person)
 --
 --   1. Read the migration tracker's TAIL first. Number this file with the next
 --      number the TRACKER shows — never `ls supabase/migrations`. The live tail

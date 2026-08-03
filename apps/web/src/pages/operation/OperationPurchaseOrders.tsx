@@ -954,7 +954,7 @@ export default function OperationPurchaseOrders() {
                   "relative flex items-center gap-2 px-2 py-1.5 rounded-control text-left text-body w-full",
                   stateSel === null
                     ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
-                    : "text-kit-slate-11 hover:bg-kit-blue-3",
+                    : "text-kit-slate-11 hover:bg-kit-slate-3",
                 ].join(" ")}
               >
                 {stateSel === null && (
@@ -979,7 +979,7 @@ export default function OperationPurchaseOrders() {
                       "relative flex items-center gap-2 px-2 py-1.5 rounded-control text-left text-body w-full",
                       on
                         ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
-                        : "text-kit-slate-11 hover:bg-kit-blue-3",
+                        : "text-kit-slate-11 hover:bg-kit-slate-3",
                     ].join(" ")}
                   >
                     {on && (
@@ -1253,7 +1253,7 @@ function WorkspaceBody({
         onClick={() => setDateOpen((o) => !o)}
         aria-expanded={dateOpen}
         data-testid="po-date-row"
-        className="mt-0.5 w-full flex items-baseline gap-2 text-body leading-6 text-left hover:bg-kit-blue-2 rounded-control"
+        className="mt-0.5 w-full flex items-baseline gap-2 text-body leading-6 text-left hover:bg-kit-slate-3 rounded-control"
       >
         <span className="w-32 shrink-0 text-label text-kit-slate-9">
           Goods Arrival
