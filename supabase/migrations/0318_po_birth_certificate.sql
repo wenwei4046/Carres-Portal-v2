@@ -5,14 +5,20 @@
 -- ⚠ ALREADY APPLIED TO PRODUCTION — 2026-08-03, BY HAND, BY LOO.
 --
 --   It went in through the Supabase SQL editor rather than the migration
---   mechanism, so prod carries it while the repo did not. This file is that
---   copy, numbered 0317 (main carried 0316 at the time), so a database rebuilt
---   from zero gets it too. Everything below is idempotent — re-running it on
---   the live database changes nothing.
+--   mechanism, so prod carries it while the repo did not. Everything below is
+--   idempotent — re-running it on the live database changes nothing.
 --
---   Jess: reconcile against the tracker tail when convenient. If the tracker
---   never saw it, the number here is the repo's truth and the tracker is what
---   needs the entry — not the other way round.
+--   RENUMBERED 0317 -> 0318 on 2026-08-03. It was numbered 0317 off `ls
+--   supabase/migrations`, but the TRACKER had meanwhile recorded a different
+--   0317 (`0317_the_record_stops_claiming_a_send`, applied through the
+--   mechanism). Two files sharing a number leaves a database rebuilt from zero
+--   applying them in alphabetical order — an order nobody chose. The rule the
+--   collision proves: an applied-and-TRACKED migration keeps its number; the
+--   one the tracker never saw is the one that moves.
+--
+--   No tracker row was fabricated for this file. Inventing an applied-at
+--   timestamp would put a guess into an audit trail; the file is idempotent, so
+--   the next `db push` records it with the time it really ran.
 --
 -- ⚠ HOW IT WAS APPLIED (kept for the next person)
 --
