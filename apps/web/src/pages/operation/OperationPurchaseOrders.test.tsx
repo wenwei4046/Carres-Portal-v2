@@ -452,25 +452,19 @@ describe("the gap against the customer's date", () => {
 
 /** Jess, 2026-08-03 — v7 took the Current Action hero out because the
  *  register's column carries it; with the workspace open that column was
- *  being CLIPPED, so the action lived nowhere. Both halves are fixed. */
+ *  being CLIPPED, so the action lived nowhere. The fix is the WIDTH, and the
+ *  workspace stays out of it: `Next — Waiting for Goods` was a status wearing
+ *  an action's label, and the same slot would have carried a real call on the
+ *  next PO. One label cannot be true of both. */
 describe("Current Action survives the workspace being open", () => {
-  it("the workspace states the next move as a quiet property row", async () => {
+  it("the workspace does NOT repeat the action — the column owns it", async () => {
     await mountLoaded();
     fireEvent.click(listing().getByText("PO-9004"));
-    const next = within(screen.getByTestId("po-next-action"));
-    expect(next.getByText("Next")).toBeInTheDocument();
-    // Overdue outranks the engine — the confirmed date is spent.
-    expect(next.getByText("Contact Supplier")).toBeInTheDocument();
-  });
-
-  it("the workspace speaks the FULL word where the column speaks short", async () => {
-    await mountLoaded();
-    fireEvent.click(listing().getByText("PO-9002"));
-    // Cancelled carries no action at all — the work is over.
     expect(screen.queryByTestId("po-next-action")).toBeNull();
-    fireEvent.click(listing().getByText("PO-9003"));
-    const next = within(screen.getByTestId("po-next-action"));
-    expect(next.queryByText("Confirm Arrival")).toBeNull();
+    // …and the word it would have carried is nowhere in the document either.
+    const doc = within(screen.getByTestId("po-document"));
+    expect(doc.queryByText("Contact Supplier")).toBeNull();
+    expect(doc.queryByText("Next")).toBeNull();
   });
 
   it("compact mode fits the longest action word without cutting it", async () => {
@@ -480,6 +474,42 @@ describe("Current Action survives the workspace being open", () => {
     expect(listing().getAllByText("Waiting for Goods").length).toBeGreaterThan(0);
     const cell = listing().getAllByText("Waiting for Goods")[0];
     expect(cell.getAttribute("title")).toBe("Waiting for Goods");
+  });
+});
+
+/** Jess, 2026-08-03 — the list said `Cody Q` and the document said
+ *  `SKU-CODY-Q`: two languages for one PO. A buyer knows Booqit · Cody ·
+ *  Jager, never 5539-1B(LHF). */
+describe("one product, one name", () => {
+  it("the document's DESCRIPTION speaks the same words as the register", async () => {
+    await mountLoaded();
+    fireEvent.click(listing().getByText("PO-9003"));
+    const doc = within(screen.getByTestId("po-document"));
+    expect(doc.getAllByText("Cody Q").length).toBeGreaterThan(0);
+    expect(doc.queryByText("SKU-CODY-Q")).toBeNull();
+    // The listing spells it identically — same function, so it cannot drift.
+    expect(listing().getByText("Cody Q ×2 · +2")).toBeInTheDocument();
+  });
+
+  it("the CODE is still reachable — hover, and the row's own surface", async () => {
+    await mountLoaded();
+    fireEvent.click(listing().getByText("PO-9003"));
+    const doc = within(screen.getByTestId("po-document"));
+    expect(doc.getAllByText("Cody Q")[0].getAttribute("title")).toBe(
+      "SKU-CODY-Q",
+    );
+    fireEvent.click(screen.getByTestId("po-item-menu-1"));
+    const sku = within(screen.getByTestId("po-item-sku"));
+    expect(sku.getByText("Item ID")).toBeInTheDocument();
+    expect(sku.getByText("SKU-CODY-Q")).toBeInTheDocument();
+  });
+
+  it("the variant is not printed twice — the name already carries it", async () => {
+    await mountLoaded();
+    fireEvent.click(listing().getByText("PO-9003"));
+    const doc = within(screen.getByTestId("po-document"));
+    // `Cody Q` holds the size; a bare `Queen` sub-line underneath said it again.
+    expect(doc.queryByText("Queen")).toBeNull();
   });
 });
 
@@ -707,9 +737,13 @@ describe("the supplier's date history, numbered (SAP's shape)", () => {
         within(screen.getByTestId("po-working-header")).getByText("PO-9005"),
       ).toBeInTheDocument(),
     );
-    // Three answers → `3rd date · 11 days later` beside the date.
-    expect(screen.getByTestId("po-date-nth").textContent).toMatch(/3rd date/);
-    expect(screen.getByTestId("po-date-nth").textContent).toMatch(/11 days later/);
+    // The header carries NO history summary (Jess, 2026-08-03): `3rd date ·
+    // 11 days later` was history squeezed into a header, and the history is
+    // one click away saying it properly.
+    expect(screen.queryByTestId("po-date-nth")).toBeNull();
+    expect(
+      within(screen.getByTestId("po-date-row")).queryByText(/days later/),
+    ).toBeNull();
     fireEvent.click(screen.getByTestId("po-date-row"));
     const h = within(screen.getByTestId("po-date-history"));
     // No "told" column — two answers keyed the same day printed the same

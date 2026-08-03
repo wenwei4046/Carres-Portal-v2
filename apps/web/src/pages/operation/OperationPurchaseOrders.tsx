@@ -7,7 +7,6 @@ import {
   poDateHistoryOf,
   PO_DELAY_REASONS,
   PO_STATE_ACTION_SHORT,
-  PO_STATE_ACTION_WORD,
   PO_WORK_STATES,
   PO_WORK_STATE_LABEL,
   poArrivalGapOf,
@@ -1057,6 +1056,12 @@ export default function OperationPurchaseOrders() {
               warehouse={warehouseById.get(selected.warehouse_id)}
               calls={callsOf(selected)}
               sizeOf={(raw) => skuBySku.get(raw)?.variant ?? null}
+              // ③ ONE naming rule for both surfaces (Jess, 2026-08-03): the
+              // register and the workspace were two languages for one PO —
+              // `Booqit 1B(LHF)` in the list, `5539-1B(LHF)` in the document.
+              // Passing the LISTING's own function down is what makes them
+              // structurally unable to drift apart again.
+              labelOf={lineLabel}
               eta={etaOf(selected)}
               today={today}
               destinations={destinations}
@@ -1120,6 +1125,7 @@ function WorkspaceBody({
   warehouse,
   calls,
   sizeOf,
+  labelOf,
   eta,
   today,
   destinations,
@@ -1130,6 +1136,9 @@ function WorkspaceBody({
   warehouse: { name: string; address: string | null } | undefined;
   calls: PurchasingOpenCall[];
   sizeOf: (sku: string) => string | null;
+  /** The REGISTER's own item-naming function, handed down so the document
+   *  and the list can never spell one product two ways. */
+  labelOf: (l: operationPoListRow["purchase_order_lines"][number]) => string;
   eta: { date: string | null; confirmed: boolean };
   today: string;
   destinations: { id: string; name: string; is_default: boolean }[];
@@ -1146,11 +1155,6 @@ function WorkspaceBody({
     workState === "completed" || workState === "cancelled"
       ? null
       : poArrivalGapOf(po.customer_delivery ?? null, eta.date);
-  /** Law 7's one action source. v7 took the big hero out (the rail owns
-   *  progress) and the register's column was meant to carry it — but with the
-   *  workspace open that column is the only place it lives, and it was being
-   *  clipped. One quiet property row, same size as its neighbours. */
-  const action = poCurrentActionOf(callPoOf(po), { todayIso: today });
   const [dateOpen, setDateOpen] = useState(false);
   const [openLine, setOpenLine] = useState<string | null>(null);
 
@@ -1162,6 +1166,9 @@ function WorkspaceBody({
       key: string;
       lineId: string;
       so: number | null;
+      /** The business name a buyer says out loud — `Booqit 1B(LHF)`. */
+      label: string;
+      /** The code. It identifies, it does not describe, so it never leads. */
       sku: string;
       size: string | null;
       qty: number;
@@ -1183,6 +1190,7 @@ function WorkspaceBody({
           key: `${l.id}-${i}`,
           lineId: l.id,
           so: r.so,
+          label: labelOf(l),
           sku: l.sku,
           size: sizeOf(l.sku),
           qty: r.qty,
@@ -1194,7 +1202,7 @@ function WorkspaceBody({
       });
     }
     return out;
-  }, [po, sizeOf]);
+  }, [po, sizeOf, labelOf]);
 
   const destName = (id: string) =>
     destinations.find((d) => d.id === id)?.name ?? "—";
@@ -1263,9 +1271,10 @@ function WorkspaceBody({
           ) : (
             <span className="text-kit-slate-9">—</span>
           )}
-          {/* The customer gap comes FIRST and loudest: `6 days later` is the
-              supplier moving against themselves, `8d late` is the promise we
-              made to a person. Same rule as the register's column. */}
+          {/* ONE thing beside the date, and it is the promise we made to a
+              person (Jess, 2026-08-03). The `2nd date · 6 days later` summary
+              that used to sit here was history squeezed into a header — the
+              history itself is one click away and says it properly. */}
           {gap && (
             <span
               data-testid="po-arrival-gap"
@@ -1273,15 +1282,7 @@ function WorkspaceBody({
                 gap.tone === "late" ? "text-kit-red-11" : "text-kit-amber-11"
               }
             >
-              {"  "}
-              {gap.label}
-            </span>
-          )}
-          {hist.entries.length > 1 && (
-            <span className="text-kit-slate-9" data-testid="po-date-nth">
-              {"  "}
-              {ordinalLabel(hist.entries.length)} date
-              {hist.slipDays ? ` · ${hist.slipDays} days later` : ""}
+              {"  "}⚠ {gap.label}
             </span>
           )}
           {overdue != null && (
@@ -1293,18 +1294,12 @@ function WorkspaceBody({
         <Icon name={dateOpen ? "collapse" : "forward"} size={14} />
       </button>
 
-      {/* What to do about all of the above. It sits AFTER the dates because
-          that is the reading order — facts, then the move. Completed and
-          cancelled POs carry none: the work is over. */}
-      {action && (
-        <div data-testid="po-next-action">
-          <Prop label="Next">
-            {action.kind === "call"
-              ? purchasingActionQueue(action.call.key)
-              : PO_STATE_ACTION_WORD[action.key]}
-          </Prop>
-        </div>
-      )}
+      {/* NO action row here (Jess, 2026-08-03). `Next — Waiting for Goods`
+          was wrong twice over: `Waiting for Goods` is a STATUS, not a next
+          step, and the same slot carries a real ACTION on a PO with an open
+          call — one label cannot be true of both. The register's Current
+          Action column already says it, and since the compact width was
+          fixed it says it whole. */}
 
       {dateOpen && (
         <div
@@ -1402,14 +1397,19 @@ function WorkspaceBody({
                 {r.so != null ? `SO-${r.so}` : "—"}
               </span>
               <span className="flex-1 min-w-0">
-                <span className="block font-semibold font-mono text-kit-slate-12 truncate">
-                  {r.sku}
+                {/* The BUSINESS name leads (Jess, 2026-08-03): a buyer knows
+                    Booqit · Cody · Jager, not 5539-1B(LHF). Same function as
+                    the register's Items column, so the two can never drift.
+                    The code identifies rather than describes — it lives on
+                    hover and in the row's own expanded surface. The old
+                    variant sub-line is gone: `Booqit 1B(LHF)` already says
+                    it, and it was printing `1B(LHF)` twice. */}
+                <span
+                  title={r.sku}
+                  className="block font-semibold text-kit-slate-12 truncate"
+                >
+                  {r.label}
                 </span>
-                {r.size && (
-                  <span className="block text-label text-kit-slate-9">
-                    {r.size}
-                  </span>
-                )}
                 {/* TWO remarks, two owners (Jess, 2026-08-02): the SALES one
                     came over from the sales order and prints for the factory;
                     the OPS one is purchasing's own and never prints. */}
@@ -1455,6 +1455,18 @@ function WorkspaceBody({
                 className="pl-6 py-1.5 border-b border-kit-slate-4 bg-kit-slate-3"
                 data-testid="po-item-extend"
               >
+                {/* Where the CODE lives now: the row above says what the
+                    product is, this says which exact one — the warehouse and
+                    the factory both key on it. */}
+                <div
+                  className="flex items-baseline gap-2 text-body leading-6"
+                  data-testid="po-item-sku"
+                >
+                  <span className="w-32 shrink-0 text-label text-kit-slate-9">
+                    Item ID
+                  </span>
+                  <span className="font-mono text-kit-slate-12">{r.sku}</span>
+                </div>
                 <LineWork
                   lineId={r.lineId}
                   qty={r.qty}
