@@ -28,6 +28,7 @@ export {
   isPurchasingCategory,
   isPurchasingNumberKey,
   productionWorkingDaysFor,
+  transitDaysFor,
   workWeekOffDaysFor,
   purchasingUrgentWindowDays,
   unratedPairs,

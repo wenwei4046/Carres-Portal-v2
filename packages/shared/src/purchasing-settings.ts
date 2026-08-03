@@ -78,6 +78,18 @@ export interface PurchasingSupplierRow {
   categories: readonly PurchasingCategory[];
   /** Non-working weekdays, or null when nobody has set this factory's week. */
   offDays: readonly number[] | null;
+  /**
+   * WORKING days between the factory finishing and the goods reaching the
+   * destination — the eighth purchasing number (Loo, 2026-08-03). Seeded 1
+   * for every supplier: both factories are local, Nice Future is collected by
+   * NETS and Ohana delivers.
+   *
+   * It exists so `purchase_orders.eta_date` can be stamped when a PO is
+   * issued. Until it did, every PO born on To Order carried a NULL arrival,
+   * and `purchasing_record_tomorrow_delivery` (0306, shipped) refuses to open
+   * without one — a built, deployed supplier call that could never fire.
+   */
+  transitDays: number | null;
 }
 
 /** One edit: who, when, and what it was before. */
@@ -143,6 +155,23 @@ export function workWeekOffDaysFor(
   if (!supplierId) return DEFAULT_OFF_DAYS;
   const row = settings.suppliers.find((s) => s.id === supplierId);
   return row?.offDays && row.offDays.length > 0 ? row.offDays : DEFAULT_OFF_DAYS;
+}
+
+/**
+ * Transit working days for this factory — or `null` when nobody has set one.
+ *
+ * NEVER DEFAULTED. A null means the caller must say so rather than invent an
+ * arrival date: P1's whole lesson is that a fallback is how a setting silently
+ * stops mattering, and an `eta_date` nobody chose is a date the Receiving
+ * queue would then treat as a measurement.
+ */
+export function transitDaysFor(
+  settings: Pick<PurchasingSettings, "suppliers">,
+  supplierId: string | null | undefined,
+): number | null {
+  if (!supplierId) return null;
+  const row = settings.suppliers.find((s) => s.id === supplierId);
+  return row?.transitDays ?? null;
 }
 
 /**
@@ -225,6 +254,7 @@ export const purchasingSettingsResponseSchema = z.object({
       name: z.string(),
       categories: z.array(purchasingCategorySchema),
       offDays: z.array(z.number().int().min(0).max(6)).nullable(),
+      transitDays: z.number().int().min(0).max(60).nullable(),
     }),
   ),
   productionDays: z.array(

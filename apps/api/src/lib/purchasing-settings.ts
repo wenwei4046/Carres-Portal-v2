@@ -84,7 +84,7 @@ export async function loadPurchasingSettings(
       .not("supplier_id", "is", null),
     sb.from("suppliers").select("id, name"),
     sb.from("purchasing_production_days").select("supplier_id, category, working_days"),
-    sb.from("purchasing_supplier_settings").select("supplier_id, off_days"),
+    sb.from("purchasing_supplier_settings").select("supplier_id, off_days, transit_days"),
     sb
       .from("purchasing_setting_changes")
       .select("setting_key, supplier_id, category, old_value, new_value, changed_at, changed_by")
@@ -111,12 +111,19 @@ export async function loadPurchasingSettings(
     }
   }
 
+  const transitBySupplier = new Map<string, number>();
   const offDaysBySupplier = new Map<string, number[]>();
   for (const row of (weekR.data ?? []) as Array<Record<string, unknown>>) {
     offDaysBySupplier.set(
       row.supplier_id as string,
       ((row.off_days as number[] | null) ?? []).map(Number),
     );
+    // The eighth number. NULL stays null rather than becoming a 0 or a 1 —
+    // "nobody has set it" and "it takes no time" are different facts, and only
+    // the first one may withhold an arrival date.
+    if (row.transit_days != null) {
+      transitBySupplier.set(row.supplier_id as string, Number(row.transit_days));
+    }
   }
 
   const nameById = new Map<string, string>();
@@ -130,6 +137,7 @@ export async function loadPurchasingSettings(
       name: nameById.get(id) ?? "",
       categories: [...cats].sort(),
       offDays: offDaysBySupplier.get(id) ?? null,
+      transitDays: transitBySupplier.get(id) ?? null,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 

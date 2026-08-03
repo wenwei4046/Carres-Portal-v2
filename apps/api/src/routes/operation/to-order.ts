@@ -1,11 +1,13 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import {
+  addWorkingDays,
   buildToOrder,
   isToOrderCategory,
   myHolidaySet,
   planFromDocuments,
   productionWorkingDaysFor,
+  transitDaysFor,
   railItemLabel,
   workWeekOffDaysFor,
   type ProductCategory,
@@ -94,6 +96,12 @@ type Loaded = {
   unresolved: Unresolved[];
   /** The whole catalog, read once — the ordered read reuses it. */
   catalog: Map<string, CatalogFact>;
+  /**
+   * The numbers, read ONCE. The issue path needs them for the PO's birth
+   * certificate; reading them a second time there costs a query AND lets the
+   * plan and the dates stamped on it come from two different reads.
+   */
+  settings: Awaited<ReturnType<typeof loadPurchasingSettings>>;
 };
 
 /**
@@ -142,6 +150,7 @@ async function loadToOrder(
         poDays: settings.poDays,
         unresolved: [],
         catalog: new Map(),
+        settings,
       },
     };
   }
@@ -336,7 +345,10 @@ async function loadToOrder(
     missingProductionDays,
   });
 
-  return { ok: true, data: { proposals, today, poDays: settings.poDays, unresolved, catalog: cat } };
+  return {
+    ok: true,
+    data: { proposals, today, poDays: settings.poDays, unresolved, catalog: cat, settings },
+  };
 }
 
 /** How far back the grid answers "what did we order". Older → Purchase Orders. */
@@ -723,17 +735,75 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
     return c.json({ error: "po_not_created", code: "po_not_created" }, 500);
   }
 
+  /**
+   * THE PO'S BIRTH CERTIFICATE (Loo, 2026-08-03).
+   *
+   * A purchase order must be born carrying what the rest of the module reads.
+   * `purchasing_record_tomorrow_delivery` (0306, shipped) refuses to open when
+   * `eta_date` is NULL — so until this stamp existed, a built and deployed
+   * supplier call could never fire on a PO raised here.
+   *
+   *   expected arrival = today
+   *                    + production working days  (on the FACTORY's week)
+   *                    + transit working days     (on the OFFICE week — moving
+   *                                                goods is arranged by us)
+   *
+   * It is stamped ONCE and then frozen: §2 — "a PO already sent is never
+   * re-computed", because its dates were true when it was sent and moving them
+   * would rewrite a promise the supplier already made.
+   *
+   * `expected_ready_date` is deliberately NOT written here. That column is the
+   * factory's PROMISE and R5 grades the factory by it; seeding it with our own
+   * estimate would score a supplier on a number it never gave. Empty is not
+   * missing data — it is the trigger of `Confirm ready date` (§3).
+   *
+   * A supplier with no transit number gets NO arrival rather than a guessed
+   * one (P1's law), and the purchase order is still raised — the goods matter
+   * more than the estimate, and the gap is visible as an empty arrival.
+   */
+  const settings = res.data.settings;
+  const transit = transitDaysFor(settings, supplierId);
+  const production = productionWorkingDaysFor(settings, supplierId, category);
+  let etaDate: string | null = null;
+  if (transit != null && production != null) {
+    const holidays = myHolidaySet();
+    const ready = addWorkingDays(todayIso(), production, {
+      offDays: workWeekOffDaysFor(settings, supplierId),
+      holidays,
+    });
+    etaDate = addWorkingDays(ready, transit, { offDays: [0, 6], holidays });
+  }
+
   // Where the goods go, in ONE statement over every document the batch made. A
   // fresh purchase order has received nothing, so the destination guard permits
   // it; it freezes on first receipt.
   const { error: upErr } = await sb
     .from("purchase_orders")
-    .update({ destination_id: destinationId })
+    .update({ destination_id: destinationId, ...(etaDate ? { eta_date: etaDate } : {}) })
     .in("id", ids);
   if (upErr) {
     const m = mapPgError(upErr);
     return c.json({ ...(m.body as object), issued: ids }, m.status);
   }
+
+  /**
+   * WHO RAISED IT. Measured 2026-08-01: `operation_create_pos_batch` writes no
+   * audit row of any kind, so a purchase order could not say who issued it or
+   * when. `po_history` has existed since 0001 for exactly this, so nothing new
+   * is invented and no migration is needed.
+   *
+   * Best-effort ON PURPOSE: the purchase orders already exist and the supplier
+   * is about to be sent them. Failing the whole issue because a history line
+   * could not be written would destroy real work to protect a note about it.
+   */
+  await sb.from("po_history").insert(
+    ids.map((id, i) => ({
+      po_id: id,
+      text: `Issued from To Order · ${plan[i]?.lines.length ?? 0} line(s)${
+        etaDate ? ` · expected arrival ${etaDate}` : " · no expected arrival (transit days not set)"
+      }`,
+    })),
+  );
 
   return c.json({
     supplier: proposal.supplierName,

@@ -14,6 +14,7 @@ import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
+import { addWorkingDays } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
 
 /**
@@ -78,7 +79,10 @@ const TABLES = (): Tbl => ({
     data: [{ supplier_id: OHANA, category: "sofa", working_days: 14 }],
     error: null,
   },
-  purchasing_supplier_settings: { data: [{ supplier_id: OHANA, off_days: [0] }], error: null },
+  purchasing_supplier_settings: {
+    data: [{ supplier_id: OHANA, off_days: [0], transit_days: 1 }],
+    error: null,
+  },
   purchasing_setting_changes: { data: [], error: null },
   suppliers: { data: [{ id: OHANA, name: "Ohana" }], error: null },
   orders: {
@@ -142,6 +146,7 @@ const TABLES = (): Tbl => ({
 function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
   const CHAIN = ["select", "in", "or", "eq", "neq", "gte", "ilike", "not", "is", "order", "limit"];
   const updates: { table: string; patch: unknown; id: unknown }[] = [];
+  const inserts: { table: string; rows: unknown }[] = [];
   const rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
   let poSeq = 2030;
 
@@ -154,6 +159,15 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
       error: result.error,
     });
     b.single = b.maybeSingle;
+    b.insert = vi.fn((rows: unknown) => {
+      inserts.push({ table, rows });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ib: any = {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ib.then = (res: any, rej: any) => Promise.resolve({ data: null, error: null }).then(res, rej);
+      ib.select = vi.fn(() => ib);
+      return ib;
+    });
     b.update = vi.fn((patch: unknown) => {
       const u: Record<string, unknown> = { table, patch, id: null };
       updates.push(u as { table: string; patch: unknown; id: unknown });
@@ -249,7 +263,7 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
     return { data: { id: `PO-${poSeq}`, line_count: 1 }, error: null };
   });
 
-  return { from, rpc, updates, rpcCalls, tableCalls };
+  return { from, rpc, updates, inserts, rpcCalls, tableCalls };
 }
 
 beforeAll(async () => {
@@ -458,7 +472,11 @@ describe("POST …/to-order/issue", () => {
     // ONE statement over every document the batch made.
     const destWrites = sb.updates.filter((u) => u.table === "purchase_orders");
     expect(destWrites).toHaveLength(1);
-    expect(destWrites[0].patch).toEqual({ destination_id: AL });
+    // Destination AND the expected arrival ride the SAME statement (2026-08-03):
+    // a fresh PO has received nothing so the destination guard permits both,
+    // and one statement means the two can never land out of step.
+    expect(destWrites[0].patch).toMatchObject({ destination_id: AL });
+    expect((destWrites[0].patch as { eta_date?: string }).eta_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(destWrites[0].id).toEqual(["PO-2031", "PO-2032"]);
   });
 
@@ -877,3 +895,100 @@ describe("POST …/issue — server validation", () => {
   });
 });
 
+
+/**
+ * THE PO'S BIRTH CERTIFICATE (Loo, 2026-08-03).
+ *
+ * A purchase order must be born carrying what the rest of the module reads.
+ * Measured the same day: `purchasing_record_tomorrow_delivery` (0306, shipped)
+ * refuses to open when `eta_date` is NULL, and nothing had ever written one on
+ * a PO raised here — a built, deployed supplier call that could never fire.
+ */
+describe("a purchase order is born with its expected arrival", () => {
+  it("stamps eta_date = today + production (factory week) + transit (office week)", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: await defaultPlan(sb),
+    });
+
+    const write = sb.updates.filter((u) => u.table === "purchase_orders");
+    expect(write).toHaveLength(1); // ONE statement over every document
+    const patch = write[0].patch as { destination_id: string; eta_date?: string };
+    expect(patch.destination_id).toBe(KLANG);
+    expect(patch.eta_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    // 14 production days on Ohana's week (Sunday off) + 1 transit day on the
+    // OFFICE week — arranging the movement is our work, not the factory's.
+    const expected = addWorkingDays(
+      addWorkingDays(new Date().toISOString().slice(0, 10), 14, { offDays: [0] }),
+      1,
+      { offDays: [0, 6] },
+    );
+    expect(patch.eta_date).toBe(expected);
+  });
+
+  it("NEVER writes expected_ready_date — that column is the factory's promise", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: await defaultPlan(sb),
+    });
+    // R5 grades a factory by `expected_ready_date`. Seeding it with OUR
+    // estimate would score a supplier on a number it never gave, and nothing
+    // on screen would say so. Empty is the trigger of `Confirm ready date`.
+    for (const u of sb.updates) {
+      expect(JSON.stringify(u.patch)).not.toContain("expected_ready_date");
+    }
+  });
+
+  it("raises the purchase order ANYWAY when transit days are not set, with no invented date", async () => {
+    const t = TABLES();
+    t.purchasing_supplier_settings = {
+      data: [{ supplier_id: OHANA, off_days: [0] }], // no transit_days
+      error: null,
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: await defaultPlan(sb),
+    });
+
+    // The goods matter more than the estimate: the PO is still raised.
+    expect(res.status).toBe(200);
+    const patch = sb.updates.find((u) => u.table === "purchase_orders")!.patch as {
+      eta_date?: string;
+    };
+    // A guessed arrival would be read downstream as a measurement (P1's law).
+    expect(patch.eta_date).toBeUndefined();
+  });
+
+  it("records who raised it — po_history, the table that has existed since 0001", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: await defaultPlan(sb),
+    });
+
+    // Measured 2026-08-01: `operation_create_pos_batch` writes no audit row of
+    // any kind, so a purchase order could not say who raised it or when.
+    const hist = sb.inserts.filter((i) => i.table === "po_history");
+    expect(hist).toHaveLength(1);
+    const rows = hist[0].rows as { po_id: string; text: string }[];
+    expect(rows).toHaveLength(2); // one per document the batch made
+    expect(rows[0].po_id).toBe("PO-2031");
+    expect(rows[0].text).toContain("expected arrival");
+  });
+});
