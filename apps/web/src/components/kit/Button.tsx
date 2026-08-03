@@ -30,8 +30,8 @@ type Size = "md" | "sm";
 
 const VARIANT: Record<Variant, string> = {
   primary: "bg-kit-blue-9 text-white border border-kit-blue-9 hover:brightness-95",
-  neutral: "bg-white text-kit-slate-12 border border-kit-slate-5 hover:bg-kit-blue-3",
-  ghost: "bg-transparent text-kit-slate-11 border border-transparent hover:bg-kit-blue-3",
+  neutral: "bg-white text-kit-slate-12 border border-kit-slate-5 hover:bg-kit-slate-3",
+  ghost: "bg-transparent text-kit-slate-11 border border-transparent hover:bg-kit-slate-3",
 };
 
 /** 32px is the live control height every form row already aligns to; 24px is

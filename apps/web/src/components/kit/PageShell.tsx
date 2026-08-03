@@ -158,7 +158,7 @@ export default function PageShell(props: PageShellProps) {
                       onClick={onFacetToggle}
                       aria-label="Show filters"
                       data-kit="page-facet-toggle"
-                      className="rounded-control p-1 text-kit-slate-11 hover:bg-kit-blue-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+                      className="rounded-control p-1 text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
                     >
                       <Icon name="filter" size={16} />
                     </button>

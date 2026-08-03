@@ -53,8 +53,8 @@ const CALENDAR_CLASSNAMES = {
   month_caption: "flex items-center justify-center",
   caption_label: "text-strong text-kit-slate-12",
   nav: "flex items-center justify-between",
-  button_previous: "rounded-control p-1 text-kit-slate-11 hover:bg-kit-blue-3",
-  button_next: "rounded-control p-1 text-kit-slate-11 hover:bg-kit-blue-3",
+  button_previous: "rounded-control p-1 text-kit-slate-11 hover:bg-kit-slate-3",
+  button_next: "rounded-control p-1 text-kit-slate-11 hover:bg-kit-slate-3",
   chevron: "fill-current",
   month_grid: "w-full border-collapse",
   weekdays: "text-label text-kit-slate-11",
@@ -62,7 +62,7 @@ const CALENDAR_CLASSNAMES = {
   week: "",
   day: "p-0 text-center",
   day_button:
-    "h-8 w-8 rounded-control text-body text-kit-slate-12 hover:bg-kit-blue-3 " +
+    "h-8 w-8 rounded-control text-body text-kit-slate-12 hover:bg-kit-slate-3 " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9",
   today: "font-medium text-kit-blue-11",
   selected: "[&>button]:bg-kit-blue-9 [&>button]:text-white [&>button]:hover:brightness-95",

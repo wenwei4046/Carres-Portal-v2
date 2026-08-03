@@ -75,6 +75,36 @@ the indeterminate dash on a partial tick.
 
 ---
 
+## GridToolbar
+
+**Purpose.** The one row above a grid: how to narrow it, what is selected, and
+the single action that acts on the selection.
+
+**When to use.** Every **Workspace** page (`03-page-patterns.md`). One per page.
+
+**When NOT to use.** A Detail page's action group — that is the title block.
+Filters that need more than a search box: those are the navigator or the
+column filters, never a second toolbar row.
+
+**Anatomy.** `[ search ] ······ [ right ] [ meta ]` — three slots, all
+optional, all the caller's content. It composes no sentence and spells no word.
+
+**Behaviour.**
+- **`right` is rendered only when it has something to say.** The primary action
+  exists while a selection exists, and vanishes with it — a permanently visible
+  commit button on an empty selection is a dead control.
+- **`meta` is the quiet corner**: the freshness stamp, never a Refresh button.
+  A Workspace recomputes itself; a Refresh implies it does not.
+- It owns no state. Search value, selection and sort belong to the page.
+
+**Do.** Keep it to one row — it is permanent height on every screen of the page.
+**Don't.** Put a page title, a KPI or a count badge here; those are the shell's
+slots (`03` — the five slots).
+
+**Used by.** Purchasing → To Order (2026-08-01, the pattern's first page).
+
+---
+
 ## SectionHeader
 
 **Purpose.** Say what a region of a page IS, and what it holds right now.

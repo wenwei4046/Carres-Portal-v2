@@ -360,6 +360,7 @@ async function loadOrderedRows(
   sb: ReturnType<typeof userClient>,
   today: string,
   catalog: Map<string, CatalogFact>,
+  supplierNames: ReadonlyMap<string, string>,
 ): Promise<ToOrderOrderedRow[]> {
   const since = new Date(`${today}T00:00:00Z`);
   since.setUTCDate(since.getUTCDate() - ORDERED_WINDOW_DAYS);
@@ -467,6 +468,7 @@ async function loadOrderedRows(
           placedAt,
           category,
           supplierId: (po.supplier_id as string | null) ?? "",
+          supplierName: supplierNames.get((po.supplier_id as string | null) ?? "") ?? null,
           orderId: null,
           customer: null,
           so: null,
@@ -489,6 +491,7 @@ async function loadOrderedRows(
         placedAt,
         category,
         supplierId: (po.supplier_id as string | null) ?? "",
+        supplierName: supplierNames.get((po.supplier_id as string | null) ?? "") ?? null,
         orderId: (order?.id as string | null) ?? null,
         customer: (order?.customer_name as string | null) ?? null,
         so: Number(so),
@@ -541,7 +544,19 @@ toOrderRouter.get("/", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
-  const ordered = await loadOrderedRows(sb, res.data.today, res.data.catalog);
+  // The factory names, read here rather than threaded out of loadToOrder: its
+  // no-live-orders early return never reads `suppliers`, and an ordered row's
+  // supplier is exactly the one that may have no demand today. 10 rows.
+  const { data: supRows, error: supErr } = await sb.from("suppliers").select("id, name");
+  if (supErr) {
+    const m = mapPgError(supErr);
+    return c.json(m.body, m.status);
+  }
+  const supplierNames = new Map<string, string>(
+    (supRows ?? []).map((s) => [s.id as string, (s.name as string) ?? ""]),
+  );
+
+  const ordered = await loadOrderedRows(sb, res.data.today, res.data.catalog, supplierNames);
 
   return c.json({
     today: res.data.today,

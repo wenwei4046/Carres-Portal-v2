@@ -144,61 +144,108 @@ reviewed.
 **Don't.** Put the commit parameters far from the commit, or the identity far
 from the irreversible button.
 
-### Carres Examples
-
-**Purchase Orders → To Order** *(region order frozen 2026-07-31; page rebuilt
-from zero on the kit the same day — `OperationToOrder.tsx`, the old shell
-deleted whole)*
-
-```
-Header                    supplier · category · order-by date
-Supplier Communication    channels · WhatsApp + Email drafts   collapsed by default
-Items                     the review itself                    the largest region
-Notes to Supplier
-Issue Purchase Order      the one primary action
-```
-
-Order is deliberate: **who am I sending to → can I reach them → what am I
-sending.** Communication sits ABOVE Items and collapsed, because the real
-sequence is review-then-send, and a section at the bottom of a long table is a
-section that gets missed.
-
-Rulings this example added (Loo, 2026-07-31 — they bind every Review page):
+**Rulings that bind every Review page** (Loo, 2026-07-31):
 
 - **An unbuilt region is NOT rendered as an empty placeholder.** A chevron
-  that opens nothing is a dead control. The frozen region ORDER holds; a
-  region joins the page when its data exists, not before.
-- **A commit parameter has ONE operational home — beside the commit.**
-  Destination lives in the Issue region, where the operator confirms it, and
-  is repeated nowhere.
-- **A region with a one-line body is a permanent line, not a collapsible.**
-  The Header is a permanent `SectionHeader` (title `supplier · category`,
-  meta `Order by {date}`) until `suppliers` carries address / tel / attn /
-  terms — then it becomes collapsible, because there is something to open.
+  that opens nothing is a dead control. A frozen region ORDER holds; a region
+  joins the page when its data exists, not before.
+- **A commit parameter has ONE operational home — beside the commit.** It is
+  repeated nowhere else on the page.
+- **A region with a one-line body is a permanent line, not a collapsible.** It
+  becomes collapsible when there is something to open.
 
-Section status:
+### Carres Examples
 
-| Section | State |
-|---|---|
-| Items | ✅ `SectionHeader` (permanent) + `DataTable` — Ref · Item · Size · Qty · `⋯` |
-| Header | line only — body blocked on `suppliers` address / tel / attn / terms |
-| Supplier Communication | not rendered — blocked on `po_sends` |
-| Notes to Supplier | not rendered — no ruled word |
-| Issue | ✅ `Card` + `Select` (Destination) + the one primary `Button` |
+None. To Order was this pattern's example until 2026-08-01; it is a
+**Workspace** now (below), and the old single-proposal Review layout —
+Header · Supplier Communication · Items · Notes · Issue, inside a 280px queue
+rail — **was deleted whole with the page**. It is not recorded here as
+history: a superseded example is a page somebody will build.
 
-The page around the workspace is the Queue pattern: a 280px queue rail
-(proposals, with the current proposal's purchase orders nested under it) and
-the workspace as the detail panel. The rail is page-local markup, tokens only
-— extracted into the kit on its second occurrence, per `02`'s own law.
+---
 
-Frozen rules this example depends on, owned by Business not by this file:
-one purchase order has exactly one fulfilment destination · a sofa purchase
-order carries one customer order and never merges · Communication is an EVENT,
-never a status · there is no `Sent` state, because the portal cannot observe
-WhatsApp.
+# Workspace
 
-**Receiving** · **Claims** — not yet designed. When they are, their shape is
-recorded here, under the pattern they use.
+**Purpose.** Decide, across many records at once, and commit in one act.
+
+**When to use.** The operator scans a whole day's work, narrows it, ticks what
+goes, and commits — and the commit produces documents, not edits. The unit of
+thought is the BATCH, not one record.
+
+**When NOT to use.** Verifying ONE record before committing it (that is
+Review) · browsing without committing (that is List) · working one item at a
+time down a queue (that is Queue).
+
+**Information Hierarchy.** 1 Where am I · 2 What is blocked · 3 The rows ·
+4 What the commit will do
+
+**Layout.** Two panes, no page scroll.
+
+```
+┌ shell header — module word · tabs · page-meta · global icons ─────────────┐
+├──────────────┬───────────────────────────────────────────────────────────┤
+│ NAVIGATOR    │ toolbar    search ···· scope · selection · PRIMARY ACTION  │
+│ ~200px       ├───────────────────────────────────────────────────────────┤
+│              │ banners    blocked / held / result — only when non-empty   │
+│ engine-      ├───────────────────────────────────────────────────────────┤
+│ guided       │                                                           │
+│ narrowing    │ GRID — the only scroll area on the page                    │
+│              │                                                           │
+│ blocks are   ├───────────────────────────────────────────────────────────┤
+│ toggles and  │ footer     what am I looking at, counted · way back out    │
+│ clear fully  │                                                           │
+└──────────────┴───────────────────────────────────────────────────────────┘
+```
+
+**Regions.** Navigator · Toolbar · Banners · Grid · Footer.
+
+**Primary action.** One, in the toolbar, carrying the count of what it is about
+to do. **It exists only while something is selected.**
+
+**Behaviour — the rules that make this a pattern and not a page.**
+
+- **Left guides, right frees.** The navigator says where the engine thinks the
+  work is; it never limits what the operator may see, select or commit.
+- **Every navigator block is a toggle and clears ALL the way.** Empty = that
+  dimension stops narrowing. Nothing is forced to stay lit.
+- **The batch is VIEW-SCOPED** (Excel's law). The commit acts on the sheet in
+  front of you: a tick hidden by any filter neither counts nor commits.
+- **The grid is the only scroll area.** The page itself does not scroll — the
+  header, toolbar and footer never move.
+- **The engine pre-selects only its own plan.** Everything a human changes is a
+  DELTA, so a refetch can add rows but can never overturn a human's tick.
+- **Reports are top flash bands, never toasts.** Success dismissible · failure
+  stays with a retry and may not be waved off · a warning stays until resolved.
+- **A page action appears only once it is BUILT.** No dead controls; a control
+  that is deliberately disabled must say why, on screen.
+- **No Refresh button** — the plan recomputes itself and states when it did.
+
+**Do.** Give the grid every pixel the other four regions do not need.
+**Don't.** Explain the commit only in a `title` tooltip — a fact the keyboard
+cannot reach is a fact half the operators never get.
+
+### Carres Examples
+
+**Purchasing → To Order** *(frozen 2026-08-01; `OperationToOrder.tsx`)* — the
+pattern's first page and the reference for the rest of the module.
+
+```
+Navigator   PO Schedule (one row per upcoming PO day, rolling, Overdue on top)
+            Category (All · Mattress · Bedframe · Sofa · …)
+            + Create Purchase
+Toolbar     search · scope · `{n} selected` · `Issue {n} POs` · Updated hh:mm
+Grid        ☑ · Customer Delivery · SO No. · Customer · Model · Qty · PO No.
+Footer      `{n} orders` · Clear filters
+```
+
+Business rules this example depends on, owned by
+`docs/PURCHASING-WORKING-FLOW.md` and not by this file: the planning engine
+owns the schedule and operators own the purchase order · `Issue PO` is the one
+act that creates a purchase order · the engine's `Order By` never reaches the
+screen — it decides which navigator row a demand sits in.
+
+**Purchase Orders** · **Receiving** · **Claims** · **Payments** — the same
+pattern. Each is recorded here as it is built.
 
 ---
 

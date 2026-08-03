@@ -1800,6 +1800,7 @@ export {
   purchaseOrderCount,
   railItemLabel,
   sizeShort,
+  scopeLine,
   soCountLabel,
   selectedShort,
   issuePosShort,

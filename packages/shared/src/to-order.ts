@@ -143,6 +143,18 @@ export const TO_ORDER_WORDS = {
   reasonSpareParts: "Spare Parts",
   reasonOffice: "Office",
   reasonOther: "Other…",
+  /**
+   * `Supplier` — ONE word with ONE home, used in two places: the Create
+   * Purchase dialog's field and, since 2026-08-03, the grid's supplier column.
+   * A second entry spelling the same word is how one concept ends up with two
+   * spellings a rename only half fixes, so there is deliberately no
+   * `colSupplier`.
+   *
+   * The column exists because supplier × category is what decides how many
+   * purchase orders `Issue` produces, and that fact used to live ONLY in the
+   * button's `title` tooltip — which a keyboard cannot reach and a screen
+   * reader may not read (`01-design-tokens.md` §9).
+   */
   supplierLabel: "Supplier",
   itemLabel: "Item",
   searchItem: "Search item…",
@@ -234,6 +246,25 @@ export function productionDaysLabel(n: number): string {
  */
 export function ordersHeadline(n: number): string {
   return `${n} Order${n === 1 ? "" : "s"}`;
+}
+
+/**
+ * `Wednesday 6 Aug · Sofa` — WHICH SLICE the operator is standing in
+ * (Loo, 2026-08-03). The navigator can narrow two dimensions at once and the
+ * grid said nothing about either, so a filtered sheet and the whole day looked
+ * identical.
+ *
+ * It is NOT a page title and must never become one: `03-page-patterns.md`
+ * bans repeating the lit tab as a heading. This states the FILTER, lives in
+ * the toolbar's scope slot, and disappears entirely when nothing is narrowed —
+ * an empty scope is a real answer (everything), not a blank label.
+ *
+ * Word-free by construction: every part is composed by the caller from words
+ * that are already ruled.
+ */
+export function scopeLine(parts: readonly (string | null | undefined)[]): string | null {
+  const kept = parts.filter((p): p is string => typeof p === "string" && p.length > 0);
+  return kept.length > 0 ? kept.join(" · ") : null;
 }
 
 /** `5 SO` — a group header's count, and a future run's count. */
@@ -592,6 +623,13 @@ export interface ToOrderOrderedRow {
   placedAt: IsoDate;
   category: ProductCategory;
   supplierId: string;
+  /**
+   * The factory's own name. On the wire since 2026-08-03 because the grid grew
+   * a Supplier column: an ordered row can belong to a supplier that has no
+   * demand today, so resolving the name from the live proposals alone would
+   * print `—` on exactly the rows a purchaser is checking up on.
+   */
+  supplierName: string | null;
   orderId: string | null;
   customer: string | null;
   so: number | null;

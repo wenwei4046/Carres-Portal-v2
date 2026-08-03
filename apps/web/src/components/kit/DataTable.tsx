@@ -149,7 +149,7 @@ function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter
           aria-label={filter.label}
           data-testid={`table-filter-${colKey}`}
           data-active={active || undefined}
-          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-control text-kit-slate-11 hover:bg-kit-blue-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
         >
           <Icon name={active ? "filter" : "columnFilter"} size={14} />
         </button>

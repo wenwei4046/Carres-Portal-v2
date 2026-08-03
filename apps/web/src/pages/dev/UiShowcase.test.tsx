@@ -117,7 +117,13 @@ describe("/ui showcase", () => {
   it("forces the SAME hover and focus the components declare", () => {
     // Button's own declarations…
     expect(BUTTON).toContain("hover:brightness-95");
-    expect(BUTTON).toContain("hover:bg-kit-blue-3");
+    // GREY, not blue (Loo, 2026-08-03): hover says "the mouse is here" and is
+    // true for one second, so it may not spend the accent. Blue now marks
+    // exactly two things on any screen — the primary action and the current
+    // SELECTION, which is a lasting state with a consequence. This mirror is
+    // what stops the two drifting apart again.
+    expect(BUTTON).toContain("hover:bg-kit-slate-3");
+    expect(BUTTON).not.toContain("hover:bg-kit-blue-3");
     expect(BUTTON).toContain("focus-visible:ring-2");
     expect(BUTTON).toContain("focus-visible:ring-kit-blue-9");
     expect(BUTTON).toContain("focus-visible:ring-offset-1");

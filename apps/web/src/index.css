@@ -81,10 +81,27 @@
     --info:           217 91% 60%;  /* #2563EB */
     --info-soft:      214 95% 93%;  /* #DBEAFE */
     --info-foreground: 0 0% 100%;
-    /* Hover tint — THE single faint-blue hover for every clickable row/nav/chip
-       (Jess 2026-07-19: hover is blue everywhere, distinct from the #C2E7FF
-       selection and from the grey section bands). Use hover:bg-hovertint. */
-    --hover-tint:     213 90% 96%;  /* #EAF3FE */
+    /* Hover tint — THE single hover fill for every clickable row/nav/chip.
+       Use hover:bg-hovertint.
+
+       GREY, ruled by Loo 2026-08-03, settling a live conflict between two
+       frozen laws: `01-design-tokens.md` §2.3 said a row hovers blue and
+       "never grey", while his own 2026-07-30 accent law said blue marks the
+       CURRENT thing and the primary action and nothing else. Both were half
+       right, and the missing sentence is the division of labour:
+
+         hover     = GREY   — "the mouse is here", true for one second,
+                              carries no meaning and must not spend the accent
+         selection = BLUE   — "this row is in the batch", a lasting state with
+                              a consequence (on To Order it means this line
+                              becomes a purchase order today)
+
+       Blue now marks exactly TWO things on any screen — the primary action
+       and the current selection — which is what makes the accent readable.
+       GitHub, SAP Fiori and Excel all split it the same way. Changing this ONE
+       value moves 88 of the portal's 99 hovers; the rest were literals and
+       were swept the same day. */
+    --hover-tint:     210 17% 95%;  /* slate-3 — the neutral hover */
     /* --error shares the v17 red; *-soft kept for pill/callout fills. */
     --error-soft:      0 93% 94%;   /* #FEE2E2 */
   }

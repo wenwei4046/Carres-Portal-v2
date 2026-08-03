@@ -1,7 +1,28 @@
 #!/usr/bin/env node
 /**
- * Design-standard guard (zero-dependency lint) — enforces docs/UI-KIT.md.
+ * Design-standard guard (zero-dependency lint) — enforces the DESIGN SYSTEM:
+ *   docs/01-design-tokens.md · docs/02-components.md · docs/03-page-patterns.md
  * Wired as `@carres/web`'s `lint` script; runs in CI + locally.
+ *
+ * ⚠ THIS FILE USED TO SAY IT ENFORCED `docs/UI-KIT.md`, WHICH IS SUPERSEDED
+ * (CLAUDE.md, 2026-07-31). The §-references still printed in the messages
+ * below are UI-KIT's and are retired with it; each rule's LAW now lives in the
+ * three files above. Re-pointing a message is a copy change; re-pointing a
+ * NUMBER is a law change and needs Loo. The one number that was simply WRONG
+ * is corrected in RULE F below (the comment said 44; the code has always
+ * allowed 36 / 40 / 52, and `01-design-tokens.md §7` rules the list row 40).
+ *
+ * WHAT THIS GUARD CANNOT SEE, recorded so nobody reads a green run as
+ * "the page is on the kit" (measured on To Order, 2026-08-03):
+ *   · a page drawing a component the kit does not have (the three flash bands
+ *     are hand-rolled banners; `02` lists `Banner` under "Not built")
+ *   · a unicode glyph used instead of kit `Icon` (⚠ ✓ ✗ →)
+ *   · two implementations of one thing (page-local `NavRow` vs `FacetRow`)
+ *   · a spacing value outside `01 §3`'s eight steps (`mb-px`)
+ *   · a dimension with no token (`w-[200px]`)
+ *   · a fact that exists only in a `title` tooltip (keyboard cannot reach it)
+ * These are review findings, not lint failures. Adding a rule for one is a
+ * change to the guard's contract — its own card, never a drive-by.
  *
  * The repo has 362 pre-existing raw-hex literals across 44 files and only ONE
  * page migrated to <ListPageShell> so far, so this is a RATCHET, not a big-bang
@@ -32,8 +53,12 @@
  *     Headings use `.t-*`. (kit scope)
  *   RULE E — inline `#F7F4EE`: the KPI fill exists ONLY as `.kpi-box` in
  *     index.css. (all web src)
- *   RULE F — row heights: `h-[Npx]` with N ≠ 44 — rows are 44px FIXED (`h-11`);
- *     content truncates, the row never grows. (kit scope)
+ *   RULE F — row heights: `h-[Npx]` outside {36 panel/KV, 40 list, 52
+ *     product-line}; content truncates, the row never grows. (kit scope)
+ *     `01-design-tokens.md §7` rules the portal's table row **40**. The old
+ *     comment here said 44 — it never matched this file's own code, which has
+ *     allowed 36/40/52 throughout. Comment corrected 2026-08-03; no behaviour
+ *     changed and the baseline did not move.
  *   RULE G — hand-rolled section chrome: a literal `section-band` class in JSX
  *     outside components/SectionPanel.tsx — render <SectionBand>. (all web src)
  *

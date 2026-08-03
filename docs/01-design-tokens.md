@@ -96,7 +96,25 @@ a job. Blue appears ONCE on a screen — on the primary button.
 
 ### 2.3 Hover and selection
 
-A row hovers a faint blue tint and selects `blue-3`. **Never grey.**
+**Ruled by Loo, 2026-08-03**, settling a live conflict between this section
+(which said a row hovers blue and "never grey") and his own 2026-07-30 accent
+law (blue marks the current thing and the primary action, and nothing else).
+Both were half right; the missing sentence is the division of labour.
+
+| | Fill | Why |
+|---|---|---|
+| **hover** | **grey** (`slate-3`) | "the mouse is here" — true for one second, carries no meaning, and must not spend the accent |
+| **selection** | **blue** (`blue-3`) | "this row is in the batch" — a lasting state with a consequence |
+
+So **blue marks exactly two things on any screen: the primary action and the
+current selection.** An accent that marks four things marks nothing.
+
+GitHub, SAP Fiori and Excel all split it this way.
+
+**Enforced, not remembered.** The hover fill is ONE CSS variable
+(`--hover-tint`), so 88 of the portal's 99 hovers move together; the remaining
+literals were swept the same day and `UiShowcase.test.tsx` pins the Button's
+own declaration, so a drift back to blue fails the suite.
 
 ---
 
@@ -179,6 +197,7 @@ Order Items table, 2026-07-31.
 | desktop-min-width | 1024 |
 | sidebar-width | 280 |
 | sidebar-collapsed-width | 72 |
+| **workspace-rail-width** | **200 — the Workspace navigator** (`03`) |
 | topbar-height | 64 |
 | page-padding | 32 |
 | section-gap | 32 |

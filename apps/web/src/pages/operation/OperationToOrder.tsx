@@ -56,6 +56,7 @@ import {
   weekdayName,
   posCreatedLine,
   railItemLabel,
+  scopeLine,
   selectedShort,
   issuePosShort,
   toOrderBuilds,
@@ -68,6 +69,7 @@ import Card from "@/components/kit/Card";
 import DataTable, { type Column, type ColumnFilter, type TableSort } from "@/components/kit/DataTable";
 import EmptyState from "@/components/kit/EmptyState";
 import GridToolbar from "@/components/kit/GridToolbar";
+import Icon from "@/components/kit/Icon";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
@@ -127,6 +129,12 @@ interface GridRow {
   proposalKey: string | null;
   buildKey: string | null;
   category: string;
+  /**
+   * The factory. Supplier × category is what decides how many purchase orders
+   * `Issue` produces, and before 2026-08-03 that fact lived only in the
+   * button's `title` tooltip — unreachable by keyboard (`01` §9).
+   */
+  supplier: string | null;
   orderId: string | null;
   customer: string | null;
   so: number | null;
@@ -307,6 +315,7 @@ export default function OperationToOrder() {
             proposalKey: p.key,
             buildKey: b.key,
             category: p.category,
+            supplier: p.supplierName || null,
             orderId: r.orderId,
             customer: r.customer ?? null,
             so: r.so,
@@ -329,6 +338,7 @@ export default function OperationToOrder() {
         proposalKey: null,
         buildKey: null,
         category: o.category,
+        supplier: o.supplierName || null,
         orderId: o.orderId,
         customer: o.customer ?? null,
         so: o.so,
@@ -391,6 +401,8 @@ export default function OperationToOrder() {
         );
       case "so":
         return sel.has(r.so != null ? String(r.so) : F_NONE);
+      case "supplier":
+        return sel.has(r.supplier ?? F_NONE);
       case "model":
         return sel.has(r.model);
       case "customer":
@@ -439,6 +451,8 @@ export default function OperationToOrder() {
             return cmpNull(a.delivery, b.delivery, (x, y) => x.localeCompare(y));
           case "so":
             return cmpNull(a.so, b.so, (x, y) => x - y);
+          case "supplier":
+            return cmpNull(a.supplier, b.supplier, (x, y) => x.localeCompare(y));
           case "model":
             return a.model.localeCompare(b.model) * dir;
           case "customer":
@@ -686,6 +700,13 @@ export default function OperationToOrder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters]);
 
+  const supplierOptions = useMemo(() => {
+    const base = filteredExcept("supplier");
+    const vals = [...new Set(base.map((r) => r.supplier ?? F_NONE))].sort();
+    return vals.map((v) => ({ value: v, label: v === F_NONE ? "—" : v }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, colFilters]);
+
   const modelOptions = useMemo(() => {
     const base = filteredExcept("model");
     const models = [...new Set(base.map((r) => r.model))].sort();
@@ -751,6 +772,21 @@ export default function OperationToOrder() {
       cell: (r) => (r.customer ? properCase(r.customer) : "—"),
     },
     {
+      /**
+       * Supplier — the column that answers "why 2 POs?" on the ROW (Loo,
+       * 2026-08-03). It sits immediately before Model: who makes it, then
+       * what they make. It is not the same fact as the rail's category, and
+       * it stops being derivable from it the day a second mattress supplier
+       * exists (September).
+       */
+      key: "supplier",
+      label: W.supplierLabel,
+      width: "130px",
+      sortable: true,
+      filter: filterFor("supplier", supplierOptions, true),
+      cell: (r) => r.supplier ?? "—",
+    },
+    {
       key: "model",
       label: W.colModel,
       width: "170px",
@@ -786,7 +822,7 @@ export default function OperationToOrder() {
         return (
           <button
             type="button"
-            title="Open Purchase Order →"
+            title="Open Purchase Order"
             className="text-kit-blue-11 tabular-nums hover:underline"
             onClick={() =>
               navigate(
@@ -887,7 +923,7 @@ export default function OperationToOrder() {
             type="button"
             onClick={() => setDialogOpen(true)}
             data-testid="to-order-create-purchase"
-            className="flex w-full items-center gap-1 px-2 py-1.5 rounded-control text-body text-kit-slate-11 hover:bg-kit-blue-3 text-left"
+            className="flex w-full items-center gap-1 px-2 py-1.5 rounded-control text-body text-kit-slate-11 hover:bg-kit-slate-3 text-left"
           >
             + {W.createPurchase}
           </button>
@@ -906,6 +942,22 @@ export default function OperationToOrder() {
                 aria-label={W.searchLabel}
               />
             }
+            /* WHICH SLICE am I standing in (Loo, 2026-08-03). The navigator
+             * narrows two dimensions at once and the grid said nothing about
+             * either, so a filtered sheet and the whole day looked identical.
+             * Every part is a word the rail itself already shows — the two
+             * can never drift — and the whole line disappears when nothing is
+             * narrowed, because that state means EVERYTHING, which is an
+             * answer rather than a blank label. Not a title: `03` bans
+             * repeating the lit tab as a heading. */
+            scope={scopeLine([
+              ...[...viewSet].map((v) =>
+                v === "overdue" ? W.filterOverdue : `${weekdayName(v)} ${fmtDate(v)}`,
+              ),
+              ...[...catSet].map(
+                (c) => RAIL_CATEGORIES.find((r) => r.key === c)?.word ?? c,
+              ),
+            ])}
             right={
               creating ? (
                 <span className="text-meta text-kit-slate-11" data-testid="to-order-creating">
@@ -956,16 +1008,18 @@ export default function OperationToOrder() {
           {barHasSomething ? (
             <div className="flex shrink-0 flex-col gap-1" data-testid="to-order-bar">
               {unread ? (
-                <div className="flex items-center gap-3 rounded-card bg-kit-amber-3 px-3 py-1.5 text-body text-kit-amber-11">
+                <div className="flex items-center gap-1.5 rounded-card bg-kit-amber-3 px-3 py-1.5 text-body text-kit-amber-11">
+                  <Icon name="flag" size={14} />
                   <span data-testid="to-order-unresolved">
-                    {`⚠ ${unresolvedHeadline(unresolved.length)} — ${W.unresolvedHelp}`}
+                    {`${unresolvedHeadline(unresolved.length)} — ${W.unresolvedHelp}`}
                   </span>
                 </div>
               ) : null}
               {!creating && donePoCount > 0 ? (
-                <div className="flex items-center gap-3 rounded-card bg-kit-green-3 px-3 py-1.5 text-body text-kit-green-11">
+                <div className="flex items-center gap-1.5 rounded-card bg-kit-green-3 px-3 py-1.5 text-body text-kit-green-11">
+                  <Icon name="confirm" size={14} />
                   <span className="tabular-nums" data-testid="to-order-created-line">
-                    {`✓ ${posCreatedLine(donePoCount)}`}
+                    {posCreatedLine(donePoCount)}
                     {donePoIds.length > 0 && donePoIds.length <= 3
                       ? ` — ${donePoIds.join(" · ")}`
                       : ""}
@@ -973,10 +1027,11 @@ export default function OperationToOrder() {
                   <span className="ml-auto flex items-center gap-2">
                     <Button
                       variant="ghost"
+                      icon="open"
                       onClick={() => navigate("/operation/procurement")}
                       data-testid="to-order-continue"
                     >
-                      {`${W.continueInPos} →`}
+                      {W.continueInPos}
                     </Button>
                     <Button
                       variant="ghost"
@@ -990,8 +1045,9 @@ export default function OperationToOrder() {
                 </div>
               ) : null}
               {!creating && failedKeys.size > 0 ? (
-                <div className="flex items-center gap-3 rounded-card bg-kit-red-3 px-3 py-1.5 text-body text-kit-red-11">
-                  <span data-testid="to-order-failed-line">{`✗ ${failedKeys.size} ${W.createFailed}`}</span>
+                <div className="flex items-center gap-1.5 rounded-card bg-kit-red-3 px-3 py-1.5 text-body text-kit-red-11">
+                  <Icon name="close" size={14} />
+                  <span data-testid="to-order-failed-line">{`${failedKeys.size} ${W.createFailed}`}</span>
                   <span className="ml-auto">
                     <Button
                       variant="neutral"
@@ -1130,7 +1186,7 @@ function NavRow({
       title={countWord}
       className={[
         "relative flex w-full items-center justify-between gap-2 px-2 py-1 rounded-control text-left mb-px",
-        active ? "bg-kit-blue-3" : "hover:bg-kit-blue-3",
+        active ? "bg-kit-blue-3" : "hover:bg-kit-slate-3",
       ].join(" ")}
     >
       {active ? (
