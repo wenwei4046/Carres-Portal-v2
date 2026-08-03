@@ -149,6 +149,24 @@ comment on column public.purchasing_settings.supplier_message_template is
 alter table public.suppliers add column if not exists email text;
 
 -- ---------------------------------------------------------------------------
+-- 3c · the write grants that Supabase hands out by default, taken back
+-- ---------------------------------------------------------------------------
+-- FOUND BY REBUILDING, NOT BY READING. Production grants `anon` and
+-- `authenticated` only SELECT on these two tables — but Supabase's
+-- `alter default privileges` grants ALL on every new table in `public`, so a
+-- database rebuilt from an earlier draft of this file came up with INSERT,
+-- UPDATE and DELETE on both. The original 0312 must therefore have revoked
+-- them, and the recovery had missed it; the miss was invisible on production,
+-- where `create table if not exists` is a no-op, and only surfaced when the
+-- tables were dropped and replayed in a rolled-back transaction.
+--
+-- It is defence in depth, not a live hole: RLS is on and there is no write
+-- policy, so a write is refused today either way. But "the RPC is the only
+-- door" is a claim about TWO locks, and a rebuilt database was carrying one.
+revoke insert, update, delete on public.po_revisions from anon, authenticated;
+revoke insert, update, delete on public.po_sends     from anon, authenticated;
+
+-- ---------------------------------------------------------------------------
 -- 4 · the two doors
 -- ---------------------------------------------------------------------------
 create or replace function public.purchasing_record_send(
@@ -273,5 +291,15 @@ begin
      where c.relname in ('po_sends', 'po_revisions') and p.polcmd <> 'r'
   ) then
     raise exception '0312 recovery: po_sends/po_revisions must carry SELECT policies only';
+  end if;
+  -- BOTH locks, not one. RLS refuses the write; the grant must not offer it
+  -- either. This is the assertion the rebuild test would have failed.
+  if exists (
+    select 1 from information_schema.role_table_grants
+     where table_name in ('po_sends', 'po_revisions')
+       and grantee in ('anon', 'authenticated')
+       and privilege_type in ('INSERT', 'UPDATE', 'DELETE')
+  ) then
+    raise exception '0312 recovery: anon/authenticated must hold no write grant on po_sends/po_revisions';
   end if;
 end $$;

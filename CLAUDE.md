@@ -574,6 +574,69 @@ If you've spent more than 30 minutes on something without progress, or you find 
 
 Don't burn an hour spinning. Surface and ask.
 
+**Scope note (Jess, 2026-08-03):** this section is about a DECISION you cannot make —
+a business rule, an architecture fork, a destructive act. It is not a licence to hand
+back routine engineering. See §16.1.
+
+---
+
+## 16.1 Engineer-Owned Delivery (Jess, 2026-08-03 — permanent)
+
+> Written after a chat delivered a finished, tested, approved change and then returned
+> push · PR · rebase · merge · deploy to her as an A/B/C menu. Her ruling: *"Your job is
+> to deliver the completed change, not return routine engineering decisions to Jess."*
+
+### Engineer-Owned Delivery
+
+After Jess approves a build or says `deploy`, the engineer owns the complete
+delivery process without returning routine engineering questions to Jess.
+
+The engineer must automatically:
+
+1. fetch and inspect latest main;
+2. rebase the work;
+3. resolve routine conflicts;
+4. run all applicable checks;
+5. perform a top-to-toe review;
+6. fix bugs, regressions, overflow, truncation, spelling, lint and test failures;
+7. repeat verification until clean;
+8. commit and push;
+9. open and merge the PR;
+10. apply approved migrations when required;
+11. deploy every affected service;
+12. verify the real production result;
+13. update the canonical checkpoint and deployment record.
+
+A discovered engineering fault is an instruction to fix and continue, not a
+reason to ask Jess whether it should be fixed.
+
+The engineer stops only when the remaining decision would change business
+meaning, architecture, irreversible production data, or an unapproved user-facing
+rule.
+
+### Default Deployment
+
+An approved change is deployed by default.
+
+Localhost review is a product review tool, not a mandatory delivery gate after
+every small amendment. When Jess has already approved the business behaviour,
+the engineer may complete checks, merge, deploy and verify without asking again.
+
+### Migration Delivery Order
+
+For future migrations, the normal order is:
+
+Draft → review business impact → commit the exact migration file → merge-ready
+verification → apply migration → deploy dependent code → production verification.
+
+Never leave an applied production migration absent from the repository.
+Never retype a migration during apply; execute the reviewed repository file.
+
+**The four things that still stop the engineer** (unchanged, and §14's red lines
+sit above all of them): a new or changed BUSINESS RULE · destructive production-data
+deletion · an irreversible ARCHITECTURE decision · user-facing WORDING whose business
+meaning has not already been ruled.
+
 ---
 
 ## 17. Project status
