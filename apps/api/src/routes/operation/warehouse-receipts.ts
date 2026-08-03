@@ -7,7 +7,7 @@ import {
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
@@ -35,15 +35,23 @@ import type { AppEnv } from "../../types";
 const warehouseReceiptsRouter = new Hono<AppEnv>();
 
 const DEFAULT_LIMIT = 200;
+/** Long enough to open the paper, short enough that a copied link dies. */
+const SIGNED_URL_TTL_SECONDS = 3600;
 
 type ReceiptRow = Record<string, unknown>;
 
 /**
- * GET / — `?status=submitted|checked_in|returned|all` (default `submitted`).
+ * GET / — `?status=submitted|returned|posted|voided|all` (default `submitted`).
  *
  * Defaults to the OPEN queue for the same reason R3's claim list defaults to
  * open: this is a worklist, and a worklist that opens on settled rows is a
- * filing cabinet.
+ * filing cabinet. Card C2 (2026-08-03) added the settled statuses, because the
+ * SAME list now feeds the `Goods Received` register — a filing cabinet is
+ * exactly what that queue is, and one list of Receiving Sessions beats two.
+ *
+ * `checked_in` is gone as a status word: 0314 renamed it to `posted` months
+ * after this whitelist was written, so the old value filtered nothing and the
+ * new one was unreachable.
  *
  * Names are resolved here rather than embedded in the row: a receipt snapshots
  * its warehouse id so the record of who counted survives a PO being relocated,
@@ -53,16 +61,25 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
   const raw = (c.req.query("status") ?? "submitted").toLowerCase();
-  const status =
-    raw === "checked_in" || raw === "returned" || raw === "all"
-      ? raw
-      : "submitted";
+  const status = (
+    ["submitted", "returned", "posted", "voided", "all"] as const
+  ).includes(raw as never)
+    ? raw
+    : "submitted";
 
   let q = sb
     .from("warehouse_receipts")
     .select(
-      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_by, submitted_at, reviewed_by, reviewed_at, return_reason",
+      // C2 widened this: `submitted_from` · `goods_received_at` · `posted_*`
+      // are what the Goods Received register reads, and they are 0314/0315
+      // columns this select predates. `reviewed_*` stays until the
+      // reader-rename slice drops it (0314's own discipline).
+      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason",
     )
+    // The register is a HISTORY, so it sorts by the BUSINESS date — when the
+    // goods physically arrived — not by when somebody keyed them in. The
+    // submitted stamp only breaks ties.
+    .order("goods_received_at", { ascending: false })
     .order("submitted_at", { ascending: false })
     .limit(DEFAULT_LIMIT);
   if (status !== "all") q = q.eq("status", status);
@@ -88,7 +105,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
   const userIds = [
     ...new Set(
       rows
-        .flatMap((r) => [r.submitted_by, r.reviewed_by])
+        .flatMap((r) => [r.submitted_by, r.reviewed_by, r.posted_by])
         .filter((v): v is string => typeof v === "string" && v.length > 0),
     ),
   ];
@@ -117,6 +134,33 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     }
   }
 
+  /**
+   * The signed DO — a short-lived URL per row, batch-signed exactly the way
+   * `supplier-claims` signs its claim photos. The signed DO IS the record's
+   * evidence, so a register that cannot open it is a filing cabinet with the
+   * paper removed. Signed only for the rows this page returns.
+   */
+  const doPaths = rows
+    .map((r) => r.do_file_path as string | null)
+    .filter((p): p is string => typeof p === "string" && p.length > 0);
+  const doUrls = new Map<string, string>();
+  if (doPaths.length > 0) {
+    // Best-effort, and deliberately so: the register's job is to LIST the
+    // records. If storage refuses to sign, the row still appears and its
+    // record reads `Not on file` — a queue that 500s because one attachment
+    // could not be signed would hide every delivery we ever took.
+    try {
+      const admin = adminClient(c.env);
+      const { data: signed } = await admin.storage
+        .from("delivery-orders")
+        .createSignedUrls(doPaths, SIGNED_URL_TTL_SECONDS);
+      for (const s of signed ?? [])
+        if (s.path && s.signedUrl) doUrls.set(s.path, s.signedUrl);
+    } catch (e) {
+      console.error("signing receipt DO urls failed (non-fatal):", e);
+    }
+  }
+
   const userNames = new Map<string, string>();
   if (userIds.length > 0) {
     const { data: users } = await sb
@@ -139,6 +183,12 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
           : null,
         reviewed_by_name: r.reviewed_by
           ? (userNames.get(r.reviewed_by as string) ?? null)
+          : null,
+        posted_by_name: r.posted_by
+          ? (userNames.get(r.posted_by as string) ?? null)
+          : null,
+        do_file_url: r.do_file_path
+          ? (doUrls.get(r.do_file_path as string) ?? null)
           : null,
         // Composed by the shared module so the ops queue and the warehouse's
         // own list describe one receipt with one sentence.

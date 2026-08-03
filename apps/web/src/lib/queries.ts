@@ -3788,7 +3788,7 @@ export interface WarehouseReceiptsQueueResponse {
 
 /** R6 (ops) — what the warehouse filed. Defaults to the waiting queue. */
 export function useOperationWarehouseReceipts(
-  status: "submitted" | "checked_in" | "returned" | "all" = "submitted",
+  status: "submitted" | "returned" | "posted" | "voided" | "all" = "submitted",
   opts?: Partial<UseQueryOptions<WarehouseReceiptsQueueResponse>>,
 ) {
   return useQuery({

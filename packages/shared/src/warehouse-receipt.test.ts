@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  receivingRecordNo,
   countedOnLine,
   warehouseReceiptProblems,
   warehouseReceiptProblemText,
@@ -267,7 +268,14 @@ describe("warehouseReceiptTotals / summary", () => {
 describe("status words", () => {
   it("names WHO a submitted receipt is waiting for", () => {
     expect(WAREHOUSE_RECEIPT_STATUS_LABEL.submitted).toBe("Waiting Carres check");
-    expect(warehouseReceiptStatusLabel("checked_in")).toBe("Checked in by Carres");
+    // C2 (2026-08-03): the status word is `posted`. `checked_in` was renamed by
+    // 0314 — it named the ACT (`Check in`) while a status has to name the
+    // STATE — and this file was the last place still asserting the old word.
+    expect(warehouseReceiptStatusLabel("posted")).toBe("Checked in by Carres");
+    expect(warehouseReceiptStatusLabel("returned")).toBe("Sent back to recount");
+    expect(warehouseReceiptStatusLabel("voided")).toBe("Reversed");
+    // An unknown key echoes rather than inventing a word.
+    expect(warehouseReceiptStatusLabel("checked_in")).toBe("checked_in");
     expect(warehouseReceiptStatusLabel("returned")).toBe("Sent back to recount");
   });
 
@@ -281,5 +289,33 @@ describe("status words", () => {
   it("falls back to the raw value rather than a blank", () => {
     expect(warehouseReceiptStatusLabel(null)).toBe("—");
     expect(warehouseReceiptStatusLabel("something_new")).toBe("something_new");
+  });
+});
+
+describe("receivingRecordNo — the Receiving Record's document number", () => {
+  const R = { id: "5b34f513-58c3-4913-9198-d513f17a6ceb", goods_received_at: "2026-08-02" };
+
+  it("prints PREFIX-DDMMYY-NNNN off the BUSINESS date", () => {
+    expect(receivingRecordNo(R)).toMatch(/^GRN-020826-\d{4}$/);
+  });
+
+  it("is stable — a reprint matches the original", () => {
+    expect(receivingRecordNo(R)).toBe(receivingRecordNo(R));
+  });
+
+  it("carries no counter — two records on one day differ by their own id", () => {
+    const other = { ...R, id: "11111111-1111-4111-8111-111111111111" };
+    expect(receivingRecordNo(other)).not.toBe(receivingRecordNo(R));
+    // Same day, so the date half is shared and only the hashed tail moves:
+    // volume stays private (a counter would tell a supplier how many
+    // deliveries we take in a month).
+    expect(receivingRecordNo(other).slice(0, 11)).toBe(receivingRecordNo(R).slice(0, 11));
+  });
+
+  it("falls back to the submitted stamp, and says nothing when it has no date", () => {
+    expect(receivingRecordNo({ id: R.id, submitted_at: "2026-07-31T10:00:00Z" })).toMatch(
+      /^GRN-310726-\d{4}$/,
+    );
+    expect(receivingRecordNo({ id: R.id })).toBe("—");
   });
 });
