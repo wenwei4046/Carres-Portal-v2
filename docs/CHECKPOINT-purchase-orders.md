@@ -906,14 +906,26 @@ study's findings live in the chat until an evidence set is complete.
 
 ### 2026-08-03 · BLOCKED, then UNBLOCKED and SHIPPED the same day
 
-> **CLOSED.** G1 was completed (`docs/execution-queues-index.md`) — 0312 + 0313 are in the
-> repository and repository ↔ production parity is proved by REBUILD. Jess then ruled
-> the wording forward in one pass: *"The latest ruling in this chat overrides the earlier
-> BLOCK for this case."* All four words shipped TOGETHER, as this section required —
-> `Copy message` · `Open WhatsApp` / `Open WhatsApp group` · `Open email` · `Snapshot N`
-> — plus migration **0317** rewriting the `po_history` and `audit_log` sentences to
-> `{Channel} opened · Snapshot N`. **The block did its job**: it is the reason the four
-> words shipped as one vocabulary instead of `Open email` going alone.
+> **CLOSED AND DEPLOYED 2026-08-03.** G1 was completed (`docs/execution-queues-index.md`) — 0312 + 0313
+> are in the repository and repository ↔ production parity is proved by REBUILD. Jess then ruled the
+> wording forward: *"The latest ruling in this chat overrides the earlier BLOCK for this case."*
+>
+> **All four words shipped TOGETHER, which is exactly what this block existed to force** —
+> `Copy message` · `Open WhatsApp group` / `Open WhatsApp` · `Open email` · `Snapshot N` — plus
+> migration **0317**, which rewrites the `po_history` and `audit_log` sentences to
+> `{Channel} opened · Snapshot N`. Without the block, `Open email` would have gone alone.
+>
+> **Deployment facts.** main `ed044070` (PR #571) + `b7c555a0` (PR #573, G1) · migration **0317
+> applied**, tracker `20260803105141`, `md5(prosrc)` **`d42fdde8…`** reconciled byte-identical to the
+> file · web **`index-C7nLHy6_.js`** (carres-portal `fdc99e25` + carres-pos `b36805f6`), all 4
+> canonicals converged, live md5 **`7d67e551…`** identical to the local build, `SERVICE_ROLE` 0,
+> `sent via` 0, `Revision` 0 · **Worker NOT redeployed and that is the record**: zero `apps/api`
+> diff, and the only `packages/shared` diff is another lane's inert display word.
+>
+> **A parallel lane clobbered half the deploy mid-ship** — `index-DB7_PnR-.js` from a pre-merge tip
+> landed on erp + carres-pos. Caught by DOWNLOADING that file and grepping it (`Revision` 1, none of
+> the four words), never by the deployment log; rebuilt from the merged tip and redeployed. **Four
+> canonicals are not a formality when two chats deploy in the same minute.**
 >
 > The record of WHY it was blocked is kept below, unedited.
 
