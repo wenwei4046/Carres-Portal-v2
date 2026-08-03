@@ -435,6 +435,9 @@ export const qk = {
     pos:       (filters?: operationPoFilters) =>
       ["operation", "pos", filters ?? {}] as const,
     po:        (id: string) => ["operation", "pos", id] as const,
+    /** The per-unit goods ids a PO minted at Issue (0153) — the PO-PDF
+     *  standard's Item ID column. Nested under "pos" for blunt invalidation. */
+    poUnits:   (id: string) => ["operation", "pos", id, "units"] as const,
     /** Loo 2026-05-16 — per-source-order ETA list for the PO detail modal.
      *  Nested under "pos" so a blunt `["operation","pos"]` invalidation after
      *  a PO mutation also clears these. Cheap (1-row-per-SO select), and the
@@ -2624,6 +2627,8 @@ export interface operationOpenPoRow {
   id: string;
   supplier_id: string;
   warehouse_id: string;
+  /** The PO's own destination (0307). A line with none follows it. */
+  destination_id?: string | null;
   status: string;
   sup_status: string;
   eta_date: string | null;
@@ -2695,6 +2700,8 @@ export interface SupplierRow {
   lead_time: string | null;
   contact: string | null;
   whatsapp_group_url: string | null;
+  /** The mailto: door's address (0313 — the ONE email column). */
+  contact_email?: string | null;
 }
 export interface SuppliersListResponse {
   suppliers: SupplierRow[];
@@ -3080,6 +3087,8 @@ export interface operationPoListRow {
   id: string;
   supplier_id: string;
   warehouse_id: string;
+  /** The PO's own destination (0307). A line with none follows it. */
+  destination_id?: string | null;
   status: "open" | "received" | "cancelled";
   sup_status: string;
   so: number | null;
@@ -3111,6 +3120,22 @@ export interface operationPoListRow {
      *  A second short delivery changes `received_qty`, the two stop matching,
      *  and the call re-opens by itself (S4 / C8's discipline). */
     balance_answer_about_qty?: number | null;
+    /** Register (Jess, 2026-08-02) — the listing speaks MODEL, never the raw
+     *  SKU code, and the name is resolved SERVER-side where every SKU can be
+     *  looked up (the browser's POS catalog misses non-active SKUs and used
+     *  to print the code). OPTIONAL: an older Worker degrades to the code. */
+    model_name?: string | null;
+    size?: string | null;
+    /** Where THIS line goes (0311) — null = wherever the PO goes. */
+    destination_id?: string | null;
+    /** Purchasing's own internal note; never printed on the PO. */
+    ops_remark?: string | null;
+    /** Register (Jess, 2026-08-02) — the EXCEL rows this PO line becomes:
+     *  one entry per SO × SKU, each carrying the SALESPERSON's remark from
+     *  the sales order. Derived server-side; a quantity no SO claims comes
+     *  back with `so: null`. OPTIONAL — an older Worker degrades to one row
+     *  per line. */
+    so_rows?: { so: number | null; qty: number; remark: string | null }[];
     // 0073 cascade picker (Loo 2026-05-09). Null for mattress + legacy
     // pre-0073 lines; bedframe carries {color, gap}; sofa carries
     // {fabric_id, fabric_name, fabric_surcharge}.
@@ -3121,11 +3146,37 @@ export interface operationPoListRow {
    *  answer about nothing, and the call re-opens. OPTIONAL for the same
    *  degrade-don't-crash reason as `short_since`. */
   tomorrow_answer_about_date?: string | null;
-  /** 2026-05-18 (Loo C+D) — per-source-SO enrichment from
-   *  /api/operation/procurement/:slug. One entry per SO this PO serves
-   *  (po.so for single, po.so_refs[] for bundle). Empty for stockpile POs
-   *  or non-procurement-tabs endpoints (the global /api/operation/pos still
-   *  returns the bare row without this field — treat as []). */
+  /** Register (2026-08-02) — the EARLIEST promised customer delivery across
+   *  every SO this PO covers; null for stockpile POs. OPTIONAL so a browser
+   *  on this build against an older Worker degrades instead of crashing. */
+  customer_delivery?: string | null;
+  /** Register (Jess, 2026-08-02) — the arriving date has been answered about
+   *  MORE THAN ONE expected arrival (promise-ledger history, 0306), so the
+   *  listing marks it `(revised)`. OPTIONAL — older Worker degrades to false. */
+  eta_revised?: boolean;
+  /** What LEFT Carres for this supplier (0312), newest first. */
+  sends?: {
+    channel: string;
+    note: string | null;
+    sent_at: string;
+    po_revisions: { rev_no: number } | null;
+  }[];
+  /** The supplier-date field's own history (0306 ledger, newest first) —
+   *  it renders BESIDE the field, never in the Activity timeline. */
+  promises?: {
+    kind: string;
+    answer: string;
+    about_date: string | null;
+    previous_date: string | null;
+    new_date: string | null;
+    reason: string | null;
+    recorded_at: string;
+  }[];
+  /** 2026-05-18 (Loo C+D) — per-source-SO enrichment. One entry per SO this
+   *  PO serves (po.so for single, po.so_refs[] for bundle). Empty for
+   *  stockpile POs. Since 2026-08-02 the global /api/operation/pos fills it
+   *  too (the Register's search answers the CUSTOMER's name); older Workers
+   *  omit it — treat as []. */
   orders?: {
     so: number;
     customer_name: string;
@@ -3137,6 +3188,10 @@ export interface operationPoListRow {
 }
 export interface operationPosListResponse {
   pos: operationPoListRow[];
+  /** The active destination registry (0307) — the per-line picker's options. */
+  destinations?: { id: string; name: string; is_default: boolean }[];
+  /** ONE company-wide supplier-message draft (0312). */
+  messageTemplate?: string | null;
 }
 
 /** Pipeline v2 (C4) — re-export the zod-derived drill-down shape so consumers
@@ -3879,6 +3934,92 @@ export function usePurchasingSettings(
 /** Every settings write returns the whole settings object and blows the
  *  purchase plan away with it — a changed production time moves an order-by
  *  date, which is the card's own Done-when. */
+/**
+ * The supplier-date door (Jess, 2026-08-02) — POST
+ * /api/operation/pos/:id/tomorrow-delivery, the ONE write for both
+ * situations: the supplier tells us early, or nobody told us and we phoned.
+ * The operator keys a DATE; the answer word is derived — the same date the
+ * PO already holds is `shipping` (the promise stands), a different one is
+ * `delayed` and must carry a reason. 0306/0310's RPC does the rest in one
+ * transaction: ledger row · the PO's date · the push into Delay planning ·
+ * the history sentence.
+ */
+export function useRecordSupplierDate(poId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      answer: "shipping" | "delayed";
+      firstDate?: string;
+      newDate?: string;
+      reason?: string;
+      remarks?: string;
+    }) =>
+      apiFetch<{ ok: true; result: unknown }>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/tomorrow-delivery`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      // Every PO list view — the register reads one, the workspace another.
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+/**
+ * The per-line doors (0311, Jess 2026-08-02): set where a line goes · SPLIT
+ * part of it to somewhere else · keep purchasing's own internal note. One
+ * hook, three paths — they invalidate the same list.
+ */
+export function usePoLineAction(lineId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      path: "destination" | "split" | "ops-remark";
+      body: Record<string, unknown>;
+    }) =>
+      apiFetch<{ ok: true; result: unknown }>(
+        `/api/operation/pos/lines/${encodeURIComponent(lineId ?? "")}/${input.path}`,
+        { method: "POST", body: JSON.stringify(input.body) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+/**
+ * What LEFT Carres (0312) — one POST per send. The REVISION comes back from
+ * the server: a send mints one only when the document changed since the last.
+ */
+export function useRecordSend(poId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { channel: "whatsapp" | "email" | "print"; note?: string }) =>
+      apiFetch<{ ok: true; result: { revision: number } }>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/sends`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+/** ONE company-wide supplier-message template. */
+export function useSetMessageTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { text: string }) =>
+      apiFetch<{ ok: true }>("/api/operation/pos/message-template", {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
 function usePurchasingSettingsMutation<TInput>(path: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -4010,6 +4151,34 @@ export interface operationPoSourceOrder {
 export interface operationPoSourceOrdersResponse {
   orders: operationPoSourceOrder[];
 }
+/** GET /api/operation/pos/:id/units — the Item ID column's real data:
+ *  `unit_code` per physical piece (0153), keyed back to lines by sku. */
+export interface operationPoUnitRow {
+  unit_code: string;
+  sku: string;
+  status: string;
+}
+export interface operationPoUnitsResponse {
+  units: operationPoUnitRow[];
+}
+export function useOperationPoUnits(
+  poId: string | null,
+  opts?: Partial<UseQueryOptions<operationPoUnitsResponse>>,
+) {
+  return useQuery({
+    queryKey: poId
+      ? qk.operation.poUnits(poId)
+      : (["operation", "pos", "null", "units"] as const),
+    queryFn: () =>
+      apiFetch<operationPoUnitsResponse>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/units`,
+      ),
+    enabled: !!poId,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 export function useOperationPoSourceOrders(
   poId: string | null,
   opts?: Partial<UseQueryOptions<operationPoSourceOrdersResponse>>,

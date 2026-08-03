@@ -106,9 +106,18 @@ export default {
          * The legacy `base-*` / `success` / `warning` ramps stay untouched
          * until the D2–D4 codemods move the pages over. */
         kit: {
+          /* SURFACE LAW (Jess, 2026-08-02, Purchase Orders first): grey is
+           * CHROME — app background, header strip, table header — and every
+           * WORKING surface (listing, workspace, nav, cards) is white. Three
+           * greys per page, maximum. Copy Linear: the chrome greys sit so
+           * close to white the data always outweighs them. Runs on Purchase
+           * Orders first; flows back portal-wide after she reviews it live. */
+          canvas: "#F7F8FA", // app background (Jess, 2026-08-02 — not a Radix step; her exact number)
+          // `strip` retired the same day (Jess's polish: too many greys were
+          // competing) — the header strip sits on the canvas, no grey of its own.
           slate: {
-            3: slate.slate3, // page canvas (Q2, frozen)
-            4: slate.slate4, // table-header wash · quiet control border (Jess, 2026-08-01)
+            3: slate.slate3, // table header #F1F3F5 (Jess, 2026-08-02) · page canvas on unmigrated pages (Q2)
+            4: slate.slate4, // quiet control border (Jess, 2026-08-01; thead moved to slate-3, 2026-08-02)
             5: slate.slate5, // hairline — table lines, card edge
             6: slate.slate6, // stronger divider — section split
             9: slate.slate9, // icon at rest · placeholder

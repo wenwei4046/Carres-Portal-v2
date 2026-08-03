@@ -53,15 +53,62 @@ export type ChasePoEventInput = z.infer<typeof chasePoEventInput>;
 export const recordTomorrowDeliveryInput = z.discriminatedUnion('answer', [
   z.object({
     answer: z.literal('shipping'),
+    // Supplier-date door (Jess, 2026-08-02): a PO with NO date yet takes its
+    // FIRST confirmed date through the same door — `firstDate` is required by
+    // the RPC exactly when `eta_date` is null, refused otherwise (draft
+    // migration extends 0306's RPC; see docs/CHECKPOINT-purchase-orders.md).
+    firstDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'firstDate must be YYYY-MM-DD').optional(),
     reason: z.string().max(300).optional(),
+    // Reason = the countable CATEGORY (PO_DELAY_REASONS); Remarks = the real
+    // story, free text. Two fields, never folded (Jess, 2026-08-02).
+    remarks: z.string().max(500).optional(),
   }).strict(),
   z.object({
     answer: z.literal('delayed'),
     newDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'newDate must be YYYY-MM-DD'),
     reason: z.string().max(300).optional(),
+    remarks: z.string().max(500).optional(),
   }).strict(),
 ]);
 export type RecordTomorrowDeliveryInput = z.infer<typeof recordTomorrowDeliveryInput>;
+
+/**
+ * What we SENT the supplier (0312, Jess 2026-08-02). The channel is the fact;
+ * the revision is derived server-side (a send mints one only when the document
+ * changed since the last).
+ */
+export const recordSendInput = z.object({
+  channel: z.enum(["whatsapp", "email", "print"]),
+  note: z.string().max(300).optional(),
+}).strict();
+export type RecordSendInput = z.infer<typeof recordSendInput>;
+
+/** ONE company-wide supplier-message template. */
+export const setMessageTemplateInput = z.object({
+  text: z.string().max(2000),
+}).strict();
+export type SetMessageTemplateInput = z.infer<typeof setMessageTemplateInput>;
+
+/**
+ * Where each LINE goes (Jess, 2026-08-02) — the three per-line write doors
+ * (0311). Purchasing's only per-line job is the destination; the ops remark
+ * is its own internal note and never prints.
+ */
+export const setLineDestinationInput = z.object({
+  destinationId: z.string().uuid(),
+}).strict();
+export type SetLineDestinationInput = z.infer<typeof setLineDestinationInput>;
+
+export const splitLineDestinationInput = z.object({
+  moveQty: z.number().int().min(1),
+  destinationId: z.string().uuid(),
+}).strict();
+export type SplitLineDestinationInput = z.infer<typeof splitLineDestinationInput>;
+
+export const setLineOpsRemarkInput = z.object({
+  text: z.string().max(500),
+}).strict();
+export type SetLineOpsRemarkInput = z.infer<typeof setLineOpsRemarkInput>;
 
 /**
  * P3 · `recordBalanceDateInput` —

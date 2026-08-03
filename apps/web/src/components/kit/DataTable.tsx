@@ -63,6 +63,21 @@ export interface ColumnFilter {
   clearLabel: string;
   /** Present = a search box above the checklist. The placeholder is the word. */
   searchPlaceholder?: string;
+  /**
+   * Excel's `Custom Date Range…` (Jess, 2026-08-02 — the PO Issued ▼). The kit
+   * renders two date fields + an apply button under the checklist and reports
+   * the pair; the PAGE owns what the pair means (it stores the range as one of
+   * its own filter values, so chips and Clear keep working unchanged).
+   */
+  range?: {
+    /** The section's word — the caller's (e.g. `Custom Date Range…`). */
+    label: string;
+    from: string | null;
+    to: string | null;
+    onApply: (from: string, to: string) => void;
+    /** The apply action's word — the caller's. */
+    applyLabel: string;
+  };
 }
 
 export interface Column<Row> {
@@ -124,6 +139,12 @@ export interface DataTableProps<Row> {
    *  page's own default order. */
   sort?: TableSort | null;
   onSortChange?: (next: TableSort | null) => void;
+  /**
+   * A row that is over — cancelled, dead — renders washed out (2990s' own
+   * recipe: the row stays on the register, greyed, so it reads as history
+   * without a word). The PAGE owns which rows qualify.
+   */
+  rowMuted?: (row: Row) => boolean;
 }
 
 /**
@@ -132,6 +153,8 @@ export interface DataTableProps<Row> {
  */
 function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter }) {
   const [needle, setNeedle] = useState("");
+  const [rangeFrom, setRangeFrom] = useState(filter.range?.from ?? "");
+  const [rangeTo, setRangeTo] = useState(filter.range?.to ?? "");
   const shown = needle.trim()
     ? filter.options.filter((o) => o.label.toLowerCase().includes(needle.trim().toLowerCase()))
     : filter.options;
@@ -183,6 +206,44 @@ function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter
             </label>
           ))}
         </div>
+        {filter.range ? (
+          /* Excel's own tail item: presets first, the custom pair last. Native
+           * date fields on purpose — a DatePicker popover inside this popover
+           * would stack two floating layers for a two-field form. */
+          <div
+            className="flex flex-col gap-1.5 border-t border-kit-slate-5 pt-2"
+            data-kit="table-filter-range"
+          >
+            <span className="text-label text-kit-slate-11">{filter.range.label}</span>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={rangeFrom}
+                onChange={(e) => setRangeFrom(e.target.value)}
+                aria-label={`${filter.range.label} from`}
+                data-testid={`table-filter-range-from-${colKey}`}
+                className="h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+              />
+              <input
+                type="date"
+                value={rangeTo}
+                onChange={(e) => setRangeTo(e.target.value)}
+                aria-label={`${filter.range.label} to`}
+                data-testid={`table-filter-range-to-${colKey}`}
+                className="h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+              />
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={rangeFrom === "" || rangeTo === "" || rangeTo < rangeFrom}
+              onClick={() => filter.range?.onApply(rangeFrom, rangeTo)}
+              data-testid={`table-filter-range-apply-${colKey}`}
+            >
+              {filter.range.applyLabel}
+            </Button>
+          </div>
+        ) : null}
         {active ? (
           <Button
             size="sm"
@@ -209,6 +270,7 @@ export default function DataTable<Row>({
   label,
   sort = null,
   onSortChange,
+  rowMuted,
 }: DataTableProps<Row>) {
   const selectableRows = selection
     ? rows.filter((r) => selection.selectable?.(r) ?? true)
@@ -250,8 +312,10 @@ export default function DataTable<Row>({
               refuses to stick a thead's backgrounds at all — the classic
               see-through header (Jess caught it live, 2026-08-01). */}
           <tr className="h-10">
+            {/* Header wash = slate-3 (Jess, 2026-08-02 surface law): one step
+                above the near-white strip, always lighter than the data. */}
             {selection && (
-              <th className="px-2 bg-kit-slate-4 border-b border-kit-slate-6">
+              <th className="px-2 bg-kit-slate-3 border-b border-kit-slate-6">
                 <Checkbox
                   id="kit-table-select-all"
                   ariaLabel={selection.label}
@@ -271,7 +335,7 @@ export default function DataTable<Row>({
                       : "descending"
                     : undefined
                 }
-                className={`px-2 bg-kit-slate-4 border-b border-kit-slate-6 text-label font-medium text-kit-slate-12 ${
+                className={`px-2 bg-kit-slate-3 border-b border-kit-slate-6 text-label font-medium text-kit-slate-12 ${
                   c.align === "right" ? "text-right" : "text-left"
                 }`}
               >
@@ -355,9 +419,12 @@ export default function DataTable<Row>({
                   /* §3.5, finally honoured: hover is ONE STEP UNDER selected
                    * (blue-2 vs blue-3) — they were identical until Jess caught
                    * it on 2026-08-01. */
+                  data-muted={rowMuted?.(row) || undefined}
                   className={`border-b border-kit-slate-5 ${
                     isSelected ? "bg-kit-blue-3" : "hover:bg-kit-blue-2"
-                  } ${onRowOpen ? "cursor-pointer" : ""}`}
+                  } ${onRowOpen ? "cursor-pointer" : ""} ${
+                    rowMuted?.(row) ? "opacity-50 grayscale" : ""
+                  }`}
                 >
                   {selection && (
                     /* The checkbox must not open the record it is ticking. */

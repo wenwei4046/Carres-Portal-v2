@@ -31,7 +31,7 @@ operationSuppliersRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
     .from("suppliers")
-    .select("id, name, kind, cat_covered, lead_time, contact, whatsapp_group_url")
+    .select("id, name, kind, cat_covered, lead_time, contact, contact_email, whatsapp_group_url")
     .order("name", { ascending: true });
   if (error) {
     const m = mapPgError(error);

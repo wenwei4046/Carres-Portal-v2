@@ -11,6 +11,11 @@ import {
   receivePoWithDoInput,
   recordBalanceDateInput,
   recordTomorrowDeliveryInput,
+  recordSendInput,
+  setMessageTemplateInput,
+  setLineDestinationInput,
+  setLineOpsRemarkInput,
+  splitLineDestinationInput,
   type AwaitingStockShortageResponse,
 } from "@carres/shared";
 import { resolveCurrentPoDuty } from "./po-duty";
@@ -113,7 +118,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // P3 (0306): `short_since` is the balance call's Due anchor — the day the
       // line last took a short delivery, stamped by a trigger so every door
       // that writes `received_qty` stamps it.
-      "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs)",
+      "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, placed_at, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs, destination_id, ops_remark)",
     );
 
   if (status !== "all") q = q.eq("status", status);
@@ -142,10 +147,22 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   const poIds = pos.map((p) => (p as Record<string, unknown>).id as string);
   const tomorrowAboutByPo = new Map<string, string | null>();
   const balanceAboutByLine = new Map<string, number | null>();
+  // Register (Jess, 2026-08-02) — `(revised)`: the arriving date has been
+  // answered about MORE THAN ONE expected arrival, so what the listing shows
+  // is not the first date the supplier named. Read from the promise ledger
+  // (0306) — the only arrival history that exists; the Phase-4 write door
+  // appends to the same ledger, so this flag starts working the day it ships.
+  const arrivalDatesByPo = new Map<string, Set<string>>();
+  // The supplier-date FIELD's own history (Jess, 2026-08-02: a field's
+  // history lives beside the field, never down in Activity). Same bounded
+  // read — no extra round-trip.
+  const promisesByPo = new Map<string, Record<string, unknown>[]>();
   if (poIds.length > 0) {
     const { data: promiseRows, error: promiseErr } = await sb
       .from("po_supplier_promises")
-      .select("po_id, po_line_id, kind, about_date, about_qty, recorded_at")
+      .select(
+        "po_id, po_line_id, kind, answer, about_date, previous_date, new_date, reason, recorded_at",
+      )
       .in("po_id", poIds)
       .order("recorded_at", { ascending: false });
     if (promiseErr) {
@@ -155,10 +172,19 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     // Newest first, so the FIRST row seen for a key is the current answer.
     for (const r of promiseRows ?? []) {
       const row = r as Record<string, unknown>;
+      const pid = row.po_id as string;
+      const hist = promisesByPo.get(pid) ?? [];
+      hist.push(row);
+      promisesByPo.set(pid, hist);
       if (row.kind === "tomorrow_delivery") {
         const key = row.po_id as string;
         if (!tomorrowAboutByPo.has(key)) {
           tomorrowAboutByPo.set(key, (row.about_date as string | null) ?? null);
+        }
+        if (row.about_date != null) {
+          const set = arrivalDatesByPo.get(key) ?? new Set<string>();
+          set.add(row.about_date as string);
+          arrivalDatesByPo.set(key, set);
         }
       } else if (row.kind === "balance_delivery" && row.po_line_id) {
         const key = row.po_line_id as string;
@@ -172,20 +198,219 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     }
   }
 
+  // ── The customer's date — the earliest promised delivery across every SO
+  // this PO covers. The Register's second column (Jess, 2026-08-02): the PO
+  // exists to make a customer date, so the listing shows it beside the day
+  // the PO was issued. One bounded IN() read over the page's SOs.
+  const soSet = new Set<number>();
+  for (const p of pos) {
+    const row = p as Record<string, unknown>;
+    if (row.so != null) soSet.add(Number(row.so));
+    for (const r of (row.so_refs as number[] | null) ?? []) soSet.add(Number(r));
+  }
+  const deliveryBySo = new Map<number, string | null>();
+  // Register (Jess, 2026-08-02) — the customer's NAME rides along so the
+  // listing's search answers "which PO carries Ah Hock's goods" without a
+  // second read. Same bounded IN() as the date.
+  const customerBySo = new Map<number, string | null>();
+  const orderIdBySo = new Map<number, string>();
+  if (soSet.size > 0) {
+    const { data: orderRows, error: orderErr } = await sb
+      .from("orders")
+      .select("id, so, delivery_date, customer_name")
+      .in("so", [...soSet]);
+    if (orderErr) {
+      const m = mapPgError(orderErr);
+      return c.json(m.body, m.status);
+    }
+    for (const r of orderRows ?? []) {
+      const row = r as Record<string, unknown>;
+      deliveryBySo.set(Number(row.so), (row.delivery_date as string | null) ?? null);
+      customerBySo.set(Number(row.so), (row.customer_name as string | null) ?? null);
+      orderIdBySo.set(Number(row.so), row.id as string);
+    }
+  }
+
+  // ── The Items grid speaks EXCEL rows (Jess, 2026-08-02): one row per
+  // SO × SKU, each with the SALESPERSON's remark flowing over from the sales
+  // order — operation never keys it. Derived by matching the covered SOs'
+  // order_lines to each PO line's SKU and dealing the PO qty out in SO order;
+  // a quantity no SO claims stays an unattributed row (so: null). This is a
+  // DISPLAY attribution — P5's allocation will make it structural.
+  const soLinesByOrderId = new Map<
+    string,
+    { sku: string; qty: number; remark: string | null }[]
+  >();
+  if (orderIdBySo.size > 0) {
+    const { data: solRows, error: solErr } = await sb
+      .from("order_lines")
+      .select("order_id, sku, qty, attrs")
+      .in("order_id", [...orderIdBySo.values()]);
+    if (solErr) {
+      const m = mapPgError(solErr);
+      return c.json(m.body, m.status);
+    }
+    for (const r of solRows ?? []) {
+      const row = r as Record<string, unknown>;
+      const attrs = (row.attrs as Record<string, unknown> | null) ?? {};
+      const remark =
+        typeof attrs.remark === "string" && attrs.remark.trim() !== ""
+          ? (attrs.remark as string)
+          : null;
+      const arr = soLinesByOrderId.get(row.order_id as string) ?? [];
+      arr.push({ sku: row.sku as string, qty: Number(row.qty ?? 0), remark });
+      soLinesByOrderId.set(row.order_id as string, arr);
+    }
+  }
+  /** Deal one PO line's qty out across its covered SOs, in SO order. */
+  const soRowsOf = (
+    row: Record<string, unknown>,
+    sku: string,
+    qty: number,
+  ): { so: number | null; qty: number; remark: string | null }[] => {
+    const sos: number[] = [];
+    if (row.so != null) sos.push(Number(row.so));
+    for (const r of (row.so_refs as number[] | null) ?? []) sos.push(Number(r));
+    const out: { so: number | null; qty: number; remark: string | null }[] = [];
+    let left = qty;
+    for (const so of [...new Set(sos)].sort((a, b) => a - b)) {
+      if (left <= 0) break;
+      const oid = orderIdBySo.get(so);
+      if (!oid) continue;
+      for (const ol of soLinesByOrderId.get(oid) ?? []) {
+        if (left <= 0) break;
+        if (ol.sku !== sku) continue;
+        const take = Math.min(left, ol.qty);
+        if (take > 0) out.push({ so, qty: take, remark: ol.remark });
+        left -= take;
+      }
+    }
+    if (left > 0) out.push({ so: null, qty: left, remark: null });
+    return out;
+  };
+  const customerDeliveryOf = (row: Record<string, unknown>): string | null => {
+    const sos: number[] = [];
+    if (row.so != null) sos.push(Number(row.so));
+    for (const r of (row.so_refs as number[] | null) ?? []) sos.push(Number(r));
+    const dates = sos
+      .map((n) => deliveryBySo.get(n) ?? null)
+      .filter((d): d is string => d != null)
+      .sort();
+    return dates[0] ?? null;
+  };
+  const ordersOf = (row: Record<string, unknown>) => {
+    const sos: number[] = [];
+    if (row.so != null) sos.push(Number(row.so));
+    for (const r of (row.so_refs as number[] | null) ?? []) sos.push(Number(r));
+    return sos
+      .filter((n) => deliveryBySo.has(n) || customerBySo.has(n))
+      .map((n) => ({
+        so: n,
+        customer_name: customerBySo.get(n) ?? "",
+        delivery_date: deliveryBySo.get(n) ?? null,
+      }));
+  };
+
+  // ── The Items column's words (Jess, 2026-08-02): the listing speaks MODEL,
+  // never the raw SKU code. The browser used to translate via its POS catalog
+  // and printed the code whenever the catalog missed — so the name is resolved
+  // HERE, where every SKU can be looked up, and rides the wire per line.
+  // `purchase_order_lines.sku` has no FK PostgREST can traverse (schema note
+  // at /:id/print-data), so one bounded IN() over the page's distinct SKUs.
+  const skuSet = new Set<string>();
+  for (const p of pos) {
+    const row = p as Record<string, unknown>;
+    const lines = (row.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [];
+    for (const l of lines) skuSet.add(l.sku as string);
+  }
+  const modelBySku = new Map<string, { model_name: string | null; size: string | null }>();
+  if (skuSet.size > 0) {
+    const { data: skuRows, error: skuErr } = await sb
+      .from("product_skus")
+      .select("sku, variant, product_models(name)")
+      .in("sku", [...skuSet]);
+    if (skuErr) {
+      const m = mapPgError(skuErr);
+      return c.json(m.body, m.status);
+    }
+    for (const r of skuRows ?? []) {
+      const row = r as Record<string, unknown>;
+      const model = row.product_models as { name?: string | null } | null;
+      modelBySku.set(row.sku as string, {
+        model_name: model?.name ?? null,
+        size: (row.variant as string | null) ?? null,
+      });
+    }
+  }
+
+  // The destination registry rides the list so the workspace's per-line picker
+  // has its options without a second call (To Order reads it the same way).
+  const { data: destRows, error: destErr } = await sb
+    .from("purchasing_destinations")
+    .select("id, name, is_default")
+    .eq("active", true)
+    .order("is_default", { ascending: false })
+    .order("name");
+  if (destErr) {
+    const m = mapPgError(destErr);
+    return c.json(m.body, m.status);
+  }
+
+  // What we have SENT (0312) — the Activity timeline reads it, and the
+  // supplier's own version number comes with it.
+  const sendsByPo = new Map<string, Record<string, unknown>[]>();
+  if (poIds.length > 0) {
+    const { data: sendRows, error: sendErr } = await sb
+      .from("po_sends")
+      .select("po_id, channel, note, sent_at, po_revisions(rev_no)")
+      .in("po_id", poIds)
+      .order("sent_at", { ascending: false });
+    if (sendErr) {
+      const m = mapPgError(sendErr);
+      return c.json(m.body, m.status);
+    }
+    for (const r of sendRows ?? []) {
+      const row = r as Record<string, unknown>;
+      const arr = sendsByPo.get(row.po_id as string) ?? [];
+      arr.push(row);
+      sendsByPo.set(row.po_id as string, arr);
+    }
+  }
+
+  const { data: tmplRow } = await sb
+    .from("purchasing_settings")
+    .select("supplier_message_template")
+    .eq("id", 1)
+    .maybeSingle();
+
   const withAnswers = pos.map((p) => {
     const row = p as Record<string, unknown>;
     const lines = (row.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [];
     return {
       ...row,
       tomorrow_answer_about_date: tomorrowAboutByPo.get(row.id as string) ?? null,
+      customer_delivery: customerDeliveryOf(row),
+      orders: ordersOf(row),
+      eta_revised: (arrivalDatesByPo.get(row.id as string)?.size ?? 0) > 1,
+      promises: promisesByPo.get(row.id as string) ?? [],
+      sends: sendsByPo.get(row.id as string) ?? [],
       purchase_order_lines: lines.map((l) => ({
         ...l,
         balance_answer_about_qty: balanceAboutByLine.get(l.id as string) ?? null,
+        model_name: modelBySku.get(l.sku as string)?.model_name ?? null,
+        size: modelBySku.get(l.sku as string)?.size ?? null,
+        so_rows: soRowsOf(row, l.sku as string, Number(l.qty ?? 0)),
       })),
     };
   });
 
-  return c.json({ pos: withAnswers });
+  return c.json({
+    pos: withAnswers,
+    destinations: destRows ?? [],
+    messageTemplate:
+      (tmplRow as { supplier_message_template?: string | null } | null)
+        ?.supplier_message_template ?? null,
+  });
 });
 
 // ----- GET /awaiting-stock-shortage -----
@@ -598,6 +823,28 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
 // enforces the role gate, refuses a cancelled PO and refuses a destination
 // with no address on file.
 //
+/**
+ * GET /api/operation/pos/:id/units — the per-unit goods ids this PO minted at
+ * Issue (0153/0154: one `id-abc123456` unit_code per physical piece, status
+ * 'incoming' until the warehouse receives). The PO-PDF-STANDARD's Item ID
+ * column is THESE ids, never the SKU — this read is what lets the workspace
+ * (and later the printed document) fill that column with real data.
+ * Own-warehouse POs only ever mint units; a PO with none returns [].
+ */
+operationPosRouter.get("/:id/units", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("ops_stock_items")
+    .select("unit_code, sku, status")
+    .eq("po_no", c.req.param("id"))
+    .order("unit_code", { ascending: true });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ units: data ?? [] });
+});
+
 // The route adds two facts the document layer needs and the RPC does not
 // carry: `so_refs` (the Sales Order column — per-line attribution does not
 // exist in the schema, so the template prints the SO only when the PO covers
@@ -1189,11 +1436,92 @@ operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, async (c) =>
   const parsed = await parseJsonBody(c, recordTomorrowDeliveryInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
+  // Remarks + the first-confirm date ride the extended RPC (draft migration —
+  // until it is applied this door serves the 0306 signature only, which is why
+  // the extras are omitted when absent rather than sent as nulls).
+  const extras: Record<string, unknown> = {};
+  if (parsed.data.remarks != null) extras.p_remarks = parsed.data.remarks;
   const { data, error } = await sb.rpc("purchasing_record_tomorrow_delivery", {
     p_po_id: c.req.param("id"),
     p_answer: parsed.data.answer,
-    p_new_date: parsed.data.answer === "delayed" ? parsed.data.newDate : null,
+    p_new_date:
+      parsed.data.answer === "delayed"
+        ? parsed.data.newDate
+        : (parsed.data.firstDate ?? null),
     p_reason: parsed.data.reason ?? null,
+    ...extras,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+// ----- POST /:id/sends -----
+// What LEFT Carres (0312). The channel is the operator's fact; the REVISION is
+// the server's — a send mints one only when the document changed since the
+// last, because re-sending an unchanged PO asks the supplier to replace
+// nothing.
+operationPosRouter.post("/:id/sends", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, recordSendInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_record_send", {
+    p_po_id: c.req.param("id"),
+    p_channel: parsed.data.channel,
+    p_note: parsed.data.note ?? null,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+// ----- PUT /message-template -----
+operationPosRouter.put("/message-template", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, setMessageTemplateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_set_message_template", {
+    p_text: parsed.data.text,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+// ----- POST /lines/:lineId/destination · /split · /ops-remark -----
+// Where each LINE goes (Jess, 2026-08-02 — 0311). Purchasing's only per-line
+// job: ten to Klang, one to AL. A whole line moves; a PART of a line SPLITS
+// (the PO stays one document with one supplier — her frozen law). The ops
+// remark is internal and, by 0311's own sanity check, can never print.
+operationPosRouter.post("/lines/:lineId/destination", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, setLineDestinationInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_set_line_destination", {
+    p_line_id: c.req.param("lineId"),
+    p_destination_id: parsed.data.destinationId,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+operationPosRouter.post("/lines/:lineId/split", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, splitLineDestinationInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_split_line_destination", {
+    p_line_id: c.req.param("lineId"),
+    p_move_qty: parsed.data.moveQty,
+    p_destination_id: parsed.data.destinationId,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+operationPosRouter.post("/lines/:lineId/ops-remark", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, setLineOpsRemarkInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_set_line_ops_remark", {
+    p_line_id: c.req.param("lineId"),
+    p_text: parsed.data.text,
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });

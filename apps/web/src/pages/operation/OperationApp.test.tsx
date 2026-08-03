@@ -46,6 +46,14 @@ vi.mock("./procurement/TabbedProcurementShell", () => ({
     <div data-testid="procurement-shell-stub">procurement-shell</div>
   ),
 }));
+// The bare procurement path mounts the Purchase Execution Workspace (Jess's
+// 2026-08-01 architecture freeze); slugged paths keep the legacy shell so
+// `?po=` deep links survive. Stubbed — it self-fetches via react-query.
+vi.mock("./OperationPurchaseOrders", () => ({
+  default: () => (
+    <div data-testid="purchase-orders-workspace-stub">po-workspace</div>
+  ),
+}));
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
@@ -68,10 +76,12 @@ function renderApp(initialPath: string) {
 }
 
 describe("OperationApp — procurement descendant routing", () => {
-  it("URL /operation/procurement mounts TabbedProcurementShell via descendant Routes", () => {
+  it("URL /operation/procurement mounts the Purchase Execution Workspace via descendant Routes", () => {
     renderApp("/operation/procurement");
-    expect(screen.getByTestId("procurement-shell-stub")).toBeInTheDocument();
-    // The dashboard must NOT render alongside the shell — `isProcurementUrl`
+    expect(
+      screen.getByTestId("purchase-orders-workspace-stub"),
+    ).toBeInTheDocument();
+    // The dashboard must NOT render alongside the workspace — `isProcurementUrl`
     // gates the conditional so only the inner <Routes> block paints.
     expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
   });
