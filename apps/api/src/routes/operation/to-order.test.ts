@@ -992,3 +992,51 @@ describe("a purchase order is born with its expected arrival", () => {
     expect(rows[0].text).toContain("expected arrival");
   });
 });
+
+/**
+ * THE FEATURE MAY BE UNAVAILABLE; THE PAGE MAY NOT BE (Jess, 2026-08-03).
+ *
+ * Typed Ready Stock demand arrives with migration 0318. Between deploying this
+ * code and applying it — and in any rebuilt environment — the table is absent.
+ * To Order's job is turning CUSTOMER orders into purchase orders and it did
+ * that for months before typed demand existed, so an optional read must never
+ * 500 the whole workspace.
+ */
+describe("purchase_demands absent — fail closed, not down", () => {
+  it("still answers 200 with the customer-order plan when the table is missing", async () => {
+    const t = TABLES();
+    // What PostgREST answers for a table that is not there.
+    t.purchase_demands = {
+      data: null,
+      error: { code: "42P01", message: 'relation "purchase_demands" does not exist' },
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await get();
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    // The customer work is all there — the day's purchasing is unaffected.
+    expect(body.proposals.length).toBeGreaterThan(0);
+    expect(body.proposals[0].rows.length).toBeGreaterThan(0);
+  });
+
+  it("issues purchase orders normally while the table is missing", async () => {
+    const t = TABLES();
+    t.purchase_demands = {
+      data: null,
+      error: { code: "42P01", message: 'relation "purchase_demands" does not exist' },
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: await defaultPlan(sb),
+    });
+    expect(res.status).toBe(200);
+  });
+});

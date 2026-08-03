@@ -325,18 +325,33 @@ async function loadToOrder(
       .select("id, purpose, sku, supplier_id, destination_id, qty, required_by, remark")
       .is("po_id", null)
       .is("cancelled_at", null);
+    /**
+     * THIS READ MAY NEVER TAKE THE PAGE DOWN.
+     *
+     * To Order's job is turning CUSTOMER orders into purchase orders, and it
+     * did that for months before typed demand existed. If `purchase_demands` is
+     * absent — the window between deploying this code and applying 0318, a
+     * rebuilt environment, a half-applied migration — the FEATURE is
+     * unavailable and the workspace is untouched. Returning an error here would
+     * 500 the whole page over an optional read, which is a far worse failure
+     * than the one it would be reporting.
+     *
+     * Fail CLOSED, not open: nothing is invented, the typed-demand list is
+     * simply empty, and the WRITE door still answers a real, named error to
+     * anyone who tries to create one — so the state is discoverable rather
+     * than silent.
+     */
     if (demandErr) {
-      const m = mapPgError(demandErr);
-      return { ok: false, status: m.status, body: m.body };
+      console.error("purchase_demands unavailable — typed demand omitted", demandErr.message);
     }
     const destName = new Map<string, string>();
-    if ((demandRows ?? []).length > 0) {
+    if (!demandErr && (demandRows ?? []).length > 0) {
       const { data: destRows } = await sb
         .from("purchasing_destinations")
         .select("id, name");
       for (const d of destRows ?? []) destName.set(d.id as string, (d.name as string) ?? "");
     }
-    for (const d of (demandRows ?? []) as Record<string, unknown>[]) {
+    for (const d of (demandErr ? [] : (demandRows ?? [])) as Record<string, unknown>[]) {
       const c = cat.get(d.sku as string);
       const category = c?.category;
       const supplierId = (d.supplier_id as string | null) ?? c?.supplierId ?? null;
@@ -891,15 +906,35 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
     for (const k of d.buildKeys) {
       const m = /^demand:(.+)$/.exec(buildRef.get(k)?.orderId ?? "");
       if (!m) continue;
-      const { error: stampErr } = await sb
+      /**
+       * CONDITIONAL on the demand still being unclaimed.
+       *
+       * Two operators can press Issue in the same second: both recomputations
+       * see the demand open, so both can raise a purchase order for it. The
+       * `is("po_id", null)` predicate means the SECOND stamp writes nothing and
+       * returns no row — which turns a silent double-order into a named,
+       * greppable event instead of one purchase order quietly overwriting the
+       * other's link.
+       *
+       * It does not PREVENT the duplicate. Preventing it needs the claim to
+       * happen inside the same transaction that creates the purchase order,
+       * which changes `operation_create_pos_batch`'s contract and is its own
+       * card. Recorded rather than hidden; exposure today is zero demands and
+       * a two-person duty roster.
+       */
+      const { data: stamped, error: stampErr } = await sb
         .from("purchase_demands")
         .update({ po_id: poId, ordered_at: new Date().toISOString() })
-        .eq("id", m[1]!);
+        .eq("id", m[1]!)
+        .is("po_id", null)
+        .select("id");
       if (stampErr) {
         // The purchase orders exist and the supplier is about to be sent them.
         // Failing the whole issue now would destroy real work to protect a
         // link; the demand reappearing is visible and recoverable.
         console.error("purchase_demands stamp failed", m[1], stampErr.message);
+      } else if ((stamped ?? []).length === 0) {
+        console.error("purchase_demands already claimed — possible duplicate order", m[1], poId);
       }
     }
   }

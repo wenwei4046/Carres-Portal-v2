@@ -32,10 +32,13 @@
 -- · NO `source` / `requested_by_role` / proposal columns, even though Phase 2
 --   (Sales Portal) is coming. A column nobody writes is worse than a missing
 --   one — that is exactly how `ops_order_control.balance` became a lock
---   reading a NULL for months. **Phase 2 attaches to this TABLE, not to a
---   column reserved for it today**: Sales gets its own write door, and the
---   proposal/approval layer, if it is ever built, is its own table in front of
---   this one. Nothing here has to change for that.
+--   reading a NULL for months.
+--
+--   **A future Sales Portal reaches this data through an APPROVED API /
+--   business door, never by reading or writing this table directly.** That is
+--   why no column is reserved for it here: the extension point is a new
+--   server-side door (and, if the business ever needs one, a proposal table in
+--   front of this one), not a field waiting in this schema.
 --
 -- · V1 HAS EXACTLY ONE PURPOSE: Ready Stock (Jess, 2026-08-03, narrowing her
 --   own earlier scope). Display is initiated by the Dealer/Sales portal as a
@@ -274,30 +277,49 @@ grant execute on function public.purchasing_cancel_demand(uuid, text) to authent
 -- 5 · Sanity — aborts the migration rather than shipping a lie
 -- ---------------------------------------------------------------------------
 do $$
-declare v_n int; v_ok boolean := false;
+declare v_n int; v_def text;
 begin
-  -- born empty; nothing is backfilled, ever
+  -- NOTHING IN THIS BLOCK WRITES A ROW. The first draft proved the CHECK by
+  -- attempting an insert and reading the failure — which is only safe if the
+  -- whole file runs inside a transaction, and a migration runner that does not
+  -- wrap it would leave a probe row behind or abort half-applied. Every
+  -- assertion below reads the CATALOGUE instead, so the proof costs nothing and
+  -- depends on no rollback.
+
+  -- born empty; nothing is ever backfilled
   select count(*) into v_n from purchase_demands;
   if v_n <> 0 then raise exception 'SANITY: purchase_demands is not empty (%)', v_n; end if;
 
-  -- NO write policy exists — the RPCs are the only doors
+  -- NO write policy exists — the two DEFINER functions are the only doors
   select count(*) into v_n from pg_policies
    where schemaname = 'public' and tablename = 'purchase_demands' and cmd <> 'SELECT';
   if v_n <> 0 then raise exception 'SANITY: % write policy(ies) on purchase_demands', v_n; end if;
 
-  -- the architecture keeps four purposes even though two are enabled
-  begin
-    insert into purchase_demands (purpose, sku, supplier_id, destination_id, qty)
-    values ('office', 'x', gen_random_uuid(), gen_random_uuid(), 1);
-  exception
-    when foreign_key_violation then v_ok := true;  -- the CHECK let 'office' through
-    when check_violation       then v_ok := false; -- a CHECK refused it: WRONG
-  end;
-  if not v_ok then
-    raise exception 'SANITY: office must stay legal in the CHECK — it is disabled in the DOOR, not the schema';
+  -- the ARCHITECTURE keeps four purposes even though the door admits one
+  select pg_get_constraintdef(oid) into v_def
+    from pg_constraint
+   where conrelid = 'public.purchase_demands'::regclass
+     and conname = 'purchase_demands_purpose_check';
+  if v_def is null then
+    select pg_get_constraintdef(c.oid) into v_def
+      from pg_constraint c
+     where c.conrelid = 'public.purchase_demands'::regclass
+       and c.contype = 'c'
+       and pg_get_constraintdef(c.oid) like '%ready_stock%';
+  end if;
+  if v_def is null or v_def not like '%office%' or v_def not like '%display%' then
+    raise exception 'SANITY: the purpose CHECK must keep the future purposes — they are disabled in the DOOR, not the schema';
   end if;
 
-  raise notice 'SANITY OK — empty, no write policy, four purposes in the schema.';
+  -- both functions exist and neither is callable by anon
+  select count(*) into v_n
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname in ('purchasing_create_demand','purchasing_cancel_demand')
+     and has_function_privilege('anon', p.oid, 'execute');
+  if v_n <> 0 then raise exception 'SANITY: % function(s) still executable by anon', v_n; end if;
+
+  raise notice 'SANITY OK — empty, no write policy, four purposes in the schema, anon locked out.';
 end $$;
 
 -- ============================================================================
