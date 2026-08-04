@@ -2049,6 +2049,25 @@ export {
   type PurchaseChaseReceiveOptions,
 } from "./purchase-report";
 
+// Q3 · Purchasing → Report — the "look at the numbers" layer. Pure, stores
+// nothing, computes at read time, and carries NO money field at all so nothing
+// downstream can print one. Q4's dashboard imports this rather than counting
+// again (a figure computed twice is two answers).
+export {
+  PO_REPORT_WORDS,
+  buildPoReport,
+  poReportCategoryLabel,
+  poReportEmpty,
+  poReportRowDetail,
+  type PoReportPo,
+  type PoReport,
+  type PoReportFacetOption,
+  type PoReportFilters,
+  type PoReportLine,
+  type PoReportResponse,
+  type PoReportRow,
+} from "./po-report";
+
 // Canonical MY mattress/bedframe size table — the short code (SKU suffix) ↔ full
 // name (the SIZE shown). Size auto-generation resolves through this so the code
 // stays `-K` while the SIZE reads `King` (never the raw `K`).
