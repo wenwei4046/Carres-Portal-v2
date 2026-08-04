@@ -6,6 +6,59 @@
 
 ---
 
+**2026-08-04 · Purchasing Q8 — the Current Action column stops reversing its own tense** (PR #605 merge `3cb84c61`, **no migration · no api · no layout, width, column or token change**, web `index-DkXEb2HW.js` — DEPLOYED, all four canonicals, live md5 == local build, `SERVICE_ROLE` 0; **no Worker deploy owed and it was measured** against the live Worker's source commit)
+
+**Loo found this himself, first thing on 2026-08-04:** *"Confirm Arrival is unclear. Arrival of what? Customer delivery? Stock arrival? Supplier ETA? Warehouse arrival?"*
+
+**The defect is a TENSE REVERSAL, not vagueness, and that is why a reword would not have fixed it.** The full string is `Confirm Goods Arrival Date` — *phone the factory and ask which day the goods reach us*, a FUTURE question. The register shortened it to `Confirm Arrival`, which a reader takes as *tick that it has arrived*. One is a phone call; the other is receiving. `PURCHASING-INFORMATION-MODEL.md` §12.3 states the rule it broke: **a short form may drop WORDS; it may never drop the TENSE or the OBJECT.** It was live on **16 of 21 rows**.
+
+**His word ships verbatim: `Check Expected Arrival`.** It matches the column beside it (`Expected Arrival`, §12.2) so the eye does not change track, and it is honest about the 16 POs where there is no date to confirm — you cannot confirm something nobody has said yet.
+
+**Three more words leave the action column, because they were never actions** (§12.3): `Contact Supplier` (`Contact` is a verb Loo retired 2026-07-28 — the portal has six and `Call` covers it), `Waiting for Goods` (a STATUS wearing an action's column; the left rail keeps it, its one home) and `Open Receiving` (navigation, not work). The column says `—`, which §12.3 rules **a real answer rather than a gap**.
+
+**THE CARD LEFT ONE THING TO BE READ AND THE READING IS ON THE RECORD.** Its table says `Contact Supplier` is **DELETED** where the other two **become `—`** — two different verbs for two different fates — and its own stated reason for deleting is *"the SAME action as the row above, merely late"*. So an overdue purchase order does **not** fall silent: it carries the same KEY and the same WORD as a dateless one. Silence would have said *nothing to do* about the one PO in the register that is provably late, and the four states the card lists would have collapsed to two words plus a hole. **It is ONE key, not two keys mapping to one string** — a second key would split the column's own Current Action filter into two rows carrying an identical label. **Its PRECEDENCE is untouched:** overdue still outranks the engine's open calls, exactly as it did when the word was `Contact Supplier`. **Live effect of the reading today: none — 0 of 21 POs are overdue.**
+
+**Verified on production with my own eyes, and the counts are the card's own.**
+
+```
+21 open purchase orders          the live database, then the deployed page
+   16  no arrival date       →   Check Expected Arrival
+    5  arrival date on file  →   —      (12 · 13 · 19 · 19 · 25 Aug)
+    0  overdue · 0 lines ever received · 0 engine calls open
+
+the rail agrees by itself:  Waiting Supplier Date 16 · Waiting for Goods 5
+```
+
+**"NO LAYOUT CHANGE" WAS PROVED RATHER THAN ASSUMED.** Measured in a real browser against the app's own stylesheet at 13px Inter — a basis that reproduces Q7's own number exactly (`Confirm tomorrow's delivery` = **175.4**, which is where the column's 192px came from):
+
+```
+Check Expected Arrival   144.1 + the cell's 16px = 160     the new word
+Confirm Arrival           93.0                  = 109      ← retired
+Contact Supplier         102.6                  = 119      ← retired
+Waiting for Goods        110.2                  = 126      ← retired (rail keeps it)
+Open Receiving            96.8                  = 113      ← retired
+Confirm tomorrow's delivery  175.4              = 191      SETS the 192px width
+```
+
+His word is **longer than all four it replaces and still 32px inside the column**, and it is not the string that sets the width — so `192px` is untouched and nothing clips. **On the DEPLOYED page it rendered at exactly 144.1px**, the pre-build number reproduced, in a 192px cell; rows still **40px**, page horizontal scroll **0**, **0 clipped cells**, and the three retired words appear nowhere in the rendered text while the rail still says `Waiting for Goods`.
+
+**The dictionary entry is the other half of the card.** `Check Expected Arrival` is now in `docs/COPY-STANDARD.md` under Loo's name, with the collision recorded in one line: **`Check` is not one of the six verbs, and `Check in` already means the receiving act in this same module** (his own document/act split, 2026-07-28), so a new hire could read it as the receiving act. The alternative needing no new verb was `Confirm expected arrival`, and the dictionary's own `Confirm ready date` already fires when the date is MISSING, so `Confirm` covered the empty case by precedent. **He saw both and chose his own word.** A word he rules goes INTO the dictionary; it does not live outside it in a card.
+
+**Gates.** web tsc **0** · shared **2122/2122** · `po-workspace` **34/34** · page **89/89 — the same count as baseline**, four tests re-pointed and none added or removed · full web suite **2470 passed / 16 pre-existing (§17.7), zero new** · build clean · **check-design 8367, IDENTICAL category for category to `origin/main`**, proved by linting a DETACHED WORKTREE at main rather than by quoting a delta.
+
+**Three negative controls, each a real edit, each verified applied before the run:** put `Confirm Arrival` back → **shared 2 · web 4** · put `Contact Supplier` back, both tables plus the overdue key → **shared 2 · web 1** · put `Waiting for Goods` back into the ACTION column → **shared 2 · web 2**.
+
+**Deployment.** Pages was owed and shipped: `index-DkXEb2HW.js`, md5 `ca5ae9db967c3b9805812439e4d05ef3`, 4,764,084 bytes, live file byte-identical to the local build, `SERVICE_ROLE` **0**. Two canonicals flapped between this hash and Q7's for a few minutes — the documented edge-cache behaviour, and **one poll cannot tell a lag from a split** — so `wrangler pages deployment list` settled it (source `3cb84c6` is the newest Production/main writer on BOTH projects) before all four converged. **Proved in BOTH directions on DOWNLOADED bundles, with a control:** `Check Expected Arrival` **0 → 1**, and going the other way `Confirm Arrival` **1 → 0** · `Contact Supplier` **2 → 0** · `Open Receiving` **2 → 0** · `Waiting for Goods` **3 → 1** (the survivor being the rail's own label), while `Waiting Supplier Date` is **1 in BOTH** — the marker proving the predecessor was really read rather than 404'd; it was fetched from its OWN deployment URL `866aec91`, because a superseded asset 404s at the apex and a grep of that error page reads as a clean 0 for everything. **No Worker deploy owed and it was MEASURED** against the LIVE WORKER'S source commit: `git diff f2517f99..HEAD -- apps/api packages/shared supabase/migrations` is EMPTY, and `apps/api` greps **0** for `po-workspace`.
+
+**Reported, not fixed.**
+
+1. **`Confirm Arrival` and `Contact Supplier` do not grep to a literal zero, and the honest split is worth more than the number.** **Live strings: 0** — neither appears in any table, any label or any rendered branch, proved on the deployed bundle. What remains is **4 tombstone comments** naming which word was retired and why, and **6 negative assertions** that fire if one comes back. A grep counting those would forbid the very guard that keeps the count at zero — the same decision `purchasing-words.test.ts` already documents for the whole lane.
+2. **`Check` is now a portal verb in practice while COPY-STANDARD's table still says six.** The new section confines it to this one label and says no other module may reach for it, but the seventh-verb bar (*"no existing verb fits, and the alternative is a module inventing its own"*) was cleared by ruling rather than by the test. That is Loo's, and it is recorded rather than acted on.
+3. **An overdue row now shows nothing about its lateness except the shared word.** `⚠ Overdue by N days` lives in the row EXPAND, and the action cell's red is reserved for a late ENGINE call, which an overdue PO does not raise. Unreachable today (0 overdue), and tone is layout, which this card may not touch.
+4. **§12.4's hole is unchanged and this card does not close it.** The portal still has no ACTION for *the factory has never told us when the goods reach us* — `Check Expected Arrival` is a state word in a column, with no trigger, no due, no owner and no five strings. §12.5 leaves that to Loo.
+
+---
+
 **2026-08-04 · Purchasing Q6 — To Order is audited, and BOTH kit powers are refused in writing** (PR pending at time of writing, **no migration, no api change, NO PAGES DEPLOY OWED — proved by CHECKSUM**)
 
 Loo, 2026-08-04: *"now to order page i want also follow us."* The card that makes that true was written deliberately small, because **the honest measurement is that To Order was already closer to the Purchase Orders architecture than Purchase Orders was**: the kit's row expand (P10), the kit's `group` and a priority-ordered rail are all live, and it has no right panel to mis-define because it is a **Workspace** (`03-page-patterns.md`), not a document register.
