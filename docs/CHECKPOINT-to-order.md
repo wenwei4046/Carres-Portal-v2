@@ -306,6 +306,80 @@ suppliers address/tel/attn/terms · an audit row from
 | tsc | web clean · api 4 pre-existing |
 | design-standard | **8438** — the ratchet may never rise |
 
+## 16 · Q6 — the audit against the Purchase Orders architecture (2026-08-04)
+
+> **APPEND ONLY.** Nothing above this line is edited by a Q-card.
+>
+> **Where this entry lives, and the departure from the Q-line block.** That block tells every
+> Q-card to append to `docs/CHECKPOINT-purchase-orders.md` §6. Q6's subject is **To Order**, so
+> it is recorded here, on the page's own checkpoint, where a To Order reader looks. Said out
+> loud rather than done quietly.
+
+**Loo, 2026-08-04: *"now to order page i want also follow us."*** The audit's honest finding is
+that the page already did, in the ways that cost anything: the kit's row **expand** (P10), the
+kit's **group**, and a **priority-ordered rail** are live, and there is **no right panel to
+mis-define**, because To Order is a **Workspace** (`03-page-patterns.md`) and not a document
+register. **Nothing on the page changed.**
+
+**The two unwired kit powers, §13.3 answered — BOTH REFUSED, with the operator reason:**
+
+```
+production, all 10 live rows, 1024 → 1280, the app's own stylesheet
+   viewport 1024 · table 668px      given   needs   widest live content
+      Supplier                        147      87   Nice Future
+      Qty                              53      24   2
+      Model                           287      75   H1401S Q
+      PO No.                          134     118   Yet to Order + Cancel
+   nothing truncates · no sideways scroll · rows 40px
+   (at 1280 the table is 934px and Model is given 402px)
+```
+
+- **`resize`** — a resize can only reveal something HIDDEN, and nothing here is: no cell
+  truncates at any viewport measured. The measured defect is the opposite (Model is given five
+  times its content) and it is **P16**'s, which fixes it for everybody; §0.4 forbids remembering
+  a drag, so wiring it would ask the operator to re-drag four columns every morning. Loo's ✅ on
+  Purchase Orders was reasoned — *"supplier names are different lengths"* — and To Order buys
+  from exactly **two** suppliers. The one column with the least headroom (`PO No.`) is the
+  **last**, which the kit gives no handle at all.
+- **`reorder`** — *"different operators watch different columns"* is a **wide**-register
+  problem: nine columns there, **four** here, all in one glance with zero horizontal scroll.
+  Loo ruled this order himself on the real page (2026-08-03) with a stated adjacency reason —
+  Qty immediately left of Model, `2 │ Cody K`.
+
+**The refusal is a TEST**, the same move #601 made for footer totals: a power that quietly
+appears later is the failure §13.3 exists to stop.
+
+**The §12.2 date scan is CLEAN in the source and on the deployed page** — `Goods Arrival` ·
+`Stock ETA` · a bare `ETA` grep **0** in the page, **0** in `TO_ORDER_WORDS`, and **0** in the
+rendered text and every `aria-label` / `title` live. **`colPreferred` is PINNED to
+`Customer Delivery`** rather than deleted, for the day the group header's bare date is labelled.
+
+**Reported into P7 as G8-G10, fixed by nobody here:** the bare group-header date carries **two
+different facts under no word** (`Customer Delivery` for a customer order · `Required By` for a
+typed Ready Stock demand, which has no §12.2 row) · **three ruled words have no screen
+consumer** (`colPreferred` · `colSoNo` · `colCustomer`) · **`PO No.` holds a status word and an
+action button in one column**, which §12.3 forbade the same day P12 shipped it. **And one for
+the KIT lane:** `resize` and `reorder` come through ONE `layout` prop, so no page can answer
+§13.3 per power.
+
+```
+Main tip     rebased TWICE mid-build — onto P14 (#602) and then Q7 (#603)
+             P13 (8ac7787f) was already an ancestor
+Web bundle   UNCHANGED — index-BscHlt88.js · md5 c46f757a… · 4,764,247 bytes
+             SERVICE_ROLE 0 · all FOUR canonicals polled and serving it
+             proved by CHECKSUM against the file DOWNLOADED from production
+API Worker   NOT owed — diff against the LIVE WORKER'S source commit f2517f99
+             (apps/api · packages/shared · supabase/migrations) is EMPTY
+Migration    none
+Gates        web tsc 0 · page 70 → 74 · web suite 2458 passed / 16 pre-existing, zero new
+             shared 2121/2121 · build clean
+             check-design 8367, IDENTICAL category for category to origin/main,
+             proved by linting a DETACHED WORKTREE at main
+Controls     layout={{…}} → 1 · updated:"Stock ETA" → 3 · colPreferred → 1
+             each a REAL edit, verified applied (the file is CRLF; perl -0pi
+             has silently declined four times on this lane)
+```
+
 ## 15 · Deployed
 
 ```
