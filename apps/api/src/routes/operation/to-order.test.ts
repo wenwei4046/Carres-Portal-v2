@@ -241,6 +241,34 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
 
   const from = vi.fn((table: string) => {
     tableCalls[table] = (tableCalls[table] ?? 0) + 1;
+    /**
+     * `ops_stock_items` is read TWICE and the two reads mean OPPOSITE things —
+     * the FREE pool a row could come off, and units already RESERVED to an
+     * order. The mock evaluates no filter, so without this branch both reads
+     * would answer the same fixture and a test asserting either would be
+     * measuring the other. Answered by the `status` the read asked for.
+     */
+    if (table === "ops_stock_items") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const b: any = {};
+      let status: string | null = null;
+      for (const m of CHAIN) {
+        b[m] = vi.fn((col?: unknown, val?: unknown) => {
+          filters.push({ table, method: m, col, val });
+          if (col === "status" && typeof val === "string") status = val;
+          return b;
+        });
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      b.then = (res: any, rej: any) =>
+        Promise.resolve(
+          tables[status === "reserved" ? "__reservedStock" : "__freeStock"] ?? {
+            data: [],
+            error: null,
+          },
+        ).then(res, rej);
+      return b;
+    }
     if (table === "product_skus") {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const b: any = {};
@@ -1285,3 +1313,245 @@ describe("a partly satisfied demand keeps its remainder", () => {
     expect(sb.rpcCalls.some((r) => r.fn === "purchasing_demand_record_issue")).toBe(false);
   });
 });
+
+// ── Card P10 — ready stock is suggested; the human decides ──────────────────
+
+const TAKE = "http://t/api/operation/purchase/to-order/take-stock";
+
+async function take(body: unknown) {
+  const jwt = await makeJwt("operation");
+  return app.fetch(
+    new Request(TAKE, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+    env,
+  );
+}
+
+/** A lone (non-modular) sofa line — the shape a shelf can actually satisfy. */
+function withLoneLine(extra: Partial<Tbl> = {}): Tbl {
+  const t = TABLES();
+  t.order_lines = {
+    data: [
+      ...(t.order_lines.data as unknown[]),
+      {
+        id: "s1", order_id: "o2", sku: "SOLO-SOFA", qty: 2, attrs: null,
+        excluded_from_plan: false, exclude_from_plan_until: null,
+      },
+    ],
+    error: null,
+  };
+  t.product_skus = {
+    data: [
+      ...(t.product_skus.data as unknown[]),
+      {
+        sku: "SOLO-SOFA", supplier_id: OHANA, cost: 500, variant: null,
+        product_models: { category: "sofa", name: "Solo" },
+      },
+    ],
+    error: null,
+  };
+  return { ...t, ...extra };
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+describe("P10 · the read offers what the shelf holds", () => {
+  async function builds(sb: ReturnType<typeof makeSb>) {
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const body = (await (await get()).json()) as any;
+    return {
+      body,
+      all: body.proposals.flatMap((p: any) => p.rows.flatMap((r: any) => r.builds)),
+    };
+  }
+
+  it("says nothing about stock when the register is empty", async () => {
+    const { all } = await builds(makeSb(withLoneLine()));
+    expect(all.length).toBeGreaterThan(0);
+    expect(all.every((b: any) => b.stock === undefined)).toBe(true);
+  });
+
+  it("offers free units on a lone line, and the warehouse names itself", async () => {
+    const { body, all } = await builds(
+      makeSb(
+        withLoneLine({
+          __freeStock: {
+            data: [{ id: "u1", sku: "SOLO-SOFA", qty: 1, date_in: "2026-07-01" }],
+            error: null,
+          },
+        }),
+      ),
+    );
+    expect(body.stockWarehouse).toBe("Carres Klang");
+    expect(all.find((b: any) => b.lines[0].sku === "SOLO-SOFA").stock).toEqual({
+      available: 1,
+      take: 1,
+    });
+  });
+
+  it("NEVER hands the free pool to the engine — consumeFreeStock stays off", async () => {
+    // The proof is the QUANTITY: one unit free, two ordered. A page that had
+    // auto-consumed would propose 1 and the operator would never see a choice.
+    const { all } = await builds(
+      makeSb(
+        withLoneLine({
+          __freeStock: {
+            data: [{ id: "u1", sku: "SOLO-SOFA", qty: 1, date_in: "2026-07-01" }],
+            error: null,
+          },
+        }),
+      ),
+    );
+    expect(all.find((b: any) => b.lines[0].sku === "SOLO-SOFA").qty).toBe(2);
+  });
+
+  it("units already reserved to the order ARE netted — a take makes the row fall", async () => {
+    const { all } = await builds(
+      makeSb(
+        withLoneLine({
+          __reservedStock: {
+            data: [{ sku: "SOLO-SOFA", qty: 1, reserved_ref: "SO-1204" }],
+            error: null,
+          },
+        }),
+      ),
+    );
+    expect(all.find((b: any) => b.lines[0].sku === "SOLO-SOFA").qty).toBe(1);
+  });
+
+  it("another order's reserved units are NOT netted", async () => {
+    const { all } = await builds(
+      makeSb(
+        withLoneLine({
+          __reservedStock: {
+            data: [{ sku: "SOLO-SOFA", qty: 1, reserved_ref: "SO-9999" }],
+            error: null,
+          },
+        }),
+      ),
+    );
+    expect(all.find((b: any) => b.lines[0].sku === "SOLO-SOFA").qty).toBe(2);
+  });
+
+  it("a line fully covered by its own reserved units leaves the workspace", async () => {
+    const { all } = await builds(
+      makeSb(
+        withLoneLine({
+          __reservedStock: {
+            data: [{ sku: "SOLO-SOFA", qty: 2, reserved_ref: "SO-1204" }],
+            error: null,
+          },
+        }),
+      ),
+    );
+    expect(all.map((b: any) => b.lines[0].sku)).not.toContain("SOLO-SOFA");
+  });
+});
+
+describe("POST /take-stock", () => {
+  const FREE = {
+    __freeStock: {
+      data: [
+        { id: "u1", sku: "SOLO-SOFA", qty: 1, date_in: "2026-07-01" },
+        { id: "u2", sku: "SOLO-SOFA", qty: 1, date_in: "2026-07-02" },
+      ],
+      error: null,
+    },
+  };
+
+  async function buildRef(sb: ReturnType<typeof makeSb>) {
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const body = (await (await get()).json()) as any;
+    for (const p of body.proposals) {
+      for (const r of p.rows) {
+        for (const b of r.builds) {
+          if (b.lines[0].sku === "SOLO-SOFA") {
+            return {
+              supplierId: p.supplierId, category: p.category,
+              orderId: r.orderId, buildKey: b.key, stock: b.stock,
+            };
+          }
+        }
+      }
+    }
+    throw new Error("fixture: no SOLO-SOFA build");
+  }
+
+  /** Make every draw answer `null` from the Nth call on — the register's own
+   *  `status = 'free'` guard losing a race. */
+  function drawsFailFrom(sb: ReturnType<typeof makeSb>, from: number) {
+    const real = sb.rpc;
+    let n = 0;
+    (sb as any).rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
+      if (fn === "ops_stock_pool_draw") {
+        sb.rpcCalls.push({ fn, args });
+        n += 1;
+        return { data: n >= from ? null : args.p_item_id, error: null };
+      }
+      return real(fn, args);
+    });
+  }
+
+  it("draws through K4's door — never a direct write, one call per record", async () => {
+    const sb = makeSb(withLoneLine(FREE));
+    const ref = await buildRef(sb);
+    expect(ref.stock).toEqual({ available: 2, take: 2 });
+    const res = await take({ ...ref, reason: "sales_urgent" });
+    expect(res.status).toBe(200);
+
+    const draws = sb.rpcCalls.filter((r) => r.fn === "ops_stock_pool_draw");
+    expect(draws).toHaveLength(2);
+    // The ORDER's own reference — what the drawer's picker has written since
+    // 0137, so the two doors into the pool speak one vocabulary.
+    expect(draws.every((d) => d.args.p_ref === "SO-1204")).toBe(true);
+    expect(draws.map((d) => d.args.p_item_id)).toEqual(["u1", "u2"]);
+    expect(draws.every((d) => d.args.p_reason === "sales_urgent")).toBe(true);
+    // NOTHING writes the register directly. A fourth door writing stock its
+    // own way is a second truth about the same units.
+    expect(sb.updates.some((u) => u.table === "ops_stock_items")).toBe(false);
+  });
+
+  it("a customer take records nothing on purchase_demands — it has no demand row", async () => {
+    const sb = makeSb(withLoneLine(FREE));
+    const ref = await buildRef(sb);
+    await take({ ...ref, reason: "sales_urgent" });
+    expect(sb.rpcCalls.some((r) => r.fn === "purchasing_demand_record_issue")).toBe(false);
+  });
+
+  it("refuses a reason the ledger does not have — the same five, from one list", async () => {
+    const sb = makeSb(withLoneLine(FREE));
+    const ref = await buildRef(sb);
+    const res = await take({ ...ref, reason: "because_i_said_so" });
+    expect(res.status).toBe(400);
+    expect(sb.rpcCalls.some((r) => r.fn === "ops_stock_pool_draw")).toBe(false);
+  });
+
+  it("refuses a build the server did not offer stock for", async () => {
+    const sb = makeSb(withLoneLine(FREE));
+    const ref = await buildRef(sb);
+    const res = await take({ ...ref, buildKey: "bk-a", reason: "sales_urgent" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "nothing_to_take" });
+  });
+
+  it("reports what really moved when a unit was grabbed first — never the offer", async () => {
+    const sb = makeSb(withLoneLine(FREE));
+    const ref = await buildRef(sb);
+    drawsFailFrom(sb, 2);
+    const res = await take({ ...ref, reason: "sales_urgent" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ records: 1 });
+  });
+
+  it("answers 409 when the whole shelf went in the meantime", async () => {
+    const sb = makeSb(withLoneLine(FREE));
+    const ref = await buildRef(sb);
+    drawsFailFrom(sb, 1);
+    const res = await take({ ...ref, reason: "sales_urgent" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "stock_gone" });
+  });
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */

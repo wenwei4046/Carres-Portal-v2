@@ -5,12 +5,19 @@ import {
   buildToOrder,
   isToOrderCategory,
   myHolidaySet,
+  netReservedToOrder,
+  orderStockRef,
   planFromDocuments,
   productionWorkingDaysFor,
+  reservedUnitsByRefAndKey,
+  stockMatchKey,
+  suggestReadyStockTake,
   toOrderBuilds,
   transitDaysFor,
   railItemLabel,
   workWeekOffDaysFor,
+  POOL_USE_REASONS,
+  type FreeStockRecord,
   type ProductCategory,
   type IssueDocument,
   type ToOrderLine,
@@ -103,7 +110,72 @@ type Loaded = {
    * plan and the dates stamped on it come from two different reads.
    */
   settings: Awaited<ReturnType<typeof loadPurchasingSettings>>;
+  /**
+   * Free register records per `stockMatchKey`, FIFO — card P10. The take path
+   * reads it to claim the exact records the suggestion was composed from, so
+   * the number the operator saw and the units the door flips come from ONE
+   * read of the register.
+   */
+  freeStockByKey: Map<string, FreeStockRecord[]>;
+  /** The own warehouse the free stock sits in — it names ITSELF on screen. */
+  stockWarehouse: { id: string; name: string } | null;
 };
+
+/**
+ * FREE WAREHOUSE STOCK, KEYED THE ONE WAY THIS PORTAL LINKS A LINE TO A UNIT.
+ *
+ * `stockMatchKey` is Jess's locked 2026-07-01 rule and it already serves the
+ * order drawer's readiness badge, the stock picker and the booking-confirm
+ * gate. To Order asking the same question a second way would be a second
+ * answer, so no key rule is invented here — measured 2026-08-04 and reported on
+ * the card: under this rule NOTHING on production matches today, because the 87
+ * free units are the June Klang sheet import carrying free-text names
+ * (`HAVEN SOFTCLOUD H1401S-K`) while demand carries catalog codes (`H1401S-K`).
+ * The 42 units the PORTAL itself minted carry catalog codes (`TRION-K`), so the
+ * suggestion starts appearing the moment portal-received goods go free — and
+ * the database starts clean at go-live.
+ *
+ * Read WHOLE and never through an `.in()` on a sku: `ops_stock_items.sku` is
+ * free text and live values carry double quotes, which is the trap documented
+ * at the catalog read above. The register is 129 rows.
+ *
+ * FIFO — oldest `date_in` first, then oldest row — because that is the pick
+ * order `ops_stock_pool_draw` itself uses, so a suggestion composed here and a
+ * draw executed there walk the shelf in the same direction.
+ */
+async function loadFreeStock(
+  sb: ReturnType<typeof userClient>,
+  warehouseId: string | null,
+): Promise<Map<string, FreeStockRecord[]>> {
+  const byKey = new Map<string, FreeStockRecord[]>();
+  let q = sb
+    .from("ops_stock_items")
+    .select("id, sku, qty, date_in, created_at")
+    .eq("status", "free")
+    .eq("needs_repair", false)
+    .order("date_in", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: true });
+  if (warehouseId) q = q.eq("warehouse_id", warehouseId);
+  const { data, error } = await q;
+  /**
+   * A FAILED STOCK READ MAY NEVER TAKE THE PAGE DOWN — the same rule the typed
+   * demand read follows one block down. To Order's job is turning demand into
+   * purchase orders and it did that before this card; without the register the
+   * SUGGESTION is unavailable and the workspace is untouched. Failing open here
+   * would 500 the whole page over an advisory number.
+   */
+  if (error) {
+    console.error("ops_stock_items unavailable — ready stock suggestion omitted", error.message);
+    return byKey;
+  }
+  for (const r of (data ?? []) as Record<string, unknown>[]) {
+    const k = stockMatchKey((r.sku as string) ?? "");
+    if (k === "") continue;
+    const arr = byKey.get(k) ?? byKey.set(k, []).get(k)!;
+    arr.push({ id: r.id as string, qty: Number(r.qty ?? 1) });
+  }
+  return byKey;
+}
 
 /**
  * Read live demand and project it. Shared by the GET and by the POST, so the
@@ -142,6 +214,20 @@ async function loadToOrder(
   const orderById = new Map(orders.map((o) => [o.id as string, o]));
   const orderIds = orders.map((o) => o.id as string);
 
+  // Carres holds exactly one own warehouse; the free pool is its shelf, and it
+  // NAMES ITSELF on screen rather than the page typing `Klang` into markup.
+  const { data: whRows } = await sb
+    .from("warehouses")
+    .select("id, name, kind")
+    .eq("kind", "own");
+  const ownWarehouses = whRows ?? [];
+  const stockWh =
+    ownWarehouses.find((w) => /klang|klg/i.test((w.name as string) ?? "")) ?? ownWarehouses[0];
+  const stockWarehouse = stockWh
+    ? { id: stockWh.id as string, name: ((stockWh.name as string) ?? "").trim() }
+    : null;
+  const freeStockByKey = await loadFreeStock(sb, stockWarehouse?.id ?? null);
+
   if (orderIds.length === 0) {
     return {
       ok: true,
@@ -152,6 +238,8 @@ async function loadToOrder(
         unresolved: [],
         catalog: new Map(),
         settings,
+        freeStockByKey,
+        stockWarehouse,
       },
     };
   }
@@ -304,6 +392,70 @@ async function loadToOrder(
   }
 
   /**
+   * UNITS ALREADY RESERVED TO AN ORDER ARE THAT ORDER'S SUPPLY — card P10.
+   *
+   * This is NOT `consumeFreeStock`, which stays off: that eats the FREE pool,
+   * goods nobody has committed. These units are already committed to THIS
+   * customer order — by P10's own take, or by the order drawer's Ready picker,
+   * which has written the same `SO-n` reference since 0137. Goods that are
+   * already the order's are supply exactly as an open purchase-order line is,
+   * and buying them again is the double-order this workspace exists to stop.
+   *
+   * It is also what makes P10's Done-when true: taking reserves the units, and
+   * the row's quantity falls because THE REGISTER says those units are spoken
+   * for. Any other way of making the number fall would be a second store of
+   * "how much of this line came off the shelf".
+   *
+   * `line_received` is deliberately NOT read here: that column counts units
+   * BOOKED IN against the order, which arrive through a purchase order the
+   * open-PO netting above already accounts for. Netting both would subtract
+   * the same goods twice.
+   *
+   * Measured 2026-08-04: 0 reserved units exist on production, so this changes
+   * no row today and every assertion about it is a unit test.
+   */
+  {
+    const { data: resRows, error: resErr } = await sb
+      .from("ops_stock_items")
+      .select("sku, qty, reserved_ref")
+      .eq("status", "reserved")
+      .not("reserved_ref", "is", null);
+    if (resErr) {
+      // Same rule as the free-stock read: an advisory number may not 500 the
+      // page. Failing CLOSED here means netting nothing, which is exactly the
+      // behaviour this workspace had before P10.
+      console.error("reserved units unavailable — netting omitted", resErr.message);
+    }
+    const reserved = reservedUnitsByRefAndKey(
+      ((resErr ? [] : (resRows ?? [])) as Record<string, unknown>[]).map((r) => ({
+        ref: (r.reserved_ref as string) ?? "",
+        sku: (r.sku as string) ?? "",
+        qty: Number(r.qty ?? 1),
+      })),
+    );
+    if (reserved.size > 0) {
+      const stillToBuy = netReservedToOrder(
+        demand.map((l) => ({
+          lineId: l.lineId,
+          sku: l.sku,
+          qty: l.qty,
+          ref: l.so != null ? orderStockRef(l.so) : null,
+        })),
+        reserved,
+      );
+      for (let i = demand.length - 1; i >= 0; i -= 1) {
+        const next = stillToBuy.get(demand[i]!.lineId);
+        if (next == null) continue;
+        // A line entirely covered by units already on the shelf has left this
+        // workspace — the same treatment a line fully covered by an open
+        // purchase order gets, and for the same reason.
+        if (next <= 0) demand.splice(i, 1);
+        else demand[i] = { ...demand[i]!, qty: next };
+      }
+    }
+  }
+
+  /**
    * READY STOCK — demand a human typed (Jess, 2026-08-03).
    *
    * It joins the customer requirements as ordinary `ToOrderLine`s, which is
@@ -450,11 +602,23 @@ async function loadToOrder(
       reviewDaysBySupplier: {},
     },
     missingProductionDays,
+    // ADVISORY ONLY. It never reaches `supply`, so `consumeFreeStock` is not
+    // just off — the engine is never even handed the pool to consume.
+    freeStockByKey,
   });
 
   return {
     ok: true,
-    data: { proposals, today, poDays: settings.poDays, unresolved, catalog: cat, settings },
+    data: {
+      proposals,
+      today,
+      poDays: settings.poDays,
+      unresolved,
+      catalog: cat,
+      settings,
+      freeStockByKey,
+      stockWarehouse,
+    },
   };
 }
 
@@ -683,6 +847,10 @@ toOrderRouter.get("/", requireOperation, async (c) => {
     proposals: res.data.proposals,
     unresolved: res.data.unresolved,
     ordered,
+    // Card P10 — the shelf names itself (`Klang: 2 available`). `null` when
+    // there is no own warehouse at all, in which case no build carries a
+    // suggestion either and nothing has a name to print.
+    stockWarehouse: res.data.stockWarehouse?.name ?? null,
     destinations: (destRows ?? []).map((d) => ({
       id: d.id as string,
       name: d.name as string,
@@ -963,6 +1131,122 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
     destination: dest.name as string,
     pos: ids.map((id, i) => ({ id, customer: plan[i]?.customer ?? proposal.supplierName })),
   });
+});
+
+/**
+ * THE TAKE — ready stock is suggested; the human decides (card P10, Loo
+ * 2026-08-04).
+ *
+ * The client posts an INTENTION and never the units: which build, and the
+ * reason the draw is recorded under. Quantities and register ids are resolved
+ * from the server's own recomputation, exactly as `/issue` does — a browser
+ * cannot invent a quantity, name a unit, or take stock for a build that is not
+ * on today's plan.
+ *
+ * `consumeFreeStock` IS NOT TOUCHED. Nothing here turns it on and nothing here
+ * writes `ops_stock_items`: every unit moves through `ops_stock_pool_draw`,
+ * K4's door (0292/0294), which takes the unit AND records why in ONE
+ * transaction. A fourth door writing stock its own way would be a second truth
+ * about the same units.
+ *
+ * WHAT IS RECORDED IS WHAT WAS ACTUALLY DRAWN. The door claims ONE register
+ * record per call under a `status = 'free'` guard, so a unit somebody else
+ * grabbed a second ago simply is not taken. The response therefore reports the
+ * units that really moved rather than the units that were offered — a partial
+ * take is a true sentence, never a silent shortfall.
+ */
+const takeStockBody = z.object({
+  supplierId: z.string().uuid(),
+  category: z.string().min(1),
+  orderId: z.string().min(1),
+  buildKey: z.string().min(1),
+  /** K4's locked five (0292). The DB refuses anything else; so does this. */
+  reason: z.enum(POOL_USE_REASONS),
+  note: z.string().max(300).nullish(),
+});
+
+toOrderRouter.post("/take-stock", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
+  }
+  const parsed = takeStockBody.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  }
+  const { supplierId, category, orderId, buildKey, reason, note } = parsed.data;
+
+  const res = await loadToOrder(sb);
+  if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
+
+  const proposal = res.data.proposals.find(
+    (p) => p.supplierId === supplierId && p.category === category,
+  );
+  const row = proposal?.rows.find((r) => r.orderId === orderId);
+  const build = row?.builds.find((b) => b.key === buildKey);
+  // No proposal, no row, no build, or a build the server did not offer stock
+  // for — all one answer. The demand may have been ordered, cancelled or
+  // covered since the page loaded, and every one of those means there is
+  // nothing here to take.
+  if (!proposal || !row || !build || !build.stock || build.lines.length !== 1) {
+    return c.json({ error: "nothing_to_take", code: "nothing_to_take" }, 409);
+  }
+  // A ready stock demand never carries a suggestion (see `ToOrderBuild.stock`),
+  // so this can only fire if that rule is ever loosened without this one.
+  if (row.readyStock === true || row.so == null) {
+    return c.json({ error: "nothing_to_take", code: "nothing_to_take" }, 409);
+  }
+
+  // Recompose the SAME suggestion from the SAME read, which is what turns the
+  // number the operator saw into the exact records the door will claim.
+  const key = stockMatchKey(build.lines[0]!.sku);
+  const plan = suggestReadyStockTake(build.qty, res.data.freeStockByKey.get(key) ?? []);
+  if (!plan) return c.json({ error: "nothing_to_take", code: "nothing_to_take" }, 409);
+
+  const ref = orderStockRef(row.so);
+  let taken = 0;
+  const itemIds: string[] = [];
+  for (const itemId of plan.itemIds) {
+    const { data, error } = await sb.rpc("ops_stock_pool_draw", {
+      p_ref: ref,
+      p_reason: reason,
+      p_note: note ?? null,
+      p_item_id: itemId,
+      p_sku: null,
+      p_condition: null,
+      p_wh: null,
+    });
+    if (error) {
+      // The units already drawn ARE drawn and are recorded with their reason —
+      // rolling them back is not this route's to do and pretending they did not
+      // move would be the lie. Report what happened, with the count.
+      const m = mapPgError(error);
+      return c.json({ ...(m.body as object), taken, ref }, m.status);
+    }
+    // Null = the record was no longer free. Nothing was taken and nothing was
+    // recorded; the next read simply will not offer it again.
+    if (!data) continue;
+    taken += 1;
+    itemIds.push(data as string);
+  }
+
+  if (taken === 0) {
+    return c.json({ error: "stock_gone", code: "stock_gone" }, 409);
+  }
+
+  // The UNITS taken, not the records — a bulk record is one row of N units, and
+  // what left the free pool is units.
+  const { data: unitRows } = await sb
+    .from("ops_stock_items")
+    .select("qty")
+    .in("id", itemIds);
+  const units = (unitRows ?? []).reduce((s, r) => s + Number(r.qty ?? 1), 0);
+
+  return c.json({ ref, records: taken, units: units || taken });
 });
 
 /**

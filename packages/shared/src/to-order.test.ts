@@ -775,3 +775,118 @@ describe("the row's own orderBy", () => {
     expect(ps[0].rows[0].orderBy).toBeNull();
   });
 });
+
+// ── 12 · Ready stock is SUGGESTED; the human decides (card P10) ─────────────
+
+describe("ready stock suggestion", () => {
+  const MATTRESS = {
+    category: "mattress" as const,
+    supplierId: NICE_FUTURE,
+    leadDays: 7,
+    offDays: [0, 6],
+    modelName: "Haven SoftCloud",
+  };
+
+  it("says nothing at all when no stock is passed — the page before this card", () => {
+    const ps = run([...PETER]);
+    expect(ps[0].rows.flatMap((r) => r.builds).every((b) => b.stock === undefined)).toBe(true);
+  });
+
+  it("offers the shelf on a single-line build, capped by what the row needs", () => {
+    const ps = run(
+      [line({ lineId: "m1", sku: "H1401S-Q", orderId: "o5", so: 1400, ...MATTRESS, qty: 5 })],
+      {
+        freeStockByKey: new Map([
+          ["h1401s|Q", [{ id: "u1", qty: 1 }, { id: "u2", qty: 1 }]],
+        ]),
+      },
+    );
+    expect(ps[0].rows[0].builds[0].stock).toEqual({ available: 2, take: 2 });
+  });
+
+  it("NEVER offers a multi-module sofa — a build is not a thing on a shelf", () => {
+    // PETER's `bk-a` is three module lines. Even with every module free, the
+    // row is buying a SOFA and the shelf holds parts.
+    const ps = run([...PETER], {
+      freeStockByKey: new Map([
+        ["55391blhf", [{ id: "u1", qty: 1 }]],
+        ["5539cnr", [{ id: "u2", qty: 1 }]],
+        ["55392arhf", [{ id: "u3", qty: 1 }]],
+      ]),
+    });
+    expect(ps[0].rows.flatMap((r) => r.builds).every((b) => b.stock === undefined)).toBe(true);
+  });
+
+  it("DOES offer a lone sofa line — the P11 discriminator, applied here too", () => {
+    const ps = run([...KEE_TONG], {
+      freeStockByKey: new Map([["55392blhf", [{ id: "u1", qty: 1 }]]]),
+    });
+    const builds = ps[0].rows.flatMap((r) => r.builds);
+    expect(builds.filter((b) => b.stock != null)).toHaveLength(1);
+  });
+
+  it("NEVER offers a ready stock demand — it asks to PUT stock somewhere", () => {
+    const ps = run(
+      [
+        line({
+          lineId: "demand:d1", orderId: "demand:d1", sku: "SONIC-S", so: null,
+          customerName: null, readyStock: true, qty: 5, ...MATTRESS,
+        }),
+      ],
+      { freeStockByKey: new Map([["sonic|S", [{ id: "u1", qty: 1 }]]]) },
+    );
+    expect(ps[0].rows[0].builds[0].stock).toBeUndefined();
+  });
+
+  it("the same units are offered to ONE row only — the pool drains as it is offered", () => {
+    const ps = run(
+      [
+        line({ lineId: "m1", sku: "H1401S-Q", orderId: "o5", so: 1400, ...MATTRESS,
+               qty: 1, deadline: "2026-08-20" }),
+        line({ lineId: "m2", sku: "H1401S-Q", orderId: "o6", so: 1401, ...MATTRESS,
+               qty: 1, deadline: "2026-08-21" }),
+      ],
+      { freeStockByKey: new Map([["h1401s|Q", [{ id: "u1", qty: 1 }]]]) },
+    );
+    const offered = ps[0].rows.flatMap((r) => r.builds).filter((b) => b.stock != null);
+    expect(offered).toHaveLength(1);
+  });
+
+  it("the EARLIEST customer delivery gets it — the engine's own allocation rule", () => {
+    const ps = run(
+      [
+        line({ lineId: "late", sku: "H1401S-Q", orderId: "o6", so: 1401, ...MATTRESS,
+               qty: 1, deadline: "2026-08-25" }),
+        line({ lineId: "soon", sku: "H1401S-Q", orderId: "o5", so: 1400, ...MATTRESS,
+               qty: 1, deadline: "2026-08-12" }),
+      ],
+      { freeStockByKey: new Map([["h1401s|Q", [{ id: "u1", qty: 1 }]]]) },
+    );
+    const winner = ps[0].rows.find((r) => r.builds.some((b) => b.stock != null));
+    expect(winner?.so).toBe(1400);
+  });
+
+  it("a bulk record too big for the row is not offered — the door cannot split it", () => {
+    const ps = run(
+      [line({ lineId: "m1", sku: "H1401S-Q", orderId: "o5", so: 1400, ...MATTRESS, qty: 1 })],
+      { freeStockByKey: new Map([["h1401s|Q", [{ id: "bulk", qty: 2 }]]]) },
+    );
+    expect(ps[0].rows[0].builds[0].stock).toBeUndefined();
+  });
+
+  it("a SKU with no free stock is untouched while its neighbour is offered some", () => {
+    const ps = run(
+      [
+        line({ lineId: "m1", sku: "H1401S-Q", orderId: "o5", so: 1400, ...MATTRESS, qty: 5 }),
+        line({ lineId: "m2", sku: "H1401S-K", orderId: "o5", so: 1400, ...MATTRESS, qty: 1 }),
+      ],
+      { freeStockByKey: new Map([["h1401s|Q", [{ id: "u1", qty: 1 }]]]) },
+    );
+    const builds = ps[0].rows[0].builds;
+    expect(builds.find((b) => b.lines[0].sku === "H1401S-Q")?.stock).toEqual({
+      available: 1,
+      take: 1,
+    });
+    expect(builds.find((b) => b.lines[0].sku === "H1401S-K")?.stock).toBeUndefined();
+  });
+});

@@ -31,6 +31,7 @@
  */
 
 import type { ProductCategory } from "./db-types";
+import { stockMatchKey } from "./line-category";
 import {
   computeNetRequirements,
   type BundleRequirement,
@@ -38,6 +39,7 @@ import {
   type NetRequirementsOptions,
   type NetRequirementsSupply,
 } from "./net-requirements";
+import { suggestReadyStockTake, type FreeStockRecord } from "./ready-stock-take";
 import type { IsoDate } from "./working-days";
 
 // ── The words ───────────────────────────────────────────────────────────────
@@ -176,6 +178,23 @@ export const TO_ORDER_WORDS = {
   cancel: "Cancel",
   create: "Create",
   nextUpdate: "Available in next update.",
+
+  // ── Ready stock is SUGGESTED; the human takes it (card P10, Loo
+  //    2026-08-04). Every word here is his own from the card's frozen
+  //    sketch — `Klang: 2 available`, `[Take 2]`, `took 2 from stock`. Each
+  //    is still owed a COPY-STANDARD row, exactly as every other word on
+  //    this page is. ─────────────────────────────────────────────────────
+  /**
+   * The expand control, for a screen reader. The QUESTION inside it — "why is
+   * this unit leaving the shelf?" — has no word here on purpose: it is K4's,
+   * asked by `PoolReasonPicker`, and a second copy of that vocabulary is
+   * exactly the drift that component exists to prevent.
+   */
+  stockOpen: "Ready stock",
+  /** Shown after a take, in place of the offer. */
+  stockTaken: "took",
+  stockTakenTail: "from stock",
+  stockTaking: "Taking…",
 
   // The Preview — what pressing Issue would create, before it exists.
   preview: "Purchase Order Preview",
@@ -408,6 +427,28 @@ export function issuedHeadline(n: number, supplier: string): string {
   return `${n} purchase order${n === 1 ? "" : "s"} issued to ${supplier}`;
 }
 
+// ── Ready stock (card P10) ──────────────────────────────────────────────────
+//
+// Loo's frozen sketch, composed rather than typed into markup — the same rule
+// every other word on this page follows. The warehouse NAMES ITSELF: `Klang`
+// is the only own warehouse today, and a second one is one row away, so
+// hard-coding the word here is a lie waiting for a warehouse.
+
+/** `Klang: 2 available` — what the shelf holds, stated before anything is done. */
+export function stockAvailableLine(warehouse: string, available: number): string {
+  return `${warehouse}: ${available} available`;
+}
+
+/** `Take 2` — the button. The number is the SUGGESTION; nobody types one. */
+export function takeStockLabel(take: number): string {
+  return `Take ${take}`;
+}
+
+/** `took 2 from stock` — what the row says once the units are its own. */
+export function tookFromStockLine(taken: number): string {
+  return `${TO_ORDER_WORDS.stockTaken} ${taken} ${TO_ORDER_WORDS.stockTakenTail}`;
+}
+
 // ── The PO Schedule (Jess's freeze, 2026-08-01, replacing the time buckets) ─
 //
 // The rail is a PURCHASE CALENDAR: one row per upcoming configured PO day
@@ -601,6 +642,17 @@ export interface BuildToOrderInput {
    * (Jess, 2026-07-28 — a fallback is how a setting silently stops mattering).
    */
   missingProductionDays?: readonly { supplierId: string; category: string }[];
+  /**
+   * Free warehouse stock, per `stockMatchKey`, as the REGISTER's own records in
+   * FIFO order — card P10. Absent = the page says nothing about stock, which is
+   * exactly what it said before this card.
+   *
+   * It is NOT `supply.freeStockBySku` and must never be routed there: that
+   * field is the net-requirements engine's, it is consumed only when
+   * `consumeFreeStock` is on, and P10's whole point is that it STAYS OFF. This
+   * one never reaches the engine — it produces a SUGGESTION a human accepts.
+   */
+  freeStockByKey?: ReadonlyMap<string, readonly FreeStockRecord[]>;
 }
 
 // ── Outputs ─────────────────────────────────────────────────────────────────
@@ -631,6 +683,31 @@ export interface ToOrderBuild {
   /** `5539-1B(LHF) · 5539-CNR · 5539-2A(RHF)` */
   codes: string;
   lines: { lineId: string; sku: string; qty: number; cost: number | null }[];
+  /**
+   * Free warehouse stock this build could be satisfied from — card P10. Absent
+   * on every build that has none, so a row with no stock has nothing to render
+   * and nothing to open.
+   *
+   * `available` is what the shelf holds; `take` is what pressing the button
+   * does, composed of whole register records so it is always exactly
+   * executable. The record IDS are deliberately NOT here: the take route
+   * recomputes them from its own read, the same discipline `/issue` uses — the
+   * client posts an intention and never the units.
+   *
+   * ONLY on a build that is ONE LINE of a CUSTOMER order:
+   *  · a multi-module sofa cannot be taken off a shelf as one sofa, and its
+   *    modules are parts rather than the thing the row is buying (the same
+   *    `members.length` discriminator P11 established);
+   *  · a READY STOCK demand is a request to PUT stock somewhere, so drawing
+   *    the units to satisfy it either does nothing (the destination is the
+   *    warehouse they are already in) or is a warehouse TRANSFER, which is a
+   *    different act with its own door. Netting it without drawing would
+   *    double-count — the same free units would be suggested against the
+   *    remainder on the next read, and `issued_qty` deliberately does not split
+   *    by cause (0320), so nothing can tell the two apart. Reported on the card
+   *    as a business question rather than guessed at here.
+   */
+  stock?: { available: number; take: number };
 }
 
 export interface ToOrderRow {
@@ -847,6 +924,69 @@ function buildSpec(members: readonly ToOrderLine[]): string {
 }
 
 /**
+ * Which build could come off the shelf, and how much — card P10.
+ *
+ * ONE PASS OVER EVERY PROPOSAL, DRAINING A SHARED POOL, AND THAT IS THE POINT.
+ * Free stock is a pool two customer orders can both want. Suggesting the same
+ * two units to two rows would produce a screen where both offers are true and
+ * only one can be accepted — the second operator meets a refusal from the
+ * register with nothing on the page having warned them. So the pool is drained
+ * as it is offered, and every suggestion on the grid can be taken.
+ *
+ * URGENCY DECIDES WHO GETS IT, using the engine's own rule rather than a new
+ * one: earliest customer delivery first, a dateless row last
+ * (`net-requirements.ts` allocates supply exactly this way, and free stock is
+ * supply). Ties break on the build key so two renders of the same data can
+ * never disagree about which row was offered the unit.
+ */
+function assignReadyStockSuggestions(
+  proposals: readonly ToOrderProposal[],
+  freeStockByKey: ReadonlyMap<string, readonly FreeStockRecord[]> | undefined,
+): void {
+  if (!freeStockByKey || freeStockByKey.size === 0) return;
+
+  const pool = new Map<string, FreeStockRecord[]>();
+  for (const [k, recs] of freeStockByKey) pool.set(k, [...recs]);
+
+  const candidates: { build: ToOrderBuild; sku: string; delivery: IsoDate | null }[] = [];
+  for (const p of proposals) {
+    for (const r of p.rows) {
+      // A READY STOCK demand is a request to PUT stock somewhere; taking the
+      // units it is asking for is either a no-op or a transfer. See
+      // `ToOrderBuild.stock`.
+      if (r.readyStock === true) continue;
+      for (const b of r.builds) {
+        // Exactly `ToOrderBuild.qty`'s discriminator: more than one line is a
+        // real module build and cannot be picked off a shelf as one thing.
+        if (b.lines.length !== 1) continue;
+        candidates.push({ build: b, sku: b.lines[0]!.sku, delivery: r.delivery });
+      }
+    }
+  }
+
+  candidates.sort((a, b) => {
+    const ad = a.delivery ?? "9999-12-31";
+    const bd = b.delivery ?? "9999-12-31";
+    if (ad !== bd) return ad < bd ? -1 : 1;
+    return a.build.key < b.build.key ? -1 : a.build.key > b.build.key ? 1 : 0;
+  });
+
+  for (const c of candidates) {
+    const key = stockMatchKey(c.sku);
+    const recs = pool.get(key);
+    if (!recs || recs.length === 0) continue;
+    const s = suggestReadyStockTake(c.build.qty, recs);
+    if (!s) continue;
+    c.build.stock = { available: s.available, take: s.take };
+    const claimed = new Set(s.itemIds);
+    pool.set(
+      key,
+      recs.filter((r) => !claimed.has(r.id)),
+    );
+  }
+}
+
+/**
  * Turn raw demand into the proposals the sidebar lists and the grid reviews.
  *
  * The engine runs first and owns every date; this function only reshapes what
@@ -1039,6 +1179,8 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
       productionDays: missing.has(pairKey) ? null : (pairLines[0]?.leadDays ?? null),
     });
   }
+
+  assignReadyStockSuggestions(proposals, input.freeStockByKey);
 
   // Earliest order-by first; a proposal with no date at all sinks.
   return proposals.sort((a, b) => {

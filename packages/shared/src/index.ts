@@ -1849,6 +1849,9 @@ export {
   unitsHeadline,
   categoryUnitsLine,
   unitLabel,
+  stockAvailableLine,
+  takeStockLabel,
+  tookFromStockLine,
   poScheduleDays,
   snapToPoDay,
   poScheduleBucket,
@@ -1868,6 +1871,19 @@ export {
   type ToOrderSortKey,
   type ToOrderSupplier,
 } from "./to-order";
+// Card P10 — ready stock is SUGGESTED; the human decides whether to take it.
+// `consumeFreeStock` stays OFF; these two rules are what make the decision
+// visible and exactly executable.
+export {
+  suggestReadyStockTake,
+  netReservedToOrder,
+  reservedUnitsByRefAndKey,
+  orderStockRef,
+  type FreeStockRecord,
+  type ReadyStockSuggestion,
+  type ReservedUnit,
+  type NettableLine,
+} from "./ready-stock-take";
 export {
   IMPORT_ACCESSORY_KINDS,
   IMPORT_LEAD_DAYS_DEFAULT,

@@ -1088,3 +1088,171 @@ describe("P9 — the footer totals what is TICKED, per category", () => {
     expect(screen.getByTestId("to-order-footer-units")).toHaveTextContent("Bedframe 4 · Sofa 3");
   });
 });
+
+// ── Card P10 — ready stock is suggested; the human decides ──────────────────
+
+describe("ready stock — the suggestion, and the act", () => {
+  /** The fixture with free stock on ONE build (wong's three bedframes). */
+  function withStock(stock: { available: number; take: number } | null) {
+    const t = structuredClone(TO_ORDER) as typeof TO_ORDER & {
+      stockWarehouse?: string;
+    };
+    t.stockWarehouse = "Carres Klang";
+    const bf = t.proposals.find((p) => p.category === "bedframe")!;
+    const target = bf.rows.find((r) => r.so === 1300)!.builds[0] as Record<string, unknown>;
+    if (stock) target.stock = stock;
+    else delete target.stock;
+    return t;
+  }
+
+  function serve(t: unknown) {
+    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+      if (path.startsWith("/api/operation/purchase/to-order/take-stock")) {
+        return Promise.resolve({ ref: "SO-1300", records: 2, units: 2 });
+      }
+      if (
+        path.startsWith("/api/operation/purchase/to-order") &&
+        !path.includes("/issue")
+      ) {
+        return Promise.resolve(t);
+      }
+      return route(path, init?.body ? JSON.parse(String(init.body)) : undefined);
+    });
+  }
+
+  const openWong = () => {
+    fireEvent.click(screen.getByTestId("to-order-day-2026-07-31"));
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+  };
+
+  it("NO stock anywhere = the grid is exactly the grid it was — no expand column", async () => {
+    serve(withStock(null));
+    await loaded();
+    openWong();
+    // The kit renders the control the moment the page passes `expansion`, so
+    // a page with nothing to open must not pass it at all.
+    expect(document.querySelector("[data-testid^=table-expand-]")).toBeNull();
+    expect(document.querySelector("[data-testid^=row-stock-]")).toBeNull();
+  });
+
+  it("a row with stock shows the marker; a row without one is untouched", async () => {
+    serve(withStock({ available: 5, take: 3 }));
+    await loaded();
+    openWong();
+    const key = `${OHANA}::bedframe:o9:l1`;
+    await waitFor(() =>
+      expect(screen.getByTestId(`row-stock-${key}`)).toBeInTheDocument(),
+    );
+    // The marker states the number the button will TAKE — bare, no unit word.
+    expect(screen.getByTestId(`row-stock-${key}`)).toHaveTextContent("3");
+    // lim's row has no stock: no marker, and no control to press.
+    expect(screen.queryByTestId(`row-stock-${OHANA}::bedframe:o8:l2`)).toBeNull();
+    expect(screen.queryByTestId(`table-expand-${OHANA}::bedframe:o8:l2`)).toBeNull();
+  });
+
+  it("opening the row states what the shelf holds, and offers no quantity box", async () => {
+    serve(withStock({ available: 5, take: 3 }));
+    await loaded();
+    openWong();
+    const key = `${OHANA}::bedframe:o9:l1`;
+    await waitFor(() => expect(screen.getByTestId(`table-expand-${key}`)).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId(`table-expand-${key}`));
+
+    const open = await screen.findByTestId(`stock-open-${key}`);
+    // `available` is stated, `take` is what the button does — two numbers,
+    // because the operator is owed both.
+    expect(open).toHaveTextContent("Carres Klang: 5 available");
+    expect(within(open).getByTestId(`stock-take-${key}`)).toHaveTextContent("Take 3");
+    // Loo's ruling 3 — the system suggests, the human accepts. There is
+    // nowhere to type a number.
+    expect(within(open).queryByRole("spinbutton")).toBeNull();
+    expect(
+      within(open).queryByDisplayValue("3"),
+    ).toBeNull();
+  });
+
+  it("the button is dim until a reason is picked — K4's own rule, not a new one", async () => {
+    serve(withStock({ available: 5, take: 3 }));
+    await loaded();
+    openWong();
+    const key = `${OHANA}::bedframe:o9:l1`;
+    await waitFor(() => expect(screen.getByTestId(`table-expand-${key}`)).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId(`table-expand-${key}`));
+
+    const take = await screen.findByTestId(`stock-take-${key}`);
+    expect(take).toBeDisabled();
+    // The ONE place the portal asks "why is this unit leaving the shelf?"
+    fireEvent.change(screen.getByTestId("pool-reason"), {
+      target: { value: "sales_urgent" },
+    });
+    await waitFor(() => expect(take).toBeEnabled());
+  });
+
+  it("taking posts the INTENTION — never a quantity, never a unit", async () => {
+    serve(withStock({ available: 5, take: 3 }));
+    await loaded();
+    openWong();
+    const key = `${OHANA}::bedframe:o9:l1`;
+    await waitFor(() => expect(screen.getByTestId(`table-expand-${key}`)).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId(`table-expand-${key}`));
+    fireEvent.change(await screen.findByTestId("pool-reason"), {
+      target: { value: "supplier_delay" },
+    });
+    fireEvent.click(screen.getByTestId(`stock-take-${key}`));
+
+    await waitFor(() =>
+      expect(
+        apiFetch.mock.calls.some(
+          (c) => String(c[0]).includes("/take-stock"),
+        ),
+      ).toBe(true),
+    );
+    const call = apiFetch.mock.calls.find((c) => String(c[0]).includes("/take-stock"))!;
+    const body = JSON.parse(String((call[1] as RequestInit).body));
+    expect(body).toEqual({
+      supplierId: OHANA,
+      category: "bedframe",
+      orderId: "o9",
+      buildKey: "l1",
+      reason: "supplier_delay",
+      note: null,
+    });
+    expect(body).not.toHaveProperty("qty");
+    expect(body).not.toHaveProperty("itemIds");
+  });
+
+  it("the width law survives the expand column — 100 with it, 100 without", async () => {
+    // `02-components.md`: give every column a width; the set sums to 100. The
+    // expand control is a REAL column, so adding it without paying for it
+    // would make the declared set 103 and stop being proportional to anything.
+    serve(withStock({ available: 5, take: 3 }));
+    await loaded();
+    openWong();
+    await waitFor(() =>
+      expect(document.querySelector("[data-testid^=table-expand-]")).not.toBeNull(),
+    );
+    const cols = [...document.querySelectorAll("colgroup col")] as HTMLElement[];
+    expect(cols.length).toBe(6); // ☑ + ⊞ + Supplier · Qty · Model · PO No.
+    for (const c of cols) expect(c.style.width).toMatch(/^\d+(\.\d+)?%$/);
+    expect(cols.reduce((s, c) => s + parseFloat(c.style.width), 0)).toBe(100);
+  });
+
+  it("a finished take says what MOVED and stops offering the same goods", async () => {
+    serve(withStock({ available: 5, take: 3 }));
+    await loaded();
+    openWong();
+    const key = `${OHANA}::bedframe:o9:l1`;
+    await waitFor(() => expect(screen.getByTestId(`table-expand-${key}`)).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId(`table-expand-${key}`));
+    fireEvent.change(await screen.findByTestId("pool-reason"), {
+      target: { value: "vip" },
+    });
+    fireEvent.click(screen.getByTestId(`stock-take-${key}`));
+
+    // The server said 2 units really moved, though 3 were offered. The row
+    // reports the truth, not the offer.
+    const took = await screen.findByTestId(`stock-took-${key}`);
+    expect(took).toHaveTextContent("took 2 from stock");
+    expect(screen.queryByTestId(`stock-take-${key}`)).toBeNull();
+  });
+});

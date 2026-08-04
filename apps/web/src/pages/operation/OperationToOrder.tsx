@@ -51,6 +51,9 @@ import {
   categoryUnitsLine,
   defaultDocuments,
   ordersHeadline,
+  stockAvailableLine,
+  takeStockLabel,
+  tookFromStockLine,
   poScheduleBucket,
   poScheduleDays,
   weekdayName,
@@ -80,6 +83,9 @@ import Textarea from "@/components/kit/Textarea";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { qk, useCatalog } from "@/lib/queries";
+import PoolReasonPicker, {
+  usePoolDrawReason,
+} from "./components/PoolReasonPicker";
 import PurchasingTabs from "./PurchasingTabs";
 
 // ── Wire types ──────────────────────────────────────────────────────────────
@@ -106,6 +112,19 @@ interface ToOrderResponse {
   ordered?: ToOrderOrderedRow[];
   /** Demand the catalog could not answer for. Empty is the only healthy value. */
   unresolved?: Unresolved[];
+  /**
+   * The own warehouse the free pool sits in — card P10. It NAMES ITSELF
+   * (`Klang: 2 available`) rather than the page typing a warehouse into markup,
+   * because a second own warehouse is one row away.
+   */
+  stockWarehouse?: string | null;
+}
+
+/** What a take actually moved — records claimed, and the units in them. */
+interface TakeStockResponse {
+  ref: string;
+  records: number;
+  units: number;
 }
 
 interface IssueResponse {
@@ -156,6 +175,14 @@ interface GridRow {
   /** Where that ready stock goes — what the group header says instead of a
    *  customer name, because a ready stock buy has no customer. */
   destination: string | null;
+  /**
+   * Free warehouse stock this build could come off, card P10. Absent on every
+   * row that has none — which is what makes *"a row with no stock is visually
+   * untouched"* structural rather than a rendering condition.
+   */
+  stock: { available: number; take: number } | null;
+  /** The supplier's id — the take posts an intention, and this names the pair. */
+  supplierId: string | null;
 }
 
 /**
@@ -292,6 +319,18 @@ export default function OperationToOrder() {
   const [creating, setCreating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  // ── Card P10 — ready stock is suggested; the human decides ────────────────
+  //
+  // All three pieces of state are the OPEN ROW's, not the page's model of the
+  // stock: which rows are unfolded, which reason each has picked, and what a
+  // finished take reported. The numbers themselves are the server's, re-read
+  // after every take, so the page never holds a second copy of the shelf.
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const [taking, setTaking] = useState<string | null>(null);
+  /** `key → units` once a take has landed; the row states it in place. */
+  const [taken, setTaken] = useState<ReadonlyMap<string, number>>(new Map());
+  const [takeError, setTakeError] = useState<ReadonlyMap<string, string>>(new Map());
+
   /** Demand the engine cannot plan (`blocked`) cannot be issued — not listed. */
   const planned = useMemo(() => proposals.filter((p) => p.blocked == null), [proposals]);
 
@@ -340,6 +379,8 @@ export default function OperationToOrder() {
             qty: b.qty,
             bucket,
             orderedPo: null,
+            stock: b.stock ?? null,
+            supplierId: p.supplierId,
           });
         }
       }
@@ -367,6 +408,10 @@ export default function OperationToOrder() {
         // older receipts belong to Purchase Orders, not this calendar.
         bucket: o.placedAt === today ? (scheduleDays[0] ?? "past") : "past",
         orderedPo: o.poId,
+        // Already bought. There is nothing left to satisfy from the shelf, so
+        // an ordered row never offers stock.
+        stock: null,
+        supplierId: o.supplierId,
       });
     }
     return rows;
@@ -693,6 +738,52 @@ export default function OperationToOrder() {
 
   const defaultDest = destinations.find((d) => d.isDefault) ?? destinations[0] ?? null;
 
+  /**
+   * TAKE — one row, one act (card P10).
+   *
+   * The body is an INTENTION: which build, and the reason K4's ledger records
+   * the draw under. No quantity is sent, because none was typed — the number is
+   * the server's suggestion and the server recomputes it. That is Loo's ruling
+   * 3 made structural rather than enforced by a disabled input.
+   *
+   * On success the plan is REFETCHED rather than patched: the row's quantity
+   * falls because the register now says those units are this order's, and the
+   * only place that arithmetic may live is the server. A page that edited its
+   * own copy would be the second store this card exists to avoid.
+   */
+  async function takeStock(r: GridRow, body: { reason: string; note: string | null }) {
+    if (!r.stock || !r.proposalKey || !r.supplierId || !r.orderId || !r.buildKey) return;
+    if (!body.reason) return;
+    setTaking(r.key);
+    setTakeError((m) => {
+      const n = new Map(m);
+      n.delete(r.key);
+      return n;
+    });
+    try {
+      const res = await apiFetch<TakeStockResponse>(
+        "/api/operation/purchase/to-order/take-stock",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            supplierId: r.supplierId,
+            category: r.category,
+            orderId: r.orderId,
+            buildKey: r.buildKey,
+            reason: body.reason,
+            note: body.note,
+          }),
+        },
+      );
+      setTaken((m) => new Map(m).set(r.key, res.units));
+      await q.refetch();
+    } catch (e) {
+      setTakeError((m) => new Map(m).set(r.key, (e as Error).message));
+    } finally {
+      setTaking(null);
+    }
+  }
+
   // ── The batch — one POST per group; grid and bar report in place ─────────
   async function issueAll(only?: ReadonlySet<string>) {
     const targets = batch.targets.filter((t) => !only || only.has(t.proposal.key));
@@ -926,6 +1017,15 @@ export default function OperationToOrder() {
    * Customer Delivery at 14 and it fell 10px short of `Fri, 21 Aug 26` on the
    * 13-inch — the 2%% came from Customer, whose names are shorter.
    */
+  /** The shelf's own name — never typed into markup (a second own warehouse
+   *  is one row away). Empty until the server says so; the marker's tooltip
+   *  and the opened row both read it. */
+  const stockWarehouse = q.data?.stockWarehouse ?? "";
+  /** Does ANY row on screen have something to take? When nothing does, the
+   *  grid gets no expansion prop at all and renders exactly as it did before
+   *  card P10 — no control column, no shifted widths. */
+  const anyStock = useMemo(() => visibleRows.some((r) => r.stock != null), [visibleRows]);
+
   const columns: readonly Column<GridRow>[] = [
     {
       /**
@@ -955,12 +1055,41 @@ export default function OperationToOrder() {
     {
       // The widest column on purpose: model names are the longest and most
       // variable text on the page, so the table's spare width belongs here.
+      //
+      // 46 → 43 exactly when card P10's expand control is on screen. That
+      // control is a real column the kit adds (3%), and `02-components.md`'s
+      // law is that the set sums to 100 — so the 3 comes from the widest
+      // column rather than being added on top, which would make the declared
+      // widths sum to 103 and stop being proportional to anything. It is
+      // conditional because the CONTROL is: a page with nothing to open has no
+      // third column to pay for, and must still sum to 100. Model stays the
+      // widest either way, by more than double.
       key: "model",
       label: W.colModel,
-      width: 46,
+      width: anyStock ? 43 : 46,
       sortable: true,
       filter: filterFor("model", modelOptions, true),
-      cell: (r) => r.model,
+      // The marker rides HERE, immediately after the model name, which is
+      // where Loo drew it. It is not a column: a seventh column would need a
+      // header word for a fact that is absent from most rows, and the frozen
+      // width system has nothing to give it. The icon is what labels it (C10's
+      // rule — never a bare coloured dot, never an emoji); the number is bare
+      // (P9's rule — no unit word on this page).
+      cell: (r) => (
+        <span className="flex items-center gap-2 min-w-0">
+          <span className="truncate">{r.model}</span>
+          {r.stock ? (
+            <span
+              className="shrink-0 inline-flex items-center gap-1 rounded-pill bg-kit-green-3 px-1.5 text-label text-kit-green-11 tabular-nums"
+              title={stockAvailableLine(stockWarehouse, r.stock.available)}
+              data-testid={`row-stock-${r.key}`}
+            >
+              <Icon name="warehouse" size={14} />
+              {r.stock.take}
+            </span>
+          ) : null}
+        </span>
+      ),
     },
     {
       key: "po",
@@ -1338,6 +1467,46 @@ export default function OperationToOrder() {
                     label: W.select,
                     selectable: (r) => !poOf(r),
                   }}
+                  /* Card P10 — AutoCount's inline ⊞ (Loo's option B, and NOT a
+                   * third pane: a third pane narrows the grid and reopens the
+                   * frozen two-pane layout). D0.5d built the control; nothing
+                   * is built a second time here.
+                   *
+                   * PASSED ONLY WHEN SOMETHING ON SCREEN CAN OPEN. The kit adds
+                   * a control column the moment this prop exists, so on a page
+                   * where no row has stock — which is every page on production
+                   * today — the grid renders byte-identically to before this
+                   * card. `a row with no stock is visually untouched` then
+                   * holds at the PAGE level, not just the row's. */
+                  expansion={
+                    anyStock
+                      ? {
+                          expanded,
+                          onToggle: (id) =>
+                            setExpanded((s) => {
+                              const n = new Set(s);
+                              if (n.has(id)) n.delete(id);
+                              else n.add(id);
+                              return n;
+                            }),
+                          label: () => W.stockOpen,
+                          // A row with nothing to open gets NO control, not a
+                          // dead one — the kit's own words for its own prop.
+                          expandable: (r) => r.stock != null,
+                          render: (r) => (
+                            <ReadyStockRow
+                              key={r.key}
+                              row={r}
+                              warehouse={stockWarehouse}
+                              busy={taking === r.key}
+                              taken={taken.get(r.key) ?? null}
+                              error={takeError.get(r.key) ?? null}
+                              onTake={(body) => void takeStock(r, body)}
+                            />
+                          ),
+                        }
+                      : undefined
+                  }
                 />
                 {/* q1 (Loo, 2026-08-03). The footer counted customer ORDERS
                     while the toolbar counted ROWS and the button counted
@@ -1421,6 +1590,89 @@ export default function OperationToOrder() {
 }
 
 // ── Pieces ──────────────────────────────────────────────────────────────────
+
+/**
+ * What unfolds under a row that could come off the shelf — card P10, Loo's
+ * frozen sketch:
+ *
+ * ```
+ * └ Klang: 2 available   [Take 2]
+ * ```
+ *
+ * THERE IS NO QUANTITY BOX, and that is his ruling 3 — *"我要的就是有一个自动
+ * 建议补货，不过我们可以手动选择要不要拉"*. The system suggests; the human
+ * accepts. The number on the button is the server's, composed of whole
+ * register records, so it is always exactly executable and there is nothing
+ * for a typed number to be refused for.
+ *
+ * THE QUESTION "WHY IS THIS UNIT LEAVING THE SHELF?" IS NOT ASKED A SECOND
+ * WAY. `PoolReasonPicker` is the ONE place the portal asks it — K4 (0292)
+ * built it for exactly this and both existing draw doors mount it. A picker
+ * written here would be a third spelling of one question, and the drift that
+ * component's own header warns about. It also brings K4's reserve-level
+ * warning, which warns and never blocks (Jess's word).
+ *
+ * A FIXED REASON WAS REFUSED. Only the operator knows whether a mattress came
+ * off the shelf because a customer is in a hurry or because the factory is
+ * late; writing one of those into an audit ledger nobody chose would record a
+ * claim nobody made (ACTION-FLOW Law 8).
+ */
+function ReadyStockRow({
+  row,
+  warehouse,
+  busy,
+  taken,
+  error,
+  onTake,
+}: {
+  row: GridRow;
+  warehouse: string;
+  busy: boolean;
+  taken: number | null;
+  error: string | null;
+  onTake: (body: { reason: string; note: string | null }) => void;
+}) {
+  const draw = usePoolDrawReason();
+  // A finished take says what MOVED and stops offering. The row's quantity has
+  // already fallen — the refetch did that — so repeating the offer would be an
+  // invitation to buy the same goods off the same shelf twice.
+  if (taken != null) {
+    return (
+      <span className="text-meta text-kit-slate-11" data-testid={`stock-took-${row.key}`}>
+        {tookFromStockLine(taken)}
+      </span>
+    );
+  }
+  if (!row.stock) return null;
+  const take = row.stock.take;
+  return (
+    <div className="flex flex-wrap items-center gap-3" data-testid={`stock-open-${row.key}`}>
+      <span className="text-meta text-kit-slate-12 tabular-nums">
+        {stockAvailableLine(warehouse, row.stock.available)}
+      </span>
+      {/* NO `warnings`, and that is a measurement rather than an omission.
+          K4's reserve level is keyed on `ops_stock_items.sku` — the register's
+          own free-text Klang name — while this row carries the CATALOG code,
+          and the two are linked here only through `stockMatchKey`. A lookup
+          would therefore miss every time, and a check that structurally cannot
+          fire is worse than no check: it reads as protection. Reported on the
+          card instead. */}
+      <PoolReasonPicker state={draw} compact />
+      <Button
+        size="sm"
+        onClick={() => onTake(draw.body)}
+        /* The ONLY thing that dims it is a missing reason — `poolDrawProblem`
+         * is the same rule the route and the database enforce, so the button
+         * and the door can never disagree about what is acceptable. */
+        disabled={busy || draw.problem != null}
+        data-testid={`stock-take-${row.key}`}
+      >
+        {busy ? W.stockTaking : takeStockLabel(take)}
+      </Button>
+      {error ? <span className="text-meta text-kit-red-11">{error}</span> : null}
+    </div>
+  );
+}
 
 /**
  * One rail row — Linear Sidebar, faithfully this time (Jess, 2026-08-01):
