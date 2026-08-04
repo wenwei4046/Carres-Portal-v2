@@ -1302,6 +1302,103 @@ describe("the working area (Q5)", () => {
   });
 });
 
+/**
+ * THE GRID IS THE OPERATOR'S (Q5, Loo 2026-08-04).
+ *
+ * CLAUDE.md §13.3 asks one question of a kit power — *will this make the
+ * operator finish faster today?* — and he answered these two by NAME: resize,
+ * because supplier names are different lengths and one width cannot suit them
+ * all; reorder, because different operators watch different columns. Footer
+ * totals and grouping were refused in the same ruling, so this suite asserts
+ * their ABSENCE too: `the kit has it` is not a reason, and an unwired power
+ * that quietly appears later is the failure §13.3 exists to stop.
+ *
+ * The ARITHMETIC of a drag is the kit's and is tested there (`grid-powers`) —
+ * jsdom has no widths, so a resize test here could only prove a handler fired.
+ * What THIS page owes is that it passes the power at all, that the handle is
+ * named after its own column word, and that nothing is remembered (§0.4).
+ */
+describe("the grid is the operator's (resize · reorder)", () => {
+  const ths = () => within(screen.getByRole("table")).getAllByRole("columnheader");
+
+  it("every header is draggable and says what may be done to it", async () => {
+    await mountLoaded();
+    const supplier = screen.getByRole("columnheader", { name: "Supplier" });
+    expect(supplier).toHaveAttribute("draggable", "true");
+    expect(supplier).toHaveAttribute("aria-roledescription", "Drag to reorder");
+  });
+
+  it("dropping Supplier onto PO Issued reorders the REGISTER's own columns", async () => {
+    await mountLoaded();
+    expect(headerTexts()).toEqual([
+      "PO Issued",
+      "Supplier",
+      "PO No.",
+      "Items",
+      "Current Action",
+    ]);
+    fireEvent.dragStart(screen.getByRole("columnheader", { name: "Supplier" }), {
+      dataTransfer: { effectAllowed: "" },
+    });
+    fireEvent.drop(screen.getByRole("columnheader", { name: "PO Issued" }));
+    expect(headerTexts()).toEqual([
+      "Supplier",
+      "PO Issued",
+      "PO No.",
+      "Items",
+      "Current Action",
+    ]);
+  });
+
+  it("a resize handle on every column but the LAST, named after its own word", async () => {
+    await mountLoaded();
+    // `Current Action` is last in compact: no neighbour to take width from,
+    // and a handle that cannot move anything is a promise the grid cannot keep.
+    expect(screen.getByTestId("table-resize-supplier")).toHaveAccessibleName(
+      "Supplier — Drag to resize",
+    );
+    expect(screen.queryByTestId("table-resize-action")).not.toBeInTheDocument();
+  });
+
+  it("the column word is still said exactly ONCE (§7), handle and all", async () => {
+    // The handle is a DESCENDANT of the header, so making the grid draggable
+    // is precisely how a screen reader starts reading `Supplier Supplier —
+    // Drag to resize`. The kit pins it; this asserts the page gets the repair.
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
+    for (const th of ths().slice(1)) {
+      expect(th).toHaveAccessibleName(
+        /^(PO Issued|Supplier|PO No\.|Items|Customer Delivery|Goods Arrival|Received|Current Action)$/,
+      );
+    }
+  });
+
+  it("NOTHING IS REMEMBERED — a reload puts the company's grid back (§0.4)", async () => {
+    // Loo ruled per-operator layout memory OUT the same day he ruled the two
+    // powers IN. That is why there is no reset control and no word for one:
+    // the reload IS the reset. If a `storageKey` is ever added, this is the
+    // test that must be rewritten first.
+    const first = await mountLoaded();
+    fireEvent.dragStart(screen.getByRole("columnheader", { name: "Supplier" }), {
+      dataTransfer: { effectAllowed: "" },
+    });
+    fireEvent.drop(screen.getByRole("columnheader", { name: "PO Issued" }));
+    expect(headerTexts()[0]).toBe("Supplier");
+
+    // A fresh mount IS the reload.
+    first.unmount();
+    await mountLoaded();
+    expect(headerTexts()[0]).toBe("PO Issued");
+  });
+
+  it("footer totals and grouping stay UNWIRED — both were refused, not forgotten", async () => {
+    await mountLoaded();
+    const table = screen.getByRole("table");
+    expect(table.querySelectorAll('[data-kit="data-totals"]')).toHaveLength(0);
+    expect(table.querySelectorAll('[data-kit="data-group"]')).toHaveLength(0);
+  });
+});
+
 describe("what we sent the supplier (0312)", () => {
   it("the draft is EDITABLE, and Save as template puts the placeholders back", async () => {
     await mountLoaded();

@@ -1179,6 +1179,26 @@ export default function OperationPurchaseOrders() {
                   />
                 ),
               }}
+              /* THE GRID IS THE OPERATOR'S (Q5, Loo 2026-08-04). §13.3 asks
+                 one question of every kit power — *will this make the operator
+                 finish faster today?* — and he answered these two by name:
+                 resize because supplier names are different lengths and one
+                 width cannot suit them all, reorder because different
+                 operators watch different columns. So this is a WIRING, not a
+                 feature: the arithmetic, the handle and the a11y repair are
+                 all D0.5d's, and the two strings are the kit's own, verbatim
+                 from `/ui` — they are accessible names for a drag, never a
+                 visible word, so nothing here is invented.
+
+                 It is deliberately NOT remembered (§0.4 — a grid's shape is
+                 the company's): a reload is the reset, which is why there is
+                 no reset control and no word for one. Footer totals and row
+                 grouping stay UNWIRED — Loo ruled both unproven the same day,
+                 and *"the kit has it"* is not an answer. */
+              layout={{
+                resizeLabel: "Drag to resize",
+                reorderLabel: "Drag to reorder",
+              }}
               label="Purchase orders"
               empty={
                 <EmptyState
