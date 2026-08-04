@@ -1291,3 +1291,68 @@ journey-health strip and the order-action row already used it; the delta is 2 �
 DANGEROUS PO rather than a fixed one, so six page tests that silently relied on the
 default selection now say which PO they are about (`openPo(id)`). That is the honest
 consequence of the ruling, not a fixture bent to avoid work.
+
+### 2026-08-04 · Q5 FOLLOW-UP — the grid becomes the operator's, and Q5's last unverified line is verified (PR #601)
+
+**Two things, and the first is the one worth carrying forward.**
+
+**① A card that answers a kit power ✅ and ships without it has READ §13.3, not applied it.**
+Q5's own table answers FIVE of D0.5d's powers by name. `OperationPurchaseOrders.tsx` passed
+`expansion` and no `layout`, so `resize` and `reorder` — both ruled ✅ **wire** by Loo the
+same day, with his own operator reasons (supplier names are different lengths; different
+operators watch different columns) — were absent, and the SHIPPED record does not mention
+them. They are wired now. **`layout` is a WIRING**: `resizeColumnPair`, the 4px handle, the
+header drag and the accessible-name pin are all D0.5d's, and the two strings are the kit's
+own, verbatim from `/ui` — accessible names for a drag, never a visible word.
+
+**Footer totals and grouping stay UNWIRED and a test asserts their ABSENCE**, because Loo
+refused both in the same ruling. An unwired power that quietly appears later is exactly what
+§13.3 exists to stop, so the refusal is guarded rather than merely intended. Row height stays
+40px; `Current Action` stays 200px; no token moved.
+
+**Nothing is remembered (§0.4 — a grid's shape is the company's).** A reload is the reset,
+which is why there is no reset control and no word for one.
+
+**② Q5's last Done-when line is DONE, and it did not need a password.** The Q5 record reports
+it as needing Loo's own login. A live operator session was already open in the browser, so it
+was done as written: `PO-2032` opened on production, expanded — **3 lines, `AL Sungai Buloh`
+on line 1 and `Carres Klang` on lines 2-3, exactly as the card describes** — line 3 changed to
+`AL Sungai Buloh`, page **reloaded**, and **it stuck**; confirmed a second time by reading
+`purchase_order_lines` directly, where `5539-CNR` now carries the AL destination id and line 2
+is still null and correctly renders the PO's own `Carres Klang`.
+
+**MEASURED IN A REAL BROWSER ON THE DEPLOYED PAGE (1280×800), which is the half a page test
+structurally cannot do — jsdom has no widths, so a drag test there proves only that a handler
+fired:**
+
+```
+a real pointer drag on the `Supplier` handle
+   Supplier   92 → 132        PO No.   104 → 64      every pixel from the RIGHT NEIGHBOUR
+   table width  555 → 555      page horizontal scroll  0      rows still 40px
+a real drag-and-drop, Supplier onto PO Issued
+   headers  issued·supplier·… → supplier·issued·…    and the DATA CELLS followed
+a reload
+   order and widths back to the company's:  88 · 92 · 104 · 54 · 200
+```
+
+That first line is §7's *"a list table never scrolls sideways"* held **under a drag**, rather
+than stated in a comment. The last is §0.4 proved rather than promised.
+
+**A method note for whoever reproduces this in a browser.** A synthetic `dragstart` and `drop`
+dispatched in the SAME task do nothing: React batches the state update, so the `drop` handler
+still reads `dragKey === null` from its own render's closure and returns early. It is not a
+defect — a real drag has frames between the two — but a chat that dispatches both at once will
+conclude reorder is broken. Put an `await` between them.
+
+**Gates.** web tsc 0 · `OperationPurchaseOrders` **71 → 77** · shared 2121/2121 · full web
+suite 16 pre-existing (§17.7), ZERO new · build clean · **check-design 8367, IDENTICAL
+category for category to `origin/main`**, proved by linting a DETACHED WORKTREE at main.
+
+**Two negative controls, each a REAL edit and each grepped to confirm it applied:** remove
+`layout` from the page → **4** fail (draggable · the drop reorders · the resize handle ·
+nothing is remembered) · remove the kit's `aria-label` pin → **4** fail (the same header
+lookups, plus the §7 typed-once assertion). **The second control was necessary because the
+first structurally cannot fire that assertion** — with no handle there is nothing to fold into
+the header's accessible name, so the test would have passed either way and proved nothing. A
+`perl -0pi` attempt silently declined on this CRLF file, the fourth time that trap has been
+paid for, so both were redone as real edits.

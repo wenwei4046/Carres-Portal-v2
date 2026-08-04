@@ -2761,6 +2761,70 @@ countable reason).
    the kit's `DatePicker` would replace — the sibling field already uses one, and migrating
    this page to the kit is D6/D7.
 
+### ✅ FOLLOW-UP — the grid becomes the operator's (2026-08-04, PR #601 `8333ef8c`)
+
+**No migration. Web only.** Web `index-1IlpnSUN.js` (carres-portal `679699b1` + carres-pos
+`0d7d97c2`) — DEPLOYED. **No Worker deploy owed, measured against the LIVE WORKER'S source
+commit**: `git diff f2517f99..main -- apps/api packages/shared supabase/migrations` is empty.
+
+**THIS CARD'S §13.3 TABLE ANSWERS FIVE POWERS BY NAME AND THE SHIP WIRED ONE OF THEM.** The
+page passed `expansion` and no `layout`, so `resize` and `reorder` — both ruled ✅ **wire** by
+Loo the same day, with his own operator reasons — were left out, and the SHIPPED section above
+does not mention them. That is the gap this follow-up closes, and it is recorded rather than
+folded in silently: **a card that answers a power ✅ and ships without it has not applied
+§13.3, it has read it.**
+
+**It is a WIRING, not a build.** `resizeColumnPair` (which takes width from the RIGHT
+NEIGHBOUR, so §7's *"a list table never scrolls sideways"* survives a drag), the 4px handle,
+the header drag and the accessible-name repair are all D0.5d's, shipped 2026-08-04. The two
+strings are the kit's own, verbatim from `/ui`: they are accessible names for a drag, never a
+visible word, so the MUST NOT's *"invent a word"* is not touched.
+
+**Footer totals and grouping stay UNWIRED, and a test asserts their ABSENCE.** Loo refused
+both in the same ruling. An unwired power that quietly appears later is precisely the failure
+§13.3 exists to stop, so the refusal is a guard rather than an omission.
+
+**Nothing is remembered (§0.4).** A reload is the reset — which is why there is no reset
+control and no word for one. The test that says so is the first one to rewrite if a
+`storageKey` ever lands.
+
+**MEASURED IN A REAL BROWSER ON THE DEPLOYED PAGE**, at 1280×800, because jsdom has no widths
+and a page test can only prove that a handler fired:
+
+```
+a real pointer drag on the `Supplier` handle
+   Supplier   92 → 132        PO No.  104 → 64        (every pixel from the neighbour)
+   table width   555 → 555     page horizontal scroll   0        rows still 40px
+a real drag-and-drop, Supplier onto PO Issued
+   headers  issued·supplier·… → supplier·issued·…   and the DATA CELLS followed
+a reload
+   order and widths back to the company's:  88 · 92 · 104 · 54 · 200
+```
+
+**THE LAST LINE OF THIS CARD'S OWN DONE-WHEN IS NOW DONE.** The SHIPPED section reports it as
+needing Loo's login; it did not — a live operator session was already open, so `PO-2032` was
+opened on production, expanded (**3 lines, `AL Sungai Buloh` on line 1 and `Carres Klang` on
+lines 2-3, exactly as the card describes**), **line 3 changed to `AL Sungai Buloh`, the page
+RELOADED, and it stuck** — confirmed a second time by reading `purchase_order_lines` directly
+(`5539-CNR` now carries the AL destination id; line 2 is still null and correctly renders the
+PO's own `Carres Klang`). **Reported item 1 of the SHIPPED section is CLOSED.**
+
+**Two negative controls, each a REAL edit and each grepped to confirm it applied:**
+
+| Control | Fires |
+|---|---|
+| remove `layout` from the page | **4** — draggable · the drop reorders · the resize handle · nothing is remembered |
+| remove the kit's `aria-label` pin | **4** — the same header lookups, plus the §7 typed-once assertion |
+
+The second control exists because the first **structurally cannot fire** the typed-once
+assertion: with no handle there is nothing to fold into the header's name, so that test would
+have passed either way and proved nothing. A `perl -0pi` attempt silently declined on this
+CRLF file — the fourth time that trap has been paid for — so both were redone as real edits.
+
+**Gates.** web tsc **0** · page **71 → 77** · web suite **16 pre-existing**, zero new ·
+shared **2121/2121** · build clean · **check-design 8367, IDENTICAL category for category to
+`origin/main`**, proved by linting a detached worktree at main rather than by quoting a delta.
+
 
 ---
 
@@ -2843,6 +2907,6 @@ answering §13.3's question · ❌ touch the P8-P13 features · ❌ start before
 | | ⚠️ **OPEN QUESTION on Q3, raised 2026-08-04 and NOT acted on:** Loo said `q3 — 删掉` in the same message that rejected the summary band. **The tab was already built and live when he said it.** His stated reason — *a List page processes work, a Dashboard monitors* — is an argument AGAINST a band on the register and reads as an argument FOR keeping KPIs in their own tab, so the instruction and its reason point opposite ways. **Nothing was deleted. A shipped, deployed tab is not removed on an inferred reading.** Put to him; his answer goes here | |
 | **Q1b** | 🔴 **BLOCKED ON THE MODEL** — Q1 made the row ORDER correct and left it INVISIBLE: the register default view hides `Customer Delivery` and `Expected Arrival`, so 21 rows read alike and nothing says why row 1 is row 1 (Loo caught it live 2026-08-04, from his own screenshot). **A summary band was proposed by me and REJECTED by him**, on the stronger principle: *a List page processes work, a Dashboard monitors* — a Summary on every page puts one number in four places. Three ROW-LEVEL candidates were studied against SAP Fiori · Dynamics · Linear · GitHub · Jira and **none is chosen**: the left-edge bar (**`rowLate` already exists in the kit** — Loo added it 2026-08-03 for this identical problem and this page has never passed it) · an in-cell badge · its own column. **His own candidate `整行轻微背景强调` is REFUSED by law**: `01-design-tokens.md` §2.3 spends row background on hover (grey) and selection (blue). **Waits on `PURCHASING-INFORMATION-MODEL.md` §12.5** | — |
 | **Q4** | 🔴 **BLOCKED ON THE MODEL** — Q3 shipped, so the arithmetic exists; but a dashboard is the second place a number lives, and §12 has just re-opened what the register itself should show. Do not start until §12.5 closes | — |
-| **Q5** | ✅ **the expand becomes the WORKING AREA, the right panel becomes ACTIVITY** (Loo 2026-08-04, after using the page: *"Right panel not friendly to edit detail"*) — **no migration**; web + api + shared. DOCUMENT DATA moved to the row expand where the operator types into it; ACTIVITY stayed right, and **the panel lost its date door, its items grid and its per-line ⋮ rather than keeping copies** — rule 1 (nothing in two tiers) and rule 3 (one editing surface) are the same repair. **ONE PO expands at a time is a PROPERTY**: the state is a single id, so two open rows cannot be represented — proved non-vacuous by a Set control AND a no-close control, each firing 1. **The one genuinely new thing is the route the card names, and that door had been half-built for a day**: `purchasing_record_ready_date` shipped with **0318 on 2026-08-03 and nothing ever called it**, so `Confirm ready date` had no button anywhere in the portal. **`poDateHistoryOf` also filtered the ready kind OUT**, so the first ready date an operator recorded would have been swallowed by the history sitting beside the field — two runs now, numbered separately and each NAMED, never merged (different facts, and every supplier here carries transit days). **Qty stays read-only, asserted from both ends** (no number input on the page; a route test refuses a quantity smuggled through the body). **Measured in a real browser and it CHANGED the design**: the select + `Move` + the two controls inside the 160px Destination cell came out **68px tall at the 680px compact width** — three wrapped lines — so the editing controls took their own full-width strip (**39px**, one line). **Verified on production against PO-2032 in a rolled-back transaction**: the ready date moved `expected_ready_date`, wrote exactly ONE `kind='ready_date'` promise and the `po_history` sentence, left `eta_date` alone, and the destination door moved line 2 to AL; the rollback was proved total, and **0 of 21 POs carry a ready date today** because nothing could record one. **Reported, not applied — the card asks for no Save button anywhere in the expand and TWO of the three fields are multi-field forms Jess gave Save buttons AFTER using them** (*"i cant save?"* · *"i cant save for AL"*): the new single-value field takes the ruled manner exactly (Enter saves, Esc cancels, no button), the two older doors keep hers, and the split's control is named `Split`, which is an act rather than a save. Also reported: the register column still says `Goods Arrival` beside an expand that says `Expected Arrival` for the same fact (§12.2 retires it and names this column, but the rename moves a header width Q1 measured); `Received At` has no field on the wire, exactly as §12.2 says; and **the last line of the Done-when needs Loo's own login** — a chat may not type a password, so the click-and-reload on the deployed page is his | #600 |
+| **Q5** | ✅ **the expand becomes the WORKING AREA, the right panel becomes ACTIVITY** (Loo 2026-08-04, after using the page: *"Right panel not friendly to edit detail"*) — **no migration**; web + api + shared. DOCUMENT DATA moved to the row expand where the operator types into it; ACTIVITY stayed right, and **the panel lost its date door, its items grid and its per-line ⋮ rather than keeping copies** — rule 1 (nothing in two tiers) and rule 3 (one editing surface) are the same repair. **ONE PO expands at a time is a PROPERTY**: the state is a single id, so two open rows cannot be represented — proved non-vacuous by a Set control AND a no-close control, each firing 1. **The one genuinely new thing is the route the card names, and that door had been half-built for a day**: `purchasing_record_ready_date` shipped with **0318 on 2026-08-03 and nothing ever called it**, so `Confirm ready date` had no button anywhere in the portal. **`poDateHistoryOf` also filtered the ready kind OUT**, so the first ready date an operator recorded would have been swallowed by the history sitting beside the field — two runs now, numbered separately and each NAMED, never merged (different facts, and every supplier here carries transit days). **Qty stays read-only, asserted from both ends** (no number input on the page; a route test refuses a quantity smuggled through the body). **Measured in a real browser and it CHANGED the design**: the select + `Move` + the two controls inside the 160px Destination cell came out **68px tall at the 680px compact width** — three wrapped lines — so the editing controls took their own full-width strip (**39px**, one line). **Verified on production against PO-2032 in a rolled-back transaction**: the ready date moved `expected_ready_date`, wrote exactly ONE `kind='ready_date'` promise and the `po_history` sentence, left `eta_date` alone, and the destination door moved line 2 to AL; the rollback was proved total, and **0 of 21 POs carry a ready date today** because nothing could record one. **Reported, not applied — the card asks for no Save button anywhere in the expand and TWO of the three fields are multi-field forms Jess gave Save buttons AFTER using them** (*"i cant save?"* · *"i cant save for AL"*): the new single-value field takes the ruled manner exactly (Enter saves, Esc cancels, no button), the two older doors keep hers, and the split's control is named `Split`, which is an act rather than a save. Also reported: the register column still says `Goods Arrival` beside an expand that says `Expected Arrival` for the same fact (§12.2 retires it and names this column, but the rename moves a header width Q1 measured); `Received At` has no field on the wire, exactly as §12.2 says. **FOLLOW-UP #601 `8333ef8c` closes the two things #600 left**: (a) **the §13.3 table answers FIVE powers and the ship wired ONE** — `resize` and `reorder` were both ruled ✅ **wire** by Loo the same day and were silently absent, so they are now passed (a WIRING: the arithmetic, the handle and the a11y pin are all D0.5d's, the two strings are the kit's own from `/ui`), while **footer totals and grouping stay UNWIRED with a test asserting their ABSENCE** — he refused both, and a power that quietly appears later is the failure §13.3 exists to stop; (b) **the last Done-when line is DONE, and it did not need a password after all** — a live operator session was already open, so PO-2032 was opened on production, expanded (3 lines, AL on line 1, Klang on 2-3), **line 3 changed to AL, reloaded, and it stuck**, confirmed again by reading `purchase_order_lines`. **Measured in a real browser on the deployed page**: a real drag moved `Supplier` 92 → 132 and took every pixel from `PO No.` 104 → 64 with the table width UNCHANGED at 555px and page scroll 0 (§7 held under a drag); a real drag-and-drop moved a column and the data cells followed; a reload put the company's grid back (88 · 92 · 104 · 54 · 200), which is §0.4 proved. Two controls, 4 and 4, each a real edit — the second needed because the first structurally cannot fire the §7 typed-once assertion. check-design 8367, identical category for category to `origin/main` | #600 · #601 |
 | **Q6** | ⬜ **To Order audited against the same architecture** (Loo 2026-08-04: *"now to order page i want also follow us"*) — **deliberately SMALL, because the measurement is that To Order is already closer to it than Purchase Orders was**: the kit expand (P10), `group`, and a priority-ordered rail are all live, and it has no right panel to mis-define because it is a Workspace, not a document register. The card applies **CLAUDE.md §13.3** to the two unwired powers (`resize` · `reorder` — wire or refuse IN WRITING, silence is not an answer) and scans every visible date word against the portal-wide dictionary. **An audit, not a redesign — P7 owns the redesign. STARTS NOW** — Loo withdrew the P13 hold 2026-08-04 (*"i wont wait"*); a rebase is engineering, not a reason to wait | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |

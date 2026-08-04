@@ -6,6 +6,51 @@
 
 ---
 
+**2026-08-04 · Purchasing Q5 follow-up — the register's grid becomes the operator's, and the card's last unverified line is verified** (PR #601 merge `8333ef8c`, **no migration**, web `index-1IlpnSUN.js` — DEPLOYED, live file md5-identical to the local build (`84c514ce…`, 4,763,084 bytes), `SERVICE_ROLE` 0; **no Worker deploy owed and it was MEASURED** against the live Worker's source commit)
+
+**Q5's own §13.3 table answers FIVE of D0.5d's kit powers by name, and the ship wired ONE of them.** Measured on the merged tip: `OperationPurchaseOrders.tsx` passes `expansion` and no `layout`. So `resize` and `reorder` — both ruled ✅ **wire** by Loo the same day, and with his own operator reasons, not the kit's — were silently absent, and the SHIPPED record does not mention them.
+
+> **A card that answers a kit power ✅ and ships without it has READ §13.3, not applied it.** That is the durable half of this entry. §13.3's question is about the operator, and Loo answered it twice in his own words: *supplier names are different lengths, so one width cannot suit them all* · *different operators watch different columns.*
+
+**It is a WIRING, not a build, and saying so is the point.** `resizeColumnPair` — which takes width from the **RIGHT NEIGHBOUR** so §7's *"a list table never scrolls sideways"* survives a drag — the 4px handle, the header drag and the accessible-name pin are all D0.5d's, shipped 2026-08-04. The two strings are the kit's own, verbatim from `/ui`: they are **accessible names for a drag, never a visible word**, so the card's MUST NOT on inventing a word is untouched.
+
+**FOOTER TOTALS AND GROUPING STAY UNWIRED, AND A TEST ASSERTS THEIR ABSENCE.** Loo refused both in the same ruling — a total is only useful if somebody acts on it, and this register groups by nothing. **An unwired power that quietly appears later is exactly the failure §13.3 exists to stop**, so the refusal is guarded rather than merely intended. Row height stays **40px** and no token moved: *"Carres is queue → list → detail with constant review and communication — GitHub / Linear / Shopify Admin, not Excel."*
+
+**Nothing is remembered (§0.4 — a grid's shape is the company's).** A reload is the reset, which is why there is no reset control and no word for one. The test that says so is the first one to rewrite if a `storageKey` ever lands.
+
+**MEASURED IN A REAL BROWSER ON THE DEPLOYED PAGE (1280×800), which is the half a page test structurally cannot do** — jsdom has no widths, so a drag test there proves that a handler fired and nothing about where the column landed:
+
+```
+a real pointer drag on the `Supplier` handle
+   Supplier   92 → 132        PO No.   104 → 64     every pixel from the RIGHT NEIGHBOUR
+   table width  555 → 555      page horizontal scroll  0      rows still 40px
+a real drag-and-drop, Supplier onto PO Issued
+   headers  issued·supplier·… → supplier·issued·…   and the DATA CELLS followed
+a reload
+   order and widths back to the company's:  88 · 92 · 104 · 54 · 200
+```
+
+The first block is §7 held **under a drag** rather than stated in a comment; the last is §0.4 proved rather than promised. Live at the same time: all 5 headers `draggable`, `aria-roledescription = Drag to reorder`, each header's accessible name still **the column word alone**, and a resize handle on 4 of 5 — none on `Current Action`, the last, because there is no neighbour to take from.
+
+**THE LAST LINE OF Q5's OWN DONE-WHEN IS NOW DONE, AND IT DID NOT NEED A PASSWORD.** The Q5 record reports it as needing Loo's own login. **A live operator session was already open in the browser**, so it was done exactly as written: `PO-2032` opened on `erp.carresofficial.com`, expanded — **3 lines, `AL Sungai Buloh` on line 1 and `Carres Klang` on lines 2-3, exactly as the card describes**, `Supplier Ready Date —`, `Expected Arrival 25 Aug 26 ⚠ 8d late` — **line 3 changed to `AL Sungai Buloh`, the page RELOADED, and it stuck.** Confirmed a second time at the database rather than trusting the screen: `purchase_order_lines` for `PO-2032` now reads `5539-1B(LHF)` → AL · `5539-2A(RHF)` → **null**, which correctly renders the PO's own `Carres Klang` · `5539-CNR` → **AL**, the line just changed. **Reported item 1 of the Q5 SHIPPED section is CLOSED.**
+
+**A method note worth not re-learning, for whoever reproduces a reorder in a real browser.** A synthetic `dragstart` and `drop` dispatched in the SAME task do nothing: React batches the state update, so the `drop` handler still reads `dragKey === null` from its own render's closure and returns early. It is not a defect — a real drag has frames between the two — but a chat that dispatches both at once will conclude reorder is broken and go looking for a bug that is not there. Put an `await` between them.
+
+**Two negative controls, each a REAL edit and each grepped to confirm it applied:**
+
+| Control | Fires |
+|---|---|
+| remove `layout` from the page | **4** — draggable · the drop reorders · the resize handle · nothing is remembered |
+| remove the kit's `aria-label` pin | **4** — the same header lookups, plus the §7 typed-once assertion |
+
+**The second control was necessary, and why is the interesting part**: the first one **structurally cannot fire** the typed-once assertion, because with no handle there is nothing to fold into the header's accessible name — the test would have passed either way and proved nothing. *A control that cannot fail the test it is aimed at is not a control.* A `perl -0pi` attempt silently declined on this CRLF file — **the fourth time that trap has been paid for** — so both were redone as real edits and each was grepped before its run was believed.
+
+**Gates.** web tsc **0** · `OperationPurchaseOrders` **71 → 77** · full web suite **16 pre-existing** (§17.7's four documented files), ZERO new · shared **2121/2121** · build clean · **check-design 8367, IDENTICAL category for category to `origin/main`**, proved by linting a DETACHED WORKTREE at main rather than by quoting a delta.
+
+**Deploy.** Built from the main tip, both Pages projects with `--branch=main`. **The four canonicals FLAPPED between the two hashes for several minutes** — the documented edge-cache behaviour — so `wrangler pages deployment list` is what settled it (source `8333ef8` is the newest Production/main writer on BOTH projects); they converged afterwards. **Proved in BOTH directions on DOWNLOADED bundles, with a control marker**: `Drag to resize` and `Drag to reorder` grep **0 in the predecessor** `index-D0zk6wtt.js` (fetched from its OWN deployment URL `e2033670` — a superseded asset 404s at the apex and a grep of that error page reads as a clean 0 for everything) and **1** each here, while `po-work-` is **1 in BOTH**, the marker proving the predecessor was really read.
+
+---
+
 **2026-08-04 · Purchasing Q5 — the expand becomes the WORKING AREA, the right panel becomes ACTIVITY** (PR #600 merge `f2517f99`, **no migration**, web `index-D0zk6wtt.js` + Worker `3b87b0ab` — DEPLOYED, four canonicals, live file md5-identical to the local build (`da176c4c…`, 4,763,015 bytes), `SERVICE_ROLE` 0)
 
 Loo, after using the page: **`Right panel not friendly to edit detail.`**
