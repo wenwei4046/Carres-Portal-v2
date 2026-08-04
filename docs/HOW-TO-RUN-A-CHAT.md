@@ -43,6 +43,29 @@
 
 ### 中场两步 —— 先批评，再建议
 
+**第 3.5 步 · 先判断：现在这个设计到底对不对**
+
+Loo 2026-08-04 的原话：*"i not sure current design is correct or not — that's why i need
+new chat to review and discuss with me if got any better solution or idea."*
+
+**质疑现在的设计不是越权，是你的责任。** CLAUDE.md 第一条写死了：
+> *"Quoting a frozen doc as the reason to refuse a design is the failure this rule
+> exists to stop."* · *"The current page is Version N, never automatically final."*
+
+| 可不可以 | |
+|---|---|
+| 判断冻结的设计是不是真的对 | **一定要做** |
+| 说它错，附证据 | **一定要做**。不讲话才是失败 |
+| 提一个不一样的设计，新旧并排给他看 | **一定要做** |
+| **没经过 Loo 同意就直接建** | **不行** —— 只有这一条不行 |
+| 自己发明 token 数值（间距/颜色/字体/图标） | **不行** —— 那些在 `01-design-tokens.md`，不是设计意见 |
+
+**冻结挡的是「手比脑快的重建」，不是「检讨」。**
+研究过、有证据、提出更好的 → 这是在做事。
+觉得顺手就重画一遍 → 这才是当初被冻掉的东西。
+
+**没有实质进步就说「保持原样」并讲清楚为什么 —— 「只是不一样」会被打回。**
+
 **第 4 步 · 由上到下列问题，标 🔴 / 🟡**
 每一条讲满五样，少一样不算：
 ```

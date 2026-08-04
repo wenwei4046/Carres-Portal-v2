@@ -1029,6 +1029,36 @@ one-way door.
    Order on 2026-08-04: the freeze stopped redesign, not completion. **The frozen layout,
    the frozen operator journey and the frozen Phase 3 words all still stand.**
 
+> **⛔ CORRECTION BY LOO, same day — point 5's last sentence was WRONG and it is the exact
+> failure CLAUDE.md's first rule exists to stop.** His words: *"but i not sure current design
+> is correct or not — that's why i need new chat to review and discuss with me if got any
+> better solution or idea."*
+>
+> The line "you add, you never redesign" quoted a frozen document as a reason to refuse a
+> design. The OWNER RULE forbids exactly that: *"never uses an old rule to restrict a new
+> idea … Quoting a frozen doc as the reason to refuse a design is the failure this rule
+> exists to stop."*
+>
+> **The rule, correctly stated — it is CLAUDE.md's UI box, unchanged:**
+>
+> | May the chat… | |
+> |---|---|
+> | study the page, measure it, and judge whether the frozen design is actually right | **REQUIRED — not permitted, required.** *"The current page is Version N, never automatically final."* |
+> | say the frozen layout is wrong, with evidence | **REQUIRED.** Silence is a failure |
+> | propose a different design, side by side with the current one | **REQUIRED**, with evidence: current problem → operator impact → international reference → Carres adaptation → trade-off → recommendation |
+> | BUILD that redesign before Loo approves it | **NO.** This is the only "no", and it was always the only one |
+> | invent token values — spacing, colour, typography, icons | **NO** — those come from `01-design-tokens.md` and are not a design opinion |
+>
+> **What the freeze actually bought, and why it still matters:** five layout rewrites in one
+> sitting produced nothing shippable. The freeze stops *rebuild-by-reflex*, not *review*. A
+> chat that studies the page and proposes better is doing the job; a chat that rewrites the
+> page because it felt better is the thing that was frozen out.
+>
+> **So this tab's plan chat has one extra duty before it writes any card:** decide, with
+> evidence, whether the current design is right. If it is — say so and say why, and the cards
+> only fill the gaps. If it is not — show Loo old vs new side by side and let him pick.
+> *"If there is no material improvement, KEEP and say so — 'only different' is rejected."*
+
 **A STARTING SHAPE for the cards — the manager finalises it; this is not frozen.**
 
 | | Card | Why it is where it is |
