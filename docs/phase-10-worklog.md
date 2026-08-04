@@ -26,7 +26,11 @@
 
 **Gates.** shared **2069/2069** (+6) · api **2062/2065**, the 3 documented pre-existing (`supplier/pos` ×2 · `partner/pickups` ×1) · web **2394/2410**, the 16 documented pre-existing · api tsc **0** · web tsc **0** · shared tsc **12**, byte-identical to the same tree without the change (test-file-only, pre-existing) · `check-design` **8368**, unchanged · build clean.
 
-**No Pages deploy owed, proved by CHECKSUM.** `apps/web` never imports `buildToOrder` — the proposal is computed in the Worker and the page only reads `toOrderBuilds` / `defaultDocuments` / `planFromDocuments`, none of which changed. A build from this tip emits **`index-DiTy2SJk.js`**, the bundle already live on all four canonicals. The Worker IS owed: `apps/api/src/routes/operation/to-order.ts` imports `buildToOrder`.
+**Deployed.** Worker **`277e1c3a-0bdf-43c3-a5a6-ecb47de7d5f7`** from main tip `6d888325`, `--env production` (never bare); wrangler echoed `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron, and `GET https://api.carresofficial.com/health` returns **200 `{"ok":true}`**.
+
+**No Pages deploy owed, proved by CHECKSUM.** `apps/web` never imports `buildToOrder` — the proposal is computed in the Worker and the page only reads `toOrderBuilds` / `defaultDocuments` / `planFromDocuments`, none of which changed. A build from this tip re-emitted **`index-DiTy2SJk.js`**, the bundle already live on **all four canonicals**, md5-identical to the local build (`4bc782e5…`, 4,749,904 bytes), `SERVICE_ROLE` **0**. The Worker IS owed: `apps/api/src/routes/operation/to-order.ts` imports `buildToOrder` — the missing half of D0.5d's rule, applied in the direction that says yes.
+
+**Production verified against the real rows, not against the artifact alone.** The old rule and the new one were computed over every live sofa order line, per order: all **10 orders read the same row quantity under both** (eight of 1, two of 2). Nothing moved, which is exactly what a fix for a defect with zero live exposure should be able to show.
 
 ---
 
