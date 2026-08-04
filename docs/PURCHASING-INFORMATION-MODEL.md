@@ -24,6 +24,12 @@
 > **FROZEN 2026-07-29 by Loo.** This is the ONE home for how the Purchasing module organises
 > information. It is read before any Purchasing work — layout, copy, or code.
 >
+> **IT NOW COVERS TWO WORKSPACES (Loo, 2026-08-04).** §1–§11 are **To Order**, frozen
+> 2026-07-29 and unchanged. **§12 is Purchase Orders**, frozen 2026-08-04. They share this
+> file rather than getting one each, because the rule directly below — *there is no third
+> Purchasing master document and none may be created* — is still in force, and because §12's
+> date dictionary is portal-wide and would otherwise have two homes.
+>
 > It does not repeat: the module's actions and their six things →
 > [`docs/PURCHASING-WORKING-FLOW.md`](PURCHASING-WORKING-FLOW.md) · the action MODEL →
 > [`docs/ACTION-FLOW-STANDARD.md`](ACTION-FLOW-STANDARD.md) · the WORDS →
@@ -486,3 +492,173 @@ Recorded so nobody re-derives them, and so a future contradiction is traceable.
 
 **Everything in the database today is test data** (CLAUDE.md). These measurements are
 evidence about whether the CODE behaves, never about business volume.
+
+---
+
+# §12 · THE PURCHASE ORDERS WORKSPACE — FROZEN 2026-08-04 by Loo
+
+> **Why this section exists, in his words:** *"这已经不是 copy，而是整个 Purchase Orders 的
+> Information Architecture. 先把模型定下来，再改 UI，一次会比较干净."*
+>
+> **He stopped the word-fixing to write this**, and he was right to: the words could not be
+> settled one at a time because each one needed a model that did not exist. **No UI is
+> decided here. No column list is decided here.** §12.5 says what is deliberately left open.
+
+## 12.1 · Workspace mission
+
+**Purchase Orders is the Supplier Execution Register.** It answers exactly one question:
+
+> **A purchase order has been issued — how far has the supplier got with it?**
+
+To Order asks *what do we not have yet*; Purchase Orders asks *what did we already ask for,
+and where is it*. A fact that helps neither has no home on this tab.
+
+## 12.2 · THE DATE DICTIONARY — portal-wide, and this is the section's centre
+
+**Ruled by Loo, 2026-08-04.** A purchase order carries FOUR dates and today the portal spells
+them six ways across four screens. **One fact, one word, everywhere it appears.**
+
+| # | The fact | **THE WORD** | Where it is stored | Who says it |
+|---|---|---|---|---|
+| ① | the factory has finished making it | **`Ready Date`** | `purchase_orders.expected_ready_date` | the supplier |
+| ② | the goods are **expected** to reach our warehouse | **`Expected Arrival`** | `purchase_orders.eta_date` | the supplier (or our own estimate — see 12.2.1) |
+| ③ | the goods **actually** reached our warehouse | **`Received At`** | `warehouse_receipts.goods_received_at` | the warehouse, at the moment it counted |
+| ④ | the customer was promised this day | **`Customer Delivery`** | `orders.delivery_date` | Sales |
+
+**`Received At` is the fact this system does not have today**, and that is why it is in the
+model rather than in a card: 0 `warehouse_receipts` rows have ever existed, so the register
+can say *how many* arrived (`Received 0 / 1`) and can never say *when*.
+
+**THESE SPELLINGS ARE RETIRED. All three named the SAME fact ②:**
+
+```
+✗  Goods Arrival     Purchase Orders column · Receiving column · the workspace's date row
+✗  Stock             the Orders list column   (its own comment: "the SUPPLIER arrival ETA")
+✗  Stock ETA         the Activity timeline    — and `ETA` is a BANNED word
+```
+
+`ETA` is banned by the Business Date Dictionary; it is the ground on which Jess's own
+`Confirm ETA` was refused on 2026-08-02, and `Stock ETA` has been live on the timeline the
+whole time.
+
+**`Expected Arrival` names its destination and so does `Customer Delivery`.** That is the
+whole reason the pair works: *arrival at OUR warehouse* against *delivery to THEIR house*.
+`Goods Arrival` named no destination, which is exactly the ambiguity Loo hit — *arrival of
+what, where?*
+
+**The sweep is portal-wide and it is NOT one card.** `Goods Arrival` is live on the Receiving
+page, which belongs to the ④ R lane; `Stock` and `Stock ETA` are live on the Orders list and
+its Activity timeline, which belong to the Orders lane. **A Purchasing chat may change neither
+page.** The word is ruled here for all of them; each lane sweeps its own screens.
+
+### 12.2.1 · An estimate and a promise are the same COLUMN and never the same STATEMENT
+
+`eta_date` holds a date the supplier gave. When there is none, the register computes one from
+production working days and shows it — measured 2026-08-04: **16 of 21 POs are showing our own
+estimate, and 8 of them are already warning that it lands after the customer's date.**
+
+> **A date we guessed and a date a factory gave may never look identical.** The register
+> already separates them by tone since Q1 (a broken promise is red; a risk we computed is
+> amber). This model makes that permanent: **`Expected Arrival` must always state which of the
+> two it is.** Nothing may present an estimate as a supplier's word.
+
+### 12.2.2 · ONE COLUMN, TWO DOCUMENTS, TWO MEANINGS — reported, not resolved
+
+Measured 2026-08-04, and it is the most dangerous thing in this section:
+
+```
+docs/PURCHASING-WORKING-FLOW.md §2
+    "the supplier's READY date | … per customer line `ops_order_control.line_etas`"
+
+apps/web/src/pages/operation/OperationOrdersControl.tsx:435
+    "The STOCK column carries the SUPPLIER ARRIVAL ETA … read from `line_etas`"
+```
+
+**The same column is the READY date in the flow file and the ARRIVAL date in the code.** Those
+are two different days — every supplier here carries `transit_days` (Ohana 1, Nice Future 1),
+so ready and arrival are by definition not the same date.
+
+This is the open carry-forward `eta-model-stock-eta-vs-line-etas-undecided` becoming load-
+bearing. Loo froze it on 2026-07-28 with *"settle after real POs run"*. **21 real POs now
+exist.** It is named here so the next ruling has somewhere to land; **this model does not
+settle it**, because it decides what an Orders-lane column means and that is not Purchasing's
+to take.
+
+## 12.3 · ACTION AND STATUS ARE TWO KINDS AND MAY NEVER SHARE A COLUMN
+
+**Ruled by Loo, 2026-08-04.** His own words: *"Current Action 其实混了 Action 和 Status …
+这一栏本身已经不纯了."*
+
+| | ACTION | STATUS |
+|---|---|---|
+| answers | what must a human DO | where are the goods |
+| shape | verb + named party + measurable object | a state word |
+| who writes it | **the action engine, and nothing else** (Law 7) | derived from stored quantities and dates |
+| when it leaves | when the system measures its outcome | when the goods move |
+| may it be empty | **yes** — nothing to do is a real answer | no, a PO is always somewhere |
+
+**`Waiting for Goods` is a STATUS wearing an action's column.** So is `Open Receiving` — that
+is navigation, not work. Both leave the action column.
+
+**`Contact Supplier` is not a legal label at all.** `Contact` was retired as a verb by Loo on
+2026-07-28 — the portal has SIX verbs and `Call` already covers *reach the outside party, get
+an answer, record the outcome*. It has been live on this page since.
+
+**`Confirm Arrival` reverses its own meaning and that is the sharpest example of why this
+section exists.** The full string is `Confirm Goods Arrival Date` — *phone the factory and ask
+which day the goods come*. The register shortens it to `Confirm Arrival`, which a reader takes
+as *tick that it has arrived*. **A future question became a past confirmation.** One is a phone
+call; the other is receiving. It is showing on 16 of 21 rows today.
+
+> **A short form may drop WORDS. It may never drop the TENSE or the OBJECT.**
+
+## 12.4 · WHAT THIS COSTS TODAY — measured, and stated before anybody builds
+
+If the action column holds only engine actions, then **today it is empty on all 21 rows.**
+
+```
+the engine has exactly TWO action keys
+    confirm_tomorrows_delivery      fires when arrival is the next office working day
+    confirm_balance_delivery_date   fires when a line is short
+
+measured 2026-08-04 · 0 of 21 POs raise either
+    the five known arrival dates are 12 · 13 · 19 · 19 · 25 Aug — none is tomorrow
+    0 lines are short, because 0 goods have ever been received
+```
+
+**That is not a reason to keep the four invented words. It is the measurement of the hole.**
+
+**THE HOLE, NAMED: no action exists for the thing 16 of 21 POs are waiting on.**
+`PURCHASING-WORKING-FLOW.md` §3 defines `Call {supplier} — confirm ready date` — the date the
+factory FINISHES. It defines no action for *the factory has never told us which day the goods
+reach us*, which is `Expected Arrival` and is the axis this whole register is built on.
+
+So the register's state machine and the flow file's action list stand on two different dates.
+**Closing that is a business decision — a new action with all six of Law 2's things, and five
+strings in COPY-STANDARD — and it is Loo's, not a chat's.**
+
+## 12.5 · WHAT IS DELIBERATELY NOT DECIDED HERE
+
+Loo's instruction was *freeze the model, then change the UI*. The following are therefore
+**open**, and a chat that settles one has taken a decision that was left to him on purpose:
+
+1. **Which columns the register carries.** *"再决定列表到底放哪些栏位."*
+2. **Where STATUS goes** once it leaves the action column — a column, the left rail, a pill.
+   The rail already carries five state words that are in no dictionary (§12.6).
+3. **The missing action** for `Expected Arrival` (§12.4) — its trigger, due, owner and five
+   strings.
+4. **How row priority is shown.** Q1 made the ORDER correct and the order is invisible; the
+   three candidates studied (a left edge bar, an in-cell badge, its own column) are recorded
+   in the checkpoint and none is chosen.
+5. **`line_etas`' true meaning** (§12.2.2) — an Orders-lane ruling.
+
+## 12.6 · Reported with the freeze, not built
+
+- **The rail's five words are in no dictionary** — `Waiting Supplier Date` · `Waiting for
+  Goods` · `Ready to Receive` · `Completed` · `Cancelled`. COPY-STANDARD rules FIVE Operation
+  Status labels (`Issued` · `In Production` · `Receiving` · `Completed` · `Cancelled`) and
+  says they are *the ONLY five*. Two vocabularies for one lifecycle. **Three of the rail's
+  five have read 0 forever** and cannot move until goods are received.
+- **`purchase_orders.sup_status` is `pending` on all 21.** `Pending` is a banned display word.
+- **One sofa is split across two purchase orders** (`SO-1204` · `1207` · `1208` · `1211`), and
+  nothing on the register can show that two PO numbers are one customer's one sofa.
