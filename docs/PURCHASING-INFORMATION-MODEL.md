@@ -650,7 +650,150 @@ Loo's instruction was *freeze the model, then change the UI*. The following are 
 4. **How row priority is shown.** Q1 made the ORDER correct and the order is invisible; the
    three candidates studied (a left edge bar, an in-cell badge, its own column) are recorded
    in the checkpoint and none is chosen.
+   **THE ORDER ITSELF IS CLOSED, 2026-08-04 — Q1 STAYS.** Loo: *"永远以 Operator Priority
+   排序，不是 PO Issued。Operator 打开 Purchase Orders，是为了处理今天最重要的事情，不是看
+   最新开的 PO."* His earlier `PO Issued Newest → Oldest` line is withdrawn by that ruling.
+   **`PO Issued` is a column and a header sort, and decides nothing about row order** — this
+   also finally settles the conflict between Jess's 2026-08-02 listing law and
+   `PURCHASING-WORKING-FLOW.md` §6 / `ACTION-FLOW-STANDARD.md` Law 5, in favour of the two laws.
 5. **`line_etas`' true meaning** (§12.2.2) — an Orders-lane ruling.
+
+## 12.7 · TREE GRID — the Information Architecture review Loo asked for, 2026-08-04
+
+> **⚠️ THIS SECTION IS A REVIEW, NOT LAW.** Loo asked *"为什么国际 ERP 用 Tree Grid …
+> 如果答案成立，我们就采用。如果不是，我们不要为了像 AutoCount 而做."* This is the answer
+> and its evidence. **Nothing here is frozen until he rules on it.** A chat that builds from
+> this section has built from a proposal.
+
+### 12.7.1 · The question, and the honest answer
+
+**The answer is: they do not use a Tree Grid for documents. They use it for HIERARCHIES.**
+
+SAP's own guideline — the largest ERP vendor, writing about its own Tree Table:
+
+> *"You should only show trees with a lot of hierarchical data **as a last resort**. Try
+> instead to break down the data into manageable chunks and allow the user to navigate or
+> drill down between them."*
+> *"Neither the tree table nor the grid table are responsive."*
+
+That is not an endorsement. It is a warning, from the vendor whose product Loo is asking us
+to learn from.
+
+**A hierarchy and a document are different shapes, and the difference is the whole answer:**
+
+| | A HIERARCHY | A DOCUMENT |
+|---|---|---|
+| depth | unbounded — a node contains a node contains a node | **exactly two, forever** |
+| examples | chart of accounts · bill of materials · org chart · product categories · cost centres · WBS | purchase order · invoice · delivery order · sales order |
+| the operator asks | *where does this sit in the structure?* | *what is on this one, and what do I do about it?* |
+| the pattern used | **Tree Grid** | **Header + Lines** |
+
+**A purchase order is a document.** It is a PO and its lines. It is never a PO inside a PO.
+It cannot grow a third level, because `PURCHASING-WORKING-FLOW.md` §3 already rules that
+adding items means a NEW PO, never a deeper one.
+
+### 12.7.2 · What the six products actually do — measured, not assumed
+
+**Every one of them expresses "a document and its lines" the same way, and it is not a tree:**
+
+| Product | The PO list | Where the lines live |
+|---|---|---|
+| **SAP Fiori** | List Report | **Object Page** — header + sections. The list-plus-detail case is the **Flexible Column Layout**, sanctioned for exactly this: *"if the user needs to switch easily between different work items … letting the user work down the list without additional navigation"* |
+| **Business Central** | List page | **Document page** — header FastTabs, then a FastTab titled **`Lines`**. Its right pane is a **FactBox**: *"related facts about the current record … at-a-glance"* — a READING surface, never the editor |
+| **Dynamics 365 F&O** | Grid with grouping + totals | Details form, and the same FactBox pattern |
+| **Oracle Fusion** | PO list | PO page — header + lines |
+| **Odoo** | List | Form — header fields + an editable lines table |
+| **AutoCount** | **FLAT list, one row per PO, no expand** | New / Edit / View opens the document |
+
+**THE SHARPEST PIECE OF EVIDENCE IS AUTOCOUNT'S OWN, AND IT IS IN LOO'S OWN SCREENSHOTS.**
+Its **Purchase Order** list (2026-08-04, his first screenshot) is flat — one row per PO, no
+expander. The hierarchical rows he admired are in **`SO Batch Posting`** (his later
+screenshot), which is a different kind of screen: it acts on MANY parents' children in ONE
+pass, before committing them all together.
+
+> **AutoCount uses a tree grid where you process many documents at once, and a flat list
+> where you pick one document and work it.** We would not be copying AutoCount by putting a
+> tree on the PO register — we would be copying the wrong AutoCount screen.
+
+### 12.7.3 · Carres already has the internationally-correct pattern
+
+Purchase Orders today is a **list + a persistent detail panel**. That IS Fiori's Flexible
+Column Layout and BC's list-plus-FactBox. **The pattern is not the problem.** What is wrong
+is the ALLOCATION — which facts sit in which of the three places (§12.7.5).
+
+### 12.7.4 · So is an expand justified at all? YES — but for a narrower reason
+
+**Not** *"so the operator does not have to open the panel"*. That reason fails its own test:
+the panel is already open and free, and duplicating its content one level up is the
+one-number-in-four-places disease Loo himself named.
+
+**The reason that survives is one the row and the panel structurally cannot cover:**
+
+> **The panel shows ONE document. The row shows ONE value per document. Neither can compare
+> the CHILDREN of SEVERAL documents at once.**
+
+Carres has exactly this case today, and Loo found it:
+
+```
+PO-2032 has 3 lines going to 2 destinations — AL Sungai Buloh + Carres Klang.
+"Which lines across all my open POs are going to AL this week?"
+  → the row can only say `Carres Klang +1`
+  → the panel can only answer for one PO at a time
+  → today: open all 21 POs, one by one
+```
+
+**That is the test, and it is portable to Receiving, Claims and Stock:**
+
+> **Build the expand when the operator must read a fact that lives on the LINE, across MANY
+> documents, in one pass. Otherwise the panel is enough and the expand is decoration.**
+
+### 12.7.5 · THE ALLOCATION — which fact goes where
+
+**Loo's rule, adopted verbatim (2026-08-04):** *"Expand only shows information that cannot be
+represented in a single row."*
+
+| Tier | The test it must pass | What lives there |
+|---|---|---|
+| **ROW** | *Is it ONE value for the whole PO, and does it help me choose which PO to touch?* | PO Issued · Supplier · PO No. · SO No. · Items · Destination · Customer Delivery · Expected Arrival · Current Action |
+| **EXPAND** | *Do I need this for SEVERAL POs at once, without opening each?* **Read-only.** | per line: which SO · which item · qty · **its own destination** · received / short / damaged · plus `Supplier Ready Date` and `Received At`, which are not columns |
+| **RIGHT PANEL** | *Am I now WORKING on this one PO?* | every write, the full four-date timeline, Communication, Print, history |
+
+**Four negative rules, and each one closes a hole this repo has already paid for:**
+
+1. **Nothing appears in two tiers.** Loo's own rule, and the reason the expand may not
+   repeat Supplier · Destination · Expected Arrival · SO · Items — all five are columns.
+2. **The expand never writes.** The moment it holds a control, there are two editing
+   surfaces for one PO and they will disagree. Writes stay in the panel (C1's rule: a second
+   door is a bypass).
+3. **The expand is not a tree.** Two levels, fixed forever. No `expandable` node inside an
+   expanded node — that is the shape Fiori calls a last resort.
+4. **A `+N` on the row is a FLAG, not an answer.** `Carres Klang +1` says *this one is
+   different*; the expand says *how*. That is why both are kept and neither is duplication.
+
+### 12.7.6 · The costs — stated, because a review that only lists benefits is an advert
+
+| Cost | Why it bites Carres specifically |
+|---|---|
+| **A filter becomes ambiguous** | Filter `Destination = AL Sungai Buloh`: does the register show the PARENT PO, or only the matching LINE? The facet counts and the nine column funnels all have to answer this, and today every one of them counts POs |
+| **A count becomes ambiguous** | The footer reads `21 purchase orders`. With children on screen, is it 21 or 35? Both are true and the operator cannot tell which they are looking at |
+| **Not responsive** | SAP's own words. Rows stop being a fixed 40px, so the scanning rhythm the page is built on breaks wherever a row is open |
+| **The 40px law bends** | `DataTable`'s own comment: the expanded cell is *"the ONE cell in this table that may be taller"* — it is already an exception, and every open row is another one |
+| **Two clicks, not one** | Read the expand → find a problem → still have to open the panel to act. The current design is one click to the panel |
+| **It is not free to un-build** | Once operators learn to expand, removing it costs more than never adding it |
+
+### 12.7.7 · What already exists, so nobody rebuilds it
+
+**D0.5d shipped the whole mechanism on 2026-08-04** (`apps/web/src/components/kit/DataTable.tsx`):
+
+```
+group     AutoCount-style group headers   — Loo asked for it 2026-08-03, live on To Order
+expand    `expanded` set + `expandable(row)` — the one cell allowed to exceed 40px
+resize    drag the header edge; width comes from the RIGHT NEIGHBOUR, never the table
+reorder   drag the header
+footer    totals band
+```
+
+**This is wiring, not building.** A chat that proposes building an expander has not read the kit.
 
 ## 12.6 · Reported with the freeze, not built
 
