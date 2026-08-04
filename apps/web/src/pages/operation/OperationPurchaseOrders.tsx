@@ -77,15 +77,26 @@ import {
  *
  *   LISTING (kit DataTable — the AutoCount register; Jess's Purchasing law,
  *     2026-08-02: the listing is for FINDING — sort, filter, search; the
- *     work happens in the workspace). Eight frozen columns, her order:
- *     PO Issued · Supplier · PO No. · Items · Customer Delivery ·
- *     Goods Arrival · Received · Current Action. **Default order = RISK TO
- *     THE CUSTOMER'S PROMISE** (Loo, 2026-08-04 — `comparePoRisk`): a late
- *     call, then goods landing after the promise, then on the day. It
- *     replaces `PO Issued` oldest first, which sorted by how long the
- *     DOCUMENT had waited rather than by how close the CUSTOMER was; her
- *     rule keeps its column, its header sort and the tie-breaker. Every
- *     column sorts by header click and
+ *     work happens in the workspace). **NINE frozen columns, ONE fixed set**
+ *     (Loo, 2026-08-04 — Q7): PO Issued · Supplier · PO No. · SO No. ·
+ *     Items · Destination · Customer Delivery · Expected Arrival ·
+ *     Current Action.
+ *
+ *     **THE SET NEVER CHANGES BECAUSE THE PANEL OPENED.** His words:
+ *     *"Operator 的眼睛会一直重新学习页面，Information Hierarchy 每开一次
+ *     Detail 就改变，这是 ERP 不应该发生的."* There is no compact variant and
+ *     no honesty guard — a column that can never hide cannot be hidden while
+ *     it is filtered. When the nine do not fit, the LISTING REGION scrolls
+ *     sideways (AutoCount's own grid does); deleting business information to
+ *     avoid a scrollbar is the thing he forbade, and resize + reorder (PR 601)
+ *     are how an operator who wants a different balance gets one.
+ *
+ *     **Default order = RISK TO THE CUSTOMER'S PROMISE** (Loo, 2026-08-04 —
+ *     `comparePoRisk`): a late call, then goods landing after the promise,
+ *     then on the day. It replaces `PO Issued` oldest first, which sorted by
+ *     how long the DOCUMENT had waited rather than by how close the CUSTOMER
+ *     was; her rule keeps its column, its header sort and the tie-breaker.
+ *     Every column sorts by header click and
  *     filters by its ▼ (dates: Excel presets + month buckets + Custom Date
  *     Range); the top Search finds across PO/Supplier/SKU/Model/SO/Customer
  *     — two different jobs, both stay.
@@ -100,8 +111,7 @@ import {
  * supplier → hand over to Receiving.
  *
  * Deliberately absent until their stores exist (dead controls are banned):
- * Notes (no store) · Supplier DO (no store) · editable Goods Arrival
- * (Phase 6 — writes the promise ledger through its own door).
+ * Notes (no store) · Supplier DO (no store).
  *
  * Two entries LEFT this list and the correction is worth keeping: the Email
  * door and the send history are BUILT (`po_sends` / `po_revisions`, 0312), and
@@ -340,6 +350,55 @@ export default function OperationPurchaseOrders() {
   const itemsTitleOf = (po: operationPoListRow): string =>
     po.purchase_order_lines.map(lineText).join("\n");
 
+  /**
+   * WHERE THE GOODS GO, for the whole PO (Q7 · Loo, 2026-08-04): *"没有
+   * Destination，Operator 根本不知道这张 PO 是特殊单."*
+   *
+   * A line with no destination of its own follows the PO's (0311's rule, the
+   * same one the expand's picker reads), and a PO with no destination follows
+   * its warehouse — so the register can never print a blank for a fact every
+   * PO has. **The names are the SAVED ones**, never re-spelt: COPY-STANDARD
+   * locks `Carres Klang` · `AL Sungai Buloh` · `HOUZS` and warns by name
+   * against shortening `AL Sungai Buloh` to `AL`.
+   *
+   * The PO's own destination LEADS when the lines disagree — the row is one
+   * value for one document (§12.7.5's ROW test) and the per-line truth is the
+   * expand's, which is why this is a FLAG and not a duplicated field.
+   */
+  const destNamesOf = (po: operationPoListRow): string[] => {
+    const nameOf = (id: string | null | undefined): string | null =>
+      id == null ? null : (destinations.find((d) => d.id === id)?.name ?? null);
+    const fallback =
+      nameOf(po.destination_id) ??
+      warehouseById.get(po.warehouse_id)?.name ??
+      null;
+    const seen: string[] = [];
+    const add = (n: string | null) => {
+      if (n != null && !seen.includes(n)) seen.push(n);
+    };
+    add(fallback);
+    for (const l of po.purchase_order_lines)
+      add(nameOf(l.destination_id) ?? fallback);
+    return seen;
+  };
+  /** `Carres Klang +1` — the portal's existing pattern. `Multiple (2)` is
+   *  refused by name (Q7's Must-NOT): it names no destination at all. */
+  const destTextOf = (po: operationPoListRow): string => {
+    const names = destNamesOf(po);
+    if (names.length === 0) return "—";
+    return names.length > 1 ? `${names[0]} +${names.length - 1}` : names[0];
+  };
+
+  /** The sales orders this PO was built from — `SO-1206 +4` when there are
+   *  several (Loo: *"Operator 经常需要知道这张 PO 是哪几个 Sales Order
+   *  组成的"*). The full list rides the cell's own title. */
+  const soTextOf = (po: operationPoListRow): string => {
+    const refs = soRefsOf(po);
+    if (refs.length === 0) return "—";
+    const head = `SO-${refs[0]}`;
+    return refs.length > 1 ? `${head} +${refs.length - 1}` : head;
+  };
+
   const prodDaysByPair = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of settingsQ.data?.productionDays ?? [])
@@ -419,8 +478,8 @@ export default function OperationPurchaseOrders() {
 
   // ── RISK ORDER (Loo, 2026-08-04) — the register's default. Built from the
   //    facts the row already prints: the engine's calls, the work state, the
-  //    customer's date and the SAME arrival the Goods Arrival cell shows, so
-  //    a row's position and its own cells can never tell two stories. The
+  //    customer's date and the SAME arrival the `Expected Arrival` cell shows,
+  //    so a row's position and its own cells can never tell two stories. The
   //    comparator itself is `comparePoRisk` in packages/shared — a page-local
   //    one would be a second priority (Law 7's shape, applied to sorting).
   const riskByPo = useMemo(() => {
@@ -482,6 +541,13 @@ export default function OperationPurchaseOrders() {
         return sel.has(po.id);
       case "items":
         return po.purchase_order_lines.some((l) => sel.has(lineLabel(l)));
+      case "sono": {
+        const refs = soRefsOf(po);
+        if (refs.length === 0) return sel.has(F_NONE);
+        return refs.some((n) => sel.has(`SO-${n}`));
+      }
+      case "dest":
+        return destNamesOf(po).some((n) => sel.has(n));
       case "issued":
         return [...sel].some((v) =>
           dateFilterMatches((po.placed_at ?? "").slice(0, 10) || null, v, today),
@@ -492,10 +558,6 @@ export default function OperationPurchaseOrders() {
         );
       case "arriving":
         return [...sel].some((v) => dateFilterMatches(etaOf(po).date, v, today));
-      case "received": {
-        const pr = poReceivingProgress(po.purchase_order_lines);
-        return sel.has(`${pr.received} / ${pr.ordered}`);
-      }
       case "action":
         return sel.has(actionKeyOf(actionOf(po)));
       default:
@@ -528,10 +590,14 @@ export default function OperationPurchaseOrders() {
             return itemsPreviewOf(p);
           case "arriving":
             return etaOf(p).date ?? "9999-12-31";
-          case "received": {
-            const pr = poReceivingProgress(p.purchase_order_lines);
-            return String(pr.received).padStart(6, "0");
+          case "sono": {
+            const refs = soRefsOf(p);
+            return refs.length === 0
+              ? "zzz"
+              : String(refs[0]).padStart(9, "0");
           }
+          case "dest":
+            return destTextOf(p);
           case "action": {
             const a = actionOf(p);
             return a ? actionListWordOf(a) : "zzz";
@@ -715,15 +781,31 @@ export default function OperationPurchaseOrders() {
     return [...labels].sort().map((v) => ({ value: v, label: v }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searched, colFilters, skuBySku, modelNameById]);
-  const receivedOptions = useMemo(() => {
-    const vals = new Set<string>();
-    for (const p of searched.filter((r) => passesAllCols(r, "received"))) {
-      const pr = poReceivingProgress(p.purchase_order_lines);
-      vals.add(`${pr.received} / ${pr.ordered}`);
+  /** Q7 — the two new columns take the same ▼ every other column carries
+   *  (Jess's Purchasing law, 2026-08-02). Both list the DISTINCT values the
+   *  current view holds, nothing invented. */
+  const soOptions = useMemo(() => {
+    const refs = new Set<number>();
+    let none = false;
+    for (const p of searched.filter((r) => passesAllCols(r, "sono"))) {
+      const rs = soRefsOf(p);
+      if (rs.length === 0) none = true;
+      for (const n of rs) refs.add(n);
     }
-    return [...vals].sort().map((v) => ({ value: v, label: v }));
+    const opts = [...refs]
+      .sort((a, b) => a - b)
+      .map((n) => ({ value: `SO-${n}`, label: `SO-${n}` }));
+    if (none) opts.push({ value: F_NONE, label: "—" });
+    return opts;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searched, colFilters]);
+  const destOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const p of searched.filter((r) => passesAllCols(r, "dest")))
+      for (const n of destNamesOf(p)) names.add(n);
+    return [...names].sort().map((v) => ({ value: v, label: v }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searched, colFilters, destinations, warehouseById]);
 
   const actionOptions = useMemo(() => {
     const base = searched.filter((p) => passesAllCols(p, "action"));
@@ -742,11 +824,19 @@ export default function OperationPurchaseOrders() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searched, colFilters, actionByPo]);
 
-  // ── The listing — fixed px interiors, one auto tail (the frozen recipe) ──
-
-  // The eight columns, in Jess's frozen order (2026-08-02):
-  //   PO Issued · Supplier · PO No. · Items · Customer Delivery ·
-  //   Goods Arrival · Received · Current Action
+  // ── The listing — ONE fixed set of NINE, every width a MEASURED minimum ──
+  //
+  // Loo's frozen order (2026-08-04 · Q7):
+  //   PO Issued · Supplier · PO No. · SO No. · Items · Destination ·
+  //   Customer Delivery · Expected Arrival · Current Action
+  //
+  // Every width below is MEASURED in a real browser against the app's own
+  // stylesheet (13px Inter, the DataTable cell's `px-2` = 16px, header = the
+  // word + 2 + the ▼'s 24 + 16). They are MINIMUMS, not preferences: the
+  // region carries `min-w-[PO_LISTING_MIN_PX]` and scrolls below it, and above
+  // it the fixed table hands the slack out. **Do not re-derive one by
+  // guessing** — jsdom has no widths, so no page test can catch a clipped
+  // cell; only the browser can.
   const columns: readonly Column<operationPoListRow>[] = [
     {
       key: "issued",
@@ -756,7 +846,7 @@ export default function OperationPurchaseOrders() {
       // never "the record we created". A system Created date, if ever
       // wanted, belongs in the workspace's details block, not here.
       label: "PO Issued",
-      width: "88px",
+      width: "96px",
       sortable: true,
       filter: filterFor("issued", issuedOptions, { range: true }),
       cell: (p) => (
@@ -768,10 +858,9 @@ export default function OperationPurchaseOrders() {
     {
       key: "supplier",
       label: "Supplier",
-      // Compact (workspace open) lends the tail its last 12px. Measured, not
-      // guessed: the widest supplier name needs 87px (`Nice Future`, 70.7 +
-      // the cell's own 16).
-      width: workspaceOpen ? "92px" : "104px",
+      // Measured, not guessed: the widest supplier name needs 87px
+      // (`Nice Future`, 70.7 + the cell's own 16).
+      width: "87px",
       sortable: true,
       filter: filterFor("supplier", supplierOptions, { searchable: true }),
       cell: (p) => supplierNameOf(p.supplier_id),
@@ -779,7 +868,7 @@ export default function OperationPurchaseOrders() {
     {
       key: "po",
       label: "PO No.",
-      width: "104px",
+      width: "83px",
       sortable: true,
       filter: filterFor("po", poOptions, { searchable: true }),
       cell: (p) => {
@@ -817,16 +906,37 @@ export default function OperationPurchaseOrders() {
       },
     },
     {
+      key: "sono",
+      // `SO No.` (Loo, 2026-08-04): *"PO 是从 SO 来的，Operator 经常需要知道
+      // 这张 PO 是哪几个 Sales Order 组成的."* The data has been on the wire
+      // since the register shipped (`so` + `so_refs`) and no column read it.
+      label: "SO No.",
+      width: "94px",
+      sortable: true,
+      filter: filterFor("sono", soOptions, { searchable: true }),
+      cell: (p) => {
+        const refs = soRefsOf(p);
+        if (refs.length === 0) return <span className="text-kit-slate-9">—</span>;
+        return (
+          <span
+            className="block truncate font-mono"
+            title={refs.map((n) => `SO-${n}`).join("\n")}
+          >
+            {soTextOf(p)}
+          </span>
+        );
+      },
+    },
+    {
       key: "items",
       label: "Items",
-      // ITEMS IS THE `auto` TAIL NOW (Loo, 2026-08-04), and Current Action is
-      // the fixed column. The recipe is unchanged — fixed interiors, ONE auto
-      // tail — only WHICH column absorbs the slack. The argument is the whole
-      // of it: the column that truncates should be the one whose truncation
-      // costs least. `Booqit 1B(…)` is still identifiable and the PO number
-      // sits right beside it; `Confirm tomorrow…` is an instruction that has
-      // been deleted.
-      width: "auto",
+      // Q7 — Items stops being the `auto` tail: there is no tail any more.
+      // Every one of the nine is a MEASURED minimum and the region scrolls
+      // when they do not fit, because deleting business information to avoid
+      // a scrollbar is exactly what Loo forbade. `Booqit 1B(…)` still
+      // truncates first among the word columns, which was Q1's argument and
+      // survives it.
+      width: "135px",
       sortable: true,
       filter: filterFor("items", itemsOptions, { searchable: true }),
       cell: (p) => (
@@ -836,6 +946,29 @@ export default function OperationPurchaseOrders() {
       ),
     },
     {
+      key: "dest",
+      // `Destination` (Loo, 2026-08-04): *"没有 Destination，Operator 根本不
+      // 知道这张 PO 是特殊单."* The ROW prints ONE value for the document — a
+      // FLAG — and the expand carries the per-LINE value the row structurally
+      // cannot hold. A flag and a field are not the same fact (§12.7.5's
+      // rule 1), which is why this is not the duplication that rule bans.
+      label: "Destination",
+      headerTitle:
+        "Where the supplier sends the goods — a PO whose lines split shows the first and how many more",
+      width: "135px",
+      sortable: true,
+      filter: filterFor("dest", destOptions, { searchable: true }),
+      cell: (p) => {
+        const names = destNamesOf(p);
+        if (names.length === 0) return <span className="text-kit-slate-9">—</span>;
+        return (
+          <span className="block truncate" title={names.join("\n")}>
+            {destTextOf(p)}
+          </span>
+        );
+      },
+    },
+    {
       key: "custdel",
       label: "Customer Delivery",
       // A merged PO carries several customers' dates; until P5's allocation
@@ -843,7 +976,7 @@ export default function OperationPurchaseOrders() {
       // 2026-08-02: never let staff read it as the whole PO's only date).
       headerTitle:
         "Earliest customer delivery across this PO's sales orders — a merged PO carries more than one",
-      width: "96px",
+      width: "140px",
       sortable: true,
       filter: filterFor("custdel", custdelOptions, { range: true }),
       cell: (p) => {
@@ -861,19 +994,21 @@ export default function OperationPurchaseOrders() {
     },
     {
       key: "arriving",
-      // `Goods Arrival`, never `Goods Arriving At` (Jess, 2026-08-03): `At`
-      // carries no information, and this column's neighbour is `Customer
-      // Delivery` — two dates of the same kind, so they now read as a pair.
-      // It is also the word ORDERS-WORKING-FLOW.md already uses.
-      label: "Goods Arrival",
-      // Wider than the 96px it carried as a bare date: the gap tail rides
-      // here, and a truncated warning is worse than no warning. 192 is
-      // MEASURED against the worst line the cell can hold — `25 Aug 26  8d
-      // late (revised)` needs 189 — never estimated: jsdom has no widths, so
-      // the page tests structurally cannot catch this and only the browser
-      // can. Compact keeps the old 96: there this column appears only when
-      // the HONESTY GUARD forces it, and six columns have never fitted 565px.
-      width: workspaceOpen ? "96px" : "192px",
+      // `Expected Arrival` — §12.2 ②, the portal-wide date dictionary Loo
+      // froze on 2026-08-04. The old spelling is RETIRED because it named no
+      // destination: *arrival of what, where?* This word and `Customer
+      // Delivery` work as a pair precisely because each names its own end —
+      // arrival at OUR warehouse against delivery to THEIR house.
+      //
+      // Q5 put the new word in the expand two rows below and this column kept
+      // the old one, so one fact was spelt two ways on one screen. The other
+      // two pages still carrying it (Receiving, and `Stock` / `Stock ETA` on
+      // the Orders list) are OTHER LANES and each sweeps its own screens.
+      label: "Expected Arrival",
+      // Wider than a bare date: the gap tail rides here, and a truncated
+      // warning is worse than no warning. MEASURED against the worst line the
+      // cell can hold — `25 Aug 26  8d late (revised)` — never estimated.
+      width: "206px",
       sortable: true,
       filter: filterFor("arriving", arrivingOptions, { range: true }),
       cell: (p) => {
@@ -939,19 +1074,10 @@ export default function OperationPurchaseOrders() {
         );
       },
     },
-    {
-      key: "received",
-      label: "Received",
-      width: "72px",
-      align: "right",
-      numeric: true,
-      sortable: true,
-      filter: filterFor("received", receivedOptions),
-      cell: (p) => {
-        const pr = poReceivingProgress(p.purchase_order_lines);
-        return `${pr.received} / ${pr.ordered}`;
-      },
-    },
+    // `Received` LEFT the register (Q7 · Loo, 2026-08-04): it is not one of
+    // his nine, and `Received At` — the fact the operator actually asks for —
+    // lives in the expand beside the line it belongs to. Nothing visible is
+    // lost today: 0 of 21 POs have ever received anything.
     {
       key: "action",
       label: "Current Action",
@@ -966,7 +1092,14 @@ export default function OperationPurchaseOrders() {
       // 23px at a 1280 viewport, 109 at 1366, 183 at 1440 — so on an ordinary
       // business laptop three of the seven words were cut, with
       // `text-overflow: clip`, so not even an ellipsis said so.
-      width: "200px",
+      //
+      // Q7 moves it 200 → 192, and that is not a shave: 192 is the MEASURED
+      // minimum of the longest word that fits (`Confirm tomorrow's delivery`
+      // = 175.4 + the cell's 16 = 192 exactly). The one 201px string,
+      // `Confirm balance delivery date`, was already the exception Q1 named
+      // and it still keeps its own `title`. Above the min-width the fixed
+      // table hands the slack out, so on any real monitor this is wider.
+      width: "192px",
       sortable: true,
       filter: filterFor("action", actionOptions),
       cell: (p) => {
@@ -993,22 +1126,21 @@ export default function OperationPurchaseOrders() {
     },
   ];
 
-  /** Gmail's reading-pane recipe, compact set re-ruled with the 8 columns
-   *  (Jess, 2026-08-02): PO Issued (when) · Supplier (with whom) · PO No.
-   *  (which document) · Items (which goods) · Current Action (what now).
-   *  Customer Delivery / Goods Arrival / Received read off the open Live
-   *  PO beside them. HONESTY GUARD unchanged: a column carrying an ACTIVE
-   *  filter or sort can never be hidden — a filter you cannot see is a lie
-   *  the table tells (P2's own law). */
-  const COMPACT_KEYS = new Set(["issued", "supplier", "po", "items", "action"]);
-  const visibleColumns = workspaceOpen
-    ? columns.filter(
-        (c) =>
-          COMPACT_KEYS.has(c.key) ||
-          (colFilters.get(c.key)?.size ?? 0) > 0 ||
-          sort?.key === c.key,
-      )
-    : columns;
+  /**
+   * THERE IS NO COMPACT SET, AND THAT IS THE RULING (Loo, 2026-08-04 · Q7).
+   *
+   * Gmail's reading-pane recipe used to swap the register down to five
+   * columns whenever the workspace was open, with an HONESTY GUARD holding a
+   * filtered or sorted column visible. Both are gone. His words: *"Operator
+   * 的眼睛会一直重新学习页面，Information Hierarchy 每开一次 Detail 就改变，
+   * 这是 ERP 不应该发生的."*
+   *
+   * The guard disappeared WITH the feature rather than being deleted — a
+   * column that can never hide cannot be hidden while it is filtered. This is
+   * the ruling most likely to be quietly re-introduced under another name, so
+   * `the column set never changes` is asserted by its own test.
+   */
+  const visibleColumns = columns;
 
   /** The kit takes a Set; the page keeps ONE id. */
   const expandedRows = useMemo(
@@ -1140,11 +1272,18 @@ export default function OperationPurchaseOrders() {
           className="flex-1 min-w-0 min-h-0 flex flex-col border-r border-kit-slate-5 bg-white"
           data-testid="po-listing"
         >
-          {/* Excel's own answer to eight columns in half a screen: the
-              LISTING region scrolls horizontally (the page never does).
-              min-width = the frozen column set at full size. */}
+          {/* ONE min-width, always (Q7 · Loo, 2026-08-04). The LISTING region
+              scrolls horizontally below it; the page never does. AutoCount's
+              own grid scrolls, and **deleting business information to avoid a
+              scrollbar is the thing he forbade** — an operator who wants a
+              different balance has resize and reorder (PR 601).
+
+              The number is the sum of the nine measured minimums (1168) plus
+              the kit's expand-control column, which takes 3% of the table:
+              1168 / 0.97 = 1204.1 → 1205, so even at the narrowest width every
+              column still reaches its own minimum. */}
           <div className="flex-1 min-h-0 overflow-auto">
-            <div className={workspaceOpen ? "" : "min-w-[880px]"}>
+            <div className="min-w-[1205px]">
               <DataTable<operationPoListRow>
               rows={rows}
               columns={visibleColumns}
@@ -2238,7 +2377,9 @@ function ActivityDesk({
     .map((l) => `${l.sku} ×${l.qty}`)
     .join("\n");
   const arriving = po.eta_date
-    ? `Goods Arrival: ${fmtDate(po.eta_date)}`
+    ? // §12.2 ② — the ONE word for this fact, everywhere it appears, and a
+      // message a supplier holds is the place it matters most.
+      `Expected Arrival: ${fmtDate(po.eta_date)}`
     : "Please confirm the arrival date.";
 
   /** The ONE company-wide draft, filled in. A template with no placeholders
@@ -2489,7 +2630,7 @@ function ActivityDesk({
 
       {/* ③ COMMUNICATION HISTORY — what the Portal OBSERVED, and nothing
           more. Deliberately NOT called `History`: the PO's real history will
-          later carry revisions, ETA changes, Goods Arrival changes, notes and
+          later carry revisions, arrival-date changes, notes and
           claims, and that name is being kept for it (Jess, 2026-08-03 —
           overriding her own 2026-08-02 `ACTIVITY`, whose reason was that the
           section would hold the business timeline; it holds only the doors).
