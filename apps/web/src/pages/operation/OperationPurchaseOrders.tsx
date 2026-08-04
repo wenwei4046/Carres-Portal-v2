@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   addWorkingDays,
+  comparePoRisk,
   myHolidaySet,
   ordinalLabel,
   poDateHistoryOf,
@@ -18,6 +19,7 @@ import {
   purchasingSupplierCallsOf,
   railItemLabel,
   type PoCurrentAction,
+  type PoRiskRow,
   type PoWorkState,
   type ProductSkuDto,
   type PurchasingOpenCall,
@@ -76,9 +78,13 @@ import {
  *     2026-08-02: the listing is for FINDING — sort, filter, search; the
  *     work happens in the workspace). Eight frozen columns, her order:
  *     PO Issued · Supplier · PO No. · Items · Customer Delivery ·
- *     Goods Arrival · Received · Current Action. Default order =
- *     PO Issued OLDEST first (the buyer chases the longest-waiting PO,
- *     never the biggest number). Every column sorts by header click and
+ *     Goods Arrival · Received · Current Action. **Default order = RISK TO
+ *     THE CUSTOMER'S PROMISE** (Loo, 2026-08-04 — `comparePoRisk`): a late
+ *     call, then goods landing after the promise, then on the day. It
+ *     replaces `PO Issued` oldest first, which sorted by how long the
+ *     DOCUMENT had waited rather than by how close the CUSTOMER was; her
+ *     rule keeps its column, its header sort and the tie-breaker. Every
+ *     column sorts by header click and
  *     filters by its ▼ (dates: Excel presets + month buckets + Custom Date
  *     Range); the top Search finds across PO/Supplier/SKU/Model/SO/Customer
  *     — two different jobs, both stay.
@@ -345,6 +351,27 @@ export default function OperationPurchaseOrders() {
       ? purchasingActionQueue(a.call.key)
       : PO_STATE_ACTION_SHORT[a.key];
 
+  // ── RISK ORDER (Loo, 2026-08-04) — the register's default. Built from the
+  //    facts the row already prints: the engine's calls, the work state, the
+  //    customer's date and the SAME arrival the Goods Arrival cell shows, so
+  //    a row's position and its own cells can never tell two stories. The
+  //    comparator itself is `comparePoRisk` in packages/shared — a page-local
+  //    one would be a second priority (Law 7's shape, applied to sorting).
+  const riskByPo = useMemo(() => {
+    const m = new Map<string, PoRiskRow>();
+    for (const po of pos) {
+      m.set(po.id, {
+        poId: po.id,
+        state: workStateOf(po, today),
+        calls: callsByPo.get(po.id) ?? [],
+        customerDeliveryIso: po.customer_delivery ?? null,
+        arrivalIso: etaByPo.get(po.id)?.date ?? po.eta_date,
+        placedAtIso: po.placed_at ?? null,
+      });
+    }
+    return m;
+  }, [pos, today, callsByPo, etaByPo]);
+
   // ── The pipeline: search → rail (calls × work status) → column filters →
   //    sort. Every rail count is computed with the OTHER dimensions applied,
   //    so a visible number always matches the rows its click produces. ─────
@@ -449,20 +476,22 @@ export default function OperationPurchaseOrders() {
       };
       sorted.sort((a, b) => dir * val(a).localeCompare(val(b)));
     } else {
-      // The Register's default order (Jess's Purchasing law, 2026-08-02):
-      // PO Issued, OLDEST first — the buyer's day starts at the PO that has
-      // been waiting the longest, never at the biggest number. Business
-      // priority, not document numbering; PO No. ▼ still sorts by number
-      // when someone asks. Clearing a header sort returns here.
+      // The Register's default order: RISK TO THE CUSTOMER'S PROMISE (Loo,
+      // 2026-08-04). It replaces `PO Issued` oldest first as the DEFAULT and
+      // settles a conflict between two laws that both said something true —
+      // `PO Issued` keeps its column and its header sort, and survives inside
+      // `comparePoRisk` as the tie-breaker. Clearing a header sort returns
+      // here, which is why this is the `else` branch and not a preset sort.
       sorted.sort((a, b) => {
-        const pa = (a.placed_at ?? "").localeCompare(b.placed_at ?? "");
-        if (pa !== 0) return pa;
-        return a.id.localeCompare(b.id);
+        const ra = riskByPo.get(a.id);
+        const rb = riskByPo.get(b.id);
+        if (!ra || !rb) return a.id.localeCompare(b.id);
+        return comparePoRisk(ra, rb);
       });
     }
     return sorted;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searched, stateSel, colFilters, sort, callsByPo, supplierById]);
+  }, [searched, stateSel, colFilters, sort, callsByPo, riskByPo, supplierById]);
 
   const stateCounts = useMemo(() => {
     const m = new Map<WorkState, number>();
@@ -673,8 +702,9 @@ export default function OperationPurchaseOrders() {
     {
       key: "supplier",
       label: "Supplier",
-      // Compact (workspace open) buys the Current Action tail its last 12px.
-      // Measured, not guessed: the widest supplier name needs 87px.
+      // Compact (workspace open) lends the tail its last 12px. Measured, not
+      // guessed: the widest supplier name needs 87px (`Nice Future`, 70.7 +
+      // the cell's own 16).
       width: workspaceOpen ? "92px" : "104px",
       sortable: true,
       filter: filterFor("supplier", supplierOptions, { searchable: true }),
@@ -723,9 +753,14 @@ export default function OperationPurchaseOrders() {
     {
       key: "items",
       label: "Items",
-      // Same 10px loan as Supplier, and the widest label measures 135px, so
-      // nothing here truncates that did not truncate before.
-      width: workspaceOpen ? "140px" : "150px",
+      // ITEMS IS THE `auto` TAIL NOW (Loo, 2026-08-04), and Current Action is
+      // the fixed column. The recipe is unchanged — fixed interiors, ONE auto
+      // tail — only WHICH column absorbs the slack. The argument is the whole
+      // of it: the column that truncates should be the one whose truncation
+      // costs least. `Booqit 1B(…)` is still identifiable and the PO number
+      // sits right beside it; `Confirm tomorrow…` is an instruction that has
+      // been deleted.
+      width: "auto",
       sortable: true,
       filter: filterFor("items", itemsOptions, { searchable: true }),
       cell: (p) => (
@@ -800,10 +835,22 @@ export default function OperationPurchaseOrders() {
           >
             {fmtDateShort(eta.date)}
             {gap && (
+              /* WHO SAID THE DATE decides the tone (Loo, 2026-08-04). Ten of
+                 the live 21 rows print a gap warning and EIGHT of those ten
+                 are computed from OUR OWN estimate — the factory has said
+                 nothing. A guess and a fact were painted the same red, and
+                 they need opposite next actions: one is a phone call to make,
+                 the other is a promise already broken. No new word and no new
+                 label — the date's own tooltip already says which is which;
+                 the colour now says it too. `same day` stays amber either
+                 way: it is tight, not broken. */
               <span
                 data-testid="po-arrival-gap"
+                data-tone={
+                  gap.tone === "late" && eta.confirmed ? "confirmed" : "estimate"
+                }
                 className={
-                  gap.tone === "late"
+                  gap.tone === "late" && eta.confirmed
                     ? " text-kit-red-11"
                     : " text-kit-amber-11"
                 }
@@ -842,7 +889,18 @@ export default function OperationPurchaseOrders() {
     {
       key: "action",
       label: "Current Action",
-      width: "auto",
+      // MEASURED in a real browser against the app's own stylesheet, 13px
+      // Inter + the DataTable cell's `px-2` (16px total): `Confirm Arrival`
+      // 109 · `Open Receiving` 113 · `Contact Supplier` 119 · `Waiting for
+      // Goods` 126 · `Confirm what happens next` 186 · `Confirm tomorrow's
+      // delivery` 191 · `Confirm balance delivery date` 201. 200px carries
+      // every one of them but the last, which keeps its own `title`.
+      //
+      // It was `auto` and it was the ONLY column being squeezed: measured
+      // 23px at a 1280 viewport, 109 at 1366, 183 at 1440 — so on an ordinary
+      // business laptop three of the seven words were cut, with
+      // `text-overflow: clip`, so not even an ellipsis said so.
+      width: "200px",
       sortable: true,
       filter: filterFor("action", actionOptions),
       cell: (p) => {
@@ -1285,10 +1343,19 @@ function WorkspaceBody({
               that used to sit here was history squeezed into a header — the
               history itself is one click away and says it properly. */}
           {gap && (
+            /* Same tone rule as the register (Loo, 2026-08-04): red only when
+               the FACTORY gave the date. Two surfaces, one rule — spelling it
+               twice is how a guess ends up red in one place and amber in the
+               other. */
             <span
               data-testid="po-arrival-gap"
+              data-tone={
+                gap.tone === "late" && eta.confirmed ? "confirmed" : "estimate"
+              }
               className={
-                gap.tone === "late" ? "text-kit-red-11" : "text-kit-amber-11"
+                gap.tone === "late" && eta.confirmed
+                  ? "text-kit-red-11"
+                  : "text-kit-amber-11"
               }
             >
               {"  "}⚠ {gap.label}

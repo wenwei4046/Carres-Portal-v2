@@ -134,6 +134,76 @@ export function poArrivalGapOf(
   return { days, tone: "late", label: `${days}d late` };
 }
 
+/**
+ * RISK ORDER — which purchase order to touch FIRST (Loo, 2026-08-04).
+ *
+ * The register opened on `PO Issued`, oldest first, which sorts by how long
+ * the DOCUMENT has waited rather than by how close the CUSTOMER is. Measured
+ * on the live 21: `PO-2038`'s customer expected goods that same day, the
+ * factory had never given a date, our own estimate landed a week after the
+ * promise — and it sat at row 8 wearing the same words as fifteen other rows.
+ *
+ * **This settles a LAW CONFLICT rather than expressing a preference.**
+ * `PURCHASING-WORKING-FLOW.md` §6 and `ACTION-FLOW-STANDARD.md` Law 5 both say
+ * row order is *risk to the promise*; Jess's 2026-08-02 listing law said
+ * `PO Issued` oldest first. Both were law. Loo ruled risk-first on 2026-08-04,
+ * and **her rule is not deleted — it survives as the header sort and as the
+ * tie-breaker below.**
+ *
+ * It lives here, beside `poCurrentActionOf` and `poArrivalGapOf`, because a
+ * comparator written inside the page would be a SECOND priority: the row's
+ * pill would say one thing and the row's position another.
+ */
+export interface PoRiskRow {
+  /** `purchase_orders.id` — the last tie-break, so the order is TOTAL and two
+   *  rows can never swap between renders. */
+  poId: string;
+  /** From `poWorkStateOf`. A finished or cancelled PO has no risk left. */
+  state: PoWorkState;
+  /** The engine's open calls (`purchasingSupplierCallsOf`) — `late` is its own. */
+  calls: readonly { late: boolean }[];
+  /** What we promised the customer (earliest across a merged PO's orders). */
+  customerDeliveryIso: string | null;
+  /** The arrival the register SHOWS — the supplier's own date, else our
+   *  estimate. The same value the Goods Arrival cell prints, so the colour and
+   *  the position can never disagree. */
+  arrivalIso: string | null;
+  /** `purchase_orders.placed_at` — Jess's rule, as the tie-breaker. */
+  placedAtIso: string | null;
+}
+
+/** 1 is the most dangerous; 5 is everything with nothing to say. */
+export type PoRiskRung = 1 | 2 | 3 | 4 | 5;
+
+/** A PO with no promised date sorts LAST inside its rung, never first — an
+ *  absent date is not an urgent one. */
+const NO_CUSTOMER_DATE = "9999-12-31";
+
+export function poRiskRungOf(row: PoRiskRow): PoRiskRung {
+  // The work is over: its gap is history, not work — the same silence the
+  // Goods Arrival cell already keeps for a finished PO.
+  if (row.state === "completed" || row.state === "cancelled") return 5;
+  if (row.calls.some((c) => c.late)) return 1;
+  const gap = poArrivalGapOf(row.customerDeliveryIso, row.arrivalIso);
+  if (gap?.tone === "late") return 2;
+  if (gap?.tone === "tight") return 3;
+  if (row.calls.length > 0) return 4;
+  return 5;
+}
+
+export function comparePoRisk(a: PoRiskRow, b: PoRiskRow): number {
+  const ra = poRiskRungOf(a);
+  const rb = poRiskRungOf(b);
+  if (ra !== rb) return ra - rb;
+  const ca = a.customerDeliveryIso ?? NO_CUSTOMER_DATE;
+  const cb = b.customerDeliveryIso ?? NO_CUSTOMER_DATE;
+  if (ca !== cb) return ca < cb ? -1 : 1;
+  const pa = a.placedAtIso ?? "";
+  const pb = b.placedAtIso ?? "";
+  if (pa !== pb) return pa < pb ? -1 : 1;
+  return a.poId.localeCompare(b.poId);
+}
+
 export function poWorkStateOf(
   po: Pick<SupplierCallPo, "status" | "etaDateIso" | "lines">,
   // Kept for signature stability (poOverdueDays and every caller pass it);
