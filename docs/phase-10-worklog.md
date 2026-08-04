@@ -6,6 +6,41 @@
 
 ---
 
+**2026-08-04 · Purchasing Q6 — To Order is audited, and BOTH kit powers are refused in writing** (PR pending at time of writing, **no migration, no api change, NO PAGES DEPLOY OWED — proved by CHECKSUM**)
+
+Loo, 2026-08-04: *"now to order page i want also follow us."* The card that makes that true was written deliberately small, because **the honest measurement is that To Order was already closer to the Purchase Orders architecture than Purchase Orders was**: the kit's row expand (P10), the kit's `group` and a priority-ordered rail are all live, and it has no right panel to mis-define because it is a **Workspace** (`03-page-patterns.md`), not a document register.
+
+**So the whole diff is two files and both are additions: 48 lines of comment recording the §13.3 answer beside the prop that would wire it, and 78 lines of test turning the audit's two findings into guards. Nothing on the page changed** — which is the card's own Done-when, and is what an audit is. **P13 was already merged** (`8ac7787f` is an ancestor of main), so the rebase the card pre-authorised for IT was not needed and its `Reserve` wording is untouched. **P14 (#602) and then Q7 (#603) both merged MID-BUILD** — P14 moved `CreatePurchaseDialog` out of the same file — and this branch was rebased onto each in turn without asking, because a routine conflict is Engineer-Owned Delivery (§13.1); **every gate and the bundle checksum were re-run after each** — a checksum taken before a rebase is a checksum of a tree nobody will merge.
+
+**§13.3 ANSWERED FOR BOTH POWERS, ON PRODUCTION MEASUREMENTS — and both answers are NO.** The card said either answer is acceptable and that silence is not; this is the first Q-card whose answer is a refusal, so the evidence is the whole entry.
+
+```
+production, all 10 live rows, 1024 → 1280, the app's own stylesheet
+   viewport 1024 · table 668px      given   needs   widest live content
+      Supplier                        147      87   Nice Future
+      Qty                              53      24   2
+      Model                           287      75   H1401S Q
+      PO No.                          134     118   Yet to Order + Cancel
+   nothing truncates · no sideways scroll · rows 40px
+   (at 1280 the table is 934px and Model is given 402px)
+```
+
+**`resize` — refused.** A resize can only reveal something that is HIDDEN, and nothing on this grid is: no cell truncates at any viewport measured, so a drag saves no click, no document opened and no exception missed — §13.3's own three tests, all failed. **The measured defect is the opposite one** — Model is given five times the width its content needs — and that is a SIZING fault with its own card, **P16, Loo's Phase 1**, which fixes it for every operator at once. §0.4 forbids remembering a drag, so wiring resize instead would ask the operator to re-drag four columns every morning to paper over a defect a card already owns: **slower, not faster**. **Loo's ✅ on the sibling page was reasoned and the reason does not transfer**: *"supplier names are different lengths; one width cannot suit them all"* — To Order can buy from exactly TWO suppliers, so one width does suit them both. **And the one column with the least headroom is the one resize cannot help**: `PO No.` has 16px spare at 1024 and is the LAST column, which the kit deliberately gives no handle — there is no neighbour to take from.
+
+**`reorder` — refused, same test, different reason.** *"Different operators watch different columns"* is a problem of a WIDE register where the column you care about is off to the right; Purchase Orders has nine, this grid has four and all four are in one glance at every viewport measured with zero horizontal scroll. **Loo ruled this order himself on the real page** (2026-08-03) with a stated adjacency reason — Qty sits immediately left of Model so the number lands against the name, `2 │ Cody K`, *"which is how a quantity reads on every invoice and in AutoCount"* — and a drag that resets on reload would invite breaking that for nothing.
+
+**The refusal is a TEST, not a paragraph** — the same move #601 made for footer totals and grouping, and for the reason it gave: *a power that quietly appears later is exactly the failure §13.3 exists to stop.*
+
+**THE DATE SCAN IS CLEAN IN BOTH PLACES.** `Goods Arrival` · `Stock ETA` · a bare `ETA` grep **0** in `OperationToOrder.tsx`, **0** in `packages/shared/src/to-order.ts`, and **0** in the rendered text and every `aria-label` / `title` of the deployed page. This page labels no date at all: the customer's date is the group header's bare date. **`colPreferred` is PINNED to §12.2's own `Customer Delivery` rather than deleted**, and that is the point — it has had no screen consumer since the identity columns moved (2026-08-03), and deleting it would leave the next chat to invent `Preferred Delivery` again the day somebody labels that slot.
+
+**Three things reported into P7 as G8-G10, none fixed here.** ① The group header's bare date carries **two different facts under no word** — a customer order's `Customer Delivery` and a typed Ready Stock demand's **`Required By`**, which has no §12.2 row at all; that is the very ambiguity Loo hit with `Goods Arrival` (*arrival of what, where?*), one level down. ② **Three ruled words have no screen consumer** (`colPreferred` · `colSoNo` · `colCustomer`, referenced only by the test asserting they are gone) — the mirror of `ops_order_control.balance`. ③ **The `PO No.` cell holds a status word and an action button in one column** (`Yet to Order` + `Cancel`), which §12.3 forbade **the same day P12 shipped it**, and P12's own reasoning is on the record and was written before §12.3 existed. **A fourth belongs to the KIT lane, not P7**: `resize` and `reorder` come through ONE `layout` prop, so no page can answer §13.3 per power — here both answers were the same and it cost nothing.
+
+**Gates.** web tsc **0** · page **70 → 74** · web suite **2458 passed · 16 pre-existing, zero new** (the four §17.7 files) · shared **2121/2121** · build clean · **check-design 8367, IDENTICAL category for category to `origin/main`** — proved by linting a DETACHED WORKTREE at main (`check-design*.mjs` are plain node scripts and need no install), never by quoting a delta, and never by stashing. **Three negative controls, each a real edit verified applied before its run**: pass `layout` → **1** fails · `updated` → `"Stock ETA"` → **3** (both Q6 word guards plus the older `Updated` pin) · `colPreferred` → `"Preferred Delivery"` → **1**. Every edit was made with the editor: **this file is CRLF and `perl -0pi` has now silently declined four times on this lane.**
+
+**Nothing was owed at deploy time and both halves were measured.** **Pages: NOT owed, proved by CHECKSUM** — comments and tests do not reach a bundle, so a build from this tip emits Q7's **`index-BscHlt88.js`**, md5 `c46f757a0458f63378ffb79305cf4bc7`, 4,764,247 bytes, and the bundle **DOWNLOADED from production** is byte-identical with `SERVICE_ROLE` **0**; **all four canonicals were polled** and all four serve it, because *an unchanged bundle row and a forgotten deploy look identical in a document* (P11's lesson). **Worker: NOT owed, measured against the LIVE WORKER'S SOURCE COMMIT** `f2517f99`, never against this branch's scope — `git diff f2517f99..HEAD -- apps/api packages/shared supabase/migrations` is EMPTY.
+
+---
+
 **2026-08-04 · Purchasing Q5 follow-up — the register's grid becomes the operator's, and the card's last unverified line is verified** (PR #601 merge `8333ef8c`, **no migration**, web `index-1IlpnSUN.js` — DEPLOYED, live file md5-identical to the local build (`84c514ce…`, 4,763,084 bytes), `SERVICE_ROLE` 0; **no Worker deploy owed and it was MEASURED** against the live Worker's source commit)
 
 **Q5's own §13.3 table answers FIVE of D0.5d's kit powers by name, and the ship wired ONE of them.** Measured on the merged tip: `OperationPurchaseOrders.tsx` passes `expansion` and no `layout`. So `resize` and `reorder` — both ruled ✅ **wire** by Loo the same day, and with his own operator reasons, not the kit's — were silently absent, and the SHIPPED record does not mention them.

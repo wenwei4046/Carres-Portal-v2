@@ -1430,6 +1430,54 @@ export default function OperationToOrder() {
                    * The bar states the STATE, not the date, so the rule holds
                    * and the row stops looking calm. */
                   rowLate={(r) => r.bucket === "overdue"}
+                  /* ── Q6 · WHY THERE IS NO `layout` PROP HERE (the audit,
+                   * 2026-08-04) — CLAUDE.md §13.3 answered for BOTH powers,
+                   * because silence is not an answer and *"the kit has it"*
+                   * is not one either.
+                   *
+                   * MEASURED ON PRODUCTION, all 10 live rows, 1024 → 1280:
+                   *
+                   *   viewport 1024 · table 668       given   needs
+                   *     Supplier                        147      87  Nice Future
+                   *     Qty                              53      24  2
+                   *     Model                           287      75  H1401S Q
+                   *     PO No.                          134     118  Yet to Order + Cancel
+                   *   nothing truncates · no sideways scroll · rows 40px
+                   *   (at 1280 the table is 934 and Model is given 402)
+                   *
+                   * RESIZE — refused. A resize can only reveal something that
+                   * is hidden, and nothing on this grid is: no cell truncates
+                   * at any viewport measured. The real defect is the opposite
+                   * — Model is given five times the width its content needs —
+                   * and that is a SIZING fault with its own card (P16, Loo's
+                   * Phase 1), which fixes it for everyone at once. §0.4
+                   * forbids remembering a drag, so wiring it instead would ask
+                   * the operator to re-drag four columns every morning to
+                   * paper over a defect a card already owns: slower, not
+                   * faster. Loo's own ✅ on Purchase Orders was reasoned —
+                   * *"supplier names are different lengths"* — and here there
+                   * are exactly TWO suppliers, so one width does suit them
+                   * both. And the ONE column with the least headroom (PO No.,
+                   * 16px spare) is the LAST, which the kit gives no handle at
+                   * all: there is no neighbour to take from.
+                   *
+                   * REORDER — refused. *"Different operators watch different
+                   * columns"* is a problem of a WIDE register where the column
+                   * you care about is off to the right; Purchase Orders has
+                   * nine. This grid has four and they are all in one glance at
+                   * every viewport measured, with no horizontal scroll. Moving
+                   * them saves no click, no document opened and no exception
+                   * missed. Loo ruled this order himself on the real page
+                   * (2026-08-03) with a stated adjacency reason — Qty sits
+                   * immediately left of Model so the number lands against the
+                   * name, `2 │ Cody K` — and a drag that resets on reload
+                   * would invite breaking that for nothing.
+                   *
+                   * REPORTED WITH THE REFUSAL: the kit hands both powers out
+                   * through ONE `layout` prop, so no page can answer §13.3 per
+                   * power. Here both answers are the same and it costs
+                   * nothing; the day a page wants one and not the other, it is
+                   * the kit lane's to split. */
                   /* ── P10 (Loo, 2026-08-04) — READY STOCK IS SUGGESTED; THE
                    * HUMAN DECIDES WHETHER TO TAKE IT.
                    *

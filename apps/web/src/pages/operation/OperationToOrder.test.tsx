@@ -1529,3 +1529,81 @@ describe("P13 · the OLDER screen is the one that does not move", () => {
     expect(picker).toContain("`Reserve this unit to ${soRef}`");
   });
 });
+
+/**
+ * ── Q6 · To Order audited against the Purchase Orders architecture ──────────
+ *
+ * An AUDIT, not a redesign (P7 owns the redesign), so what ships is the two
+ * things the audit found true, turned into guards. A conclusion that lives
+ * only in a document is one hand away from being undone by accident.
+ *
+ * ① THE PORTAL-WIDE DATE DICTIONARY (`PURCHASING-INFORMATION-MODEL.md` §12.2,
+ *    ruled by Loo 2026-08-04). Four facts, four words — `Ready Date` ·
+ *    `Expected Arrival` · `Received At` · `Customer Delivery` — and THREE
+ *    retired spellings that all named fact ②: `Goods Arrival`, `Stock` and
+ *    `Stock ETA` (`ETA` itself is a banned word). Measured 2026-08-04: this
+ *    page carries none of the three, in the source OR on the live page. This
+ *    guard is what keeps that true.
+ *
+ * ② THE TWO KIT POWERS THIS PAGE DELIBERATELY DOES NOT WIRE — `resize` and
+ *    `reorder`. CLAUDE.md §13.3 asks one question of every kit power, *will
+ *    this make the operator finish faster today?*, and on THIS page, measured
+ *    on production, the answer is no for both (the reasoning is beside the
+ *    `DataTable` in the page). The absence is asserted for the same reason
+ *    #601 asserted the absence of footer totals on Purchase Orders: a power
+ *    that quietly appears later is exactly the failure §13.3 exists to stop.
+ */
+describe("Q6 · the audit's two findings, as guards", () => {
+  /**
+   * THE WORDS MODULE IS THE STRONGER CLAIM, and the same argument P12's scan
+   * makes: every fixed string on this page comes from `TO_ORDER_WORDS`, whose
+   * own law is *"a word that is not here has not been ruled"* — so a retired
+   * word that is not in it cannot reach the screen through any branch, not
+   * only through the branches a fixture happens to render.
+   */
+  it("no ruled word on this page spells a retired date", () => {
+    const offenders = Object.entries(W).filter(
+      ([, v]) =>
+        typeof v === "string" && /(goods\s+arrival|stock\s+eta|\bETA\b)/i.test(v),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  /**
+   * `Customer Delivery` is pinned rather than deleted, and that is the point.
+   * The fact moved onto the GROUP HEADER as a bare date when the identity
+   * columns left (2026-08-03), so it labels nothing today — but §12.2 rules
+   * the word for the day anybody labels that slot, and a constant nobody can
+   * read is how the next chat invents `Preferred Delivery` again.
+   */
+  it("the customer's date keeps §12.2's own word, ready for the day it is labelled", () => {
+    expect(W.colPreferred).toBe("Customer Delivery");
+  });
+
+  /**
+   * The rendered half, and it is deliberately narrower than the scan above:
+   * only the two-word spellings are checked here, because a bare `ETA` could
+   * one day be three characters inside a real model name and a guard that
+   * fails on the catalog is a guard somebody deletes.
+   */
+  it("nothing rendered — customer work or ready stock — says Goods Arrival or Stock ETA", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    expect(document.body.textContent ?? "").not.toMatch(/goods\s+arrival|stock\s+eta/i);
+  });
+
+  /**
+   * §13.3, answered rather than obeyed. Both controls are the kit's ONE
+   * `layout` prop, so this single assertion covers both refusals: no prop, no
+   * handle, no draggable header.
+   */
+  it("no column may be resized and none may be dragged — §13.3 answered, not silent", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    expect(document.querySelectorAll('[data-testid^="table-resize-"]')).toHaveLength(0);
+    expect(document.querySelectorAll('thead th[draggable="true"]')).toHaveLength(0);
+    // …while the two powers the page DOES wire are untouched by the refusal.
+    expect(document.querySelectorAll('[data-kit="data-group"]').length).toBeGreaterThan(0);
+    expect(document.querySelectorAll("colgroup col")).toHaveLength(6);
+  });
+});
