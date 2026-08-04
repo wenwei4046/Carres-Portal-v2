@@ -6,7 +6,7 @@
 
 ---
 
-**2026-08-04 · Purchasing P11 — a sofa that has no modules carries its own quantity** (PR #587, **no migration**, `packages/shared` + tests only)
+**2026-08-04 · Purchasing P11 — a sofa that has no modules carries its own quantity** (PR #589, **no migration**, `packages/shared` + tests only)
 
 **The rule was right and it was pointed at the wrong thing.** A customer's sofa is three `order_lines` — `1B(LHF)` + `CNR` + `2A(RHF)`, each qty 1 — and summing them reads as three sofas, so `buildToOrder` collapsed a sofa build to `1`. It collapsed it by CATEGORY. The grouping key is `l.buildKey ?? "line::" + l.lineId`, so a sofa line with no build key becomes a group of ONE and was collapsed too: a typed ready stock demand of 5 proposed 1, and so would a customer line for two identical non-modular sofas. **The discriminator moved from the category to the modules**: a group of more than one line is a build and collapses; a lone line carries its own quantity, exactly as every other category does. It cannot over-reach, and that is structural rather than careful — a group of more than one can only exist under a real build key, because a synthetic `line::` key is unique per line.
 
