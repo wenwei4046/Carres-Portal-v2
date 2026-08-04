@@ -430,3 +430,118 @@ describe("§10.1 — this file spells no word", () => {
     expect(params).not.toMatch(/=\s*["'`]/);
   });
 });
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * P16 — `sizing="content"`: the columns take what they measured, and a
+ * FILLER takes the rest.
+ *
+ * The kit half of Loo's rule ① (2026-08-04): *"A table's WIDTH does not
+ * decide a COLUMN's width. Content does."* In `table-fixed` the browser hands
+ * spare width back out over the columns unless something `auto` is sitting
+ * there to take it — so without the filler, "size a column to its content" is
+ * a number the browser immediately overrides. jsdom cannot prove the LAYOUT;
+ * it can prove the structure that produces it.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+const PX_COLUMNS: Column<Row>[] = [
+  { key: "ref", label: "Order", width: "120px", cell: (r) => r.ref },
+  { key: "qty", label: "Qty", width: "55px", align: "right", numeric: true, cell: (r) => r.qty },
+];
+
+const cols = () => [...document.querySelectorAll("colgroup col")] as HTMLElement[];
+
+const SELECTION = {
+  selected: new Set<string>(),
+  onToggleRow: () => {},
+  onToggleAll: () => {},
+  label: "Select all",
+};
+
+const EXPANSION = {
+  expanded: new Set<string>(),
+  onToggle: () => {},
+  render: (r: Row) => <div>{r.ref} lines</div>,
+  label: (r: Row) => `Open ${r.ref}`,
+};
+
+describe("P16 · sizing — the default is still fill, and it is untouched", () => {
+  it("adds no filler and keeps the kit's own columns proportional", () => {
+    render(<DataTable {...base} selection={SELECTION} expansion={EXPANSION} />);
+    expect(document.querySelector('[data-kit="table-filler"]')).toBeNull();
+    // 3% + 4% — the shares D0.5c shipped. Purchase Orders and Receiving are
+    // on this path, so a change here would reach two frozen pages.
+    expect(cols()[0]!.style.width).toBe("3%");
+    expect(cols()[1]!.style.width).toBe("4%");
+  });
+});
+
+describe('P16 · sizing="content" — nothing but the filler grows', () => {
+  it("keeps each column at exactly the width its def asked for", () => {
+    render(<DataTable {...base} columns={PX_COLUMNS} sizing="content" />);
+    expect(cols().map((c) => c.style.width)).toEqual(["120px", "55px", "auto"]);
+  });
+
+  it("fixes the kit's own two columns in pixels, not shares of the table", () => {
+    render(
+      <DataTable {...base} columns={PX_COLUMNS} selection={SELECTION} expansion={EXPANSION} sizing="content" />,
+    );
+    // A 3% share of a table that no longer stretches is a 24px disclosure
+    // button in 20px of column.
+    expect(cols()[0]!.style.width).toBe("42px");
+    expect(cols()[1]!.style.width).toBe("32px");
+  });
+
+  it("gives the filler no word, no role and nothing to read", () => {
+    render(<DataTable {...base} columns={PX_COLUMNS} sizing="content" />);
+    const head = document.querySelector('thead th[data-kit="table-filler"]')!;
+    expect(head).toBeInTheDocument();
+    expect(head.textContent).toBe("");
+    expect(head.getAttribute("aria-hidden")).toBe("true");
+    // It is not a column: the header row a screen reader hears is the caller's.
+    expect(headers()).toEqual(["Order", "Qty"]);
+  });
+
+  it("puts one filler cell in every row, so no row stops short of the edge", () => {
+    render(<DataTable {...base} columns={PX_COLUMNS} sizing="content" />);
+    for (const tr of document.querySelectorAll('tbody tr[data-kit="data-row"]')) {
+      expect(tr.querySelectorAll('[data-kit="table-filler"]')).toHaveLength(1);
+    }
+  });
+
+  it("counts the filler in colSpan — a group header still spans the table", () => {
+    render(
+      <DataTable
+        {...base}
+        columns={PX_COLUMNS}
+        sizing="content"
+        group={{ keyOf: () => "one", header: () => <span>SO-1256</span> }}
+      />,
+    );
+    const cell = document.querySelector('[data-kit="data-group"] td')!;
+    // 2 columns + the filler. Without this the group header would end where
+    // the last column ends and the band would break mid-sheet.
+    expect(cell.getAttribute("colspan")).toBe("3");
+  });
+
+  it("counts the filler in colSpan — an expanded record still spans the table", () => {
+    render(
+      <DataTable
+        {...base}
+        columns={PX_COLUMNS}
+        sizing="content"
+        expansion={{ ...EXPANSION, expanded: new Set(["1"]) }}
+      />,
+    );
+    const cell = document.querySelector('[data-kit="data-expansion"] td')!;
+    // 2 columns + the disclosure column + the filler.
+    expect(cell.getAttribute("colspan")).toBe("4");
+  });
+});
+
+describe("P16 · the kit draws no top corner", () => {
+  it("leaves the frame to the page — a list grid is a sheet, not a card", () => {
+    render(<DataTable {...base} />);
+    const root = document.querySelector('[data-kit="data-table"]')!;
+    expect(root.className).not.toMatch(/rounded/);
+  });
+});

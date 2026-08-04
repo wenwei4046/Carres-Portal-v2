@@ -1003,40 +1003,65 @@ export default function OperationToOrder() {
    * The factory comes FIRST because it is what the operator groups by in his
    * head — everything to its right describes that factory's work.
    *
-   * WIDTHS ARE ALL PERCENTAGES AND THEY SUM TO 100 (with `DataTable`'s own 4%
-   * checkbox). That is `02-components.md`'s DataTable law — *"Give every
-   * column a width; the set sums to 100"* — and this page was breaking it:
-   * ONE percentage (20), five raw pixel strings, and a final `auto`. Mixing
-   * three units means nothing is proportional to anything, and `auto` on the
-   * LAST column hands every spare pixel to the narrowest content on the page,
-   * which is the empty right-hand third Loo saw.
+   * ── P16 · EVERY WIDTH IS THE CONTENT'S, AND THE TABLE GETS NO VOTE ──────
    *
-   * The 2026-08-01 checkpoint's "fixed pixels with the last column auto" is
-   * RETIRED by this. It was written to cure percentage columns inflating on a
-   * wide monitor; the real cure is that the slack belongs to the column with
-   * the longest variable content — Model — not to whichever column is last.
+   * LOO RULED IT, 2026-08-04: *"A table's WIDTH does not decide a COLUMN's
+   * width. Content does."* — *"不要为了填满空间发明新的栏位。"* Trailing
+   * whitespace on the right is not waste; it says the page holds these
+   * business facts and no more. This is a spreadsheet, not a dashboard, and
+   * Excel · AutoCount · Business Central · SAP List Report all accept it.
    *
-   *   3  ⊞ (DataTable's own, P10)   4  ☑ (DataTable's own)
-   *   22 Supplier                   8  Qty
-   *   43 Model ← takes the slack   20  PO No.                   ── 100
+   * WHAT WAS WRONG, MEASURED ON PRODUCTION AT 1440×900 (2026-08-04): the
+   * table was 1094px, its content needed 345, and `Model` alone held **470px
+   * — 43%** for strings like `Sonic S` (46px). `Supplier` held 241 for
+   * `Nice Future` (71). That is why the page read as floating, and it is why
+   * flushing the container ALONE would have made it worse: the same sparse
+   * content spread over 1126px.
    *
-   * P10's expand control costs 3, and it comes out of MODEL for the same
-   * reason Model holds the slack: it is the widest column and the only one
-   * with room to give. The identity columns (Customer Delivery · SO No. ·
-   * Customer) named in the older split moved into the GROUP HEADER — one
-   * line per customer order, AutoCount's own shape.
+   * THE PERCENTAGES ARE RETIRED, AND SO IS THE RULE THAT PRODUCED THEM. The
+   * earlier split (22 · 8 · 43 · 20, summing to 100) obeyed
+   * `02-components.md`'s *"the set sums to 100"* faithfully — and summing to
+   * 100 is exactly the instruction *"stretch to fill"*. `Model` was given the
+   * slack because it holds the longest text; the fault was that there was
+   * slack to give at all.
    *
-   * QTY SITS BEFORE MODEL (Loo, 2026-08-03, on the real page). Right-aligned
-   * in a 6%% column BETWEEN Model and PO No., the number was pushed to the far
-   * side of a wide column and read as though it belonged to neither. Before
-   * Model it lands directly against the model name — `2 │ Cody K` — which is
-   * how a quantity reads on every invoice and in AutoCount.
+   * EVERY NUMBER BELOW IS MEASURED IN A REAL BROWSER against the app's own
+   * stylesheet (13px Inter cells, 11px/500 headers, the cell's `px-2` = 16),
+   * on production, against the WORST STRING THE COLUMN CAN HOLD — not the
+   * worst on screen today, which is six rows of two suppliers.
    *
-   * MEASURED in a real browser, not estimated (2026-08-03): at every viewport
-   * from a 13-inch MacBook Air (776px of table) to a 2560 desktop, no column
-   * truncates and the table NEVER scrolls sideways. The first split had
-   * Customer Delivery at 14 and it fell 10px short of `Fri, 21 Aug 26` on the
-   * 13-inch — the 2%% came from Customer, whose names are shorter.
+   *   col       worst content                      +16  header min  → width
+   *   Supplier  `Carres Internal`           90.8  106.8       101.6    111
+   *   Qty       `999`                       24.2   40.2        50.8     55
+   *   Model     `Mattress Protector SS`    134.3  150.3        90.7    155
+   *   PO No.    `Yet to Order` + `Cancel`  143.0  159.0        94.7    163
+   *                                                                 ── 484
+   *
+   * THE +4 IS A SUB-PIXEL GUARD AND IT WAS PAID FOR ONCE ALREADY. `PO No.`
+   * shipped its first build at exactly 159 — 143.0 of content in 143 of box —
+   * and the browser ELLIPSIZED it: text metrics are fractional, box widths
+   * round, and a column sized to the exact measurement is one rounding away
+   * from a lie. `scrollWidth === clientWidth` said it fit while the screen
+   * said `Yet to Ord…`, which is why the eye is the last check and not the
+   * first. Every width is therefore `ceil(measured) + 4`.
+   *
+   * A HEADER IS A FLOOR NO COLUMN MAY GO UNDER, and it is why `Qty` is 51 for
+   * 24px of digits. Sorted and filterable, a header costs the word + 2 + the
+   * sort arrow's 14 + 2 + the ▼'s 24 + 16 of padding; `Qty` has no ▼ but does
+   * sort, so 18.8 + 2 + 14 + 16 = 50.8. Everything else lands inside Loo's
+   * ~1.3× (Supplier 1.18 · Model 1.12 · PO No. 1.11).
+   *
+   * `sizing="content"` is what makes these numbers TRUE rather than
+   * requested: in `table-fixed` the browser hands spare width back out to the
+   * columns unless something `auto` is there to take it, so `DataTable` grows
+   * a trailing FILLER that carries no word and no fact. **No column absorbs
+   * the slack, and no column was added.**
+   *
+   * ORDER (Loo, 2026-08-03, on the real page): Supplier · Qty · Model ·
+   * PO No. The factory comes FIRST because it is what the operator groups by
+   * in his head. QTY SITS BEFORE MODEL — against the model name it reads
+   * `2 │ Cody K`, the way a quantity reads on every invoice. The identity
+   * columns (Customer Delivery · SO No. · Customer) live in the GROUP HEADER.
    */
   const columns: readonly Column<GridRow>[] = [
     {
@@ -1047,7 +1072,8 @@ export default function OperationToOrder() {
        */
       key: "supplier",
       label: W.supplierLabel,
-      width: 22,
+      // `Carres Internal` — 90.8px, the longest of the ten supplier names.
+      width: "111px",
       sortable: true,
       filter: filterFor("supplier", supplierOptions, true),
       cell: (r) => r.supplier ?? "—",
@@ -1055,7 +1081,9 @@ export default function OperationToOrder() {
     {
       key: "qty",
       label: W.colQty,
-      width: 8,
+      // The HEADER's floor, not the digits': `Qty` + its sort arrow + padding
+      // is 50.8, where three digits need 40.2.
+      width: "55px",
       align: "right",
       numeric: true,
       sortable: true,
@@ -1065,11 +1093,16 @@ export default function OperationToOrder() {
       cell: (r) => r.qty,
     },
     {
-      // The widest column on purpose: model names are the longest and most
-      // variable text on the page, so the table's spare width belongs here.
+      // Still the widest column, because model names are the longest text on
+      // the page — but 151px, which is what the longest of them MEASURES
+      // (`Mattress Protector SS`, 134.3), not whatever the table had left
+      // over. The stock note below rides this cell and does NOT buy width:
+      // it is `shrink-0` beside a `truncate`d name, it shows on a row that
+      // reserved stock (0 of 6 today), and paying 135px of permanent width
+      // for it is the permanently-empty column Loo rejected.
       key: "model",
       label: W.colModel,
-      width: 43,
+      width: "155px",
       sortable: true,
       filter: filterFor("model", modelOptions, true),
       cell: (r) =>
@@ -1091,7 +1124,10 @@ export default function OperationToOrder() {
     {
       key: "po",
       label: W.colPoNo,
-      width: 20,
+      // The widest thing this cell holds is P12's pair: `Yet to Order` (73.9)
+      // + the flex gap (8) + the `Cancel` button (61.1) = 143, + 16 padding.
+      // A `PO-2047` receipt needs 72.
+      width: "163px",
       sortable: true,
       filter: filterFor("po", poOptions),
       cell: (r) => {
@@ -1103,14 +1139,15 @@ export default function OperationToOrder() {
         //
         // `PO No.` asks *did this become a purchase order?* On a row still to
         // buy it says `Yet to Order`; `Cancel` is the other answer to the same
-        // question — *it never will.* Putting it here also costs the frozen
-        // layout NOTHING: the four widths sum to 93 and the two kit columns to
-        // 7, so a seventh column could only be paid for out of `Model`, which
-        // this page's own law reserves as the one column the spare width
-        // belongs to. Measured at 1280 (the operator's laptop, the width Q1 and
-        // P9 were both decided at): the grid area is ~1056px, this column is
-        // 20% = ~211px less 24px of cell padding, and `Yet to Order` + gap +
-        // the button is ~141px of the 187px available.
+        // question — *it never will.* A seventh column would have had to be
+        // paid for out of another column's content; riding this cell is paid
+        // for out of nothing.
+        //
+        // P16 re-measured it rather than inheriting the claim: the pair needs
+        // `Yet to Order` 73.9 + the 8px gap + the button 61.1 = 143, and this
+        // column is 163 less 16 of padding = 147 of usable width. It is the
+        // string that SETS the column, so it fits exactly and at every
+        // viewport — the width no longer depends on what the table was given.
         //
         // ONLY A ROW THAT IS ITS OWN DEMAND GETS IT. A customer requirement is
         // not cancellable here at all — that is the Orders module's act on the
@@ -1254,8 +1291,12 @@ export default function OperationToOrder() {
           </button>
         </aside>
 
-        {/* ── The Excel Workspace: one toolbar, one grid. ───────────────── */}
-        <div className="flex-1 min-w-0 flex flex-col min-h-0 gap-2 px-4 pt-2 pb-3">
+        {/* ── The Excel Workspace: one toolbar, one grid. ─────────────────
+            P16 — NO SIDE GUTTERS. The 16px on each edge held the grid off the
+            rail and the window like a card on a page; a sheet meets them. The
+            vertical padding stays: the toolbar is not a sheet and still needs
+            air above it. */}
+        <div className="flex-1 min-w-0 flex flex-col min-h-0 gap-2 pt-2 pb-3">
           <GridToolbar
             search={
               <SearchInput
@@ -1414,10 +1455,18 @@ export default function OperationToOrder() {
                 </div>
               )
             ) : (
-              <div className="flex-1 min-h-0 flex flex-col rounded-card overflow-hidden">
+              /* FLUSH (P16). The rounded frame is gone with the workspace's
+                 own 16px gutters: a grid that is a SHEET meets the toolbar
+                 above it and the rail beside it squarely. `overflow-hidden`
+                 goes with the radius — it existed to clip the corners. */
+              <div className="flex-1 min-h-0 flex flex-col">
                 <DataTable
                   rows={visibleRows}
                   columns={columns}
+                  /* Loo's rule ①, as a mechanism: the columns take exactly
+                     what their content measured and the leftover goes to a
+                     filler that holds nothing. */
+                  sizing="content"
                   rowId={(r) => r.key}
                   empty={W.empty}
                   label={W.itemsTableLabel}

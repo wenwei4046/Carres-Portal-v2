@@ -297,6 +297,34 @@ export interface DataTableProps<Row> {
    * failure this whole line was opened to stop. The card's own rule applies to
    * the card: never rebuild anything a doc marks ALREADY EXISTS.
    */
+  /**
+   * **How the table spends the width it is given** (card P16, Loo's ruling
+   * 2026-08-04: *"A table's WIDTH does not decide a COLUMN's width. Content
+   * does."*).
+   *
+   *   · `"fill"` (DEFAULT, and the only behaviour before P16) — the widths in
+   *     `Column.width` are shares of the container, and any width the columns
+   *     do not claim is handed back out among them. Percentages, and pixels
+   *     above their `min-w`, both grow. Purchase Orders and Receiving are on
+   *     this and are untouched.
+   *
+   *   · `"content"` — every column gets exactly the width its def asks for and
+   *     NOTHING MORE, and the leftover goes to a trailing FILLER that carries
+   *     no word, no data, no sort and no filter. Trailing whitespace is the
+   *     point, not a defect: it says the page holds these business facts and
+   *     no more.
+   *
+   * **The filler is what makes the rule enforceable rather than a hope.** In
+   * `table-fixed`, spare width is shared out over the columns unless something
+   * `auto` is there to take it — so without a filler, "size a column to its
+   * content" is a number the browser immediately overrides. It is deliberately
+   * NOT a column: it never enters `columns`, so it cannot be sorted, filtered,
+   * hidden or reordered, and a page cannot accidentally put a fact in it.
+   *
+   * It also fixes the kit's own two columns at pixels, because a 3%/4% share
+   * of a table that no longer stretches is a disclosure control in 20px.
+   */
+  sizing?: "fill" | "content";
 }
 
 /**
@@ -428,6 +456,11 @@ export default function DataTable<Row>({
   expansion,
   layout,
   totals,
+  /* NO DEFAULT VALUE — `undefined` IS `"fill"`, the same way `order` and
+   * `widthPct` are null until something is dragged. §10.1's guard forbids
+   * defaulting a prop to a string, and it is right to: the default must be
+   * the ABSENCE of the caller's choice, never a copy of it. */
+  sizing,
 }: DataTableProps<Row>) {
   const selectableRows = selection
     ? rows.filter((r) => selection.selectable?.(r) ?? true)
@@ -452,7 +485,11 @@ export default function DataTable<Row>({
   const headRef = useRef<HTMLTableRowElement | null>(null);
 
   const ordered = useMemo(() => applyColumnOrder(columns, order), [columns, order]);
-  const colSpan = ordered.length + (selection ? 1 : 0) + (expansion ? 1 : 0);
+  /* P16 — the filler is a CELL in every row, so it counts here or a group
+   * header and an expanded record would both stop short of the right edge. */
+  const fills = sizing === "content";
+  const colSpan =
+    ordered.length + (selection ? 1 : 0) + (expansion ? 1 : 0) + (fills ? 1 : 0);
 
   /**
    * Resize by pointer. The FIRST drag snapshots every column's rendered width
@@ -508,7 +545,13 @@ export default function DataTable<Row>({
   return (
     <div
       data-kit="data-table"
-      className="min-h-0 flex-1 overflow-auto rounded-t-card border border-kit-slate-5 bg-white"
+      /* NO TOP RADIUS (card P16, Loo 2026-08-04). A rounded lip under a
+       * square toolbar reads as a card floating on a page; a list grid is a
+       * SHEET and meets what is above it flush. A page that wants a rounded
+       * frame still gets one from its own wrapper — the kit stopped drawing a
+       * corner nobody asked it for. Checked on all three pages that render
+       * this file: To Order, Purchase Orders, Receiving. */
+      className="min-h-0 flex-1 overflow-auto border border-kit-slate-5 bg-white"
     >
       <table
         aria-label={label}
@@ -520,8 +563,13 @@ export default function DataTable<Row>({
         {/* PERCENTAGE widths + `table-fixed` → the table is always exactly the
          *  container width, so it never scrolls sideways on a laptop. */}
         <colgroup>
-          {expansion && <col style={{ width: "3%" }} />}
-          {selection && <col style={{ width: "4%" }} />}
+          {/* The kit's own two. In `content` sizing they are PIXELS measured
+           *  against what they hold — the 24px disclosure button in its 8+8
+           *  padding and 2px late bar (42), the 16px checkbox in its own (32)
+           *  — because 3%/4% of a table that no longer stretches is a control
+           *  narrower than itself. */}
+          {expansion && <col style={{ width: fills ? "42px" : "3%" }} />}
+          {selection && <col style={{ width: fills ? "32px" : "4%" }} />}
           {ordered.map((c) => (
             <col
               key={c.key}
@@ -535,6 +583,9 @@ export default function DataTable<Row>({
               }}
             />
           ))}
+          {/* The filler — `auto`, so `table-fixed` gives IT the slack instead
+           *  of sharing it out over the columns above. */}
+          {fills && <col style={{ width: "auto" }} />}
         </colgroup>
 
         <thead className={`sticky top-0 ${Z_TABLE_HEADER}`}>
@@ -675,6 +726,17 @@ export default function DataTable<Row>({
                 ) : null}
               </th>
             ))}
+            {/* The filler carries the header's own wash and rule so the band
+             *  reaches the right edge. It holds no word — there is nothing
+             *  here to sort, filter or read — and is hidden from a screen
+             *  reader for the same reason. */}
+            {fills && (
+              <th
+                aria-hidden="true"
+                data-kit="table-filler"
+                className="bg-kit-slate-3 border-b border-kit-slate-6"
+              />
+            )}
           </tr>
         </thead>
 
@@ -788,6 +850,7 @@ export default function DataTable<Row>({
                       {c.cell(row)}
                     </td>
                   ))}
+                  {fills && <td aria-hidden="true" data-kit="table-filler" />}
                   </tr>
                 {isExpanded ? (
                   /* THE ONE CELL THAT MAY BE TALL. The table's own rule is
@@ -827,6 +890,13 @@ export default function DataTable<Row>({
                   {totals.cell(c, rows)}
                 </td>
               ))}
+              {fills && (
+                <td
+                  aria-hidden="true"
+                  data-kit="table-filler"
+                  className="bg-kit-slate-3 border-t border-kit-slate-6"
+                />
+              )}
             </tr>
           </tfoot>
         ) : null}
