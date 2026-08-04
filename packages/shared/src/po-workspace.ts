@@ -301,7 +301,20 @@ export interface PoDateHistoryEntry {
 }
 
 export interface PoDateHistory {
+  /** `Expected Arrival` — when the goods are expected to reach us. */
   entries: PoDateHistoryEntry[];
+  /**
+   * `Supplier Ready Date` — when the factory says it has FINISHED making it
+   * (Q5). Its own list, never merged into `entries`: the two are different
+   * FACTS (§12.2's date dictionary), every supplier here carries transit days,
+   * and one numbered run mixing them would count `2nd` across two questions
+   * and measure a slip between a ready date and an arrival date.
+   *
+   * Before Q5 this ledger kind was FILTERED OUT, so the first ready date an
+   * operator recorded would have been swallowed by the history that sits
+   * beside the field.
+   */
+  readyEntries: PoDateHistoryEntry[];
   /** The first date the supplier ever gave, or null if they never have. */
   firstDate: string | null;
   /** The date they stand on now. */
@@ -309,19 +322,32 @@ export interface PoDateHistory {
   /** Calendar days between the first promise and the current one; 0 when
    *  they have never moved. Null when there is nothing to compare. */
   slipDays: number | null;
+  /** The ready date they stand on now, or null if they never gave one. */
+  readyCurrentDate: string | null;
+  /** The same slip measurement, for the ready date's own run. */
+  readySlipDays: number | null;
 }
 
-export function poDateHistoryOf(
-  promises: readonly PoDatePromise[] | null | undefined,
-): PoDateHistory {
-  const rows = (promises ?? [])
-    .filter((p) => p.kind === "tomorrow_delivery")
+/** Oldest first, numbered, one kind at a time. */
+function dateEntriesOf(
+  promises: readonly PoDatePromise[],
+  kind: "tomorrow_delivery" | "ready_date",
+): PoDateHistoryEntry[] {
+  const rows = promises
+    .filter((p) => p.kind === kind)
     .slice()
     .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
   const entries: PoDateHistoryEntry[] = [];
   for (const r of rows) {
-    // A delay names the NEW date; a confirmation names the date it was about.
-    const date = r.answer === "delayed" ? r.new_date : r.about_date;
+    // A ready date IS the answer, so it always names its new date. On the
+    // arrival kind a delay names the NEW date and a confirmation names the
+    // date it was about.
+    const date =
+      kind === "ready_date"
+        ? r.new_date
+        : r.answer === "delayed"
+          ? r.new_date
+          : r.about_date;
     if (!date) continue;
     // A repeated confirmation of the SAME date is not a new date — it is the
     // same promise restated, so it never earns an ordinal.
@@ -334,17 +360,35 @@ export function poDateHistoryOf(
       recordedAt: r.recorded_at,
     });
   }
-  const firstDate = entries[0]?.date ?? null;
-  const currentDate = entries[entries.length - 1]?.date ?? null;
-  const slipDays =
-    firstDate && currentDate
-      ? Math.round(
-          (Date.parse(`${currentDate}T00:00:00Z`) -
-            Date.parse(`${firstDate}T00:00:00Z`)) /
-            86_400_000,
-        )
-      : null;
-  return { entries, firstDate, currentDate, slipDays };
+  return entries;
+}
+
+const slipOf = (entries: readonly PoDateHistoryEntry[]): number | null => {
+  const first = entries[0]?.date ?? null;
+  const current = entries[entries.length - 1]?.date ?? null;
+  return first && current
+    ? Math.round(
+        (Date.parse(`${current}T00:00:00Z`) - Date.parse(`${first}T00:00:00Z`)) /
+          86_400_000,
+      )
+    : null;
+};
+
+export function poDateHistoryOf(
+  promises: readonly PoDatePromise[] | null | undefined,
+): PoDateHistory {
+  const all = promises ?? [];
+  const entries = dateEntriesOf(all, "tomorrow_delivery");
+  const readyEntries = dateEntriesOf(all, "ready_date");
+  return {
+    entries,
+    readyEntries,
+    firstDate: entries[0]?.date ?? null,
+    currentDate: entries[entries.length - 1]?.date ?? null,
+    slipDays: slipOf(entries),
+    readyCurrentDate: readyEntries[readyEntries.length - 1]?.date ?? null,
+    readySlipDays: slipOf(readyEntries),
+  };
 }
 
 /** `1st` · `2nd` · `3rd` · `4th` … */

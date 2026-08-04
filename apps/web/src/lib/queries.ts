@@ -3108,6 +3108,14 @@ export interface operationPoListRow {
   so: number | null;
   so_refs: number[] | null;
   eta_date: string | null;
+  /** `Supplier Ready Date` (§12.2 ①) — the day the FACTORY says it has finished
+   *  making the goods, written only by `purchasing_record_ready_date` (0318)
+   *  after a supplier answered. It is NOT `eta_date`, which is our own
+   *  prediction of arrival: R5 grades a supplier on this one, so the engine may
+   *  never seed it. OPTIONAL — a browser on this build against an older Worker
+   *  degrades to "no ready date yet", which is also the state that raises
+   *  `Confirm ready date`. */
+  expected_ready_date?: string | null;
   placed_at: string;
   purchase_order_lines: {
     // 0076 (Loo 2026-05-10): line UUID — primary key after migration. Used
@@ -3184,6 +3192,8 @@ export interface operationPoListRow {
     previous_date: string | null;
     new_date: string | null;
     reason: string | null;
+    /** The free-text story beside the countable `reason` (0310). */
+    remarks?: string | null;
     recorded_at: string;
   }[];
   /** 2026-05-18 (Loo C+D) — per-source-SO enrichment. One entry per SO this
@@ -3974,6 +3984,32 @@ export function useRecordSupplierDate(poId: string | null) {
       ),
     onSuccess: () => {
       // Every PO list view — the register reads one, the workspace another.
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+/**
+ * Q5 · the SUPPLIER READY DATE door — POST /api/operation/pos/:id/ready-date.
+ *
+ * `Confirm ready date` is the oldest action in the purchasing flow and until
+ * now the portal had no button that could close it: 0318 shipped the RPC and
+ * nothing called it. ONE date and an optional reason — the factory finishing is
+ * one fact, not a promise that can be "still standing", so there is no answer
+ * word to derive (that belongs to the ARRIVAL door above).
+ *
+ * The RPC appends to the same promise ledger, so the history beside the field
+ * grows by itself.
+ */
+export function useRecordReadyDate(poId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { newDate: string; reason?: string }) =>
+      apiFetch<{ ok: true; result: unknown }>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/ready-date`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
     },
   });

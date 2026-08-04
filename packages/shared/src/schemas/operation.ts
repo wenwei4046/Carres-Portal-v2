@@ -73,6 +73,28 @@ export const recordTomorrowDeliveryInput = z.discriminatedUnion('answer', [
 export type RecordTomorrowDeliveryInput = z.infer<typeof recordTomorrowDeliveryInput>;
 
 /**
+ * Q5 · `recordReadyDateInput` — POST /api/operation/pos/:id/ready-date.
+ * Maps to `purchasing_record_ready_date(p_po_id, p_new_date, p_reason)`
+ * (migration **0318**, applied 2026-08-03).
+ *
+ * `Confirm ready date` has been a live action with NO button in the portal
+ * since it was written: 0318 shipped the write door and no route ever called
+ * it. This is that door's HTTP half, and it is deliberately the same shape as
+ * `recordBalanceDateInput` — one date, one optional reason — because the RPC
+ * takes exactly that and a schema that offers more would be inventing an
+ * answer the ledger cannot store.
+ *
+ * There is no `answer` discriminator, unlike the tomorrow call: `Ready Date`
+ * asks WHEN the factory finishes, not whether a promise still stands, so it
+ * has one completion (`docs/PURCHASING-INFORMATION-MODEL.md` §12.2 ①).
+ */
+export const recordReadyDateInput = z.object({
+  newDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'newDate must be YYYY-MM-DD'),
+  reason: z.string().max(300).optional(),
+}).strict();
+export type RecordReadyDateInput = z.infer<typeof recordReadyDateInput>;
+
+/**
  * What we SENT the supplier (0312, Jess 2026-08-02). The channel is the fact;
  * the revision is derived server-side (a send mints one only when the document
  * changed since the last).

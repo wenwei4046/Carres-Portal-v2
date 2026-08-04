@@ -10,6 +10,7 @@ import {
   reassignPoWarehouseInput,
   officeReceiveInput,
   recordBalanceDateInput,
+  recordReadyDateInput,
   recordTomorrowDeliveryInput,
   recordSendInput,
   setMessageTemplateInput,
@@ -120,7 +121,12 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // P3 (0306): `short_since` is the balance call's Due anchor — the day the
       // line last took a short delivery, stamped by a trigger so every door
       // that writes `received_qty` stamps it.
-      "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, placed_at, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs, destination_id, ops_remark)",
+      // Q5: `expected_ready_date` — the factory's own promise (0318), the
+      // FIRST of §12.2's four dates and the one the register has never carried.
+      // It is a different fact from `eta_date` (OUR prediction) and the two are
+      // never merged: R5 grades a supplier on this column, so it holds only
+      // what a human recorded after the supplier answered.
+      "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, expected_ready_date, placed_at, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs, destination_id, ops_remark)",
     );
 
   if (status !== "all") q = q.eq("status", status);
@@ -163,7 +169,13 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     const { data: promiseRows, error: promiseErr } = await sb
       .from("po_supplier_promises")
       .select(
-        "po_id, po_line_id, kind, answer, about_date, previous_date, new_date, reason, recorded_at",
+        // `about_qty` and `remarks` are selected because this route already
+        // READS them: the balance call's re-open test compares `about_qty` (it
+        // was resolving to null on every row — a promise about a quantity the
+        // client never received), and the date history prints `remarks` beside
+        // the countable `reason` (0310). Found while wiring Q5's ready date;
+        // fixed rather than left, since both are one word in this string.
+        "po_id, po_line_id, kind, answer, about_date, about_qty, previous_date, new_date, reason, remarks, recorded_at",
       )
       .in("po_id", poIds)
       .order("recorded_at", { ascending: false });
@@ -1620,6 +1632,34 @@ operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, async (c) =>
         : (parsed.data.firstDate ?? null),
     p_reason: parsed.data.reason ?? null,
     ...extras,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+// ----- POST /:id/ready-date -----
+// Q5 · `Call {supplier} — confirm ready date`, counted per PO. THE DOOR THAT
+// HAD NO HANDLE: `purchasing_record_ready_date` shipped with migration 0318 on
+// 2026-08-03 and nothing in the portal has ever called it, so the action the
+// flow file has defined since it was written could not be closed from a screen.
+//
+// It is deliberately the twin of `/tomorrow-delivery` above — `userClient` +
+// the operator's own JWT, never `service_role` (the RPC's own
+// `purchasing_supplier_call_gate()` IS the boundary, and a service key would
+// walk around it), and the same `mapSupplierCallError`, so `po_not_open` comes
+// back as a readable 422 instead of a raw Postgres string.
+//
+// The RPC does everything in one transaction: the append-only promise row
+// (`kind='ready_date'`), the PO's own `expected_ready_date`, and the
+// `po_history` sentence. Nothing here computes or stores a second copy.
+operationPosRouter.post("/:id/ready-date", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, recordReadyDateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_record_ready_date", {
+    p_po_id: c.req.param("id"),
+    p_new_date: parsed.data.newDate,
+    p_reason: parsed.data.reason ?? null,
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });

@@ -217,6 +217,59 @@ describe("poDateHistoryOf — the supplier's numbered dates (SAP's shape)", () =
     expect(h.slipDays).toBeNull();
   });
 
+  /**
+   * Q5 — THE READY DATE HAS ITS OWN RUN. Before Q5 this function filtered the
+   * `ready_date` kind OUT, so the first ready date an operator recorded would
+   * have been silently swallowed by the history sitting beside the field.
+   */
+  const R = (nd: string, at: string, reason: string | null = null) => ({
+    kind: "ready_date",
+    answer: "ready_date",
+    about_date: null,
+    previous_date: null,
+    new_date: nd,
+    reason,
+    recorded_at: at,
+  });
+
+  it("a ready date is kept, numbered in its OWN run", () => {
+    const h = poDateHistoryOf([
+      R("2026-09-10", "2026-08-01T00:00:00Z"),
+      R("2026-09-15", "2026-08-08T00:00:00Z", "Production Delay"),
+    ]);
+    expect(h.readyEntries.map((e) => [e.ordinal, e.date])).toEqual([
+      [1, "2026-09-10"],
+      [2, "2026-09-15"],
+    ]);
+    expect(h.readyCurrentDate).toBe("2026-09-15");
+    expect(h.readySlipDays).toBe(5);
+  });
+
+  it("the two kinds never merge — one numbered run each, one slip each", () => {
+    // A ready date and an arrival date are different FACTS (§12.2), and every
+    // supplier here carries transit days, so a `2nd` counted across both would
+    // number two questions and measure a slip between a ready date and an
+    // arrival date.
+    const h = poDateHistoryOf([
+      P("shipping", "2026-10-31", null, "2026-04-02T00:00:00Z"),
+      R("2026-09-10", "2026-04-03T00:00:00Z"),
+      P("delayed", "2026-10-31", "2026-11-05", "2026-04-09T00:00:00Z"),
+    ]);
+    expect(h.entries.map((e) => e.date)).toEqual(["2026-10-31", "2026-11-05"]);
+    expect(h.readyEntries.map((e) => e.date)).toEqual(["2026-09-10"]);
+    expect(h.currentDate).toBe("2026-11-05");
+    expect(h.readyCurrentDate).toBe("2026-09-10");
+    // One ready answer earns no slip — there is nothing to compare it to.
+    expect(h.readySlipDays).toBe(0);
+  });
+
+  it("a PO with only arrival answers has an EMPTY ready run, never a guess", () => {
+    const h = poDateHistoryOf([P("shipping", "2026-10-31", null, "2026-04-02T00:00:00Z")]);
+    expect(h.readyEntries).toHaveLength(0);
+    expect(h.readyCurrentDate).toBeNull();
+    expect(h.readySlipDays).toBeNull();
+  });
+
   it("ordinalLabel speaks English, including the teens", () => {
     expect([1, 2, 3, 4, 11, 12, 13, 21].map(ordinalLabel)).toEqual([
       "1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st",

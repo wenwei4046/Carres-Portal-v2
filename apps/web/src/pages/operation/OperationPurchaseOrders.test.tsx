@@ -235,6 +235,46 @@ const POS = [
     orders: [],
     purchase_order_lines: [line("g1", "SKU-JAGER-K", 1, "Jager", "King")],
   },
+  {
+    // Q5 — THE ONLY PO CARRYING A SUPPLIER READY DATE. The factory has
+    // answered both questions: it finishes on 12 Aug and the goods reach us on
+    // 5 Dec, so the two runs of history are both non-empty and must stay apart.
+    id: "PO-9008",
+    supplier_id: OHANA,
+    warehouse_id: WH,
+    status: "open",
+    sup_status: "confirmed",
+    so: 1800,
+    so_refs: null,
+    eta_date: "2099-12-05",
+    expected_ready_date: "2099-08-12",
+    placed_at: "2026-06-01T08:00:00Z",
+    // Comfortably before the customer's date → no gap, nothing to warn about.
+    customer_delivery: "2099-12-31",
+    eta_revised: false,
+    orders: [],
+    promises: [
+      {
+        kind: "ready_date",
+        answer: "ready_date",
+        about_date: null,
+        previous_date: null,
+        new_date: "2099-08-12",
+        reason: null,
+        recorded_at: "2026-06-02T02:00:00Z",
+      },
+      {
+        kind: "tomorrow_delivery",
+        answer: "shipping",
+        about_date: "2099-12-05",
+        previous_date: null,
+        new_date: null,
+        reason: null,
+        recorded_at: "2026-06-03T02:00:00Z",
+      },
+    ],
+    purchase_order_lines: [line("h1", "SKU-SONIC-K", 1, "Sonic", "King")],
+  },
 ];
 
 /** The catalog the ESTIMATE needs: a SKU → model → category, so
@@ -317,10 +357,17 @@ async function mountLoaded() {
   return r;
 }
 
+/**
+ * The WORD headers. The expand control's column carries none — deliberately,
+ * exactly like the checkbox column: it is a control, not a fact, and §7 says a
+ * header word is typed once (`the-expand-control-column-has-no-header` below
+ * asserts the empty one is really there).
+ */
 const headerTexts = () =>
   within(screen.getByRole("table"))
     .getAllByRole("columnheader")
-    .map((th) => th.textContent ?? "");
+    .map((th) => th.textContent ?? "")
+    .filter((t) => t !== "");
 
 /** The WORKSPACE prints the selected PO's number too (document head + the
  *  WhatsApp draft), so every row assertion scopes to the LISTING's table. */
@@ -338,6 +385,19 @@ async function openPo(id: string) {
       within(screen.getByTestId("po-working-header")).getByText(id),
     ).toBeInTheDocument(),
   );
+}
+
+/**
+ * Q5 — THE WORKING AREA IS THE ROW EXPAND (Loo, 2026-08-04). Every test that
+ * used to reach the date door or the items grid inside the right panel now
+ * opens the row instead: the panel stopped being an editing surface.
+ */
+async function expandPo(id: string) {
+  fireEvent.click(screen.getByTestId(`table-expand-${id}`));
+  await waitFor(() =>
+    expect(screen.getByTestId(`po-work-${id}`)).toBeInTheDocument(),
+  );
+  return within(screen.getByTestId(`po-work-${id}`));
 }
 
 describe("the eight frozen columns", () => {
@@ -372,6 +432,17 @@ describe("the eight frozen columns", () => {
     fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     const th = screen.getByRole("columnheader", { name: /Customer Delivery/ });
     expect(th.getAttribute("title")).toMatch(/Earliest customer delivery/);
+  });
+
+  it("the expand control's column carries no header word", async () => {
+    await mountLoaded();
+    const all = within(screen.getByRole("table"))
+      .getAllByRole("columnheader")
+      .map((th) => th.textContent ?? "");
+    // Q5: the working area's control is a CONTROL, not a fact. It sits first,
+    // and it is silent — same treatment as the checkbox column.
+    expect(all[0]).toBe("");
+    expect(all.filter((t) => t === "")).toHaveLength(1);
   });
 
   it("HONESTY GUARD — a sorted column stays visible in compact mode", async () => {
@@ -411,8 +482,11 @@ describe("the default order — risk to the customer's promise", () => {
       "PO-9001",
       // rung 3 — they land ON the customer's day.
       "PO-9005",
-      // rung 5 — the work is over: fully received, then cancelled.
+      // rung 5 — nothing to say. Inside the rung the nearer customer date
+      // first, and a PO with no customer date LAST: the two finished POs sit
+      // beside the quiet one, which is what "nothing to do" looks like.
       "PO-9006",
+      "PO-9008",
       "PO-9002",
     ]);
   });
@@ -427,6 +501,7 @@ describe("the default order — risk to the customer's promise", () => {
       "PO-9003", // 1 Mar
       "PO-9005", // 1 Apr
       "PO-9006", // 1 May
+      "PO-9008", // 1 Jun
       "PO-9007", // 2099
     ]);
     // asc → desc → cleared. A third click hands the page back its own default.
@@ -439,6 +514,7 @@ describe("the default order — risk to the customer's promise", () => {
       "PO-9001",
       "PO-9005",
       "PO-9006",
+      "PO-9008",
       "PO-9002",
     ]);
   });
@@ -540,14 +616,14 @@ describe("the gap against the customer's date", () => {
     expect(cell.getByText("(revised)")).toBeInTheDocument();
   });
 
-  it("the workspace prints the customer's date and the gap where the delay is RECORDED", async () => {
+  it("the WORKING AREA prints the gap, because that is where the date is RECORDED", async () => {
     await mountLoaded();
     fireEvent.click(listing().getByText("PO-9001"));
+    // The panel still states the promise we made to a person — read only:
+    // purchasing cannot move a customer's date.
     expect(screen.getByTestId("po-customer-delivery")).toBeInTheDocument();
-    const header = screen.getByTestId("po-document");
-    expect(
-      within(header).getAllByTestId("po-arrival-gap").length,
-    ).toBeGreaterThan(0);
+    const work = await expandPo("PO-9001");
+    expect(work.getAllByTestId("po-arrival-gap").length).toBeGreaterThan(0);
   });
 });
 
@@ -590,18 +666,18 @@ describe("the gap's tone says WHO gave the date", () => {
     expect(gap.className).toContain("text-kit-amber-11");
   });
 
-  it("the workspace uses the SAME rule — two surfaces cannot disagree", async () => {
+  it("the WORKING AREA uses the SAME rule — two surfaces cannot disagree", async () => {
     await mountLoaded();
-    await openPo("PO-9001");
-    const doc = within(screen.getByTestId("po-document"));
-    expect(
-      doc.getAllByTestId("po-arrival-gap")[0].getAttribute("data-tone"),
-    ).toBe("confirmed");
-    await openPo("PO-9007");
-    const doc2 = within(screen.getByTestId("po-document"));
-    expect(
-      doc2.getAllByTestId("po-arrival-gap")[0].getAttribute("data-tone"),
-    ).toBe("estimate");
+    const work = await expandPo("PO-9001");
+    expect(work.getAllByTestId("po-arrival-gap")[0].getAttribute("data-tone")).toBe(
+      "confirmed",
+    );
+    // Opening a second closes the first (Loo's rule 2), so this is also the
+    // one-at-a-time behaviour exercised from the other end.
+    const work2 = await expandPo("PO-9007");
+    expect(work2.getAllByTestId("po-arrival-gap")[0].getAttribute("data-tone")).toBe(
+      "estimate",
+    );
   });
 });
 
@@ -683,35 +759,28 @@ describe("Current Action survives the workspace being open", () => {
  *  `SKU-CODY-Q`: two languages for one PO. A buyer knows Booqit · Cody ·
  *  Jager, never 5539-1B(LHF). */
 describe("one product, one name", () => {
-  it("the document's DESCRIPTION speaks the same words as the register", async () => {
+  it("the working area's DESCRIPTION speaks the same words as the register", async () => {
     await mountLoaded();
-    fireEvent.click(listing().getByText("PO-9003"));
-    const doc = within(screen.getByTestId("po-document"));
-    expect(doc.getAllByText("Cody Q").length).toBeGreaterThan(0);
-    expect(doc.queryByText("SKU-CODY-Q")).toBeNull();
+    const work = await expandPo("PO-9003");
+    expect(work.getAllByText("Cody Q").length).toBeGreaterThan(0);
+    expect(work.queryByText("SKU-CODY-Q")).toBeNull();
     // The listing spells it identically — same function, so it cannot drift.
     expect(listing().getByText("Cody Q ×2 · +2")).toBeInTheDocument();
   });
 
-  it("the CODE is still reachable — hover, and the row's own surface", async () => {
+  it("the CODE is still reachable — on hover, where it identifies without describing", async () => {
     await mountLoaded();
-    fireEvent.click(listing().getByText("PO-9003"));
-    const doc = within(screen.getByTestId("po-document"));
-    expect(doc.getAllByText("Cody Q")[0].getAttribute("title")).toBe(
+    const work = await expandPo("PO-9003");
+    expect(work.getAllByText("Cody Q")[0].getAttribute("title")).toBe(
       "SKU-CODY-Q",
     );
-    fireEvent.click(screen.getByTestId("po-item-menu-1"));
-    const sku = within(screen.getByTestId("po-item-sku"));
-    expect(sku.getByText("Item ID")).toBeInTheDocument();
-    expect(sku.getByText("SKU-CODY-Q")).toBeInTheDocument();
   });
 
   it("the variant is not printed twice — the name already carries it", async () => {
     await mountLoaded();
-    fireEvent.click(listing().getByText("PO-9003"));
-    const doc = within(screen.getByTestId("po-document"));
+    const work = await expandPo("PO-9003");
     // `Cody Q` holds the size; a bare `Queen` sub-line underneath said it again.
-    expect(doc.queryByText("Queen")).toBeNull();
+    expect(work.queryByText("Queen")).toBeNull();
   });
 });
 
@@ -789,9 +858,9 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
 
   it("the supplier-date row opens IN PLACE and carries the field's own history", async () => {
     await mountLoaded();
-    await openPo("PO-9001");
+    const work = await expandPo("PO-9001");
     expect(screen.queryByTestId("po-date-extend")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("po-date-row"));
+    fireEvent.click(work.getByTestId("po-date-row"));
     const ext = within(screen.getByTestId("po-date-extend"));
     // PO-9001's ledger holds ONE answer → one dated line, no ordinal yet.
     expect(ext.getByText(/Production Delay/)).toBeInTheDocument();
@@ -799,57 +868,53 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
 
   it("OVERDUE is printed beside the date, never a second bucket", async () => {
     await mountLoaded();
-    fireEvent.click(listing().getByText("PO-9004"));
-    await waitFor(() =>
-      expect(
-        within(screen.getByTestId("po-working-header")).getByText("PO-9004"),
-      ).toBeInTheDocument(),
-    );
-    expect(screen.getByTestId("po-overdue").textContent).toMatch(/Overdue by \d+ day/);
+    const work = await expandPo("PO-9004");
+    expect(work.getByTestId("po-overdue").textContent).toMatch(/Overdue by \d+ day/);
     // The rail still has five buckets — Contact Supplier is an ACTION.
     expect(screen.queryByTestId("po-rail-state-overdue")).not.toBeInTheDocument();
   });
 
   it("ITEMS is an Excel grid: one row per SO × SKU, with the SO's remark", async () => {
     await mountLoaded();
-    fireEvent.click(listing().getByText("PO-9003"));
-    await waitFor(() =>
-      expect(
-        within(screen.getByTestId("po-working-header")).getByText("PO-9003"),
-      ).toBeInTheDocument(),
-    );
-    const items = within(screen.getByTestId("po-doc-items"));
+    const work = await expandPo("PO-9003");
+    const items = within(work.getByTestId("po-doc-items"));
     // Line a1 covers TWO sales orders → two rows, never one stacked cell.
     expect(items.getByText("SO-1300")).toBeInTheDocument();
     expect(items.getByText("SO-1301")).toBeInTheDocument();
     // The salesperson's remark flows over, read-only, LABELLED as theirs —
     // purchasing's own note is a separate line marked Ops.
     expect(items.getByText("Sales: No drilling")).toBeInTheDocument();
-    expect(items.getByText("Recv")).toBeInTheDocument();
+    // `Received`, not `Recv` — the abbreviation rule bans shorthand a new hire
+    // must google, and `Received` is already the ruled word (the Receiving
+    // Workspace's, and the register column beside it).
+    expect(items.getByText("Received")).toBeInTheDocument();
+    expect(items.queryByText("Recv")).toBeNull();
     expect(items.getByText("Total")).toBeInTheDocument();
   });
 
-  it("the row's ⋮ opens its actions IN PLACE — no drill-in, no modal", async () => {
+  it("the per-line doors are IN the row, quiet until clicked — the ⋮ is gone", async () => {
     await mountLoaded();
-    expect(screen.queryByTestId("po-item-extend")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("po-item-menu-1"));
-    const ext = within(screen.getByTestId("po-item-extend"));
-    expect(ext.getByText("Destination")).toBeInTheDocument();
-    expect(ext.getByText("Ops remark")).toBeInTheDocument();
+    const work = await expandPo("PO-9003");
+    // Q5: the destination is a CELL of the grid now, not a menu two clicks
+    // deep, because "which lines go to AL?" is the question the expand exists
+    // to answer across many POs.
+    expect(work.queryByTestId("po-item-menu-1")).toBeNull();
+    expect(work.getByText("Destination")).toBeInTheDocument();
     // QUIET by default (Jess, "it always show like that?"): values are TEXT,
-    // no control and no Save button until something is clicked.
-    expect(ext.queryByTestId("po-line-destination")).not.toBeInTheDocument();
-    expect(ext.queryByRole("textbox")).not.toBeInTheDocument();
-    expect(ext.getByText("Add a note…")).toBeInTheDocument();
+    // no control until something is clicked.
+    expect(work.queryByTestId("po-line-destination-1")).not.toBeInTheDocument();
+    expect(work.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(work.getAllByText("Add a note…").length).toBeGreaterThan(0);
   });
 
   it("quantities live on the rows — no Receiving panel AND no door", async () => {
     await mountLoaded();
+    const work = await expandPo("PO-9003");
     expect(screen.queryByTestId("po-receiving-summary")).not.toBeInTheDocument();
-    // The warehouse checks in over there and Recv moves by itself (Jess,
+    // The warehouse checks in over there and Received moves by itself (Jess,
     // 2026-08-02) — purchasing never navigates to do it.
     expect(screen.queryByTestId("po-open-receiving")).not.toBeInTheDocument();
-    expect(within(screen.getByTestId("po-doc-items")).getByText("Recv")).toBeInTheDocument();
+    expect(within(work.getByTestId("po-doc-items")).getByText("Received")).toBeInTheDocument();
   });
 
   // Jess, 2026-08-03: three CONCERNS, three bands — Document · Communication ·
@@ -910,9 +975,9 @@ describe("the ONE Current Action source (Law 7)", () => {
 describe("the supplier-date door (Jess's cycle, one form)", () => {
   it("a PO with NO date takes its FIRST date — no reason asked", async () => {
     await mountLoaded();
-    fireEvent.click(listing().getByText("PO-9002"));
+    const work = await expandPo("PO-9002");
     // PO-9002 is cancelled; use the one with no date instead.
-    fireEvent.click(screen.getByTestId("po-date-row"));
+    fireEvent.click(work.getByTestId("po-date-row"));
     fireEvent.click(screen.getByTestId("po-date-open"));
     const form = within(screen.getByTestId("po-date-form"));
     expect(form.getByTestId("po-date-input")).toBeInTheDocument();
@@ -923,7 +988,7 @@ describe("the supplier-date door (Jess's cycle, one form)", () => {
   it("keying a DIFFERENT date asks for a reason and posts a delay", async () => {
     await mountLoaded();
     // PO-9001 holds a supplier-confirmed date (its ledger says so).
-    await openPo("PO-9001");
+    await expandPo("PO-9001");
     fireEvent.click(screen.getByTestId("po-date-row"));
     fireEvent.click(screen.getByTestId("po-date-open"));
     const input = screen.getByTestId("po-date-input");
@@ -960,20 +1025,15 @@ describe("the supplier-date door (Jess's cycle, one form)", () => {
 describe("the supplier's date history, numbered (SAP's shape)", () => {
   it("counts the dates and prints the slip once there is more than one", async () => {
     await mountLoaded();
-    fireEvent.click(listing().getByText("PO-9005"));
-    await waitFor(() =>
-      expect(
-        within(screen.getByTestId("po-working-header")).getByText("PO-9005"),
-      ).toBeInTheDocument(),
-    );
-    // The header carries NO history summary (Jess, 2026-08-03): `3rd date ·
+    const work = await expandPo("PO-9005");
+    // The date row carries NO history summary (Jess, 2026-08-03): `3rd date ·
     // 11 days later` was history squeezed into a header, and the history is
     // one click away saying it properly.
     expect(screen.queryByTestId("po-date-nth")).toBeNull();
     expect(
-      within(screen.getByTestId("po-date-row")).queryByText(/days later/),
+      within(work.getByTestId("po-date-row")).queryByText(/days later/),
     ).toBeNull();
-    fireEvent.click(screen.getByTestId("po-date-row"));
+    fireEvent.click(work.getByTestId("po-date-row"));
     const h = within(screen.getByTestId("po-date-history"));
     // No "told" column — two answers keyed the same day printed the same
     // date twice and read as a second delivery date.
@@ -985,7 +1045,8 @@ describe("the supplier's date history, numbered (SAP's shape)", () => {
 
   it("the extend is QUIET — no form until you ask to record something", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-date-row"));
+    const work = await expandPo("PO-9003");
+    fireEvent.click(work.getByTestId("po-date-row"));
     // History and a quiet trigger; no date box, no Remarks box standing open.
     expect(screen.queryByTestId("po-date-form")).not.toBeInTheDocument();
     expect(screen.queryByTestId("po-date-remarks")).not.toBeInTheDocument();
@@ -1003,7 +1064,8 @@ describe("the supplier's date history, numbered (SAP's shape)", () => {
 
   it("Esc closes the date form and records nothing", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-date-row"));
+    const work = await expandPo("PO-9003");
+    fireEvent.click(work.getByTestId("po-date-row"));
     fireEvent.click(screen.getByTestId("po-date-open"));
     fireEvent.change(screen.getByTestId("po-date-input"), {
       target: { value: "2099-12-31" },
@@ -1017,7 +1079,7 @@ describe("the supplier's date history, numbered (SAP's shape)", () => {
 
   it("once a date is keyed it says exactly what Save will record", async () => {
     await mountLoaded();
-    await openPo("PO-9001"); // it holds 2099-12-30 — the date this test keys
+    await expandPo("PO-9001"); // it holds 2099-12-30 — the date this test keys
     fireEvent.click(screen.getByTestId("po-date-row"));
     fireEvent.click(screen.getByTestId("po-date-open"));
     const input = screen.getByTestId("po-date-input");
@@ -1030,25 +1092,22 @@ describe("the supplier's date history, numbered (SAP's shape)", () => {
   });
 });
 
-describe("where each line goes (0311, Jess 2026-08-02)", () => {
+describe("where each line goes (0311, Jess 2026-08-02 — now a cell of the expand)", () => {
   it("changing the destination for the WHOLE line posts /destination", async () => {
     await mountLoaded();
-    fireEvent.click(listing().getByText("PO-9003"));
-    await waitFor(() =>
-      expect(
-        within(screen.getByTestId("po-working-header")).getByText("PO-9003"),
-      ).toBeInTheDocument(),
-    );
-    // Row 3 is a qty-1 line, so there is nothing to split.
-    fireEvent.click(screen.getByTestId("po-item-menu-3"));
-    fireEvent.click(screen.getByTestId("po-line-destination-open"));
-    fireEvent.change(screen.getByTestId("po-line-destination"), {
+    const work = await expandPo("PO-9003");
+    // Row 4 is a qty-1 line (rows 1-2 are the split SO rows of line a1), so
+    // there is nothing to split.
+    fireEvent.click(work.getByTestId("po-line-destination-open-4"));
+    fireEvent.change(work.getByTestId("po-line-destination-4"), {
       target: { value: AL },
     });
-    expect(screen.getByTestId("po-line-effect").textContent).toMatch(/All 1 move/);
+    expect(work.getByTestId("po-line-effect-4").textContent).toMatch(/All 1 move/);
     // A picker changed with the MOUSE needs a button (Jess: "i cant save for
-    // AL") — Enter is a keyboard gesture nobody reaches for here.
-    fireEvent.click(screen.getByTestId("po-line-destination-save"));
+    // AL") — Enter is a keyboard gesture nobody reaches for here. Q5 asked for
+    // no Save button anywhere in the expand; that is REPORTED rather than
+    // applied, because removing it re-breaks what she reported live.
+    fireEvent.click(work.getByTestId("po-line-destination-save-4"));
     await waitFor(() =>
       expect(
         apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/destination")),
@@ -1058,26 +1117,20 @@ describe("where each line goes (0311, Jess 2026-08-02)", () => {
 
   it("moving PART of a line SPLITS it — the PO stays one document", async () => {
     await mountLoaded();
-    fireEvent.click(listing().getByText("PO-9001"));
-    await waitFor(() =>
-      expect(
-        within(screen.getByTestId("po-working-header")).getByText("PO-9001"),
-      ).toBeInTheDocument(),
-    );
+    const work = await expandPo("PO-9001");
     // PO-9001's only line is qty 3 → Move appears.
-    fireEvent.click(screen.getByTestId("po-item-menu-1"));
-    fireEvent.click(screen.getByTestId("po-line-destination-open"));
-    fireEvent.change(screen.getByTestId("po-line-destination"), {
+    fireEvent.click(work.getByTestId("po-line-destination-open-1"));
+    fireEvent.change(work.getByTestId("po-line-destination-1"), {
       target: { value: AL },
     });
-    fireEvent.change(screen.getByTestId("po-line-move-qty"), {
+    fireEvent.change(work.getByTestId("po-line-move-qty-1"), {
       target: { value: "1" },
     });
-    expect(screen.getByTestId("po-line-effect").textContent).toMatch(
+    expect(work.getByTestId("po-line-effect-1").textContent).toMatch(
       /1 of 3 move; 2 stay/,
     );
-    expect(screen.getByTestId("po-line-destination-save").textContent).toBe("Split");
-    fireEvent.click(screen.getByTestId("po-line-destination-save"));
+    expect(work.getByTestId("po-line-destination-save-1").textContent).toBe("Split");
+    fireEvent.click(work.getByTestId("po-line-destination-save-1"));
     await waitFor(() =>
       expect(apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/split"))).toBe(
         true,
@@ -1090,14 +1143,27 @@ describe("where each line goes (0311, Jess 2026-08-02)", () => {
     });
   });
 
+  it("a row shows its SO slice but the split arithmetic reads the whole LINE", async () => {
+    await mountLoaded();
+    const work = await expandPo("PO-9003");
+    // Line a1 is qty 2 across TWO sales orders, so row 1 shows 1 — and the
+    // destination still moves the LINE, so the effect line must say 2.
+    fireEvent.click(work.getByTestId("po-line-destination-open-1"));
+    fireEvent.change(work.getByTestId("po-line-destination-1"), {
+      target: { value: AL },
+    });
+    expect(work.getByTestId("po-line-effect-1").textContent).toMatch(/of 2 move|All 2 move/);
+  });
+
   it("the ops remark is purchasing's own — internal, and it says so", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-item-menu-1"));
-    fireEvent.click(screen.getByTestId("po-line-ops-open"));
-    const input = screen.getByTestId("po-line-ops-remark") as HTMLInputElement;
+    const work = await expandPo("PO-9003");
+    fireEvent.click(work.getByTestId("po-line-ops-open-1"));
+    const input = work.getByTestId("po-line-ops-remark-1") as HTMLInputElement;
     expect(input.placeholder).toMatch(/never printed/i);
     fireEvent.change(input, { target: { value: "AL collects Friday" } });
-    fireEvent.click(screen.getByTestId("po-line-ops-save"));
+    // ONE value → the ruled manner exactly: Enter saves, no Save button.
+    fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() =>
       expect(
         apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/ops-remark")),
@@ -1109,18 +1175,130 @@ describe("where each line goes (0311, Jess 2026-08-02)", () => {
 describe("inline edit — Esc puts it back", () => {
   it("opening, changing and pressing Esc records nothing", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-item-menu-1"));
-    fireEvent.click(screen.getByTestId("po-line-destination-open"));
-    fireEvent.change(screen.getByTestId("po-line-destination"), {
+    const work = await expandPo("PO-9003");
+    fireEvent.click(work.getByTestId("po-line-destination-open-1"));
+    fireEvent.change(work.getByTestId("po-line-destination-1"), {
       target: { value: AL },
     });
-    fireEvent.keyDown(screen.getByTestId("po-line-destination"), { key: "Escape" });
+    fireEvent.keyDown(work.getByTestId("po-line-destination-1"), { key: "Escape" });
     // Back to plain text, and nothing was posted.
-    expect(screen.queryByTestId("po-line-destination")).not.toBeInTheDocument();
-    expect(screen.getByTestId("po-line-destination-open")).toBeInTheDocument();
+    expect(work.queryByTestId("po-line-destination-1")).not.toBeInTheDocument();
+    expect(work.getByTestId("po-line-destination-open-1")).toBeInTheDocument();
     expect(
       apiFetch.mock.calls.some((c) => String(c[0]).includes("/lines/")),
     ).toBe(false);
+  });
+});
+
+/**
+ * Q5 · THE EXPAND IS THE WORKING AREA, THE PANEL IS ACTIVITY
+ * (Loo, 2026-08-04 — `PURCHASING-INFORMATION-MODEL.md` §12.7.5).
+ *
+ * His diagnosis after using the page: *"Right panel not friendly to edit
+ * detail."* The panel's JOB was wrong, not the editing — DOCUMENT DATA belongs
+ * in the middle where the operator types into it, and ACTIVITY stays right.
+ */
+describe("the working area (Q5)", () => {
+  it("ONE PO expands at a time — opening a second closes the first", async () => {
+    await mountLoaded();
+    await expandPo("PO-9003");
+    expect(screen.getByTestId("po-work-PO-9003")).toBeInTheDocument();
+    await expandPo("PO-9001");
+    // The state cannot represent two open rows, which is stronger than a rule
+    // that closes the other one.
+    expect(screen.queryByTestId("po-work-PO-9003")).toBeNull();
+    expect(screen.getByTestId("po-work-PO-9001")).toBeInTheDocument();
+  });
+
+  it("clicking the control again closes it, and nothing is left open", async () => {
+    await mountLoaded();
+    await expandPo("PO-9003");
+    fireEvent.click(screen.getByTestId("table-expand-PO-9003"));
+    expect(screen.queryByTestId("po-work-PO-9003")).toBeNull();
+    expect(document.querySelectorAll('[data-kit="data-expansion"]')).toHaveLength(0);
+  });
+
+  it("the RIGHT PANEL no longer carries a date door — Activity is intact", async () => {
+    await mountLoaded();
+    const panel = within(screen.getByTestId("po-document"));
+    // The two date doors and the items grid left for the expand (his rule 3:
+    // ONE editing surface). What stays is the subject and the activity.
+    expect(panel.queryByTestId("po-date-row")).toBeNull();
+    expect(panel.queryByTestId("po-ready-date-open")).toBeNull();
+    expect(panel.queryByTestId("po-doc-items")).toBeNull();
+    expect(panel.getByTestId("po-working-header")).toBeInTheDocument();
+    expect(panel.getByTestId("po-activity")).toBeInTheDocument();
+    expect(panel.getByText("Document")).toBeInTheDocument();
+    expect(panel.getByText("Communication")).toBeInTheDocument();
+    expect(panel.getByText("Communication History")).toBeInTheDocument();
+    expect(panel.getByTestId("po-print-pdf")).toBeInTheDocument();
+  });
+
+  it("QTY IS TEXT — there is no quantity input anywhere in the expand", async () => {
+    await mountLoaded();
+    const work = await expandPo("PO-9003");
+    // A frozen business rule, not a preference: items are ADDED to a sent PO by
+    // raising a NEW one (§3), and 0316 left PO-line quantities RPC-only with no
+    // `set_line_qty` door. The only number input that may appear is the SPLIT's
+    // Move field, and that one only exists while a destination is being changed.
+    expect(work.queryByRole("spinbutton")).toBeNull();
+    expect(
+      apiFetch.mock.calls.some((c) => String(c[0]).includes("/qty")),
+    ).toBe(false);
+  });
+
+  it("records the SUPPLIER READY DATE through 0318's own door", async () => {
+    await mountLoaded();
+    const work = await expandPo("PO-9003");
+    expect(work.getByText("Supplier Ready Date")).toBeInTheDocument();
+    fireEvent.click(work.getByTestId("po-ready-date-open"));
+    const input = work.getByTestId("po-ready-date-input");
+    fireEvent.change(input, { target: { value: "2099-09-10" } });
+    // ONE value → Enter saves, and there is NO Save button beside it.
+    expect(work.queryByTestId("po-ready-date-save")).toBeNull();
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() =>
+      expect(
+        apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/ready-date")),
+      ).toBe(true),
+    );
+    const call = apiFetch.mock.calls.find((c) => String(c[0]).endsWith("/ready-date"))!;
+    expect(String(call[0])).toContain("/pos/PO-9003/ready-date");
+    expect(JSON.parse(String((call[1] as { body: string }).body))).toEqual({
+      newDate: "2099-09-10",
+    });
+  });
+
+  it("Esc restores the ready date and posts nothing", async () => {
+    await mountLoaded();
+    const work = await expandPo("PO-9003");
+    fireEvent.click(work.getByTestId("po-ready-date-open"));
+    fireEvent.change(work.getByTestId("po-ready-date-input"), {
+      target: { value: "2099-09-10" },
+    });
+    fireEvent.keyDown(work.getByTestId("po-ready-date-input"), { key: "Escape" });
+    expect(work.queryByTestId("po-ready-date-input")).toBeNull();
+    expect(work.getByTestId("po-ready-date-open")).toBeInTheDocument();
+    expect(
+      apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/ready-date")),
+    ).toBe(false);
+  });
+
+  it("a PO carrying a ready date prints it, and the history says WHICH date it is", async () => {
+    await mountLoaded();
+    const work = await expandPo("PO-9008");
+    // The field itself.
+    expect(work.getByTestId("po-ready-date-open").textContent).toMatch(/12 Aug/);
+    fireEvent.click(work.getByTestId("po-date-row"));
+    const ext = within(screen.getByTestId("po-date-extend"));
+    // TWO runs, each NAMED. Before Q5 `poDateHistoryOf` filtered the ready kind
+    // out, so the first ready date recorded would have been swallowed here.
+    const ready = within(ext.getByTestId("po-ready-history"));
+    expect(ready.getByText("Supplier Ready Date")).toBeInTheDocument();
+    expect(ready.getByText(/12 Aug/)).toBeInTheDocument();
+    expect(
+      within(ext.getByTestId("po-date-history")).getByText("Expected Arrival"),
+    ).toBeInTheDocument();
   });
 });
 

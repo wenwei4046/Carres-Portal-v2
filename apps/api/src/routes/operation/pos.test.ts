@@ -2429,3 +2429,180 @@ describe("POST /api/operation/pos/batch", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Q5 · POST /api/operation/pos/:id/ready-date — THE DOOR THAT HAD NO HANDLE.
+ *
+ * `purchasing_record_ready_date` shipped with migration 0318 on 2026-08-03 and
+ * nothing in the portal ever called it, so `Confirm ready date` — an action the
+ * purchasing flow has defined since it was written — could not be closed from
+ * any screen. These tests pin the HTTP half: the RPC name, its exact argument
+ * shape, the readable 422s, and the role gate.
+ */
+describe("POST /api/operation/pos/:id/ready-date", () => {
+  const PO_ID = "PO-2032";
+
+  it("records the supplier's ready date and calls the 0318 RPC by name", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { po_id: PO_ID, previous_date: null, new_date: "2026-09-10" },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/ready-date`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newDate: "2026-09-10" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_record_ready_date", {
+      p_po_id: PO_ID,
+      p_new_date: "2026-09-10",
+      p_reason: null,
+    });
+    // The RPC's signature is (text, date, text): a missing or extra key is
+    // PGRST202 in production and a green test without this assertion.
+    assertRpcCallShape(rpc, "purchasing_record_ready_date", [
+      "p_po_id",
+      "p_new_date",
+      "p_reason",
+    ]);
+  });
+
+  it("carries the reason when the operator gave one", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: {}, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/ready-date`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newDate: "2026-09-10", reason: "Production Delay" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc.mock.calls[0]?.[1]).toMatchObject({ p_reason: "Production Delay" });
+  });
+
+  it("refuses a date that is not a date, before any RPC runs", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/ready-date`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newDate: "10 Sep 2026" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("a QUANTITY cannot be smuggled in — the schema is strict", async () => {
+    // Q5's own MUST NOT: qty is not editable here, and the closest thing to a
+    // door is a body key nobody validates. `.strict()` is what refuses it.
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/ready-date`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newDate: "2026-09-10", qty: 99 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("maps the RPC's own po_not_open detail to a readable 422", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "P0001", message: "PO PO-2032 is cancelled", details: "po_not_open" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/ready-date`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newDate: "2026-09-10" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect((await res.json()) as { code: string }).toMatchObject({ code: "po_not_open" });
+  });
+
+  it("maps po_not_found to 404", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "42P01", message: "PO not found", details: "po_not_found" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/ready-date`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newDate: "2026-09-10" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 for a dealer, and no RPC runs", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/ready-date`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newDate: "2026-09-10" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("uses the operator's OWN client — never service_role", async () => {
+    // The RPC's `purchasing_supplier_call_gate()` IS the boundary (Q5's MUST
+    // NOT). A service key would walk around it, so the route may only ever
+    // reach the database through `userClient`.
+    const rpc = vi.fn().mockResolvedValue({ data: {}, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/ready-date`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newDate: "2026-09-10" }),
+      }),
+      env,
+    );
+    expect(vi.mocked(userClient)).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining("."),
+    );
+    const passedJwt = vi.mocked(userClient).mock.calls[0]?.[1];
+    expect(passedJwt).toBe(jwt);
+  });
+});
