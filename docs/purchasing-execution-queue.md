@@ -1470,6 +1470,63 @@ customer order), which is a different rule that stays · ❌ touch `OperationToO
 
 ---
 
+## P12 · A demand can be cancelled — and the remainder of a part-ordered one can too
+
+**Lane: PURCHASING · the grid row of `OperationToOrder.tsx` + a route + a migration.
+STARTS AFTER P10**, which owns that grid region. The door and the button ship in ONE card:
+**a route with no caller is the bypass C1 deleted**, and a button with no door is a lie.
+
+**LOO RULED IT, 2026-08-04 — final, no chat re-asks it.**
+
+> **A demand that has already been part-ordered CAN have its remainder cancelled.**
+
+His reasoning, and it is the business rule: *"ordered 3, don't want the other 2"* is an
+ordinary day. **The 3 already ordered are the purchase order's problem** — stopping those runs
+through the PO flow (`PURCHASING-WORKING-FLOW.md` §9), not through here. Today's gate refuses
+the moment `po_id` exists, so **the migration relaxing it is the card's real work.**
+
+**Why it is not optional.** Without it a part-ordered demand can only ever grow — the disease
+already named on `Confirm ready date`, a queue with no way out. And measured today: **nobody
+can cancel ANY demand at all**, so a mistyped row nags forever.
+
+**CANCEL IS NOT DELETE, and the line between them is Loo's, 2026-08-04.** He named
+AutoCount's real weakness — *"backend dont know how can delete due to when testing"*: it
+records everything and cleans nothing, so a test mistake is permanent.
+
+| | Who it is for | Button? | Record? |
+|---|---|---|---|
+| **Cancel** | real business — *"ordered 3, don't want the other 2"* | ✅ yes | ✅ kept forever |
+| **Purge** | test rubbish | ❌ **NEVER a button** | — |
+
+**No delete button, and the reason is C1's:** *a live route with no caller is a bypass one
+curl away.* A delete built for testing survives into production as a way to erase a real
+purchase record leaving no trace. **Test data is cleaned by SQL on request, and the whole
+database starts clean at go-live** — CLAUDE.md's standing rule, so this needs no feature.
+
+**AutoCount is the shape to copy here, and Loo's own screenshots are the evidence:** its
+Purchase menu carries **`Cancel Purchase Order` as its own document**, and SO Batch Posting
+carries **`Outstanding Qty`** beside a **`Partial`** status. Cancelling the OUTSTANDING
+BALANCE is a first-class act there and leaves a record. **Our `remaining_qty` IS AutoCount's
+`Outstanding Qty`** — so this card gives the concept the team already knows.
+
+**The numbers stay automatic.** `remaining_qty` is `GENERATED ALWAYS (qty - issued_qty)`, so
+a cancel sets the remainder to nothing and the row leaves the workspace by itself. **Nobody
+types a quantity and nobody can type a wrong one** — the reason P8 generated it rather than
+stored it.
+
+**Build.** Relax the cancel gate so a part-ordered demand may cancel its REMAINDER (never the
+issued part) · a reason stays mandatory (`cancel_reason` already exists) · the route and the
+row's button in one card · a cancelled demand leaves the workspace and stays readable.
+
+**Done when.** A never-ordered demand cancels · a 3-of-5 demand cancels its remaining 2 while
+the 3 keep their PO link · cancelling twice is refused · no reason is refused · **no delete
+path is added anywhere** (assert it) · the row disappears from To Order with no number typed.
+
+**Must NOT.** ❌ add a delete route or button · ❌ let a cancel touch the issued quantity or
+the PO · ❌ ship the route without the button · ❌ touch the rail or the dialog.
+
+---
+
 ## P10 · Ready stock is suggested; the human decides whether to take it
 
 **Lane: PURCHASING · touches the grid region of `OperationToOrder.tsx` + `apps/api` +
@@ -1534,6 +1591,6 @@ P10 → then P7**, which inherits three working features instead of re-deriving 
 | P8 | ✅ **a typed purchase demand can actually be saved** (migration **0320 applied**) — and **the create half was already shipped by #581/0319 when the card was written**, so it was verified, not rebuilt. What was missing was the card's ONE ADDITION: `issued_qty` (writable only through a door) + `remaining_qty` (**GENERATED**, so it cannot disagree), and *"still to buy"* stops meaning *"has no purchase order"*. The issue path stops PATCHing and **adds** what it took, refusing an over-issue by name. 8 assertions on prod, rolled back; applied function byte-identical to the file. **Reported, not fixed: a ready-stock demand for a SOFA projects as 1** whatever quantity was typed (the frozen sofa grain — a business question), and **nobody can cancel a demand** (RPC exists, no route, no button — a route with no caller is C1's bypass) | #584 |
 | P9 | ✅ **the page says how many of each you are buying** (Loo 2026-08-04) — **no migration, web only**. CATEGORY rows carry bare UNIT counts; the PO Schedule above them keeps counting ORDERS, and the two are told apart by their own tooltips (`12 Orders` · `19 units`, COPY-STANDARD's own pair — no word invented). The rail counts UNISSUED work and **cascades over every narrowing except the category picks**, so the number a row shows is the number of units its click produces. The footer totals what is TICKED, per category, accumulated **inside the loop that decides what Issue acts on** — the VIEW-SCOPED law holds by construction, not by two counts agreeing. **Measured in a real browser on live data (1280×720)**: rail `All 20 · Mattress 15 · Bedframe 4 · Sofa 1 · Pillow 0 · Mattress Protector 0`, each equal to the grid's own Qty sum (mattress = 10 rows, 15 units — the two are not the same number); footer `Mattress 15 · Bedframe 4 · Sofa 1` beside `15 selected · Issue 3 POs`. **The card said "footer, beside the Issue button" and those are two places, so the widths were measured**: the line costs 257px and the toolbar has 223px spare at 1280 (607px at 1920) — a line that fits on a manager's monitor and breaks on an operator's laptop is not a placement, so it went to the footer band (573px spare). **Reported, not fixed**: Loo's 2026-08-03 footer ban was on the customer ORDER count, so the old blanket `no digits` test is NARROWED to `/d+s*(orders?|SO)/` rather than deleted · the design-standard scanner reads `PR #494` in a comment as a hex colour · the rail excludes an order with no delivery date, exactly as the grid does · a flat per-SKU SQL says 3 sofa units where the engine's per-BUILD allocation says 1, and the engine is the authority | #585 |
 | P11 | ⬜ **a sofa with no modules is counted like everything else** — P8's sofa finding, **RULED A DEFECT rather than a business question** (2026-08-04): the `? 1` collapses MODULE LINES and a typed demand has none. **Wider than the demand path** — any sofa line with no build key is forced to 1, a real customer order included (0 such lines live today). Shared module only; collides with nobody | — |
-| P12 | ⬜ **a demand can be cancelled** (door + button in ONE card — a route with no caller is a bypass). **After P10**, whose card owns the grid row the button belongs on. **BLOCKED on one business answer**: may the remainder of a part-ordered demand be cancelled? | — |
+| P12 | ⬜ **a demand can be cancelled — and so can the remainder of a part-ordered one** (door + button in ONE card — a route with no caller is a bypass). **After P10**, whose card owns the grid row. **UNBLOCKED 2026-08-04 — Loo ruled the remainder CAN be cancelled**; the 3 already ordered are the PO flow's problem, not this one's. Migration relaxes the `po_id` gate. **Cancel is not delete: no delete button ever** — test rubbish goes by SQL and the database starts clean at go-live | — |
 | P10 | ⬜ **ready stock is suggested, the human takes it** (Loo 2026-08-04) — the engine already computes it and it is switched off and unshown. Inline expand; taking goes through K4's pool draw. **After D0.5d** | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |
