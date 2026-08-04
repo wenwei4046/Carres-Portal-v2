@@ -55,7 +55,7 @@ redesign.)*
 |---|---|---|---|
 | **P8** a typed demand can be saved | `purchasing-execution-queue.md` | migration · `apps/api` · `packages/shared` · **only the `CreatePurchaseDialog` region** of `OperationToOrder.tsx` | P9 · D0.5d |
 | **P9** the page says how many of each | `purchasing-execution-queue.md` | **only the rail + footer regions** of `OperationToOrder.tsx` | P8 · D0.5d |
-| **D0.5d** the grid grows five powers | `ui-kit-execution-queue.md` | `components/kit/**` · `pages/dev/**` | everything |
+| **D0.5d** the grid grows five powers 🔨 **CLAIMED 2026-08-04 — `claude/ui-kit-queue-d0-5d-975c9e`** | `ui-kit-execution-queue.md` | `components/kit/**` · `pages/dev/**` | everything |
 | **P10** ready stock suggested, human takes | `purchasing-execution-queue.md` | **grid region** of `OperationToOrder.tsx` · api · shared | **AFTER D0.5d** |
 
 ```
