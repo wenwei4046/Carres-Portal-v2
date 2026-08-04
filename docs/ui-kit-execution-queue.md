@@ -1577,7 +1577,29 @@ into `DataTable` is how one tab's flow leaks into four others — the exact fail
 - ❌ copy AutoCount's density (28px rows, 10px headers). §7's sizing law is frozen at 40px.
 - ❌ add a `Refresh` button. The Workspace pattern bans it by name.
 
-### ✅ BUILT 2026-08-04 — three powers shipped, two are findings
+### ✅ BUILT + DEPLOYED 2026-08-04 — three powers shipped, two are findings
+
+> **Deploy receipt.** PR #586, merge `9c06c4d5`, **no migration**. web
+> `index-DiTy2SJk.js` + `UiShowcase-uLigvBgT.js` (carres-portal `03b1e171` +
+> carres-pos `3270ef94`, both `--branch=main`); all four canonicals converged on
+> the FIRST poll, and the live file is **md5-identical to the local build**
+> (`4bc782e5…`, 4,749,904 bytes) with `SERVICE_ROLE` **0**. Worker
+> `b8e31975-c564-4560-8657-c9a1e5fcd851`, `--env production`, bindings echoed,
+> `GET /health` **200**. **The same bundle carries P9**, which that chat verified
+> independently from the other direction.
+>
+> **THE WORKER DEPLOY WAS NOT OWED, and this chat got that wrong first.** It
+> measured `git diff ca2af6ac..HEAD -- packages/shared`, saw P9's `to-order.ts`
+> +43, and concluded a deploy was required. **A `packages/shared` change only
+> reaches the Worker if `apps/api` imports it** — `unitsHeadline` and
+> `categoryUnitsLine` are imported by `apps/api` **0 times**, and the `apps/api`
+> diff is empty. `b8e31975` is a re-deploy of identical source: harmless, and
+> recorded as the no-op it is rather than dressed up as a requirement.
+>
+> **The "split" it reported was the documented cache lag.** Polling the four
+> canonicals ONCE before deploying showed two hashes; the P9 chat polled twice
+> and measured convergence. **One poll cannot tell a lag from a split**, and a
+> weaker observation may not overwrite a stronger one just because it is newer.
 
 **Three of the five are props on `DataTable`: row expand · resize + reorder · footer
 totals.** The other two are not omissions and neither was quietly dropped — one is refused
