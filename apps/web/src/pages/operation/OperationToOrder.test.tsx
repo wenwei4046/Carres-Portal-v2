@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -1234,5 +1237,230 @@ describe("P10 · ready stock on the grid", () => {
     await loadedWith(body);
     // The receipt row in the fixture carries a PO number and no control.
     expect(screen.queryByTestId("table-expand-po:PO-9001:o30")).toBeNull();
+  });
+});
+
+/**
+ * ── P12 · a demand can be cancelled, and so can the remainder of a
+ *    part-ordered one (Loo, 2026-08-04) ──────────────────────────────────────
+ *
+ * *"Ordered 3, don't want the other 2"* is an ordinary day. The 3 already
+ * ordered are the purchase order's problem (`PURCHASING-WORKING-FLOW.md` §9);
+ * what this page owns is the REMAINDER — which is exactly the number the row
+ * already prints, because the api builds a demand row from the database's
+ * GENERATED `remaining_qty`.
+ *
+ * The button and the door ship together: a route with no caller is the bypass
+ * C1 deleted, and a button with no door is the same fault reversed.
+ */
+describe("P12 — Cancel on a demand row", () => {
+  /**
+   * A demand of 5 with 3 already on a purchase order — the card's own case.
+   * What reaches the page is the REMAINDER, 2: the row is here only because
+   * that number is above zero.
+   */
+  const PART_ORDERED = {
+    key: `${OHANA}::bedframe`,
+    supplierId: OHANA,
+    supplierName: "Ohana",
+    category: "bedframe",
+    label: "Ohana · Bedframe",
+    orderBy: null,
+    poCount: 1,
+    blocked: null,
+    productionDays: 7,
+    rows: [
+      {
+        orderId: "demand:6299ed4e-3c91-43c5-b41b-1e8fe9677c7d",
+        so: null,
+        customer: "—",
+        readyStock: true,
+        destination: "Carres Klang",
+        qty: 2,
+        summary: "Sonic · 2",
+        stockReady: null,
+        delivery: null,
+        orderBy: null,
+        builds: [build("d1", "Sonic", "SONIC-S", 2, "Single")],
+      },
+    ],
+  };
+
+  const cancelCalls: { path: string; body: unknown }[] = [];
+  let cancelFails: string | null = null;
+
+  async function loadedWithDemand(proposals: unknown[] = [PART_ORDERED]) {
+    cancelCalls.length = 0;
+    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+      if (/\/demand\/[^/]+\/cancel$/.test(path)) {
+        cancelCalls.push({ path, body: JSON.parse(String(init?.body ?? "{}")) });
+        return cancelFails
+          ? Promise.reject(new Error(cancelFails))
+          : Promise.resolve({ id: "x", cancelled: 2, issued: 3 });
+      }
+      if (path.startsWith("/api/operation/purchase/to-order/issue")) {
+        return route(path, init?.body ? JSON.parse(String(init.body)) : undefined);
+      }
+      if (path.startsWith("/api/operation/purchase/to-order")) {
+        return Promise.resolve({ ...TO_ORDER, proposals });
+      }
+      return route(path, undefined);
+    });
+    await loaded();
+  }
+
+  beforeEach(() => {
+    cancelFails = null;
+  });
+
+  it("a typed demand row offers Cancel; a customer requirement never does", async () => {
+    await loadedWithDemand([PART_ORDERED, ...TO_ORDER.proposals]);
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    const sheet = screen.getByTestId("to-order-sheet");
+    /**
+     * EXACTLY ONE, and that is the load-bearing assertion. Cancelling a
+     * CUSTOMER's order is the Orders module's act; a second door to it here
+     * would be a second truth about the same decision. Every other row on
+     * screen is a customer requirement and gets no control at all.
+     */
+    expect(within(sheet).getAllByRole("button", { name: W.cancelDemand })).toHaveLength(1);
+  });
+
+  it("the dialog states what is being cancelled — the REMAINDER, and nobody types it", async () => {
+    await loadedWithDemand();
+    fireEvent.click(screen.getAllByRole("button", { name: W.cancelDemand })[0]);
+
+    const dialog = await screen.findByTestId("to-order-cancel-dialog");
+    expect(within(dialog).getByText("Sonic S")).toBeInTheDocument();
+    // 2 — what is LEFT to buy, not the 5 that was originally asked for.
+    expect(screen.getByTestId("to-order-cancel-qty")).toHaveTextContent("2");
+    // NO quantity field anywhere: a cancel takes the whole remainder, and a
+    // number a human types is a number a human can get wrong.
+    expect(
+      [...dialog.querySelectorAll("input")].filter((i) => i.type !== "hidden"),
+    ).toHaveLength(0);
+  });
+
+  it("a reason is mandatory — the confirm button will not arm without one", async () => {
+    await loadedWithDemand();
+    fireEvent.click(screen.getAllByRole("button", { name: W.cancelDemand })[0]);
+    await screen.findByTestId("to-order-cancel-dialog");
+
+    const submit = screen.getByTestId("to-order-cancel-submit");
+    expect(submit).toBeDisabled();
+    // Whitespace is not a reason.
+    fireEvent.change(screen.getByLabelText(W.cancelReason), { target: { value: "   " } });
+    expect(submit).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(W.cancelReason), {
+      target: { value: "do not want the other 2" },
+    });
+    expect(submit).not.toBeDisabled();
+    expect(cancelCalls).toHaveLength(0);
+  });
+
+  it("confirming sends the demand's id and the reason, and nothing else", async () => {
+    await loadedWithDemand();
+    fireEvent.click(screen.getAllByRole("button", { name: W.cancelDemand })[0]);
+    await screen.findByTestId("to-order-cancel-dialog");
+    fireEvent.change(screen.getByLabelText(W.cancelReason), {
+      target: { value: "do not want the other 2" },
+    });
+    fireEvent.click(screen.getByTestId("to-order-cancel-submit"));
+
+    await waitFor(() => expect(cancelCalls).toHaveLength(1));
+    // The DEMAND's uuid, taken off `demand:<uuid>` — never the grid row key.
+    expect(cancelCalls[0].path).toBe(
+      "/api/operation/purchase/to-order/demand/6299ed4e-3c91-43c5-b41b-1e8fe9677c7d/cancel",
+    );
+    expect(cancelCalls[0].body).toEqual({ reason: "do not want the other 2" });
+    // The dialog closes only on success.
+    await waitFor(() => expect(screen.queryByTestId("to-order-cancel-dialog")).toBeNull());
+  });
+
+  it("a refusal stays in the dialog with the reason intact", async () => {
+    cancelFails = "already cancelled";
+    await loadedWithDemand();
+    fireEvent.click(screen.getAllByRole("button", { name: W.cancelDemand })[0]);
+    await screen.findByTestId("to-order-cancel-dialog");
+    fireEvent.change(screen.getByLabelText(W.cancelReason), { target: { value: "oops" } });
+    fireEvent.click(screen.getByTestId("to-order-cancel-submit"));
+
+    // A cancel that did not happen must not look like one that did.
+    expect(await screen.findByTestId("to-order-cancel-failed")).toHaveTextContent(
+      "already cancelled",
+    );
+    expect(screen.getByTestId("to-order-cancel-dialog")).toBeInTheDocument();
+    expect(screen.getByLabelText(W.cancelReason)).toHaveValue("oops");
+  });
+
+  it("an ordered row offers no Cancel — its PO cell is a receipt, not a decision", async () => {
+    await loadedWithDemand([]);
+    const sheet = screen.getByTestId("to-order-sheet");
+    // The fixture's ordered receipt (PO-9001) is all that is left; nothing is
+    // cancellable, and the PO cell prints its number exactly as before.
+    expect(within(sheet).queryByRole("button", { name: W.cancelDemand })).toBeNull();
+  });
+});
+
+/**
+ * P12 — CANCEL IS NOT DELETE, on the page as well as in the api (Loo,
+ * 2026-08-04). A SOURCE SCAN, because what is claimed is that no control
+ * exists ANYWHERE — a render test only sees the branches its fixture reaches,
+ * and this page is thousands of lines of branches. Comments are stripped
+ * first: the file is full of prose about why there is no delete, and a scan
+ * that reads its own tombstone fails on the text explaining it.
+ */
+describe("the page offers no way to delete a demand", () => {
+  const src = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "OperationToOrder.tsx"),
+    "utf8",
+  )
+    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1")
+    // Every `${…}` collapses to `:id` BEFORE anything is extracted. Written
+    // the other way round the path scan stopped at the first `)` inside
+    // `encodeURIComponent(demandId)` and reported a path nobody wrote — a
+    // scan can only be evidence about the page once it is evidence about
+    // itself.
+    .replace(/\$\{[^{}]*\}/g, ":id");
+
+  /**
+   * THE VISIBLE-WORD HALF IS ASSERTED AGAINST THE WORDS MODULE, NOT THE PAGE
+   * SOURCE, and that is the stronger claim rather than the easier one. Every
+   * fixed string on this page comes from `TO_ORDER_WORDS` — its own law is
+   * *"a word that is not here has not been ruled"* — so a word that is not in
+   * it cannot reach the screen. Scanning the .tsx for a quoted `delete`
+   * instead reads `n.delete(id)` (an ordinary `Set` call) the moment an
+   * unpaired apostrophe upstream lets the match span into it, which is what
+   * this test did on its first run.
+   */
+  it("no ruled word on this page says delete or purge", () => {
+    /**
+     * `delete` and `purge` ONLY. `Remove` is deliberately not banned, and
+     * finding out why is the useful part: `itemsRemove` exists in this module
+     * for the PREVIEW's item table — taking a line out of a purchase order
+     * that has not been created yet, which destroys no record because there is
+     * none. Banning the string would have failed on a word that means the
+     * opposite of the thing the card forbids. (It also has ZERO consumers
+     * today, which is reported in the card and is not this test's business.)
+     */
+    const offenders = Object.entries(W).filter(
+      ([, v]) => typeof v === "string" && /\b(delete|purge)\b/i.test(v),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("the page calls no DELETE method and reaches no delete path", () => {
+    expect(src).not.toMatch(/method:\s*["'`]DELETE["'`]/i);
+    expect(src).not.toMatch(/["'`][^"'`\n]*\/(delete|purge|remove)\b/i);
+  });
+
+  it("the only demand doors the page opens are create and cancel", () => {
+    const paths = [...src.matchAll(/to-order\/demand[a-z:/-]*/g)].map((m) => m[0]);
+    expect([...new Set(paths)].sort()).toEqual([
+      "to-order/demand",
+      "to-order/demand/:id/cancel",
+    ]);
   });
 });

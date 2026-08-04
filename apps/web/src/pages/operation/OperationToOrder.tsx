@@ -216,6 +216,19 @@ function properCase(name: string): string {
     .replace(/(^|[\s\-\/])([a-z])/g, (_m, sep, ch) => sep + ch.toUpperCase());
 }
 
+/**
+ * P12 — the `purchase_demands` row behind a grid row, or `null`.
+ *
+ * A typed demand carries `demand:<uuid>` as its `orderId` (the api sets it so
+ * the demand groups alone and so an issue can be credited back). A CUSTOMER
+ * requirement never matches, which is what keeps `Cancel` off every row it has
+ * no business on: cancelling a customer's order is the Orders module's act, and
+ * this door only reaches the table a human typed into.
+ */
+function demandIdOf(r: GridRow): string | null {
+  return /^demand:(.+)$/.exec(r.orderId ?? "")?.[1] ?? null;
+}
+
 /** Sentinels for filter options that are facts, not values. */
 const F_OVERDUE = "__overdue__";
 const F_NONE = "__none__";
@@ -327,6 +340,15 @@ export default function OperationToOrder() {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [taking, setTaking] = useState<string | null>(null);
   const [takeError, setTakeError] = useState<ReadonlyMap<string, string>>(new Map());
+  /**
+   * P12 — the row whose purchase is being cancelled, or `null`.
+   *
+   * A confirm step exists because a cancel is not undoable from any screen: the
+   * record keeps the reason forever and nothing in the portal un-cancels a
+   * demand. The step is also where the mandatory reason is typed, so it is not
+   * a bare "are you sure?" — it asks for something the record needs.
+   */
+  const [cancelRow, setCancelRow] = useState<GridRow | null>(null);
 
   /** Demand the engine cannot plan (`blocked`) cannot be issued — not listed. */
   const planned = useMemo(() => proposals.filter((p) => p.blocked == null), [proposals]);
@@ -1077,7 +1099,42 @@ export default function OperationToOrder() {
       cell: (r) => {
         const po = poOf(r);
         // Not "no data" — WORK. Muted, unclickable, filterable by name.
-        if (!po) return <span className="text-kit-slate-11">{W.yetToOrder}</span>;
+        //
+        // ── P12 (Loo, 2026-08-04) — `Cancel` RIDES THIS CELL, and the reason is
+        // that this column already asks the question the button answers.
+        //
+        // `PO No.` asks *did this become a purchase order?* On a row still to
+        // buy it says `Yet to Order`; `Cancel` is the other answer to the same
+        // question — *it never will.* Putting it here also costs the frozen
+        // layout NOTHING: the four widths sum to 93 and the two kit columns to
+        // 7, so a seventh column could only be paid for out of `Model`, which
+        // this page's own law reserves as the one column the spare width
+        // belongs to. Measured at 1280 (the operator's laptop, the width Q1 and
+        // P9 were both decided at): the grid area is ~1056px, this column is
+        // 20% = ~211px less 24px of cell padding, and `Yet to Order` + gap +
+        // the button is ~141px of the 187px available.
+        //
+        // ONLY A ROW THAT IS ITS OWN DEMAND GETS IT. A customer requirement is
+        // not cancellable here at all — that is the Orders module's act on the
+        // customer's order, and a second door to it would be a second truth.
+        if (!po) {
+          const demandId = demandIdOf(r);
+          return (
+            <span className="flex items-center gap-2 min-w-0">
+              <span className="text-kit-slate-11 truncate">{W.yetToOrder}</span>
+              {demandId ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCancelRow(r)}
+                  data-testid={`to-order-cancel-${r.key}`}
+                >
+                  {W.cancelDemand}
+                </Button>
+              ) : null}
+            </span>
+          );
+        }
         // The number is the receipt AND the door to the next step: it lands
         // on Purchase Orders with THIS document opened.
         const slug = PO_TAB_SLUG[r.category];
@@ -1568,6 +1625,18 @@ export default function OperationToOrder() {
         destinations={destinations}
         onCreated={() => void q.refetch()}
       />
+
+      {/* P12 — the confirm step for `Cancel`. The page REFETCHES rather than
+          hiding the row itself: a cancel takes the whole remainder, so the row
+          is gone from the server's own answer, and removing it locally would be
+          this page deciding a thing the server already decided. */}
+      <CancelPurchaseDialog
+        row={cancelRow}
+        onOpenChange={(o) => {
+          if (!o) setCancelRow(null);
+        }}
+        onCancelled={() => void q.refetch()}
+      />
     </div>
   );
 }
@@ -1836,6 +1905,128 @@ function CreatePurchaseDialog({
           label={W.remark}
           value={remark}
           onChange={(e) => setRemark(e.target.value)}
+        />
+      </div>
+    </Modal>
+  );
+}
+/**
+ * P12 — `Cancel Purchase` (Loo, 2026-08-04).
+ *
+ * THE REMAINDER IS WHAT IS CANCELLED, and on a part-ordered demand that is the
+ * whole point: *"ordered 3, don't want the other 2"* is an ordinary day, and
+ * stopping the 3 runs through the purchase order (`PURCHASING-WORKING-FLOW.md`
+ * §9), never through here.
+ *
+ * NOBODY TYPES A QUANTITY. The row's `Qty` already IS the remainder — the api
+ * builds a demand row from the database's GENERATED `remaining_qty` — so the
+ * dialog states the number rather than asking for one. A typed number is a
+ * number somebody can get wrong, and the act it would serve (reduce a demand)
+ * is a different act nobody has asked for.
+ *
+ * THE REASON IS MANDATORY, and it is why this is a dialog rather than a bare
+ * confirm: the record needs something a yes/no cannot give it. `Cancel
+ * Purchase` stays disabled until there is one, so the refusal is never
+ * something the operator has to meet.
+ *
+ * THERE IS NO DELETE HERE AND THERE MAY NEVER BE ONE. Cancel keeps the record
+ * with its reason; test rubbish is cleaned by SQL on request and the database
+ * starts clean at go-live.
+ *
+ * The way out is the frame's own ✕ (DialogFrame's `Close`), not a second
+ * `Cancel` button — two buttons reading `Cancel` in one dialog, one meaning
+ * *stop this purchase* and one meaning *stop this dialog*, is the one arrangement
+ * that could not be read.
+ */
+function CancelPurchaseDialog({
+  row,
+  onOpenChange,
+  onCancelled,
+}: {
+  row: GridRow | null;
+  onOpenChange: (open: boolean) => void;
+  onCancelled: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  const demandId = row ? demandIdOf(row) : null;
+  const canCancel = !saving && demandId != null && reason.trim() !== "";
+
+  function close() {
+    setReason("");
+    setFailed(null);
+    onOpenChange(false);
+  }
+
+  async function submit() {
+    if (!canCancel || !demandId) return;
+    setSaving(true);
+    setFailed(null);
+    try {
+      await apiFetch(
+        `/api/operation/purchase/to-order/demand/${encodeURIComponent(demandId)}/cancel`,
+        { method: "POST", body: JSON.stringify({ reason: reason.trim() }) },
+      );
+      close();
+      onCancelled();
+    } catch (e) {
+      // The failure STAYS in the dialog with the reason intact — a cancel that
+      // did not happen must not look like one that did. `already_cancelled` and
+      // `nothing_to_cancel` both arrive here as the server's own sentence.
+      setFailed(e instanceof Error ? e.message : W.createFailed);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={row != null}
+      onOpenChange={(o) => {
+        if (!o) close();
+      }}
+      title={W.cancelPurchase}
+      footer={
+        <span className="flex items-center gap-3 pt-1">
+          {failed ? (
+            <span className="text-meta text-kit-red-11" data-testid="to-order-cancel-failed">
+              {failed}
+            </span>
+          ) : null}
+          <Button
+            variant="primary"
+            disabled={!canCancel}
+            loading={saving}
+            onClick={() => void submit()}
+            data-testid="to-order-cancel-submit"
+          >
+            {W.cancelPurchase}
+          </Button>
+        </span>
+      }
+    >
+      <div className="flex flex-col gap-3" data-testid="to-order-cancel-dialog">
+        {/* WHAT is being cancelled, in the grid's own two words for it. Both
+            labels are the ones already on this page — `Item` from the create
+            dialog, `Qty` from the column — so the dialog and the row it came
+            from cannot describe the same purchase differently. */}
+        <div className="flex items-baseline gap-2 text-body">
+          <span className="text-meta text-kit-slate-11">{W.itemLabel}</span>
+          <span className="text-kit-slate-12">{row?.model ?? ""}</span>
+        </div>
+        <div className="flex items-baseline gap-2 text-body">
+          <span className="text-meta text-kit-slate-11">{W.colQty}</span>
+          <span className="text-kit-slate-12 tabular-nums" data-testid="to-order-cancel-qty">
+            {row?.qty ?? ""}
+          </span>
+        </div>
+        <Textarea
+          id="cd-reason"
+          label={W.cancelReason}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
         />
       </div>
     </Modal>

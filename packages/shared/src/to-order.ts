@@ -177,6 +177,48 @@ export const TO_ORDER_WORDS = {
   create: "Create",
   nextUpdate: "Available in next update.",
 
+  // ── P12 (Loo, 2026-08-04) — a typed demand can be cancelled, and so can the
+  //    REMAINDER of one that was part-ordered. ─────────────────────────────
+  /**
+   * The row's button. `Cancel` is COPY-STANDARD's own verb for this act
+   * (*"Cancel an order | **Cancel** | Void · Abandon · Kill"*), so no word is
+   * invented here.
+   *
+   * IT IS A SEPARATE ENTRY FROM `cancel` ABOVE, WHICH SPELLS THE SAME WORD ON
+   * PURPOSE. `cancel` is the Create Purchase dialog's abandon button and the
+   * filter popover's clear label — form controls, which COPY-STANDARD exempts
+   * from the verb dictionary BY NAME (*"a button inside a form that stores what
+   * you just typed is `Save`, and one that abandons it is `Cancel` — those are
+   * not actions"*). This one is the ACTION. Two concepts that happen to share a
+   * spelling are two entries; the same concept spelt twice would be the drift
+   * this file warns about under `supplierLabel`, and a rename of one of these
+   * must never silently rename the other.
+   */
+  cancelDemand: "Cancel",
+  /**
+   * The confirm dialog — its title AND its confirm button, the same words in
+   * both so the press and the promise cannot differ.
+   *
+   * The verb plus its object, where the row's button carries the verb alone.
+   * That is C1's own shape (a party-free word in a tight slot, the fuller line
+   * where it stands alone): in the grid the row IS the purchase and its
+   * neighbours name it, while a dialog is read with nothing around it. The noun
+   * is `Create Purchase`'s own — this is the exact inverse of the act that made
+   * the row — and AutoCount, which the team already knows, carries `Cancel
+   * Purchase Order` as a document of its own.
+   */
+  cancelPurchase: "Cancel Purchase",
+  /**
+   * The one field, and it is mandatory — the server refuses a blank one by name
+   * and the table's `purchase_demands_cancel_pair` CHECK refuses the pair.
+   *
+   * Deliberately NOT the `reason` entry above: that one labels the create
+   * dialog's PURPOSE picker (`Ready Stock` · `Display` · …), which asks what the
+   * purchase is FOR. This asks why it is being stopped. Same word, different
+   * question, so it gets its own home rather than borrowing one.
+   */
+  cancelReason: "Reason",
+
   // The Preview — what pressing Issue would create, before it exists.
   preview: "Purchase Order Preview",
   /**
