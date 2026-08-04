@@ -412,6 +412,8 @@ export {
   chasePoEventInput,
   // P3 (0306) — the two supplier calls' answer bodies.
   recordTomorrowDeliveryInput,
+  // Q5 (0318) — the supplier's promised READY date, the third answer body.
+  recordReadyDateInput,
   recordSendInput,
   setMessageTemplateInput,
   setLineDestinationInput,
@@ -456,6 +458,7 @@ export {
   type ChasePoEventInput,
   type RecordTomorrowDeliveryInput,
   type RecordBalanceDateInput,
+  type RecordReadyDateInput,
   type AttachDoInput,
   type ReceivePoWithDoInput,
   type OfficeReceiveInput,

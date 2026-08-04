@@ -50,6 +50,7 @@ import {
   useOperationPos,
   useOperationSuppliers,
   usePoLineAction,
+  useRecordReadyDate,
   useRecordSend,
   useRecordSupplierDate,
   useSetMessageTemplate,
@@ -139,6 +140,64 @@ function callPoOf(po: operationPoListRow): SupplierCallPo {
   };
 }
 
+/**
+ * THE EXCEL ROWS: one per SO × SKU, never the paper's stacked cells (Jess,
+ * 2026-08-02). Received is dealt across a line's rows in the same SO order the
+ * quantities were — a DISPLAY attribution until P5's allocation.
+ *
+ * `lineQty` / `lineReceived` ride along because the destination doors work on
+ * the LINE, not on the SO slice: what may still be re-routed is the line's
+ * un-received remainder, and a row showing 1 of a 3-unit line must not tell the
+ * split arithmetic that there is only 1 to move.
+ */
+function docRowsOf(
+  po: operationPoListRow,
+  labelOf: (l: operationPoListRow["purchase_order_lines"][number]) => string,
+) {
+  const out: {
+    key: string;
+    lineId: string;
+    so: number | null;
+    /** The business name a buyer says out loud — `Booqit 1B(LHF)`. */
+    label: string;
+    /** The code. It identifies, it does not describe, so it never leads. */
+    sku: string;
+    qty: number;
+    received: number;
+    lineQty: number;
+    lineReceived: number;
+    remark: string | null;
+    destinationId: string | null;
+    opsRemark: string | null;
+  }[] = [];
+  for (const l of po.purchase_order_lines) {
+    const parts =
+      l.so_rows && l.so_rows.length > 0
+        ? l.so_rows
+        : [{ so: null, qty: l.qty, remark: null }];
+    let recvLeft = l.received_qty;
+    parts.forEach((r, i) => {
+      const got = Math.min(recvLeft, r.qty);
+      recvLeft -= got;
+      out.push({
+        key: `${l.id}-${i}`,
+        lineId: l.id,
+        so: r.so,
+        label: labelOf(l),
+        sku: l.sku,
+        qty: r.qty,
+        received: got,
+        lineQty: l.qty,
+        lineReceived: l.received_qty,
+        remark: r.remark,
+        destinationId: l.destination_id ?? null,
+        opsRemark: l.ops_remark ?? null,
+      });
+    });
+  }
+  return out;
+}
+
 function soRefsOf(po: operationPoListRow): number[] {
   const set = new Set<number>();
   if (po.so != null) set.add(po.so);
@@ -202,6 +261,13 @@ export default function OperationPurchaseOrders() {
   // reading-pane compact mode. Its control lives in the SHELL's page-meta
   // slot, not in a pane corner — no master grows arrows on panels.
   const [workspaceOpen, setWorkspaceOpen] = useState(true);
+  /**
+   * ONE PO EXPANDS AT A TIME (Loo's rule 2, §12.7.5) — so this is a single id,
+   * not a Set: the state cannot represent two open rows, which is stronger than
+   * a rule that closes the other one. The expand holds date pickers, dropdowns
+   * and inputs, and three open at once is a page of live controls with no focus.
+   */
+  const [expandedPo, setExpandedPo] = useState<string | null>(null);
 
   const today = todayMYT();
   const pos = useMemo(() => posQ.data?.pos ?? [], [posQ.data]);
@@ -944,6 +1010,12 @@ export default function OperationPurchaseOrders() {
       )
     : columns;
 
+  /** The kit takes a Set; the page keeps ONE id. */
+  const expandedRows = useMemo(
+    () => new Set(expandedPo ? [expandedPo] : []),
+    [expandedPo],
+  );
+
   const filtered = colFilters.size > 0 || stateSel !== null;
   const clearAll = () => {
     setColFilters(new Map());
@@ -1082,6 +1154,31 @@ export default function OperationPurchaseOrders() {
               onSortChange={setSort}
               loading={posQ.isLoading}
               rowMuted={(p) => p.status === "cancelled"}
+              /* THE WORKING AREA (Q5, Loo 2026-08-04). The mechanism is
+                 D0.5d's — the kit renders the control and the tall cell, and
+                 this page renders the contents and owns which row is open. The
+                 label is the record's own name, which is the precedent the
+                 Report tab set: an accessible name that invents no word. */
+              expansion={{
+                expanded: expandedRows,
+                onToggle: (id) =>
+                  setExpandedPo((cur) => (cur === id ? null : id)),
+                label: (p) => p.id,
+                render: (p) => (
+                  <PoWorkArea
+                    po={p}
+                    supplierName={supplierNameOf(p.supplier_id)}
+                    calls={callsOf(p)}
+                    labelOf={lineLabel}
+                    eta={etaOf(p)}
+                    today={today}
+                    destinations={destinations}
+                    fallbackDestName={
+                      warehouseById.get(p.warehouse_id)?.name ?? "—"
+                    }
+                  />
+                ),
+              }}
               label="Purchase orders"
               empty={
                 <EmptyState
@@ -1121,17 +1218,6 @@ export default function OperationPurchaseOrders() {
               po={selected}
               supplier={supplierById.get(selected.supplier_id)}
               warehouse={warehouseById.get(selected.warehouse_id)}
-              calls={callsOf(selected)}
-              sizeOf={(raw) => skuBySku.get(raw)?.variant ?? null}
-              // ③ ONE naming rule for both surfaces (Jess, 2026-08-03): the
-              // register and the workspace were two languages for one PO —
-              // `Booqit 1B(LHF)` in the list, `5539-1B(LHF)` in the document.
-              // Passing the LISTING's own function down is what makes them
-              // structurally unable to drift apart again.
-              labelOf={lineLabel}
-              eta={etaOf(selected)}
-              today={today}
-              destinations={destinations}
               messageTemplate={messageTemplate}
             />
           ) : (
@@ -1148,33 +1234,379 @@ export default function OperationPurchaseOrders() {
   );
 }
 
-/* ── The Supplier Workspace for ONE Purchase Order (Jess, 2026-08-02 FINAL).
+/**
+ * ── THE WORKING AREA — the row expand (Q5, Loo 2026-08-04) ─────────────────
  *
- * WORKSPACE LAW — every section answers ONE operator question, and a future
- * field that answers none of them does not belong here:
+ * His diagnosis after using the page: **`Right panel not friendly to edit
+ * detail.`** The panel's JOB was defined wrong, not the editing — it had become
+ * everything at once: edit · timeline · notes · communication · print.
  *
- *   WORK HEADER       identity + work state + CURRENT ACTION (typography
- *                     only — quiet first; a highlighted container only if
- *                     live use proves it does not stand out) + PO Issued ·
- *                     Received. Expected Arrival deliberately NOT here — it
- *                     lives in SUPPLIER with its history.
- *   PURCHASE ORDER    "What is this PO?"          (mission: Reference —
- *                     read only, always the CURRENT revision; edits happen
- *                     in SUPPLIER. UI speaks business, not "Reference".)
- *   SUPPLIER          "What must I do with the supplier?"  (mission: manage
- *                     supplier execution — Goods Arrival + its history
- *                     beside it, Open Actions; grows forever: DO · Revision
- *                     · Change/Split Deliver To · Claims links.)
- *   ACTIVITY          "What have we communicated?" (mission: record and
- *                     perform business communication — tools + the business
- *                     timeline, a read-time merge of the real stores.)
- *   RECEIVING         "What has happened after arrival?"  (mission: hand
- *                     over to warehouse operation — summary + door only.)
+ * `PURCHASING-INFORMATION-MODEL.md` §12.7.5 splits it, and the split is his:
+ *
+ *   DOCUMENT DATA — destination · the two dates · qty · line remark · received
+ *     → the EXPAND. The document is in front of you and you type into it,
+ *       which is the whole reason AutoCount feels good.
+ *   ACTIVITY — communication · timeline · files · print
+ *     → the RIGHT PANEL, which stops being an editing surface.
+ *
+ * **ONE editing surface** (his rule 3): the date door and the per-line doors
+ * moved OUT of the panel rather than being kept in both. Two doors onto one PO
+ * is C1's bypass in a new coat.
+ *
+ * **ONE PO expands at a time** (his rule 2) — the page owns that, not this
+ * component: the expand holds date pickers and dropdowns, and three open at
+ * once is a page of live controls with no focus.
+ *
+ * **It is NOT a tree** (his rule 4): two levels, fixed forever. Nothing in here
+ * is itself expandable.
+ *
+ * Qty renders as TEXT and there is deliberately no input:
+ * `PURCHASING-WORKING-FLOW.md` §3 rules that items are ADDED to a sent PO by
+ * raising a NEW one, and migration 0316 left PO-line quantities RPC-only with
+ * no `set_line_qty` door. Building the input Loo sketched would need a
+ * migration AND the reversal of a frozen rule.
+ */
+function PoWorkArea({
+  po,
+  supplierName,
+  calls,
+  labelOf,
+  eta,
+  today,
+  destinations,
+  fallbackDestName,
+}: {
+  po: operationPoListRow;
+  supplierName: string;
+  calls: PurchasingOpenCall[];
+  labelOf: (l: operationPoListRow["purchase_order_lines"][number]) => string;
+  eta: { date: string | null; confirmed: boolean };
+  today: string;
+  destinations: { id: string; name: string; is_default: boolean }[];
+  fallbackDestName: string;
+}) {
+  const [dateOpen, setDateOpen] = useState(false);
+  const progress = poReceivingProgress(po.purchase_order_lines);
+  const overdue = poOverdueDays(callPoOf(po), today);
+  const workState = poWorkStateOf(callPoOf(po), today);
+  /** The same shared rule the register's cell reads — spelling it twice is how
+   *  a guess ends up red in one place and amber in the other. */
+  const gap =
+    workState === "completed" || workState === "cancelled"
+      ? null
+      : poArrivalGapOf(po.customer_delivery ?? null, eta.date);
+  const rows = useMemo(() => docRowsOf(po, labelOf), [po, labelOf]);
+  const hist = useMemo(() => poDateHistoryOf(po.promises), [po.promises]);
+
+  return (
+    <div data-testid={`po-work-${po.id}`}>
+      {/* ① THE TWO DATES — §12.2's ① and ②, side by side, because the whole
+           question an operator answers here is *what did the factory say, and
+           when does it reach us*. Both are editable; the panel carries neither
+           any more. */}
+      <div className="flex flex-wrap items-baseline gap-x-8 gap-y-1">
+        <ReadyDateField po={po} supplierName={supplierName} />
+        <div className="flex items-baseline gap-2 text-body leading-6">
+          <span className="text-label text-kit-slate-9">Expected Arrival</span>
+          <button
+            type="button"
+            onClick={() => setDateOpen((o) => !o)}
+            aria-expanded={dateOpen}
+            data-testid="po-date-row"
+            className="flex items-baseline gap-1 rounded-control px-1 text-left hover:bg-kit-slate-3"
+          >
+            {eta.date ? (
+              <span
+                className={[
+                  "tabular-nums border-b border-dashed border-kit-slate-5",
+                  eta.confirmed ? "text-kit-slate-12" : "text-kit-slate-9",
+                ].join(" ")}
+              >
+                {fmtDateShort(eta.date)}
+                {!eta.confirmed && (
+                  <span className="text-kit-slate-9"> · expected</span>
+                )}
+              </span>
+            ) : (
+              <span className="text-kit-slate-9 border-b border-dashed border-kit-slate-5">
+                —
+              </span>
+            )}
+            {gap && (
+              <span
+                data-testid="po-arrival-gap"
+                data-tone={
+                  gap.tone === "late" && eta.confirmed ? "confirmed" : "estimate"
+                }
+                className={
+                  gap.tone === "late" && eta.confirmed
+                    ? "text-kit-red-11"
+                    : "text-kit-amber-11"
+                }
+              >
+                ⚠ {gap.label}
+              </span>
+            )}
+            {overdue != null && (
+              <span className="text-kit-red-11" data-testid="po-overdue">
+                ⚠ Overdue by {overdue} day{overdue === 1 ? "" : "s"}
+              </span>
+            )}
+            <Icon name={dateOpen ? "collapse" : "forward"} size={14} />
+          </button>
+        </div>
+      </div>
+
+      {dateOpen && (
+        <div
+          className="mt-1 pl-2 border-l-2 border-kit-blue-9"
+          data-testid="po-date-extend"
+        >
+          <SupplierDateForm po={po} confirmed={eta.confirmed} supplierName={supplierName} />
+          {calls.map((c) => (
+            <div
+              key={c.poLineId ?? c.key}
+              className="flex items-baseline gap-2 text-body leading-6"
+            >
+              <span
+                aria-hidden
+                className={[
+                  "w-1.5 h-1.5 rounded-full shrink-0 self-center",
+                  c.late ? "bg-kit-red-9" : "bg-kit-amber-9",
+                ].join(" ")}
+              />
+              <span className="text-kit-slate-12">
+                {purchasingActionQueue(c.key)}
+              </span>
+              {c.dueIso && (
+                <span className="ml-auto text-label text-kit-slate-9">
+                  due {fmtDateShort(c.dueIso)}
+                </span>
+              )}
+            </div>
+          ))}
+          {/* TWO RUNS, EACH NAMED (Q5). `poDateHistoryOf` filtered the ready
+              kind out until now, so the first ready date an operator recorded
+              would have been swallowed by the history sitting beside the
+              field. They are never merged into one numbered run: they are
+              different FACTS, and a slip measured between a ready date and an
+              arrival date is a number about nothing. */}
+          <DateRun
+            label="Expected Arrival"
+            testid="po-date-history"
+            entries={hist.entries}
+            emptyText={`No date from ${supplierName} yet.`}
+          />
+          {hist.readyEntries.length > 0 && (
+            <DateRun
+              label="Supplier Ready Date"
+              testid="po-ready-history"
+              entries={hist.readyEntries}
+              emptyText=""
+            />
+          )}
+        </div>
+      )}
+
+      {/* ② THE LINES — one row per SO × SKU (the Excel rows, Jess 2026-08-02),
+           and the destination is EDITABLE right there. This is the fact the
+           row and the panel structurally cannot show: the row prints ONE value
+           for the whole PO (`Carres Klang +1`) and the panel answers for one
+           PO at a time, so *"which lines across my open POs go to AL?"* used
+           to mean opening all 21. */}
+      <div className="mt-3" data-testid="po-doc-items">
+        <div className="flex gap-2 text-label uppercase tracking-wide text-kit-slate-9 border-y border-kit-slate-5 py-1">
+          <span className="w-4 font-medium">#</span>
+          <span className="w-16 font-medium">SO No.</span>
+          <span className="flex-1 min-w-0 font-medium">Description</span>
+          <span className="w-10 text-right font-medium">Qty</span>
+          <span className="w-40 font-medium">Destination</span>
+          <span className="w-16 text-right font-medium">Received</span>
+        </div>
+        {rows.map((r, i) => (
+          <LineRow
+            key={r.key}
+            row={r}
+            index={i + 1}
+            poDestinationId={po.destination_id ?? null}
+            destinations={destinations}
+            fallbackDestName={fallbackDestName}
+          />
+        ))}
+        <div className="flex gap-2 py-1.5 text-body">
+          <span className="w-4" />
+          <span className="w-16" />
+          <span className="flex-1 min-w-0 text-label uppercase tracking-wide text-kit-slate-9">
+            Total
+          </span>
+          <span className="w-10 text-right font-semibold text-kit-slate-12 tabular-nums">
+            {progress.ordered}
+          </span>
+          <span className="w-40" />
+          <span className="w-16 text-right font-semibold text-kit-slate-12 tabular-nums">
+            {progress.received} / {progress.ordered}
+          </span>
+        </div>
+        {progress.issueQty > 0 && (
+          <div className="text-body text-kit-red-11">
+            {progress.issueQty} with a problem
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** One numbered run of dates, named by the FIELD it belongs to. */
+function DateRun({
+  label,
+  testid,
+  entries,
+  emptyText,
+}: {
+  label: string;
+  testid: string;
+  entries: readonly { ordinal: number; date: string; reason: string | null; remarks: string | null; recordedAt: string }[];
+  emptyText: string;
+}) {
+  if (entries.length === 0) {
+    return emptyText ? (
+      <div className="text-label text-kit-slate-9 leading-6">{emptyText}</div>
+    ) : null;
+  }
+  return (
+    <div data-testid={testid}>
+      <div className="text-label text-kit-slate-9">{label}</div>
+      {entries.map((e) => (
+        <div
+          key={e.recordedAt}
+          className="flex items-baseline gap-2 text-body leading-6"
+        >
+          {/* One date earns no number — `1st` of one is not a sequence. */}
+          {entries.length > 1 && (
+            <span className="w-7 shrink-0 text-label text-kit-slate-9">
+              {ordinalLabel(e.ordinal)}
+            </span>
+          )}
+          <span className="w-[68px] shrink-0 tabular-nums text-kit-slate-12">
+            {fmtDateShort(e.date)}
+          </span>
+          <span className="min-w-0 text-kit-slate-9">
+            {[e.reason, e.remarks].filter(Boolean).join(" · ")}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * `Supplier Ready Date` — §12.2 ①, the day the FACTORY says it has finished.
+ *
+ * THE DOOR THAT HAD NO HANDLE: `purchasing_record_ready_date` shipped with
+ * migration 0318 on 2026-08-03 and nothing in the portal ever called it, so
+ * `Confirm ready date` — an action the flow file has carried since it was
+ * written — could not be closed from a screen.
+ *
+ * ONE value, so it takes the ruled inline manner exactly (Jess, 2026-08-02): a
+ * value is TEXT until clicked, then a control; **Enter saves, Esc cancels, and
+ * there is no Save button.** A date already given is never edited — you record
+ * the NEXT one, and the ledger keeps both.
+ */
+function ReadyDateField({
+  po,
+  supplierName,
+}: {
+  po: operationPoListRow;
+  supplierName: string;
+}) {
+  const held = po.expected_ready_date ?? null;
+  const [editing, setEditing] = useState(false);
+  const [date, setDate] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const save = useRecordReadyDate(po.id);
+
+  const close = () => {
+    setEditing(false);
+    setDate("");
+    setErr(null);
+  };
+  const submit = () => {
+    if (date === "" || save.isPending) return;
+    setErr(null);
+    save.mutate(
+      { newDate: date },
+      {
+        onSuccess: close,
+        onError: (e) => setErr(e instanceof Error ? e.message : String(e)),
+      },
+    );
+  };
+
+  return (
+    <div className="flex items-baseline gap-2 text-body leading-6">
+      <span className="text-label text-kit-slate-9">Supplier Ready Date</span>
+      {editing ? (
+        <input
+          type="date"
+          value={date}
+          autoFocus
+          onChange={(e) => setDate(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit();
+            if (e.key === "Escape") close();
+          }}
+          aria-label={`Supplier ready date from ${supplierName}`}
+          data-testid="po-ready-date-input"
+          className="h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          data-testid="po-ready-date-open"
+          className={[
+            "border-b border-dashed border-kit-slate-5 text-left hover:text-kit-slate-12 tabular-nums",
+            held ? "text-kit-slate-12" : "text-kit-slate-9",
+          ].join(" ")}
+        >
+          {held ? fmtDateShort(held) : "—"}
+        </button>
+      )}
+      {save.isPending && (
+        <span className="text-label text-kit-slate-9">Saving…</span>
+      )}
+      {err && (
+        <span className="text-label text-kit-red-11" data-testid="po-ready-date-error">
+          {err}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ── THE ACTIVITY PANEL for ONE Purchase Order.
+ *
+ * **It stopped being an editing surface on 2026-08-04 (Q5, Loo).** The panel
+ * used to carry the date door, the items grid and the per-line doors as well as
+ * the communication desk — everything at once, which is what produced
+ * *"Right panel not friendly to edit detail."* §12.7.5's split sends DOCUMENT
+ * DATA to the expand and leaves ACTIVITY here:
+ *
+ *   IDENTITY     which PO this is — the subject the activity is ABOUT. Read
+ *                only, and purchasing cannot move a customer's promise.
+ *   ACTIVITY     "What have we communicated?" — Document · Communication ·
+ *                Communication History (`ActivityDesk`).
+ *
+ * What LEFT, and where it went: `Expected Arrival` + its history and
+ * `Supplier Ready Date` → the expand's two date fields · the items grid, the
+ * per-line destination and the ops remark → the expand's line rows. **Nothing
+ * was deleted and nothing is in two places** — his rule 1 (nothing appears in
+ * two tiers) and rule 3 (one editing surface).
  *
  * Rhythm = CARRES WORKSPACE RHYTHM v1: one continuous working document,
- * hairline + small-caps sections, 24px property rows, ONE loud element
- * (the Current Action), no cards, no letterhead (the paper look belongs to
- * the printed 0307 document). */
+ * hairline + small-caps sections, 24px property rows, no cards, no letterhead
+ * (the paper look belongs to the printed 0307 document). */
 
 /** The Linear property row: label + value, ONE 24px line, never stacked. */
 function Prop({ label, children }: { label: string; children: ReactNode }) {
@@ -1190,94 +1622,14 @@ function WorkspaceBody({
   po,
   supplier,
   warehouse,
-  calls,
-  sizeOf,
-  labelOf,
-  eta,
-  today,
-  destinations,
   messageTemplate,
 }: {
   po: operationPoListRow;
   supplier: SupplierRow | undefined;
   warehouse: { name: string; address: string | null } | undefined;
-  calls: PurchasingOpenCall[];
-  sizeOf: (sku: string) => string | null;
-  /** The REGISTER's own item-naming function, handed down so the document
-   *  and the list can never spell one product two ways. */
-  labelOf: (l: operationPoListRow["purchase_order_lines"][number]) => string;
-  eta: { date: string | null; confirmed: boolean };
-  today: string;
-  destinations: { id: string; name: string; is_default: boolean }[];
   messageTemplate: string | null;
 }) {
   const supplierName = supplier?.name ?? po.supplier_id;
-  const progress = poReceivingProgress(po.purchase_order_lines);
-  const overdue = poOverdueDays(callPoOf(po), today);
-  const workState = poWorkStateOf(callPoOf(po), today);
-  /** The gap the register now prints, read by the SAME shared rule — the
-   *  delay is RECORDED here, so this is where the operator most needs to know
-   *  the promise they are about to break. */
-  const gap =
-    workState === "completed" || workState === "cancelled"
-      ? null
-      : poArrivalGapOf(po.customer_delivery ?? null, eta.date);
-  const [dateOpen, setDateOpen] = useState(false);
-  const [openLine, setOpenLine] = useState<string | null>(null);
-
-  /** The EXCEL rows: one per SO × SKU (never the paper's stacked cells).
-   *  Received is dealt across a line's rows in the same SO order the
-   *  quantities were — a DISPLAY attribution until P5's allocation. */
-  const rows = useMemo(() => {
-    const out: {
-      key: string;
-      lineId: string;
-      so: number | null;
-      /** The business name a buyer says out loud — `Booqit 1B(LHF)`. */
-      label: string;
-      /** The code. It identifies, it does not describe, so it never leads. */
-      sku: string;
-      size: string | null;
-      qty: number;
-      received: number;
-      remark: string | null;
-      destinationId: string | null;
-      opsRemark: string | null;
-    }[] = [];
-    for (const l of po.purchase_order_lines) {
-      const parts =
-        l.so_rows && l.so_rows.length > 0
-          ? l.so_rows
-          : [{ so: null, qty: l.qty, remark: null }];
-      let recvLeft = l.received_qty;
-      parts.forEach((r, i) => {
-        const got = Math.min(recvLeft, r.qty);
-        recvLeft -= got;
-        out.push({
-          key: `${l.id}-${i}`,
-          lineId: l.id,
-          so: r.so,
-          label: labelOf(l),
-          sku: l.sku,
-          size: sizeOf(l.sku),
-          qty: r.qty,
-          received: got,
-          remark: r.remark,
-          destinationId: l.destination_id ?? null,
-          opsRemark: l.ops_remark ?? null,
-        });
-      });
-    }
-    return out;
-  }, [po, sizeOf, labelOf]);
-
-  const destName = (id: string) =>
-    destinations.find((d) => d.id === id)?.name ?? "—";
-
-  // The supplier's date history, numbered — SAP's shape (first promise vs the
-  // one they stand on now, plus the slip), read out of the append-only ledger.
-  const hist = useMemo(() => poDateHistoryOf(po.promises), [po.promises]);
-
   return (
     <div className="px-4 py-4" data-testid="po-document">
       {/* ── ① FIXED HEADER — labels left, the document number right. It
@@ -1310,277 +1662,6 @@ function WorkspaceBody({
         </span>
       </div>
 
-      {/* The supplier's date — the ONE row that opens a form. Overdue is a
-          fact printed beside it (Jess's cycle), never a second bucket. */}
-      <button
-        type="button"
-        onClick={() => setDateOpen((o) => !o)}
-        aria-expanded={dateOpen}
-        data-testid="po-date-row"
-        className="mt-0.5 w-full flex items-baseline gap-2 text-body leading-6 text-left hover:bg-kit-slate-3 rounded-control"
-      >
-        <span className="w-32 shrink-0 text-label text-kit-slate-9">
-          Goods Arrival
-        </span>
-        <span className="min-w-0 flex-1">
-          {eta.date ? (
-            <span
-              className={[
-                "tabular-nums",
-                eta.confirmed ? "text-kit-slate-12" : "text-kit-slate-9",
-              ].join(" ")}
-            >
-              {fmtDateShort(eta.date)}
-              {!eta.confirmed && (
-                <span className="text-kit-slate-9"> · expected</span>
-              )}
-            </span>
-          ) : (
-            <span className="text-kit-slate-9">—</span>
-          )}
-          {/* ONE thing beside the date, and it is the promise we made to a
-              person (Jess, 2026-08-03). The `2nd date · 6 days later` summary
-              that used to sit here was history squeezed into a header — the
-              history itself is one click away and says it properly. */}
-          {gap && (
-            /* Same tone rule as the register (Loo, 2026-08-04): red only when
-               the FACTORY gave the date. Two surfaces, one rule — spelling it
-               twice is how a guess ends up red in one place and amber in the
-               other. */
-            <span
-              data-testid="po-arrival-gap"
-              data-tone={
-                gap.tone === "late" && eta.confirmed ? "confirmed" : "estimate"
-              }
-              className={
-                gap.tone === "late" && eta.confirmed
-                  ? "text-kit-red-11"
-                  : "text-kit-amber-11"
-              }
-            >
-              {"  "}⚠ {gap.label}
-            </span>
-          )}
-          {overdue != null && (
-            <span className="text-kit-red-11" data-testid="po-overdue">
-              {"  "}⚠ Overdue by {overdue} day{overdue === 1 ? "" : "s"}
-            </span>
-          )}
-        </span>
-        <Icon name={dateOpen ? "collapse" : "forward"} size={14} />
-      </button>
-
-      {/* NO action row here (Jess, 2026-08-03). `Next — Waiting for Goods`
-          was wrong twice over: `Waiting for Goods` is a STATUS, not a next
-          step, and the same slot carries a real ACTION on a PO with an open
-          call — one label cannot be true of both. The register's Current
-          Action column already says it, and since the compact width was
-          fixed it says it whole. */}
-
-      {dateOpen && (
-        <div
-          className="mt-1 ml-32 pl-2 border-l-2 border-kit-blue-9"
-          data-testid="po-date-extend"
-        >
-          <SupplierDateForm po={po} confirmed={eta.confirmed} supplierName={supplierName} />
-          {calls.map((c) => (
-            <div
-              key={c.poLineId ?? c.key}
-              className="flex items-baseline gap-2 text-body leading-6"
-            >
-              <span
-                aria-hidden
-                className={[
-                  "w-1.5 h-1.5 rounded-full shrink-0 self-center",
-                  c.late ? "bg-kit-red-9" : "bg-kit-amber-9",
-                ].join(" ")}
-              />
-              <span className="text-kit-slate-12">
-                {purchasingActionQueue(c.key)}
-              </span>
-              {c.dueIso && (
-                <span className="ml-auto text-label text-kit-slate-9">
-                  due {fmtDateShort(c.dueIso)}
-                </span>
-              )}
-            </div>
-          ))}
-          {hist.entries.length === 0 ? (
-            <div className="text-label text-kit-slate-9 leading-6">
-              No date from {supplierName} yet.
-            </div>
-          ) : (
-            /* Numbered oldest first — `1st` is the date the supplier FIRST
-               gave (never the engine's estimate: an estimate is our guess,
-               not their promise). One date earns no number. */
-            <div data-testid="po-date-history">
-              {hist.entries.map((e) => (
-                <div
-                  key={e.recordedAt}
-                  className="flex items-baseline gap-2 text-body leading-6"
-                >
-                  {hist.entries.length > 1 && (
-                    <span className="w-7 shrink-0 text-label text-kit-slate-9">
-                      {ordinalLabel(e.ordinal)}
-                    </span>
-                  )}
-                  <span className="w-[68px] shrink-0 tabular-nums text-kit-slate-12">
-                    {fmtDateShort(e.date)}
-                  </span>
-                  {/* Not `truncate`: `Production Delay` overflowed by 3px and
-                      printed `Production Del…` — a reason category clipped is
-                      a reason nobody can count. The ordinal and the date gave
-                      back 20px so the five short reasons sit on ONE line; the
-                      one long one wraps, which is the honest way to run out
-                      of room. */}
-                  <span className="min-w-0 text-kit-slate-9">
-                    {[e.reason, e.remarks].filter(Boolean).join(" · ")}
-                  </span>
-                  {/* No "told" column (Jess, 2026-08-02): every answer keyed
-                      on the same day printed the same date twice, and a second
-                      date beside a delivery date reads as another delivery
-                      date. What the row must answer is WHICH date and WHY. */}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── ② ITEMS — the Excel grid. Quantities live on the rows, so there
-           is no Receiving panel: the total row hands over. ────────────── */}
-      <div className="mt-3" data-testid="po-doc-items">
-        <div className="flex gap-2 text-label uppercase tracking-wide text-kit-slate-9 border-y border-kit-slate-5 py-1">
-          <span className="w-4 font-medium">#</span>
-          <span className="w-16 font-medium">SO No.</span>
-          <span className="flex-1 font-medium">Description</span>
-          <span className="w-8 text-right font-medium">Qty</span>
-          <span className="w-10 text-right font-medium">Recv</span>
-          <span className="w-6 shrink-0" />
-        </div>
-        {rows.map((r, i) => (
-          <div key={r.key}>
-            {/* ⋮ opens NAMED actions (Jess, 2026-08-02: "why so fragile?").
-                Excel right-clicks, Gmail and Linear use a ⋮ — a row action
-                must be a control with a name, never a word you happen to
-                click. The row itself no longer toggles anything. */}
-            <div
-              data-testid={`po-item-row-${i + 1}`}
-              className="w-full flex gap-2 py-1.5 text-body border-b border-kit-slate-4"
-            >
-              <span className="w-4 text-kit-slate-9 tabular-nums">{i + 1}</span>
-              <span className="w-16 text-label text-kit-slate-11 tabular-nums">
-                {r.so != null ? `SO-${r.so}` : "—"}
-              </span>
-              <span className="flex-1 min-w-0">
-                {/* The BUSINESS name leads (Jess, 2026-08-03): a buyer knows
-                    Booqit · Cody · Jager, not 5539-1B(LHF). Same function as
-                    the register's Items column, so the two can never drift.
-                    The code identifies rather than describes — it lives on
-                    hover and in the row's own expanded surface. The old
-                    variant sub-line is gone: `Booqit 1B(LHF)` already says
-                    it, and it was printing `1B(LHF)` twice. */}
-                <span
-                  title={r.sku}
-                  className="block font-semibold text-kit-slate-12 truncate"
-                >
-                  {r.label}
-                </span>
-                {/* TWO remarks, two owners (Jess, 2026-08-02): the SALES one
-                    came over from the sales order and prints for the factory;
-                    the OPS one is purchasing's own and never prints. */}
-                {r.remark && (
-                  <span className="block text-label text-kit-slate-11">
-                    Sales: {r.remark}
-                  </span>
-                )}
-                {r.destinationId && (
-                  <span className="block text-label text-kit-blue-11">
-                    → {destName(r.destinationId)}
-                  </span>
-                )}
-                {r.opsRemark && (
-                  <span className="block text-label text-kit-slate-9">
-                    Ops: {r.opsRemark}
-                  </span>
-                )}
-              </span>
-              <span className="w-8 text-right text-kit-slate-12 tabular-nums">
-                {r.qty}
-              </span>
-              <span className="w-10 text-right tabular-nums text-kit-slate-9">
-                {r.received}
-              </span>
-              <span className="w-6 shrink-0 text-right">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOpenLine(openLine === r.key ? null : r.key)
-                  }
-                  aria-expanded={openLine === r.key}
-                  aria-label={`Actions for line ${i + 1}`}
-                  data-testid={`po-item-menu-${i + 1}`}
-                  className="px-1 rounded text-kit-slate-9 hover:text-kit-slate-12 hover:bg-kit-slate-3"
-                >
-                  ⋮
-                </button>
-              </span>
-            </div>
-            {openLine === r.key && (
-              <div
-                className="pl-6 py-1.5 border-b border-kit-slate-4 bg-kit-slate-3"
-                data-testid="po-item-extend"
-              >
-                {/* Where the CODE lives now: the row above says what the
-                    product is, this says which exact one — the warehouse and
-                    the factory both key on it. */}
-                <div
-                  className="flex items-baseline gap-2 text-body leading-6"
-                  data-testid="po-item-sku"
-                >
-                  <span className="w-32 shrink-0 text-label text-kit-slate-9">
-                    Item ID
-                  </span>
-                  <span className="font-mono text-kit-slate-12">{r.sku}</span>
-                </div>
-                <LineWork
-                  lineId={r.lineId}
-                  qty={r.qty}
-                  received={r.received}
-                  destinationId={r.destinationId}
-                  poDestinationId={po.destination_id ?? null}
-                  opsRemark={r.opsRemark}
-                  destinations={destinations}
-                  fallbackName={warehouse?.name ?? "—"}
-                />
-              </div>
-            )}
-          </div>
-        ))}
-        <div className="flex gap-2 py-1.5 text-body border-b border-kit-slate-5">
-          <span className="w-4" />
-          <span className="w-16" />
-          <span className="flex-1 text-label uppercase tracking-wide text-kit-slate-9">
-            Total
-          </span>
-          <span className="w-8 text-right font-semibold text-kit-slate-12 tabular-nums">
-            {progress.ordered}
-          </span>
-          <span className="w-10 text-right font-semibold text-kit-slate-12 tabular-nums">
-            {progress.received}
-          </span>
-          <span className="w-6 shrink-0" />
-        </div>
-        {/* No door to Receiving (Jess, 2026-08-02): the warehouse checks the
-            goods in over there and the Recv column moves BY ITSELF — a link
-            that only navigates is a step purchasing never needs to take. */}
-        {progress.issueQty > 0 && (
-          <div className="mt-1 text-body text-kit-red-11">
-            {progress.issueQty} with a problem
-          </div>
-        )}
-      </div>
-
       {/* ── ③ ACTIVITY — tools + the business timeline. ───────────────── */}
       <ActivityDesk po={po} supplier={supplier} template={messageTemplate} />
     </div>
@@ -1589,60 +1670,67 @@ function WorkspaceBody({
 
 
 /**
- * The line's work surface (Jess, 2026-08-02 — 0311). Purchasing's only
- * per-line job is WHERE THIS PIECE GOES, so that is what opens under the row:
- * a destination picker and purchasing's own note.
+ * ONE LINE OF THE PURCHASE ORDER — and the doors that belong to it (0311, Jess
+ * 2026-08-02; moved out of the right panel's ⋮ and into the expand by Q5).
  *
- * When only PART of the quantity goes elsewhere the LINE splits — the PO
- * stays one document with one supplier (her frozen law). Only the un-received
+ * The destination used to open behind a ⋮ inside the right panel. It is a CELL
+ * of the working area's grid now, because that is the ONE fact neither the row
+ * nor the panel can show: the register's row prints one value for the whole PO
+ * (`Carres Klang +1`) and the panel answers for one PO at a time, so *"which
+ * lines across my open POs go to AL this week?"* meant opening all 21.
+ *
+ * **THE EDITING CONTROLS SIT ON THEIR OWN STRIP UNDER THE ROW, AND THAT WAS
+ * MEASURED RATHER THAN PREFERRED.** With the select, the `Move` field and the
+ * two controls all inside the 160px Destination cell, the cluster measured
+ * **68px tall in a real browser at the compact listing width (680px)** — it
+ * wrapped onto three lines and pushed the row to 81px. jsdom has no widths, so
+ * no page test could have caught it. The cell keeps the select; everything else
+ * gets the row's full width.
+ *
+ * INLINE EDIT, Linear's/Notion's manner (Jess, 2026-08-02: "it always show like
+ * that?"): a value is TEXT until you click it. Esc puts it back and posts
+ * nothing.
+ *
+ * **The commit control stays, and that is a REPORTED departure from Q5's "no
+ * Save button anywhere in the expand".** Jess ruled it live on 2026-08-02 with
+ * *"i cant save for AL"*: a picker changed with the MOUSE has no keyboard
+ * gesture to commit, and the `Move` field makes it a two-value act. The button
+ * is named by what it does — `Split` when only part of the line moves — so a
+ * partial move can never be committed by something that reads `Save`.
+ *
+ * When only PART of the quantity goes elsewhere the LINE splits; the PO stays
+ * one document with one supplier (her frozen law). Only the un-received
  * remainder can move: goods a warehouse already holds cannot be re-routed by
  * editing a document.
  */
-/**
- * The line's work surface (Jess, 2026-08-02 — 0311). Purchasing's only
- * per-line job is WHERE THIS PIECE GOES, so that is what opens under the row.
- *
- * INLINE EDIT, Linear's/Notion's manner (Jess, 2026-08-02: "it always show
- * like that?"): a value is TEXT until you click it. A form standing open on
- * every row, with a Save that is grey most of the time, is furniture — the
- * quiet state must look quiet. Enter saves, Esc cancels; there is no Save
- * button anywhere.
- *
- * When only PART of the quantity goes elsewhere the LINE splits — the PO
- * stays one document with one supplier (her frozen law). Only the un-received
- * remainder can move: goods a warehouse already holds cannot be re-routed by
- * editing a document.
- */
-function LineWork({
-  lineId,
-  qty,
-  received,
-  destinationId,
+function LineRow({
+  row,
+  index,
   poDestinationId,
-  opsRemark,
   destinations,
-  fallbackName,
+  fallbackDestName,
 }: {
-  lineId: string;
-  qty: number;
-  received: number;
-  destinationId: string | null;
+  row: ReturnType<typeof docRowsOf>[number];
+  index: number;
   poDestinationId: string | null;
-  opsRemark: string | null;
   destinations: { id: string; name: string; is_default: boolean }[];
-  fallbackName: string;
+  fallbackDestName: string;
 }) {
-  const act = usePoLineAction(lineId);
-  const current = destinationId ?? poDestinationId ?? "";
+  const act = usePoLineAction(row.lineId);
+  const current = row.destinationId ?? poDestinationId ?? "";
   const currentName =
-    destinations.find((d) => d.id === current)?.name ?? fallbackName;
+    destinations.find((d) => d.id === current)?.name ?? fallbackDestName;
+
   const [editing, setEditing] = useState<null | "dest" | "note">(null);
   const [dest, setDest] = useState(current);
   const [moveQty, setMoveQty] = useState("");
-  const [note, setNote] = useState(opsRemark ?? "");
+  const [note, setNote] = useState(row.opsRemark ?? "");
   const [err, setErr] = useState<string | null>(null);
 
-  const free = Math.max(0, qty - received);
+  /** The LINE's un-received remainder, never this row's SO slice: a row showing
+   *  1 of a 3-unit line must not tell the split arithmetic there is one to
+   *  move. (The SO attribution is a DISPLAY one until P5.) */
+  const free = Math.max(0, row.lineQty - row.lineReceived);
   const moving = Number(moveQty || 0);
   const changed = dest !== "" && dest !== current;
   const willSplit = changed && moving >= 1 && moving < free;
@@ -1651,7 +1739,7 @@ function LineWork({
     setEditing(null);
     setDest(current);
     setMoveQty("");
-    setNote(opsRemark ?? "");
+    setNote(row.opsRemark ?? "");
     setErr(null);
   };
   const run = (
@@ -1672,107 +1760,43 @@ function LineWork({
     if (willSplit) run("split", { moveQty: moving, destinationId: dest });
     else run("destination", { destinationId: dest });
   };
+  const keys = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") saveDestination();
+    if (e.key === "Escape") close();
+  };
 
   const EDIT_TEXT =
     "border-b border-dashed border-kit-slate-5 text-left hover:text-kit-slate-12";
-  const KEYS = "text-label text-kit-slate-9";
 
   return (
-    <div data-testid="po-line-work">
-      <div className="flex items-center gap-2 text-body leading-6">
-        <span className="w-24 shrink-0 text-label text-kit-slate-9">
-          Destination
+    <div>
+      <div
+        data-testid={`po-item-row-${index}`}
+        className="flex gap-2 py-1.5 text-body border-b border-kit-slate-4"
+      >
+        <span className="w-4 text-kit-slate-9 tabular-nums">{index}</span>
+        <span className="w-16 text-label text-kit-slate-11 tabular-nums">
+          {row.so != null ? `SO-${row.so}` : "—"}
         </span>
-        {editing === "dest" ? (
-          <>
-            <select
-              value={dest}
-              autoFocus
-              onChange={(e) => setDest(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") saveDestination();
-                if (e.key === "Escape") close();
-              }}
-              aria-label="Destination"
-              data-testid="po-line-destination"
-              className="h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12"
-            >
-              {destinations.length === 0 && (
-                <option value="">{fallbackName}</option>
-              )}
-              {destinations.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-            {changed && free > 1 && (
-              <>
-                <span className="text-label text-kit-slate-9">Move</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={free}
-                  value={moveQty}
-                  onChange={(e) => setMoveQty(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") saveDestination();
-                    if (e.key === "Escape") close();
-                  }}
-                  placeholder={`${free}`}
-                  aria-label="Move how many"
-                  data-testid="po-line-move-qty"
-                  className="h-8 w-14 rounded-control border border-kit-slate-5 bg-white px-2 text-right text-body text-kit-slate-12 tabular-nums"
-                />
-                <span className="text-label text-kit-slate-9">of {free}</span>
-              </>
-            )}
-            <button
-              type="button"
-              onClick={saveDestination}
-              disabled={!changed || act.isPending}
-              data-testid="po-line-destination-save"
-              className={`${DOC_BTN} disabled:opacity-40`}
-            >
-              {act.isPending ? "Saving…" : willSplit ? "Split" : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={close}
-              data-testid="po-line-destination-cancel"
-              className={`${KEYS} hover:text-kit-slate-12`}
-            >
-              Cancel
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setEditing("dest")}
-            data-testid="po-line-destination-open"
-            className={`${EDIT_TEXT} text-kit-slate-12`}
+        <span className="flex-1 min-w-0">
+          {/* The BUSINESS name leads (Jess, 2026-08-03): a buyer knows Booqit ·
+              Cody · Jager, not 5539-1B(LHF). The code identifies rather than
+              describes, so it lives on hover. */}
+          <span
+            title={row.sku}
+            className="block font-semibold text-kit-slate-12 truncate"
           >
-            {currentName}
-          </button>
-        )}
-      </div>
-      {editing === "dest" && changed && (
-        <div
-          className="ml-24 pl-2 text-label text-kit-slate-9"
-          data-testid="po-line-effect"
-        >
-          {willSplit
-            ? `${moving} of ${free} move; ${free - moving} stay.`
-            : `All ${free} move.`}
-        </div>
-      )}
-
-      <div className="mt-1 flex items-center gap-2 text-body leading-6">
-        <span className="w-24 shrink-0 text-label text-kit-slate-9">
-          Ops remark
-        </span>
-        {editing === "note" ? (
-          <>
+            {row.label}
+          </span>
+          {/* TWO remarks, two owners: the SALES one came over from the sales
+              order and prints for the factory; the OPS one is purchasing's own
+              and never prints. */}
+          {row.remark && (
+            <span className="block text-label text-kit-slate-11">
+              Sales: {row.remark}
+            </span>
+          )}
+          {editing === "note" ? (
             <input
               type="text"
               value={note}
@@ -1784,42 +1808,119 @@ function LineWork({
               }}
               placeholder="Internal — never printed"
               aria-label="Ops remark"
-              data-testid="po-line-ops-remark"
-              className="h-8 flex-1 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12"
+              data-testid={`po-line-ops-remark-${index}`}
+              className="mt-0.5 h-7 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-label text-kit-slate-12"
             />
+          ) : (
+            /* ONE value → the ruled manner exactly: Enter saves, Esc cancels,
+               no Save button. */
             <button
               type="button"
-              onClick={() => run("ops-remark", { text: note })}
-              disabled={note === (opsRemark ?? "") || act.isPending}
-              data-testid="po-line-ops-save"
-              className={`${DOC_BTN} disabled:opacity-40`}
+              onClick={() => setEditing("note")}
+              data-testid={`po-line-ops-open-${index}`}
+              className={`block max-w-full truncate text-label text-kit-slate-9 ${EDIT_TEXT}`}
             >
-              {act.isPending ? "Saving…" : "Save"}
+              {row.opsRemark ? `Ops: ${row.opsRemark}` : "Add a note…"}
             </button>
+          )}
+        </span>
+        <span className="w-10 text-right text-kit-slate-12 tabular-nums">
+          {row.qty}
+        </span>
+        <span className="w-40 min-w-0">
+          {editing === "dest" ? (
+            <select
+              value={dest}
+              autoFocus
+              onChange={(e) => setDest(e.target.value)}
+              onKeyDown={keys}
+              aria-label="Destination"
+              data-testid={`po-line-destination-${index}`}
+              className="h-8 w-full min-w-0 rounded-control border border-kit-slate-5 bg-white px-1 text-body text-kit-slate-12"
+            >
+              {destinations.length === 0 && (
+                <option value="">{fallbackDestName}</option>
+              )}
+              {destinations.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          ) : (
             <button
               type="button"
-              onClick={close}
-              data-testid="po-line-ops-cancel"
-              className={`${KEYS} hover:text-kit-slate-12`}
+              onClick={() => setEditing("dest")}
+              data-testid={`po-line-destination-open-${index}`}
+              className={`block max-w-full truncate text-kit-slate-12 ${EDIT_TEXT}`}
             >
-              Cancel
+              {currentName}
             </button>
-          </>
-        ) : (
+          )}
+        </span>
+        <span className="w-16 text-right tabular-nums text-kit-slate-9">
+          {row.received} / {row.qty}
+        </span>
+      </div>
+      {editing === "dest" && (
+        /* THE ROW'S OWN WIDTH, not the cell's 160px — measured: the four
+           controls inside the cell wrapped onto three lines. */
+        <div
+          className="flex flex-wrap items-center gap-2 pb-1.5 px-2 text-body border-b border-kit-slate-4"
+          data-testid={`po-line-edit-${index}`}
+        >
+          {changed && free > 1 && (
+            <>
+              <span className="text-label text-kit-slate-9">Move</span>
+              <input
+                type="number"
+                min={1}
+                max={free}
+                value={moveQty}
+                onChange={(e) => setMoveQty(e.target.value)}
+                onKeyDown={keys}
+                placeholder={`${free}`}
+                aria-label="Move how many"
+                data-testid={`po-line-move-qty-${index}`}
+                className="h-8 w-14 rounded-control border border-kit-slate-5 bg-white px-2 text-right text-body text-kit-slate-12 tabular-nums"
+              />
+              <span className="text-label text-kit-slate-9">of {free}</span>
+            </>
+          )}
           <button
             type="button"
-            onClick={() => setEditing("note")}
-            data-testid="po-line-ops-open"
-            className={`${EDIT_TEXT} ${
-              opsRemark ? "text-kit-slate-12" : "text-kit-slate-9"
-            }`}
+            onClick={saveDestination}
+            disabled={!changed || act.isPending}
+            data-testid={`po-line-destination-save-${index}`}
+            className={`${DOC_BTN} disabled:opacity-40`}
           >
-            {opsRemark ?? "Add a note…"}
+            {act.isPending ? "Saving…" : willSplit ? "Split" : "Save"}
           </button>
-        )}
-      </div>
+          <button
+            type="button"
+            onClick={close}
+            data-testid={`po-line-destination-cancel-${index}`}
+            className="text-label text-kit-slate-9 hover:text-kit-slate-12"
+          >
+            Cancel
+          </button>
+          {changed && (
+            <span
+              className="text-label text-kit-slate-9"
+              data-testid={`po-line-effect-${index}`}
+            >
+              {willSplit
+                ? `${moving} of ${free} move; ${free - moving} stay.`
+                : `All ${free} move.`}
+            </span>
+          )}
+        </div>
+      )}
       {err && (
-        <div className="text-label text-kit-red-11" data-testid="po-line-error">
+        <div
+          className="pb-1.5 px-2 text-label text-kit-red-11 border-b border-kit-slate-4"
+          data-testid={`po-line-error-${index}`}
+        >
           {err}
         </div>
       )}
