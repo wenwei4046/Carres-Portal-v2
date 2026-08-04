@@ -171,12 +171,26 @@ export interface PoReportFacetOption {
   pos: number;
 }
 
+/**
+ * One group of the rail.
+ *
+ * **`all` is the count the `All` row's own click produces** — this group's
+ * filter CLEARED, every other filter kept. It is deliberately not the report's
+ * filtered total: with August picked, a month rail reading `All 14` says *all
+ * months hold 14 purchase orders*, and 21 of them do. Found on production,
+ * 2026-08-04, before anybody read it as a business figure.
+ */
+export interface PoReportFacet<T = PoReportFacetOption> {
+  all: number;
+  options: T[];
+}
+
 export interface PoReport {
   rows: PoReportRow[];
   total: PoReportRow;
-  months: PoReportFacetOption[];
-  suppliers: (PoReportFacetOption & { name: string })[];
-  categories: PoReportFacetOption[];
+  months: PoReportFacet;
+  suppliers: PoReportFacet<PoReportFacetOption & { name: string }>;
+  categories: PoReportFacet;
 }
 
 // ── The computation ─────────────────────────────────────────────────────────
@@ -267,26 +281,35 @@ export function buildPoReport(
   // never with its own, so picking `Ohana` does not make `Nice Future`
   // disappear — the portal's own facet law (P2-Claims).
   const monthKeys = [...new Set(live.map((l) => l.month))].sort().reverse();
-  const months: PoReportFacetOption[] = monthKeys.map((value) => ({
-    value,
-    pos: distinctPos(live.filter((l) => matches(l, { ...filters, month: value }))),
-  }));
+  const months: PoReportFacet = {
+    all: distinctPos(live.filter((l) => matches(l, { ...filters, month: null }))),
+    options: monthKeys.map((value) => ({
+      value,
+      pos: distinctPos(live.filter((l) => matches(l, { ...filters, month: value }))),
+    })),
+  };
 
   const supplierNames = new Map<string, string>();
   for (const l of live) supplierNames.set(l.supplierId, l.supplierName);
-  const suppliers = [...supplierNames.entries()]
-    .map(([value, name]) => ({
-      value,
-      name,
-      pos: distinctPos(live.filter((l) => matches(l, { ...filters, supplierId: value }))),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const suppliers: PoReportFacet<PoReportFacetOption & { name: string }> = {
+    all: distinctPos(live.filter((l) => matches(l, { ...filters, supplierId: null }))),
+    options: [...supplierNames.entries()]
+      .map(([value, name]) => ({
+        value,
+        name,
+        pos: distinctPos(live.filter((l) => matches(l, { ...filters, supplierId: value }))),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  };
 
   const categoryKeys = [...new Set(live.map((l) => l.category ?? ""))].sort();
-  const categories: PoReportFacetOption[] = categoryKeys.map((value) => ({
-    value,
-    pos: distinctPos(live.filter((l) => matches(l, { ...filters, category: value }))),
-  }));
+  const categories: PoReportFacet = {
+    all: distinctPos(live.filter((l) => matches(l, { ...filters, category: null }))),
+    options: categoryKeys.map((value) => ({
+      value,
+      pos: distinctPos(live.filter((l) => matches(l, { ...filters, category: value }))),
+    })),
+  };
 
   return { rows, total: totalRow, months, suppliers, categories };
 }

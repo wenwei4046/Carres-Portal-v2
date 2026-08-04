@@ -143,8 +143,34 @@ describe("buildPoReport — cancelled purchase orders", () => {
       }),
     ];
     const r = buildPoReport(rows, {});
-    expect(r.months.map((m) => m.value)).toEqual(["2026-08"]);
-    expect(r.suppliers.map((s) => s.name)).toEqual(["Ohana"]);
+    expect(r.months.options.map((m) => m.value)).toEqual(["2026-08"]);
+    expect(r.suppliers.options.map((s) => s.name)).toEqual(["Ohana"]);
+  });
+});
+
+describe("the rail's `All` row", () => {
+  /**
+   * FOUND ON PRODUCTION, 2026-08-04. With August picked, every `All` row read
+   * `14` — the report's FILTERED total — so the month rail said *all months
+   * hold 14 purchase orders*, and 21 of them do. An `All` row's number must be
+   * the number its own click produces: this group cleared, every other group
+   * kept.
+   */
+  it("counts what its own click produces — this group cleared, the others kept", () => {
+    const rows = [...august()];
+    rows.push(line({ poId: "PO-200", month: "2026-07", ordered: 3 }));
+    const r = buildPoReport(rows, { month: "2026-08" });
+    expect(r.total.pos).toBe(14); // the grid's Total — August only
+    expect(r.months.all).toBe(15); // clicking `All` shows every month
+    // The OTHER groups keep the August pick, so their `All` is August's total.
+    expect(r.suppliers.all).toBe(14);
+    expect(r.categories.all).toBe(14);
+  });
+
+  it("with nothing picked, every `All` row equals the whole set", () => {
+    const r = buildPoReport(august(), {});
+    expect([r.months.all, r.suppliers.all, r.categories.all]).toEqual([14, 14, 14]);
+    expect(r.total.pos).toBe(14);
   });
 });
 
@@ -226,15 +252,17 @@ describe("buildPoReport — the filters", () => {
     // Ohana is picked. Nice Future must still show its own real count, or
     // there would be no way back to it.
     const r = buildPoReport(rows, { supplierId: OHANA });
-    expect(r.suppliers).toEqual([
+    expect(r.suppliers.options).toEqual([
       { value: NICE, name: "Nice Future", pos: 1 },
       { value: OHANA, name: "Ohana", pos: 1 },
     ]);
+    expect(r.suppliers.all).toBe(2);
     // The CATEGORY facet, however, is counted inside the Ohana pick.
-    expect(r.categories).toEqual([
+    expect(r.categories.options).toEqual([
       { value: "mattress", pos: 0 },
       { value: "sofa", pos: 1 },
     ]);
+    expect(r.categories.all).toBe(1);
   });
 
   it("months come back newest first", () => {
@@ -243,7 +271,7 @@ describe("buildPoReport — the filters", () => {
       line({ poId: "PO-2", month: "2026-08" }),
       line({ poId: "PO-3", month: "2026-06" }),
     ];
-    expect(buildPoReport(rows, {}).months.map((m) => m.value)).toEqual([
+    expect(buildPoReport(rows, {}).months.options.map((m) => m.value)).toEqual([
       "2026-08",
       "2026-07",
       "2026-06",

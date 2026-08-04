@@ -167,6 +167,24 @@ describe("the rail", () => {
     fireEvent.click(screen.getByTestId(`po-report-supplier-${OHANA}`));
     expect(screen.getByTestId(`po-report-supplier-${NICE}`).textContent).toContain("4");
   });
+
+  /**
+   * FOUND ON PRODUCTION, 2026-08-04, and this is the guard. With August picked
+   * the month rail read `All 14` — the report's filtered total — while all
+   * months really hold 21. An `All` row prints the number ITS OWN click
+   * produces.
+   */
+  it("the month rail's `All` counts every month, even while a month is picked", () => {
+    mockLines();
+    render(wrap(<OperationPurchasingReport />));
+    fireEvent.click(screen.getByTestId("po-report-month-2026-08"));
+    expect(screen.getByTestId("po-report-month-all").textContent).toContain("21");
+    // …and the OTHER rails stay inside the August pick.
+    expect(screen.getByTestId("po-report-supplier-all").textContent).toContain("14");
+    expect(screen.getByTestId("po-report-category-all").textContent).toContain("14");
+    // The grid's Total is August's, not every month's.
+    expect(within(screen.getByLabelText("Total")).getAllByRole("cell")[2]!.textContent).toBe("14");
+  });
 });
 
 describe("every number is a door", () => {

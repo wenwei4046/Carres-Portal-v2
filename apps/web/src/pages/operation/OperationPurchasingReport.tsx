@@ -176,12 +176,12 @@ export default function OperationPurchasingReport() {
           <RailGroup title={W.month}>
             <RailItem
               label={W.all}
-              count={report.total.pos}
+              count={report.months.all}
               active={month == null}
               onClick={() => setMonth(null)}
               testId="po-report-month-all"
             />
-            {report.months.map((m) => (
+            {report.months.options.map((m) => (
               <RailItem
                 key={m.value}
                 label={fmtMonth(m.value)}
@@ -196,12 +196,12 @@ export default function OperationPurchasingReport() {
           <RailGroup title={W.supplier}>
             <RailItem
               label={W.all}
-              count={report.total.pos}
+              count={report.suppliers.all}
               active={supplierId == null}
               onClick={() => setSupplierId(null)}
               testId="po-report-supplier-all"
             />
-            {report.suppliers.map((s) => (
+            {report.suppliers.options.map((s) => (
               <RailItem
                 key={s.value}
                 label={s.name}
@@ -216,12 +216,12 @@ export default function OperationPurchasingReport() {
           <RailGroup title={W.category}>
             <RailItem
               label={W.all}
-              count={report.total.pos}
+              count={report.categories.all}
               active={category == null}
               onClick={() => setCategory(null)}
               testId="po-report-category-all"
             />
-            {report.categories.map((c) => (
+            {report.categories.options.map((c) => (
               <RailItem
                 key={c.value || "none"}
                 label={poReportCategoryLabel(c.value)}
