@@ -1905,6 +1905,25 @@ with your own eyes, and write what you saw into the PR. *"Tests pass"* is not ve
 never edit anything above the line) and ONE line to `docs/phase-10-worklog.md`, and tick the
 card in the Status table below.
 
+### Q3's four open items — ANSWERED 2026-08-04, none of them was a business decision
+
+> Q3 shipped and returned four things "for Loo". Read one by one, **three are `KEEP` and one
+> is bookkeeping** — recorded here so the next chat does not put them to him again. **The
+> standing rule they are answered under is the Design System's own:** *"If there is no
+> material improvement, KEEP and say so — 'only different' is rejected."*
+
+| # | Q3 asked | Answer |
+|---|---|---|
+| 1 | should a click JUMP to a filtered Purchase Orders list instead of expanding in place? | **KEEP the expansion.** Expanding keeps the operator where they are and the PO number inside it still jumps. Jumping away spends the reader's place to save one click, and it is the behaviour that makes AutoCount's own reports hard to get back out of. A parameter is cheap; the loss of place is the cost |
+| 2 | add a `Group by` button? | **NO.** Its only two options — Category and Supplier — are already the rail's own filters. A second entrance to the same capability plus a word the dictionary does not have, for nothing |
+| 3 | add a `Status` filter? | **NO, and it was never open.** COPY-STANDARD bans a `Status` heading by name, and all 21 live POs hold one status, so the control could not narrow anything |
+| 4 | `Month` has no dictionary entry | **Bookkeeping, not a decision.** The word is already on the HR and Finance screens; Q3 copied it rather than inventing one. It joins COPY-STANDARD as a record of what is already live |
+
+**The pattern worth carrying, because it is the one Loo keeps paying for:** a finding is not
+automatically a question. Before returning one, ask whether any answer changes what gets
+built — 1 and 2 would have cost work for no gain, 3 was already ruled by a law the card had
+read, and 4 needed a line in a file. **None of them needed him.**
+
 **If building the card as written would ship something wrong, STOP and tell Loo before
 building.** Do not build a known-wrong thing because a card said so.
 
