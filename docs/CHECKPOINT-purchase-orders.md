@@ -969,3 +969,75 @@ missing file.
 **Unblocked by:** governance card **G1** (`docs/execution-queues-index.md`) — restore 0312 /
 0313 into the repository and verify repository ↔ production parity. **After the repository is
 complete the wording changes in ONE pass**, all four words together.
+
+---
+
+### 2026-08-04 · LOO OPENS A PLAN CHAT FOR THIS TAB — the charter and the measured diagnosis
+
+> Appended, not edited — §6's append-only rule. Nothing above this line changes.
+
+**Why a second manager chat is justified, in one measurement.** Counted on prod
+2026-08-04:
+
+| | |
+|---|---|
+| purchase orders | **21 — every one `open`, none closed** |
+| PO lines | 35 |
+| lines with any goods received | **0** |
+| `warehouse_receipts` / `receiving_events` | **0 / 0** |
+| POs carrying `expected_ready_date` | **0 of 21** |
+| POs carrying an ETA | **5 of 21** — so **16 sit in `Need Confirmation` forever** |
+| `po_supplier_promises` rows | 4 |
+| suppliers with an email / a WhatsApp group | **1 of 10 / 5 of 10** |
+
+**The story those numbers tell: 21 purchase orders went IN and not one has come OUT.**
+
+```
+Issue PO            ✅  21 raised
+  ↓
+① supplier says when it is READY      ❌  0 of 21 — and §5/G6 already found
+                                          that NO route in the portal writes
+                                          `expected_ready_date`, so the
+                                          `Confirm ready date` queue can only grow
+  ↓
+② supplier says when it ARRIVES       ❌  16 of 21 have no ETA
+  ↓
+③ goods received                      ❌  0 receipts, 0 events, ever
+  ↓
+④ PO closes                           ❌  0 closed
+```
+
+**This is not a polish backlog. Every stage after `Issue PO` is either unbuilt or
+unreachable**, which is why the tab reads seven-tenths finished and behaves like a
+one-way door.
+
+**THE CHARTER — what the Purchase Orders manager chat owns, and what it may not touch.**
+
+1. **It owns:** `docs/CHECKPOINT-purchase-orders.md` (append only) and any `Q`-cards it
+   writes into `docs/purchasing-execution-queue.md` under its own heading.
+2. **It may NOT edit** the To Order cards (P8 · P9 · P10), the index's ACTIVE SET, or
+   `OperationToOrder.tsx` — a second planner rewriting the first planner's cards is the
+   one-concern-one-file failure with two authors instead of one.
+3. **Kit changes go through D0.5d, never a fork.** This tab renders through
+   `DataTable`; a private table here would be the second grid the whole programme exists
+   to prevent.
+4. **File collision is LOW and that is measured, not assumed** — `OperationPurchaseOrders.tsx`
+   (2,353 lines) shares no file with `OperationToOrder.tsx` (1,548). The overlap to watch is
+   `apps/api` and `packages/shared`, where P8 also writes; different route files, so the risk
+   is a rebase, not a redesign.
+5. **Starting this work UNFREEZES the tab** (Phase 2 freeze, 2026-08-03). Same shape as To
+   Order on 2026-08-04: the freeze stopped redesign, not completion. **The frozen layout,
+   the frozen operator journey and the frozen Phase 3 words all still stand.**
+
+**A STARTING SHAPE for the cards — the manager finalises it; this is not frozen.**
+
+| | Card | Why it is where it is |
+|---|---|---|
+| **Q1** | **The supplier's answer has somewhere to land** | The one card that unblocks the tab. Ready date + goods arrival are both *"the supplier told us a date"* — and **P3 already built the ledger for exactly that** (`po_supplier_promises`, 4 live rows). This is wiring an existing store to two missing write doors, not new architecture. Fixes §5's first gap AND P7's G6 in one act |
+| **Q2** | **The date history reads `Confirmed / Changed`** | **Jess already designed it, 2026-08-03**, and deliberately kept it out of Phase 3: *"Do NOT fold it into a Phase 3 card."* **Zero migration, zero api change** — `recorded_at` and the answer already ride the wire. Small, and it is hers, so build it as designed |
+| **Q3** | **A PO closes itself when the goods are in** | 0 of 21 closed. Carry-forward `hold-release-does-not-close-the-po` already names one path that leaves a PO open forever. Needs Q1 and real receipts first |
+| **Q4** | **Supplier contact data** | **NOT a build card — it is data entry.** 1 email and 5 groups of 10 suppliers. The Communication desk cannot work without it and no amount of code fixes it. Carry-forward `supplier-contact-data-is-thin` holds the detail |
+
+**Two things that stay closed to this chat** — both Jess's, both still true: the 50-100 line
+layout stress test (**real PO only, she refuses synthetic data**; prod ceiling re-measured
+2026-08-04 is still 4 lines) and any redesign of the frozen operator journey.
