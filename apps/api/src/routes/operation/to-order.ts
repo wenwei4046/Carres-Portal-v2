@@ -1345,4 +1345,68 @@ toOrderRouter.post("/demand", requireOperation, async (c) => {
   return c.json(data ?? { ok: true });
 });
 
+/**
+ * `Cancel` on a demand row — and on the REMAINDER of a part-ordered one
+ * (Loo, 2026-08-04, card P12).
+ *
+ * IT SHIPS WITH ITS BUTTON, in the same card, because C1 deleted a live route
+ * whose only caller had gone: *a route with no caller is a bypass one curl
+ * away.* The inverse is the same fault — a button with no door is a lie.
+ *
+ * NO QUANTITY IS IN THE BODY, and that is the design rather than an omission.
+ * A cancel takes the whole remainder or it is not a cancel, and `remaining_qty`
+ * is GENERATED in the database (0320), so the number nobody typed is also a
+ * number nobody can get wrong. What the RPC answers with — `cancelled` — is
+ * read back off the row, so the figure the operator is told is the figure the
+ * record now holds.
+ *
+ * `issued_qty` and `po_id` are untouched by the door: what was already ordered
+ * keeps its purchase order, and stopping THAT is the purchase order's own
+ * business (`PURCHASING-WORKING-FLOW.md` §9).
+ *
+ * There is no DELETE route here and there may never be one. Cancel keeps the
+ * record; test rubbish is cleaned by SQL on request and the database starts
+ * clean at go-live, so nothing is owed. A delete built for testing survives
+ * into production as a way to erase a real purchase record leaving no trace.
+ */
+const cancelDemandBody = z.object({
+  // Mandatory, and refused in three places rather than one: here, in the RPC by
+  // name (`reason_required`), and by the table's own `cancel_pair` CHECK. A
+  // cancellation without a reason is half a record.
+  reason: z.string().trim().min(1).max(500),
+});
+
+toOrderRouter.post("/demand/:id/cancel", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const id = c.req.param("id");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: "invalid_id", code: "invalid_param" }, 400);
+  }
+
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
+  }
+  const parsed = cancelDemandBody.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  }
+
+  const { data, error } = await sb.rpc("purchasing_cancel_demand", {
+    p_id: id,
+    p_reason: parsed.data.reason,
+  });
+  if (error) {
+    // `already_cancelled` and `nothing_to_cancel` arrive as P0001 and reach the
+    // page as their own named codes — an operator meeting one must be told
+    // which of the two happened, not that something went wrong.
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data ?? { ok: true });
+});
+
 export default toOrderRouter;

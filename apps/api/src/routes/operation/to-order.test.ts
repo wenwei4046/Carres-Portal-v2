@@ -1627,3 +1627,165 @@ describe("P10 · the take", () => {
     expect(res.status).toBe(403);
   });
 });
+
+/**
+ * ── P12 · the cancel door (Loo, 2026-08-04) ─────────────────────────────────
+ *
+ * `POST /demand/:id/cancel`. It ships in the same card as its button, because
+ * C1 deleted a live route whose only caller had gone — *a route with no caller
+ * is a bypass one curl away* — and a button with no door is the same fault
+ * pointing the other way.
+ *
+ * These tests are about the DOOR, not the rule: the rule (a part-ordered demand
+ * may cancel its remainder, a fully issued one may not, a reason is mandatory)
+ * lives in 0321 and was proved against production in a rolled-back transaction.
+ * What the route owes is that it reaches that rule with exactly what it was
+ * given, sends no quantity, and hands the server's own refusal back by name.
+ */
+describe("POST /api/operation/purchase/to-order/demand/:id/cancel", () => {
+  const CANCEL_ID = "6299ed4e-3c91-43c5-b41b-1e8fe9677c7d";
+
+  async function cancel(
+    id: string,
+    body: unknown,
+    role = "operation",
+    rpcResult: { data: unknown; error: unknown } = {
+      data: { id: CANCEL_ID, cancelled: 2, issued: 3 },
+      error: null,
+    },
+  ) {
+    const calls: { fn: string; args: Record<string, unknown> }[] = [];
+    vi.mocked(userClient).mockReturnValue({
+      from: vi.fn(),
+      rpc: vi.fn(async (fn: string, args: Record<string, unknown>) => {
+        calls.push({ fn, args });
+        return rpcResult;
+      }),
+    } as never);
+    const jwt = await makeJwt(role);
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/purchase/to-order/demand/${id}/cancel`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+    return { res, calls };
+  }
+
+  it("reaches purchasing_cancel_demand with the id and the reason — and NO quantity", async () => {
+    const { res, calls } = await cancel(CANCEL_ID, { reason: "do not want the other 2" });
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].fn).toBe("purchasing_cancel_demand");
+    expect(calls[0].args.p_id).toBe(CANCEL_ID);
+    expect(calls[0].args.p_reason).toBe("do not want the other 2");
+    /**
+     * THE CARD'S OWN "nobody types a quantity", as a test rather than a
+     * sentence. A cancel takes the whole remainder, and `remaining_qty` is
+     * GENERATED — a quantity on this wire would be a number that can disagree
+     * with the one the database computed.
+     */
+    expect(Object.keys(calls[0].args).sort()).toEqual(["p_id", "p_reason"]);
+  });
+
+  it("answers with what was cancelled and what stays ordered", async () => {
+    const { res } = await cancel(CANCEL_ID, { reason: "changed our mind" });
+    expect(await res.json()).toEqual({ id: CANCEL_ID, cancelled: 2, issued: 3 });
+  });
+
+  it("refuses a blank reason before it reaches the database", async () => {
+    const { res, calls } = await cancel(CANCEL_ID, { reason: "   " });
+    expect(res.status).toBe(400);
+    // The RPC would refuse it too (`reason_required`), and the table's CHECK
+    // behind that. Three refusals, and the cheapest one runs first.
+    expect(calls).toHaveLength(0);
+  });
+
+  it("refuses a missing reason", async () => {
+    const { res, calls } = await cancel(CANCEL_ID, {});
+    expect(res.status).toBe(400);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("refuses an id that is not a demand id", async () => {
+    const { res, calls } = await cancel("PO-2040", { reason: "x" });
+    expect(res.status).toBe(400);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("hands back `already_cancelled` by name", async () => {
+    const { res } = await cancel(CANCEL_ID, { reason: "x" }, "operation", {
+      data: null,
+      error: { code: "P0001", details: "already_cancelled", message: "already cancelled" },
+    });
+    expect(res.status).toBe(422);
+    expect((await res.json()).code).toBe("already_cancelled");
+  });
+
+  it("hands back `nothing_to_cancel` by name", async () => {
+    const { res } = await cancel(CANCEL_ID, { reason: "x" }, "operation", {
+      data: null,
+      error: {
+        code: "P0001",
+        details: "nothing_to_cancel",
+        message: "demand has nothing left to cancel",
+      },
+    });
+    expect(res.status).toBe(422);
+    // The two refusals must not read alike: one means it already happened, the
+    // other that there is nothing left to do it to.
+    expect((await res.json()).code).toBe("nothing_to_cancel");
+  });
+
+  it("is not open to a supplier login", async () => {
+    const { res, calls } = await cancel(CANCEL_ID, { reason: "x" }, "supplier");
+    expect(res.status).toBe(403);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+/**
+ * P12 — CANCEL IS NOT DELETE, asserted rather than promised (Loo, 2026-08-04,
+ * naming AutoCount's own weakness: *"backend dont know how can delete due to
+ * when testing"*).
+ *
+ * A SOURCE SCAN, not a request test: a request test only proves the door it
+ * knocks on, and what is being claimed here is that NO door exists anywhere.
+ * Comments are stripped first — the file is full of prose about why there is no
+ * delete, and a scan that reads its own tombstone is a scan that fails on the
+ * text explaining it (D0.5b's lesson, twice).
+ */
+describe("no delete path exists for a purchase demand", () => {
+  const src = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "to-order.ts"),
+    "utf8",
+  )
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  it("the route file registers no DELETE handler at all", () => {
+    expect(src).not.toMatch(/\.delete\s*\(/);
+  });
+
+  it("the route file never deletes from purchase_demands", () => {
+    expect(src).not.toMatch(/purchase_demands[\s\S]{0,200}?\.delete\s*\(/);
+    expect(src).not.toMatch(/\.delete\s*\(\s*\)[\s\S]{0,200}?purchase_demands/);
+  });
+
+  it("no route path in the file spells a delete or a purge", () => {
+    expect(src).not.toMatch(/["'`][^"'`]*\/(delete|purge|remove)\b/i);
+  });
+
+  it("the only demand doors are create, cancel and the issue record", () => {
+    const rpcs = [...src.matchAll(/rpc\(\s*"(purchasing_[a-z_]*demand[a-z_]*)"/g)].map(
+      (m) => m[1],
+    );
+    expect([...new Set(rpcs)].sort()).toEqual([
+      "purchasing_cancel_demand",
+      "purchasing_create_demand",
+      "purchasing_demand_record_issue",
+    ]);
+  });
+});
