@@ -18,6 +18,7 @@ import {
   sizeShort,
   soCountLabel,
   sortToOrderRows,
+  toOrderBuilds,
   unitsHeadline,
   poScheduleDays,
   snapToPoDay,
@@ -302,6 +303,102 @@ describe("sofa builds", () => {
         category: "bedframe", leadDays: 7, qty: 3, modelName: "Cody" }),
     ]);
     expect(bed.rows[0].qty).toBe(3);
+  });
+});
+
+// ── P11 · a sofa with no modules carries its own quantity ───────────────────
+
+/**
+ * The collapse to `1` exists to turn `1B(LHF)` + `CNR` + `2A(RHF)` into ONE
+ * physical sofa. It was applied to the CATEGORY, so a sofa line with no build
+ * key — a typed ready stock demand, or a customer line for a non-modular sofa —
+ * was collapsed too, and its quantity was thrown away with nothing on screen
+ * saying a number had changed.
+ *
+ * Both halves are asserted here: the lone line now carries its own quantity,
+ * and a genuine multi-module build still proposes exactly 1. The second is the
+ * rule being PRESERVED, so it is the one that must not be allowed to rot.
+ */
+describe("a sofa build's quantity", () => {
+  /** A typed ready stock demand — one sku, one number, no modules at all. */
+  const demand = (qty: number) =>
+    line({
+      lineId: "demand:d1", sku: "5539-1A(LHF)", orderId: "demand:d1",
+      so: null, customerName: null, buildKey: null, deadline: "2026-08-22",
+      readyStock: true, destinationName: "Carres Klang", qty,
+    });
+
+  it("a ready stock demand of 5 sofas proposes 5, not 1", () => {
+    const [sofa] = run([demand(5)]);
+    expect(sofa.rows[0].builds).toHaveLength(1);
+    expect(sofa.rows[0].builds[0].qty).toBe(5);
+    expect(sofa.rows[0].qty).toBe(5);
+  });
+
+  it("issues a purchase order for 5, and credits the demand the same 5", () => {
+    const [sofa] = run([demand(5)]);
+    const [po] = planPurchaseOrders(sofa);
+    expect(po.lines).toEqual([{ sku: "5539-1A(LHF)", qty: 5, cost: null }]);
+    // The api credits `purchasing_demand_record_issue` with the BUILD's qty
+    // while the purchase order is written from the LINE's. They have to be the
+    // same number or a demand of 5 is ordered in full and recorded as 1 —
+    // leaving 4 to be bought a second time.
+    const [ref] = toOrderBuilds(sofa);
+    expect(ref.qty).toBe(po.lines[0].qty);
+  });
+
+  it("a customer line of 2 non-modular sofas proposes 2", () => {
+    const [sofa] = run([
+      line({
+        lineId: "n1", sku: "5539-1A(LHF)", orderId: "on", so: 1310,
+        customerName: "tan", buildKey: null, qty: 2,
+      }),
+    ]);
+    expect(sofa.rows[0].builds[0].qty).toBe(2);
+    expect(sofa.rows[0].qty).toBe(2);
+  });
+
+  it("a genuine three-module customer sofa still proposes exactly 1", () => {
+    const [sofa] = run([
+      line({ lineId: "p1", sku: "5539-1B(LHF)", buildKey: "bk-a" }),
+      line({ lineId: "p2", sku: "5539-CNR", buildKey: "bk-a" }),
+      line({ lineId: "p3", sku: "5539-2A(RHF)", buildKey: "bk-a" }),
+    ]);
+    expect(sofa.rows[0].builds).toHaveLength(1);
+    expect(sofa.rows[0].builds[0].lines).toHaveLength(3);
+    expect(sofa.rows[0].builds[0].qty).toBe(1);
+    expect(sofa.rows[0].qty).toBe(1);
+  });
+
+  it("a two-module build beside a lone line counts 1 + its own quantity", () => {
+    const [sofa] = run([
+      line({ lineId: "p4", sku: "5539-1A(LHF)", buildKey: "bk-b" }),
+      line({ lineId: "p5", sku: "5539-2A(RHF)", buildKey: "bk-b" }),
+      line({ lineId: "p6", sku: "5539-L(RHF)", buildKey: null, qty: 3 }),
+    ]);
+    expect(sofa.rows[0].builds.map((b) => b.qty)).toEqual([1, 3]);
+    expect(sofa.rows[0].qty).toBe(4);
+  });
+
+  it("the row total is the sum of its builds, in every category", () => {
+    const ps = run([
+      ...PETER,
+      // A lone line of 2 inside PETER's own order, so the row (4) and the
+      // build COUNT (3) are different numbers. Without it the fixture agrees
+      // with the retired `builds.length` too and guards nothing.
+      line({ lineId: "p6", sku: "5539-L(RHF)", buildKey: null, qty: 2 }),
+      ...KEE_TONG,
+      line({ lineId: "b1", sku: "CODY-Q", orderId: "o9", so: 1300, customerName: "wong",
+        category: "bedframe", leadDays: 7, qty: 3, modelName: "Cody" }),
+    ]);
+    const peter = ps.flatMap((p) => p.rows).find((r) => r.orderId === "o1");
+    expect(peter?.builds).toHaveLength(3);
+    expect(peter?.qty).toBe(4);
+    const rows = ps.flatMap((p) => p.rows);
+    expect(rows.length).toBeGreaterThan(2);
+    for (const r of rows) {
+      expect(r.qty).toBe(r.builds.reduce((s, b) => s + b.qty, 0));
+    }
   });
 });
 

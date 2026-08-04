@@ -6,6 +6,30 @@
 
 ---
 
+**2026-08-04 · Purchasing P11 — a sofa that has no modules carries its own quantity** (PR #587, **no migration**, `packages/shared` + tests only)
+
+**The rule was right and it was pointed at the wrong thing.** A customer's sofa is three `order_lines` — `1B(LHF)` + `CNR` + `2A(RHF)`, each qty 1 — and summing them reads as three sofas, so `buildToOrder` collapsed a sofa build to `1`. It collapsed it by CATEGORY. The grouping key is `l.buildKey ?? "line::" + l.lineId`, so a sofa line with no build key becomes a group of ONE and was collapsed too: a typed ready stock demand of 5 proposed 1, and so would a customer line for two identical non-modular sofas. **The discriminator moved from the category to the modules**: a group of more than one line is a build and collapses; a lone line carries its own quantity, exactly as every other category does. It cannot over-reach, and that is structural rather than careful — a group of more than one can only exist under a real build key, because a synthetic `line::` key is unique per line.
+
+**The card scoped this to what is DISPLAYED, and it is also what is RECORDED — that is the half nobody had measured.** `apps/api` credits `purchasing_demand_record_issue` with the BUILD's quantity (`p_qty: ref?.qty`) while the purchase order is written by `planFromDocuments` from the LINE's. Two numbers, two places, and for a sofa demand they disagreed: the factory is sent an order for 5, the demand records 1 issued, `remaining_qty` stays 4 — and the row comes back tomorrow to be bought again. One fix closes the grid, the row and the ledger together, and the api test asserts the purchase-order line and the credited quantity are the same number rather than checking each against a constant.
+
+**The row stopped being counted a second time.** It was `builds.length` for sofa and a fresh sum over the lines for everything else — two computations that have to agree with the builds underneath them. It is `builds.reduce(+qty)` now, for every category, so the row and its builds agree by construction. For every non-sofa category the answer is unchanged, because each line is its own build and it is the same sum over the same lines.
+
+**`isOnePoPerOrder` was NOT deleted** — it still decides the PO boundary (`poCount: rows.length`, one sofa purchase order per customer order), which is a different rule and stays.
+
+**Live effect today: none, and it was measured rather than assumed.** On production: 26 sofa order lines in 12 groups — **9 genuine multi-module builds** (still 1 each) and **3 lone lines, all qty 1**, so no row changes. No keyed sofa line anywhere carries qty > 1, and the explode is why: `explodeSofaBuild` emits `qty: 1` per cell, so a build's members are always 1 apiece. One single-cell keyed build exists live and reads 1 under both the old rule and the new one. The only live `purchase_demands` row is a mattress. **The defect was a landmine, not a fire** — which is exactly why it was worth fixing before the first sofa demand is typed.
+
+**Three negative controls, each fired as a real edit.** Restore the `? 1` → exactly the 4 new shared tests go red. Restore `builds.length` → 4. The api sofa-demand test → 1, and its message is the defect in words: `expected 1 to be 5`.
+
+**A control that did NOT fire, and the reason is worth not re-learning.** The first api control was a `perl -0pi` substitution that CRLF silently declined, so the file was never edited and the 45/45 that followed proved nothing about the test. Re-run through a real edit it fires. D0.5d hit the same trap two cards ago; *a control that does not fire is a claim about your edit before it is a claim about your test.*
+
+**And a test that passed its own control was strengthened rather than kept.** `the row total is the sum of its builds` was written to guard the new row rule and its fixture agreed with the retired `builds.length` too — PETER's two multi-module builds sum to 2 and count 2, so it guarded nothing. A lone line of 2 was added to that order, making the row (4) and the build count (3) different numbers; it now fails under the control.
+
+**Gates.** shared **2069/2069** (+6) · api **2062/2065**, the 3 documented pre-existing (`supplier/pos` ×2 · `partner/pickups` ×1) · web **2394/2410**, the 16 documented pre-existing · api tsc **0** · web tsc **0** · shared tsc **12**, byte-identical to the same tree without the change (test-file-only, pre-existing) · `check-design` **8368**, unchanged · build clean.
+
+**No Pages deploy owed, proved by CHECKSUM.** `apps/web` never imports `buildToOrder` — the proposal is computed in the Worker and the page only reads `toOrderBuilds` / `defaultDocuments` / `planFromDocuments`, none of which changed. A build from this tip emits **`index-DiTy2SJk.js`**, the bundle already live on all four canonicals. The Worker IS owed: `apps/api/src/routes/operation/to-order.ts` imports `buildToOrder`.
+
+---
+
 **2026-08-04 · UI-KIT D0.5d — `DataTable` grows the grid powers, and two of the five turn out not to be code** (PR #586 merge `9c06c4d5`, **no migration**, web `index-DiTy2SJk.js` + `UiShowcase-uLigvBgT.js` [carres-portal `03b1e171` + carres-pos `3270ef94`, both `--branch=main`] + Worker `b8e31975` — DEPLOYED, all four canonicals converged on the first poll, live bundle md5-identical to the local build; the Worker deploy turned out NOT to be owed — see the correction at the end).
 
 **The card asked for five grid powers AutoCount has and we do not. Three are now optional props; the other two are findings, and both are named rather than quietly dropped** — a card that ships three of five and reports five is how a queue stops being true. Row expand · resize + reorder · footer totals shipped. Layout MEMORY is **refused by §0.4**. The record bar was **measured to exist already**.

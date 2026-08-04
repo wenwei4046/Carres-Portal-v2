@@ -1067,9 +1067,10 @@ const DEMAND_ID = "9ce4bbb1-0000-4000-8000-00000000d001";
 
 /**
  * A MATTRESS, deliberately — the live demand is `SONIC-S`, and mattress is the
- * grain where a quantity is a quantity. Sofa counts BUILDS (one build is one
- * sofa however many module lines it has), so a sofa fixture would have measured
- * the sofa rule rather than the remainder.
+ * grain where a quantity is a quantity. Sofa counted BUILDS whatever the row
+ * was, so a sofa fixture here would have measured that rule rather than the
+ * remainder. It measured it and REPORTED it, which is card P11; the sofa case
+ * has its own fixture below now that a lone line carries its own quantity.
  */
 function withDemand(issued: number, qty = 5) {
   const t = TABLES();
@@ -1213,6 +1214,63 @@ describe("a partly satisfied demand keeps its remainder", () => {
 
     // 0316's rule on this table: the quantity may not move by a client write.
     expect(sb.updates.some((u) => u.table === "purchase_demands")).toBe(false);
+  });
+
+  /**
+   * The same demand, on the SOFA grain (card P11). A typed demand is one sku
+   * and one number and has no modules at all, so the build-collapse must not
+   * reach it: the proposal, the purchase order and the number credited back to
+   * the demand all have to be the quantity that was typed.
+   */
+  function withSofaDemand(qty = 5) {
+    const t = withDemand(0, qty);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (t.purchase_demands.data as any[])[0].sku = "5539-1A(LHF)"; // a real sofa sku
+    return t;
+  }
+
+  it("a typed SOFA demand of 5 is proposed, ordered and recorded as 5", async () => {
+    const sb = makeSb(withSofaDemand(5));
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    const row = demandRow(body);
+    expect(row).not.toBeNull();
+    expect(row.qty).toBe(5);
+    expect(row.builds).toHaveLength(1);
+    expect(row.builds[0].qty).toBe(5);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prop = body.proposals.find((p: any) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (p.rows ?? []).some((r: any) => r.orderId === `demand:${DEMAND_ID}`),
+    );
+    const res = await post({
+      supplierId: prop.supplierId,
+      category: prop.category,
+      destinationId: KLANG,
+      purchaseOrders: [
+        {
+          key: "d1",
+          include: true,
+          buildKeys: row.builds.map((b: { key: string }) => b.key),
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+
+    // The purchase order and the credit are the SAME number. They are computed
+    // from two different places — the line, and the build — so a disagreement
+    // orders 5 and records 1, and the other 4 come back to be bought again.
+    const batch = sb.rpcCalls.find((c) => c.fn === "operation_create_pos_batch")!;
+    const pos = batch.args.p_pos as { lines: { sku: string; qty: number }[] }[];
+    expect(pos).toHaveLength(1);
+    expect(pos[0].lines.map((l) => l.qty)).toEqual([5]);
+
+    const calls = sb.rpcCalls.filter((r) => r.fn === "purchasing_demand_record_issue");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].args.p_qty).toBe(5);
   });
 
   it("a customer order is not a demand — it records nothing on this table", async () => {
