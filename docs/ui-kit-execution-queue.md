@@ -55,6 +55,8 @@ deliverable is Foundation Components, not a better document.
 | **D4** | codemod **spacing** | ⏳ — baselined at E 1,727 |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
 | **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ — **also carries the `.t4-*` legacy migration** (PM, 2026-07-29). D2 found a SECOND retired ramp: 9 classes, **44 in-scope uses across 8 files**, invisible to rule D because a page writes only the class name while the size and weight sit in `index.css`. **`.t4-hero-num` is `20px/700`** and `lib/design-standard.ts:132` records that 700, so a §2.2-dead weight still renders. Ruled **Reported Only for D2**: it is a visual change on a money figure and belongs with the pages when they migrate. **D6 owns the DEFINITIONS and the mirror's `weight: 700`** |
+| **D0.5d** | **`DataTable` grows the five grid powers AutoCount has and we do not** — resize · reorder · layout memory · row expand · footer totals. **Kit only, additive only.** Full card below | ⬜ — **safe to run alongside any ORDERS-lane card**; it touches no page |
+| **D7-Claims** | **Supplier Claims renders through `DataTable`** — the last hand-rolled `<table>` in Purchasing. Full card below | ⬜ — needs nothing from D0.5d; today's `DataTable` already sorts and filters |
 | **D7+** | Delivery · Purchase · Receiving · Stock · Service · Payments · Catalog — one card each | ⏳ — whichever of these owns a file still writing `.t4-*` retires it there, so the last card to migrate does not inherit the ramp's deletion |
 
 **Order is not negotiable for D0.5 → D6.** Rebuilding a page before the
@@ -1521,6 +1523,89 @@ an input, and an input does not get to gate the build.
 **It still lands before D1**, which is the half of the ordering that matters downstream: D1 writes
 the Build Guard baseline over all 225 files, and a guard written against a law about to gain five
 principles is a guard that gets rewritten.
+
+---
+
+## D0.5d · `DataTable` grows the five grid powers AutoCount has (Loo, 2026-08-04)
+
+**Lane: KIT.** Touches `apps/web/src/components/kit/**` and `apps/web/src/pages/dev/UiShowcase.tsx`
+and **nothing else**. Safe to run at the same time as C13, C14 and D7-Claims.
+
+**Why.** Loo put AutoCount's Purchase modules next to ours. AutoCount's advantage is not any
+one screen — it is that **twenty modules share one grid**, so staff learn the grid once and
+every module is free. `DataTable` (D0.5c) already carries the two hardest halves: **sort by
+header click** and the **Excel `ColumnFilter`** (value checklist + search + range). Five powers
+are missing, and every one of them is a GRID power, not a business rule.
+
+**Build — five additive props, no signature changes.**
+
+| # | Power | AutoCount's version |
+|---|---|---|
+| 1 | column **resize** + **reorder** | drag the right edge · drag the header |
+| 2 | **layout memory** — `storageKey` persisting `{order, hidden, widths, sort}` | every module remembers per user |
+| 3 | **row expand** — a `renderExpansion` slot; the CONTENT is the caller's | SO Batch Posting's `⊞` opens the lines |
+| 4 | **footer totals** — which columns aggregate is the caller's | the totals strip inside the grid |
+| 5 | **record footer** — `Record n of m` + a visible, clearable filter statement | the bottom filter bar with `Edit Filter` |
+
+**THE RULE THAT MAKES THIS SAFE, and it is not advisory.**
+
+> **Every prop is OPTIONAL and every existing signature is untouched.** Three live pages
+> render through `DataTable` today — **To Order** (13 kit imports) and **Purchase Orders** and
+> **Receiving** (4 each) — and **To Order is FROZEN (Jess, 2026-08-01) and Purchase Orders is
+> FROZEN (Phase 2, 2026-08-03)**. A changed signature reaches a frozen page. A new optional
+> prop cannot.
+
+**And the kit's own law still binds: this file spells no word.** Column names, status words,
+filter labels and empty states are the caller's, from COPY-STANDARD. A business word compiled
+into `DataTable` is how one tab's flow leaks into four others — the exact failure Loo named.
+
+**Done when.**
+
+- All five render on `/ui` in every §9 state, and `/ui` stays lazy (it must not reach the
+  operator's bundle — prove it by grepping the built main chunk, as D0.5b did).
+- The three live pages are **byte-identical in behaviour**: their tests pass unchanged, and a
+  `git diff` shows zero lines changed outside `components/kit/**` and `pages/dev/**`.
+- `@ts-expect-error` tests prove `DataTable` still takes no `className`, and that no new prop
+  accepts a string that would be a visible word.
+- §16 coverage recomputed, arithmetic printed. It may not go down.
+
+**Must NOT.**
+
+- ❌ migrate any page onto the new props. D6 and D7 do that.
+- ❌ copy AutoCount's **group-by drag banner** in this card — grouping already exists as
+  `group.keyOf` and a second grouping mechanism is a second source of truth.
+- ❌ copy AutoCount's density (28px rows, 10px headers). §7's sizing law is frozen at 40px.
+- ❌ add a `Refresh` button. The Workspace pattern bans it by name.
+
+---
+
+## D7-Claims · Supplier Claims renders through `DataTable` (Loo, 2026-08-04)
+
+**Lane: CLAIMS — one file, `OperationSupplierClaims.tsx`.** Safe alongside every other card
+here. **④ R is LINE COMPLETE, so this file has no other claimant** — but claim it anyway.
+
+**Why — measured 2026-08-04.**
+
+| Page | kit imports | hand-rolled `<table>` | header sorts |
+|---|---|---|---|
+| To Order | 13 | 0 | ✅ |
+| Purchase Orders | 4 | 0 | ✅ |
+| Receiving | 4 | 0 | ✅ |
+| **Supplier Claims** | **0** | **1** | ❌ |
+
+Claims is the one Purchasing tab that never joined. It already has the facet rail and the click
+law (P2, #494) — only the TABLE is still hand-written, so this is the smallest possible proof
+that the migration path works before D6 runs it on 4,982 lines of Orders.
+
+**Build.** Replace the hand-rolled `<table>` with `DataTable`. Header words come from the
+column defs. **No word changes, no column added or removed, no filter behaviour changed** —
+P2 ruled Claims' click behaviour and R8 ruled its words; both stand.
+
+**Done when.** Zero `<table>` in the file · every existing test passes untouched · the page's
+words grep identical before and after · sorting works on every column that has a natural order.
+
+**Must NOT.** ❌ re-word anything (that was R8) · ❌ change the facet rail (that was P2) ·
+❌ wait for D0.5d — today's `DataTable` is enough.
 
 ---
 

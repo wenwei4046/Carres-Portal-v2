@@ -20,6 +20,69 @@
 >   (fetch → `log HEAD..origin/main` empty → build from union → both Pages projects →
 >   poll 4 canonicals). A "different hash" moment during polling is normal — it resolves.
 
+## ⭐ THE AUTOCOUNT PROGRAMME — four cards, three chats at once (Loo, 2026-08-04)
+
+> **Why it is written as one block.** Loo asked one question that this index had no single
+> answer for: *"are you fixing only one page or all Purchasing tabs? don't mix the every tab
+> business flow."* The answer is a SHAPE, and the shape is what stops the mixing.
+
+**Two layers, and a card belongs to exactly one of them.**
+
+```
+LAYER 1 · GRID CAPABILITY — one component, every tab, ZERO business words
+          sort · column filter ▼ · resize · reorder · layout memory ·
+          row expand · footer totals · record count
+          → lives in components/kit/**            → line ⑧ D-cards
+          → AutoCount's real advantage: 20 modules, one grid
+
+LAYER 2 · BUSINESS FLOW — per page, NEVER shared
+          what a row means · which columns exist · what the action is ·
+          what the gate is · what closes it
+          → To Order ≠ Purchase Orders ≠ Receiving ≠ Claims ≠ Orders
+          → one card, one page, one chat
+```
+
+**The rule that prevents the mixing Loo named:** a Layer 1 change may not compile a word or a
+rule from any one tab, and a Layer 2 card may not touch a second page. `DataTable`'s own header
+already says it — *"This file spells no word."*
+
+**The four cards, and what runs together.**
+
+| Card | Doc | Only file(s) it may edit | Runs with |
+|---|---|---|---|
+| **C13** the red means something again | `portal-core-execution-queue.md` | `OperationOrdersControl.tsx` | D0.5d · D7-Claims |
+| **C14** nothing says the same thing twice | `portal-core-execution-queue.md` | `OperationOrdersControl.tsx` | D0.5d · D7-Claims — **but AFTER C13** |
+| **D0.5d** the grid grows five powers | `ui-kit-execution-queue.md` | `components/kit/**` · `pages/dev/**` | everything |
+| **D7-Claims** Claims joins the grid | `ui-kit-execution-queue.md` | `OperationSupplierClaims.tsx` | everything |
+
+```
+now, in parallel:   chat A → C13        chat B → D0.5d       chat C → D7-Claims
+then:               chat A → C14        chat B → D0.5d …
+after both merge:   D6 (Orders renders through PageShell + DataTable)
+```
+
+**PAGES NO CARD HERE MAY TOUCH, and the reason is on the record:**
+
+| Page | Why it is closed |
+|---|---|
+| **To Order** | Jess FROZE it 2026-08-01 — *"现在批准这一个 checkpoint。不要继续加功能。"* |
+| **Purchase Orders** | Phase 2 FREEZE, 2026-08-03 |
+| **Receiving** | carry-forward `receiving-queue-model-architecture-review` — *"no Purchasing sibling chat may edit that page"* |
+
+D0.5d is additive-only **because** two of those three render through `DataTable` today. That is
+not caution; it is the only way a kit card can run while a page is frozen.
+
+**Within line ⑥ the old rule still holds: one card at a time.** C11 · C13 · C14 all edit the
+Orders list — never two at once, and never alongside a T-card, a J-card or D6.
+
+**What AutoCount is being copied FOR, and what it is not.** Copy the grid (one grid, every
+module), `Transfer From` / `Transfer To` / `View Flow`, the bottom info dock, `Void` vs
+`Delete`, per-row `Error Message`. **Do not copy** 1,737 rows with no queue, no owner and no
+due date — the Action ladder is this portal's advantage over AutoCount and no card may trade
+it away for resemblance.
+
+---
+
 ## Governance cards
 
 > **Not a business line.** These cards fix the REPOSITORY, not a module. They carry no
@@ -748,6 +811,45 @@ Read docs/receiving-claim-execution-queue.md. Do card R1 ONLY. ...
 Read docs/ready-stock-execution-queue.md. Do card K1 ONLY. ...
 Read docs/purchasing-execution-queue.md. Do card P1 ONLY. ...
 Read docs/portal-core-execution-queue.md. Do card C2 ONLY. ...
+```
+
+**The AutoCount programme — paste one of these into one chat each (2026-08-04):**
+
+```
+Read docs/portal-core-execution-queue.md. Do card C13 ONLY. CLAIM it first — set C13 to
+`🔨 CLAIMED <date> — <branch>` in that doc, push that line, then verify the claim on origin.
+Build it, test it, create the PR, re-verify the claim before opening it, merge, deploy from
+main, then mark C13 ✅ in the doc with the PR number. Do not touch any other card. Do not
+touch To Order, Purchase Orders or Receiving. Do not redesign anything marked ALREADY EXISTS.
+```
+
+```
+Read docs/ui-kit-execution-queue.md. Do card D0.5d ONLY. CLAIM it first — set D0.5d to
+`🔨 CLAIMED <date> — <branch>` in that doc, push that line, then verify the claim on origin.
+Every new prop is OPTIONAL and no existing signature changes — To Order and Purchase Orders
+are FROZEN and render through this component. Build it, test it, create the PR, re-verify the
+claim before opening it, merge, deploy from main, then mark D0.5d ✅ with the PR number.
+Migrate no page. Do not touch any other card.
+```
+
+```
+Read docs/ui-kit-execution-queue.md. Do card D7-Claims ONLY. CLAIM it first — set it to
+`🔨 CLAIMED <date> — <branch>` in that doc, push that line, then verify the claim on origin.
+Change no word and no column — R8 ruled the words and P2 ruled the click behaviour. Build it,
+test it, create the PR, re-verify the claim before opening it, merge, deploy from main, then
+mark it ✅ with the PR number. Do not touch any other card.
+```
+
+**One worktree per chat (guardrail #9) — create them before you start:**
+
+```bash
+git worktree add .claude/worktrees/c13-orders-red -b claude/c13-orders-red main
+```
+```bash
+git worktree add .claude/worktrees/d05d-datatable -b claude/d05d-datatable main
+```
+```bash
+git worktree add .claude/worktrees/d7-claims -b claude/d7-claims main
 ```
 
 Full sentence template: "Read <doc>. Do card <n> ONLY. **CLAIM it first — set <n> to
