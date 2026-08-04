@@ -1419,6 +1419,57 @@ CATEGORY rows · ❌ touch the grid columns or the dialog.
 
 ---
 
+## P11 · A sofa that has no modules is counted like everything else
+
+**Lane: PURCHASING · touches `packages/shared/src/to-order.ts` and its tests. No web page,
+no api, no migration.** Collides with nobody — open it now, alongside P9 and D0.5d.
+
+**This is a DEFECT, not a business decision, and it was ruled so rather than put to Loo.**
+P8 reported it as an open question. Read against the code it is not one.
+
+**The line, verified on `origin/main` 2026-08-04** (`to-order.ts:940`):
+
+```js
+qty: isOnePoPerOrder(category)        // isOnePoPerOrder === (category === "sofa")
+  ? 1                                  // a sofa build is ALWAYS 1
+  : members.reduce(…)                  // every other category sums the real quantity
+```
+
+and one level up (`:959`) the row repeats it — sofa counts `builds.length`, everything else
+counts pieces.
+
+**Why the `? 1` is right where it was written, and wrong here.** A customer's sofa is three
+`order_lines` — `1B(LHF)` + `CNR` + `2A(RHF)`, each qty 1 — and summing them reads as three
+sofas. The rule collapses MODULE LINES into one physical sofa. **A typed purchase demand has
+no modules**: it is one SKU and one number, structurally identical to a mattress. Applying a
+module-merging rule to a row that has no modules is the whole bug.
+
+**It is WIDER than the demand path, and that is measured.** The grouping key is
+`l.buildKey ?? "line::" + l.lineId`, so **any** sofa line with no build key becomes its own
+build and is then forced to 1 — **including a real customer order line.** A customer ordering
+two identical non-modular sofas on one line would raise a PO for one. Counted on prod
+2026-08-04: **0 such lines today**, so nothing is wrong in the field right now. **Fix the
+rule, not the demand path**, or the customer case ships as a landmine.
+
+**The failure is silent, which is what makes it urgent rather than tidy.** Type 5, store 5,
+the grid shows 5, the PO says 1 — and no surface anywhere says a number changed.
+
+**Build.** A build's quantity comes from its members whenever the build is a single line
+carrying its own quantity. The collapse stays for genuine multi-module builds — that rule is
+frozen and correct.
+
+**Done when.** A ready-stock demand of 5 sofas proposes 5 and issues a PO for 5 · a real
+three-module customer sofa still proposes exactly 1 (regression-tested, since that is the
+rule being preserved) · a customer line of 2 non-modular sofas proposes 2 · the row total and
+the build totals agree · a negative control fires (restore the `? 1` and exactly the new tests
+go red).
+
+**Must NOT.** ❌ delete `isOnePoPerOrder` — it still decides the PO boundary (one sofa PO per
+customer order), which is a different rule that stays · ❌ touch `OperationToOrder.tsx`
+(P9 and P10 own it) · ❌ change how modules group.
+
+---
+
 ## P10 · Ready stock is suggested; the human decides whether to take it
 
 **Lane: PURCHASING · touches the grid region of `OperationToOrder.tsx` + `apps/api` +
@@ -1482,5 +1533,7 @@ P10 → then P7**, which inherits three working features instead of re-deriving 
 | P6 | ✅ **Purchasing terminology freeze** (2026-07-29), **partly superseded 2026-07-30 by the Purchasing clean restart**: `Draft PO` is permanently removed, raising a PO is ONE act (`Issue PO`), Operation Status is FIVE labels, and the verb dictionary went 6 → 7 (`Prepare`) and back to 6. Docs only | — |
 | P8 | ✅ **a typed purchase demand can actually be saved** (migration **0320 applied**) — and **the create half was already shipped by #581/0319 when the card was written**, so it was verified, not rebuilt. What was missing was the card's ONE ADDITION: `issued_qty` (writable only through a door) + `remaining_qty` (**GENERATED**, so it cannot disagree), and *"still to buy"* stops meaning *"has no purchase order"*. The issue path stops PATCHing and **adds** what it took, refusing an over-issue by name. 8 assertions on prod, rolled back; applied function byte-identical to the file. **Reported, not fixed: a ready-stock demand for a SOFA projects as 1** whatever quantity was typed (the frozen sofa grain — a business question), and **nobody can cancel a demand** (RPC exists, no route, no button — a route with no caller is C1's bypass) | #584 |
 | P9 | ✅ **the page says how many of each you are buying** (Loo 2026-08-04) — **no migration, web only**. CATEGORY rows carry bare UNIT counts; the PO Schedule above them keeps counting ORDERS, and the two are told apart by their own tooltips (`12 Orders` · `19 units`, COPY-STANDARD's own pair — no word invented). The rail counts UNISSUED work and **cascades over every narrowing except the category picks**, so the number a row shows is the number of units its click produces. The footer totals what is TICKED, per category, accumulated **inside the loop that decides what Issue acts on** — the VIEW-SCOPED law holds by construction, not by two counts agreeing. **Measured in a real browser on live data (1280×720)**: rail `All 20 · Mattress 15 · Bedframe 4 · Sofa 1 · Pillow 0 · Mattress Protector 0`, each equal to the grid's own Qty sum (mattress = 10 rows, 15 units — the two are not the same number); footer `Mattress 15 · Bedframe 4 · Sofa 1` beside `15 selected · Issue 3 POs`. **The card said "footer, beside the Issue button" and those are two places, so the widths were measured**: the line costs 257px and the toolbar has 223px spare at 1280 (607px at 1920) — a line that fits on a manager's monitor and breaks on an operator's laptop is not a placement, so it went to the footer band (573px spare). **Reported, not fixed**: Loo's 2026-08-03 footer ban was on the customer ORDER count, so the old blanket `no digits` test is NARROWED to `/d+s*(orders?|SO)/` rather than deleted · the design-standard scanner reads `PR #494` in a comment as a hex colour · the rail excludes an order with no delivery date, exactly as the grid does · a flat per-SKU SQL says 3 sofa units where the engine's per-BUILD allocation says 1, and the engine is the authority | #585 |
+| P11 | ⬜ **a sofa with no modules is counted like everything else** — P8's sofa finding, **RULED A DEFECT rather than a business question** (2026-08-04): the `? 1` collapses MODULE LINES and a typed demand has none. **Wider than the demand path** — any sofa line with no build key is forced to 1, a real customer order included (0 such lines live today). Shared module only; collides with nobody | — |
+| P12 | ⬜ **a demand can be cancelled** (door + button in ONE card — a route with no caller is a bypass). **After P10**, whose card owns the grid row the button belongs on. **BLOCKED on one business answer**: may the remainder of a part-ordered demand be cancelled? | — |
 | P10 | ⬜ **ready stock is suggested, the human takes it** (Loo 2026-08-04) — the engine already computes it and it is switched off and unshown. Inline expand; taking goes through K4's pool draw. **After D0.5d** | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |
