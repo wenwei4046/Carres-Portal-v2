@@ -854,3 +854,73 @@ describe("the group header — one line per customer order", () => {
     expect(groups.length).toBeLessThan(rows.length);
   });
 });
+
+/**
+ * READY STOCK WITH NO `Required By` MUST STILL BE LISTED.
+ *
+ * Found by pressing the real button on 2026-08-03: the demand saved, the
+ * dialog closed, and the row was nowhere. The TBD guard above — written for a
+ * CUSTOMER whose delivery date is not agreed yet — was swallowing it.
+ *
+ * They are different facts. An empty customer date means *nobody has promised
+ * this yet*; an empty `Required By` on ready stock is the frozen meaning *buy
+ * it on the next run*. Applying the customer rule to typed demand made it
+ * stored, saved and invisible, which is the worst of the three.
+ */
+describe("Ready Stock is listed even with no date", () => {
+  const READY = {
+    key: `${OHANA}::bedframe`,
+    supplierId: OHANA,
+    supplierName: "Ohana",
+    category: "bedframe",
+    label: "Ohana · Bedframe",
+    orderBy: null,
+    poCount: 1,
+    blocked: null,
+    productionDays: 7,
+    rows: [
+      {
+        orderId: "demand:abc-123",
+        so: null,
+        customer: "—",
+        readyStock: true,
+        destination: "Carres Klang",
+        qty: 5,
+        summary: "Sonic · 5",
+        stockReady: null,
+        delivery: null, // no Required By — buy it on the next run
+        orderBy: null,
+        builds: [build("d1", "Sonic", "SONIC-S", 5, "Single")],
+      },
+    ],
+  };
+
+  it("shows the row, and the group says Ready Stock and where it goes", async () => {
+    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+      if (path.startsWith("/api/operation/purchase/to-order/issue")) {
+        return route(path, init?.body ? JSON.parse(String(init.body)) : undefined);
+      }
+      if (path.startsWith("/api/operation/purchase/to-order")) {
+        return Promise.resolve({ ...TO_ORDER, proposals: [READY] });
+      }
+      return route(path, undefined);
+    });
+    await loaded();
+
+    const sheet = screen.getByTestId("to-order-sheet");
+    expect(within(sheet).getByText("Sonic S")).toBeInTheDocument();
+
+    const group = [...document.querySelectorAll('[data-kit="data-group"]')].find((g) =>
+      /Ready Stock/.test(g.textContent ?? ""),
+    );
+    expect(group).toBeTruthy();
+    // It names the DESTINATION, because it has no customer to name.
+    expect(group!.textContent).toContain("Carres Klang");
+    // …and no SO number is invented for it.
+    expect(group!.textContent).not.toMatch(/SO-/);
+    // …and it does NOT borrow the customer word for an empty date: on ready
+    // stock an empty Required By means *buy it on the next run*, which is the
+    // opposite of *nobody has promised this yet*.
+    expect(group!.textContent).not.toContain(W.noDeliveryDate);
+  });
+});

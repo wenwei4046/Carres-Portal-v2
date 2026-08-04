@@ -305,7 +305,14 @@ export default function OperationToOrder() {
         // date is confirmed the projection brings the order straight back,
         // and chasing that confirmation is the Orders module's own Call
         // customer action. Ordered rows (receipts) are unaffected.
-        if (r.delivery == null) continue;
+        //
+        // A READY STOCK DEMAND IS EXEMPT, and finding out why cost a real
+        // press of the button (2026-08-03). This rule is about a CUSTOMER
+        // whose date is not agreed yet. Ready stock has no customer and never
+        // will: an empty `Required By` is not "unconfirmed", it is the frozen
+        // meaning *buy it on the next run*. Applying the customer rule to it
+        // swallowed every typed demand silently — saved, stored, invisible.
+        if (r.delivery == null && !r.readyStock) continue;
         const bucket =
           today == null
             ? "overdue"
@@ -1181,15 +1188,24 @@ export default function OperationToOrder() {
                               {properCase(r.customer)}
                             </span>
                           ) : null}
-                          <span
-                            className={
-                              r.late
-                                ? "text-kit-red-11 font-medium tabular-nums"
-                                : "text-kit-slate-11 tabular-nums"
-                            }
-                          >
-                            {r.delivery ? fmtDate(r.delivery) : W.noDeliveryDate}
-                          </span>
+                          {/* `No delivery date` is a CUSTOMER's word — it means
+                              nobody has promised this yet. On ready stock an
+                              empty date means the opposite: buy it on the next
+                              run. So the ready stock group prints its date when
+                              one was asked for and prints NOTHING when none
+                              was, rather than borrowing a sentence that is
+                              false about it. */}
+                          {r.readyStock && !r.delivery ? null : (
+                            <span
+                              className={
+                                r.late
+                                  ? "text-kit-red-11 font-medium tabular-nums"
+                                  : "text-kit-slate-11 tabular-nums"
+                              }
+                            >
+                              {r.delivery ? fmtDate(r.delivery) : W.noDeliveryDate}
+                            </span>
+                          )}
                           {partly ? (
                             <span className="rounded-pill bg-kit-amber-3 px-2 py-0.5 text-label text-kit-amber-11">
                               {W.partlyOrdered}
