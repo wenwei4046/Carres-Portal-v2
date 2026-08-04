@@ -1165,7 +1165,7 @@ describe("P10 · ready stock on the grid", () => {
     fireEvent.click(screen.getByTestId(`table-expand-${rowKey}`));
     const panel = screen.getByTestId(`to-order-stock-${rowKey}`);
     expect(panel).toHaveTextContent("Carres Klang: 2 available");
-    expect(screen.getByTestId(`to-order-take-${rowKey}`)).toHaveTextContent("Take 2");
+    expect(screen.getByTestId(`to-order-reserve-${rowKey}`)).toHaveTextContent("Reserve 2");
   });
 
   it("the number on the button is the number the row shows — never a typed one", async () => {
@@ -1177,10 +1177,10 @@ describe("P10 · ready stock on the grid", () => {
     expect(panel.querySelectorAll("input")).toHaveLength(0);
   });
 
-  it("Take posts the ROW, and no quantity — the server owns the number", async () => {
+  it("Reserve posts the ROW, and no quantity — the server owns the number", async () => {
     await loadedWith(withOffer(2));
     fireEvent.click(screen.getByTestId(`table-expand-${rowKey}`));
-    fireEvent.click(screen.getByTestId(`to-order-take-${rowKey}`));
+    fireEvent.click(screen.getByTestId(`to-order-reserve-${rowKey}`));
     await waitFor(() => {
       const call = apiFetch.mock.calls.find((c) =>
         String(c[0]).includes("/to-order/take-stock"),
@@ -1200,7 +1200,7 @@ describe("P10 · ready stock on the grid", () => {
       (c) => String(c[0]) === "/api/operation/purchase/to-order",
     ).length;
     fireEvent.click(screen.getByTestId(`table-expand-${rowKey}`));
-    fireEvent.click(screen.getByTestId(`to-order-take-${rowKey}`));
+    fireEvent.click(screen.getByTestId(`to-order-reserve-${rowKey}`));
     await waitFor(() => {
       const after = apiFetch.mock.calls.filter(
         (c) => String(c[0]) === "/api/operation/purchase/to-order",
@@ -1213,7 +1213,7 @@ describe("P10 · ready stock on the grid", () => {
     await loadedWith(withOffer(2));
     takeResponse = () => Promise.reject(new Error("no_free_stock"));
     fireEvent.click(screen.getByTestId(`table-expand-${rowKey}`));
-    fireEvent.click(screen.getByTestId(`to-order-take-${rowKey}`));
+    fireEvent.click(screen.getByTestId(`to-order-reserve-${rowKey}`));
     await waitFor(() =>
       expect(screen.getByTestId(`to-order-stock-${rowKey}`)).toHaveTextContent(
         "no_free_stock",
@@ -1228,7 +1228,7 @@ describe("P10 · ready stock on the grid", () => {
     await loadedWith(body);
     // `rowBox` is the row's CHECKBOX; the sentence is in the row itself.
     expect(rowBox(ELLA.proposal, ELLA.orderId, ELLA.buildKey).closest("tr")).toHaveTextContent(
-      "took 2 from stock",
+      "reserved 2 from stock",
     );
   });
 
@@ -1237,6 +1237,35 @@ describe("P10 · ready stock on the grid", () => {
     await loadedWith(body);
     // The receipt row in the fixture carries a PO number and no control.
     expect(screen.queryByTestId("table-expand-po:PO-9001:o30")).toBeNull();
+  });
+
+  /**
+   * ── P13① · ONE ACT, ONE WORD (Loo, 2026-08-04) ────────────────────────────
+   *
+   * The order drawer's picker has said `Reserve {n} to {soRef}` for this exact
+   * act since 2026-06-30. P10 shipped `Take` on 2026-08-04, and Loo ruled the
+   * OLDER word wins: the goods do not leave, they are LOCKED until delivery,
+   * and `Take` reads as *already gone* — an operator who believes stock has
+   * left will not chase it.
+   */
+  it("P13 — the button reads Reserve, with the system's own number", async () => {
+    await loadedWith(withOffer(2));
+    fireEvent.click(screen.getByTestId(`table-expand-${rowKey}`));
+    expect(screen.getByTestId(`to-order-reserve-${rowKey}`)).toHaveTextContent("Reserve 2");
+    expect(screen.getByTestId(`to-order-stock-${rowKey}`).textContent ?? "").not.toMatch(
+      /\b(take|took|taken)\b/i,
+    );
+  });
+
+  it("P13 — no rendered word anywhere on the page says Take or took", async () => {
+    const body = withOffer(2);
+    const row = body.proposals[0].rows[0] as unknown as Record<string, unknown>;
+    // Render BOTH take-path strings at once: the offer and the past-tense fact.
+    (row.builds as Record<string, unknown>[])[0].takenFromStock = 2;
+    await loadedWith(body);
+    fireEvent.click(screen.getByTestId(`table-expand-${rowKey}`));
+    expect(document.body.textContent ?? "").not.toMatch(/\b(take|took|taken|takes)\b/i);
+    expect(document.body.textContent ?? "").toContain("reserved 2 from stock");
   });
 });
 
@@ -1462,5 +1491,32 @@ describe("the page offers no way to delete a demand", () => {
       "to-order/demand",
       "to-order/demand/:id/cancel",
     ]);
+  });
+});
+
+/**
+ * P13① — ONE ACT, ONE WORD (Loo, 2026-08-04).
+ *
+ * The order drawer's picker has said `Reserve {n} to {soRef}` for this exact
+ * act since 2026-06-30. To Order shipped `Take` on 2026-08-04, and Loo ruled
+ * the OLDER word wins: the goods do not leave, they are LOCKED until delivery,
+ * and `Take` reads as *already gone*.
+ *
+ * BOTH HALVES ARE ASSERTED — that the new screen moved, and that the old one
+ * did NOT. A rename card's real risk is that it "harmonises" in the wrong
+ * direction, so the drawer's two strings are pinned byte for byte.
+ */
+describe("P13 · the OLDER screen is the one that does not move", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+
+  it("THE DRAWER IS NOT TOUCHED — its wording is byte-identical", () => {
+    const dialog = readFileSync(join(here, "components/ReserveStockDialog.tsx"), "utf8");
+    const picker = readFileSync(join(here, "components/StockPickerGrid.tsx"), "utf8");
+    // The two strings Loo named. Reproduced here character for character so a
+    // later "harmonisation" of the older screen fails this test.
+    expect(dialog).toContain("`Reserve ${checked.size} to ${soRef}`");
+    expect(dialog).toContain("Reserve ready stock");
+    expect(picker).toContain("`Reserve ${checked.size} to ${soRef}`");
+    expect(picker).toContain("`Reserve this unit to ${soRef}`");
   });
 });

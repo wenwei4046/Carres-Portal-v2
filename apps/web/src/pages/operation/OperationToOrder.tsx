@@ -62,8 +62,8 @@ import {
   unitsHeadline,
   unresolvedHeadline,
   freeStockLine,
-  takeFromStockLabel,
-  tookFromStockLabel,
+  reserveFromStockLabel,
+  reservedFromStockLabel,
   stockExpandLabel,
   type ToOrderOrderedRow,
   type ToOrderProposal,
@@ -115,8 +115,9 @@ interface ToOrderResponse {
   stockWarehouse?: string | null;
 }
 
-/** P10 — what `Take` answers with. The number is the SERVER's. */
-interface TakeStockResponse {
+/** P10 — what `Reserve` answers with. The number is the SERVER's. The wire key
+ *  stays `taken`: it is a contract, not a word anybody reads (P13). */
+interface ReserveStockResponse {
   taken: number;
   reference: string;
   items: number;
@@ -338,8 +339,8 @@ export default function OperationToOrder() {
    * second copy of that is a second source of truth.
    */
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
-  const [taking, setTaking] = useState<string | null>(null);
-  const [takeError, setTakeError] = useState<ReadonlyMap<string, string>>(new Map());
+  const [reserving, setReserving] = useState<string | null>(null);
+  const [reserveError, setReserveError] = useState<ReadonlyMap<string, string>>(new Map());
   /**
    * P12 — the row whose purchase is being cancelled, or `null`.
    *
@@ -818,29 +819,34 @@ export default function OperationToOrder() {
   }
 
   /**
-   * ── P10 · `Take` — the human accepting the system's suggestion ────────────
+   * ── P10 · `Reserve` — the human accepting the system's suggestion ─────────
    *
-   * NO QUANTITY IS SENT. Loo's ruling 3: the system suggests, the human takes,
-   * so there is nothing to type and nothing to mistype — and the REASON is
-   * recorded by construction, because the press can mean one thing only.
+   * NO QUANTITY IS SENT. Loo's ruling 3: the system suggests, the human
+   * decides, so there is nothing to type and nothing to mistype — and the
+   * REASON is recorded by construction, because the press can mean one thing
+   * only.
+   *
+   * THE WORD IS `Reserve` (P13, Loo 2026-08-04). The goods do not leave; they
+   * are locked until delivery, and the order drawer's picker has said
+   * `Reserve {n} to {soRef}` for this exact act since 2026-06-30.
    *
    * The server does the whole act (reserve through K4's door, reduce a typed
    * demand through 0320's), then the page REFETCHES rather than patching the
-   * row from the response. A take changes what every other row may be offered
-   * — the pool is shared — so re-reading is the only way the grid stays true.
-   * That is the opposite of Issue, which updates in place because a purchase
-   * order changes nothing about its neighbours.
+   * row from the response. A reserve changes what every other row may be
+   * offered — the pool is shared — so re-reading is the only way the grid
+   * stays true. That is the opposite of Issue, which updates in place because
+   * a purchase order changes nothing about its neighbours.
    */
-  async function takeStock(row: GridRow) {
-    if (!row.orderId || !row.buildKey || taking) return;
-    setTaking(row.key);
-    setTakeError((m) => {
+  async function reserveStock(row: GridRow) {
+    if (!row.orderId || !row.buildKey || reserving) return;
+    setReserving(row.key);
+    setReserveError((m) => {
       const n = new Map(m);
       n.delete(row.key);
       return n;
     });
     try {
-      await apiFetch<TakeStockResponse>("/api/operation/purchase/to-order/take-stock", {
+      await apiFetch<ReserveStockResponse>("/api/operation/purchase/to-order/take-stock", {
         method: "POST",
         body: JSON.stringify({ orderId: row.orderId, buildKey: row.buildKey }),
       });
@@ -851,13 +857,13 @@ export default function OperationToOrder() {
       });
       await q.refetch();
     } catch (e) {
-      setTakeError((m) =>
+      setReserveError((m) =>
         // The server's own named reason, and the page's existing fallback for
         // a request that failed without one — no new word is invented here.
         new Map(m).set(row.key, e instanceof Error ? e.message : "failed"),
       );
     } finally {
-      setTaking(null);
+      setReserving(null);
     }
   }
 
@@ -1083,7 +1089,7 @@ export default function OperationToOrder() {
                 module keeps paying for. It rides the Model column because
                 that is where the page's spare width is. */}
             <span className="shrink-0 text-label text-kit-green-11">
-              {tookFromStockLabel(r.takenFromStock)}
+              {reservedFromStockLabel(r.takenFromStock)}
             </span>
           </span>
         ) : (
@@ -1466,14 +1472,14 @@ export default function OperationToOrder() {
                         </span>
                         <Button
                           size="sm"
-                          onClick={() => takeStock(r)}
-                          disabled={taking != null}
-                          data-testid={`to-order-take-${r.key}`}
+                          onClick={() => reserveStock(r)}
+                          disabled={reserving != null}
+                          data-testid={`to-order-reserve-${r.key}`}
                         >
-                          {takeFromStockLabel(r.freeStock)}
+                          {reserveFromStockLabel(r.freeStock)}
                         </Button>
-                        {takeError.get(r.key) ? (
-                          <span className="text-kit-red-11">{takeError.get(r.key)}</span>
+                        {reserveError.get(r.key) ? (
+                          <span className="text-kit-red-11">{reserveError.get(r.key)}</span>
                         ) : null}
                       </span>
                     ),

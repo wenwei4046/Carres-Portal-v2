@@ -354,31 +354,49 @@ export function soCountLabel(n: number): string {
 // ── Ready stock, suggested (P10, Loo 2026-08-04) ────────────────────────────
 //
 // Loo's ruling 3: *"我要的就是有一个自动建议补货，不过我们可以手动选择要不要拉。"*
-// The system SUGGESTS; the human TAKES. So there is no quantity box anywhere
+// The system SUGGESTS; the human decides. So there is no quantity box anywhere
 // in these three strings — the number is the system's, and pressing the button
 // is the whole of the operator's decision. That is what makes the REASON
 // recorded by construction: there is only one thing the press can mean.
 //
-// Every one of the three is Loo's own word from the card's frozen sketch.
-// Each is owed a COPY-STANDARD row.
+// ── P13 · THE WORD IS `Reserve`, NOT `Take` (Loo, 2026-08-04) ───────────────
+//
+// P10 shipped `Take`, and the order drawer's picker has said
+// `Reserve {n} to {soRef}` for the SAME ACT since 2026-06-30. One act, two
+// words, two screens. Loo ruled `Reserve`, for three reasons that are the
+// record:
+//
+//   1. IT IS MORE ACCURATE. The goods do not leave — they are LOCKED until
+//      delivery. `Take` reads as *already gone*, and an operator who believes
+//      stock has left will not chase it.
+//   2. IT CAME FIRST. Live since 2026-06-30; an older word that is not wrong
+//      is not replaced.
+//   3. IT NAMES THE PARTY. `Reserve 2 to SO-1209` says who it is for.
+//
+// THE DRAWER IS NOT TOUCHED. This card moves the NEWER screen onto the older
+// one, never the reverse — `ReserveStockDialog` and `StockPickerGrid` keep
+// their wording byte for byte, and a test asserts it.
 
 /** `Carres Klang: 2 available` — the expanded row's one sentence. */
 export function freeStockLine(warehouse: string, n: number): string {
   return `${warehouse}: ${n} available`;
 }
 
-/** `Take 2` — the button. It carries the number BECAUSE nothing else may. */
-export function takeFromStockLabel(n: number): string {
-  return `Take ${n}`;
+/** `Reserve 2` — the button. It carries the number BECAUSE nothing else may. */
+export function reserveFromStockLabel(n: number): string {
+  return `Reserve ${n}`;
 }
 
 /**
- * `took 2 from stock` — why this row's quantity is smaller than what was asked
- * for. Without it the number simply falls, and a quantity that changes with
- * nothing saying so is the silent failure this module keeps paying for.
+ * `reserved 2 from stock` — why this row's quantity is smaller than what was
+ * asked for. Without it the number simply falls, and a quantity that changes
+ * with nothing saying so is the silent failure this module keeps paying for.
+ *
+ * It is the past tense of the BUTTON's own verb, so the fact and the act that
+ * produced it read as one thing (P13; it said `took … from stock` before).
  */
-export function tookFromStockLabel(n: number): string {
-  return `took ${n} from stock`;
+export function reservedFromStockLabel(n: number): string {
+  return `reserved ${n} from stock`;
 }
 
 /** The expand control's own word, for a screen reader — the number is the
@@ -408,15 +426,20 @@ export function readyStockRef(destination: string | null | undefined): string {
 /**
  * Why the unit left the free pool, for K4's ledger.
  *
- * The reason CODE is `other`, and that is a measured gap rather than a lazy
- * default: K4's locked five (`sales_urgent` · `supplier_delay` ·
- * `warranty_exchange` · `vip` · `other`) has no row for *taken instead of
- * buying it*, and adding a sixth is a business ruling on a locked vocabulary,
- * not a routine fix. `other` is the escape hatch K4 built, and it REQUIRES a
- * note — so the monthly split still reads as an answer instead of a silence.
+ * P10 recorded this as `other` with a note, because K4's locked five had no
+ * row for *"we had it on the shelf, so we did not raise a purchase order"* and
+ * inventing a sixth would have been a ruling on a locked vocabulary. Loo made
+ * that ruling on 2026-08-04 (P13), so the reason now says it itself.
+ *
+ * The note stays, and it says only what the reason CANNOT: WHICH build the
+ * unit went to. It no longer repeats *taken instead of raising a purchase
+ * order* — with the reason carrying that sentence, keeping it in the note
+ * would write the same fact into the ledger twice.
  */
+export const READY_STOCK_DRAW_REASON = "used_instead_of_ordering" as const;
+
 export function readyStockDrawNote(label: string): string {
-  return `To Order · taken instead of raising a purchase order · ${label}`;
+  return `To Order · ${label}`;
 }
 
 /** `8 pcs` — physical units, the factory's own count. */

@@ -8,6 +8,7 @@ import {
   planFromDocuments,
   productionWorkingDaysFor,
   readyStockDrawNote,
+  READY_STOCK_DRAW_REASON,
   readyStockRef,
   stockMatchKey,
   toOrderBuilds,
@@ -1155,8 +1156,14 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
 });
 
 /**
- * `Take` — ready stock is SUGGESTED; the human decides whether to take it
- * (card P10, Loo 2026-08-04).
+ * `Reserve` — ready stock is SUGGESTED; the human decides whether to reserve
+ * it (card P10, Loo 2026-08-04; the word is P13's, same day — the goods do not
+ * leave, they are LOCKED until delivery, and the order drawer's picker has
+ * said `Reserve` for this act since 2026-06-30).
+ *
+ * THE ROUTE PATH STAYS `/take-stock`. It is a wire contract, not a word on a
+ * screen, and renaming it would break a browser open across the deploy for
+ * nothing. P13 rules the VOCABULARY the operator reads.
  *
  * THE BODY CARRIES NO QUANTITY, and that is his ruling 3 built as a contract
  * rather than as a screen rule: *"我要的就是有一个自动建议补货，不过我们可以
@@ -1231,7 +1238,11 @@ toOrderRouter.post("/take-stock", requireOperation, async (c) => {
   for (const itemId of build.freeStockItemIds) {
     const { data, error } = await sb.rpc("ops_stock_pool_draw", {
       p_ref: ref,
-      p_reason: "other",
+      // P13 (0322) — K4's own sixth reason. P10 wrote `other` + a note because
+      // the five had no row for *taken instead of buying it*; Loo added the
+      // word on 2026-08-04, so the ledger now says it in its own vocabulary
+      // and the monthly split stops reading as an unexplained `Other`.
+      p_reason: READY_STOCK_DRAW_REASON,
       p_note: note,
       p_item_id: itemId,
       p_sku: null,
