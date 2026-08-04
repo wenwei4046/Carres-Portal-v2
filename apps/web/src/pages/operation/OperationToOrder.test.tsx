@@ -927,18 +927,86 @@ describe("Supplier on the row", () => {
  * to 100"); the page was simply breaking its own kit's law. These two tests are
  * the enforcement, so it cannot drift back by hand.
  */
-describe("the grid's width system", () => {
-  it("every column is a PERCENTAGE and the set sums to 100 with the checkbox", async () => {
-    await loaded();
-    const cols = [...document.querySelectorAll("colgroup col")] as HTMLElement[];
-    // ⊞ (P10) + ☑ + Supplier · Qty · Model · PO No. The expand control's 3%
-    // came OUT of Model, so the set still sums to 100 and the table still
-    // never scrolls sideways — the law this test exists for.
-    expect(cols.length).toBe(6);
+/**
+ * P16 — LOO'S RULE ①, AS THE ONLY THING JSDOM CAN HOLD OF IT.
+ *
+ * **These tests do NOT prove the widths are right.** jsdom has no layout, so
+ * `getBoundingClientRect()` is zero for every cell and a page test can never
+ * see a truncated string. The measuring was done in a real browser at 1440,
+ * 1280 and 1024 and the numbers are quoted in the PR and in the column defs.
+ *
+ * What a test CAN hold is that nobody quietly puts the old system back: that
+ * every width is a MEASURED PIXEL rather than a share of the container, that
+ * no column is `auto`, and that the leftover goes to the kit's filler instead
+ * of to a column. The block this replaces asserted the opposite law — *"every
+ * column is a percentage and the set sums to 100"* — and summing to 100 IS
+ * the instruction "stretch to fill". It is rewritten, not deleted, because
+ * the page still needs a guard on how it spends width.
+ */
+describe("P16 · the grid's width system — content sizes the column", () => {
+  /* The measured minimums. `ceil(worst string + 16px of cell padding) + 4`,
+   * or the header's own floor where that is wider (`Qty`). Changing one of
+   * these is a MEASUREMENT, taken in a browser — never a guess in this file. */
+  const RULED = { supplier: "111px", qty: "55px", model: "155px", po: "163px" };
 
-    for (const c of cols) expect(c.style.width).toMatch(/^\d+(\.\d+)?%$/); // no px, no auto
-    const total = cols.reduce((s, c) => s + parseFloat(c.style.width), 0);
-    expect(total).toBe(100);
+  it("gives every column the pixel width its own content measured", async () => {
+    await loaded();
+    const widths = [...document.querySelectorAll("thead th[data-column]")].map((th) => {
+      const col = [...document.querySelectorAll("colgroup col")][
+        [...th.parentElement!.children].indexOf(th)
+      ] as HTMLElement;
+      return [(th as HTMLElement).dataset.column, col.style.width];
+    });
+    expect(Object.fromEntries(widths)).toEqual(RULED);
+  });
+
+  it("lets NO column absorb the slack — not a percentage, not an `auto`", async () => {
+    await loaded();
+    // Every column the PAGE declares is a fixed pixel. A `%` would grow with
+    // the container and an `auto` would eat the remainder — the two shapes
+    // this card exists to remove.
+    const dataCols = [...document.querySelectorAll("thead th[data-column]")].map(
+      (th) =>
+        (
+          [...document.querySelectorAll("colgroup col")][
+            [...th.parentElement!.children].indexOf(th)
+          ] as HTMLElement
+        ).style.width,
+    );
+    expect(dataCols.length).toBe(4);
+    for (const w of dataCols) expect(w).toMatch(/^\d+px$/);
+  });
+
+  it("hands the leftover to the kit's filler, which holds nothing", async () => {
+    await loaded();
+    const filler = document.querySelector('thead th[data-kit="table-filler"]');
+    expect(filler).toBeInTheDocument();
+    expect(filler!.textContent).toBe("");
+    // Hidden from a screen reader: there is no fact in it to read out.
+    expect(filler!.getAttribute("aria-hidden")).toBe("true");
+    // It is NOT a column — it never enters `columns`, so it cannot be sorted,
+    // filtered or reordered, and the header row is still the four words.
+    expect(screen.getAllByRole("columnheader").map((h) => h.textContent!.trim())).toEqual([
+      "",
+      "",
+      W.supplierLabel,
+      W.colQty,
+      W.colModel,
+      W.colPoNo,
+    ]);
+  });
+
+  it("frames nothing — the sheet is flush, with no gutters and no radius", async () => {
+    await loaded();
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "OperationToOrder.tsx"),
+      "utf8",
+    ).replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
+    // The workspace column keeps its vertical air and loses the 16px sides.
+    expect(src).toContain("flex-1 min-w-0 flex flex-col min-h-0 gap-2 pt-2 pb-3");
+    expect(src).not.toMatch(/min-w-0 flex flex-col min-h-0 gap-2 px-4/);
+    // And the grid's own wrapper no longer draws a card frame around it.
+    expect(src).not.toMatch(/flex-1 min-h-0 flex flex-col rounded-card/);
   });
 
   it("reads Supplier · Qty · Model · PO No. — the order's own facts left", async () => {
@@ -1761,6 +1829,11 @@ describe("Q6 · the audit's two findings, as guards", () => {
     expect(document.querySelectorAll('thead th[draggable="true"]')).toHaveLength(0);
     // …while the two powers the page DOES wire are untouched by the refusal.
     expect(document.querySelectorAll('[data-kit="data-group"]').length).toBeGreaterThan(0);
-    expect(document.querySelectorAll("colgroup col")).toHaveLength(6);
+    // ⊞ + ☑ + the four business columns + P16's filler. The count was 6
+    // before P16 and the SEVENTH is not a column: it carries no word, no
+    // sort and no filter, and `P16 · the grid's width system` above pins
+    // both halves of that — what it is, and that the header row is still
+    // the same four words.
+    expect(document.querySelectorAll("colgroup col")).toHaveLength(7);
   });
 });
