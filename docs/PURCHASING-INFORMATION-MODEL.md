@@ -781,7 +781,7 @@ and the history on the right is that, without AutoCount's full-page expand.
 
 **Four rules, and each one closes a hole this repo has already paid for:**
 
-1. **Nothing appears in two tiers.** Loo's own rule, and the reason the expand may not
+1. **A fact may be READ in two tiers. It may be WRITTEN in only one.** *(Narrowed by Loo, 2026-08-04, after using the page: it first read "nothing appears in two tiers", and Q5 obeyed it by taking the items grid OUT of the right panel — so clicking a row showed the supplier, the dates and the communication and never what was ON the purchase order. **Rule 1 was written to stop two sources of TRUTH; two READERS of one source were never the danger.** The panel gets the items back, read-only; the expand keeps the editing. Card Q9.)* Loo's own rule, and the reason the expand may not
    repeat Supplier · PO No. · Items — those are columns. *(Destination and Expected Arrival
    DO appear twice on purpose and it is not duplication: the row prints ONE value for the
    whole PO as a flag — `Carres Klang +1` — and the expand carries the per-LINE value that
