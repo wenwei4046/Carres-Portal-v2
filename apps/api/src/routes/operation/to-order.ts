@@ -7,15 +7,20 @@ import {
   myHolidaySet,
   planFromDocuments,
   productionWorkingDaysFor,
+  readyStockDrawNote,
+  readyStockRef,
+  stockMatchKey,
   toOrderBuilds,
   transitDaysFor,
   railItemLabel,
   workWeekOffDaysFor,
   type ProductCategory,
   type IssueDocument,
+  type ToOrderBuild,
   type ToOrderLine,
   type ToOrderOrderedRow,
   type ToOrderProposal,
+  type ToOrderRow,
 } from "@carres/shared";
 import { validateIssuePlan } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
@@ -103,7 +108,25 @@ type Loaded = {
    * plan and the dates stamped on it come from two different reads.
    */
   settings: Awaited<ReturnType<typeof loadPurchasingSettings>>;
+  /** P10 — the warehouse the free stock was counted at, by its own name. */
+  stockWarehouse: { id: string; name: string } | null;
+  /** P10 — how many units each offered register record holds, so the take can
+   *  say what it drew without a second read. */
+  stockQtyById: Map<string, number>;
 };
+
+/**
+ * P10 — the ONE reference a drawn unit is committed to, for a row of this
+ * grid. Server-side, so a browser can never name someone else's order.
+ */
+function stockRefOf(
+  readyStock: boolean | undefined,
+  so: number | null,
+  destination: string | null | undefined,
+): string | null {
+  if (readyStock) return readyStockRef(destination ?? null);
+  return so != null ? `SO-${so}` : null;
+}
 
 /**
  * Read live demand and project it. Shared by the GET and by the POST, so the
@@ -152,6 +175,8 @@ async function loadToOrder(
         unresolved: [],
         catalog: new Map(),
         settings,
+        stockWarehouse: null,
+        stockQtyById: new Map(),
       },
     };
   }
@@ -223,6 +248,9 @@ async function loadToOrder(
   const seenMissing = new Set<string>();
   /** Demand the catalog could not answer for. Never dropped in silence. */
   const unresolved: { sku: string; orderId: string; so: number | null }[] = [];
+  /** P10 — a typed demand's own `issued_qty`, the ceiling on what the ledger
+   *  may be read as having taken for it. */
+  const issuedByLine = new Map<string, number>();
 
   for (const l of lines) {
     const c = cat.get(l.sku as string);
@@ -406,6 +434,7 @@ async function loadToOrder(
         readyStock: true,
         destinationName: destName.get(d.destination_id as string) ?? null,
       });
+      issuedByLine.set(`demand:${id}`, Number(d.issued_qty ?? 0));
     }
   }
 
@@ -431,14 +460,149 @@ async function loadToOrder(
     }
   }
 
+  /**
+   * ── READY STOCK (card P10, Loo 2026-08-04) ────────────────────────────────
+   *
+   * The engine has computed how much a demand could take from free stock since
+   * the day it was written, and it was switched off (`consumeFreeStock`) and
+   * shown to nobody. Jess's 2026-07-21 ruling — goods are labelled per order,
+   * so nothing auto-consumes them — is right and stays; what was missing is
+   * that a decision reserved for a human never reached the human.
+   *
+   * TWO READS, and each answers a different question:
+   *
+   *   `ops_stock_items`      what is FREE right now — the offer.
+   *   `ops_stock_pool_usage` what has already been TAKEN — why a quantity is
+   *                          smaller than what was asked for.
+   *
+   * THE REGISTER, NOT `stock_balances`. They are two tables with no trigger
+   * between them (measured 2026-08-04), and the pool draw moves the REGISTER.
+   * A number read from the other one would not fall when a unit was taken, so
+   * the same units would be offered again tomorrow. `purchase.ts`'s advisory
+   * read still uses `stock_balances`; that is a different surface and is
+   * reported, not changed here.
+   *
+   * THE LEDGER, NOT `status = 'reserved'`. A unit that is delivered becomes
+   * `sold`, so a reservation-based reading would let a satisfied requirement
+   * come BACK as something to buy the day the goods went out. The ledger is
+   * permanent and dated, and its own comment says why: it counts the DECISION,
+   * never net units.
+   *
+   * NEITHER READ MAY TAKE THE PAGE DOWN. To Order turned customer orders into
+   * purchase orders for months before ready stock was on it; if either table
+   * is unreachable the FEATURE is unavailable and the workspace is exactly
+   * what it was — no offer, no netting, nothing invented.
+   */
+  let stockWarehouse: { id: string; name: string } | null = null;
+  const freeStock: Record<string, { id: string; qty: number }[]> = {};
+  const stockQtyById = new Map<string, number>();
+  try {
+    const { data: whRows } = await sb
+      .from("warehouses")
+      .select("id, name, kind")
+      .eq("kind", "own");
+    const own = whRows ?? [];
+    // The issue path's own rule, so the stock offered and the warehouse a
+    // purchase order is raised against can never be two different places.
+    const wh = own.find((w) => /klang|klg/i.test((w.name as string) ?? "")) ?? own[0];
+    if (wh) {
+      stockWarehouse = { id: wh.id as string, name: (wh.name as string) ?? "" };
+
+      const { data: itemRows, error: itemErr } = await sb
+        .from("ops_stock_items")
+        .select("id, sku, qty, date_in, created_at")
+        .eq("status", "free")
+        .eq("needs_repair", false)
+        .eq("warehouse_id", stockWarehouse.id);
+      if (itemErr) throw new Error(itemErr.message);
+
+      // FIFO — `ops_stock_pool_draw`'s own pick order (oldest first), so the
+      // records this page offers are the records it would have taken anyway.
+      const items = [...((itemRows ?? []) as Record<string, unknown>[])].sort((a, b) => {
+        const ad = (a.date_in as string | null) ?? "9999-12-31";
+        const bd = (b.date_in as string | null) ?? "9999-12-31";
+        if (ad !== bd) return ad < bd ? -1 : 1;
+        const ac = (a.created_at as string | null) ?? "";
+        const bc = (b.created_at as string | null) ?? "";
+        return ac < bc ? -1 : ac > bc ? 1 : 0;
+      });
+      for (const it of items) {
+        // `order_lines.sku` and `ops_stock_items.sku` are two vocabularies —
+        // the catalog code against the warehouse's own name. `stockMatchKey`
+        // is the portal's ONE rule for linking them, already read by the
+        // readiness badge and the drawer's picker.
+        const key = stockMatchKey(it.sku as string);
+        const qty = Math.max(1, Number(it.qty ?? 1));
+        (freeStock[key] ??= []).push({ id: it.id as string, qty });
+        stockQtyById.set(it.id as string, qty);
+      }
+    }
+  } catch (e) {
+    console.error("ready stock unavailable — no offer made", (e as Error).message);
+  }
+
+  /** `{ref}::{stockKey}` → units already drawn for it. */
+  const takenByRefKey = new Map<string, number>();
+  try {
+    const { data: usageRows, error: usageErr } = await sb
+      .from("ops_stock_pool_usage")
+      .select("sku, qty, ref");
+    if (usageErr) throw new Error(usageErr.message);
+    for (const u of (usageRows ?? []) as Record<string, unknown>[]) {
+      const ref = (u.ref as string | null) ?? "";
+      if (!ref) continue;
+      const k = `${ref}::${stockMatchKey(u.sku as string)}`;
+      takenByRefKey.set(k, (takenByRefKey.get(k) ?? 0) + Math.max(0, Number(u.qty ?? 0)));
+    }
+  } catch (e) {
+    console.error("ready stock ledger unavailable — takes not shown", (e as Error).message);
+  }
+
+  /**
+   * Net what was taken out of what is still to buy, and carry the fact.
+   *
+   * The two row kinds net through DIFFERENT stores and that is not a smell —
+   * they genuinely have different ones. A typed demand's remainder is
+   * `remaining_qty`, GENERATED in the database (0320), so it is already net
+   * and the ledger is read only to SAY so. A customer line has no counter, so
+   * the ledger is the netting: a unit committed to `SO-1234` is a unit we do
+   * not have to buy, whichever door committed it — the drawer's picker counts
+   * exactly as this page's own button does, because it is the same act.
+   */
+  const budget = new Map(takenByRefKey);
+  const planned: ToOrderLine[] = [];
+  for (const l of demand) {
+    const key = stockMatchKey(l.sku);
+    l.stockKey = key;
+    const ref = stockRefOf(l.readyStock, l.so, l.destinationName);
+    if (ref) {
+      const bk = `${ref}::${key}`;
+      // A demand may never be read as having taken more than it has ISSUED,
+      // and a customer line never more than it ORDERED — so an unrelated draw
+      // sharing a reference cannot make a requirement disappear.
+      const ceiling = l.readyStock ? (issuedByLine.get(l.lineId) ?? 0) : l.qty;
+      const take = Math.max(0, Math.min(budget.get(bk) ?? 0, ceiling));
+      if (take > 0) {
+        budget.set(bk, (budget.get(bk) ?? 0) - take);
+        l.takenFromStock = take;
+        // A typed demand's `qty` IS `remaining_qty` and is already net.
+        if (!l.readyStock) l.qty = Math.max(0, l.qty - take);
+      }
+    }
+    // Nothing left to buy is not a row — the same rule an open purchase order
+    // has always had.
+    if (l.qty > 0) planned.push(l);
+  }
+
   const today = todayIso();
   const proposals = buildToOrder({
-    lines: demand,
+    lines: planned,
     suppliers: (supRows ?? []).map((s) => ({
       id: s.id as string,
       name: (s.name as string) ?? "",
     })),
     supply: { openPoBySku },
+    freeStock,
     options: {
       today,
       holidays: myHolidaySet(),
@@ -454,7 +618,16 @@ async function loadToOrder(
 
   return {
     ok: true,
-    data: { proposals, today, poDays: settings.poDays, unresolved, catalog: cat, settings },
+    data: {
+      proposals,
+      today,
+      poDays: settings.poDays,
+      unresolved,
+      catalog: cat,
+      settings,
+      stockWarehouse,
+      stockQtyById,
+    },
   };
 }
 
@@ -683,6 +856,11 @@ toOrderRouter.get("/", requireOperation, async (c) => {
     proposals: res.data.proposals,
     unresolved: res.data.unresolved,
     ordered,
+    // P10 — the warehouse the offer was counted at, by its own name. The page
+    // states WHERE the stock is, and it may not invent the word `Klang`: a
+    // second warehouse is a rename away, and a sentence naming the wrong shed
+    // is worse than one naming none.
+    stockWarehouse: res.data.stockWarehouse?.name ?? null,
     destinations: (destRows ?? []).map((d) => ({
       id: d.id as string,
       name: d.name as string,
@@ -963,6 +1141,142 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
     destination: dest.name as string,
     pos: ids.map((id, i) => ({ id, customer: plan[i]?.customer ?? proposal.supplierName })),
   });
+});
+
+/**
+ * `Take` — ready stock is SUGGESTED; the human decides whether to take it
+ * (card P10, Loo 2026-08-04).
+ *
+ * THE BODY CARRIES NO QUANTITY, and that is his ruling 3 built as a contract
+ * rather than as a screen rule: *"我要的就是有一个自动建议补货，不过我们可以
+ * 手动选择要不要拉。"* The system suggests, the human accepts — so there is
+ * nothing to type, nothing to mistype, and the REASON is recorded by
+ * construction, because pressing this can mean exactly one thing.
+ *
+ * The server recomputes the whole workspace and reads the offer off its OWN
+ * projection, so a stale tab cannot take stock against last hour's demand and
+ * a browser cannot name a quantity, a SKU or a unit.
+ */
+const takeStockBody = z.object({
+  orderId: z.string().min(1),
+  buildKey: z.string().min(1),
+});
+
+toOrderRouter.post("/take-stock", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
+  }
+  const parsed = takeStockBody.safeParse(raw);
+  if (!parsed.success) return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  const { orderId, buildKey } = parsed.data;
+
+  const res = await loadToOrder(sb);
+  if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
+
+  let found: { row: ToOrderRow; build: ToOrderBuild } | null = null;
+  for (const p of res.data.proposals) {
+    for (const row of p.rows) {
+      if (row.orderId !== orderId) continue;
+      const build = row.builds.find((b) => b.key === buildKey);
+      if (build) found = { row, build };
+    }
+  }
+  // The row moved, was ordered, or was covered since the page loaded. Absent
+  // from the recomputation IS the refusal — there is nothing to take.
+  if (!found) return c.json({ error: "unknown_build", code: "unknown_build" }, 409);
+
+  const { row, build } = found;
+  if (build.freeStock <= 0 || build.freeStockItemIds.length === 0) {
+    return c.json({ error: "no_free_stock", code: "no_free_stock" }, 409);
+  }
+  const ref = stockRefOf(row.readyStock, row.so, row.destination);
+  if (!ref) {
+    // A customer row with no SO cannot say what the unit is committed to, and
+    // `ops_stock_pool_draw` refuses an empty reference by name. Refused here
+    // rather than there, so the operator gets the reason and not a 500.
+    return c.json({ error: "no_reference", code: "no_reference" }, 422);
+  }
+
+  /**
+   * K4'S DOOR, and only K4's door (0292/0294). It makes the draw and its
+   * reason ONE transaction, flips the unit to `reserved` under this reference,
+   * writes the ledger row, the audit row and the order's own timeline. A
+   * fourth door writing `ops_stock_items` its own way would be a second truth
+   * about the same units.
+   *
+   * ONE CALL PER RECORD, because that is the door's shape — and it is what
+   * makes *"taking twice cannot over-draw"* structural rather than hopeful:
+   * each call claims its unit only `where status = 'free'`, so a unit somebody
+   * else took a second ago comes back null and is simply not counted.
+   */
+  const note = readyStockDrawNote(build.title);
+  let taken = 0;
+  const drawn: string[] = [];
+  for (const itemId of build.freeStockItemIds) {
+    const { data, error } = await sb.rpc("ops_stock_pool_draw", {
+      p_ref: ref,
+      p_reason: "other",
+      p_note: note,
+      p_item_id: itemId,
+      p_sku: null,
+      p_condition: null,
+      p_wh: null,
+    });
+    if (error) {
+      const m = mapPgError(error);
+      return c.json({ ...(m.body as object), taken }, m.status);
+    }
+    if (!data) continue; // no longer free — somebody else got there first
+    drawn.push(itemId);
+    taken += res.data.stockQtyById.get(itemId) ?? 1;
+  }
+
+  if (taken === 0) {
+    return c.json({ error: "no_free_stock", code: "no_free_stock" }, 409);
+  }
+
+  /**
+   * A TYPED DEMAND'S REMAINDER FALLS THROUGH ITS OWN DOOR (0320).
+   *
+   * A customer line needs nothing here: the ledger row just written IS the
+   * record, and the next read nets it. A typed demand carries a counter, and
+   * `purchasing_demand_record_issue` is the only thing allowed to move it —
+   * additive, `FOR UPDATE`, and refusing an over-issue by name.
+   *
+   * It runs AFTER the draw on purpose. If it fails, the units are reserved and
+   * the demand still asks for them: we would buy too many, which is visible on
+   * the next read and recoverable. The other order would have us buy too few,
+   * and a customer short of goods is not recoverable by looking at a screen.
+   */
+  if (row.readyStock) {
+    const m = /^demand:(.+)$/.exec(row.orderId);
+    if (m) {
+      const { error } = await sb.rpc("purchasing_demand_record_issue", {
+        p_id: m[1]!,
+        p_qty: taken,
+        p_po_id: null,
+      });
+      if (error) {
+        console.error("purchase_demands stock take not recorded", m[1], error.message);
+        return c.json(
+          {
+            error: "demand_not_recorded",
+            code: "demand_not_recorded",
+            message: `${taken} unit(s) were reserved but the demand was not reduced.`,
+            taken,
+          },
+          500,
+        );
+      }
+    }
+  }
+
+  return c.json({ taken, reference: ref, items: drawn.length });
 });
 
 /**

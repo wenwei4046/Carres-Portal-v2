@@ -799,7 +799,10 @@ describe("the grid's width system", () => {
   it("every column is a PERCENTAGE and the set sums to 100 with the checkbox", async () => {
     await loaded();
     const cols = [...document.querySelectorAll("colgroup col")] as HTMLElement[];
-    expect(cols.length).toBe(5); // ☑ + Supplier · Qty · Model · PO No.
+    // ⊞ (P10) + ☑ + Supplier · Qty · Model · PO No. The expand control's 3%
+    // came OUT of Model, so the set still sums to 100 and the table still
+    // never scrolls sideways — the law this test exists for.
+    expect(cols.length).toBe(6);
 
     for (const c of cols) expect(c.style.width).toMatch(/^\d+(\.\d+)?%$/); // no px, no auto
     const total = cols.reduce((s, c) => s + parseFloat(c.style.width), 0);
@@ -1086,5 +1089,150 @@ describe("P9 — the footer totals what is TICKED, per category", () => {
     // … and the footer counts UNITS: SEVEN, because wong's single row is
     // three bedframes. This is the pair Loo could not read anywhere.
     expect(screen.getByTestId("to-order-footer-units")).toHaveTextContent("Bedframe 4 · Sofa 3");
+  });
+});
+
+/**
+ * P10 — READY STOCK IS SUGGESTED; THE HUMAN DECIDES WHETHER TO TAKE IT
+ * (Loo, 2026-08-04).
+ *
+ * Jess's 2026-07-21 ruling is untouched: nothing auto-consumes labelled
+ * stock. What was missing is that the number the engine already computed was
+ * shown to nobody. Loo's option B: AutoCount's inline ⊞, using the kit's own
+ * row expand — not a third pane, not a second expander.
+ */
+describe("P10 · ready stock on the grid", () => {
+  /** The overdue view holds ella's sofa row (`bk-e`) — one build, one line. */
+  const ELLA = { proposal: `${OHANA}::sofa`, orderId: "o2", buildKey: "bk-e" };
+
+  /** The same payload with the offer put on ella's build. */
+  function withOffer(freeStock: number, warehouse: string | null = "Carres Klang") {
+    const body = structuredClone(TO_ORDER) as typeof TO_ORDER & {
+      stockWarehouse?: string | null;
+    };
+    body.stockWarehouse = warehouse;
+    const row = body.proposals[0].rows[0] as unknown as Record<string, unknown>;
+    const b = (row.builds as Record<string, unknown>[])[0];
+    b.freeStock = freeStock;
+    b.freeStockItemIds = Array.from({ length: freeStock }, (_, i) => `i${i + 1}`);
+    row.freeStock = freeStock;
+    return body;
+  }
+
+  /** Load with a given payload, then open the view ella's row lives in. */
+  async function loadedWith(body: unknown) {
+    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+      if (path.startsWith("/api/operation/purchase/to-order/take-stock")) {
+        return takeResponse(init);
+      }
+      if (path.startsWith("/api/operation/purchase/to-order/issue")) {
+        return route(path, init?.body ? JSON.parse(String(init.body)) : undefined);
+      }
+      if (path.startsWith("/api/operation/purchase/to-order")) return Promise.resolve(body);
+      return Promise.resolve({});
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+  }
+
+  let takeResponse: (init?: RequestInit) => Promise<unknown>;
+  beforeEach(() => {
+    takeResponse = () => Promise.resolve({ taken: 2, reference: "SO-1204", items: 2 });
+  });
+
+  const rowKey = `${ELLA.proposal}:${ELLA.orderId}:${ELLA.buildKey}`;
+
+  it("a row the warehouse holds nothing for is visually untouched — no control at all", async () => {
+    await loadedWith(withOffer(0));
+    expect(screen.queryByTestId(`table-expand-${rowKey}`)).toBeNull();
+    // And every OTHER row on the page is equally untouched.
+    expect(document.querySelectorAll('[data-testid^="table-expand-"]')).toHaveLength(0);
+  });
+
+  it("a row with stock gets the ⊞ — its presence IS the marker, and it carries the number", async () => {
+    await loadedWith(withOffer(2));
+    const ctrl = screen.getByTestId(`table-expand-${rowKey}`);
+    // The number rides the label, so a screen reader gets what the ⊞ means.
+    expect(ctrl).toHaveAttribute("aria-label", "Booqit — 2 available");
+    expect(ctrl).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("opening the row says where the stock is and offers to take exactly that much", async () => {
+    await loadedWith(withOffer(2));
+    fireEvent.click(screen.getByTestId(`table-expand-${rowKey}`));
+    const panel = screen.getByTestId(`to-order-stock-${rowKey}`);
+    expect(panel).toHaveTextContent("Carres Klang: 2 available");
+    expect(screen.getByTestId(`to-order-take-${rowKey}`)).toHaveTextContent("Take 2");
+  });
+
+  it("the number on the button is the number the row shows — never a typed one", async () => {
+    await loadedWith(withOffer(2));
+    fireEvent.click(screen.getByTestId(`table-expand-${rowKey}`));
+    const panel = screen.getByTestId(`to-order-stock-${rowKey}`);
+    // Loo's ruling 3: the system suggests, the human accepts. There is
+    // nowhere on this page to type a quantity.
+    expect(panel.querySelectorAll("input")).toHaveLength(0);
+  });
+
+  it("Take posts the ROW, and no quantity — the server owns the number", async () => {
+    await loadedWith(withOffer(2));
+    fireEvent.click(screen.getByTestId(`table-expand-${rowKey}`));
+    fireEvent.click(screen.getByTestId(`to-order-take-${rowKey}`));
+    await waitFor(() => {
+      const call = apiFetch.mock.calls.find((c) =>
+        String(c[0]).includes("/to-order/take-stock"),
+      );
+      expect(call).toBeTruthy();
+      const body = JSON.parse(String((call![1] as RequestInit).body));
+      expect(body).toEqual({ orderId: "o2", buildKey: "bk-e" });
+    });
+  });
+
+  it("re-reads the whole workspace after a take — the pool is shared", async () => {
+    // Issue updates the grid in place because a purchase order changes
+    // nothing about its neighbours. A take DOES: the units it removed were
+    // on offer to every other row of that model.
+    await loadedWith(withOffer(2));
+    const before = apiFetch.mock.calls.filter(
+      (c) => String(c[0]) === "/api/operation/purchase/to-order",
+    ).length;
+    fireEvent.click(screen.getByTestId(`table-expand-${rowKey}`));
+    fireEvent.click(screen.getByTestId(`to-order-take-${rowKey}`));
+    await waitFor(() => {
+      const after = apiFetch.mock.calls.filter(
+        (c) => String(c[0]) === "/api/operation/purchase/to-order",
+      ).length;
+      expect(after).toBeGreaterThan(before);
+    });
+  });
+
+  it("a refused take states the server's own reason and leaves the row open", async () => {
+    await loadedWith(withOffer(2));
+    takeResponse = () => Promise.reject(new Error("no_free_stock"));
+    fireEvent.click(screen.getByTestId(`table-expand-${rowKey}`));
+    fireEvent.click(screen.getByTestId(`to-order-take-${rowKey}`));
+    await waitFor(() =>
+      expect(screen.getByTestId(`to-order-stock-${rowKey}`)).toHaveTextContent(
+        "no_free_stock",
+      ),
+    );
+  });
+
+  it("says why a quantity is smaller than what was asked for", async () => {
+    const body = withOffer(0);
+    const row = body.proposals[0].rows[0] as unknown as Record<string, unknown>;
+    (row.builds as Record<string, unknown>[])[0].takenFromStock = 2;
+    await loadedWith(body);
+    // `rowBox` is the row's CHECKBOX; the sentence is in the row itself.
+    expect(rowBox(ELLA.proposal, ELLA.orderId, ELLA.buildKey).closest("tr")).toHaveTextContent(
+      "took 2 from stock",
+    );
+  });
+
+  it("an ALREADY ORDERED row is never offered stock — there is nothing left to decide", async () => {
+    const body = withOffer(2);
+    await loadedWith(body);
+    // The receipt row in the fixture carries a PO number and no control.
+    expect(screen.queryByTestId("table-expand-po:PO-9001:o30")).toBeNull();
   });
 });

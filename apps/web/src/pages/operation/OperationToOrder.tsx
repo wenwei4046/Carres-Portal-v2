@@ -61,6 +61,10 @@ import {
   toOrderBuilds,
   unitsHeadline,
   unresolvedHeadline,
+  freeStockLine,
+  takeFromStockLabel,
+  tookFromStockLabel,
+  stockExpandLabel,
   type ToOrderOrderedRow,
   type ToOrderProposal,
 } from "@carres/shared";
@@ -106,6 +110,16 @@ interface ToOrderResponse {
   ordered?: ToOrderOrderedRow[];
   /** Demand the catalog could not answer for. Empty is the only healthy value. */
   unresolved?: Unresolved[];
+  /** P10 — the warehouse the free-stock offer was counted at, by its own
+   *  name. `null` = there is no offer to make and no sentence to print. */
+  stockWarehouse?: string | null;
+}
+
+/** P10 — what `Take` answers with. The number is the SERVER's. */
+interface TakeStockResponse {
+  taken: number;
+  reference: string;
+  items: number;
 }
 
 interface IssueResponse {
@@ -156,6 +170,14 @@ interface GridRow {
   /** Where that ready stock goes — what the group header says instead of a
    *  customer name, because a ready stock buy has no customer. */
   destination: string | null;
+  /**
+   * P10 — how many units the warehouse could cover TODAY. `0` on every row on
+   * a floor with no matching stock, which is what keeps the grid byte-identical
+   * to what it was: the expand control appears only where this is above zero.
+   */
+  freeStock: number;
+  /** P10 — units of this build already taken from ready stock. */
+  takenFromStock: number;
 }
 
 /**
@@ -216,6 +238,10 @@ export default function OperationToOrder() {
   const destinations = useMemo(() => q.data?.destinations ?? [], [q.data]);
   const unresolved = useMemo(() => q.data?.unresolved ?? [], [q.data]);
   const today = q.data?.today ?? null;
+  /** P10 — the warehouse the offer was counted at. The page NEVER types the
+   *  word: a second warehouse is a rename away, and a sentence naming the
+   *  wrong shed is worse than one naming none. */
+  const stockWarehouse = q.data?.stockWarehouse ?? null;
 
   /**
    * The Work Queue's two picks live in the URL, so a refresh or a shared
@@ -291,6 +317,16 @@ export default function OperationToOrder() {
   const [results, setResults] = useState<ReadonlyMap<string, GroupResult>>(new Map());
   const [creating, setCreating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  /**
+   * P10 — which rows are open, and which one is mid-take.
+   *
+   * Controlled by the page, which is `DataTable`'s own contract: the page
+   * already knows the record it is working on, and a component holding a
+   * second copy of that is a second source of truth.
+   */
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const [taking, setTaking] = useState<string | null>(null);
+  const [takeError, setTakeError] = useState<ReadonlyMap<string, string>>(new Map());
 
   /** Demand the engine cannot plan (`blocked`) cannot be issued — not listed. */
   const planned = useMemo(() => proposals.filter((p) => p.blocked == null), [proposals]);
@@ -340,6 +376,8 @@ export default function OperationToOrder() {
             qty: b.qty,
             bucket,
             orderedPo: null,
+            freeStock: b.freeStock ?? 0,
+            takenFromStock: b.takenFromStock ?? 0,
           });
         }
       }
@@ -367,6 +405,10 @@ export default function OperationToOrder() {
         // older receipts belong to Purchase Orders, not this calendar.
         bucket: o.placedAt === today ? (scheduleDays[0] ?? "past") : "past",
         orderedPo: o.poId,
+        // An ordered row is a RECEIPT. There is nothing left to decide on it,
+        // so it is never offered stock and never opens.
+        freeStock: 0,
+        takenFromStock: 0,
       });
     }
     return rows;
@@ -753,6 +795,50 @@ export default function OperationToOrder() {
     // updates in place). The next natural refetch reconciles.
   }
 
+  /**
+   * ── P10 · `Take` — the human accepting the system's suggestion ────────────
+   *
+   * NO QUANTITY IS SENT. Loo's ruling 3: the system suggests, the human takes,
+   * so there is nothing to type and nothing to mistype — and the REASON is
+   * recorded by construction, because the press can mean one thing only.
+   *
+   * The server does the whole act (reserve through K4's door, reduce a typed
+   * demand through 0320's), then the page REFETCHES rather than patching the
+   * row from the response. A take changes what every other row may be offered
+   * — the pool is shared — so re-reading is the only way the grid stays true.
+   * That is the opposite of Issue, which updates in place because a purchase
+   * order changes nothing about its neighbours.
+   */
+  async function takeStock(row: GridRow) {
+    if (!row.orderId || !row.buildKey || taking) return;
+    setTaking(row.key);
+    setTakeError((m) => {
+      const n = new Map(m);
+      n.delete(row.key);
+      return n;
+    });
+    try {
+      await apiFetch<TakeStockResponse>("/api/operation/purchase/to-order/take-stock", {
+        method: "POST",
+        body: JSON.stringify({ orderId: row.orderId, buildKey: row.buildKey }),
+      });
+      setExpanded((s) => {
+        const n = new Set(s);
+        n.delete(row.key);
+        return n;
+      });
+      await q.refetch();
+    } catch (e) {
+      setTakeError((m) =>
+        // The server's own named reason, and the page's existing fallback for
+        // a request that failed without one — no new word is invented here.
+        new Map(m).set(row.key, e instanceof Error ? e.message : "failed"),
+      );
+    } finally {
+      setTaking(null);
+    }
+  }
+
   const failedKeys = useMemo(
     () =>
       new Set(
@@ -910,9 +996,15 @@ export default function OperationToOrder() {
    * wide monitor; the real cure is that the slack belongs to the column with
    * the longest variable content — Model — not to whichever column is last.
    *
-   *   4  ☑ (DataTable's own)     13  Supplier      16  Customer Delivery
-   *   10 SO No.                  14  Customer       6  Qty
-   *   25 Model ← takes the slack  12  PO No.                    ── 100
+   *   3  ⊞ (DataTable's own, P10)   4  ☑ (DataTable's own)
+   *   22 Supplier                   8  Qty
+   *   43 Model ← takes the slack   20  PO No.                   ── 100
+   *
+   * P10's expand control costs 3, and it comes out of MODEL for the same
+   * reason Model holds the slack: it is the widest column and the only one
+   * with room to give. The identity columns (Customer Delivery · SO No. ·
+   * Customer) named in the older split moved into the GROUP HEADER — one
+   * line per customer order, AutoCount's own shape.
    *
    * QTY SITS BEFORE MODEL (Loo, 2026-08-03, on the real page). Right-aligned
    * in a 6%% column BETWEEN Model and PO No., the number was pushed to the far
@@ -957,10 +1049,24 @@ export default function OperationToOrder() {
       // variable text on the page, so the table's spare width belongs here.
       key: "model",
       label: W.colModel,
-      width: 46,
+      width: 43,
       sortable: true,
       filter: filterFor("model", modelOptions, true),
-      cell: (r) => r.model,
+      cell: (r) =>
+        r.takenFromStock > 0 ? (
+          <span className="flex items-baseline gap-2 min-w-0">
+            <span className="truncate">{r.model}</span>
+            {/* P10 — why this row's quantity is smaller than what was asked
+                for. A number that simply falls is the silent failure this
+                module keeps paying for. It rides the Model column because
+                that is where the page's spare width is. */}
+            <span className="shrink-0 text-label text-kit-green-11">
+              {tookFromStockLabel(r.takenFromStock)}
+            </span>
+          </span>
+        ) : (
+          r.model
+        ),
     },
     {
       key: "po",
@@ -1269,6 +1375,52 @@ export default function OperationToOrder() {
                    * The bar states the STATE, not the date, so the rule holds
                    * and the row stops looking calm. */
                   rowLate={(r) => r.bucket === "overdue"}
+                  /* ── P10 (Loo, 2026-08-04) — READY STOCK IS SUGGESTED; THE
+                   * HUMAN DECIDES WHETHER TO TAKE IT.
+                   *
+                   * His option B: AutoCount's inline ⊞, not a third pane — a
+                   * pane narrows the grid and reopens the frozen two-column
+                   * layout. The kit's own row expand (D0.5d), not a second
+                   * one built here.
+                   *
+                   * A ROW THE WAREHOUSE HOLDS NOTHING FOR GETS NO CONTROL AT
+                   * ALL. That is the card's "a row with no stock is visually
+                   * untouched", and it is what makes the ⊞ itself the marker:
+                   * its presence says there is something to decide, and the
+                   * number rides its label so a screen reader gets it too. */
+                  expansion={{
+                    expanded,
+                    expandable: (r) => r.freeStock > 0 && !poOf(r),
+                    label: (r) => stockExpandLabel(r.model, r.freeStock),
+                    onToggle: (id) =>
+                      setExpanded((s) => {
+                        const n = new Set(s);
+                        if (n.has(id)) n.delete(id);
+                        else n.add(id);
+                        return n;
+                      }),
+                    render: (r) => (
+                      <span
+                        className="flex items-center gap-3 text-body"
+                        data-testid={`to-order-stock-${r.key}`}
+                      >
+                        <span className="text-kit-slate-11">
+                          {freeStockLine(stockWarehouse ?? "", r.freeStock)}
+                        </span>
+                        <Button
+                          size="sm"
+                          onClick={() => takeStock(r)}
+                          disabled={taking != null}
+                          data-testid={`to-order-take-${r.key}`}
+                        >
+                          {takeFromStockLabel(r.freeStock)}
+                        </Button>
+                        {takeError.get(r.key) ? (
+                          <span className="text-kit-red-11">{takeError.get(r.key)}</span>
+                        ) : null}
+                      </span>
+                    ),
+                  }}
                   /* ONE line per customer order — AutoCount's own shape. The
                    * facts that used to repeat down every row of an order live
                    * here now, plus the two that could only ever be true of an

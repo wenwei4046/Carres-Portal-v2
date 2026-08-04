@@ -1285,3 +1285,334 @@ describe("a partly satisfied demand keeps its remainder", () => {
     expect(sb.rpcCalls.some((r) => r.fn === "purchasing_demand_record_issue")).toBe(false);
   });
 });
+
+// ── P10 · ready stock is SUGGESTED; the human decides whether to take it ─────
+//
+// Jess's 2026-07-21 ruling stands untouched: `consumeFreeStock` is OFF and
+// nothing auto-eats labelled stock. The defect is that the number was computed
+// and shown to nobody.
+
+const TAKE = "http://t/api/operation/purchase/to-order/take-stock";
+
+async function take(body: unknown) {
+  const jwt = await makeJwt("operation");
+  return app.fetch(
+    new Request(TAKE, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+    env,
+  );
+}
+
+/**
+ * Free register records + the pool-usage ledger, on top of whatever base the
+ * caller passes. The stock SKUs are written the warehouse's way (`Sonic
+ * Single`, not `SONIC-S`) on purpose — that drift is the whole reason
+ * `stockMatchKey` exists, and a fixture using the catalog spelling would test
+ * a join that does not happen in production.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withStock(base: any, items: unknown[], usage: unknown[] = []) {
+  base.ops_stock_items = { data: items, error: null };
+  base.ops_stock_pool_usage = { data: usage, error: null };
+  return base;
+}
+
+const READY_REF = "Ready Stock · Carres Klang";
+
+const unit = (id: string, sku: string, qty = 1, dateIn = "2026-01-01") => ({
+  id,
+  sku,
+  qty,
+  date_in: dateIn,
+  created_at: `${dateIn}T00:00:00Z`,
+});
+
+describe("P10 · the offer", () => {
+  it("makes no offer at all when the warehouse holds nothing — the page is untouched", async () => {
+    const sb = makeSb(withStock(withDemand(0), []));
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    const row = demandRow(body);
+    expect(row.freeStock).toBe(0);
+    expect(row.builds[0].freeStockItemIds).toEqual([]);
+    expect(row.qty).toBe(5);
+  });
+
+  it("offers what is free, matched across the two SKU vocabularies, and SUBTRACTS NOTHING", async () => {
+    const sb = makeSb(
+      withStock(withDemand(0), [unit("i1", "Sonic Single"), unit("i2", "Sonic Single")]),
+    );
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    const row = demandRow(body);
+    expect(row.freeStock).toBe(2);
+    expect(row.builds[0].freeStockItemIds).toEqual(["i1", "i2"]);
+    // THE RULING (Jess, 2026-07-21): the row still asks for all 5.
+    expect(row.qty).toBe(5);
+    expect(body.stockWarehouse).toBe("Carres Klang");
+  });
+
+  it("names the warehouse from the record, never a word typed into the page", async () => {
+    const t = withStock(withDemand(0), [unit("i1", "Sonic Single")]);
+    t.warehouses = { data: [{ id: WAREHOUSE, name: "Carres Semenyih", kind: "own" }], error: null };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    expect(body.stockWarehouse).toBe("Carres Semenyih");
+  });
+
+  it("counts the REGISTER, not stock_balances — the two are different tables", async () => {
+    // `ops_stock_pool_draw` moves the register. A count read from the rollup
+    // would not fall when a unit is taken, so the same units would be offered
+    // again tomorrow.
+    const sb = makeSb(withStock(withDemand(0), [unit("i1", "Sonic Single")]));
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    await get();
+    expect(sb.tableCalls.ops_stock_items ?? 0).toBeGreaterThan(0);
+    expect(sb.tableCalls.stock_balances ?? 0).toBe(0);
+  });
+
+  it("asks only for FREE, sound units at the one warehouse", async () => {
+    const sb = makeSb(withStock(withDemand(0), [unit("i1", "Sonic Single")]));
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    await get();
+    const f = sb.filters.filter((x) => x.table === "ops_stock_items");
+    expect(f).toContainEqual({ table: "ops_stock_items", method: "eq", col: "status", val: "free" });
+    expect(f).toContainEqual({
+      table: "ops_stock_items", method: "eq", col: "needs_repair", val: false,
+    });
+    expect(f).toContainEqual({
+      table: "ops_stock_items", method: "eq", col: "warehouse_id", val: WAREHOUSE,
+    });
+  });
+
+  it("stays up when the register is unreachable — the feature goes, the workspace does not", async () => {
+    const t = withDemand(0);
+    t.ops_stock_items = {
+      data: null,
+      error: { code: "42P01", message: "relation ops_stock_items does not exist" },
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await get();
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(demandRow(body).freeStock).toBe(0);
+    expect(demandRow(body).qty).toBe(5);
+  });
+});
+
+describe("P10 · what was already taken", () => {
+  it("reads the LEDGER, so a delivered unit does not make the requirement come back", async () => {
+    // A reservation-based reading would lose the fact the day the goods go out
+    // (`reserved` becomes `sold`) and put a satisfied requirement back on the
+    // page.
+    const sb = makeSb(
+      withStock(withDemand(2), [], [{ ref: READY_REF, sku: "Sonic Single", qty: 2 }]),
+    );
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    const row = demandRow(body);
+    // The remainder comes from the database's own generated column, and the
+    // ledger only says WHY it is smaller.
+    expect(row.qty).toBe(3);
+    expect(row.takenFromStock).toBe(2);
+  });
+
+  it("nets a customer requirement whichever door committed the unit", async () => {
+    // A unit reserved to SO-1204 through the order drawer is a unit we do not
+    // have to buy. This page's own button and that one are the same act.
+    const sb = makeSb(
+      withStock(TABLES(), [], [{ ref: "SO-1204", sku: "5539-1A(LHF)", qty: 1 }]),
+    );
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    // ella's order was ONE module line of 1. Taken from stock, it has nothing
+    // left to buy and leaves the workspace entirely.
+    const rows = body.proposals.flatMap((p: { rows: unknown[] }) => p.rows);
+    expect(rows.some((r: { so: number }) => r.so === 1204)).toBe(false);
+    expect(rows.some((r: { so: number }) => r.so === 1207)).toBe(true);
+  });
+
+  it("a draw under someone else's reference never touches this row", async () => {
+    const sb = makeSb(
+      withStock(TABLES(), [], [{ ref: "SO-9999", sku: "5539-1A(LHF)", qty: 1 }]),
+    );
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    const rows = body.proposals.flatMap((p: { rows: unknown[] }) => p.rows);
+    expect(rows.some((r: { so: number }) => r.so === 1204)).toBe(true);
+  });
+
+  it("a demand is never read as having taken more than it ISSUED", async () => {
+    // A second demand to the same destination shares the reference. The
+    // ceiling is the row's own counter, so a stranger's draw cannot make a
+    // requirement disappear.
+    const sb = makeSb(
+      withStock(withDemand(0), [], [{ ref: READY_REF, sku: "Sonic Single", qty: 4 }]),
+    );
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    expect(demandRow(body).takenFromStock).toBe(0);
+    expect(demandRow(body).qty).toBe(5);
+  });
+});
+
+describe("P10 · the take", () => {
+  /** The demand row's build key, read off the server's own projection. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function demandBuild(sb: any) {
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    const row = demandRow(body);
+    return { orderId: row.orderId, buildKey: row.builds[0].key };
+  }
+
+  it("goes through K4's door, one call per record, with the reason and the reference", async () => {
+    const sb = makeSb(
+      withStock(withDemand(0), [unit("i1", "Sonic Single"), unit("i2", "Sonic Single")]),
+    );
+    const target = await demandBuild(sb);
+    const res = await take(target);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ taken: 2, reference: READY_REF });
+
+    const draws = sb.rpcCalls.filter((r) => r.fn === "ops_stock_pool_draw");
+    expect(draws.map((d) => d.args.p_item_id)).toEqual(["i1", "i2"]);
+    for (const d of draws) {
+      expect(d.args.p_ref).toBe(READY_REF);
+      // K4's locked five has no row for "taken instead of buying"; `other` is
+      // its own escape hatch and it REQUIRES words.
+      expect(d.args.p_reason).toBe("other");
+      expect(String(d.args.p_note)).toContain("To Order");
+    }
+  });
+
+  it("never writes ops_stock_items itself — a fourth door is a second truth", async () => {
+    const sb = makeSb(withStock(withDemand(0), [unit("i1", "Sonic Single")]));
+    const target = await demandBuild(sb);
+    await take(target);
+    expect(sb.updates.some((u) => u.table === "ops_stock_items")).toBe(false);
+  });
+
+  it("reduces a typed demand through its own door, by what was actually drawn", async () => {
+    const sb = makeSb(
+      withStock(withDemand(0), [unit("i1", "Sonic Single"), unit("i2", "Sonic Single")]),
+    );
+    const target = await demandBuild(sb);
+    await take(target);
+    const calls = sb.rpcCalls.filter((r) => r.fn === "purchasing_demand_record_issue");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].args.p_qty).toBe(2);
+    // Nothing was ordered, so nothing may claim a purchase order.
+    expect(calls[0].args.p_po_id).toBeNull();
+    expect(sb.updates.some((u) => u.table === "purchase_demands")).toBe(false);
+  });
+
+  it("a CUSTOMER row records no demand — the ledger row IS the record", async () => {
+    // TWO units, because ella's earlier deadline is served first — the engine's
+    // own allocation order, and the reason one unit could never reach PETER.
+    const sb = makeSb(
+      withStock(TABLES(), [unit("i1", "5539-1A(LHF)"), unit("i2", "5539-1A(LHF)")]),
+    );
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    // `bk-b` is PETER's lone module line — one line, so it IS offerable.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row = body.proposals[0].rows.find((r: any) => r.so === 1207);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const build = row.builds.find((b: any) => b.freeStock > 0);
+    expect(build).toBeTruthy();
+
+    const res = await take({ orderId: row.orderId, buildKey: build.key });
+    expect(res.status).toBe(200);
+    const draws = sb.rpcCalls.filter((r) => r.fn === "ops_stock_pool_draw");
+    expect(draws).toHaveLength(1);
+    expect(draws[0].args.p_ref).toBe("SO-1207");
+    // The SECOND record — ella's row was offered the first, and the take draws
+    // exactly what the row was shown.
+    expect(draws[0].args.p_item_id).toBe("i2");
+    expect(sb.rpcCalls.some((r) => r.fn === "purchasing_demand_record_issue")).toBe(false);
+  });
+
+  it("taking twice cannot over-draw", async () => {
+    const sb = makeSb(withStock(withDemand(0), [unit("i1", "Sonic Single")]));
+    const target = await demandBuild(sb);
+    await take(target);
+
+    // The unit is no longer free. The door answers null — the whole point of
+    // its `where status = free` guard — so the second press takes nothing and,
+    // critically, records nothing against the demand.
+    const before = sb.rpcCalls.filter((r) => r.fn === "purchasing_demand_record_issue").length;
+    sb.rpc.mockImplementation(
+      // The real RPC returns a union; this stand-in only ever answers the
+      // draw's "nothing was free" null, so the shape is widened at the seam.
+      (async (fn: string, args: Record<string, unknown>) => {
+        sb.rpcCalls.push({ fn, args });
+        return { data: null, error: null };
+      }) as never,
+    );
+    const res = await take(target);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "no_free_stock" });
+    expect(sb.rpcCalls.filter((r) => r.fn === "purchasing_demand_record_issue")).toHaveLength(
+      before,
+    );
+  });
+
+  it("refuses a build the recomputation does not know about", async () => {
+    const sb = makeSb(withStock(withDemand(0), [unit("i1", "Sonic Single")]));
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await take({ orderId: `demand:${DEMAND_ID}`, buildKey: "not-a-build" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "unknown_build" });
+  });
+
+  it("refuses a row the warehouse holds nothing for", async () => {
+    const sb = makeSb(withStock(withDemand(0), []));
+    const target = await demandBuild(sb);
+    const res = await take(target);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "no_free_stock" });
+    expect(sb.rpcCalls.some((r) => r.fn === "ops_stock_pool_draw")).toBe(false);
+  });
+
+  it("carries no quantity on the wire — the system suggests, the human accepts", async () => {
+    const sb = makeSb(withStock(withDemand(0), [unit("i1", "Sonic Single")]));
+    const target = await demandBuild(sb);
+    // A browser naming its own number is ignored by the CONTRACT, not by a
+    // check somewhere in the body.
+    const res = await take({ ...target, qty: 99 });
+    expect(res.status).toBe(200);
+    const calls = sb.rpcCalls.filter((r) => r.fn === "purchasing_demand_record_issue");
+    expect(calls[0].args.p_qty).toBe(1);
+  });
+
+  it("is refused to anyone who is not operation", async () => {
+    const sb = makeSb(withStock(withDemand(0), [unit("i1", "Sonic Single")]));
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(TAKE, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: "x", buildKey: "y" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
