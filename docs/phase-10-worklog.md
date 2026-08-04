@@ -64,7 +64,7 @@ The constant feeds `opsStockReserveReasonSchema`, which guards **both** routes a
 
 **The Worker was owed and needed no import argument** — `apps/api/src/routes/operation/to-order.ts` is a direct change, measured against the LIVE WORKER'S SOURCE COMMIT `3245a59a`. `b74c98f9` serves **100%**, `GET /health` returns **200 `{"ok":true}`**. **The route's own reason string could not be content-verified from this session and that is recorded rather than papered over**: auth runs before routing, so a 401 proves nothing (P1's lesson) and no operator login was available. What IS proved is the version serving all traffic, built from the tip that carries it — and the RULE it reaches was verified directly against production through the live `ops_stock_pool_draw` and the widened CHECK.
 
-**A deploy-time fact worth not re-learning**: the correct `CLOUDFLARE_ACCOUNT_ID` is **`e2494242a0fd563cacee5a301cf95dd3`**. The value in an older memory note (`e2494242bb2b…`) is wrong and fails with `Authentication error [code: 10000]`, which reads like an expired token and is not one — wrangler prints the real account id in the same output.
+**A deploy-time fact worth not re-learning**: the correct `CLOUDFLARE_ACCOUNT_ID` is **`e2494242a0fd563cacee5a301cf95dd3`** — which is exactly what `memory/project-web-deploy-mechanism.md` has always said; this chat mistyped it from a truncated index line. A wrong account id fails with `Authentication error [code: 10000]`, which reads like an expired token and is not one: **wrangler prints the real account id in the same output**, so the fix is inside the error message.
 
 ## Reported, not fixed
 
