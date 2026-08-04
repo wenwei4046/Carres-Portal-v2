@@ -1483,7 +1483,30 @@ customer order), which is a different rule that stays · ❌ touch `OperationToO
 
 ---
 
-## P13 · The pool ledger gains the word for what To Order actually does
+## P13 · The take path says what it means — one button word, one reason word
+
+**Two rulings by Loo on 2026-08-04, ONE card** — both are the vocabulary of the same act
+(taking a unit off the ready pool for an order), and splitting them would mean two chats, two
+PRs and two passes over the same code path.
+
+### ① `Take` becomes `Reserve` — one act may not have two words
+
+**The finding (P10's stand-down chat):** To Order's new button says **`Take`**, while the
+order drawer's picker has said **`Reserve {n} to {soRef}`** for the same act **since
+2026-06-30**. One act, two words, two screens — rule 8's failure.
+
+**Loo ruled `Reserve`, and his three reasons are the record:**
+
+1. **It is more accurate.** The goods do not leave — they are LOCKED until delivery. `Take`
+   reads as *already gone*, and an operator who believes stock has left will not chase it.
+2. **It came first.** Live since 2026-06-30; an older word that is not wrong is not replaced.
+3. **It names the party.** `Reserve 2 to SO-1209` says who it is for; `Take` cannot.
+
+**Build.** To Order's button and every string around it read `Reserve`. **The drawer is NOT
+touched** — it is already right, and this card exists so the newer screen matches the older
+one, never the reverse. A source scan asserts `Take` is gone from the To Order take path.
+
+### ② The pool ledger gains a sixth reason
 
 **Lane: PURCHASING · migration + `packages/shared` + the one picker. AFTER P12** (it edits
 the same grid region's take path). Small.
@@ -1515,13 +1538,20 @@ word, it is a one-word change and nothing else moves.
 take path records it instead of `other` · the `other`-needs-a-note rule is untouched · K5's
 monthly split shows it as its own line.
 
-**Done when.** A To Order take records the new reason, not `other` · the five existing words
-are byte-identical in the CHECK, the constant and on screen (assert it) · a take with no
-reason is still refused · **no backfill of the `other` rows already written** — they are the
-honest record of what the system could say at the time.
+### Done when (both halves)
 
-**Must NOT.** ❌ rename or re-order the existing five · ❌ backfill history · ❌ make the
-reason optional · ❌ let this card touch the cancel path (that is P12).
+The To Order button reads `Reserve` and `Take` is gone from that path, proved by a source
+scan · **the drawer's wording is byte-identical to before** (assert it — this card moves the
+new screen to the old one, never the other way) · a To Order take records the new reason, not
+`other` · the five existing reason words are byte-identical in the CHECK, the constant and on
+screen · a take with no reason is still refused · **no backfill of the `other` rows already
+written** — they are the honest record of what the system could say at the time.
+
+### Must NOT
+
+❌ change the drawer's `Reserve {n} to {soRef}` · ❌ rename or re-order the existing five
+reasons · ❌ backfill history · ❌ make the reason optional · ❌ touch the cancel path
+(that is P12) or anything outside the take path.
 
 ---
 
@@ -2312,7 +2342,7 @@ not a variant) · ❌ invent a word · ❌ start before Q3 merges.
 | P9 | ✅ **the page says how many of each you are buying** (Loo 2026-08-04) — **no migration, web only**. CATEGORY rows carry bare UNIT counts; the PO Schedule above them keeps counting ORDERS, and the two are told apart by their own tooltips (`12 Orders` · `19 units`, COPY-STANDARD's own pair — no word invented). The rail counts UNISSUED work and **cascades over every narrowing except the category picks**, so the number a row shows is the number of units its click produces. The footer totals what is TICKED, per category, accumulated **inside the loop that decides what Issue acts on** — the VIEW-SCOPED law holds by construction, not by two counts agreeing. **Measured in a real browser on live data (1280×720)**: rail `All 20 · Mattress 15 · Bedframe 4 · Sofa 1 · Pillow 0 · Mattress Protector 0`, each equal to the grid's own Qty sum (mattress = 10 rows, 15 units — the two are not the same number); footer `Mattress 15 · Bedframe 4 · Sofa 1` beside `15 selected · Issue 3 POs`. **The card said "footer, beside the Issue button" and those are two places, so the widths were measured**: the line costs 257px and the toolbar has 223px spare at 1280 (607px at 1920) — a line that fits on a manager's monitor and breaks on an operator's laptop is not a placement, so it went to the footer band (573px spare). **Reported, not fixed**: Loo's 2026-08-03 footer ban was on the customer ORDER count, so the old blanket `no digits` test is NARROWED to `/d+s*(orders?|SO)/` rather than deleted · the design-standard scanner reads `PR #494` in a comment as a hex colour · the rail excludes an order with no delivery date, exactly as the grid does · a flat per-SKU SQL says 3 sofa units where the engine's per-BUILD allocation says 1, and the engine is the authority | #585 |
 | P11 | ✅ **a sofa with no modules carries its own quantity** — **no migration, shared engine only; no Pages deploy owed and it is proved by CHECKSUM** (the web never imports `buildToOrder`, so a build from this tip emits `index-DiTy2SJk.js`, the bundle already live). The discriminator moved from the CATEGORY to the MODULES: a group of more than one line is a build and collapses to 1, a lone line carries its own quantity — and a group of more than one can only exist under a real build key, since a synthetic `line::` key is unique per line. **The row stopped being counted a second time**: it is `builds.reduce(+qty)` for every category, so the row and its builds agree by construction rather than by two counts agreeing (`builds.length` is gone). **The defect was wider than the display and that is the part the card did not name**: the api credits `purchasing_demand_record_issue` with the BUILD's qty while the purchase order is written from the LINE's — so a demand of 5 was ordered in full and recorded as 1, leaving 4 to be bought a second time. One fix closes all three. **Measured on prod**: 12 sofa groups — 9 genuine multi-module builds (still 1 each) and 3 lone lines, all qty 1, so **0 rows change today**. **Three negative controls, each fired as a real edit**: restore the `? 1` → exactly the 4 new shared tests · restore `builds.length` → 4 · the api sofa-demand test → 1, reading `expected 1 to be 5`. **A control that did not fire, and why**: the first api control was a `perl` in-place edit that CRLF silently declined, so the 45/45 that followed proved nothing — re-run as a real edit it fires. **The row-sum test also passed its own control at first** and was strengthened rather than kept: its fixture agreed with `builds.length` too, so it guarded nothing until a lone line of 2 was added to it | #589 |
 | P12 | 🔨 CLAIMED 2026-08-04 — `claude/p12-cancel` · **a demand can be cancelled — and so can the remainder of a part-ordered one** (door + button in ONE card — a route with no caller is a bypass). **After P10**, whose card owns the grid row. **UNBLOCKED 2026-08-04 — Loo ruled the remainder CAN be cancelled**; the 3 already ordered are the PO flow's problem, not this one's. Migration relaxes the `po_id` gate. **Cancel is not delete: no delete button ever** — test rubbish goes by SQL and the database starts clean at go-live | — |
-| P13 | ⬜ **the pool ledger gains the word for what To Order actually does** — **Loo ruled 2026-08-04: add it.** K4 has five reasons and none describes *"we had it on the shelf, so we did not raise a PO"*, so P10 records every take as `other`; K5 exists to answer 为什么一直缺货 and cannot, if every take reads Other. Migration widens the CHECK to six. **AFTER P12** | — |
+| P13 | ⬜ **the take path says what it means — one button word, one reason word** (Loo ruled BOTH 2026-08-04, ONE card). ① `Take` → **`Reserve`**: the drawer has said `Reserve {n} to {soRef}` for the same act since 2026-06-30, and the goods do not leave — they are LOCKED until delivery, so `Take` reads as already gone. The drawer is NOT touched. ② K4 gains a sixth reason — none of its five describes *"we had it on the shelf, so we did not raise a PO"*, so K5 cannot answer 为什么一直缺货. Migration widens the CHECK. **AFTER P12** | — |
 | P10 | ✅ **ready stock is suggested, the human takes it** — **no migration**. The engine has computed it since the day it was written and it was switched off and shown to nobody; `consumeFreeStock` is still `false` and nothing nets it, because Jess's 2026-07-21 ruling stands — the defect was that a decision reserved for a human never reached the human. Loo's option B: D0.5d's inline row expand, the offer counted off the **register** (`ops_stock_items`, the table the draw moves) and what was already taken read off **K4's LEDGER** — not off `status='reserved'`, which would put a satisfied requirement back on the page the day the goods went out. `POST /take-stock` carries no quantity and goes through `ops_stock_pool_draw`, one call per record. **It was built TWICE the same day**; the parallel branch `claude/p10-ready-stock-4c0f8f` is preserved on origin and NOT merged, and its four independent measurements are recorded under the card: **the offer matches nothing on live data today** (the 87 free units are Klang-sheet descriptions, all 31 demand SKUs are catalog codes — zero overlap, correct, self-healing) · **`Take` here vs `Reserve {n} to {soRef}` in the drawer's picker, one act two words, Loo's to rule** · **the kit's 3% expand column is narrower than its own 24px control below ~1440px** (3px onto the checkbox at 1024; nothing clips, no sideways scroll, rows still 40px) · **the offer does not filter CONDITION**, so a released `damaged` unit would be offered to a customer (zero exposure today, measured) | #591 |
 | **Q1** | ✅ **the register puts the most dangerous PO first** (Loo 2026-08-04) — **no migration, no api change, no Worker deploy** (`apps/api` imports nothing from `po-workspace`, measured). `comparePoRisk` lives in `packages/shared`, never in the page: a page-local comparator would be a SECOND priority, and the row's pill would say one thing while its position said another. **Jess's `PO Issued` law is overridden as the DEFAULT and is NOT deleted** — it keeps its column, its header sort, and it is the tie-breaker; a test asserts that clearing a header sort returns to RISK order. `Current Action` 200px fixed and `Items` becomes the `auto` tail — **the recipe is unchanged, only which column absorbs the slack**, and the argument is that the column which truncates should be the one whose truncation costs least. **Widths measured in a real browser and the measurement reproduced the card's own four numbers exactly** (auto gave it 23px at 1280 · 109 at 1366 · 183 at 1440 · 663 at 1920, against words needing 109–201). **Reported, not hidden: the compact fixed sum moves 424 → 484, so the listing region's horizontal-scroll threshold moves from a 1257px viewport to a 1317px one** — at 1280 the region gains 37px of scroll where today it has none and a 23px instruction column; the region already answers "the columns do not fit" that way by its own design, and a readable instruction beats a deleted one, so 200 shipped as ruled with the number on the record. A gap from OUR estimate is amber, a gap the factory gave stays red, `same day` amber either way — **no new word, only the tone**, and the workspace reads the same rule. **Verified against production data before the deploy**: 10 of 21 rows warn and 8 of the 10 are our own estimate · **`PO-2038` is row 1** with an amber `7d late` (it was row 8) · `PO-2031` and `PO-2032` are the only two reds, both `8d late` · **zero open engine calls exist today**, so rungs 1 and 4 are empty on live data. Four negative controls, each run as a real edit and each verified to have applied: rung 1 → shared 2 + web 3 · register tone → 1 · workspace tone → 1 · `auto` → 2. **`data-tone` is NOT a clean bundle marker** — it greps 2 in BOTH bundles (the journey-health strip and the order-action row already used it); the clean one is `"confirmed":"estimate"`, 0 → 2 | #590 |
 | **Q2** | ⬜ **the factory's ready date has somewhere to land** (Loo 2026-08-04) — `purchasing_record_ready_date` is LIVE in prod (0318) with **zero callers**: no route, no button, 0 of 21 POs carry a ready date. Adds the route + the workspace button + teaches `poDateHistoryOf` the second kind (today it filters `tomorrow_delivery` and would silently swallow every ready date). **No migration.** The QUEUE stays To Order's — reported, not built | — |
