@@ -759,6 +759,31 @@ roles run their whole lifecycle on it.
 | Demand somebody has consciously reviewed and delayed | region **`Purchasing on Hold`** · row fact **`On hold until {date}`**, carrying **Held by** · **Reason** · **Held time** · **Resume date** | Snoozed · Paused · Excluded · Hidden · Pending |
 | An item whose supplier cannot be worked out | **`Supplier not assigned`** — a FACT, under Missing Configuration. Supporting line: `Assign a supplier before this item can enter the purchasing plan.` | Orphan · Unknown supplier · Invalid SKU · Supplier error |
 
+### The register's Current Action words (Loo, 2026-08-04 — card Q8)
+
+The Purchase Orders register has a `Current Action` column. **It holds exactly ONE state word
+and otherwise says `—`.** Three words that used to sit in it were not actions and are RETIRED.
+
+| What the column says | When | Note |
+|---|---|---|
+| **`Check Expected Arrival`** | the factory has never told us which day the goods reach us — **and also when the date they gave has PASSED and nothing came** | **Loo's own word, chosen after seeing the preview.** It is the SHORT spelling of `Confirm Goods Arrival Date`; it matches the column beside it (`Expected Arrival`) so the eye does not change track |
+| **`—`** | the goods are on their way, or already checked in, or the PO is completed or cancelled | **an empty action column is a real answer** (`PURCHASING-INFORMATION-MODEL.md` §12.3), not a gap |
+
+| RETIRED — never put back | Why |
+|---|---|
+| ~~`Confirm Arrival`~~ | it REVERSED the full string's tense. `Confirm Goods Arrival Date` asks the factory *which day do the goods reach us* (FUTURE); `Confirm Arrival` reads as *tick that it has arrived* (PAST). **A short form may drop WORDS; it may never drop the TENSE or the OBJECT** |
+| ~~`Contact Supplier`~~ | `Contact` is not one of the six verbs — Loo retired it 2026-07-28 and `Call` covers it. It was also a second word for a LATE version of one action, and **a late version of one action is not a second action**: lateness is shown in red, not spelt differently |
+| ~~`Waiting for Goods`~~ | a STATUS wearing an action's column. It keeps its one home — the register's left rail |
+| ~~`Open Receiving`~~ | navigation, not work |
+
+> **⚠️ ONE COLLISION, REPORTED TO LOO AND OVERRULED BY HIM. Do not "fix" it back.**
+> `Check` is not one of the six verbs, and **`Check in` already means the receiving act in
+> this same module** (the document/act split, Loo 2026-07-28) — so a new hire could read
+> `Check Expected Arrival` as the receiving act. The alternative needing no new verb was
+> `Confirm expected arrival`. **He saw both and chose `Check Expected Arrival`.** It does not
+> widen the verb table: `Check` governs this one label and nothing else, and no other module
+> may reach for it.
+
 ### The Report words (Loo, 2026-08-04 — card Q3)
 
 Purchasing has a "look at the numbers" layer, and these are the only words on

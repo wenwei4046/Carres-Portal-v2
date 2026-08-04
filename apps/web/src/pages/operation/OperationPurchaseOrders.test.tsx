@@ -159,7 +159,8 @@ const POS = [
     purchase_order_lines: [line("e1", "SKU-SONIC-K", 1, "Sonic", "King")],
   },
   {
-    // The date PASSED and nothing arrived → Overdue, action Contact Supplier.
+    // The date PASSED and nothing arrived → Overdue, which since Q8 carries
+    // the same action as a dateless PO: `Check Expected Arrival`.
     id: "PO-9004",
     supplier_id: OHANA,
     warehouse_id: WH,
@@ -881,8 +882,8 @@ describe("nine measured minimums, and no tail", () => {
 
   it("every action word still carries its own title, so a clip can be read", async () => {
     await mountLoaded();
-    const cell = listing().getAllByText("Waiting for Goods")[0];
-    expect(cell.getAttribute("title")).toBe("Waiting for Goods");
+    const cell = listing().getAllByText("Check Expected Arrival")[0];
+    expect(cell.getAttribute("title")).toBe("Check Expected Arrival");
   });
 });
 
@@ -898,7 +899,11 @@ describe("Current Action survives the workspace being open", () => {
     fireEvent.click(listing().getByText("PO-9004"));
     expect(screen.queryByTestId("po-next-action")).toBeNull();
     // …and the word it would have carried is nowhere in the document either.
+    // PO-9004 is the OVERDUE one, and since Q8 its word is the same one a
+    // dateless PO carries — the retired `Contact Supplier` is checked too,
+    // so this cannot pass merely because a string stopped existing.
     const doc = within(screen.getByTestId("po-document"));
+    expect(doc.queryByText("Check Expected Arrival")).toBeNull();
     expect(doc.queryByText("Contact Supplier")).toBeNull();
     expect(doc.queryByText("Next")).toBeNull();
   });
@@ -907,9 +912,11 @@ describe("Current Action survives the workspace being open", () => {
     await mountLoaded();
     // Compact is the default. The word must be present ENTIRE — the bug was a
     // silent `clip`, so a partial match would have passed all along.
-    expect(listing().getAllByText("Waiting for Goods").length).toBeGreaterThan(0);
-    const cell = listing().getAllByText("Waiting for Goods")[0];
-    expect(cell.getAttribute("title")).toBe("Waiting for Goods");
+    expect(
+      listing().getAllByText("Check Expected Arrival").length,
+    ).toBeGreaterThan(0);
+    const cell = listing().getAllByText("Check Expected Arrival")[0];
+    expect(cell.getAttribute("title")).toBe("Check Expected Arrival");
   });
 });
 
@@ -1028,7 +1035,8 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
     await mountLoaded();
     const work = await expandPo("PO-9004");
     expect(work.getByTestId("po-overdue").textContent).toMatch(/Overdue by \d+ day/);
-    // The rail still has five buckets — Contact Supplier is an ACTION.
+    // The rail still has five buckets — overdue is a sub-state of waiting,
+    // and what it needs from a human is an ACTION, in the action column.
     expect(screen.queryByTestId("po-rail-state-overdue")).not.toBeInTheDocument();
   });
 
@@ -1117,21 +1125,45 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
 });
 
 describe("the ONE Current Action source (Law 7)", () => {
-  it("the register's column reads the shared engine — no dashes on live work", async () => {
+  /** Since Q7 the row carries three columns that can be empty (SO No.,
+   *  Destination, Current Action), so a `—` must be asked for BY COLUMN. */
+  const actionCellOf = (poNo: string) =>
+    within(
+      listing().getByText(poNo).closest("tr")!.querySelector(
+        "td:last-child",
+      ) as HTMLElement,
+    );
+
+  it("the register's column reads the shared engine, and `—` is a real answer", async () => {
     await mountLoaded();
-    expect(listing().getAllByText("Waiting for Goods").length).toBeGreaterThan(0);
-    const cancelled = listing().getByText("PO-9002").closest("tr")!;
-    // Since Q7 the row carries three columns that can be empty (SO No.,
-    // Destination, Current Action), so this asks for the ACTION cell by name.
-    const action = (cancelled as HTMLElement).querySelector(
-      "td:last-child",
-    ) as HTMLElement;
-    expect(within(action).getByText("—")).toBeInTheDocument();
+    expect(
+      listing().getAllByText("Check Expected Arrival").length,
+    ).toBeGreaterThan(0);
+    // Q8 (Loo, 2026-08-04 · §12.3): a status and a navigation are not
+    // actions, so a PO whose goods are on the way says nothing. `—` here is
+    // the ANSWER, not a hole — the rail carries `Waiting for Goods`.
+    expect(actionCellOf("PO-9001").getByText("—")).toBeInTheDocument();
+    // …and the work being over says nothing either.
+    expect(actionCellOf("PO-9002").getByText("—")).toBeInTheDocument();
   });
 
-  it("an overdue PO's column says Contact Supplier, never Confirm again", async () => {
+  it("an overdue PO carries the SAME word as a dateless one (Q8)", async () => {
     await mountLoaded();
-    expect(listing().getByText("Contact Supplier")).toBeInTheDocument();
+    // PO-9004's supplier date passed and nothing came; PO-9007 never had one.
+    // Both need the same phone call, so both read the same word — a late
+    // version of one action is not a second action (Loo, 2026-08-04).
+    expect(
+      actionCellOf("PO-9004").getByText("Check Expected Arrival"),
+    ).toBeInTheDocument();
+    expect(
+      actionCellOf("PO-9007").getByText("Check Expected Arrival"),
+    ).toBeInTheDocument();
+    // The three retired words are gone from the whole register, not just from
+    // these two rows — `Waiting for Goods` only as the RAIL's own label.
+    expect(listing().queryByText("Contact Supplier")).toBeNull();
+    expect(listing().queryByText("Confirm Arrival")).toBeNull();
+    expect(listing().queryByText("Open Receiving")).toBeNull();
+    expect(listing().queryByText("Waiting for Goods")).toBeNull();
   });
 });
 

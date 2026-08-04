@@ -1082,11 +1082,17 @@ export default function OperationPurchaseOrders() {
       key: "action",
       label: "Current Action",
       // MEASURED in a real browser against the app's own stylesheet, 13px
-      // Inter + the DataTable cell's `px-2` (16px total): `Confirm Arrival`
-      // 109 · `Open Receiving` 113 · `Contact Supplier` 119 · `Waiting for
-      // Goods` 126 · `Confirm what happens next` 186 · `Confirm tomorrow's
-      // delivery` 191 · `Confirm balance delivery date` 201. 200px carries
+      // Inter + the DataTable cell's `px-2` (16px total): `Check Expected
+      // Arrival` 160 · `Confirm what happens next` 186 · `Confirm tomorrow's
+      // delivery` 191 · `Confirm balance delivery date` 201. 192px carries
       // every one of them but the last, which keeps its own `title`.
+      //
+      // Q8 (Loo, 2026-08-04) took FOUR words out of this list and the width
+      // did not move, which is why that card changed no layout: the three it
+      // deleted were the SHORT ones (`Confirm Arrival` 109 · `Open Receiving`
+      // 113 · `Contact Supplier` 119 · `Waiting for Goods` 126), and his own
+      // replacement is 160 — longer than all four, still 32px inside the
+      // column, and still shorter than the string that SETS the width.
       //
       // It was `auto` and it was the ONLY column being squeezed: measured
       // 23px at a 1280 viewport, 109 at 1366, 183 at 1440 — so on an ordinary
@@ -1104,20 +1110,16 @@ export default function OperationPurchaseOrders() {
       filter: filterFor("action", actionOptions),
       cell: (p) => {
         const a = actionOf(p);
+        // `—` is a real answer, not a gap (§12.3): a PO whose goods are on
+        // their way, or already checked in, has nothing for a person to DO
+        // here — the rail carries the status and Receiving carries the door.
         if (!a) return <span className="text-kit-slate-9">—</span>;
         const late = a.kind === "call" && a.call.late;
-        const quiet = a.kind === "state" && a.key === "waiting";
         const word = actionListWordOf(a);
         return (
           <span
             title={word}
-            className={
-              late
-                ? "text-kit-red-11"
-                : quiet
-                  ? "text-kit-slate-9"
-                  : "text-kit-slate-12"
-            }
+            className={late ? "text-kit-red-11" : "text-kit-slate-12"}
           >
             {word}
           </span>
