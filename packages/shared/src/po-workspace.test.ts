@@ -94,39 +94,44 @@ describe("poCurrentActionOf — ONE action, engine first", () => {
     });
   });
 
-  it("waiting says itself why there is nothing to phone about", () => {
-    const a = poCurrentActionOf(po({ etaDateIso: "2026-09-01" }), {
-      todayIso: TODAY,
-    });
-    expect(a).toEqual({
-      kind: "state",
-      key: "waiting",
-      word: "Waiting for Goods",
-    });
+  it("waiting carries NO action — a status is not work (§12.3)", () => {
+    // `Waiting for Goods` was a STATUS wearing an action's column. It keeps
+    // its real home (the rail's `PO_WORK_STATE_LABEL`) and this returns null,
+    // which the register prints as `—`.
+    expect(
+      poCurrentActionOf(po({ etaDateIso: "2026-09-01" }), { todayIso: TODAY }),
+    ).toBeNull();
+    expect(PO_WORK_STATE_LABEL.waiting).toBe("Waiting for Goods");
   });
 
-  it("ready hands over with Open Receiving — the system is not a person", () => {
+  it("ready carries NO action — navigation is not work (§12.3)", () => {
     // Quiet-ready: goods partially in AND the balance answer still names the
     // current received qty (call closed). An unanswered shortfall keeps the
-    // BALANCE call open and outranks the handover word — Law 7 working.
+    // BALANCE call open and outranks the silence — Law 7 working.
     const ready = po({ etaDateIso: "2026-09-01" });
     ready.lines[0].receivedQty = 1;
     ready.lines[0].balanceAnswerAboutQty = 1;
-    const a = poCurrentActionOf(ready, { todayIso: TODAY });
-    expect(a).toEqual({ kind: "state", key: "ready", word: "Open Receiving" });
+    expect(poCurrentActionOf(ready, { todayIso: TODAY })).toBeNull();
   });
 
-  it("OVERDUE outranks everything — the confirmed date is spent, so the word is Contact Supplier", () => {
-    // The date passed, nothing arrived: even though the engine's late call is
-    // open, the cycle's word is Contact Supplier — never Confirm again.
+  it("OVERDUE is the SAME action, merely late — one key, one word (Loo, Q8)", () => {
+    // The date passed and nothing arrived, so the date we hold is worthless
+    // and the job is the one the column already names. It still outranks the
+    // engine's late call, exactly as it did when the word was the retired
+    // `Contact Supplier` — the PRECEDENCE did not move, only the word.
     const a = poCurrentActionOf(po({ etaDateIso: "2026-08-01" }), {
       todayIso: TODAY,
     });
     expect(a).toEqual({
       kind: "state",
-      key: "overdue",
-      word: "Contact Supplier",
+      key: "need_confirmation",
+      word: PO_STATE_ACTION_WORD.need_confirmation,
     });
+    // …and it is the SAME key a dateless PO carries, so the register's
+    // Current Action filter cannot grow two rows with one identical label.
+    expect(a?.kind === "state" && a.key).toBe(
+      (poCurrentActionOf(po(), { todayIso: TODAY }) as { key: string }).key,
+    );
   });
 
   it("LAW 7 — the engine's open call BEATS the quiet state word", () => {
@@ -158,8 +163,38 @@ describe("the listing's short spellings", () => {
       expect(PO_STATE_ACTION_SHORT[key]).not.toMatch(/\bETA\b/i);
       expect(PO_STATE_ACTION_WORD[key]).not.toMatch(/\bETA\b/i);
     }
-    expect(PO_STATE_ACTION_SHORT.need_confirmation).toBe("Confirm Arrival");
-    expect(PO_STATE_ACTION_SHORT.overdue).toBe("Contact Supplier");
+    expect(PO_STATE_ACTION_SHORT.need_confirmation).toBe(
+      "Check Expected Arrival",
+    );
+  });
+
+  /**
+   * Q8 (Loo, 2026-08-04) — §12.3 made structural.
+   *
+   * The action tables hold ONE key, so a status word cannot be put back into
+   * the action column without adding a key here, which fires this test. The
+   * three retired words are also named individually, because the failure this
+   * guards is somebody re-adding one of them by hand — and the SHORT table is
+   * scanned as well as the full one, since `Waiting for Goods` and
+   * `Open Receiving` were spelt identically in both.
+   */
+  it("the action column holds ONE state word — the other three were not actions", () => {
+    expect(Object.keys(PO_STATE_ACTION_WORD)).toEqual(["need_confirmation"]);
+    expect(Object.keys(PO_STATE_ACTION_SHORT)).toEqual(["need_confirmation"]);
+    const every = [
+      ...Object.values(PO_STATE_ACTION_WORD),
+      ...Object.values(PO_STATE_ACTION_SHORT),
+    ];
+    for (const retired of [
+      "Confirm Arrival", // reversed its own tense
+      "Contact Supplier", // `Contact` is a retired verb (Loo, 2026-07-28)
+      "Waiting for Goods", // a STATUS — it lives on the rail
+      "Open Receiving", // navigation, not work
+    ]) {
+      expect(every).not.toContain(retired);
+    }
+    // `Waiting for Goods` did not vanish: the RAIL is its one home.
+    expect(PO_WORK_STATE_LABEL.waiting).toBe("Waiting for Goods");
   });
 
   it("the delay-reason dropdown is Jess's six, and Remarks is NOT one of them", () => {

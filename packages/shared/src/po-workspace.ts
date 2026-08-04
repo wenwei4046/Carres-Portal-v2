@@ -45,12 +45,21 @@ export const PO_WORK_STATE_LABEL: Record<PoWorkState, string> = {
 };
 
 /**
- * The state words a quiet PO's Current Action falls back to (Jess,
- * 2026-08-02): an ACTION says what to do — or says itself why there is
- * nothing to phone about today (`Waiting for Goods`, never "No Action
- * Today": today's nothing is tomorrow's something, so the name must not
- * freeze the emptiness). `Open Receiving` because the system is not a
- * person — no "Hand to".
+ * The state word a quiet PO's Current Action falls back to.
+ *
+ * **THERE IS EXACTLY ONE, and that is Loo's ruling of 2026-08-04 (card Q8),
+ * applying `PURCHASING-INFORMATION-MODEL.md` §12.3 — an ACTION and a STATUS
+ * may never share a column.** Three of the four words this table used to hold
+ * were not actions at all and they are gone rather than reworded:
+ *
+ *   `Waiting for Goods`  a STATUS wearing an action's column. It keeps its
+ *                        real home, `PO_WORK_STATE_LABEL` — the rail — and
+ *                        the column says `—`, which §12.3 rules a real answer
+ *   `Open Receiving`     navigation, not work
+ *   `Contact Supplier`   `Contact` was retired as a verb by Loo on
+ *                        2026-07-28 (the portal has SIX and `Call` covers
+ *                        it), AND it was a second word for a LATE version of
+ *                        the one action below — see `poCurrentActionOf`
  */
 export const PO_STATE_ACTION_WORD = {
   // `Goods Arrival`, never `Goods Arriving At` (Jess, 2026-08-03): `At` adds
@@ -59,24 +68,31 @@ export const PO_STATE_ACTION_WORD = {
   // word `ORDERS-WORKING-FLOW.md` already uses (`Waiting Goods Arrival`), so
   // Purchasing stops speaking its own dialect.
   need_confirmation: "Confirm Goods Arrival Date",
-  waiting: "Waiting for Goods",
-  overdue: "Contact Supplier",
-  ready: "Open Receiving",
 } as const;
 
 /**
- * The LISTING's short spellings (Jess, 2026-08-02): 19 rows repeating a
+ * The LISTING's short spelling (Jess, 2026-08-02): 19 rows repeating a
  * seven-word sentence becomes wallpaper — a column wants a scannable verb,
  * the workspace hero keeps the full wording. C1's own two-string discipline
- * (queue word vs row line), applied to the register. `Confirm Arrival`
- * rather than her other candidate `Confirm ETA` — the Business Date
- * Dictionary bans "ETA" outright.
+ * (queue word vs row line), applied to the register.
+ *
+ * **`Check Expected Arrival` — LOO'S OWN WORD, chosen after seeing the
+ * preview (2026-08-04, card Q8).** It replaces `Confirm Arrival`, which
+ * REVERSED the full string's tense: `Confirm Goods Arrival Date` asks the
+ * factory *which day do the goods reach us* (FUTURE); `Confirm Arrival` reads
+ * as *tick that it has arrived* (PAST). A short form may drop WORDS; it may
+ * never drop the TENSE or the OBJECT (§12.3). His word also matches the
+ * column beside it — `Expected Arrival`, §12.2 — so the eye does not change
+ * track, and it is honest about the POs where there is no date to confirm.
+ *
+ * **REPORTED TO HIM AND OVERRULED — recorded so nobody "fixes" it back:**
+ * `Check` is not one of the portal's six verbs, and `Check in` already means
+ * the receiving act in this very module (Loo, 2026-07-28). The alternative
+ * needing no new verb was `Confirm expected arrival`. He saw both and chose
+ * this one; it is in `docs/COPY-STANDARD.md` under his name.
  */
 export const PO_STATE_ACTION_SHORT = {
-  need_confirmation: "Confirm Arrival",
-  waiting: "Waiting for Goods",
-  overdue: "Contact Supplier",
-  ready: "Open Receiving",
+  need_confirmation: "Check Expected Arrival",
 } as const;
 
 /**
@@ -248,8 +264,22 @@ export type PoCurrentAction =
   | { kind: "state"; key: keyof typeof PO_STATE_ACTION_WORD; word: string };
 
 /**
- * ONE Current Action per PO — or none (completed / cancelled carry no hero:
- * the work is over). Engine first, state word only when the engine is quiet.
+ * ONE Current Action per PO — or none. Engine first, the one state word only
+ * when the engine is quiet.
+ *
+ * **NULL IS A REAL ANSWER, not a gap** (§12.3: *may it be empty — yes*).
+ * `completed` and `cancelled` carry none because the work is over;
+ * `waiting` and `ready` carry none because what they had to say was a STATUS
+ * and a navigation, and neither is work. The register prints `—`.
+ *
+ * **OVERDUE IS THE SAME ACTION, MERELY LATE (Loo, 2026-08-04 · Q8).** The
+ * supplier's date passed and nothing came, so the date we hold is worthless
+ * and the operator's job is the one this column already names: find out when
+ * the goods actually arrive. It therefore returns the SAME key and the SAME
+ * word — never a second key, which would also split the column's filter into
+ * two rows carrying one identical label. Its PRECEDENCE is untouched: it
+ * still outranks the engine's calls exactly as it did when the word was
+ * `Contact Supplier`.
  */
 export function poCurrentActionOf(
   po: SupplierCallPo,
@@ -257,15 +287,19 @@ export function poCurrentActionOf(
 ): PoCurrentAction | null {
   const state = poWorkStateOf(po, opts.todayIso);
   if (state === "completed" || state === "cancelled") return null;
-  // Overdue outranks everything (Jess's cycle: the date passed and nothing
-  // came — the confirmed date is SPENT, so the word is Contact Supplier,
-  // never Confirm again). Still ONE source: this function.
   if (poOverdueDays(po, opts.todayIso) != null) {
-    return { kind: "state", key: "overdue", word: PO_STATE_ACTION_WORD.overdue };
+    return {
+      kind: "state",
+      key: "need_confirmation",
+      word: PO_STATE_ACTION_WORD.need_confirmation,
+    };
   }
   const calls = purchasingSupplierCallsOf(po, opts);
   if (calls.length > 0) return { kind: "call", call: calls[0] };
-  return { kind: "state", key: state, word: PO_STATE_ACTION_WORD[state] };
+  if (state === "need_confirmation") {
+    return { kind: "state", key: state, word: PO_STATE_ACTION_WORD[state] };
+  }
+  return null;
 }
 
 /**
