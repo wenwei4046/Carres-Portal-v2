@@ -33,8 +33,39 @@
  *
  * **Nothing is migrated onto this in D0.5c.** The Orders table keeps its own
  * markup until **D6**, which is the card that re-lays that page out.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **D0.5d — the grid powers AutoCount has** (Loo, 2026-08-04): row expand ·
+ * column resize · column reorder · footer totals. Two of the card's five are
+ * not props here, and both are said out loud rather than quietly dropped —
+ * layout MEMORY is refused by §0.4 (below), and the RECORD BAR was measured to
+ * exist already in `PageShell.footer` + `PageShell.chips` (see `records`).
+ *
+ * **Every one of them is an OPTIONAL prop and no existing signature moved**,
+ * which is not tidiness — it is the only reason a kit card could run at all.
+ * Three live pages render through this file today and two of them are FROZEN
+ * (To Order, Jess 2026-08-01; Purchase Orders, Phase 2, 2026-08-03). A changed
+ * signature reaches a frozen page; a new optional prop cannot. Pass none of
+ * them and this component emits byte-identical markup to D0.5c's.
+ *
+ * **Layout MEMORY is deliberately absent, and it is the finding this card
+ * carries.** §0.4 rules that *"the UI, the workflow and the
+ * navigation … no per-user store of UI shape"*, and guard rule L enforces it.
+ * Remembering a per-operator column order in `localStorage` is that store, and
+ * moving it from `pages/**` into the kit would satisfy the guard while breaking
+ * the law the guard exists to serve. So the drag is a WITHIN-SESSION affordance:
+ * a reload restores the company's shape, and two operators still see one tool.
+ * Whether §0.4 bends for a grid is Loo's, not a build card's.
  */
-import { Fragment, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Button from "./Button";
 import Checkbox from "./Checkbox";
 import EmptyState from "./EmptyState";
@@ -42,7 +73,11 @@ import Icon from "./Icon";
 import Loading from "./Loading";
 import Popover from "./Popover";
 import SearchInput from "./SearchInput";
-import { Z_TABLE_HEADER } from "./overlay-layer";
+import { applyColumnOrder, moveColumnOrder, resizeColumnPair } from "./grid-layout";
+import { Z_TABLE_FOOTER, Z_TABLE_HEADER } from "./overlay-layer";
+
+/** A column may not be dragged under this, as a percentage of the table. */
+const MIN_COLUMN_PCT = 4;
 
 /**
  * A column's Excel filter (Jess, 2026-08-01 — the AutoCount workspace: every
@@ -188,6 +223,80 @@ export interface DataTableProps<Row> {
     /** Rendered inside one full-width cell. The caller owns every word. */
     header: (row: Row) => ReactNode;
   };
+  /**
+   * **D0.5d power 3 — a row opens.** AutoCount's `SO Batch Posting` ⊞: the row
+   * is the record and its detail unfolds underneath, in place, without leaving
+   * the list. This is the power **P10 is waiting on**, which is why it is the
+   * first of the five and why its content is not negotiable: the kit renders
+   * the control, the caller renders EVERYTHING inside.
+   *
+   * Controlled, like `selection`, and for the same reason — the page already
+   * knows which record it is working on, and a component holding a second copy
+   * of that is a second source of truth. Absent = no control column at all,
+   * which is what keeps the three live pages untouched.
+   *
+   * The expanded cell is the ONE cell in this table that may be taller than
+   * 40px and may wrap: it is not a row of the list, it is the record. The
+   * 40px law binds the rows you scan, or nothing could ever open.
+   */
+  expansion?: {
+    /** Which rows are open. */
+    expanded: ReadonlySet<string>;
+    onToggle: (id: string) => void;
+    /** The whole contents. The kit renders no part of it and no word of it. */
+    render: (row: Row) => ReactNode;
+    /** What the control does, for a screen reader — the CALLER's word. */
+    label: (row: Row) => string;
+    /** A row with nothing to open gets no control, not a dead one. */
+    expandable?: (row: Row) => boolean;
+  };
+  /**
+   * **D0.5d power 1 — the operator drags the grid.** Drag a header's right
+   * edge to resize; drag the header itself to reorder. Absent = the columns
+   * render exactly as the caller declared them and nothing is draggable.
+   *
+   * **A resize takes width from the RIGHT NEIGHBOUR and never from the table.**
+   * §7's first rule is that a list table never scrolls sideways, and a column
+   * that simply grew would break it on the first drag. See `resizeColumnPair`.
+   *
+   * **It is NOT remembered between sessions, and that is why it needs no reset
+   * control.** §0.4 rules out a per-user store of UI shape, so a reload puts
+   * the company's grid back — the reset already exists and costs no pixels, no
+   * word and no new affordance. There is no `storageKey` here and there is
+   * deliberately nowhere to put one.
+   */
+  layout?: {
+    /** What a resize handle is, for a screen reader — the caller's word. */
+    resizeLabel: string;
+    /** What a draggable header is, for a screen reader — the caller's word. */
+    reorderLabel: string;
+  };
+  /**
+   * **D0.5d power 4 — the totals strip inside the grid**, pinned under the last
+   * row the way the head is pinned over the first.
+   *
+   * **Which columns aggregate, and what an aggregate MEANS, is entirely the
+   * caller's** — the kit does not sum, does not count and does not format
+   * (§7: money is `Money` and a date is `fmtDate()`). A column the caller
+   * returns nothing for renders an empty cell, so the strip lines up with the
+   * numbers above it whether or not every column has one.
+   */
+  totals?: {
+    /** What the strip is, for a screen reader — the caller's word. */
+    label: string;
+    cell: (column: Column<Row>, rows: readonly Row[]) => ReactNode;
+  };
+  /*
+   * **D0.5d power 5 — the record bar — is NOT here, because it already
+   * exists.** Measured 2026-08-04 before a line was written: `PageShell` ships
+   * `footer`, a 36px band whose own doc comment reads *"Count + pagination"*,
+   * already inside §1.3's height budget — and `OperationToOrder` already
+   * renders it. Its sibling `chips` is the clearable filter statement, live on
+   * three pages. A `records` prop here would have put a second 36px bar under
+   * the first, spelling one thing twice in two components, which is the §6.6
+   * failure this whole line was opened to stop. The card's own rule applies to
+   * the card: never rebuild anything a doc marks ALREADY EXISTS.
+   */
 }
 
 /**
@@ -316,6 +425,9 @@ export default function DataTable<Row>({
   rowLate,
   rowMuted,
   group,
+  expansion,
+  layout,
+  totals,
 }: DataTableProps<Row>) {
   const selectableRows = selection
     ? rows.filter((r) => selection.selectable?.(r) ?? true)
@@ -326,7 +438,72 @@ export default function DataTable<Row>({
   const allSelected =
     selection != null && selectableRows.length > 0 && selectedCount === selectableRows.length;
   const someSelected = selectedCount > 0 && !allSelected;
-  const colSpan = columns.length + (selection ? 1 : 0);
+
+  /* ── D0.5d · the operator's grid ──────────────────────────────────────────
+   * Both pieces of state are `null` until something is dragged, and `null`
+   * means "the caller's". That is what makes a page which passes no `layout`
+   * render exactly the markup D0.5c rendered — the default is not a copy of
+   * the caller's values, it is their ABSENCE. Neither is written anywhere that
+   * survives a reload (§0.4).
+   */
+  const [order, setOrder] = useState<string[] | null>(null);
+  const [widthPct, setWidthPct] = useState<Record<string, number> | null>(null);
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  const headRef = useRef<HTMLTableRowElement | null>(null);
+
+  const ordered = useMemo(() => applyColumnOrder(columns, order), [columns, order]);
+  const colSpan = ordered.length + (selection ? 1 : 0) + (expansion ? 1 : 0);
+
+  /**
+   * Resize by pointer. The FIRST drag snapshots every column's rendered width
+   * as a percentage — including the ones the caller declared in `px` or as
+   * `auto` — so that from the first frame onward the widths are one unit that
+   * sums to the table, and `resizeColumnPair` can hold that sum constant.
+   *
+   * A measurement of zero means we are not in a browser (jsdom returns zero
+   * for every rect), and the drag is REFUSED rather than acted on: resizing
+   * off numbers we did not really read would set every column to `NaN%`.
+   */
+  const startResize = useCallback(
+    (index: number, e: React.PointerEvent<HTMLElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const headRow = headRef.current;
+      if (!headRow) return;
+      const cells = Array.from(headRow.querySelectorAll("th[data-column]"));
+      const px = cells.map((c) => c.getBoundingClientRect().width);
+      const total = px.reduce((a, b) => a + b, 0);
+      if (total <= 0 || px.length !== ordered.length) return;
+      const startPct = px.map((w) => (w / total) * 100);
+      const startX = e.clientX;
+      const target = e.currentTarget;
+      target.setPointerCapture?.(e.pointerId);
+
+      const move = (ev: PointerEvent) => {
+        const deltaPct = ((ev.clientX - startX) / total) * 100;
+        const next = resizeColumnPair(startPct, index, deltaPct, MIN_COLUMN_PCT);
+        setWidthPct(Object.fromEntries(ordered.map((c, i) => [c.key, next[i]!])));
+      };
+      const end = () => {
+        target.removeEventListener("pointermove", move);
+        target.removeEventListener("pointerup", end);
+        target.removeEventListener("pointercancel", end);
+      };
+      target.addEventListener("pointermove", move);
+      target.addEventListener("pointerup", end);
+      target.addEventListener("pointercancel", end);
+    },
+    [ordered],
+  );
+
+  /* A column the caller stopped passing must not keep a width, or the grid
+   * silently narrows for every operator who dragged it before it went. */
+  useEffect(() => {
+    if (widthPct == null) return;
+    const live = new Set(columns.map((c) => c.key));
+    if (Object.keys(widthPct).every((k) => live.has(k))) return;
+    setWidthPct(null);
+  }, [columns, widthPct]);
 
   return (
     <div
@@ -343,11 +520,19 @@ export default function DataTable<Row>({
         {/* PERCENTAGE widths + `table-fixed` → the table is always exactly the
          *  container width, so it never scrolls sideways on a laptop. */}
         <colgroup>
+          {expansion && <col style={{ width: "3%" }} />}
           {selection && <col style={{ width: "4%" }} />}
-          {columns.map((c) => (
+          {ordered.map((c) => (
             <col
               key={c.key}
-              style={{ width: typeof c.width === "number" ? `${c.width}%` : c.width }}
+              style={{
+                width:
+                  widthPct?.[c.key] != null
+                    ? `${widthPct[c.key]}%`
+                    : typeof c.width === "number"
+                      ? `${c.width}%`
+                      : c.width,
+              }}
             />
           ))}
         </colgroup>
@@ -356,9 +541,10 @@ export default function DataTable<Row>({
           {/* border-separate + cell-level wash: with border-collapse, Chrome
               refuses to stick a thead's backgrounds at all — the classic
               see-through header (Jess caught it live, 2026-08-01). */}
-          <tr className="h-10">
+          <tr className="h-10" ref={headRef}>
             {/* Header wash = slate-3 (Jess, 2026-08-02 surface law): one step
                 above the near-white strip, always lighter than the data. */}
+            {expansion && <th className="bg-kit-slate-3 border-b border-kit-slate-6" />}
             {selection && (
               <th className="px-2 bg-kit-slate-3 border-b border-kit-slate-6">
                 <Checkbox
@@ -369,9 +555,10 @@ export default function DataTable<Row>({
                 />
               </th>
             )}
-            {columns.map((c) => (
+            {ordered.map((c, ci) => (
               <th
                 key={c.key}
+                data-column={c.key}
                 title={c.headerTitle}
                 aria-sort={
                   sort?.key === c.key
@@ -380,9 +567,50 @@ export default function DataTable<Row>({
                       : "descending"
                     : undefined
                 }
-                className={`px-2 bg-kit-slate-3 border-b border-kit-slate-6 text-label font-medium text-kit-slate-12 ${
-                  c.align === "right" ? "text-right" : "text-left"
-                }`}
+                /* REORDER — the whole header is the handle, which is the
+                 * shape every grid an operator has met uses. It is only
+                 * draggable while `layout` is passed, so a frozen page's
+                 * header keeps exactly the attributes it had. */
+                draggable={layout != null || undefined}
+                onDragStart={
+                  layout
+                    ? (e) => {
+                        setDragKey(c.key);
+                        e.dataTransfer.effectAllowed = "move";
+                      }
+                    : undefined
+                }
+                onDragOver={layout ? (e) => e.preventDefault() : undefined}
+                onDrop={
+                  layout
+                    ? (e) => {
+                        e.preventDefault();
+                        if (dragKey == null) return;
+                        setOrder(
+                          moveColumnOrder(
+                            order ?? ordered.map((x) => x.key),
+                            dragKey,
+                            c.key,
+                          ),
+                        );
+                        setDragKey(null);
+                      }
+                    : undefined
+                }
+                onDragEnd={layout ? () => setDragKey(null) : undefined}
+                /* The name is PINNED to the column word, and that is a repair
+                 * rather than a preference: the resize handle below is a
+                 * descendant, so its own label was being folded into this
+                 * header's accessible name and a screen reader read
+                 * `Order Order — Drag to resize`. §7 says the header word is
+                 * typed once; without this pin, turning the grid draggable
+                 * quietly said it twice. What the operator may DO to the
+                 * header is `aria-roledescription`, never part of its name. */
+                aria-label={layout ? c.label : undefined}
+                aria-roledescription={layout?.reorderLabel}
+                className={`relative px-2 bg-kit-slate-3 border-b border-kit-slate-6 text-label font-medium text-kit-slate-12 ${
+                  layout ? "cursor-grab" : ""
+                } ${c.align === "right" ? "text-right" : "text-left"}`}
               >
                 {/* The word first, its controls after — `Qty ▼`, never
                  * `▼ Qty` (Jess, 2026-08-01), whatever the alignment. A
@@ -429,6 +657,22 @@ export default function DataTable<Row>({
                   )}
                   {c.filter ? <HeaderFilter colKey={c.key} filter={c.filter} /> : null}
                 </span>
+                {/* RESIZE — a 4px grab strip on the right edge, invisible
+                 * until the pointer is on it. The LAST column has none: there
+                 * is no neighbour to take from, and a handle that cannot move
+                 * anything is a promise the grid cannot keep. */}
+                {layout && ci < ordered.length - 1 ? (
+                  <span
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label={`${c.label} — ${layout.resizeLabel}`}
+                    data-testid={`table-resize-${c.key}`}
+                    draggable={false}
+                    onPointerDown={(e) => startResize(ci, e)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute inset-y-0 right-0 w-1 cursor-col-resize hover:bg-kit-blue-9"
+                  />
+                ) : null}
               </th>
             ))}
           </tr>
@@ -454,6 +698,11 @@ export default function DataTable<Row>({
               const id = rowId(row);
               const isSelected = selection?.selected.has(id) ?? false;
               const late = rowLate?.(row) ?? false;
+              const isExpanded = expansion?.expanded.has(id) ?? false;
+              /* The late bar rides the row's FIRST cell, whichever that is
+               * today — a disclosure column would otherwise have pushed the
+               * one mark that says "act now" out of the reader's way. */
+              const lateBar = late ? "border-kit-red-9" : "border-transparent";
               // A header is emitted whenever the key CHANGES from the row
               // above — so the PAGE's sort decides where groups begin and the
               // kit re-orders nothing of its own.
@@ -488,10 +737,33 @@ export default function DataTable<Row>({
                     rowMuted?.(row) ? "opacity-50 grayscale" : ""
                   }`}
                 >
+                  {expansion && (
+                    /* The disclosure must not open the record it is unfolding
+                     * — the same stopPropagation the checkbox cell has, for
+                     * the same reason: two different things happen on one
+                     * click and only one of them was asked for. */
+                    <td
+                      className={`px-2 border-l-2 ${lateBar}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {(expansion.expandable?.(row) ?? true) ? (
+                        <button
+                          type="button"
+                          aria-expanded={isExpanded}
+                          aria-label={expansion.label(row)}
+                          data-testid={`table-expand-${id}`}
+                          onClick={() => expansion.onToggle(id)}
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+                        >
+                          <Icon name={isExpanded ? "collapse" : "expand"} size={14} />
+                        </button>
+                      ) : null}
+                    </td>
+                  )}
                   {selection && (
                     /* The checkbox must not open the record it is ticking. */
                     <td
-                      className={`px-2 border-l-2 ${late ? "border-kit-red-9" : "border-transparent"}`}
+                      className={`px-2 ${expansion ? "" : `border-l-2 ${lateBar}`}`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       {(selection.selectable?.(row) ?? true) ? (
@@ -504,13 +776,11 @@ export default function DataTable<Row>({
                       ) : null}
                     </td>
                   )}
-                  {columns.map((c, i) => (
+                  {ordered.map((c, i) => (
                     <td
                       key={c.key}
                       className={`px-2 text-kit-slate-12 ${
-                        !selection && i === 0
-                          ? `border-l-2 ${late ? "border-kit-red-9" : "border-transparent"}`
-                          : ""
+                        !selection && !expansion && i === 0 ? `border-l-2 ${lateBar}` : ""
                       } ${c.align === "right" ? "text-right" : ""} ${
                         c.numeric ? "tabular-nums" : ""
                       }`}
@@ -519,10 +789,47 @@ export default function DataTable<Row>({
                     </td>
                   ))}
                   </tr>
+                {isExpanded ? (
+                  /* THE ONE CELL THAT MAY BE TALL. The table's own rule is
+                   * `[&_td]:h-10` + `whitespace-nowrap`, and it binds the rows
+                   * you SCAN — a record that unfolded into 40 clipped pixels
+                   * would not have opened at all. `!` because that rule is a
+                   * descendant selector and outranks a plain class. */
+                  <tr data-kit="data-expansion" data-row={id}>
+                    <td
+                      colSpan={colSpan}
+                      className="!h-auto !overflow-visible !whitespace-normal border-b border-kit-slate-5 bg-kit-slate-2 px-4 py-3 align-top"
+                    >
+                      {expansion!.render(row)}
+                    </td>
+                  </tr>
+                ) : null}
                 </Fragment>
               );
             })}
         </tbody>
+
+        {/* TOTALS — pinned under the last row the way the head is pinned over
+         *  the first. It is withheld while the table is loading or empty: a
+         *  totals strip over no rows states a total of nothing. */}
+        {totals && !loading && rows.length > 0 ? (
+          <tfoot className={`sticky bottom-0 ${Z_TABLE_FOOTER}`}>
+            <tr className="h-10" aria-label={totals.label} data-kit="data-totals">
+              {expansion && <td className="bg-kit-slate-3 border-t border-kit-slate-6" />}
+              {selection && <td className="bg-kit-slate-3 border-t border-kit-slate-6" />}
+              {ordered.map((c) => (
+                <td
+                  key={c.key}
+                  className={`px-2 bg-kit-slate-3 border-t border-kit-slate-6 text-kit-slate-12 ${
+                    c.align === "right" ? "text-right" : ""
+                  } ${c.numeric ? "tabular-nums" : ""}`}
+                >
+                  {totals.cell(c, rows)}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        ) : null}
       </table>
     </div>
   );

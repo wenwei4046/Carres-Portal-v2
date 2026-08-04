@@ -55,7 +55,7 @@ deliverable is Foundation Components, not a better document.
 | **D4** | codemod **spacing** | ⏳ — baselined at E 1,727 |
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
 | **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ — **also carries the `.t4-*` legacy migration** (PM, 2026-07-29). D2 found a SECOND retired ramp: 9 classes, **44 in-scope uses across 8 files**, invisible to rule D because a page writes only the class name while the size and weight sit in `index.css`. **`.t4-hero-num` is `20px/700`** and `lib/design-standard.ts:132` records that 700, so a §2.2-dead weight still renders. Ruled **Reported Only for D2**: it is a visual change on a money figure and belongs with the pages when they migrate. **D6 owns the DEFINITIONS and the mirror's `weight: 700`** |
-| **D0.5d** | **`DataTable` grows the five grid powers AutoCount has and we do not** — resize · reorder · layout memory · row expand · footer totals. **Kit only, additive only.** Full card below | 🔨 **CLAIMED 2026-08-04 — `claude/ui-kit-queue-d0-5d-975c9e`** |
+| **D0.5d** | **`DataTable` grows the grid powers AutoCount has and we do not** — row expand · resize · reorder · footer totals. **Kit only, additive only.** Full card below | ✅ **BUILT 2026-08-04** — 3 of 5 shipped as optional props; **layout memory REFUSED by §0.4** (a business decision, named below) and **the record bar ALREADY EXISTS** in `PageShell.footer` + `chips`. No page migrated |
 | **D7-Claims** | **Supplier Claims renders through `DataTable`** — the last hand-rolled `<table>` in Purchasing. Full card below | ⬜ — needs nothing from D0.5d; today's `DataTable` already sorts and filters |
 | **D7+** | Delivery · Purchase · Receiving · Stock · Service · Payments · Catalog — one card each | ⏳ — whichever of these owns a file still writing `.t4-*` retires it there, so the last card to migrate does not inherit the ramp's deletion |
 
@@ -1576,6 +1576,86 @@ into `DataTable` is how one tab's flow leaks into four others — the exact fail
   `group.keyOf` and a second grouping mechanism is a second source of truth.
 - ❌ copy AutoCount's density (28px rows, 10px headers). §7's sizing law is frozen at 40px.
 - ❌ add a `Refresh` button. The Workspace pattern bans it by name.
+
+### ✅ BUILT 2026-08-04 — three powers shipped, two are findings
+
+**Three of the five are props on `DataTable`: row expand · resize + reorder · footer
+totals.** The other two are not omissions and neither was quietly dropped — one is refused
+by a frozen law and the other was measured to exist already. Both are below, with the
+evidence, because a card that ships three of five and says five is how a queue stops being
+true.
+
+| Power | State |
+|---|---|
+| 3 · **row expand** | ✅ `expansion` — **built first, because P10 waits on it** |
+| 1 · **resize + reorder** | ✅ `layout` — session-only, see the §0.4 finding |
+| 4 · **footer totals** | ✅ `totals` |
+| 2 · **layout memory** | ❌ **REFUSED by §0.4 — a business decision for Loo, below** |
+| 5 · **record bar** | ❌ **ALREADY EXISTS** — `PageShell.footer` + `PageShell.chips` |
+
+**The licence held, and it is the property that mattered more than any feature.** Every new
+prop is optional; a caller who passes none of them gets D0.5c's markup back, asserted by its
+own test block (no expansion column · no `<tfoot>` · no draggable header · no resize handle ·
+the header's accessible name still the column word). `git diff` touches **`components/kit/**`
+and `pages/dev/**` only** — the three live pages are not in it, and To Order · Purchase
+Orders · Receiving pass their suites unchanged.
+
+**FINDING 1 — layout memory is refused by §0.4, and that is Loo's to overturn, not a build
+card's.** The card says *"`storageKey` persisting `{order, hidden, widths, sort}` — every
+module remembers per user."* §0.4 rules the opposite by name: *"The UI, the workflow and the
+navigation … **No, ever** … no per-user store of UI shape,"* enforced by guard rule L, and it
+is one of the ✅ rows §16 counts. **Moving that store from `pages/**` into the kit would have
+satisfied the guard while breaking the law the guard exists to serve** — so it was not built,
+and there is no `storageKey` anywhere to make it easy later. The drag therefore lasts the
+session, and **a reload is the reset**, which is why no reset control and no reset word were
+invented. Two tests hold it: `DataTable.tsx` and `grid-layout.ts` may name no browser store,
+and `layout={{ storageKey }}` does not compile. **The question in one line:** *does §0.4 bend
+so an operator's own column order survives a reload, or does the grid stay the company's?*
+
+**FINDING 2 — power 5 was already built, in both halves, and a second copy was one file
+away.** Measured before a line was written: `PageShell` ships `footer`, a **36px** band whose
+own doc comment reads *"Count + pagination"* and which is already inside §1.3's height
+budget — and **`OperationToOrder` already renders it**. Its sibling `chips` is the visible,
+clearable filter statement, live on three pages. A `records` prop on `DataTable` was written,
+worked, and was **deleted**: it was a near-byte-for-byte second copy of `page-footer`
+(`h-9`, `rounded-b-card`, `text-meta text-kit-slate-11`) that would have stacked a second
+36px bar under the first. One band, two components, is §6.6's failure inside the one file
+whose header says it spells no word.
+
+**A defect this card created and its own test caught.** Making the header draggable put the
+resize handle INSIDE the `<th>`, so the handle's label was folded into the header's
+accessible name and a screen reader read **`Order Order — Drag to resize`**. §7's third rule
+is that the header word is typed once; turning the grid draggable had quietly made it be
+said twice. Fixed by pinning the name (`aria-label={c.label}`) and describing the drag with
+`aria-roledescription`, which is what that attribute is for.
+
+**Four negative controls, each run, each firing exactly where it should:** make the resize
+grow instead of taking from the neighbour → exactly the 2 sum-invariant tests · drop the
+header-name pin → exactly the 2 header-name tests · let the totals strip render over zero
+rows → exactly 1 · introduce a `localStorage` grid store → exactly the 2 §0.4 tests.
+**Control 2 reported PASS on its first run and the break had not applied** — the file is
+CRLF and the `perl` pattern was written with `\n`. *A negative control that does not fire is
+a claim about your edit before it is a claim about the test.*
+
+**Two more things worth not re-learning.** `@ts-expect-error` above a multi-line JSX element
+guards nothing: TypeScript reports a missing property at the **attribute's** position, so the
+directive belongs on the attribute — the sibling of D0.5c's spread trap, found the same way,
+by the directive reporting itself unused. And the §16 generator refused a ✅ pointing at
+`grid-layout.ts` until the file was **`git add`ed**: it runs `git ls-files`, so an untracked
+file is correctly not a mechanism.
+
+**Gates.** `tsc -p tsconfig.app.json` clean (where the six `@ts-expect-error` constraints are
+actually checked) · `pnpm --filter @carres/web lint` **byte-identical to the tree WITHOUT this
+change — 8368 findings, every rule `=` or `▼`** (G +3 and I +8 are main's own drift from a
+stale baseline, proved by linting the pre-change tree, never quoted as this card's) · build
+clean · web suite **2386 passed / 16 pre-existing** in the four documented files, **zero
+new**. **`/ui` stays lazy, measured on the built bundle**: `Drag to resize` · `Drag to
+reorder` · `grid-powers` grep **0** in `index-*.js` and **1** in `UiShowcase-*.js`;
+`SERVICE_ROLE` **0**. *(`data-expansion` and `data-totals` grep 1 in the main chunk and that
+is correct — `DataTable` itself ships there, three pages import it. The showcase does not.)*
+
+**§16: 36 / 48 = 75.00% → 39 / 51 = 76.47%**, debt unchanged at 3, generated by
+`check-design.mjs --report` and never hand-typed. Arithmetic in UI-KIT §16.
 
 ---
 

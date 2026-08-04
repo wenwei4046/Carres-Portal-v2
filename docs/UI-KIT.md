@@ -1351,15 +1351,22 @@ a second host would stack two toasts in two corners.
 | Alignment | `align` and `numeric` per column; `numeric` is tabular figures (§2.3) |
 | Empty | an `EmptyState`, never a blank body |
 | Loading | a skeleton — shape, not words |
+| **Row expand** ✅ **D0.5d** | optional. A disclosure column, controlled by the page; the expanded cell is the ONE cell that may be taller than 40px and may wrap, because it is the RECORD and not a row you scan |
+| **Resize · reorder** ✅ **D0.5d** | optional. Drag a header's right edge, or the header itself. A resize takes width from the RIGHT NEIGHBOUR, so the sum never moves and row 1 above survives the drag |
+| **Layout memory** | ❌ **not built, and not an omission** — §0.4 rules out a per-user store of UI shape. The drag lasts the session; a reload is the reset, and it costs no control and no word |
+| **Totals** ✅ **D0.5d** | optional. Pinned under the last row at §4.4 layer 1 — the head's layer, because a head and a totals row are the same chrome and can never overlap. **Which columns aggregate, and what an aggregate means, is the caller's**: the kit sums nothing |
+| **Record bar** | already `PageShell` — `footer` (36px, *"Count + pagination"*, inside §1.3's budget) + `chips` (the clearable filter statement). **A second bar under the table would spell one band twice** |
 
 **It formats nothing.** Money is `Money` / `.t-num` and a date is `fmtDate()`
 (§2.3 · §2.4); a table that formatted them would be a second date spelling. It
 decides where a value sits and whether its figures line up, and stops.
 
-**Still not specified, and named so nobody assumes otherwise:** sort · density ·
+**Still not specified, and named so nobody assumes otherwise:** density ·
 pagination · the action cell. Orders carries its own of each today, and each is
 a decision rather than an extraction — they land with **D6**, the card that
-re-lays that page out.
+re-lays that page out. *(Sort left this list on 2026-08-01 with the Excel header
+reflex, and column hiding is not on it because it is not a table power: a caller
+hides a column by not passing it.)*
 
 Today: **26 files hand-roll a `<table>`, in 7 header shapes, in two opposite
 visual languages** (dark header + white text ×6, light grey header + grey text
@@ -1372,6 +1379,9 @@ D6 and D7+ retire the 26.
 | A row is 40px and a cell never wraps | **Component API** — the height and `whitespace-nowrap` are the component's | ✅ **live (D0.5c)** | `DataTable.tsx` |
 | A header word is typed once | **Type System** — `label` lives on the column def and the `<th>` reads it | ✅ **live (D0.5c)** | `DataTable.tsx` |
 | "Some rows selected" is a real state | **Type System** — the select-all takes `boolean \| "indeterminate"` | ✅ **live (D0.5c)** | `Checkbox.tsx` · `DataTable.tsx` |
+| A resize may never widen the table | **Component API** — `resizeColumnPair` moves width between a PAIR, so the sum is invariant and rule 1 above survives every drag | ✅ **live (D0.5d)** | `grid-layout.ts` |
+| An opened record is not a 40px row | **Component API** — the expansion cell, and only it, overrides the table's own height and nowrap | ✅ **live (D0.5d)** | `DataTable.tsx` |
+| A totals strip states no total over no rows | **Component API** — the `<tfoot>` is not rendered while the table is empty or loading | ✅ **live (D0.5d)** | `DataTable.tsx` |
 
 ---
 
@@ -1893,35 +1903,60 @@ and by D0.6 the published number was nine points adrift of its own tables.)*
   Spacing       ███░░░░░░░    25%     1 / 4
   Icons         ██████████   100%     4 / 4
   Components    █████████░    93%    14 / 15
-  Table         ██████████   100%     4 / 4
+  Table         ██████████   100%     7 / 7
   Layout        █████░░░░░    50%     3 / 6
   Hierarchy     ██████████   100%     7 / 7
   ──────────────────────────────────────────
-  TOTAL         ████████░░    75%    36 / 48
+  TOTAL         ████████░░    76%    39 / 51
 ```
 
 | | Count | Meaning |
 |---|---|---|
-| Rules | **48** | design rules stated in §1–§8 |
-| **Enforced** | **36** | Type System / Component API / Build Guard / ESLint is live |
+| Rules | **51** | design rules stated in §1–§8 |
+| **Enforced** | **39** | Type System / Component API / Build Guard / ESLint is live |
 | Scheduled | 9 | a card exists |
 | **Blocked on a decision** | **0** | ✅ the PENDING REGISTER is empty |
 | **Human Review debt** | **3** | nobody has found a mechanism |
 
-36 + 9 + 3 = 48.
+39 + 9 + 3 = 51.
 
-**Coverage — 36 / 48 = 75.00%.** Counted from the Enforcement
+**Coverage — 39 / 51 = 76.47%.** Counted from the Enforcement
 column of every rule table in §1–§8, by `check-design.mjs --report`. **No card may
 add to this figure by hand** — three cards did, and by D0.6 the published number
 was nine points adrift of the tables it claimed to summarise.
 
 **Governance and copy rules are outside this count**, as they always have been:
 §0 and §10 carry **10** more rule rows. Widening the denominator would read
-36 / 58 = 62.07% on a day nothing got worse, so it is stated, not taken.
+39 / 61 = 63.93% on a day nothing got worse, so it is stated, not taken.
 
 **Every ✅ points at a file that exists in the repo** — checked, not asserted.
 
 <!-- UI-HEALTH:END -->
+
+**The D0.5d arithmetic, shown so it can be checked:**
+
+```
+rules      48  +  3  =  51     §7 gains three table rules, one per grid power
+                               that could carry a mechanism. Row expand,
+                               resize/reorder and totals are ONE §7 property
+                               row each and three enforceable rules between them
+enforced   36  +  3  =  39     each is born enforced: the splitter arithmetic is
+                               a pure function with a test that fails if it ever
+                               grows the table; the tall cell and the withheld
+                               strip are the component's, not a caller's
+coverage   75.00%  →  76.47%   ⬆  +1.47
+debt          3    →      3    unchanged — nothing was added with Human Review
+blocked       0    →      0    unchanged
+```
+
+**Two of the card's five powers added NO rule, and both are recorded rather
+than counted.** Layout MEMORY is refused by §0.4 and needs no rule of its own
+— §0.4 already has one, with guard rule L behind it. The RECORD BAR was
+measured to exist: `PageShell.footer` is a 36px band already inside §1.3's
+budget whose own comment reads *"Count + pagination"*, and `chips` is the
+clearable filter statement. **Counting either as a new enforced rule would have
+moved this figure for work nobody did**, which is the exact failure the
+generator was written to end.
 
 **The D0.6 arithmetic, shown so it can be checked:**
 
