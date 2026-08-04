@@ -935,11 +935,26 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
           model,
           size,
           ordinal: (nameCount.get(named) ?? 0) > 1 ? i : null,
-          // A sofa build IS one sofa however many module lines it has; every
-          // other category is one line whose own quantity is the answer.
-          qty: isOnePoPerOrder(category)
-            ? 1
-            : members.reduce((s, m) => s + (toOrderByLine.get(m.lineId) ?? m.qty), 0),
+          // A sofa build IS one sofa however many MODULE LINES it has — that
+          // rule collapses `1B(LHF)` + `CNR` + `2A(RHF)` into one physical
+          // sofa, and it is frozen and correct.
+          //
+          // It may only be applied to a group that HAS modules. The grouping
+          // key is `buildKey ?? line::<lineId>`, so a sofa line with no build
+          // key becomes a group of ONE — a typed ready stock demand, or a
+          // customer line for a non-modular sofa. Collapsing a group of one to
+          // `1` threw its quantity away silently (P11): type 5, the PO says 1.
+          //
+          // So the discriminator is the MODULES, not the category: a group of
+          // more than one line is a build and collapses; a lone line carries
+          // its own quantity, exactly as every other category does. A group of
+          // more than one can only exist under a real build key — a synthetic
+          // `line::` key is unique per line — so this cannot collapse anything
+          // that is not a build.
+          qty:
+            isOnePoPerOrder(category) && members.length > 1
+              ? 1
+              : members.reduce((s, m) => s + (toOrderByLine.get(m.lineId) ?? m.qty), 0),
           title:
             (nameCount.get(named) ?? 0) > 1
               ? `${unitLabel(category, 1)} ${i} — ${named}`
@@ -955,10 +970,13 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
         });
       }
 
-      // Sofa counts builds; everything else counts pieces.
-      const qty = isOnePoPerOrder(category)
-        ? builds.length
-        : orderLines.reduce((s, l) => s + (toOrderByLine.get(l.lineId) ?? l.qty), 0);
+      // The row is the sum of the things under it. It used to be computed a
+      // second time from the lines (and, for sofa, as `builds.length`), which
+      // is two counts that have to agree; summing the builds makes the row and
+      // its builds agree BY CONSTRUCTION. For every non-sofa category the
+      // answer is unchanged — each line is its own build, so the sum is the
+      // same sum over the same lines.
+      const qty = builds.reduce((s, b) => s + b.qty, 0);
 
       const bundle = bundleByLine.get(orderLines[0].lineId);
       const stockReady = bundle?.arriveBy ?? null;
