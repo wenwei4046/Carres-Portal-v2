@@ -1168,3 +1168,99 @@ AutoCount's reports. Copying 2990s here would copy the gap.
 3. **`purchase_orders.sup_status` is `pending` on all 21.** `Pending` is a banned display word
    (`01-design-tokens.md` §10, COPY-STANDARD), and the second status axis carries no
    information today.
+
+### 2026-08-04 · Q1 SHIPPED — the register puts the most dangerous purchase order first (PR #590)
+
+**Merge `df5fe44b` · no migration · no api change · web `index-DJiohLXa.js`, all four
+canonicals on the first poll, live file md5-identical to the local build
+(`2aa64d88…`, 4,750,858 bytes), `SERVICE_ROLE` 0. No Worker deploy owed and it was
+MEASURED, not assumed**: `git diff 6d888325..main -- apps/api supabase/migrations` is
+empty, and `apps/api` imports nothing from `po-workspace` (grep 0), so the
+`packages/shared` diff reaches no api code path. `GET /health` **200 `{"ok":true}`**.
+
+**⚠️ JESS'S 2026-08-02 LISTING LAW IS OVERRIDDEN AS THE DEFAULT, BY LOO, AND IT IS NOT
+DELETED.** Her rule — *the listing is AutoCount, for FINDING; default order `PO Issued`
+OLDEST first* — was law, and so were `PURCHASING-WORKING-FLOW.md` §6 and
+`ACTION-FLOW-STANDARD.md` Law 5, which both say row order is *risk to the promise*.
+**Loo ruled risk-first on 2026-08-04.** `PO Issued` keeps its column, keeps its header
+sort, and survives inside `comparePoRisk` as the tie-breaker — a test asserts that
+clicking the header still sorts by issue date and that CLEARING the sort returns to
+risk order. **She is to be told once; nothing of hers was quietly removed.**
+
+**What shipped, three things.**
+
+1. **`comparePoRisk` / `poRiskRungOf`** — a pure function in `packages/shared`, beside
+   `poCurrentActionOf` and `poArrivalGapOf`. Rungs: a LATE engine call · goods landing
+   after the customer's date · landing ON it · an open call not yet late · everything
+   else; then the nearest customer date (**no date sorts LAST**), then PO Issued oldest,
+   then the PO number so the order is TOTAL and two rows cannot swap between renders. A
+   finished or cancelled PO never rises — its gap is history, the same silence the Goods
+   Arrival cell already keeps. It lives in `shared` because a comparator written inside
+   the page would be a SECOND priority: the row's pill would say one thing and the row's
+   position another.
+2. **`Current Action` is a fixed 200px and `Items` becomes the `auto` tail.** The recipe
+   is unchanged — fixed interiors, ONE auto tail — only WHICH column absorbs the slack.
+3. **The gap tail's tone follows WHO gave the date**: red only when the factory confirmed
+   it, amber when it is our own estimate; `same day` stays amber either way. No new word
+   — the date's own tooltip already said which was which, and the colour now says it too.
+   The workspace reads the same rule, so the two surfaces cannot disagree.
+
+**WIDTHS MEASURED IN A REAL BROWSER against the app's own loaded stylesheet** (13px
+Inter + `DataTable`'s `px-2`), and the measurement reproduced the card's own numbers
+exactly, which is what says the model is right:
+
+```
+Current Action, when it was `auto`      1280 → 23px · 1366 → 109 · 1440 → 183 · 1920 → 663
+the words that must fit                 Confirm Arrival 109 · Open Receiving 113 ·
+                                        Contact Supplier 119 · Waiting for Goods 126 ·
+                                        Confirm what happens next 186 ·
+                                        Confirm tomorrow's delivery 191 ·
+                                        Confirm balance delivery date 201
+after                                   200px at every viewport
+Items (the tail), compact               1280 → 0 · 1366 → 49 · 1440 → 123 · 1920 → 603
+Items (the tail), expanded              1280 → 24 · 1366 → 77 · 1440 → 151 · 1920 → 631
+```
+
+**REPORTED, NOT HIDDEN — one measured regression at exactly 1280.** The compact fixed
+sum moves 424 → 484, so the LISTING REGION's horizontal-scroll threshold moves from a
+**1257px viewport to a 1317px** one: at 1280 the region gains **37px** of horizontal
+scroll (`scrollWidth` 484 vs `clientWidth` 447) where today it has none and a 23px
+`Current Action`. The region already answers *"the columns do not fit"* with a
+horizontal scroll by its own design (`min-w-[880px]` in expanded mode, and its comment
+says so), and the ruling's own principle prefers a readable instruction to a deleted
+one — so 200px shipped as ruled and the number is on the record rather than the ruling
+being quietly softened. If Loo wants the 1280 case back it is one number, not a redesign.
+
+**VERIFIED AGAINST PRODUCTION DATA before the deploy** (read-only SQL over the live 21
+POs, the live production-day settings and the live promise ledger), and it reproduces
+the card's own measurements independently:
+
+- **10 of 21 rows print a gap warning and 8 of the 10 are our own estimate.**
+- **`PO-2038` is row 1** — Nice Future, issued 1 Aug, the factory has never given a date,
+  our estimate 11 Aug against a customer date of **4 Aug**: an **amber `7d late`**. It was
+  row 8 of 21.
+- **`PO-2031` and `PO-2032` are the only two RED gaps on the page**, both `8d late`, both
+  from a date the factory itself gave.
+- **Zero open engine calls exist today** — every `eta_date` is beyond tomorrow — so rungs
+  1 and 4 are empty on live data and rung 2 leads. First eight: `PO-2038 · PO-2037 ·
+  PO-2039 · PO-2048 · PO-2031 · PO-2040 · PO-2032 · PO-2041`.
+
+**Gates:** web tsc 0 · `OperationPurchaseOrders` **51 → 62** · `po-workspace` **23 → 30**
+· shared 2076/2076 · full web suite 16 pre-existing (§17.7), ZERO new · **check-design
+8368, byte-identical, proved by linting the tree WITHOUT the change** · build clean.
+**Four negative controls, each run as a REAL edit and each verified to have applied
+before its run was believed**: remove rung 1 → shared 2 + web 3 · remove the tone split
+in the register → 1 · in the workspace → 1 · `Current Action` back to `auto` → 2.
+
+**Proved on the downloaded bundles, both directions**: `"confirmed":"estimate"` greps
+**0** in the predecessor (`index-DiTy2SJk.js`, fetched from its OWN deployment URL —
+a superseded asset 404s at the apex) and **2** here; and the bundle carries the widths
+literally — predecessor `Current Action",width:"auto"` + `Items",width:"150px"`, live
+`Current Action",width:"200px"` + `Items",width:"auto"`. **`data-tone` is NOT a clean
+marker and saying so is the method note**: it greps 2 in BOTH bundles, because the order
+journey-health strip and the order-action row already used it; the delta is 2 → 4.
+
+**One test change worth knowing about:** the row that auto-selects is now the most
+DANGEROUS PO rather than a fixed one, so six page tests that silently relied on the
+default selection now say which PO they are about (`openPo(id)`). That is the honest
+consequence of the ruling, not a fixture bent to avoid work.
