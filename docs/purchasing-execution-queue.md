@@ -2095,6 +2095,92 @@ Order, Receiving, Claims or Settings · ❌ invent a word — see the block belo
 where every other word lives. A word ruled in a card and nowhere else is a word the dictionary
 does not have.
 
+### ✅ SHIPPED — what actually landed (2026-08-04)
+
+PR **#593** (`6f6250a1`) + PR **#596** (the production fix below). **No migration.** A new
+page, a new api route, one tab, and the four new words written into `docs/COPY-STANDARD.md`.
+`OperationPurchaseOrders.tsx` and `po-workspace.ts` — Q1's files — are untouched.
+
+**The computation is ONE pure module** (`packages/shared/src/po-report.ts`) and it stores
+nothing: no table, no RPC, no cached figure. `GET /api/operation/pos/report` hands over one
+flat purchase-order LINE per row, read off the same `purchase_order_lines` the register reads.
+**Q4 imports this rather than counting again** — that is the whole reason it is in `shared`.
+
+**NO MONEY, and it is STRUCTURAL rather than remembered.** There is no cost field on the wire
+and none on `PoReportLine`, so nothing downstream can print one by accident — 0307's discipline
+applied to a read. Asserted from both ends: the api body is scanned for
+`cost|price|total|currency|amount|RM|MYR`, and so is the rendered page.
+
+**THE TOTAL'S `POs` IS A DISTINCT COUNT, NEVER THE SUM OF THE GROUPS.** One purchase order may
+carry two categories, and summing would report it twice. Today none does (July 5+1+1 = 7
+distinct · August 8+3+3 = 14 distinct), which is exactly why the rule had to be written into
+the arithmetic rather than left to agree by accident.
+
+**PRODUCTION VERIFICATION, in a real browser at 1280×720 on `erp.carresofficial.com`.** The
+August figures read off the live screen are the card's own SQL, re-run the same day:
+
+```
+Sofa        8   11   0   11
+Bedframe    3    4   0    4
+Mattress    3    4   0    4
+Total      14   19   0   19
+```
+
+Measured on the same page: rail **200px** · table **934px and it does not scroll sideways** ·
+rows **40px** · the page itself does not scroll · header widths Category **346** ·
+POs/Ordered/Received/Outstanding **140** each.
+
+**THE VERIFICATION FOUND A DEFECT AND THAT IS WHY IT IS DONE IN A BROWSER.** With August
+picked, every rail `All` row printed `14` — the report's FILTERED total — so the month rail
+said *all months hold 14 purchase orders*, and 21 of them do. **An `All` row must print the
+number its own click produces**: that group's filter cleared, every other group's kept. The
+facet shape became `{ all, options }` and each `all` is computed that way. Found on production
+before anybody read it as a business figure; fixed, tested, and guarded in both suites.
+
+**Five negative controls, each run as a REAL edit** (the P11 lesson — a `perl -0pi` edit can
+silently decline on CRLF and leave a green run proving nothing; one of these fixes did exactly
+that and was redone with a real edit):
+
+| Control | Fires |
+|---|---|
+| remove the cancelled-purchase-order exclusion | shared **3** · web **1** |
+| make the Total the SUM of the group counts | shared **1** |
+| make the door ignore the filters | shared **1** · web **3** |
+| put a `cost` field on the api payload | api **1** |
+| point a rail's `All` back at the filtered total | web **1** |
+
+**Gates.** web tsc **0** · api tsc **0** · shared **2088/2088** · api **3 pre-existing**
+(`supplier/pos` ×2 · `partner/pickups` ×1) · web **16 pre-existing** (the documented four
+files) · new: shared **21** · api **8** · page **16**. **check-design 8368, category for
+category IDENTICAL to `origin/main`** — proved by linting BOTH trees (detached `origin/main`,
+then the branch), never by quoting a delta.
+
+**Reported, NOT built — five, and each names why:**
+
+1. **The door lands on the PO, not on a filtered register.** The card says a click lands on the
+   register with `month × category` already applied. The register has no URL filter but `?po=`,
+   and giving it one means editing `OperationPurchaseOrders.tsx` — **Q1's file, which this card
+   was told not to touch.** So the deeper rule is what shipped: the row unfolds IN PLACE into
+   exactly the purchase orders its own count was made of, each a link into the register at that
+   document. *"A number its own click cannot produce is the first count in this portal that
+   lies"* still holds. The register-filter half is one param on that file once Q1 is free.
+2. **No `group by` control.** Its two axes (`Category` · `Supplier`) are both already rail
+   filters, and the CONTROL itself needs a word — `Group by` — that no dictionary has. Nothing
+   was invented; grouping is by category, and the sort is most-ordered-first as a DEFAULT
+   rather than a control, for the same reason.
+3. **No `Status` facet.** COPY-STANDARD's facet-heading table bans a `Status` heading **by
+   name** (*"status is the pill on the row, and a facet filtering by it would compete with the
+   queue rows"*), and measured 2026-08-04 all 21 live purchase orders sit in ONE state — so the
+   group could narrow nothing even if the word existed.
+4. **`Month` has no COPY-STANDARD row.** It is reused verbatim from the portal's own live
+   screens (HR's commission-run column, Finance's month picker) rather than invented — P3 met
+   this exact square with `Note (optional)` and made the same call. It is written into the
+   dictionary edit as a reported gap, not smuggled in as a ruling.
+5. **The rail renders through `workspace-rail`'s `RailGroup`/`RailItem`** — Receiving's own
+   recipe, which obeys the 2026-08-03 grey-hover law. **To Order still draws a THIRD
+   implementation of the same row (`NavRow`, blue-hover)**; that is a pre-existing finding and
+   not this card's to sweep.
+
 ---
 
 ## Q4 · Purchasing gets its dashboard
@@ -2178,6 +2264,6 @@ not a variant) · ❌ invent a word · ❌ start before Q3 merges.
 | P10 | ✅ **ready stock is suggested, the human takes it** — **no migration**. The engine has computed it since the day it was written and it was switched off and shown to nobody; `consumeFreeStock` is still `false` and nothing nets it, because Jess's 2026-07-21 ruling stands — the defect was that a decision reserved for a human never reached the human. Loo's option B: D0.5d's inline row expand, the offer counted off the **register** (`ops_stock_items`, the table the draw moves) and what was already taken read off **K4's LEDGER** — not off `status='reserved'`, which would put a satisfied requirement back on the page the day the goods went out. `POST /take-stock` carries no quantity and goes through `ops_stock_pool_draw`, one call per record. **It was built TWICE the same day**; the parallel branch `claude/p10-ready-stock-4c0f8f` is preserved on origin and NOT merged, and its four independent measurements are recorded under the card: **the offer matches nothing on live data today** (the 87 free units are Klang-sheet descriptions, all 31 demand SKUs are catalog codes — zero overlap, correct, self-healing) · **`Take` here vs `Reserve {n} to {soRef}` in the drawer's picker, one act two words, Loo's to rule** · **the kit's 3% expand column is narrower than its own 24px control below ~1440px** (3px onto the checkbox at 1024; nothing clips, no sideways scroll, rows still 40px) · **the offer does not filter CONDITION**, so a released `damaged` unit would be offered to a customer (zero exposure today, measured) | #591 |
 | **Q1** | ✅ **the register puts the most dangerous PO first** (Loo 2026-08-04) — **no migration, no api change, no Worker deploy** (`apps/api` imports nothing from `po-workspace`, measured). `comparePoRisk` lives in `packages/shared`, never in the page: a page-local comparator would be a SECOND priority, and the row's pill would say one thing while its position said another. **Jess's `PO Issued` law is overridden as the DEFAULT and is NOT deleted** — it keeps its column, its header sort, and it is the tie-breaker; a test asserts that clearing a header sort returns to RISK order. `Current Action` 200px fixed and `Items` becomes the `auto` tail — **the recipe is unchanged, only which column absorbs the slack**, and the argument is that the column which truncates should be the one whose truncation costs least. **Widths measured in a real browser and the measurement reproduced the card's own four numbers exactly** (auto gave it 23px at 1280 · 109 at 1366 · 183 at 1440 · 663 at 1920, against words needing 109–201). **Reported, not hidden: the compact fixed sum moves 424 → 484, so the listing region's horizontal-scroll threshold moves from a 1257px viewport to a 1317px one** — at 1280 the region gains 37px of scroll where today it has none and a 23px instruction column; the region already answers "the columns do not fit" that way by its own design, and a readable instruction beats a deleted one, so 200 shipped as ruled with the number on the record. A gap from OUR estimate is amber, a gap the factory gave stays red, `same day` amber either way — **no new word, only the tone**, and the workspace reads the same rule. **Verified against production data before the deploy**: 10 of 21 rows warn and 8 of the 10 are our own estimate · **`PO-2038` is row 1** with an amber `7d late` (it was row 8) · `PO-2031` and `PO-2032` are the only two reds, both `8d late` · **zero open engine calls exist today**, so rungs 1 and 4 are empty on live data. Four negative controls, each run as a real edit and each verified to have applied: rung 1 → shared 2 + web 3 · register tone → 1 · workspace tone → 1 · `auto` → 2. **`data-tone` is NOT a clean bundle marker** — it greps 2 in BOTH bundles (the journey-health strip and the order-action row already used it); the clean one is `"confirmed":"estimate"`, 0 → 2 | #590 |
 | **Q2** | ⬜ **the factory's ready date has somewhere to land** (Loo 2026-08-04) — `purchasing_record_ready_date` is LIVE in prod (0318) with **zero callers**: no route, no button, 0 of 21 POs carry a ready date. Adds the route + the workspace button + teaches `poDateHistoryOf` the second kind (today it filters `tomorrow_delivery` and would silently swallow every ready date). **No migration.** The QUEUE stays To Order's — reported, not built | — |
-| **Q3** | ⬜ **Purchasing gets its report tab** (Loo 2026-08-04) — the whole "look at the numbers" layer is missing; quantity only, **no money by Loo's ruling** (and `cost` is 0.00 on all 35 lines anyway). Stores nothing, computes at read time, every number is a door back to the rows it counted. **✅ UNBLOCKED — Loo ruled the words 2026-08-04: the tab is `Report` (singular, his spelling and AutoCount's own menu word), plus `POs` · `Ordered` · `Total`; the card also writes them into COPY-STANDARD.** Runs in PARALLEL with Q1 — different files | — |
+| **Q3** | ✅ **Purchasing gets its Report tab** (Loo 2026-08-04) — **no migration; a new page, a new api route, one tab, and the four new words written into COPY-STANDARD.** It stores nothing and computes at read time; **NO MONEY, structurally** — there is no cost field on the wire, so the page could not print one (asserted from both ends). **The Total's `POs` is a DISTINCT count, never the sum of the groups** — one purchase order may carry two categories, and today none does, which is exactly why the rule is in the arithmetic rather than left to agree by accident. **Verified on production in a real browser**: August reads `Sofa 8/11 · Bedframe 3/4 · Mattress 3/4 · Total 14/19`, the card's own SQL re-run the same day; rail 200px, table 934px with no sideways scroll, rows 40px. **The browser check found a defect and that is the point of doing it there**: every rail `All` row printed the FILTERED total, so with August picked the month rail said *all months hold 14* when 21 do — an `All` row now prints the number its own click produces. **check-design 8368, identical category for category to `origin/main`**, proved by linting both trees. **Reported not built**: the door lands on the PO rather than a filtered register (that needs a param on Q1's file) · no `group by` and no `Status` facet — both need words no dictionary has, and `Status` is banned as a facet heading by name · `Month` is reused from HR/Finance and has no dictionary row · To Order still draws a third copy of the rail row | #593 · #596 |
 | **Q4** | ⬜ **Purchasing gets its dashboard** (Loo 2026-08-04) — four tiles, each a count the engine already computes, each clickable. **⛔ BLOCKED until Q3 merges**: a tile is a report figure made large, and computing it twice guarantees two answers | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |

@@ -2061,6 +2061,7 @@ export {
   poReportRowDetail,
   type PoReportPo,
   type PoReport,
+  type PoReportFacet,
   type PoReportFacetOption,
   type PoReportFilters,
   type PoReportLine,
