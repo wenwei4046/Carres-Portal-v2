@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   addWorkingDays,
   buildToOrder,
+  DEMAND_PURPOSE_DEFAULT,
+  DEMAND_PURPOSE_VALUES,
   isToOrderCategory,
   myHolidaySet,
   planFromDocuments,
@@ -15,6 +17,7 @@ import {
   transitDaysFor,
   railItemLabel,
   workWeekOffDaysFor,
+  type DemandPickItem,
   type ProductCategory,
   type IssueDocument,
   type ToOrderBuild,
@@ -127,6 +130,99 @@ function stockRefOf(
 ): string | null {
   if (readyStock) return readyStockRef(destination ?? null);
   return so != null ? `SO-${so}` : null;
+}
+
+/**
+ * ── READY STOCK, THE ONE RULE (card P10, Loo 2026-08-04) ────────────────────
+ *
+ * The engine has computed how much a demand could take from free stock since
+ * the day it was written, and it was switched off (`consumeFreeStock`) and
+ * shown to nobody. Jess's 2026-07-21 ruling — goods are labelled per order, so
+ * nothing auto-consumes them — is right and stays; what was missing is that a
+ * decision reserved for a human never reached the human.
+ *
+ * **P15 EXTRACTED THIS INTO A FUNCTION AND CHANGED NOT ONE LINE OF IT.** The
+ * Create Purchase picker must show *"the same free-stock number the grid would
+ * offer for that SKU (one rule, not a second count)"* — that card's Must-NOT
+ * says so by name — and the only way a second surface cannot disagree with the
+ * first is for there to be no second implementation. Two callers, one body.
+ *
+ * THE REGISTER, NOT `stock_balances`. They are two tables with no trigger
+ * between them (measured 2026-08-04), and the pool draw moves the REGISTER.
+ * A number read from the other one would not fall when a unit was taken, so
+ * the same units would be offered again tomorrow. `purchase.ts`'s advisory
+ * read still uses `stock_balances`; that is a different surface and is
+ * reported, not changed here.
+ *
+ * IT MAY NEVER TAKE THE PAGE DOWN. To Order turned customer orders into
+ * purchase orders for months before ready stock was on it; if the table is
+ * unreachable the FEATURE is unavailable and the workspace is exactly what it
+ * was — no offer, no netting, nothing invented.
+ */
+async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<{
+  stockWarehouse: { id: string; name: string } | null;
+  freeStock: Record<string, { id: string; qty: number }[]>;
+  stockQtyById: Map<string, number>;
+}> {
+  let stockWarehouse: { id: string; name: string } | null = null;
+  const freeStock: Record<string, { id: string; qty: number }[]> = {};
+  const stockQtyById = new Map<string, number>();
+  try {
+    const { data: whRows } = await sb
+      .from("warehouses")
+      .select("id, name, kind")
+      .eq("kind", "own");
+    const own = whRows ?? [];
+    // The issue path's own rule, so the stock offered and the warehouse a
+    // purchase order is raised against can never be two different places.
+    const wh = own.find((w) => /klang|klg/i.test((w.name as string) ?? "")) ?? own[0];
+    if (wh) {
+      stockWarehouse = { id: wh.id as string, name: (wh.name as string) ?? "" };
+
+      const { data: itemRows, error: itemErr } = await sb
+        .from("ops_stock_items")
+        .select("id, sku, qty, date_in, created_at")
+        .eq("status", "free")
+        .eq("needs_repair", false)
+        // READY STOCK'S OWN DEFINITION OF READY, mirrored rather than
+        // re-decided (`GET /api/ops/stock/ready`). Free and sound is not
+        // enough on its own: R4 releases a quarantined unit back to `free`,
+        // so the day a DAMAGED one is released this page would otherwise
+        // offer it to a customer's order. Live exposure today is zero
+        // (measured 2026-08-04: 54 `new` + 33 `exhibition`, nothing else) —
+        // which is exactly why it is closed now rather than after the first
+        // release. The list is that route's, verbatim, and its own header
+        // comment is stale: the CODE admits `old` and `refurbished` too and
+        // excludes only `damaged`.
+        .in("condition", ["new", "exhibition", "old", "refurbished"])
+        .eq("warehouse_id", stockWarehouse.id);
+      if (itemErr) throw new Error(itemErr.message);
+
+      // FIFO — `ops_stock_pool_draw`'s own pick order (oldest first), so the
+      // records this page offers are the records it would have taken anyway.
+      const items = [...((itemRows ?? []) as Record<string, unknown>[])].sort((a, b) => {
+        const ad = (a.date_in as string | null) ?? "9999-12-31";
+        const bd = (b.date_in as string | null) ?? "9999-12-31";
+        if (ad !== bd) return ad < bd ? -1 : 1;
+        const ac = (a.created_at as string | null) ?? "";
+        const bc = (b.created_at as string | null) ?? "";
+        return ac < bc ? -1 : ac > bc ? 1 : 0;
+      });
+      for (const it of items) {
+        // `order_lines.sku` and `ops_stock_items.sku` are two vocabularies —
+        // the catalog code against the warehouse's own name. `stockMatchKey`
+        // is the portal's ONE rule for linking them, already read by the
+        // readiness badge and the drawer's picker.
+        const key = stockMatchKey(it.sku as string);
+        const qty = Math.max(1, Number(it.qty ?? 1));
+        (freeStock[key] ??= []).push({ id: it.id as string, qty });
+        stockQtyById.set(it.id as string, qty);
+      }
+    }
+  } catch (e) {
+    console.error("ready stock unavailable — no offer made", (e as Error).message);
+  }
+  return { stockWarehouse, freeStock, stockQtyById };
 }
 
 /**
@@ -494,64 +590,7 @@ async function loadToOrder(
    * is unreachable the FEATURE is unavailable and the workspace is exactly
    * what it was — no offer, no netting, nothing invented.
    */
-  let stockWarehouse: { id: string; name: string } | null = null;
-  const freeStock: Record<string, { id: string; qty: number }[]> = {};
-  const stockQtyById = new Map<string, number>();
-  try {
-    const { data: whRows } = await sb
-      .from("warehouses")
-      .select("id, name, kind")
-      .eq("kind", "own");
-    const own = whRows ?? [];
-    // The issue path's own rule, so the stock offered and the warehouse a
-    // purchase order is raised against can never be two different places.
-    const wh = own.find((w) => /klang|klg/i.test((w.name as string) ?? "")) ?? own[0];
-    if (wh) {
-      stockWarehouse = { id: wh.id as string, name: (wh.name as string) ?? "" };
-
-      const { data: itemRows, error: itemErr } = await sb
-        .from("ops_stock_items")
-        .select("id, sku, qty, date_in, created_at")
-        .eq("status", "free")
-        .eq("needs_repair", false)
-        // READY STOCK'S OWN DEFINITION OF READY, mirrored rather than
-        // re-decided (`GET /api/ops/stock/ready`). Free and sound is not
-        // enough on its own: R4 releases a quarantined unit back to `free`,
-        // so the day a DAMAGED one is released this page would otherwise
-        // offer it to a customer's order. Live exposure today is zero
-        // (measured 2026-08-04: 54 `new` + 33 `exhibition`, nothing else) —
-        // which is exactly why it is closed now rather than after the first
-        // release. The list is that route's, verbatim, and its own header
-        // comment is stale: the CODE admits `old` and `refurbished` too and
-        // excludes only `damaged`.
-        .in("condition", ["new", "exhibition", "old", "refurbished"])
-        .eq("warehouse_id", stockWarehouse.id);
-      if (itemErr) throw new Error(itemErr.message);
-
-      // FIFO — `ops_stock_pool_draw`'s own pick order (oldest first), so the
-      // records this page offers are the records it would have taken anyway.
-      const items = [...((itemRows ?? []) as Record<string, unknown>[])].sort((a, b) => {
-        const ad = (a.date_in as string | null) ?? "9999-12-31";
-        const bd = (b.date_in as string | null) ?? "9999-12-31";
-        if (ad !== bd) return ad < bd ? -1 : 1;
-        const ac = (a.created_at as string | null) ?? "";
-        const bc = (b.created_at as string | null) ?? "";
-        return ac < bc ? -1 : ac > bc ? 1 : 0;
-      });
-      for (const it of items) {
-        // `order_lines.sku` and `ops_stock_items.sku` are two vocabularies —
-        // the catalog code against the warehouse's own name. `stockMatchKey`
-        // is the portal's ONE rule for linking them, already read by the
-        // readiness badge and the drawer's picker.
-        const key = stockMatchKey(it.sku as string);
-        const qty = Math.max(1, Number(it.qty ?? 1));
-        (freeStock[key] ??= []).push({ id: it.id as string, qty });
-        stockQtyById.set(it.id as string, qty);
-      }
-    }
-  } catch (e) {
-    console.error("ready stock unavailable — no offer made", (e as Error).message);
-  }
+  const { stockWarehouse, freeStock, stockQtyById } = await readFreeStock(sb);
 
   /** `{ref}::{stockKey}` → units already drawn for it. */
   const takenByRefKey = new Map<string, number>();
@@ -1318,12 +1357,148 @@ toOrderRouter.post("/take-stock", requireOperation, async (c) => {
  * product has one factory, and a demand pointed at the wrong one becomes a
  * purchase order pointed at the wrong one.
  */
+/**
+ * `GET /demand/pick-items` — what the Create Purchase picker chooses from
+ * (card P15, Loo 2026-08-04).
+ *
+ * **IT EXISTS BECAUSE THE STOCK NUMBERS CANNOT BE COMPUTED IN THE BROWSER.**
+ * The card's Must-NOT is explicit — *"let the picker compute stock its own
+ * way — read P10's rule"* — and P10's rule reads `ops_stock_items` at the own
+ * warehouse through `stockMatchKey`. The dialog had only the catalog bundle,
+ * which knows nothing about the register, so a browser-side count would have
+ * been a second rule by construction. This route calls `readFreeStock`, the
+ * literal function the grid's offer is built from.
+ *
+ * THREE NUMBERS, ONE READ, AND EACH MEANS SOMETHING DIFFERENT:
+ *
+ *   On Hand   every unit standing in the warehouse, whatever its condition —
+ *             a damaged mattress is still in the building.
+ *   Reserved  spoken for by an order. Context, never cover.
+ *   Free      P10's own answer, unmodified: free · sound · at that warehouse.
+ *
+ * On live data today two of them agree (87 free, 0 reserved, measured
+ * 2026-08-04) and that is honest rather than redundant — `Reserved 0` is the
+ * fact that nothing is spoken for, and the three separate the day a
+ * reservation exists.
+ *
+ * THE SUPPLIER RIDES ALONG AS A FACT. `purchasing_create_demand` derives it
+ * from the SKU and there is no parameter to override it; this is the same
+ * derivation shown a step earlier so an operator can predict which purchase
+ * order their demand will join (the engine groups by supplier × category).
+ *
+ * A SKU WITH NO SUPPLIER IS NOT OFFERED. The RPC refuses it by name
+ * (`sku_has_no_supplier`), and offering it teaches the operator that refusals
+ * are random rather than a configuration hole.
+ */
+toOrderRouter.get("/demand/pick-items", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: skuRows, error: skuErr } = await sb
+    .from("product_skus")
+    .select("sku, variant, variant_kind, supplier_id, model_id")
+    .not("supplier_id", "is", null);
+  if (skuErr) {
+    const m = mapPgError(skuErr);
+    return c.json(m.body, m.status);
+  }
+
+  const { data: modelRows, error: modelErr } = await sb
+    .from("product_models")
+    .select("id, name");
+  if (modelErr) {
+    const m = mapPgError(modelErr);
+    return c.json(m.body, m.status);
+  }
+  const modelName = new Map(
+    (modelRows ?? []).map((m) => [m.id as string, (m.name as string) ?? ""]),
+  );
+
+  const { data: supRows, error: supErr } = await sb.from("suppliers").select("id, name");
+  if (supErr) {
+    const m = mapPgError(supErr);
+    return c.json(m.body, m.status);
+  }
+  const supplierName = new Map(
+    (supRows ?? []).map((s) => [s.id as string, (s.name as string) ?? ""]),
+  );
+
+  // P10's rule, called rather than copied.
+  const { stockWarehouse, freeStock } = await readFreeStock(sb);
+
+  /** On Hand and Reserved — the register's other two questions, one query. */
+  const onHandByKey = new Map<string, number>();
+  const reservedByKey = new Map<string, number>();
+  if (stockWarehouse) {
+    try {
+      const { data: rows, error } = await sb
+        .from("ops_stock_items")
+        .select("sku, qty, status")
+        // `free` and `reserved` are the two statuses that mean the unit is
+        // HERE. `incoming` is on its way and is not on hand; `sold`,
+        // `transferred`, `voided`, `returned_to_supplier` and `written_off`
+        // have left. `on_hold` IS here — R4 quarantines it in the building —
+        // so it counts as On Hand and, correctly, never as Free.
+        .in("status", ["free", "reserved", "on_hold"])
+        .eq("warehouse_id", stockWarehouse.id);
+      if (error) throw new Error(error.message);
+      for (const r of rows ?? []) {
+        const key = stockMatchKey(r.sku as string);
+        const qty = Math.max(1, Number(r.qty ?? 1));
+        onHandByKey.set(key, (onHandByKey.get(key) ?? 0) + qty);
+        if (r.status === "reserved") {
+          reservedByKey.set(key, (reservedByKey.get(key) ?? 0) + qty);
+        }
+      }
+    } catch (e) {
+      // Same contract as `readFreeStock`: the picker degrades to zeroes rather
+      // than taking the dialog down. A demand can always be typed.
+      console.error("stock counts unavailable — picker shows none", (e as Error).message);
+    }
+  }
+
+  const items: DemandPickItem[] = (skuRows ?? []).map((s) => {
+    const sku = s.sku as string;
+    const key = stockMatchKey(sku);
+    return {
+      sku,
+      label: railItemLabel(
+        modelName.get(s.model_id as string) ?? sku,
+        s.variant_kind === "size" ? ((s.variant as string) ?? null) : null,
+      ),
+      supplier: supplierName.get(s.supplier_id as string) ?? null,
+      onHand: onHandByKey.get(key) ?? 0,
+      reserved: reservedByKey.get(key) ?? 0,
+      free: (freeStock[key] ?? []).reduce((n, r) => n + r.qty, 0),
+    };
+  });
+  items.sort((a, b) => a.sku.localeCompare(b.sku));
+
+  return c.json({ items, stockWarehouse: stockWarehouse?.name ?? null });
+});
+
 const demandBody = z.object({
   sku: z.string().min(1),
   qty: z.number().int().min(1),
   destinationId: z.string().uuid(),
   requiredBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
   remark: z.string().max(500).nullish(),
+  /**
+   * P15 — the Source. **The enum is the SHARED constant, not a list retyped
+   * here**: `DEMAND_PURPOSES` mirrors `purchase_demands.purpose`'s CHECK and
+   * `purchasing_create_demand`'s own gate, so the picker, this validator and
+   * the database cannot come to hold three different lists — which is exactly
+   * what 0322 had to repair on the pool's reasons.
+   *
+   * OPTIONAL, and that is a compatibility decision rather than an oversight: a
+   * browser still holding the pre-P15 bundle posts no `purpose`, and it must
+   * keep working. It falls to `ready_stock` — the RPC's own default, and the
+   * only value that browser could ever have meant.
+   *
+   * THERE IS NO `supplier` KEY AND THERE MAY NEVER BE ONE. The supplier is
+   * derived from the SKU inside the RPC; the dialog SHOWS it as a fact. A
+   * client that could name it is a client that could name the wrong factory.
+   */
+  purpose: z.enum(DEMAND_PURPOSE_VALUES as [string, ...string[]]).optional(),
 });
 
 toOrderRouter.post("/demand", requireOperation, async (c) => {
@@ -1339,7 +1514,7 @@ toOrderRouter.post("/demand", requireOperation, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
-  const { sku, qty, destinationId, requiredBy, remark } = parsed.data;
+  const { sku, qty, destinationId, requiredBy, remark, purpose } = parsed.data;
 
   const { data, error } = await sb.rpc("purchasing_create_demand", {
     p_sku: sku,
@@ -1347,7 +1522,7 @@ toOrderRouter.post("/demand", requireOperation, async (c) => {
     p_destination_id: destinationId,
     p_required_by: requiredBy ?? null,
     p_remark: remark ?? null,
-    p_purpose: "ready_stock",
+    p_purpose: purpose ?? DEMAND_PURPOSE_DEFAULT,
   });
   if (error) {
     const m = mapPgError(error);
