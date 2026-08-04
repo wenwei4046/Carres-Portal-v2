@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -8,15 +11,15 @@ import OperationPurchaseOrders from "./OperationPurchaseOrders";
 const PO_DELAY_REASONS_FOR_TEST: readonly string[] = PO_DELAY_REASONS;
 
 /**
- * Purchase Orders — the Register's Step-1 freeze (Jess, 2026-08-02):
+ * Purchase Orders — the Supplier Execution Register.
  *
- *   · eight columns, her order: PO Issued · Supplier · PO No. · Items ·
- *     Customer Delivery · Goods Arrival · Received · Current Action;
- *   · default order = PO Issued OLDEST first (business priority, never the
- *     document number);
+ *   · **NINE columns, ONE fixed set** (Loo, 2026-08-04 · Q7): PO Issued ·
+ *     Supplier · PO No. · SO No. · Items · Destination · Customer Delivery ·
+ *     Expected Arrival · Current Action. **The set never changes because the
+ *     panel opened** — the compact variant and its honesty guard are deleted,
+ *     and that is the ruling most likely to be re-introduced under a new name;
+ *   · default order = RISK TO THE CUSTOMER'S PROMISE (Loo, 2026-08-04);
  *   · Items speaks MODEL off the wire (`model_name`), `×N` only when N ≥ 2;
- *   · compact keeps PO Issued · Supplier · PO No. · Items · Current Action,
- *     with the HONESTY GUARD (an actively filtered/sorted column never hides);
  *   · Search finds across PO / Supplier / SKU / Model / SO / Customer;
  *   · a cancelled PO greys out; a revised arriving date says `(revised)`.
  */
@@ -275,6 +278,28 @@ const POS = [
     ],
     purchase_order_lines: [line("h1", "SKU-SONIC-K", 1, "Sonic", "King")],
   },
+  {
+    // Q7 — PO-2032's own shape: ONE purchase order whose lines go TWO ways.
+    // The row prints the PO's own destination and how many more (a FLAG); the
+    // per-line truth is the expand's, which is why this is not a duplicate.
+    id: "PO-9009",
+    supplier_id: OHANA,
+    warehouse_id: WH,
+    destination_id: KLANG,
+    status: "open",
+    sup_status: "confirmed",
+    so: 1900,
+    so_refs: [1901, 1902],
+    eta_date: "2099-09-09",
+    placed_at: "2026-07-01T08:00:00Z",
+    customer_delivery: "2099-12-31",
+    eta_revised: false,
+    orders: [],
+    purchase_order_lines: [
+      { ...line("i1", "SKU-SONIC-K", 1, "Sonic", "King"), destination_id: AL },
+      line("i2", "SKU-CODY-Q", 1, "Cody", "Queen"),
+    ],
+  },
 ];
 
 /** The catalog the ESTIMATE needs: a SKU → model → category, so
@@ -400,36 +425,60 @@ async function expandPo(id: string) {
   return within(screen.getByTestId(`po-work-${id}`));
 }
 
-describe("the eight frozen columns", () => {
-  it("compact mode (workspace open) keeps exactly Jess's five", async () => {
+/** Loo's nine, in his order — the ONE set (Q7, 2026-08-04). */
+const NINE = [
+  "PO Issued",
+  "Supplier",
+  "PO No.",
+  "SO No.",
+  "Items",
+  "Destination",
+  "Customer Delivery",
+  "Expected Arrival",
+  "Current Action",
+];
+
+describe("the nine frozen columns — ONE set, always", () => {
+  it("the register opens on all nine, in his order", async () => {
     await mountLoaded();
-    expect(headerTexts()).toEqual([
-      "PO Issued",
-      "Supplier",
-      "PO No.",
-      "Items",
-      "Current Action",
-    ]);
+    expect(headerTexts()).toEqual(NINE);
   });
 
-  it("collapsing the workspace shows all eight, in her order", async () => {
+  /**
+   * THE RULING MOST LIKELY TO BE QUIETLY RE-INTRODUCED (Loo, 2026-08-04):
+   * *"Operator 的眼睛会一直重新学习页面，Information Hierarchy 每开一次 Detail
+   * 就改变，这是 ERP 不应该发生的."* The page used to swap to a five-column
+   * compact set whenever the workspace was open. Closing and re-opening the
+   * panel must move NOTHING.
+   */
+  it("opening and closing the workspace changes NO column", async () => {
     await mountLoaded();
+    const open = headerTexts();
     fireEvent.click(screen.getByTestId("po-workspace-toggle"));
-    expect(headerTexts()).toEqual([
-      "PO Issued",
-      "Supplier",
-      "PO No.",
-      "Items",
-      "Customer Delivery",
-      "Goods Arrival",
-      "Received",
-      "Current Action",
-    ]);
+    const closed = headerTexts();
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
+    const reopened = headerTexts();
+    expect(open).toEqual(NINE);
+    expect(closed).toEqual(NINE);
+    expect(reopened).toEqual(NINE);
+  });
+
+  /** The honesty guard did not have to be kept: a column that can never hide
+   *  cannot be hidden while it is filtered. Sorting one proves the set is
+   *  still the same nine rather than five plus a rescued survivor. */
+  it("sorting a column adds nothing and hides nothing", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("table-sort-arriving"));
+    expect(headerTexts()).toEqual(NINE);
+  });
+
+  it("`Received` is gone — it is not one of his nine", async () => {
+    await mountLoaded();
+    expect(headerTexts()).not.toContain("Received");
   });
 
   it("Customer Delivery's header says it is the EARLIEST date on a merged PO", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     const th = screen.getByRole("columnheader", { name: /Customer Delivery/ });
     expect(th.getAttribute("title")).toMatch(/Earliest customer delivery/);
   });
@@ -444,13 +493,111 @@ describe("the eight frozen columns", () => {
     expect(all[0]).toBe("");
     expect(all.filter((t) => t === "")).toHaveLength(1);
   });
+});
 
-  it("HONESTY GUARD — a sorted column stays visible in compact mode", async () => {
+/**
+ * §12.2 — ONE FACT, ONE WORD, EVERYWHERE IT APPEARS (Loo, 2026-08-04).
+ *
+ * `Goods Arrival` named no destination — *arrival of what, where?* — and Q5
+ * made the split visible by correctly using the new word in the expand while
+ * this column kept the old one. A source scan of the page file, not a render
+ * test, is what guards a rename: a render test only sees the branches its
+ * fixture reaches.
+ */
+describe("the retired arrival word is off this page", () => {
+  /**
+   * A SOURCE SCAN, not a render test — the discipline this repo pays for
+   * repeatedly (R8 · C1 · P13): a render test only sees the branches its
+   * fixture reaches, and the retired word survived on this page for a day
+   * inside a branch nobody's fixture opened. Comments are NOT stripped: the
+   * word is retired portal-wide, and a comment naming it is the tombstone
+   * that has already sent two readers looking for live code.
+   */
+  it("`Goods Arrival` appears ZERO times in the page source", () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "OperationPurchaseOrders.tsx"),
+      "utf8",
+    );
+    expect(src.split("Goods Arrival").length - 1).toBe(0);
+  });
+
+  it("the column says `Expected Arrival`", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
-    fireEvent.click(screen.getByTestId("table-sort-arriving"));
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
-    expect(headerTexts()).toContain("Goods Arrival");
+    expect(headerTexts()).toContain("Expected Arrival");
+    expect(headerTexts()).not.toContain("Goods Arrival");
+  });
+
+  it("nothing rendered anywhere on the page says the retired word", async () => {
+    await mountLoaded();
+    expect(document.body.textContent ?? "").not.toContain("Goods Arrival");
+  });
+
+  it("the supplier message carries the ruled word, not the retired one", async () => {
+    await mountLoaded();
+    await openPo("PO-9001");
+    fireEvent.click(screen.getByTestId("po-wa-toggle"));
+    const draft = screen.getByTestId("po-wa-message") as HTMLTextAreaElement;
+    // A message a supplier HOLDS is where one fact spelt two ways costs most.
+    expect(draft.value).toContain("Expected Arrival:");
+    expect(draft.value).not.toContain("Goods Arrival");
+  });
+});
+
+/**
+ * `SO No.` and `Destination` — two of Loo's nine that simply did not exist,
+ * with their data already on the wire (`so` + `so_refs`, and 0311's per-line
+ * `destination_id`). `+N` is the portal's existing pattern; `Multiple (2)` is
+ * refused by name, and `AL Sungai Buloh` may never be shortened to `AL`.
+ */
+describe("SO No. — which sales orders this PO is made of", () => {
+  it("one SO prints itself; several print the first and how many more", async () => {
+    await mountLoaded();
+    const one = listing().getByText("PO-9001").closest("tr")!;
+    expect(within(one).getByText("SO-1200")).toBeInTheDocument();
+    const many = listing().getByText("PO-9009").closest("tr")!;
+    expect(within(many).getByText("SO-1900 +2")).toBeInTheDocument();
+  });
+
+  it("the full list rides the cell's own title — nothing is lost to `+N`", async () => {
+    await mountLoaded();
+    const many = listing().getByText("PO-9009").closest("tr")!;
+    expect(within(many).getByText("SO-1900 +2").getAttribute("title")).toBe(
+      "SO-1900\nSO-1901\nSO-1902",
+    );
+  });
+
+  it("a stockpile PO that serves no sales order says so", async () => {
+    await mountLoaded();
+    const none = listing().getByText("PO-9002").closest("tr")!;
+    expect(within(none).getAllByText("—").length).toBeGreaterThan(0);
+  });
+});
+
+describe("Destination — is this PO a special one?", () => {
+  it("a PO whose lines all agree prints ONE full name", async () => {
+    await mountLoaded();
+    const row = listing().getByText("PO-9003").closest("tr")!;
+    expect(within(row).getByText("Carres Klang")).toBeInTheDocument();
+  });
+
+  it("lines going two ways print the PO's own first, then how many more", async () => {
+    await mountLoaded();
+    const row = listing().getByText("PO-9009").closest("tr")!;
+    const cell = within(row).getByText("Carres Klang +1");
+    // FULL NAMES ONLY — `AL`, `Multiple (2)` and `Drop point` are all refused.
+    expect(cell.getAttribute("title")).toBe("Carres Klang\nAL Sungai Buloh");
+    expect(row.textContent ?? "").not.toContain("Multiple (");
+  });
+
+  it("never shortens `AL Sungai Buloh`", async () => {
+    await mountLoaded();
+    fireEvent.change(screen.getByPlaceholderText("Search"), {
+      target: { value: "PO-9009" },
+    });
+    const row = listing().getByText("PO-9009").closest("tr")!;
+    expect(within(row).getByText("Carres Klang +1").getAttribute("title")).toContain(
+      "AL Sungai Buloh",
+    );
   });
 });
 
@@ -487,6 +634,7 @@ describe("the default order — risk to the customer's promise", () => {
       // beside the quiet one, which is what "nothing to do" looks like.
       "PO-9006",
       "PO-9008",
+      "PO-9009",
       "PO-9002",
     ]);
   });
@@ -502,6 +650,7 @@ describe("the default order — risk to the customer's promise", () => {
       "PO-9005", // 1 Apr
       "PO-9006", // 1 May
       "PO-9008", // 1 Jun
+      "PO-9009", // 1 Jul
       "PO-9007", // 2099
     ]);
     // asc → desc → cleared. A third click hands the page back its own default.
@@ -515,6 +664,7 @@ describe("the default order — risk to the customer's promise", () => {
       "PO-9005",
       "PO-9006",
       "PO-9008",
+      "PO-9009",
       "PO-9002",
     ]);
   });
@@ -548,7 +698,6 @@ describe("what the row states", () => {
 
   it("a revised arriving date says (revised)", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     // Two POs now carry a revised date (9001, 9005) — the marker is per row.
     expect(listing().getAllByText("(revised)").length).toBe(2);
   });
@@ -567,7 +716,6 @@ describe("the gap against the customer's date", () => {
 
   it("a PO landing after the promise says how many days late", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     const row = listing().getByText("PO-9001").closest("tr")!;
     expect(
       within(row as HTMLElement).getByTestId("po-arrival-gap"),
@@ -576,7 +724,6 @@ describe("the gap against the customer's date", () => {
 
   it("landing ON the customer's own day is not fine — it says same day", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     const row = listing().getByText("PO-9005").closest("tr")!;
     expect(
       within(row as HTMLElement).getByTestId("po-arrival-gap"),
@@ -585,7 +732,6 @@ describe("the gap against the customer's date", () => {
 
   it("room to spare says NOTHING — silence has to mean fine", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     // PO-9003 arrives today against a 2099 promise: acres of room.
     const row = listing().getByText("PO-9003").closest("tr")!;
     expect(
@@ -595,7 +741,6 @@ describe("the gap against the customer's date", () => {
 
   it("a finished PO stays silent — its gap is history, not work", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     // PO-9006 landed 10 days after the promise and is fully received.
     const row = listing().getByText("PO-9006").closest("tr")!;
     expect(
@@ -609,7 +754,6 @@ describe("the gap against the customer's date", () => {
 
   it("the gap survives beside (revised) — the warning is never the thing cut", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     const row = listing().getByText("PO-9001").closest("tr")!;
     const cell = within(row as HTMLElement);
     expect(cell.getByTestId("po-arrival-gap")).toBeInTheDocument();
@@ -643,7 +787,6 @@ describe("the gap's tone says WHO gave the date", () => {
 
   it("the FACTORY's own date landing late is RED", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     const gap = gapIn("PO-9001"); // eta_date on the wire = the supplier's word
     expect(gap.getAttribute("data-tone")).toBe("confirmed");
     expect(gap.className).toContain("text-kit-red-11");
@@ -651,7 +794,6 @@ describe("the gap's tone says WHO gave the date", () => {
 
   it("OUR OWN estimate landing late is AMBER — nobody has said anything yet", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     const gap = gapIn("PO-9007"); // no eta_date: issued + production days
     expect(gap.getAttribute("data-tone")).toBe("estimate");
     expect(gap.className).toContain("text-kit-amber-11");
@@ -660,7 +802,6 @@ describe("the gap's tone says WHO gave the date", () => {
 
   it("`same day` stays amber even when the factory said it — tight, not broken", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     const gap = gapIn("PO-9005");
     expect(gap).toHaveTextContent("same day");
     expect(gap.className).toContain("text-kit-amber-11");
@@ -691,7 +832,7 @@ describe("the gap's tone says WHO gave the date", () => {
  * layout, so this asserts the CONTRACT the browser then renders: which column
  * is fixed and which one absorbs the slack.
  */
-describe("Current Action is a fixed column; Items is the tail", () => {
+describe("nine measured minimums, and no tail", () => {
   const colWidths = () => {
     const table = screen.getByRole("table");
     const cols = Array.from(table.querySelectorAll("colgroup col"));
@@ -703,22 +844,39 @@ describe("Current Action is a fixed column; Items is the tail", () => {
     );
   };
 
-  it("compact: Current Action holds 200px and Items takes what is left", async () => {
+  /** The px numbers are Loo's own measured minimums (Q7). They are asserted
+   *  here so a later chat cannot shave one to make a scrollbar go away — the
+   *  MEASUREMENT itself is a browser's job, and this only pins the contract. */
+  it("every column carries its measured minimum, and none is `auto`", async () => {
     await mountLoaded();
-    const w = colWidths();
-    expect(w.action).toBe("200px");
-    expect(w.items).toBe("auto");
-    // Exactly ONE auto tail — the recipe is unchanged, only which column it is.
-    expect(Object.values(w).filter((v) => v === "auto")).toHaveLength(1);
+    expect(colWidths()).toMatchObject({
+      issued: "96px",
+      supplier: "87px",
+      po: "83px",
+      sono: "94px",
+      items: "135px",
+      dest: "135px",
+      custdel: "140px",
+      arriving: "206px",
+      action: "192px",
+    });
+    expect(Object.values(colWidths()).filter((v) => v === "auto")).toHaveLength(0);
   });
 
-  it("expanded: the same rule, so the two modes cannot drift", async () => {
+  it("the widths do not move when the workspace opens or closes", async () => {
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
-    const w = colWidths();
-    expect(w.action).toBe("200px");
-    expect(w.items).toBe("auto");
-    expect(Object.values(w).filter((v) => v === "auto")).toHaveLength(1);
+    const open = colWidths();
+    expect(colWidths()).toEqual(open);
+  });
+
+  /** Item 6 of the card: the region scrolls rather than losing a column.
+   *  Deleting business information to avoid a scrollbar is what Loo forbade. */
+  it("the listing region keeps ONE min-width and scrolls below it", async () => {
+    await mountLoaded();
+    const region = screen.getByTestId("po-listing");
+    const scroller = region.querySelector(".overflow-auto") as HTMLElement;
+    expect(scroller.firstElementChild?.className).toContain("min-w-[1205px]");
+    expect(scroller.firstElementChild?.className).toContain("min-w-[1205px]");
   });
 
   it("every action word still carries its own title, so a clip can be read", async () => {
@@ -963,7 +1121,12 @@ describe("the ONE Current Action source (Law 7)", () => {
     await mountLoaded();
     expect(listing().getAllByText("Waiting for Goods").length).toBeGreaterThan(0);
     const cancelled = listing().getByText("PO-9002").closest("tr")!;
-    expect(within(cancelled as HTMLElement).getByText("—")).toBeInTheDocument();
+    // Since Q7 the row carries three columns that can be empty (SO No.,
+    // Destination, Current Action), so this asks for the ACTION cell by name.
+    const action = (cancelled as HTMLElement).querySelector(
+      "td:last-child",
+    ) as HTMLElement;
+    expect(within(action).getByText("—")).toBeInTheDocument();
   });
 
   it("an overdue PO's column says Contact Supplier, never Confirm again", async () => {
@@ -1330,13 +1493,7 @@ describe("the grid is the operator's (resize · reorder)", () => {
 
   it("dropping Supplier onto PO Issued reorders the REGISTER's own columns", async () => {
     await mountLoaded();
-    expect(headerTexts()).toEqual([
-      "PO Issued",
-      "Supplier",
-      "PO No.",
-      "Items",
-      "Current Action",
-    ]);
+    expect(headerTexts()).toEqual(NINE);
     fireEvent.dragStart(screen.getByRole("columnheader", { name: "Supplier" }), {
       dataTransfer: { effectAllowed: "" },
     });
@@ -1344,9 +1501,7 @@ describe("the grid is the operator's (resize · reorder)", () => {
     expect(headerTexts()).toEqual([
       "Supplier",
       "PO Issued",
-      "PO No.",
-      "Items",
-      "Current Action",
+      ...NINE.slice(2),
     ]);
   });
 
@@ -1365,10 +1520,9 @@ describe("the grid is the operator's (resize · reorder)", () => {
     // is precisely how a screen reader starts reading `Supplier Supplier —
     // Drag to resize`. The kit pins it; this asserts the page gets the repair.
     await mountLoaded();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
     for (const th of ths().slice(1)) {
       expect(th).toHaveAccessibleName(
-        /^(PO Issued|Supplier|PO No\.|Items|Customer Delivery|Goods Arrival|Received|Current Action)$/,
+        /^(PO Issued|Supplier|PO No\.|SO No\.|Items|Destination|Customer Delivery|Expected Arrival|Current Action)$/,
       );
     }
   });
