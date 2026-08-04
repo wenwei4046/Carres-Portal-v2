@@ -38,6 +38,15 @@ export const Z_LADDER: readonly ZLayer[] = [
 /** Layer 1 — the sticky table head, owned by `DataTable` (D0.5c). */
 export const Z_TABLE_HEADER = "z-10";
 
+/**
+ * Layer 1 AGAIN — the totals strip (D0.5d). An alias, deliberately, and not a
+ * sixth rung: a table's head and its totals row are the same thing, chrome
+ * that floats over its own rows, and they can never overlap each other. Giving
+ * the footer a layer of its own would have grown a closed set of five by one
+ * for no case that exists.
+ */
+export const Z_TABLE_FOOTER = Z_TABLE_HEADER;
+
 /** Layer 3 — everything that floats beside the thing that opened it. */
 export const Z_FLOATING = "z-30";
 

@@ -194,6 +194,8 @@ export default function UiShowcase() {
   const [picked, setPicked] = useState(true);
   const [some, setSome] = useState<boolean | "indeterminate">("indeterminate");
   const [date, setDate] = useState<string | null>("2026-07-19");
+  /* D0.5d — expansion is CONTROLLED, so the page owns which record is open. */
+  const [openRows, setOpenRows] = useState<ReadonlySet<string>>(new Set(["1"]));
 
   return (
     <main className="min-h-screen bg-kit-slate-3 p-8">
@@ -940,6 +942,88 @@ export default function UiShowcase() {
             The table is `table-fixed` on percentage widths, so it is always exactly the container
             width and never scrolls sideways; rows are 40px fixed and each cell clips its own
             overflow. Clicking a row opens its record — the drawer above.
+          </p>
+        </Section>
+
+        {/* ─── 5b · The grid powers — card D0.5d ───────────────────────────── */}
+        <Section
+          id="grid-powers"
+          title="DataTable — the grid powers, §7 · card D0.5d"
+          note="Row expand · column resize · column reorder · footer totals. Every one is an OPTIONAL prop: pass none and this is the D0.5c table, which is what lets a kit card ship while two of the three pages rendering through it are frozen. The record bar below the table is PageShell's own footer band, not a second one — it already existed."
+        >
+          <Card padding="none">
+            <div className="h-96">
+              <PageShell
+                variant="list"
+                title="To Order"
+                chips={[{ label: "Supplier: Ohana", onClear: () => {} }]}
+                /* Power 5 — the record bar — is PageShell's own band, not a
+                 * second one under the table. It is rendered here so `/ui`
+                 * shows the whole grid an operator meets. */
+                footer={<span>Record 3 of 55</span>}
+              >
+                <DataTable
+                  label="Purchase demands"
+                  rows={DEMO_ROWS}
+                  columns={DEMO_COLUMNS}
+                  rowId={(r) => r.id}
+                  expansion={{
+                    expanded: openRows,
+                    onToggle: (id) =>
+                      setOpenRows((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(id)) next.delete(id);
+                        else next.add(id);
+                        return next;
+                      }),
+                    label: (r) => `Show the lines of ${r.ref}`,
+                    render: (r) => (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-label text-kit-slate-11">Lines</span>
+                        <span className="text-body text-kit-slate-12">
+                          {r.customer} — the caller renders every word in here, and the kit renders
+                          none of them. {LONG}
+                        </span>
+                      </div>
+                    ),
+                  }}
+                  layout={{ resizeLabel: "Drag to resize", reorderLabel: "Drag to reorder" }}
+                  totals={{
+                    label: "Totals",
+                    cell: (c, rows) => (c.key === "owing" ? `${rows.length} rows` : null),
+                  }}
+                  empty="No demands match this filter"
+                />
+              </PageShell>
+            </div>
+          </Card>
+          <Card padding="none">
+            <div className="h-64">
+              <Sample label="empty — the totals strip is withheld, because a total of nothing is not a total">
+                <div className="w-full">
+                  <DataTable
+                    label="Purchase demands"
+                    rows={[]}
+                    columns={DEMO_COLUMNS}
+                    rowId={(r) => r.id}
+                    totals={{ label: "Totals", cell: () => "—" }}
+                    empty="No demands match this filter"
+                  />
+                </div>
+              </Sample>
+            </div>
+          </Card>
+          {/* The LOADING state is deliberately not drawn a second time here.
+           *  It is `Loading`'s own skeleton and already has a section on this
+           *  page, and the only thing D0.5d adds to it is an ABSENCE — the
+           *  totals strip withheld — which no screenshot can photograph. That
+           *  is asserted in `grid-powers.test.tsx` instead, which is where a
+           *  claim about something not being rendered actually holds. */}
+          <p className="text-meta text-kit-slate-11">
+            A resize takes width from the RIGHT NEIGHBOUR and never from the table, so the sum stays
+            the container and §7's first rule — a list table never scrolls sideways — survives the
+            first drag. The layout is NOT remembered between sessions: §0.4 rules that the tool's
+            shape is the company's, not the operator's, so a reload puts the columns back.
           </p>
         </Section>
 
