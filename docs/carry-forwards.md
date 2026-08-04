@@ -295,3 +295,25 @@ real supplier account is pointed at PO-2032 before then. In either case the
 answer is still not an UPDATE — it is to void the PO's test history wholesale
 with the rest of the seed data.
 
+### `po-workspace-rail-inline-copy` — LOW, blocked on PR 507
+
+`OperationPurchaseOrders.tsx` still draws its own 200px navigation rail inline.
+The shared recipe already exists at
+`apps/web/src/pages/operation/components/workspace-rail.tsx` and
+`OperationReceiving.tsx` renders through it.
+
+**After PR 507 lands** (the 4,047-conversion typography codemod, which owns that
+file today), `OperationPurchaseOrders.tsx` adopts `RailGroup` / `RailItem` and
+deletes its inline pair. It is an import, not a decision — the home is built.
+
+**This entry is NOT permission to edit the file while the codemod PR owns it.**
+Hand-resolving conflicts inside a 4,047-conversion codemod is how a codemod
+gets corrupted. Wait for 507.
+
+Worth carrying with it: extracting the recipe is what let the design linter SEE
+that the rail hovered BLUE, against `01-design-tokens` §2.3 (a row / nav / chip
+hovers grey; blue is the primary action and the selected row only). The shared
+copy is grey and guarded. **The inline copy in `OperationPurchaseOrders.tsx` is
+still blue**, hidden inside that file's baseline — adopting the shared
+primitive fixes it in the same move.
+
