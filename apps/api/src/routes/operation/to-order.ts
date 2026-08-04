@@ -316,22 +316,28 @@ async function loadToOrder(
    * stock buy has no customer to sit under — and so the issue path can map a
    * created purchase order back to the row that asked for it.
    *
-   * Open only: a demand already on a purchase order has left this workspace,
-   * exactly as a covered customer line has.
+   * OPEN MEANS "STILL SOMETHING TO BUY", AND THAT IS THE REMAINDER — not the
+   * absence of a purchase order link (0320, Loo's 2026-08-04 ruling). A demand
+   * for 5 whose ready stock covered 2 is a demand for 3 and must still be here;
+   * reading `po_id is null` would have shown it as 5 or as nothing at all.
+   * `remaining_qty` is generated in the database, so this number and the
+   * counter behind it cannot disagree.
    */
   {
     const { data: demandRows, error: demandErr } = await sb
       .from("purchase_demands")
-      .select("id, purpose, sku, supplier_id, destination_id, qty, required_by, remark")
-      .is("po_id", null)
+      .select(
+        "id, purpose, sku, supplier_id, destination_id, qty, issued_qty, remaining_qty, required_by, remark",
+      )
+      .gt("remaining_qty", 0)
       .is("cancelled_at", null);
     /**
      * THIS READ MAY NEVER TAKE THE PAGE DOWN.
      *
      * To Order's job is turning CUSTOMER orders into purchase orders, and it
      * did that for months before typed demand existed. If `purchase_demands` is
-     * absent — the window between deploying this code and applying 0318, a
-     * rebuilt environment, a half-applied migration — the FEATURE is
+     * absent — the window between deploying this code and applying 0319/0320,
+     * a rebuilt environment, a half-applied migration — the FEATURE is
      * unavailable and the workspace is untouched. Returning an error here would
      * 500 the whole page over an optional read, which is a far worse failure
      * than the one it would be reporting.
@@ -379,7 +385,9 @@ async function loadToOrder(
         sku: d.sku as string,
         category: category as ProductCategory,
         supplierId,
-        qty: Number(d.qty ?? 0),
+        // What is LEFT to buy, never what was originally asked for. The row is
+        // only in this list because that number is above zero.
+        qty: Number(d.remaining_qty ?? 0),
         deadline: (d.required_by as string | null) ?? null,
         leadDays,
         offDays: workWeekOffDaysFor(settings, supplierId),
@@ -886,17 +894,26 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
   }
 
   /**
-   * A READY STOCK DEMAND THAT JUST BECAME A PURCHASE ORDER STOPS BEING DEMAND.
+   * A READY STOCK DEMAND THAT JUST BECAME A PURCHASE ORDER STOPS BEING DEMAND —
+   * BY THE QUANTITY THAT WAS ORDERED, not all of it (0320, Loo 2026-08-04).
    *
    * The table carries no status column on purpose (Jess, 2026-08-01): open /
-   * ordered / done are DERIVED from `po_id`. So the ONE thing the issue path
-   * owes a demand is that link — without it the row sits on To Order for ever
-   * and gets ordered twice.
+   * ordered / done are DERIVED. What the issue path owes a demand is the
+   * NUMBER it took; without it the row sits on To Order for ever and gets
+   * ordered twice.
+   *
+   * IT GOES THROUGH THE RPC, and that is 0316's rule applied to this table:
+   * a quantity a client can PATCH is a quantity that moves with no arithmetic
+   * and no guard. `purchasing_demand_record_issue` adds rather than sets (two
+   * documents taking from one demand must add up), takes the row FOR UPDATE
+   * (two operators pressing Issue in the same second queue instead of both
+   * reading the same `issued_qty`), and refuses an over-issue by name — with
+   * the table's own CHECK behind it in case a second door is ever written.
    *
    * The map is EXACT rather than by supplier: each document names the builds it
    * carried, and a build knows its `orderId`, which for a ready stock demand is
-   * `demand:<uuid>`. So a demand is stamped with the purchase order that
-   * actually took it, never with "one of today's".
+   * `demand:<uuid>`. So a demand is credited to the purchase order that
+   * actually took it, never to "one of today's".
    */
   const buildRef = new Map(toOrderBuilds(proposal).map((b) => [b.buildKey, b]));
   const included = docs.filter((d) => d.include && d.buildKeys.length > 0);
@@ -904,37 +921,20 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
     const poId = ids[i];
     if (!poId) continue;
     for (const k of d.buildKeys) {
-      const m = /^demand:(.+)$/.exec(buildRef.get(k)?.orderId ?? "");
+      const ref = buildRef.get(k);
+      const m = /^demand:(.+)$/.exec(ref?.orderId ?? "");
       if (!m) continue;
-      /**
-       * CONDITIONAL on the demand still being unclaimed.
-       *
-       * Two operators can press Issue in the same second: both recomputations
-       * see the demand open, so both can raise a purchase order for it. The
-       * `is("po_id", null)` predicate means the SECOND stamp writes nothing and
-       * returns no row — which turns a silent double-order into a named,
-       * greppable event instead of one purchase order quietly overwriting the
-       * other's link.
-       *
-       * It does not PREVENT the duplicate. Preventing it needs the claim to
-       * happen inside the same transaction that creates the purchase order,
-       * which changes `operation_create_pos_batch`'s contract and is its own
-       * card. Recorded rather than hidden; exposure today is zero demands and
-       * a two-person duty roster.
-       */
-      const { data: stamped, error: stampErr } = await sb
-        .from("purchase_demands")
-        .update({ po_id: poId, ordered_at: new Date().toISOString() })
-        .eq("id", m[1]!)
-        .is("po_id", null)
-        .select("id");
+      const { error: stampErr } = await sb.rpc("purchasing_demand_record_issue", {
+        p_id: m[1]!,
+        p_qty: ref?.qty ?? 0,
+        p_po_id: poId,
+      });
       if (stampErr) {
         // The purchase orders exist and the supplier is about to be sent them.
         // Failing the whole issue now would destroy real work to protect a
-        // link; the demand reappearing is visible and recoverable.
-        console.error("purchase_demands stamp failed", m[1], stampErr.message);
-      } else if ((stamped ?? []).length === 0) {
-        console.error("purchase_demands already claimed — possible duplicate order", m[1], poId);
+        // number; the demand reappearing is visible and recoverable, and an
+        // over-issue refusal is exactly the double-order this names out loud.
+        console.error("purchase_demands issue record failed", m[1], stampErr.message);
       }
     }
   }

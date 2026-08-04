@@ -144,8 +144,18 @@ const TABLES = (): Tbl => ({
 
 /** Records what every table saw, plus every rpc + update call. */
 function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
-  const CHAIN = ["select", "in", "or", "eq", "neq", "gte", "ilike", "not", "is", "order", "limit"];
+  const CHAIN = [
+    "select", "in", "or", "eq", "neq", "gt", "gte", "ilike", "not", "is", "order", "limit",
+  ];
   const updates: { table: string; patch: unknown; id: unknown }[] = [];
+  /**
+   * Every filter every read applied. The mock does NOT evaluate them — the
+   * fixture is whatever it is — so a test that cares WHICH question was asked
+   * has to read the question rather than the answer. That is exactly the case
+   * for "still to buy": the fixture cannot tell `po_id is null` apart from
+   * `remaining_qty > 0`, and the whole of 0320 is that they are different.
+   */
+  const filters: { table: string; method: string; col: unknown; val: unknown }[] = [];
   const inserts: { table: string; rows: unknown }[] = [];
   const rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
   let poSeq = 2030;
@@ -153,7 +163,12 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
   function builder(table: string, result: { data: unknown; error: unknown }) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const b: any = {};
-    for (const m of CHAIN) b[m] = vi.fn(() => b);
+    for (const m of CHAIN) {
+      b[m] = vi.fn((col?: unknown, val?: unknown) => {
+        filters.push({ table, method: m, col, val });
+        return b;
+      });
+    }
     b.maybeSingle = vi.fn().mockResolvedValue({
       data: Array.isArray(result.data) ? (result.data[0] ?? null) : result.data,
       error: result.error,
@@ -263,7 +278,7 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
     return { data: { id: `PO-${poSeq}`, line_count: 1 }, error: null };
   });
 
-  return { from, rpc, updates, inserts, rpcCalls, tableCalls };
+  return { from, rpc, updates, inserts, rpcCalls, tableCalls, filters };
 }
 
 beforeAll(async () => {
@@ -1038,5 +1053,177 @@ describe("purchase_demands absent — fail closed, not down", () => {
       purchaseOrders: await defaultPlan(sb),
     });
     expect(res.status).toBe(200);
+  });
+});
+
+/**
+ * A DEMAND SURVIVES BEING PART SATISFIED (Loo, 2026-08-04 · migration 0320).
+ *
+ * 0319 froze "one row = one issue" and Loo ruled the business needs the other
+ * thing: a demand's quantity FALLS when ready stock is taken (card P10), so the
+ * row has to keep its remainder instead of disappearing or re-appearing whole.
+ */
+const DEMAND_ID = "9ce4bbb1-0000-4000-8000-00000000d001";
+
+/**
+ * A MATTRESS, deliberately — the live demand is `SONIC-S`, and mattress is the
+ * grain where a quantity is a quantity. Sofa counts BUILDS (one build is one
+ * sofa however many module lines it has), so a sofa fixture would have measured
+ * the sofa rule rather than the remainder.
+ */
+function withDemand(issued: number, qty = 5) {
+  const t = TABLES();
+  t.purchasing_production_days = {
+    data: [
+      { supplier_id: OHANA, category: "sofa", working_days: 14 },
+      { supplier_id: OHANA, category: "mattress", working_days: 10 },
+    ],
+    error: null,
+  };
+  t.product_skus = {
+    data: [
+      ...(t.product_skus.data as unknown[]),
+      {
+        sku: "SONIC-S",
+        supplier_id: OHANA,
+        cost: 300,
+        variant: "Single",
+        variant_kind: "size",
+        product_models: { category: "mattress", name: "Sonic" },
+      },
+    ],
+    error: null,
+  };
+  t.purchase_demands = {
+    data: [
+      {
+        id: DEMAND_ID,
+        purpose: "ready_stock",
+        sku: "SONIC-S",
+        supplier_id: OHANA,
+        destination_id: KLANG,
+        qty,
+        issued_qty: issued,
+        // GENERATED in the database. The fixture states it the way the wire
+        // carries it rather than recomputing it, because a test that does the
+        // subtraction itself would still pass if the column were dropped.
+        remaining_qty: qty - issued,
+        required_by: null,
+        remark: null,
+      },
+    ],
+    error: null,
+  };
+  return t;
+}
+
+/** The one demand row, wherever it landed among the proposals. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function demandRow(body: any) {
+  for (const p of body.proposals ?? []) {
+    for (const r of p.rows ?? []) if (r.orderId === `demand:${DEMAND_ID}`) return r;
+  }
+  return null;
+}
+
+describe("a partly satisfied demand keeps its remainder", () => {
+  it("shows what is LEFT to buy, not what was originally asked for", async () => {
+    const sb = makeSb(withDemand(2)); // 5 asked for, 2 already dealt with
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    const row = demandRow(body);
+    expect(row).not.toBeNull();
+
+    // 3, never 5. Buying 5 again is the double order this column exists to stop.
+    const units = row.builds.reduce((n: number, b: { qty: number }) => n + b.qty, 0);
+    expect(units).toBe(3);
+  });
+
+  it("an untouched demand is unchanged — the whole quantity is still to buy", async () => {
+    const sb = makeSb(withDemand(0));
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    const units = demandRow(body).builds.reduce(
+      (n: number, b: { qty: number }) => n + b.qty,
+      0,
+    );
+    expect(units).toBe(5);
+  });
+
+  it("asks what is LEFT, never whether a purchase order exists", async () => {
+    const sb = makeSb(withDemand(2));
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    await get();
+
+    const onDemands = sb.filters.filter((f) => f.table === "purchase_demands");
+    // The question that keeps a partly satisfied row alive.
+    expect(onDemands).toContainEqual({
+      table: "purchase_demands",
+      method: "gt",
+      col: "remaining_qty",
+      val: 0,
+    });
+    // The question that would have buried it. `po_id is null` reads a demand
+    // that was partly ordered as finished.
+    expect(
+      onDemands.some((f) => f.method === "is" && f.col === "po_id"),
+    ).toBe(false);
+  });
+
+  it("issuing records the quantity it took, through the door — never a PATCH", async () => {
+    const sb = makeSb(withDemand(2));
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    // The demand's OWN proposal — it is a mattress, and the sofa work is a
+    // separate document with a separate supplier×category key.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prop = body.proposals.find((p: any) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (p.rows ?? []).some((r: any) => r.orderId === `demand:${DEMAND_ID}`),
+    );
+    expect(prop).toBeTruthy();
+
+    const res = await post({
+      supplierId: prop.supplierId,
+      category: prop.category,
+      destinationId: KLANG,
+      purchaseOrders: [
+        {
+          key: "d1",
+          include: true,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          buildKeys: prop.rows.flatMap((r: any) => r.builds.map((b: any) => b.key)),
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+
+    const calls = sb.rpcCalls.filter((r) => r.fn === "purchasing_demand_record_issue");
+    expect(calls).toHaveLength(1);
+    // The REMAINDER it actually ordered, and the purchase order that took it.
+    expect(calls[0].args.p_id).toBe(DEMAND_ID);
+    expect(calls[0].args.p_qty).toBe(3);
+    expect(String(calls[0].args.p_po_id)).toMatch(/^PO-/);
+
+    // 0316's rule on this table: the quantity may not move by a client write.
+    expect(sb.updates.some((u) => u.table === "purchase_demands")).toBe(false);
+  });
+
+  it("a customer order is not a demand — it records nothing on this table", async () => {
+    const sb = makeSb(TABLES()); // no typed demand at all
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: await defaultPlan(sb),
+    });
+    expect(sb.rpcCalls.some((r) => r.fn === "purchasing_demand_record_issue")).toBe(false);
   });
 });
