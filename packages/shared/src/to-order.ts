@@ -261,6 +261,49 @@ export function ordersHeadline(n: number): string {
   return `${n} Order${n === 1 ? "" : "s"}`;
 }
 
+/**
+ * `19 units` — the CATEGORY rail row's tooltip (P9, Loo 2026-08-04).
+ *
+ * THE NUMBER ON SCREEN IS BARE. Loo ruled it: `Mattress 19`, never
+ * `Mattress 19 件`. So the rail prints the digit alone and the WORD lives
+ * here, in the row's `title`, for a hover and a screen reader — which is
+ * exactly where `ordersHeadline` already puts the PO Schedule block's word.
+ *
+ * That pairing is the whole point of this function existing. Two blocks of
+ * right-aligned numbers sit one above the other in a 200px rail and they
+ * count DIFFERENT THINGS: the calendar rows count customer ORDERS, the
+ * category rows count UNITS. A bare `3` and a bare `3` are indistinguishable,
+ * so the two tooltips must not be. `12 Orders` · `19 units` — COPY-STANDARD's
+ * own pair, verbatim from its Numbers section (`3 units` / `12 orders`); no
+ * word is invented here.
+ */
+export function unitsHeadline(n: number): string {
+  return `${n} unit${n === 1 ? "" : "s"}`;
+}
+
+/**
+ * `Mattress 7 · Bedframe 1 · Sofa 1` — what the ticked rows will buy, by
+ * category (P9, Loo 2026-08-04).
+ *
+ * Bare numbers again, and the category's own word does the labelling — the
+ * rail says `Mattress 19` and this says `Mattress 7`, one vocabulary.
+ *
+ * A category contributing NOTHING is dropped rather than printed as a zero,
+ * and that is the opposite of the rail's rule ON PURPOSE. The rail is a fixed
+ * vocabulary an operator navigates by, so `Sofa 0` must hold its place or the
+ * rows move under the pointer. This line is a SENTENCE about one selection;
+ * `Sofa 0` in it is a clause saying nothing, and five of them would bury the
+ * two that matter.
+ */
+export function categoryUnitsLine(
+  parts: readonly { word: string; units: number }[],
+): string {
+  return parts
+    .filter((p) => p.units > 0)
+    .map((p) => `${p.word} ${p.units}`)
+    .join(" · ");
+}
+
 /** `5 SO` — a group header's count, and a future run's count. */
 export function soCountLabel(n: number): string {
   return `${n} SO`;

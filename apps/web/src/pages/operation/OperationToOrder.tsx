@@ -48,6 +48,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   TO_ORDER_WORDS as W,
   categoryLabel,
+  categoryUnitsLine,
   defaultDocuments,
   ordersHeadline,
   poScheduleBucket,
@@ -58,6 +59,7 @@ import {
   selectedShort,
   issuePosShort,
   toOrderBuilds,
+  unitsHeadline,
   unresolvedHeadline,
   type ToOrderOrderedRow,
   type ToOrderProposal,
@@ -441,6 +443,65 @@ export default function OperationToOrder() {
       ),
     );
 
+  /**
+   * ── The rail's CATEGORY counts (P9, Loo 2026-08-04) ──────────────────────
+   *
+   * The six rows were hard-coded `count={null}`, so the page could not answer
+   * *"how many mattresses am I buying today?"* anywhere — the grid prints a
+   * per-row `Qty` and nothing totalled it.
+   *
+   * UNITS, not orders. The block above counts customer ORDERS; this one counts
+   * physical pieces, because a purchaser buys pieces. Two right-aligned columns
+   * of digits in a 200px rail is how a number gets misread, so each row's
+   * tooltip names its own unit — `12 Orders` up there, `19 units` here.
+   *
+   * WHAT IS COUNTED, and each half is a decision:
+   *
+   * · UNISSUED ONLY (`poOf(r)` skipped) — the same rule `timeCounts` has used
+   *   since the calendar shipped ("unissued work per calendar row, falling as
+   *   POs land"). Loo's question is what he is BUYING; a row already on a
+   *   purchase order has been bought. Two adjacent counts where one falls on
+   *   Issue and the other does not would be worse than either alone.
+   *
+   * · THE CASCADE — every narrowing on the page EXCEPT the category picks
+   *   themselves (`filteredExcept(null)` over `inView`, which the memo below
+   *   re-derives WITHOUT `catSet`). This is the portal's own facet law (§8.2,
+   *   PR 494: each group counted with every filter except its own), and here
+   *   it buys one concrete guarantee: the number a row shows is the number of
+   *   units its click produces. Count against the unfiltered set instead and
+   *   the rail says `Mattress 19` while clicking it shows 3, because the
+   *   Supplier column is filtered.
+   *
+   * `All` is counted the same way, so it always equals what CLEARING the
+   * category gives back — the two rows stay arithmetically consistent with
+   * each other whichever one is lit.
+   */
+  const categoryUnits = useMemo(() => {
+    const byCategory = new Map<string, number>();
+    let all = 0;
+    for (const r of allRows) {
+      if (poOf(r)) continue;
+      // Everything `inView` applies except the category picks — see above.
+      if (viewSet.size > 0 && !viewSet.has(r.bucket)) continue;
+      const q = search.trim().toLowerCase();
+      if (
+        q !== "" &&
+        !(
+          (r.so != null && `so-${r.so}`.includes(q)) ||
+          r.model.toLowerCase().includes(q) ||
+          (r.customer ?? "").toLowerCase().includes(q) ||
+          (poOf(r) ?? "").toLowerCase().includes(q)
+        )
+      )
+        continue;
+      if (![...colFilters.entries()].every(([k, sel]) => passes(r, k, sel))) continue;
+      byCategory.set(r.category, (byCategory.get(r.category) ?? 0) + r.qty);
+      all += r.qty;
+    }
+    return { byCategory, all };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRows, viewSet, search, colFilters, rowPo]);
+
   const visibleRows = useMemo(() => {
     const rows = filteredExcept(null);
     const dir = sort?.dir === "desc" ? -1 : 1;
@@ -553,9 +614,24 @@ export default function OperationToOrder() {
   const batch = useMemo(() => {
     const selectedByProposal = new Map<string, Set<string>>();
     let selectedRows = 0;
+    /**
+     * P9 (Loo, 2026-08-04): UNITS per category for what is TICKED — the
+     * footer's line. It is accumulated HERE, in the loop that already decides
+     * what Issue acts on, rather than in a memo of its own.
+     *
+     * That is structural, not tidiness. The batch is VIEW-SCOPED (Jess's
+     * Excel law two comments up: a tick hidden by a filter neither counts nor
+     * issues). A second count walking `allRows`, or walking `visibleRows` with
+     * its own copy of the selection test, would agree with the button today
+     * and drift the first time either predicate is touched — and a footer that
+     * promises 7 mattresses while the click buys 3 is worse than no footer.
+     * One loop, one list, one answer.
+     */
+    const unitsByCategory = new Map<string, number>();
     for (const r of visibleRows) {
       if (r.proposalKey == null || r.buildKey == null || !isSelected(r)) continue;
       selectedRows += 1;
+      unitsByCategory.set(r.category, (unitsByCategory.get(r.category) ?? 0) + r.qty);
       const s = selectedByProposal.get(r.proposalKey) ?? new Set<string>();
       s.add(r.buildKey);
       selectedByProposal.set(r.proposalKey, s);
@@ -587,9 +663,33 @@ export default function OperationToOrder() {
         ]),
       });
     }
-    return { selectedRows, poCount, targets };
+    return { selectedRows, poCount, targets, unitsByCategory };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleRows, userOff, userOn, rowPo, planned]);
+
+  /**
+   * `Mattress 7 · Bedframe 1 · Sofa 1` — the footer's line, in Loo's own
+   * walking order (`RAIL_CATEGORIES`), so the footer and the rail read down
+   * in the same sequence. A category nothing ticked contributes nothing;
+   * `categoryUnitsLine` drops it.
+   *
+   * Any category the wire produces that the rail does not name is appended
+   * rather than dropped — the rail is a FIXED vocabulary and this line is a
+   * total, and a total that silently omits units would be the same lie the
+   * card exists to end.
+   */
+  const footerUnits = useMemo(() => {
+    const named = RAIL_CATEGORIES.map((c) => ({
+      word: c.word,
+      units: batch.unitsByCategory.get(c.key) ?? 0,
+    }));
+    const knownKeys = new Set(RAIL_CATEGORIES.map((c) => c.key));
+    const extra = [...batch.unitsByCategory.entries()]
+      .filter(([k]) => !knownKeys.has(k))
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, units]) => ({ word: categoryLabel(k), units }));
+    return categoryUnitsLine([...named, ...extra]);
+  }, [batch]);
 
   const defaultDest = destinations.find((d) => d.isDefault) ?? destinations[0] ?? null;
 
@@ -952,12 +1052,19 @@ export default function OperationToOrder() {
           <span className="px-2 pb-1 text-label font-medium uppercase text-kit-slate-11">
             {W.categoryHeading}
           </span>
+          {/* P9 (Loo, 2026-08-04): the bare number is UNITS; the word that
+              tells it apart from the ORDERS counted above lives in the
+              tooltip. A zero row still renders its number — a category is a
+              fixed vocabulary, and hiding `Sofa 0` would change the rail's
+              shape under the operator, which is the one thing a navigator
+              may never do. */}
           <NavRow
             active={catSet.size === 0}
             onClick={clearCats}
             testId="to-order-cat-all"
             name={W.categoryAll}
-            count={null}
+            count={String(categoryUnits.all)}
+            countWord={unitsHeadline(categoryUnits.all)}
           />
           {RAIL_CATEGORIES.map((c) => (
             <NavRow
@@ -966,7 +1073,8 @@ export default function OperationToOrder() {
               onClick={() => toggleCat(c.key)}
               testId={`to-order-cat-${c.key}`}
               name={c.word}
-              count={null}
+              count={String(categoryUnits.byCategory.get(c.key) ?? 0)}
+              countWord={unitsHeadline(categoryUnits.byCategory.get(c.key) ?? 0)}
             />
           ))}
 
@@ -1244,6 +1352,40 @@ export default function OperationToOrder() {
                   className="shrink-0 flex items-center gap-3 px-3 h-10 border border-t-0 border-kit-slate-5 bg-white text-meta text-kit-slate-11"
                   data-testid="to-order-footer"
                 >
+                  {/* P9 (Loo, 2026-08-04) — what the tick will BUY, by
+                      category, in units.
+
+                      THE CARD SAYS "footer, beside the Issue button" and the
+                      two are different places, so the widths were MEASURED in
+                      a real browser rather than guessed (jsdom has none).
+                      With every row ticked on live data the line is
+                      `Mattress 15 · Bedframe 4 · Sofa 1`, and adding it to
+                      the toolbar beside the pill costs 257px:
+
+                        1280×720 — toolbar bar 764px, 223px spare → DOES NOT
+                                   FIT; the search box gets squeezed
+                        1920×1080 — bar 1404px, 607px spare → fits
+
+                      A line that fits on the manager's monitor and breaks on
+                      an operator's laptop is not a placement. The footer is a
+                      full-width 40px band carrying one right-aligned button:
+                      191px used of 764, 573px spare at 1280. So the pair Loo
+                      asked for still reads as one sentence — `15 selected ·
+                      Issue 3 POs` above the grid, the breakdown below it —
+                      and the number of categories can grow to five without
+                      anything moving.
+
+                      Present only while something is ticked, because that is
+                      the only time it has anything to say — the same
+                      condition the Issue pill itself renders on. */}
+                  {batch.selectedRows > 0 && footerUnits !== "" ? (
+                    <span
+                      className="tabular-nums"
+                      data-testid="to-order-footer-units"
+                    >
+                      {footerUnits}
+                    </span>
+                  ) : null}
                   {/* A column filter narrows SILENTLY (the ▼ turns funnel, and
                       that is all) — so whenever one is on, the footer says so
                       and hands back the way out. Jess's "why 6 orders?" is

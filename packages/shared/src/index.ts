@@ -1842,6 +1842,8 @@ export {
   validateIssuePlan,
   sortToOrderRows,
   unresolvedHeadline,
+  unitsHeadline,
+  categoryUnitsLine,
   unitLabel,
   poScheduleDays,
   snapToPoDay,

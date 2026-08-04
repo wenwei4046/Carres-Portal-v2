@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildToOrder,
+  categoryUnitsLine,
   composeSummary,
   countItems,
   countOrders,
@@ -17,6 +18,7 @@ import {
   sizeShort,
   soCountLabel,
   sortToOrderRows,
+  unitsHeadline,
   poScheduleDays,
   snapToPoDay,
   poScheduleBucket,
@@ -188,6 +190,47 @@ describe("the purchase-order boundary", () => {
     expect(ordersHeadline(12)).toBe("12 Orders");
     expect(soCountLabel(1)).toBe("1 SO");
     expect(soCountLabel(38)).toBe("38 SO");
+  });
+
+  it("P9 — the CATEGORY rail's tooltip says UNITS where the calendar's says Orders", () => {
+    // The two blocks sit one above the other in a 200px rail and count
+    // DIFFERENT THINGS. The numbers on screen are bare, so these two
+    // sentences are the ONLY thing telling a `3` from a `3`.
+    expect(unitsHeadline(1)).toBe("1 unit");
+    expect(unitsHeadline(19)).toBe("19 units");
+    expect(unitsHeadline(0)).toBe("0 units");
+    // COPY-STANDARD's Numbers section rules the pair `3 units` / `12 orders`;
+    // neither word is invented here, and they must never converge.
+    expect(unitsHeadline(3)).not.toBe(ordersHeadline(3));
+  });
+
+  it("P9 — the ticked line names each category once, bare, and drops the empty ones", () => {
+    expect(
+      categoryUnitsLine([
+        { word: "Mattress", units: 7 },
+        { word: "Bedframe", units: 1 },
+        { word: "Sofa", units: 1 },
+      ]),
+    ).toBe("Mattress 7 · Bedframe 1 · Sofa 1");
+    // A category contributing nothing is DROPPED — the opposite of the rail,
+    // where `Sofa 0` must hold its place. This is a sentence about one
+    // selection, and `Sofa 0` in it is a clause saying nothing.
+    expect(
+      categoryUnitsLine([
+        { word: "Mattress", units: 5 },
+        { word: "Bedframe", units: 0 },
+        { word: "Sofa", units: 0 },
+        { word: "Pillow", units: 0 },
+        { word: "Mattress Protector", units: 0 },
+      ]),
+    ).toBe("Mattress 5");
+    // Nothing ticked at all says nothing — the footer renders no line.
+    expect(categoryUnitsLine([{ word: "Sofa", units: 0 }])).toBe("");
+    expect(categoryUnitsLine([])).toBe("");
+    // Loo, 2026-08-04: BARE. No unit word may reach this string.
+    const line = categoryUnitsLine([{ word: "Mattress", units: 7 }]);
+    expect(line).toBe("Mattress 7");
+    expect(line).not.toMatch(/unit|pcs|piece|件/i);
   });
 
   it("a rail row's item label — the model plus the size LETTER, never the full word", () => {
