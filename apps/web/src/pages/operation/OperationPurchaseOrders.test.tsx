@@ -215,7 +215,43 @@ const POS = [
       },
     ],
   },
+  {
+    // THE ESTIMATE CASE — the one Q1 exists for. The factory has never given a
+    // date, so `eta_date` is null and the register shows OUR OWN estimate
+    // (issued + the supplier × category production days). It still lands after
+    // the customer's date, so the gap speaks — in AMBER, because nobody at the
+    // factory has said anything. Live, 8 of the 10 gap warnings are this.
+    id: "PO-9007",
+    supplier_id: OHANA,
+    warehouse_id: WH,
+    status: "open",
+    sup_status: "confirmed",
+    so: 1700,
+    so_refs: null,
+    eta_date: null,
+    placed_at: "2099-03-02T08:00:00Z",
+    customer_delivery: "2099-03-03",
+    eta_revised: false,
+    orders: [],
+    purchase_order_lines: [line("g1", "SKU-JAGER-K", 1, "Jager", "King")],
+  },
 ];
+
+/** The catalog the ESTIMATE needs: a SKU → model → category, so
+ *  `productionDays` can be resolved for PO-9007. Deliberately ONE sku —
+ *  `SKU-CODY-Q` stays out, or the workspace would start printing a `Queen`
+ *  size sub-line the name already carries, and `RAW-UNKNOWN-1` stays out so it
+ *  keeps proving the no-`model_name` fallback. */
+const CATALOG = {
+  skus: [{ sku: "SKU-JAGER-K", modelId: "m-jager", variant: null }],
+  models: [{ id: "m-jager", name: "Jager", category: "bedframe" }],
+};
+const PURCHASING_SETTINGS = {
+  productionDays: [
+    { supplierId: OHANA, category: "bedframe", workingDays: 7 },
+  ],
+  suppliers: [{ id: OHANA, offDays: [0] }],
+};
 
 beforeEach(() => {
   apiFetch.mockReset();
@@ -251,10 +287,9 @@ beforeEach(() => {
       });
     if (url === "/api/operation/warehouse")
       return Promise.resolve({ warehouses: [] });
-    if (url.startsWith("/api/catalog"))
-      return Promise.resolve({ skus: [], models: [] });
+    if (url.startsWith("/api/catalog")) return Promise.resolve(CATALOG);
     if (url.startsWith("/api/operation/purchasing/settings"))
-      return Promise.resolve({ productionDays: [], suppliers: [] });
+      return Promise.resolve(PURCHASING_SETTINGS);
     return Promise.resolve({});
   });
 });
@@ -291,6 +326,19 @@ const headerTexts = () =>
  *  WhatsApp draft), so every row assertion scopes to the LISTING's table. */
 const listing = () => within(screen.getByRole("table"));
 const hasRow = (id: string) => listing().queryAllByText(id).length > 0;
+
+/** Select one PO in the register and wait for its workspace.
+ *  Needed since the default order became RISK (Loo, 2026-08-04): the row that
+ *  auto-selects is the most DANGEROUS PO, not a fixed fixture. A test about
+ *  one PO now says which one. */
+async function openPo(id: string) {
+  fireEvent.click(listing().getByText(id));
+  await waitFor(() =>
+    expect(
+      within(screen.getByTestId("po-working-header")).getByText(id),
+    ).toBeInTheDocument(),
+  );
+}
 
 describe("the eight frozen columns", () => {
   it("compact mode (workspace open) keeps exactly Jess's five", async () => {
@@ -335,21 +383,63 @@ describe("the eight frozen columns", () => {
   });
 });
 
-describe("the default order — PO Issued, oldest first", () => {
-  it("sorts by the issued date, never the PO number", async () => {
-    await mountLoaded();
-    const cells = listing()
+/**
+ * THE DEFAULT ORDER IS RISK TO THE CUSTOMER'S PROMISE (Loo, 2026-08-04).
+ *
+ * It replaces `PO Issued` oldest first, which sorted by how long the DOCUMENT
+ * had waited rather than by how close the CUSTOMER was. Jess's rule is NOT
+ * deleted: it keeps its column, its header sort, and it survives inside
+ * `comparePoRisk` as the tie-breaker.
+ */
+describe("the default order — risk to the customer's promise", () => {
+  const order = () =>
+    listing()
       .getAllByText(/^PO-9\d{3}$/)
       .map((el) => el.textContent);
-    // 10 Jan (9004) → 5 Jan… wait: issued dates are 9004 10-Jan, 9001 5-Jan,
-    // 9002 1-Feb, 9003 1-Mar → oldest first, never the PO number.
-    expect(cells).toEqual([
-      "PO-9001",
-      "PO-9004",
-      "PO-9002",
+
+  it("a late call leads, then goods landing after the promise, then on the day", async () => {
+    await mountLoaded();
+    expect(order()).toEqual([
+      // rung 1 — an open engine call already late (9003 arrives today, 9004's
+      // date has passed). Inside the rung, the nearer customer date first and
+      // a PO with no customer date LAST.
       "PO-9003",
+      "PO-9004",
+      // rung 2 — the goods land after what we promised. 9007 is our own
+      // ESTIMATE (3 Mar) and 9001 the factory's own word (22 Dec).
+      "PO-9007",
+      "PO-9001",
+      // rung 3 — they land ON the customer's day.
+      "PO-9005",
+      // rung 5 — the work is over: fully received, then cancelled.
+      "PO-9006",
+      "PO-9002",
+    ]);
+  });
+
+  it("PO Issued still sorts by header click — and clearing returns to RISK", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("table-sort-issued"));
+    expect(order()).toEqual([
+      "PO-9001", // 5 Jan
+      "PO-9004", // 10 Jan
+      "PO-9002", // 1 Feb
+      "PO-9003", // 1 Mar
+      "PO-9005", // 1 Apr
+      "PO-9006", // 1 May
+      "PO-9007", // 2099
+    ]);
+    // asc → desc → cleared. A third click hands the page back its own default.
+    fireEvent.click(screen.getByTestId("table-sort-issued"));
+    fireEvent.click(screen.getByTestId("table-sort-issued"));
+    expect(order()).toEqual([
+      "PO-9003",
+      "PO-9004",
+      "PO-9007",
+      "PO-9001",
       "PO-9005",
       "PO-9006",
+      "PO-9002",
     ]);
   });
 });
@@ -435,8 +525,10 @@ describe("the gap against the customer's date", () => {
     expect(
       within(row as HTMLElement).queryByTestId("po-arrival-gap"),
     ).toBeNull();
-    // …and exactly the two live ones speak, nobody else.
-    expect(gaps()).toEqual(["8d late", "same day"]);
+    // …and exactly the three live ones speak, nobody else: 9007 (estimate),
+    // 9001 (`8d late`) and 9005 (`same day`), in risk order.
+    expect(gaps()).toHaveLength(3);
+    expect(gaps().slice(1)).toEqual(["8d late", "same day"]);
   });
 
   it("the gap survives beside (revised) — the warning is never the thing cut", async () => {
@@ -456,6 +548,107 @@ describe("the gap against the customer's date", () => {
     expect(
       within(header).getAllByTestId("po-arrival-gap").length,
     ).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * A GUESS IS NOT PAINTED THE SAME AS A FACT (Loo, 2026-08-04).
+ *
+ * Ten of the live 21 rows print a gap warning and EIGHT of them are computed
+ * from OUR OWN estimate — the factory has said nothing. The date was already
+ * grey while the warning beside it was red, identical to the rows where the
+ * supplier really did give a date. No new word: only the tone.
+ */
+describe("the gap's tone says WHO gave the date", () => {
+  const gapIn = (id: string) =>
+    within(listing().getByText(id).closest("tr") as HTMLElement).getByTestId(
+      "po-arrival-gap",
+    );
+
+  it("the FACTORY's own date landing late is RED", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
+    const gap = gapIn("PO-9001"); // eta_date on the wire = the supplier's word
+    expect(gap.getAttribute("data-tone")).toBe("confirmed");
+    expect(gap.className).toContain("text-kit-red-11");
+  });
+
+  it("OUR OWN estimate landing late is AMBER — nobody has said anything yet", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
+    const gap = gapIn("PO-9007"); // no eta_date: issued + production days
+    expect(gap.getAttribute("data-tone")).toBe("estimate");
+    expect(gap.className).toContain("text-kit-amber-11");
+    expect(gap.className).not.toContain("text-kit-red-11");
+  });
+
+  it("`same day` stays amber even when the factory said it — tight, not broken", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
+    const gap = gapIn("PO-9005");
+    expect(gap).toHaveTextContent("same day");
+    expect(gap.className).toContain("text-kit-amber-11");
+  });
+
+  it("the workspace uses the SAME rule — two surfaces cannot disagree", async () => {
+    await mountLoaded();
+    await openPo("PO-9001");
+    const doc = within(screen.getByTestId("po-document"));
+    expect(
+      doc.getAllByTestId("po-arrival-gap")[0].getAttribute("data-tone"),
+    ).toBe("confirmed");
+    await openPo("PO-9007");
+    const doc2 = within(screen.getByTestId("po-document"));
+    expect(
+      doc2.getAllByTestId("po-arrival-gap")[0].getAttribute("data-tone"),
+    ).toBe("estimate");
+  });
+});
+
+/**
+ * THE COLUMN THAT SAYS WHAT TO DO STOPS BEING THE ONE THAT IS SQUEEZED
+ * (Loo, 2026-08-04). `Current Action` was `width: "auto"`, so it got the
+ * LEFTOVER — measured in a real browser at 23px on a 1280 viewport and 109 on
+ * a 1366, with `text-overflow: clip`, so not even an ellipsis said so.
+ *
+ * **The real widths are MEASURED IN A BROWSER, never here** — jsdom has no
+ * layout, so this asserts the CONTRACT the browser then renders: which column
+ * is fixed and which one absorbs the slack.
+ */
+describe("Current Action is a fixed column; Items is the tail", () => {
+  const colWidths = () => {
+    const table = screen.getByRole("table");
+    const cols = Array.from(table.querySelectorAll("colgroup col"));
+    const keys = within(table)
+      .getAllByRole("columnheader")
+      .map((th) => th.getAttribute("data-column"));
+    return Object.fromEntries(
+      keys.map((k, i) => [k, (cols[i] as HTMLElement)?.style.width]),
+    );
+  };
+
+  it("compact: Current Action holds 200px and Items takes what is left", async () => {
+    await mountLoaded();
+    const w = colWidths();
+    expect(w.action).toBe("200px");
+    expect(w.items).toBe("auto");
+    // Exactly ONE auto tail — the recipe is unchanged, only which column it is.
+    expect(Object.values(w).filter((v) => v === "auto")).toHaveLength(1);
+  });
+
+  it("expanded: the same rule, so the two modes cannot drift", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
+    const w = colWidths();
+    expect(w.action).toBe("200px");
+    expect(w.items).toBe("auto");
+    expect(Object.values(w).filter((v) => v === "auto")).toHaveLength(1);
+  });
+
+  it("every action word still carries its own title, so a clip can be read", async () => {
+    await mountLoaded();
+    const cell = listing().getAllByText("Waiting for Goods")[0];
+    expect(cell.getAttribute("title")).toBe("Waiting for Goods");
   });
 });
 
@@ -587,13 +780,16 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
     expect(header.getByText("PO Issued")).toBeInTheDocument();
     expect(header.getByText("Delivery To")).toBeInTheDocument();
     expect(header.getByText("Supplier")).toBeInTheDocument();
-    expect(header.getByText("PO-9001")).toBeInTheDocument();
+    // The auto-selected PO is the register's FIRST row, which is now the most
+    // dangerous one rather than the oldest document (Loo, 2026-08-04).
+    expect(header.getByText("PO-9003")).toBeInTheDocument();
     // Progress belongs to the rail — the header never repeats it.
     expect(screen.queryByTestId("po-work-state")).not.toBeInTheDocument();
   });
 
   it("the supplier-date row opens IN PLACE and carries the field's own history", async () => {
     await mountLoaded();
+    await openPo("PO-9001");
     expect(screen.queryByTestId("po-date-extend")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("po-date-row"));
     const ext = within(screen.getByTestId("po-date-extend"));
@@ -727,6 +923,7 @@ describe("the supplier-date door (Jess's cycle, one form)", () => {
   it("keying a DIFFERENT date asks for a reason and posts a delay", async () => {
     await mountLoaded();
     // PO-9001 holds a supplier-confirmed date (its ledger says so).
+    await openPo("PO-9001");
     fireEvent.click(screen.getByTestId("po-date-row"));
     fireEvent.click(screen.getByTestId("po-date-open"));
     const input = screen.getByTestId("po-date-input");
@@ -820,6 +1017,7 @@ describe("the supplier's date history, numbered (SAP's shape)", () => {
 
   it("once a date is keyed it says exactly what Save will record", async () => {
     await mountLoaded();
+    await openPo("PO-9001"); // it holds 2099-12-30 — the date this test keys
     fireEvent.click(screen.getByTestId("po-date-row"));
     fireEvent.click(screen.getByTestId("po-date-open"));
     const input = screen.getByTestId("po-date-input");
@@ -929,6 +1127,7 @@ describe("inline edit — Esc puts it back", () => {
 describe("what we sent the supplier (0312)", () => {
   it("the draft is EDITABLE, and Save as template puts the placeholders back", async () => {
     await mountLoaded();
+    await openPo("PO-9001");
     fireEvent.click(screen.getByTestId("po-wa-toggle"));
     const box = screen.getByTestId("po-wa-message") as HTMLTextAreaElement;
     expect(box.tagName).toBe("TEXTAREA");
@@ -954,6 +1153,7 @@ describe("what we sent the supplier (0312)", () => {
   it("Email is a mailto: — the portal has no sender, and says so when there is no address", async () => {
     await mountLoaded();
     // PO-9001 is Nice Future, which has an address on file.
+    await openPo("PO-9001");
     const mail = screen.getByTestId("po-open-email") as HTMLAnchorElement;
     expect(mail.getAttribute("href")).toMatch(/^mailto:sales%40nicefuture\.example\?subject=/);
     // Ohana has none — the panel states the absence instead of a dead button.
@@ -973,6 +1173,7 @@ describe("what we sent the supplier (0312)", () => {
   // itself opening, so nobody has to remember afterwards. Only the claim moved.
   it("the DOOR records itself opening — no I've sent button to remember afterwards", async () => {
     await mountLoaded();
+    await openPo("PO-9001"); // the one supplier with an address on file
     expect(screen.getByTestId("po-history").textContent).toBe("No communication yet.");
     expect(screen.queryByTestId("po-sent")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("po-open-email"));
@@ -1039,6 +1240,7 @@ describe("what we sent the supplier (0312)", () => {
     await mountLoaded();
     // PO-9001 is Nice Future: a phone on file and no group, so the click opens
     // a `wa.me/` chat with ONE named party.
+    await openPo("PO-9001");
     const wa = screen.getByTestId("po-open-whatsapp") as HTMLAnchorElement;
     expect(wa).toHaveTextContent("Open WhatsApp");
     expect(wa).not.toHaveTextContent("group");

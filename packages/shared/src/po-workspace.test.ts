@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  comparePoRisk,
   ordinalLabel,
   poDateHistoryOf,
+  poRiskRungOf,
+  type PoRiskRow,
   PO_DELAY_REASONS,
   PO_STATE_ACTION_SHORT,
   PO_STATE_ACTION_WORD,
@@ -259,5 +262,121 @@ describe("poArrivalGapOf", () => {
   it("counts CALENDAR days — a customer does not care that it is a Sunday", () => {
     // 31 Aug → 1 Sep crosses a month end; the arithmetic must not care.
     expect(poArrivalGapOf("2026-08-31", "2026-09-02")?.days).toBe(2);
+  });
+});
+
+/**
+ * RISK ORDER (Loo, 2026-08-04) — which purchase order to touch FIRST.
+ *
+ * The register opened on `PO Issued` oldest first, which sorts by how long the
+ * DOCUMENT has waited. Measured live: `PO-2038`'s customer was expecting goods
+ * that same day, the factory had never given a date, and it sat at row 8.
+ */
+describe("comparePoRisk — the register's default order", () => {
+  const row = (over: Partial<PoRiskRow> = {}): PoRiskRow => ({
+    poId: "PO-1",
+    state: "need_confirmation",
+    calls: [],
+    customerDeliveryIso: null,
+    arrivalIso: null,
+    placedAtIso: "2026-05-01T08:00:00Z",
+    ...over,
+  });
+
+  it("the five rungs, in order", () => {
+    // 1 — an open engine call that is already LATE.
+    expect(poRiskRungOf(row({ calls: [{ late: true }] }))).toBe(1);
+    // 2 — the goods land AFTER what we promised the customer.
+    expect(
+      poRiskRungOf(
+        row({ customerDeliveryIso: "2026-08-17", arrivalIso: "2026-08-25" }),
+      ),
+    ).toBe(2);
+    // 3 — they land ON the customer's own day: no room for one hiccup.
+    expect(
+      poRiskRungOf(
+        row({ customerDeliveryIso: "2026-08-18", arrivalIso: "2026-08-18" }),
+      ),
+    ).toBe(3);
+    // 4 — an open call that is not late yet.
+    expect(poRiskRungOf(row({ calls: [{ late: false }] }))).toBe(4);
+    // 5 — nothing to say.
+    expect(poRiskRungOf(row())).toBe(5);
+  });
+
+  it("a LATE call outranks goods landing after the promise", () => {
+    const late = row({ poId: "PO-LATE", calls: [{ late: true }] });
+    const after = row({
+      poId: "PO-AFTER",
+      customerDeliveryIso: "2026-08-17",
+      arrivalIso: "2026-08-25",
+    });
+    expect([after, late].sort(comparePoRisk).map((r) => r.poId)).toEqual([
+      "PO-LATE",
+      "PO-AFTER",
+    ]);
+  });
+
+  it("a FINISHED or CANCELLED PO never rises, however late its goods were", () => {
+    // The gap is history, not work — the same silence the Goods Arrival cell
+    // already keeps for a PO whose work is over.
+    const done = row({
+      poId: "PO-DONE",
+      state: "completed",
+      customerDeliveryIso: "2026-05-10",
+      arrivalIso: "2026-05-20",
+      calls: [{ late: true }],
+    });
+    const cancelled = row({ poId: "PO-CANX", state: "cancelled" });
+    expect(poRiskRungOf(done)).toBe(5);
+    expect(poRiskRungOf(cancelled)).toBe(5);
+    const quiet = row({ poId: "PO-QUIET", calls: [{ late: false }] });
+    expect([done, quiet, cancelled].sort(comparePoRisk).map((r) => r.poId)[0]).toBe(
+      "PO-QUIET",
+    );
+  });
+
+  it("inside a rung the NEAREST customer date leads, and no date sorts LAST", () => {
+    const near = row({ poId: "PO-NEAR", calls: [{ late: true }], customerDeliveryIso: "2026-08-04" });
+    const far = row({ poId: "PO-FAR", calls: [{ late: true }], customerDeliveryIso: "2026-09-30" });
+    const none = row({ poId: "PO-NONE", calls: [{ late: true }], customerDeliveryIso: null });
+    expect([none, far, near].sort(comparePoRisk).map((r) => r.poId)).toEqual([
+      "PO-NEAR",
+      "PO-FAR",
+      "PO-NONE",
+    ]);
+  });
+
+  it("Jess's PO Issued rule survives as the TIE-BREAKER, oldest first", () => {
+    const old = row({ poId: "PO-OLD", placedAtIso: "2026-01-05T08:00:00Z" });
+    const recent = row({ poId: "PO-NEW", placedAtIso: "2026-07-05T08:00:00Z" });
+    expect([recent, old].sort(comparePoRisk).map((r) => r.poId)).toEqual([
+      "PO-OLD",
+      "PO-NEW",
+    ]);
+  });
+
+  it("the order is TOTAL — two identical rows still cannot swap between renders", () => {
+    const a = row({ poId: "PO-2001" });
+    const b = row({ poId: "PO-2002" });
+    expect(comparePoRisk(a, b)).toBeLessThan(0);
+    expect(comparePoRisk(b, a)).toBeGreaterThan(0);
+    expect(comparePoRisk(a, a)).toBe(0);
+  });
+
+  it("PO-2038's own shape: an ESTIMATE that lands after the promise still rises", () => {
+    // The live case this card exists for — the factory has said nothing, so
+    // there is no call at all and the only signal is our own estimate.
+    const p2038 = row({
+      poId: "PO-2038",
+      customerDeliveryIso: "2026-08-04",
+      arrivalIso: "2026-08-11",
+    });
+    const quiet = row({ poId: "PO-QUIET", placedAtIso: "2026-01-01T08:00:00Z" });
+    expect(poRiskRungOf(p2038)).toBe(2);
+    expect([quiet, p2038].sort(comparePoRisk).map((r) => r.poId)).toEqual([
+      "PO-2038",
+      "PO-QUIET",
+    ]);
   });
 });
