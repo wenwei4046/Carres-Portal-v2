@@ -24,6 +24,10 @@ import {
   snapToPoDay,
   poScheduleBucket,
   weekdayName,
+  freeStockLine,
+  takeFromStockLabel,
+  tookFromStockLabel,
+  stockExpandLabel,
   type ToOrderLine,
   type ToOrderRow,
 } from "./to-order";
@@ -544,11 +548,32 @@ describe("Stock Ready", () => {
     expect(sofa.rows.map((r) => r.customer)).toEqual(["ella", "PETER"]);
   });
 
+  /**
+   * The fields `sortToOrderRows` never reads. They were simply omitted here
+   * until 2026-08-04, which meant these two fixtures had not type-checked
+   * since `delivery` and `orderBy` joined `ToOrderRow` — the objects were
+   * `ToOrderRow` in name only. Spreading a complete row keeps the tests about
+   * SORTING and stops a new field breaking them.
+   */
+  const BARE_ROW: ToOrderRow = {
+    orderId: "",
+    so: null,
+    customer: "",
+    qty: 1,
+    summary: "",
+    stockReady: null,
+    delivery: null,
+    orderBy: null,
+    builds: [],
+    freeStock: 0,
+    takenFromStock: 0,
+  };
+
   it("sinks a row with no date in BOTH directions", () => {
     const rows: ToOrderRow[] = [
-      { orderId: "a", so: 1, customer: "a", qty: 1, summary: "", stockReady: "2026-08-01", builds: [] },
-      { orderId: "b", so: 2, customer: "b", qty: 1, summary: "", stockReady: null, builds: [] },
-      { orderId: "c", so: 3, customer: "c", qty: 1, summary: "", stockReady: "2026-08-20", builds: [] },
+      { ...BARE_ROW, orderId: "a", so: 1, customer: "a", stockReady: "2026-08-01" },
+      { ...BARE_ROW, orderId: "b", so: 2, customer: "b", stockReady: null },
+      { ...BARE_ROW, orderId: "c", so: 3, customer: "c", stockReady: "2026-08-20" },
     ];
     expect(sortToOrderRows(rows, "stockReady", true).map((r) => r.orderId)).toEqual(["a", "c", "b"]);
     expect(sortToOrderRows(rows, "stockReady", false).map((r) => r.orderId)).toEqual(["c", "a", "b"]);
@@ -558,8 +583,8 @@ describe("Stock Ready", () => {
     // `aaa` would win a customer sort and `1` would win a Qty sort — it has no
     // deadline, so neither may lift it above dated work.
     const rows: ToOrderRow[] = [
-      { orderId: "none", so: 1, customer: "aaa", qty: 1, summary: "aaa", stockReady: null, builds: [] },
-      { orderId: "b", so: 9, customer: "zzz", qty: 9, summary: "zzz", stockReady: "2026-08-01", builds: [] },
+      { ...BARE_ROW, orderId: "none", so: 1, customer: "aaa", summary: "aaa", stockReady: null },
+      { ...BARE_ROW, orderId: "b", so: 9, customer: "zzz", qty: 9, summary: "zzz", stockReady: "2026-08-01" },
     ];
     for (const key of ["cust", "so", "qty", "summary", "stockReady"] as const) {
       expect(sortToOrderRows(rows, key, true).map((r) => r.orderId)).toEqual(["b", "none"]);
@@ -773,5 +798,184 @@ describe("the row's own orderBy", () => {
   it("a dateless order's row has no orderBy at all — never a defaulted one", () => {
     const ps = run([...KEE_TONG]);
     expect(ps[0].rows[0].orderBy).toBeNull();
+  });
+});
+
+// ── 15 · P10 · ready stock is SUGGESTED, never consumed ─────────────────────
+//
+// Jess's 2026-07-21 ruling stands and is untouched: goods are labelled per
+// order, so `consumeFreeStock` stays OFF and nothing here nets free stock out
+// of a quantity. What P10 fixes is that the number was computed and shown to
+// nobody.
+
+describe("P10 · the free-stock offer", () => {
+  /** One mattress line, Nice Future, its own build. */
+  const MAT = (over: Partial<ToOrderLine> = {}) =>
+    line({
+      lineId: "m1", sku: "H1401S-K", orderId: "o7", so: 1290, customerName: "ng",
+      category: "mattress", supplierId: NICE_FUTURE, leadDays: 7, modelName: "Haven",
+      deadline: "2026-08-20", offDays: OFFICE_OFF_DAYS, qty: 5, stockKey: "haven|K",
+      ...over,
+    });
+
+  const rowOf = (ls: ToOrderLine[], extra: Parameters<typeof run>[1] = {}) =>
+    run(ls, extra)[0].rows[0];
+
+  it("offers nothing at all when the caller passes no free stock — the page is untouched", () => {
+    const r = rowOf([MAT()]);
+    expect(r.freeStock).toBe(0);
+    expect(r.builds[0].freeStock).toBe(0);
+    expect(r.builds[0].freeStockItemIds).toEqual([]);
+    // And the quantity is the whole requirement: nothing was consumed.
+    expect(r.qty).toBe(5);
+  });
+
+  it("offers what the warehouse holds, and NEVER subtracts it", () => {
+    const r = rowOf([MAT()], {
+      freeStock: { "haven|K": [{ id: "i1", qty: 1 }, { id: "i2", qty: 1 }] },
+    });
+    expect(r.freeStock).toBe(2);
+    expect(r.builds[0].freeStockItemIds).toEqual(["i1", "i2"]);
+    // THE RULING: the row still says buy 5. The human decides.
+    expect(r.qty).toBe(5);
+    expect(r.builds[0].qty).toBe(5);
+  });
+
+  it("never offers more than the row still needs", () => {
+    const r = rowOf([MAT({ qty: 2 })], {
+      freeStock: {
+        "haven|K": [{ id: "i1", qty: 1 }, { id: "i2", qty: 1 }, { id: "i3", qty: 1 }],
+      },
+    });
+    expect(r.freeStock).toBe(2);
+    expect(r.builds[0].freeStockItemIds).toEqual(["i1", "i2"]);
+  });
+
+  it("skips a record that would over-reserve rather than splitting it", () => {
+    // A bulk record of 555 against a need of 2 would reserve 553 units nobody
+    // asked for. The single unit behind it still fits and is offered.
+    const r = rowOf([MAT({ qty: 2 })], {
+      freeStock: { "haven|K": [{ id: "bulk", qty: 555 }, { id: "one", qty: 1 }] },
+    });
+    expect(r.freeStock).toBe(1);
+    expect(r.builds[0].freeStockItemIds).toEqual(["one"]);
+  });
+
+  it("offers a bulk record whole when it fits exactly", () => {
+    const r = rowOf([MAT({ qty: 2 })], {
+      freeStock: { "haven|K": [{ id: "pair", qty: 2 }] },
+    });
+    expect(r.freeStock).toBe(2);
+    expect(r.builds[0].freeStockItemIds).toEqual(["pair"]);
+  });
+
+  it("never offers one unit to two rows — the earliest deadline is served first", () => {
+    const ps = run(
+      [
+        MAT({ lineId: "far", orderId: "of", so: 1, qty: 1, deadline: "2026-09-30" }),
+        MAT({ lineId: "near", orderId: "on", so: 2, qty: 1, deadline: "2026-08-10" }),
+      ],
+      { freeStock: { "haven|K": [{ id: "only", qty: 1 }] } },
+    );
+    const rows = ps[0].rows;
+    const near = rows.find((r) => r.so === 2)!;
+    const far = rows.find((r) => r.so === 1)!;
+    expect(near.freeStock).toBe(1);
+    expect(near.builds[0].freeStockItemIds).toEqual(["only"]);
+    expect(far.freeStock).toBe(0);
+    expect(far.builds[0].freeStockItemIds).toEqual([]);
+  });
+
+  it("two SKU spellings that resolve to ONE pool drain ONE pool", () => {
+    // `order_lines.sku` and `ops_stock_items.sku` are two vocabularies. Two
+    // lines whose spellings differ but whose stock is the same stock must not
+    // both be offered the same unit.
+    const ps = run(
+      [
+        MAT({ lineId: "a", orderId: "oa", so: 1, qty: 1, sku: "H1401S-K", deadline: "2026-08-10" }),
+        MAT({ lineId: "b", orderId: "ob", so: 2, qty: 1, sku: "HAVEN SOFTCLOUD H1401S-K",
+              deadline: "2026-08-11" }),
+      ],
+      { freeStock: { "haven|K": [{ id: "only", qty: 1 }] } },
+    );
+    const total = ps[0].rows.reduce((s, r) => s + r.freeStock, 0);
+    expect(total).toBe(1);
+  });
+
+  it("a SOFA BUILD of modules is offered nothing — its quantity is one sofa, its members are three SKUs", () => {
+    // The keys are the lines' OWN stock keys — `stockKey ?? sku`. Written
+    // lower-cased at first, they matched nothing, and this test passed with
+    // the module guard removed: it was measuring a typo, not the rule.
+    const r = rowOf(PETER, {
+      freeStock: {
+        // Every module has a free unit on the shelf. It still is not a sofa.
+        "5539-1B(LHF)": [{ id: "s1", qty: 1 }],
+        "5539-CNR": [{ id: "s2", qty: 1 }],
+        "5539-2A(RHF)": [{ id: "s3", qty: 1 }],
+        "5539-1A(LHF)": [{ id: "s4", qty: 1 }],
+      },
+    });
+    expect(r.freeStock).toBe(0);
+    for (const b of r.builds) expect(b.freeStockItemIds).toEqual([]);
+  });
+
+  it("a LONE sofa line is offered stock — the discriminator is the modules, not the category", () => {
+    const r = rowOf(
+      [line({ lineId: "solo", sku: "TELLUC-1S", orderId: "os", so: 9, buildKey: null,
+              qty: 2, stockKey: "telluc1s" })],
+      { freeStock: { telluc1s: [{ id: "t1", qty: 1 }] } },
+    );
+    expect(r.freeStock).toBe(1);
+  });
+
+  it("a line already covered by an open purchase order is offered nothing", () => {
+    // It has left the workspace; offering it stock would be offering to solve
+    // a problem that no longer exists.
+    const ps = run([MAT({ qty: 2 })], {
+      supply: { openPoBySku: { "H1401S-K": 2 } },
+      freeStock: { "haven|K": [{ id: "i1", qty: 1 }] },
+    });
+    expect(ps).toEqual([]);
+  });
+
+  it("carries what was already taken onto the row, and the quantity is already net of it", () => {
+    // The CALLER nets it (the stores are the caller's — the pool-draw ledger
+    // and `purchase_demands.remaining_qty`); this only has to carry the fact,
+    // or the number falls with nothing saying why.
+    const r = rowOf([MAT({ qty: 3, takenFromStock: 2 })]);
+    expect(r.qty).toBe(3);
+    expect(r.takenFromStock).toBe(2);
+    expect(r.builds[0].takenFromStock).toBe(2);
+  });
+
+  it("a row's offer is the sum of its builds' — by construction", () => {
+    const r = rowOf(
+      [
+        MAT({ lineId: "x", qty: 1, sku: "H1401S-K", stockKey: "a" }),
+        MAT({ lineId: "y", qty: 1, sku: "H1401S-Q", stockKey: "b", modelName: "Haven Q" }),
+      ],
+      { freeStock: { a: [{ id: "i1", qty: 1 }], b: [{ id: "i2", qty: 1 }] } },
+    );
+    expect(r.builds.map((b) => b.freeStock)).toEqual([1, 1]);
+    expect(r.freeStock).toBe(2);
+  });
+});
+
+describe("P10 · the three words", () => {
+  it("says where the stock is and how much of it there is", () => {
+    expect(freeStockLine("Carres Klang", 2)).toBe("Carres Klang: 2 available");
+  });
+
+  it("puts the number on the button — there is no quantity box anywhere", () => {
+    expect(takeFromStockLabel(2)).toBe("Take 2");
+    expect(takeFromStockLabel(1)).toBe("Take 1");
+  });
+
+  it("says why a quantity is smaller than what was asked for", () => {
+    expect(tookFromStockLabel(2)).toBe("took 2 from stock");
+  });
+
+  it("names the row in the expand control, so the number is not lost to a screen reader", () => {
+    expect(stockExpandLabel("Haven K", 2)).toBe("Haven K — 2 available");
   });
 });

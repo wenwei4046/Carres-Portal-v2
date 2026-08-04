@@ -309,6 +309,74 @@ export function soCountLabel(n: number): string {
   return `${n} SO`;
 }
 
+// ── Ready stock, suggested (P10, Loo 2026-08-04) ────────────────────────────
+//
+// Loo's ruling 3: *"我要的就是有一个自动建议补货，不过我们可以手动选择要不要拉。"*
+// The system SUGGESTS; the human TAKES. So there is no quantity box anywhere
+// in these three strings — the number is the system's, and pressing the button
+// is the whole of the operator's decision. That is what makes the REASON
+// recorded by construction: there is only one thing the press can mean.
+//
+// Every one of the three is Loo's own word from the card's frozen sketch.
+// Each is owed a COPY-STANDARD row.
+
+/** `Carres Klang: 2 available` — the expanded row's one sentence. */
+export function freeStockLine(warehouse: string, n: number): string {
+  return `${warehouse}: ${n} available`;
+}
+
+/** `Take 2` — the button. It carries the number BECAUSE nothing else may. */
+export function takeFromStockLabel(n: number): string {
+  return `Take ${n}`;
+}
+
+/**
+ * `took 2 from stock` — why this row's quantity is smaller than what was asked
+ * for. Without it the number simply falls, and a quantity that changes with
+ * nothing saying so is the silent failure this module keeps paying for.
+ */
+export function tookFromStockLabel(n: number): string {
+  return `took ${n} from stock`;
+}
+
+/** The expand control's own word, for a screen reader — the number is the
+ *  point, so it is in the label rather than a generic "expand row". */
+export function stockExpandLabel(model: string, n: number): string {
+  return `${model} — ${n} available`;
+}
+
+/**
+ * What a drawn unit is COMMITTED to — `ops_stock_items.reserved_ref`, which a
+ * warehouse person reads on the register.
+ *
+ * A customer requirement uses `SO-{so}`, the portal's own reference since 0137
+ * and the one `lineReadiness`, the booking gate and the activity log already
+ * match on — so a unit taken here is indistinguishable from one reserved
+ * through the order drawer, which is correct: it is the same act.
+ *
+ * A typed demand has no customer and no SO. What it HAS is a destination, and
+ * that is the true answer to "committed to what" — the same fact the grid's
+ * group header already prints in place of a customer name.
+ */
+export function readyStockRef(destination: string | null | undefined): string {
+  const d = (destination ?? "").trim();
+  return d ? `${TO_ORDER_WORDS.readyStockGroup} · ${d}` : TO_ORDER_WORDS.readyStockGroup;
+}
+
+/**
+ * Why the unit left the free pool, for K4's ledger.
+ *
+ * The reason CODE is `other`, and that is a measured gap rather than a lazy
+ * default: K4's locked five (`sales_urgent` · `supplier_delay` ·
+ * `warranty_exchange` · `vip` · `other`) has no row for *taken instead of
+ * buying it*, and adding a sixth is a business ruling on a locked vocabulary,
+ * not a routine fix. `other` is the escape hatch K4 built, and it REQUIRES a
+ * note — so the monthly split still reads as an answer instead of a silence.
+ */
+export function readyStockDrawNote(label: string): string {
+  return `To Order · taken instead of raising a purchase order · ${label}`;
+}
+
 /** `8 pcs` — physical units, the factory's own count. */
 export function pcsCount(n: number): string {
   return `${n} pcs`;
@@ -583,6 +651,30 @@ export interface ToOrderLine extends DemandLine {
   readyStock?: boolean;
   /** Where the ready stock goes — the destination the buyer chose. */
   destinationName?: string | null;
+  /**
+   * P10 — which pool of FREE ready stock this line draws from.
+   *
+   * `order_lines.sku` and `ops_stock_items.sku` are two vocabularies (the
+   * catalog code `H1401S-K` against the warehouse's own `HAVEN SOFTCLOUD
+   * H1401S-K`), so the caller resolves them and hands the resolved key down.
+   * The engine keys the free pool on THIS, not on `sku`: two lines whose SKU
+   * strings differ but resolve to the same physical stock must drain ONE pool,
+   * or the page offers the same two units to two rows.
+   *
+   * Absent → the line's own `sku`, which is the openPo pool's own key.
+   */
+  stockKey?: string;
+  /**
+   * P10 — units of this line's requirement ALREADY taken from ready stock.
+   *
+   * DISPLAY ONLY. The caller has already subtracted it from `qty`, because the
+   * stores that record it are the caller's (`ops_stock_pool_usage` for a
+   * customer line; `purchase_demands.remaining_qty`, which is generated in the
+   * database, for a typed demand). Nothing in this file nets it, and
+   * `consumeFreeStock` stays OFF — the ruling that goods are labelled per
+   * order is untouched (Jess, 2026-07-21).
+   */
+  takenFromStock?: number;
 }
 
 export interface ToOrderSupplier {
@@ -601,6 +693,17 @@ export interface BuildToOrderInput {
    * (Jess, 2026-07-28 — a fallback is how a setting silently stops mattering).
    */
   missingProductionDays?: readonly { supplierId: string; category: string }[];
+  /**
+   * P10 — FREE ready-stock RECORDS, keyed by `ToOrderLine.stockKey`, oldest
+   * first. Records rather than a number, because the pool draw reserves a
+   * record entire: what can be taken is a question about which records fit,
+   * not about a total (see the allocation block).
+   *
+   * Absent → no row is offered anything and the grid is byte-identical to
+   * what it rendered before P10 — which is what keeps `Take` a feature of a
+   * warehouse that has stock, rather than a change to the page.
+   */
+  freeStock?: Record<string, readonly { id: string; qty: number }[]>;
 }
 
 // ── Outputs ─────────────────────────────────────────────────────────────────
@@ -631,6 +734,29 @@ export interface ToOrderBuild {
   /** `5539-1B(LHF) · 5539-CNR · 5539-2A(RHF)` */
   codes: string;
   lines: { lineId: string; sku: string; qty: number; cost: number | null }[];
+  /**
+   * P10 — how many of this build's units free ready stock could cover TODAY.
+   * Advisory: nothing is netted, the row's `qty` is untouched, and the number
+   * exists so a human can decide. `0` means the row is visually untouched.
+   *
+   * **A build of more than one line always reads 0, and that is structural.**
+   * Such a build is a sofa's modules: its quantity is ONE sofa while its
+   * members are N different SKUs, so "take 1 from stock" would mean drawing a
+   * unit of every module, and a partial match would reserve modules that
+   * cannot make a sofa. A lone line has one SKU and one number, so the
+   * arithmetic is unambiguous — the same discriminator P11 established for
+   * the quantity itself.
+   */
+  freeStock: number;
+  /**
+   * P10 — the exact register records `freeStock` counts, FIFO. The take draws
+   * THESE and nothing else, so the number a row shows and the units its button
+   * reserves are one answer rather than two that have to agree.
+   */
+  freeStockItemIds: string[];
+  /** P10 — units of this build already taken from ready stock (display only;
+   *  `qty` is already net of it). */
+  takenFromStock: number;
 }
 
 export interface ToOrderRow {
@@ -660,6 +786,10 @@ export interface ToOrderRow {
    */
   orderBy: IsoDate | null;
   builds: ToOrderBuild[];
+  /** P10 — Σ of the builds'. Advisory; never netted out of `qty`. */
+  freeStock: number;
+  /** P10 — Σ of the builds'. `qty` is already net of it. */
+  takenFromStock: number;
 }
 
 /**
@@ -869,6 +999,68 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
   const toOrderByLine = new Map<string, number>();
   for (const r of net.lines) toOrderByLine.set(r.line.lineId, r.toOrder);
 
+  /**
+   * P10 — WHAT FREE READY STOCK COULD COVER, offered and never taken.
+   *
+   * `consumeFreeStock` stays OFF (Jess, 2026-07-21: goods are labelled per
+   * order and auto-eating them without a WMS confuses goods-in/out). Her
+   * ruling is right and it is untouched — the defect P10 fixes is that a
+   * decision reserved for a human was never SHOWN to the human. So the free
+   * pool is allocated exactly as the engine allocates the others, and the
+   * result is put ON the row instead of subtracted FROM it.
+   *
+   * THREE PROPERTIES, and each is why this is here rather than in the caller:
+   *
+   * 1. `net.lines` comes back in the engine's OWN allocation order (earliest
+   *    deadline, then earliest placed), so the units are offered in the same
+   *    order open POs are — the customer waiting longest is offered them
+   *    first, and no two rows are ever offered the same unit.
+   *
+   * 2. **Whole records only.** A register record is ONE record of N units
+   *    (0218), and the pool draw reserves a record entire. Offering 2 out of a
+   *    record of 555 would reserve 553 units nobody asked for, so a record
+   *    that does not fit what is still needed is skipped rather than split.
+   *
+   * 3. **The ids come out with the number.** The offer and the act read the
+   *    same list, so what a row shows IS what its button draws — the property
+   *    P9 established on this page, held by construction rather than by two
+   *    computations agreeing.
+   */
+  const offerByLine = new Map<string, { qty: number; itemIds: string[] }>();
+  if (input.freeStock) {
+    // A module line is not offerable — see `ToOrderBuild.freeStock`. Marked
+    // from the SAME grouping the builds are made from, so the two cannot drift.
+    const groupSize = new Map<string, number>();
+    const groupOf = (l: ToOrderLine) => `${l.orderId}::${l.buildKey ?? `line::${l.lineId}`}`;
+    for (const l of eligible) groupSize.set(groupOf(l), (groupSize.get(groupOf(l)) ?? 0) + 1);
+
+    const pool = new Map<string, { id: string; qty: number }[]>();
+    for (const [k, recs] of Object.entries(input.freeStock)) pool.set(k, [...recs]);
+
+    for (const r of net.lines) {
+      const line = r.line as ToOrderLine;
+      const need = r.toOrder;
+      if (need <= 0) continue;
+      if ((groupSize.get(groupOf(line)) ?? 1) > 1) continue;
+      const recs = pool.get(line.stockKey ?? line.sku);
+      if (!recs || recs.length === 0) continue;
+      let qty = 0;
+      const itemIds: string[] = [];
+      for (let i = 0; i < recs.length && qty < need; i += 1) {
+        const rec = recs[i]!;
+        if (qty + rec.qty > need) continue; // would over-reserve — skip, never split
+        qty += rec.qty;
+        itemIds.push(rec.id);
+      }
+      if (qty <= 0) continue;
+      pool.set(
+        line.stockKey ?? line.sku,
+        recs.filter((rec) => !itemIds.includes(rec.id)),
+      );
+      offerByLine.set(line.lineId, { qty, itemIds });
+    }
+  }
+
   const supplierName = new Map(input.suppliers.map((s) => [s.id, s.name]));
   const missing = new Set(
     (input.missingProductionDays ?? []).map((m) => `${m.supplierId}::${m.category}`),
@@ -967,6 +1159,12 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
             qty: toOrderByLine.get(m.lineId) ?? m.qty,
             cost: m.cost,
           })),
+          // A build of MODULES gets no offer — see the field's own comment.
+          // `offerByLine` already refuses one; asking here too would be a
+          // second rule to keep in step, so it reads the one answer.
+          freeStock: offerByLine.get(members[0]!.lineId)?.qty ?? 0,
+          freeStockItemIds: offerByLine.get(members[0]!.lineId)?.itemIds ?? [],
+          takenFromStock: members.reduce((s, m) => s + (m.takenFromStock ?? 0), 0),
         });
       }
 
@@ -1019,6 +1217,11 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
         }),
         stockReady,
         builds,
+        // Summed from the builds for the same reason `qty` is (P11): a row and
+        // the things under it agree by construction, never by two counts
+        // happening to match.
+        freeStock: builds.reduce((s, b) => s + b.freeStock, 0),
+        takenFromStock: builds.reduce((s, b) => s + b.takenFromStock, 0),
       });
     }
 
