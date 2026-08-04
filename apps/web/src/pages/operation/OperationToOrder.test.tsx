@@ -1440,19 +1440,28 @@ describe("P12 — Cancel on a demand row", () => {
  * that reads its own tombstone fails on the text explaining it.
  */
 describe("the page offers no way to delete a demand", () => {
-  const src = readFileSync(
-    join(dirname(fileURLToPath(import.meta.url)), "OperationToOrder.tsx"),
-    "utf8",
-  )
-    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1")
-    // Every `${…}` collapses to `:id` BEFORE anything is extracted. Written
-    // the other way round the path scan stopped at the first `)` inside
-    // `encodeURIComponent(demandId)` and reported a path nobody wrote — a
-    // scan can only be evidence about the page once it is evidence about
-    // itself.
-    .replace(/\$\{[^{}]*\}/g, ":id");
+  /**
+   * P14 — BOTH FILES, and the second one is not a widening of the claim.
+   * `CreatePurchaseDialog` moved out of this page on 2026-08-04 and took the
+   * create door with it. A scan that still named only `OperationToOrder.tsx`
+   * would go on passing while seeing HALF the demand doors — the same silent
+   * shrink that let `sent via whatsapp` reach production under 51 green render
+   * tests. The expected values below are untouched: the scan's scope follows
+   * the code so that its ASSERTION can stay exactly what it was.
+   */
+  const scan = (file: string) =>
+    readFileSync(join(dirname(fileURLToPath(import.meta.url)), file), "utf8")
+      .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1")
+      // Every `${…}` collapses to `:id` BEFORE anything is extracted. Written
+      // the other way round the path scan stopped at the first `)` inside
+      // `encodeURIComponent(demandId)` and reported a path nobody wrote — a
+      // scan can only be evidence about the page once it is evidence about
+      // itself.
+      .replace(/\$\{[^{}]*\}/g, ":id");
+
+  const src = [scan("OperationToOrder.tsx"), scan("CreatePurchaseDialog.tsx")].join("\n");
 
   /**
    * THE VISIBLE-WORD HALF IS ASSERTED AGAINST THE WORDS MODULE, NOT THE PAGE

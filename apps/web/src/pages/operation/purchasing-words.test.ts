@@ -52,6 +52,13 @@ const LANE = [
   // was green. A lane list that does not grow with the lane is a lane list
   // that quietly stops being one.
   "pages/operation/OperationPurchaseOrders.tsx",
+  // Added by P14 (2026-08-04), the day `CreatePurchaseDialog` moved out of
+  // `OperationToOrder.tsx` into its own file. Its words were scanned by every
+  // rule below while it lived inside the page; leaving it off this list would
+  // have let a PURE MOVE quietly retire five of them, and every rule here is a
+  // NEGATIVE assertion — the suite would have gone on passing, more easily.
+  // That is the failure the note above records having already been paid for.
+  "pages/operation/CreatePurchaseDialog.tsx",
 ];
 
 const read = (rel: string) => readFileSync(join(WEB_SRC, rel), "utf8");
@@ -71,7 +78,7 @@ function visibleSource(rel: string): string {
 
 describe("R8 · the Purchasing lane speaks the dictionary", () => {
   it("scans every lane file (a rename must not silently empty this suite)", () => {
-    expect(LANE.length).toBe(8);
+    expect(LANE.length).toBe(9);
     for (const f of LANE) expect(read(f).length, f).toBeGreaterThan(500);
   });
 
