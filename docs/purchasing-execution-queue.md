@@ -2534,13 +2534,85 @@ if he wants it, it is its own card with its own business decision.
 - Negative controls, each quoted with its failure count: remove the one-at-a-time guard ·
   remove the `ready_date` branch from `poDateHistoryOf` · point the new route at the wrong RPC.
 
+### THE KIT POWERS THIS PAGE HAS NEVER WIRED — and Loo ruled each one, 2026-08-04
+
+Measured: `OperationPurchaseOrders.tsx` passes **none** of D0.5d's four props. That list is
+not the plan — **CLAUDE.md §13.3** applies, and he answered it feature by feature:
+
+| Power | | Why |
+|---|---|---|
+| **Expand row** | ✅ **wire** | line-level facts compared across many POs without opening each. This card's whole point |
+| **Resize column** | ✅ **wire** | supplier names are different lengths; one width cannot suit them all |
+| **Reorder column** | ✅ **wire** | different operators watch different columns |
+| **Footer totals** | ⚠️ **do NOT wire** until somebody names what an operator would DO with the number. Being already built is not a reason | |
+| **Group rows** | ⚠️ **do NOT wire.** This register groups by nothing today; grouping for the sake of grouping is the failure §13.3 names | |
+
+**REFUSED, and this is a ruling not an omission** (Loo, 2026-08-04): **row height stays 40px.**
+Do not shrink it to AutoCount's ~28px. *"Carres is queue → list → detail with constant review
+and communication — GitHub / Linear / Shopify Admin, not Excel."* Also refused: Excel-style
+right-click header menus, and per-operator layout memory (**§0.4 — a grid's shape is the
+company's; he ruled it the same day**).
+
+**The card's brief is `Bring AutoCount's productivity into Carres`, never
+`Make Carres look like AutoCount`.**
+
 ### MUST NOT
 
 ❌ write a migration · ❌ make Qty editable · ❌ leave a second editing surface in the panel ·
-❌ nest an expandable inside an expanded row · ❌ invent a word — `Supplier Ready Date` ·
-`Expected Arrival` · `Received At` · `Customer Delivery` are ruled in
+❌ nest an expandable inside an expanded row · ❌ change the 40px row height or any other token ·
+❌ wire footer totals or grouping · ❌ add per-operator layout memory · ❌ invent a word —
+`Supplier Ready Date` · `Expected Arrival` · `Received At` · `Customer Delivery` are ruled in
 `PURCHASING-INFORMATION-MODEL.md` §12.2, and everything else is already in COPY-STANDARD ·
 ❌ touch `OperationToOrder.tsx` · ❌ use `service_role` · ❌ hold the card for a design round.
+
+---
+
+## Q6 · To Order is audited against the same architecture
+
+**Lane: PURCHASING · `OperationToOrder.tsx`. NO migration. STARTS AFTER P13 MERGES** — P13
+(`claude/p13-take-words`) holds that file today.
+
+> **Loo, 2026-08-04: *"now to order page i want also follow us."*** This card is the audit
+> that makes that true — **and it is deliberately small, because the honest measurement is
+> that To Order is already closer to the architecture than Purchase Orders was.**
+
+### ALREADY TRUE — measured 2026-08-04, do not rebuild
+
+| | |
+|---|---|
+| the kit's row **expand** | live since P10, and its own comment says *"the kit's own row expand (D0.5d), not a second one"* — `expandable: (r) => r.freeStock > 0 && !poOf(r)`. §13.3 is already satisfied here: the control appears only where it has something to open |
+| the kit's **group** | live — `SO-1209 · Steven · Wed, 26 Aug 26` |
+| **priority row order** | the rail is `Overdue` first, then the PO-day buckets. That IS operator priority, which is what Q1 had to fix on Purchase Orders |
+| **no right panel** | To Order is a **Workspace** (`docs/03-page-patterns.md`), not a document register. The Row / Expand / Right-Panel split does NOT map onto it, and inventing a panel here would be copying a shape rather than solving a problem |
+
+### What this card actually does
+
+1. **Apply CLAUDE.md §13.3 to the two unwired powers, and answer the question rather than
+   the list.** `resize` and `reorder` are not wired. For EACH one, either wire it or write
+   down why an operator is no faster with it. **Both answers are acceptable; silence is not.**
+2. **Check every visible date word against the frozen dictionary**
+   (`PURCHASING-INFORMATION-MODEL.md` §12.2): `Supplier Ready Date` · `Expected Arrival` ·
+   `Received At` · `Customer Delivery`. The dictionary is **portal-wide** — a page showing
+   one of those four facts under any other word is the defect it was written to stop. The
+   group header's bare date is the customer's date; if it is ever labelled, that is its word.
+3. **Report anything on this page that the Purchase Orders architecture would have caught**
+   — a status wearing an action's clothes, a fact stated in two places, a control that writes
+   from two surfaces. **Report it into P7's card. Do not fix it here.**
+
+### DONE WHEN
+
+- `resize` and `reorder` are each either wired or refused **in writing, with the operator
+  reason** — quoted in the PR.
+- A source scan proves no retired date word (`Goods Arrival` · `Stock ETA`) is on this page,
+  and the result is quoted.
+- Nothing else on the page changed. **This is an audit, not a redesign** — P7 owns the
+  redesign.
+
+### MUST NOT
+
+❌ change the row height or any token · ❌ add a right panel · ❌ wire a power without
+answering §13.3's question · ❌ touch the P8-P13 features · ❌ start before P13 merges ·
+❌ do P7's rewrite.
 
 ## Status
 
@@ -2565,4 +2637,5 @@ if he wants it, it is its own card with its own business decision.
 | **Q1b** | 🔴 **BLOCKED ON THE MODEL** — Q1 made the row ORDER correct and left it INVISIBLE: the register default view hides `Customer Delivery` and `Expected Arrival`, so 21 rows read alike and nothing says why row 1 is row 1 (Loo caught it live 2026-08-04, from his own screenshot). **A summary band was proposed by me and REJECTED by him**, on the stronger principle: *a List page processes work, a Dashboard monitors* — a Summary on every page puts one number in four places. Three ROW-LEVEL candidates were studied against SAP Fiori · Dynamics · Linear · GitHub · Jira and **none is chosen**: the left-edge bar (**`rowLate` already exists in the kit** — Loo added it 2026-08-03 for this identical problem and this page has never passed it) · an in-cell badge · its own column. **His own candidate `整行轻微背景强调` is REFUSED by law**: `01-design-tokens.md` §2.3 spends row background on hover (grey) and selection (blue). **Waits on `PURCHASING-INFORMATION-MODEL.md` §12.5** | — |
 | **Q4** | 🔴 **BLOCKED ON THE MODEL** — Q3 shipped, so the arithmetic exists; but a dashboard is the second place a number lives, and §12 has just re-opened what the register itself should show. Do not start until §12.5 closes | — |
 | **Q5** | ⬜ **the expand becomes the WORKING AREA, the right panel becomes ACTIVITY** (Loo 2026-08-04, after using the page: *"Right panel not friendly to edit detail"*). **NO migration** — every write door is already in production and D0.5d already shipped row expand; the only new code is ONE route (`POST /:id/ready-date`) over the live 0318 RPC. DOCUMENT DATA moves to the middle where the operator types into it; ACTIVITY stays right. ONE PO expands at a time; the date door LEAVES the panel so there is exactly one editing surface. **Qty stays read-only and that is a frozen business rule, not a preference** — §3 says added items go on a NEW PO, and 0316 left no qty door on purpose. **Governed by CLAUDE.md §13.2 — build and ship, no design round** | — |
+| **Q6** | ⬜ **To Order audited against the same architecture** (Loo 2026-08-04: *"now to order page i want also follow us"*) — **deliberately SMALL, because the measurement is that To Order is already closer to it than Purchase Orders was**: the kit expand (P10), `group`, and a priority-ordered rail are all live, and it has no right panel to mis-define because it is a Workspace, not a document register. The card applies **CLAUDE.md §13.3** to the two unwired powers (`resize` · `reorder` — wire or refuse IN WRITING, silence is not an answer) and scans every visible date word against the portal-wide dictionary. **An audit, not a redesign — P7 owns the redesign. After P13 merges** | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |

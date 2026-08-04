@@ -654,6 +654,52 @@ answers *"let me first settle X"* three times in a row has taken a day of his ti
 him nothing to look at. **If the business rule is settled and the thing can be on screen
 today, it goes on screen today.**
 
+### 13.3 THE FEATURE JUSTIFICATION RULE (Loo, 2026-08-04 — PERMANENT)
+
+> **A kit having a feature is not a reason to wire it.** Written the day a chat listed five
+> D0.5d powers the Purchase Orders page had not adopted and treated the list itself as the
+> plan.
+
+**Every feature answers ONE question before it is wired, and the question is about the
+operator, never about the kit:**
+
+```
+Will this make the operator finish faster today?
+
+   — three fewer mouse clicks?
+   — five fewer purchase orders opened?
+   — one fewer exception missed?
+
+"The kit has it" is not an answer.
+```
+
+**Worked example, Loo's own, 2026-08-04:**
+
+| | | |
+|---|---|---|
+| Expand row | ✅ wire | line-level facts can be compared across many documents without opening each |
+| Resize column | ✅ wire | supplier names are different lengths; one width cannot suit them all |
+| Reorder column | ✅ wire | different operators watch different columns |
+| Footer totals | ⚠️ **prove the business value first** | a total is only useful if somebody acts on it. Being already built is not the value |
+| Group rows | ⚠️ **only where a real grouping need exists** | never grouping for the sake of grouping |
+
+**AND THE MIRROR OF IT — do not copy an appearance to get a capability.** Same day, same
+ruling, and this is the reasoning that generalises:
+
+> **Carres is not AutoCount and must not be made to look like it.** AutoCount is one person
+> keying many documents in a row, keyboard-first, high-density entry. Carres is one operator
+> switching between states — a queue on the left, a list in the middle, a detail on the right,
+> with constant reviewing and communicating. **That is GitHub · Linear · Shopify Admin, not
+> Excel.**
+>
+> So the portal's **row height stays 40px** and no token is changed to imitate another
+> product. What was actually wanted was never 28px — it was *see more at once · open the
+> right pane less · compare many records · find the exception fast*. **Those are capabilities
+> and they are bought with structure, not with density.**
+
+**The card's brief is therefore never "make X look like Y". It is "bring Y's productivity
+into X".**
+
 ## 14. Red lines (inherited from global CLAUDE.md, restated for project)
 
 1. **Never DROP / TRUNCATE / DELETE** without explicit single-instance confirmation from Loo in current conversation.
