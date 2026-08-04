@@ -1071,3 +1071,100 @@ one-way door.
 **Two things that stay closed to this chat** — both Jess's, both still true: the 50-100 line
 layout stress test (**real PO only, she refuses synthetic data**; prod ceiling re-measured
 2026-08-04 is still 4 lines) and any redesign of the frozen operator journey.
+
+### 2026-08-04 · The plan chat's verdict on the frozen design, and the four cards Loo approved
+
+> Appended, not edited. The charter's "STARTING SHAPE" table above is now FINALISED and the
+> mapping is below — it said *"the manager finalises it; this is not frozen."*
+
+**THE VERDICT LOO ASKED FOR: the structure is right, the priority is wrong. Do not redesign
+the page.**
+
+What was studied against what it does, and judged KEEP: the register/workspace split (listing
+is for FINDING, the workspace is for WORKING — the same division SAP Fiori, Gmail and
+Dynamics use) · `poCurrentActionOf` as ONE action source both surfaces read, so they cannot
+drift (Law 7) · `poArrivalGapOf` as ONE gap rule · the product-naming function passed down so
+the register and the document cannot name one item two ways · the append-only promise ledger,
+which has no column to overwrite · `Print PDF` and `{door} opened · Snapshot N`, which is Law
+8 correctly applied.
+
+**The one thing that is wrong, in one sentence: the page answers *"which PO is this?"* well
+and *"which PO should I touch first?"* badly.** That is a change of priority, not of shape.
+
+**THE MEASUREMENTS THAT PRODUCED THAT VERDICT — prod + a real browser, 2026-08-04.**
+
+| Finding | Evidence |
+|---|---|
+| 🔴 the riskiest PO is buried | **`PO-2038`: customer delivery date 2026-08-04 — TODAY — no supplier date, our own estimate lands 7 days late. It sits at row 8 of 21, in the same words as 15 other rows, and is neither red nor amber.** 7 POs have a customer date within 7 days and no confirmed arrival |
+| 🔴 the sort is a LAW CONFLICT | `PURCHASING-WORKING-FLOW.md` §6 and `ACTION-FLOW-STANDARD.md` Law 5 both say *risk to the promise*; Jess's 2026-08-02 listing law says `PO Issued` oldest first. Both were law. **Loo ruled risk-first, 2026-08-04.** `PO Issued` keeps its column, its header sort and the tie-breaker |
+| 🔴 the instruction column is the only one squeezed | `Current Action` is `width: "auto"`. Measured with the app's own stylesheet, `px-2` padding: **23px @1280 · 109px @1366 · 183px @1440**, workspace open (the default). `Waiting for Goods` needs 126px, `Confirm tomorrow's delivery` 191px, `Confirm balance delivery date` 201px. `Goods Arrival` is a fixed 192px for a 65px date |
+| 🔴 a guess is painted the same red as a fact | 10 of 21 rows print a gap warning; **8 of the 10 come from OUR OWN estimate** — the factory has said nothing. Grey date, red warning, identical to the 2 rows the supplier really answered |
+| 🟡 a built door with no handle | **`purchasing_record_ready_date` is live in prod (0318) with ZERO callers in the whole repo.** 0 of 21 POs carry a ready date, and no path can create one. `poDateHistoryOf` filters `kind==='tomorrow_delivery'`, so the day it is wired the history silently swallows every ready date |
+| 🟡 three rail buckets are permanently zero | `Waiting Supplier Date 16 · Waiting for Goods 5 · Ready to Receive 0 · Completed 0 · Cancelled 0`. `Ready to Receive` needs `received_qty > 0` and this tab has no receiving door. The five rail words are also **not** the five ruled Operation Status labels (`Issued · In Production · Receiving · Completed · Cancelled`), and are in no dictionary — §5 already owed them |
+| 🟡 no "look at the numbers" layer exists at all | All five tabs answer *what do I do with THIS document*. Nothing answers *how many mattresses this month* |
+
+**LOO'S RULINGS, 2026-08-04:**
+
+1. **Risk order replaces `PO Issued` as the register's default.** Overrides Jess's 2026-08-02
+   listing law as the DEFAULT only; her rule survives as the header sort and the tie-breaker.
+   **She is to be told once — the rule is not deleted silently.**
+2. **No costing on any purchasing report.** His words: *"i dont show costing — due to supplier
+   have own, finance will deal with it. If future need to add, just add, not now."* Measured
+   the same day and it agrees: `purchase_order_lines.cost` is **0.00 on all 35 lines**, so a
+   money column would print `RM 0.00` for everything.
+3. **Purchasing gets a report layer and then a dashboard, in that order** — the dashboard is
+   the report's figures made large, and computing them twice guarantees two answers.
+4. **Order of play: Q1 → Q2 → Q3 → Q4**, on his instruction *"go — follow you"*. Q1 first
+   because it is the only one where the page is losing work today.
+
+**WHAT WAS RESEARCHED, so nobody re-derives it.** AutoCount's own Purchase menu draws the line
+between documents (top half) and reports (`Monthly Purchase Analysis Report` · `Purchase
+Analysis By Document Report` · `Top/Bottom Purchase Ranking Report`, bottom half); Odoo does
+the same with a per-app `Reporting` menu; SAP Fiori and NetSuite give each ROLE an overview
+page; Odoo and Linear deliberately do not, putting statistics inside the list instead. **The
+condition shared by every version that works: a tile must be clickable and must land on
+exactly the rows it counted.** AutoCount's ceiling is that its answer to every analysis is
+*export to Excel*, and a number in Excel has left the system — that is the specific thing
+Carres can beat.
+
+**2990s IS NOT THE REFERENCE FOR THIS, and that was measured by reading their code rather
+than assumed:** one global `Dashboard.tsx` (144 lines, sales counts only, no purchasing), one
+cross-module `Outstanding.tsx` (8 tabs, date range), four `*DetailListing.tsx` files **all on
+the sales side, and no purchase report page at all**. They copied AutoCount's grid and not
+AutoCount's reports. Copying 2990s here would copy the gap.
+
+**THE FINALISED CARDS — `docs/purchasing-execution-queue.md`, under the Q heading.**
+
+| Card | What it is | Migration |
+|---|---|---|
+| **Q1** | the register puts the most dangerous PO first (+ `Current Action` fixed width, + estimate-vs-confirmed tone) | none |
+| **Q2** | the factory's ready date has somewhere to land (route + button + history) | none — 0318 is already live |
+| **Q3** | Purchasing gets its report tab — quantity only | none · **⛔ blocked on words** |
+| **Q4** | Purchasing gets its dashboard | none · **⛔ blocked on Q3** |
+
+**HOW THE CHARTER'S STARTING SHAPE MAPS TO THESE — stated so nothing looks lost:**
+
+- charter **Q1** (*the supplier's answer has somewhere to land*) → **Q2**, and it is SMALLER
+  than the charter thought: it is not "wiring an existing store to two missing write doors",
+  because migration 0318 already shipped the whole database half. Only a route and a button
+  are missing.
+- charter **Q2** (*the date history reads `Confirmed / Changed`*) → **still open, deliberately
+  not folded in.** It is Jess's own design and she ruled it out of Phase 3. It touches the same
+  function Q2 edits (`poDateHistoryOf`), so whoever builds it after Q2 must read Q2 first.
+- charter **Q3** (*a PO closes itself when the goods are in*) → **still open, and it cannot be
+  started**: `warehouse_receipts` and `receiving_events` are both **0** and this tab has no
+  receiving door, so there is no closing event to react to.
+- charter **Q4** (*supplier contact data*) → unchanged. Data entry, not a card.
+
+**THREE THINGS REPORTED AND DELIBERATELY NOT BUILT** (they need a ruling, not code):
+
+1. **The rail's five words are in no dictionary** and compete with COPY-STANDARD's five
+   Operation Status labels. That is a word decision — Jess's.
+2. **One sofa is split across two purchase orders.** `SO-1204` · `1207` · `1208` · `1211` each
+   carry one sofa build on TWO Ohana POs issued two days apart. The register cannot show that
+   `PO-2031` and `PO-2040` are the same sofa for the same customer, so an operator phoning
+   Ohana about SO-1204 must know two PO numbers. `PURCHASING-WORKING-FLOW.md` §3 rules that
+   added items go on a NEW PO and says nothing about reading the two together afterwards.
+3. **`purchase_orders.sup_status` is `pending` on all 21.** `Pending` is a banned display word
+   (`01-design-tokens.md` §10, COPY-STANDARD), and the second status axis carries no
+   information today.

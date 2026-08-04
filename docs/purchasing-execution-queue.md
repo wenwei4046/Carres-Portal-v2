@@ -1591,6 +1591,502 @@ marker when free stock is 0 · ❌ redesign the grid.
 P8-P10 are surgical. Running them together guarantees conflict. **P8 ‖ P9 ‖ D0.5d now →
 P10 → then P7**, which inherits three working features instead of re-deriving them.
 
+---
+
+# ⭐ LOO OPENED A PURCHASE ORDERS PLAN CHAT, 2026-08-04 — Q1 · Q2 · Q3 · Q4
+
+> **These four cards belong to the Purchase Orders manager chat** and live under this
+> heading only (its charter is `docs/CHECKPOINT-purchase-orders.md` §6, 2026-08-04).
+> **They do not touch `OperationToOrder.tsx`, the P8/P9/P10 cards, or the index's
+> ACTIVE SET.** A Q-chat and a P-chat may run at the same time — different files —
+> but two Q-chats may NOT: Q1 and Q2 both open `OperationPurchaseOrders.tsx`.
+>
+> **Order of play: Q1 → Q2 → Q3 → Q4.** Q1 first because it is the only one where the
+> page is losing work TODAY. Q4 is Q3's numbers made large, so Q4 may not start before
+> Q3 merges, or the same figure gets computed twice and the two will disagree.
+
+## Ground truth for the Q line — measured on prod 2026-08-04, re-measure before you build
+
+| Fact | Value |
+|---|---|
+| purchase orders | **21 — every one `open`, none closed, none cancelled** |
+| PO lines | 35 · lines with any goods received **0** |
+| `warehouse_receipts` / `receiving_events` | **0 / 0** — nothing has ever been received on this system |
+| POs carrying `eta_date` (the supplier's own arrival date) | **5 of 21** |
+| POs carrying `expected_ready_date` | **0 of 21** |
+| `po_supplier_promises` rows | 4 — **all `kind='tomorrow_delivery'`, zero `ready_date`** |
+| production-day pairs configured | 3 (Nice Future × mattress 7 · Ohana × bedframe 7 · Ohana × sofa 14) |
+| supplier work weeks | Ohana off `[0]` · Nice Future off `[0,6]` |
+| `purchase_order_lines.cost` | **0.00 on all 35 lines** — nobody keys a purchase price |
+| `purchase_orders.sup_status` | **`pending` on all 21** — the second status axis carries no information today |
+
+**Everything in the database is TEST data** (CLAUDE.md). These numbers are evidence about
+whether the CODE behaves — never about business volume, and never a reason to write a
+backfill.
+
+## Every Q-card ships to production — this block is not repeated per card
+
+**Engineer-Owned Delivery (CLAUDE.md §13.1) applies in full.** After the card is built you
+own the whole chain without asking: rebase on latest `main` · resolve routine conflicts ·
+run every gate · fix what you find · commit · push · open and merge the PR · deploy ·
+verify production · append the record. **Finding another bug is an instruction to fix it and
+continue, not a reason to stop.**
+
+**Gates that must be green before you merge** (quote the numbers in the PR):
+
+```
+corepack pnpm --filter @carres/web exec tsc --noEmit          → 0
+corepack pnpm --filter @carres/web exec vitest run OperationPurchaseOrders
+corepack pnpm --filter @carres/shared test
+corepack pnpm --filter @carres/web lint
+corepack pnpm --filter @carres/web build
+```
+
+Baseline for the whole suite is CLAUDE.md §17.7 — **ZERO NEW failures is the bar**, the
+listed old ones are not yours to chase.
+
+**A NEGATIVE CONTROL IS REQUIRED and must be quoted in the PR.** Delete the line you just
+wrote, run the test, and record how many tests fail. *A control that did not run is not a
+control* — if it fires 0, your test is measuring nothing and the card is not done.
+
+**WIDTHS ARE MEASURED IN A REAL BROWSER, NEVER ESTIMATED AND NEVER FROM A TEST.** jsdom has
+no widths, so the page suite structurally cannot catch a truncated cell. The method that
+works, and that produced every number in Q1:
+
+```
+1. .claude/launch.json → a vite entry on a free port; copy apps/web/.env.production
+   to apps/web/.env.local first
+2. open the page, then measure with the app's OWN loaded stylesheet:
+      await document.fonts.load('400 13px Inter')
+      span.className = 'text-body'; span.textContent = 'Waiting for Goods'
+      span.getBoundingClientRect().width
+3. DataTable cell padding is `px-2` — add 16px, not 32
+```
+
+**Deploy law.** Merge to `main` first, build from the **main tip**, deploy BOTH Pages
+projects (`carres-portal` + `carres-pos`) with `--branch=main`, then poll all FOUR canonical
+URLs until they converge. Download the live bundle to a FILE and grep it — never trust a
+deployment log. An `apps/api` diff is measured against the **live Worker's source commit at
+the moment of deploying**, not against your branch's scope.
+
+**Verify on production with real data, and say the PO number.** Every Q-card's Done-when
+names a specific live PO. Open it on `https://erp.carresofficial.com`, confirm the behaviour
+with your own eyes, and write what you saw into the PR. *"Tests pass"* is not verification.
+
+**Then append ONE dated entry to `docs/CHECKPOINT-purchase-orders.md` §6** (append only —
+never edit anything above the line) and ONE line to `docs/phase-10-worklog.md`, and tick the
+card in the Status table below.
+
+**If building the card as written would ship something wrong, STOP and tell Loo before
+building.** Do not build a known-wrong thing because a card said so.
+
+---
+
+## Q1 · The register puts the most dangerous purchase order first
+
+**Lane: PURCHASE ORDERS · touches `apps/web/src/pages/operation/OperationPurchaseOrders.tsx`
+and `packages/shared/src/po-workspace.ts` only. NO migration. NO api change.**
+
+### ALREADY EXISTS — never rebuild
+
+- `poCurrentActionOf()` (`packages/shared/src/po-workspace.ts`) — the ONE action source that
+  both the register column and the workspace hero read. **Do not add a second.**
+- `poArrivalGapOf()` — the ONE rule that compares the arrival date against the customer's.
+- `etaOf(po)` in the page — resolves confirmed date, else the engine's estimate from
+  production working days. **P1's law holds: no setting → no estimate, never a silent 7.**
+- `purchasingSupplierCallsOf()` — the engine's open calls, each already carrying `late`.
+- The eight frozen columns and their order. **Q1 does not change which columns exist.**
+
+### Why — measured on prod and in a real browser, 2026-08-04
+
+**① The riskiest PO is buried, and today there is a real one.**
+
+```
+PO-2038 · Nice Future · issued 1 Aug
+   customer delivery date  2026-08-04   ← TODAY
+   supplier arrival date   none — the factory has never given one
+   our own estimate        2026-08-11   ← 7 days after the customer's date
+   where it sits           row 8 of 21
+   what its row says       "Confirm Arrival" — the same words as 15 other rows
+   what colour it is       none. Not red, not amber
+```
+
+The default order is `PO Issued` oldest first. **That sorts by how long the DOCUMENT has
+waited, not by how close the CUSTOMER is.** Seven POs have a customer date within 7 days and
+no supplier-confirmed arrival.
+
+**② This is a law conflict, and Loo settled it 2026-08-04 in favour of risk.**
+`docs/PURCHASING-WORKING-FLOW.md` §6 and `docs/ACTION-FLOW-STANDARD.md` Law 5 both say row
+order is *risk to the promise*. Jess's 2026-08-02 listing law says `PO Issued` oldest first.
+**Both were law and they disagreed.** Loo ruled risk-first. `PO Issued` keeps its column and
+its header sort; it stops being the default. **Record the override under Loo's name in the
+checkpoint, and tell Jess once — do not delete her rule silently.**
+
+**③ The column that says what to do is the only one squeezed.** Measured at 13px Inter with
+the app's own stylesheet, `DataTable` cell padding `px-2` (16px total):
+
+```
+Current Action is `width: "auto"` — it gets the LEFTOVER.
+   viewport 1280  →   23px      viewport 1440  →  183px
+   viewport 1366  →  109px      viewport 1536  →  279px
+(portal sidebar 232 + rail 200 + workspace 400; the workspace is OPEN by default,
+ so this is what an operator sees on opening the page)
+
+The words that have to fit:
+   Confirm Arrival               109px
+   Open Receiving                113px
+   Contact Supplier              119px
+   Waiting for Goods             126px
+   Confirm what happens next     186px
+   Confirm tomorrow's delivery   191px
+   Confirm balance delivery date 201px
+
+Meanwhile `Goods Arrival` is a FIXED 192px carrying a 65px date.
+```
+
+At 1366 — an ordinary business laptop — **three of the seven possible words are cut off**,
+with `text-overflow: clip`, so not even an ellipsis says so.
+
+**④ A guess is painted the same red as a fact.** 10 of 21 rows print a gap warning. **8 of
+those 10 are computed from OUR OWN estimate — the factory has said nothing.** The date is
+grey and the warning beside it is red, identical to the 2 rows where the supplier really did
+give a date. Those two situations need opposite next actions.
+
+### Build
+
+**1 · Default row order = risk to the customer's promise.** A new exported pure function in
+`po-workspace.ts` (the register and any later surface read the SAME one — a page-local
+comparator would be a second priority). Rungs, highest first:
+
+```
+1  an open engine call that is LATE            (call.late — the engine already computes it)
+2  goods land AFTER the customer's date        (poArrivalGapOf → tone 'late')
+3  goods land ON the customer's date           (tone 'tight')
+4  an open engine call not yet late
+5  everything else
+   then  customer delivery date ASCENDING   (no date sorts LAST, never first)
+   then  PO Issued oldest first             (Jess's rule survives as the tie-breaker)
+```
+
+A finished or cancelled PO never rises: it has no risk left. Clearing a header sort returns
+to THIS order, not to `PO Issued`.
+
+**2 · `Current Action` gets a fixed width; `Items` becomes the `auto` tail.** 200px, which
+covers every word above except the two longest — and those two carry a `title`. **The
+argument, and it is the durable part: the column that truncates should be the one whose
+truncation costs least.** `Booqit 1B(…)` is still identifiable; `Confirm tomorrow…` is an
+instruction that has been deleted. Longest live product label is 14 characters, measured.
+
+**3 · The gap tail's tone follows who said the date.** No new word, no new label — only the
+tone: **red when `etaOf(po).confirmed` is true** (the factory told us), **amber when it is
+our estimate**. The two existing tooltips already say which is which; the colour now says it
+too. `same day` stays amber either way.
+
+### DONE WHEN
+
+- On `https://erp.carresofficial.com/operation/procurement`, **`PO-2038` is row 1** and its
+  arrival cell reads an amber `7d late`. Say so in the PR, with what you saw.
+- `PO-2031` and `PO-2032` (supplier-confirmed, `8d late`) are **red**, and are the only red
+  gaps on the page.
+- Clicking the `PO Issued` header still sorts by issue date; clearing it returns to risk
+  order — asserted by a test.
+- Current Action is measured at **200px in a real browser** and `Waiting for Goods` renders
+  whole at a 1366 viewport. **Quote the measured pixel numbers in the PR.**
+- Negative controls, each quoted with its failure count: remove rung 1 → the late-call test
+  fails · remove the confirmed/estimate tone split → the tone test fails · put
+  `Current Action` back to `auto` → the width test fails.
+
+### MUST NOT
+
+❌ change which columns exist, or their order · ❌ add a second comparator inside the page ·
+❌ add or respell any visible word — every word on this page is already ruled ·
+❌ touch the rail's five buckets (that is a separate, reported gap) · ❌ touch
+`OperationToOrder.tsx` · ❌ delete Jess's `PO Issued` rule from the checkpoint — it is
+overridden as the DEFAULT and survives as the tie-breaker and as a header sort.
+
+---
+
+## Q2 · The factory's ready date has somewhere to land
+
+**Lane: PURCHASE ORDERS · touches `apps/api/src/routes/operation/pos.ts`,
+`packages/shared/src/schemas/operation.ts`, `packages/shared/src/po-workspace.ts` and the
+PO workspace in `OperationPurchaseOrders.tsx`. NO migration — and that was measured, not
+assumed.**
+
+### ALREADY EXISTS — never rebuild
+
+- **`purchasing_record_ready_date(p_po_id text, p_new_date date, p_reason text)` is LIVE in
+  production** (migration `0318_po_birth_certificate.sql`). It is `security definer`, gated
+  by `purchasing_supplier_call_gate()`, takes the PO `FOR UPDATE`, refuses a PO that is not
+  `open`, **appends** a `kind='ready_date'` row to `po_supplier_promises` (never overwrites —
+  the table has no date column anybody can update), updates `expected_ready_date`, and writes
+  a `po_history` sentence. `authenticated` holds EXECUTE; `anon` and `public` are revoked.
+- The `po_supplier_promises` CHECK constraints **already allow** `kind='ready_date'` with
+  `answer='ready_date'` and `po_line_id IS NULL`. Nothing about the store needs changing.
+- All FIVE strings are already ruled in `docs/COPY-STANDARD.md`'s PURCHASING table:
+  `Confirm ready date` · `Call {supplier} — confirm ready date` · **Button `Record ready
+  date`** · `Ready date recorded` · `No supplier to call today. Everything on track.`
+  **Do not invent a sixth.**
+- The supplier-date door in the workspace (the in-place extend on the date row) is the shape
+  to copy — same form, same Reason/Remarks split, same "the form says what Save will record
+  before it is pressed".
+
+### Why
+
+**The door is built and has no handle.** `purchasing_record_ready_date` has **ZERO callers
+anywhere in the repository** — grep it: no api route, no query, no button. So:
+
+```
+0 of 21 POs carry a ready date, and no path in the portal can ever create one.
+0 of 4 promise rows are kind='ready_date'.
+```
+
+`docs/PURCHASING-WORKING-FLOW.md` §3 makes the ready date the FIRST thing that happens after
+`Issue PO`, and `docs/ACTION-FLOW-STANDARD.md` Law 4 rung 3 ranks `Confirm ready date`
+**above** `Issue PO`. Today it is the one rung of the purchasing flow with no way to close it.
+The information model's §11 already records this: *"`Confirm ready date` has no path in the
+portal that can close it"* — measured 2026-07-29 and still true.
+
+**A second defect, and it fires the day the first is fixed.** `poDateHistoryOf()`
+(`po-workspace.ts`) filters `p.kind === 'tomorrow_delivery'`. The moment ready dates start
+being recorded, **the workspace's date history will silently drop every one of them** — the
+ledger will hold answers the screen cannot show. Fix it in the same card or the fix ships a
+lie.
+
+### Build
+
+**1 · `POST /api/operation/pos/:id/ready-date`** in `pos.ts`, built exactly like the existing
+`/:id/tomorrow-delivery` route directly above it: a zod input in
+`packages/shared/src/schemas/operation.ts`, `userClient` + the JWT (never `service_role` —
+the RPC's own gate is the security boundary), and the SAME `mapSupplierCallError` so
+`po_not_open` and `po_not_found` come back as readable 422/404 instead of a raw constraint
+string. Input: `newDate` (required, `YYYY-MM-DD`) + `reason` (optional).
+
+**2 · The button in the workspace.** `Record ready date`, in the SUPPLIER region beside the
+existing arrival-date door. Same manner as the date door Jess ruled live on 2026-08-02:
+the field starts **EMPTY** (a date already given can never be edited — the ledger only gains
+a row), Save is disabled until something is keyed, and the effect sentence stays silent until
+then. Done message `Ready date recorded`.
+
+**3 · `poDateHistoryOf` learns the second kind.** It must show both kinds and must say which
+is which — a ready date and an arrival date are two different promises about the same PO, and
+merging them into one unlabelled list would make the slip count meaningless. Keep `slipDays`
+measured within ONE kind.
+
+### THE BOUNDARY — read this before you widen the card
+
+**`Confirm ready date` as a QUEUE lives on the To Order tab, not here.**
+`docs/PURCHASING-WORKING-FLOW.md` §1's frozen deadline-anchor rule assigns
+`Issue PO · Confirm ready date` to To Order and `Confirm tomorrow's delivery · Check in ·
+Confirm balance delivery date` to Receiving. This card builds **the recording door only** —
+the route and the button on the PO workspace, where the PO lives.
+
+Two things are therefore **REPORTED, NOT BUILT**, and the next chat must not quietly add them:
+
+- **`purchasingSupplierCallsOf` has exactly two keys** (`confirm_tomorrows_delivery` ·
+  `confirm_balance_delivery_date`). There is **no `confirm_ready_date` call in the engine at
+  all**, so no queue tile, no due date and no count exist for it anywhere. Adding one changes
+  the To Order tab, which this lane may not touch.
+- **The rail's five buckets do not change.** `poWorkStateOf` reads the ARRIVAL date; a ready
+  date is a different promise and must not move a PO out of `Waiting Supplier Date`. Adding a
+  sixth bucket needs a word Jess has not ruled.
+
+### DONE WHEN
+
+- On production, record a ready date against a real open PO through the button. Then prove
+  all four with your own eyes and say so in the PR: `expected_ready_date` moved · a
+  `kind='ready_date'` row exists in `po_supplier_promises` with the reason · a `po_history`
+  sentence was written · **the workspace's date history shows it**, labelled as a ready date.
+- A second ready date on the same PO **appends** — the first row is still there.
+- A PO that is not `open` is refused with a readable message, not a raw constraint string.
+- Negative controls: remove the `ready_date` branch from `poDateHistoryOf` → the history test
+  fails · point the route at the wrong RPC → the route test fails. Quote both counts.
+
+### MUST NOT
+
+❌ write a migration — the RPC, the CHECKs and the grants are already in production ·
+❌ add a queue tile, a due date or a count for `Confirm ready date` · ❌ add a sixth rail
+bucket · ❌ touch `OperationToOrder.tsx` · ❌ use `service_role` · ❌ invent a word — all
+five strings are already in COPY-STANDARD.
+
+---
+
+## Q3 · Purchasing gets its report tab
+
+**Lane: PURCHASE ORDERS · a NEW page + a NEW api route + one line in `PurchasingTabs.tsx`.
+NO migration. Touches no existing purchasing page.**
+
+> **⛔ BLOCKED ON WORDS. Do not start until Loo has ruled the strings.** Every word on a
+> Carres screen must already exist in `docs/COPY-STANDARD.md`, and this page needs words that
+> are not in it yet — the tab's own name and the four column headers. The candidates are
+> listed at the end of this card. **A chat that invents one has broken the rule, not
+> followed it.**
+
+### Why
+
+**Carres has no "look at the numbers" screen anywhere in Purchasing.** All five tabs answer
+*"what do I do with THIS document?"*. Nothing answers *"how many mattresses did we buy this
+month?"* — Loo asked for it 2026-08-04 and it does not exist.
+
+**This is a whole missing LAYER, not a missing button.** AutoCount's own Purchase menu draws
+the line: the top half is documents (`Purchase Order`, `Goods Received Note`, `Purchase
+Invoice`), the bottom half is reports (`Monthly Purchase Analysis Report`, `Purchase Analysis
+By Document Report`, `Top/Bottom Purchase Ranking Report`). Odoo does the same with a
+`Reporting` menu inside each app.
+
+**2990s is NOT the reference here, and that was measured by reading their code
+2026-08-04.** They have ONE global `Dashboard.tsx` (144 lines, sales figures only, no
+purchasing at all), one cross-module `Outstanding.tsx` (8 tabs, date range), and **no
+purchase report page whatsoever** — they have four `*DetailListing.tsx` files and every one
+is on the sales side. **They copied AutoCount's grid and not AutoCount's reports.** Copying
+2990s here would copy the gap.
+
+**The data already answers the question.** Run today, from `purchase_order_lines` joined
+through `product_skus → product_models.category`:
+
+```
+month     category    POs   ordered   received   outstanding
+2026-07   sofa          5        12          0            12
+2026-07   bedframe      1         6          0             6
+2026-07   mattress      1         5          0             5
+2026-08   sofa          8        11          0            11
+2026-08   bedframe      3         4          0             4
+2026-08   mattress      3         4          0             4
+```
+
+Every one of the 35 lines resolves a category — there is no unknown bucket to design around.
+
+### Build
+
+A read-only page with AutoCount's own shape (his fourth screenshot, 2026-08-04): filters on
+the left, grouping on the right, results below, export at the bottom.
+
+```
+filter    month ▼   ·   supplier ▼   ·   category ▼   ·   status ▼
+group by  category ▼           sort  most first ▼
+─────────────────────────────────────────────────────────────────
+category      POs      ordered    received    outstanding
+sofa            8           11           0             11      → click
+bedframe        3            4           0              4      → click
+mattress        3            4           0              4      → click
+─────────────────────────────────────────────────────────────────
+total          14           19           0             19
+```
+
+**Three rules that make this a report and not a second source of truth:**
+
+1. **It stores nothing.** No table, no RPC, no cached figure. It reads the same
+   `purchase_order_lines` the register reads, and computes at read time. A report with its
+   own store is a second number that will eventually disagree with the first.
+2. **Every number is a DOOR.** Clicking a row lands on the Purchase Orders register with
+   that month × category filter already applied, showing **exactly the POs the number
+   counted**. This is the one thing AutoCount cannot do — its answer to every analysis is
+   "export to Excel", and a number in Excel has left the system. *"A number its own click
+   cannot produce is the first count in this portal that lies"* (P2's Claims rule).
+3. **Cancelled POs are excluded, and the exclusion is stated on screen.** A silent filter is
+   how two people get two answers from one report.
+
+**NO MONEY. Ruled by Loo, 2026-08-04:** *"i dont show costing — due to supplier have own,
+finance will deal with it. If future need to add, just add, not now."* The report prints
+QUANTITY only. It is also currently unbuildable: `purchase_order_lines.cost` is **0.00 on all
+35 lines** — nobody keys a purchase price — so a value column would print `RM 0.00` for
+everything. Adding money later is one column, not a rebuild.
+
+### DONE WHEN
+
+- The tab renders on production and its August figures match the SQL above, re-run on the day
+  you ship. **Quote both the screen and the query in the PR.**
+- Clicking `sofa` lands on the register showing exactly those POs — count them and say the
+  number.
+- The month filter changes the figures; an empty month says so in words rather than printing
+  zeros with no explanation.
+- No money anywhere on the page — prove it with a source scan for `RM`, `cost`, `total` in
+  the new files, and quote the result.
+- Negative control: break the cancelled-PO exclusion → a test fails. Quote the count.
+
+### MUST NOT
+
+❌ create a table, an RPC or any stored figure · ❌ print money · ❌ touch the register, To
+Order, Receiving, Claims or Settings · ❌ invent a word — see the block below ·
+❌ add a Refresh button (a report recomputes itself and states when it did).
+
+### THE WORDS LOO MUST RULE BEFORE THIS CARD OPENS
+
+| What | Candidate | Note |
+|---|---|---|
+| the tab | `Reports` | AutoCount says *Report*, Odoo says *Reporting* |
+| column 2 | `POs` | `PO` is already a ruled word |
+| column 3 | `Ordered` | not yet in COPY-STANDARD |
+| column 4 | `Received` | **already ruled** (Receiving Workspace words) |
+| column 5 | `Outstanding` | **already ruled** — and its own rule says it is PRINTED, never left as a subtraction |
+| the last row | `Total` | not yet in COPY-STANDARD |
+
+---
+
+## Q4 · Purchasing gets its dashboard
+
+**Lane: PURCHASE ORDERS. STARTS ONLY AFTER Q3 MERGES.**
+
+> **⛔ BLOCKED ON Q3, and the reason is structural, not scheduling.** A dashboard tile is a
+> report figure made large. If Q4 computes its own counts, the same number is computed twice
+> and the two WILL disagree — that is the disease this repository keeps paying for
+> (`ops_order_control.balance`, and C5's one figure read three ways). **Q4 imports Q3's
+> computation. It writes no arithmetic of its own.**
+
+### Why
+
+Loo, 2026-08-04: *"every department should have one dashboard and control all these right?
+what is international advise?"*
+
+**The international answer is: yes, with one condition.** SAP Fiori gives each role an
+Overview Page; NetSuite gives each role a portlet dashboard. Odoo and Linear deliberately do
+not — they put the statistics inside the list instead. **AutoCount has no dashboard at all,
+and neither does 2990s for purchasing** (measured: their one `Dashboard.tsx` shows sales
+counts only).
+
+**The condition every one of the ones that works shares: each tile must be clickable and must
+land on exactly the rows it counted.** A tile that only prints a number is decoration, and
+decoration stops being read within a quarter.
+
+**Carres already has something AutoCount and 2990s do not** — the action engine. The
+purchasing dashboard is not new intelligence; it is `poCurrentActionOf` and `poArrivalGapOf`
+counted and made large.
+
+### Build
+
+Four tiles, each a count of something the engine ALREADY computes, each a door:
+
+```
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│      2       │ │      16      │ │      10      │ │      21      │
+│ arriving     │ │ waiting for  │ │ landing late │ │ purchase     │
+│ after the    │ │ a supplier   │ │ or on the    │ │ orders open  │
+│ customer ⚠   │ │ date         │ │ day          │ │              │
+└──────┬───────┘ └──────┬───────┘ └──────┬───────┘ └──────┬───────┘
+       └────────────────┴── each opens the register, filtered ──┘
+```
+
+- Every tile reads Q3's computation or the existing shared engine. **No new arithmetic.**
+- A tile at zero still renders. On this page a zero is an answer — *watched and fine* — and a
+  tile that disappears makes the row's shape move under the operator.
+- Red only where the engine already calls it late. **A number is not a status until somebody
+  sets a target** (COPY-STANDARD) — do not paint a threshold nobody has ruled.
+
+### DONE WHEN
+
+- The tiles' numbers equal the register's own counts for the same filter, on production, on
+  the day you ship. **If any tile disagrees with the register by one, the card is not done** —
+  that disagreement is the whole thing this card exists to avoid.
+- Every tile click lands on the register with the matching filter applied.
+- Negative control: point one tile at its own private count instead of the shared one → a
+  test fails. Quote it.
+
+### MUST NOT
+
+❌ compute any figure this page does not already compute elsewhere · ❌ add a KPI to the
+shell header (`docs/03-page-patterns.md` — the five slots; a KPI in the header is a defect,
+not a variant) · ❌ invent a word · ❌ start before Q3 merges.
+
 ## Status
 
 | Card | Status | PR |
@@ -1606,4 +2102,8 @@ P10 → then P7**, which inherits three working features instead of re-deriving 
 | P11 | ✅ **a sofa with no modules carries its own quantity** — **no migration, shared engine only; no Pages deploy owed and it is proved by CHECKSUM** (the web never imports `buildToOrder`, so a build from this tip emits `index-DiTy2SJk.js`, the bundle already live). The discriminator moved from the CATEGORY to the MODULES: a group of more than one line is a build and collapses to 1, a lone line carries its own quantity — and a group of more than one can only exist under a real build key, since a synthetic `line::` key is unique per line. **The row stopped being counted a second time**: it is `builds.reduce(+qty)` for every category, so the row and its builds agree by construction rather than by two counts agreeing (`builds.length` is gone). **The defect was wider than the display and that is the part the card did not name**: the api credits `purchasing_demand_record_issue` with the BUILD's qty while the purchase order is written from the LINE's — so a demand of 5 was ordered in full and recorded as 1, leaving 4 to be bought a second time. One fix closes all three. **Measured on prod**: 12 sofa groups — 9 genuine multi-module builds (still 1 each) and 3 lone lines, all qty 1, so **0 rows change today**. **Three negative controls, each fired as a real edit**: restore the `? 1` → exactly the 4 new shared tests · restore `builds.length` → 4 · the api sofa-demand test → 1, reading `expected 1 to be 5`. **A control that did not fire, and why**: the first api control was a `perl` in-place edit that CRLF silently declined, so the 45/45 that followed proved nothing — re-run as a real edit it fires. **The row-sum test also passed its own control at first** and was strengthened rather than kept: its fixture agreed with `builds.length` too, so it guarded nothing until a lone line of 2 was added to it | #589 |
 | P12 | ⬜ **a demand can be cancelled — and so can the remainder of a part-ordered one** (door + button in ONE card — a route with no caller is a bypass). **After P10**, whose card owns the grid row. **UNBLOCKED 2026-08-04 — Loo ruled the remainder CAN be cancelled**; the 3 already ordered are the PO flow's problem, not this one's. Migration relaxes the `po_id` gate. **Cancel is not delete: no delete button ever** — test rubbish goes by SQL and the database starts clean at go-live | — |
 | P10 | 🔨 **CLAIMED 2026-08-04 — `claude/p10-purchasing-execution-queue-f7e180`** · **ready stock is suggested, the human takes it** (Loo 2026-08-04) — the engine already computes it and it is switched off and unshown. Inline expand; taking goes through K4's pool draw. **After D0.5d** — *(supersedes the `…-a64763` claim of the same day: that worktree carried the claim commit and nothing else — clean tree, no branch on origin, zero code.)* | — |
+| **Q1** | ⬜ **the register puts the most dangerous PO first** (Loo 2026-08-04) — risk order replaces `PO Issued` as the DEFAULT (law conflict, ruled by Loo); `Current Action` gets a fixed 200px and `Items` becomes the tail; a gap from OUR estimate goes amber, a gap the factory gave stays red. **No migration, no api.** Measured: `PO-2038`'s customer is expecting goods TODAY and it sits at row 8 wearing the same words as 15 other rows | — |
+| **Q2** | ⬜ **the factory's ready date has somewhere to land** (Loo 2026-08-04) — `purchasing_record_ready_date` is LIVE in prod (0318) with **zero callers**: no route, no button, 0 of 21 POs carry a ready date. Adds the route + the workspace button + teaches `poDateHistoryOf` the second kind (today it filters `tomorrow_delivery` and would silently swallow every ready date). **No migration.** The QUEUE stays To Order's — reported, not built | — |
+| **Q3** | ⬜ **Purchasing gets its report tab** (Loo 2026-08-04) — the whole "look at the numbers" layer is missing; quantity only, **no money by Loo's ruling** (and `cost` is 0.00 on all 35 lines anyway). Stores nothing, computes at read time, every number is a door back to the rows it counted. **⛔ BLOCKED on Loo ruling the tab name + 3 column words** | — |
+| **Q4** | ⬜ **Purchasing gets its dashboard** (Loo 2026-08-04) — four tiles, each a count the engine already computes, each clickable. **⛔ BLOCKED until Q3 merges**: a tile is a report figure made large, and computing it twice guarantees two answers | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |
