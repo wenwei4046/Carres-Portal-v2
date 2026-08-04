@@ -513,6 +513,17 @@ async function loadToOrder(
         .select("id, sku, qty, date_in, created_at")
         .eq("status", "free")
         .eq("needs_repair", false)
+        // READY STOCK'S OWN DEFINITION OF READY, mirrored rather than
+        // re-decided (`GET /api/ops/stock/ready`). Free and sound is not
+        // enough on its own: R4 releases a quarantined unit back to `free`,
+        // so the day a DAMAGED one is released this page would otherwise
+        // offer it to a customer's order. Live exposure today is zero
+        // (measured 2026-08-04: 54 `new` + 33 `exhibition`, nothing else) —
+        // which is exactly why it is closed now rather than after the first
+        // release. The list is that route's, verbatim, and its own header
+        // comment is stale: the CODE admits `old` and `refurbished` too and
+        // excludes only `damaged`.
+        .in("condition", ["new", "exhibition", "old", "refurbished"])
         .eq("warehouse_id", stockWarehouse.id);
       if (itemErr) throw new Error(itemErr.message);
 

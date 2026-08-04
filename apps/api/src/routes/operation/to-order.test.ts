@@ -1390,6 +1390,17 @@ describe("P10 · the offer", () => {
     expect(f).toContainEqual({
       table: "ops_stock_items", method: "eq", col: "warehouse_id", val: WAREHOUSE,
     });
+    // Ready Stock's OWN definition of ready, mirrored not re-decided. R4
+    // releases a quarantined unit back to `free`, so without this the page
+    // would offer a DAMAGED unit to a customer's order the day one is
+    // released. (`/api/ops/stock/ready`'s header comment says `new` +
+    // `exhibition`; its CODE is this list, and the code is the rule.)
+    expect(f).toContainEqual({
+      table: "ops_stock_items",
+      method: "in",
+      col: "condition",
+      val: ["new", "exhibition", "old", "refurbished"],
+    });
   });
 
   it("stays up when the register is unreachable — the feature goes, the workspace does not", async () => {
