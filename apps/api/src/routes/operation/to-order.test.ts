@@ -262,10 +262,10 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       b.then = (res: any, rej: any) =>
         Promise.resolve(
-          tables[status === "reserved" ? "__reservedStock" : "__freeStock"] ?? {
+          (tables[status === "reserved" ? "__reservedStock" : "__freeStock"] ?? {
             data: [],
             error: null,
-          },
+          }) as { data: unknown; error: unknown },
         ).then(res, rej);
       return b;
     }
@@ -1353,7 +1353,7 @@ function withLoneLine(extra: Partial<Tbl> = {}): Tbl {
     ],
     error: null,
   };
-  return { ...t, ...extra };
+  return { ...t, ...extra } as Tbl;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
