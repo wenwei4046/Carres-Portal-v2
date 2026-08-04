@@ -1289,6 +1289,92 @@ remainder. No new visible word (§0A's list already covers this dialog).
 **Must NOT.** ❌ add a status column · ❌ allow free-text items · ❌ touch the rail, the grid
 columns or the toolbar (P9 and P10 own those regions of the same file — stay inside the dialog).
 
+### ✅ SHIPPED 2026-08-04 — and HALF THE CARD WAS ALREADY BUILT WHEN IT WAS WRITTEN
+
+**The card's own premise was stale, and measuring it first is what kept this card small.**
+*"`+ Create Purchase` opens a real dialog and its Save goes nowhere"* was true when the card
+was written and false by the time it was claimed: **PR #581 (migration 0319, 2026-08-03) built
+the whole create path** — the dialog posts to `POST /api/operation/purchase/to-order/demand`,
+`purchasing_create_demand` writes the row, and `33e68554` fixed the half that saved it and did
+not show it. Measured live before building anything: `purchase_demands` exists, both RPCs
+exist, **and it holds one real row** (`SONIC-S`, qty 5, never ordered). So three quarters of
+the Done-when was already true and was VERIFIED rather than rebuilt.
+
+**What was genuinely missing is the card's own ONE ADDITION, and only that.** 0319 froze
+*"NO PARTIAL QUANTITY. One row = one issue"*; Loo ruled on 2026-08-04 that the business needs
+the other thing, and the owner rule says the older text does not outrank him.
+
+**Migration 0320 — one writable counter, one derived number.** `issued_qty` is the units that
+have stopped being something to buy; `remaining_qty` is **GENERATED** (`qty - issued_qty`), so
+it is a real column the index and every reader can use and it **structurally cannot disagree**
+with the counter. Two stored numbers that must agree is the disease this repo keeps paying for.
+
+**`issued_qty` deliberately does NOT split by cause** — a purchase order today, a ready-stock
+take when P10 lands. The cause is already recorded where the act happened (`purchase_order_lines`
+says what was ordered; K4's pool-draw ledger, 0292/0294, says what was drawn and why). Splitting
+it here would be a second telling of a fact that already has a home, **and it would make P10
+alter a generated expression on a live table — the exact cost this card exists to avoid.**
+
+**"Still to buy" stopped meaning "has no purchase order".** The old predicate (`po_id is null`)
+reads a partly satisfied demand as finished — precisely the row this card exists to keep alive.
+The index, the api read and the grid's quantity all moved to `remaining_qty > 0` together.
+
+**The issue path stops PATCHing the table and goes through a door, which is 0316's rule applied
+here word for word.** `purchasing_demand_record_issue` **ADDS** the quantity taken rather than
+setting a total (two documents taking from one demand must add up, and a caller that computes
+the new total has to read the old one first — a race), takes the row `FOR UPDATE`, and refuses
+an over-issue **by name and with both numbers**, with the table's own CHECK behind it in case a
+second door is ever written. That is P10's *"taking twice cannot over-draw"* available before
+P10 starts.
+
+**Proved on production in a rolled-back transaction, not argued: 8 assertions** — a live demand
+comes through 0 issued / remaining = qty · a new demand is born 0 of 5 · **a part issue of 2
+leaves remaining 3, and the row is still open work** · a second document takes 1 more and the
+two add up while the FIRST purchase order keeps the link · an over-issue is refused as
+`over_issue` · the CHECK refuses it even without the door · a cancelled demand takes no more.
+**Rollback verified total** (0 new columns, 0 new function, 0 probe rows, the index predicate
+still the old one). **The negative control fired**: with the guard removed the same harness
+booked issued 99 / **remaining −94**. The applied function is **byte-identical to the reviewed
+repository file** — `md5(prosrc)` `273dd249d4d88e184406ce1d7d6ba9a1`, 2008 chars.
+
+**A method note worth not re-learning: a control that did not run is not a control.** The first
+attempt at the api negative control shelled out to `python`, which is not installed here; the
+edit never happened, the suite passed 44/44, and that green was evidence of nothing. Re-run as
+a real edit, the two controls fire **exactly 3** (revert the read) and **exactly 1** (revert the
+door to a PATCH).
+
+**A defect found in the ALREADY-SHIPPED half, reported and NOT fixed here.** A ready-stock demand
+for a **sofa** projects as **1**, whatever quantity was typed — `to-order.ts` rules that a sofa
+build IS one sofa however many module lines it has (`isOnePoPerOrder`), and a typed demand has
+no build key, so qty 5 becomes one build of 1. It was found because the first test fixture used
+a sofa SKU and measured the sofa rule instead of the remainder. **It is a business question, not
+a bug to quietly patch** — does a ready-stock demand for 5 sofas mean five separate builds, or
+one line of 5? — and the sofa grain is frozen law. Live exposure today is zero: the one real
+demand is a mattress. The fixture is a mattress now, deliberately.
+
+**Four more findings, reported not built.**
+1. **`purchasing_cancel_demand` is untouched, and that is a decision.** Its gate refuses a demand
+   already on a purchase order. Once P10 can satisfy part of a demand from stock, *"may the
+   operator cancel the REMAINDER of a demand that was partly ordered?"* becomes a real business
+   question with two defensible answers — **Loo's, not a migration's**. Today the two readings
+   are indistinguishable (the issue path takes the whole demand, so `po_id is not null` and
+   `issued_qty > 0` are the same set).
+2. **No operator can cancel a demand at all.** The RPC exists; there is **no api route and no
+   button**. A route with no caller is what card C1 deleted as *"a bypass one curl away"*, so
+   none was added — the door and the control ship together, on the card that gives the operator
+   the control. The store records a cancellation; nothing can yet ask it to.
+3. **The dialog region was not edited, and needed no edit.** The card bounds P8 to it; the bound
+   is not a quota. Zero web files changed, so no Pages deploy was required by this card.
+4. **0318 and 0319 are applied and ABSENT from the migration tracker** (both run through the SQL
+   editor). Numbering off the tracker tail alone would have handed out 0318 and collided with two
+   live sets of objects. **The number is the MAX of tracker tail · repository tail · every
+   branch** — 0317 · 0319 · 0319 → 0320, and 0320 went through `apply_migration`, so it IS in the
+   tracker.
+
+**Gates:** api tsc **0** · api suite **2061 passed, 3 pre-existing** (`supplier/pos` ×2 ·
+`partner/pickups` ×1 — baseline, zero new) · `to-order.test.ts` **39 → 44** · web To Order page
+**41/41** untouched. **No new visible word** (§0A's list already covers this dialog).
+
 ---
 
 ## P9 · The page says how many of each you are buying
@@ -1394,7 +1480,7 @@ P10 → then P7**, which inherits three working features instead of re-deriving 
 | P4 | ✅ where the goods go — migration **0307 applied, verified and merged** 2026-07-29 · **P4 FROZEN**; the application-code half is NOT P4 and starts as its own execution card (§10) | #513 |
 | P5 | ⬜ after P1-P4 · prove it with a real PO | — |
 | P6 | ✅ **Purchasing terminology freeze** (2026-07-29), **partly superseded 2026-07-30 by the Purchasing clean restart**: `Draft PO` is permanently removed, raising a PO is ONE act (`Issue PO`), Operation Status is FIVE labels, and the verb dictionary went 6 → 7 (`Prepare`) and back to 6. Docs only | — |
-| P8 | 🔨 **CLAIMED 2026-08-04 — `claude/card-p8-create-purchase-dialog-d8685f`** · a typed purchase demand can actually be saved (Loo 2026-08-04) — `purchase_demands`, built with `issued`/`remaining` from day one. Migration + api + the dialog region only | — |
+| P8 | ✅ **a typed purchase demand can actually be saved** (migration **0320 applied**) — and **the create half was already shipped by #581/0319 when the card was written**, so it was verified, not rebuilt. What was missing was the card's ONE ADDITION: `issued_qty` (writable only through a door) + `remaining_qty` (**GENERATED**, so it cannot disagree), and *"still to buy"* stops meaning *"has no purchase order"*. The issue path stops PATCHing and **adds** what it took, refusing an over-issue by name. 8 assertions on prod, rolled back; applied function byte-identical to the file. **Reported, not fixed: a ready-stock demand for a SOFA projects as 1** whatever quantity was typed (the frozen sofa grain — a business question), and **nobody can cancel a demand** (RPC exists, no route, no button — a route with no caller is C1's bypass) | #584 |
 | P9 | ⬜ **the page says how many of each you are buying** (Loo 2026-08-04) — CATEGORY rows carry bare unit counts; a footer totals the ticked rows. Rail + footer regions only | — |
 | P10 | ⬜ **ready stock is suggested, the human takes it** (Loo 2026-08-04) — the engine already computes it and it is switched off and unshown. Inline expand; taking goes through K4's pool draw. **After D0.5d** | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |
