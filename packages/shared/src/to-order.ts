@@ -38,6 +38,7 @@ import {
   type NetRequirementsOptions,
   type NetRequirementsSupply,
 } from "./net-requirements";
+import { readyStockOffer, type FreeStockUnit, type ReadyStockOffer } from "./ready-stock-offer";
 import type { IsoDate } from "./working-days";
 
 // ── The words ───────────────────────────────────────────────────────────────
@@ -312,6 +313,39 @@ export function soCountLabel(n: number): string {
 /** `8 pcs` — physical units, the factory's own count. */
 export function pcsCount(n: number): string {
   return `${n} pcs`;
+}
+
+/**
+ * ── P10 · the ready stock offer's three strings ─────────────────────────────
+ *
+ * **NOT ONE OF THEM IS NEW, AND THAT IS THE POINT.** This act already has a
+ * vocabulary on screen — the order drawer's Ready picker has drawn from the
+ * same pool through the same door since 2026-06-30, and it says `{n} free` and
+ * `Reserve {n} to {soRef}`. Loo's card sketched the button as `[Take 2]`; a
+ * second word for one act on two screens is the exact defect card R8 spent a
+ * whole sweep removing, and COPY-STANDARD's law is one business, one
+ * dictionary. So the shipped word wins and the difference is REPORTED on the
+ * card rather than settled here — the word is Loo's to rule, and either answer
+ * is one edit to this file plus one to `ReserveStockDialog`.
+ *
+ * They live here so the row's marker, its tooltip and the panel underneath it
+ * cannot spell the same fact three ways.
+ */
+
+/** `2 free` — units of this item standing unreserved on the floor. */
+export function freeStockCount(n: number): string {
+  return `${n} free`;
+}
+
+/** `Carres Klang · 2 free` — where they are, and how many. */
+export function freeStockAt(warehouse: string | null, n: number): string {
+  const count = freeStockCount(n);
+  return warehouse ? `${warehouse} · ${count}` : count;
+}
+
+/** `Reserve 2 to SO-1234` — the button, verbatim from the picker that ships. */
+export function reserveFromStock(n: number, ref: string): string {
+  return `Reserve ${n} to ${ref}`;
 }
 
 /**
@@ -601,6 +635,19 @@ export interface BuildToOrderInput {
    * (Jess, 2026-07-28 — a fallback is how a setting silently stops mattering).
    */
   missingProductionDays?: readonly { supplierId: string; category: string }[];
+  /**
+   * **P10** — free warehouse records that match each demand line, keyed by
+   * `lineId` and already in the draw's own FIFO order. The engine turns them
+   * into a `ToOrderBuild.stock` OFFER; it never consumes them, and a line
+   * absent from this map simply has nothing on the floor.
+   *
+   * It is per LINE rather than per SKU because the offer must be measured
+   * against what THIS build still needs, and because the register keys on its
+   * own free-text spelling — matching a catalog code to a warehouse name is the
+   * caller's job (`stockMatchKey`, the one rule the readiness badge and the
+   * stock picker already share).
+   */
+  freeStockByLine?: Record<string, readonly FreeStockUnit[]>;
 }
 
 // ── Outputs ─────────────────────────────────────────────────────────────────
@@ -631,6 +678,19 @@ export interface ToOrderBuild {
   /** `5539-1B(LHF) · 5539-CNR · 5539-2A(RHF)` */
   codes: string;
   lines: { lineId: string; sku: string; qty: number; cost: number | null }[];
+  /**
+   * **P10 — free ready stock that could satisfy this build**, or absent when
+   * the floor holds none. Advisory: `consumeFreeStock` stays OFF, so nothing
+   * here has been netted out of `qty`. Taking is an ACT the operator performs.
+   *
+   * ONLY A BUILD OF ONE LINE EVER CARRIES ONE. A sofa build is three module
+   * lines that are one physical sofa; two of its three modules sitting in the
+   * warehouse is not a sofa anybody can deliver, and reserving them would
+   * reduce a quantity by an amount that means nothing. Every mattress, every
+   * bedframe, a typed demand and a non-modular sofa are all builds of one line,
+   * so this covers everything a single reservation can actually satisfy.
+   */
+  stock?: ReadyStockOffer;
 }
 
 export interface ToOrderRow {
@@ -873,6 +933,7 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
   const missing = new Set(
     (input.missingProductionDays ?? []).map((m) => `${m.supplierId}::${m.category}`),
   );
+  const freeStockByLine = input.freeStockByLine ?? {};
 
   // group 1 — supplier × category
   const byPair = new Map<string, ToOrderLine[]>();
@@ -930,6 +991,19 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
       for (const [key, members] of byBuild) {
         i += 1;
         const { model, size, named } = nameBuild(members);
+        const buildQty =
+          isOnePoPerOrder(category) && members.length > 1
+            ? 1
+            : members.reduce((s, m) => s + (toOrderByLine.get(m.lineId) ?? m.qty), 0);
+        /**
+         * P10 — the offer, and the ONE condition on it. A build of more than
+         * one line is a sofa's modules: reserving some of them satisfies no
+         * requirement anybody can deliver, so it is never offered stock. See
+         * `ToOrderBuild.stock`.
+         */
+        const stockUnits =
+          members.length === 1 ? (freeStockByLine[members[0].lineId] ?? []) : [];
+        const stock = stockUnits.length > 0 ? readyStockOffer(buildQty, stockUnits) : null;
         builds.push({
           key,
           model,
@@ -951,10 +1025,7 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
           // more than one can only exist under a real build key — a synthetic
           // `line::` key is unique per line — so this cannot collapse anything
           // that is not a build.
-          qty:
-            isOnePoPerOrder(category) && members.length > 1
-              ? 1
-              : members.reduce((s, m) => s + (toOrderByLine.get(m.lineId) ?? m.qty), 0),
+          qty: buildQty,
           title:
             (nameCount.get(named) ?? 0) > 1
               ? `${unitLabel(category, 1)} ${i} — ${named}`
@@ -967,6 +1038,7 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
             qty: toOrderByLine.get(m.lineId) ?? m.qty,
             cost: m.cost,
           })),
+          ...(stock ? { stock } : {}),
         });
       }
 

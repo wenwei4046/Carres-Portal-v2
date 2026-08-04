@@ -1285,3 +1285,300 @@ describe("a partly satisfied demand keeps its remainder", () => {
     expect(sb.rpcCalls.some((r) => r.fn === "purchasing_demand_record_issue")).toBe(false);
   });
 });
+
+// ── P10 · ready stock is suggested; the human decides whether to take it ────
+
+const NICE_FUTURE = "22222222-2222-2222-2222-2222222222e2";
+
+/**
+ * `stockMatchKey` IS THE MATCHER, and this fixture is deliberate about what
+ * that buys and what it does not.
+ *
+ * It is the ONE rule that links an order line to warehouse free stock — the
+ * readiness badge and the stock picker have shared it since D1 — so P10 reuses
+ * it rather than inventing a second way to decide which physical unit answers
+ * which requirement. It survives COSMETIC drift (`SONIC-K` ↔ `Sonic-K`,
+ * `…-Q` ↔ `… Queen`) and nothing more, which is right: a looser rule would
+ * reserve the wrong goods.
+ *
+ * MEASURED ON PROD 2026-08-04, and reported on the card rather than coded
+ * around: the 87 free units are the AutoCount Klang import, whose SKUs are
+ * sheet DESCRIPTIONS (`Sonic L1202S-K`, `Haven SoftCloud-H1401S-Q`), while
+ * every live demand line is a catalog code (`SONIC-K`, `H1401S-Q`). Those are
+ * different products as far as any matcher can tell, so the overlap today is
+ * ZERO and no row shows a marker. It heals by itself: units minted by the
+ * portal's own receiving already carry catalog codes (`M1401F-Q`, `B1201S-Q`,
+ * `5539-2A(RHF)` are `incoming` on prod right now), so the first thing
+ * received through the portal lights this up. The last test in this block
+ * pins the non-match so nobody "fixes" it into a fuzzy guess.
+ */
+function stockTables() {
+  const t = TABLES();
+  t.suppliers = { data: [{ id: NICE_FUTURE, name: "Nice Future" }], error: null };
+  t.purchasing_production_days = {
+    data: [{ supplier_id: NICE_FUTURE, category: "mattress", working_days: 7 }],
+    error: null,
+  };
+  t.purchasing_supplier_settings = {
+    data: [{ supplier_id: NICE_FUTURE, off_days: [0, 6], transit_days: 1 }],
+    error: null,
+  };
+  t.orders = {
+    data: [
+      {
+        id: "o1", so: 1207, customer_name: "PETER", status: "proceed_order",
+        delivery_date: "2026-09-30", delivery_date_tbd: false,
+        placed_at: "2026-07-01", created_at: "2026-07-01",
+      },
+    ],
+    error: null,
+  };
+  t.order_lines = {
+    data: [
+      {
+        id: "m1", order_id: "o1", sku: "SONIC-K", qty: 5, attrs: null,
+        excluded_from_plan: false, exclude_from_plan_until: null,
+      },
+    ],
+    error: null,
+  };
+  t.product_skus = {
+    data: [
+      {
+        sku: "SONIC-K", supplier_id: NICE_FUTURE, cost: 100, variant: "King",
+        variant_kind: "size", product_models: { category: "mattress", name: "Sonic" },
+      },
+    ],
+    error: null,
+  };
+  t.ops_stock_items = { data: [], error: null };
+  return t;
+}
+
+const freeItem = (id: string, over: Record<string, unknown> = {}) => ({
+  id,
+  sku: "Sonic-K",
+  status: "free",
+  condition: "new",
+  needs_repair: false,
+  qty: 1,
+  warehouse_id: WAREHOUSE,
+  reserved_ref: null,
+  date_in: "2026-07-01",
+  created_at: "2026-07-01T00:00:00Z",
+  ...over,
+});
+
+async function readStock(t: ReturnType<typeof TABLES>) {
+  const sb = makeSb(t);
+  vi.mocked(userClient).mockReturnValue(sb as never);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body = (await (await get()).json()) as any;
+  return { sb, body };
+}
+
+describe("P10 — the ready stock offer", () => {
+  it("says nothing when the register is empty", async () => {
+    const { body } = await readStock(stockTables());
+    expect(body.proposals[0].rows[0].builds[0].stock).toBeUndefined();
+  });
+
+  it("offers the free units, matched through the drift the ONE rule allows", async () => {
+    const t = stockTables();
+    t.ops_stock_items = { data: [freeItem("u1"), freeItem("u2")], error: null };
+    const { body } = await readStock(t);
+    const b = body.proposals[0].rows[0].builds[0];
+    // Advisory: `consumeFreeStock` stays OFF, so the quantity to buy is 5 still.
+    expect(b.qty).toBe(5);
+    expect(b.stock).toMatchObject({
+      available: 2,
+      takeable: 2,
+      itemIds: ["u1", "u2"],
+      stockSku: "Sonic-K",
+      warehouse: "Carres Klang",
+    });
+  });
+
+  it("names the units in the door's own FIFO order", async () => {
+    const t = stockTables();
+    t.ops_stock_items = {
+      data: [
+        freeItem("newer", { date_in: "2026-07-20" }),
+        freeItem("oldest", { date_in: "2026-01-02" }),
+      ],
+      error: null,
+    };
+    const { body } = await readStock(t);
+    expect(body.proposals[0].rows[0].builds[0].stock.itemIds).toEqual(["oldest", "newer"]);
+  });
+
+  it("offers only what Ready Stock itself calls ready", async () => {
+    // `GET /api/ops/stock/ready`'s own predicate, reused rather than re-decided.
+    const t = stockTables();
+    t.ops_stock_items = {
+      data: [
+        freeItem("broken", { needs_repair: true }),
+        freeItem("worn", { condition: "old" }),
+        freeItem("gone", { status: "sold" }),
+        freeItem("ok", { condition: "exhibition" }),
+      ],
+      error: null,
+    };
+    const { body } = await readStock(t);
+    expect(body.proposals[0].rows[0].builds[0].stock).toMatchObject({
+      available: 1,
+      itemIds: ["ok"],
+    });
+  });
+
+  it("a unit ALREADY reserved to this order stops being something to buy", async () => {
+    // The reservation IS the record — there is no counter beside it to keep in
+    // step, so a release puts the demand straight back. This also closes a hole
+    // that predates P10: the drawer's Ready picker has reserved units to an
+    // order since 2026-06-30 and To Order went on buying them a second time.
+    const t = stockTables();
+    t.ops_stock_items = {
+      data: [
+        freeItem("r1", { status: "reserved", reserved_ref: "SO-1207" }),
+        freeItem("r2", { status: "reserved", reserved_ref: "SO-1207" }),
+      ],
+      error: null,
+    };
+    const { body } = await readStock(t);
+    expect(body.proposals[0].rows[0].builds[0].qty).toBe(3);
+  });
+
+  it("a fully served line leaves the workspace altogether", async () => {
+    const t = stockTables();
+    t.ops_stock_items = {
+      data: Array.from({ length: 5 }, (_, i) =>
+        freeItem(`r${i}`, { status: "reserved", reserved_ref: "SO-1207" }),
+      ),
+      error: null,
+    };
+    const { body } = await readStock(t);
+    expect(body.proposals).toEqual([]);
+  });
+
+  it("a reservation made for ANOTHER order changes nothing here", async () => {
+    const t = stockTables();
+    t.ops_stock_items = {
+      data: [freeItem("r1", { status: "reserved", reserved_ref: "SO-9999" })],
+      error: null,
+    };
+    const { body } = await readStock(t);
+    expect(body.proposals[0].rows[0].builds[0].qty).toBe(5);
+  });
+
+  it("the purchase order that follows carries the REDUCED quantity", async () => {
+    const t = stockTables();
+    t.ops_stock_items = {
+      data: [freeItem("r1", { status: "reserved", reserved_ref: "SO-1207" })],
+      error: null,
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    const buildKeys = body.proposals[0].rows[0].builds.map((b: { key: string }) => b.key);
+    const jwt = await makeJwt("operation");
+    await app.fetch(
+      new Request(ISSUE, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supplierId: NICE_FUTURE,
+          category: "mattress",
+          destinationId: KLANG,
+          purchaseOrders: [{ key: "d1", include: true, buildKeys }],
+        }),
+      }),
+      env,
+    );
+    const batch = sb.rpcCalls.find((r) => r.fn === "operation_create_pos_batch")!;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lines = (batch.args.p_pos as any[])[0].lines;
+    expect(lines).toEqual([expect.objectContaining({ sku: "SONIC-K", qty: 4 })]);
+  });
+
+  it("never offers the same physical unit to two lines", async () => {
+    const t = stockTables();
+    t.orders = {
+      data: [
+        ...(t.orders.data as unknown[]),
+        {
+          id: "o2", so: 1208, customer_name: "ella", status: "place",
+          delivery_date: "2026-09-30", delivery_date_tbd: false,
+          placed_at: "2026-07-01", created_at: "2026-07-01",
+        },
+      ],
+      error: null,
+    };
+    t.order_lines = {
+      data: [
+        {
+          id: "m1", order_id: "o1", sku: "SONIC-K", qty: 1, attrs: null,
+          excluded_from_plan: false, exclude_from_plan_until: null,
+        },
+        {
+          id: "m2", order_id: "o2", sku: "SONIC-K", qty: 1, attrs: null,
+          excluded_from_plan: false, exclude_from_plan_until: null,
+        },
+      ],
+      error: null,
+    };
+    t.ops_stock_items = { data: [freeItem("u1")], error: null };
+    const { body } = await readStock(t);
+    const offered = body.proposals[0].rows.flatMap(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (r: any) => r.builds.map((b: any) => b.stock?.itemIds ?? []),
+    );
+    expect(offered.flat()).toEqual(["u1"]);
+  });
+
+  it("never offers stock to a TYPED ready stock demand", async () => {
+    // Not an oversight — see the api's own note. A customer's units leave for a
+    // customer, so reserving them IS the act; a ready stock demand asks for
+    // units to be FREE at a destination, and the only live destination is the
+    // warehouse those units already stand in. Reserving them there would lock
+    // them to a reference nobody can act on and reduce the buy by the same
+    // amount, leaving the floor exactly where it started.
+    const t = stockTables();
+    t.order_lines = { data: [], error: null };
+    t.purchase_demands = {
+      data: [
+        {
+          id: "d1", purpose: "ready_stock", sku: "SONIC-K",
+          supplier_id: NICE_FUTURE, destination_id: KLANG,
+          qty: 5, issued_qty: 0, remaining_qty: 5, required_by: null, remark: null,
+        },
+      ],
+      error: null,
+    };
+    t.ops_stock_items = { data: [freeItem("u1"), freeItem("u2")], error: null };
+    const { body } = await readStock(t);
+    const row = body.proposals[0].rows[0];
+    expect(row.readyStock).toBe(true);
+    expect(row.builds[0].qty).toBe(5);
+    expect(row.builds[0].stock).toBeUndefined();
+  });
+
+  it("does NOT match a Klang sheet description to a catalog code", async () => {
+    // This is the live state on prod today, pinned so nobody widens the rule
+    // into a guess. `Sonic L1202S-K` and `SONIC-K` are different products as
+    // far as any matcher can tell, and reserving the wrong physical unit is a
+    // worse failure than offering nothing.
+    const t = stockTables();
+    t.ops_stock_items = { data: [freeItem("u1", { sku: "Sonic L1202S-K" })], error: null };
+    const { body } = await readStock(t);
+    expect(body.proposals[0].rows[0].builds[0].stock).toBeUndefined();
+  });
+
+  it("an unreadable register costs the SUGGESTION, never the page", async () => {
+    const t = stockTables();
+    t.ops_stock_items = { data: null, error: { message: "relation does not exist" } };
+    const { body } = await readStock(t);
+    expect(body.proposals[0].rows[0].builds[0].qty).toBe(5);
+    expect(body.proposals[0].rows[0].builds[0].stock).toBeUndefined();
+  });
+});

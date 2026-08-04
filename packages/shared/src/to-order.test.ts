@@ -775,3 +775,88 @@ describe("the row's own orderBy", () => {
     expect(ps[0].rows[0].orderBy).toBeNull();
   });
 });
+
+// ── P10 · ready stock is suggested; the human decides whether to take it ────
+
+describe("the ready stock offer on a build", () => {
+  const freeUnit = (itemId: string, qty = 1) => ({
+    itemId,
+    sku: "Sonic L1202S-K",
+    qty,
+    condition: "new",
+    warehouse: "Carres Klang",
+  });
+
+  /** One mattress line, standing alone — the ordinary shape of a build of one. */
+  const MATTRESS = line({
+    lineId: "m1",
+    orderId: "o-m",
+    sku: "SONIC-K",
+    category: "mattress",
+    supplierId: NICE_FUTURE,
+    qty: 5,
+    modelName: "Sonic",
+    variant: "King",
+    variantKind: "size",
+    offDays: [0, 6],
+  });
+
+  it("says nothing at all when no free stock was handed to the line", () => {
+    const ps = run([MATTRESS]);
+    expect(ps[0].rows[0].builds[0].stock).toBeUndefined();
+  });
+
+  it("carries the offer on a build of one line, and nets NOTHING out of qty", () => {
+    // `consumeFreeStock` stays OFF (Jess, 2026-07-21): the suggestion is
+    // advisory and the quantity to buy is untouched until a human acts.
+    const ps = run([MATTRESS], {
+      freeStockByLine: { m1: [freeUnit("u1"), freeUnit("u2")] },
+    });
+    const b = ps[0].rows[0].builds[0];
+    expect(b.qty).toBe(5);
+    expect(b.stock).toEqual({
+      available: 2,
+      takeable: 2,
+      itemIds: ["u1", "u2"],
+      stockSku: "Sonic L1202S-K",
+      warehouse: "Carres Klang",
+    });
+  });
+
+  it("measures the offer against what the build still needs, not the line", () => {
+    const ps = run([{ ...MATTRESS, qty: 1 }], {
+      freeStockByLine: { m1: [freeUnit("u1"), freeUnit("u2")] },
+    });
+    expect(ps[0].rows[0].builds[0].stock).toMatchObject({ available: 2, takeable: 1 });
+  });
+
+  it("NEVER offers stock to a sofa build that has modules", () => {
+    // Two of a sofa's three modules sitting in the warehouse is not a sofa
+    // anybody can deliver, and reserving them would reduce a quantity by an
+    // amount that means nothing.
+    const ps = run([...PETER], {
+      freeStockByLine: {
+        p1: [freeUnit("u1")],
+        p2: [freeUnit("u2")],
+        p3: [freeUnit("u3")],
+        p4: [freeUnit("u4")],
+        p5: [freeUnit("u5")],
+      },
+    });
+    for (const b of ps[0].rows[0].builds) expect(b.stock).toBeUndefined();
+  });
+
+  it("DOES offer stock to a sofa line that has no modules", () => {
+    // The P11 discriminator, applied here too: a lone line is one physical
+    // thing carrying its own quantity, so one reservation genuinely serves it.
+    const lone = line({ lineId: "s1", orderId: "o-s", sku: "TELLUC-1S", qty: 2 });
+    const ps = run([lone], { freeStockByLine: { s1: [freeUnit("u1"), freeUnit("u2")] } });
+    expect(ps[0].rows[0].builds[0].stock).toMatchObject({ takeable: 2 });
+  });
+
+  it("leaves every existing build untouched when no stock is passed at all", () => {
+    const withOut = run([...PETER, ...KEE_TONG]);
+    const withEmpty = run([...PETER, ...KEE_TONG], { freeStockByLine: {} });
+    expect(withEmpty).toEqual(withOut);
+  });
+});

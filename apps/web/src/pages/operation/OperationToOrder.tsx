@@ -45,12 +45,15 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   TO_ORDER_WORDS as W,
   categoryLabel,
   categoryUnitsLine,
   defaultDocuments,
+  freeStockAt,
   ordersHeadline,
+  reserveFromStock,
   poScheduleBucket,
   poScheduleDays,
   weekdayName,
@@ -61,6 +64,7 @@ import {
   toOrderBuilds,
   unitsHeadline,
   unresolvedHeadline,
+  type ReadyStockOffer,
   type ToOrderOrderedRow,
   type ToOrderProposal,
 } from "@carres/shared";
@@ -80,6 +84,7 @@ import Textarea from "@/components/kit/Textarea";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { qk, useCatalog } from "@/lib/queries";
+import PoolReasonPicker, { usePoolDrawReason } from "./components/PoolReasonPicker";
 import PurchasingTabs from "./PurchasingTabs";
 
 // ── Wire types ──────────────────────────────────────────────────────────────
@@ -156,6 +161,15 @@ interface GridRow {
   /** Where that ready stock goes — what the group header says instead of a
    *  customer name, because a ready stock buy has no customer. */
   destination: string | null;
+  /**
+   * **P10 — free ready stock the floor could give this build**, or absent when
+   * it holds none. Advisory: the engine has NOT netted it out of `qty`
+   * (`consumeFreeStock` stays off, Jess 2026-07-21). Taking it is an act.
+   */
+  stock?: ReadyStockOffer;
+  /** `SO-1234` — what a reserved unit is committed TO. Null on a ready stock
+   *  row, which is why such a row is never offered stock (see the api). */
+  soRef: string | null;
 }
 
 /**
@@ -291,6 +305,8 @@ export default function OperationToOrder() {
   const [results, setResults] = useState<ReadonlyMap<string, GroupResult>>(new Map());
   const [creating, setCreating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  /** P10 — which rows have their ready stock open. Collapsed costs no pixels. */
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
 
   /** Demand the engine cannot plan (`blocked`) cannot be issued — not listed. */
   const planned = useMemo(() => proposals.filter((p) => p.blocked == null), [proposals]);
@@ -340,6 +356,8 @@ export default function OperationToOrder() {
             qty: b.qty,
             bucket,
             orderedPo: null,
+            soRef: r.so != null ? `SO-${r.so}` : null,
+            ...(b.stock ? { stock: b.stock } : {}),
           });
         }
       }
@@ -367,6 +385,7 @@ export default function OperationToOrder() {
         // older receipts belong to Purchase Orders, not this calendar.
         bucket: o.placedAt === today ? (scheduleDays[0] ?? "past") : "past",
         orderedPo: o.poId,
+        soRef: o.so != null ? `SO-${o.so}` : null,
       });
     }
     return rows;
@@ -545,6 +564,9 @@ export default function OperationToOrder() {
     return sorted;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters, sort, rowPo]);
+
+  /** P10 — is there anything on screen to open? See the `expansion` prop. */
+  const anyOffer = useMemo(() => visibleRows.some((r) => r.stock != null), [visibleRows]);
 
   // ── Selection: the engine pre-ticks ITS plan, a human ticks the rest ──────
 
@@ -960,7 +982,31 @@ export default function OperationToOrder() {
       width: 46,
       sortable: true,
       filter: filterFor("model", modelOptions, true),
-      cell: (r) => r.model,
+      /**
+       * P10 — the marker rides IN the model cell, not in a column of its own.
+       * The six widths are a frozen set that sums to 100 and the card's own
+       * ❌ is "redesign the grid"; a seventh column would take width from
+       * every row to say something about almost none of them. The Model column
+       * is the one that carries the slack, and the fact is ABOUT the model.
+       *
+       * The sort and the filter read `r.model`, which this does not touch.
+       */
+      cell: (r) =>
+        r.stock ? (
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="truncate">{r.model}</span>
+            <span
+              className="shrink-0 inline-flex items-center gap-1 rounded-pill bg-kit-green-3 px-2 py-0.5 text-label text-kit-green-11 tabular-nums"
+              title={freeStockAt(r.stock.warehouse, r.stock.available)}
+              data-testid={`row-stock-${r.key}`}
+            >
+              <Icon name="warehouse" size={14} />
+              {r.stock.available}
+            </span>
+          </span>
+        ) : (
+          r.model
+        ),
     },
     {
       key: "po",
@@ -1328,6 +1374,48 @@ export default function OperationToOrder() {
                       );
                     },
                   }}
+                  /**
+                   * P10 — AutoCount's inline ⊞ (Loo's option B), which is
+                   * D0.5d's own row expand and NOT a second one: the kit
+                   * renders the control, this page renders everything inside.
+                   *
+                   * PASSED ONLY WHEN SOMETHING ON SCREEN CAN OPEN. The prop
+                   * adds a 3% control column to every row, and the card's ❌
+                   * is "redesign the grid" — so on a page where the floor has
+                   * nothing to offer (which is the whole page today, measured)
+                   * the table renders exactly as it did before this card.
+                   */
+                  expansion={
+                    anyOffer
+                      ? {
+                          expanded,
+                          onToggle: (id) =>
+                            setExpanded((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(id)) next.delete(id);
+                              else next.add(id);
+                              return next;
+                            }),
+                          expandable: (r) => r.stock != null,
+                          label: (r) => `${W.readyStockGroup} · ${r.model}`,
+                          render: (r) =>
+                            r.stock && r.soRef ? (
+                              <ReadyStockPanel
+                                offer={r.stock}
+                                soRef={r.soRef}
+                                onReserved={() => {
+                                  setExpanded((prev) => {
+                                    const next = new Set(prev);
+                                    next.delete(r.key);
+                                    return next;
+                                  });
+                                  void q.refetch();
+                                }}
+                              />
+                            ) : null,
+                        }
+                      : undefined
+                  }
                   selection={{
                     selected: selectedKeys,
                     onToggleRow: (id) => {
@@ -1421,6 +1509,103 @@ export default function OperationToOrder() {
 }
 
 // ── Pieces ──────────────────────────────────────────────────────────────────
+
+/**
+ * **P10 — what the floor is offering this row, and the one press that takes it.**
+ *
+ * THE SYSTEM SUGGESTS, THE HUMAN TAKES (Loo, 2026-08-04). There is no quantity
+ * box: the number is the server's own suggestion, computed from what the
+ * warehouse holds and what this build still needs, and the operator either
+ * accepts it or does not. Free typing may be added later if he asks; nothing
+ * here blocks it.
+ *
+ * **IT GOES THROUGH K4's EXISTING DOOR AND NO OTHER.**
+ * `POST /api/ops/stock/reserve-item` → `ops_stock_pool_draw` (0292/0294), which
+ * flips the unit and writes the reason in ONE transaction. That is the same
+ * route the order drawer's Ready picker has used since K4 shipped, so this card
+ * adds no fourth writer of stock and no second truth about the same units. It
+ * is also why the reason is asked here rather than assumed: K4's law is that a
+ * unit does not leave the shelf without one, and the list is Jess's locked five.
+ *
+ * **TAKING TWICE CANNOT OVER-DRAW, and it is structural rather than guarded.**
+ * The RPC claims a unit only `where status = 'free'`, so a second press finds
+ * nothing and says so; and the next read recomputes the offer against a demand
+ * that has already fallen, because the reservation IS what says the demand fell.
+ */
+function ReadyStockPanel({
+  offer,
+  soRef,
+  onReserved,
+}: {
+  offer: ReadyStockOffer;
+  soRef: string;
+  onReserved: () => void;
+}) {
+  const draw = usePoolDrawReason();
+  const [busy, setBusy] = useState(false);
+  const warnings = useMemo(
+    () => draw.warningsFor([{ sku: offer.stockSku, qty: offer.takeable }]),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [offer.stockSku, offer.takeable, draw.warningsFor],
+  );
+
+  async function reserve() {
+    if (offer.takeable <= 0 || draw.problem || busy) return;
+    setBusy(true);
+    // One call per RECORD, because one record is what the door moves. Settled
+    // rather than raced: a unit somebody else grabbed a second ago fails on its
+    // own and the rest still land, which is the picker's own behaviour.
+    const results = await Promise.allSettled(
+      offer.itemIds.map((itemId) =>
+        apiFetch("/api/ops/stock/reserve-item", {
+          method: "POST",
+          body: JSON.stringify({ itemId, ref: soRef, ...draw.body }),
+        }),
+      ),
+    );
+    setBusy(false);
+    const ok = results.filter((r) => r.status === "fulfilled").length;
+    const failed = results.length - ok;
+    if (ok > 0) {
+      toast.success(
+        `Reserved ${ok} unit${ok === 1 ? "" : "s"} to ${soRef}` +
+          (failed ? ` · ${failed} could not be reserved` : ""),
+      );
+      onReserved();
+      return;
+    }
+    toast.error("Could not reserve — units may have been grabbed already");
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3" data-testid="ready-stock-panel">
+      <span className="text-body text-kit-slate-12 tabular-nums">
+        {freeStockAt(offer.warehouse, offer.available)}
+      </span>
+      {/* NOTHING IS OFFERED WHEN NOTHING CAN BE TAKEN — no question, no button.
+          It happens when the floor holds only records BIGGER than what is left
+          to buy: the register moves WHOLE records (K4 refuses to split a bulk
+          row), so a press would over-reserve a customer's order. The panel
+          states the two units it can see and stops. It does not SAY why, and
+          that sentence is deliberately not invented here — COPY-STANDARD has
+          no row for it and a word not in it may not appear on screen. */}
+      {offer.takeable > 0 ? (
+        <>
+          <PoolReasonPicker state={draw} warnings={warnings} compact />
+          <Button
+            size="sm"
+            onClick={() => void reserve()}
+            disabled={busy || !!draw.problem}
+            title={draw.problem ?? undefined}
+            data-testid="ready-stock-reserve"
+          >
+            {reserveFromStock(offer.takeable, soRef)}
+          </Button>
+        </>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * One rail row — Linear Sidebar, faithfully this time (Jess, 2026-08-01):

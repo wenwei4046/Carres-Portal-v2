@@ -1088,3 +1088,158 @@ describe("P9 — the footer totals what is TICKED, per category", () => {
     expect(screen.getByTestId("to-order-footer-units")).toHaveTextContent("Bedframe 4 · Sofa 3");
   });
 });
+
+// ── P10 · ready stock is suggested; the human decides whether to take it ────
+
+/**
+ * `ella`'s sofa row (`o2` / `bk-e`) is the one the offer is hung on: it is a
+ * build of ONE line, it is in the default view, and its SO is 1204 — so every
+ * assertion below reads the same row the fixture already exercises.
+ */
+const ELLA_ROW = `${OHANA}::sofa:o2:bk-e`;
+
+function withOffer(offer: unknown) {
+  return {
+    ...TO_ORDER,
+    proposals: TO_ORDER.proposals.map((p, i) =>
+      i !== 0
+        ? p
+        : {
+            ...p,
+            rows: p.rows.map((r) =>
+              r.orderId !== "o2"
+                ? r
+                : { ...r, builds: [{ ...r.builds[0], stock: offer }] },
+            ),
+          },
+    ),
+  };
+}
+
+function serveOffer(offer: unknown) {
+  apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+    if (
+      path.startsWith("/api/operation/purchase/to-order") &&
+      !path.includes("/issue")
+    ) {
+      return Promise.resolve(withOffer(offer));
+    }
+    return route(path, init?.body ? JSON.parse(String(init.body)) : undefined);
+  });
+}
+
+const OFFER = {
+  available: 2,
+  takeable: 2,
+  itemIds: ["u1", "u2"],
+  stockSku: "Booqit-1A",
+  warehouse: "Carres Klang",
+};
+
+describe("P10 — ready stock on the row", () => {
+  it("changes NOTHING when the floor has nothing to offer", async () => {
+    // The whole page today, measured: the expand control is a 3% column on
+    // every row, so it is not paid for until something can actually open.
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue")); // ella lives here
+    expect(document.querySelectorAll('[data-testid^="table-expand-"]')).toHaveLength(0);
+    expect(document.querySelectorAll('[data-testid^="row-stock-"]')).toHaveLength(0);
+  });
+
+  it("marks the row with the units the floor holds, and says where", async () => {
+    serveOffer(OFFER);
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue")); // ella lives here
+    const marker = await screen.findByTestId(`row-stock-${ELLA_ROW}`);
+    expect(marker).toHaveTextContent("2");
+    expect(marker).toHaveAttribute("title", "Carres Klang · 2 free");
+  });
+
+  it("does not net the suggestion out of the quantity to buy", async () => {
+    // `consumeFreeStock` stays OFF (Jess, 2026-07-21). The row still says buy 1.
+    serveOffer(OFFER);
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue")); // ella lives here
+    const marker = await screen.findByTestId(`row-stock-${ELLA_ROW}`);
+    const tr = marker.closest("tr")!;
+    // Qty is the one right-aligned column in this grid (Loo, 2026-08-03).
+    expect(tr.querySelector("td.text-right")).toHaveTextContent("1");
+    expect(marker).toHaveTextContent("2");
+  });
+
+  it("gives ONLY the offered row a control to open", async () => {
+    serveOffer(OFFER);
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue")); // ella lives here
+    await screen.findByTestId(`row-stock-${ELLA_ROW}`);
+    const controls = document.querySelectorAll('[data-testid^="table-expand-"]');
+    expect(controls).toHaveLength(1);
+    expect(controls[0]).toHaveAttribute("data-testid", `table-expand-${ELLA_ROW}`);
+  });
+
+  it("opens to the two numbers and a button that names what it takes", async () => {
+    serveOffer(OFFER);
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue")); // ella lives here
+    fireEvent.click(await screen.findByTestId(`table-expand-${ELLA_ROW}`));
+    const panel = await screen.findByTestId("ready-stock-panel");
+    expect(panel).toHaveTextContent("Carres Klang · 2 free");
+    expect(within(panel).getByTestId("ready-stock-reserve")).toHaveTextContent(
+      "Reserve 2 to SO-1204",
+    );
+  });
+
+  it("will not take a unit until somebody says why — K4's law", async () => {
+    serveOffer(OFFER);
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue")); // ella lives here
+    fireEvent.click(await screen.findByTestId(`table-expand-${ELLA_ROW}`));
+    const panel = await screen.findByTestId("ready-stock-panel");
+    const button = within(panel).getByTestId("ready-stock-reserve");
+    expect(button).toBeDisabled();
+    fireEvent.change(within(panel).getByTestId("pool-reason"), {
+      target: { value: "sales_urgent" },
+    });
+    expect(button).not.toBeDisabled();
+  });
+
+  it("takes through K4's door — one call per record, with the reason", async () => {
+    serveOffer(OFFER);
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue")); // ella lives here
+    fireEvent.click(await screen.findByTestId(`table-expand-${ELLA_ROW}`));
+    const panel = await screen.findByTestId("ready-stock-panel");
+    fireEvent.change(within(panel).getByTestId("pool-reason"), {
+      target: { value: "sales_urgent" },
+    });
+    fireEvent.click(within(panel).getByTestId("ready-stock-reserve"));
+    await waitFor(() => {
+      const calls = apiFetch.mock.calls.filter(
+        (c) => String(c[0]) === "/api/ops/stock/reserve-item",
+      );
+      expect(calls).toHaveLength(2);
+      expect(JSON.parse(String((calls[0][1] as RequestInit).body))).toEqual({
+        itemId: "u1",
+        ref: "SO-1204",
+        reason: "sales_urgent",
+        note: null,
+      });
+      expect(JSON.parse(String((calls[1][1] as RequestInit).body))).toMatchObject({
+        itemId: "u2",
+      });
+    });
+  });
+
+  it("offers no press at all when nothing can be taken without over-reserving", async () => {
+    // The floor holds a 2-unit record and the row needs 1. The register moves
+    // WHOLE records, so the honest answer is the two numbers and no button.
+    serveOffer({ ...OFFER, takeable: 0, itemIds: [] });
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue")); // ella lives here
+    fireEvent.click(await screen.findByTestId(`table-expand-${ELLA_ROW}`));
+    const panel = await screen.findByTestId("ready-stock-panel");
+    expect(panel).toHaveTextContent("Carres Klang · 2 free");
+    expect(within(panel).queryByTestId("ready-stock-reserve")).toBeNull();
+    expect(within(panel).queryByTestId("pool-reason")).toBeNull();
+  });
+});

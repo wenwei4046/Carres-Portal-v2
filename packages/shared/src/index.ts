@@ -1818,6 +1818,9 @@ export {
   countOrders,
   defaultDocuments,
   composeSummary,
+  freeStockAt,
+  freeStockCount,
+  reserveFromStock,
   isOnePoPerOrder,
   isToOrderCategory,
   issuedHeadline,
@@ -1864,6 +1867,13 @@ export {
   type ToOrderSortKey,
   type ToOrderSupplier,
 } from "./to-order";
+// P10 — what the warehouse floor could give a To Order build, and exactly what
+// one press of Take would claim. Advisory: `consumeFreeStock` stays OFF.
+export {
+  readyStockOffer,
+  type FreeStockUnit,
+  type ReadyStockOffer,
+} from "./ready-stock-offer";
 export {
   IMPORT_ACCESSORY_KINDS,
   IMPORT_LEAD_DAYS_DEFAULT,

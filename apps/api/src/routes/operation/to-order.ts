@@ -7,10 +7,12 @@ import {
   myHolidaySet,
   planFromDocuments,
   productionWorkingDaysFor,
+  stockMatchKey,
   toOrderBuilds,
   transitDaysFor,
   railItemLabel,
   workWeekOffDaysFor,
+  type FreeStockUnit,
   type ProductCategory,
   type IssueDocument,
   type ToOrderLine,
@@ -78,6 +80,129 @@ function attr(attrs: unknown, key: string): string | null {
 }
 
 type Unresolved = { sku: string; orderId: string; so: number | null };
+
+/**
+ * THE PER-UNIT REGISTER, read once — card P10.
+ *
+ * Two questions come out of one read, and they are two halves of the same fact:
+ *
+ *   `free`      — what the floor could still give a demand line (the OFFER).
+ *   `committed` — what the floor has ALREADY given it (units reserved to this
+ *                 order), which is demand that has stopped being something to
+ *                 buy and must leave the workspace.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * IT IS `ops_stock_items`, NOT `stock_balances`, AND THAT IS LOAD-BEARING.
+ *
+ * `apps/api/src/routes/operation/purchase.ts` counts free stock off
+ * `stock_balances` (`qty − reserved`). To Order may not: **the door P10 takes
+ * through — K4's `ops_stock_pool_draw` — flips an `ops_stock_items` ROW.** A
+ * number read from the rollup and an act performed on the register can
+ * disagree, and measured on prod 2026-08-04 they already do (one sofa record is
+ * free in the register and reserved in the rollup). A screen that offers two
+ * units the door cannot find is worse than a screen that offers nothing.
+ *
+ * THE SKU IS NEVER PUT IN AN `.in()`, same rule as the catalog read above:
+ * these values are free text and 16 live demand lines carry a double quote.
+ * The register is 129 rows; reading it whole costs nothing and removes the
+ * class.
+ *
+ * ONLY WHAT READY STOCK ITSELF CALLS READY — `status='free'`, not
+ * `needs_repair`, condition `new` or `exhibition`. That is `GET /api/ops/stock/
+ * ready`'s own predicate, reused rather than re-decided: `old`, `damaged` and
+ * `refurbished` units are not what a purchaser is choosing between buying and
+ * taking.
+ */
+interface RegisterRead {
+  /** Free records per `stockMatchKey`, in the draw's own FIFO order. */
+  free: Map<string, FreeStockUnit[]>;
+  /** Units already reserved to an order, keyed `${so}::${stockMatchKey}`. */
+  committed: Map<string, number>;
+}
+
+const REGISTER_READY_CONDITIONS = new Set(["new", "exhibition"]);
+
+async function loadRegister(
+  sb: ReturnType<typeof userClient>,
+): Promise<RegisterRead> {
+  const out: RegisterRead = { free: new Map(), committed: new Map() };
+
+  const { data: whRows } = await sb.from("warehouses").select("id, name");
+  const whName = new Map<string, string>(
+    (whRows ?? []).map((w) => [w.id as string, (w.name as string) ?? ""]),
+  );
+
+  const { data, error } = await sb
+    .from("ops_stock_items")
+    .select(
+      "id, sku, status, condition, needs_repair, qty, warehouse_id, reserved_ref, date_in, created_at",
+    )
+    .in("status", ["free", "reserved"]);
+  /**
+   * THIS READ MAY NEVER TAKE THE PAGE DOWN — the same rule the typed-demand
+   * read above keeps, for the same reason. To Order turned customer orders into
+   * purchase orders for months without knowing anything about the warehouse
+   * floor. If the register cannot be read, the SUGGESTION is unavailable and
+   * the workspace is untouched; nothing is invented and no quantity moves.
+   */
+  if (error) {
+    console.error("ops_stock_items unavailable — ready stock not offered", error.message);
+    return out;
+  }
+
+  const rows = (data ?? []) as Record<string, unknown>[];
+  // FIFO, exactly `ops_stock_pool_draw`'s own pick order: `date_in asc nulls
+  // last, created_at asc`. The units this offer NAMES are then the units that
+  // door would claim.
+  rows.sort((a, b) => {
+    const ad = (a.date_in as string | null) ?? "￿";
+    const bd = (b.date_in as string | null) ?? "￿";
+    if (ad !== bd) return ad < bd ? -1 : 1;
+    const ac = (a.created_at as string | null) ?? "";
+    const bc = (b.created_at as string | null) ?? "";
+    return ac < bc ? -1 : ac > bc ? 1 : 0;
+  });
+
+  for (const r of rows) {
+    const sku = (r.sku as string | null) ?? "";
+    if (!sku.trim()) continue;
+    const key = stockMatchKey(sku);
+    const qty = Math.max(0, Math.floor(Number(r.qty ?? 1) || 1));
+    const status = r.status as string;
+
+    if (status === "reserved") {
+      // The reference the unit was committed to. `SO-1234` is the portal's own
+      // spelling — `_activity_log_order_id_from_ref` reads exactly that shape —
+      // so the SO number is pulled from it rather than through a second query.
+      // A reservation whose ref names no order (a loan, a free-typed note)
+      // commits nothing this workspace can measure, so it is skipped rather
+      // than guessed at.
+      const m = /(?:SO|DL)-(\d+)/i.exec((r.reserved_ref as string | null) ?? "");
+      if (!m) continue;
+      const k = `${Number(m[1])}::${key}`;
+      out.committed.set(k, (out.committed.get(k) ?? 0) + qty);
+      continue;
+    }
+
+    // Asked for again in code, not only in the query. A read that widens by one
+    // status would otherwise start offering sold goods, and the offer names
+    // physical units somebody is about to reserve.
+    if (status !== "free") continue;
+    if ((r.needs_repair as boolean | null) === true) continue;
+    if (!REGISTER_READY_CONDITIONS.has((r.condition as string | null) ?? "")) continue;
+    const arr = out.free.get(key) ?? [];
+    arr.push({
+      itemId: r.id as string,
+      sku,
+      qty,
+      condition: (r.condition as string | null) ?? null,
+      warehouse: whName.get((r.warehouse_id as string | null) ?? "") ?? null,
+    });
+    out.free.set(key, arr);
+  }
+
+  return out;
+}
 
 type CatalogFact = {
   supplierId: string | null;
@@ -218,6 +343,15 @@ async function loadToOrder(
     return { ok: false, status: m.status, body: m.body };
   }
 
+  const register = await loadRegister(sb);
+  /**
+   * P10 — units of an order already standing on the floor, spent as the demand
+   * lines are read. An order with two lines of the same item shares one pool of
+   * reservations, so the first line read takes from it first; the lines arrive
+   * in the database's own order, so the same read gives the same answer twice.
+   */
+  const committedLeft = new Map(register.committed);
+
   const demand: ToOrderLine[] = [];
   const missingProductionDays: { supplierId: string; category: string }[] = [];
   const seenMissing = new Set<string>();
@@ -278,13 +412,45 @@ async function loadToOrder(
       todayIso()) as string;
     const attrs = (l as { attrs?: unknown }).attrs;
 
+    /**
+     * P10 — WHAT IS LEFT TO BUY, and the reservation is what says so.
+     *
+     * A unit taken from ready stock for this order is `ops_stock_items` flipped
+     * to `reserved` with the order's own ref. That row IS the record; there is
+     * no counter beside it to keep in step, so the two can never disagree and a
+     * release puts the demand straight back. It is the same voice a typed
+     * demand already speaks — 0320's `remaining_qty` — applied to the other
+     * kind of demand line.
+     *
+     * This also closes a hole that predates P10: the order drawer's Ready
+     * picker has reserved warehouse units to an order since 2026-06-30, and To
+     * Order's supply has only ever read open purchase orders — so an order
+     * already served from the floor was still being bought a second time.
+     * Live exposure today is zero, measured: 0 reserved records on prod.
+     */
+    const rawQty = Number(l.qty ?? 0);
+    const soNo = order.so != null ? Number(order.so) : null;
+    let qty = rawQty;
+    if (soNo != null) {
+      const k = `${soNo}::${stockMatchKey(l.sku as string)}`;
+      const have = committedLeft.get(k) ?? 0;
+      const used = Math.min(have, rawQty);
+      if (used > 0) {
+        committedLeft.set(k, have - used);
+        qty = rawQty - used;
+      }
+    }
+    // Fully served from the floor — it has left this workspace, exactly as a
+    // line fully covered by an open purchase order does.
+    if (qty <= 0) continue;
+
     demand.push({
       lineId: l.id as string,
       orderId: l.order_id as string,
       sku: l.sku as string,
       category: category as ProductCategory,
       supplierId,
-      qty: Number(l.qty ?? 0),
+      qty,
       deadline: deadline ? deadline.slice(0, 10) : null,
       leadDays,
       offDays: workWeekOffDaysFor(settings, supplierId),
@@ -431,9 +597,53 @@ async function loadToOrder(
     }
   }
 
+  /**
+   * P10 — WHICH LINE IS OFFERED WHICH UNITS.
+   *
+   * The pool is spent as it is handed out, so two lines can never be offered
+   * the same physical unit and the numbers on two rows can never add up to more
+   * than the floor holds. Order of service is the demand list's own order, so
+   * the same read gives the same answer twice.
+   *
+   * A TYPED READY STOCK DEMAND IS DELIBERATELY NOT OFFERED, and this is the one
+   * thing card P10 could not settle from the code. A customer's units leave for
+   * a customer, so reserving them IS the whole act. A ready stock demand asks
+   * for units to be FREE at a destination — and the only destination on the one
+   * live demand is `Carres Klang`, the very warehouse the free units stand in
+   * (measured 2026-08-04). Reserving them there would lock two units to a
+   * reference nobody can act on AND reduce the buy by the same two, leaving the
+   * floor exactly where it started with two units now unsellable. The truthful
+   * act for that row is not a draw at all — nothing leaves the pool; it is that
+   * the demand double-counts stock already held and its remainder should be
+   * CANCELLED, which is card P12 and Loo's ruling to make. Nothing is invented
+   * here in the meantime.
+   */
+  const freeStockByLine: Record<string, FreeStockUnit[]> = {};
+  {
+    const pool = new Map<string, FreeStockUnit[]>();
+    for (const [k, v] of register.free) pool.set(k, [...v]);
+    for (const l of demand) {
+      if (l.readyStock === true) continue;
+      const avail = pool.get(stockMatchKey(l.sku));
+      if (!avail || avail.length === 0) continue;
+      // Hand over whole records, FIFO, until they could cover this line — never
+      // fewer (a short hand-out would under-state the offer) and never the
+      // whole pool (that would offer the same unit to the next line too).
+      const take: FreeStockUnit[] = [];
+      let handed = 0;
+      while (avail.length > 0 && handed < l.qty) {
+        const u = avail.shift()!;
+        take.push(u);
+        handed += u.qty;
+      }
+      if (take.length > 0) freeStockByLine[l.lineId] = take;
+    }
+  }
+
   const today = todayIso();
   const proposals = buildToOrder({
     lines: demand,
+    freeStockByLine,
     suppliers: (supRows ?? []).map((s) => ({
       id: s.id as string,
       name: (s.name as string) ?? "",
