@@ -14,6 +14,85 @@
 
 ---
 
+## ⭐ 跟 LOO 合作的规矩（Loo 定，2026-08-04）—— 每一个 chat 照做
+
+> **他为什么要定这条。** 他的原话：*"i always failed to keep discuss — nothing come out …
+> forever discuss agreed but chat wasting time, never complete and settle themself."*
+> 讨论很多、上线很少。下面八步就是拿来治这件事的。
+>
+> **这一段是给 LOO 的。跟 Jess 讲话的规矩在 §15 和各个 checkpoint 的 §0，两边不冲突：
+> Jess 要的是 COO 级的挑战，Loo 要的是「先研究、先批评、给我选项、然后做完」。**
+
+### 开场三步 —— 先研究，不准先讲话
+
+**第 1 步 · 读法律**
+`docs/01-design-tokens.md` · `02-components.md` · `03-page-patterns.md`（UI kit 三件套）
+`docs/COPY-STANDARD.md`（每一个字）· `docs/ACTION-FLOW-STANDARD.md`（每一个动作）
+再加**你正在碰的那个 module 的 working-flow 档**。
+**必须用 `Read` 工具真的读，transcript 要看得到。** 讲「我读过了」不算。
+
+**第 2 步 · 读别人怎么做**
+`docs/2990s-copy-and-gaps-audit-2026-07-24.md`（19 项对照）
+`C:\Users\User\OneDrive\Desktop\2990s`（Loo 自己另一套系统，`DataGrid.tsx` 是 AutoCount 式表格的完整参考）
+**AutoCount 是团队每天在用的东西** —— 点表头排序、每栏漏斗、拖栏位、底部合计、右键选单、`Transfer From/To`、`View Flow`。抄能力，**不抄它没有 queue、没有负责人、没有 due date 那一套**。
+
+**第 3 步 · 看真东西，量真数字**
+开真页面（`pnpm -C apps/web exec vite`，记得先 copy `.env.production` → `.env.local`）。
+用 SQL 量。**宽度要在真浏览器量 —— jsdom 没有宽度，页面测试结构上就抓不到被切掉的字。**
+**猜的数字一律不准写。**
+
+### 中场两步 —— 先批评，再建议
+
+**第 4 步 · 由上到下列问题，标 🔴 / 🟡**
+每一条讲满五样，少一样不算：
+```
+现在什么问题 → 操作员受什么影响 → 国际怎么做 → 我们怎么改 → 代价是什么
+```
+**只挑毛病不给解法 = 没做完。** 没问题就说「没找到问题」——沉默才是失败。
+
+**第 5 步 · 给选项，一次问一个**
+```
+2-3 个选项，一个一行，每个讲代价
+推荐的排第一，讲为什么
+Loo 回一个字母
+```
+**一次只问一个决定。** 问完就不要再换个说法问第二次。
+
+### 收场三步 —— 做完，不要回来
+
+**第 6 步 · 他同意了 = 做到上线**
+不等他看 preview。build → test → PR → merge → deploy → 验证 production。
+这是 CLAUDE.md §13.1 Engineer-Owned Delivery。
+
+**第 7 步 · 上线后给他网址 + 用数字讲**
+他自己讲过 *"i cant check from the preview to point"* —— 所以**你先自己检查一遍**，然后用数字告诉他改了什么（几行变几行、几个字被切掉变 0）。
+
+**第 8 步 · 只有一种事可以回来问：生意规则**
+技术、bug、字眼、部署、冲突、测试、rebase —— **自己解决**。
+**找到另一个 bug 不是停下来的理由，是修掉它然后继续。**
+
+### 讲话怎么讲
+
+- **简单中文，短句。** 英文技术词保留（Supabase、RLS、migration、PO、SKU）。
+- **要 step 1 2 3。** 他讲过 *"can you make it simple step 1 2 3, i dont know what you said"* ——
+  他看不懂，是你写得不好，不是他的问题。**重写，不要重复。**
+- **画面先画 ASCII 给他看，他点头才写 code。** 就算他说「直接做」也一样。
+- **结论先讲，理由后讲。**
+- **不要长篇大表。** 一次讲一件事。
+
+### 不准做
+
+| ❌ | 为什么 |
+|---|---|
+| 说「我读了文件」但 transcript 没有 `Read` | 这是最常见的假动作 |
+| 把技术问题包装成生意问题回来问他 | 他要的是决定，不是工单 |
+| 一次丢五个问题给他 | 他会一个都不回 |
+| 只批评不给解法 | 他要的是 critical **advisor**，不是评审 |
+| 因为找到另一个 bug 就停下来 | 修掉，继续 |
+| 写完文件就当作做完 | 文件不是产品。上线才是 |
+
+---
+
 ## The four laws every chat must read (they outrank any pasted text)
 
 | File | Settles |
