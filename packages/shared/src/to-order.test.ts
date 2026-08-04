@@ -25,12 +25,15 @@ import {
   poScheduleBucket,
   weekdayName,
   freeStockLine,
-  takeFromStockLabel,
-  tookFromStockLabel,
+  reserveFromStockLabel,
+  reservedFromStockLabel,
   stockExpandLabel,
+  readyStockDrawNote,
+  READY_STOCK_DRAW_REASON,
   type ToOrderLine,
   type ToOrderRow,
 } from "./to-order";
+import { POOL_USE_REASONS, poolDrawProblem } from "./pool-usage";
 import { subtractWorkingDays } from "./working-days";
 
 /**
@@ -967,15 +970,52 @@ describe("P10 · the three words", () => {
   });
 
   it("puts the number on the button — there is no quantity box anywhere", () => {
-    expect(takeFromStockLabel(2)).toBe("Take 2");
-    expect(takeFromStockLabel(1)).toBe("Take 1");
+    expect(reserveFromStockLabel(2)).toBe("Reserve 2");
+    expect(reserveFromStockLabel(1)).toBe("Reserve 1");
   });
 
   it("says why a quantity is smaller than what was asked for", () => {
-    expect(tookFromStockLabel(2)).toBe("took 2 from stock");
+    expect(reservedFromStockLabel(2)).toBe("reserved 2 from stock");
   });
 
   it("names the row in the expand control, so the number is not lost to a screen reader", () => {
     expect(stockExpandLabel("Haven K", 2)).toBe("Haven K — 2 available");
+  });
+});
+
+/**
+ * P13① — one act may not have two words. The order drawer's picker has said
+ * `Reserve {n} to {soRef}` since 2026-06-30; To Order shipped `Take` on
+ * 2026-08-04 and Loo ruled the same day that the OLDER word wins.
+ */
+describe("P13 · the take path speaks the drawer's word", () => {
+  it("says Reserve, and `Take` is gone from every string in the path", () => {
+    const strings = [
+      freeStockLine("Carres Klang", 2),
+      reserveFromStockLabel(2),
+      reservedFromStockLabel(2),
+      stockExpandLabel("Haven K", 2),
+      readyStockDrawNote("Haven K"),
+    ];
+    for (const s of strings) {
+      expect(s).not.toMatch(/\b(take|takes|taken|took|taking)\b/i);
+    }
+    expect(reserveFromStockLabel(2)).toContain("Reserve");
+    expect(reservedFromStockLabel(2)).toContain("reserved");
+  });
+
+  it("records K4's sixth reason, never the catch-all P10 had to use", () => {
+    expect(READY_STOCK_DRAW_REASON).toBe("used_instead_of_ordering");
+    expect(READY_STOCK_DRAW_REASON).not.toBe("other");
+    // The reason is a real member of the shared list, not a string the
+    // database would refuse.
+    expect(POOL_USE_REASONS).toContain(READY_STOCK_DRAW_REASON);
+    expect(poolDrawProblem({ reason: READY_STOCK_DRAW_REASON })).toBeNull();
+  });
+
+  it("keeps in the note only what the reason cannot say — which build", () => {
+    expect(readyStockDrawNote("Haven K")).toBe("To Order · Haven K");
+    // The reason now carries this sentence; the note must not write it twice.
+    expect(readyStockDrawNote("Haven K")).not.toContain("purchase order");
   });
 });

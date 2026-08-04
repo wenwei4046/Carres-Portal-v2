@@ -1504,10 +1504,21 @@ describe("P10 · the take", () => {
     expect(draws.map((d) => d.args.p_item_id)).toEqual(["i1", "i2"]);
     for (const d of draws) {
       expect(d.args.p_ref).toBe(READY_REF);
-      // K4's locked five has no row for "taken instead of buying"; `other` is
-      // its own escape hatch and it REQUIRES words.
-      expect(d.args.p_reason).toBe("other");
+      /**
+       * P13② (0322) — K4's SIXTH reason, ruled by Loo on 2026-08-04.
+       *
+       * P10 wrote `other` + a note, because the locked five had no row for
+       * *"we had it on the shelf, so we did not raise a purchase order"* and
+       * inventing one would have been a ruling on a locked vocabulary. The
+       * ruling was made, so the ledger now says it in its own word — and a
+       * monthly split whose biggest slice reads `Other` stops being the only
+       * answer K5 can give to 为什么一直缺货.
+       */
+      expect(d.args.p_reason).toBe("used_instead_of_ordering");
+      expect(d.args.p_reason).not.toBe("other");
+      // The note keeps only what the reason cannot say: WHICH build.
       expect(String(d.args.p_note)).toContain("To Order");
+      expect(String(d.args.p_note)).not.toContain("purchase order");
     }
   });
 

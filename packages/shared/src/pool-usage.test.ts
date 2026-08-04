@@ -28,14 +28,45 @@ const entry = (e: Partial<PoolUsageEntry> & { qty: number }): PoolUsageEntry => 
 });
 
 describe("the locked reason list", () => {
-  it("is the card's five, in the card's order", () => {
+  it("is K4's five in K4's order, with P13's sixth APPENDED", () => {
     expect([...POOL_USE_REASONS]).toEqual([
       "sales_urgent",
       "supplier_delay",
       "warranty_exchange",
       "vip",
       "other",
+      "used_instead_of_ordering",
     ]);
+  });
+
+  /**
+   * P13's Must-NOT, as a test rather than as a sentence: the sixth word may
+   * not have moved any of the five. This is the assertion that fires if a
+   * later chat "tidies" the catch-all back to the end of the list.
+   */
+  it("leaves the five exactly where K4 put them", () => {
+    expect(POOL_USE_REASONS.slice(0, 5)).toEqual([
+      "sales_urgent",
+      "supplier_delay",
+      "warranty_exchange",
+      "vip",
+      "other",
+    ]);
+    expect(POOL_USE_REASON_LABEL.sales_urgent).toBe("Sales urgent");
+    expect(POOL_USE_REASON_LABEL.supplier_delay).toBe("Supplier delay");
+    expect(POOL_USE_REASON_LABEL.warranty_exchange).toBe("Warranty exchange");
+    expect(POOL_USE_REASON_LABEL.vip).toBe("VIP");
+    expect(POOL_USE_REASON_LABEL.other).toBe("Other");
+  });
+
+  it("gives the To Order take its own word", () => {
+    expect(POOL_USE_REASON_LABEL.used_instead_of_ordering).toBe(
+      "Used instead of ordering",
+    );
+    // It says its own sentence, so it does not lean on a note the way `other`
+    // must — that is the whole reason it exists.
+    expect(poolUseNeedsNote("used_instead_of_ordering")).toBe(false);
+    expect(poolDrawProblem({ reason: "used_instead_of_ordering" })).toBeNull();
   });
 
   it("gives every key a screen word (no DB word reaches the UI)", () => {

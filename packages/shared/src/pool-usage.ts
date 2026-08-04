@@ -47,12 +47,29 @@ import { aggregateStockUnits } from "./ready-stock-plan";
 
 // ── The reason list (Jess-locked) ───────────────────────────────────────────
 
+/**
+ * K4's five, plus P13's sixth (Loo, 2026-08-04).
+ *
+ * THE SIXTH IS APPENDED, NEVER INSERTED. P13's Must-NOT forbids re-ordering
+ * the existing five, and this array IS the display order of the monthly split
+ * and of every reason picker — inserting `used_instead_of_ordering` before
+ * `other` would move `other` and change a screen nobody asked to change. So
+ * the catch-all is not last any more, and that is the price of not moving a
+ * locked list.
+ *
+ * WHY A SIXTH AT ALL. K4 exists to answer 为什么一直缺货. P10's To Order take
+ * — *"we had it on the shelf, so we did not raise a purchase order"* — is not
+ * any of the five, so it was recorded as `other` with a note; a monthly split
+ * where the biggest slice reads `Other` cannot answer the question the ledger
+ * was built for.
+ */
 export const POOL_USE_REASONS = [
   "sales_urgent",
   "supplier_delay",
   "warranty_exchange",
   "vip",
   "other",
+  "used_instead_of_ordering",
 ] as const;
 export type PoolUseReason = (typeof POOL_USE_REASONS)[number];
 
@@ -63,6 +80,9 @@ export const POOL_USE_REASON_LABEL: Record<PoolUseReason, string> = {
   warranty_exchange: "Warranty exchange",
   vip: "VIP",
   other: "Other",
+  // P13's own word, from the card: it names the act from the POOL's side,
+  // which is what `warranty_exchange` and `vip` already do.
+  used_instead_of_ordering: "Used instead of ordering",
 };
 
 export const POOL_USE_NOTE_MAX = 300;
