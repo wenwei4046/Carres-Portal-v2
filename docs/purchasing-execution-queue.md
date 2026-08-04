@@ -2828,6 +2828,78 @@ shared **2121/2121** · build clean · **check-design 8367, IDENTICAL category f
 
 ---
 
+## Q7 · The frozen column set becomes real, and one page stops spelling one date two ways
+
+**Lane: PURCHASE ORDERS · `OperationPurchaseOrders.tsx` only. NO migration, NO api change.**
+
+> **THIS CARD IS A REPORTING FAILURE BEING REPAIRED, and the manager chat owns the failure.**
+> Loo froze the column set on 2026-08-04 and the plan chat kept moving to the next topic
+> without ever writing the card. **Five of his rulings are still not on the page**, and one of
+> them — the two-word date — was made WORSE by Q5, which correctly used the new word in the
+> expand while the column beside it kept the retired one.
+
+### What Loo ruled, and what the page actually does — measured 2026-08-04
+
+| His ruling | On the page today |
+|---|---|
+| **One fixed column set. The list may NEVER change columns because the panel opened.** *"Operator 的眼睛会一直重新学习页面，Information Hierarchy 每开一次 Detail 就改变，这是 ERP 不应该发生的."* | ❌ **`COMPACT_KEYS` is still live** (`OperationPurchaseOrders.tsx`) — 5 columns with the panel open, 8 with it closed |
+| the order: `PO Issued · Supplier · PO No. · SO No. · Items · Destination · Customer Delivery · Expected Arrival · Current Action` | ❌ the page has 8 in a different order |
+| **`SO No.`** — *"PO 是从 SO 来的，Operator 经常需要知道这张 PO 是哪几个 Sales Order 组成的"*; multiple reads `SO-1203 +2` | ❌ **no such column.** The data is on the wire (`so_refs`) |
+| **`Destination`** — *"没有 Destination，Operator 根本不知道这张 PO 是特殊单"*; multiple reads `Carres Klang +1`, full names, never `AL` | ❌ **no such column**, and PO-2032 really does split AL / Klang today |
+| **`Expected Arrival`** replaces `Goods Arrival` (§12.2, portal-wide) | ❌ the column says **`Goods Arrival`** (line ~868) while the expand two rows below says **`Expected Arrival`** for the same fact |
+| `Received` is not in his nine | ❌ still a column |
+
+### Build — one fixed set, nine columns, no compact variant
+
+```
+PO Issued │ Supplier │ PO No. │ SO No. │ Items │ Destination │ Customer Delivery │ Expected Arrival │ Current Action
+    96    │    87    │   83   │   94   │  135  │     135     │        140        │       206        │      192
+                                                                                              total 1168
+```
+
+Those are **measured minimums** (real browser, the app's own stylesheet, `px-2` cell padding,
+header = text + 2 + 24 for the funnel + 16). **Do not re-derive them by guessing; re-measure
+if you change any string.**
+
+1. **Delete `COMPACT_KEYS` and the whole compact variant.** One set, always. The HONESTY GUARD
+   it served disappears with it — a column that never hides cannot be hidden while filtered.
+2. **`SO No.`** — from `so_refs`, `SO-1206 +4` when there are several. PO-2037 really carries 5.
+3. **`Destination`** — the PO's destination, or its lines' when they differ: `Carres Klang +1`.
+   **Full names only** (`AL Sungai Buloh`, never `AL` — COPY-STANDARD rules the three strings
+   and warns specifically against re-spelling them). `+N` is the portal's existing pattern;
+   **`Multiple (2)` is refused by name.**
+4. **`Goods Arrival` → `Expected Arrival`.** Retired portal-wide by §12.2. **The other two
+   pages that still carry it (Receiving, and `Stock` / `Stock ETA` on Orders) are OTHER LANES
+   — report them, do not touch them.**
+5. **`Received` leaves the register.** It is not in his nine, and `Received At` lives in the
+   expand. *(0 of 21 POs have ever received anything, so nothing visible is lost today.)*
+6. **The list keeps ONE min-width equal to the sum and scrolls horizontally below it.**
+   AutoCount's own grid scrolls; deleting business information to avoid a scrollbar is the
+   thing Loo forbade. **Resize and reorder are already wired (#601)**, so an operator who wants
+   a different balance has one.
+
+### DONE WHEN
+
+- Opening and closing the workspace changes **no column** — asserted by a test, and this is
+  the ruling most likely to be quietly re-introduced later.
+- `PO-2037` shows `SO-1206 +4`; `PO-2032` shows `Carres Klang +1`; both checked on production
+  with your own eyes and quoted in the PR.
+- A source scan proves `Goods Arrival` appears **zero** times in this file, and the count is
+  quoted.
+- Every column width re-measured in a real browser and the numbers quoted. **jsdom has no
+  widths — the suite structurally cannot catch a truncated cell.**
+- Negative controls, each a real edit with its failure count: restore `COMPACT_KEYS` · drop
+  the `+N` from Destination · put `Goods Arrival` back.
+
+### MUST NOT
+
+❌ shorten `AL Sungai Buloh` · ❌ invent `Multiple (2)` · ❌ delete a column to avoid a
+horizontal scrollbar · ❌ re-introduce a compact set under another name · ❌ touch Receiving,
+Orders or To Order · ❌ change the 40px row height or any token · ❌ hold the card for a design
+round (§13.2).
+
+---
+
 ## Q6 · To Order is audited against the same architecture
 
 **Lane: PURCHASING · `OperationToOrder.tsx`. NO migration. START NOW — do not wait for P13.**
@@ -2908,5 +2980,6 @@ answering §13.3's question · ❌ touch the P8-P13 features · ❌ start before
 | **Q1b** | 🔴 **BLOCKED ON THE MODEL** — Q1 made the row ORDER correct and left it INVISIBLE: the register default view hides `Customer Delivery` and `Expected Arrival`, so 21 rows read alike and nothing says why row 1 is row 1 (Loo caught it live 2026-08-04, from his own screenshot). **A summary band was proposed by me and REJECTED by him**, on the stronger principle: *a List page processes work, a Dashboard monitors* — a Summary on every page puts one number in four places. Three ROW-LEVEL candidates were studied against SAP Fiori · Dynamics · Linear · GitHub · Jira and **none is chosen**: the left-edge bar (**`rowLate` already exists in the kit** — Loo added it 2026-08-03 for this identical problem and this page has never passed it) · an in-cell badge · its own column. **His own candidate `整行轻微背景强调` is REFUSED by law**: `01-design-tokens.md` §2.3 spends row background on hover (grey) and selection (blue). **Waits on `PURCHASING-INFORMATION-MODEL.md` §12.5** | — |
 | **Q4** | 🔴 **BLOCKED ON THE MODEL** — Q3 shipped, so the arithmetic exists; but a dashboard is the second place a number lives, and §12 has just re-opened what the register itself should show. Do not start until §12.5 closes | — |
 | **Q5** | ✅ **the expand becomes the WORKING AREA, the right panel becomes ACTIVITY** (Loo 2026-08-04, after using the page: *"Right panel not friendly to edit detail"*) — **no migration**; web + api + shared. DOCUMENT DATA moved to the row expand where the operator types into it; ACTIVITY stayed right, and **the panel lost its date door, its items grid and its per-line ⋮ rather than keeping copies** — rule 1 (nothing in two tiers) and rule 3 (one editing surface) are the same repair. **ONE PO expands at a time is a PROPERTY**: the state is a single id, so two open rows cannot be represented — proved non-vacuous by a Set control AND a no-close control, each firing 1. **The one genuinely new thing is the route the card names, and that door had been half-built for a day**: `purchasing_record_ready_date` shipped with **0318 on 2026-08-03 and nothing ever called it**, so `Confirm ready date` had no button anywhere in the portal. **`poDateHistoryOf` also filtered the ready kind OUT**, so the first ready date an operator recorded would have been swallowed by the history sitting beside the field — two runs now, numbered separately and each NAMED, never merged (different facts, and every supplier here carries transit days). **Qty stays read-only, asserted from both ends** (no number input on the page; a route test refuses a quantity smuggled through the body). **Measured in a real browser and it CHANGED the design**: the select + `Move` + the two controls inside the 160px Destination cell came out **68px tall at the 680px compact width** — three wrapped lines — so the editing controls took their own full-width strip (**39px**, one line). **Verified on production against PO-2032 in a rolled-back transaction**: the ready date moved `expected_ready_date`, wrote exactly ONE `kind='ready_date'` promise and the `po_history` sentence, left `eta_date` alone, and the destination door moved line 2 to AL; the rollback was proved total, and **0 of 21 POs carry a ready date today** because nothing could record one. **Reported, not applied — the card asks for no Save button anywhere in the expand and TWO of the three fields are multi-field forms Jess gave Save buttons AFTER using them** (*"i cant save?"* · *"i cant save for AL"*): the new single-value field takes the ruled manner exactly (Enter saves, Esc cancels, no button), the two older doors keep hers, and the split's control is named `Split`, which is an act rather than a save. Also reported: the register column still says `Goods Arrival` beside an expand that says `Expected Arrival` for the same fact (§12.2 retires it and names this column, but the rename moves a header width Q1 measured); `Received At` has no field on the wire, exactly as §12.2 says. **FOLLOW-UP #601 `8333ef8c` closes the two things #600 left**: (a) **the §13.3 table answers FIVE powers and the ship wired ONE** — `resize` and `reorder` were both ruled ✅ **wire** by Loo the same day and were silently absent, so they are now passed (a WIRING: the arithmetic, the handle and the a11y pin are all D0.5d's, the two strings are the kit's own from `/ui`), while **footer totals and grouping stay UNWIRED with a test asserting their ABSENCE** — he refused both, and a power that quietly appears later is the failure §13.3 exists to stop; (b) **the last Done-when line is DONE, and it did not need a password after all** — a live operator session was already open, so PO-2032 was opened on production, expanded (3 lines, AL on line 1, Klang on 2-3), **line 3 changed to AL, reloaded, and it stuck**, confirmed again by reading `purchase_order_lines`. **Measured in a real browser on the deployed page**: a real drag moved `Supplier` 92 → 132 and took every pixel from `PO No.` 104 → 64 with the table width UNCHANGED at 555px and page scroll 0 (§7 held under a drag); a real drag-and-drop moved a column and the data cells followed; a reload put the company's grid back (88 · 92 · 104 · 54 · 200), which is §0.4 proved. Two controls, 4 and 4, each a real edit — the second needed because the first structurally cannot fire the §7 typed-once assertion. check-design 8367, identical category for category to `origin/main` | #600 · #601 |
+| **Q7** | ⬜ **the frozen column set becomes real** — **a REPORTING FAILURE of the manager chat being repaired**: Loo froze the nine columns and their order on 2026-08-04 and no card was ever written, so **five of his rulings are still not on the page** — `COMPACT_KEYS` still swaps the column set when the panel opens (he banned exactly that: *"Operator 的眼睛会一直重新学习页面"*), `SO No.` and `Destination` do not exist as columns, `Received` is still there and is not in his nine, and **the column says `Goods Arrival` while the expand two rows below says `Expected Arrival` for the same fact** — §12.2 retired the first, and Q5 made the split visible by correctly using the new word in the expand. Nine measured minimums total 1168px; the list keeps ONE min-width and scrolls, because deleting business information to avoid a scrollbar is what he forbade. **No migration, no api** | — |
 | **Q6** | ⬜ **To Order audited against the same architecture** (Loo 2026-08-04: *"now to order page i want also follow us"*) — **deliberately SMALL, because the measurement is that To Order is already closer to it than Purchase Orders was**: the kit expand (P10), `group`, and a priority-ordered rail are all live, and it has no right panel to mis-define because it is a Workspace, not a document register. The card applies **CLAUDE.md §13.3** to the two unwired powers (`resize` · `reorder` — wire or refuse IN WRITING, silence is not an answer) and scans every visible date word against the portal-wide dictionary. **An audit, not a redesign — P7 owns the redesign. STARTS NOW** — Loo withdrew the P13 hold 2026-08-04 (*"i wont wait"*); a rebase is engineering, not a reason to wait | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |

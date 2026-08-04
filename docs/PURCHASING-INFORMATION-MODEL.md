@@ -795,9 +795,29 @@ and the history on the right is that, without AutoCount's full-page expand.
 4. **The expand is not a tree.** Two levels, fixed forever. No expandable node inside an
    expanded node — the shape Fiori calls a last resort.
 
-**Saving is automatic, in the manner already ruled on this page** (Jess, 2026-08-02): a value
-is TEXT until clicked, then a control; **Enter saves, Esc cancels, and there is no Save button
-anywhere on the surface.**
+### 12.7.5a · HOW A FIELD SAVES — corrected by real use, 2026-08-04
+
+**The rule as first written was wrong, and Jess broke it with her hands within minutes of
+using the page** — *"i cant save?"* and *"i cant save for AL"*. It said: *a value is TEXT
+until clicked, then a control; Enter saves, Esc cancels, and there is no Save button anywhere
+on the surface.* That is Jess's own 2026-08-02 inline-edit ruling and it is still right — but
+only for the case it was written about.
+
+**The missing distinction, and it is mechanical:**
+
+| The field | How it commits | Why |
+|---|---|---|
+| **one value the operator TYPES** — a date, a remark | **Enter saves · Esc cancels · no button** | the hand is already on the keyboard, so the gesture is free and a button would be furniture |
+| **a value chosen with the MOUSE** — a dropdown | **an explicit Save** | **a picker changed with the mouse has no keyboard gesture to commit.** There is nothing for Enter to mean |
+| **a form of SEVERAL fields** — date + reason + remarks | **an explicit Save** | Enter in field 1 cannot know whether fields 2 and 3 are finished |
+
+**A button that performs an ACT rather than storing a value is named for the act** — the
+quantity split's control is `Split`, not `Save`, because it does something the operator can
+describe.
+
+> **This correction is what CLAUDE.md §13.2 is for.** The rule was defensible in writing and
+> false in the hand, and it took one operator one minute to prove it. Nobody would have found
+> it in another day of discussion.
 
 ### 12.7.6 · The costs — stated, because a review that only lists benefits is an advert
 
