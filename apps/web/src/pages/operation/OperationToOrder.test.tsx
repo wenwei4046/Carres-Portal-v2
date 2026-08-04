@@ -220,7 +220,9 @@ describe("the PO Schedule — a purchase calendar, not a menu", () => {
     // The retired vocabulary stays retired.
     expect(within(nav).queryByText("Tomorrow")).toBeNull();
     expect(within(nav).queryByText("This Week")).toBeNull();
-    // CATEGORY is a WORK ORDER, not a scoreboard: heading + rows, no counts.
+    // CATEGORY is Loo's WORK ORDER, and since P9 (2026-08-04) each row also
+    // carries how many UNITS that click produces. It may never say `Orders` —
+    // that is the block above, counting a different thing.
     expect(within(nav).getByText(W.categoryHeading)).toBeInTheDocument();
     expect(within(nav).getByTestId("to-order-cat-all")).not.toHaveTextContent("Orders");
     expect(within(nav).getByTestId("to-order-create-purchase")).toHaveTextContent(
@@ -429,11 +431,20 @@ describe("the Excel reflexes — header sort, per-column filters", () => {
     // The empty PO cell SAYS the work instead of a mute dash, and the
     // footer counts what the sheet shows.
     expect(screen.getAllByText(W.yetToOrder).length).toBeGreaterThan(0);
-    // NO COUNT AT ALL (Loo, 2026-08-03).  read as a third number in
-    // a third unit — and  already means something else on this screen,
-    // in the Qty column. His pair stands: what I ticked, and how many purchase
-    // orders it becomes. The footer keeps only the way OUT of a filter.
-    expect(screen.getByTestId("to-order-footer")).not.toHaveTextContent(/[0-9]/);
+    // NO CUSTOMER-ORDER COUNT (Loo, 2026-08-03). `3 orders` read as a third
+    // number in a third unit, and operations does not work in customer
+    // orders. His pair stands: what I ticked, and how many purchase orders it
+    // becomes.
+    //
+    // TWO RULINGS MEET HERE AND THEY DO NOT COLLIDE. The 2026-08-03 ban was on
+    // the ORDER count; P9 (2026-08-04) puts UNITS in the footer, which is the
+    // one thing Loo said the page could not answer. So the guard is narrowed
+    // to what was actually banned rather than deleted — `N order` / `N SO` may
+    // never come back, and the units line is free to be there.
+    const footer = screen.getByTestId("to-order-footer");
+    expect(footer).not.toHaveTextContent(/\d+\s*(orders?|SO)\b/i);
+    // …and the digits it DOES carry are P9's, nobody else's.
+    expect(screen.getByTestId("to-order-footer-units")).toBeInTheDocument();
   });
 });
 
@@ -922,5 +933,158 @@ describe("Ready Stock is listed even with no date", () => {
     // stock an empty Required By means *buy it on the next run*, which is the
     // opposite of *nobody has promised this yet*.
     expect(group!.textContent).not.toContain(W.noDeliveryDate);
+  });
+});
+
+/**
+ * ── P9 · the page says how many of each you are buying (Loo, 2026-08-04) ─────
+ *
+ * Two numbers, and they mean different things. The rail's CATEGORY rows count
+ * UNITS still to buy; the PO SCHEDULE rows above them count customer ORDERS.
+ * Both print BARE — Loo ruled `Mattress 7`, never `Mattress 7 件` — so the
+ * only thing telling them apart is each row's own tooltip.
+ *
+ * Fixture (today = Thu 2026-07-30). Everything whose order-by has passed is
+ * Overdue: ella 1 sofa · PETER 2 sofas · wong 3 bedframes · lim 1 bedframe.
+ * That is FOUR customer orders and SEVEN units, which is exactly the pair
+ * this card exists to stop anyone confusing. kee tong has no delivery date,
+ * so is not purchasable work and is in neither number.
+ */
+describe("P9 — the CATEGORY rows carry a bare unit count", () => {
+  const overdueOnly = () => {
+    fireEvent.click(screen.getByTestId("to-order-day-2026-07-31")); // clear Friday
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+  };
+
+  it("counts UNITS where the calendar above counts ORDERS — 4 orders, 7 units", async () => {
+    await loaded();
+    overdueOnly();
+    const nav = screen.getByTestId("to-order-nav");
+
+    // The calendar row: FOUR — customer orders.
+    const overdue = within(nav).getByTestId("to-order-overdue");
+    expect(overdue).toHaveTextContent("4");
+    expect(overdue.getAttribute("title")).toContain("4 Orders");
+
+    // The category rows: SEVEN units, split 3 sofa + 4 bedframe. PETER's one
+    // order is two units and wong's one row is three, which is why these
+    // numbers can never be read off the calendar.
+    expect(within(nav).getByTestId("to-order-cat-sofa")).toHaveTextContent("Sofa3");
+    expect(within(nav).getByTestId("to-order-cat-bedframe")).toHaveTextContent("Bedframe4");
+    expect(within(nav).getByTestId("to-order-cat-all")).toHaveTextContent("All7");
+
+    // The tooltip is the whole disambiguation, because the digits are bare.
+    expect(within(nav).getByTestId("to-order-cat-sofa")).toHaveAttribute("title", "3 units");
+    expect(within(nav).getByTestId("to-order-cat-all")).toHaveAttribute("title", "7 units");
+  });
+
+  it("a zero category still renders its row — a navigator may not change shape", async () => {
+    await loaded();
+    overdueOnly();
+    const nav = screen.getByTestId("to-order-nav");
+    // No mattress demand is overdue, and the row is still there saying so.
+    expect(within(nav).getByTestId("to-order-cat-mattress")).toHaveTextContent("Mattress0");
+    expect(within(nav).getByTestId("to-order-cat-pillow")).toHaveTextContent("Pillow0");
+    expect(within(nav).getByTestId("to-order-cat-mattress_protector")).toHaveTextContent(
+      "Mattress Protector0",
+    );
+  });
+
+  it("no unit word reaches the screen — the word lives in the tooltip only", async () => {
+    await loaded();
+    overdueOnly();
+    const nav = screen.getByTestId("to-order-nav");
+    for (const k of ["all", "mattress", "bedframe", "sofa", "pillow", "mattress_protector"]) {
+      const row = within(nav).getByTestId(`to-order-cat-${k}`);
+      // Loo, 2026-08-04: BARE. Not `件`, not `units`, not `pcs`.
+      expect(row.textContent ?? "").not.toMatch(/unit|pcs|piece|件/i);
+      // …and the word IS reachable, for a hover and a screen reader.
+      expect(row.getAttribute("title")).toMatch(/^\d+ units?$/);
+    }
+  });
+
+  it("the count is what the click PRODUCES — it falls with every other filter", async () => {
+    await loaded();
+    overdueOnly();
+    const nav = screen.getByTestId("to-order-nav");
+    expect(within(nav).getByTestId("to-order-cat-bedframe")).toHaveTextContent("Bedframe4");
+
+    // Search narrows the sheet, so it must narrow the promise too: lim's one
+    // bedframe only. A rail that still said 4 would be advertising rows the
+    // click cannot show.
+    fireEvent.change(screen.getByLabelText(W.searchLabel), { target: { value: "lim" } });
+    await waitFor(() =>
+      expect(within(nav).getByTestId("to-order-cat-bedframe")).toHaveTextContent("Bedframe1"),
+    );
+    // `All` moves with it, so the two rows stay arithmetically consistent.
+    expect(within(nav).getByTestId("to-order-cat-all")).toHaveTextContent("All1");
+    expect(within(nav).getByTestId("to-order-cat-sofa")).toHaveTextContent("Sofa0");
+  });
+});
+
+describe("P9 — the footer totals what is TICKED, per category", () => {
+  const overdueOnly = () => {
+    fireEvent.click(screen.getByTestId("to-order-day-2026-07-31"));
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+  };
+
+  it("units per category for the ticked rows, in Loo's walking order", async () => {
+    await loaded();
+    overdueOnly();
+    // Overdue pre-ticks itself — it is the engine's own plan.
+    await waitFor(() => expect(screen.getByTestId("to-order-footer-units")).toBeInTheDocument());
+    // Bedframe before Sofa: RAIL_CATEGORIES order, so the footer and the rail
+    // read down in the same sequence.
+    expect(screen.getByTestId("to-order-footer-units")).toHaveTextContent("Bedframe 4 · Sofa 3");
+    // Mattress ticked nothing, so it is absent rather than printed as a zero.
+    expect(screen.getByTestId("to-order-footer-units")).not.toHaveTextContent("Mattress");
+  });
+
+  it("VIEW-SCOPED — a filter moves the footer, because it moves what Issue acts on", async () => {
+    await loaded();
+    overdueOnly();
+    await waitFor(() =>
+      expect(screen.getByTestId("to-order-footer-units")).toHaveTextContent("Bedframe 4 · Sofa 3"),
+    );
+
+    // Excel's iron law: a tick hidden by a filter neither counts nor issues.
+    // The footer comes from the same list the button acts on, so narrowing to
+    // Sofa must drop the bedframes from BOTH.
+    fireEvent.click(screen.getByTestId("to-order-cat-sofa"));
+    await waitFor(() =>
+      expect(screen.getByTestId("to-order-footer-units")).toHaveTextContent("Sofa 3"),
+    );
+    expect(screen.getByTestId("to-order-footer-units")).not.toHaveTextContent("Bedframe");
+
+    // …and the ticks are remembered, not thrown away: clearing brings it back.
+    fireEvent.click(screen.getByTestId("to-order-cat-sofa"));
+    await waitFor(() =>
+      expect(screen.getByTestId("to-order-footer-units")).toHaveTextContent("Bedframe 4 · Sofa 3"),
+    );
+  });
+
+  it("the line goes with the selection — the band stays, the sentence does not", async () => {
+    await loaded();
+    overdueOnly();
+    await waitFor(() => expect(screen.getByTestId("to-order-footer-units")).toBeInTheDocument());
+
+    // Untick everything through the header ☑ — the same act that empties the
+    // Issue pill must empty this.
+    fireEvent.click(document.querySelector("thead [role=checkbox]")!);
+    await waitFor(() => expect(screen.queryByTestId("to-order-issue-pill")).toBeNull());
+    expect(screen.queryByTestId("to-order-footer-units")).toBeNull();
+    // The band itself is not conditional — the Clear-filters button lives there.
+    expect(screen.getByTestId("to-order-footer")).toBeInTheDocument();
+  });
+
+  it("units are not rows — one ticked row can be three units", async () => {
+    await loaded();
+    overdueOnly();
+    await waitFor(() => expect(screen.getByTestId("to-order-issue-pill")).toBeInTheDocument());
+    // The toolbar counts ROWS …
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 selected");
+    // … and the footer counts UNITS: SEVEN, because wong's single row is
+    // three bedframes. This is the pair Loo could not read anywhere.
+    expect(screen.getByTestId("to-order-footer-units")).toHaveTextContent("Bedframe 4 · Sofa 3");
   });
 });
