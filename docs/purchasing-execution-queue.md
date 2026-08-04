@@ -1610,6 +1610,103 @@ path is added anywhere** (assert it) · the row disappears from To Order with no
 **Must NOT.** ❌ add a delete route or button · ❌ let a cancel touch the issued quantity or
 the PO · ❌ ship the route without the button · ❌ touch the rail or the dialog.
 
+### ✅ SHIPPED 2026-08-04 — PR #598 `3245a59a` · migration **0321 applied** · web `index-mIdlwTf2.js` · Worker `59bdd682`
+
+**ONE LINE OF GATE CHANGE IS THE WHOLE CARD**, and 0320 had already written down which
+line: `po_id is not null → already_ordered` becomes `remaining_qty <= 0 →
+nothing_to_cancel`. The old gate asked *has anything been ordered?*; the new one asks *is
+there anything left to cancel?*, which is the question the operator is answering and the one
+0320 made askable by GENERATING `remaining_qty`.
+
+**THE CARD'S "a cancel sets the remainder to nothing" IS NOT WHAT SHIPPED, AND THE CARD'S
+OWN Must-NOT IS WHY.** The obvious reading — set `issued_qty = qty` so the generated
+remainder falls to 0 — is refused by *"❌ let a cancel touch the issued quantity"*, and it
+would also be a lie: `issued_qty` means *units something TOOK*, so a demand of 5 with 3
+ordered would read as 5 procured. Nothing is written but `cancelled_at` + `cancel_reason`,
+and the row leaves by itself because `purchase_demands_open_idx`, the api read and the grid
+**all already key on `remaining_qty > 0 AND cancelled_at is null`** — the second half was
+there before this card was written.
+
+**SO THERE IS NO CANCELLED-QUANTITY COLUMN, and that is a property rather than a decision to
+trust.** `purchasing_demand_record_issue` refuses a cancelled demand, so `issued_qty` cannot
+move afterwards, so **`remaining_qty` FREEZES at the cancel and IS the record of what was
+cancelled** — asserted live (T6). A stored second copy of a generated number is the disease
+this table was built to avoid.
+
+**NOBODY TYPES A QUANTITY, asserted on the WIRE and not only on the screen**: the route test
+pins `Object.keys(args)` to exactly `p_id` · `p_reason`. Smuggling a `p_qty` fires it.
+
+**`Cancel` RIDES THE `PO No.` CELL, and the placement was measured rather than picked.** That
+column already asks *did this become a purchase order?*; on a row still to buy it answers
+`Yet to Order`, and `Cancel` is the other answer to the same question. It also costs the
+frozen layout NOTHING — the four widths sum to 93 and the two kit columns to 7, so a seventh
+column could only be paid for out of `Model`, which this page's own law reserves as the one
+column the spare width belongs to. At 1280 (the width Q1 and P9 were both decided at) the
+grid area is ~1056px, the column is 20% ≈ 211px less 24px padding, and `Yet to Order` + gap +
+button is ~141px of the 187px available.
+
+**ONLY A ROW THAT IS ITS OWN DEMAND GETS IT** — `demand:<uuid>` — and a test pins the count
+at exactly ONE across a fixture holding customer rows too. Cancelling a customer's order is
+the Orders module's act; a second door to it here would be a second truth.
+
+**THREE WORDS ADDED, NONE INVENTED.** `Cancel` is COPY-STANDARD's own verb for this act; it
+is a SEPARATE constant from the existing `cancel` on purpose, because that one is the create
+dialog's form-abandon button and the filter's clear label, which the dictionary exempts from
+the verb table **by name**. The dialog says `Cancel Purchase` — the verb plus `Create
+Purchase`'s own noun, the exact inverse of the act that made the row, and AutoCount's own
+document name. **The way out of the dialog is the frame's ✕, not a second button**: two
+buttons reading `Cancel` in one dialog, one meaning *stop this purchase* and one *stop this
+dialog*, is the one arrangement that could not be read.
+
+**CANCEL IS NOT DELETE, ASSERTED IN FIVE PLACES** rather than promised in prose: 0321's
+sanity block proves no delete policy, no `DELETE` grant and no function deleting from the
+table; a source scan on the route proves no `.delete(` and no delete path; a source scan on
+the page proves no `method: "DELETE"` and that the only demand doors it opens are create and
+cancel. **Adding a delete route fires three of them.**
+
+**VERIFIED ON PRODUCTION, BEFORE AND AFTER.** Before: 8 assertions in a rolled-back
+transaction (rollback proved total — function md5 unchanged, 1 demand, 0 cancelled), and the
+**negative control fired: the LIVE function refused the card's own case with detail
+`already_ordered`**. After: the applied function's `md5(prosrc)` is **byte-identical to the
+reviewed repository file** (`d5d76292…`, body extracted from `git show`), it is **in the
+tracker** (`20260804055735` — 0318/0319's lesson applied), and the live function was run
+against a real 3-of-5 demand in a rolled-back transaction: `{"cancelled": 2, "issued": 3}`,
+`PO-2040` kept, and the row gone from the open-demand set.
+
+**LIVE EFFECT TODAY: NONE, measured.** Production holds ONE demand (`SONIC-S`, qty 5, issued
+0, never ordered) — so the part-ordered path this card exists for has no live row yet, and
+what changes today is that a mistyped demand can finally be got rid of at all.
+
+**Five code negative controls, each fired as a real edit and verified applied**: the
+demand-only guard removed → the *exactly one Cancel* test · the mandatory reason removed → 1 ·
+a delete route added → 3 · the api's reason guard relaxed → 1 · a quantity smuggled onto the
+wire → 1.
+
+**Gates.** shared **2111/2111** · api tsc 0, suite 3 pre-existing, `to-order.test.ts` 64 → 76 ·
+web tsc 0, suite **16 pre-existing, zero new**, `OperationToOrder.test.tsx` 58 → 67 ·
+**check-design 8368, byte-identical category-for-category to the tree WITHOUT this change**
+(proved by stashing and re-linting) · build clean, `SERVICE_ROLE` 0. Both Pages projects and
+the Worker deployed; **all four canonicals on the first poll**, live bundle md5-identical to
+the local build (`9fbc787a…`), and **both directions proved on downloaded bundles** —
+`to-order-cancel-submit` · `Cancel Purchase` · `to-order-cancel-dialog` are **0 in the
+predecessor** `index-AfemgCnW.js` (4,759,570 bytes, a real bundle) and **1 in the live one**,
+with `to-order-create-dialog` at 1 in both as the control.
+
+**TWO THINGS REPORTED, NOT FIXED.**
+
+1. **`TO_ORDER_WORDS.itemsRemove` (`"Remove"`) has ZERO consumers** — measured by grep across
+   `apps/web` and `packages/shared`. It belongs to the Purchase Order PREVIEW's item table,
+   which is a different concept from this card's (taking a line out of a document that does
+   not exist yet destroys no record), which is exactly why the delete-word scan bans
+   `delete` and `purge` and NOT `remove`. Deleting an unused ruled word is a COPY-STANDARD
+   decision, not a routine fix.
+2. **The api route could not be content-verified from this session.** Auth runs before
+   routing, so a 401 on `/demand/:id/cancel` proves nothing (P1's lesson) and no operator
+   login was available here. What IS proved: the Worker version serving 100% of traffic is
+   `59bdd682`, built from the main tip that contains the route, with `GET /health` **200
+   `{"ok":true}`** and the correct bindings echoed — and the rule the route reaches was
+   verified directly against production through the live function.
+
 ---
 
 ## P10 · Ready stock is suggested; the human decides whether to take it
@@ -2341,7 +2438,7 @@ not a variant) · ❌ invent a word · ❌ start before Q3 merges.
 | P8 | ✅ **a typed purchase demand can actually be saved** (migration **0320 applied**) — and **the create half was already shipped by #581/0319 when the card was written**, so it was verified, not rebuilt. What was missing was the card's ONE ADDITION: `issued_qty` (writable only through a door) + `remaining_qty` (**GENERATED**, so it cannot disagree), and *"still to buy"* stops meaning *"has no purchase order"*. The issue path stops PATCHing and **adds** what it took, refusing an over-issue by name. 8 assertions on prod, rolled back; applied function byte-identical to the file. **Reported, not fixed: a ready-stock demand for a SOFA projects as 1** whatever quantity was typed — ruled a DEFECT rather than the business question this row first called it, and **CLOSED by P11** (#589), which also found it was credited as 1 while the purchase order ordered the full quantity — and **nobody can cancel a demand** (RPC exists, no route, no button — a route with no caller is C1's bypass) | #584 |
 | P9 | ✅ **the page says how many of each you are buying** (Loo 2026-08-04) — **no migration, web only**. CATEGORY rows carry bare UNIT counts; the PO Schedule above them keeps counting ORDERS, and the two are told apart by their own tooltips (`12 Orders` · `19 units`, COPY-STANDARD's own pair — no word invented). The rail counts UNISSUED work and **cascades over every narrowing except the category picks**, so the number a row shows is the number of units its click produces. The footer totals what is TICKED, per category, accumulated **inside the loop that decides what Issue acts on** — the VIEW-SCOPED law holds by construction, not by two counts agreeing. **Measured in a real browser on live data (1280×720)**: rail `All 20 · Mattress 15 · Bedframe 4 · Sofa 1 · Pillow 0 · Mattress Protector 0`, each equal to the grid's own Qty sum (mattress = 10 rows, 15 units — the two are not the same number); footer `Mattress 15 · Bedframe 4 · Sofa 1` beside `15 selected · Issue 3 POs`. **The card said "footer, beside the Issue button" and those are two places, so the widths were measured**: the line costs 257px and the toolbar has 223px spare at 1280 (607px at 1920) — a line that fits on a manager's monitor and breaks on an operator's laptop is not a placement, so it went to the footer band (573px spare). **Reported, not fixed**: Loo's 2026-08-03 footer ban was on the customer ORDER count, so the old blanket `no digits` test is NARROWED to `/d+s*(orders?|SO)/` rather than deleted · the design-standard scanner reads `PR #494` in a comment as a hex colour · the rail excludes an order with no delivery date, exactly as the grid does · a flat per-SKU SQL says 3 sofa units where the engine's per-BUILD allocation says 1, and the engine is the authority | #585 |
 | P11 | ✅ **a sofa with no modules carries its own quantity** — **no migration, shared engine only; no Pages deploy owed and it is proved by CHECKSUM** (the web never imports `buildToOrder`, so a build from this tip emits `index-DiTy2SJk.js`, the bundle already live). The discriminator moved from the CATEGORY to the MODULES: a group of more than one line is a build and collapses to 1, a lone line carries its own quantity — and a group of more than one can only exist under a real build key, since a synthetic `line::` key is unique per line. **The row stopped being counted a second time**: it is `builds.reduce(+qty)` for every category, so the row and its builds agree by construction rather than by two counts agreeing (`builds.length` is gone). **The defect was wider than the display and that is the part the card did not name**: the api credits `purchasing_demand_record_issue` with the BUILD's qty while the purchase order is written from the LINE's — so a demand of 5 was ordered in full and recorded as 1, leaving 4 to be bought a second time. One fix closes all three. **Measured on prod**: 12 sofa groups — 9 genuine multi-module builds (still 1 each) and 3 lone lines, all qty 1, so **0 rows change today**. **Three negative controls, each fired as a real edit**: restore the `? 1` → exactly the 4 new shared tests · restore `builds.length` → 4 · the api sofa-demand test → 1, reading `expected 1 to be 5`. **A control that did not fire, and why**: the first api control was a `perl` in-place edit that CRLF silently declined, so the 45/45 that followed proved nothing — re-run as a real edit it fires. **The row-sum test also passed its own control at first** and was strengthened rather than kept: its fixture agreed with `builds.length` too, so it guarded nothing until a lone line of 2 was added to it | #589 |
-| P12 | 🔨 CLAIMED 2026-08-04 — `claude/p12-cancel` · **a demand can be cancelled — and so can the remainder of a part-ordered one** (door + button in ONE card — a route with no caller is a bypass). **After P10**, whose card owns the grid row. **UNBLOCKED 2026-08-04 — Loo ruled the remainder CAN be cancelled**; the 3 already ordered are the PO flow's problem, not this one's. Migration relaxes the `po_id` gate. **Cancel is not delete: no delete button ever** — test rubbish goes by SQL and the database starts clean at go-live | — |
+| P12 | ✅ **SHIPPED 2026-08-04** (PR #598 `3245a59a`, migration **0321 applied**, web `index-mIdlwTf2.js` + Worker `59bdd682`) · **a demand can be cancelled — and so can the remainder of a part-ordered one** (door + button in ONE card — a route with no caller is a bypass). **After P10**, whose card owns the grid row. **UNBLOCKED 2026-08-04 — Loo ruled the remainder CAN be cancelled**; the 3 already ordered are the PO flow's problem, not this one's. Migration relaxes the `po_id` gate. **Cancel is not delete: no delete button ever** — test rubbish goes by SQL and the database starts clean at go-live | — |
 | P13 | ⬜ **the take path says what it means — one button word, one reason word** (Loo ruled BOTH 2026-08-04, ONE card). ① `Take` → **`Reserve`**: the drawer has said `Reserve {n} to {soRef}` for the same act since 2026-06-30, and the goods do not leave — they are LOCKED until delivery, so `Take` reads as already gone. The drawer is NOT touched. ② K4 gains a sixth reason — none of its five describes *"we had it on the shelf, so we did not raise a PO"*, so K5 cannot answer 为什么一直缺货. Migration widens the CHECK. **AFTER P12** | — |
 | P10 | ✅ **ready stock is suggested, the human takes it** — **no migration**. The engine has computed it since the day it was written and it was switched off and shown to nobody; `consumeFreeStock` is still `false` and nothing nets it, because Jess's 2026-07-21 ruling stands — the defect was that a decision reserved for a human never reached the human. Loo's option B: D0.5d's inline row expand, the offer counted off the **register** (`ops_stock_items`, the table the draw moves) and what was already taken read off **K4's LEDGER** — not off `status='reserved'`, which would put a satisfied requirement back on the page the day the goods went out. `POST /take-stock` carries no quantity and goes through `ops_stock_pool_draw`, one call per record. **It was built TWICE the same day**; the parallel branch `claude/p10-ready-stock-4c0f8f` is preserved on origin and NOT merged, and its four independent measurements are recorded under the card: **the offer matches nothing on live data today** (the 87 free units are Klang-sheet descriptions, all 31 demand SKUs are catalog codes — zero overlap, correct, self-healing) · **`Take` here vs `Reserve {n} to {soRef}` in the drawer's picker, one act two words, Loo's to rule** · **the kit's 3% expand column is narrower than its own 24px control below ~1440px** (3px onto the checkbox at 1024; nothing clips, no sideways scroll, rows still 40px) · **the offer does not filter CONDITION**, so a released `damaged` unit would be offered to a customer (zero exposure today, measured) | #591 |
 | **Q1** | ✅ **the register puts the most dangerous PO first** (Loo 2026-08-04) — **no migration, no api change, no Worker deploy** (`apps/api` imports nothing from `po-workspace`, measured). `comparePoRisk` lives in `packages/shared`, never in the page: a page-local comparator would be a SECOND priority, and the row's pill would say one thing while its position said another. **Jess's `PO Issued` law is overridden as the DEFAULT and is NOT deleted** — it keeps its column, its header sort, and it is the tie-breaker; a test asserts that clearing a header sort returns to RISK order. `Current Action` 200px fixed and `Items` becomes the `auto` tail — **the recipe is unchanged, only which column absorbs the slack**, and the argument is that the column which truncates should be the one whose truncation costs least. **Widths measured in a real browser and the measurement reproduced the card's own four numbers exactly** (auto gave it 23px at 1280 · 109 at 1366 · 183 at 1440 · 663 at 1920, against words needing 109–201). **Reported, not hidden: the compact fixed sum moves 424 → 484, so the listing region's horizontal-scroll threshold moves from a 1257px viewport to a 1317px one** — at 1280 the region gains 37px of scroll where today it has none and a 23px instruction column; the region already answers "the columns do not fit" that way by its own design, and a readable instruction beats a deleted one, so 200 shipped as ruled with the number on the record. A gap from OUR estimate is amber, a gap the factory gave stays red, `same day` amber either way — **no new word, only the tone**, and the workspace reads the same rule. **Verified against production data before the deploy**: 10 of 21 rows warn and 8 of the 10 are our own estimate · **`PO-2038` is row 1** with an amber `7d late` (it was row 8) · `PO-2031` and `PO-2032` are the only two reds, both `8d late` · **zero open engine calls exist today**, so rungs 1 and 4 are empty on live data. Four negative controls, each run as a real edit and each verified to have applied: rung 1 → shared 2 + web 3 · register tone → 1 · workspace tone → 1 · `auto` → 2. **`data-tone` is NOT a clean bundle marker** — it greps 2 in BOTH bundles (the journey-health strip and the order-action row already used it); the clean one is `"confirmed":"estimate"`, 0 → 2 | #590 |

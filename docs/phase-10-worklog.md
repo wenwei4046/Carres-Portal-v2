@@ -6,6 +6,115 @@
 
 ---
 
+**2026-08-04 · Purchasing P12 — the remainder of a part-ordered demand can be cancelled** (PR #598 merge `3245a59a`, migration **0321 applied and verified BEFORE the merge**, web `index-mIdlwTf2.js` + Worker `59bdd682` — DEPLOYED, four canonicals on the first poll, live md5-identical to the local build (`9fbc787a…`, 4,761,673 bytes), `SERVICE_ROLE` 0)
+
+**Loo ruled it 2026-08-04, final, and the ruling was not re-asked.** *"Ordered 3, don't want the other 2"* is an ordinary day; the 3 already ordered are the purchase order's problem (`PURCHASING-WORKING-FLOW.md` §9), not this door's. Two measured facts made it urgent: without it a part-ordered demand can only ever GROW — the disease already named on `Confirm ready date`, a queue with no way out — and **nobody could cancel ANY demand at all**, so a mistyped row nagged forever.
+
+### 0320 left the question open BY NAME, which is why this was one line
+
+The migration this replaces says so in its own header:
+
+> *"Once P10 can satisfy part of a demand from stock, 'may the operator cancel the REMAINDER of a demand that was partly ordered?' becomes a real business question with two defensible answers, and it is Loo's, not this migration's."*
+
+So the whole card is a gate:
+
+```
+before   po_id is not null    -> refuse `already_ordered`
+after    remaining_qty <= 0   -> refuse `nothing_to_cancel`
+```
+
+The old gate asked *has anything been ordered?* The new one asks *is there anything left to cancel?* — which is the question the operator is actually answering, and the one 0320 made askable by GENERATING `remaining_qty`.
+
+### The card's own sentence is not what shipped, and the card's own Must-NOT is why
+
+P12 reads *"a cancel sets the remainder to nothing and the row leaves the workspace by itself"*. The obvious implementation is `issued_qty = qty`, so the generated `remaining_qty` falls to 0. That is refused twice over:
+
+- the card's own **"❌ let a cancel touch the issued quantity or the PO"**, and
+- **it would be a lie.** `issued_qty` means *units that stopped being something to buy because something TOOK them* — a purchase order, a ready-stock draw. A demand of 5 with 3 ordered would read as 5 procured.
+
+What ships writes `cancelled_at` + `cancel_reason` and nothing else. **The row leaves the workspace by itself anyway, because `purchase_demands_open_idx`, the api read and the grid all ALREADY key on `remaining_qty > 0 AND cancelled_at is null`** — the second half of that predicate was there before this card was written. Nothing had to be added for the row to disappear.
+
+### So there is no cancelled-quantity column, and that is a property rather than a promise
+
+`purchasing_demand_record_issue` refuses a cancelled demand. So `issued_qty` cannot move after a cancel. So **`remaining_qty` freezes at the moment of cancelling and IS the record of how much was cancelled** — asserted live (T6: an issue against a cancelled demand is refused `already_cancelled`). A stored second copy of a number that is already generated is the disease this table was built to avoid, and 0320's own header says so.
+
+### Nobody types a quantity — asserted on the WIRE, not only on the screen
+
+The route test pins the RPC arguments to exactly `p_id` and `p_reason`:
+
+```ts
+expect(Object.keys(calls[0].args).sort()).toEqual(["p_id", "p_reason"]);
+```
+
+A cancel takes the whole remainder or it is not a cancel, and the partial case a typed number would serve (*reduce the demand*) is a different act nobody has asked for. Smuggling a `p_qty` onto the call fires this test — control 5.
+
+### `Cancel` rides the `PO No.` cell, and the placement was measured
+
+That column already asks *did this become a purchase order?* On a row still to buy it answers `Yet to Order`; **`Cancel` is the other answer to the same question — it never will.** It also costs the frozen layout nothing: the four column widths sum to 93 and the two kit columns (expand, select) to 7, so a seventh column could only be paid for out of `Model`, which this page's own law reserves as the one column the spare width belongs to. At 1280 — the width Q1 and P9 were both decided at — the grid area is ~1056px, this column is 20% ≈ 211px less 24px of cell padding, and `Yet to Order` + gap + button is ~141px of the 187px available.
+
+**Only a row that is its own demand gets it.** A typed demand carries `demand:<uuid>` as its `orderId`; a customer requirement never matches. A test pins the count at exactly ONE across a fixture holding customer rows too — cancelling a customer's order is the Orders module's act, and a second door to it here would be a second truth about the same decision.
+
+### Three words added, none invented
+
+- **`cancelDemand: "Cancel"`** — the row's button. COPY-STANDARD's own verb (*"Cancel an order | **Cancel** | Void · Abandon · Kill"*). It is a **separate constant** from the existing `cancel`, which spells the same word: that one is the create dialog's abandon button and the filter popover's clear label, and the dictionary exempts form controls **by name** (*"a button inside a form … that abandons it is `Cancel` — those are not actions"*). Two concepts sharing a spelling are two entries; the same concept spelt twice is the drift the module already warns about under `supplierLabel`.
+- **`cancelPurchase: "Cancel Purchase"`** — the dialog's title AND its confirm button, the same words in both so the press and the promise cannot differ. The verb plus `Create Purchase`'s own noun: the exact inverse of the act that made the row, and AutoCount — which the team already knows — carries `Cancel Purchase Order` as a document of its own.
+- **`cancelReason: "Reason"`** — deliberately not the existing `reason`, which labels the create dialog's PURPOSE picker (*what is this purchase FOR*). This asks *why is it being stopped*.
+
+**The way out of the dialog is the frame's own ✕**, not a second button: two buttons reading `Cancel` in one dialog, one meaning *stop this purchase* and one *stop this dialog*, is the one arrangement that could not be read.
+
+### Cancel is not delete — asserted in five places
+
+Loo named AutoCount's real weakness: *"backend dont know how can delete due to when testing"* — it records everything and cleans nothing, so a test mistake is permanent. The answer is not a delete button. Test rubbish is cleaned by SQL on request and the database starts clean at go-live, so no feature is owed; and a delete built for testing survives into production as a way to erase a real purchase record leaving no trace (C1's *a live route with no caller is a bypass one curl away*).
+
+So it is asserted rather than promised:
+
+| Where | What it proves |
+|---|---|
+| 0321 sanity | no `DELETE`/`ALL` policy on `purchase_demands` |
+| 0321 sanity | no `DELETE` grant to `anon` · `authenticated` · `public` |
+| 0321 sanity | no function anywhere deletes from the table |
+| api source scan | no `.delete(`, no delete path, and the only demand RPCs are create · cancel · record-issue |
+| web source scan | no `method: "DELETE"`, no delete path, and the only demand doors are create and cancel |
+
+Adding a delete route fires three of them (control 3).
+
+### Verified on production, before and after
+
+**Before applying** — 8 assertions in a rolled-back transaction against prod, with the function replaced inside the transaction: a never-ordered demand cancels · **a 3-of-5 demand cancels its remaining 2 while the 3 keep `PO-2040` and `issued_qty` 3** · a second cancel is refused `already_cancelled` · a blank reason is refused `reason_required` · a fully-issued demand is refused `nothing_to_cancel` · an issue against a cancelled demand is refused (which is what makes `remaining_qty` frozen) · all three probes leave the open-demand set while the one live demand is untouched · no delete policy, grant or function. **The rollback was verified total** — 1 demand, 0 cancelled, function md5 unchanged.
+
+**The negative control fired**: with the function left exactly as production had it, the card's own case was refused with detail `already_ordered` (*"already on purchase order PO-2040"*). That is the proof the card describes a real gate rather than a hypothetical one.
+
+**After applying** — every VERIFY line passes (`has_new_gate` true · `has_old_gate` false · 1 copy · anon false / authenticated true · 0 write policies · 0 delete grants · 0 delete functions), the migration is **in the tracker** (`20260804055735` — 0318/0319's lesson applied, so nobody has to guess later), and **the applied body is byte-identical to the reviewed repository file**: `md5(prosrc)` `d5d762923c318c98a29362f9ba7df478`, matched against the body extracted from `git show HEAD:supabase/migrations/0321_*.sql`. Then the live function itself was run against a real 3-of-5 demand in a rolled-back transaction and answered `{"id": …, "issued": 3, "cancelled": 2}`, with `PO-2040` kept and the row gone from the open-demand set.
+
+**Live effect today: none, measured.** Production holds ONE demand — `SONIC-S`, qty 5, issued 0, never ordered — so the part-ordered path this card exists for has no live row yet. What changes today is that a mistyped demand can be got rid of at all.
+
+### Negative controls — five, each a real edit, each verified applied
+
+| Control | Fires |
+|---|---|
+| the `demandId` guard removed from the PO cell | *a typed demand row offers Cancel; a customer requirement never does* |
+| `reason.trim() !== ""` removed from `canCancel` | *a reason is mandatory* |
+| a `POST /demand/:id/delete` route added | 3 delete-scan tests |
+| the api's `.trim().min(1)` relaxed | *refuses a blank reason before it reaches the database* |
+| `p_qty: 2` added to the RPC call | *…and NO quantity* |
+
+Each was checked with a `grep -c` for the edited text before running, because P11 and Q3 both lost a control to a silently-declined `perl -0pi` edit on CRLF.
+
+**Two of this session's own tests were wrong on their first run and were fixed rather than kept.** The page's delete-word scan matched `n.delete(id)` — an ordinary `Set` call — because `["'`][^"'`]*\bdelete\b` spans newlines and an unpaired apostrophe upstream let it reach; it is asserted against `TO_ORDER_WORDS` instead, which is the stronger claim (the module's own law is *"a word that is not here has not been ruled"*, so a word not in it cannot reach the screen). And the path scan reported `to-order/demand/${encodeURIComponent(demandId` because its character class stopped at the `)`; `${…}` now collapses to `:id` **before** anything is extracted. A scan is only evidence about the page once it is evidence about itself.
+
+### Gates
+
+shared **2111/2111** · api tsc 0, suite 3 pre-existing (`supplier/pos` ×2 · `partner/pickups` ×1), `to-order.test.ts` **64 → 76** · web tsc 0, suite **16 pre-existing, zero new**, `OperationToOrder.test.tsx` **58 → 67** · **check-design 8368, byte-identical category-for-category to the tree WITHOUT this change** (proved by stashing `apps` + `packages` and re-linting — never quote a lint delta without linting the tree without your change) · build clean, `SERVICE_ROLE` 0.
+
+Both Pages projects deployed (`carres-portal` `5d939d45` + `carres-pos` `4a477642`, both `--branch=main`) and the Worker `--env production` (`59bdd682`, serving 100%, correct bindings echoed, `GET /health` 200). **All four canonicals on the first poll**, live bundle md5-identical to the local build. **Both directions proved on downloaded bundles, with a control**: `to-order-cancel-submit` · `Cancel Purchase` · `to-order-cancel-dialog` are **0** in the predecessor `index-AfemgCnW.js` (4,759,570 bytes — a real bundle, which matters because a superseded asset can 404 and a grep of that error page reads as a clean 0 for everything) and **1** in the live one, while `to-order-create-dialog` is **1 in both**.
+
+### Reported, not fixed
+
+1. **`TO_ORDER_WORDS.itemsRemove` (`"Remove"`) has ZERO consumers** — measured by grep across `apps/web` and `packages/shared`. It belongs to the Purchase Order PREVIEW's item table, which is a genuinely different concept from this card's: taking a line out of a document that does not exist yet destroys no record. That is exactly why the delete-word scan bans `delete` and `purge` and **not** `remove` — banning the string would have failed on a word meaning the opposite of the thing the card forbids. Deleting an unused ruled word is a COPY-STANDARD decision, not a routine fix.
+2. **The api route could not be content-verified from this session.** Auth runs before routing, so a 401 on `/demand/:id/cancel` proves nothing (P1's lesson, and the reason P10 verified its own route by content instead), and no operator login was available here. What is proved: the Worker version serving 100% of traffic is `59bdd682`, built from the main tip that contains the route, with `GET /health` 200 and the right bindings — and the RULE the route reaches was verified directly against production through the live function.
+
+---
+
 **2026-08-04 · Purchasing Q3 — Purchasing gets its Report tab** (PR #593 merge `6f6250a1` + PR #596 merge `1dc72732`, **no migration**, web `index-AfemgCnW.js` + Worker `ef2d5486` — DEPLOYED, four canonicals, live md5-identical to the local build (`fd6c2fe3…`, 4,759,570 bytes), `SERVICE_ROLE` 0)
 
 **Carres had no "look at the numbers" screen anywhere in Purchasing.** All five tabs answer *what do I do with THIS document*; nothing answered *how many mattresses did we buy this month*. This is a whole missing LAYER, and AutoCount's own Purchase menu draws exactly this line — documents in the top half, reports in the bottom. **2990s is not the reference and that was measured by reading their code**: one global `Dashboard.tsx` of 144 lines with sales counts only, four `*DetailListing.tsx` files all on the sales side, and no purchase report page at all. Copying 2990s here would copy the gap.
