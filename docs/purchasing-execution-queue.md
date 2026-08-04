@@ -1916,11 +1916,14 @@ five strings are already in COPY-STANDARD.
 **Lane: PURCHASE ORDERS · a NEW page + a NEW api route + one line in `PurchasingTabs.tsx`.
 NO migration. Touches no existing purchasing page.**
 
-> **⛔ BLOCKED ON WORDS. Do not start until Loo has ruled the strings.** Every word on a
-> Carres screen must already exist in `docs/COPY-STANDARD.md`, and this page needs words that
-> are not in it yet — the tab's own name and the four column headers. The candidates are
-> listed at the end of this card. **A chat that invents one has broken the rule, not
-> followed it.**
+> **✅ UNBLOCKED — Loo ruled the words 2026-08-04.** They are listed at the end of this card
+> and they are now the only strings this page may use. **The tab is `Report`, singular** —
+> his own spelling, and it matches AutoCount's own menu bar, which the team already reads
+> every day. Every other word on the page must already exist in `docs/COPY-STANDARD.md`.
+> **A chat that invents a sixth has broken the rule, not followed it.**
+>
+> **This card must also write the four new words INTO `docs/COPY-STANDARD.md`** — a ruled
+> word that lives only in a card is a word the next chat cannot find.
 
 ### Why
 
@@ -2010,16 +2013,21 @@ everything. Adding money later is one column, not a rebuild.
 Order, Receiving, Claims or Settings · ❌ invent a word — see the block below ·
 ❌ add a Refresh button (a report recomputes itself and states when it did).
 
-### THE WORDS LOO MUST RULE BEFORE THIS CARD OPENS
+### THE WORDS — RULED BY LOO 2026-08-04. These six and no others.
 
-| What | Candidate | Note |
+| What | The word | Status |
 |---|---|---|
-| the tab | `Reports` | AutoCount says *Report*, Odoo says *Reporting* |
-| column 2 | `POs` | `PO` is already a ruled word |
-| column 3 | `Ordered` | not yet in COPY-STANDARD |
-| column 4 | `Received` | **already ruled** (Receiving Workspace words) |
-| column 5 | `Outstanding` | **already ruled** — and its own rule says it is PRINTED, never left as a subtraction |
-| the last row | `Total` | not yet in COPY-STANDARD |
+| the tab | **`Report`** — singular | **NEW.** Loo's own spelling, given verbatim. It is also AutoCount's own menu-bar word, which the team reads daily — so this is the word already in their mouths, not a new one. **`Reports` and `Reporting` are both wrong; do not "correct" it** |
+| column 2 | **`POs`** | **NEW.** `PO` is already ruled as the document's name; this is its plural |
+| column 3 | **`Ordered`** | **NEW.** The quantity we asked the factory for |
+| column 4 | **`Received`** | already ruled — the Receiving Workspace words |
+| column 5 | **`Outstanding`** | already ruled — **and its own rule binds here: it is PRINTED, never left as `19 − 0` for the reader to subtract** |
+| the last row | **`Total`** | **NEW** |
+
+**Part of this card is a docs edit, not an afterthought:** add `Report` · `POs` · `Ordered` ·
+`Total` to `docs/COPY-STANDARD.md` under the Purchasing section, so the next chat finds them
+where every other word lives. A word ruled in a card and nowhere else is a word the dictionary
+does not have.
 
 ---
 
@@ -2104,6 +2112,6 @@ not a variant) · ❌ invent a word · ❌ start before Q3 merges.
 | P10 | 🔨 **CLAIMED 2026-08-04 — `claude/p10-purchasing-execution-queue-f7e180`** · **ready stock is suggested, the human takes it** (Loo 2026-08-04) — the engine already computes it and it is switched off and unshown. Inline expand; taking goes through K4's pool draw. **After D0.5d** — *(supersedes the `…-a64763` claim of the same day: that worktree carried the claim commit and nothing else — clean tree, no branch on origin, zero code.)* | — |
 | **Q1** | ⬜ **the register puts the most dangerous PO first** (Loo 2026-08-04) — risk order replaces `PO Issued` as the DEFAULT (law conflict, ruled by Loo); `Current Action` gets a fixed 200px and `Items` becomes the tail; a gap from OUR estimate goes amber, a gap the factory gave stays red. **No migration, no api.** Measured: `PO-2038`'s customer is expecting goods TODAY and it sits at row 8 wearing the same words as 15 other rows | — |
 | **Q2** | ⬜ **the factory's ready date has somewhere to land** (Loo 2026-08-04) — `purchasing_record_ready_date` is LIVE in prod (0318) with **zero callers**: no route, no button, 0 of 21 POs carry a ready date. Adds the route + the workspace button + teaches `poDateHistoryOf` the second kind (today it filters `tomorrow_delivery` and would silently swallow every ready date). **No migration.** The QUEUE stays To Order's — reported, not built | — |
-| **Q3** | ⬜ **Purchasing gets its report tab** (Loo 2026-08-04) — the whole "look at the numbers" layer is missing; quantity only, **no money by Loo's ruling** (and `cost` is 0.00 on all 35 lines anyway). Stores nothing, computes at read time, every number is a door back to the rows it counted. **⛔ BLOCKED on Loo ruling the tab name + 3 column words** | — |
+| **Q3** | ⬜ **Purchasing gets its report tab** (Loo 2026-08-04) — the whole "look at the numbers" layer is missing; quantity only, **no money by Loo's ruling** (and `cost` is 0.00 on all 35 lines anyway). Stores nothing, computes at read time, every number is a door back to the rows it counted. **✅ UNBLOCKED — Loo ruled the words 2026-08-04: the tab is `Report` (singular, his spelling and AutoCount's own menu word), plus `POs` · `Ordered` · `Total`; the card also writes them into COPY-STANDARD.** Runs in PARALLEL with Q1 — different files | — |
 | **Q4** | ⬜ **Purchasing gets its dashboard** (Loo 2026-08-04) — four tiles, each a count the engine already computes, each clickable. **⛔ BLOCKED until Q3 merges**: a tile is a report figure made large, and computing it twice guarantees two answers | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |
