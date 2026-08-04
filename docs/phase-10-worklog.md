@@ -6,6 +6,74 @@
 
 ---
 
+**2026-08-04 · Purchasing P13 — the take path says `Reserve`, and the pool gets its sixth reason** (PR #599 merge `8ac7787f`, migration **0322 applied and verified BEFORE the merge**, web `index-CT-nebMG.js` + Worker `b74c98f9` — DEPLOYED, four canonicals on the first poll, live md5-identical to the local build (`c40ed713…`, 4,761,762 bytes), `SERVICE_ROLE` 0)
+
+**Two rulings by Loo on 2026-08-04, ONE card**, because both are the vocabulary of the same act — taking a unit off the ready pool for an order — and splitting them would have meant two chats, two PRs and two passes over the same twenty lines.
+
+## ① `Take` becomes `Reserve`
+
+The order drawer's picker has said `Reserve {n} to {soRef}` for this exact act **since 2026-06-30**. P10 shipped `Take` on 2026-08-04 and its own stand-down chat reported the clash. Loo ruled `Reserve`, and his three reasons are the record:
+
+1. **It is more accurate.** The goods do not leave — they are LOCKED until delivery. `Take` reads as *already gone*, and an operator who believes stock has left will not chase it.
+2. **It came first.** Live since 2026-06-30; an older word that is not wrong is not replaced.
+3. **It names the party.** `Reserve 2 to SO-1209` says who it is for; `Take` cannot.
+
+**A RENAME CARD'S REAL RISK IS HARMONISING IN THE WRONG DIRECTION, so both halves are asserted rather than one.** The page is asserted to render no `Take` / `took` anywhere with both take-path strings on screen at once, and a SOURCE SCAN pins the drawer's four strings character for character — `` `Reserve ${checked.size} to ${soRef}` `` in both `ReserveStockDialog` and `StockPickerGrid`, plus `Reserve ready stock` and `` `Reserve this unit to ${soRef}` ``. Editing the OLDER screen fires that test, proved as a real edit (exactly 1).
+
+**THE PAST TENSE MOVED TOO, and that is the half a rename forgets.** `took 2 from stock` — the Model-column fact explaining why a row's quantity fell — is now `reserved 2 from stock`, the past tense of the BUTTON's own verb, so the act and the record of it read as one thing. A scan for `Take` alone passes on `took`, which is exactly why the assertion is over the whole rendered page rather than over the button.
+
+**THE ROUTE PATH `/take-stock` AND THE WIRE KEY `taken` DELIBERATELY STAY.** They are contracts, not words an operator reads, and renaming them would break a browser open across the deploy for nothing. P13 rules the vocabulary. The local identifiers moved with the word (`takeStock` → `reserveStock`, `taking` → `reserving`, the testid `to-order-take-` → `to-order-reserve-`), which is also what gave the deploy a clean bundle marker in both directions.
+
+## ② K4's reason list gains a sixth word — migration 0322
+
+K4 (0292) exists to answer **为什么一直缺货**, and it does that by making every draw off the free pool name its reason from a locked five: `sales_urgent · supplier_delay · warranty_exchange · vip · other`. P10 opened a SIXTH way out of that pool — the To Order take, *"we had it on the shelf, so we did not raise a purchase order"* — and none of the five describes it, so every take was recorded as `other` with a note. **That was right of that chat** (inventing a word for a locked vocabulary is a business ruling, not a routine fix) **and wrong to leave**: a monthly split whose biggest slice reads `Other` cannot answer the question the ledger was built for.
+
+**THE CHECK ALONE WOULD HAVE BEEN A HALF-FIX, and reading the code rather than the card is what found it.** The five-word list lives in **FOUR** places:
+
+| Site | What it guards |
+|---|---|
+| `ops_stock_pool_usage_reason_check` | the stored row |
+| `ops_stock_pool_draw`'s own body (0292) | both reserve doors |
+| `ops_stock_takeout`'s own body (0294) | the takeout-from-free door |
+| `POOL_USE_REASONS` (`packages/shared`) | the zod enum + all three pickers |
+
+The constant feeds `opsStockReserveReasonSchema`, which guards **both** routes and renders **all three** reason dropdowns. Widening the CHECK and the constant while leaving the two RPC bodies at five would have put a word in every dropdown that the server refuses by name — the exact disease `poolDrawProblem`'s own comment was written to prevent (*"a button that goes dark for a different reason than the server refuses for"*). **0322 widens all three SQL sites; the constant makes zod follow for free.**
+
+**THE SIXTH IS APPENDED, NOT INSERTED, AND THE COST IS ON THE RECORD.** The card's Must-NOT forbids re-ordering the five, and `POOL_USE_REASONS` is also the DISPLAY order of the monthly split and of every picker — so putting `used_instead_of_ordering` in its natural place (before the catch-all) would have MOVED `other`, changing a screen nobody asked to change. **So `other` is no longer last.** A test pins the first five by index; putting the sixth before `other` fires it (2).
+
+**A CONSEQUENCE REPORTED RATHER THAN HIDDEN: the sixth word appears in the MANUAL pickers too** — the order drawer's reserve picker and the On-hand reserve/takeout dropdowns — because the card's own instruction is *"the shared constant gains the sixth"* and that constant is what those pickers render. It is honest there (a manual reserve made instead of ordering IS that reason) and the alternative was a second list, which is the thing K4 exists to avoid. **No picker file was edited; the diff outside the To Order take path is zero.**
+
+**THE NOTE STOPPED SAYING THE REASON'S OWN SENTENCE.** P10 wrote `To Order · taken instead of raising a purchase order · {build}` because `other` explains nothing by itself. With the reason carrying that sentence, the note keeps only what the reason CANNOT say — WHICH build — and reads `To Order · {build}`. Restoring the old text fires shared 2 + api 1.
+
+**NOBODY WAS BACKFILLED, and today that is trivially true rather than carefully avoided: `ops_stock_pool_usage` holds ZERO rows on production** (measured before and after). K4's ledger has never been written to, because the To Order offer matches nothing on live data — P10's own measurement, unchanged. **Live effect today: none.** What changes is that the first draw ever recorded will name itself instead of reading `Other`.
+
+## Verification
+
+**The control ran FIRST, and it fired.** Before the migration, an insert of `used_instead_of_ordering` against the live table was refused by the CHECK — so everything after it is evidence rather than a tautology.
+
+- **Dry run on production**: the whole migration plus 6 assertion groups in a rolled-back transaction (all six accepted · the sixth inserts with no note · each of the five still inserts · `other` with no words still refused · an unruled word still refused · the draw door names the sixth and still demands words for Other). **Rollback proved total**: CHECK back to five, both function md5s unchanged, ledger 0 rows, 0 stray rows.
+- **Applied through the mechanism** (tracker row `20260804071901`), and the applied bodies reconcile **byte-identical to the COMMITTED file** — `md5(prosrc)` `0c074fa0…` (4197) and `862710c2…` (2438), recomputed from `git show HEAD:…` rather than from the working copy, so a working-copy edit could not have flattered the comparison.
+- **Post-apply on live**: 4 of 4, rolled back.
+- **Migration number**: tracker tail `0321` · repository tail `0321` · every branch's tail `0321` → **0322**. Rule 17 in its widened form, all three measured.
+
+**Five negative controls, each a real edit, each verified applied, each fired**: button back to `Take` → shared 2 + web 2 · api reason back to `other` → 1 · the sixth inserted before `other` → 2 · the drawer harmonised the wrong way → 1 · the note repeating the reason → shared 2 + api 1. **One did not apply on its first attempt and is recorded**: a `node` replace whose pattern used `\n` matched nothing, because the file is CRLF — P11's and D0.5d's trap for the third time, and a control that did not run is not a control. Re-run CRLF-aware, it fires.
+
+**Gates.** shared **2118/2118** · api tsc **2, unchanged** · api suite 3 pre-existing (`supplier/pos` ×2 · `partner/pickups` ×1), `to-order.test.ts` **76/76** · web tsc **0** · web suite **16 pre-existing, zero new** · **check-design 8368, identical category for category to `origin/main`**, proved by linting a **detached worktree at main** rather than by stashing (memory's own rule: a stash pop can grab another chat's parked WIP — verified afterwards that the three pre-existing stashes are untouched).
+
+**Deployed, and proved in BOTH directions on downloaded bundles with a control marker.** `to-order-reserve-` is **0** in the predecessor `index-mIdlwTf2.js` and **1** here; `to-order-take-` is **1 → 0**; `used_instead_of_ordering` is **0 → 2**; and `to-order-stock-` is **1 in BOTH**, the marker proving the predecessor was really read. The predecessor was fetched from its OWN deployment URL `5d939d45`, because a superseded asset 404s at the apex and a grep of that 1.7 kB error page reads as a clean 0 for everything. Four canonicals on the first poll; live md5 == local build; `SERVICE_ROLE` 0.
+
+**The Worker was owed and needed no import argument** — `apps/api/src/routes/operation/to-order.ts` is a direct change, measured against the LIVE WORKER'S SOURCE COMMIT `3245a59a`. `b74c98f9` serves **100%**, `GET /health` returns **200 `{"ok":true}`**. **The route's own reason string could not be content-verified from this session and that is recorded rather than papered over**: auth runs before routing, so a 401 proves nothing (P1's lesson) and no operator login was available. What IS proved is the version serving all traffic, built from the tip that carries it — and the RULE it reaches was verified directly against production through the live `ops_stock_pool_draw` and the widened CHECK.
+
+**A deploy-time fact worth not re-learning**: the correct `CLOUDFLARE_ACCOUNT_ID` is **`e2494242a0fd563cacee5a301cf95dd3`**. The value in an older memory note (`e2494242bb2b…`) is wrong and fails with `Authentication error [code: 10000]`, which reads like an expired token and is not one — wrangler prints the real account id in the same output.
+
+## Reported, not fixed
+
+1. **Neither word is in COPY-STANDARD, and neither were P10's three.** That card recorded its three strings as *"owed a COPY-STANDARD row"* and none was written. P13 changes two of them and adds a sixth reason label, so the debt is now five Purchasing words (`Reserve {n}` · `reserved {n} from stock` · `{warehouse}: {n} available` · `{model} — {n} available` · `Used instead of ordering`) plus K4's own five, which have never had rows either. **Writing that dictionary is not a rename card's scope** — it would be one chat ruling on Purchasing's and Ready Stock's vocabulary at once.
+2. **`POOL_USE_REASON_LABEL` is now the display word in three pickers this card did not open.** Worth one look from whoever next owns Ready Stock.
+3. **The §17.1 "api tsc 0" line was stale.** `to-order.test.ts` carries two `TS2571` errors; they are pre-existing, measured on the tree WITHOUT this change too.
+
+---
+
 **2026-08-04 · Purchasing P12 — the remainder of a part-ordered demand can be cancelled** (PR #598 merge `3245a59a`, migration **0321 applied and verified BEFORE the merge**, web `index-mIdlwTf2.js` + Worker `59bdd682` — DEPLOYED, four canonicals on the first poll, live md5-identical to the local build (`9fbc787a…`, 4,761,673 bytes), `SERVICE_ROLE` 0)
 
 **Loo ruled it 2026-08-04, final, and the ruling was not re-asked.** *"Ordered 3, don't want the other 2"* is an ordinary day; the 3 already ordered are the purchase order's problem (`PURCHASING-WORKING-FLOW.md` §9), not this door's. Two measured facts made it urgent: without it a part-ordered demand can only ever GROW — the disease already named on `Confirm ready date`, a queue with no way out — and **nobody could cancel ANY demand at all**, so a mistyped row nagged forever.
