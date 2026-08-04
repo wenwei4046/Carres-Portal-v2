@@ -2444,6 +2444,104 @@ Four tiles, each a count of something the engine ALREADY computes, each a door:
 shell header (`docs/03-page-patterns.md` — the five slots; a KPI in the header is a defect,
 not a variant) · ❌ invent a word · ❌ start before Q3 merges.
 
+## Q5 · The expand becomes the working area, and the right panel becomes Activity
+
+**Lane: PURCHASE ORDERS · `OperationPurchaseOrders.tsx` + ONE new api route.
+NO migration — every write door already exists in production.**
+
+> **THIS CARD ABSORBS Q2.** Q2 was *"the ready date has somewhere to land"*; that landing
+> place is now this expand, so building them apart would build the same field twice.
+> **Q2 is closed by Q5, not skipped.**
+>
+> **Build it and ship it. Do not open a design round.** CLAUDE.md **§13.2 · The UI Evolution
+> Rule** (Loo, 2026-08-04) governs this card: the business is settled, so the UI goes on
+> screen and is judged in production, not in chat. *"Never keep a feature in discussion for
+> days when it can be evaluated in production within hours."*
+
+### ALREADY EXISTS — never rebuild
+
+| | |
+|---|---|
+| **row expand** | `DataTable`'s `expand` — `expanded: Set<string>` + `expandable(row)`; its own comment: *"the expanded cell is the ONE cell in this table that may be taller than 40px"*. **D0.5d, shipped 2026-08-04** |
+| **destination write** | `purchasing_set_line_destination` RPC **+ `POST /api/operation/pos/lines/:lineId/destination`** — both live |
+| **line remark write** | `purchasing_set_line_ops_remark` + `POST /lines/:lineId/ops-remark` — both live |
+| **expected arrival write** | `purchasing_record_tomorrow_delivery` + `POST /:id/tomorrow-delivery` — both live |
+| **ready date write** | `purchasing_record_ready_date` (migration **0318**, gated, audited, ledger-writing) — **RPC live, NO ROUTE. This is the one thing to add.** |
+| **the inline-edit manner** | Jess, 2026-08-02: a value is TEXT until clicked, then a control; **Enter saves, Esc cancels, no Save button anywhere** |
+
+### Why — Loo, 2026-08-04
+
+His diagnosis after using the page: **`Right panel not friendly to edit detail.`** The panel's
+JOB was defined wrong, not the editing. It had become everything at once — edit · timeline ·
+notes · communication · print.
+
+**The split that fixes it:** DOCUMENT DATA (the PO) goes in the middle where the operator
+types into it, exactly as AutoCount feels; ACTIVITY (what happened around the PO) stays on
+the right. Full reasoning + the three-tier allocation:
+`docs/PURCHASING-INFORMATION-MODEL.md` §12.7.5.
+
+### Build
+
+```
+▼ PO-2032   Ohana   SO-1211   Booqit 1B +2   Carres Klang +1   17 Aug   25 Aug ⚠8d   Waiting
+  ┌────────────────────────────────────────────────────────────────────────────────────┐
+  │  Supplier Ready Date   [ ─ ]              Expected Arrival   [ 25 Aug 26 ]          │
+  │  ──────────────────────────────────────────────────────────────────────────────────│
+  │  SO-1211   Booqit 1B(LHF)   1   [ AL Sungai Buloh ▾ ]   0 / 1                       │
+  │  SO-1211   Booqit 2A(RHF)   1   [ Carres Klang ▾    ]   0 / 1                       │
+  │  SO-1211   Booqit CNR       1   [ Carres Klang ▾    ]   0 / 1                       │
+  └────────────────────────────────────────────────────────────────────────────────────┘
+▶ PO-2031  …
+```
+
+1. **ONE PO expands at a time.** Opening a second closes the first — the expand holds live
+   controls and three open at once is a page with no focus.
+2. **Editable in the expand:** per-line `Destination` (existing route) · `Supplier Ready Date`
+   (**new route**) · `Expected Arrival` (existing route).
+3. **Read-only in the expand:** SO No. · item · qty · received. See the refusal below.
+4. **`POST /api/operation/pos/:id/ready-date`** — built exactly like `/:id/tomorrow-delivery`
+   directly above it: a zod input in `packages/shared/src/schemas/operation.ts`, `userClient`
+   + the JWT (**never `service_role`** — the RPC's own gate is the boundary), and the same
+   `mapSupplierCallError` so `po_not_open` returns a readable 422 rather than a raw constraint.
+5. **`poDateHistoryOf` learns the second kind.** It filters `kind === 'tomorrow_delivery'`
+   today, so the first ready date recorded would be **silently swallowed by the history**.
+   Show both and say which is which.
+6. **The date door LEAVES the right panel.** One editing surface, or the two disagree. The
+   panel keeps Communication · Timeline · Print and stops carrying the date row.
+
+### ONE THING THE CARD REFUSES TO BUILD, and it is a frozen business rule, not a preference
+
+**Qty is NOT editable.** Loo's sketch has `Qty [Input]`, and
+`docs/PURCHASING-WORKING-FLOW.md` §3 rules: *"Items are ADDED to a sent PO by raising a NEW
+PO, never by editing the old one"* — the supplier holds that document exactly as they received
+it. **There is also no door**: migration 0316 made PO-line quantities RPC-only and no
+`set_line_qty` RPC exists, deliberately.
+
+**Building a Qty input would need a migration AND a reversal of a frozen rule.** Qty renders
+as text. **Report it; do not build it, and do not ask Loo to re-rule it inside this card** —
+if he wants it, it is its own card with its own business decision.
+
+### DONE WHEN — verify on production, with your eyes, and say the PO number
+
+- **`PO-2032`** — the only live PO with two destinations — expands and shows its 3 lines with
+  `AL Sungai Buloh` on line 1 and `Carres Klang` on lines 2-3. **Change one, reload, it stuck.**
+- A **Supplier Ready Date** recorded through the expand on a real open PO moves
+  `expected_ready_date`, writes a `kind='ready_date'` promise row, writes a `po_history`
+  sentence, **and appears in the date history labelled as a ready date.**
+- Opening a second PO closes the first — asserted by a test.
+- The right panel no longer carries a date door; Communication, Timeline and Print are intact.
+- `Esc` restores and posts nothing; there is no Save button anywhere in the expand.
+- Negative controls, each quoted with its failure count: remove the one-at-a-time guard ·
+  remove the `ready_date` branch from `poDateHistoryOf` · point the new route at the wrong RPC.
+
+### MUST NOT
+
+❌ write a migration · ❌ make Qty editable · ❌ leave a second editing surface in the panel ·
+❌ nest an expandable inside an expanded row · ❌ invent a word — `Supplier Ready Date` ·
+`Expected Arrival` · `Received At` · `Customer Delivery` are ruled in
+`PURCHASING-INFORMATION-MODEL.md` §12.2, and everything else is already in COPY-STANDARD ·
+❌ touch `OperationToOrder.tsx` · ❌ use `service_role` · ❌ hold the card for a design round.
+
 ## Status
 
 | Card | Status | PR |
@@ -2461,9 +2559,10 @@ not a variant) · ❌ invent a word · ❌ start before Q3 merges.
 | P13 | ⬜ **the take path says what it means — one button word, one reason word** (Loo ruled BOTH 2026-08-04, ONE card). ① `Take` → **`Reserve`**: the drawer has said `Reserve {n} to {soRef}` for the same act since 2026-06-30, and the goods do not leave — they are LOCKED until delivery, so `Take` reads as already gone. The drawer is NOT touched. ② K4 gains a sixth reason — none of its five describes *"we had it on the shelf, so we did not raise a PO"*, so K5 cannot answer 为什么一直缺货. Migration widens the CHECK. **AFTER P12** | — |
 | P10 | ✅ **ready stock is suggested, the human takes it** — **no migration**. The engine has computed it since the day it was written and it was switched off and shown to nobody; `consumeFreeStock` is still `false` and nothing nets it, because Jess's 2026-07-21 ruling stands — the defect was that a decision reserved for a human never reached the human. Loo's option B: D0.5d's inline row expand, the offer counted off the **register** (`ops_stock_items`, the table the draw moves) and what was already taken read off **K4's LEDGER** — not off `status='reserved'`, which would put a satisfied requirement back on the page the day the goods went out. `POST /take-stock` carries no quantity and goes through `ops_stock_pool_draw`, one call per record. **It was built TWICE the same day**; the parallel branch `claude/p10-ready-stock-4c0f8f` is preserved on origin and NOT merged, and its four independent measurements are recorded under the card: **the offer matches nothing on live data today** (the 87 free units are Klang-sheet descriptions, all 31 demand SKUs are catalog codes — zero overlap, correct, self-healing) · **`Take` here vs `Reserve {n} to {soRef}` in the drawer's picker, one act two words, Loo's to rule** · **the kit's 3% expand column is narrower than its own 24px control below ~1440px** (3px onto the checkbox at 1024; nothing clips, no sideways scroll, rows still 40px) · **the offer does not filter CONDITION**, so a released `damaged` unit would be offered to a customer (zero exposure today, measured) | #591 |
 | **Q1** | ✅ **the register puts the most dangerous PO first** (Loo 2026-08-04) — **no migration, no api change, no Worker deploy** (`apps/api` imports nothing from `po-workspace`, measured). `comparePoRisk` lives in `packages/shared`, never in the page: a page-local comparator would be a SECOND priority, and the row's pill would say one thing while its position said another. **Jess's `PO Issued` law is overridden as the DEFAULT and is NOT deleted** — it keeps its column, its header sort, and it is the tie-breaker; a test asserts that clearing a header sort returns to RISK order. `Current Action` 200px fixed and `Items` becomes the `auto` tail — **the recipe is unchanged, only which column absorbs the slack**, and the argument is that the column which truncates should be the one whose truncation costs least. **Widths measured in a real browser and the measurement reproduced the card's own four numbers exactly** (auto gave it 23px at 1280 · 109 at 1366 · 183 at 1440 · 663 at 1920, against words needing 109–201). **Reported, not hidden: the compact fixed sum moves 424 → 484, so the listing region's horizontal-scroll threshold moves from a 1257px viewport to a 1317px one** — at 1280 the region gains 37px of scroll where today it has none and a 23px instruction column; the region already answers "the columns do not fit" that way by its own design, and a readable instruction beats a deleted one, so 200 shipped as ruled with the number on the record. A gap from OUR estimate is amber, a gap the factory gave stays red, `same day` amber either way — **no new word, only the tone**, and the workspace reads the same rule. **Verified against production data before the deploy**: 10 of 21 rows warn and 8 of the 10 are our own estimate · **`PO-2038` is row 1** with an amber `7d late` (it was row 8) · `PO-2031` and `PO-2032` are the only two reds, both `8d late` · **zero open engine calls exist today**, so rungs 1 and 4 are empty on live data. Four negative controls, each run as a real edit and each verified to have applied: rung 1 → shared 2 + web 3 · register tone → 1 · workspace tone → 1 · `auto` → 2. **`data-tone` is NOT a clean bundle marker** — it greps 2 in BOTH bundles (the journey-health strip and the order-action row already used it); the clean one is `"confirmed":"estimate"`, 0 → 2 | #590 |
-| **Q2** | ⬜ **the factory's ready date has somewhere to land** (Loo 2026-08-04) — `purchasing_record_ready_date` is LIVE in prod (0318) with **zero callers**: no route, no button, 0 of 21 POs carry a ready date. Adds the route + the workspace button + teaches `poDateHistoryOf` the second kind (today it filters `tomorrow_delivery` and would silently swallow every ready date). **No migration.** The QUEUE stays To Order's — reported, not built | — |
+| ~~Q2~~ | ➡️ **ABSORBED BY Q5, 2026-08-04 — closed, not skipped.** Q2 was *the ready date has somewhere to land*; Loo then ruled that landing place is the row EXPAND, so building them apart would build the same field twice. The one thing Q2 uniquely owned — the missing `POST /:id/ready-date` route over the live 0318 RPC — is now step 4 of Q5 | — |
 | **Q3** | ✅ **Purchasing gets its Report tab** (Loo 2026-08-04) — **no migration; a new page, a new api route, one tab, and the four new words written into COPY-STANDARD.** It stores nothing and computes at read time; **NO MONEY, structurally** — there is no cost field on the wire, so the page could not print one (asserted from both ends). **The Total's `POs` is a DISTINCT count, never the sum of the groups** — one purchase order may carry two categories, and today none does, which is exactly why the rule is in the arithmetic rather than left to agree by accident. **Verified on production in a real browser**: August reads `Sofa 8/11 · Bedframe 3/4 · Mattress 3/4 · Total 14/19`, the card's own SQL re-run the same day; rail 200px, table 934px with no sideways scroll, rows 40px. **The browser check found a defect and that is the point of doing it there**: every rail `All` row printed the FILTERED total, so with August picked the month rail said *all months hold 14* when 21 do — an `All` row now prints the number its own click produces. **check-design 8368, identical category for category to `origin/main`**, proved by linting both trees. **Reported not built**: the door lands on the PO rather than a filtered register (that needs a param on Q1's file) · no `group by` and no `Status` facet — both need words no dictionary has, and `Status` is banned as a facet heading by name · `Month` is reused from HR/Finance and has no dictionary row · To Order still draws a third copy of the rail row | #593 · #596 |
 | | ⚠️ **OPEN QUESTION on Q3, raised 2026-08-04 and NOT acted on:** Loo said `q3 — 删掉` in the same message that rejected the summary band. **The tab was already built and live when he said it.** His stated reason — *a List page processes work, a Dashboard monitors* — is an argument AGAINST a band on the register and reads as an argument FOR keeping KPIs in their own tab, so the instruction and its reason point opposite ways. **Nothing was deleted. A shipped, deployed tab is not removed on an inferred reading.** Put to him; his answer goes here | |
 | **Q1b** | 🔴 **BLOCKED ON THE MODEL** — Q1 made the row ORDER correct and left it INVISIBLE: the register default view hides `Customer Delivery` and `Expected Arrival`, so 21 rows read alike and nothing says why row 1 is row 1 (Loo caught it live 2026-08-04, from his own screenshot). **A summary band was proposed by me and REJECTED by him**, on the stronger principle: *a List page processes work, a Dashboard monitors* — a Summary on every page puts one number in four places. Three ROW-LEVEL candidates were studied against SAP Fiori · Dynamics · Linear · GitHub · Jira and **none is chosen**: the left-edge bar (**`rowLate` already exists in the kit** — Loo added it 2026-08-03 for this identical problem and this page has never passed it) · an in-cell badge · its own column. **His own candidate `整行轻微背景强调` is REFUSED by law**: `01-design-tokens.md` §2.3 spends row background on hover (grey) and selection (blue). **Waits on `PURCHASING-INFORMATION-MODEL.md` §12.5** | — |
 | **Q4** | 🔴 **BLOCKED ON THE MODEL** — Q3 shipped, so the arithmetic exists; but a dashboard is the second place a number lives, and §12 has just re-opened what the register itself should show. Do not start until §12.5 closes | — |
+| **Q5** | ⬜ **the expand becomes the WORKING AREA, the right panel becomes ACTIVITY** (Loo 2026-08-04, after using the page: *"Right panel not friendly to edit detail"*). **NO migration** — every write door is already in production and D0.5d already shipped row expand; the only new code is ONE route (`POST /:id/ready-date`) over the live 0318 RPC. DOCUMENT DATA moves to the middle where the operator types into it; ACTIVITY stays right. ONE PO expands at a time; the date door LEAVES the panel so there is exactly one editing surface. **Qty stays read-only and that is a frozen business rule, not a preference** — §3 says added items go on a NEW PO, and 0316 left no qty door on purpose. **Governed by CLAUDE.md §13.2 — build and ship, no design round** | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |

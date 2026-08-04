@@ -752,23 +752,52 @@ PO-2032 has 3 lines going to 2 destinations — AL Sungai Buloh + Carres Klang.
 **Loo's rule, adopted verbatim (2026-08-04):** *"Expand only shows information that cannot be
 represented in a single row."*
 
+> **⛔ THIS ALLOCATION WAS REWRITTEN BY LOO THE SAME DAY, AND HIS IS BETTER.** The version
+> below is his. What it replaced said *"the expand never writes; writes stay in the panel"* —
+> and my reason for that rule was that two editing surfaces for one PO will disagree.
+> **He removed the disagreement instead of the feature: the panel STOPS being an editing
+> surface.** One editing surface remains, so the rule it needed is gone. His diagnosis is
+> the part worth keeping: *"Right panel not friendly to edit detail"* — which is a signal
+> that the panel's JOB was defined wrong, not that editing is hard.
+
+**The split that decides everything: DOCUMENT DATA vs ACTIVITY** (Loo, 2026-08-04).
+
+| | **A · Document Data** — the PO itself | **B · Activity** — what happened AROUND the PO |
+|---|---|---|
+| what | Destination · Supplier Ready Date · Expected Arrival · Qty · line remark · supplier SKU · receiving qty | Communication · Timeline · Files · Notes · Print |
+| is it the PO? | **yes** | **no** |
+| where it lives | **the EXPAND — the working area** | **the RIGHT PANEL — the Activity panel** |
+
 | Tier | The test it must pass | What lives there |
 |---|---|---|
 | **ROW** | *Is it ONE value for the whole PO, and does it help me choose which PO to touch?* | PO Issued · Supplier · PO No. · SO No. · Items · Destination · Customer Delivery · Expected Arrival · Current Action |
-| **EXPAND** | *Do I need this for SEVERAL POs at once, without opening each?* **Read-only.** | per line: which SO · which item · qty · **its own destination** · received / short / damaged · plus `Supplier Ready Date` and `Received At`, which are not columns |
-| **RIGHT PANEL** | *Am I now WORKING on this one PO?* | every write, the full four-date timeline, Communication, Print, history |
+| **EXPAND — the WORKING AREA** | *Is this the DOCUMENT?* Line-level facts, **and the operator edits them here.** | per line: which SO · which item · qty · **its own destination** (editable) · received / short / damaged · plus `Supplier Ready Date` and `Expected Arrival` (editable) and `Received At` |
+| **RIGHT PANEL — the ACTIVITY PANEL** | *Is this something that HAPPENED, rather than the PO?* | Communication · Timeline · Files · Notes · Print. **It stops carrying the date door** |
 
-**Four negative rules, and each one closes a hole this repo has already paid for:**
+**Why this is right and the old version was not:** the operator's real complaint was
+*click → right → scroll → change → close → click the next one*. AutoCount feels good because
+**the document is in front of you and you type into it.** Putting the document in the middle
+and the history on the right is that, without AutoCount's full-page expand.
+
+**Four rules, and each one closes a hole this repo has already paid for:**
 
 1. **Nothing appears in two tiers.** Loo's own rule, and the reason the expand may not
-   repeat Supplier · Destination · Expected Arrival · SO · Items — all five are columns.
-2. **The expand never writes.** The moment it holds a control, there are two editing
-   surfaces for one PO and they will disagree. Writes stay in the panel (C1's rule: a second
-   door is a bypass).
-3. **The expand is not a tree.** Two levels, fixed forever. No `expandable` node inside an
-   expanded node — that is the shape Fiori calls a last resort.
-4. **A `+N` on the row is a FLAG, not an answer.** `Carres Klang +1` says *this one is
-   different*; the expand says *how*. That is why both are kept and neither is duplication.
+   repeat Supplier · PO No. · Items — those are columns. *(Destination and Expected Arrival
+   DO appear twice on purpose and it is not duplication: the row prints ONE value for the
+   whole PO as a flag — `Carres Klang +1` — and the expand carries the per-LINE value that
+   the row structurally cannot hold. A flag and a field are not the same fact.)*
+2. **ONE PO expands at a time.** Loo's rule, and it is load-bearing rather than tidy: the
+   expand holds date pickers, dropdowns and inputs, and three open at once is a page of live
+   controls with no focus. **Opening a second closes the first.**
+3. **ONE editing surface.** Because the expand edits, the panel must NOT — the date door
+   moves out of the panel rather than being kept in both. Two doors onto one PO is C1's
+   bypass in a new coat.
+4. **The expand is not a tree.** Two levels, fixed forever. No expandable node inside an
+   expanded node — the shape Fiori calls a last resort.
+
+**Saving is automatic, in the manner already ruled on this page** (Jess, 2026-08-02): a value
+is TEXT until clicked, then a control; **Enter saves, Esc cancels, and there is no Save button
+anywhere on the surface.**
 
 ### 12.7.6 · The costs — stated, because a review that only lists benefits is an advert
 

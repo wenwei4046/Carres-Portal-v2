@@ -601,6 +601,59 @@ reset`, which would have broken every new clone.)
   bundle and grepping it, never by a deployment log. The fix is always: rebuild
   from latest `main` and deploy BOTH Pages projects.
 
+### 13.2 THE UI EVOLUTION RULE (Loo, 2026-08-04 — PERMANENT)
+
+> **His words, and the reason he wrote it:** *"i want like this and dont always hold just do
+> it — later cant — just change. forever hold i cant see anything."*
+>
+> It was written after a Purchase Orders planning session spent a whole day on column widths,
+> header lengths and expand heights **without shipping anything he could operate.** His
+> diagnosis is the rule: *"你现在遇到的问题不是设计能力，而是验证太晚."*
+
+```text
+UI EVOLUTION RULE
+
+Business rules freeze before implementation.
+UI layout does NOT freeze before operators have used it.
+
+Every new workflow is deployed as early as possible.
+Real operator feedback overrides theoretical discussion.
+Never delay implementation because of speculative UI concerns.
+
+Build first. Review with real usage. Iterate immediately.
+```
+
+```text
+Do not block implementation because of hypothetical future problems.
+If a better design is discovered after deployment, refactor it.
+Never keep a feature in discussion for days
+when it can be evaluated in production within hours.
+```
+
+**The four phases:**
+
+| | |
+|---|---|
+| **1 · Freeze Business** | business rule · data ownership · workflow. **Nothing else.** UI is not frozen here |
+| **2 · Build immediately** | business is settled → build, ship, deploy. No second design round |
+| **3 · Real usage** | Loo operates it. *"如果没做出来，我们永远不知道"* |
+| **4 · Improve** | a worse-in-practice design is CHANGED, not defended. **"We decided that before" is not a reason** |
+
+**What this does NOT weaken — and a chat that reads it as a licence has misread it:**
+
+- **§14's red lines** stand above it, always.
+- **`docs/COPY-STANDARD.md` stands**: a word that has not been ruled may not appear on screen.
+  Words are business, not layout, and they are still ruled before the build.
+- **`01-design-tokens.md` stands**: token VALUES are never invented, whatever the hurry.
+- **§13.1 Engineer-Owned Delivery stands**: shipping fast still means tested, self-reviewed,
+  verified in production. Fast is not unverified.
+- **A migration is not "UI"**: schema still gets its review, its dry run and its rollback.
+
+**The failure this rule exists to stop is a CHAT'S failure, not Loo's.** A planning chat that
+answers *"let me first settle X"* three times in a row has taken a day of his time and given
+him nothing to look at. **If the business rule is settled and the thing can be on screen
+today, it goes on screen today.**
+
 ## 14. Red lines (inherited from global CLAUDE.md, restated for project)
 
 1. **Never DROP / TRUNCATE / DELETE** without explicit single-instance confirmation from Loo in current conversation.
