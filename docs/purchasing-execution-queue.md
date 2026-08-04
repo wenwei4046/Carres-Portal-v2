@@ -1578,6 +1578,116 @@ word invented** — the six Source words are already in `TO_ORDER_WORDS`.
 **Must NOT.** ❌ let the picker compute stock its own way — read P10's rule · ❌ build a
 multi-supplier chooser · ❌ change `Required By` or `Destination` · ❌ touch the grid.
 
+### ✅ SHIPPED 2026-08-04 — and DEFECT 2 WAS BLOCKED BY A RULE, NOT BY MISSING CODE
+
+**The card's premise for defect 2 was stale in the same way P8's was, and measuring first is
+what turned a UI card into a one-gate migration.** *"The payload carries `sku` · `qty` ·
+`destinationId` · `requiredBy` · `remark` and no `purpose`"* was true of the CLIENT and
+false of the wire: the route already sent `p_purpose`, hardcoded, because
+**`purchasing_create_demand` refused every other value BY NAME** (`purpose_not_enabled`) —
+Jess, 2026-08-03, *"V1 buys READY STOCK only… Display begins at the Dealer/Sales portal and
+Office at a future internal request workflow."* **0319 wrote that refusal deliberately so
+that *"the day one is approved this gate is the only thing that changes"*, and 0323 is that
+day.** Loo ruled the four the CHECK already held; **the CHECK is not widened, and no value is
+added, removed or re-ordered.**
+
+**`Spare Parts` and `Other…` are NOT offered, and that is the card's own Done-when rather
+than a narrowing.** Both are ruled WORDS in `TO_ORDER_WORDS`; **neither has ever had a
+database value.** Offering six when the store can record four would mean the operator's
+choice is refused by name on two of them — *a demand records the Source the operator chose*
+would be false — which is the exact disease 0322 had to repair on the pool's reasons, where
+one list lived in four places and only two moved. Naming `other` here would also be a
+migration ruling on a business question nobody has asked: other than what, recorded where?
+
+**DEFECT 1 IS BIGGER THAN THE CARD MEASURED, and production says so: FIFTEEN SKUs share the
+model name `Booqit`, not four** — every one a `part` variant, every one Ohana. The card saw
+four because the picker caps at 8 results. `railItemLabel` prints the model plus a size
+letter and a part has no size, so fifteen different products rendered one word. **Verified on
+the deployed page**: searching `Booqit` returns 8 rows, all reading `Booqit` in Model, each
+separated only by its own code (`5539-1A(LHF)` … `5539-2B(LHF)`).
+
+**THE STOCK NUMBERS ARE ZERO ON LIVE DATA AND THAT IS THE CORRECT ANSWER, not a wiring
+fault.** `free` is P10's rule EXTRACTED into `readFreeStock` and called by both surfaces —
+two callers of one body, so a second count is structurally impossible. The register holds
+**975 free units** and every one is keyed off a free-text warehouse name while the catalog
+uses codes: measured, `stockMatchKey("B1201F-Q")` is `b1201f|Q` and
+`stockMatchKey("Breeze FirmCare-B1201F-Q")` is `breezefirmcareb1201f|Q`. They do not match,
+which is **P10's own measured finding** (*"total offered = 0"*) reproduced — so the picker
+shows exactly the number the grid would offer, which is what the Done-when asks for.
+
+**TWO DEPARTURES, both stated rather than slipped in.** ① The picker's second column is
+**`Model`**, not the card's `Item`: the FIELD this picker belongs to is already labelled
+`Item`, so `Item` as a header would put one word on two things in one dialog (C6's own
+finding, where two blocks both read `Actions`). `Model` is the ruled word the GRID uses for
+this exact value. ② It renders through the kit's **`DataTable`**, not a hand-rolled table —
+which is why **check-design is 8367, identical category for category to `origin/main`**,
+proved by linting a DETACHED WORKTREE at main. A hand-rolled one measured **+1 in category G**
+(§0.1), and the guard's own escape (`not-a-list-page`) covers only the page SHELL, which
+genuinely does not belong inside a modal.
+
+**THE SUPPLIER IS SHOWN AND NEVER CHOSEN — Jess's ruling survives intact.** The dialog prints
+`Supplier: Ohana` on pick; the RPC derives it from the SKU, there is no parameter to override
+it, and a route test asserts a smuggled `supplierId` reaches nothing. `Required By` and
+`Destination` were not touched.
+
+**A LATENT HOLE IN THE PAGE'S OWN SOURCE SCAN, found and fixed.** The JSX comment stripper ran
+FIRST, and its leading brace-then-whitespace opener starts at ANY brace followed by a block
+comment — so a function body opening with a doc comment let it delete **5,868 characters of
+live code**, including both demand doors, while the test went on passing. That is the silent
+shrink P14's own note records having already been paid for once. Stripping ordinary block
+comments first cannot do it: the match begins at the comment. **Caught by the guard's own
+create-door assertion, which failed on its own.**
+
+**Verified BEFORE the merge and AFTER the apply.** The **negative control ran first and
+FIRED** — the live pre-0323 function refused `warranty` with `purpose_not_enabled`, *"purpose
+warranty is not available yet"*. Then the sanity block plus **11 behavioural assertions** in a
+rolled-back transaction (all four stored; `spare_parts` and `other` refused by NAME rather
+than by a raw CHECK; unknown sku · qty 0 · bad destination still refused; the default still
+`ready_stock`), **rollback proved total**. Applied THROUGH the mechanism — tracker row
+`20260804114009` — and the applied body reconciles **byte-identical to the COMMITTED file**
+(`md5(prosrc)` `5fecede1…`, 2329 chars, computed from `git show HEAD:…` rather than the
+working copy). 6 of 6 post-apply, rolled back.
+
+**The number came from rule 17's widened form and all three measurements were taken**:
+tracker tail `0322` · repository tail `0322` · every branch's tail `0322` → 0323.
+
+**SEVEN negative controls, each a real edit verified applied, each fired**: free counts
+reserved → api 2 · route re-hardcodes the purpose → api 1 · the two unstorable words made
+offerable → shared 3 · the SKU column removed → web 5 · the supplier fact removed → web 1 ·
+the comment-stripper order restored → web 1. **One control did NOT fire and the CONTROL was
+fixed rather than kept**: widening the Model column does not remove the SKU, so it was
+measuring nothing.
+
+**Live effect today, measured**: 200 SKUs offered · 5 withheld for having no supplier ·
+Carres Klang · 975 on hand · 975 free · **0 reserved**, so On Hand and Free read the same
+number on every row until the first reservation exists. `purchase_demands` holds ONE row and
+**0 non-ready-stock demands** — the Source starts recording from the next demand typed.
+
+**VERIFIED IN A REAL BROWSER ON PRODUCTION at 1280×800**, which is the half jsdom structurally
+cannot do: six fields (`Item · Qty · Reason · Destination · Required By · Remark`), five
+columns (`SKU · Model · On Hand · Reserved · Free` at `143 · 143 · 71 · 62 · 57` inside a
+512px modal), the listing **not** scrolling sideways, page horizontal scroll **0**, rows
+**40px**, **0 clipped cells**, `Supplier: Ohana` on pick with no control inside it, and the
+Reason list holding exactly `Ready Stock · Display · Warranty · Office`. **The first attempt
+measured a 0×0 viewport** — the documented pane-not-displayed condition — and every width in
+it was an artifact; only `resize_window` made the numbers real.
+
+**A 401 on the new route proves nothing and it is recorded that way**: auth runs before
+routing, so `/demand/pick-items` and a nonsense path both answer 401 (measured side by side).
+What IS proved is the version serving **100%** built from the tip that contains it, plus the
+deployed page reading it with a live operator session.
+
+**Five things reported, not fixed.** ① **`Source` vs `Reason` vs `Purpose`** — one concept,
+three spellings across §0A's frozen field list, this mirror and Jess's own comment. The label
+reads `Reason` because that word is already in `TO_ORDER_WORDS` and the six option words are
+named after it; `Source` has never been on a screen, so spelling it would be the new word the
+card forbids. **Jess's to rule.** ② **`On Hand` vs `On hand`** — the Stock register's page
+title and its sidebar tab disagree; another lane's file. ③ **The live `purchase_demands` table
+carried NO comment** although 0319's file sets one — hand-apply drift, and 0323 restores it.
+④ The register's free-text SKU vocabulary is why every stock number reads 0; that is a data
+question, not this card's. ⑤ `Spare Parts` and `Other…` now have a screen that deliberately
+cannot offer them — if the business wants either, it needs a CHECK value and its own card.
+
 ---
 
 ## P16 · The grid's columns are sized by their content — Loo's Phase 1
@@ -3568,7 +3678,7 @@ kit's.
 | P12 | ✅ **SHIPPED 2026-08-04** (PR #598 `3245a59a`, migration **0321 applied**, web `index-mIdlwTf2.js` + Worker `59bdd682`) · **a demand can be cancelled — and so can the remainder of a part-ordered one** (door + button in ONE card — a route with no caller is a bypass). **After P10**, whose card owns the grid row. **UNBLOCKED 2026-08-04 — Loo ruled the remainder CAN be cancelled**; the 3 already ordered are the PO flow's problem, not this one's. Migration relaxes the `po_id` gate. **Cancel is not delete: no delete button ever** — test rubbish goes by SQL and the database starts clean at go-live | — |
 | P13 | ✅ **SHIPPED 2026-08-04** (PR #599 `8ac7787f`, migration **0322 applied**, web `index-CT-nebMG.js` + Worker `b74c98f9`) · **the take path says what it means — one button word, one reason word** (Loo ruled BOTH 2026-08-04, ONE card). ① `Take` → **`Reserve`**, and the past tense with it (`took 2 from stock` → `reserved 2 from stock`) — the drawer has said `Reserve {n} to {soRef}` for the same act since 2026-06-30, and the goods do not leave. **BOTH directions are asserted**: the page renders no `Take`/`took`, and a source scan pins the drawer's four strings byte for byte, so harmonising the OLDER screen onto the newer one fires a test. The route path `/take-stock` stays — a wire contract, not a word. ② **K4 gains a sixth reason**, and the CHECK alone would have been a half-fix: the five-word list lives in FOUR places, and the shared constant feeds the zod enum guarding both routes and all three pickers — so 0322 widens the CHECK **and both RPC bodies**. **The sixth is APPENDED, so `other` is no longer last** — the Must-NOT forbids moving the five, and that array is the display order. **No backfill, and today trivially so: `ops_stock_pool_usage` holds ZERO rows on production**, so the live effect is none and what changes is that the first draw ever recorded names itself. **The negative control ran BEFORE the migration and fired** (the live pre-0322 CHECK refused the word); applied bodies reconcile byte-identical to the committed file. Five code controls, each a real edit, each fired — **one silently declined first because the file is CRLF**, the third time that trap has been paid for. **Reported, not fixed: neither word is in COPY-STANDARD** — nor were P10's three, nor K4's five | #599 |
 | P14 | ✅ **SHIPPED 2026-08-04** (PR #602 `656bfb50`, **no migration**, web `index-BCW9pZU0.js` — DEPLOYED, all four canonicals, live md5 == local build, `SERVICE_ROLE` 0) · **`CreatePurchaseDialog` moves to its own file** — a PURE move, zero behaviour, so that P15 and P16 are two lanes instead of one collision. **BYTE-IDENTICAL IS PROVED, NOT ASSERTED**: of the **206 moved lines exactly ONE differs** — `export default`, which the card asks for by name — and of the `Destination` interface's **5 lines exactly ONE differs**, the `export` keyword. The interface travels with the dialog because it is its PROP TYPE, and is exported back exactly as `ReserveStockDialog` already exports `ReserveFreeUnit`; the alternative (leave it on the page and import it back) is a circular import for nothing. `OperationToOrder.tsx` is `2 insertions, 216 deletions` — the block, the interface, four now-unused imports, one import line. **`sed` ON THIS MACHINE STRIPS CR**, so the first attempt silently wrote an LF file over a CRLF one and `file` reported the mix; redone in Node with the endings verified — **the fourth time that trap has been paid for**. **TWO SOURCE SCANS HAD TO FOLLOW THE CODE, and that is the one place the card's *"tests pass unchanged"* could not hold — reported rather than slipped in.** Both name a file BY PATH, so a move that leaves them alone shrinks them silently: `the only demand doors the page opens are create and cancel` **FAILED** (the create door left the file) and now scans BOTH files with its **expected values untouched** — the scope follows the code so the ASSERTION can stay what it was; and `purchasing-words.test.ts`'s `LANE` goes **8 → 9**, because every rule there is a NEGATIVE assertion and leaving the new file off would have retired five of them **while the suite went on passing** — the exact failure that file's own note records having already been paid for once, in production, under 51 green render tests. **Every RENDER test passes unchanged**; no test was added, removed or re-expected. **Three negative controls, each a real edit, each verified applied, each fired**: plant `Chase` in the new file → the lane word rule fires (proving the file is really SCANNED, not merely listed) · change the dialog's rendered label → the page's render test fires (proving the page renders THIS file) · the demand-doors scan fired on its own before it was widened. **The deploy is one a STRING GREP STRUCTURALLY CANNOT PROVE and it is recorded that way**: a pure move adds and removes no string, so all five dialog markers grep **1 in BOTH** bundles — which is what a move must look like. What proves it instead is that **building `origin/main` in the same worktree emitted `index-1IlpnSUN.js`, byte-for-byte the bundle recorded as live** (predecessor md5 `84c514ce…`, 4,763,084 bytes — the figure §17.1 already carried), so the toolchain reproduces production; the moved tree emits `index-BCW9pZU0.js` at **exactly the same 4,763,084 bytes**, which is the signature of a move that changed no code. Two canonicals lagged on the first poll and `deployments list` settled it (`656bfb5` newest Production/main writer on BOTH projects) before they converged — **one poll cannot tell a lag from a split**. **No Worker deploy owed and it was MEASURED** against the LIVE WORKER's source commit: `git diff f2517f99 HEAD -- apps/api packages/shared supabase/migrations` is EMPTY (`/health` 200 anyway). tsc 0 · the two suites 85/85, the same count as baseline · full web suite 2454 passed, 16 pre-existing (§17.7), zero new · **check-design 8367, IDENTICAL category for category** to the tree without the change (359 → 360 files, the new one). **The dialog's four defects are UNTOUCHED — P15 owns them** — and the grid was not opened | #602 |
-| P15 | 🔨 **CLAIMED 2026-08-04 — claude/p15-dialog-052bfd** · **the Create Purchase dialog stops guessing** — four measured defects: **four different SKUs render as the word `Booqit`** (you cannot pick the right one) · **no `Source` at all** (the payload has no `purpose`, so Warranty/Display/Office cannot be told apart) · no stock in the picker · no supplier. **After P14**, parallel with P16 | — |
+| P15 | ✅ **SHIPPED 2026-08-04** (PR #607 `d460d899`, migration **0323 applied and verified BEFORE the merge**, web `index-C3XUGs8p.js` + Worker `620bc69a` — DEPLOYED, all four canonicals, live md5 == local build, `SERVICE_ROLE` 0) · **the Create Purchase dialog stops guessing** — four measured defects: **four different SKUs render as the word `Booqit`** (you cannot pick the right one) · **no `Source` at all** (the payload has no `purpose`, so Warranty/Display/Office cannot be told apart) · no stock in the picker · no supplier. **After P14**, parallel with P16 | — |
 | P16 | ⬜ **the grid's columns are sized by their content — Loo's Phase 1** (his ruling 2026-08-04: a table's width does not decide a column's width; `Expand` has ONE job; an inline second line is the only exception). Measured: `Model` holds 396px of a 922px table for strings like `Sonic S`. **No column added.** After P14, parallel with P15 | — |
 | P10 | ✅ **ready stock is suggested, the human takes it** — **no migration**. The engine has computed it since the day it was written and it was switched off and shown to nobody; `consumeFreeStock` is still `false` and nothing nets it, because Jess's 2026-07-21 ruling stands — the defect was that a decision reserved for a human never reached the human. Loo's option B: D0.5d's inline row expand, the offer counted off the **register** (`ops_stock_items`, the table the draw moves) and what was already taken read off **K4's LEDGER** — not off `status='reserved'`, which would put a satisfied requirement back on the page the day the goods went out. `POST /take-stock` carries no quantity and goes through `ops_stock_pool_draw`, one call per record. **It was built TWICE the same day**; the parallel branch `claude/p10-ready-stock-4c0f8f` is preserved on origin and NOT merged, and its four independent measurements are recorded under the card: **the offer matches nothing on live data today** (the 87 free units are Klang-sheet descriptions, all 31 demand SKUs are catalog codes — zero overlap, correct, self-healing) · **`Take` here vs `Reserve {n} to {soRef}` in the drawer's picker, one act two words, Loo's to rule** · **the kit's 3% expand column is narrower than its own 24px control below ~1440px** (3px onto the checkbox at 1024; nothing clips, no sideways scroll, rows still 40px) · **the offer does not filter CONDITION**, so a released `damaged` unit would be offered to a customer (zero exposure today, measured) | #591 |
 | **Q1** | ✅ **the register puts the most dangerous PO first** (Loo 2026-08-04) — **no migration, no api change, no Worker deploy** (`apps/api` imports nothing from `po-workspace`, measured). `comparePoRisk` lives in `packages/shared`, never in the page: a page-local comparator would be a SECOND priority, and the row's pill would say one thing while its position said another. **Jess's `PO Issued` law is overridden as the DEFAULT and is NOT deleted** — it keeps its column, its header sort, and it is the tie-breaker; a test asserts that clearing a header sort returns to RISK order. `Current Action` 200px fixed and `Items` becomes the `auto` tail — **the recipe is unchanged, only which column absorbs the slack**, and the argument is that the column which truncates should be the one whose truncation costs least. **Widths measured in a real browser and the measurement reproduced the card's own four numbers exactly** (auto gave it 23px at 1280 · 109 at 1366 · 183 at 1440 · 663 at 1920, against words needing 109–201). **Reported, not hidden: the compact fixed sum moves 424 → 484, so the listing region's horizontal-scroll threshold moves from a 1257px viewport to a 1317px one** — at 1280 the region gains 37px of scroll where today it has none and a 23px instruction column; the region already answers "the columns do not fit" that way by its own design, and a readable instruction beats a deleted one, so 200 shipped as ruled with the number on the record. A gap from OUR estimate is amber, a gap the factory gave stays red, `same day` amber either way — **no new word, only the tone**, and the workspace reads the same rule. **Verified against production data before the deploy**: 10 of 21 rows warn and 8 of the 10 are our own estimate · **`PO-2038` is row 1** with an amber `7d late` (it was row 8) · `PO-2031` and `PO-2032` are the only two reds, both `8d late` · **zero open engine calls exist today**, so rungs 1 and 4 are empty on live data. Four negative controls, each run as a real edit and each verified to have applied: rung 1 → shared 2 + web 3 · register tone → 1 · workspace tone → 1 · `auto` → 2. **`data-tone` is NOT a clean bundle marker** — it greps 2 in BOTH bundles (the journey-health strip and the order-action row already used it); the clean one is `"confirmed":"estimate"`, 0 → 2 | #590 |
