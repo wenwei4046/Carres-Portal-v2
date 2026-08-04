@@ -1528,6 +1528,32 @@ principles is a guard that gets rewritten.
 
 ## D0.5d · `DataTable` grows the five grid powers AutoCount has (Loo, 2026-08-04)
 
+> ### ✅ LOO RULED THE LAYOUT-MEMORY QUESTION, 2026-08-04 — §0.4 STANDS, no chat re-asks it
+>
+> D0.5d refused `storageKey` and brought the question back: *does §0.4 bend so an operator's
+> own column order survives a reload?* **Loo's answer: it does not.** A grid's shape is the
+> company's; a drag lasts the session and a reload is the reset. **`storageKey` is not to be
+> added to `DataTable`, and no page may persist column order, width or visibility.**
+>
+> **The measurement that decided it — localStorage remembers a BROWSER, not a person.**
+> Counted on prod 2026-08-04: five active `operation` accounts — `jess` · `khoryee` ·
+> `shasha` · `yujun` and a shared `operation@carres.com`. In one office that means two
+> people on one machine **overwrite each other's layout**, and one person on two machines
+> **has to drag it twice**. The feature would deliver the confusion of a per-person setting
+> with none of the benefit.
+>
+> Two more reasons, in his order: every operator sees the same screen, so training, a
+> screenshot and *"what do you see?"* all have one answer — and nobody has ever complained
+> about column order, so there is nothing to fix.
+>
+> **AutoCount does persist per-user layouts, and it is deliberately NOT copied here.** That
+> is the standing rule of this whole programme: copy AutoCount's grid POWERS, not its
+> assumptions.
+>
+> **If it ever does become a real complaint, the fix is NOT this one.** The right answer is a
+> COMPANY default column order — one person arranges it, everyone gets it — which keeps §0.4
+> intact. That is a future card, and it is not open.
+
 **Lane: KIT.** Touches `apps/web/src/components/kit/**` and `apps/web/src/pages/dev/UiShowcase.tsx`
 and **nothing else**. Safe to run at the same time as C13, C14 and D7-Claims.
 
