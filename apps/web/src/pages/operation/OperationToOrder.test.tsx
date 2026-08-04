@@ -1129,8 +1129,12 @@ describe("ready stock — the suggestion, and the act", () => {
     serve(withStock(null));
     await loaded();
     openWong();
-    // The kit renders the control the moment the page passes `expansion`, so
-    // a page with nothing to open must not pass it at all.
+    // The COLUMN is the assertion, not the control. `expandable` already
+    // withholds a control from a row with nothing to open, so a test that only
+    // looked for the button would pass even with `expansion` forced on — and
+    // the operator would still be paying 3% of the table for an empty column.
+    expect([...document.querySelectorAll("colgroup col")]).toHaveLength(5);
+    expect(document.querySelector("[data-kit=data-expansion]")).toBeNull();
     expect(document.querySelector("[data-testid^=table-expand-]")).toBeNull();
     expect(document.querySelector("[data-testid^=row-stock-]")).toBeNull();
   });
