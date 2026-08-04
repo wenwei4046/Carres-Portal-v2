@@ -149,13 +149,79 @@ export const TO_ORDER_WORDS = {
    * says so.
    */
   createPurchase: "Create Purchase",
+  /**
+   * The dialog's Source field — **the label is `Reason`, and that is a choice
+   * between two words that were both already ruled** (card P15, 2026-08-04).
+   *
+   * The frozen field list in `CHECKPOINT-to-order.md` §0A calls this field
+   * `Source`; this mirror has called it `Reason` since the dialog was drawn,
+   * and the six option words below are named after it. `Source` has no entry
+   * here and never appeared on a screen, so spelling it would have been a new
+   * visible word — which P15's own Done-when forbids by name. The concept is
+   * Source; the word an operator reads is `Reason`. That the two documents
+   * disagree is reported by P15, not settled by it.
+   */
   reason: "Reason",
+  /**
+   * The six. **FOUR of them can be recorded and two cannot**, and the split is
+   * the database's, not this file's: `purchase_demands.purpose` has a CHECK
+   * holding exactly `ready_stock` · `display` · `office` · `warranty`, and
+   * 0323 opened the write door to those four and no more.
+   *
+   * `reasonSpareParts` and `reasonOther` therefore have NO value to be stored
+   * as and are NOT offered by the dialog — see `DEMAND_PURPOSES`, which is the
+   * list a control may render. They stay here because they are ruled words a
+   * later card may need; a word with no home in the store is a word the server
+   * refuses by name, which is exactly the failure 0322 paid for on the pool's
+   * reasons.
+   */
   reasonReadyStock: "Ready Stock",
   reasonDisplay: "Display",
   reasonWarranty: "Warranty",
   reasonSpareParts: "Spare Parts",
   reasonOffice: "Office",
   reasonOther: "Other…",
+  // ── P15 (Loo, 2026-08-04) — the item picker stops being one word per row ──
+  /**
+   * The picker's SKU column. **This is the card's first and worst defect**:
+   * four different SKUs (`5539-L(RHF)` · `5539-2NA` · `5539-CNR` ·
+   * `5539-Console`) all rendered as the single word `Booqit`, because
+   * `railItemLabel` prints the MODEL and a size letter, and a part variant has
+   * no size. An operator could not pick the right one, and buying the wrong
+   * thing is worse than not knowing the stock. AutoCount leads its own picker
+   * with `Item Code` for this reason.
+   *
+   * `SKU` is not invented: it is already the visible column word on the
+   * Movements register (`OperationMovements.tsx`) and the stock import's own
+   * header. It stays a technical term untranslated, as CLAUDE.md rules.
+   */
+  pickerColSku: "SKU",
+  /**
+   * `On Hand` — every unit of this SKU standing in the warehouse now, whatever
+   * its condition. The spelling is the Stock register's own page title; the
+   * sidebar tab spells it `On hand`, and THAT disagreement is reported by P15
+   * rather than fixed here (it is the Stock lane's file).
+   */
+  pickerColOnHand: "On Hand",
+  /**
+   * `Reserved` and `Free` are the REGISTER's own status words, and their one
+   * home is `OPS_STOCK_STATUS_LABEL` in `stock-hold.ts`. These two entries
+   * mirror it so the picker reads one vocabulary, and a test asserts the
+   * mirror equals the source — a copy that can drift is not a mirror.
+   */
+  pickerColReserved: "Reserved",
+  pickerColFree: "Free",
+  /**
+   * The picker's own table, for a screen reader. **Never rendered**, which is
+   * why it is not a new visible word — the same shape as `itemsTableLabel`
+   * above. A table that gained a header row also needs a name, or a screen
+   * reader announces "table" and nothing else.
+   *
+   * There is deliberately NO empty-state sentence: the picker showed an empty
+   * box before P15 and shows one now. P15 does not list that as a defect, and
+   * a sentence nobody has ruled may not appear on a screen.
+   */
+  pickerTableLabel: "Search results",
   /**
    * `Supplier` — ONE word with ONE home, used in two places: the Create
    * Purchase dialog's field and, since 2026-08-03, the grid's supplier column.
@@ -268,6 +334,68 @@ export const TO_ORDER_WORDS = {
 
   empty: "No purchase orders to issue.",
 } as const;
+
+/**
+ * ── The Source a typed demand may carry (card P15, Loo 2026-08-04) ──────────
+ *
+ * **THE MIRROR OF A DATABASE LIST, NOT A MENU SOMEBODY CHOSE.** The values are
+ * `purchase_demands.purpose`'s CHECK, and the write door
+ * (`purchasing_create_demand`, opened by 0323) names the same four. Three
+ * places must agree — the CHECK, the function's own gate, and this — and 0322
+ * is why: when the pool's reasons lived in four places and only two were
+ * widened, every dropdown offered a word the server refused by name.
+ *
+ * This array is therefore the ONLY list a control may render. `Spare Parts`
+ * and `Other…` are ruled WORDS in `TO_ORDER_WORDS` and are deliberately not
+ * here: neither has ever had a value to be stored as, and inventing one would
+ * be a screen ruling on a business question ("other" than what?).
+ *
+ * THE ORDER IS THE DISPLAY ORDER and it is the frequency order, not the
+ * CHECK's: Ready Stock is what almost every typed demand is, so it leads and
+ * is the default; the other three are the exceptions this field exists to tell
+ * apart.
+ */
+export const DEMAND_PURPOSES = [
+  { value: "ready_stock", label: TO_ORDER_WORDS.reasonReadyStock },
+  { value: "display", label: TO_ORDER_WORDS.reasonDisplay },
+  { value: "warranty", label: TO_ORDER_WORDS.reasonWarranty },
+  { value: "office", label: TO_ORDER_WORDS.reasonOffice },
+] as const;
+
+export type DemandPurpose = (typeof DEMAND_PURPOSES)[number]["value"];
+
+/** The default a dialog opens on — and the value the RPC itself defaults to. */
+export const DEMAND_PURPOSE_DEFAULT: DemandPurpose = "ready_stock";
+
+/** Every storable Source value, for a zod enum and for a guard. */
+export const DEMAND_PURPOSE_VALUES = DEMAND_PURPOSES.map((p) => p.value) as readonly string[];
+
+export function isDemandPurpose(v: unknown): v is DemandPurpose {
+  return typeof v === "string" && DEMAND_PURPOSE_VALUES.includes(v);
+}
+
+/**
+ * ── What the picker knows about one SKU (card P15) ──────────────────────────
+ *
+ * The three numbers are ONE read of the register (`ops_stock_items`) at the
+ * warehouse To Order offers stock from, and `free` is P10's own rule reused
+ * rather than re-derived — the card's Must-NOT says so by name, and a second
+ * count is a second answer waiting to disagree.
+ */
+export interface DemandPickItem {
+  /** The catalog code. The picker leads with it — P15's defect 1. */
+  sku: string;
+  /** `Sonic Q` — the model + size letter. Not unique, which is the whole point. */
+  label: string;
+  /** DERIVED from the SKU, never chosen. `null` means the SKU is unbuyable. */
+  supplier: string | null;
+  /** Units standing in the warehouse now, any condition. */
+  onHand: number;
+  /** Units spoken for by an order. */
+  reserved: number;
+  /** What the grid would offer — free, sound and at that warehouse. */
+  free: number;
+}
 
 /**
  * `PO 2` — a queue-rail row. Small on purpose (Loo, 2026-07-31: the rail is

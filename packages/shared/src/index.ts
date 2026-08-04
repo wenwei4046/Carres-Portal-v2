@@ -1819,6 +1819,13 @@ export {
   TO_ORDER_WORDS,
   TO_ORDER_CATEGORIES,
   ISSUE_BATCH_MAX,
+  // P15 — the Source a typed demand carries, mirroring the database's own list.
+  DEMAND_PURPOSES,
+  DEMAND_PURPOSE_DEFAULT,
+  DEMAND_PURPOSE_VALUES,
+  isDemandPurpose,
+  type DemandPurpose,
+  type DemandPickItem,
   buildToOrder,
   categoryLabel,
   countItems,
