@@ -1628,12 +1628,21 @@ width**, and the scanned rows stay exactly 40px (the expanded record measured 57
 one cell allowed to be tall). #591's own note measured 1280 and 1920 only. It is the KIT's
 geometry, so it is reported rather than edited here.
 
-**FINDING 4 — the offer does not ask what CONDITION a unit is in.** #591 scopes the register read
-to `status='free'` · `needs_repair=false` · the own warehouse, and stops there. `GET
-/api/ops/stock/ready` — Ready Stock's own definition of ready — additionally requires condition
-`new` or `exhibition`. **Live exposure is zero, measured**: every free unit on prod today is `new`
-(54 records) or `exhibition` (33). But R4 releases a quarantined unit back to `free`, so the day a
-`damaged` or `old` unit is released the page would offer it to a customer's order. One predicate.
+**FINDING 4 — the offer did not ask what CONDITION a unit is in. ✅ FIXED (PR #595), and the
+finding's own premise needed one correction.** #591 scoped the register read to `status='free'` ·
+`needs_repair=false` · the own warehouse, and stopped there. R4 releases a quarantined unit back
+to `free`, so the day a `damaged` unit was released the page would have offered it to a
+customer's order. **Live exposure was zero, measured**: every free unit on prod is `new` (54) or
+`exhibition` (33) — which is exactly why it was closed before the first release rather than after.
+
+**The correction: `GET /api/ops/stock/ready` does NOT require `new` or `exhibition`.** That is
+what its own header comment at `ops/stock.ts:46` says, and the CODE one line below admits
+`['new','exhibition','old','refurbished']` and excludes only `damaged`. The finding read the
+comment; the rule is the code. **The predicate mirrors the route's list verbatim**, so the two
+surfaces cannot drift and no condition policy is invented here — narrowing to `new` +
+`exhibition` would have silently stopped offering the `old` and `refurbished` units Ready Stock
+itself calls ready, which is a business decision nobody made. **The stale comment is reported,
+not edited: it is `ops/stock.ts`'s, not this lane's file.** Negative control fires exactly 1.
 
 ---
 
