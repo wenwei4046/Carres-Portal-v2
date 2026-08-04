@@ -759,6 +759,33 @@ roles run their whole lifecycle on it.
 | Demand somebody has consciously reviewed and delayed | region **`Purchasing on Hold`** · row fact **`On hold until {date}`**, carrying **Held by** · **Reason** · **Held time** · **Resume date** | Snoozed · Paused · Excluded · Hidden · Pending |
 | An item whose supplier cannot be worked out | **`Supplier not assigned`** — a FACT, under Missing Configuration. Supporting line: `Assign a supplier before this item can enter the purchasing plan.` | Orphan · Unknown supplier · Invalid SKU · Supplier error |
 
+### The Report words (Loo, 2026-08-04 — card Q3)
+
+Purchasing has a "look at the numbers" layer, and these are the only words on
+it. **Six were ruled; the page may use no seventh.**
+
+| What | The word | Note |
+|---|---|---|
+| the tab | **`Report`** — **singular** | Loo's own spelling, given verbatim, and it is AutoCount's own menu-bar word, which the team reads daily. **`Reports` and `Reporting` are both wrong; do not "correct" it** |
+| a column: how many purchase orders | **`POs`** | the plural of `PO`, the document's own name |
+| a column: the quantity we asked the factory for | **`Ordered`** | |
+| a column: what physically arrived | **`Received`** | already ruled — the Receiving Workspace's word, reused, not respelt |
+| a column: what is still owed | **`Outstanding`** | already ruled — and **its own rule binds here**: it is PRINTED, never left as `19 − 0` for the reader to subtract |
+| the last row | **`Total`** | |
+
+**No money appears anywhere on this page** (Loo, 2026-08-04): *"i dont show
+costing — due to supplier have own, finance will deal with it. If future need
+to add, just add, not now."* It is structural rather than remembered — the wire
+carries no price field at all, so the page could not print one.
+
+**The rail's headings are `Month` · `Supplier` · `Category`.** The last two are
+the facet-group headings ruled above. **`Month` has no row in this file** — it
+is reused verbatim from the portal's own live screens (HR's commission-run
+column, Finance's month picker) rather than invented, and it is reported here so
+the next chat finds it. **There is deliberately no `Status` facet**: the
+facet-heading rule above bans one by name, and measured 2026-08-04 all 21 live
+purchase orders sit in one state, so the group could narrow nothing.
+
 **Communication is NOT part of the PO lifecycle** (Loo, 2026-07-29). WhatsApp and Email are
 channels that may vary per supplier; they are never a status, never an Operation Status value,
 and they occupy no position in the purchasing information model. The channel words themselves

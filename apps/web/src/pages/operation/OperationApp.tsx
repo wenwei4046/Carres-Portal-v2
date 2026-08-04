@@ -35,6 +35,8 @@ import OperationReceiving from "./OperationReceiving";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
+// Q3 (Loo, 2026-08-04) — Purchasing → Report: the "look at the numbers" layer.
+import OperationPurchasingReport from "./OperationPurchasingReport";
 // 0226 — the operation-facing COSTING catalog (SKU Master / Modular / Fabric).
 import OperationCatalogPage from "@/pages/catalog/OperationCatalogPage";
 import { CATALOG_TAB_PARAM } from "@/pages/catalog/catalog-tabs";
@@ -254,6 +256,7 @@ export default function OperationApp() {
           tab !== "purchase" &&
           tab !== "receiving" &&
           tab !== "claims" &&
+          tab !== "purchasing-report" &&
           tab !== "purchasing-settings" && <GlobalTopBar />}
         <div className="flex-1 min-h-0 overflow-auto">
         {isUrlDriven ? (
@@ -333,6 +336,10 @@ export default function OperationApp() {
                 reads. Manager-only; the tab is hidden for everyone else and
                 the RPCs refuse the write regardless. */}
             {tab === "purchasing-settings" && <OperationPurchasingSettings />}
+            {/* Q3 — Purchasing → Report. Read-only, stores nothing, computes
+                at read time; every figure is a door back to the purchase
+                orders it counted. */}
+            {tab === "purchasing-report" && <OperationPurchasingReport />}
             {/* T11 — Delivery: the 3-pane module (queues · calendar · detail).
                 Read-only by design; every write stays behind the order drawer. */}
             {tab === "delivery" && <OperationDelivery />}

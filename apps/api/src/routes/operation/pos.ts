@@ -17,6 +17,8 @@ import {
   setLineOpsRemarkInput,
   splitLineDestinationInput,
   type AwaitingStockShortageResponse,
+  type PoReportLine,
+  type PoReportResponse,
 } from "@carres/shared";
 import { resolveCurrentPoDuty } from "./po-duty";
 // renderPoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
@@ -411,6 +413,97 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       (tmplRow as { supplier_message_template?: string | null } | null)
         ?.supplier_message_template ?? null,
   });
+});
+
+// ----- GET /report -----
+//
+// Q3 · Purchasing → Report. The whole "look at the numbers" layer: one flat
+// purchase-order LINE per row, and every figure on screen is computed from
+// them at read time by `buildPoReport` (`packages/shared/src/po-report.ts`).
+//
+// **It stores nothing** — no table, no RPC, no cached figure. It reads exactly
+// the `purchase_order_lines` the register reads, so the report and the register
+// can never disagree about a number.
+//
+// **NO MONEY IS ON THE WIRE** (Loo, 2026-08-04). `cost` is not selected and no
+// price field exists on the payload, so a client cannot print what it never
+// receives — 0307's own discipline, applied to a read.
+//
+// A cancelled purchase order is sent WITH its `cancelled` flag rather than
+// filtered out here: the exclusion is a business rule the shared module owns
+// and a test can remove, and the screen states it.
+//
+// Path is registered before the `/:id/*` routes so the static segment wins in
+// Hono's matcher, exactly as `/awaiting-stock-shortage` below is.
+operationPosRouter.get("/report", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data, error } = await sb
+    .from("purchase_orders")
+    .select(
+      "id, supplier_id, status, placed_at, suppliers(name), purchase_order_lines(sku, qty, received_qty)",
+    )
+    .order("placed_at", { ascending: false })
+    // A ceiling, not a page: the report has no pagination and none is wanted,
+    // so this is the point at which the figures would need a server-side
+    // aggregate instead of a flatten. 21 purchase orders live (2026-08-04).
+    .limit(1000);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const rows = data ?? [];
+
+  // The category comes from the catalog, one bounded IN() over the page's
+  // distinct SKUs — the same shape the list route uses for `model_name`.
+  const skuSet = new Set<string>();
+  for (const r of rows) {
+    const row = r as Record<string, unknown>;
+    for (const l of (row.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [])
+      skuSet.add(l.sku as string);
+  }
+  const categoryBySku = new Map<string, string | null>();
+  if (skuSet.size > 0) {
+    const { data: skuRows, error: skuErr } = await sb
+      .from("product_skus")
+      .select("sku, product_models(category)")
+      .in("sku", [...skuSet]);
+    if (skuErr) {
+      const m = mapPgError(skuErr);
+      return c.json(m.body, m.status);
+    }
+    for (const r of skuRows ?? []) {
+      const row = r as Record<string, unknown>;
+      const model = row.product_models as { category?: string | null } | null;
+      categoryBySku.set(row.sku as string, model?.category ?? null);
+    }
+  }
+
+  const lines: PoReportLine[] = [];
+  for (const r of rows) {
+    const row = r as Record<string, unknown>;
+    const supplier = row.suppliers as { name?: string | null } | null;
+    const placedAt = row.placed_at as string | null;
+    // MYT, the portal's zone — the api's own idiom (`+8h`, then slice), so a
+    // purchase order raised at 9pm on the 31st is not filed under next month.
+    const month = placedAt
+      ? new Date(new Date(placedAt).getTime() + 8 * 3_600_000).toISOString().slice(0, 7)
+      : "";
+    for (const l of (row.purchase_order_lines as Array<Record<string, unknown>> | null) ?? []) {
+      lines.push({
+        poId: row.id as string,
+        supplierId: (row.supplier_id as string | null) ?? "",
+        supplierName: supplier?.name ?? ((row.supplier_id as string | null) ?? ""),
+        month,
+        category: categoryBySku.get(l.sku as string) ?? null,
+        cancelled: (row.status as string | null) === "cancelled",
+        ordered: Number(l.qty ?? 0),
+        received: Number(l.received_qty ?? 0),
+      });
+    }
+  }
+
+  return c.json({ lines } satisfies PoReportResponse);
 });
 
 // ----- GET /awaiting-stock-shortage -----

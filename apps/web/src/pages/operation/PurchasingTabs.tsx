@@ -6,9 +6,11 @@ import {
   ShoppingCart,
   PackageCheck,
   AlertTriangle,
+  BarChart3,
   Settings,
   type LucideIcon,
 } from "lucide-react";
+import { PO_REPORT_WORDS } from "@carres/shared";
 import { usePurchasingSettings } from "@/lib/queries";
 import ModuleHeader from "./components/ModuleHeader";
 
@@ -49,6 +51,7 @@ type PurchasingTab =
   | "purchase-orders"
   | "receiving"
   | "claims"
+  | "purchasing-report"
   | "purchasing-settings";
 
 interface TabDef {
@@ -63,6 +66,17 @@ const TABS: TabDef[] = [
   { key: "purchase-orders", label: "Purchase Orders", to: "/operation/procurement", icon: ShoppingCart },
   { key: "receiving", label: "Receiving", to: "/operation?tab=receiving", icon: PackageCheck },
   { key: "claims", label: "Claims", to: "/operation?tab=claims", icon: AlertTriangle },
+  // Q3 (Loo, 2026-08-04) — the "look at the numbers" layer. AutoCount's own
+  // Purchase menu draws this same line: documents in the top half, reports in
+  // the bottom, so the reports sit AFTER the four document tabs and before the
+  // manager-only Settings. The word is `Report`, singular — his own spelling
+  // and AutoCount's own menu word.
+  {
+    key: "purchasing-report",
+    label: PO_REPORT_WORDS.tab,
+    to: "/operation?tab=purchasing-report",
+    icon: BarChart3,
+  },
   // P1 — the fifth tab of the working flow's §1. Manager-only, so it renders
   // only for a caller the server says may edit; the RPC gate is what actually
   // protects the numbers.
@@ -80,9 +94,11 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
       ? "receiving"
       : tabParam === "claims"
         ? "claims"
-        : tabParam === "purchasing-settings"
-          ? "purchasing-settings"
-          : "to-order";
+        : tabParam === "purchasing-report"
+          ? "purchasing-report"
+          : tabParam === "purchasing-settings"
+            ? "purchasing-settings"
+            : "to-order";
   const canEditSettings = settingsQ.data?.canEdit ?? false;
   const tabs = TABS.filter((t) => t.key !== "purchasing-settings" || canEditSettings);
   const activeLabel = TABS.find((t) => t.key === active)?.label ?? "Purchasing";

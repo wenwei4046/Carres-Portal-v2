@@ -222,6 +222,9 @@ import {
   type StoreChannel,
   // Purchase / Procurement MRP cockpit — GET /api/operation/purchase/today.
   type PurchaseTodayResponse,
+  // Q3 — Purchasing → Report (GET /api/operation/pos/report). Facts only; the
+  // figures are computed by `buildPoReport`.
+  type PoReportResponse,
   // P1 (0303) — Purchasing → Settings.
   type PurchasingSettingsResponse,
   type PurchasingSetNumberInput,
@@ -524,6 +527,11 @@ export const qk = {
     /** To Order — the Planning Workspace projection, recomputed on every read
      *  (GET /api/operation/purchase/to-order). Issuing invalidates ["operation"]. */
     toOrder: () => ["operation", "purchase", "to-order"] as const,
+    /** Q3 — the Report tab's ONE read (GET /api/operation/pos/report). Nested
+     *  under `pos` so any blunt PO invalidation reaches the figures too: the
+     *  report stores nothing, so it must never be the last screen holding an
+     *  old number. */
+    poReport: () => ["operation", "pos", "report"] as const,
   },
   // Phase 5 — HQ Finance namespace. Same nested-key strategy as `principal`
   // and `operation` so mutations can blast `["finance"]` (e.g. topup-approve
@@ -4119,6 +4127,25 @@ export function useOperationPos(
       apiFetch<operationPosListResponse>(
         "/api/operation/pos" + operationPosSearch(filters),
       ),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/**
+ * Q3 · Purchasing → Report — the whole "look at the numbers" layer, in one
+ * read. It returns FACTS (one flat purchase-order line each) and no figures:
+ * every number on screen is computed by `buildPoReport`, so the report and
+ * Q4's dashboard cannot arrive at two answers.
+ *
+ * `staleTime` matches the register's 30s — a report that refetched on every
+ * focus would flicker its own totals, and there is deliberately no Refresh
+ * button (a report recomputes itself and states when it did).
+ */
+export function usePoReport(opts?: Partial<UseQueryOptions<PoReportResponse>>) {
+  return useQuery({
+    queryKey: qk.operation.poReport(),
+    queryFn: () => apiFetch<PoReportResponse>("/api/operation/pos/report"),
     staleTime: 30_000,
     ...opts,
   });
