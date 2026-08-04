@@ -6,6 +6,129 @@
 
 ---
 
+**2026-08-04 · Purchasing Q5 — the expand becomes the WORKING AREA, the right panel becomes ACTIVITY** (PR #600 merge `f2517f99`, **no migration**, web `index-D0zk6wtt.js` + Worker `3b87b0ab` — DEPLOYED, four canonicals, live file md5-identical to the local build (`da176c4c…`, 4,763,015 bytes), `SERVICE_ROLE` 0)
+
+Loo, after using the page: **`Right panel not friendly to edit detail.`**
+
+**The panel's JOB was defined wrong, not the editing.** It had become everything at once — edit · timeline · notes · communication · print — so the operator's real complaint was the loop: *click → right → scroll → change → close → click the next one.* `PURCHASING-INFORMATION-MODEL.md` §12.7.5 splits it, and the split is his own:
+
+```
+DOCUMENT DATA   destination · the two dates · qty · line remark · received
+                → the EXPAND, the working area. The document is in front of
+                  you and you type into it, which is why AutoCount feels good.
+ACTIVITY        communication · timeline · files · print
+                → the RIGHT PANEL, which stops being an editing surface.
+```
+
+## What moved, and what was DELETED rather than copied
+
+The panel lost its date row, its whole items grid and its per-line `⋮`. **Nothing is in two places.** Rule 1 (*nothing appears in two tiers*) and rule 3 (*ONE editing surface*) are the same repair here, and this card's own MUST NOT — *"leave a second editing surface in the panel"* — is what made the deletion mandatory rather than a matter of taste. Two doors onto one PO is C1's bypass in a new coat: the card that found an Office login could PATCH `received_qty` straight through PostgREST because a live route had no caller.
+
+What the panel keeps: the identity block (PO Issued · Delivery To · Supplier · Customer Delivery + the PO number) — the subject the activity is ABOUT — and `Document` / `Communication` / `Communication History`, untouched.
+
+## ONE PO expands at a time is a PROPERTY, not a rule that runs
+
+The state is a single `string | null`, so **two open rows cannot be represented**. That is stronger than a handler that closes the other one, and it matters because the expand holds date pickers, dropdowns and inputs: three open at once is a page of live controls with no focus.
+
+**The test that says so was proved non-vacuous twice**, which is the lesson P11 and D0.5d both paid for. A control that turns the state into a `Set` and appends fires the one-at-a-time test (exactly 1); a control that drops the close-on-re-click fires the other one (exactly 1). Either control alone would have left one of the two tests unexercised.
+
+## The one genuinely new thing is the route, and the door had been half-built for a day
+
+`purchasing_record_ready_date` shipped with **migration 0318 on 2026-08-03** — gated, audited, ledger-writing — and **nothing in the portal ever called it.** So `Call {supplier} — confirm ready date`, an action `PURCHASING-WORKING-FLOW.md` §3 has carried since it was written and whose five strings have been in COPY-STANDARD just as long, **had no button anywhere.** Measured on production: **0 of 21 POs carry an `expected_ready_date`**, and `expected_ready_date` has exactly ONE writer in the whole database.
+
+`POST /api/operation/pos/:id/ready-date` is deliberately the twin of `/tomorrow-delivery` directly above it:
+
+- a zod input in `packages/shared/src/schemas/operation.ts` — one date, one optional reason, `.strict()`;
+- `userClient` + the operator's own JWT, **never `service_role`**: the RPC's own `purchasing_supplier_call_gate()` IS the boundary, and a service key would walk around it;
+- the same `mapSupplierCallError`, so `po_not_open` is a readable 422 and `po_not_found` a 404 rather than a raw Postgres string.
+
+**There is no `answer` discriminator, unlike the tomorrow call.** `Ready Date` asks WHEN the factory finishes; it is not a promise that can be "still standing", so it has one completion (§12.2 ①).
+
+## `poDateHistoryOf` learns the second kind — a bug that was one day old
+
+It filtered `kind === 'tomorrow_delivery'`. So the moment the ready-date door opened, **the first ready date an operator recorded would have been silently swallowed by the history sitting beside the field** — the field would show it and its own history would not.
+
+Two runs now, numbered separately and **each NAMED on screen** (`Expected Arrival` · `Supplier Ready Date`). They are never merged into one numbered run, and the reason is not tidiness: they are different FACTS (§12.2 ① vs ②), every supplier here carries transit days (Ohana 1, Nice Future 1), so a `2nd` counted across both would number two questions, and a slip measured between a ready date and an arrival date is a number about nothing.
+
+## Qty stays READ-ONLY — a frozen rule, not a preference
+
+Loo's sketch has `Qty [Input]`. It is refused twice over: `PURCHASING-WORKING-FLOW.md` §3 rules that items are ADDED to a sent PO by raising a NEW one — the supplier holds that document exactly as they received it — and migration **0316** made PO-line quantities RPC-only with no `set_line_qty` door, deliberately. Building the input would have needed a migration AND the reversal of a frozen rule.
+
+**Asserted from both ends**: the page renders no number input at all except the SPLIT's `Move` field (which exists only while a destination is being changed), and the route test refuses a quantity smuggled through the body — `.strict()` is what makes that true.
+
+## MEASURED IN A REAL BROWSER, AND IT CHANGED THE DESIGN
+
+jsdom has no widths, so the page tests structurally cannot see this. Measured against the app's own stylesheet at the **compact listing width (680px — 1280 viewport minus the 200px rail and the 400px panel)**:
+
+```
+first draft   the select + Move + Split + Cancel INSIDE the 160px cell
+              → the cluster is 68px TALL, three wrapped lines, row 81px
+
+shipped       the cell keeps the select (160px, fits)
+              the editing controls take their own full-width strip
+              → strip 39px, ONE line · row 45px · no horizontal overflow
+```
+
+The two date fields sit on ONE 25px row at both 680px and 1080px. The line grid comes out `# 16 · SO No. 64 · Description 262 · Qty 40 · Destination 160 · Received 64` with five 8px gaps — exactly the 646px available, and `Booqit 1B(LHF)` is not clipped.
+
+## A DEPARTURE FROM THE CARD, REPORTED RATHER THAN APPLIED
+
+The card's Done-when says *"there is no Save button anywhere in the expand"*, quoting Jess's 2026-08-02 inline-edit manner. **Two of the three fields are MULTI-field forms that she gave Save buttons after using them:**
+
+| Field | Her words | Why the button |
+|---|---|---|
+| `Expected Arrival` (date + reason + remarks) | *"i cant save?"* | Enter-to-save is an inline gesture for ONE value; here it is a hidden control |
+| per-line `Destination` (+ `Move`) | *"i cant save for AL"* | a picker changed with the MOUSE has no keyboard gesture to commit |
+
+Removing them re-breaks exactly what she reported. So the ONE new single-value field (`Supplier Ready Date`) takes the ruled manner exactly — Enter saves, Esc cancels, no button — the two older doors keep hers, and the split's control is named **`Split`**, which is an act rather than a save. **`Esc` restores and posts nothing everywhere**, which is the half of that Done-when line that did hold.
+
+## Verification
+
+**Production, on PO-2032 — the card's own PO.** Measured first: 3 lines, `AL Sungai Buloh` on `5539-1B(LHF)` and the PO's own `Carres Klang` followed by the other two, **0 received**, so no destination is frozen (§2's freeze rule bites only once a line has received something).
+
+Six assertions inside a **rolled-back** transaction, as an ACTIVE operation user (the gate reads `app_users` by `auth.uid()`, so the harness had to be a real one — the first attempt was refused by name, which is itself the gate working):
+
+```
+A0  the harness really is an operator            app_role() = operation
+A1  expected_ready_date moved                    → 2026-08-12
+A2  exactly ONE kind='ready_date' promise row    reason kept, po_line_id null
+A3  the po_history sentence                      'Supplier ready date - -> 2026-08-12'
+A4  eta_date did NOT move                        still 2026-08-25 (a different fact)
+A5  the destination door moved line 2            → AL Sungai Buloh
+A6  no quantity moved on any line                3 lines, qty 1, received 0
+```
+
+Then the **rollback was proved total** — `expected_ready_date` NULL again, 0 ready promises, 0 history rows, line 2's destination back to NULL — so **nothing invented was left on a live purchase order.**
+
+**Gates.** web tsc 0 · page suite **62 → 71** · api `pos.test.ts` **76 → 84** · shared `po-workspace` **29 → 33** · full suites at baseline (web 16 pre-existing · api 3 pre-existing, both re-measured on the tree WITHOUT this change) · `check-design` **8368**, unchanged in total.
+
+**Five negative controls, each a real edit, each verified applied:**
+
+```
+the state becomes a Set (many rows open)      → 1
+the close-on-re-click removed                 → 1
+the ready_date branch out of poDateHistoryOf  → shared 2 + web 1
+the route points at the WRONG RPC             → 1
+a second date door back in the panel          → 3
+```
+
+**The deploy, proved in BOTH directions on downloaded bundles.** `po-work-` · `po-ready-date-open` · `po-line-destination-open-` grep 0 in the predecessor `index-CT-nebMG.js` (4,761,762 bytes — a real bundle, not the 404 page that reads as a clean 0 for everything) and 1 each here; `Supplier Ready Date` 0 → 2. **The removals are the sharper half**: `po-item-menu-` is 1 → 0 and `Recv` is 3 → 2, the two survivors identified by their own class strings (`w-10` / `w-12`) as other pages' rather than assumed.
+
+**The api route could not be content-verified and that is recorded rather than papered over.** Auth runs before routing, so the **401** the new path answers is the SAME 401 a nonsense path answers — both measured side by side. What is proved is the version serving 100% of traffic, built from the tip that contains the route, plus the RULE it reaches, verified directly against the live database above.
+
+## Reported, not fixed
+
+1. **The last line of the card's own Done-when needs Loo's login.** *"`PO-2032` expands and shows its 3 lines … Change one, reload, it stuck."* A chat may not type a password into a field, so the click-and-reload on the deployed page is his. The nearest thing was done instead, and it is two-sided: the deployed bundle carries the working area (grep, both directions, with a control marker) and both doors were proved on the live database against that exact PO.
+2. **`Goods Arrival` still heads the register column while the expand below it says `Expected Arrival` for the same fact.** §12.2 retires that spelling **and names this page's column by name** — but the header change moves a width Q1 measured in a real browser (96px compact / 192px expanded), so it is one word plus a re-measurement and it is named here rather than slipped into a card about the expand. The panel's own copy of the retired word went with the date row, so the count is now one, not three.
+3. **`Received At` (§12.2 ③) has no field on the wire and none was invented.** The model already says why: 0 `warehouse_receipts` rows have ever existed, so the register can say how many arrived and never when.
+4. **The destination picker shows on EVERY row of a multi-SO line, because the destination belongs to the LINE.** A merged line appears as two SO rows and both print the same value; editing either edits the line. That is the truth of the data until P5's allocation, and the split arithmetic deliberately reads the LINE's un-received remainder rather than the row's slice — a row showing 1 of a 3-unit line must not tell the split there is one to move.
+5. **The expand control's column is the kit's 3%**, which at the compact width is ~20px against a 24px control. P10 measured the same thing on To Order; nothing clips, the `auto` tail absorbs it, and the number belongs to `DataTable`, not to this page.
+6. **`check-design` is 8368 in total but not category-for-category** against the tree without this change: `E` +2 · `G` +1 · `I` −3. The `G` is the native `<input type="date">` that the kit's `DatePicker` would replace — the sibling arrival field already uses a native one, and migrating this page to the kit is D6/D7.
+7. **A shell trap worth not re-learning:** a `node -e "…"` one-liner containing back-ticked identifiers has those identifiers eaten by bash as command substitutions. It silently produced a doc row with eleven blank gaps where code spans belonged, and it was caught only by reading the written line back. Write the text to a file and read it in the script.
+
+---
+
+
 **2026-08-04 · Purchasing P13 — the take path says `Reserve`, and the pool gets its sixth reason** (PR #599 merge `8ac7787f`, migration **0322 applied and verified BEFORE the merge**, web `index-CT-nebMG.js` + Worker `b74c98f9` — DEPLOYED, four canonicals on the first poll, live md5-identical to the local build (`c40ed713…`, 4,761,762 bytes), `SERVICE_ROLE` 0)
 
 **Two rulings by Loo on 2026-08-04, ONE card**, because both are the vocabulary of the same act — taking a unit off the ready pool for an order — and splitting them would have meant two chats, two PRs and two passes over the same twenty lines.

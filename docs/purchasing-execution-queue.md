@@ -2666,6 +2666,102 @@ company's; he ruled it the same day**).
 `PURCHASING-INFORMATION-MODEL.md` §12.2, and everything else is already in COPY-STANDARD ·
 ❌ touch `OperationToOrder.tsx` · ❌ use `service_role` · ❌ hold the card for a design round.
 
+### ✅ SHIPPED — what actually landed (2026-08-04, PR #600 `f2517f99`)
+
+**No migration.** Web + api + `packages/shared`. Web `index-D0zk6wtt.js` (carres-portal
+`e2033670` + carres-pos `4c729b59`) + Worker `3b87b0ab` — DEPLOYED, four canonicals, live
+file md5-identical to the local build, `SERVICE_ROLE` 0.
+
+**The split, built as §12.7.5 rules it.** The EXPAND carries the document: the two dates
+(`Supplier Ready Date` · `Expected Arrival`, both editable) and one line per SO × SKU with
+which SO, which item, qty, **its own destination** (editable), its ops remark and `Received`.
+The RIGHT PANEL carries identity + `Document` / `Communication` / `Communication History`.
+
+**THE PANEL LOSES THREE THINGS AND NOTHING IS DUPLICATED.** Its date row, its items grid and
+its per-line `⋮` are gone — not copied. Rule 1 (nothing appears in two tiers) and rule 3 (ONE
+editing surface) are the same repair here, and the card's own MUST NOT (*"leave a second
+editing surface in the panel"*) is what made the deletion mandatory rather than optional.
+
+**ONE PO expands at a time is a PROPERTY, not a rule that runs.** The state is a single id,
+so two open rows cannot be represented. The test that says so was proved non-vacuous by TWO
+controls: turning the state into a Set fires it, and removing the close-on-re-click fires the
+other one.
+
+**The one genuinely new thing is the route, and the door had been half-built for a day.**
+`purchasing_record_ready_date` shipped with **0318 on 2026-08-03 and nothing ever called it**,
+so `Confirm ready date` — an action `PURCHASING-WORKING-FLOW.md` §3 has carried since it was
+written — **had no button anywhere in the portal**. `POST /:id/ready-date` is the twin of
+`/tomorrow-delivery` directly above it: `userClient` + the operator's own JWT, never
+`service_role` (the RPC's own `purchasing_supplier_call_gate()` IS the boundary), and the same
+`mapSupplierCallError`, so `po_not_open` comes back as a readable 422.
+
+**`poDateHistoryOf` learns the second kind, and the bug it closes was one day old.** It
+filtered `kind='tomorrow_delivery'`, so **the first ready date an operator recorded would have
+been swallowed by the history sitting beside the field.** The two runs are numbered separately
+and each is NAMED on screen: they are different FACTS (§12.2 ① vs ②), every supplier here
+carries transit days, and a slip measured between a ready date and an arrival date is a number
+about nothing.
+
+**MEASURED IN A REAL BROWSER, AND IT CHANGED THE DESIGN.** With the select, the `Move` field
+and the two controls all inside the 160px Destination cell, the cluster came out **68px tall
+at the compact listing width (680px)** — three wrapped lines, pushing the row to 81px. The
+editing controls moved to their own full-width strip under the row: **39px, one line**, row
+45px, no horizontal overflow, and the two date fields sit on ONE 25px row at both 680px and
+1080px. **jsdom has no widths, so no page test could have caught it.**
+
+**A DEPARTURE FROM THIS CARD, REPORTED RATHER THAN APPLIED.** Its Done-when says *"there is no
+Save button anywhere in the expand"*. Two of the three fields are MULTI-field forms that Jess
+gave Save buttons **after using them** — *"i cant save?"* (the arrival form) and *"i cant save
+for AL"* (the destination picker: a picker changed with the MOUSE has no keyboard gesture to
+commit). Removing them re-breaks exactly what she reported. So: the ONE new single-value field
+(`Supplier Ready Date`) takes the ruled manner exactly — Enter saves, Esc cancels, no button —
+the two older doors keep hers, and the split's control is named `Split`, which is an act rather
+than a save. **Esc restores and posts nothing everywhere, which is the half that did hold.**
+
+**Verified against PRODUCTION on PO-2032** — the card's own PO: 3 lines, `AL Sungai Buloh` on
+line 1 and the PO's `Carres Klang` followed by lines 2-3, 0 received (so nothing is frozen).
+Six assertions inside a **rolled-back** transaction: the ready date moved
+`expected_ready_date` to 12 Aug, wrote exactly ONE `kind='ready_date'` promise, wrote the
+`po_history` sentence (`Supplier ready date - -> 2026-08-12`), left `eta_date` alone, and the
+destination door moved line 2 to AL — then the **rollback was proved total** and
+`expected_ready_date` still has exactly ONE writer in the whole database. Nothing invented was
+left on a live purchase order.
+
+**Live effect today: measured — 0 of 21 POs carry a ready date**, because until this deploy
+nothing in the portal could record one.
+
+**Two things fixed on the way, both one word in a SELECT.** The promises read never selected
+`about_qty` (so the balance call's re-open comparison, which this route's file computes, saw
+null on every row) or `remarks` (so the ledger's free text could not print beside its
+countable reason).
+
+**Reported, not fixed (Law 0):**
+
+1. **The last line of this card's own Done-when needs Loo's login.** *"Open PO-2032, expand
+   it, change a destination, reload, it stuck."* A password may not be typed by a chat, so the
+   click-and-reload on the deployed page is his; the two doors were proved at the database
+   instead, and the deployed bundle was proved to carry the working area in both directions.
+2. **`Goods Arrival` still heads the register column while the expand below it says
+   `Expected Arrival` for the same fact.** §12.2 retires the former **and names this page's
+   column by name** — but the rename moves a header width Q1 measured in a browser (96px
+   compact / 192px expanded), so it is named here rather than slipped into a card about the
+   expand. It is one word and one re-measurement.
+3. **`Received At` (§12.2 ③) has no field on the wire and none was invented.** The model
+   already says why: 0 `warehouse_receipts` rows have ever existed, so the register can say
+   how many arrived and never when.
+4. **The destination shows on EVERY row of a multi-SO line, because it belongs to the LINE.**
+   Line a1 of a merged PO appears as two SO rows and both print the same picker; editing either
+   edits the line. That is the truth of the data until P5's allocation, and the split
+   arithmetic deliberately reads the LINE's remainder, never the row's slice.
+5. **The expand control's column is the kit's 3%**, so at the compact listing width it is
+   ~20px against a 24px control — P10 measured the same thing on To Order. Nothing clips and
+   the `auto` tail absorbs it; the kit owns that number, not this page.
+6. **`check-design` 8368, unchanged in total**, but not category-for-category: `E` +2 · `G` +1
+   · `I` −3 against the tree without this change. The `G` is the native `<input type="date">`
+   the kit's `DatePicker` would replace — the sibling field already uses one, and migrating
+   this page to the kit is D6/D7.
+
+
 ---
 
 ## Q6 · To Order is audited against the same architecture
@@ -2737,6 +2833,6 @@ answering §13.3's question · ❌ touch the P8-P13 features · ❌ start before
 | | ⚠️ **OPEN QUESTION on Q3, raised 2026-08-04 and NOT acted on:** Loo said `q3 — 删掉` in the same message that rejected the summary band. **The tab was already built and live when he said it.** His stated reason — *a List page processes work, a Dashboard monitors* — is an argument AGAINST a band on the register and reads as an argument FOR keeping KPIs in their own tab, so the instruction and its reason point opposite ways. **Nothing was deleted. A shipped, deployed tab is not removed on an inferred reading.** Put to him; his answer goes here | |
 | **Q1b** | 🔴 **BLOCKED ON THE MODEL** — Q1 made the row ORDER correct and left it INVISIBLE: the register default view hides `Customer Delivery` and `Expected Arrival`, so 21 rows read alike and nothing says why row 1 is row 1 (Loo caught it live 2026-08-04, from his own screenshot). **A summary band was proposed by me and REJECTED by him**, on the stronger principle: *a List page processes work, a Dashboard monitors* — a Summary on every page puts one number in four places. Three ROW-LEVEL candidates were studied against SAP Fiori · Dynamics · Linear · GitHub · Jira and **none is chosen**: the left-edge bar (**`rowLate` already exists in the kit** — Loo added it 2026-08-03 for this identical problem and this page has never passed it) · an in-cell badge · its own column. **His own candidate `整行轻微背景强调` is REFUSED by law**: `01-design-tokens.md` §2.3 spends row background on hover (grey) and selection (blue). **Waits on `PURCHASING-INFORMATION-MODEL.md` §12.5** | — |
 | **Q4** | 🔴 **BLOCKED ON THE MODEL** — Q3 shipped, so the arithmetic exists; but a dashboard is the second place a number lives, and §12 has just re-opened what the register itself should show. Do not start until §12.5 closes | — |
-| **Q5** | ⬜ **the expand becomes the WORKING AREA, the right panel becomes ACTIVITY** (Loo 2026-08-04, after using the page: *"Right panel not friendly to edit detail"*). **NO migration** — every write door is already in production and D0.5d already shipped row expand; the only new code is ONE route (`POST /:id/ready-date`) over the live 0318 RPC. DOCUMENT DATA moves to the middle where the operator types into it; ACTIVITY stays right. ONE PO expands at a time; the date door LEAVES the panel so there is exactly one editing surface. **Qty stays read-only and that is a frozen business rule, not a preference** — §3 says added items go on a NEW PO, and 0316 left no qty door on purpose. **Governed by CLAUDE.md §13.2 — build and ship, no design round** | — |
+| **Q5** | ✅ **the expand becomes the WORKING AREA, the right panel becomes ACTIVITY** (Loo 2026-08-04, after using the page: *"Right panel not friendly to edit detail"*) — **no migration**; web + api + shared. DOCUMENT DATA moved to the row expand where the operator types into it; ACTIVITY stayed right, and **the panel lost its date door, its items grid and its per-line ⋮ rather than keeping copies** — rule 1 (nothing in two tiers) and rule 3 (one editing surface) are the same repair. **ONE PO expands at a time is a PROPERTY**: the state is a single id, so two open rows cannot be represented — proved non-vacuous by a Set control AND a no-close control, each firing 1. **The one genuinely new thing is the route the card names, and that door had been half-built for a day**: `purchasing_record_ready_date` shipped with **0318 on 2026-08-03 and nothing ever called it**, so `Confirm ready date` had no button anywhere in the portal. **`poDateHistoryOf` also filtered the ready kind OUT**, so the first ready date an operator recorded would have been swallowed by the history sitting beside the field — two runs now, numbered separately and each NAMED, never merged (different facts, and every supplier here carries transit days). **Qty stays read-only, asserted from both ends** (no number input on the page; a route test refuses a quantity smuggled through the body). **Measured in a real browser and it CHANGED the design**: the select + `Move` + the two controls inside the 160px Destination cell came out **68px tall at the 680px compact width** — three wrapped lines — so the editing controls took their own full-width strip (**39px**, one line). **Verified on production against PO-2032 in a rolled-back transaction**: the ready date moved `expected_ready_date`, wrote exactly ONE `kind='ready_date'` promise and the `po_history` sentence, left `eta_date` alone, and the destination door moved line 2 to AL; the rollback was proved total, and **0 of 21 POs carry a ready date today** because nothing could record one. **Reported, not applied — the card asks for no Save button anywhere in the expand and TWO of the three fields are multi-field forms Jess gave Save buttons AFTER using them** (*"i cant save?"* · *"i cant save for AL"*): the new single-value field takes the ruled manner exactly (Enter saves, Esc cancels, no button), the two older doors keep hers, and the split's control is named `Split`, which is an act rather than a save. Also reported: the register column still says `Goods Arrival` beside an expand that says `Expected Arrival` for the same fact (§12.2 retires it and names this column, but the rename moves a header width Q1 measured); `Received At` has no field on the wire, exactly as §12.2 says; and **the last line of the Done-when needs Loo's own login** — a chat may not type a password, so the click-and-reload on the deployed page is his | #600 |
 | **Q6** | ⬜ **To Order audited against the same architecture** (Loo 2026-08-04: *"now to order page i want also follow us"*) — **deliberately SMALL, because the measurement is that To Order is already closer to it than Purchase Orders was**: the kit expand (P10), `group`, and a priority-ordered rail are all live, and it has no right panel to mis-define because it is a Workspace, not a document register. The card applies **CLAUDE.md §13.3** to the two unwired powers (`resize` · `reorder` — wire or refuse IN WRITING, silence is not an answer) and scans every visible date word against the portal-wide dictionary. **An audit, not a redesign — P7 owns the redesign. After P13 merges** | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |

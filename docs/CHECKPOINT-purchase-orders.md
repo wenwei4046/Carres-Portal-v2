@@ -1,5 +1,32 @@
 # CHECKPOINT — Purchasing · Purchase Orders (Supplier Execution Register)
 
+> ## ⚠️ RE-ALLOCATED BY LOO, 2026-08-04 — read this before believing the layout below
+>
+> This file is still the record of HOW the page got here and of Jess's rules, and none of
+> her rulings is withdrawn. But **card Q5 moved where the work happens** (his words after
+> using it: *`Right panel not friendly to edit detail.`*), under the allocation he froze in
+> `PURCHASING-INFORMATION-MODEL.md` **§12.7.5**:
+>
+> | | before Q5 | after Q5 |
+> |---|---|---|
+> | the two dates + their history | the right panel's date row | **the row EXPAND** |
+> | the items grid, per-line destination, ops remark | the right panel, behind a `⋮` | **the row EXPAND** |
+> | the right panel | edit + document + communication + history | **ACTIVITY only** — identity + `Document` / `Communication` / `Communication History` |
+>
+> So **every sentence below that puts a date door, an items grid or a `⋮` inside the
+> workspace pane describes where those things USED to be.** Their behaviour, their words
+> and Jess's own rules about them are unchanged — only the tier they live in moved, and
+> nothing is in two tiers.
+>
+> Also live since Q5: **`POST /api/operation/pos/:id/ready-date`**, so
+> `Confirm ready date` finally has a button (0318's RPC had shipped with no caller), and
+> `Supplier Ready Date` is a field on the page. Full record → `docs/phase-10-worklog.md`,
+> 2026-08-04 · Q5.
+>
+> **Her two deliberately-not-done items below are untouched by this** — the date-history
+> redesign and the 50–100-line stress test are still hers and still open.
+
+
 > **⭐ FROZEN 2026-08-03 by Jess.** *"现在批准这一个 checkpoint。不要继续加功能。"*
 > The Workspace is DONE. **The next chat does NOT keep polishing this page** — her
 > words: *"再继续改只会开始进入无限微调."* Read this whole file, quote her rules
