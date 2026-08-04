@@ -1233,6 +1233,157 @@ fact being lost.
   takes over on the subscription model. Sofa and bed frame unchanged. Its own line when it
   comes.
 
+---
+
+# ⭐ LOO UNFROZE To Order, 2026-08-04 — P8 · P9 · P10
+
+> **The freeze that stops applying, and why.** Jess froze To Order on 2026-08-01
+> (*"现在批准这一个 checkpoint。不要继续加功能。"*). That freeze was ruled after **five layout
+> rewrites in one sitting** — it froze the LOOK so nobody redesigned it a sixth time. It was
+> never a ruling that the tab is finished. Loo reviewed the tab on 2026-08-04, named three
+> things it cannot do, and ruled them in. **THE OWNER RULE applies: no rule in this repo is
+> frozen against Loo.** The frozen LAYOUT still stands — P8-P10 add to it and redesign nothing.
+
+**What Loo decided, 2026-08-04. Four rulings, all final — no chat re-asks them.**
+
+1. **Category rows carry a number.** They are hard-coded `count={null}` today (6 rows,
+   `OperationToOrder.tsx:955-971`) while the PO Schedule rows above them carry counts.
+2. **The number is UNITS, and it prints bare — no unit word.** `Mattress 7`, never
+   `Mattress 7 件`. **This needs no COPY-STANDARD ruling: a bare number is not a word.**
+3. **The system SUGGESTS, the human TAKES.** His words: *"我要的就是有一个自动建议补货，不过我们
+   可以手动选择要不要拉。"* So there is **no free-typed quantity box.** A row's quantity falls
+   because the operator accepted a suggestion, which means the REASON is recorded by
+   construction. Free typing may be added later if he asks; nothing here blocks it.
+4. **Layout = AutoCount's inline expand (his option B).** Not a third pane — a third pane
+   narrows the grid and reopens the frozen two-pane layout. `⊞` on the row, detail underneath.
+
+---
+
+## P8 · A typed purchase demand can actually be saved
+
+**Lane: PURCHASING · touches `supabase/migrations` · `apps/api` · `packages/shared` and ONLY
+the `CreatePurchaseDialog` region of `OperationToOrder.tsx` (line 1359+).**
+Runs at the same time as P9 and D0.5d.
+
+**Why.** `+ Create Purchase` opens a real dialog and **its Save goes nowhere** — the page's own
+comment says so: *"The dialog is real; its SAVE arrives with the unified purchase_demands
+card."* Warranty · Display · Office · Spare Parts demand **cannot be recorded at all today.**
+This is the biggest hole in the tab and nothing downstream can be right without it.
+
+**ALREADY DESIGNED — build it, do not redesign it.** `CHECKPOINT-to-order.md` §0A froze the
+table: fields **Source · Purchase Item · Supplier · Qty · Required By · Remark · Created
+By/At · Cancelled At/Reason**; **no status column** (open/ordered/done are DERIVED from PO
+links; only cancellation is stored); **no free-text items** — a Purchase Item master.
+
+**ONE ADDITION Loo's 2026-08-04 ruling requires, and it goes in NOW.** The frozen text says
+*"NO partial qty (one row = one issue; upgrade later if the business ever needs it)."* Loo
+ruled the business needs it — a demand's quantity falls when ready stock is taken (P10), so a
+row must survive being partly satisfied. **Build the store able to say `issued` and
+`remaining` from day one.** Adding them later means a migration on a live table plus a rewrite
+of every reader; adding them now costs two columns nothing reads yet.
+
+**Done when.** Type a demand → Save → it is in the database → it appears in tomorrow's To
+Order list. Cancel is recorded, never deleted. A test proves a partly-issued demand keeps its
+remainder. No new visible word (§0A's list already covers this dialog).
+
+**Must NOT.** ❌ add a status column · ❌ allow free-text items · ❌ touch the rail, the grid
+columns or the toolbar (P9 and P10 own those regions of the same file — stay inside the dialog).
+
+---
+
+## P9 · The page says how many of each you are buying
+
+**Lane: PURCHASING · touches ONLY the rail and footer regions of `OperationToOrder.tsx`.**
+Runs at the same time as P8 and D0.5d. Smallest of the three — expect it to merge first.
+
+**Why — measured on the live page 2026-08-04.**
+
+```
+PO SCHEDULE            CATEGORY
+  Overdue      3         All                  ← count={null}
+  Wednesday    2         Mattress             ← count={null}
+  Friday       0         Bedframe             ← count={null}
+  Monday       3         Sofa                 ← count={null}
+                         Pillow               ← count={null}
+                         Mattress Protector   ← count={null}
+```
+
+Loo cannot answer *"how many mattresses am I buying today?"* anywhere on this page. The grid
+prints a per-row `Qty` and **nothing totals it.**
+
+**Build — two places, and the two numbers mean different things.**
+
+1. **Rail CATEGORY rows** — total UNITS in view, bare number. **The PO Schedule rows above
+   count ORDERS**; two adjacent columns of numbers meaning different things is how a number
+   gets misread, so the two must be told apart in the row's own tooltip.
+2. **Footer, beside the Issue button** — units per category **for what is TICKED**:
+   `勾选 4 · Mattress 7 · Bedframe 1 · Sofa 1   [Issue 2 POs]`.
+
+**The batch is VIEW-SCOPED (the frozen Excel law).** A tick hidden by a filter neither counts
+nor issues — so the footer's numbers must come from the same list the Issue button acts on,
+not from a second count. Prove it with a test that filters, then asserts the footer moved.
+
+**Done when.** Both numbers correct on live data, checked in a browser and quoted in the PR ·
+a zero category still renders its row (unlike a queue, a category is a fixed vocabulary —
+hiding `Sofa 0` would make the rail's shape change under the operator) · no unit word on
+screen · footer disappears with the selection.
+
+**Must NOT.** ❌ print `件` or any unit word (Loo, 2026-08-04) · ❌ count orders in the
+CATEGORY rows · ❌ touch the grid columns or the dialog.
+
+---
+
+## P10 · Ready stock is suggested; the human decides whether to take it
+
+**Lane: PURCHASING · touches the grid region of `OperationToOrder.tsx` + `apps/api` +
+`packages/shared`. STARTS AFTER D0.5d MERGES** — it needs the kit's row expand.
+
+**Why — and the finding is that the work is nearly all done and switched off.**
+
+Measured 2026-08-04 by reading the engine, not by guessing:
+
+| Fact | Where |
+|---|---|
+| the api DOES count free stock (`qty − reserved`, Klang) | `apps/api/src/routes/operation/purchase.ts:369-423` |
+| the engine DOES compute how much a demand could take from it | `net-requirements.ts` — `coveredByFreeStock` · `freeStockAvailable` |
+| **it is deliberately NOT subtracted** | `consumeFreeStock` defaults **false** and nothing anywhere turns it on |
+| **and the number never reaches the screen** | To Order prints `Qty 5` with no hint that Klang holds 2 |
+
+**Jess's 2026-07-21 ruling is RIGHT and stays:** goods are labelled per order, and auto-consuming
+free stock without a WMS/scan confuses goods-in/out. **The defect is not the ruling — it is that
+a decision reserved for a human is never shown to the human.**
+
+**Build — Loo's option B, drawn by him and frozen here.**
+
+```
+closed        ⊞ ☑ Nice Future  5  Sonic S   🟢 2
+                ☑ Nice Future  1  H1401S            ← no stock: nothing shown
+expanded      ⊟ ☑ Nice Future  5  Sonic S   🟢 2
+                   └ Klang: 2 available   [Take 2]
+after taking    ☑ Nice Future  3  Sonic S   took 2 from stock
+```
+
+- `consumeFreeStock` **stays OFF**. The suggestion is advisory; taking it is an ACT.
+- **Taking goes through K4's existing door** — `ops_stock_pool_draw` (migrations 0292/0294)
+  already makes a draw and its reason ONE transaction across all three doors into the pool.
+  **A fourth door that writes stock its own way is a second truth about the same units.**
+  Taking here must reserve the units, or the next operator sells them out from under this order.
+- No free-typed quantity box (Loo's ruling 3).
+
+**Done when.** A row with stock shows the marker and nothing else changes · taking reduces the
+quantity, reserves the units and leaves a dated reason readable in Ready Stock · a row with no
+stock is visually untouched · **taking twice cannot over-draw** (test it) · the PO that follows
+carries the reduced quantity.
+
+**Must NOT.** ❌ turn `consumeFreeStock` on · ❌ write `ops_stock_items` directly · ❌ show a
+marker when free stock is 0 · ❌ redesign the grid.
+
+---
+
+**Order of play, and P7 waits.** P7 rewrites this whole page against the information model;
+P8-P10 are surgical. Running them together guarantees conflict. **P8 ‖ P9 ‖ D0.5d now →
+P10 → then P7**, which inherits three working features instead of re-deriving them.
+
 ## Status
 
 | Card | Status | PR |
@@ -1243,4 +1394,7 @@ fact being lost.
 | P4 | ✅ where the goods go — migration **0307 applied, verified and merged** 2026-07-29 · **P4 FROZEN**; the application-code half is NOT P4 and starts as its own execution card (§10) | #513 |
 | P5 | ⬜ after P1-P4 · prove it with a real PO | — |
 | P6 | ✅ **Purchasing terminology freeze** (2026-07-29), **partly superseded 2026-07-30 by the Purchasing clean restart**: `Draft PO` is permanently removed, raising a PO is ONE act (`Issue PO`), Operation Status is FIVE labels, and the verb dictionary went 6 → 7 (`Prepare`) and back to 6. Docs only | — |
+| P8 | ⬜ **a typed purchase demand can actually be saved** (Loo 2026-08-04) — `purchase_demands`, built with `issued`/`remaining` from day one. Migration + api + the dialog region only | — |
+| P9 | ⬜ **the page says how many of each you are buying** (Loo 2026-08-04) — CATEGORY rows carry bare unit counts; a footer totals the ticked rows. Rail + footer regions only | — |
+| P10 | ⬜ **ready stock is suggested, the human takes it** (Loo 2026-08-04) — the engine already computes it and it is switched off and unshown. Inline expand; taking goes through K4's pool draw. **After D0.5d** | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives: demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |

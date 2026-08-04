@@ -46,20 +46,33 @@ LAYER 2 · BUSINESS FLOW — per page, NEVER shared
 rule from any one tab, and a Layer 2 card may not touch a second page. `DataTable`'s own header
 already says it — *"This file spells no word."*
 
-**The four cards, and what runs together.**
+**THE ACTIVE SET — Loo redirected the whole programme onto To Order, 2026-08-04.**
+*(He also UNFROZE To Order; the ruling and its four decisions are at the head of
+`purchasing-execution-queue.md`. The frozen LAYOUT still stands — these cards add, never
+redesign.)*
 
-| Card | Doc | Only file(s) it may edit | Runs with |
+| Card | Doc | Only file(s) / REGION it may edit | Runs with |
 |---|---|---|---|
-| **C13** the red means something again | `portal-core-execution-queue.md` | `OperationOrdersControl.tsx` | D0.5d · D7-Claims |
-| **C14** nothing says the same thing twice | `portal-core-execution-queue.md` | `OperationOrdersControl.tsx` | D0.5d · D7-Claims — **but AFTER C13** |
+| **P8** a typed demand can be saved | `purchasing-execution-queue.md` | migration · `apps/api` · `packages/shared` · **only the `CreatePurchaseDialog` region** of `OperationToOrder.tsx` | P9 · D0.5d |
+| **P9** the page says how many of each | `purchasing-execution-queue.md` | **only the rail + footer regions** of `OperationToOrder.tsx` | P8 · D0.5d |
 | **D0.5d** the grid grows five powers | `ui-kit-execution-queue.md` | `components/kit/**` · `pages/dev/**` | everything |
-| **D7-Claims** Claims joins the grid | `ui-kit-execution-queue.md` | `OperationSupplierClaims.tsx` | everything |
+| **P10** ready stock suggested, human takes | `purchasing-execution-queue.md` | **grid region** of `OperationToOrder.tsx` · api · shared | **AFTER D0.5d** |
 
 ```
-now, in parallel:   chat A → C13        chat B → D0.5d       chat C → D7-Claims
-then:               chat A → C14        chat B → D0.5d …
-after both merge:   D6 (Orders renders through PageShell + DataTable)
+now, in parallel:   chat A → P8        chat B → P9        chat C → D0.5d
+after D0.5d merges: chat C → P10
+then:               P7 (the full Planning Workspace rewrite)
 ```
+
+**Three chats share ONE file (`OperationToOrder.tsx`, 1,548 lines) — so the split is by
+REGION and it is not optional.** P8 stays inside the dialog (line 1359+), P9 inside the rail
+and footer, P10 inside the grid. Git merges different regions cleanly; two chats in one region
+do not. **First to finish merges; the others rebase.** A chat that edits a region another card
+owns has broken the split even if the tests pass.
+
+**QUEUED, NOT NOW** — still valid, still claimable once To Order lands: **C13** · **C14**
+(Orders list) and **D7-Claims**. They collide with nothing here, but Loo's focus is To Order
+and a chat should take an active card first.
 
 **PAGES NO CARD HERE MAY TOUCH, and the reason is on the record:**
 
@@ -813,44 +826,57 @@ Read docs/purchasing-execution-queue.md. Do card P1 ONLY. ...
 Read docs/portal-core-execution-queue.md. Do card C2 ONLY. ...
 ```
 
-**The AutoCount programme — paste one of these into one chat each (2026-08-04):**
+**The To Order programme — paste one into each chat (Loo, 2026-08-04). All three carry the
+same standing instruction: DELIVER, do not come back.**
 
 ```
-Read docs/portal-core-execution-queue.md. Do card C13 ONLY. CLAIM it first — set C13 to
-`🔨 CLAIMED <date> — <branch>` in that doc, push that line, then verify the claim on origin.
-Build it, test it, create the PR, re-verify the claim before opening it, merge, deploy from
-main, then mark C13 ✅ in the doc with the PR number. Do not touch any other card. Do not
-touch To Order, Purchase Orders or Receiving. Do not redesign anything marked ALREADY EXISTS.
+Read docs/purchasing-execution-queue.md — the "LOO UNFROZE To Order" block and card P8.
+Do card P8 ONLY. CLAIM it first — set P8 to `🔨 CLAIMED <date> — <branch>` in that doc, push
+that line, then verify the claim on origin. Loo's four rulings of 2026-08-04 are FINAL: do not
+re-ask them. Inside OperationToOrder.tsx you may edit ONLY the CreatePurchaseDialog region
+(line 1359+) — P9 owns the rail and footer, P10 owns the grid. Build it, test it, create the
+PR, re-verify the claim, merge, deploy from main, verify production, then mark P8 ✅ with the
+PR number. Engineer-Owned Delivery (CLAUDE.md §13.1) applies: do not ask about push, rebase,
+merge, deploy, lint, tests or conflicts — find it, fix it, verify it, continue. Come back ONLY
+for a new business rule. Report at the end: repo · migration · deploy · production check.
+```
+
+```
+Read docs/purchasing-execution-queue.md — the "LOO UNFROZE To Order" block and card P9.
+Do card P9 ONLY. CLAIM it first — set P9 to `🔨 CLAIMED <date> — <branch>` in that doc, push
+that line, then verify the claim on origin. Loo ruled: bare numbers, NO unit word; CATEGORY
+counts UNITS while PO Schedule counts ORDERS. Inside OperationToOrder.tsx you may edit ONLY
+the rail and footer regions — P8 owns the dialog, P10 owns the grid. Measure both numbers in a
+real browser and quote them in the PR; jsdom cannot prove this. Build it, test it, create the
+PR, re-verify the claim, merge, deploy from main, verify production, then mark P9 ✅ with the
+PR number. Engineer-Owned Delivery applies: do not ask about push, rebase, merge, deploy, lint
+or conflicts. Come back ONLY for a new business rule.
 ```
 
 ```
 Read docs/ui-kit-execution-queue.md. Do card D0.5d ONLY. CLAIM it first — set D0.5d to
 `🔨 CLAIMED <date> — <branch>` in that doc, push that line, then verify the claim on origin.
-Every new prop is OPTIONAL and no existing signature changes — To Order and Purchase Orders
-are FROZEN and render through this component. Build it, test it, create the PR, re-verify the
-claim before opening it, merge, deploy from main, then mark D0.5d ✅ with the PR number.
-Migrate no page. Do not touch any other card.
+Every new prop is OPTIONAL and no existing signature changes — To Order, Purchase Orders and
+Receiving all render through this component today and two of those pages are frozen. Row
+expand is the one P10 is waiting on; ship it first if you split the card. Migrate no page.
+Build it, test it, create the PR, re-verify the claim, merge, deploy from main, then mark
+D0.5d ✅ with the PR number. Engineer-Owned Delivery applies. Come back ONLY for a business rule.
 ```
 
-```
-Read docs/ui-kit-execution-queue.md. Do card D7-Claims ONLY. CLAIM it first — set it to
-`🔨 CLAIMED <date> — <branch>` in that doc, push that line, then verify the claim on origin.
-Change no word and no column — R8 ruled the words and P2 ruled the click behaviour. Build it,
-test it, create the PR, re-verify the claim before opening it, merge, deploy from main, then
-mark it ✅ with the PR number. Do not touch any other card.
-```
-
-**One worktree per chat (guardrail #9) — create them before you start:**
+**One worktree per chat (guardrail #9) — create all three before you start:**
 
 ```bash
-git worktree add .claude/worktrees/c13-orders-red -b claude/c13-orders-red main
+git worktree add .claude/worktrees/p8-purchase-demands -b claude/p8-purchase-demands main
+```
+```bash
+git worktree add .claude/worktrees/p9-category-counts -b claude/p9-category-counts main
 ```
 ```bash
 git worktree add .claude/worktrees/d05d-datatable -b claude/d05d-datatable main
 ```
-```bash
-git worktree add .claude/worktrees/d7-claims -b claude/d7-claims main
-```
+
+**Every worktree needs `apps/web/.env.local`** (copy `apps/web/.env.production`) or the dev
+server comes up unconfigured — a lesson this line has already paid for.
 
 Full sentence template: "Read <doc>. Do card <n> ONLY. **CLAIM it first — set <n> to
 `🔨 CLAIMED <date> — <branch>` in that doc, push that line, then verify the claim on origin.**
