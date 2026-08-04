@@ -30,10 +30,16 @@ import {
   stockExpandLabel,
   readyStockDrawNote,
   READY_STOCK_DRAW_REASON,
+  TO_ORDER_WORDS,
+  DEMAND_PURPOSES,
+  DEMAND_PURPOSE_DEFAULT,
+  DEMAND_PURPOSE_VALUES,
+  isDemandPurpose,
   type ToOrderLine,
   type ToOrderRow,
 } from "./to-order";
 import { POOL_USE_REASONS, poolDrawProblem } from "./pool-usage";
+import { OPS_STOCK_STATUS_LABEL } from "./stock-hold";
 import { subtractWorkingDays } from "./working-days";
 
 /**
@@ -1017,5 +1023,78 @@ describe("P13 · the take path speaks the drawer's word", () => {
     expect(readyStockDrawNote("Haven K")).toBe("To Order · Haven K");
     // The reason now carries this sentence; the note must not write it twice.
     expect(readyStockDrawNote("Haven K")).not.toContain("purchase order");
+  });
+});
+
+/**
+ * P15 — THE SOURCE LIST IS A MIRROR OF THE DATABASE, NOT A MENU (Loo,
+ * 2026-08-04).
+ *
+ * The same discipline 0322 had to repair on the stock pool's reasons: the list
+ * lives in `purchase_demands.purpose`'s CHECK, in `purchasing_create_demand`'s
+ * own gate (0323) and here. When only some of them move, a dropdown offers a
+ * word the server refuses BY NAME.
+ */
+describe("P15 · the Source a typed demand may carry", () => {
+  it("holds exactly the four the database can store", () => {
+    expect(DEMAND_PURPOSES.map((p) => p.value)).toEqual([
+      "ready_stock",
+      "display",
+      "warranty",
+      "office",
+    ]);
+  });
+
+  it("offers no word the store has no value for", () => {
+    // `Spare Parts` and `Other…` are RULED WORDS and they are deliberately not
+    // offerable — neither has ever had a CHECK value, and inventing one would
+    // be a screen ruling on a business question nobody has asked.
+    const labels = DEMAND_PURPOSES.map((p) => p.label);
+    expect(labels).not.toContain(TO_ORDER_WORDS.reasonSpareParts);
+    expect(labels).not.toContain(TO_ORDER_WORDS.reasonOther);
+    // ...and the words themselves survive, because a later card may need them.
+    expect(TO_ORDER_WORDS.reasonSpareParts).toBe("Spare Parts");
+    expect(TO_ORDER_WORDS.reasonOther).toBe("Other…");
+  });
+
+  it("every label comes from the words module — none is spelt twice", () => {
+    for (const p of DEMAND_PURPOSES) {
+      expect(Object.values(TO_ORDER_WORDS)).toContain(p.label);
+    }
+  });
+
+  it("the default is Ready Stock — the RPC's own default and the common case", () => {
+    expect(DEMAND_PURPOSE_DEFAULT).toBe("ready_stock");
+    expect(DEMAND_PURPOSES[0].value).toBe(DEMAND_PURPOSE_DEFAULT);
+    expect(isDemandPurpose(DEMAND_PURPOSE_DEFAULT)).toBe(true);
+  });
+
+  it("the guard admits the four and refuses everything else", () => {
+    for (const v of DEMAND_PURPOSE_VALUES) expect(isDemandPurpose(v)).toBe(true);
+    for (const v of ["spare_parts", "other", "", "READY_STOCK", null, 7, undefined]) {
+      expect(isDemandPurpose(v)).toBe(false);
+    }
+  });
+});
+
+/**
+ * P15 — THE PICKER'S TWO STOCK WORDS ARE THE REGISTER'S OWN.
+ *
+ * `Free` and `Reserved` have ONE home — `OPS_STOCK_STATUS_LABEL` — and the
+ * picker's headers mirror it. A copy that may drift is not a mirror, so the
+ * equality is asserted rather than trusted to whoever renames next.
+ */
+describe("P15 · the picker's column words", () => {
+  it("Free and Reserved are the register's own labels, character for character", () => {
+    expect(TO_ORDER_WORDS.pickerColFree).toBe(OPS_STOCK_STATUS_LABEL.free);
+    expect(TO_ORDER_WORDS.pickerColReserved).toBe(OPS_STOCK_STATUS_LABEL.reserved);
+  });
+
+  it("the ambiguous column is the SKU, and it is not the Item field's word", () => {
+    // P15's defect 1: four SKUs read `Booqit`. The code is what separates them.
+    expect(TO_ORDER_WORDS.pickerColSku).toBe("SKU");
+    // One word may not label two things in one dialog: the FIELD is `Item`, so
+    // the model COLUMN takes the grid's own word for that value.
+    expect(TO_ORDER_WORDS.colModel).not.toBe(TO_ORDER_WORDS.itemLabel);
   });
 });

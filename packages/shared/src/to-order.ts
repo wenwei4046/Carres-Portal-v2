@@ -211,10 +211,17 @@ export const TO_ORDER_WORDS = {
    */
   pickerColReserved: "Reserved",
   pickerColFree: "Free",
-  /** The picker's own table, for a screen reader. Never rendered. */
+  /**
+   * The picker's own table, for a screen reader. **Never rendered**, which is
+   * why it is not a new visible word — the same shape as `itemsTableLabel`
+   * above. A table that gained a header row also needs a name, or a screen
+   * reader announces "table" and nothing else.
+   *
+   * There is deliberately NO empty-state sentence: the picker showed an empty
+   * box before P15 and shows one now. P15 does not list that as a defect, and
+   * a sentence nobody has ruled may not appear on a screen.
+   */
   pickerTableLabel: "Search results",
-  /** Voiced in the picker when a search matches nothing at all. */
-  pickerEmpty: "No item matches.",
   /**
    * `Supplier` — ONE word with ONE home, used in two places: the Create
    * Purchase dialog's field and, since 2026-08-03, the grid's supplier column.

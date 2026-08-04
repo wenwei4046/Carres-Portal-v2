@@ -1800,3 +1800,237 @@ describe("no delete path exists for a purchase demand", () => {
     ]);
   });
 });
+
+/**
+ * P15 — THE SOURCE, AND THE PICKER'S OWN READ (Loo, 2026-08-04).
+ *
+ * `purpose` was a hardcoded `"ready_stock"` on this route because the RPC
+ * refused everything else by name (Jess, 2026-08-03 — *"V1 buys READY STOCK
+ * only"*). 0319 wrote that refusal so that *"the day one is approved this gate
+ * is the only thing that changes"*; Loo approved the four the CHECK holds and
+ * 0323 changed that one gate. The route now forwards what the operator chose.
+ */
+describe("POST …/to-order/demand — the Source rides the wire (P15)", () => {
+  const DEST = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
+
+  async function create(body: unknown, role = "operation") {
+    const calls: { fn: string; args: Record<string, unknown> }[] = [];
+    vi.mocked(userClient).mockReturnValue({
+      from: vi.fn(),
+      rpc: vi.fn(async (fn: string, args: Record<string, unknown>) => {
+        calls.push({ fn, args });
+        return { data: { id: "d1", supplier_id: "s1" }, error: null };
+      }),
+    } as never);
+    const jwt = await makeJwt(role);
+    const res = await app.fetch(
+      new Request("http://t/api/operation/purchase/to-order/demand", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+    return { res, calls };
+  }
+
+  const base = { sku: "SONIC-S", qty: 2, destinationId: DEST };
+
+  it("forwards each of the four purposes the store can record", async () => {
+    for (const p of ["ready_stock", "display", "warranty", "office"]) {
+      const { res, calls } = await create({ ...base, purpose: p });
+      expect(res.status).toBe(200);
+      expect(calls[0].fn).toBe("purchasing_create_demand");
+      expect(calls[0].args.p_purpose).toBe(p);
+    }
+  });
+
+  it("refuses a purpose the database has no value for, before it reaches the RPC", async () => {
+    // `Spare Parts` and `Other…` are ruled WORDS with no CHECK value. The
+    // dialog does not offer them; this proves the wire does not either, so the
+    // three lists (CHECK · function gate · shared constant) cannot drift into
+    // a fourth that only the api believes.
+    for (const p of ["spare_parts", "other", "", "READY_STOCK"]) {
+      const { res, calls } = await create({ ...base, purpose: p });
+      expect(res.status).toBe(400);
+      expect(calls).toHaveLength(0);
+    }
+  });
+
+  it("a browser on the pre-P15 bundle still works, and means ready stock", async () => {
+    // No `purpose` key at all — the only thing that browser could have meant,
+    // and the RPC's own default.
+    const { res, calls } = await create(base);
+    expect(res.status).toBe(200);
+    expect(calls[0].args.p_purpose).toBe("ready_stock");
+  });
+
+  it("NO SUPPLIER may be smuggled through the body", async () => {
+    /**
+     * Jess's 2026-08-03 ruling as a test: a product has ONE factory and the
+     * server derives it from the SKU. P15 shows the supplier in the dialog —
+     * that is the derivation read back, never a second answer. The RPC has no
+     * supplier parameter, so a body carrying one must reach nothing.
+     */
+    const { res, calls } = await create({
+      ...base,
+      purpose: "display",
+      supplierId: "11111111-1111-1111-1111-111111111111",
+      supplier: "Somebody Else",
+    });
+    expect(res.status).toBe(200);
+    expect(Object.keys(calls[0].args).sort()).toEqual([
+      "p_destination_id",
+      "p_purpose",
+      "p_qty",
+      "p_remark",
+      "p_required_by",
+      "p_sku",
+    ]);
+  });
+});
+
+describe("GET …/to-order/demand/pick-items — the picker's own read (P15)", () => {
+  const WH = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
+
+  function client(opts?: { stockRows?: Record<string, unknown>[] }) {
+    const stock = opts?.stockRows ?? [
+      // free · sound · at the warehouse → On Hand AND Free
+      { id: "u1", sku: "SONIC-S", qty: 1, status: "free", condition: "new", needs_repair: false },
+      { id: "u2", sku: "SONIC-S", qty: 1, status: "free", condition: "new", needs_repair: false },
+      // reserved → On Hand, never Free
+      { id: "u3", sku: "SONIC-S", qty: 1, status: "reserved", condition: "new", needs_repair: false },
+      // quarantined → physically here, so On Hand; never Free (R4)
+      { id: "u4", sku: "SONIC-S", qty: 1, status: "on_hold", condition: "new", needs_repair: false },
+      // on its way → neither
+      { id: "u5", sku: "SONIC-S", qty: 9, status: "incoming", condition: "new", needs_repair: false },
+    ];
+    return {
+      from: vi.fn((table: string) => {
+        const rows =
+          table === "product_skus"
+            ? [
+                { sku: "5539-CNR", variant: "Corner", variant_kind: "part", supplier_id: "sup1", model_id: "m1" },
+                { sku: "SONIC-S", variant: "Single", variant_kind: "size", supplier_id: "sup2", model_id: "m2" },
+              ]
+            : table === "product_models"
+              ? [
+                  { id: "m1", name: "Booqit" },
+                  { id: "m2", name: "Sonic" },
+                ]
+              : table === "suppliers"
+                ? [
+                    { id: "sup1", name: "Ohana" },
+                    { id: "sup2", name: "Nice Future" },
+                  ]
+                : table === "warehouses"
+                  ? [{ id: WH, name: "Carres Klang", kind: "own" }]
+                  : table === "ops_stock_items"
+                    ? stock
+                    : [];
+        const q: Record<string, unknown> = {};
+        const chain = () => q;
+        // Every narrowing the route applies, honoured so the shaped rows are
+        // what the route would really have seen.
+        q.select = vi.fn(chain);
+        q.eq = vi.fn((col: string, val: unknown) => {
+          if (table === "ops_stock_items" && col === "status") {
+            (q as { _rows: unknown[] })._rows = stock.filter((r) => r.status === val);
+          }
+          if (table === "ops_stock_items" && col === "needs_repair") {
+            const cur = ((q as { _rows?: Record<string, unknown>[] })._rows ?? stock);
+            (q as { _rows: unknown[] })._rows = cur.filter((r) => r.needs_repair === val);
+          }
+          return q;
+        });
+        q.in = vi.fn((col: string, vals: unknown[]) => {
+          if (table === "ops_stock_items") {
+            const cur = ((q as { _rows?: Record<string, unknown>[] })._rows ?? stock);
+            (q as { _rows: unknown[] })._rows = cur.filter((r) =>
+              vals.includes(r[col] as never),
+            );
+          }
+          return q;
+        });
+        q.not = vi.fn(chain);
+        q.order = vi.fn(chain);
+        q.then = (resolve: (v: unknown) => unknown) =>
+          resolve({
+            data: table === "ops_stock_items"
+              ? ((q as { _rows?: unknown[] })._rows ?? stock)
+              : rows,
+            error: null,
+          });
+        return q;
+      }),
+      rpc: vi.fn(),
+    };
+  }
+
+  async function pick(c = client()) {
+    vi.mocked(userClient).mockReturnValue(c as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/purchase/to-order/demand/pick-items", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    return { res, body: (await res.json()) as { items: unknown[]; stockWarehouse: string | null } };
+  }
+
+  it("leads with the SKU, so two items that share a name are told apart", async () => {
+    const { res, body } = await pick();
+    expect(res.status).toBe(200);
+    const items = body.items as { sku: string; label: string }[];
+    // `5539-CNR` is a PART variant, so `railItemLabel` has no size letter to
+    // add and the label is the bare model — P15's defect 1, at the source.
+    const corner = items.find((i) => i.sku === "5539-CNR")!;
+    expect(corner.label).toBe("Booqit");
+    expect(corner.sku).toBe("5539-CNR");
+  });
+
+  it("the supplier is DERIVED and rides along as a fact", async () => {
+    const { body } = await pick();
+    const items = body.items as { sku: string; supplier: string | null }[];
+    expect(items.find((i) => i.sku === "5539-CNR")!.supplier).toBe("Ohana");
+    expect(items.find((i) => i.sku === "SONIC-S")!.supplier).toBe("Nice Future");
+  });
+
+  it("the three stock numbers each mean a different thing", async () => {
+    const { body } = await pick();
+    const s = (body.items as { sku: string; onHand: number; reserved: number; free: number }[])
+      .find((i) => i.sku === "SONIC-S")!;
+    // 2 free + 1 reserved + 1 on hold are all standing in the building.
+    expect(s.onHand).toBe(4);
+    expect(s.reserved).toBe(1);
+    // FREE is P10's rule: free · sound · at that warehouse. A quarantined unit
+    // is on hand and can never be free; an incoming one is neither.
+    expect(s.free).toBe(2);
+    expect(body.stockWarehouse).toBe("Carres Klang");
+  });
+
+  it("a SKU with no supplier is not offered — the RPC would refuse it by name", async () => {
+    const { body } = await pick();
+    // The route asks the database for `supplier_id is not null`; nothing here
+    // may arrive with a null supplier, because offering it teaches the operator
+    // that refusals are random rather than a configuration hole.
+    for (const i of body.items as { supplier: string | null }[]) {
+      expect(i.supplier).not.toBeNull();
+    }
+  });
+
+  it("the register being unreachable costs the numbers, never the dialog", async () => {
+    const c = client();
+    const realFrom = c.from;
+    c.from = vi.fn((table: string) => {
+      if (table === "ops_stock_items") throw new Error("register down");
+      return (realFrom as (t: string) => unknown)(table);
+    }) as never;
+    const { res, body } = await pick(c);
+    // A demand can always be typed. The offer degrades to zero, and zero is
+    // what the grid would offer too — never an invented number.
+    expect(res.status).toBe(200);
+    expect((body.items as { free: number }[]).every((i) => i.free === 0)).toBe(true);
+  });
+});

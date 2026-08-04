@@ -152,7 +152,32 @@ const TO_ORDER = {
 
 let failCategories: Set<string>;
 
+/**
+ * The Create Purchase picker's own read (P15).
+ *
+ * **THE FIRST FOUR ROWS ARE THE DEFECT THIS CARD EXISTS FOR, copied from the
+ * live measurement of 2026-08-04**: four different SKUs whose model label is
+ * the single word `Booqit`, because a PART variant has no size letter to tell
+ * them apart. Before P15 the picker printed that label alone and an operator
+ * could not pick the right one.
+ */
+const PICK_ITEMS = {
+  items: [
+    { sku: "5539-L(RHF)", label: "Booqit", supplier: "Ohana", onHand: 3, reserved: 1, free: 2 },
+    { sku: "5539-2NA", label: "Booqit", supplier: "Ohana", onHand: 0, reserved: 0, free: 0 },
+    { sku: "5539-CNR", label: "Booqit", supplier: "Ohana", onHand: 5, reserved: 0, free: 5 },
+    { sku: "5539-Console", label: "Booqit", supplier: "Ohana", onHand: 0, reserved: 0, free: 0 },
+    { sku: "SONIC-S", label: "Sonic S", supplier: "Nice Future", onHand: 7, reserved: 2, free: 5 },
+  ],
+  stockWarehouse: "Carres Klang",
+};
+
 function route(path: string, body?: { category?: string; purchaseOrders?: { key: string }[] }) {
+  // BEFORE the generic to-order branch — `startsWith` would otherwise answer
+  // the picker with the whole workspace payload.
+  if (path.startsWith("/api/operation/purchase/to-order/demand/pick-items")) {
+    return Promise.resolve(PICK_ITEMS);
+  }
   if (path.startsWith("/api/operation/purchase/to-order/issue")) {
     const cat = body?.category ?? "?";
     if (failCategories.has(cat)) return Promise.reject(new Error(`boom-${cat}`));
@@ -612,32 +637,136 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
   });
 });
 
-describe("+ Create Purchase — the entrance is real, the save is next", () => {
-  it("asks FIVE things and offers no purpose, no supplier, nothing disabled", async () => {
+describe("+ Create Purchase — the dialog stops guessing (P15)", () => {
+  /**
+   * The picker renders through the kit's `DataTable` (§0.1 — a hand-rolled
+   * table is a violation the guard counts). A row is found BY ITS SKU CELL,
+   * which is the assertion this card is about anyway: if the code is not
+   * rendered the row cannot be addressed, and defect 1 is back.
+   */
+  const pickRow = (sku: string) =>
+    screen.getByText(sku, { selector: ".font-mono" }).closest("tr")!;
+
+  async function openDialog() {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-create-purchase"));
     const dialog = await screen.findByTestId("to-order-create-dialog");
+    await waitFor(() => expect(pickRow("5539-CNR")).toBeTruthy());
+    return dialog;
+  }
 
-    // Item · Quantity · Deliver To · Required By · Remark (Jess, 2026-08-03).
+  it("asks SIX things — the five that were right, plus the Source", async () => {
+    const dialog = await openDialog();
+
+    // Item · Quantity · Deliver To · Required By · Remark were correct and are
+    // untouched. `Required By` and `Destination` are Loo's own ruling and the
+    // card forbids changing them.
     for (const w of [W.itemLabel, W.itemsColQty, W.destination, W.requiredBy, W.remark]) {
       expect(within(dialog).getByText(w)).toBeInTheDocument();
     }
+    // THE SIXTH — P15's defect 2. `Reason` is the mirror's own word for the
+    // field the frozen list calls Source; nothing new is spelt.
+    expect(within(dialog).getByText(W.reason)).toBeInTheDocument();
 
-    // NO purpose picker: V1 buys one thing, so choosing is not a question.
-    expect(within(dialog).queryByText(W.reason)).toBeNull();
-    expect(within(dialog).queryByText(W.reasonReadyStock)).toBeNull();
-    // NO supplier picker: a product has one factory and the server derives it.
-    expect(within(dialog).queryByText(W.supplierLabel)).toBeNull();
     // Category was never asked and still is not.
     expect(within(dialog).queryByText("Category")).toBeNull();
-
-    // NOTHING DISABLED AND NO PLACEHOLDER — Display and Office begin at other
-    // portals, and a greyed control here would promise this page owns them.
+    // Nothing disabled, no placeholder promise.
     expect(screen.queryByText(W.nextUpdate)).toBeNull();
-    expect(within(dialog).queryByText(/Display|Office/)).toBeNull();
   });
 
-  it("Save is refused until an item is picked, then posts what the server needs", async () => {
+  it("DEFECT 1 — four SKUs that share the word Booqit are told apart", async () => {
+    const dialog = await openDialog();
+
+    // The label alone is ambiguous FOUR ways, which is the live measurement.
+    expect(within(dialog).getAllByText("Booqit")).toHaveLength(4);
+    // The SKU is what distinguishes them, and every one of them is on screen.
+    for (const sku of ["5539-L(RHF)", "5539-2NA", "5539-CNR", "5539-Console"]) {
+      expect(within(dialog).getByText(sku)).toBeInTheDocument();
+    }
+    // ...under a header that says what the column is.
+    expect(within(dialog).getByText(W.pickerColSku)).toBeInTheDocument();
+
+    // ONE WORD, ONE THING. The ambiguous column is headed `Model` — the grid's
+    // own word for this value — because the FIELD is already `Item`, and one
+    // word labelling two things in one dialog is the defect this card is
+    // fixing in another form.
+    expect(within(dialog).getAllByText(W.itemLabel)).toHaveLength(1);
+    expect(within(dialog).getByText(W.colModel)).toBeInTheDocument();
+  });
+
+  it("DEFECT 3 — the picker carries the stock numbers, headed by their own words", async () => {
+    const dialog = await openDialog();
+
+    for (const w of [W.pickerColOnHand, W.pickerColReserved, W.pickerColFree]) {
+      expect(within(dialog).getByText(w)).toBeInTheDocument();
+    }
+    // The row an operator would read before buying: 5 on hand, none spoken
+    // for, 5 free — so buying more may be unnecessary.
+    const row = pickRow("5539-CNR");
+    expect(row).toHaveTextContent("5539-CNR");
+    expect(row).toHaveTextContent("5");
+    // ...and a SKU with nothing in the warehouse says zero rather than blank.
+    expect(pickRow("5539-2NA")).toHaveTextContent("0");
+  });
+
+  it("DEFECT 4 — the supplier appears on pick, as a FACT and never a chooser", async () => {
+    const dialog = await openDialog();
+
+    // Nothing claimed before an item is picked.
+    expect(within(dialog).queryByTestId("cp-supplier")).toBeNull();
+
+    fireEvent.click(pickRow("SONIC-S"));
+    expect(within(dialog).getByTestId("cp-supplier")).toHaveTextContent("Nice Future");
+
+    // IT IS NOT A CONTROL. The supplier is derived by the server from the SKU
+    // (Jess, 2026-08-03); a client that could name it could name the wrong
+    // factory, so there is no input, no select and no button for it.
+    const supplier = within(dialog).getByTestId("cp-supplier");
+    expect(supplier.querySelector("input,select,button")).toBeNull();
+  });
+
+  it("DEFECT 2 — the Source is chosen and it is what gets posted", async () => {
+    await openDialog();
+    fireEvent.click(pickRow("SONIC-S"));
+
+    // The four the store can record. Spare Parts and Other… are ruled WORDS
+    // with no database value, so they are absent rather than greyed — a
+    // control offering a word the server refuses by name is the disease 0322
+    // had to repair on the stock pool's reasons.
+    // Opened by KEYBOARD: jsdom@25 has no `PointerEvent`, so a synthesised
+    // pointerDown is an Event React ignores and a Radix listbox silently never
+    // opens — D0.5b paid for that once already.
+    const trigger = document.getElementById("cp-purpose")!;
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    // Scoped to the LIST, because the trigger renders the chosen value too and
+    // `Ready Stock` is legitimately on screen twice while the list is open.
+    const list = await screen.findByRole("listbox");
+    for (const w of [W.reasonReadyStock, W.reasonDisplay, W.reasonWarranty, W.reasonOffice]) {
+      expect(within(list).getByText(w)).toBeInTheDocument();
+    }
+    expect(within(list).queryByText(W.reasonSpareParts)).toBeNull();
+    expect(within(list).queryByText(W.reasonOther)).toBeNull();
+
+    fireEvent.click(within(list).getByText(W.reasonWarranty));
+
+    apiFetch.mockClear();
+    fireEvent.click(screen.getByTestId("to-order-create-submit"));
+    await waitFor(() => {
+      const post = apiFetch.mock.calls.find(
+        (c) => (c[1] as RequestInit | undefined)?.method === "POST",
+      );
+      expect(post).toBeTruthy();
+      const sent = JSON.parse(String((post![1] as RequestInit).body));
+      expect(sent.purpose).toBe("warranty");
+      expect(sent.sku).toBe("SONIC-S");
+      // NO SUPPLIER ON THE WIRE. There is no key to send and no parameter to
+      // send it to — the RPC derives it.
+      expect(sent).not.toHaveProperty("supplier");
+      expect(sent).not.toHaveProperty("supplierId");
+    });
+  });
+
+  it("Save is refused until an item is picked", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-create-purchase"));
     await screen.findByTestId("to-order-create-dialog");
@@ -1449,10 +1578,30 @@ describe("the page offers no way to delete a demand", () => {
    * tests. The expected values below are untouched: the scan's scope follows
    * the code so that its ASSERTION can stay exactly what it was.
    */
+  /**
+   * P15 — THE COMMENT STRIPPER BLINDED ITSELF, and the order of two lines is
+   * the whole fix.
+   *
+   * `{…/*…*​/…}` ran FIRST, and its leading `\{\s*` will start at ANY brace
+   * followed by whitespace and a `/*`. A function body that opens with a
+   * doc comment is exactly that shape, so the match ran from the function's
+   * own `{` to the first `*​/}` it could find and deleted **5,868 characters
+   * of live code** — including both of this dialog's demand doors. The scan
+   * went on passing while seeing half the file, which is the silent shrink
+   * the note above records having already been paid for once.
+   *
+   * Stripping ordinary block comments FIRST cannot do that: the match begins
+   * at `/*`, so it can never swallow the code in front of one. The JSX form
+   * is then left in place as the no-op it has become — deleting it would be a
+   * claim about JSX this test has no reason to make.
+   *
+   * It is caught rather than theoretical: the create-door assertion below
+   * failed on its own the moment this file gained a doc comment.
+   */
   const scan = (file: string) =>
     readFileSync(join(dirname(fileURLToPath(import.meta.url)), file), "utf8")
-      .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
       .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
       .replace(/(^|[^:])\/\/.*$/gm, "$1")
       // Every `${…}` collapses to `:id` BEFORE anything is extracted. Written
       // the other way round the path scan stopped at the first `)` inside
@@ -1494,11 +1643,19 @@ describe("the page offers no way to delete a demand", () => {
     expect(src).not.toMatch(/["'`][^"'`\n]*\/(delete|purge|remove)\b/i);
   });
 
-  it("the only demand doors the page opens are create and cancel", () => {
+  /**
+   * P15 adds a THIRD path and it is a READ. The two WRITE doors below are
+   * byte-untouched — create and cancel, exactly as P12 and P14 left them —
+   * and `pick-items` is a `GET` that answers what the picker may choose from.
+   * It is listed rather than excluded by a filter: this assertion's value is
+   * that it names EVERY path, so a door added quietly is a failure.
+   */
+  it("the only demand doors the page opens are create, cancel and the picker read", () => {
     const paths = [...src.matchAll(/to-order\/demand[a-z:/-]*/g)].map((m) => m[0]);
     expect([...new Set(paths)].sort()).toEqual([
       "to-order/demand",
       "to-order/demand/:id/cancel",
+      "to-order/demand/pick-items",
     ]);
   });
 });
