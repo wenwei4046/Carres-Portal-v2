@@ -258,6 +258,40 @@ export const TO_ORDER_WORDS = {
   create: "Create",
   nextUpdate: "Available in next update.",
 
+  // ── P19 (Loo, 2026-08-05) — Create Purchase takes MANY lines ─────────────
+  /**
+   * The control that adds a row to the line list. Rendered as `+ {lineAdd}`,
+   * the same shape as `+ {createPurchase}` on the rail — the glyph is markup,
+   * the WORD is here.
+   *
+   * **It is the one genuinely new word on this card, and Loo ruled it on
+   * 2026-08-05 from three options with the alternatives' costs attached.**
+   * The Sales Portal — the very form the comparison was made against — spells
+   * the same gesture `Add line item`, and `Add item` was the third candidate;
+   * he chose `Add line`, so the pair below reads as one act on one row rather
+   * than borrowing another form's phrasing. It gains a COPY-STANDARD row in
+   * the same card, because a word on a screen with no entry there is the gap
+   * this module's own law exists to close.
+   */
+  lineAdd: "Add line",
+  /**
+   * The control that takes a row back out, before anything is submitted.
+   *
+   * **A SEPARATE ENTRY FROM `itemsRemove`, WHICH SPELLS THE SAME WORD, and the
+   * split is this file's own rule rather than an oversight.** `itemsRemove` is
+   * the PO Preview's item menu — taking a line off a purchase order that is
+   * about to be issued. This one is a form control on a row nobody has saved.
+   * Two concepts that happen to share a spelling are two entries (the
+   * `cancelDemand` / `cancel` precedent, six entries above); the same concept
+   * spelt twice is the drift `supplierLabel` warns about. A rename of either
+   * must never silently rename the other.
+   *
+   * It is never offered on a line that has already been created: that row is a
+   * record now, and a control implying it could be un-made would be a lie —
+   * the row says `createdWord` instead.
+   */
+  lineRemove: "Remove",
+
   // ── P12 (Loo, 2026-08-04) — a typed demand can be cancelled, and so can the
   //    REMAINDER of one that was part-ordered. ─────────────────────────────
   /**

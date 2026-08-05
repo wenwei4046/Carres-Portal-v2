@@ -459,6 +459,35 @@ its own.**)*
 you just typed is `Save`, and one that abandons it is `Cancel` — those are not actions, they
 never appear in a queue, and they need no verb from this table.
 
+#### The line-list controls (Loo, 2026-08-05, card P19)
+
+**A form whose body is a LIST OF LINES needs two more controls, and they are form buttons by
+the rule directly above — they take no verb from the table and they never appear in a queue.**
+They are ruled here anyway, because this document's own law is that a word on a screen has an
+entry, and both were live on Carres screens for months with none.
+
+| Concept | Canonical word | Do NOT use |
+|---|---|---|
+| Add one more line to the list being typed | **`Add line`** (rendered `+ Add line`) | Add line item · Add item · Add row · New line · Insert · `+` alone |
+| Take a line back out, before it is submitted | **`Remove`** | Delete · Remove line · Clear · Discard · `×` alone |
+
+**Loo chose from three candidates with their costs attached**, and the two he did not choose
+are recorded because each was already on a real screen and a later chat will find them:
+the Sales Portal's New Sales Order — the form the P19 comparison was made against — spells the
+same pair `Add line item` / `Remove line`, and `Add item` was the third. He ruled `Add line` /
+`Remove`, so **the Sales Portal is now the screen that disagrees with the dictionary**, and
+changing it is that lane's card, not a tidy-up anyone may do in passing.
+
+**`Remove` is deliberately NOT `Delete`.** Nothing has been stored yet: the row is typing, and
+`Delete` names the destruction of a record. Once a line HAS been created the control is gone
+altogether — a created line reads `Created`, because a form that offers to remove a record it
+cannot un-make is lying about what the press does.
+
+**Neither word may be reused for a worklist action.** `Remove` here is a form control on an
+unsaved row; taking a line off a purchase order that exists is a different act and gets its own
+entry, exactly as `Cancel`-the-action and `Cancel`-the-form-button are two entries in the
+Purchasing mirror.
+
 **The CHANNEL is not the action.** `Call {supplier} — confirm what happens next` is the same
 action whether it is done by phone, by WhatsApp or in person: outward communication whose
 outcome is recorded. A button that opens WhatsApp or copies the message is HOW,
