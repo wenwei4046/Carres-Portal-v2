@@ -319,7 +319,7 @@ const NO_EXPANSION: ReadonlySet<string> = new Set<string>();
  * header, every line and the total row cannot drift apart.
  *
  * **A GRID, not a flex row, and that is Q10 Ⓓ.** `Description` was `flex-1`
- * inside a cell that spans the whole 1206px table, so it took 787px and pushed
+ * inside a cell that spans the whole 1208px table, so it took 787px and pushed
  * `Qty`, `Destination` and `Received` past the right edge of a 568px listing.
  * `minmax(0, 1fr)` takes what is LEFT of the five measured tracks and can never
  * take more; the tracks themselves are exact, so no fixed column can be
@@ -1023,7 +1023,12 @@ export default function OperationPurchaseOrders() {
       // 这张 PO 是哪几个 Sales Order 组成的."* The data has been on the wire
       // since the register shipped (`so` + `so_refs`) and no column read it.
       label: "SO No.",
-      width: "94px",
+      // 94 → 95, Loo 2026-08-05 (card Q13 follow-up), the same ruling that
+      // took `supplier` to 88: P17's separator takes 1px of the BOX, so 94
+      // left `SO-1206 +4` 77px of content for 78px of ink and clipped it on
+      // 2 live rows with no ellipsis. **A frozen width that truncates is not
+      // the frozen intent.**
+      width: "95px",
       sortable: true,
       filter: filterFor("sono", soOptions, { searchable: true }),
       cell: (p) => {
@@ -1048,7 +1053,14 @@ export default function OperationPurchaseOrders() {
       // a scrollbar is exactly what Loo forbade. `Booqit 1B(…)` still
       // truncates first among the word columns, which was Q1's argument and
       // survives it.
-      width: "135px",
+      //
+      // 135 → 136, Loo 2026-08-05 (card Q13 follow-up), the same ruling that
+      // took `supplier` to 88 and `sono` to 95: P17's separator takes 1px of
+      // the BOX, so 135 left `Booqit 2B(LHF) · +1` 118px of content for 119px
+      // of ink. **The column still truncates on a long enough item list — it
+      // always did, and it has a `title` — but it may not lose its last pixel
+      // to a border.**
+      width: "136px",
       sortable: true,
       filter: filterFor("items", itemsOptions, { searchable: true }),
       cell: (p) => (
@@ -1385,30 +1397,34 @@ export default function OperationPurchaseOrders() {
               scrollbar is the thing he forbade** — an operator who wants a
               different balance has resize and reorder (PR 601).
 
-              The number is the sum of the nine measured minimums (1169) plus
+              The number is the sum of the nine measured minimums (1171) plus
               the kit's expand-control column, which takes 3% of the table:
-              1169 / 0.97 = 1205.15 → 1206, so even at the narrowest width every
+              1171 / 0.97 = 1207.22 → 1208, so even at the narrowest width every
               column still reaches its own minimum.
 
               IT IS DERIVED, NOT DECORATIVE, and card Q13 measured what happens
-              when it is left behind. Widening `supplier` 87 → 88 and holding
-              1205 does not shrink a business column — `table-fixed` takes the
-              pixel out of the only non-pixel track, the kit's 3% control
+              when it is left behind. Widening a column and holding the old
+              min-width does not shrink a business column — `table-fixed` takes
+              the pixel out of the only non-pixel track, the kit's 3% control
               column, whose expand button ALREADY overflows it (P16's
-              documented clip). Measured live at 1280, where this min-width is
-              the binding constraint: 87/1205 → control 35px, clip 7px; 88/1205
-              → control 34px, clip 8px; 88/1206 → control 35px, clip 7px, and
-              the supplier clip gone. **A test derives this number from the
-              column widths, so the two cannot drift apart again.** */}
+              documented clip). Measured live at 1280 on the deployed page,
+              where this min-width is the binding constraint: `sono`/`items` at
+              95/136 with the min-width left at 1206 → control 35px → **33px**
+              and P16's clip 7px → **9px**, while every business column still
+              renders at its ruled width, i.e. the damage is INVISIBLE to the
+              assertion that pins them; at 1208 the control is back to 35px and
+              the clip to 7px with the business clips gone. **A test derives
+              this number from the column widths, so the two cannot drift apart
+              again.** */}
           {/* `container-type: inline-size` makes this scroller a query
               container, so the expanded record can be sized to the VISIBLE
-              width (`100cqi`) rather than to the 1206px table it spans — Q10 Ⓓ.
+              width (`100cqi`) rather than to the 1208px table it spans — Q10 Ⓓ.
               Measured at 1280 before the fix: the expand's own header was
               1171px inside 568px, so `Qty`, `Destination` and `Received` were
               unreachable. Nothing else in the table is absolutely positioned
               (the ▼ menus are Radix portals), so the containment costs nothing. */}
           <div className="flex-1 min-h-0 overflow-auto [container-type:inline-size]">
-            <div className="min-w-[1206px]">
+            <div className="min-w-[1208px]">
               <DataTable<operationPoListRow>
               rows={rows}
               columns={visibleColumns}
@@ -1588,7 +1604,7 @@ function PoWorkArea({
 
   return (
     /* SIZED TO THE VISIBLE WIDTH (Q10 Ⓓ). The expanded cell spans every column,
-     * so it inherits the table's 1206px minimum — measured on production at
+     * so it inherits the table's 1208px minimum — measured on production at
      * 1280, the expand's own header came out 1171px inside a 568px listing and
      * `Qty`, `Destination` and `Received` could not be reached at all.
      * `100cqi` is the SCROLLER's visible width (its container-query size, set
@@ -1615,7 +1631,7 @@ function PoWorkArea({
      *
      * **THE BOUND IS LOAD-BEARING AND IT IS NOT DECORATION.** `width:fit-content`
      * is capped by the AVAILABLE width, and available here is the `<td>`'s —
-     * i.e. the table's `min-w-[1206px]`, not the pane. Measured with a 200-char
+     * i.e. the table's `min-w-[1208px]`, not the pane. Measured with a 200-char
      * description at 1280: bounded, the record is 935 and `Received` ends at
      * 1212, inside the 1217 scrollport, and the name truncates (scrollWidth 1871
      * against clientWidth 551); with the `max-w` removed the record is 1171 and
