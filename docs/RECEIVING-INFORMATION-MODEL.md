@@ -53,14 +53,28 @@ produces a refusal at issue that the business never asked for.
 | Path | Where the goods go | Who confirms fulfilment |
 |---|---|---|
 | **Warehouse** | into a Carres warehouse | **nobody presses anything** — posting the Receiving Session IS the confirmation |
-| **Direct to customer** | the supplier or the carrier takes them straight to the customer | **Operation confirms it explicitly** — no Session can ever exist for those goods |
+| **Direct to customer** | the supplier hands the goods over and they never touch a Carres floor — **a carrier takes them to the customer, OR the customer collects at the factory** | **Operation confirms it explicitly** — no Session can ever exist for those goods |
 
-**TWO PATHS ARE RULED. A THIRD SITUATION IS RECORDED AND IS NOT A RULED PATH** — Loo
-mentioned in passing, 2026-08-05, that *"我们有发生过顾客去我们厂那边"*: the customer goes to
-the factory and takes the goods themselves. **It is written down as a business fact so it is
-not lost, and nothing more** — it has not been ruled, it is not a third row in the table
-above, and no build may treat it as one. *(A chat turned that remark into a frozen path and
-was corrected by him the same day. The remark is true; making it law was not his act.)*
+**THERE ARE TWO PATHS, NOT THREE — AND *"顾客自己去厂里拿"* IS THE SECOND ONE.** Loo raised it
+on 2026-08-05 and asked what it belongs to. It belongs here, and the test is what makes it
+obvious:
+
+> **Fulfilment asks ONE question: did the supplier hand the goods over?**
+> Customer-collects and carrier-delivers give the **same answer** — the goods left the factory
+> and reached the customer, and no Carres floor was involved either way.
+
+- **WHO CARRIES THE GOODS IS A DELIVERY FACT, NOT A FULFILMENT FACT.** Our lorry, AL's lorry,
+  or the customer's own car — that already has a home on the delivery side. Opening a second
+  fulfilment path because the *carrier* changed would keep two mechanisms alive to answer one
+  question, which is the shape that cost Purchasing five rebuilds.
+- **The one real difference is EVIDENCE, and evidence is a note, not a path.** A carrier
+  reports back; a self-collection is reported by the factory. That changes *how we came to
+  know*, never *what happened* — so it rides the fulfilment record's own note beside `who ·
+  when`, and no new field, path or button is created for it.
+- **What it DOES change is on the Orders side, and it is named here so nobody thinks it was
+  missed:** a customer who collects at the factory means Carres arranges no delivery, issues
+  no DO and charges no delivery fee. That is the Delivery module's business, not Purchasing's,
+  and it is not part of the fulfilment record.
 
 - **The warehouse path gets NO extra confirm button, and that is a rule rather than a
   convenience.** §1 says the check-in itself IS the completed GRN; a second *"yes, the
@@ -70,11 +84,15 @@ was corrected by him the same day. The remark is true; making it law was not his
   from a quantity and never read off a Receiving status. **`which path` is a stored value
   of the fulfilment record**, not a re-derivation of the destination — a destination can be
   edited after the fact, and the record must keep saying how the goods actually went.
-- **The list of paths is Loo's and is not closed by a chat.** Two are ruled above; a third
-  enters this table only when he rules it.
+- **The list of paths is Loo's and is not closed by a chat.** Two are ruled above. A third
+  is added only if a case appears whose answer to *"did the supplier hand the goods over?"*
+  is genuinely different — a change of carrier never is.
 - **None of these is a Receiving screen.** Receiving handles goods; goods that never arrive
   here are not its work. The confirmation belongs to the buyer's side — §1's role-anchor
   rule, one file over.
+
+*(The two-not-three ruling above was made by the chat, on Loo's own question, under the test
+in the blockquote. He overrules it with one word.)*
 
 **MEASURED ON LIVE PRODUCTION, 2026-08-05 — the direct path is not hypothetical, and it
 is already stuck.** `purchasing_destinations` holds three rows, and 0307's own constraint
@@ -300,7 +318,6 @@ Event names themselves are business facts and closed:
 | Item | Waits for |
 |---|---|
 | **the fulfilment record itself** (who · when · which path) and the Operation confirmation for the paths with no Carres floor — §1.2's rule is frozen, nothing is built, and **PO-2032 is stuck today** | its own card, on the BUYER's side, never a Receiving screen |
-| **`customer collects at the supplier`** — recorded in §1.2 as a business fact he mentioned, NOT a ruled path. **No chat may promote it, design a confirmer for it, or ask him about it again** | Loo raising it himself |
 | `receiving method` value naming (`manual` vs something better) | before migration |
 | photo TYPE taxonomy (DO / Goods / Damage / Other) | photos v2 |
 | Goods Received At lower bound (PO Date vs something finer) | before migration |
