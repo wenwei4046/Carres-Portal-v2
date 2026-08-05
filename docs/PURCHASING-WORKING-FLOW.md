@@ -689,6 +689,57 @@ the word on screen, not about this formula.
 
 **Two ladders, two questions, and they are never merged.** A screen may show both.
 
+### Supplier fulfilment ≠ goods received — FROZEN by Loo, 2026-08-05
+
+**Three things were being answered by one number, and they are three:**
+
+```
+PO Complete   ←  supplier fulfilment confirmed
+GRN           ←  the Receiving Session, and nothing else
+Inventory     ←  Receiving, and nothing else
+```
+
+`Completed` is a statement about the **SUPPLIER**: they finished the job. Everything above
+it on this page derives that statement from `received_qty`, which is a statement about a
+**Carres floor**. The two agree only when the goods were coming to us in the first place.
+
+**Which confirms it, by path — and the warehouse path gains NO button:**
+
+| Path | Who confirms fulfilment |
+|---|---|
+| goods come into a Carres warehouse | **nobody presses anything** — posting the Receiving Session IS the confirmation, and a second press over the same goods is the second data-entry step Receiving exists to remove |
+| the supplier or carrier takes the goods **straight to the customer** | **Operation confirms it explicitly** — no Receiving Session can ever exist for those goods |
+
+**Fulfilment carries its OWN record — who · when · which path.** It may never be expressed
+by writing `received_qty`, and never by reusing a Receiving status. That is this section's
+own rule one paragraph down — *a quantity means exactly one thing* — applied to the one
+place it was about to be broken: `received_qty` means units physically received into a
+Carres warehouse, and a purchase order made to look finished by moving it would put goods
+on a floor they were never on, in the ledger the next order is sold against.
+
+**MEASURED ON LIVE PRODUCTION, 2026-08-05 — this is not hypothetical and it is already
+stuck.** A destination is either linked to a warehouse or carries a plain address (0307's
+own constraint), so the path is readable today with no new column:
+
+```
+Carres Klang       warehouse-linked      24 POs
+AL Sungai Buloh    address only           2 PO LINES   ← never reaches a Carres floor
+HOUZS              address only           0
+```
+
+Both lines sit on **PO-2032**, a three-line purchase order — 0311's own worked example word
+for word (*"one of them to AL Sungai Buloh because AL collects it and takes it straight to
+the customer"*). No Receiving Session can ever exist for them, so `received >= ordered` can
+never become true, so **PO-2032 can never reach `Completed` under the rail ladder above.**
+
+**The rule is frozen; the fulfilment record is NOT built.** It is the buyer's, never a
+Receiving screen (§1's role-anchor rule), and it has its own card. Until it ships, a
+direct-to-customer line simply has no way to be finished, and **nothing may close the gap
+by writing a receipt that did not happen.**
+
+Model detail — the fields, the two paths and what Receiving may never own:
+[`RECEIVING-INFORMATION-MODEL.md`](RECEIVING-INFORMATION-MODEL.md) §1.1 · §1.2.
+
 ### What "still to buy" really asks
 
 **It is not `required_qty > po_qty`.** That test was published here, it is wrong in two ways

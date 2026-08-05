@@ -19,6 +19,63 @@ first (Manual); the Warehouse takes over on its own login when trusted.
 Whether a submission needs Review is decided by the SUBMITTER's permission,
 never by the module as a whole.
 
+### 1.1 · Supplier fulfilment ≠ goods received (frozen by Loo, 2026-08-05)
+
+**Three questions were being answered by one number. They are three:**
+
+```
+PO Complete   ←  supplier fulfilment confirmed
+GRN           ←  the Receiving Session, and nothing else
+Inventory     ←  Receiving, and nothing else
+```
+
+**Receiving owns the second and the third, and never the first.** A Receiving Session
+says *the goods are on our floor and counted*. It does not say *the supplier finished
+the job* — those are the same sentence only when the goods were coming to us in the
+first place.
+
+**`received_qty` and the Receiving status may NEVER be borrowed to express fulfilment.**
+[`PURCHASING-WORKING-FLOW.md`](PURCHASING-WORKING-FLOW.md) §9 already rules that a
+quantity means exactly one thing, and `received_qty` means *units physically received
+into a Carres warehouse*. Writing it to make a purchase order look finished would make
+the stock ledger claim goods are on a floor they were never on — and the stock ledger is
+what the next order is sold against.
+
+### 1.2 · The two fulfilment paths, and who confirms each (frozen by Loo, 2026-08-05)
+
+| Path | Where the goods go | Who confirms fulfilment |
+|---|---|---|
+| **Warehouse** | into a Carres warehouse | **nobody presses anything** — posting the Receiving Session IS the confirmation |
+| **Direct to customer** | the supplier or the carrier takes them straight to the customer | **Operation confirms it explicitly** — no Session can ever exist for those goods |
+
+- **The warehouse path gets NO extra confirm button, and that is a rule rather than a
+  convenience.** §1 says the check-in itself IS the completed GRN; a second *"yes, the
+  supplier finished"* press over the same goods is exactly the second data-entry step
+  this module exists to remove.
+- **Fulfilment carries its OWN record: who · when · which path.** It is never inferred
+  from a quantity and never read off a Receiving status.
+- **The direct path is not a Receiving screen.** Receiving handles goods; goods that
+  never arrive here are not its work. The confirmation belongs to the buyer's side —
+  §1's role-anchor rule, one file over.
+
+**MEASURED ON LIVE PRODUCTION, 2026-08-05 — the direct path is not hypothetical, and it
+is already stuck.** `purchasing_destinations` holds three rows, and 0307's own constraint
+makes the discriminator readable without a new column: a destination is either linked to
+a warehouse or carries a plain address.
+
+```
+Carres Klang       warehouse-linked      24 POs
+AL Sungai Buloh    address only           2 PO LINES   ← goods never reach a Carres floor
+HOUZS              address only           0
+```
+
+Both of those lines sit on **PO-2032**, a three-line purchase order, and they are 0311's
+own worked example word for word: *"one of them to AL Sungai Buloh because AL collects it
+and takes it straight to the customer."* **No Receiving Session can ever exist for those
+two lines**, so `received >= ordered` can never become true for PO-2032, so **PO-2032 can
+never reach `Completed` under today's derivation.** The rule above names the gap; the
+fulfilment record that closes it is NOT built (§8).
+
 ---
 
 ## 2 · The one object: Receiving Session
@@ -224,6 +281,7 @@ Event names themselves are business facts and closed:
 
 | Item | Waits for |
 |---|---|
+| **the fulfilment record itself** (who · when · which path) and the Operation confirmation for the direct-to-customer path — §1.2's rule is frozen, nothing is built, and **PO-2032 is stuck today** | its own card, on the BUYER's side, never a Receiving screen |
 | `receiving method` value naming (`manual` vs something better) | before migration |
 | photo TYPE taxonomy (DO / Goods / Damage / Other) | photos v2 |
 | Goods Received At lower bound (PO Date vs something finer) | before migration |
