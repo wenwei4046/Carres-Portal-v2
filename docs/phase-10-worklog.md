@@ -6,6 +6,138 @@
 
 ---
 
+**2026-08-05 · Purchasing P18 — the order's proceed date joins the group header** (PR #623 merge `398c8fb2`, **no migration**, web `index-i_G0UkdY.js` + Worker `83d339ef` — DEPLOYED)
+
+Loo asked for a **column**. The answer is a group-header line, and the reason is his own ruling of 2026-08-04: *a table's width is not filled by inventing columns, and a fact which is not per-row does not get one.* Proceed date is an ORDER fact — every line under `SO-1209` shares it — so a column would print the same date three times and hold the width forever.
+
+**Nothing new is captured.** `orders.proceed_date` has existed since migration 0165 (Phase 11) and Sales already keys it on the New Sales Order form, labelled `PROCEED DATE · PRODUCTION START`. This card reads a date somebody already types.
+
+## The measurement came first, and it went one step past the card
+
+| | |
+|---|---|
+| `orders.proceed_date` on native orders | **23 of 28 = 82%** — the card's own figure, confirmed exactly |
+| Orders that can actually reach the To Order grid | **22 — and all 22 carry a proceed date** |
+| Waits today | **4 to 15 days** |
+
+The second row is the one the card did not have. The five orders without a proceed date **also have no delivery date**, and `OperationToOrder.tsx:368` already skips a customer order with no date (Jess's rule, ruled three times). So on live data the fact is present on every order-backed group the page can show — which is a stronger argument for putting it on the header than 82% was.
+
+## The one question, asked once, and the answer was a defect fix
+
+The card reserved exactly one decision: *the date alone, or the date plus how long it has waited.* Three options went up **with the live reading attached**, and Loo ruled **C — the count appears only once the date has PASSED**.
+
+That is not a matter of taste, and the option list is what made it visible. Measured on production the same morning, **`SO-1256`'s proceed date was the NEXT day (2026-08-06)**. The card's own sketch — `Proceed 20 Jul (16 days)`, unconditional — would have printed **`(-1 days)`** on the real page on the day it shipped.
+
+`proceedWaitedDays` therefore returns `null` in three cases, and `null` means *print the date alone*:
+
+- no proceed date at all
+- a date still ahead of today
+- **the day itself** — deliberately, because `(0 days)` on the very morning production is due to start would read as a complaint about an order that is perfectly on time
+
+It is a pure function of two ISO strings and takes `today` as an argument rather than reading a clock, so a test can stand on a fixed day, and the page hands it the same `today` the row's `late` flag already uses — one day, one answer, no chance of the header disagreeing with the red date beside it.
+
+## No word was invented, and it was checked rather than assumed
+
+`Proceed date` is already the live spelling in **four** places: the Sales form's `PROCEED DATE · PRODUCTION START`, the order-entry field config (`Proceed date · production start`), the Sales Order Maintenance column (`Proceed Date`) and the ops CSV export header (`Proceed`).
+
+It is deliberately **not** the bare `Proceed`, which `COPY-STANDARD` owns as an order **STATE** (*customer confirmed ETA — ready for PO*). Same word, different fact; a test asserts the two are not equal.
+
+**It is labelled where the delivery date beside it is not, and the asymmetry is the mechanism, not an oversight.** The header carried exactly one bare date before this card. A second bare date would be two unexplained dates in a row — the confusion the card's Done-when forbids by name. The label plus the SHORT spelling (`fmtDateShort`, no weekday, against the delivery date's long `fmtDate`) is what tells them apart, so *"cannot be confused"* is structural rather than hoped for.
+
+**A deliberate departure from the preview Loo picked, recorded rather than slipped in.** That preview read `Proceed date 21 Jul` with no year; what ships is `Proceed date 21 Jul 26`, because `fmt-date.ts` is the ONE place a date spelling may exist and a year-less format would be a second one. More information, one home.
+
+## The field is REQUIRED on the wire, and the compiler earned it
+
+`proceedDate` is a required field on `ToOrderRow` and `ToOrderOrderedRow`, not an optional one. That choice is what made `tsc` name every construction site instead of letting them default to `undefined` silently:
+
+1. a stale sort fixture in `to-order.test.ts` — whose **own comment already records `delivery` and `orderBy` having done exactly this in August 2026**, when the objects were *"`ToOrderRow` in name only"*
+2. the **receipt** row in the api's ordered read-back
+3. a **manual purchase order** with no customer order behind it — `null`, for the same reason its `so`, `customer` and `delivery` are null
+
+**The receipt half is load-bearing, not tidiness.** An order whose every line has been bought has **no demand rows left**, so its group on the grid is made of receipts alone. Carrying the fact on demand rows only would blank the header on exactly the orders a purchaser is checking up on. Both `orders` selects in the route therefore name the column, and a source scan asserts there are exactly two and that both do.
+
+## Two api tests, because one of them structurally cannot fail
+
+The behaviour test proves the mapping from `orders.proceed_date` through to the wire. It **cannot** prove the column is asked for: `makeSb` returns its fixture whatever the `select` string says, so a route that never named `proceed_date` passes it.
+
+The source scan is the half that holds PostgREST — an unnamed column comes back `undefined` in production while every mock in the file stays green. The negative control settles it: dropping `proceed_date` from the receipt select fires **only** the source scan, by name, and the behaviour test stays **green**.
+
+## Widths were measured on the live page BEFORE the code existed
+
+P17's method, and the half jsdom structurally cannot do. The exact element P18 renders was injected into the real production group header and the layout re-measured, at three viewports:
+
+| viewport | columns | table | band | rows | wrapped | truncated | page scroll |
+|---|---|---|---|---|---|---|---|
+| 1024 | `42·32·111·55·155·163·152` **identical** | 710 **identical** | 40 → 40 | 40px | no | 0 | 0 |
+| 1280 | `42·32·111·55·155·163·408` **identical** | 966 **identical** | 40 → 40 | 40px | no | 0 | 0 |
+| 1920 | `42·32·111·55·155·163·1048` **identical** | 1606 **identical** | 40 → 40 | 40px | no | 0 | 0 |
+
+Ink on the header line goes **218.6 → 429.3px** against **694px** available at the tightest viewport (measured sub-pixel with a `Range` against the header's own computed font, 13px/18px Inter).
+
+**The worst case was read out of the database rather than invented — and the invented one erred safe.** A fabricated 33-character customer name gave 813.4px; the real longest name that can reach the grid is `herng bedframe 2` (16 chars, `SO-1256`) — which is *itself* the future-date case, so it prints the short form. Every reachable order was then measured with the `Partly ordered` pill counted in:
+
+```
+SO-1256   652.2 / 694   spare  41.8
+SO-1212   670.1 / 694   spare  23.9   ← tightest
+SO-1216   645.6 / 694   spare  48.4
+SO-1284   558.5 / 694   spare 135.5
+```
+
+**Reported, not softened:** 23.9px makes this the line with the least slack on the page. A longer customer name **truncates rather than wraps** — the name carries `truncate` inside a non-wrapping flex row — so the band stays 40px and nothing clips; but the next word added to this header must be measured first.
+
+## Production verification — both branches of the ruling on one screen
+
+The deployed page, live data, 1920 → 1280 → 1024:
+
+```
+SO-1209 · Steven · Wed, 26 Aug 26 · Proceed date 22 Jul 26 (14 days)
+Ready Stock · Carres Klang
+```
+
+The **14** matches the database exactly (`proceed_date` 2026-07-22 against 2026-08-05). The Ready Stock group shows **nothing** — a manual demand has no order and therefore no plan, which is the card's first Done-when line and its Must-NOT, both on the live screen at once. Columns, table width, bands and row heights all identical to the pre-deploy baseline; header ink 410.1px, line 18px, 0 truncated, page scroll 0.
+
+**Reported: the FUTURE-date branch is NOT observable on production today.** `SO-1256` is fully ordered, so it is not on the grid in any bucket. The case that motivated Loo's ruling is proved by four shared unit tests and a page test asserting no `(-N days)` ever renders — **not** by the live screen.
+
+**Reported: no screenshot was taken.** The Browser pane does not composite in this session — but this is worth recording precisely, because several recent cards logged live measurement as impossible here: **the pane reports 0×0 until `resize_window` is called, and after that call layout is entirely real.** Every width in this entry is a genuine browser layout number.
+
+## Gates
+
+- web tsc **0** · shared tsc **0** · api tsc **2 pre-existing** (`to-order.test.ts` `TS2571` ×2 — proved untouched with `git show HEAD:`, not merely assumed from the document)
+- shared **2141/2141** · api **3 pre-existing** (`supplier/pos` ×2 · `partner/pickups` ×1)
+- full web suite **16 failed / 2563 passed** — exactly §17.7's four documented files, **zero new**
+- the three targeted suites **102 · 87 · 89** (from 90 · 85 · 81)
+- **check-design 8340, identical category for category to `origin/main`**, proved by linting a **detached worktree at main** rather than by quoting a number
+
+## Five negative controls, each a real edit verified on disk, each fired
+
+| control | fires |
+|---|---|
+| delete the header render | **5** |
+| make the count unconditional (undo Loo's ruling) | shared **2** · web **1** |
+| drop `proceed_date` from the receipt select | **1** — the SOURCE SCAN, by name |
+| drop `proceedDate` from the demand mapping | **1** |
+| put it on a row (the exact mistake the Must-NOT forbids) | **3** |
+
+**The control harness itself proved nothing on its first run.** It reported *0 occurrences* because the search strings were typed with LF newlines against CRLF files — the **fifth** time this lane has paid for that trap (`sed` stripping CR, `perl -0pi` silently declining, twice more since). It now converts to the file's own endings, re-reads from disk to confirm the edit landed, and **exits non-zero when it did not** — because a control that did not run is not a control, and a suite that passes after a failed edit is evidence of nothing.
+
+## Deploy
+
+- **Both Pages projects**, `--branch=main`: carres-portal `cc815f7c` + carres-pos `aa8784bf`. **All four canonicals on the FIRST poll.**
+- Live file **byte-identical** to the local build — `cmp` clean, not merely an md5 match (`5c423ee7…`, 4,769,316 bytes). `SERVICE_ROLE` **0**.
+- **THE OBVIOUS MARKER WAS AGAIN THE WRONG ONE, by a wide margin.** `Proceed date` greps **9** in the predecessor `index-DCDgFPBE.js` and 10 here — because the Sales form, the field config, the maintenance column and three validation messages have spelt it that way for months, which is exactly why this card had to invent no word. The clean marker is the words-object assignment **`proceedDate:"Proceed date"`, 0 → 1**. Controls present in BOTH, proving the predecessor was really read rather than 404'd: `po-work-` 1/1 · `Partly ordered` 1/1 · `Ready Stock` 2/2 · `No delivery date` 3/3 — the last three being the header's own existing words, which P18 does not touch. The predecessor was fetched at 4,768,749 bytes, a real bundle rather than the 1.7kB SPA fallback that greps as a clean 0 for everything.
+- **A Worker deploy WAS owed** and needed no import argument: P18 changes `apps/api/src/routes/operation/to-order.ts` directly. Measured against the **live Worker's own source commit read from `wrangler`** — `620bc69a` from `d460d899` (P15's) — the diff carries no migration, and besides P18's own two files only C11's `money-format.ts` + `order-action-words.ts`, whose web half was already live. **That is the documented consequence of measuring against the live Worker rather than your own branch's scope.** Worker `83d339ef` serves **100%**; `/health` **200 `{"ok":true}`**.
+
+## A method failure of my own
+
+The first pass of edits landed in the **main checkout** (`C:\Users\User\OneDrive\Desktop\Carres-Portal v2`) instead of this card's worktree — the paths differ only by the `.claude/worktrees/…` segment. Three typechecks were then run *in the worktree*, came back clean, and **proved nothing at all**, because the tree they ran on did not carry the change.
+
+Caught by `git diff --name-only` printing empty when it should have listed three files. The work was moved across by patch, and the main checkout restored to exactly its prior state: the three tracked files reverted, its three pre-existing untracked files left alone, and all three stashes intact (memory's own rule — a stash there belongs to another chat).
+
+**A green gate is only evidence if you can show the tree it ran on carried the change.** The cheap check is `git diff --numstat` before quoting any gate.
+
+---
+
+
 **2026-08-05 · Purchasing Q13 — the `supplier` column widens 87 → 88** (PR #622 merge `4552d31d`, **no migration · no api · no Worker deploy owed · no new word, column, token or row height**, web `index-DCDgFPBE.js` — DEPLOYED, all four canonicals on the FIRST poll, live md5 == the build from the main tip, `SERVICE_ROLE` 0)
 
 **Loo ruled it from P17's own reported cost**, the day after that card shipped: *Q7 froze WHICH columns and HOW WIDE so that nothing truncates. Holding 87 while it truncates keeps the number and loses the intent.*
