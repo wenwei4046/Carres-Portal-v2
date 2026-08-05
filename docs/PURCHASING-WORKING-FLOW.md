@@ -405,7 +405,7 @@ for the balance turns one purchase into two and nothing reconciles afterwards.
 
 **Already built** — the claim lifecycle (R2 · R3 · R4, `supplier_claims`). It is named here
 because it belongs to the purchasing flow, not because it is work: this file must not
-describe it a second way. See `docs/receiving-claim-execution-queue.md`.
+describe it a second way. See [`PURCHASING-NEXT.md`](PURCHASING-NEXT.md) and §10 below.
 
 - **Tab** — **Claims.** It is the buyer's work under §1 and it has its own tab, so the
   role-anchor ruling of 2026-08-05 moved nothing here.
@@ -842,3 +842,103 @@ they are built when a real PO needs them.
 items means a NEW PO (§3), and stopping one means cancelling the whole PO. So there is no
 version of a sent PO to keep, and the question "what did the supplier actually agree to?" is
 answered by the document they were sent, which never changes.
+
+---
+
+## 10 · The claim, once the supplier has answered — FROZEN by Loo, 2026-08-05
+
+> **This section is business law, not layout.** It was ruled in one sitting after Loo tested
+> every option against real Carres cases. The cards that build it are `R13 · R9 · R11 · R12`
+> in [`PURCHASING-NEXT.md`](PURCHASING-NEXT.md); the vocabulary they still owe
+> [`COPY-STANDARD.md`](COPY-STANDARD.md) is listed there.
+
+### 10.1 · The four layers, and they may never be collapsed
+
+```
+Customer Problem  →  Supplier Response  →  Carres Resolution  →  Carres Execution
+                                                          →  Stock · Finance · Demand
+```
+
+**The test that keeps them apart:** *can both be true at the same time?* **If yes, they are two
+fields, not one list.** That single test removed `Return to Supplier` from the resolution list
+(it loops back to the supplier instead of ending anything) and split the resolution in two.
+
+### 10.2 · TWO decisions, because they answer two different questions
+
+Forcing one list to answer both is what made every earlier draft contradict itself.
+
+| | Asks | Options |
+|---|---|---|
+| **Customer Resolution** | what are we doing for the CUSTOMER? | `Replace` · `Repair` · `Accept As-Is` · `No Replacement Required` |
+| **Item Outcome** | what happened to THIS item? | `Put Back in Stock` · `Return to Supplier` · `Write Off` |
+
+**The worked case, and it is why the split exists.** The customer cancelled AND the mattress is
+destroyed. Under one list the operator must choose which truth to record — i.e. must lie. Under
+two, both are recorded: Customer Resolution `No Replacement Required`, Item Outcome `Write Off`.
+
+**`Item Outcome` already exists** (R4 / migration 0299) and **Claims is its only home** —
+`STOCK_HOLD_OUTCOMES` is imported by one file in the repository. Moving it out of Claims leaves
+quarantined goods with no way out of quarantine.
+
+**`Refund` is NOT built and NOT deleted.** Its business meaning is not frozen: supplier credit
+note? cash? offset against future purchases? **Nobody may guess it.**
+
+### 10.3 · Carres Execution — frozen, not built
+
+```
+Return to Supplier · Collect Defective Item · Replace First · Collect First · Exchange on Collection
+```
+
+Execution happens AFTER a resolution and answers *how the decision is carried out*. **No option
+above may be folded into a resolution list.**
+
+### 10.4 · The five business laws
+
+1. **`Replace` = a NEW item.** How the defective item is collected is an EXECUTION decision,
+   never part of the resolution.
+2. **`Repair` = the SAME item**, and it returns to the SAME customer — **unless Carres decides
+   the customer cannot wait**, in which case the customer gets a replacement first and the
+   repaired item goes to warehouse stock. **That is Carres' decision, not the supplier's.**
+3. **Default policy — recover the defective item whenever practical.** Repair for resale,
+   reduce losses, preserve asset value. **Not because the supplier asks; because the item is
+   still worth money to Carres.** Replacement-first is the exception, and it is a business
+   decision (customer cannot wait · supplier cannot collect · customer experience wins).
+4. **When the supplier refuses, the screen states the fact and stops.**
+   `Supplier Response: Rejected` → a waiting state → `Next Action: Select Resolution`.
+   **Stock, Finance and Demand are NOT derived until a resolution is chosen** — after a refusal
+   nothing is yet known about any of them, and a screen may only show what is true right now.
+5. **Consequences are `f(Resolution, Execution)`, never `f(Resolution)`.** Law 2 is the proof:
+   one resolution, two different stock outcomes, and the difference is an execution decision.
+
+### 10.5 · A claim's owner
+
+**A claim keeps the PO-duty holder of the month it was OPENED in, forever.** It never changes
+when the month rolls over: the person who spoke to the factory is the person who knows the
+case, and a name that changes by itself points at somebody who never touched it.
+
+**It is DERIVED, not stored** — `ops_po_duty` (month → user), never a new `assigned_to` column.
+*(`org_duties` does **not** hold this: its `po_duty_editor` key is the person who edits the
+rota, not the person on it.)* A human taking over from the duty holder uses §5's Purchasing-wide
+takeover mechanism, which no module may re-invent.
+
+### 10.6 · Where a claim can be born — one engine, and today one entrance
+
+**The long-term architecture, and it is how SAP, Oracle and Dynamics all do it:**
+
+```
+Receiving       ──┐
+                  ├──▶  Supplier Claim  (ONE engine)
+Service Cases   ──┘
+```
+
+Receiving asks *wrong item? damaged? missing? quantity correct?*; warranty asks *manufacturing
+defect? misuse? installation? expired?* — **different investigations that often meet at the same
+supplier action.** A single "everything" claims list is a dumping ground and is refused.
+
+**TODAY only the first entrance exists**, and that is a ruling with a stated price:
+0299's guard allows `incoming → on_hold` and no other entry, so a unit already in the free pool
+that is later found faulty goes through `needs_repair` instead. **A fault found after receiving
+therefore has no supplier-claim route at all — it is a service case.**
+**If that is ever to change, the entry rule and the refurbish door must be settled in the SAME
+change** (carry-forward `hold-entry-only-from-incoming`) — otherwise the refurbish path hands a
+held unit back to the pool with no claim ever answered.

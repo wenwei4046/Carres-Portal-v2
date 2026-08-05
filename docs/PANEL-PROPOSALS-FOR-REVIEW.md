@@ -112,7 +112,7 @@ The order detail is the **hub** — every other module (stock, payments, procure
 >   (the ONE flow file)
 > - [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) — the To Order
 >   information architecture, **frozen 2026-07-29**
-> - [`docs/purchasing-execution-queue.md`](purchasing-execution-queue.md) — what shipped and
+> - [`docs/PURCHASING-NEXT.md`](PURCHASING-NEXT.md) — what shipped and
 >   what is next
 
 **What this section claimed, and why every line of it had to go** (kept so the correction is
