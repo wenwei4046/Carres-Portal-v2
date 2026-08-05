@@ -224,6 +224,17 @@ Confirm balance delivery date   per PO LINE, after a short delivery
 **Every promise is kept, never overwritten** — `po_supplier_promises` is append-only and each
 row names what it was made ABOUT, so a factory that slips again re-opens the call by itself.
 
+> **⚠️ ONLY TWO OF THE THREE ARE ACTUALLY ASKED.** Measured 2026-08-05:
+> `purchasingSupplierCallsOf` (`packages/shared/src/purchasing-supplier-calls.ts:55`) has
+> exactly two keys — `confirm_tomorrows_delivery` · `confirm_balance_delivery_date`.
+> **`confirm_ready_date` is not in the purchasing engine at all**; it exists only in the ORDERS
+> ladder (`order-action-words.ts:148`), which is a different screen. So this tab has the DOOR
+> (the `Supplier Ready Date` field on the expand, and `purchasing_record_ready_date`,
+> migration 0318) and **no queue, no trigger, no due, no count and no way to turn late.**
+> Loo ruled the action onto this tab on 2026-08-05 — *"queue and door in one place"* — and the
+> queue never followed. **1 of 24 POs carries a ready date.** Building it is in
+> APPROVED EVOLUTION below; nothing about it is undecided.
+
 ### WHAT IS ON SCREEN TODAY
 `OperationPurchaseOrders.tsx`, 3,167 lines · route `/operation/procurement` · *measured
 2026-08-05 from its docblock and its 44 named controls; not read line by line.*
@@ -273,10 +284,55 @@ Tables: `purchase_orders` **24** · `purchase_order_lines` **38** · `po_history
   moves no status, mints no revision and has no limit.
 - **Communication is not part of the PO lifecycle** — never a status, never a stage.
 - **Row order is risk to the customer's promise**, and clearing a header sort returns to it.
-- **Red is reserved for a date the factory GAVE.** Our own estimate warns amber.
+- **Red is reserved for a date the factory GAVE.** Our own estimate warns amber. **⚠️ The code
+  can no longer tell the two apart — see APPROVED EVOLUTION. The rule stands; its test is
+  broken.**
 - **One editing surface per fact.** The expand is the working area; the right panel is Activity.
 
 ### APPROVED EVOLUTION
+- **The page must stop calling our own arithmetic a supplier's word** (Loo, 2026-08-05).
+  Provenance is decided by a NULL TEST — `OperationPurchaseOrders.tsx:519`,
+  `if (po.eta_date) { confirmed: true }`. That was correct until **2026-08-03**, when commit
+  `1ddfce7e` *"a purchase order is born with its expected arrival"* made the To Order issue
+  path stamp **our own estimate** into `eta_date`. A null test can no longer tell a promise
+  from a guess. **Measured on production 2026-08-05: FIVE POs carry an arrival date with ZERO
+  supplier answers behind it** — `PO-2050` · `2051` · `2052` · `2053` · `2054`, and it was two
+  that morning; the arithmetic reproduces exactly (`issued + production on the supplier's week
+  + transit on the office week`). Each renders **black, no tooltip**, `Current Action` `—`, and
+  is counted in `Waiting Goods` — four signals saying the factory has spoken when nobody has
+  asked it anything. **`PO-2052` is the sharpest: it holds a REAL ready date (12 Aug) beside a
+  self-computed arrival (14 Aug), both in black.** **It grows and it eats a rule that shipped
+  the day before**: every PO born from 3 Aug carries a date, so `Need Supplier Confirmation`
+  becomes unreachable for new purchase orders. **Fix, and no migration is needed:**
+  `po_supplier_promises` is append-only and already holds every arrival a supplier has ever
+  given (`kind='tomorrow_delivery'`; a `ready_date` row is fact ① and must NOT count), and
+  `pos.ts:163` already reads it — so `confirmed` becomes *"is there a recorded supplier
+  answer"*, and `poWorkStateOf` reads provenance rather than the raw date. **Do NOT stop the
+  issue path stamping `eta_date`** — 0306 refuses to open on a NULL arrival and a shipped
+  supplier call would go dark — and **do NOT gate the tomorrow call on provenance**: firing on
+  our own estimate is exactly the phone call that gets the first real date, and the RPC's
+  `v_first` branch was built for it.
+- **ONE arithmetic for the expected arrival, not two.** `to-order.ts:1116-1124` computes
+  `production` on the FACTORY's week then `transit` on the OFFICE week (Law 2A);
+  `OperationPurchaseOrders.tsx:533` computes `placed_at + production` and **never adds
+  transit**. Both live suppliers carry `transit_days = 1`. Recomputed over the 16 dateless POs
+  (Malaysian public holidays checked — none between 1 and 19 Aug 2026) **the missing day bites
+  three rows**: `PO-2036` is silent where it should read `same day`; `PO-2049` and `PO-2042`
+  read amber `same day` where the truth is red `1d late`. **One page under-warns by exactly the
+  day it forgot.** Extract one exported function and make both callers use it — a second copy
+  is the disease this repository keeps paying for.
+- **`Confirm ready date` needs the queue to go with its door** (Loo, 2026-08-05 — see the
+  ⚠️ under WORKFLOW). A third key in `purchasingSupplierCallsOf` on the same rules as the two
+  beside it: **no anchor, no call**, and an answer closes it only while it still names the
+  current facts. **Nothing here is a new decision** — the trigger, checklist, completion,
+  due (`customer date − production working days − buffer`), owner (the PO-duty holder) and
+  count (one PO) are ruled, and COPY-STANDARD already carries the five strings. No migration
+  (0318 shipped the database half); no new word; no second door — the expand's field is the
+  one. **A supplier × category with no production number gets NO due rather than a default:
+  P1 deleted exactly that habit.**
+- **Recording a ready date deliberately does not move the expected arrival**, and the cost is
+  now visible: `PO-2052` shows the factory's real 12 Aug beside a stale self-computed 14 Aug.
+  Whether the two dates should be linked is a business decision and has not been taken.
 - **Prove it with a real PO, end to end** — the line has never run. Two gates have no home yet
   (a PO cannot be issued twice for the same customer line and quantity; a check-in cannot be
   posted twice for the same supplier DO number), and **whoever is on an action must show on

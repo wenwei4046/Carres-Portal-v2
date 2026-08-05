@@ -93,6 +93,13 @@ not a new guideline  →  fold the rule into this Constitution
 6  Overwrite the MASTER in the same PR.
 ```
 
+**TWO CHATS PER MODULE IS THE CEILING** (Loo, 2026-08-05 — restored here because it lived in
+the Purchasing queue file the migration archived). On 2026-08-05 four lanes touched Purchasing:
+the card number Q12 was claimed twice and Q13 twice, each lane renumbering around the other
+without knowing, and Loo received a stale report about a defect already fixed. **Past two, the
+manager spends the day de-duplicating instead of deciding.** A chat that only CLAIMS and writes
+nothing still occupies a slot — three lanes sat claimed-and-empty that day.
+
 **Only ONE thing may interrupt the owner: a business rule.** Technical problems, bugs, wording
 conflicts, deploys, rebases, test failures — **solve them yourself. Finding another bug is not
 a reason to stop; it is an instruction to fix it and continue.**
