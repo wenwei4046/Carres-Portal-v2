@@ -18,6 +18,7 @@ import {
   collectPillLabel,
   computeStorageFee,
   orderActionLine,
+  orderActionQueue,
   orderMoney,
   summarizePayments,
   type OrderPaymentRow,
@@ -46,15 +47,27 @@ import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
  * OperationPayments — the Master Sheet "Balance" tab, rebuilt 2026-07-19 (Jess)
  * as the LOOSE, stock-aware Collections Desk (§A0 golden reference).
  *
- * The critical business rule baked in: **you chase the customer's money only
- * once you can answer "when's my delivery?"** — so every row carries the STOCK
- * & delivery signal (goods in / waiting ETA / supplier late) beside the money.
- * The money worklist QUEUES are stock-aware: "Ready to chase" = owing AND goods
+ * The critical business rule baked in: **you call for the customer's money
+ * only once you can answer "when's my delivery?"** — so every row carries the
+ * STOCK & delivery signal (goods in / waiting ETA / supplier late) beside the
+ * money. The money worklist QUEUES are stock-aware: "Collect" = owing AND goods
  * in (safe to call); "Waiting stock" = owing but goods not in yet (hold the
- * call). Chasing opens a WhatsApp popover with a pre-call brief (stock + the
+ * call). Calling opens a WhatsApp popover with a pre-call brief (stock + the
  * delivery window + "logistics contacts 1-3 days before") — the operator's
  * verbal script — while the WhatsApp text stays date-free per the locked
  * wa-templates rule.
+ *
+ * **The word `Chase` left this page on 2026-08-05 (card C12).** COPY-STANDARD
+ * bans it outright — it names a mood, not an outcome — and this page had never
+ * been scanned once, because C1's guard lived inside the drawer's own test file
+ * and guarded only the drawer. Fifteen banned strings were live here.
+ *
+ * The money queue is now `Collect`, READ from `orderActionQueue("collect")` so
+ * this desk and the Orders ladder cannot spell one action two ways; the firm
+ * message tone is `Call text`, the drawer's own live word for the same
+ * template; and `last_chased_at` — a DB COLUMN, which keeps its name — is read
+ * on screen as `Message copied`, the phrase ACTION-FLOW Law 8 permits and the
+ * drawer's Calls panel has printed for that same column since C1.
  *
  * Loose layout: full-width white table, 52px rows, generous padding, no
  * truncation of the customer, two-line cells. Facets are multi-select Sets with
@@ -105,7 +118,7 @@ interface RawPaymentRow {
   delivered_at: string | null;
   source_ref: string[] | null;
   order_lines: RawLine[] | null;
-  /** C5 — `orders.paid` + the add-on sum: the goods money the desk chases.
+  /** C5 — `orders.paid` + the add-on sum: the goods money the desk collects.
    *  Optional so a browser on this build against a pre-C5 Worker degrades to
    *  "value unknown" rather than crashing. */
   paid?: number | string | null;
@@ -162,16 +175,24 @@ async function printReceipt(row: OrderPaymentRow, orderCode: string, customerNam
   }
 }
 
-/** "Chased today / 3d ago" — collections must show when a debtor was last
- *  touched so it isn't over-chased or left to go cold. */
-function chasedAgo(iso: string | null): string | null {
+/**
+ * "Message copied today / 3d ago" — collections must show when a debtor was
+ * last contacted, so nobody is called twice in one morning or left to go cold.
+ *
+ * **It says what the portal WATCHED — a message leaving on the clipboard.**
+ * ACTION-FLOW Law 8: opening an external application does not prove the
+ * external outcome occurred. It is the drawer's own wording for this same
+ * `last_chased_at` column, live since C1: one column, one sentence, wherever
+ * it is printed.
+ */
+function messageCopiedAgo(iso: string | null): string | null {
   if (!iso) return null;
   const then = new Date(iso).getTime();
   if (isNaN(then)) return null;
   const days = Math.floor((Date.now() - then) / 86_400_000);
-  if (days <= 0) return "Chased today";
-  if (days === 1) return "Chased 1d ago";
-  return `Chased ${days}d ago`;
+  if (days <= 0) return "Message copied today";
+  if (days === 1) return "Message copied 1d ago";
+  return `Message copied ${days}d ago`;
 }
 
 /** Phone → wa.me base link (MY-aware). Local copy of OrderDetailDrawer.waLink so
@@ -254,10 +275,17 @@ function toggleInSet<T>(prev: Set<T>, v: T): Set<T> {
 }
 
 // ── Queues (money worklist, stock-aware) ─────────────────────────────────────
+//
+// C12: the first tile READS its word from `orderActionQueue("collect")` rather
+// than spelling one. It is the same action the Orders ladder displays, and
+// COPY-STANDARD rule 8 is "same word app-wide" — a second spelling here would
+// be a queue and a row naming one act two ways, which is the whole failure the
+// shared module exists to make impossible. The other three name STOCK STATES,
+// not actions, so they have no entry in it and keep their own words.
 const QUEUES = [
   {
     key: "ready",
-    label: "Ready to chase",
+    label: orderActionQueue("collect"),
     dot: "bg-success",
     desc: "Owing + goods in — safe to call (you can answer the delivery question)",
   },
@@ -265,13 +293,13 @@ const QUEUES = [
     key: "waiting",
     label: "Waiting stock",
     dot: "bg-warning",
-    desc: "Owing but goods not in yet — hold the call, or chase supplier first",
+    desc: "Owing but goods not in yet — call the supplier before the customer",
   },
   {
     key: "late",
     label: "Stock late",
     dot: "bg-danger",
-    desc: "Owing + supplier missed the ETA — chase the supplier, not the customer",
+    desc: "Owing + supplier missed the ETA — call the supplier, not the customer",
   },
   {
     key: "storage",
@@ -315,7 +343,7 @@ interface Row {
   lastChasedAt: string | null;
 }
 
-/** The "owing / storage" view predicate — anything still to chase. */
+/** The "owing / storage" view predicate — anything still to collect. */
 function isOwingRow(r: Row): boolean {
   return r.owing > 0 || (r.paymentStatus != null && r.paymentStatus.toLowerCase() !== "paid");
 }
@@ -343,7 +371,7 @@ export default function OperationPayments() {
   const [payFilter, setPayFilter] = useState<Set<string>>(new Set());
   const [regionFilter, setRegionFilter] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [chaseFor, setChaseFor] = useState<Row | null>(null);
+  const [collectFor, setCollectFor] = useState<Row | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const today = todayIso();
 
@@ -745,7 +773,7 @@ export default function OperationPayments() {
                   key={r.id}
                   r={r}
                   onSave={save}
-                  onChase={() => setChaseFor(r)}
+                  onCollect={() => setCollectFor(r)}
                   expanded={expanded.has(r.id)}
                   onToggle={() => setExpanded((prev) => toggleInSet(prev, r.id))}
                 />
@@ -755,7 +783,9 @@ export default function OperationPayments() {
         </div>
       </ListPageShell>
 
-      {chaseFor && <ChasePopover r={chaseFor} onClose={() => setChaseFor(null)} onSave={save} />}
+      {collectFor && (
+        <CollectPopover r={collectFor} onClose={() => setCollectFor(null)} onSave={save} />
+      )}
     </>
   );
 }
@@ -764,13 +794,13 @@ export default function OperationPayments() {
 function PaymentRow({
   r,
   onSave,
-  onChase,
+  onCollect,
   expanded,
   onToggle,
 }: {
   r: Row;
   onSave: (id: string, patch: UpdateOpsOrderControlInput) => void;
-  onChase: () => void;
+  onCollect: () => void;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -866,7 +896,7 @@ function PaymentRow({
               <>
                 <button
                   type="button"
-                  onClick={onChase}
+                  onClick={onCollect}
                   className="pill pill-collected inline-flex items-center gap-1.5 hover:brightness-95"
                   title={
                     r.held
@@ -885,9 +915,9 @@ function PaymentRow({
                 </button>
                 <div
                   className="mt-1.5 text-label text-base-400"
-                  title={r.lastChasedAt ? `Last chased ${fmtDate(r.lastChasedAt, { time: true })}` : undefined}
+                  title={r.lastChasedAt ? `Last message copied ${fmtDate(r.lastChasedAt, { time: true })}` : undefined}
                 >
-                  {chasedAgo(r.lastChasedAt) ?? "Not chased yet"}
+                  {messageCopiedAgo(r.lastChasedAt) ?? "No message copied yet"}
                   {r.dueDate && (
                     <span className={r.overdue ? "text-danger font-semibold" : "text-base-500"}>
                       {" · "}
@@ -1135,16 +1165,16 @@ function OrderMoneyDetail({
         <div className="mt-2 text-label text-base-400 leading-snug">
           {r.dueDate
             ? r.overdue
-              ? `Overdue since ${fmtDate(r.dueDate)} — chase now.`
+              ? `Overdue since ${fmtDate(r.dueDate)} — call now.`
               : `Snoozed until ${fmtDate(r.dueDate)}.`
-            : "Set the date the customer promised to pay — it sinks off the chase queue until then."}
+            : "Set the date the customer promised to pay — it sinks off the Collect queue until then."}
         </div>
       </div>
     </div>
   );
 }
 
-/** Stock badge + delivery window (the "safe to chase / what to tell them" cell). */
+/** Stock badge + delivery window (the "safe to call / what to tell them" cell). */
 function StockCell({ r }: { r: Row }) {
   const s = r.stock;
   const badge =
@@ -1160,7 +1190,7 @@ function StockCell({ r }: { r: Row }) {
 
   const windowNote =
     s.state === "late"
-      ? "Supplier late — chase the goods first, not the customer"
+      ? "Supplier late — call the supplier first, not the customer"
       : s.state === "waiting" || s.state === "no_eta"
         ? "Goods not in — quote a window, don't promise a fixed date"
         : r.etaTbd
@@ -1205,8 +1235,28 @@ function StatusSelect({
   );
 }
 
-// ─── Chase popover (WhatsApp + pre-call brief) ───────────────────────────────
-function ChasePopover({
+/**
+ * The two message tones, as the operator reads them.
+ *
+ * **The KEY stays `chase` and the LABEL does not**, and the split is the point:
+ * `"chase"` is the `wa-templates` contract shared with the drawer, and
+ * COPY-STANDARD exempts an internal key by name — but this toggle used to
+ * RENDER that key under a `capitalize` class, so the banned word reached the
+ * screen as `Chase` through a door no source scan can see. A lone lowercase
+ * token is exactly what every banned-word scanner in this repo skips as
+ * internal. Fixed here by giving the button a real label; reported as a finding,
+ * because the scanner still cannot see the next one.
+ *
+ * The words are the drawer's own, live since C1, for these same two templates:
+ * the firm tone is a `Call` (COPY-STANDARD's verb table), never a mood.
+ */
+const TONE_LABEL: Record<"reminder" | "chase", string> = {
+  reminder: "Reminder",
+  chase: "Call text",
+};
+
+// ─── Collect popover (WhatsApp + pre-call brief) ─────────────────────────────
+function CollectPopover({
   r,
   onClose,
   onSave,
@@ -1215,8 +1265,9 @@ function ChasePopover({
   onClose: () => void;
   onSave: (id: string, patch: UpdateOpsOrderControlInput) => void;
 }) {
-  // Default tone: goods delivered/held or supplier late → firmer Chase; else a
-  // gentle Reminder.
+  // Default tone: goods delivered/held or supplier late → the firmer Call
+  // text; else a gentle Reminder. The two KEYS are the wa-templates contract
+  // and are internal; the two LABELS are TONE_LABEL above.
   const [tone, setTone] = useState<"reminder" | "chase">(r.delivered || r.held ? "chase" : "reminder");
   const salutation = salutationOf(null, r.customer);
   const outstanding = rmAmount(r.owing);
@@ -1225,11 +1276,20 @@ function ChasePopover({
   const wa = waLink(r.phone);
 
   const send = () => {
+    // C12 · Loo's ruling, 2026-08-05. The clipboard write happens on BOTH
+    // branches now, and it is not a convenience — it is what makes the word on
+    // screen TRUE. This one stamp feeds `Message copied {date}` here and in the
+    // drawer, and until today the WhatsApp branch copied nothing, so that
+    // sentence named an act nobody had performed. ACTION-FLOW Law 8 says the
+    // portal records only what it observed; the choice was to blur the wording
+    // or to make the observation match it, and Loo took the second.
+    // (It earns its keep besides: a `wa.me` prefill that is dropped or
+    // truncated now leaves the operator the full text on the clipboard.)
+    void navigator.clipboard?.writeText(text);
     if (wa) {
       window.open(`${wa}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
       toast.success("Opening WhatsApp — hit send");
     } else {
-      void navigator.clipboard?.writeText(text);
       toast.success("No number on file — message copied, paste into WhatsApp");
     }
     onSave(r.id, { last_chased_at: new Date().toISOString() });
@@ -1244,7 +1304,7 @@ function ChasePopover({
     r.stock.state === "ready"
       ? "In stock ✓ ready to deliver"
       : r.stock.state === "late"
-        ? `Supplier late (ETA ${fmtDate(r.stock.etaIso)} passed) — chase goods first`
+        ? `Supplier late (ETA ${fmtDate(r.stock.etaIso)} passed) — call the supplier first`
         : r.stock.state === "waiting" || r.stock.state === "no_eta"
           ? `Not in yet · ETA ${fmtDate(r.stock.etaIso)}`
           : "Not tracked";
@@ -1263,7 +1323,7 @@ function ChasePopover({
         <div className="flex items-center gap-2 px-4 py-3 border-b border-base-100">
           <MessageCircle size={16} className="text-success" strokeWidth={2.5} />
           <span className="text-body font-semibold text-base-900">
-            Chase · {r.customer} · {r.phone ?? "no phone"}
+            {orderActionQueue("collect")} · {r.customer} · {r.phone ?? "no phone"}
           </span>
           <div className="ml-auto flex items-center gap-2">
             <div className="flex bg-base-100 rounded-full p-0.5">
@@ -1272,11 +1332,11 @@ function ChasePopover({
                   key={t}
                   type="button"
                   onClick={() => setTone(t)}
-                  className={`text-label px-2.5 py-1 rounded-full font-semibold capitalize transition-colors ${
+                  className={`text-label px-2.5 py-1 rounded-full font-semibold transition-colors ${
                     tone === t ? "bg-white text-base-900 shadow-sm" : "text-base-500"
                   }`}
                 >
-                  {t}
+                  {TONE_LABEL[t]}
                 </button>
               ))}
             </div>
