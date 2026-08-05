@@ -50,7 +50,6 @@ import OrderDetailDrawer from "./components/OrderDetailDrawer";
 // move on the same commit instead of one drifting into a second answer.
 import {
   deliveryStepAnchor,
-  fmtRM,
   logisticStateOf,
   moneyOf,
   nextActionOf,
@@ -232,7 +231,8 @@ export default function OperationDelivery() {
         line: orderActionLine(next.key, {
           logistics: state.partner,
           customer: o.customer_name,
-          amount: money.known ? fmtRM(money.outstanding) : null,
+          // C11 — the RAW number; the words module prints it to the cent.
+          amount: money.known ? money.outstanding : null,
         }),
         tone: next.tone,
         locked: !!next.locked,

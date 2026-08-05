@@ -119,16 +119,17 @@ describe("order action words — the row line", () => {
   });
 
   it("money reads RM {amount} from {customer}, and never invents a figure", () => {
-    expect(orderActionLine("collect", { amount: "2,455", customer: "John Tan" })).toBe(
-      "Collect RM 2,455 from John Tan",
+    // C11 — the amount is a NUMBER and the module spells it, to the cent.
+    expect(orderActionLine("collect", { amount: 2455, customer: "John Tan" })).toBe(
+      "Collect RM 2,455.00 from John Tan",
     );
     expect(orderActionLine("collect", { customer: "John Tan" })).toBe(
       "Collect from John Tan",
     );
-    expect(collectPillLabel("2,455")).toBe("Collect RM 2,455");
+    expect(collectPillLabel(2455)).toBe("Collect RM 2,455.00");
     expect(collectPillLabel(null)).toBe("Collect");
     // The pill deliberately drops the customer — their name is on the same row.
-    expect(collectPillLabel("2,455")).not.toMatch(/from/);
+    expect(collectPillLabel(2455)).not.toMatch(/from/);
   });
 
   it("the party-less four read the same as their queue word", () => {
@@ -224,10 +225,10 @@ describe("order action words — the banned words", () => {
       expect(orderActionQueue(key)).not.toMatch(BANNED);
       expect(orderActionLine(key)).not.toMatch(BANNED);
       expect(
-        orderActionLine(key, { amount: "1,000", customer: "A", supplier: "B", logistics: "C" }),
+        orderActionLine(key, { amount: 1000, customer: "A", supplier: "B", logistics: "C" }),
       ).not.toMatch(BANNED);
     }
-    expect(collectPillLabel("1,000")).not.toMatch(BANNED);
+    expect(collectPillLabel(1000)).not.toMatch(BANNED);
   });
 
   it("exposes every queue word so a caller can guard the whole set", () => {

@@ -2310,7 +2310,10 @@ describe("The three dots (C10 · Law 6 · ORDERS-WORKING-FLOW §7)", () => {
     expect(rowDotsOf(o, READY, NO_ETA, NO_LOGI)[2].state).toBe("green");
     const red = rowDotsOf(makeRow({ id: "y", so: 2, ...owing }), READY, NO_ETA, NO_LOGI)[2];
     expect(red.state).toBe("red");
-    expect(red.title).toBe("Money — RM 4,000 outstanding");
+    // C11 — to the cent. This read `RM 4,000` until 2026-08-05, which was the
+    // rounding half of the bug: the dot's own tooltip built its money string by
+    // hand, beside the label rather than through it.
+    expect(red.title).toBe("Money — RM 4,000.00 outstanding");
     // An order nobody has priced: 37 live rows look like this. A number nobody
     // knows may not paint an alarm (ORDERS-WORKING-FLOW §2).
     const unpriced = makeRow({
@@ -2526,7 +2529,8 @@ describe("Actions column · +N and the delivering FACT (C3)", () => {
   it("the +N names what it is hiding and opens the drawer's full list", () => {
     wrap(<OperationOrdersControl />);
     const more = within(row(3001)).getByTestId("next-more");
-    expect(more.getAttribute("title")).toContain("Collect RM 2,455 from John Tan");
+    // C11 — the figure carries its sen (it read `RM 2,455` before 2026-08-05).
+    expect(more.getAttribute("title")).toContain("Collect RM 2,455.00 from John Tan");
     fireEvent.click(more);
     expect(screen.getByTestId("drawer-stub")).toHaveAttribute("data-order-id", "three");
   });

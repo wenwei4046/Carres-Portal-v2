@@ -329,7 +329,8 @@ describe("OperationDelivery — the calendar reads the booking, never the promis
     // C3 — the money-held order's line is the action that CLEARS the hold, with
     // its figure, where it used to read `Confirm delivery with …`: the resting
     // Confirm was retired and the 🔒 moved onto `Collect`.
-    expect(within(detail).getByText(/Collect RM 2,455 from/)).toBeTruthy();
+    // C11 — the figure carries its sen (it read `RM 2,455` before 2026-08-05).
+    expect(within(detail).getByText(/Collect RM 2,455\.00 from/)).toBeTruthy();
     expect(within(detail).getByText("🔒")).toBeTruthy();
   });
 

@@ -843,6 +843,10 @@ export {
   type DeliveryResponsibility,
 } from "./delivery-reasons";
 
+// C11 · The ONE spelling of a ringgit amount — `RM 1,250.50`, two decimals
+// always (Loo 2026-07-28). `apps/web/src/lib/format-currency.ts` re-exports it.
+export { fmtMoney } from "./money-format";
+
 // C1 · The words an order action may say — queue word (no party) + row line
 // (party named). The ONE code home for COPY-STANDARD's action dictionary.
 export {

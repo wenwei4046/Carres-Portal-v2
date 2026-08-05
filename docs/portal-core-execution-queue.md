@@ -299,11 +299,51 @@ a WORD sweep and a MONEY law. One card, one concern; they are C12 and C11.
 three files to 0 on its own base. Nothing else in the repo is affected — `supabase/migrations`,
 `apps/api` and `packages/shared` each have **0** files in its diff.
 
-## C11 · A money figure is the money owed (Loo's ruling, 2026-07-28)
+## C11 · A money figure is the money owed — ✅ SHIPPED (PR #619)
 
-**This is not a wording card.** COPY-STANDARD has said `RM 1,250.00` all along; Loo restated it
-on 2026-07-28 with the reason attached — *"收款金额必须与实际应收金额一致，不允许为了视觉统一改变
-金额显示"* — and it is now written into the money section with the two shapes that break it.
+**The fix is a TYPE, not five edits.** `OrderActionParties.amount` was a `string`, and that is
+the whole cause: a string says nothing about whether it is already prefixed or already rounded,
+so both were things a caller could hand the words module — and one caller did each. It is a
+**`number`** now. The module owns the prefix and the two decimals, the caller owns neither, and
+a sixth caller is refused by `tsc` rather than by a reviewer. Four `@ts-expect-error` lines —
+each the exact mistake a live screen made — fail the BUILD if the field ever goes back.
+
+**The card's own premise about `fmtRM` was wrong, measured before anything was touched.** It
+says *"exported and used for non-money too (it is the generic number formatter). Do not widen
+it."* On today's `main` it had **FOUR call sites and all four were `outstanding`** — this file's
+money dot, its row pill, its drawer strip, and the Delivery pane. The three other `fmtRM`s in
+the repo are *separate local functions* in catalog/sofa files. So it was not widened and not
+kept: it is **DELETED**, and the rounding shape stops existing in the money path
+(`maximumFractionDigits:0` greps **1 → 0** in the built bundle).
+
+**One spelling, and it is identity rather than agreement.** `packages/shared/src/money-format.ts`
+is the one home; `apps/web/src/lib/format-currency.rm` **re-exports** it, and
+`OperationPayments`' own local `rm` — a FOURTH copy of the same six lines — is deleted. A test
+asserts `rm === fmtMoney`, not that they produce the same output: the negative control for it is
+a second body that is byte-identical in output and it still fires, because two implementations
+that merely agree is the arrangement under which the third one (a rounding one) grew unnoticed.
+
+**Loo's ruling, unchanged:** *"收款金额必须与实际应收金额一致，不允许为了视觉统一改变金额显示"* —
+COPY-STANDARD has said `RM 1,250.00` all along, and the two shapes that broke it are now
+unexpressible rather than merely forbidden.
+
+**Five negative controls, each a real edit verified on disk**: `amount` back to `string` → **8**
+tsc errors · a rounding `fmtMoney` → **7** · `collectPillLabel(rm(…))` back on the desk → **1** ·
+`fmtRM` reintroduced → **2** · a second `rm` body → **1**.
+
+Gates: shared tsc **0** · web tsc **0** · build clean · shared **2136/2136** (control 2129, +7) ·
+web **16 failed / 2543 passed** against a **DETACHED CONTROL WORKTREE at `origin/main` measuring
+16 / 2536** — the same four §17.7 files, so **zero new failures and +7 tests** ·
+**check-design 8340, identical category for category to the control** (the `▲ +3` on G and I is
+main's own stale baseline, present on both trees). **The control build emitted
+`index-B4JoYeUj.js`, byte-for-byte the bundle §17.1 records as live**, so the toolchain
+demonstrably reproduces production.
+
+**Reported, not fixed:** `Money` (`components/Money.tsx`) still rounds — it is the display
+COMPONENT for prices and live totals, its own recipe, and the card's NOT-in-scope names exactly
+that. It does not render an amount owed on any of the five surfaces.
+
+**What it said, and what was measured:**
 
 **The bug, measured, not inferred** (run against the live shared module):
 
@@ -1390,7 +1430,7 @@ truncate: the premise was 42% too wide. **Re-measure before moving a single widt
 | C2 | ✅ **LIVE** 2026-07-27 — two layers; the drawer lists every open action | #466 |
 | C3 | ✅ **LIVE** 2026-07-27 — the `+N`, and `Confirm delivery` becomes a fact | #479 |
 | C4 | ⛔ **RETIRED 2026-07-28 — re-cut as C11 + C12.** PR #484 stays OPEN and untouched; it is where the unshipped work lives | [#484](https://github.com/wenwei4046/Carres-Portal-v2/pull/484) (open, not to be merged as-is) |
-| C11 | 🔨 **CLAIMED 2026-08-05 — `claude/c11-money-78ee2b`** · a money figure is the money owed (Loo 2026-07-28) — 5 call sites, 2 failures, 1 cause. **ORDERS lane**, not alongside ⑧ D0.5c | — |
+| C11 | ✅ **a money figure is the money owed** (Loo 2026-07-28) — the cause was a `string` parameter; it is a `number`, so both failures are now compile errors. `fmtRM` DELETED (its 4 call sites were all `outstanding` — the card's premise was wrong). One money spelling, asserted by identity | [#619](https://github.com/wenwei4046/Carres-Portal-v2/pull/619) |
 | C12 | ✅ **LIVE 2026-08-05** — the last `Chase` leaves the portal. **The card said 21 strings and the real number was 16**: ② died with its file (`OperationPurchase.tsx` deleted whole on 2026-08-01, #534), so ① 15 + ③ 1 + ② 0. The scanner moved to `src/test/banned-words.ts`, reads JSX text that carries an interpolation, and runs on THREE pages; R8's carve-out for its own strings is deleted — measured empty first. **No migration, no api, no `packages/shared` diff** | [#615](https://github.com/wenwei4046/Carres-Portal-v2/pull/615) |
 | C13 | ✅ **LIVE** 2026-08-05 — the red means something again. `liveScope` excludes the AutoCount archive; **`Overdue` 38 → 1 on production**, and that 1 is a real call. **No migration, no `apps/api` diff.** Item 4 (splitting Overdue by the age of the miss) **DEFERRED by Loo** — COPY-STANDARD owns no such pair | [#611](https://github.com/wenwei4046/Carres-Portal-v2/pull/611) |
 | C14 | ⬜ **nothing says the same thing twice** (Loo 2026-08-04) — Delivery ≡ Actions on 31/31 rows; 30 truncated cells; 219px above the first row. **ORDERS lane, AFTER C13** | — |

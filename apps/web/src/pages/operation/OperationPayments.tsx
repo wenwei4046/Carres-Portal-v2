@@ -28,6 +28,7 @@ import {
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { cjkClassName } from "@/lib/cjk";
+import { rm } from "@/lib/format-currency";
 import { fmtDate } from "@/lib/fmt-date";
 import { orderStatusPill } from "@/lib/status-pill";
 import { useOrderPayments, useRecordPayment } from "@/lib/queries";
@@ -148,9 +149,12 @@ function catOf(sku: string): "msbf" | "sof" | "other" {
   return "other";
 }
 
-function rm(n: number): string {
-  return `RM ${n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+// C11 — this file's own `rm` body is DELETED (2026-08-05). It was the FOURTH
+// copy of the same six lines, and a fourth copy is how the fifth one came to
+// round: the collections desk spelt money correctly here and then handed the
+// finished string to a label that adds `RM` itself. One home now —
+// `packages/shared/src/money-format.ts`, re-exported by `lib/format-currency`
+// and imported at the head of this file.
 
 /** Render + open a receipt PDF for one ledger entry (client-side, self-contained
  *  — needs only the ledger row + customer/SO, no order-total derivation). Mirrors
@@ -901,17 +905,21 @@ function PaymentRow({
                   title={
                     r.held
                       ? orderActionLine("collect", {
-                          amount: rm(r.owing),
+                          amount: r.owing,
                           customer: r.customer,
                         }) + " — delivery is held until it is paid"
                       : orderActionLine("collect", {
-                          amount: rm(r.owing),
+                          amount: r.owing,
                           customer: r.customer,
                         })
                   }
                 >
                   {r.held && <Lock size={11} strokeWidth={2.5} aria-hidden="true" />}
-                  {collectPillLabel(rm(r.owing))}
+                  {/* C11 — the RAW number. Passing `rm(r.owing)` here is what put
+                      `Collect RM RM 11,246.00` on every row of this desk: the
+                      words module owns the `RM`, and it now owns the digits too,
+                      so there is nothing left for a caller to double up. */}
+                  {collectPillLabel(r.owing)}
                 </button>
                 <div
                   className="mt-1.5 text-label text-base-400"
