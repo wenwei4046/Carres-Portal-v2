@@ -1884,6 +1884,8 @@ describe("one purchase order, one way of looking at it (Q10)", () => {
     await expandPo("PO-9003");
     const cls = screen.getByTestId("po-work-PO-9003").className;
     expect(cls).toContain("100cqi");
+    // Q11 turned the pin into a CEILING; it may never stop being one.
+    expect(cls).toContain("max-w-[calc(100cqi-2rem)]");
     // `sticky` was measured NOT to hold inside a table cell, so it is not left
     // here as a class that does nothing.
     expect(cls).not.toContain("sticky");
@@ -1912,5 +1914,48 @@ describe("one purchase order, one way of looking at it (Q10)", () => {
     expect(
       (row.children[2] as HTMLElement).className,
     ).not.toContain("flex-1");
+  });
+
+  /**
+   * Q11 — THE ROW ENDS WHERE ITS CONTENT ENDS.
+   *
+   * jsdom has no widths, so this asserts the two classes that PRODUCE them and
+   * the numbers are measured in a browser (PO-2037 on production: the record
+   * 1575 → 474 at 1920, 935 → 474 at 1280; `Description` 1191 → 90; the dead
+   * space between an item's name and its `Qty` 1138 → 23).
+   *
+   * The pair is the whole card. `w-fit` alone re-opens Q10's bug, because
+   * `fit-content` is capped by the AVAILABLE width and available here is the
+   * table's 1205px cell, not the pane — measured with a 200-character name at
+   * 1280: bounded, `Received` ends at 1212 inside a 1217 scrollport and the
+   * name truncates; unbounded it ends at 1448, off the right edge.
+   */
+  it("the record is content-width, and the pane is its ceiling", async () => {
+    await mountLoaded();
+    await expandPo("PO-9003");
+    const classes = screen.getByTestId("po-work-PO-9003").className.split(/\s+/);
+    expect(classes).toContain("w-fit");
+    expect(classes).toContain("max-w-[calc(100cqi-2rem)]");
+    // The pane must be a CEILING, never the width itself: a fixed width is what
+    // gave `Description` 1191px for 67px of ink. Compared as a TOKEN, because
+    // `max-w-[calc(100cqi-2rem)]` contains the fixed form as a substring.
+    expect(classes).not.toContain("w-[calc(100cqi-2rem)]");
+  });
+
+  it("the header, the item rows and TOTAL are one template, so they cannot stagger", async () => {
+    await mountLoaded();
+    await expandPo("PO-9003");
+    const items = screen.getByTestId("po-doc-items");
+    const grids = [...items.querySelectorAll<HTMLElement>("div")].filter((el) =>
+      /grid-cols-\[/.test(el.className),
+    );
+    // Header + at least one line + TOTAL, and every one of them the same recipe.
+    expect(grids.length).toBeGreaterThanOrEqual(3);
+    const templates = new Set(
+      grids.map((el) => (el.className.match(/grid-cols-\[[^\]]+\]/) ?? [""])[0]),
+    );
+    expect([...templates]).toEqual([
+      "grid-cols-[16px_64px_minmax(0,1fr)_40px_160px_64px]",
+    ]);
   });
 });

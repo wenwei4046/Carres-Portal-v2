@@ -325,6 +325,20 @@ const NO_EXPANSION: ReadonlySet<string> = new Set<string>();
  * take more; the tracks themselves are exact, so no fixed column can be
  * squeezed either. Sum of the fixed tracks + gaps = 384px, which is what the
  * expand needs before `Description` gets its first pixel.
+ *
+ * **Q11 DID NOT CHANGE THIS LINE, AND THE REASON IS A MEASUREMENT.** "Take what
+ * is left" only eats the screen while the record it sits in is as wide as the
+ * screen; the record is `w-fit` now (see `PoWorkArea`), so *left over* is the
+ * record's own content width and this track resolves to the description's own
+ * size. Probed on production with PO-2037 open: swapping this token for
+ * `minmax(0,auto)` gives the SAME record width (474px) and the SAME six column
+ * origins (277 · 301 · 373 · 471 · 519 · 687) in all three grids — identical,
+ * so the token that was already here stays.
+ *
+ * What the `1fr` still buys is ALIGNMENT: the header, every line and the TOTAL
+ * are three separate grids of one width, and a flexible track absorbs the same
+ * slack in each, so they cannot fall out of line. A `max-content` track would
+ * size each grid to its OWN longest string and stagger them.
  */
 const ITEM_GRID =
   "grid grid-cols-[16px_64px_minmax(0,1fr)_40px_160px_64px] gap-2";
@@ -1571,8 +1585,30 @@ function PoWorkArea({
      * CLOSES the panel, so the listing is 968px and the whole record fits
      * inside it without scrolling at all.
      *
+     * **AND CONTENT-WIDTH SINCE Q11 (Loo, 2026-08-05), WHICH IS WHY THE `w-` IS
+     * NOW A `max-w-`.** Pinned to the visible width the record was ALWAYS the
+     * whole pane, so `Description` — the one flexible track — held 1191px at
+     * 1920 for 67px of ink and pushed `Qty`, `Destination` and `Received` to the
+     * far edge: 1138px of nothing between an item's name and its quantity, on
+     * every line, five lines on PO-2037. `w-fit` ends the row where its content
+     * ends and leaves the slack on the RIGHT, where empty space reads as empty.
+     * Measured on production, PO-2037: the record goes 1575 → 474 at 1920 and
+     * 935 → 474 at 1280, and `Description` 1191 → 90.
+     *
+     * **THE BOUND IS LOAD-BEARING AND IT IS NOT DECORATION.** `width:fit-content`
+     * is capped by the AVAILABLE width, and available here is the `<td>`'s —
+     * i.e. the table's `min-w-[1205px]`, not the pane. Measured with a 200-char
+     * description at 1280: bounded, the record is 935 and `Received` ends at
+     * 1212, inside the 1217 scrollport, and the name truncates (scrollWidth 1871
+     * against clientWidth 551); with the `max-w` removed the record is 1171 and
+     * `Received` ends at 1448 — 231px past the right edge, which is Q10's bug
+     * re-opened. Never remove it.
+     *
      * jsdom has no widths — every number above is from a real browser. */
-    <div data-testid={`po-work-${po.id}`} className="w-[calc(100cqi-2rem)]">
+    <div
+      data-testid={`po-work-${po.id}`}
+      className="w-fit max-w-[calc(100cqi-2rem)]"
+    >
       {/* ① THE TWO DATES — §12.2's ① and ②, side by side, because the whole
            question an operator answers here is *what did the factory say, and
            when does it reach us*. Both are editable; the panel carries neither
