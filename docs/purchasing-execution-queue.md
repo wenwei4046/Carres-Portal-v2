@@ -1753,7 +1753,10 @@ or `remove` has no COPY-STANDARD row, STOP and ask Loo · ❌ touch the grid (P1
 ---
 ## P17 · The grid gets its column separators — Loo ruled it after seeing both
 
-> 🔨 **CLAIMED 2026-08-05 — branch `claude/p17-grid-lines-773933`.**
+> ✅ **SHIPPED 2026-08-05** — PR **#620** `f8a9f197` + the production fix **#621** `ee55b84f`.
+> **No migration · no api · no Worker deploy owed** (measured). Web
+> `index-63l6VIUk.js`, all four canonicals, live md5 == local build
+> (`43c091a9…`, 4,768,749 bytes), `SERVICE_ROLE` **0**. Full record below.
 
 **Lane: KIT · `components/kit/DataTable.tsx` + `/ui`. FOUR pages change at once** — To Order,
 Purchase Orders, Receiving and Claims all render through it. That is the point, not a risk.
@@ -1790,6 +1793,129 @@ except for the lines this card adds.
 **Must NOT.** ❌ invent a colour · ❌ change any width, height or word · ❌ border the FACET
 rail or any card — this is the data grid only · ❌ make the lines dark enough to compete with
 the text; they are structure, not content.
+
+### ✅ SHIPPED 2026-08-05 — PR #620 `f8a9f197` + PR #621 `ee55b84f` · web `index-63l6VIUk.js`
+
+**THE CARD'S OWN MEASUREMENT REPRODUCED EXACTLY BEFORE A LINE WAS WRITTEN.** On production
+at 1920×1080: To Order **7 cells**, Purchase Orders **220**, Receiving **110**, Claims **11**
+— **`border-right: 0px` on every one of them.** The "seven cells" of the card is To Order's
+two kit columns + four data columns + the filler.
+
+**NO COLOUR WAS INVENTED, AND THE TOKEN WAS ALREADY NAMED FOR THIS JOB.** `01-design-tokens`
+§2.1 gives `border` = `slate-5` the use *"table lines · card edge"*, and a column separator IS
+a table line. Measured live, the row hairline already renders in exactly that value
+(`rgb(224, 225, 230)`), so a column line and a row line are **one line turned ninety degrees**.
+Deliberately not `divider` (`slate-6`) — that is *"section split"*, correct for the head's own
+bottom edge, and a column line drawn in it changes colour at the header.
+
+**THE BUILD WAS CHANGED BY A MEASUREMENT, AND A BLANKET RULE WOULD HAVE SHAVED THE CHECKBOX ON
+EVERY ROW.** P16 sized the kit's own two columns to their contents EXACTLY — the checkbox cell
+`8 + 16 + 8 = 32`, the disclosure cell `2 + 8 + 24 + 8 = 42` — so both carry **zero slack**.
+Applied as a browser-only style on the live page (Loo's own method), the selection cell's
+content box fell to 15px, the 16px control overflowed, and `[&_td]:overflow-hidden` clipped it:
+**5 clipped elements on To Order.** Widening the column to pay for the line would move every
+business column 1px right, which this card forbids. **So the gutter's boundary is drawn as the
+FIRST DATA COLUMN'S LEFT border — the same pixel, paid for by a column that has room** — and
+there is no rule *between* the disclosure and the checkbox, because those are one gutter, not
+two facts. Re-probed live: **0 clipped**, widths identical, rows 40px, page scroll 0.
+
+**A CASCADE BUG WAS SHIPPED AND CAUGHT ON PRODUCTION — the useful half of this record.**
+Tailwind's `border-{color}` paints **all four edges**, so a cell carrying its own bottom colour
+AND the rule's colour had one win by **stylesheet order, not class order**. Measured on the
+deployed bundle: **every header cell drew its rule in `rgb(217,217,224)` — slate-6**, the exact
+thing §5.1 forbids; and on **Receiving**, which has no control gutter, the first column
+inherited the late bar's all-sides `border-transparent` and rendered
+**`borderRightColor: rgba(0,0,0,0)` at 1px — the separator was simply not there**, and on a
+late row it would have been RED. Body cells were always correct, which is why every class-level
+test passed and the defect lived only in the cascade. #621 moves every border colour to a
+per-side utility (`border-r-…` · `border-l-…` · `border-b-…` · `border-t-…`), which cannot
+collide. **The invariant is now asserted structurally — no cell may carry an all-sides border
+colour** — because jsdom has no Tailwind cascade to measure and that is the form which catches
+it without a browser.
+
+**WHAT IS NOT SLICED, and both are the card's own words followed rather than reversed.** The
+**group band** keeps its full span: it floated because *nothing beneath it was ruled*, and the
+ruled columns now anchor it — cutting it into per-column cells would draw a line through the
+middle of one sentence. **Trailing whitespace is BOUNDED, never latticed**: the last real
+column rules its own right edge so the empty region reads as closed, and it is not filled with
+further lines, because P16 froze Loo's ruling that trailing whitespace says *this page holds
+these business facts and no more* — fake rules would say more columns are coming.
+
+**VERIFIED ON PRODUCTION, ALL FOUR PAGES, AT 1920×1080.**
+
+| page | table | ruled cells | colour | widths | rows | clipped | page scroll |
+|---|---:|---:|---|---|---:|---:|---:|
+| To Order | 1606 | 25 | slate-5, **0 wrong** | `42·32·111·55·155·163·1048` unchanged | 40px | **0** | 0 |
+| Purchase Orders | 1205 | 198 | slate-5, **0 wrong** | Q7's nine intact `96·87·83·94·135·135·140·206·192` | 40px | 28 (see below) | 0 |
+| Receiving | 1205 | 88 | slate-5, **0 wrong** | `88·92·104·150·771` unchanged | 40px | **0** | 0 |
+| Claims | 1502 | 9 | slate-5, **0 wrong** | D7's eight intact `150·111·181·154·147·194·368·134` | — (0 rows) | **0** | 0 |
+
+The group band is **1 cell, unruled**; the filler is **unruled on both sides** while the last
+real column rules; the late bar is intact at 2px.
+
+**REPORTED, NOT SOFTENED — the one measured cost, and it was isolated with a live control.**
+On **Purchase Orders**, running the page with and without the rule (the 2px late bar held
+constant): **without → 21 clipped, all 6px**, which is P16's already-documented expand-button
+clip and **not this card's**; **with → the same 21, plus 7 × 1px.** Those seven are
+`Nice Future` in the **87px `supplier` column** — Q7's frozen minimum, sized with **zero
+slack** — so the rule shaves the last pixel of the final letter. `text-overflow: clip`, so
+there is no ellipsis to announce it. **It cannot be fixed here: 87 is Loo's frozen number and
+this card may not change a width.** Widening it to 88 is his call.
+
+**Negative controls — ten, each a real edit verified on disk before the suite was trusted.**
+
+| control | fires |
+|---|---:|
+| delete the rule | 3 |
+| wrong token (`slate-6`) | 1 |
+| delete the gutter rule | 1 |
+| rule the last cell too | 2 |
+| slice the group band | 1 |
+| lattice the filler | 1 |
+| rule the zero-slack checkbox column | 1 |
+| all-sides header colour back | 1 |
+| all-sides transparent late bar back | 2 |
+| all-sides totals colour back | 1 |
+
+**TWO CONTROLS DID NOT FIRE ON THEIR FIRST RUN AND BOTH TIMES THE TEST WAS FIXED, NOT THE
+CONTROL.** The filler assertion checked only the HEADER filler, so a latticed *body* filler
+passed — it now scans head, body and totals. And the cascade invariant had its backslashes
+eaten by a heredoc, so `split(/s+/)` was splitting on the letter *s* and the regex matched
+`border-kit-slate-d+`, which never matches: **it was measuring nothing.** Rewritten with a
+direct edit. **Two more controls silently declined** because the file is CRLF and a multi-line
+match does not apply — the trap this repo has now paid for six times; every control asserts it
+landed on disk first.
+
+**Gates.** web tsc **0** · build clean · `SERVICE_ROLE` **0** · kit + all four page suites
+**403/403** · full web suite **16 failed / 2554 passed (2570)** against a **DETACHED CONTROL
+WORKTREE at `origin/main`** measuring **18 failed / 2534 passed (2552)** — the same four §17.7
+files, **zero new failures**, and the control's two extra are the documented
+`OperationPurchaseOrders` load-flake · **check-design byte-identical category for category to
+that control** (the `▲ +3` on G and I is main's own stale baseline, present on both trees).
+One page assertion moved: `OperationToOrder`'s late-bar test pinned the exact class
+`border-kit-red-9`; its intent — *a red left bar* — is unchanged, only the spelling is per-side.
+
+**Both directions proved on DOWNLOADED bundles, and the OBVIOUS marker was again the wrong
+one:** `border-r border-kit-slate-5` greps **6 in the predecessor**, because the string already
+lives in other components, so its 6 → 7 delta proves nothing alone. The clean markers are
+`border-r border-r-kit-slate-5` (**0 → 1**), `border-l border-l-kit-slate-5` (**0 → 1**),
+`border-b border-b-kit-slate-6` (**0 → 4**) and `border-l-transparent` (**0 → 1**); going the
+other way `border-transparent` is **18 → 17**. Controls present in BOTH: `table-filler` 3/3 ·
+`po-work-` 1/1 — the markers proving the predecessor was really read, fetched from its OWN
+deployment URL rather than the apex.
+
+**No Worker deploy was owed and it was MEASURED against the LIVE WORKER'S source commit read
+from `wrangler deployments list`** — `620bc69a` from `d460d899`. The `packages/shared` diff
+since it is another lane's (C11's `money-format`, C12's words), and the ONE symbol `apps/api`
+imports from the changed module, `orderActionDone`, is **byte-identical across both commits**
+(`md5(prosrc)` of the extracted function, `05d0f522…` on each); `fmtMoney` is imported by
+`apps/api` **0 times**. `/health` **200 `{"ok":true}`**.
+
+**REPORTED: no photograph was taken.** The Browser pane does not composite in this session
+(`screenshot` times out with *"the Browser pane is not displayed"*), so the card's *"opened on
+production and photographed before and after"* is **OWED**. Every number above is a real
+browser layout measurement on the live page — not jsdom — but nobody has looked at the
+rendered pixels.
 
 ---
 
@@ -4277,7 +4403,7 @@ kit's.
 | P14 | ✅ **SHIPPED 2026-08-04** (PR #602 `656bfb50`, **no migration**, web `index-BCW9pZU0.js` — DEPLOYED, all four canonicals, live md5 == local build, `SERVICE_ROLE` 0) · **`CreatePurchaseDialog` moves to its own file** — a PURE move, zero behaviour, so that P15 and P16 are two lanes instead of one collision. **BYTE-IDENTICAL IS PROVED, NOT ASSERTED**: of the **206 moved lines exactly ONE differs** — `export default`, which the card asks for by name — and of the `Destination` interface's **5 lines exactly ONE differs**, the `export` keyword. The interface travels with the dialog because it is its PROP TYPE, and is exported back exactly as `ReserveStockDialog` already exports `ReserveFreeUnit`; the alternative (leave it on the page and import it back) is a circular import for nothing. `OperationToOrder.tsx` is `2 insertions, 216 deletions` — the block, the interface, four now-unused imports, one import line. **`sed` ON THIS MACHINE STRIPS CR**, so the first attempt silently wrote an LF file over a CRLF one and `file` reported the mix; redone in Node with the endings verified — **the fourth time that trap has been paid for**. **TWO SOURCE SCANS HAD TO FOLLOW THE CODE, and that is the one place the card's *"tests pass unchanged"* could not hold — reported rather than slipped in.** Both name a file BY PATH, so a move that leaves them alone shrinks them silently: `the only demand doors the page opens are create and cancel` **FAILED** (the create door left the file) and now scans BOTH files with its **expected values untouched** — the scope follows the code so the ASSERTION can stay what it was; and `purchasing-words.test.ts`'s `LANE` goes **8 → 9**, because every rule there is a NEGATIVE assertion and leaving the new file off would have retired five of them **while the suite went on passing** — the exact failure that file's own note records having already been paid for once, in production, under 51 green render tests. **Every RENDER test passes unchanged**; no test was added, removed or re-expected. **Three negative controls, each a real edit, each verified applied, each fired**: plant `Chase` in the new file → the lane word rule fires (proving the file is really SCANNED, not merely listed) · change the dialog's rendered label → the page's render test fires (proving the page renders THIS file) · the demand-doors scan fired on its own before it was widened. **The deploy is one a STRING GREP STRUCTURALLY CANNOT PROVE and it is recorded that way**: a pure move adds and removes no string, so all five dialog markers grep **1 in BOTH** bundles — which is what a move must look like. What proves it instead is that **building `origin/main` in the same worktree emitted `index-1IlpnSUN.js`, byte-for-byte the bundle recorded as live** (predecessor md5 `84c514ce…`, 4,763,084 bytes — the figure §17.1 already carried), so the toolchain reproduces production; the moved tree emits `index-BCW9pZU0.js` at **exactly the same 4,763,084 bytes**, which is the signature of a move that changed no code. Two canonicals lagged on the first poll and `deployments list` settled it (`656bfb5` newest Production/main writer on BOTH projects) before they converged — **one poll cannot tell a lag from a split**. **No Worker deploy owed and it was MEASURED** against the LIVE WORKER's source commit: `git diff f2517f99 HEAD -- apps/api packages/shared supabase/migrations` is EMPTY (`/health` 200 anyway). tsc 0 · the two suites 85/85, the same count as baseline · full web suite 2454 passed, 16 pre-existing (§17.7), zero new · **check-design 8367, IDENTICAL category for category** to the tree without the change (359 → 360 files, the new one). **The dialog's four defects are UNTOUCHED — P15 owns them** — and the grid was not opened | #602 |
 | P15 | ✅ **SHIPPED 2026-08-04** (PR #607 `d460d899`, migration **0323 applied and verified BEFORE the merge**, web `index-C3XUGs8p.js` + Worker `620bc69a` — DEPLOYED, all four canonicals, live md5 == local build, `SERVICE_ROLE` 0) · **the Create Purchase dialog stops guessing** — four measured defects: **four different SKUs render as the word `Booqit`** (you cannot pick the right one) · **no `Source` at all** (the payload has no `purpose`, so Warranty/Display/Office cannot be told apart) · no stock in the picker · no supplier. **After P14**, parallel with P16 | — |
 | P16 | ✅ **SHIPPED 2026-08-04** (PR #609 `dc1908c5`, **no migration · no api · no new word · no column added**, web `index-b8xJQC_M.js` — DEPLOYED, all four canonicals, live md5 == local build `bde01851…` 4,765,583 bytes, `SERVICE_ROLE` **0**; **no Worker deploy owed and it was MEASURED** against the LIVE WORKER'S source commit `d460d899` — `git diff d460d899..main -- apps/api packages/shared supabase/migrations` is EMPTY, `/health` 200) · **the grid's columns are sized by their content — Loo's Phase 1.** **Measured on production BEFORE building**: the table was 1094px, its content needed ~345, and `Model` alone held **470px — 43%** for strings like `Sonic S` (46.4), `Supplier` 241 for `Nice Future` (70.7). **That is why flushing the container ALONE would have made it worse**, not better. Every width is now MEASURED in a real browser against the app's own stylesheet (13px Inter cells, 11px/500 headers, `px-2` = 16) against **the worst string the column CAN hold** — not the worst on screen, which is six rows of two suppliers; supplier names came from `suppliers`, model names from `product_models`: `Carres Internal` 90.8 → **111** · `Qty` header floor 50.8 → **55** · `Mattress Protector SS` 134.3 → **155** · `Yet to Order`+`Cancel` 143.0 → **163** (ratios 1.22 · header-bound · 1.15 · 1.14, all inside Loo's ~1.3×). **A HEADER IS A FLOOR NO COLUMN MAY GO UNDER** — sorted and filterable it costs the word + 2 + the arrow's 14 + 2 + the ▼'s 24 + 16 — which is why `Qty` is 55 for 24px of digits. **THE `+4` IS A SUB-PIXEL GUARD AND IT WAS PAID FOR ONCE ALREADY**: `PO No.` was first built at exactly 159 (143.0 of content in 143 of box) and the browser **ELLIPSIZED** it — `scrollWidth === clientWidth` said it fitted while the screen said `Yet to Ord…`, because text metrics are fractional and box widths round. Every width is `ceil(measured) + 4`, and **the eye is the last check, not the first**. **`Model` is sized for `Mattress Protector SS` deliberately**, though protectors are 0 today: the rail's Pillow and Mattress Protector rows are Jess's planned-ahead placeholders (*"the rows exist so the layout never moves again"*), so narrowing it now moves the layout later. **THE KIT HAD TO CHANGE, and the reason is the card's own rule**: in `table-fixed` the browser hands spare width BACK OUT over the columns unless something `auto` is there to take it, so "size a column to its content" is a number the browser immediately overrides. `DataTable` gains ONE optional prop — **`sizing="content"`**: each column gets exactly its def's width, a trailing **FILLER** takes the rest, and the kit's own two columns become pixels (42 · 32), because a 3% share of a table that no longer stretches is a 24px disclosure button in a 20px column. **THE FILLER IS NOT A COLUMN and the Must-NOT is not bent**: it never enters `columns`, so it cannot be sorted, filtered, hidden or reordered, it carries no word, it is `aria-hidden`, and the header row a screen reader hears is still the same four words — it is what makes *"no column absorbs the slack"* enforceable rather than a hope. **`sizing` takes NO DEFAULT VALUE — `undefined` IS fill** — because the kit's own §10.1 guard forbids defaulting a prop to a string and **caught `sizing = "fill"` on the first run**; it was right, and the default is now the ABSENCE of the caller's choice, exactly like `order` and `widthPct`. **MEASURED IN A REAL BROWSER AT ALL THREE VIEWPORTS, which is the half jsdom structurally cannot do** — every column at exactly its ruled width (`42 · 32 · 111 · 55 · 155 · 163`) at 1440, 1280 and 1024, **0 clipped cells** at every one, rows still **40px**, page horizontal scroll **0**; truncation was detected over `td, th, td *, th *`, because **the ellipsis lives on nested `truncate` spans and a `td`-only scan is exactly how the first pass missed the `PO No.` clip**. **REPORTED, NOT SOFTENED**: at 1024 with the sidebar EXPANDED the listing region scrolls **20px** (region 540, table 558) — on production, with the operator's own collapsed rail, it is **0** at all three. It is the honest consequence of content-sized columns: the only way to remove it is to squeeze a column below its content, which is the thing this card forbids. **Flush**: the workspace's 16px side gutters and the kit's `rounded-t-card` are gone, and the grid's wrapper drops `rounded-card overflow-hidden` with them — measured live, the sheet's right edge is **1388** and the right rail's left edge is **1388**. **The radius lives in the SHARED kit, so both sibling pages were opened and checked on production**: Purchase Orders still renders its nine frozen minimums (`96 · 87 · 83 · 94 · 135 · 135 · 140 · 206 · 192`) and Receiving `88 · 92 · 104 · 150 · 291`, both with **no filler**, rows 40px, radius 0. **Reported, pre-existing, NOT mine**: Purchase Orders' expand `<td>` clips 40px of button into 33px of column — production measured **35 / 40 / 33** on the predecessor bundle too. **Expand keeps its ONE job** (P10's meaning, untouched) and **no inline second line was added** — rule ③ is an exception left unused, because no fact needed one. **A TEST THAT ASSERTED THE OLD LAW WAS REWRITTEN, NOT DELETED**: `the grid's width system` asserted *"every column is a PERCENTAGE and the set sums to 100"*, and summing to 100 IS the instruction "stretch to fill". Gates: web tsc **0** · shared **2129/2129** · the two suites **121/121** (grid-powers 32 → 40 · page 74 → 81) · full web suite **2485 passed / 16 pre-existing** (§17.7), zero new · **check-design 8366 against main's 8367, proved by linting a DETACHED WORKTREE at `origin/main`** — category for category identical except **E 1693 → 1692**, the change removing one off-law value and adding none. **Four negative controls, each a real edit verified applied, each fired**: drop `sizing="content"` → 2 · a percentage back on `Model` → 2 · restore the kit's top radius → 1 · restore the 16px gutters → 1. **Both directions proved on DOWNLOADED bundles with controls**: `table-filler` **0 → 3** · `155px` · `163px` · `111px` each **0 → 1**, and going the other way `rounded-t-card` **1 → 0**, while `Yet to Order` is **1 in BOTH** and `to-order-cancel-` **5 in BOTH** — the markers proving the predecessor `index-C3XUGs8p.js` was really read, fetched from its OWN deployment URL `b38e7e41` (4,765,187 bytes, a real bundle rather than the 404 page that greps as a clean 0 for everything). **All four canonicals FLAPPED for ~2 minutes** and `wrangler pages deployment list` settled it (`dc1908c` the newest Production/main writer on BOTH projects) before they converged — **one poll cannot tell a lag from a split**. **Phase 2 is NOT open** | #609 |
-| P17 | 🔨 **CLAIMED 2026-08-05 — `claude/p17-grid-lines-773933`** · **the grid gets its column separators** — Loo ruled it 2026-08-05 from two photographs of the live page, seconds apart. Measured: all seven cells carry `border-right: 0px`. The floating group band, the broken-looking whitespace and the tiring page are ONE cause. **KIT — four pages change at once.** No colour invented | — |
+| P17 | ✅ **SHIPPED 2026-08-05** (PR #620 `f8a9f197` + the production fix #621 `ee55b84f`, **no migration · no api · no Worker deploy owed**, web `index-63l6VIUk.js` — DEPLOYED, all four canonicals, live md5 == local build, `SERVICE_ROLE` 0) · **the grid gets its column separators.** The card's measurement reproduced exactly first: **To Order 7 cells · Purchase Orders 220 · Receiving 110 · Claims 11, `border-right: 0px` on every one.** **No colour invented** — §2.1 already gives `border` = `slate-5` the use *"table lines"*, and the row hairline measures that same `rgb(224,225,230)` live, so a column line is a row line turned ninety degrees. **A BLANKET RULE WOULD HAVE SHAVED THE CHECKBOX ON EVERY ROW**: P16 sized the kit's two control columns to their contents EXACTLY (`8+16+8` and `2+8+24+8`), so a right border took the 16px checkbox into a 15px box and `overflow-hidden` clipped it — measured live as 5 clipped elements. Widening would move every business column, which the card forbids, so **the gutter's boundary is the FIRST DATA column's LEFT border**: same pixel, paid for by a column with room, and no rule between the two control columns because they are one gutter. **A CASCADE BUG SHIPPED AND WAS CAUGHT ON PRODUCTION** — Tailwind's `border-{color}` paints all four edges, so **every header cell drew its rule in slate-6** and on **Receiving** (no gutter) the first column inherited the late bar's `border-transparent` and was **INVISIBLE**, and would have been RED on a late row; #621 moves every border colour per-side and asserts the invariant structurally, because jsdom has no cascade to measure. **The band is not sliced** (it floated for want of ruled columns BENEATH it) and **trailing whitespace is bounded, never latticed** (P16's frozen ruling). **Verified on all four production pages at 1920×1080**: 25 · 198 · 88 · 9 ruled cells, **every one slate-5, 0 wrong**, every width unchanged (Q7's nine and D7's eight intact), rows 40px, page scroll 0. **Reported, not softened — the one measured cost, isolated with a live control**: on Purchase Orders, without the rule 21 clipped (all 6px, P16's already-documented expand-button clip, **not this card's**), with it the same 21 **plus 7 × 1px** — `Nice Future` in the **87px `supplier` column, Q7's frozen zero-slack minimum** — and 87 is Loo's number, so it cannot be fixed here. Ten negative controls, each a real edit verified on disk; **two did not fire first time and the TEST was fixed, not the control** (the filler scan checked only the header; the cascade regex had its backslashes eaten by a heredoc and was **measuring nothing**). Gates: tsc 0 · kit + four page suites 403/403 · full web suite **16 failed / 2554 passed** against a detached `origin/main` control measuring **18 / 2534** — zero new · check-design **byte-identical category for category**. **Reported: NO PHOTOGRAPH was taken** — the Browser pane does not composite in this session, so the card's *before and after* photographs are **OWED**; every figure is a real browser layout number all the same | #620 · #621 |
 | P18 | ⬜ **the order's proceed date joins the group header** — Loo asked for a column; it is an ORDER fact, so a column would print the same date on every line of the group. `orders.proceed_date` is **23 of 28 native orders = 82%** (Remark was refused at ~10%). Sales keys it as `PROCEED DATE · PRODUCTION START`. **One question for Loo before building: date, or date + how long it has waited** | — |
 | P19 | ⬜ **Create Purchase takes many lines** (Loo 2026-08-05) — Sales Portal's New Sales Order and AutoCount's Purchase Request both take MANY lines; ours is the only one that makes you re-open a dialog for the second thing. **The schema already supports it** (`purchase_demands` is one row per SKU), so this is the form, not the data. Header = Source · Destination · Required By; lines = Item · Qty · Remark. **After P15** | — |
 | P10 | ✅ **ready stock is suggested, the human takes it** — **no migration**. The engine has computed it since the day it was written and it was switched off and shown to nobody; `consumeFreeStock` is still `false` and nothing nets it, because Jess's 2026-07-21 ruling stands — the defect was that a decision reserved for a human never reached the human. Loo's option B: D0.5d's inline row expand, the offer counted off the **register** (`ops_stock_items`, the table the draw moves) and what was already taken read off **K4's LEDGER** — not off `status='reserved'`, which would put a satisfied requirement back on the page the day the goods went out. `POST /take-stock` carries no quantity and goes through `ops_stock_pool_draw`, one call per record. **It was built TWICE the same day**; the parallel branch `claude/p10-ready-stock-4c0f8f` is preserved on origin and NOT merged, and its four independent measurements are recorded under the card: **the offer matches nothing on live data today** (the 87 free units are Klang-sheet descriptions, all 31 demand SKUs are catalog codes — zero overlap, correct, self-healing) · **`Take` here vs `Reserve {n} to {soRef}` in the drawer's picker, one act two words, Loo's to rule** · **the kit's 3% expand column is narrower than its own 24px control below ~1440px** (3px onto the checkbox at 1024; nothing clips, no sideways scroll, rows still 40px) · **the offer does not filter CONDITION**, so a released `damaged` unit would be offered to a customer (zero exposure today, measured) | #591 |
