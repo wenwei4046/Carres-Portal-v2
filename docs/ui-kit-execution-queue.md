@@ -56,7 +56,7 @@ deliverable is Foundation Components, not a better document.
 | **D5** | Guard → **Fail**. Blocked while the PENDING register is non-empty | ⏳ |
 | **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ — **also carries the `.t4-*` legacy migration** (PM, 2026-07-29). D2 found a SECOND retired ramp: 9 classes, **44 in-scope uses across 8 files**, invisible to rule D because a page writes only the class name while the size and weight sit in `index.css`. **`.t4-hero-num` is `20px/700`** and `lib/design-standard.ts:132` records that 700, so a §2.2-dead weight still renders. Ruled **Reported Only for D2**: it is a visual change on a money figure and belongs with the pages when they migrate. **D6 owns the DEFINITIONS and the mirror's `weight: 700`** |
 | **D0.5d** | **`DataTable` grows the grid powers AutoCount has and we do not** — row expand · resize · reorder · footer totals. **Kit only, additive only.** Full card below | ✅ **BUILT 2026-08-04** — 3 of 5 shipped as optional props; **layout memory REFUSED by §0.4** (a business decision, named below) and **the record bar ALREADY EXISTS** in `PageShell.footer` + `chips`. No page migrated |
-| **D7-Claims** | **Supplier Claims renders through `DataTable`** — the last hand-rolled `<table>` in Purchasing. Full card below | 🔨 **CLAIMED 2026-08-05 — `claude/d7-claims-datatable-aaafb6`** |
+| **D7-Claims** | **Supplier Claims renders through `DataTable`** — the last hand-rolled `<table>` in Purchasing. Full card below | ✅ **SHIPPED 2026-08-05, PR #612 `2a10599b`, deployed.** 43/43 tests pass UNTOUCHED · rendered words BYTE-IDENTICAL · guard `G` 687 → 686. Two findings below |
 | **D7+** | Delivery · Purchase · Receiving · Stock · Service · Payments · Catalog — one card each | ⏳ — whichever of these owns a file still writing `.t4-*` retires it there, so the last card to migrate does not inherit the ramp's deletion |
 
 **Order is not negotiable for D0.5 → D6.** Rebuilding a page before the
@@ -1734,6 +1734,86 @@ words grep identical before and after · sorting works on every column that has 
 
 **Must NOT.** ❌ re-word anything (that was R8) · ❌ change the facet rail (that was P2) ·
 ❌ wait for D0.5d — today's `DataTable` is enough.
+
+### ✅ SHIPPED 2026-08-05 — PR #612 `2a10599b` · **no migration · no api** · web `index-BiJsXPig.js`
+
+Deployed carres-portal `3983a9c4` + carres-pos `dec5b88b`, both `--branch=main`; live file
+**md5-identical to the local build** (`7eacbe61…`, 4,766,375 bytes), `SERVICE_ROLE` **0**.
+**The four canonicals SPLIT on the first poll and converged on the second** — the documented
+edge lag, and `wrangler pages deployment list` settled it: source `2a10599` is the newest
+Production/main writer. **No Worker deploy was owed and it was MEASURED**, not assumed:
+`git log --since=<the Worker's deploy time> -- apps/api packages/shared supabase/migrations`
+is EMPTY, and `GET /health` answers **200 `{"ok":true}`**.
+
+**THE ROW WAS TWO LINES TALL AND THE KIT'S ROW IS 40px — that is the whole card.** Six cells
+stacked a second line (the status pill · `{n} units` · the note · `DO {n}` · who reported it ·
+the photo count). Every fact moved onto ONE line, each still its OWN element — which is not
+tidiness but the reason **43/43 tests pass with not one test edited**, and why a dump of every
+rendered word is **BYTE-IDENTICAL** before and after across three states (list · panel open ·
+empty). The one difference the first build produced was a READING ORDER inside one cell
+(`Open` before `2 photos`); it was put back rather than argued away, so the evidence is exact.
+
+**LOO'S RULE ① APPLIED WITH REAL NUMBERS, AND PRODUCTION HAS ZERO CLAIMS.** So the worst
+string of each column came from the SOURCE it draws on — `suppliers.name` (`Carres Internal`
+90.8) · `purchase_order_lines.sku` (`LYYAR-1A(LHF)` 95.3) · the bounded label sets in
+`supplier-claim.ts` · and the ONE sentence the late sweep writes — never off the rows on
+screen, of which there are none. Measured in a REAL browser against the app's own stylesheet
+at 13px Inter, each width `ceil(measured) + 16 + 4`:
+
+```
+Claim 150 · Supplier 111 · Item 181 · Problem 154
+PO 147 · Reported 194 · Next move 368 · (actions) 134     all inside 1.06–1.22×
+```
+
+**Verified on the DEPLOYED page at three viewports: every column renders at exactly those
+eight numbers** — identical at 1280, 1440 and 1920, which is rule ① proved rather than
+requested — with `pageHorizScroll` **0** at all three and a **21px trailing filler at 1920**,
+which is *"trailing whitespace is not waste"* on screen. Sorting was exercised live: seven
+sortable columns, `aria-sort` cycling ascending → descending → **cleared**, no console errors.
+
+**THE ONE MEASURED COST, REPORTED RATHER THAN SOFTENED.** 1439 + the kit's 42px expand
+control = **1481**, against a container of **1022** at 1440 and **862** at 1280. The listing
+region scrolls sideways. **It already did** — the hand-rolled table carried `minWidth: 1120`
+in the same 1022 — but the threshold moves **1120 → 1481**, because putting a two-line cell
+on one line costs horizontal width. That is the price of the 40px law, and it is this card's
+honest half.
+
+**FINDING 1 — the kit has no mechanism for Loo's rule ③, and that is what D6 must know.**
+Sized to hold its note in full, `Problem` would be **350px rather than 154** — 200px of
+permanent width for a fact only a `late_delivery` claim carries, which is exactly what Loo
+REFUSED on the sibling page (*"a permanent column for a 10% fact is a permanently empty
+column"*). His answer was rule ③: **an inline second line, under the row, only when it has
+content.** `DataTable` has no such prop, and rule ② reserves `expansion` for the record's own
+detail — here the claim panel. So the note rides `Problem` inline and truncates with its full
+text on `title`: nothing unreachable, nothing invented. **A page whose cells stack will meet
+this every time, and Orders stacks far more than six.**
+
+**FINDING 2 — `OperationPurchaseOrders.test.tsx` is FLAKY ON MAIN under full-suite load, and
+it is not in §17.7.** Measured against a DETACHED CONTROL WORKTREE at the same commit
+(`55dcba22`) rather than against a stale baseline: control **28** failures / 6 files, this
+branch **25** / 5. It passes **89/89 in isolation on both trees** and fails 1 · 3 · 9 · 11
+across full-suite runs; `OperationReceiving.test.tsx` flaked once on the control too. The
+STABLE set is identical on both trees — `OperationOrders 7 · OrderCustomerCard 4 ·
+NiceFutureMattressTab 1 · OhanaSofaTab 4 = 16`, exactly the documented baseline. **Zero new
+failures**, and the instability belongs to the Purchase Orders lane.
+
+**The kit gained TWO optional props and no signature moved** (D0.5d's discipline, so the three
+frozen pages emit byte-identical markup): `testId` + `rootRef` name **the element that actually
+SCROLLS**. A page owning P2's scroll restore has to find the scroller, and the scroller is the
+kit's div — without them a page can only wrap it in a second `overflow-auto`, **which scrolls
+in jsdom, passes the test, and never scrolls in a browser.** `rowTestId` is the page's own name
+for its row. Guard: every check-design category **equal or LOWER** than the control, proved by
+linting a detached worktree at main rather than by trusting the tool's own stale baseline —
+**`G` (hand-rolled table / input / select / overlay) 687 → 686**, the `<table>` this card
+removed, plus `O` −18 · `E` −3 · `P` −2 · `I` −1, and nothing up. Three negative controls, each
+a real edit verified applied: drop `rowTestId` → **8** fail · drop `testId` → **3** · drop
+`rootRef` → **3**.
+
+**Reported, not fixed:** the expand chevron and the `Open` button are now two controls doing
+one job — removing the button would delete a column the card forbids removing, so both stay ·
+**no row was verified on production, because production holds 0 claims**: the 40px row, the
+inline second-line facts and the expand panel are proved by the 43 page tests, not by the live
+screen, and that split is stated rather than blurred.
 
 ---
 
