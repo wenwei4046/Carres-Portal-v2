@@ -116,6 +116,40 @@ describe("Modal", () => {
     );
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
+
+  /**
+   * P19 (2026-08-05) — the centred surface got a SECOND width, and these two
+   * tests are the reason that is not a loosening of D0.5b's law.
+   *
+   * That law said *"a modal that can be told its width is four widths by next
+   * quarter, so there is no size prop"*, and the danger it names is a FREE
+   * width. The set is closed at two, both values live in `tailwind.config.ts`,
+   * and the prop is a union of one literal — so what a page can express is
+   * "wide" or nothing, never a number.
+   */
+  it("takes the 512px width when it is told nothing — an absent prop is the default", () => {
+    render(
+      <Modal open onOpenChange={() => {}} title="t">
+        body
+      </Modal>,
+    );
+    const modal = document.querySelector('[data-kit="modal"]')!;
+    expect(modal).toHaveClass("max-w-modal");
+    expect(modal).not.toHaveClass("max-w-modal-wide");
+  });
+
+  it("takes the wide width ONLY when asked, and never both", () => {
+    render(
+      <Modal open onOpenChange={() => {}} title="t" width="wide">
+        body
+      </Modal>,
+    );
+    const modal = document.querySelector('[data-kit="modal"]')!;
+    expect(modal).toHaveClass("max-w-modal-wide");
+    // Two max-widths on one element is a race the last class wins; the map
+    // returns ONE, so the surface cannot be told two things at once.
+    expect(modal).not.toHaveClass("max-w-modal");
+  });
 });
 
 describe("Drawer", () => {
