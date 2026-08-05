@@ -54,12 +54,13 @@ produces a refusal at issue that the business never asked for.
 |---|---|---|
 | **Warehouse** | into a Carres warehouse | **nobody presses anything** — posting the Receiving Session IS the confirmation |
 | **Direct to customer** | the supplier or the carrier takes them straight to the customer | **Operation confirms it explicitly** — no Session can ever exist for those goods |
-| **Customer collects at the supplier** | the customer goes to the factory and takes the goods themselves | *(same category: no Carres floor, no Session. **WHO confirms it is open** — nobody on our side witnesses the handover; see §8)* |
 
-**The third path is Loo's own, 2026-08-05:** *"我们有发生过顾客去我们厂那边"* — it happens,
-so the model carries it. It is not a variant of the second: in the second a Carres-arranged
-carrier moves the goods and we can ask them; in the third **no Carres party is present at
-all**, which is why its confirmer is parked rather than guessed.
+**TWO PATHS ARE RULED. A THIRD SITUATION IS RECORDED AND IS NOT A RULED PATH** — Loo
+mentioned in passing, 2026-08-05, that *"我们有发生过顾客去我们厂那边"*: the customer goes to
+the factory and takes the goods themselves. **It is written down as a business fact so it is
+not lost, and nothing more** — it has not been ruled, it is not a third row in the table
+above, and no build may treat it as one. *(A chat turned that remark into a frozen path and
+was corrected by him the same day. The remark is true; making it law was not his act.)*
 
 - **The warehouse path gets NO extra confirm button, and that is a rule rather than a
   convenience.** §1 says the check-in itself IS the completed GRN; a second *"yes, the
@@ -69,8 +70,8 @@ all**, which is why its confirmer is parked rather than guessed.
   from a quantity and never read off a Receiving status. **`which path` is a stored value
   of the fulfilment record**, not a re-derivation of the destination — a destination can be
   edited after the fact, and the record must keep saying how the goods actually went.
-- **The list of paths is Loo's and is not closed by a chat.** Three are named above; a
-  fourth enters here before it enters any code.
+- **The list of paths is Loo's and is not closed by a chat.** Two are ruled above; a third
+  enters this table only when he rules it.
 - **None of these is a Receiving screen.** Receiving handles goods; goods that never arrive
   here are not its work. The confirmation belongs to the buyer's side — §1's role-anchor
   rule, one file over.
@@ -299,7 +300,7 @@ Event names themselves are business facts and closed:
 | Item | Waits for |
 |---|---|
 | **the fulfilment record itself** (who · when · which path) and the Operation confirmation for the paths with no Carres floor — §1.2's rule is frozen, nothing is built, and **PO-2032 is stuck today** | its own card, on the BUYER's side, never a Receiving screen |
-| **WHO confirms `customer collects at the supplier`** — no Carres party witnesses that handover, so the confirmation rests on either the supplier's word or the customer's signature at the factory. **Loo's, and deliberately not guessed** | his ruling, before that path is built |
+| **`customer collects at the supplier`** — recorded in §1.2 as a business fact he mentioned, NOT a ruled path. **No chat may promote it, design a confirmer for it, or ask him about it again** | Loo raising it himself |
 | `receiving method` value naming (`manual` vs something better) | before migration |
 | photo TYPE taxonomy (DO / Goods / Damage / Other) | photos v2 |
 | Goods Received At lower bound (PO Date vs something finer) | before migration |
