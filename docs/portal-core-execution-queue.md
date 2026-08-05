@@ -1333,7 +1333,7 @@ truncate: the premise was 42% too wide. **Re-measure before moving a single widt
 | C4 | ⛔ **RETIRED 2026-07-28 — re-cut as C11 + C12.** PR #484 stays OPEN and untouched; it is where the unshipped work lives | [#484](https://github.com/wenwei4046/Carres-Portal-v2/pull/484) (open, not to be merged as-is) |
 | C11 | ⬜ **a money figure is the money owed** (Loo 2026-07-28) — 5 call sites, 2 failures, 1 cause. **ORDERS lane**, not alongside ⑧ D0.5c | — |
 | C12 | ⬜ **the last `Chase` leaves the portal** — 21 strings + the shared scanner. **PURCHASING lane** (one file); split its ② off if P3 must start first | — |
-| C13 | ⬜ **the red means something again** (Loo 2026-08-04) — 37 of 37 Overdue are the AutoCount archive; 0 of 28 real orders are late. Web only, no migration. **ORDERS lane** | — |
+| C13 | 🔨 CLAIMED 2026-08-05 — `claude/c13-orders-red-581c98` · **the red means something again** (Loo 2026-08-04) — 37 of 37 Overdue are the AutoCount archive; 0 of 28 real orders are late. Web only, no migration. **ORDERS lane** | — |
 | C14 | ⬜ **nothing says the same thing twice** (Loo 2026-08-04) — Delivery ≡ Actions on 31/31 rows; 30 truncated cells; 219px above the first row. **ORDERS lane, AFTER C13** | — |
 | C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
 | C6 | ✅ **LIVE** 2026-07-28 — every action opens the steps that close it; the order's PIC is the task owner | #486 |
