@@ -1356,3 +1356,95 @@ first structurally cannot fire that assertion** — with no handle there is noth
 the header's accessible name, so the test would have passed either way and proved nothing. A
 `perl -0pi` attempt silently declined on this CRLF file, the fourth time that trap has been
 paid for, so both were redone as real edits.
+
+---
+
+### 2026-08-05 · Q13 SHIPPED — the `supplier` column widens 87 → 88 (PR #622)
+
+**No migration · no api · no Worker deploy owed · no new word, column, token or row height.**
+Two numbers and a test. Web `index-DCDgFPBE.js` — DEPLOYED (carres-portal `215c8960` +
+carres-pos `7800b6e3`, both `--branch=main`), **all four canonicals on the FIRST poll**, live
+file md5-identical to the local build (`be8afdac…`, 4,768,749 bytes), `SERVICE_ROLE` **0**.
+
+**Loo ruled it from P17's own reported cost:** *Q7 froze WHICH columns and HOW WIDE so that
+nothing truncates. Holding 87 while it truncates keeps the number and loses the intent.*
+
+**THE MEASUREMENT REPRODUCED ON PRODUCTION BEFORE A LINE WAS WRITTEN, and it CORRECTS P17.**
+28 clipped elements over `td, th, td *, th *`: 21 × 6px in the expand-control column (P16's
+documented clip, not this card's) and **7 × 1px**. P17 recorded all seven as *"`Nice Future`
+in the 87px `supplier` column"*. **Four are; the other three are `SO-1206 +4` and `+3` in
+`sono` (94px) and `Booqit 2B(LHF) · +1` in `items` (135px)** — two columns Loo did not name,
+reported below rather than widened. **A live control proves all seven are P17's border**:
+removing every vertical rule as a browser-only style leaves only the 21; putting them back
+returns all seven.
+
+**THE SECOND NUMBER IS NOT OPTIONAL, AND THAT IS THE DURABLE PART.** The listing's min-width
+is DERIVED — the kit's expand-control column takes 3% of the table, so the nine pixel columns
+are 97% of it: 1168 → 1169, and 1169 / 0.97 = 1205.15 → **1206**. Probed live at 1280, where
+the min-width binds:
+
+| probe | ctl column | ctl clip | supplier clip |
+|---|---:|---:|---:|
+| `87px` / `1205px` — before | 35 | **7px** × 21 | 1px × 4 |
+| `88px` / `1205px` — the tempting half-fix | **34** | **8px** × 21 | 0 |
+| `88px` / `1206px` — what shipped | 35 | **7px** × 21 | 0 |
+
+The middle row fixes `supplier` by making P16's already-clipping expand button one pixel
+worse — **and every business column still renders at its ruled width, so the damage is
+invisible to the width assertion.** A new test therefore re-derives the min-width from the
+rendered column widths; the two cannot drift apart again.
+
+**VERIFIED IN A REAL BROWSER ON PRODUCTION AT 1280 · 1440 · 1920.** `supplier` renders **88**
+at all three and the other eight are Q7's exactly (`96 · 88 · 83 · 94 · 135 · 135 · 140 ·
+206 · 192`); the **4 × 1px `supplier` clips are 0**, the 21 are unchanged (7px at 1280/1440,
+6px at 1920 — P16's, varying with the 3% column's sub-pixel), the 3 reported ones remain;
+rows **40px**, page horizontal scroll **0** everywhere. On a live row `Nice Future` measures
+`clientWidth 87 · scrollWidth 87 · clipped false`, its right border still 1px
+`rgb(224, 225, 230)` = slate-5, so P17's rule is intact. Only two suppliers exist on the
+register today (`Nice Future` ×4, `Ohana` ×17).
+
+**Four negative controls, each a real edit verified on disk first:** `supplier` back to 87 →
+**2** · min-width back to 1205 → **2** · `items` 135 → 150 with the min-width left alone →
+**2** · **`items` 135 → 150 AND its pinned expectation updated with it → 1, the derived guard
+alone.** The fourth is the one that matters: it models a chat changing a width on purpose,
+where no other assertion can see the min-width was left behind. One control silently declined
+first because the file is CRLF and a multi-line needle does not match — **the seventh time
+that trap has been paid for on this lane.**
+
+**Gates.** web tsc **0** · build clean · `OperationPurchaseOrders` **100 → 101** · full web
+suite **16 failed / 2555 passed (2571)** against a **DETACHED CONTROL WORKTREE at
+`origin/main`** measuring **17 failed / 2553 passed (2570)** — the same four §17.7 files, test
+for test, so **zero new failures**; the control's extra is the documented full-suite load-flake
+in this very file, which passes **100/100 in isolation on the control**. **check-design 8340,
+IDENTICAL category for category to that control.**
+
+**Both directions proved on DOWNLOADED bundles.** `min-w-[1206px]` **0 → 1** ·
+`min-w-[1205px]` **1 → 0** · `"87px"` **1 → 0** · `"88px"` 2 → 3 (so `"88px"` is NOT a clean
+marker alone — the removal is). Controls present in BOTH: `po-listing` 1/1 and `"96px"` 1/1,
+the untouched neighbour width. The predecessor is P17's `index-63l6VIUk.js`, fetched from its
+OWN deployment URL `ee0c6b7e` (4,768,749 bytes, md5 `43c091a9…` — the figure §17.1 already
+carried), never the apex, where a superseded asset returns the 1.7kB SPA fallback that greps
+as a clean 0 for everything. **Both bundles are EXACTLY 4,768,749 bytes** — same size,
+different md5, which is the signature of a same-length change (`87`→`88`, `1205`→`1206`).
+
+**No Worker deploy was owed and it was MEASURED against the live Worker's own source commit
+read from `wrangler deployments list`** — `620bc69a` from `d460d899`, still serving 100%.
+`apps/api` and `supabase/migrations` diffs since it are EMPTY; the `packages/shared` diff is
+another lane's, and `apps/api` references `fmtMoney` · `money-format` · `orderActionLine` ·
+`collectPillLabel` · `order-action-words` **0 times each**, while the one symbol it does
+import, `orderActionDone`, is **byte-identical across both commits** (md5 of the extracted
+function `200f11aa…` on each). `/health` **200 `{"ok":true}`**. This card touches two
+`apps/web` files and a doc.
+
+**REPORTED, NOT FIXED**
+
+1. **Three 1px clips remain and they are not in the column Loo named** — `sono` × 2, `items`
+   × 1. His reasoning applies word for word, but these are two more of Q7's frozen numbers
+   and **widening them is his ruling, not this card's**; the card's MUST-NOT says so by name.
+2. **P16's 21 × 6px expand-button clip is untouched** and belongs to another card.
+3. **The card was written as Q12 and renumbered Q13 mid-build** — the Receiving Boundary
+   Review card took Q12 on `main` (`3824dc81`) while this one was being built. Rebased; the
+   doc conflict was resolved by keeping both.
+4. **No photograph.** The Browser pane does not composite in this session, so every figure
+   above is a real browser layout measurement on the live page rather than pixels anyone
+   looked at.

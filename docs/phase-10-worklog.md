@@ -6,6 +6,71 @@
 
 ---
 
+**2026-08-05 · Purchasing Q13 — the `supplier` column widens 87 → 88** (PR #622 merge `4552d31d`, **no migration · no api · no Worker deploy owed · no new word, column, token or row height**, web `index-DCDgFPBE.js` — DEPLOYED, all four canonicals on the FIRST poll, live md5 == the build from the main tip, `SERVICE_ROLE` 0)
+
+**Loo ruled it from P17's own reported cost**, the day after that card shipped: *Q7 froze WHICH columns and HOW WIDE so that nothing truncates. Holding 87 while it truncates keeps the number and loses the intent.*
+
+## The measurement, reproduced on production before a line was written
+
+At `https://erp.carresofficial.com/operation/procurement`, 21 live POs, table 1205 — a scan over `td, th, td *, th *`:
+
+```
+TOTAL 28 clipped
+  ctl        6px × 21   the expand button — P16's documented clip, NOT this card's
+  supplier   1px ×  4   `Nice Future`            cw 86   sw 87
+  sono       1px ×  2   `SO-1206 +4` · `+3`      cw 77   sw 78
+  items      1px ×  1   `Booqit 2B(LHF) · +1`    cw 118  sw 119
+```
+
+**A LIVE CONTROL proves all seven 1px clips are P17's border, not pre-existing.** Removing every vertical rule as a browser-only style on the deployed page and re-scanning leaves **only the 21 ctl clips**; putting them back returns all seven.
+
+**AND IT CORRECTS P17's OWN REPORT — which is the reason the number was re-measured rather than copied.** P17 recorded the seven as *"`Nice Future` in the 87px `supplier` column"*. **Four are; the other three are in `sono` (94px) and `items` (135px)** — two columns Loo did not name. His reasoning applies to them word for word, and they are still two more of Q7's frozen numbers, so they are REPORTED, not widened: the card's own MUST-NOT says so by name.
+
+## Two numbers, and the second is not optional
+
+`supplier` **87 → 88** (`Nice Future` is 70.7 at 13px Inter + the cell's `px-2` = 86.7 of content; the rule takes 1px of the box, so 87 leaves 86), and the listing's **`min-w-[1205px]` → `min-w-[1206px]`**.
+
+**THAT SECOND NUMBER IS DERIVED, AND LEAVING IT BEHIND WOULD HAVE PAID FOR THE PIXEL OUT OF THE CONTROL COLUMN.** The kit's expand-control column takes 3% of the table, so the nine pixel columns are 97% of it: 1168 → 1169, and 1169 / 0.97 = 1205.15 → 1206. Probed live at 1280, where the min-width is the binding constraint:
+
+| probe | ctl column | ctl clip | supplier clip |
+|---|---:|---:|---:|
+| `87px` / `1205px` — before | 35 | **7px** × 21 | 1px × 4 |
+| `88px` / `1205px` — the tempting half-fix | **34** | **8px** × 21 | 0 |
+| `88px` / `1206px` — what shipped | 35 | **7px** × 21 | 0 |
+
+The middle row fixes `supplier` by making P16's already-clipping expand button one pixel worse — **and every business column still renders at its ruled width, so the damage is invisible to the assertion that pins the widths.** A new test therefore reads both numbers off the rendered DOM and re-derives one from the other; change a width without the min-width, or the min-width without a width, and it fires.
+
+## Verified in a real browser on production at 1280 · 1440 · 1920
+
+`supplier` renders **88** at all three, the other eight exactly Q7's (`96 · 88 · 83 · 94 · 135 · 135 · 140 · 206 · 192`); the **4 × 1px supplier clips are 0**, the 21 unchanged (7px at 1280/1440, 6px at 1920 — P16's, varying with the 3% column's sub-pixel, not with this change), the 3 reported ones remain; rows **40px**, page horizontal scroll **0** everywhere. On a live row `Nice Future` measures **`clientWidth 87 · scrollWidth 87 · clipped false`**, its right border still 1px `rgb(224, 225, 230)` = slate-5, so P17's rule is intact. The register holds two suppliers today — `Nice Future` ×4, `Ohana` ×17.
+
+## Four negative controls, each a real edit verified on disk first
+
+| control | fires |
+|---|---:|
+| `supplier` back to `87px` | 2 |
+| `min-w-[1206px]` back to `1205px` | 2 |
+| `items` 135 → 150, min-width left alone | 2 |
+| `items` 135 → 150 **and its pinned expectation updated with it** | **1** — the derived guard alone |
+
+**The fourth is the one that matters**: it models a chat changing a width on purpose, where no other assertion can see that the min-width was left behind. One control silently declined first because the file is CRLF and a multi-line needle does not match — **the seventh time that trap has been paid for on this lane**; every control was grepped on disk before the suite was trusted.
+
+## Gates, deploy, and a method failure of my own
+
+web tsc **0** · build clean · page suite **100 → 101** · full web suite **16 failed / 2555 passed (2571)** against a **DETACHED CONTROL WORKTREE at `origin/main`** measuring **17 failed / 2553 passed (2570)** — the same four §17.7 files, test for test, so **zero new failures**; the control's extra is the documented full-suite load-flake in this very file, which passes **100/100 in isolation on the control**. **check-design 8340, IDENTICAL category for category to that control.**
+
+**Both directions proved on DOWNLOADED bundles**: `min-w-[1206px]` **0 → 1** · `min-w-[1205px]` **1 → 0** · `"87px"` **1 → 0**; `"88px"` is 2 → 3, so it is NOT a clean marker alone and the removal is. Controls present in BOTH: `po-listing` 1/1 · `"96px"` 1/1, the untouched neighbour width. The predecessor is P17's `index-63l6VIUk.js`, fetched from its OWN deployment URL `ee0c6b7e` (md5 `43c091a9…`) rather than the apex, where a superseded asset returns the 1.7kB SPA fallback that greps as a clean 0 for everything. **Both bundles are EXACTLY 4,768,749 bytes** — same size, different md5, which is the signature of a same-length change (`87`→`88`, `1205`→`1206`).
+
+**No Worker deploy was owed and it was MEASURED against the live Worker's own source commit read from `wrangler deployments list`** — `620bc69a` from `d460d899`, serving 100%. `apps/api` and `supabase/migrations` diffs since it are EMPTY; the `packages/shared` diff is another lane's, and `apps/api` references `fmtMoney` · `money-format` · `orderActionLine` · `collectPillLabel` · `order-action-words` **0 times each**, while the one symbol it does import, `orderActionDone`, is **byte-identical across both commits** (md5 of the extracted function `200f11aa…` on each). `/health` **200 `{"ok":true}`**.
+
+**A NAME COLLISION WITH A PARALLEL LANE, resolved rather than overwritten.** The card was written as **Q12**; the Receiving Boundary Review card took that number on `main` (`3824dc81`) while this one was building. Rebased onto `dd946572`, the doc conflict resolved by keeping BOTH — theirs landed first, so it keeps Q12 and this is **Q13** — and every `card Q12` reference in the source and tests was renumbered with it.
+
+**A METHOD FAILURE OF MY OWN, recorded because it nearly cost another chat's work.** The card's first draft was written into the MAIN REPOSITORY rather than into this worktree — the path omitted the worktree prefix, the exact trap P17's record already carries. The main repo turned out to hold three other modified files (another chat's parked WIP) and to sit on a different commit, so it was reverted with `git checkout --` on **that one file only**, after checking the diff was 72 insertions and **0 deletions** — i.e. that nothing of theirs was inside it.
+
+**Reported, not fixed**: the three remaining 1px clips are Loo's to rule · P16's 21-cell expand-button clip belongs to another card · the old min-width test asserted the same thing twice on consecutive lines and one copy was removed, inside lines this card was already editing · **no photograph was taken** — the Browser pane does not composite in this session, so every figure above is a real browser layout measurement on the live page rather than pixels anyone looked at.
+
+---
+
 **2026-08-05 · Purchasing Q11 — the expand's row ends where its content ends** (PR #614 merge `45adfc68`, **no migration · no api · no new word · nothing on the register touched**, web `index-B9tLrytx.js` — DEPLOYED, all four canonicals on the FIRST poll, live md5 == local build, `SERVICE_ROLE` 0; **no Worker deploy owed and it was measured against the live Worker's own source commit read from `wrangler`**)
 
 **Loo selected the expand on the live page and chose option B — content width, zero dead space — over capping the column.** The card is one grid template and its container, and what shipped is **ONE className**.
