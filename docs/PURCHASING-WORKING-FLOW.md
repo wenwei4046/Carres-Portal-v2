@@ -714,12 +714,17 @@ answering it would mean refusing at issue something the business does every week
 | Path | Who confirms fulfilment |
 |---|---|
 | goods come into a Carres warehouse | **nobody presses anything** — posting the Receiving Session IS the confirmation, and a second press over the same goods is the second data-entry step Receiving exists to remove |
-| the supplier or carrier takes the goods **straight to the customer** | **Operation confirms it explicitly** — no Receiving Session can ever exist for those goods |
+| the goods never touch a Carres floor — **a carrier takes them to the customer, OR the customer collects at the factory** | **Operation confirms it explicitly** — no Receiving Session can ever exist for those goods |
 
-**Recorded, and NOT a third row above:** Loo mentioned in passing on 2026-08-05 that
-*"我们有发生过顾客去我们厂那边"* — a customer sometimes collects at the factory. It is kept
-here as a business fact so it is not lost; **it has not been ruled and no build may treat it
-as a path.**
+**TWO PATHS, NOT THREE — and *"顾客自己去厂里拿"* is the second one.** Loo raised it on
+2026-08-05 and asked what it belongs to. **Fulfilment asks one question: did the supplier
+hand the goods over?** Customer-collects and carrier-delivers answer it identically, so they
+are one path. **Who carries the goods is a DELIVERY fact**, which already has its own home;
+opening a second fulfilment path because the carrier changed would keep two mechanisms alive
+to answer one question. The only real difference is EVIDENCE — a carrier reports back, a
+self-collection is reported by the factory — and that rides the record's note, never a new
+path. What self-collection DOES change is on the Orders side (no delivery arranged, no DO, no
+delivery fee), and that is the Delivery module's, not Purchasing's.
 
 **Fulfilment carries its OWN record — who · when · which path.** It may never be expressed
 by writing `received_qty`, and never by reusing a Receiving status. That is this section's
