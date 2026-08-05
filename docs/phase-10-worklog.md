@@ -6,6 +6,86 @@
 
 ---
 
+**2026-08-05 · Purchasing Q11 — the expand's row ends where its content ends** (PR #614 merge `45adfc68`, **no migration · no api · no new word · nothing on the register touched**, web `index-B9tLrytx.js` — DEPLOYED, all four canonicals on the FIRST poll, live md5 == local build, `SERVICE_ROLE` 0; **no Worker deploy owed and it was measured against the live Worker's own source commit read from `wrangler`**)
+
+**Loo selected the expand on the live page and chose option B — content width, zero dead space — over capping the column.** The card is one grid template and its container, and what shipped is **ONE className**.
+
+## The defect, reproduced on production before anything was touched
+
+`PO-2037` expanded, panel closed, measured in a real browser:
+
+```
+                                  1920                 1280
+the record                     1575px (x 277→1852)     935px
+the Description column         1191px                  551px
+the widest ink in it            66.8px  ("Add a note…")
+dead space, name → Qty     1138–1141px  ON EVERY ONE OF FIVE LINES
+```
+
+`Description` is the one flexible track, and while the box it sits in is as wide as the pane, *take what is left* means *take the pane*. It evicted `Qty`, `Destination` and `Received` to the far right, so **a line was read by crossing the whole screen, once per line.**
+
+## The fix
+
+`w-[calc(100cqi-2rem)]` → **`w-fit max-w-[calc(100cqi-2rem)]`** on the expanded record.
+
+Measured on the DEPLOYED page, same PO:
+
+```
+the record       1575 → 474 at 1920      935 → 474 at 1280
+Description      1191 → 90
+dead space       1138 → 37–40 per line
+column origins   277 · 301 · 373 · 471 · 519 · 687 — identical for the header,
+                 all five lines and TOTAL
+0 clipped elements in the record · page horizontal scroll 0 · scanned rows still 40px
+```
+
+**474 is the record's honest content width, and it is NOT set by the grid — reported rather than filed off.** Probed live, the two DATE fields above the items have a max-content of **474** and the grid **461**, so the record takes the wider of its own children and `Description` ends with 90px for 67px of ink: ~23px of slack. Closing that means sizing the grid independently of the record, which is a second width to keep in step with the first.
+
+## The trap, measured in both directions on the deployed bundle
+
+`width: fit-content` is capped by the AVAILABLE width, and available here is the `<td>`'s — the table's own `min-w-[1205px]`, not the pane. With a fabricated **200-character** description at 1280:
+
+```
+bounded     record  935   Received ends 1212   visible edge 1217   ON SCREEN
+                          truncates: scrollWidth 1572 vs clientWidth 551, title intact
+unbounded   record 1171   Received ends 1448   231px past the edge  OFF SCREEN
+                          ← Q10's bug re-opened, the one Loo reported as
+                            "i cant see this listing at all"
+```
+
+At 1920 the same 200 characters give a record of **1563** against a 1565 ceiling, `Received` ending at 1840 inside the visible 1857, still ONE line at 46px, page scroll 0. **Content width when the content is short; the pane's width when it is long; never more.**
+
+## `ITEM_GRID` is untouched, and that is a measurement rather than a shortcut
+
+**The card's first named negative control — *"put `minmax(0,1fr)` back"* — could not be run, because the token never left. That is reported rather than dressed up.** Probed live with the record already `w-fit`, swapping `minmax(0,1fr)` for `minmax(0,auto)` gives the **same 474px record and the same six column origins in all three grids**. Identical.
+
+And the `1fr` is what keeps the three grids ALIGNED. The header, every line and `TOTAL` are three SEPARATE grids of one width; a flexible track absorbs the same slack in each, so they cannot fall out of line. **A `max-content` track would size each grid to its OWN longest string and stagger them** — which is the third control below, and it fires.
+
+## Gates, and the controls
+
+web tsc **0** · build clean · page suite **98 → 100** · full web suite **16 failed / 2504 passed — exactly §17.7's four documented files, ZERO new** (`OperationPurchaseOrders` passed 100/100 in the full run as well as in isolation, where C13 measured it flaky on main) · **check-design 8340, identical category for category to `origin/main`, proved by linting a DETACHED WORKTREE at main** — never a stash (memory's own rule: a pop grabs another chat's parked WIP).
+
+| negative control (each a real edit, verified applied) | fires |
+|---|---:|
+| drop `w-fit` (back to the fixed width) | **2** |
+| drop the `max-w` bound | **2** |
+| give the `TOTAL` row its own template | **1** |
+
+**The MUST-NOT was proved held rather than assumed**: after the deploy the register's nine columns still measure `96 · 87 · 83 · 94 · 135 · 135 · 140 · 206 · 192` — Q7's frozen minimums — the table 1203px, rows 40px.
+
+## Deployment
+
+- **Pages: DEPLOYED to both projects** (`5bb00ebd` carres-portal + `791d429d` carres-pos, both `--branch=main`), **all four canonicals on the FIRST poll**, live file md5-identical to the local build (`b9e5f4c1…`).
+- **Both directions proved on DOWNLOADED bundles with two controls, and the byte count is the sharpest part**: `w-fit max-w-[calc(100cqi-2rem)]` **0 → 1** and `"w-[calc(100cqi-2rem)]"` **1 → 0**, while `po-work-` and `100cqi` are **1 in BOTH** — the markers proving the predecessor `index-BO-R9Kej.js` was really read (fetched from Q10's OWN deployment URL `e6c8e4c6`, 4,768,607 bytes — a real bundle, not the 1.7kB SPA fallback that greps as a clean 0 for everything). The new bundle is **4,768,617 bytes, exactly ten more** — the ten characters `w-fit max-`. That also proves the toolchain reproduces production: two commits of `_headers` and shared TEST files landed on main since Q10's build and changed the bundle by nothing.
+- **Worker: NOT owed, measured against the LIVE WORKER'S OWN SOURCE COMMIT read from `wrangler deployments list`** (`620bc69a` from `d460d899`, P15's — the same figure Q10 corrected §17.1 to). `apps/api` and `supabase/migrations` are untouched since it, and the only `packages/shared` diff is three `*.test.ts` files, which no Worker bundles. `/health` **200 `{"ok":true}`**.
+
+## Reported, not fixed
+
+1. **The ~23px of slack** — the record's width is the DATES row's, not the grid's (474 vs 461).
+2. **The Browser pane does not composite in this session** (`screenshot` fails with *"the Browser pane is not displayed"*, the same limitation C13 recorded), so the expand was opened with `element.click()` rather than a synthetic pointer event. **Every width in this entry is a real browser layout number**, which is what the card asks for — but no screenshot was taken and no pointer-driven click was performed.
+
+---
+
 **2026-08-05 · Portal Core C13 — the red on the Orders list means something again** (PR #611 merge `55dcba22`, **no migration · no `apps/api` diff · no new field · no flag column**, web `index-D7U_hEyq.js` — DEPLOYED, all four canonicals, live md5 == local build, `SERVICE_ROLE` 0; **no Worker deploy owed, and it was measured against the REAL live Worker rather than against §17.1**)
 
 **Loo, 2026-08-04, from the card's own SQL against production:**
