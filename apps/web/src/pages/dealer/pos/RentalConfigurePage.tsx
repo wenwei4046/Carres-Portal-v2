@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { ArrowLeft, Check, Plus, Repeat, X } from "lucide-react";
 import type { CatalogResponse, PosRentalPlan, ProductModelDto } from "@carres/shared";
 import { newLocalId } from "../new-order/configurators";
@@ -103,7 +104,7 @@ export default function RentalConfigurePage({
     });
   }
 
-  return (
+  return createPortal(
     <div
       className={`pos-proto cfg-root${wizardTopbar ? " has-wizardbar" : ""}`}
       style={{ position: "fixed", inset: 0, zIndex: 50 }}
@@ -274,7 +275,8 @@ export default function RentalConfigurePage({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
