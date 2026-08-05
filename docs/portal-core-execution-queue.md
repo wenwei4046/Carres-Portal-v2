@@ -1415,6 +1415,26 @@ truncate: the premise was 42% too wide. **Re-measure before moving a single widt
 - A test asserts the `Delivery` cell no longer contains the action sentence.
 - No word is added. Every surviving string is one COPY-STANDARD already audits.
 
+### FOLDED IN by the manager, 2026-08-05 — C11's leftover belongs to this card
+
+C11 shipped and reported one thing it deliberately did not fix, **measured live**:
+
+```
+Orders,   Owing facet   RM 74,783        ← rounded by hand at OperationOrdersControl.tsx:3060
+Payments, same figure   RM 74,783.00
+```
+
+**One number, two spellings, two pages.** That is this card's own concern — *nothing says the
+same thing twice* — so it lands here rather than in a card of its own. C11 was right to leave
+it: a facet total is a ROLLUP, not a collect action, and its source scan deliberately does not
+ban `Math.round` because that line would fail it.
+
+**Use `fmtMoney`, the one home C11 built.** Do not hand-format, and do not widen C11's scan —
+this is one call site, and after it the scan may ban `Math.round` in this file too.
+
+**Loo's standing ruling covers it:** 「收款金额必须与实际应收金额一致，不允许为了视觉统一改变金
+额显示」. A rollup that drops the cents to look tidy is the same trade he refused.
+
 **Must NOT.**
 
 - ❌ remove a STAGE tab because it counts zero. A stage is not a queue — P2's ruling; there is
