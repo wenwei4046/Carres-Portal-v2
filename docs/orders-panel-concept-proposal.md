@@ -14,7 +14,7 @@ Read these BEFORE writing any code:
 
 - `docs/COPY-STANDARD.md` — 10 rules · row action-line template · What-to-do template · canonical vocabulary (SO vs PO)
 - `docs/UI-KIT.md` §A0 — Module-tab law · Copy law · Date law · Hover law · Action law
-- `docs/PURCHASING-WORKING-FLOW.md` + `docs/PURCHASING-INFORMATION-MODEL.md` — Purchasing's live rules (mirror the discipline). *(Corrected 2026-07-29: `purchase-cockpit-handoff.md` was deleted 2026-07-27.)*
+- `docs/purchasing/MASTER.md` + `docs/purchasing/MASTER.md` — Purchasing's live rules (mirror the discipline). *(Corrected 2026-07-29: `purchase-cockpit-handoff.md` was deleted 2026-07-27.)*
 - `apps/web/src/pages/operation/OperationPurchase.tsx` — the shipped reference implementation
 - `apps/web/src/pages/operation/OperationOrdersControl.tsx` — the Orders panel we're modifying
 - `apps/web/src/pages/operation/components/OrderDetailDrawer.tsx` — the current drawer (to be replaced by inline detail in Phase 2)
@@ -64,7 +64,7 @@ Paste this into a fresh chat on Sat:
 > Continue Orders panel redesign. Read:
 > 1. `docs/COPY-STANDARD.md`
 > 2. `docs/UI-KIT.md` §A0
-> 3. `docs/PURCHASING-WORKING-FLOW.md` *(was `purchase-cockpit-handoff.md` §5, deleted 2026-07-27)*
+> 3. `docs/purchasing/MASTER.md` *(was `purchase-cockpit-handoff.md` §5, deleted 2026-07-27)*
 > 4. `docs/orders-panel-concept-proposal.md` (this file)
 >
 > Visually study `https://erp.carresofficial.com/operation?tab=purchase` for the design language. Then start Phase 1 (copy audit + row action-line + What-to-do — safe, non-structural, no layout change).
@@ -73,5 +73,5 @@ Paste this into a fresh chat on Sat:
 
 - Sat / Sun / public holidays greyed on Purchase Days-to-order strip (`packages/shared/src/my-holidays.ts` already exists — just import + check each cell's ISO).
 - L / R chevron nav on Purchase strip (shift the 14-day window ±7 days).
-- Real `Prepare PO` / `Issue PO` / `Check in` write paths (now `docs/PURCHASING-WORKING-FLOW.md` §3 — `purchase-cockpit-handoff.md` was deleted 2026-07-27). *(Corrected 2026-07-29: this line said `Send PO` and `Chase WhatsApp`; `Send PO` is retired and `Chase` is a banned word.)*
+- Real `Prepare PO` / `Issue PO` / `Check in` write paths (docs/purchasing/MASTER.md). *(Corrected 2026-07-29: this line said `Send PO` and `Chase WhatsApp`; `Send PO` is retired and `Chase` is a banned word.)*
 - Lead-time settings screen (migration 0243).

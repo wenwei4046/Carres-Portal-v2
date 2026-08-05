@@ -37,7 +37,7 @@ prioritized P1/P2/P3 to lift toward 10/10. Zero-experience UX standard.
    business locks (Loo/Jess decisions · NEVER override silently).
 2. `docs/COPY-STANDARD.md` — microcopy rules + canonical vocabulary
 3. `docs/UI-KIT.md` §A0 — design laws
-4. `docs/PURCHASING-WORKING-FLOW.md` — shipped reference *(corrected 2026-07-29: `purchase-cockpit-handoff.md` deleted 2026-07-27)*
+4. `docs/purchasing/MASTER.md` — shipped reference *(corrected 2026-07-29: `purchase-cockpit-handoff.md` deleted 2026-07-27)*
 5. `docs/reviewer-prompt-template.md` — this prompt (for reference)
 6. Then module proposals in priority order:
    - `docs/subscription-mattress-proposal.md` (Sept 2026 hard deadline)
@@ -216,7 +216,7 @@ Confirm you have read (list which files you can access):
 - Master doc §3 business locks
 - COPY-STANDARD.md
 - UI-KIT.md §A0
-- *(purchase-cockpit-handoff.md — DELETED 2026-07-27; use PURCHASING-WORKING-FLOW.md)*
+- *(purchasing/MASTER.md)*
 
 Then ask Jess:
 

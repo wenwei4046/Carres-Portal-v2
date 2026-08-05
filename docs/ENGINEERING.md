@@ -1,0 +1,228 @@
+# ENGINEERING — the stack, the repo, and how work reaches production
+
+> **Open this when you need a specific answer. Do not read it to start work** — that is
+> `CLAUDE.md` plus your module's MASTER.
+>
+> Everything here is mechanics. **Rules live in the Constitution; business lives in a MASTER.**
+
+---
+
+## 1 · Stack — do not deviate without asking
+
+| Layer | Technology |
+|---|---|
+| Web | Vite + React 18 + TypeScript + React Router 7 + Tailwind 3 + TanStack Query 5 + Zustand 5 |
+| Web UI | **Radix primitives** (behaviour) + the Carres kit (appearance) + `lucide-react` + `sonner` + `react-day-picker`. **NOT shadcn/ui** |
+| API | Hono v4 on Cloudflare Workers (Wrangler) |
+| Shared | zod schemas + db-types + domain types + adapters in `packages/shared` |
+| DB | Supabase Postgres + RLS + RPCs + Auth + Storage |
+| Deploy | Cloudflare Pages (web) + Cloudflare Workers (api) |
+| Packages | pnpm v9 + workspaces + Turborepo |
+
+**Never introduce** Next.js, Vercel, Express, Prisma, Drizzle, NextAuth, MUI, Chakra,
+Bootstrap, styled-components, redux, or any ORM other than supabase-js. **Ask first.**
+
+```
+apps/web/         Vite SPA      → Cloudflare Pages
+apps/api/         Hono          → Cloudflare Workers
+packages/shared/  db-types · domain · adapters · zod schemas
+supabase/         migrations + seed
+```
+
+---
+
+## 2 · Architecture
+
+```
+Browser (Vite SPA)
+  ↓ Authorization: Bearer <Supabase JWT>
+Hono on CF Workers   — verify JWT, validate with zod, apply business rules
+  ↓ user JWT (RLS)  |  service_role (admin/cron only)
+Supabase (Postgres + RLS + RPCs)
+```
+
+**Auth is the one exception:** `signInWithPassword` / `signUp` / `resetPassword` go straight
+from the browser to Supabase Auth. Everything after login goes through Hono with the JWT.
+
+| Boundary | Rule |
+|---|---|
+| Browser → Hono | Hono trusts nothing. Always `jose` JWT verify + zod payload validate |
+| Hono → Supabase (user op) | Forward the user JWT. **RLS is the security boundary** |
+| Hono → Supabase (admin/cron) | `service_role`, restricted to specific routes |
+
+**`SUPABASE_SERVICE_ROLE_KEY` — red line.** Cloudflare Workers secrets only. Never in source,
+never in a committed `.env`, never referenced from `apps/web`, never logged, never in a
+response. **Grep `apps/web/dist` for `SERVICE_ROLE` before every commit; it must be 0.**
+
+---
+
+## 3 · RLS performance — three rules that are not optional
+
+The old HV Portal has 130 policies and a lagging dashboard. Do not repeat it.
+
+1. **Custom JWT claims.** A Supabase Auth Hook injects `role`, `dealer_id`, `supplier_id`,
+   `partner_id` into `app_metadata` at login. Policies read `auth.jwt()`, **never a function
+   that queries `app_users` per row.**
+2. **InitPlan wrapping.** `( select auth.app_dealer_id() )`, never the bare call. PG14+ runs the
+   wrapped form ONCE per query; the unwrapped form runs per row.
+3. **`stable` marker.** Every helper in the `auth` schema is
+   `language sql stable security definer`. Missing `stable` defeats the planner's caching.
+
+Baseline, passed and still enforced: dealer 50 active orders < 100ms · principal dashboard
+summary < 500ms · operation 4-column kanban < 200ms.
+
+---
+
+## 4 · Code conventions
+
+- **Database** `snake_case` · **`db-types.ts`** `snake_case` matching rows · **`domain.ts`**
+  `camelCase` for UI. **Conversion happens only in `packages/shared/src/adapters.ts`.**
+- Components `PascalCase.tsx`, one default export. Utilities `kebab-case.ts`.
+  **Never barrel-export from `apps/*`** — only `packages/shared`.
+- Import order: external → `@carres/shared/*` → `@/*` → relative.
+- **No magic strings.** Table names → `packages/shared/src/tables.ts`. RPC names →
+  `rpcs.ts`. API routes → the typed Hono client.
+- **zod everywhere.** One schema, two consumers — the route and the form. Never duplicated.
+- **React Query keys are centralised** in `apps/web/src/lib/queries.ts` (`qk`). Never an inline
+  `queryKey` anywhere else.
+
+---
+
+## 5 · Migrations
+
+```
+Draft  →  review business impact  →  commit the exact file  →  merge-ready verification
+       →  apply  →  deploy dependent code  →  verify production
+```
+
+- **Draft SQL never lands in `supabase/migrations/` before Jess approves.** Drafts go in chat.
+- **Number from the MAX of: the tracker tail · the repository tail · every branch.** Never from
+  `ls`. Migrations applied by hand through the SQL editor are absent from the tracker while
+  their objects are live — that has caused two collisions.
+- **Verify BEFORE merging**: run the assertions in a rolled-back transaction on production, run
+  a NEGATIVE CONTROL that proves the guard fires, then reconcile `md5(prosrc)` of every applied
+  function against `git show HEAD:<file>` — not against the working copy.
+- **Never retype a migration during apply.** Execute the exact reviewed repository file.
+- **An applied migration missing from the repository is a P0**, not a tidy-up. Push first,
+  review second.
+
+---
+
+## 6 · Deployment
+
+```
+merge to main  →  build from the MAIN TIP  →  deploy BOTH Pages projects
+               →  poll all four canonical URLs until they converge  →  verify
+```
+
+- **Never deploy production from a feature branch.**
+- **An api diff is measured against the LIVE WORKER'S SOURCE COMMIT**, read from
+  `wrangler deployments list` — **never from a document.** A card that changes no `apps/api`
+  file can still owe a Worker deploy because another lane's api half merged meanwhile.
+- **A `packages/shared` change reaches the Worker only if `apps/api` imports the thing that
+  changed** — and when that is unclear, settle it by BUILDING both:
+  `wrangler deploy --env production --dry-run` and compare the bundle md5.
+  **A different bundle is a deploy owed, whatever the changed-file list suggests.**
+- **Deploy the Worker with `--env production`, never bare.** Bare overwrites production with
+  localhost bindings and drops the custom domain.
+- **Prove a web deploy on the DOWNLOADED bundle, in both directions** — a string that should
+  appear greps 0 → 1, one that should go greps 1 → 0, and a CONTROL string greps the same in
+  both, proving the predecessor was really read. Fetch the predecessor from **its own
+  deployment URL**: a superseded asset 404s at the apex, and a 1.7 kB SPA fallback greps as a
+  clean 0 for everything.
+- `grep -c` on a minified bundle counts LINES, not occurrences. Use `grep -o … | wc -l`.
+
+### Cloudflare specifics
+
+```
+wrangler secret put SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_JWT_SECRET
+```
+Local dev reads `.dev.vars` (gitignored). Cron is scheduled in UTC — 09:00 MYT = `0 1 * * *`,
+17:00 MYT = `0 9 * * *`; **every cron carries a comment with its MYT time.**
+SPA fallback lives in `apps/web/public/_redirects`: `/*  /index.html  200`.
+
+---
+
+## 7 · Testing
+
+- **Unit (vitest)** — every adapter, zod schema and utility, 100%.
+- **Integration (vitest + msw)** — every Hono route, Supabase mocked.
+- **E2E (Playwright)** — each role's happy path.
+- **A negative control is required.** A test that passes when you break the thing it guards is
+  measuring nothing. Verify on disk that the control edit actually applied — CRLF files have
+  silently swallowed `perl -0pi` edits at least seven times on this repo.
+- **Measure the baseline on a detached worktree at `origin/main` before quoting a delta.** The
+  documented number is a starting point, not a substitute for running it.
+
+### Known pre-existing failures — the baseline, not regressions
+
+```
+api 3   supplier/pos ×2 · partner/pickups ×1
+web 17  OperationOrders ×7 · OrderCustomerCard ×4 · OhanaSofaTab ×4 ·
+        NiceFutureMattressTab ×1 · OperationPurchaseOrders ×1
+```
+
+Measured 2026-08-05 on `origin/main`: **web 17 failed / 2,484 passed of 2,501.**
+`OperationPurchaseOrders.test.tsx` and two others also flake under full-suite load and pass in
+isolation — **run twice before calling one a regression.**
+
+---
+
+## 8 · Git
+
+- Default branch `main`, always deployable. Feature branches, **no direct commits to main
+  during phase work.** Conventional Commits.
+- **After a rebase or merge, check you did not silently eat somebody else's record:**
+  ```bash
+  git diff origin/main -- docs/ | grep '^-' | grep -v '^---'
+  ```
+  Any removed line that is not yours means you ate it. Recover it from `origin/main`.
+  **No conflict does not mean no loss.**
+- **First thing after editing: `git diff --name-only`.** If it is empty you edited the wrong
+  checkout — a green `tsc` on unmodified code proves nothing.
+- **One worktree per workstream.** Two chats must never share a checkout.
+
+---
+
+## 9 · Current production state
+
+> **Re-measure before quoting any of this.** `wrangler deployments list` is the authority for
+> what is live — this table has been stale three times, and each time a card nearly shipped the
+> wrong deploy decision.
+
+| | |
+|---|---|
+| Web | `https://carres-portal.pages.dev` · `pos.carresofficial.com` (dealer/showroom/bd) · `erp.carresofficial.com` (internal). **TWO Pages projects, ONE build** |
+| API | `https://carres-portal-v2-api.wwch.workers.dev` + `api.carresofficial.com` |
+| DB | Supabase `kfprgpjpaffedghytstl` — staging IS production |
+| Migration tail | `0323`. **Verify against the tracker before numbering.** |
+| Live web bundle | last recorded `index-8yEXF9xX.js` from main tip `41287939` (2026-08-05) |
+| Live Worker | last recorded `0a7949bd` from main tip `bef687a5` (2026-08-05) |
+
+**Full deployment history** → [`phase-10-worklog.md`](phase-10-worklog.md) and
+[`claude-md-archive-2026-07-25.md`](claude-md-archive-2026-07-25.md). **Open carry-forwards** →
+[`carry-forwards.md`](carry-forwards.md).
+
+### Known risks, signed off by Loo
+
+- **`principal@carres.com` password is `111`**, and **9 alpha users are also on `111`.**
+  Rotate before the portal is shared with anyone outside the team.
+- The demo product catalog was not wiped at cutover; if it is proven fictional, `scripts/
+  phase-9-cleanup.sql` layer 6 removes it.
+
+---
+
+## 10 · Reference material
+
+`reference/` at repo root (gitignored — readable, never committed or built).
+
+| Path | Use |
+|---|---|
+| `reference/proto/*.jsx` | **source of truth for BEHAVIOUR** — which buttons, modals, columns and transitions exist. **Never a source for anything visual** |
+| `reference/production/src/lib/{queries,adapters,db-types,domain}.ts` | the data contract |
+| `reference/MIGRATION_SPEC.md` | 1,047-line spec — search by section number |
+| `reference/CLAUDE.md` | **DO NOT FOLLOW.** It describes the prototype's no-build conventions |
+
+**`reference/production/src/` is not a starting codebase.** It talks to Supabase directly with
+no Hono layer. Pages in `apps/web/src/pages/` are written from scratch by reading
+`reference/proto/*.jsx` — never copy-pasted from `production/`.

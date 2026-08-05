@@ -530,7 +530,7 @@ on_file  archive  open_before  open_after  OVERDUE_BEFORE  OVERDUE_AFTER
 
 **Loo found this himself, first thing on 2026-08-04:** *"Confirm Arrival is unclear. Arrival of what? Customer delivery? Stock arrival? Supplier ETA? Warehouse arrival?"*
 
-**The defect is a TENSE REVERSAL, not vagueness, and that is why a reword would not have fixed it.** The full string is `Confirm Goods Arrival Date` — *phone the factory and ask which day the goods reach us*, a FUTURE question. The register shortened it to `Confirm Arrival`, which a reader takes as *tick that it has arrived*. One is a phone call; the other is receiving. `PURCHASING-INFORMATION-MODEL.md` §12.3 states the rule it broke: **a short form may drop WORDS; it may never drop the TENSE or the OBJECT.** It was live on **16 of 21 rows**.
+**The defect is a TENSE REVERSAL, not vagueness, and that is why a reword would not have fixed it.** The full string is `Confirm Goods Arrival Date` — *phone the factory and ask which day the goods reach us*, a FUTURE question. The register shortened it to `Confirm Arrival`, which a reader takes as *tick that it has arrived*. One is a phone call; the other is receiving. `docs/purchasing/MASTER.md` §12.3 states the rule it broke: **a short form may drop WORDS; it may never drop the TENSE or the OBJECT.** It was live on **16 of 21 rows**.
 
 **His word ships verbatim: `Check Expected Arrival`.** It matches the column beside it (`Expected Arrival`, §12.2) so the eye does not change track, and it is honest about the 16 POs where there is no date to confirm — you cannot confirm something nobody has said yet.
 
@@ -663,7 +663,7 @@ The first block is §7 held **under a drag** rather than stated in a comment; th
 
 Loo, after using the page: **`Right panel not friendly to edit detail.`**
 
-**The panel's JOB was defined wrong, not the editing.** It had become everything at once — edit · timeline · notes · communication · print — so the operator's real complaint was the loop: *click → right → scroll → change → close → click the next one.* `PURCHASING-INFORMATION-MODEL.md` §12.7.5 splits it, and the split is his own:
+**The panel's JOB was defined wrong, not the editing.** It had become everything at once — edit · timeline · notes · communication · print — so the operator's real complaint was the loop: *click → right → scroll → change → close → click the next one.* `docs/purchasing/MASTER.md` §12.7.5 splits it, and the split is his own:
 
 ```
 DOCUMENT DATA   destination · the two dates · qty · line remark · received
@@ -687,7 +687,7 @@ The state is a single `string | null`, so **two open rows cannot be represented*
 
 ## The one genuinely new thing is the route, and the door had been half-built for a day
 
-`purchasing_record_ready_date` shipped with **migration 0318 on 2026-08-03** — gated, audited, ledger-writing — and **nothing in the portal ever called it.** So `Call {supplier} — confirm ready date`, an action `PURCHASING-WORKING-FLOW.md` §3 has carried since it was written and whose five strings have been in COPY-STANDARD just as long, **had no button anywhere.** Measured on production: **0 of 21 POs carry an `expected_ready_date`**, and `expected_ready_date` has exactly ONE writer in the whole database.
+`purchasing_record_ready_date` shipped with **migration 0318 on 2026-08-03** — gated, audited, ledger-writing — and **nothing in the portal ever called it.** So `Call {supplier} — confirm ready date`, an action `docs/purchasing/MASTER.md` §3 has carried since it was written and whose five strings have been in COPY-STANDARD just as long, **had no button anywhere.** Measured on production: **0 of 21 POs carry an `expected_ready_date`**, and `expected_ready_date` has exactly ONE writer in the whole database.
 
 `POST /api/operation/pos/:id/ready-date` is deliberately the twin of `/tomorrow-delivery` directly above it:
 
@@ -705,7 +705,7 @@ Two runs now, numbered separately and **each NAMED on screen** (`Expected Arriva
 
 ## Qty stays READ-ONLY — a frozen rule, not a preference
 
-Loo's sketch has `Qty [Input]`. It is refused twice over: `PURCHASING-WORKING-FLOW.md` §3 rules that items are ADDED to a sent PO by raising a NEW one — the supplier holds that document exactly as they received it — and migration **0316** made PO-line quantities RPC-only with no `set_line_qty` door, deliberately. Building the input would have needed a migration AND the reversal of a frozen rule.
+Loo's sketch has `Qty [Input]`. It is refused twice over: `docs/purchasing/MASTER.md` §3 rules that items are ADDED to a sent PO by raising a NEW one — the supplier holds that document exactly as they received it — and migration **0316** made PO-line quantities RPC-only with no `set_line_qty` door, deliberately. Building the input would have needed a migration AND the reversal of a frozen rule.
 
 **Asserted from both ends**: the page renders no number input at all except the SPLIT's `Move` field (which exists only while a destination is being changed), and the route test refuses a quantity smuggled through the body — `.strict()` is what makes that true.
 
@@ -852,7 +852,7 @@ The constant feeds `opsStockReserveReasonSchema`, which guards **both** routes a
 
 **2026-08-04 · Purchasing P12 — the remainder of a part-ordered demand can be cancelled** (PR #598 merge `3245a59a`, migration **0321 applied and verified BEFORE the merge**, web `index-mIdlwTf2.js` + Worker `59bdd682` — DEPLOYED, four canonicals on the first poll, live md5-identical to the local build (`9fbc787a…`, 4,761,673 bytes), `SERVICE_ROLE` 0)
 
-**Loo ruled it 2026-08-04, final, and the ruling was not re-asked.** *"Ordered 3, don't want the other 2"* is an ordinary day; the 3 already ordered are the purchase order's problem (`PURCHASING-WORKING-FLOW.md` §9), not this door's. Two measured facts made it urgent: without it a part-ordered demand can only ever GROW — the disease already named on `Confirm ready date`, a queue with no way out — and **nobody could cancel ANY demand at all**, so a mistyped row nagged forever.
+**Loo ruled it 2026-08-04, final, and the ruling was not re-asked.** *"Ordered 3, don't want the other 2"* is an ordinary day; the 3 already ordered are the purchase order's problem (purchasing/MASTER.md), not this door's. Two measured facts made it urgent: without it a part-ordered demand can only ever GROW — the disease already named on `Confirm ready date`, a queue with no way out — and **nobody could cancel ANY demand at all**, so a mistyped row nagged forever.
 
 ### 0320 left the question open BY NAME, which is why this was one line
 
@@ -1036,7 +1036,7 @@ Both Pages projects deployed (`carres-portal` `5d939d45` + `carres-pos` `4a47764
 
 **The page answered *"which PO is this?"* well and *"which PO should I touch first?"* badly, and today there was a real one.** `PO-2038`: Nice Future, issued 1 Aug, the factory has never given a date, our own estimate lands 11 Aug — and the customer was expecting the goods on **4 Aug, that same day**. It sat at **row 8 of 21**, in the same words as fifteen other rows, neither red nor amber. The default order was `PO Issued` oldest first, which sorts by how long the DOCUMENT has waited rather than by how close the CUSTOMER is.
 
-**THIS SETTLED A LAW CONFLICT RATHER THAN EXPRESSING A PREFERENCE, AND NOTHING OF JESS'S WAS DELETED.** `PURCHASING-WORKING-FLOW.md` §6 and `ACTION-FLOW-STANDARD.md` Law 5 both say row order is *risk to the promise*; her 2026-08-02 listing law says `PO Issued` OLDEST first. **Both were law.** Loo ruled risk-first. Her rule keeps its column, keeps its header sort, and survives inside the comparator as the TIE-BREAKER — a test asserts that clicking the header still sorts by issue date and that CLEARING the sort returns to risk order, which is the half a chat would forget. **She is told once; the override is recorded under his name in the checkpoint.**
+**THIS SETTLED A LAW CONFLICT RATHER THAN EXPRESSING A PREFERENCE, AND NOTHING OF JESS'S WAS DELETED.** `docs/purchasing/MASTER.md` §6 and `ACTION-FLOW-STANDARD.md` Law 5 both say row order is *risk to the promise*; her 2026-08-02 listing law says `PO Issued` OLDEST first. **Both were law.** Loo ruled risk-first. Her rule keeps its column, keeps its header sort, and survives inside the comparator as the TIE-BREAKER — a test asserts that clicking the header still sorts by issue date and that CLEARING the sort returns to risk order, which is the half a chat would forget. **She is told once; the override is recorded under his name in the checkpoint.**
 
 **`comparePoRisk` lives in `packages/shared`, not in the page, and that is the same reason `poCurrentActionOf` does.** A comparator written inside the page would be a SECOND priority: the row's pill would say one thing and the row's position another. Rungs, highest first: a LATE engine call · goods landing AFTER the customer's date · landing ON it · an open call not yet late · everything else — then the nearest customer date (**no date sorts LAST, never first: an absent date is not an urgent one**), then PO Issued oldest, then the PO number, so **the order is TOTAL and two rows cannot swap between renders**. A finished or cancelled PO never rises: its gap is history, the same silence the Goods Arrival cell has kept since the freeze pass.
 
@@ -4575,7 +4575,7 @@ next chat asks the same question again.
    how the engine works** — the moment a PO exists the action becomes `Call {supplier} —
    confirm ready date`, which is what records the date. **RULED: the engine is right and the
    card is wrong** — an action closes when *its own* recorded outcome lands, and the ready
-   date is the NEXT action's outcome. `PURCHASING-WORKING-FLOW.md` §3 is Jess's to correct.
+   date is the NEXT action's outcome. `docs/purchasing/MASTER.md` §3 is Jess's to correct.
 4. **`Arrange new delivery date` (dictionary) vs `Agree new delivery date` (code), and
    `{logistics}` vs `{customer}`** — C2 finding #3, unchanged; **C8 owns it.** C6's button
    word is party-free, so it is correct under either ruling.
@@ -5080,7 +5080,7 @@ strings shipped.
 
 | Group | Rows | Where the words come from |
 |---|---|---|
-| `Today's work` | **`Check in`** | the ONE action of `PURCHASING-WORKING-FLOW.md` §7 that lives on this tab |
+| `Today's work` | **`Check in`** | the ONE action of `docs/purchasing/MASTER.md` §7 that lives on this tab |
 | `Progress` | `Receiving issue` · `Partially received` · `In transit` · `Fully received` | the page's own R1 column (`packages/shared/po-receiving.ts`) |
 | `Supplier` | one row per factory | the same facet the To Order tab carries |
 

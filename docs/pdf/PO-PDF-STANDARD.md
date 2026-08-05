@@ -141,7 +141,7 @@ A bulk PO speaks the supplier's language: **model first, quantity summed.**
 - **OPEN — deferred by Loo to the purchase-order build chat**: the exact bedframe
   Description format (what is Secondary vs pairs, wording of config lines) is to be
   discussed there, not invented here.
-- **RECORDED CONFLICT, not resolved**: `PURCHASING-WORKING-FLOW.md` §3 still says every
+- **RECORDED CONFLICT, not resolved**: `docs/purchasing/MASTER.md` §3 still says every
   NON-sofa line consolidates per supplier (ten customers' bed frames = one PO), and the
   To Order engine groups that way today. Loo's one-PO-one-customer bedframe ruling
   contradicts it. The purchasing chat must put this to Loo/Jess and update the flow file
@@ -249,5 +249,5 @@ Issued by Shasha      Computer-generated document · No signature required.     
 |---|---|---|
 | 2026-08-01 | Initial baseline — full design session: header shape, Supplier Delivery By naming, frameless cards, no-grid-line table, Item Grammar, one-set-per-page sofa layout with drawing, quiet footer, no signature, no money, no End line, no sofa total row. | Loo |
 | 2026-08-02 | §8 footer FINAL: one row, three sections (audit · legal · page), 15mm → 8mm, legal lines merged into one sentence. Sofa · bedframe · mattress renders approved as FINAL on this template. | Loo |
-| 2026-08-02 | §6.2: bedframe = one PO one customer (approved render on the final template). Bedframe Description format left OPEN for the purchase-order build chat. Consolidation conflict with PURCHASING-WORKING-FLOW §3 recorded, not resolved. | Loo |
+| 2026-08-02 | §6.2: bedframe = one PO one customer (approved render on the final template). Bedframe Description format left OPEN for the purchase-order build chat. Consolidation conflict with `docs/purchasing/MASTER.md` §3 recorded, not resolved. | Loo |
 | 2026-08-01 (evening) | Header final: 35mm label-gutter under the logo; `SUPPLIER DELIVERY BY` + `PO ISSUED DATE` labels 6.5pt light-grey caps; both dates ALL CAPS 7pt/700 ink on one X, equal weight; PO number 18pt (supersedes 15.5); doc block bottom-aligned. Footer: `Issued by {name}` added, repeated PO number removed. §6.1 bulk-PO listing rules (group by model, SO refs in column, Item ID = per-unit auto id, SKU as description, TOTAL QUANTITY row). 6-section grid + metadata-card headers rejected on review. | Loo |

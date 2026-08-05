@@ -15,7 +15,7 @@ You are reviewing the Carres Portal — a make-to-order furniture operations sys
 1. **`docs/carres-portal-system-architecture.md`** — THIS file (system overview + business locks)
 2. **`docs/COPY-STANDARD.md`** — microcopy vocabulary rules
 3. **`docs/UI-KIT.md`** — design laws *(corrected 2026-07-29: `§A0` stopped existing in the 2026-07-27 kit rewrite; the live sections are §8.2 interaction law and §8.3 module-tab law)*
-4. **`docs/PURCHASING-WORKING-FLOW.md`** + **`docs/PURCHASING-INFORMATION-MODEL.md`** — Purchasing's behaviour and its frozen information architecture *(corrected 2026-07-29: this line pointed at `docs/purchase-cockpit-handoff.md` §5, deleted 2026-07-27)*
+4. **`docs/purchasing/MASTER.md`** + **`docs/purchasing/MASTER.md`** — Purchasing's behaviour and its frozen information architecture *(corrected 2026-07-29: this line pointed at `docs/purchase-cockpit-handoff.md` §5, deleted 2026-07-27)*
 5. Module proposals in priority order:
    - `docs/orders-panel-concept-proposal.md`
    - *(`docs/purchasing-3panels-proposal.md` — DELETED 2026-07-27; Purchasing's live docs are the two named at 4 above)*
@@ -64,7 +64,7 @@ You are reviewing the Carres Portal — a make-to-order furniture operations sys
 | # | Module | Status | Sidebar item | 1-line purpose |
 |---|---|---|---|---|
 | 1 | **Orders** | 🟡 half-shipped · proposal locked (PR #244) | Orders | Customer SO lifecycle: placed → proceed → pending → scheduled → delivered |
-| 2 | **Purchasing** | 🟢 **all 5 tabs shipped** (P1-P4). PO lifecycle redesigned + frozen 2026-07-29, simplified 2026-07-30 — see [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) | Purchasing (**5 tabs**) | Supplier PO lifecycle: To Order (the plan) · Purchase Orders (the official document) · Receiving · Claims · Settings (manager-only) |
+| 2 | **Purchasing** | 🟢 **all 5 tabs shipped** (P1-P4). PO lifecycle redesigned + frozen 2026-07-29, simplified 2026-07-30 — see [`docs/purchasing/MASTER.md`](purchasing/MASTER.md) | Purchasing (**5 tabs**) | Supplier PO lifecycle: To Order (the plan) · Purchase Orders (the official document) · Receiving · Claims · Settings (manager-only) |
 | 3 | **Inventory** | 🔵 proposal locked (PR #247) | Inventory (4 tabs, replaces Stock) | On hand · Ready stock · Movements · Reconciliation |
 | 4 | **Delivery** | 🔵 proposal locked (PR #247) | Delivery (new module) | 3PL delivery lifecycle: To assign · In transit · POD queue |
 | 5 | **Payments** | 🟡 basic shipped · proposal locked (PR #247) | Payments (4 tabs) | Money flows: Collect (customer AR) · Pay (supplier AP) · Reconcile (bank) · Refunds |
@@ -98,7 +98,7 @@ You are reviewing the Carres Portal — a make-to-order furniture operations sys
 > **⛔ SUPERSEDED 2026-07-29 — every number below is stale and the settings table is BUILT.**
 > **P1 (PR #488, migration 0303) made every purchasing number a manager-edited setting**, per
 > supplier × category, with a change history the screen reads. **The live values are
-> [`docs/PURCHASING-WORKING-FLOW.md`](PURCHASING-WORKING-FLOW.md) §2 — read them there, never
+> [`docs/purchasing/MASTER.md`](purchasing/MASTER.md) §2 — read them there, never
 > from this list.** Three corrections that matter, because a chat acting on the old text
 > would order late:
 >

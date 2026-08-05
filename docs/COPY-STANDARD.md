@@ -334,7 +334,7 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Arrange new delivery date` | `Call {logistics} — arrange new delivery date` | `Record new date` | `New date recorded` | `No delayed order needs a new date.` |
 | `Collect RM {amount}` | `Collect RM {amount} from {customer}` | `Record payment` | `Payment recorded` | `Nothing outstanding.` |
 
-**PURCHASING** (`docs/PURCHASING-WORKING-FLOW.md`):
+**PURCHASING** (docs/purchasing/MASTER.md):
 
 | Queue tile | Row line | Button | Done message | Empty state |
 |---|---|---|---|---|
@@ -774,8 +774,8 @@ doubt, grep the codebase and match what already ships.
 ## The Purchase Order lifecycle words — CANONICAL HOME (Loo, 2026-07-29 · frozen by P6)
 
 **Every Purchasing word lives here. No other file may redefine one; they reference this
-section.** `docs/PURCHASING-WORKING-FLOW.md` owns what the actions DO,
-`docs/PURCHASING-INFORMATION-MODEL.md` owns where the facts sit — neither respells a word.
+section.** `docs/purchasing/MASTER.md` owns what the actions DO,
+`docs/purchasing/MASTER.md` owns where the facts sit — neither respells a word.
 
 **This is a PURCHASING exception to two rows in the vocabulary table above, and it is
 deliberate.** A Purchase Order and a customer order are two different subjects; a word banned
@@ -818,7 +818,7 @@ and otherwise says `—`.** Three words that used to sit in it were not actions 
 | What the column says | When | Note |
 |---|---|---|
 | **`Check Expected Arrival`** | the factory has never told us which day the goods reach us — **and also when the date they gave has PASSED and nothing came** | **Loo's own word, chosen after seeing the preview.** It is the SHORT spelling of `Confirm Goods Arrival Date`; it matches the column beside it (`Expected Arrival`) so the eye does not change track |
-| **`—`** | the goods are on their way, or already checked in, or the PO is completed or cancelled | **an empty action column is a real answer** (`PURCHASING-INFORMATION-MODEL.md` §12.3), not a gap |
+| **`—`** | the goods are on their way, or already checked in, or the PO is completed or cancelled | **an empty action column is a real answer** (purchasing/MASTER.md), not a gap |
 
 | RETIRED — never put back | Why |
 |---|---|

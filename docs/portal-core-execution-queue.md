@@ -719,7 +719,7 @@ columns nobody writes is the `ops_order_control.balance` disease. Nothing is pen
    the engine does not work that way** — the moment a PO exists the action becomes
    `Call {supplier} — confirm ready date`, which is what records the date. **RULED: the
    engine is right and the card is wrong** — an action closes when *its own* recorded outcome
-   lands, and the ready date is the NEXT action's outcome. `PURCHASING-WORKING-FLOW.md` §3 is
+   lands, and the ready date is the NEXT action's outcome. `docs/purchasing/MASTER.md` §3 is
    Jess's to correct; a build chat does not touch it.
 4. **The dictionary's `Arrange new delivery date` and the code's `Agree new delivery date`
    still disagree, and so do their parties** (`{logistics}` vs `{customer}`) — C2 finding #3,
