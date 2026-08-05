@@ -104,7 +104,14 @@ export default function RentalConfigurePage({
   }
 
   return (
-    <div className="cfg-page pos-proto" data-testid="rental-configure">
+    <div
+      className={`pos-proto cfg-root${wizardTopbar ? " has-wizardbar" : ""}`}
+      style={{ position: "fixed", inset: 0, zIndex: 50 }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Configure ${model.name} · Rent-to-Own`}
+      data-testid="rental-configure"
+    >
       {wizardTopbar ? <ConfigureTopbarBrand ctx={wizardTopbar} onBack={onClose} /> : null}
 
       <div className="cfg-header">
