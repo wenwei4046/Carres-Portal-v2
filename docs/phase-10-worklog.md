@@ -6,6 +6,57 @@
 
 ---
 
+**2026-08-05 · Purchasing Q13 follow-up — `sono` 94 → 95 and `items` 135 → 136** (PR #626 merge `963a37f1`, **no migration · no api · no Worker deploy owed**, web `index-Dg3pY7uT.js` — DEPLOYED, live md5 == the build from the main tip, `SERVICE_ROLE` 0)
+
+Loo ruled the two columns Q13 reported and deliberately left alone: *"Yes — widen `sono` 94→95 and `items` 135→136 as well. Same defect, same reasoning. Re-derive the min-width from the nine, as you did for supplier."*
+
+## The three numbers, and the third is derived
+
+`sono` **94 → 95** · `items` **135 → 136** · min-width **1206 → 1208** = `ceil(1171 / 0.97)`, because the kit's expand-control column takes 3% of the table.
+
+**Holding 1206 would have taken TWO pixels from that control column — measured live at 1280 before building**, which is the same trap Q13 measured at one pixel and the reason its derived test exists:
+
+| probe | ctl column | ctl clip | business clips |
+|---|---:|---:|---:|
+| `94`/`135`/`1206` — before | 35 | 7px × 21 | 3 |
+| `95`/`136`/`1206` — the half-fix | **33** | **9px** × 21 | 0 |
+| `95`/`136`/`1208` — what shipped | 35 | 7px × 21 | **0** |
+
+Every business column still renders at its ruled width in the middle row, so the damage is invisible to the assertion that pins them.
+
+## Verified on production at 1280 · 1440 · 1920 — identical at all three
+
+`min-w-[1208px]`, table 1206, columns `35 · 96 · 88 · 83 · 95 · 136 · 135 · 140 · 206 · 192`, rows **40px**, page horizontal scroll **0**, and the only clips left are P16's `ctl 7px × 21`. The three strings read in full on live rows: `SO-1206 +4` and `+3` **cw 78 · sw 78 · clipped false**, `Booqit 2B(LHF) · +1` **cw 119 · sw 119 · clipped false**, and Q13's `Nice Future` still **cw 87 · sw 87 · clipped false** on 4 rows.
+
+## A measurement was thrown away before it was believed
+
+The first reading on the deployed page returned **zero clips of any kind, 25px rows and a 1229px table**. It was wrong: the computed font was **Times New Roman** — the app's stylesheet had not applied in the pane, so nothing could truncate because nothing was styled. The CSS was fetched directly to prove the file was fine (200, 234,577 bytes, carrying the `h-10` rule), and the measurement helper now **refuses to report unless the computed font is Inter**. Every number above was taken after that guard passed. **An unstyled page reports a clean grid** — and it reports it as a pass.
+
+## A correction to another lane's record, with the reason it happened
+
+`ed09e54d` ("docs: P17 — correct the clip count, and close it") stated *"Closed by Q13 / PR #622 … Re-measured live: zero 1px clips remain."* **Three remained**, live on the deployed bundle, and the cause is method rather than carelessness:
+
+```
+scan `td, th`                →  ctl 7px × 21 only        i.e. ZERO 1px clips
+scan `td, th, td *, th *`    →  + sono 1px × 2, items 1px × 1
+```
+
+All three sit on nested `truncate` spans. **This is P16's own documented trap hit a second time** — *"the ellipsis lives on nested `truncate` spans and a `td`-only scan is exactly how the first pass missed the `PO No.` clip."* The doc is corrected in place and the rule written next to it: a clip scan on this grid must include `td *, th *`.
+
+## Gates and controls
+
+web tsc **0** · build clean · page suite **101/101** · full web suite **16 failed / 2574 passed (2590)** against a **DETACHED CONTROL WORKTREE at `origin/main`** measuring the **identical 16 / 2574 (2590)** — zero new, and no test added or removed: three expectations moved, which is the change. **check-design 8340, identical to the control.**
+
+Four negative controls, each a real edit verified on disk first: `sono` back to 94 → **2** · `items` back to 135 → **2** · min-width back to 1206 → **2** (`expected 1206 to be 1208`) · **`sono` back to 94 WITH its pinned expectation updated → 1** (`expected 1208 to be 1207`), the derived guard alone.
+
+**Both directions on DOWNLOADED bundles**: `min-w-[1208px]` **0 → 1** · `min-w-[1206px]` **1 → 0** · `"95px"` **0 → 1** · `"136px"` **0 → 1** · `"94px"` **1 → 0**; controls in BOTH `po-listing` 1/1 and `"88px"` 3/3 — Q13's own number, untouched.
+
+**No Worker deploy owed, and the baseline in §17.1 had gone stale AGAIN.** Measured against `d460d899` the api diff read as +19 lines of `to-order.ts` and a deploy would have looked owed; `wrangler deployments list` says the live Worker is **`0a7949bd`, deployed 07:01 today** — P19's — and from P19's own merge `bef687a5` the `apps/api`, `supabase/migrations` and `packages/shared` diffs to `origin/main` are all EMPTY. `/health` **200**. **The live Worker's source commit is read from `wrangler`, never from a document** — the second time in two cards that reading the table would have produced a wrong answer.
+
+**Reported, not fixed**: at 1920 the listing region gains **1px** of horizontal scroll (region 1207, wrapper 1206 → 1208) and P16's expand-button clip goes 6px → 7px, matching 1280 and 1440 — the honest price of content-sized columns, since the control column is the only elastic track, and the alternative is shaving a business column, which the ruling forbids; page-level scroll stays 0 everywhere · `items` still truncates on a long enough item list, as it always did, and carries a `title` · **a screenshot still could not be taken**: `preview_start` → `resize_window` → measure is the documented order, it was followed, it produces real layout numbers, and `computer{action:"screenshot"}` still times out after exactly that order. **Measuring and photographing are two different capabilities and only one of them works here.**
+
+---
+
 **2026-08-05 · Purchasing P18 — the order's proceed date joins the group header** (PR #623 merge `398c8fb2`, **no migration**, web `index-i_G0UkdY.js` + Worker `83d339ef` — DEPLOYED)
 
 Loo asked for a **column**. The answer is a group-header line, and the reason is his own ruling of 2026-08-04: *a table's width is not filled by inventing columns, and a fact which is not per-row does not get one.* Proceed date is an ORDER fact — every line under `SO-1209` shares it — so a column would print the same date three times and hold the width forever.
