@@ -4317,6 +4317,78 @@ to him with the evidence above.**
 
 ---
 
+## Q13 · The `supplier` column widens 87 → 88, because a frozen width that truncates is not the frozen intent
+
+**Lane: PURCHASE ORDERS · `OperationPurchaseOrders.tsx` only. NO migration, NO api, NO new
+word, NO new column. Two numbers.**
+
+> **Loo ruled it on 2026-08-05, reading P17's own reported cost.** P17 added the grid's
+> column separators, measured the price with a live control on the deployed page, and reported
+> that the rule shaves the last pixel of `Nice Future` in the 87px `supplier` column — with
+> `text-overflow: clip`, so no ellipsis announces it. **His ruling:** *Q7 froze WHICH columns
+> and HOW WIDE so that nothing truncates. Holding 87 while it truncates keeps the number and
+> loses the intent. Widen to 88.*
+
+### The measurement — reproduced on production before a line was written
+
+At `https://erp.carresofficial.com/operation/procurement`, 21 live POs, table 1205:
+
+```
+clipped elements (scan over td, th, td *, th *)      TOTAL 28
+    ctl        6px × 21     the expand button — P16's documented clip, NOT this card's
+    supplier   1px ×  4     `Nice Future`            cw 86   sw 87
+    sono       1px ×  2     `SO-1206 +4` · `+3`      cw 77   sw 78
+    items      1px ×  1     `Booqit 2B(LHF) · +1`    cw 118  sw 119
+```
+
+**A LIVE CONTROL proves all seven 1px clips are P17's border, not pre-existing.** Removing
+every vertical rule as a browser-only style on the deployed page and re-scanning leaves
+**only the 21 ctl clips**; putting them back returns all seven.
+
+**AND IT CORRECTS P17's OWN REPORT, which is why the number was re-measured rather than
+copied.** P17 recorded the seven as *"`Nice Future` in the 87px `supplier` column"*. Four of
+them are; **the other three are in `sono` (94px) and `items` (135px)**, two columns Loo did
+not name. See REPORTED below — they are not this card's to widen.
+
+### The build — two numbers, and the second one is not optional
+
+1. **`supplier` `87px` → `88px`.** `Nice Future` measures 70.7 at 13px Inter plus the cell's
+   own `px-2` = 16 → 86.7 of content; the rule takes 1px of the box, so 87 leaves 86 and
+   clips, and 88 leaves 87.
+2. **The listing's `min-w-[1205px]` → `min-w-[1206px]`.** That number is not decoration: it
+   is `the sum of the nine / 0.97`, because the kit's expand-control column takes 3% of the
+   table. The sum moves 1168 → 1169, so 1169 / 0.97 = 1205.15 → **1206**.
+
+**LEAVING THE MIN-WIDTH AT 1205 WOULD HAVE PAID FOR THE PIXEL OUT OF THE CONTROL COLUMN, AND
+IT WAS MEASURED.** Probed live at 1280, where the min-width is the binding constraint:
+
+| probe | ctl column | ctl clip | supplier clip |
+|---|---:|---:|---:|
+| `87px` / `1205px` — today | 35 | **7px** × 21 | 1px × 4 |
+| `88px` / `1205px` — the tempting half-fix | **34** | **8px** × 21 | 0 |
+| `88px` / `1206px` — what ships | 35 | **7px** × 21 | 0 |
+
+The middle row fixes `supplier` by making P16's already-clipping expand button one pixel
+worse. **The two numbers are ONE change**, and a test derives the second from the first so
+they cannot drift apart again.
+
+### DONE WHEN
+
+- Measured in a real browser on the DEPLOYED page at **1280, 1440 and 1920**, quoted in the
+  PR: the **4 × 1px `supplier` clips are 0**, the **21 are unchanged** (they are P16's), every
+  other column renders at its Q7 minimum, rows still 40px, page horizontal scroll 0.
+- `Nice Future` is read in full on a live row.
+- A negative control, a real edit verified on disk, with its failure count.
+
+### MUST NOT
+
+❌ touch any of the other eight widths · ❌ widen `sono` or `items` — Loo named one column ·
+❌ shorten a supplier name or add an ellipsis · ❌ change a token, a word, a row height or a
+column · ❌ remove P16's expand-button clip — a different card owns it · ❌ touch To Order,
+Receiving or Claims.
+
+---
+
 ## Q6 · To Order is audited against the same architecture
 
 **Lane: PURCHASING · `OperationToOrder.tsx`. NO migration. START NOW — do not wait for P13.**

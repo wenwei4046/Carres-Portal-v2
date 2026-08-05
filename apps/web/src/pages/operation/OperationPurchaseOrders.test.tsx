@@ -863,7 +863,11 @@ describe("nine measured minimums, and no tail", () => {
     await mountLoaded();
     expect(colWidths()).toMatchObject({
       issued: "96px",
-      supplier: "87px",
+      // 87 → 88, Loo 2026-08-05 (card Q13). P17's separator takes 1px of the
+      // BOX, so 87 left `Nice Future` 86px of content for 87px of ink and
+      // clipped it on 4 live rows with no ellipsis. The other eight are Q7's,
+      // untouched.
+      supplier: "88px",
       po: "83px",
       sono: "94px",
       items: "135px",
@@ -887,8 +891,49 @@ describe("nine measured minimums, and no tail", () => {
     await mountLoaded();
     const region = screen.getByTestId("po-listing");
     const scroller = region.querySelector(".overflow-auto") as HTMLElement;
-    expect(scroller.firstElementChild?.className).toContain("min-w-[1205px]");
-    expect(scroller.firstElementChild?.className).toContain("min-w-[1205px]");
+    expect(scroller.firstElementChild?.className).toContain("min-w-[1206px]");
+  });
+
+  /**
+   * THE MIN-WIDTH IS DERIVED FROM THE NINE, AND THE TWO MAY NEVER DRIFT APART
+   * (card Q13, 2026-08-05).
+   *
+   * The number is not decoration: the kit's expand-control column takes 3% of
+   * the table, so the sum of the nine pixel columns is only 97% of it. Q13
+   * MEASURED what happens when a width moves and this number does not — in
+   * `table-fixed` the browser takes the difference out of the only non-pixel
+   * track, which is that control column, and its expand button already
+   * overflows (P16's documented clip). Live at 1280: `88px`/`1205px` shrank the
+   * control 35 → 34 and made the clip 7px → 8px, while every business column
+   * kept its ruled width — i.e. the damage is INVISIBLE to the assertion above.
+   *
+   * So this reads both numbers off the rendered DOM and re-derives one from the
+   * other. Change a width without the min-width — or the min-width without a
+   * width — and it fires.
+   */
+  it("the min-width is exactly the sum of the nine over 0.97", async () => {
+    await mountLoaded();
+    /* The kit's own expand-control column is the 3% one, and it is exactly
+     * what the other 97% is measured against — so it is dropped by NOT having
+     * a `data-column`, never by looking like a percentage. A business column
+     * that turned into a percentage must fail this, not slip through it. */
+    const px = Object.entries(colWidths())
+      .filter(([k]) => k !== "null")
+      .map(([k, w]) => {
+        const m = /^(\d+)px$/.exec(String(w));
+        expect(m, `column \`${k}\` is a pixel width, got ${w}`).not.toBeNull();
+        return Number(m![1]);
+      });
+    expect(px).toHaveLength(9);
+    const sum = px.reduce((a, b) => a + b, 0);
+
+    const scroller = screen
+      .getByTestId("po-listing")
+      .querySelector(".overflow-auto") as HTMLElement;
+    const cls = String(scroller.firstElementChild?.className);
+    const min = Number(/min-w-\[(\d+)px\]/.exec(cls)?.[1]);
+
+    expect(min).toBe(Math.ceil(sum / 0.97));
   });
 
   it("every action word still carries its own title, so a clip can be read", async () => {
