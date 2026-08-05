@@ -92,6 +92,26 @@ AutoCount 式表格的完整参考（拖栏宽 · 拖栏序 · group by · 行�
 用 SQL 量。**宽度要在真浏览器量 —— jsdom 没有宽度，页面测试结构上就抓不到被切掉的字。**
 **猜的数字一律不准写。**
 
+> #### ⚠️ 浏览器是能用的 —— 至少有五张卡以为不能用，白白少做了验证
+>
+> 症状：`screenshot` 超时、viewport 读到 `0×0`、`No preview is open`。
+> **那不是坏了，是窗口还没开 / 还没给尺寸。**
+>
+> **正确顺序，三步，缺一步就会以为它坏了：**
+> ```
+> 1. preview_start  { url: "https://erp.carresofficial.com/..." }   ← 先开窗
+> 2. resize_window  { width: 1440, height: 900 }                    ← 一定要给尺寸
+> 3. screenshot / javascript_tool                                   ← 现在才是真的
+> ```
+> **`resize_window` 之前 layout 全部是 0；之后每一个数字都是真的。**
+> 截图缩得太小看不到 1px 的线 → **把 viewport 调小到 800 左右**，截图就是 1:1。
+>
+> 已经登入的 production session 通常还在，直接开 `erp.carresofficial.com` 就有资料。
+> 路由是 query param：`/operation?tab=purchase`，不是 `/operation/to-order`。
+>
+> **「这个 session 没办法截图 / 没办法量」不再是可以接受的结论。** 先照上面三步做过，
+> 还是不行才写进报告。
+
 ### 中场两步 —— 先批评，再建议
 
 **第 3.5 步 · 先判断：现在这个设计到底对不对**
@@ -153,6 +173,23 @@ Loo 回一个字母
 - **画面先画 ASCII 给他看，他点头才写 code。** 就算他说「直接做」也一样。
 - **结论先讲，理由后讲。**
 - **不要长篇大表。** 一次讲一件事。
+
+### ⚠️ Rebase 之后一定要检查：你有没有默默吃掉别人的记录
+
+**2026-08-05，P18 真的踩到了。** 它 rebase 到 P19 上面，git **完全没有报冲突**，
+却把 P19 写的 bundle 记录和 worklog 索引行**整行删掉了** —— 因为两个人写在同一段、
+用了同一个编号。
+
+**没有冲突不等于没有损失。** rebase 或 merge 之后，做这一步：
+
+```bash
+git diff origin/main -- docs/ | grep '^-' | grep -v '^---'
+```
+
+**任何一行是「减号」而且不是你自己写的 → 你吃掉了别人的东西，去 `origin/main` 捞回来。**
+
+同一天还有一个：**编辑落在主 checkout，不是自己的 worktree** —— 结果 `tsc` 跑的是
+没改过的 code，一片绿。**改完第一件事先 `git diff --name-only`，看到空的就是你改错地方了。**
 
 ### 不准做
 
