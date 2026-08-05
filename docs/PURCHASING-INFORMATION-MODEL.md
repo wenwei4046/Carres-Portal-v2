@@ -40,7 +40,7 @@
 > [`docs/ACTION-FLOW-STANDARD.md`](ACTION-FLOW-STANDARD.md) · the WORDS →
 > [`docs/COPY-STANDARD.md`](COPY-STANDARD.md) · the SHELL and the click behaviour →
 > [`docs/UI-KIT.md`](UI-KIT.md) · card progress →
-> [`docs/purchasing-execution-queue.md`](purchasing-execution-queue.md).
+> [`docs/PURCHASING-NEXT.md`](PURCHASING-NEXT.md).
 >
 > **The boundary with UI-KIT.** **`docs/UI-KIT.md` owns PRESENTATION ARCHITECTURE** — what
 > meets the eye and in what order, shared by every page in the portal. **This file owns

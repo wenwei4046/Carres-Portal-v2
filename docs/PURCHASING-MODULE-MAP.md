@@ -8,6 +8,26 @@
 > | [`PURCHASING-WORKING-FLOW.md`](PURCHASING-WORKING-FLOW.md) | what Purchasing **DOES** — actions, triggers, gates |
 > | [`PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) | how the information is **ORGANISED** |
 > | **this file** | what is **BUILT AND ON SCREEN RIGHT NOW** — every block, every button, every endpoint, every table, with live row counts |
+| [`PURCHASING-NEXT.md`](PURCHASING-NEXT.md) | what is **LEFT TO BUILD** — open cards only, nothing shipped |
+
+---
+
+## THE FRONT DOOR — you read THIS file, then ONE section of ONE other
+
+**Nobody reads four files.** That is why chats skip. Read this one, then follow the sign:
+
+| What you are doing | Go to |
+|---|---|
+| **anything at all in Purchasing** | **start here — §2, then your tab's §3.x. Nothing else may come first** |
+| changing a screen | **§3.x of this file** — it names every button, endpoint and table that tab has |
+| *"is this rule real, and who set it?"* | `PURCHASING-WORKING-FLOW.md` — §10 is the claim model, §9 is what the system believes |
+| *"where does this information belong?"* | `PURCHASING-INFORMATION-MODEL.md` |
+| *"what is still to be built?"* | `PURCHASING-NEXT.md` — open cards only |
+| *"what word may I put on screen?"* | `COPY-STANDARD.md`. **If it is not there, STOP and ask Loo** |
+| *"how does an action appear and close?"* | `ACTION-FLOW-STANDARD.md` |
+| what a shipped card actually did | `archive/` — **history only. No chat is required to read it** |
+
+**Four files, but you never read four.** One front door, then one section.
 
 ---
 
@@ -50,11 +70,25 @@ live on that very page since 2026-07-27**. Its only contact with `SupplierClaimP
 
 ## §1 · How to keep this file true
 
-- **Every card that changes a Purchasing screen updates its tab's section here, in the same PR.**
+**IF YOUR PR TOUCHES A PURCHASING PAGE, YOU UPDATE THAT TAB'S §3.x IN THE SAME PR.**
+Six lines, and a build chat can check itself against them:
+
+```
+□ the on-screen sketch          — did a block move, appear or disappear?
+□ the CONTROLS list             — added, removed or renamed a data-testid?
+□ the ENDPOINTS list            — a new route, or one that died?
+□ the TABLES list + row counts  — re-measure; never copy the old number
+□ the MEASURED HOW line         — say how YOU read it, not how the last chat did
+□ §7 known gaps                 — did you close one, or find one?
+```
+
 - **Never delete a row to make the map tidy** — the map's value is that it is complete.
-- **Each tab below carries a `MEASURED HOW` line.** A tab read end-to-end and a tab read from
-  its docblock are not the same evidence, and the next chat must be able to tell them apart.
+- **Each tab carries a `MEASURED HOW` line.** A tab read end to end and a tab read from its
+  docblock are not the same evidence, and the next chat must be able to tell them apart.
   **That line is the honesty this file needs to avoid becoming the trap in §0.**
+- **A card is open in `PURCHASING-NEXT.md` to make this enforceable in CODE** — a guard that
+  fails when a PR changes a Purchasing page file and does not change this map. A rule written
+  in a document gets skipped; a failing test does not.
 
 ---
 

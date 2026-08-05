@@ -34,4 +34,4 @@
 - **Catalog(1159 SKU)已在系统 live**(Operation Catalog + POS 用它下单)。一 SKU → 一供应商 → 一买价(`product_skus.cost`)。
 - **库存:Klg = 唯一真实数量;PJ Showroom = Klg 的筛选视图。**
 - **现在到上线前全是测试** → 边测边清 → **上线那天做最后一次整体清空**,之后全是真单。**所以别过度设计"测试/真实"分离。**
-- 采购/进货:`docs/PURCHASING-WORKING-FLOW.md`(流程) + `docs/purchasing-execution-queue.md`(卡片)。删测试订单工具:`scripts/cleanup-autocount-orders.sql`。
+- 采购/进货:`docs/PURCHASING-WORKING-FLOW.md`(流程) + `docs/PURCHASING-NEXT.md`(卡片)。删测试订单工具:`scripts/cleanup-autocount-orders.sql`。

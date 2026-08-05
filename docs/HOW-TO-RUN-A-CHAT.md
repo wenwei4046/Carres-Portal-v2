@@ -51,11 +51,24 @@
 **① 我们自己的流程。** 你碰哪个 module 就读它的 working-flow 档，**整个 Purchasing 五个
 tab 是一条链，不是五个独立页面**：
 
-> ⭐ **碰 Purchasing 的话，先读 [`docs/PURCHASING-MODULE-MAP.md`](PURCHASING-MODULE-MAP.md)。**
-> 那是「现在画面上真的有什么」—— 每个 tab 的每一块、每一颗按钮、每一支 API、每一张表。
-> **Loo 2026-08-05 下令写的**：一个 chat 花了四轮设计一个 2026-07-27 就上线的东西，因为它
-> 读的是上一个 chat 的笔记，不是那一页。**checkpoint 的「已量过」清单是起点，不是天花板；
-> grep 找不到你没想到的按钮。要读档案。**
+> ⭐⭐ **碰 Purchasing 的话，只有四份档，而且只有一个大门。**
+>
+> ```
+> ① docs/PURCHASING-MODULE-MAP.md      ← 大门，永远先读这一份
+>                                        现在画面上真的有什么，一个 tab 一节
+> ② docs/PURCHASING-WORKING-FLOW.md    ← 业务规则（§10 = claim model）
+> ③ docs/PURCHASING-INFORMATION-MODEL.md ← 资讯怎么摆
+> ④ docs/PURCHASING-NEXT.md            ← 还没做的卡，只有还没做的
+> ```
+>
+> **没有一个 chat 要读四份。读大门，大门告诉你翻哪一份的哪一节。**
+>
+> **Loo 2026-08-05 下令的**：一个 chat 花了四轮设计一个 2026-07-27 就上线的东西，因为它读的是
+> 上一个 chat 的笔记，不是那一页。**checkpoint 的「已量过」清单是起点，不是天花板；grep 找不到
+> 你没想到的按钮。要读档案。**
+>
+> **五份 checkpoint + 两份 queue 档（8,999 行）搬去 `docs/archive/`，没有删。**
+> **做完的和没做的不可以住同一份档 —— 这条对每一个 module 都成立。**
 
 ```
 Create Purchase → To Order → Purchase Orders → Receiving → Claims

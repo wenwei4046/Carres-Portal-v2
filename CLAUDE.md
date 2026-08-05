@@ -22,30 +22,41 @@
 > decisions, then writes CARDS; it writes no code) and a **BUILD chat** (does ONE card, ships
 > it, marks it ✅; it redesigns nothing).
 >
-> **SEVEN lines now — ⑦ Purchasing opened 2026-07-27** with
-> [`docs/PURCHASING-WORKING-FLOW.md`](docs/PURCHASING-WORKING-FLOW.md) +
-> [`docs/purchasing-execution-queue.md`](docs/purchasing-execution-queue.md).
-> **Purchasing has a THIRD file since 2026-07-29 and it is read before any To Order work:**
-> [`docs/PURCHASING-INFORMATION-MODEL.md`](docs/PURCHASING-INFORMATION-MODEL.md) — the
-> information architecture, frozen by Loo. It is not a second flow file: the flow file says
-> what Purchasing DOES, the information model says how To Order's information is ORGANISED,
-> and neither repeats the other. **Eight terminology slots in its §10 are OPEN and no chat
-> may fill one.** **Seven older
-> purchasing documents (1,222 lines) were DELETED** — none was authoritative, so every build
-> chat picked a different one and built something different. That is the whole reason the
-> module failed five times, and it is why one concern gets exactly one file.
+> **SEVEN lines now — ⑦ Purchasing opened 2026-07-27.**
 >
-> **⭐ A FOURTH file joined on 2026-08-05 and it is read FIRST, before any Purchasing work
-> of any kind:** [`docs/PURCHASING-MODULE-MAP.md`](docs/PURCHASING-MODULE-MAP.md) — **what is
-> ACTUALLY on the screen today**, tab by tab: every block, every button, every endpoint,
-> every table, with live row counts and a `MEASURED HOW` line per tab. The flow file says
-> what Purchasing DOES, the information model says how it is ORGANISED, and the map says
-> **what is already BUILT.** *(Loo ordered it after a planning session spent four rounds
-> designing a picker that had been live on that page since 2026-07-27. Its §0 names the
-> mechanism: a checkpoint's measurement list is a STARTING point, never a ceiling, and
-> `grep` cannot inventory a page — it only finds words you already thought of. **Read the
-> file.**)* **Every card that changes a Purchasing screen updates that tab's section in the
-> same PR.**
+> ### ⭐⭐ PURCHASING HAS EXACTLY FOUR FILES, AND ONE FRONT DOOR (Loo, 2026-08-05)
+>
+> **Read the MAP. It tells you which of the other three to open, and which section.
+> Nobody reads four files — that is why chats skipped, and what a chat skips it re-invents.**
+>
+> | | |
+> |---|---|
+> | **① [`docs/PURCHASING-MODULE-MAP.md`](docs/PURCHASING-MODULE-MAP.md)** | **THE FRONT DOOR — read this first, always.** What is ACTUALLY on the screen today, tab by tab: every block, every button, every endpoint, every table with live row counts, and a **`MEASURED HOW`** line so the next chat can tell a page read end to end from a page read from its docblock |
+> | ② [`docs/PURCHASING-WORKING-FLOW.md`](docs/PURCHASING-WORKING-FLOW.md) | the business RULES — every action with its trigger, gate, due and owner. **§10 is the claim model, frozen by Loo 2026-08-05** |
+> | ③ [`docs/PURCHASING-INFORMATION-MODEL.md`](docs/PURCHASING-INFORMATION-MODEL.md) | how the information is ORGANISED, frozen by Loo |
+> | ④ [`docs/PURCHASING-NEXT.md`](docs/PURCHASING-NEXT.md) | what is LEFT TO BUILD — **open cards only.** A card that ships is deleted from it the same day |
+>
+> **The rule that produced this shape, and it generalises to every module:**
+>
+> ```
+> Done work and to-do work may never live in the same file.
+> A CHECKPOINT is a session artifact: once its content is in a permanent file, it dies.
+> ```
+>
+> **Measured 2026-08-05:** the two Purchasing queue files plus five checkpoints held **8,999
+> lines**, and the open work inside them was **eight cards**. All seven moved to
+> [`docs/archive/`](docs/archive/README.md) — **nothing deleted, and no chat is required to
+> read anything in there.**
+>
+> *(Loo ordered the map after a planning session spent four rounds designing an item-outcome
+> picker that had been live on the Claims panel since 2026-07-27, because the chat was reading
+> a previous chat's notes instead of the page. The map's §0 names the mechanism: **a
+> checkpoint's measurement list is a STARTING point, never a ceiling**, and **`grep` cannot
+> inventory a page** — it only finds words you already thought of. **Read the file.**)*
+>
+> **Every card that changes a Purchasing screen updates that tab's section of the MAP in the
+> same PR** — a six-line checklist sits in its §1, and card **G-MAP** makes it a failing test
+> rather than a sentence.
 >
 > **FOUR LAWS outrank anything pasted into a chat:**
 > [`docs/ACTION-FLOW-STANDARD.md`](docs/ACTION-FLOW-STANDARD.md) — how actions are computed,
@@ -868,15 +879,15 @@ than kept — Law 0A).
 | **Portal Core C7 — the delivery order prints itself** (the hard gate moves off confirming a date and onto issuing the document; NO migration, because 0098 only stamps `do_number` when it is NULL; an operator never types a DO again) | ✅ LIVE | 2026-07-28 | PR #489 · no migration · `docs/portal-core-execution-queue.md` |
 | **Portal Core C10 — the three dots become real** (goods · delivery · money render BESIDE the stage pill, each as its own icon; `rowDotsOf` had a renderer and, it turned out, no tests either) | ✅ LIVE | 2026-07-27 | PR #471 · no migration · `docs/portal-core-execution-queue.md` |
 | **Portal Core C9 — a storage fee holds the delivery** (the gate reads ONE number; only the manager releases it, in two outcomes named apart so a release never forgives money) | ✅ LIVE | 2026-07-27 | PR #472 · no migration · `docs/portal-core-execution-queue.md` |
-| **Purchasing P2 — every Purchasing list obeys ONE click law** (To Order · Claims · Receiving; a tile filters and clears, two picks are two ✕-able chips, and closing a drawer gives back the filters AND the scroll. The card's own lasting contribution is §8.2's *stage vs queue* rule: the test is whether "nothing selected" is a legal view) | ✅ LIVE | 2026-07-28 | PR #492 · #494 · #495 · no migration · `docs/purchasing-execution-queue.md` |
-| **Receiving R8 — the banned-verb sweep** (`Chase` · `Receive`-as-a-verb · `Send back` · `Save count` · `GRN`-as-the-act off the whole Purchasing lane; the two dead To Order filters deleted whole; one action stops being spelt two ways on the Claims screen) | ✅ LIVE | 2026-07-28 | PR #499 · no migration · `docs/receiving-claim-execution-queue.md` — **R7 still open; R8 does NOT close line ④ or Purchasing** |
-| **Purchasing P1 — the numbers become settings** (seven numbers stop being constants and become a manager-only tab; a supplier × category with no number reads `Set a number` and gets no order-by date at all; five doors closed, including the safety net that fired nine days late) | ✅ LIVE | 2026-07-28 | PR #488 · 0303 · `docs/purchasing-execution-queue.md` — **line ⑦ opens for real** |
-| **Purchasing P3 — the two supplier calls** (`Confirm tomorrow's delivery` per PO · `Confirm balance delivery date` per PO LINE; ONE append-only promise ledger, so "every promise is kept" has no column to overwrite; both close only while the answer still names the CURRENT facts. **A balance date enters Delay planning too — Loo's ruling, one delay model reused, merged-PO false positives accepted until P5's allocation**) | ✅ LIVE | 2026-07-29 | PR #506 · 0306 · `docs/purchasing-execution-queue.md` |
+| **Purchasing P2 — every Purchasing list obeys ONE click law** (To Order · Claims · Receiving; a tile filters and clears, two picks are two ✕-able chips, and closing a drawer gives back the filters AND the scroll. The card's own lasting contribution is §8.2's *stage vs queue* rule: the test is whether "nothing selected" is a legal view) | ✅ LIVE | 2026-07-28 | PR #492 · #494 · #495 · no migration · `docs/archive/purchasing-shipped-cards.md` |
+| **Receiving R8 — the banned-verb sweep** (`Chase` · `Receive`-as-a-verb · `Send back` · `Save count` · `GRN`-as-the-act off the whole Purchasing lane; the two dead To Order filters deleted whole; one action stops being spelt two ways on the Claims screen) | ✅ LIVE | 2026-07-28 | PR #499 · no migration · `docs/archive/receiving-claim-shipped-cards.md` — **R7 still open; R8 does NOT close line ④ or Purchasing** |
+| **Purchasing P1 — the numbers become settings** (seven numbers stop being constants and become a manager-only tab; a supplier × category with no number reads `Set a number` and gets no order-by date at all; five doors closed, including the safety net that fired nine days late) | ✅ LIVE | 2026-07-28 | PR #488 · 0303 · `docs/archive/purchasing-shipped-cards.md` — **line ⑦ opens for real** |
+| **Purchasing P3 — the two supplier calls** (`Confirm tomorrow's delivery` per PO · `Confirm balance delivery date` per PO LINE; ONE append-only promise ledger, so "every promise is kept" has no column to overwrite; both close only while the answer still names the CURRENT facts. **A balance date enters Delay planning too — Loo's ruling, one delay model reused, merged-PO false positives accepted until P5's allocation**) | ✅ LIVE | 2026-07-29 | PR #506 · 0306 · `docs/archive/purchasing-shipped-cards.md` |
 | **Service Case S4 — the deadline** (14 WORKING days from the report, DERIVED and never stored; the call the portal asks for four days out carries a picked reason, and every event names the deadline it was made about; extend once, bounded) | ✅ LIVE | 2026-07-27 | PR #449 · 0298 · `docs/service-case-execution-queue.md` |
 | **Service Case S5 — the monthly numbers** (the review layer; NO migration — the day a case ended is the `customer_confirmed` entry S3's own close gate already demands, so `closed_at` was refused, not deferred; every figure withholds itself with a reason rather than printing one the records cannot back) | ✅ LIVE | 2026-07-27 | PR #474 · **no migration** · `docs/service-case-execution-queue.md` — **line ③ COMPLETE: S1-S5** |
 | **Ready Stock K5 — stock health + proposal accuracy** (the review layer; reads the two numbers K1 and K4 already collect and adds no third; every alert stays silent until the records can back it) | ✅ LIVE | 2026-07-27 | PR #451 · **no migration** · `docs/ready-stock-execution-queue.md` — **line ⑤ COMPLETE: K0-K5** |
 | **Ready Stock K4 — pool usage reasons + reserve levels** (a DATED ledger, not 0213's undated column; the draw and the reason are one transaction across all THREE doors out of the pool; the level warns and never blocks) | ✅ LIVE | 2026-07-27 | PR #434 · 0292 + 0294 · `docs/ready-stock-execution-queue.md` |
-| **Receiving R4 — problem stock is quarantined** (three statuses on the existing machine; the guard asks WHERE a unit is going, never who is writing, so it holds against PostgREST too; the receive mints the shortfall a held unit leaves behind) | ✅ LIVE | 2026-07-27 | PR #454 · 0299 · `docs/receiving-claim-execution-queue.md` |
+| **Receiving R4 — problem stock is quarantined** (three statuses on the existing machine; the guard asks WHERE a unit is going, never who is writing, so it holds against PostgREST too; the receive mints the shortfall a held unit leaves behind) | ✅ LIVE | 2026-07-27 | PR #454 · 0299 · `docs/archive/receiving-claim-shipped-cards.md` |
 | **Rental signature capture** (the POS asked for a signature and threw it away; an agreement is now BORN signed, and approve refuses an unsigned one) | ✅ LIVE | 2026-07-26 | PR #378 · 0279 · worklog ㉓ |
 | **Rental collection engine ②a** (the schedule speaks the 7th and asserts its own sum; `rental_billings` finally has ONE writer; a collected month is undeletable) | ✅ LIVE | 2026-07-26 | PR #387 · 0281 · worklog ㉔ |
 | **Rental — a bounced card stops being invisible** (`invoice.payment_failed` recorded as an EVENT, never as a second writer of `rental_billings`; idempotent on Stripe's event id so retries are rows and re-deliveries are not; badged on the LIST, not just in the drawer). Also deletes the retired `RentToOwnPage`. | ✅ LIVE | 2026-07-27 | PR #439 · 0295 |
