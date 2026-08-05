@@ -498,8 +498,10 @@ Purchasing          ← ④ R-cards + ⑦ P-cards. Tabs: To Order · Purchase Or
                        warehouse staff land on it through their own login (R6).
                        FIVE TABS, frozen — To Order stores no work-in-progress object,
                        not as a sixth tab (Loo 2026-07-29). Which action sits on
-                       which tab is the deadline-anchor rule: customer-anchored
-                       → To Order, goods-anchored → Receiving
+                       which tab is the ROLE-ANCHOR rule (Loo, 2026-08-05, card
+                       Q12): asking the supplier → the buyer's tabs, handling
+                       the goods → Receiving. The deadline-anchor rule it
+                       replaced is DELETED, not superseded
 Delivery            ← ✅ LIVE (① T11, PR #425) — the 3-pane module page; reads only,
                        every write hands back to the order drawer
 Stock               ← ⑤ K0 merges On Hand + Movements into ONE door with tabs
