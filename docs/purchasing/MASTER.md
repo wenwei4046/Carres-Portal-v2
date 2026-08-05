@@ -336,6 +336,49 @@ RIGHT 400px  ONE PO's Receiving Session. Receiving Mode takes the stage rather t
 `GET /operation/warehouse-receipts` · `POST /:id/check-in` · `POST /:id/send-back`
 Tables: `warehouse_receipts` **3** · `receiving_events` **3**
 
+### THE INFORMATION MODEL — frozen
+
+**ONE physical delivery (one truck) = ONE Receiving Session.**
+
+- A missed line on the same truck is an **Amend** on the same Session — never a second one.
+- A genuinely second truck is a NEW Session (a normal partial delivery).
+- A wrong record (wrong qty / PO / DO) is a **Void** plus a correct new Session.
+  **History is never overwritten and never edited in place.**
+- **Duplicate guard: same Supplier + same PO + same DO number cannot create a second live
+  Session.** One DO number MAY span several POs — one van, two POs is legal, and each PO gets
+  its own Session.
+- **A field's owner is the module that CREATES it.** Foreign fields display read-only with a
+  jump to their owner. The Session owns: session id · PO ref · **the warehouse SNAPSHOT**
+  (never re-derived after a PO relocation) · supplier DO number · lines (received-this-time as
+  a DELTA · damaged · wrong · photos) · the internal note, **which is never mixed with
+  supplier-facing text.**
+
+**THREE TIMES, never one `created_at`:**
+
+| Time | Set by | Editable | Means |
+|---|---|---|---|
+| **Goods Received At** | human | ✅ default today; never future; never before the PO date | when the goods PHYSICALLY arrived |
+| **Submitted At** | system | ❌ | when it entered the system |
+| **Posted At** | system | ❌ | when it hit the books |
+
+**Friday's truck keyed in on Monday reads: Received Friday · Submitted Monday.** Reports use
+the business date, audit keeps the system dates, **and both are true.**
+
+**THE EVENT LEDGER IS THE ONE HISTORY.** `receiving_events` is append-only; the Activity
+timeline reads it **and nothing else.** A single status column loses *"was once returned"* the
+moment it resubmits, and a second return overwrites the first reason.
+
+**Event names are business facts and the list is CLOSED:**
+`submitted · returned · resubmitted · posted · voided · amended`
+(**`resubmitted` is a first-class event — never `submitted` with a flag.**)
+
+**The payload dictionary is closed too, and a new key enters the table before it enters any
+payload:** `do_number` · `goods_received_at` · `units_counted` · `entry_source`
+(`office | warehouse`) · `reason` · `claims_linked` · `changes`.
+**Both doors write the same five keys on `posted`**, so a report over the ledger reads the same
+regardless of which desk keyed the count — which is why the Office's single act **widened the
+payload rather than manufacturing a `submitted` event nobody performed.**
+
 ### FROZEN RULES
 - **The Supplier DO number is THEIRS.** No default, no suggestion — a number we invent is a
   reference the supplier never issued, and it defeats the duplicate guard that reads it.

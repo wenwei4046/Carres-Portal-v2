@@ -440,7 +440,7 @@ rewrite banned were instead fixed AT SOURCE (`Carrier's date` → `Logistics' da
 `…, no date yet`), so the rail calendar and this page cannot spell one fact two ways.
 
 **Found, not fixed (not this card):** `Delivery` now has its own menu item, but its actions
-live in `docs/ORDERS-WORKING-FLOW.md` §3 — deliberate, because they are the ORDER's actions
+live in `orders/MASTER.md` §3 — deliberate, because they are the ORDER's actions
 and Law 3 forbids two homes. A `DELIVERY-WORKING-FLOW.md` would require the Orders file to
 lose that section; that is Jess's call, not a build chat's. Also still open from T9/T10: the
 drawer's two `Unscheduled` copies (`OrderDetailDrawer.tsx` ~3814, ~3853) and the PO lens's

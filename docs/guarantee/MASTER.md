@@ -1,4 +1,26 @@
-# Guarantee packages — spec (v1, locked 2026-07-26)
+# GUARANTEE & SERVICE PACKAGE — MASTER
+
+> **The only Guarantee document.** Overwritten when re-ruled; never versioned.
+> **You read `CLAUDE.md` and this file.**
+>
+> **MISSION** — a guarantee and a care plan are the SAME object: it attaches to an item, it has
+> a clock, and it gets used up. **Only the visit COUNT differs — a guarantee is a care plan with
+> one visit.**
+>
+> **WHAT IS ON SCREEN TODAY** — `OperationGuarantees.tsx` **308 lines** (the claim desk) + a POS
+> covered-item picker + an invoice cover block + a `GuaranteeCoverStrip` on both order-detail
+> surfaces. *Measured 2026-08-05 from file size and the shipped card records; **not read line by
+> line.*** **SHIPPED and sellable** (migrations 0261-0263, 0274) — unlike the sofa / PWP /
+> delivery engines it does **not** ship dormant.
+>
+> **APPROVED EVOLUTION** — a recurring plan counts visits REMAINING but not when they are DUE,
+> so nothing can say *"this customer is owed a clean this month"*; fine for the pilot, needs a
+> due date before volume. And a sellable care plan now lives in `guarantee_terms` while the
+> RENTAL-included package still lives in `service_packages` — **two registries for one
+> concept**, closed when the rental path is re-pointed.
+
+---
+
 
 **Status**: SHIPPED (migrations 0261-0263). Unlike the sofa / PWP / delivery engines this does
 **not** ship dormant — Loo asked for it sellable from day one.

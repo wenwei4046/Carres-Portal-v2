@@ -17,7 +17,7 @@ Paste this into a fresh chat:
 >    frozen 2026-07-29. **This replaces the two dead pointers this list used to carry**
 >    (`purchase-cockpit-handoff.md` §5 and `purchasing-3panels-proposal.md`, both DELETED
 >    2026-07-27 — a chat following them was being sent to files that do not exist)
-> 5. `docs/orders-panel-concept-proposal.md` — Orders sibling (same discipline)
+> 5. `orders/MASTER.md` — Orders sibling (same discipline)
 > 6. `docs/purchasing/MASTER.md` — how Purchasing behaves (the ONE flow file)
 >
 > Live-poke `https://erp.carresofficial.com/operation?tab=purchase` for the visual/interaction language.

@@ -16,7 +16,7 @@ Paste this into a fresh chat:
 > 3. `docs/COPY-STANDARD.md` — microcopy rules
 > 4. `docs/UI-KIT.md` §A0 — Module-tab law
 > 5. `docs/purchasing/MASTER.md` — Purchasing reference *(corrected 2026-07-29: `purchase-cockpit-handoff.md` deleted 2026-07-27)*
-> 6. `docs/orders-panel-concept-proposal.md` — Orders integration (subscription SO type lives there)
+> 6. `orders/MASTER.md` — Orders integration (subscription SO type lives there)
 > 7. `docs/payment-module-proposal.md` — billing + collections cross-module
 > 8. `docs/delivery-module-proposal.md` — first-mattress delivery cross-module
 > 9. `docs/right-rail-widgets-proposal.md` — Calendar widget shows subscription schedule

@@ -120,7 +120,7 @@ with the customer confirming they are satisfied. A case the WAREHOUSE or a suppl
 before the goods went out ends when the fix is verified internally — the customer was never
 told, so there is nothing for them to confirm. If such a case DELAYS the customer's
 delivery, that is not this case's ending: it opens the delivery-side chain, where logistics
-arranges the new date (see `docs/ORDERS-WORKING-FLOW.md`).
+arranges the new date (see `orders/MASTER.md`).
 **Done when:** closing a case requires all its steps closed, and the ending that matches
 who reported it.
 

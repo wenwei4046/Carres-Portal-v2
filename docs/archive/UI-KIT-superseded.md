@@ -511,7 +511,7 @@ Purchasing, Receiving and Service Detail without learning any of them again.
 
 > **The boundary with the information model (Loo, 2026-07-28).** This section owns
 > **PRESENTATION architecture** — what meets the eye and in what order, shared by
-> every detail page. **[`ORDER-DETAIL-INFORMATION-MODEL.md`](ORDER-DETAIL-INFORMATION-MODEL.md)
+> every detail page. **[`orders/MASTER.md`](orders/MASTER.md)
 > owns INFORMATION architecture** — which business question each block answers, how
 > deep an answer goes (Answer · Context · Evidence · Detail) and what it says in each
 > state (Working · Blocked · Waiting · Completed). Neither repeats the other; that file

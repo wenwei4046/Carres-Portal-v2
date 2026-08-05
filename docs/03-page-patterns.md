@@ -118,7 +118,7 @@ Carres Examples**
 
 **Order Detail** — the Golden Template. Six questions in the order a human asks
 them, and the System Model is re-fitted to serve it, never the reverse.
-Detail in `docs/ORDER-DETAIL-INFORMATION-MODEL.md`.
+Detail in `orders/MASTER.md`.
 
 ---
 

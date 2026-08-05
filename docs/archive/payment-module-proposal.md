@@ -13,7 +13,7 @@ Paste this into a fresh chat:
 > 2. `docs/COPY-STANDARD.md` — microcopy rules
 > 3. `docs/UI-KIT.md` §A0 — Module-tab law
 > 4. `docs/purchasing/MASTER.md` — Purchasing reference *(corrected 2026-07-29: `purchase-cockpit-handoff.md` deleted 2026-07-27)*
-> 5. `docs/orders-panel-concept-proposal.md` — Orders sibling (Payment's ③ 钱 track lives in Orders)
+> 5. `orders/MASTER.md` — Orders sibling (Payment's ③ 钱 track lives in Orders)
 > 6. `docs/inventory-module-proposal.md` + `docs/delivery-module-proposal.md` — siblings
 >
 > Live-poke `https://erp.carresofficial.com/operation?tab=payments` for current state.

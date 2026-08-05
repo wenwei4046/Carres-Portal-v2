@@ -54,7 +54,7 @@ Every rule exists in ONE document only.
 | Action engine | `docs/ACTION-FLOW-STANDARD.md` |
 | UI wording | `docs/COPY-STANDARD.md` |
 | A module's working flow | `docs/<MODULE>-WORKING-FLOW.md` |
-| Execution queue | `docs/execution-queues-index.md` |
+| Execution queue | `../CLAUDE.md` |
 
 Never duplicate a rule into a second document. When a rule changes, the source document is
 updated and nothing else — a copy elsewhere is how Delivery gets fixed and Purchasing is
@@ -137,7 +137,7 @@ place, never duplicated:
 
 **Every module owns ONE working-flow file. Every working-flow file uses the SAME structure.
 Only the business content differs — the document structure never changes.**
-Orders' file (`docs/ORDERS-WORKING-FLOW.md`) is the template; a module's file is named
+Orders' file (`orders/MASTER.md`) is the template; a module's file is named
 `docs/<MODULE>-WORKING-FLOW.md` and is written when that line starts.
 
 **The shape is fixed** so every module reads the same way, and a chat can be pointed at one
@@ -190,7 +190,7 @@ what shows against OTHER tracks — and there both answers are the same.
 **Rung 2 never names the customer.** Carres does not phone a customer about a delay —
 logistics carries that conversation, and the action in this portal is the call to
 logistics. Any surface that opens a customer call about a delay is wrong.
-(Jess, 2026-07-27; the flow is `docs/ORDERS-WORKING-FLOW.md` §3.)
+(Jess, 2026-07-27; the flow is `orders/MASTER.md` §3.)
 **This is now a GUARD, not a comment** — C8 wired three lines (both delay labels and the
 journey strip's owner row) to a test fed the customer's real name; any of them mentioning the
 customer fails. It caught C8's own first draft of the owner row.
@@ -216,7 +216,7 @@ out never outranks a RM 1,500 order going out tomorrow.
 
 The dots are three INDEPENDENT facts, never one status: **goods · delivery · money**. Each
 is labelled by its own small icon from the portal icon set (never emoji, per
-`docs/UI-KIT.md`) — **so the dots need no header of their own.**
+`ui/MASTER.md`) — **so the dots need no header of their own.**
 
 **They sit BESIDE the stage pill, never replacing it** (Jess 2026-07-27). The pill is the
 order's overall progress summary — WHERE this order is; the dots are WHICH PART has
@@ -232,7 +232,7 @@ John Tan     Proceed  📦 🚚 $          Call Ohana — confirm ready date  +2
 A delivered order never alarms on goods or delivery, and may still show a red money dot
 with an open payment action. Delivered is not paid.
 
-Tones live in `docs/ORDERS-WORKING-FLOW.md` §7 — one home (Law 0A).
+Tones live in `orders/MASTER.md` §7 — one home (Law 0A).
 
 **BUILT — C10, PR #471, live 2026-07-27.** The dots render beside the stage pill in the
 `Status` column, each as its own Lucide icon (goods `Package` · delivery `Truck` · money

@@ -14,7 +14,7 @@ Paste this into a fresh chat:
 > 1. `docs/right-rail-widgets-proposal.md` — this file, the SPEC
 > 2. `docs/COPY-STANDARD.md` — microcopy rules
 > 3. `docs/UI-KIT.md` §A0 — Module-tab law
-> 4. `docs/orders-panel-concept-proposal.md` — Orders sibling (Duty Board expansion lives there too)
+> 4. `orders/MASTER.md` — Orders sibling (Duty Board expansion lives there too)
 > 5. All other module proposals (Purchase / Inventory / Delivery / Payment) for cross-panel content matrix
 >
 > Live-poke `https://erp.carresofficial.com/operation?tab=purchase` for current right rail (Team · Calendar · Follow-ups · Activity).

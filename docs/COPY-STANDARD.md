@@ -204,7 +204,7 @@ name the act with a verb from the table, name the artefact with the artefact's r
 
 **This file defines WORDING only.** Action behaviour → `docs/ACTION-FLOW-STANDARD.md` ·
 a module's workflow → `docs/<MODULE>-WORKING-FLOW.md` · execution queues →
-`docs/execution-queues-index.md`. A rule lives in one document and is never copied here.
+`../CLAUDE.md`. A rule lives in one document and is never copied here.
 
 ## The delivery queue words (re-ruled by Jess 2026-07-27 — this is the only version)
 
@@ -219,7 +219,7 @@ checklist item. The list is closed; a new chat does not add a fifth:
 | 4 | `Upload delivery photo` |
 
 **Only the words live here.** What each queue holds and when it goes late are TRIGGERS and
-DUE conditions — they live in `docs/ORDERS-WORKING-FLOW.md` §3, and nowhere else (Law 0A).
+DUE conditions — they live in `orders/MASTER.md` §3, and nowhere else (Law 0A).
 This table used to carry them; C2 found the copy and it was deleted rather than kept in
 step.
 
@@ -421,7 +421,7 @@ string. `Carres Klang` never shows it: its address is derived from the own wareh
 
 ### Facet group headings (locked 2026-07-28, after P2-Claims found they had no home)
 
-The facet rail's ORDER is `docs/UI-KIT.md` §8.4; the WORDS are here. A module picks the
+The facet rail's ORDER is `ui/MASTER.md` §8.4; the WORDS are here. A module picks the
 headings it needs from this list and adds none.
 
 | Heading | What sits under it |
@@ -1042,7 +1042,7 @@ When a page sits under a module tab bar (Purchasing's `To Order / Purchase
 Orders / Receiving / Claims / Settings`), the page does NOT repeat the active tab as
 a breadcrumb or big title. **The tab is the title.** Move the freshness
 stamp (`Today · Wed 22 Jul`) and refresh icon to the right side of the
-tab bar. See `docs/UI-KIT.md` "Module-tab law".
+tab bar. See `ui/MASTER.md` "Module-tab law".
 
 ---
 

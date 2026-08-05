@@ -147,15 +147,28 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 
 ## 8 · Modules
 
-| Module | MASTER |
-|---|---|
-| **Purchasing** — buy what customers ordered and what the shelf needs | [`docs/purchasing/MASTER.md`](docs/purchasing/MASTER.md) |
-| Orders | [`docs/ORDERS-WORKING-FLOW.md`](docs/ORDERS-WORKING-FLOW.md) — *not yet a MASTER* |
-| Delivery · Service Cases · Ready Stock · Portal Core · HR · Rental | see [`docs/execution-queues-index.md`](docs/execution-queues-index.md) — *not yet MASTERs* |
+| Module | What it owns | MASTER |
+|---|---|---|
+| **Orders** | the customer's order end to end — the list, the drawer, the action engine, delay planning, the money gate | [`docs/orders/MASTER.md`](docs/orders/MASTER.md) |
+| **Purchasing** | buy what customers ordered and what the shelf needs | [`docs/purchasing/MASTER.md`](docs/purchasing/MASTER.md) |
+| **Delivery** | the delivery WORKSPACE — a view of Orders' delivery track | [`docs/delivery/MASTER.md`](docs/delivery/MASTER.md) |
+| **Stock** | on hand · in & out · ready stock · the reorder engine | [`docs/stock/MASTER.md`](docs/stock/MASTER.md) |
+| **Payment** | the collections desk | [`docs/payment/MASTER.md`](docs/payment/MASTER.md) |
+| **Service** | customer complaints after delivery | [`docs/service/MASTER.md`](docs/service/MASTER.md) |
+| **UI** | the design system, the kit, the portal shell and its right rail | [`docs/ui/MASTER.md`](docs/ui/MASTER.md) |
+| **HR** | people, commission, targets, cost | [`docs/hr/MASTER.md`](docs/hr/MASTER.md) |
+| **Rental** | rent-to-own agreements, billing and buyout | [`docs/rental/MASTER.md`](docs/rental/MASTER.md) |
 
-**Only Purchasing has been converted. The other lines still use the old shape** (a working-flow
-file plus an execution queue). **Converting one is a card, not a tidy-up**, and the rule for
-doing it is: business objects become sections, shipped cards go to git, checkpoints die.
+**Two module boundaries were MEASURED rather than assumed, and both follow the rule *use the
+business objects the repository already has*:**
+
+- **Portal Core is not a module.** Its fourteen cards were all Orders-list and Orders-drawer
+  work, so its rules live in the Orders MASTER.
+- **Inventory and Ready Stock are ONE module.** The portal has a single `Stock` door with three
+  tabs; two masters would be two names for one screen.
+
+**A module gets a folder only when it is a real operator surface with measured reality.**
+Never create an empty master for symmetry.
 
 ## 9 · The four laws that outrank anything pasted into a chat
 

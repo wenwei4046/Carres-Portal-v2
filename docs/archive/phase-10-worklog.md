@@ -3540,7 +3540,7 @@ names. COPY-STANDARD gains only the four strings this page genuinely owns: `Queu
 - **Contradicts the code:** the card's ground truth says T9-T11 speak the NEW words; the live
   labels are the old ones and the rename belongs to C1. Reported rather than forced.
 - **Would confuse a new hire:** `Delivery` has a menu item but its actions live in
-  `ORDERS-WORKING-FLOW.md` §3 — deliberate (they are the order's actions; Law 3 forbids two
+  `orders/MASTER.md` §3 — deliberate (they are the order's actions; Law 3 forbids two
   homes). A `DELIVERY-WORKING-FLOW.md` would require the Orders file to lose that section:
   Jess's call.
 - **Could not be built as written:** the proposal's prerequisite is the whole drawer lane
@@ -4055,7 +4055,7 @@ grep **0** in the live 4,414,341-byte bundle.
 (carres-portal `2fc26610` + carres-pos `71626c49`, 4 canonicals converged on the first
 poll) · Worker `8ac7c764` · worktree `card-c1-implementation-7bd64a`.
 
-Card C1 of `docs/portal-core-execution-queue.md`. Every visible action label on the Orders
+Card C1 of `orders/MASTER.md`. Every visible action label on the Orders
 list, its queues, its drawer and the Delivery module now reads **verb + named party +
 measurable object**, and the words Jess banned leave with it.
 
@@ -4285,7 +4285,7 @@ Suites at baseline: shared **1726/1726** · api **3** pre-existing · web **16**
 
 ---
 
-**2026-07-27 · Portal Core C2 — the ladder splits into two layers, and nothing hides any more** (PR #466 merge `bc92e4cc`, no migration, web `index-BYggEOBr.js` [carres-portal `19d0fbbf` + carres-pos `a8c77e64`, **all 4 canonicals converged on the first poll**, 4,426,596 bytes downloaded-then-grepped, `SERVICE_ROLE` 0] + Worker `739d4be8` — DEPLOYED from main tip `bc92e4cc`; every migration file on the tip was confirmed applied first, tracker tail **0300**. Wrangler's receipt read back `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron, and `GET /health` through the custom domain returns 200. Worktree `card-c2-implementation`) — card C2 of `docs/portal-core-execution-queue.md`: "replace `first matching rule wins` with a function that returns every open action … a separate pure function picks which one goes first", **done when an order with three open actions shows three rows; no action can be hidden by another; the drawer and the row can never disagree.**
+**2026-07-27 · Portal Core C2 — the ladder splits into two layers, and nothing hides any more** (PR #466 merge `bc92e4cc`, no migration, web `index-BYggEOBr.js` [carres-portal `19d0fbbf` + carres-pos `a8c77e64`, **all 4 canonicals converged on the first poll**, 4,426,596 bytes downloaded-then-grepped, `SERVICE_ROLE` 0] + Worker `739d4be8` — DEPLOYED from main tip `bc92e4cc`; every migration file on the tip was confirmed applied first, tracker tail **0300**. Wrangler's receipt read back `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron, and `GET /health` through the custom domain returns 200. Worktree `card-c2-implementation`) — card C2 of `orders/MASTER.md`: "replace `first matching rule wins` with a function that returns every open action … a separate pure function picks which one goes first", **done when an order with three open actions shows three rows; no action can be hidden by another; the drawer and the row can never disagree.**
 
 **The bug the card names is real and it was a whole class of invisible work.** `nextActionOf` returned on its first match, so an order with no PO, RM 2,000 owing and no logistics company printed one pill — `Send PO` — and the other two facts did not exist anywhere on screen. That is what ACTION-FLOW Law 1 retired the single ladder for.
 
@@ -4413,7 +4413,7 @@ undo a decision the manager already made.
 
 ### Reported, not fixed (Law 0)
 
-1. **`ORDERS-WORKING-FLOW.md` §5 puts the money gate on ISSUING the delivery order; the code
+1. **`orders/MASTER.md` §5 puts the money gate on ISSUING the delivery order; the code
    puts it on CONFIRMING the date.** §5: "Issuing the delivery order is the hard gate, not
    agreeing a date… Agreeing the date still WARNS about the same three." Live, the only money
    gate is `bookingConfirmGate`, which REFUSES a confirmation — C5 fixed it there and C9
@@ -5151,7 +5151,7 @@ guard already uses, and the only safeguard either session had that would have ca
 **0305 applied and verified BEFORE the merge**, Worker `611ab79f` + web `index-BIOm5Q5p.js`
 [carres-portal `7a023e62` + carres-pos `bc415c9a`, 4 canonicals ✓ first poll] — DEPLOYED)
 
-`ORDERS-WORKING-FLOW.md` §3 rules two deadlines for the delay flow and the engine carried
+`orders/MASTER.md` §3 rules two deadlines for the delay flow and the engine carried
 neither — C8 reported that and correctly invented no number:
 
 | Stage | Action | Due | Clock starts at |

@@ -265,7 +265,7 @@ FIRST read, in this order:
   docs/execution-queues-index.md     (every line, every card, what shipped)
   docs/ACTION-FLOW-STANDARD.md       (the engine law, incl. Law 0 and Law 0A)
   docs/COPY-STANDARD.md              (every visible word)
-  docs/ORDERS-WORKING-FLOW.md        (the template every module's flow file follows)
+  orders/MASTER.md        (the template every module's flow file follows)
 
 Then tell me, short:
   - which lines are complete, which cards are next, and what is blocking anything
@@ -309,7 +309,7 @@ FIRST, read these and treat them as law that outranks anything I paste:
   docs/execution-queues-index.md
   docs/<MODULE>-WORKING-FLOW.md for the module we are discussing — if that file does not
     exist yet, creating it is part of your job, in the SAME shape as
-    docs/ORDERS-WORKING-FLOW.md (sections 1-8, every action carrying its six things)
+    orders/MASTER.md (sections 1-8, every action carrying its six things)
   the queue doc for that module (from the index)
 
 Then read the conversation I paste below and answer THREE questions, in this order,

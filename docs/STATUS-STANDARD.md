@@ -1,6 +1,6 @@
 # STATUS STANDARD — dials, checklist marks, chase buttons
 
-> Companion to [`docs/UI-KIT.md`](UI-KIT.md) (the law — this file details ONE
+> Companion to [`ui/MASTER.md`](ui/MASTER.md) (the law — this file details ONE
 > subsystem: how order status renders). Locked 2026-07-17 (Jess). Code lives
 > in `OrderDetailDrawer.tsx` (`PieDial`, `CheckMark`) + `index.css`
 > (`.btn-reminder` / `.btn-chase` / `.railtab*`).
@@ -44,7 +44,7 @@ the rest.
 
 ## 3. The chase pair (every party panel's footer)
 
-> ⚠ Button colour is NOT ruled here. [`docs/UI-KIT.md`](UI-KIT.md) §3.3 owns the
+> ⚠ Button colour is NOT ruled here. [`ui/MASTER.md`](ui/MASTER.md) §3.3 owns the
 > four colour jobs and §3.6 owns action tone — tone comes from a CONDITION, never
 > from which verb it is. This section describes only the two buttons' shape.
 
