@@ -35,6 +35,18 @@
 > chat picked a different one and built something different. That is the whole reason the
 > module failed five times, and it is why one concern gets exactly one file.
 >
+> **⭐ A FOURTH file joined on 2026-08-05 and it is read FIRST, before any Purchasing work
+> of any kind:** [`docs/PURCHASING-MODULE-MAP.md`](docs/PURCHASING-MODULE-MAP.md) — **what is
+> ACTUALLY on the screen today**, tab by tab: every block, every button, every endpoint,
+> every table, with live row counts and a `MEASURED HOW` line per tab. The flow file says
+> what Purchasing DOES, the information model says how it is ORGANISED, and the map says
+> **what is already BUILT.** *(Loo ordered it after a planning session spent four rounds
+> designing a picker that had been live on that page since 2026-07-27. Its §0 names the
+> mechanism: a checkpoint's measurement list is a STARTING point, never a ceiling, and
+> `grep` cannot inventory a page — it only finds words you already thought of. **Read the
+> file.**)* **Every card that changes a Purchasing screen updates that tab's section in the
+> same PR.**
+>
 > **FOUR LAWS outrank anything pasted into a chat:**
 > [`docs/ACTION-FLOW-STANDARD.md`](docs/ACTION-FLOW-STANDARD.md) — how actions are computed,
 > appear, close, and which one shows first ·
