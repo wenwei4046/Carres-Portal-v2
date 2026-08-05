@@ -127,10 +127,10 @@ const MIN_COLUMN_PCT = 4;
  * AutoCount and Excel both separate the gutter from the data with a single
  * line.
  */
-const COLUMN_RULE = "border-r border-kit-slate-5";
+const COLUMN_RULE = "border-r border-r-kit-slate-5";
 
 /** The same line, drawn from the other side — see `COLUMN_RULE`. */
-const GUTTER_RULE = "border-l border-kit-slate-5";
+const GUTTER_RULE = "border-l border-l-kit-slate-5";
 
 /**
  * A column's Excel filter (Jess, 2026-08-01 — the AutoCount workspace: every
@@ -702,10 +702,10 @@ export default function DataTable<Row>({
             {/* Header wash = slate-3 (Jess, 2026-08-02 surface law): one step
                 above the near-white strip, always lighter than the data. */}
             {expansion && (
-              <th className="bg-kit-slate-3 border-b border-kit-slate-6" />
+              <th className="bg-kit-slate-3 border-b border-b-kit-slate-6" />
             )}
             {selection && (
-              <th className="px-2 bg-kit-slate-3 border-b border-kit-slate-6">
+              <th className="px-2 bg-kit-slate-3 border-b border-b-kit-slate-6">
                 <Checkbox
                   id="kit-table-select-all"
                   ariaLabel={selection.label}
@@ -767,7 +767,7 @@ export default function DataTable<Row>({
                  * header is `aria-roledescription`, never part of its name. */
                 aria-label={layout ? c.label : undefined}
                 aria-roledescription={layout?.reorderLabel}
-                className={`relative px-2 bg-kit-slate-3 border-b border-kit-slate-6 ${columnRule(
+                className={`relative px-2 bg-kit-slate-3 border-b border-b-kit-slate-6 ${columnRule(
                   ci,
                 )} text-label font-medium text-kit-slate-12 ${
                   layout ? "cursor-grab" : ""
@@ -852,7 +852,7 @@ export default function DataTable<Row>({
               <th
                 aria-hidden="true"
                 data-kit="table-filler"
-                className="bg-kit-slate-3 border-b border-kit-slate-6"
+                className="bg-kit-slate-3 border-b border-b-kit-slate-6"
               />
             )}
           </tr>
@@ -882,7 +882,7 @@ export default function DataTable<Row>({
               /* The late bar rides the row's FIRST cell, whichever that is
                * today — a disclosure column would otherwise have pushed the
                * one mark that says "act now" out of the reader's way. */
-              const lateBar = late ? "border-kit-red-9" : "border-transparent";
+              const lateBar = late ? "border-l-kit-red-9" : "border-l-transparent";
               // A header is emitted whenever the key CHANGES from the row
               // above — so the PAGE's sort decides where groups begin and the
               // kit re-orders nothing of its own.
@@ -1006,15 +1006,15 @@ export default function DataTable<Row>({
           <tfoot className={`sticky bottom-0 ${Z_TABLE_FOOTER}`}>
             <tr className="h-10" aria-label={totals.label} data-kit="data-totals">
               {expansion && (
-                <td className="bg-kit-slate-3 border-t border-kit-slate-6" />
+                <td className="bg-kit-slate-3 border-t border-t-kit-slate-6" />
               )}
               {selection && (
-                <td className="bg-kit-slate-3 border-t border-kit-slate-6" />
+                <td className="bg-kit-slate-3 border-t border-t-kit-slate-6" />
               )}
               {ordered.map((c, ci) => (
                 <td
                   key={c.key}
-                  className={`px-2 bg-kit-slate-3 border-t border-kit-slate-6 ${columnRule(
+                  className={`px-2 bg-kit-slate-3 border-t border-t-kit-slate-6 ${columnRule(
                     ci,
                   )} text-kit-slate-12 ${c.align === "right" ? "text-right" : ""} ${
                     c.numeric ? "tabular-nums" : ""
@@ -1027,7 +1027,7 @@ export default function DataTable<Row>({
                 <td
                   aria-hidden="true"
                   data-kit="table-filler"
-                  className="bg-kit-slate-3 border-t border-kit-slate-6"
+                  className="bg-kit-slate-3 border-t border-t-kit-slate-6"
                 />
               )}
             </tr>

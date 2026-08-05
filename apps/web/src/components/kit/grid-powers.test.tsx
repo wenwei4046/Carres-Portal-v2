@@ -143,7 +143,7 @@ describe("row expand", () => {
   it("moves the late bar onto the disclosure cell — the first cell still carries it", () => {
     render(<DataTable {...base} expansion={expansion([])} rowLate={(r) => r.id === "1"} />);
     const firstRow = document.querySelector('[data-kit="data-row"]')!;
-    expect(firstRow.querySelector("td")!.className).toContain("border-kit-red-9");
+    expect(firstRow.querySelector("td")!.className).toContain("border-l-kit-red-9");
   });
 });
 
@@ -584,7 +584,7 @@ describe("P17 · a data grid carries column separators", () => {
       expect(cells[1]!.className).not.toMatch(RULE); // checkbox
       // The gutter's boundary is the FIRST DATA column's left border — the
       // same pixel, paid for by a column that has room.
-      expect(cells[2]!.className).toMatch(/border-l border-kit-slate-5/);
+      expect(cells[2]!.className).toMatch(/border-l border-l-kit-slate-5/);
     }
   });
 
@@ -592,8 +592,8 @@ describe("P17 · a data grid carries column separators", () => {
     render(<DataTable {...base} />);
     // No control column ⇒ column 0 IS the table's left edge, and it is also the
     // cell carrying the 2px late bar. Two claims on one border is a fight.
-    expect(headCells()[0]!.className).not.toMatch(/border-l border-kit-slate-5/);
-    expect(rowCells()[0]!.className).not.toMatch(/border-l border-kit-slate-5/);
+    expect(headCells()[0]!.className).not.toMatch(/border-l border-l-kit-slate-5/);
+    expect(rowCells()[0]!.className).not.toMatch(/border-l border-l-kit-slate-5/);
   });
 
   it("leaves the LAST cell unruled — the edge belongs to the wrapper, not to a cell", () => {
@@ -603,14 +603,49 @@ describe("P17 · a data grid carries column separators", () => {
     expect(rowCells().at(-1)!.className).not.toMatch(RULE);
   });
 
+  /**
+   * THE CASCADE BUG THIS CARD SHIPPED ONCE AND CAUGHT ON PRODUCTION.
+   *
+   * Tailwind's `border-{color}` sets border-color on ALL FOUR SIDES, so a cell
+   * carrying both `border-kit-slate-6` (for its bottom edge) and the column
+   * rule's colour had ONE of them win by stylesheet order — not by the class
+   * attribute's order. Measured live on the first deploy: every header cell
+   * drew its column rule in slate-6, and on a page with no control gutter the
+   * first column drew it in `transparent` (the late bar's own all-sides
+   * colour), so the line was INVISIBLE on Receiving.
+   *
+   * Per-side colour utilities cannot collide. jsdom has no Tailwind cascade to
+   * measure, so the invariant is asserted structurally — which is the form
+   * that would have caught it.
+   */
+  it("colours every border PER SIDE, so no two edges can fight over one property", () => {
+    render(
+      <DataTable
+        {...base}
+        selection={SELECTION}
+        expansion={EXPANSION}
+        rowLate={(r) => r.id === "1"}
+        totals={{ label: "Totals", cell: () => null }}
+      />,
+    );
+    const cells = [...document.querySelectorAll("th, td")];
+    expect(cells.length).toBeGreaterThan(0);
+    for (const c of cells) {
+      for (const cls of c.className.split(/\s+/).filter(Boolean)) {
+        // `border-<colour>` with no side letter paints all four edges.
+        expect(cls).not.toMatch(/^border-(kit-[a-z]+-\d+|transparent)$/);
+      }
+    }
+  });
+
   it("draws it in ONE token — slate-5, the row hairline's own value", () => {
     render(<DataTable {...base} selection={SELECTION} expansion={EXPANSION} />);
     for (const c of [...headCells(), ...rowCells()]) {
       if (!RULE.test(c.className)) continue;
-      expect(c.className).toMatch(/border-r border-kit-slate-5/);
+      expect(c.className).toMatch(/border-r border-r-kit-slate-5/);
       // NOT `divider` (slate-6). That is the head's own bottom edge, and a
       // column line drawn in it changes colour at the header.
-      expect(c.className).not.toMatch(/border-r border-kit-slate-6/);
+      expect(c.className).not.toMatch(/border-r border-r-kit-slate-6/);
     }
   });
 

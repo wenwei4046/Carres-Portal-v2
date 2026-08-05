@@ -492,7 +492,10 @@ describe("an overdue row says so on the row", () => {
 
     const bars = [...document.querySelectorAll('[data-kit="data-row"] td:first-child')];
     expect(bars.length).toBeGreaterThan(0);
-    for (const b of bars) expect(b.className).toContain("border-kit-red-9");
+    // P17 spells the bar's colour PER SIDE (`border-l-…`): an all-sides
+    // `border-kit-red-9` also painted the cell's new column rule red, and its
+    // `border-transparent` twin painted it invisible. Same bar, same red.
+    for (const b of bars) expect(b.className).toContain("border-l-kit-red-9");
 
     // Swap to the first upcoming run — NOT overdue, same table, no red.
     fireEvent.click(screen.getByTestId("to-order-overdue"));
@@ -500,8 +503,8 @@ describe("an overdue row says so on the row", () => {
     const calm = [...document.querySelectorAll('[data-kit="data-row"] td:first-child')];
     expect(calm.length).toBeGreaterThan(0);
     for (const b of calm) {
-      expect(b.className).toContain("border-transparent");
-      expect(b.className).not.toContain("border-kit-red-9");
+      expect(b.className).toContain("border-l-transparent");
+      expect(b.className).not.toContain("border-l-kit-red-9");
     }
   });
 });
