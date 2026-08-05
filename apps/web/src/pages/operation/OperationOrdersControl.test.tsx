@@ -12,6 +12,7 @@ import OperationOrdersControl, {
   slackDays,
   logisticStateOf,
   rowDotsOf,
+  isImportedArchive,
 } from "./OperationOrdersControl";
 import type {
   StockInfo,
@@ -2560,5 +2561,157 @@ describe("Actions column · +N and the delivering FACT (C3)", () => {
     // …and the drawer's dynamic checklist is EMPTY: one fewer row, not a row
     // nobody can act on.
     expect(journey.openActions).toEqual([]);
+  });
+});
+
+// ── C13 · the imported archive is not work ───────────────────────────────────
+//
+// Loo, 2026-08-04, measured on prod: 37 of 37 Overdue orders were the AutoCount
+// archive and not one of the 28 real orders was late, so the page showed a day's
+// work that does not exist.
+//
+// The fixture below carries BOTH provenances and puts an overdue order on each
+// side, which is the only shape that can tell "the archive is excluded" apart
+// from "everything overdue is excluded".
+describe("The imported archive is excluded from WORK, never from the record (C13)", () => {
+  const inDays = (n: number) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  };
+
+  /** A queue row renders `{label}{count}` with no separator, so `Overdue1`
+   *  gives `\b1\b` no boundary to find. Read the trailing number instead. */
+  const queueCount = (el: HTMLElement) =>
+    Number((el.textContent ?? "").match(/(\d+)\s*$/)?.[1] ?? NaN);
+
+  // 1 native overdue · 2 archive overdue · 1 native due next week.
+  // Prod's own shape in miniature — the archive is the majority of the misses.
+  const MIXED: operationOrderListRow[] = [
+    makeRow({
+      id: "n-late",
+      so: 2001,
+      customer_name: "Real Late",
+      delivery_date: inDays(-2),
+    }),
+    makeRow({
+      id: "a-late-1",
+      so: 2002,
+      customer_name: "Archive One",
+      source_system: "autocount",
+      source_ref: ["CR0001"],
+      delivery_date: inDays(-9),
+    }),
+    makeRow({
+      id: "a-late-2",
+      so: 2003,
+      customer_name: "Archive Two",
+      source_system: "autocount",
+      source_ref: ["CR0002"],
+      delivery_date: inDays(-30),
+    }),
+    makeRow({
+      id: "n-soon",
+      so: 2004,
+      customer_name: "Real Soon",
+      delivery_date: inDays(8),
+    }),
+  ];
+
+  beforeEach(() => {
+    listHookState = {
+      data: { orders: MIXED },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+  });
+
+  it("isImportedArchive reads source_system and nothing else", () => {
+    expect(isImportedArchive(makeRow({ id: "x", so: 1, source_system: "autocount" }))).toBe(true);
+    expect(isImportedArchive(makeRow({ id: "x", so: 1, source_system: null }))).toBe(false);
+    // A row that is late, unpaid and ancient is still not archive — provenance
+    // is the ONLY test, so nothing else on the row can be mistaken for it.
+    expect(
+      isImportedArchive(makeRow({ id: "x", so: 1, delivery_date: inDays(-99) })),
+    ).toBe(false);
+  });
+
+  it("Overdue counts the real order only — 1, not 3, in BOTH of its homes", () => {
+    wrap(<OperationOrdersControl />);
+    // `Overdue` is deliberately rendered twice — the QUEUES row and the
+    // DEADLINE bucket share `dueEntries` (the file's own comment: "same state").
+    // Asserting over both at once is what proves they cannot drift apart.
+    const overdues = screen.getAllByRole("button", { name: /^Overdue/ });
+    expect(overdues).toHaveLength(2);
+    // 1 = the native miss. 3 = what the page said before this card.
+    for (const b of overdues) expect(queueCount(b)).toBe(1);
+  });
+
+  it("the DELIVERY group skips the archive too — ONE filter reaches every count", () => {
+    wrap(<OperationOrdersControl />);
+    // All FOUR fixture rows carry no logistics company, so this queue is the
+    // sharpest reading available: 4 without the filter, 2 with it. `unassigned`
+    // is a DIFFERENT memo from `dueEntries`, which is the point — the card's
+    // rule is that ONE filter in `liveScope` reaches every count, not that
+    // Overdue was patched by hand.
+    const grp = within(screen.getByTestId("filter-delivery"));
+    const noLogistics = grp.getByRole("button", { name: /No logistics picked/ });
+    expect(queueCount(noLogistics)).toBe(2);
+  });
+
+  it("the LOGISTICS facet reads the same scope — a third independent memo", () => {
+    wrap(<OperationOrdersControl />);
+    const grp = within(screen.getByTestId("filter-logistic"));
+    // `logisticEntries` buckets every open order by carrier; with none picked,
+    // the no-carrier row holds the 2 real orders and neither archive row.
+    const counts = grp
+      .getAllByRole("button")
+      .map(queueCount)
+      .filter((n) => !Number.isNaN(n));
+    expect(counts.length).toBeGreaterThan(0);
+    // 3 or 4 is only reachable by counting an archive row as work.
+    for (const n of counts) expect(n).toBeLessThanOrEqual(2);
+  });
+
+  it("the archive rows are STILL in the table — readable, openable, searchable", () => {
+    wrap(<OperationOrdersControl />);
+    // All four rows render. Excluded from WORK, never hidden from the record.
+    expect(rowsBySo().sort()).toEqual(["2001", "2002", "2003", "2004"]);
+    expect(screen.getByText("Archive One")).toBeInTheDocument();
+    expect(screen.getByText("Archive Two")).toBeInTheDocument();
+  });
+
+  it("clicking Overdue returns exactly the order the count promised", () => {
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(
+      within(screen.getByTestId("filter-deadline")).getByRole("button", {
+        name: /^Overdue/,
+      }),
+    );
+    // The portal's own law: a facet must never print a number its own click
+    // cannot produce. 1 on the pill → 1 row on the click.
+    expect(rowsBySo()).toEqual(["2001"]);
+  });
+
+  it("the page says out loud what it left out", () => {
+    wrap(<OperationOrdersControl />);
+    const note = screen.getByTestId("orders-archive-note");
+    expect(note).toHaveTextContent(
+      "2 imported archive orders are not counted in the queues",
+    );
+  });
+
+  it("no archive on file → no sentence (it disappears at go-live by itself)", () => {
+    listHookState.data = { orders: MIXED.filter((o) => !isImportedArchive(o)) };
+    wrap(<OperationOrdersControl />);
+    expect(screen.queryByTestId("orders-archive-note")).toBeNull();
+    // …and the real work is untouched: the one genuine miss still counts.
+    for (const b of screen.getAllByRole("button", { name: /^Overdue/ }))
+      expect(queueCount(b)).toBe(1);
   });
 });
