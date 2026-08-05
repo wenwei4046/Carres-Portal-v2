@@ -591,6 +591,182 @@ queue, not a flow with two holes in it.
   leave data, which nothing tracks yet; when HR grows leave records, this becomes a card
   across orders-assign + R7 + S-line in one move).
 
+## R9 · One claim, one outcome — and a button that splits it
+
+**Lane: ④ RECEIVING & SUPPLIER CLAIM · `supplier_claims` + `supplier-claim.ts` +
+`supplier-scorecard.ts` + the Claims screen. Amends R3 and R5; answers R4's carry-forward.**
+
+**LOO RULED IT 2026-08-05: option A — a claim holds ONE outcome. Two outcomes are two
+claims.** He did not choose it for simplicity:
+
+> **AutoCount is already A.** Its `Cancel Purchase Order` · `Goods Return` · `Purchase Return`
+> are three independent documents, and **no object in it holds more than one outcome.**
+> *"换 2 退 1"* in AutoCount is two documents. The team already works this way.
+
+**THE ONE REAL OBJECTION IS ANSWERED ON THE SCORECARD SIDE, NOT THE MODEL SIDE — that is the
+whole shape of the ruling.** The cost of A is that splitting one problem into two documents
+inflates any number that counts DOCUMENTS, and those numbers are what we take to a supplier
+negotiation. Fixing that in the model (by letting one claim hold two outcomes) is expensive
+and permanent; fixing it in the counter is cheap. **So the counter changes.**
+
+### The three conditions, all binding — none is optional
+
+**① R5 counts PROBLEM PO LINES, never claim documents.** One line of goods with a problem is
+**one occurrence**, however many claims close it. Concretely, and measured against the shipped
+code:
+
+- `ScorecardClaim` today carries `po_id` and **not** `po_line_id`, and `claimRate` keys on
+  `claimedPoIds` — a Set of distinct **POs**. It gains `po_line_id` and re-keys to distinct
+  problem **LINES**.
+- **The claim STATS move with it or the fix is half done.** `claims.open` must count distinct
+  lines with an open claim, and the settle-time average must measure **per line, to the LAST
+  claim on that line closing** — a line is not settled while one of its two halves is open.
+  Leaving these on claim rows would let a split turn one slow settlement into two fast ones.
+- **`supplier_claims.po_line_id` is `ON DELETE SET NULL` (0288), so a claim can have no
+  line.** Such a claim cannot be attributed to one and **may not be silently dropped**: count
+  it BY NAME, the way R5 already names a PO with no `eta_date` (*"that one is ours, not the
+  supplier's"*).
+
+**② The split is a BUTTON on the claim screen.** One press on *"this one ends two ways"* turns
+one claim into two and divides the quantity. **An operator is never told to go and open a
+second claim by hand** — that is the same failure as C1's second receiving door: a workflow
+that exists only in somebody's head is a workflow half the team does differently.
+
+**③ The A → B upgrade path is written down now, while it is free.** If the business ever needs
+one claim to hold many outcomes, every existing claim becomes **one child row: outcome copied,
+quantity equal to the whole claim.** That is one row per claim even with real data on file —
+**A is cheap to reverse, and the card says so rather than letting a later chat call it
+irreversible.**
+
+### `Cancel PO` leaves the outcome list — `Cancel Outstanding` replaces it
+
+**Loo, 2026-08-05, answering the question this lane asked twice and nobody answered.**
+Cancelling a whole purchase order is a **PO-level** act; one claim, which is about one line,
+cannot hold it. The outcome is **`Cancel Outstanding`** — *cancel only the quantity on THIS
+line that has not arrived.* The business consequence is unchanged: the customer did not get
+the goods, so **the demand returns to To Order.**
+
+> ⚠️ **THIS CONTRADICTS A FROZEN RULE AND THE CONTRADICTION IS DELIBERATE — do not "fix" it
+> back.** `PURCHASING-WORKING-FLOW.md` §9 says, frozen 2026-07-28: *"There is no cancelled
+> quantity, and purchasing does not model a cancellation … stopping is the whole PO … never a
+> quantity typed onto a line."* **Loo's 2026-08-05 ruling overrides it**, and §9 must be
+> updated in the same PR or the next chat will read the old sentence and revert this.
+>
+> **§9's ACTUAL objection is avoidable, and the builder should avoid it.** Its reason is that a
+> per-line cancelled quantity *"would put a policy decision into an arithmetic column."*
+> **P12 / migration 0321 already solved that exact shape**: cancelling a demand writes NO
+> cancelled-quantity column — it stamps `cancelled_at` and lets the GENERATED `remaining_qty`
+> FREEZE, so the remainder *is* the record of what was cancelled. **Do the same here**: stop
+> the line, do not type a number into it. Then §9 loses its objection instead of losing its
+> argument.
+
+**The returning demand keeps its ORIGINAL required-by date and will land straight in
+`Overdue`. That is correct and it is not a bug.** The goods really are late — they were due,
+they did not come, and the purchase was cancelled. **Written down here on purpose**, because
+in three months this looks exactly like a date-defaulting bug and somebody will "repair" it.
+
+### What the builder must reconcile BEFORE writing code
+
+**The live model has no `resolution` field at all**, and this card must not add a third one
+beside two that already exist. Measured on `packages/shared/src/supplier-claim.ts`:
+
+| field | meaning | options |
+|---|---|---|
+| `requested_action` | what WE asked for | `Replace · Deliver missing parts · Deliver correct item · Repair · Return for inspection · Deliver remaining` |
+| `supplier_response` | what the SUPPLIER answered | `Replacement · Deliver remaining · Repair · Return & replace · Reject · Other agreement` |
+
+**The `Resolution` list this ruling edits was designed in the planning chat and is NOT in the
+repository.** So step 1 is to state, in the PR, which of these three it is: a rename of
+`supplier_response`, a THIRD field recording what actually happened, or a replacement for
+both. **R3 froze the two-field design for a stated reason** (*"what we wanted vs what we got is
+analysable"*, and the ask FREEZES once answered), so a third field must argue against that
+sentence rather than ignore it. **If it needs Loo, ask once — do not guess.**
+
+### Also closed by this card
+
+**R4's carry-forward `hold-resolution-is-per-claim-not-per-unit`** is the same problem from
+the stock side: `ops_stock_resolve_hold` moves EVERY held unit of a claim to ONE outcome, so
+*"supplier took 2 back, we scrapped 1"* cannot be recorded. **Under A that is correct
+behaviour, not a limitation** — it is two claims, and the split button is how you get there.
+The CF's proposed `p_item_ids` narrowing is therefore **not** the fix; mark it closed by
+ruling, and say so in the CF rather than deleting it.
+
+**Done when.** A claim carries exactly one outcome and the type makes a second one
+unrepresentable · the split button turns one claim into two with the quantity divided, and no
+screen tells an operator to open a claim by hand · R5's claim rate, open count and settle
+average are all keyed on the problem LINE, and a split provably does not move any of them
+(assert it: two claims from one line read the same as one) · a claim with a NULL `po_line_id`
+is counted by name, never dropped · `Cancel Outstanding` replaces `Cancel PO`, cancels only
+the undelivered quantity of its line, and returns the demand to To Order · §9 is updated in
+the same PR · the A → B upgrade path is in the card.
+
+**Timing — Loo ruled it explicitly: NOW.** Live today: **0 claims** (re-verify before
+building). There is no real data to migrate, which is the cheapest this change will ever be.
+
+**Must NOT.** ❌ let one claim hold two outcomes · ❌ leave R5 counting claim documents ·
+❌ make the operator open the second claim themselves · ❌ type a cancelled quantity into an
+arithmetic column — freeze the remainder, 0321's shape · ❌ default the returning demand to a
+new required-by date to keep it out of Overdue · ❌ invent a word: every outcome label needs a
+COPY-STANDARD row, and `Cancel Outstanding` does not have one yet — **stop and ask Loo** ·
+❌ touch the Receiving queue model (its own CF reserves it for the Receiving workstream).
+
+---
+
+## R10 · `PURCHASING-WORKING-FLOW.md` §9 says something the code does not do
+
+**Lane: ④ · DOCS ONLY. No migration, no api, no UI.** Small, and it is a LAW file, so it gets
+its own card rather than riding R9 — one concern, one file.
+
+**Loo ruled it a real defect, 2026-08-05: *"一份会误导人的文件比没有文件糟。"*** It is on this
+card because **it already misled a chat in this lane** — the §9 formula was read as the live
+rule and the live rule is different.
+
+**Measured 2026-08-05.** §9 publishes this ladder:
+
+```
+Part received     0 < received_qty < po_qty
+Fully received    received_qty >= po_qty
+Balance owed      po_qty − received_qty
+```
+
+`poReceivingProgress` (`packages/shared/src/po-receiving.ts`, the function the screens
+actually render from) computes:
+
+```
+fully_received      ordered > 0 && received >= ordered
+receiving_issue     damaged + wrong_item > 0        ← §9 HAS NO SUCH STATE
+partially_received  received > 0
+in_transit          otherwise
+```
+
+**Four disagreements, each checkable:**
+
+1. **`Receiving issue` does not exist in §9 at all**, and in the code it is the SECOND rung —
+   it OUTRANKS `partially_received`. A line with 5 of 10 received and 1 damaged reads
+   `Receiving issue` on screen and `Part received` by §9's formula.
+2. **§9's `Part received` condition is necessary but not sufficient.** The code tests
+   `fully_received` first and `receiving_issue` second, so the published formula selects rows
+   the screen does not.
+3. **`Balance owed` can go negative in §9's arithmetic and cannot in the code**, which clamps
+   per line (`min(qty, received_qty)`) precisely so a stray over-receipt cannot make the total
+   read as more than ordered.
+4. **§9 says *"the unit is the PO line"* while `poReceivingProgress` sums ACROSS lines and
+   returns ONE state for the whole PO.** Both statements are defensible; together they are how
+   a reader concludes the line-level formula drives the PO-level pill.
+
+**Build.** Correct §9 to what the code does — **the code is the authority here, because it is
+what the operator sees.** State the four-rung ladder with its PRECEDENCE (the order is the
+rule), keep the stored-quantity table, keep the clamp, and say plainly which numbers are
+per-line and which are per-PO.
+
+**Done when.** §9 and `po-receiving.ts` agree rung for rung · the precedence is written as an
+ORDER, not a set · a reader can tell per-line from per-PO without opening the code.
+
+**Must NOT.** ❌ change any code to match the document — this card moves the document ·
+❌ silently drop §9's frozen rulings that are still true (the two status axes · no `Draft` ·
+`Open` never on screen) · ❌ fold R9's `Cancel Outstanding` amendment in here; that one ships
+with R9, in R9's PR.
+
 ## Status
 
 | Card | Status | PR |
@@ -603,3 +779,5 @@ queue, not a flow with two holes in it.
 | R6 | ✅ | [#490](https://github.com/wenwei4046/Carres-Portal-v2/pull/490) · 0301 + 0302 |
 | R7 | ✅ the Receiving design, Phase 1 — **docs + architecture only, NO migration** · RE-CUT by Loo 2026-07-29, so **it is no longer GRN duty auto-assign — that rotation is still REQUIRED and belongs to Administration / Work Assignment** (§3.16) | [#515](https://github.com/wenwei4046/Carres-Portal-v2/pull/515) |
 | R8 | ✅ | [#499](https://github.com/wenwei4046/Carres-Portal-v2/pull/499) · no migration |
+| R9 | ⬜ **one claim, one outcome — and a button that splits it** (Loo 2026-08-05, option A). AutoCount is already A: `Cancel Purchase Order` / `Goods Return` / `Purchase Return` are three documents and none holds two outcomes. **Three binding conditions:** R5 counts problem PO **LINES**, not claim documents (a split may not pollute a negotiation number) · the split is a **BUTTON** on the claim screen, never "go open a second claim" · the A→B upgrade path is written in the card (one row per claim, outcome copied, qty = whole). **`Cancel PO` leaves the outcome list for `Cancel Outstanding`** — line-level, undelivered qty only, demand returns to To Order **and lands in Overdue, correctly**. ⚠️ **Overrides `PURCHASING-WORKING-FLOW.md` §9's frozen no-per-line-cancellation rule — §9 updates in the same PR.** Build NOW: 0 claims live. Closes the R4 CF `hold-resolution-is-per-claim-not-per-unit` **by ruling** | — |
+| R10 | ⬜ **§9 says something the code does not do** — DOCS ONLY. §9 publishes a 2-rung ladder; `poReceivingProgress` runs 4 rungs where **`Receiving issue` outranks `partially_received` and §9 does not have that state at all**; §9's `Balance owed` can go negative and the code clamps; §9 says the unit is the LINE while the function returns one state per PO. **It has already misled a chat in this lane.** The code is the authority — the document moves | — |
