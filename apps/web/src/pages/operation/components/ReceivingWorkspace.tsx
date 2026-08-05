@@ -3,12 +3,9 @@ import {
   caseProductCategory,
   poLineReportable,
   poReceivingProgress,
-  purchasingActionButton,
-  purchasingActionQueue,
   receiveLineClaimProblems,
   wrongItemClaimTypesFor,
   RECEIVE_LINE_CLAIM_PROBLEM_TEXT,
-  type PurchasingOpenCall,
 } from "@carres/shared";
 import { fmtDateShort } from "@/lib/fmt-date";
 import {
@@ -21,7 +18,6 @@ import {
 import DOFileUploadField from "@/components/DOFileUploadField";
 import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
 import { DOC_BTN, DOC_TH, DocSection as Section, Prop } from "./workspace-doc";
-import RecordSupplierAnswerModal from "./RecordSupplierAnswerModal";
 
 /**
  * ReceivingWorkspace — Slice B, the Office Receiving Workspace for ONE PO.
@@ -97,17 +93,12 @@ export default function ReceivingWorkspace({
   po,
   supplier,
   warehouseName,
-  calls,
   receiving,
   onReceiving,
 }: {
   po: operationPoListRow;
   supplier: SupplierRow | undefined;
   warehouseName: string;
-  /** P3's open supplier calls for THIS PO, computed once by the page — the
-   *  Current Action column and these buttons read the same array, so a queue
-   *  word and its button can never disagree. */
-  calls: PurchasingOpenCall[];
   /** Receiving Mode is the PAGE's state, because it decides the whole stage:
    *  the listing steps aside and the workspace takes the screen. */
   receiving: boolean;
@@ -117,9 +108,6 @@ export default function ReceivingWorkspace({
   const progress = poReceivingProgress(lines);
   const supplierName = supplier?.name ?? po.supplier_id;
   const receivingQ = usePoReceiving(po.id);
-  const [answerFor, setAnswerFor] = useState<
-    { kind: "tomorrow" | "balance"; poLineId?: string } | null
-  >(null);
 
   return (
     <div className="px-4 py-4" data-testid="receiving-workspace">
@@ -136,22 +124,10 @@ export default function ReceivingWorkspace({
           supplierName={supplierName}
           warehouseName={warehouseName}
           onStart={() => onReceiving(true)}
-          calls={calls}
-          onAnswer={(kind, poLineId) => setAnswerFor({ kind, poLineId })}
           events={receivingQ.data?.events ?? []}
           loadingEvents={receivingQ.isLoading}
           outstanding={progress.ordered - progress.received}
           progress={progress}
-        />
-      )}
-
-      {answerFor && (
-        <RecordSupplierAnswerModal
-          kind={answerFor.kind}
-          po={po}
-          supplierName={supplierName}
-          poLineId={answerFor.poLineId}
-          onClose={() => setAnswerFor(null)}
         />
       )}
     </div>
@@ -165,8 +141,6 @@ function ReadMode({
   supplierName,
   warehouseName,
   onStart,
-  calls,
-  onAnswer,
   events,
   loadingEvents,
   outstanding,
@@ -176,8 +150,6 @@ function ReadMode({
   supplierName: string;
   warehouseName: string;
   onStart: () => void;
-  calls: PurchasingOpenCall[];
-  onAnswer: (kind: "tomorrow" | "balance", poLineId?: string) => void;
   events: ReceivingEvent[];
   loadingEvents: boolean;
   outstanding: number;
@@ -246,44 +218,14 @@ function ReadMode({
           </div>
         )}
 
-        {/* P3's two supplier calls. They were row buttons before Slice B; the
-            row is a DataTable cell now, so they live where the PO's work
-            lives. Every open call is shown, never just the top one — Law 1:
-            one action may not suppress another, and a PO delivered short can
-            genuinely carry its balance call AND its next tomorrow call at
-            once. Order is §4's: tomorrow, then balance. */}
-        {calls
-          .filter((a) => a.key === "confirm_tomorrows_delivery")
-          .map((a) => (
-            <button
-              key={a.key}
-              type="button"
-              onClick={() => onAnswer("tomorrow")}
-              title={purchasingActionQueue("confirm_tomorrows_delivery")}
-              data-testid={`receiving-tomorrow-${po.id}`}
-              className={`mt-2 ml-2 text-label py-1.5 px-3 ${
-                a.late ? "btn-danger" : "btn-secondary"
-              }`}
-            >
-              {purchasingActionButton("confirm_tomorrows_delivery")}
-            </button>
-          ))}
-        {calls
-          .filter((a) => a.key === "confirm_balance_delivery_date")
-          .map((a) => (
-            <button
-              key={a.poLineId}
-              type="button"
-              onClick={() => onAnswer("balance", a.poLineId)}
-              title={`${a.sku} · ${purchasingActionQueue("confirm_balance_delivery_date")}`}
-              data-testid={`receiving-balance-${a.poLineId}`}
-              className={`mt-2 ml-2 text-label py-1.5 px-3 ${
-                a.late ? "btn-danger" : "btn-secondary"
-              }`}
-            >
-              {purchasingActionButton("confirm_balance_delivery_date")}
-            </button>
-          ))}
+        {/* P3's two supplier calls STOOD HERE UNTIL Q14 (2026-08-05) and this
+            page may not grow them back. Loo's role-anchor: work done by ASKING
+            THE SUPPLIER for something is the buyer's, work done by HANDLING THE
+            GOODS is Receiving's — so both calls, and both their doors, are
+            Purchase Orders'. The tomorrow call had a SECOND door here writing
+            the same endpoint as the register's; the balance call had its ONLY
+            one, which is why the register's had to be built before these came
+            out. Their home is the row expand on `OperationPurchaseOrders`. */}
       </Section>
 
       <Section title="Items">
