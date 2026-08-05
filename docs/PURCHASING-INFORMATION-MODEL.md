@@ -24,11 +24,16 @@
 > **FROZEN 2026-07-29 by Loo.** This is the ONE home for how the Purchasing module organises
 > information. It is read before any Purchasing work — layout, copy, or code.
 >
-> **IT NOW COVERS TWO WORKSPACES (Loo, 2026-08-04).** §1–§11 are **To Order**, frozen
-> 2026-07-29 and unchanged. **§12 is Purchase Orders**, frozen 2026-08-04. They share this
+> **IT NOW COVERS THREE WORKSPACES (Loo, 2026-08-04 · 2026-08-05).** §1–§11 are **To Order**,
+> frozen 2026-07-29 and unchanged. **§12 is Purchase Orders**, frozen 2026-08-04. **§13 is
+> Receiving**, ruled 2026-08-05 (card Q12) and written to be read BESIDE §12. They share this
 > file rather than getting one each, because the rule directly below — *there is no third
 > Purchasing master document and none may be created* — is still in force, and because §12's
 > date dictionary is portal-wide and would otherwise have two homes.
+>
+> **§13 is architecture only.** The Receiving FORM — its fields, its gates, its photos, its
+> posting flow and its timeline — belongs to the Receiving module by Loo's own split, and
+> nothing in §13 designs it.
 >
 > It does not repeat: the module's actions and their six things →
 > [`docs/PURCHASING-WORKING-FLOW.md`](PURCHASING-WORKING-FLOW.md) · the action MODEL →
@@ -334,9 +339,9 @@ Stated in §3 · E/F. Repeated here because it is the rule most likely to be los
 ## 7 · The workspace boundary
 
 **→ The boundary rule is `docs/PURCHASING-WORKING-FLOW.md` §1.** It is a cross-module
-workflow boundary, so the workflow file owns it whole: the deadline-anchor rule, the list of
-which action lives on which tab, and why the plain-language "goods are not yet secured"
-sentence is an explanation rather than the rule.
+workflow boundary, so the workflow file owns it whole: the **role-anchor** rule (ruled
+2026-08-05 — asking the supplier is the buyer's, handling the goods is Receiving's), the list
+of which action lives on which tab, and the one case it leaves open.
 
 **Why this model needs it at all:** the boundary is what decides the CONTENTS of this
 workspace. Everything §1–§6 organises is the work the boundary assigns to To Order; the
@@ -447,7 +452,7 @@ phase.
 
   What crosses OUT of this workspace, and what decides it:
      a requirement leaves the moment a PO exists          → Purchase Orders · Receiving
-     which ACTION sits on which tab is the deadline-anchor boundary
+     which ACTION sits on which tab is the role-anchor boundary
                                         → PURCHASING-WORKING-FLOW.md §1 (not restated here)
 ```
 
@@ -856,3 +861,162 @@ footer    totals band
 - **`purchase_orders.sup_status` is `pending` on all 21.** `Pending` is a banned display word.
 - **One sofa is split across two purchase orders** (`SO-1204` · `1207` · `1208` · `1211`), and
   nothing on the register can show that two PO numbers are one customer's one sofa.
+
+---
+
+# §13 · THE RECEIVING WORKSPACE — the four tiers, RULED 2026-08-05 by Loo (card Q12)
+
+> **Read beside §12, never instead of it.** §12 is the Supplier Execution Register; §13 is the
+> Receiving Workspace. They are the same SHAPE — list · expand · panel — and they answer
+> different questions, and the whole point of putting them next to each other is that a chat
+> can see which fact belongs to which.
+>
+> **This section is ARCHITECTURE only, by Loo's own split (2026-08-05):** *what the page is
+> for, and which fact goes in the Row, the Expand, the Panel or the Form* is the Purchasing
+> workflow's. **The Receiving Form itself — the DO number, the damage photos, the posting
+> flow, the timeline — is the RECEIVING module's**, and nothing here designs it.
+
+## 13.1 · Workspace mission
+
+**Receiving is the Goods Custody Workspace.** It answers exactly one question:
+
+> **Goods have turned up — what physically came, and does the record now match the floor?**
+
+§12.1's register asks *where has the supplier got to*; §13 asks *what is in my hands*. The line
+between them is `PURCHASING-WORKING-FLOW.md` §1's role-anchor rule, and after the 2026-08-05
+ruling this workspace carries **exactly one action of the module: `Check in`.**
+
+**What that ruling took OFF this page** — `Confirm tomorrow's delivery` and
+`Confirm balance delivery date`. Both are phone calls to a factory about goods that have not
+arrived, both are owned by the PO-duty holder, and both now live on Purchase Orders.
+
+## 13.2 · The four tiers
+
+**Loo's draft, confirmed with two corrections** — the corrections are marked and each carries
+its evidence. The tier tests are §12.7.5's, reused deliberately: two workspaces of one module
+may not sort facts by two different questions.
+
+| Tier | The test it must pass | What lives there |
+|---|---|---|
+| **ROW** | *Is it ONE value for the whole PO, and does it help me decide whether to start on this one?* | supplier · PO No. · Supplier DO No. (once counted) · items preview · `Received n / m` · the queue's own state |
+| **EXPAND** | *Is it a LINE-level fact I need to read across MANY purchase orders in one pass?* **READ-ONLY.** | per line: which item · `Ordered` · `Received` · **`Remaining`** · what is held or in exception |
+| **RIGHT PANEL** | *Is it the RECORD of this PO's receiving — what has happened to it here?* | `Receiving Summary` · `Items` · `Exceptions` · `Activity`. **No Communication band** |
+| **FORM** | *Is somebody writing what physically came?* **The one and only writing surface.** | Receiving Mode: `Supplier DO No.` · `Goods Received At` · `Signed DO photo` · `Receive now` per line · damage / wrong-item · `Save Receiving` |
+
+### Correction 1 — the RIGHT PANEL takes NO Communication band
+
+Loo's draft read *`RIGHT PANEL Summary · Timeline · Communication`*. **`Communication` is
+struck**, and this is the one correction that would have re-created the defect Q12 was written
+to close.
+
+- Phase 3 froze it on 2026-08-03: **"Communication starts from the DOCUMENT"**, and the
+  document is the purchase order. §12.7.5 puts Communication · Timeline · Files · Notes · Print
+  in the REGISTER's Activity panel.
+- After the role-anchor ruling, every action that talks to a supplier is Purchase Orders'. A
+  Communication band on Receiving would be a second door to the supplier from the tab that,
+  by the rule just written, does not talk to suppliers.
+- **Measured 2026-08-05: Receiving has no Communication band today** — its pane holds
+  `Receiving Summary` · `Items` · `Exceptions` · `Activity`. So this is a fence, not a repair:
+  it stops one being added later on the strength of Loo's own draft line.
+
+**`Activity` is not `Timeline` and the words are not interchangeable.** Receiving's `Activity`
+is the receiving sessions and their events — what this workspace did. The register's `Timeline`
+is what the supplier did. COPY-STANDARD already rules `No receiving activity yet.` for the
+empty state, and it is deliberately not `Nothing received yet` (Jess, 2026-08-03).
+
+### Correction 2 — the EXPAND must print `Remaining`, and today nothing does
+
+Loo's draft asks for *Ordered / Received / Remaining*. Measured 2026-08-05: the panel's `Items`
+block prints `Ordered` and `Received` and a `Total` row, and **prints no per-line remainder at
+all** — a PO-level outstanding exists in `Receiving Summary`, but a line's is left as
+subtraction.
+
+COPY-STANDARD's own Receiving Workspace rule already forbids that: *"Outstanding is PRINTED,
+not left as `5 − 3`. An operator should never subtract to learn what is still owed."* The rule
+was written for the summary and the same reason binds the line. **The word is the one already
+ruled — `Outstanding` — and `Remaining` is Loo's draft language for the same fact, not a
+second word to add to the dictionary.**
+
+*(Building it is the Receiving module's. §13 states the requirement; it does not draw it.)*
+
+### Why an EXPAND is justified here at all
+
+§12.7.4's frozen test — *build the expand when the operator must read a fact that lives on the
+LINE, across MANY documents, in one pass* — and Receiving passes it for the same reason
+Purchase Orders did, with a different fact:
+
+```
+"Which lines, across all my open POs, are still short?"
+  → the row can only say `Received 12 / 35` for a whole PO
+  → the panel can only answer for one PO at a time
+```
+
+**The expand is READ-ONLY here, and that is the difference from §12.** On Purchase Orders the
+expand edits, because each fact there is ONE value the operator types or picks — a date, a
+destination. On Receiving the writing is a FORM of several fields with a gate on it (a DO
+number, a signed photo, a count per line), which is §12.7.5a's own third row: *a form of
+SEVERAL fields → an explicit Save*. **That is why Receiving has a fourth tier and Purchase
+Orders has three** — not because receiving is more important, but because its write cannot be
+expressed as an inline field.
+
+### The FORM is a MODE, not an overlay — and it is the ONE writing surface
+
+Already shipped as `Read Mode → Start Receiving → Receiving Mode → Save → Posted` (Slice B,
+2026-08-03). §12.7.5's **rule 3, ONE editing surface**, therefore holds on this workspace by
+construction: the row reads, the expand reads, the panel reads, the form writes. Nothing else
+on this tab may grow a write.
+
+**`Start Receiving` is a PRIMARY ACTION and never a section** (COPY-STANDARD, locked
+2026-08-03). It is not a fifth tier and it is not an action of the module — `Check in` is the
+action; `Start Receiving` is the button that opens the surface that closes it.
+
+## 13.3 · What the ruling does to `Current Action`
+
+The `Current Action` column on Receiving could take exactly three values, computed in
+`OperationReceiving.tsx` from the engine's open calls first and `Check in` second:
+
+```
+Confirm tomorrow's delivery        ← leaves: Purchase Orders' work
+Confirm balance delivery date      ← leaves: Purchase Orders' work
+Check in                           ← stays
+```
+
+**With the two calls gone the column has one possible value, and the queue the row is already
+sitting in says it.** A column whose only content is the name of the list it is in carries no
+information, and §12.3's own law applies: an action column may be empty, but a column that can
+only ever say one thing is not an action column.
+
+**This section does not delete the column** — that is a screen change and the Receiving module
+owns the screen. It records what the boundary decided, so that whoever opens that page next is
+not re-arguing it from the words.
+
+## 13.4 · What §13 deliberately does NOT decide
+
+1. **The Receiving Form's design** — fields, layout, gates, photos, posting. Loo's split.
+2. **The queue model.** `To Receive` / `Goods Received` is **Jess's ruling of 2026-08-03** and
+   it stands; **no `GRN` tab may ever be added**, because GRN is a DOCUMENT of Receiving.
+   *(Measured 2026-08-05, and the carry-forward that raised it is out of date: the page already
+   ships her two queues, and the four progress words — `Receiving issue` · `Partially received`
+   · `In transit` · `Fully received` — are already demoted to a facet group inside the work
+   queue, which is exactly what that carry-forward asked for.)*
+3. **`To receive` and `In transit` are NOT merged.** Both read 21 today and they are different
+   facts: a part-received PO leaves `In transit` and stays in `To receive`. Merging them on
+   today's numbers would delete a distinction the first real delivery creates.
+4. **`Check in` is not renamed.** Loo confirmed the word on 2026-08-05 and it already carries
+   all five strings in COPY-STANDARD.
+
+## 13.5 · The measured facts §13 rests on
+
+| Fact | Measured |
+|---|---|
+| `warehouse_receipts` = **0** · `receiving_events` = **0** — no receiving has ever happened | 2026-08-05 |
+| part-received lines = **0** · short lines = **0** · lines with any receipt = **0** of 35 | 2026-08-05 |
+| purchase orders arriving tomorrow = **0**, so neither departing call fires today | 2026-08-05 |
+| 21 purchase orders, all `open`; `supplier_claims` = **0** | 2026-08-05 |
+| Receiving's pane holds Summary · Items · Exceptions · Activity — **no Communication band** | 2026-08-05 |
+| the panel's `Items` block prints no per-line remainder | 2026-08-05 |
+
+**Nobody has disproved any of this with use, and that is stated rather than hidden.** Every
+queue on that page is uniform because nothing has ever arrived. §13 is therefore an
+architecture ruling made BEFORE the first delivery — which is the right time to make it, and
+the reason it must be revisited the week real goods start landing.
