@@ -19,7 +19,10 @@
 - **GRN station is LIVE**: `OperationReceiving.tsx` (待收 queue: To receive / Received /
   All) + `ReceivePOModal` (per-line tick + DO upload + signed checkbox →
   `operation_receive_po_with_do` RPC; `ops_stock_items` incoming→free + stock_balances).
-  GRN scope = goods INTO Carres Klang only (AL/HOUZS goods tracked by Stock Location).
+  **GRN scope = goods ACCEPTED BY OR ON BEHALF OF CARRES** — `docs/RECEIVING-INFORMATION-MODEL.md`
+  §1.1, ruled by Loo 2026-08-05. *(This line used to read "goods INTO Carres Klang only". It was
+  a PLACE rule and it is deleted, not annotated: AL and HOUZS are not warehouses, yet goods are
+  accepted there for Carres, so the old wording said those goods were received by nobody.)*
 - Multi-DO partial pickup already exists on the supplier→ops side (0107-0111 era).
 - Supplier claim CONCEPT does not exist yet — that is what R2+ builds.
 - Money rule (Jess, locked): **supplier claims never produce a Credit Note** — credit
@@ -581,6 +584,239 @@ would be a queue chat naming a business that has not spoken.
 first, they get their five strings in COPY-STANDARD, and only then does a tile appear.
 Until then the single named step is correct and complete on its own — one action with a
 queue, not a flow with two holes in it.
+
+## R9 · R10 · R11 — the three things a Receiving row has no door to (Loo, 2026-08-05)
+
+**He asked for the row `⋯` menu and named its contents. The menu is D9 (kit).
+These are the three items that go IN it, and each is a feature, not a menu
+entry.** Until at least two exist, D9 wires nothing on this tab.
+
+**All three are already FROZEN in `docs/RECEIVING-INFORMATION-MODEL.md`** — §4
+(the five statuses) and §6.1 (the Event Payload Dictionary). **No chat may
+redesign them here; these cards implement what is already ruled.**
+
+### R9 · The GRN prints
+
+**NO migration.** The 2990s master is `apps/backend/src/lib/grn-pdf.ts`; the
+Carres shape is `docs/pdf/PO-PDF-STANDARD.md`, already used by the PO document
+(PR #557). **Measured 2026-08-05: `grep -rl grn apps/api/src apps/web/src/lib`
+returns NOTHING — Carres has no GRN document of any kind.** It is the 2990s
+audit's gap #2, still open: *"Operator receives goods with no audit trail."*
+
+**Prints NO RM**, same law as the PO (Loo, 2026-07-28). It prints what the
+supplier and the warehouse both need to agree on: GRN No. · Goods Received At ·
+Supplier · PO No. · Supplier DO No. · the lines with received / damaged / wrong ·
+who counted it.
+
+### R10 · Void
+
+**Migration.** `warehouse_receipts` gains `void_by / at / reason`; a `voided`
+event is appended. **The reversibility invariant is already law** (model §4):
+a Posted Session may be reversed ONLY while every received unit is still
+reversible — allocated, sold, delivered, transferred or consumed units BLOCK it
+and the operator is sent to the inventory correction flow, which this card does
+NOT design. Void exists only for Posted; an unsubmitted Draft is discarded.
+
+**This is the expensive one and it must not be bundled with R9.** It reverses
+stock through the engine, so it needs its own rolled-back dry run and its own
+negative control.
+
+### R11 · Amend — ADD ONLY
+
+**Migration** (the `amended` event's payload: `reason` + `changes[]`).
+Model §4, frozen: it exists only for Posted, only for goods that were
+**physically in the SAME delivery** and got left off the record. **Allowed:**
+add a quantity · add evidence · add a note. **Refused:** reduce a quantity ·
+swap an item · change the PO · change the supplier DO identity. Those are
+recording errors and go `Void → recreate`.
+
+**2990s does this and it is worth copying:** `GrnFromPo` with `?appendToGrn=`
+pulls more PO lines into a POSTED GRN. Same idea, but Carres's rule is stricter
+by design — theirs can append any line, ours only what came on the same truck.
+
+**Order: R9 → R11 → R10.** R9 is a document and touches no stock; R10 moves
+stock backwards and is the only one that can hurt.
+
+## R12 · The portal stops losing work and stops staying silent (Loo, 2026-08-05)
+
+> **His words:** *"i found all our tabs dont have further action and no undo?
+> what we can built now"* — after asking what Gmail and Google Sheets do.
+
+**Measured 2026-08-05, and the numbers are why this card exists:**
+
+```
+`undo`         in the WHOLE app: ONE feature — the POS cart (CartDrawer.tsx)
+               Purchasing · Receiving · Orders: ZERO
+`beforeunload` in the WHOLE app: ZERO. Nothing warns before a half-typed form dies
+sonner toasts  154 files use them
+               OperationReceiving · OperationToOrder · OperationPurchaseOrders ·
+               OperationSupplierClaims: **0 each**
+```
+
+**The tool is already installed everywhere and Purchasing uses none of it.**
+`sonner` already supports `action: { label, onClick }` — the POS proves it.
+
+### ⚠️ UNDO IS NOT VOID, and confusing them would break Law 8
+
+| | What it means | Where it is legal |
+|---|---|---|
+| **Undo** | it never happened; nothing downstream saw it | ONLY before the act becomes a business record |
+| **Void** (R10) | it happened, we reversed it, **both are on the record** | after posting — and the reversibility invariant applies |
+
+**A posted Receiving Session may never carry an `Undo`.** It has booked stock,
+may have minted a supplier claim, and has written a `posted` event to an
+append-only ledger. Gmail can un-archive because archiving is private and
+reversible; receiving goods is neither.
+
+### ① The form stops dying — the biggest one, and it is cheap
+
+`ReceivingMode` holds the count, the DO number, the date and the note in React
+state and **nothing else**. Reload, a stray back-button, a closed laptop → all
+of it is gone, with no warning. An operator counting five lines loses five lines.
+
+**Two mechanisms, both standard:**
+- the draft is written to `sessionStorage` as it is typed and restored on mount —
+  **2990s already does exactly this** (`grnNewDraft`), and Google Docs/Sheets
+  made it the expectation
+- `beforeunload` while a count is in progress, so the browser asks first
+
+**Restoring must be VISIBLE, never silent** — a line saying the draft was
+restored and offering to discard it. A form that silently refills itself is how
+yesterday's count gets posted as today's.
+
+### ② Every act says what happened
+
+Four Purchasing pages, zero toasts. Saving a receiving — the act that books
+goods into stock — currently just closes Receiving Mode and says **nothing**.
+
+Each act gets its done message, and the words already exist: `docs/COPY-STANDARD.md`
+carries a done message for every action in the dictionary. **No new word.**
+
+### ③ `Undo` only where the act is genuinely reversible
+
+Legal today: `Cancel Purchase` (P12) · a destination change · a filter clear.
+**Not legal:** anything that has posted.
+
+**A toast's `Undo` is not a substitute for a confirm on an irreversible act,
+and it is not a licence to remove one.** The rule stays: reversible → act now,
+offer Undo, no dialog. Irreversible → ask first.
+
+### What is NOT in this card, and why
+
+- **Ctrl+Z, multi-step (Sheets)** — a spreadsheet edits cells in one document;
+  this portal writes records to a server. There is no stack to walk back.
+- **Version history (Sheets)** — Receiving already has it and it is stronger:
+  `receiving_events`, append-only, per session (model §6). Nothing to copy.
+- **Undo Send's delay-then-send trick** — it works because Gmail holds the mail
+  back. Holding a receive back would mean stock is wrong for those seconds.
+
+**Order: ① → ② → ③.** ① is the one that loses real work today.
+
+## R13 · `In transit` → `Not received` (Loo, 2026-08-05 — RULED)
+
+**Lane: ④ R. Web + `packages/shared`. NO migration. ONE word.**
+
+**The ruling and the reason are already law** — `docs/COPY-STANDARD.md`, "The
+Receiving rail's progress words". This card only makes the code match it. Do
+not re-argue the word.
+
+### What to touch
+
+```
+packages/shared/src/po-receiving.ts     the `label` for state `in_transit`
+                                        → "Not received"
+apps/web/src/pages/operation/OperationReceiving.tsx:181   the rail's label
+```
+
+**The state KEY `in_transit` does NOT change.** It is an identifier, not a word
+(`01-design-tokens` §0: *"A label is presentation; the identifier is the
+contract"*). Renaming it churns the API payload, the tests and the URL for a
+word nobody reads.
+
+### The trap this card exists to avoid
+
+**`In transit` is live in TWO other modules and is CORRECT in both.** A
+find-and-replace breaks them:
+
+| Where | Why it is right there |
+|---|---|
+| `PartnerDashboard.tsx` · `PartnerFactoryPickupsPage.tsx` | `in_transit` = `sup_status` is `picked_up` or `shipped` — **the partner pressed it.** The evidence Receiving lacks, this one has |
+| `FinanceAP.tsx:18` | a payment bucket. A different concept that happens to share a string |
+
+**Grep both directions, and report the count that STAYS.** A PR that leaves
+zero `In transit` in the repo has broken two correct screens.
+
+### DONE WHEN
+
+- The Receiving rail reads `Not received` on production. **Measured today it
+  will read `Not received 21`.**
+- `In transit` still greps > 0 — the partner and finance sites, named in the PR.
+- The shared label change means **`apps/api` must be checked for an import of
+  `po-receiving`**; if it imports it, a Worker deploy is owed (CLAUDE.md §13.1's
+  rule: measure the api diff against the LIVE Worker's source commit).
+- A test asserts the rail word, and a negative control puts `In transit` back
+  and fires.
+
+## R14 · The page stops deciding Receiving by PLACE (Loo, 2026-08-05 — RULED)
+
+**Lane: ④ R. The boundary is already law** — `docs/RECEIVING-INFORMATION-MODEL.md`
+§1.1. This card makes the code match it. **Do not re-argue the definition.**
+
+### The live code that contradicts the ruling — measured 2026-08-05
+
+`apps/web/src/pages/operation/OperationReceiving.tsx:259-278`, its own comment:
+
+> *"GRN scope: goods INTO an OWN warehouse only. LP-owned warehouses (HOUZS
+> Balakong, OHANA) never hit a Klang GRN"*
+
+```js
+hasLpWarehouse ? notCancelled.filter(p => warehouseById.get(p.warehouse_id)?.owning_partner_id == null) : notCancelled
+```
+
+**It decides Receiving by WHO OWNS THE PLACE.** Under §1.1 that is the wrong
+question: a partner-owned location that accepts goods for Carres **is**
+Receiving. The filter is dormant today (one warehouse, `owning_partner_id`
+null), so **nothing on screen changes** — but it fires the day a 3PL location
+is added, and it would silently hide real receiving work.
+
+### What the boundary reads instead — and it is NO NEW COLUMN
+
+**Loo, 2026-08-05, correcting this card's first draft:**
+
+> *"Do not add a boolean like 'accepts goods on behalf of Carres' to
+> `purchasing_destinations`. Receiving responsibility is a business capability,
+> not a destination property. A destination answers WHERE goods go. Receiving
+> answers WHO accepted the goods. Keep those two concepts separate."*
+
+So the filter is **replaced, not re-pointed**, and what replaces it is §1.2's
+coverage rule, which needs nothing that does not already exist:
+
+```
+a destination may be received into
+  ⇔ it maps to a real `warehouses` record
+```
+
+Today that resolves to **Carres Klang and nothing else** — measured: one
+warehouse record, and `purchasing_destinations` holds 3 rows
+(`Carres Klang` default · `AL Sungai Buloh` · `HOUZS`). **The day multi-location
+inventory lands, the same condition admits AL and HOUZS by itself**, with no
+edit to this rule and no edit to §1.1.
+
+**`owning_partner_id` may not be read for this.** Ownership and acceptance are
+different facts — a partner can own a shed and still accept for us — and
+inferring one from the other is exactly how the current filter got it wrong.
+
+### Why AL is refused today, and it is NOT "AL has no stock yet"
+
+**Loo's reason, and it is stronger than the one this card first gave:** booking
+an AL receipt against the only warehouse record we have would record it as
+**Klang stock**. That is **false inventory**, and false inventory is worse than
+a capability we do not yet offer — it is copied into planning, into reorder
+alerts and into what a store promises a customer.
+
+**So this card refuses AL, and it must say WHY on screen rather than hiding the
+PO.** A silently missing row teaches an operator that the work does not exist.
+The word for that state is not ruled — **stop and ask before inventing one.**
 
 ## LATER
 

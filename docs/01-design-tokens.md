@@ -224,14 +224,42 @@ Validated 2026-07-31: the kebab is `overflow`, and `more` does not exist.
 |---:|---|
 | button-sm / md / lg | 32 / 40 / 48 |
 | input-sm / md / lg | 32 / 40 / 48 |
-| **row-compact** | **40 — the portal's table row** |
+| **row-compact** | **32 — the portal's table row** |
 | row-default | 48 |
 | row-comfortable | 56 |
 | badge-height | 24 |
 
-**Rows are 40px FIXED and content adapts to the row, never the reverse.**
-Cells clip their own overflow and ellipsis-truncate. Validated on the Purchase
-Order Items table, 2026-07-31.
+**Rows are 32px FIXED and content adapts to the row, never the reverse.**
+Cells clip their own overflow and ellipsis-truncate.
+
+### 7.1 The row is 32, and 32 is not a new number
+
+**Ruled by Loo, 2026-08-05** (card D8), after the density question was measured
+rather than argued. It replaces the 40 validated on 2026-07-31 and it does NOT
+reopen his 2026-08-04 ruling — that one refused **28px**, and it refused it for
+a reason this change keeps: *"no token is changed to imitate another product."*
+
+| | |
+|---|---|
+| **32** | SAP Fiori's **Compact** density (`2rem`), the desktop mouse-and-keyboard row. Also already this file's `button-sm` and `input-sm` — so the value is reused, not invented |
+| **28** | 2990s' own CSS (`~28px row height, fs-12 body`) and AutoCount's WinForms lineage. **Refused**: it needs the body type dropped to 12 to breathe, which is a SECOND token change, and it is the density Carres was told not to imitate |
+
+**Measured on production before the ruling, at the real chrome heights**
+(module header 45 · table header 40 · footer 40 = 126 fixed):
+
+| viewport | 40px | **32px** |
+|---|---:|---:|
+| 1366×768 laptop | 13 rows | **16** |
+| 1920×1080 | 21 rows | **26** |
+| 2560×1440 | 30 rows | **37** |
+
+**The body type does NOT change.** `text-body` stays 13px/18, so a 32px row
+carries 7px above and below the line box.
+
+**The floor is the control, not the text.** Measured live: `DataTable`'s
+disclosure button is **24 × 24** inside a 35px column. 32 leaves it 4px of
+vertical slack; anything below 28 does not fit at all. A row height may never
+be chosen without measuring the tallest control the row has to hold.
 
 ---
 
@@ -255,7 +283,18 @@ Order Items table, 2026-07-31.
 
 ## 9 · Accessibility
 
-Minimum touch target 40px · keyboard focus required · WCAG AA contrast.
+**Minimum interactive target 24 × 24 CSS px** (WCAG 2.2 AA, 2.5.8) · keyboard
+focus required · WCAG AA contrast.
+
+**Corrected 2026-08-05 with the row ruling (§7.1).** This line read *"minimum
+touch target 40px"*, which is a TOUCH figure — it was stricter than the standard
+it cited and it would have refused the 32px row on a page nobody taps. The
+portal is a desktop mouse-and-keyboard product; a phone or tablet surface, if
+one is ever built, sets its own floor there and does not move this one.
+
+A table ROW is not the target — the control inside it is. `DataTable`'s
+disclosure button is 24 × 24 and clears the standard exactly; a control that
+cannot reach 24 grows its hit area with padding rather than shrinking the rule.
 
 **Every overlay opens by keyboard.** Verified by test rather than assumed: a
 Radix trigger opens on `Enter`, and jsdom has no `PointerEvent`, so a click-only

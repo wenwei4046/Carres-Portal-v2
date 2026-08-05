@@ -607,6 +607,46 @@ do not take the five-string shape.
 | `No receiving activity yet.` | Activity empty state | **Never `Nothing received yet`** (Jess, 2026-08-03) — that reads as *the goods have not come*, which is a different fact and usually a false one. What is empty is the RECORD. |
 | `Open in Claims` | Exceptions section | A DOOR, never a form. The claim already exists; the receive that recorded the problem opened it. |
 
+### The Receiving rail's progress words (locked by Loo, 2026-08-05)
+
+**His ruling, in his own words:**
+
+> *"`In transit` 表示货已经在运输途中。如果系统没有证据证明供应商已经发货，
+> 就不应该使用这个状态。改成 `Not received`。"*
+
+**This is Law 8 (the Observation Law) applied to a STATE word**, and it is the
+first time that law has been stated for a state rather than for a record:
+
+> **A state word may not claim an outside-world fact the portal has not
+> observed.** `In transit` claims a lorry is moving. Measured 2026-08-05: it
+> was showing on **21 of 21** purchase orders while `expected_ready_date` was
+> **NULL on all 21** — nobody had told us anything at all.
+
+| The word | What it means | |
+|---|---|---|
+| **`Not received`** | nothing has been counted in against this PO | replaces `In transit`, which claimed shipment we had no evidence of |
+| `Partially received` | some good units are in, the rest are still owed | unchanged |
+| `Fully received` | every unit ordered has been counted in | unchanged |
+| `Receiving issue` | something arrived damaged or wrong and good units are still owed | unchanged |
+
+**These four are the Receiving tab's rail and the PO row's progress. They are
+not Operation Status** (`Issued` · `In Production` · `Receiving` · `Completed` ·
+`Cancelled`), which answers a different question and keeps its own five words.
+
+**THE RENAME IS SCOPED, AND THE SCOPE IS THE RULING ITSELF.** `In transit` is
+live in two other places and **both are correct there**, because both have the
+evidence Receiving lacks:
+
+```
+Partner portal   in_transit = sup_status 'picked_up' | 'shipped'
+                 — the partner PRESSED it. Evidence exists. KEEP.
+Finance AP       a payment bucket, a different concept entirely. KEEP.
+```
+
+A blanket sweep of the string would break two screens that are telling the
+truth. **Rename the word where the evidence is missing, never the string
+wherever it appears.**
+
 ### Receiving and supplier-exception words (locked 2026-07-27)
 
 One vocabulary for every module that waits on a supplier. Never invent a synonym.

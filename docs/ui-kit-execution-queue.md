@@ -57,6 +57,7 @@ deliverable is Foundation Components, not a better document.
 | **D6** | Orders list: 7 bands → 3 (11 rows → 14-15 visible) | ⏳ — **also carries the `.t4-*` legacy migration** (PM, 2026-07-29). D2 found a SECOND retired ramp: 9 classes, **44 in-scope uses across 8 files**, invisible to rule D because a page writes only the class name while the size and weight sit in `index.css`. **`.t4-hero-num` is `20px/700`** and `lib/design-standard.ts:132` records that 700, so a §2.2-dead weight still renders. Ruled **Reported Only for D2**: it is a visual change on a money figure and belongs with the pages when they migrate. **D6 owns the DEFINITIONS and the mirror's `weight: 700`** |
 | **D0.5d** | **`DataTable` grows the grid powers AutoCount has and we do not** — row expand · resize · reorder · footer totals. **Kit only, additive only.** Full card below | ✅ **BUILT 2026-08-04** — 3 of 5 shipped as optional props; **layout memory REFUSED by §0.4** (a business decision, named below) and **the record bar ALREADY EXISTS** in `PageShell.footer` + `chips`. No page migrated |
 | **D7-Claims** | **Supplier Claims renders through `DataTable`** — the last hand-rolled `<table>` in Purchasing. Full card below | ✅ **SHIPPED 2026-08-05, PR #612 `2a10599b`, deployed.** 43/43 tests pass UNTOUCHED · rendered words BYTE-IDENTICAL · guard `G` 687 → 686. Two findings below |
+| **D8** | **The table row becomes 32px** — Fiori Compact. One token, six grids, no page redesign. Full card below | ⬜ **RULED by Loo 2026-08-05 (option A), not built.** `01-design-tokens` §7 + §7.1 + §9 already carry the ruling |
 | **D7+** | Delivery · Purchase · Receiving · Stock · Service · Payments · Catalog — one card each | ⏳ — whichever of these owns a file still writing `.t4-*` retires it there, so the last card to migrate does not inherit the ramp's deletion |
 
 **Order is not negotiable for D0.5 → D6.** Rebuilding a page before the
@@ -1814,6 +1815,181 @@ one job — removing the button would delete a column the card forbids removing,
 **no row was verified on production, because production holds 0 claims**: the 40px row, the
 inline second-line facts and the expand panel are proved by the 43 page tests, not by the live
 screen, and that split is stated rather than blurred.
+
+---
+
+## D8 · The table row becomes 32px (Loo, 2026-08-05 — option A)
+
+**Lane: UI-KIT. Kit + tokens only. NO migration. NO page redesign. NO business rule.**
+
+> **His question, and it is the reason this card is small:** *"28px should we
+> review to start at 28px? are we too height? … i might consider to tighter."*
+> **He was offered 32 / 28 / keep 40 with the measurements and chose 32.**
+
+### What is already decided — do not re-open
+
+The value, the reason, the measurements and the accessibility correction are
+**already written into `docs/01-design-tokens.md` §7 · §7.1 · §9**. That file is
+the law; this card only makes the code match it. A build chat that re-argues 28
+vs 32 has taken a decision Loo already made.
+
+Three things that ruling deliberately does NOT change:
+
+- **`text-body` stays 13px/18.** Dropping to 12 to "fit" is a second token
+  change and it is exactly what makes 28 look like AutoCount.
+- **His 2026-08-04 ruling stands.** It refused **28** and refused imitating
+  another product; 32 is Fiori Compact and is already `button-sm` in §7.
+- **No column, word, width or layout moves.** If a page looks different beyond
+  its row height, the card was exceeded.
+
+### What to touch
+
+```
+docs/01-design-tokens.md              ✅ DONE — §7 · §7.1 · §9 already ruled
+apps/web/src/components/kit/tokens.ts   the mirror — a token changed in one and
+                                        not the other is a token that does not exist
+apps/web/src/components/kit/DataTable.tsx
+      `[&_td]:h-10`  → the 32px class      (rows)
+      `<tr className="h-10">` ×2           (header row · totals band)
+      the `h-9` group-header band          re-measured against 32, not assumed
+```
+
+**Everything else follows for free**, and that is the whole reason this card is
+cheap: To Order · Purchase Orders · Receiving · Claims · Report all render
+through the same `DataTable`. **Measured 2026-08-05 in a real browser on
+production: all five tabs are 40px / 13px / 40px header today** — one component,
+five pages, no page-local row height to hunt.
+
+### DONE WHEN
+
+- Every Purchasing grid measures **32px** rows in a real browser on production —
+  not in jsdom, which has no heights.
+- **0 clipped elements**, measured the way P17 measured them. The floor is the
+  **24 × 24 disclosure button**, which has 4px of slack at 32.
+- The type is untouched: body still computes **13px / 18px**.
+- Column widths are **byte-identical** to today's measured set — Q7's nine
+  (`96 · 87 · 83 · 94 · 135 · 135 · 140 · 206 · 192`), D7-Claims' eight
+  (`150 · 111 · 181 · 154 · 147 · 194 · 368 · 134`), Receiving's seven
+  (`88 · 104 · 104 · 150 · 104 · 72 · auto`). **A row-height card that moves a
+  width has changed something nobody approved.**
+- Page horizontal scroll still **0** everywhere.
+- The expand cell keeps its exemption — it is the one cell allowed to be taller.
+
+### The one real cost, named rather than discovered
+
+**Every test and every §17.1 deploy record that asserts `40px` goes red.** That
+is dozens of assertions across the Purchasing suites and it is ENGINEERING, not
+a business question — CLAUDE.md §13.1. Fix them, do not ask about them, and do
+not baseline around them.
+
+**Do not "fix" a test by loosening it to `>= 32`.** The number is the point: a
+row that can be any height is the silent row-grower the 40px law was written to
+kill. Assert 32 exactly.
+
+### What this buys, measured before the ruling
+
+Chrome above the rows is **126px fixed** (module header 45 · table header 40 ·
+footer 40), measured live.
+
+| viewport | 40px today | **32px** |
+|---|---:|---:|
+| 1366×768 laptop | 13 rows | **16** |
+| 1920×1080 | 21 rows | **26** |
+| 2560×1440 | 30 rows | **37** |
+
+**Honest scope of the win: today it buys nothing.** Measured 2026-08-05 —
+To Order 6 rows · Purchase Orders 21 · Receiving 21 · Claims 0, and 1080p holds
+exactly 21 at 40px, so **no Purchasing tab scrolls vertically today.** The
+ruling is for the 500-orders-a-month target, and it is taken now because six
+grids share one component and the change is one token; at twenty pages it is not.
+
+---
+
+## D9 · The row gets a `⋯` menu — and it is NOT a right-click menu (Loo, 2026-08-05)
+
+**Lane: UI-KIT. Kit + wiring. NO migration.**
+
+> **He asked for the right-click menu AutoCount and 2990s have, and then asked
+> for the four items I said were missing** — *"i want built this now & apply all
+> purchasing tab."*
+
+### Right-click is REFUSED and the alternative is what ships
+
+| | |
+|---|---|
+| **right-click menu** | invisible — nothing on screen says it exists · fights the browser's own menu · has no keyboard equivalent · **GitHub · Linear · Gmail · Shopify · Fiori: none of them use one.** It is WinForms lineage, which is the thing Carres was told not to imitate (CLAUDE.md §13.2) |
+| **row `⋯`** | visible · keyboard-reachable · **already in the kit** — `DropdownMenu` (D0.5b) and the `overflow` icon (§6). Same power, discoverable |
+
+**A menu with one item is not a menu.** A tab wires `rowActions` only when it has
+**two or more** actions that WORK today; until then the row keeps its inline
+control. A tab that would render a one-item menu ships nothing — asserted.
+
+### What to touch
+
+```
+apps/web/src/components/kit/DataTable.tsx     new OPTIONAL prop `rowActions?(row) => Action[]`
+                                              renders a trailing `⋯` cell, fixed width, never
+                                              inside a business column. Absent prop = today's
+                                              markup byte-identical (the D0.5d rule)
+```
+
+An action is `{ label, onSelect, disabled?, danger? }`. **The kit renders the
+menu and owns none of the words** — every label comes from the page and must
+already exist in `docs/COPY-STANDARD.md`.
+
+### What each tab wires — measured 2026-08-05, only what EXISTS
+
+| Tab | Items that work today | Verdict |
+|---|---|---|
+| **Purchase Orders** | `Print PDF` (live since Q10) · `Copy message` / `Open WhatsApp` (the Communication band) · `Cancel` (`purchase_orders.status='cancelled'` exists) | **wire** — three real items |
+| **To Order** | `Cancel Purchase` (P12, live) | **do NOT wire** — one item. Q6 already refused extra powers on this page; a menu holding one button is worse than the button |
+| **Claims** | `Close` (R3, live) | **do NOT wire** — one item |
+| **Receiving** | nothing but `open`, which the row click already does | **do NOT wire until R9 · R10 · R11 land** (Print GRN · Void · Amend, receiving queue). Then it has three and earns the menu |
+
+**This is §13.3 applied, not caution.** *"Will this make the operator finish
+faster today?"* — on Purchase Orders yes, three doors that today take a click
+into the panel. On the other three, no.
+
+### DONE WHEN
+
+- `⋯` renders on Purchase Orders rows and opens by mouse AND by keyboard
+  (jsdom has no `PointerEvent` — open it with `Enter`, D0.5b's lesson).
+- A grid passing no `rowActions` renders markup **byte-identical** to today.
+- **No right-click handler exists anywhere in the kit** — asserted, so nobody
+  adds one later "to match AutoCount".
+- Every label greps to a row in `docs/COPY-STANDARD.md`.
+- Column widths unchanged; the `⋯` cell is its own fixed column, like the
+  disclosure gutter (§5.1 — the gutter pays for no separator).
+
+---
+
+## D10 · The kit's `notify()` can carry an `Undo` (Loo, 2026-08-05)
+
+**Lane: UI-KIT. One function signature. NO migration.**
+
+**Measured 2026-08-05:** `apps/web/src/components/kit/Toast.tsx` exports
+`notify(kind, message)` and nothing else — **no action slot**. Meanwhile
+`sonner` (154 files) already supports `action: { label, onClick }`, and the POS
+cart is the ONE place in the whole app that uses it (`CartDrawer.tsx:166`).
+
+So the portal already knows how to offer an Undo, in one feature, through a
+door the kit does not expose. Every other page reaching for one would either
+bypass the kit or invent its own toast.
+
+```
+notify(kind, message, action?: { label: string; onClick: () => void })
+```
+
+**The label is the PAGE's word and must be in `docs/COPY-STANDARD.md`** — the
+kit renders it and rules none of it. `Undo` itself needs its dictionary row
+before it appears outside the POS cart.
+
+**One item only.** A toast is a passing sentence, not a menu; two actions in a
+disappearing strip is a decision nobody has time to read.
+
+**It does not license removing a confirm dialog.** Reversible → act, then offer
+Undo. Irreversible → still ask first. The 21 confirm sites measured today are
+not this card's to sweep.
 
 ---
 

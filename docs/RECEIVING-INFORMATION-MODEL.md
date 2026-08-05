@@ -19,6 +19,145 @@ first (Manual); the Warehouse takes over on its own login when trusted.
 Whether a submission needs Review is decided by the SUBMITTER's permission,
 never by the module as a whole.
 
+### 1.1 · THE BOUNDARY — what makes something a Receiving Session (Loo, 2026-08-05)
+
+```
+A Receiving Session exists when
+GOODS ARE ACCEPTED BY OR ON BEHALF OF CARRES.
+
+Warehouse location is IMPLEMENTATION.
+Acceptance responsibility is the BUSINESS RULE.
+```
+
+**The question is never "where did the goods go". It is "who accepted them on
+Carres's behalf".**
+
+| The real case | Accepted by / for Carres? | Receiving Session |
+|---|---|---|
+| Supplier → **Carres Klang** | our own people count it | ✅ |
+| Supplier → **AL Sungai Buloh · HOUZS** | Carres people, or a party Carres appointed | ✅ |
+| Supplier → **the customer's home** | nobody from Carres touches it | ❌ |
+
+**This REPLACES "goods arriving at a Carres warehouse", and the two are not the
+same definition.** The old one asked about a PLACE, and it was already wrong in
+practice: **AL and HOUZS are not warehouses** (`PURCHASING-WORKING-FLOW` §3,
+Loo 2026-07-28 — Carres owns exactly one warehouse record) and goods are
+nevertheless accepted there on Carres's behalf. Under the old definition those
+goods were received by nobody.
+
+**Why this one is written to last.** A place-based rule has to be re-decided
+every time the business adds a location — a 3PL, an out-of-state store, an
+overseas hub. An acceptance-based rule answers all of them on the day they
+appear, because the question it asks does not mention geography.
+
+**What follows from it, and what does NOT:**
+
+- **DESTINATION AND ACCEPTANCE ARE TWO CONCEPTS AND ARE NEVER MERGED** (Loo,
+  2026-08-05, correcting an earlier draft of this section):
+
+  > *"Do not add a boolean like 'accepts goods on behalf of Carres' to
+  > `purchasing_destinations`. Receiving responsibility is a business
+  > capability, not a destination property. A destination answers WHERE goods
+  > go. Receiving answers WHO accepted the goods."*
+
+  An address is a place; an accepting arrangement is a relationship with a
+  party, and it changes over time — we may appoint a 3PL this year and take the
+  work back next year. A flag on an address cannot express that, and worse, it
+  would silently rewrite the past: every receipt already filed would start
+  reading under today's arrangement. **Who actually accepted a given delivery
+  is a fact of that delivery**, and the Session already records it
+  (`submitted_by` · `entry_source`, §3.1 / §6.1).
+
+- Where the goods physically sit afterwards is a separate fact again, and it is
+  a STOCK question, not a Receiving one.
+- **"Not a Receiving Session" does not mean "no record" — and who makes that
+  record is FROZEN (Loo, 2026-08-05):**
+
+  ```
+  Who accepts the goods on behalf of Carres?   OPERATION.
+  Supplier fulfilment confirmation owner   =   OPERATION.
+  ```
+
+  ```
+  Supplier
+      │
+      ▼
+  Operation confirms supplier fulfilment
+      │
+      ├── Deliver to Carres ──────→ Receiving Session + GRN
+      │
+      └── Direct deliver to customer ──→ No GRN ──→ PO Complete
+  ```
+
+  **His reason, and it is why this needs no second discussion:** Operation is
+  ALREADY the PO owner — Issue PO · chase the supplier · Receiving · Claims —
+  and *"PO 应该由同一个 Owner 负责关掉"*. **An AE who knows the customer has
+  the goods tells Operation; Operation completes the purchase.** The AE
+  supplies information and never reaches into Purchasing to close a PO.
+
+  > *"这样责任只有一个，不会出现：「我以为 AE 会关。」「AE 以为 Operation
+  > 会关。」"*
+
+  **Later, if an AE or a Host is genuinely authorised to accept, the rule is
+  EXTENDED — the definition in §1.1 does not move.** That is the same shape as
+  §1.2: one frozen definition, coverage growing underneath it.
+
+- **SUPPLIER FULFILMENT ≠ GOODS RECEIVED** (Loo, 2026-08-05 — frozen, and it is
+  what PROTECTS everything above from being quietly undone):
+
+  ```
+  PO Complete   ←  Supplier fulfilment confirmed
+  GRN           ←  Receiving Session only
+  Inventory     ←  Receiving only
+  ```
+
+  **`received_qty` may never be moved to close a direct-delivery PO.** Its
+  meaning is frozen — *physical goods received by or on behalf of Carres* — and
+  the Receiving KPI, the warehouse received quantity, supplier receiving
+  performance and the GRN statistics all read it. His own words: *"如果直送客户，
+  你为了关 PO 去改 `received_qty`，以后所有统计都会开始说谎。"*
+
+  **Without this line §1.1 would not survive contact with the first
+  direct-delivery order**, because the cheapest way to close that PO is one
+  addition to `received_qty` — and the Receiving definition dies with it.
+
+  The purchasing side of the rule, including where fulfilment IS stored, is
+  [`PURCHASING-WORKING-FLOW.md`](PURCHASING-WORKING-FLOW.md) §9. It is not
+  repeated here.
+- The three-times rule (§5), the event ledger (§6) and the five statuses (§4)
+  are unchanged. This section only says WHEN a Session comes into existence.
+
+### 1.2 · A capability is enabled only where the record can be TRUE (Loo, 2026-08-05)
+
+**He ruled this while choosing how to phase §1.1 in, and it is stated as a rule
+because it is not about AL:**
+
+> *"The system must never lie about inventory location. If we allow Receiving
+> at AL before the inventory model supports multiple inventory locations, every
+> receipt at AL will be recorded as Klang stock. That creates FALSE INVENTORY,
+> which is worse than temporarily not supporting AL Receiving."*
+
+```
+Today   Receiving is supported only where inventory can be recorded truthfully.
+Later   When multi-location inventory exists, AL / HOUZS Receiving is enabled
+        WITHOUT changing the Receiving definition.
+```
+
+**The definition (§1.1) and its coverage are two different things**, and that
+separation is the point: the boundary is frozen now and permanently, while what
+the system can honestly support grows underneath it. A definition that had to
+be re-cut every time coverage changed would not be a definition.
+
+**What this means for the code TODAY, and it is why no new column is needed:**
+a destination may be received into only when it maps to a real `warehouses`
+record. Carres has exactly one, so the answer is Carres Klang — **derived from
+a fact that already exists**, not stored as a new flag. The day multi-location
+inventory lands, the same derived condition admits AL and HOUZS by itself.
+
+**A wrong stock figure is not a display bug.** It is copied into planning, into
+reorder alerts and into what a store promises a customer, and every one of those
+is discovered later by a human doing a physical count.
+
 ---
 
 ## 2 · The one object: Receiving Session

@@ -312,7 +312,14 @@ delay conversation, and it never opens a call to the customer.
 recorded as 8 received and 2 still owed. **The shortfall stays on the SAME PO** — a second PO
 for the balance turns one purchase into two and nothing reconciles afterwards.
 
-**A PO is finished by QUANTITY, never by the existence of a receiving record.**
+**A PO IS NEVER FINISHED BY THE EXISTENCE OF A RECEIVING RECORD.** A GRN existing proves a
+delivery happened, not that the order is done — the quantities decide that.
+
+*(This sentence used to read "a PO is finished by QUANTITY". Half of it survived Loo's
+2026-08-05 ruling and half did not, so it is rewritten rather than left to be read the old way:
+quantity closes the WAREHOUSE branch, and a direct delivery is closed by **supplier fulfilment
+confirmation** with `received_qty` deliberately untouched — §9, `Supplier fulfilment ≠ Goods
+received`.)*
 
 ### `Call {supplier} — confirm balance delivery date`
 
@@ -536,6 +543,67 @@ Operations explicitly says to stop**, and stopping is the whole PO
 (`purchase_orders.status = 'cancelled'`, which already exists), never a quantity typed onto a
 line. A per-line cancelled quantity would be a second way to say the same thing and would put
 a policy decision into an arithmetic column.
+
+**A PO CAN FINISH WITHOUT GOODS EVER REACHING US, AND OPERATION IS THE ONE WHO SAYS SO**
+(Loo, 2026-08-05 — frozen, and he closed the discussion with it).
+
+The derived table above assumes every unit passes through a check-in. **One real case does
+not**: the supplier delivers straight to the customer. Nobody at Carres accepts the goods, so
+there is no Receiving Session and no GRN
+([`RECEIVING-INFORMATION-MODEL.md`](RECEIVING-INFORMATION-MODEL.md) §1.1) — and without a rule
+the purchase order would hang open forever.
+
+```
+Who accepts the goods on behalf of Carres?   OPERATION.
+Supplier fulfilment confirmation owner   =   OPERATION.
+```
+
+**Operation confirms supplier fulfilment**, and that confirmation forks: delivered to Carres →
+a Receiving Session; delivered direct to the customer → **no GRN, PO complete**. Operation is
+already the PO owner (`Issue PO` · the supplier calls · Receiving · Claims), so the person who
+opened the purchase order is the person who closes it. **An AE who learns the customer has the
+goods tells Operation; the AE never closes a PO.** One owner, so *"我以为 AE 会关"* cannot
+happen.
+
+**If an AE or a Host is ever authorised to accept goods, this rule is EXTENDED — the Receiving
+definition does not move.**
+
+### SUPPLIER FULFILMENT ≠ GOODS RECEIVED (Loo, 2026-08-05 — FROZEN)
+
+> **A Purchase Order completes when the SUPPLIER HAS FULFILLED THE ORDER, not necessarily when
+> Carres has physically received the goods.**
+
+**THREE EVENTS, THREE FIELDS, NEVER SHARED:**
+
+```
+PO Complete   ←  Supplier fulfilment confirmed
+GRN           ←  Receiving Session only
+Inventory     ←  Receiving only
+```
+
+**`received_qty` MAY NEVER BE MOVED TO CLOSE A DIRECT-DELIVERY PO.** Its meaning is frozen —
+*physical goods received by or on behalf of Carres* — and it is read by the Receiving KPI, the
+warehouse received quantity, supplier receiving performance and the GRN statistics. Writing it
+for goods nobody at Carres ever handled makes **all four** start lying at once, and the lie is
+invisible: every figure still adds up.
+
+**This is the exact shortcut the rule exists to forbid**, and it is the one a future chat will
+reach for first: *"to make the PO complete, I added to `received_qty`."* One line, and the
+Receiving definition is gone.
+
+**Two consequences, so nobody builds around them:**
+
+- **The warehouse branch needs NO second button.** A PO received in full IS its supplier's
+  fulfilment — the goods are the proof. Asking Operation to tick a box afterwards would be a
+  tick-box that only records an assertion, banned by `docs/ACTION-FLOW-STANDARD.md` Law 2A.
+  **Only the direct-delivery branch is confirmed by hand**, because nothing else can observe it.
+- **Fulfilment needs its own store**, on `purchase_orders`, recording who confirmed it, when,
+  and which branch. **It is not `received_qty`, not `status` and not a receiving field.**
+  The migration is not written here.
+
+*(The stored `po_status` value `received` keeps its name — a store keeps its contract and the
+screen translates, `docs/COPY-STANDARD.md` §10. The UI word for this state is already
+**`Completed`**, and it is correct for both branches.)*
 
 **A quantity means exactly one thing.** No column is ever reused to mean a second thing —
 that is how a number quietly stops being true, and how a lock ends up reading a column
