@@ -3508,7 +3508,7 @@ goes INTO the dictionary; it does not sit outside it in a card.
 
 ### ⚠️ ONE CONFLICT, REPORTED AND OVERRULED BY HIM — record it, do not re-litigate it
 
-**`Check` is not one of the portal's six verbs** (`Assign` · `Call` · `Issue` · `Upload` ·
+**`Check` was not one of the portal's verbs when this card shipped** *(Loo opened the table on 2026-08-05 and it is now the SEVENTH — `docs/COPY-STANDARD.md`, with its meaning and its boundary against `Call` and `Check in`)* (`Assign` · `Call` · `Issue` · `Upload` ·
 `Close` · `Return`), **and `Check in` already means something else in this very module** —
 *goods arrived, count them* (Loo, 2026-07-28, the document/act split).
 

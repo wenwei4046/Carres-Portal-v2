@@ -601,7 +601,7 @@ to take.
 is navigation, not work. Both leave the action column.
 
 **`Contact Supplier` is not a legal label at all.** `Contact` was retired as a verb by Loo on
-2026-07-28 — the portal has SIX verbs and `Call` already covers *reach the outside party, get
+2026-07-28 — `Call` already covers *reach the outside party, get
 an answer, record the outcome*. It has been live on this page since.
 
 **`Confirm Arrival` reverses its own meaning and that is the sharpest example of why this

@@ -445,12 +445,13 @@ against.
 
 ### The verb dictionary — portal-wide (locked 2026-07-27)
 
-**SIX verbs, six meanings. Every module uses these; no module invents a seventh.**
+**SEVEN verbs, seven meanings. Every module uses these; no module invents an eighth.**
 
 *(It was five until 2026-07-28. `Return` was added by Loo's ruling because R6 needed a word
 for "this record goes back to whoever produced it" and reached for `Send back`. **`Prepare`
 was added 2026-07-29 and RETIRED 2026-07-30** with the Purchasing clean restart: raising a
-purchase order is one act again, so the verb has no object left. **The bar for a seventh is
+purchase order is one act again, so the verb has no object left. **`Check` was added by Loo
+on 2026-08-05** — see the row below and the note under the table. **The bar for an eighth is
 the bar `Return` cleared: no existing verb fits, and the alternative is a module inventing
 its own.**)*
 
@@ -502,6 +503,27 @@ resolved at render time from what is on file — never a third blended word cove
 | **Upload** | evidence is attached | the file exists |
 | **Close** | a case or claim is finished and its record is sealed | the record can no longer change |
 | **Return** | a record goes BACK to the party that produced it, for them to act on | the record is with them **and its state says so on their screen** |
+| **Check** | a fact the business needs is MISSING, and somebody must establish it — by any means | the fact is **recorded in the system**. Finding out and not writing it down completes nothing |
+
+### `Check` vs `Call`, and `Check` vs `Check in` (Loo, 2026-08-05)
+
+**Added on his ruling, after he read the alternative and chose this word anyway.** The
+conflict was reported to him and is recorded here rather than re-argued.
+
+| | It names | Example |
+|---|---|---|
+| **`Call`** | going OUTWARD to a NAMED party for something only they can tell us | `Call {supplier} — confirm tomorrow's delivery` |
+| **`Check`** | a fact that is simply ABSENT. The source is not part of the action, and may be an email already sitting in the inbox, a portal, or a phone call | `Check Expected Arrival` |
+| **`Check in`** | goods have physically arrived and are being counted. A two-word phrase with its own dictionary row, and an act on GOODS rather than on a fact | `Check in from {supplier}` |
+
+**The distinction that keeps them apart is the OBJECT.** `Check` takes a missing FACT;
+`Check in` takes arriving GOODS. A reader who meets both on the Purchasing module reads two
+different objects, which is the same test the `GRN` / `Check in` document-act split already
+passed on 2026-07-28.
+
+**Why `Call` was not stretched to cover it:** on 16 of 21 live purchase orders nobody has said
+anything at all, so there is no promise to confirm and no named party who is known to hold the
+answer. `Confirm` presumes something was said; `Call` presumes we know whom to ask.
 
 Examples: `Assign logistics` · `Assign PIC` · `Assign warehouse picker` ·
 `Call {supplier} — confirm ready date` · `Call {logistics} — confirm delivery date` ·
@@ -772,17 +794,22 @@ and otherwise says `—`.** Three words that used to sit in it were not actions 
 | RETIRED — never put back | Why |
 |---|---|
 | ~~`Confirm Arrival`~~ | it REVERSED the full string's tense. `Confirm Goods Arrival Date` asks the factory *which day do the goods reach us* (FUTURE); `Confirm Arrival` reads as *tick that it has arrived* (PAST). **A short form may drop WORDS; it may never drop the TENSE or the OBJECT** |
-| ~~`Contact Supplier`~~ | `Contact` is not one of the six verbs — Loo retired it 2026-07-28 and `Call` covers it. It was also a second word for a LATE version of one action, and **a late version of one action is not a second action**: lateness is shown in red, not spelt differently |
+| ~~`Contact Supplier`~~ | `Contact` is not one of the verbs — Loo retired it 2026-07-28 and `Call` covers it. It was also a second word for a LATE version of one action, and **a late version of one action is not a second action**: lateness is shown in red, not spelt differently |
 | ~~`Waiting for Goods`~~ | a STATUS wearing an action's column. It keeps its one home — the register's left rail |
 | ~~`Open Receiving`~~ | navigation, not work |
 
 > **⚠️ ONE COLLISION, REPORTED TO LOO AND OVERRULED BY HIM. Do not "fix" it back.**
-> `Check` is not one of the six verbs, and **`Check in` already means the receiving act in
-> this same module** (the document/act split, Loo 2026-07-28) — so a new hire could read
-> `Check Expected Arrival` as the receiving act. The alternative needing no new verb was
-> `Confirm expected arrival`. **He saw both and chose `Check Expected Arrival`.** It does not
-> widen the verb table: `Check` governs this one label and nothing else, and no other module
-> may reach for it.
+> `Check in` already means the receiving act in this same module (the document/act split,
+> Loo 2026-07-28) — so a new hire could read `Check Expected Arrival` as the receiving act.
+> The alternative needing no new verb was `Confirm expected arrival`. **He saw both and chose
+> `Check Expected Arrival`.**
+>
+> **RESOLVED 2026-08-05 — he opened the verb table rather than leaving an exception.**
+> The row above first said `Check` "does not widen the verb table … no other module may reach
+> for it", which left the dictionary claiming SIX verbs while a seventh was live on 16 rows —
+> the exact drift this dictionary exists to stop. **`Check` is now the seventh verb**, with
+> its meaning, its completion and its boundary against `Call` and `Check in` written in the
+> verb dictionary above. **Any module may use it, for the meaning defined there and no other.**
 
 ### The Report words (Loo, 2026-08-04 — card Q3)
 
