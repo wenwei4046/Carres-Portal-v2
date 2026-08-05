@@ -41,7 +41,7 @@ prioritized P1/P2/P3 to lift toward 10/10. Zero-experience UX standard.
 5. `docs/reviewer-prompt-template.md` — this prompt (for reference)
 6. Then module proposals in priority order:
    - `docs/subscription-mattress-proposal.md` (Sept 2026 hard deadline)
-   - `docs/orders-panel-concept-proposal.md`
+   - `orders/MASTER.md`
    - *(`docs/purchasing-3panels-proposal.md` — DELETED 2026-07-27)*
    - `docs/inventory-module-proposal.md`
    - `docs/delivery-module-proposal.md`
@@ -223,7 +223,7 @@ Then ask Jess:
 "我 ready. 你要我 review 哪一份 proposal 先? 建议 order:
 1. Master doc (docs/carres-portal-system-architecture.md) — 我先整体过一遍再看单个 module?
 2. Subscription mattress (docs/subscription-mattress-proposal.md) — Sept 2026 hard deadline, biggest risk
-3. Orders panel (docs/orders-panel-concept-proposal.md) — half-done biggest daily driver
+3. Orders panel (orders/MASTER.md) — half-done biggest daily driver
 4. 其他 modules 按 priority · 你说了算
 
 回一个数字 · 或告诉我哪份 · 我开始 review."

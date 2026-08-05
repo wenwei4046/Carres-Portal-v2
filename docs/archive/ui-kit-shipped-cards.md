@@ -81,11 +81,11 @@ believing it had followed a locked spec.
 | 7 no-KPI + counterparty panel | RETIRED | UI-KIT §1.4 rule 3 + C2's drawer (`CallsPanel`) |
 | 8 dials & checklist marks | **CHECK ✅** | `STATUS-STANDARD.md` §1 *"A 30px donut … whose FILL fraction and COLOUR are the state"*, §2 *"20px rounded mark, shape-first"*. Its NEXT-verb list died with C1/C3 |
 | 9 Items tab | RETIRED (layout, D7) + **MOVED** (words) | `Book in` / `GRN` / `Receive` were already banned in COPY-STANDARD; **`Reserved` → `Ready`** is a new row there, scoped to an ORDER LINE only |
-| 10 Balance tab | **CHECK ✅** | `ORDERS-WORKING-FLOW.md` §3 *"outstanding = Σ order lines + add-ons + chargeable storage − `orders.paid`"* — one shared rule, `packages/shared/order-money.ts` |
+| 10 Balance tab | **CHECK ✅** | `orders/MASTER.md` §3 *"outstanding = Σ order lines + add-ons + chargeable storage − `orders.paid`"* — one shared rule, `packages/shared/order-money.ts` |
 | 11 **storage rates** | **CHECK ✅, and CORRECTED** | `packages/shared/src/schemas/ops-order-control.ts` *"MS/BF = RM150 per commenced 30-day month over the window. Sofa = the first 14 days of the window free, then a flat one-time RM200."* CLAUDE.md and OPS-BUILD-BRIEF both said "RM200/2wk" — a RECURRING fee the code has never charged. Both rewritten |
 | 12 Delivery tab | RETIRED | ① Delivery line (D1 · T1-T11) |
-| 13 WhatsApp templates | **MOVED** | `ORDERS-WORKING-FLOW.md` §3 "What we send"; the literal bodies stay in `apps/web/src/lib/wa-templates.ts` |
-| 14 · 14.5 staff assignment | **MOVED** | `ORDERS-WORKING-FLOW.md` §3 "How the PIC is decided" — the whole live rule (0232 + 0235). The PO-duty half was already owned by `docs/purchasing/MASTER.md` |
+| 13 WhatsApp templates | **MOVED** | `orders/MASTER.md` §3 "What we send"; the literal bodies stay in `apps/web/src/lib/wa-templates.ts` |
+| 14 · 14.5 staff assignment | **MOVED** | `orders/MASTER.md` §3 "How the PIC is decided" — the whole live rule (0232 + 0235). The PO-duty half was already owned by `docs/purchasing/MASTER.md` |
 | 14.6 purchasing | deleted 2026-07-28 | — |
 | 14.7 import reconciliation | **CHECK ✗ → MOVED** | `docs/autocount-import-contract.md` §7. That file had no trace of it and still said re-import "must upsert" — the opposite of 0214. Overwritten with create-only + the 0237 append door + the `clean` test |
 | 16 · Build order | RETIRED | — |
@@ -585,7 +585,7 @@ and exactly the "renders NO issues container" test goes red, nothing else moves.
 ## D0.5c — the original card (`DetailShell` in full; the `PageShell` / `DataTable` halves keep their one-liners above)
 
 **Written 2026-07-28, the day the Order Detail Information Architecture closed.** Its whole
-input is [`docs/ORDER-DETAIL-INFORMATION-MODEL.md`](ORDER-DETAIL-INFORMATION-MODEL.md) §10 (L4),
+input is [`orders/MASTER.md`](orders/MASTER.md) §10 (L4),
 which exists because UI-KIT §1.4's rules are meant to be enforced by TYPES rather than by memory.
 **Read L4 before writing a line.** This card does not restate it; it says what to build.
 
@@ -1239,7 +1239,7 @@ already refused the package ceremony. Choosing that mechanism was this card's jo
 the least-invention option available, since the date is already line 4 of the law.
 
 **Nothing was redesigned, no business rule moved, and the IA was not opened.** `git diff
---name-only` contains neither `ORDER-DETAIL-INFORMATION-MODEL.md` nor `ACTION-FLOW-STANDARD.md`.
+--name-only` contains neither `orders/MASTER.md` nor `ACTION-FLOW-STANDARD.md`.
 
 ### The mirror is re-based, and provably no value moved
 
@@ -1500,7 +1500,7 @@ Every line is checkable by someone who did not write the card.
       `h-[`; `pnpm --filter @carres/web lint` clean; web suite at baseline (today **2029 passed /
       16 pre-existing**), `tsc -p tsconfig.app.json` clean.
 - [ ] **The IA files are untouched** — `git diff --name-only` contains neither
-      `ORDER-DETAIL-INFORMATION-MODEL.md` nor `ACTION-FLOW-STANDARD.md`.
+      `orders/MASTER.md` nor `ACTION-FLOW-STANDARD.md`.
 - [ ] **No new document was created.**
 - [ ] **`docs/ui-reference-review.md`'s parking lot is updated** — KIT-CONSOLIDATION marked done,
       with the observations that were carried and the ones deliberately not.

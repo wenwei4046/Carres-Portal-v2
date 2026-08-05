@@ -32,7 +32,7 @@
 **A reference is a source of REASONING, not of authority.** Nothing in this file outranks
 `docs/UI-KIT.md`, `docs/COPY-STANDARD.md`, `docs/ACTION-FLOW-STANDARD.md`,
 `docs/execution-queues-index.md`, or the frozen
-[`ORDER-DETAIL-INFORMATION-MODEL.md`](ORDER-DETAIL-INFORMATION-MODEL.md). Where a reference
+[`orders/MASTER.md`](orders/MASTER.md). Where a reference
 conflicts with one of those, the conflict is **reported and the law wins** — that is a finding,
 not a licence.
 
@@ -240,7 +240,7 @@ without a mechanism is a rule that has not been finished, and finishing one cost
   **nothing was added to `docs/ui-reference/`** (`UI-KIT` §11 requires a screenshot in the repo
   before a visual reference may be cited — and no visual reference is cited here, by design).
 - **Carres side read live this session, not from memory:**
-  [`docs/ORDER-DETAIL-INFORMATION-MODEL.md`](ORDER-DETAIL-INFORMATION-MODEL.md) in full,
+  [`orders/MASTER.md`](orders/MASTER.md) in full,
   [`docs/ACTION-FLOW-STANDARD.md`](ACTION-FLOW-STANDARD.md) in full, and
   [`docs/UI-KIT.md`](UI-KIT.md) §0–§2 and §5–§16.
 - **Not read, and not needed for this entry:** `COPY-STANDARD.md` (Fiori's wording contributions

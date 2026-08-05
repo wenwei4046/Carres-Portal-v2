@@ -16,7 +16,7 @@
 
 ## 0 · Governance
 
-These rules moved here from the retired `UI-KIT.md` §0 because they are about
+These rules moved here from the retired `ui/MASTER.md` §0 because they are about
 tokens, not about a page.
 
 **Use tokens only.** Never hardcode a colour, a type size, a spacing value, a

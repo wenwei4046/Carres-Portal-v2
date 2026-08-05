@@ -199,8 +199,8 @@ isolation — **run twice before calling one a regression.**
 | Live web bundle | last recorded `index-8yEXF9xX.js` from main tip `41287939` (2026-08-05) |
 | Live Worker | last recorded `0a7949bd` from main tip `bef687a5` (2026-08-05) |
 
-**Full deployment history** → [`phase-10-worklog.md`](phase-10-worklog.md) and
-[`claude-md-archive-2026-07-25.md`](claude-md-archive-2026-07-25.md). **Open carry-forwards** →
+**Full deployment history** → [`ENGINEERING.md`](ENGINEERING.md) and
+[`ENGINEERING.md`](ENGINEERING.md). **Open carry-forwards** →
 [`carry-forwards.md`](carry-forwards.md).
 
 ### Known risks, signed off by Loo
@@ -226,3 +226,57 @@ isolation — **run twice before calling one a regression.**
 **`reference/production/src/` is not a starting codebase.** It talks to Supabase directly with
 no Hono layer. Pages in `apps/web/src/pages/` are written from scratch by reading
 `reference/proto/*.jsx` — never copy-pasted from `production/`.
+
+---
+
+## 11 · Measuring the real product
+
+**The browser WORKS. At least five cards wrongly concluded it did not and skipped verification.**
+Symptoms — `screenshot` times out, viewport reads `0×0`, *"No preview is open"* — mean the
+window is not open or has no size, **not that it is broken.**
+
+```
+1  preview_start   { url: "https://erp.carresofficial.com/..." }   open the window
+2  resize_window   { width: 1440, height: 900 }                    ALWAYS give a size
+3  screenshot / javascript_tool                                    only now is it real
+```
+
+**Before `resize_window` every layout number is 0; after it every number is real.**
+
+**Measuring and photographing are two different capabilities, and only one is reliable:**
+
+| | Needs | Reliable |
+|---|---|---|
+| **measuring width / colour / text with JS** | `preview_start` + `resize_window` | ✅ always — this is the main tool |
+| **a screenshot** | the pane must also be really displayed | ⚠️ times out when it is not |
+
+**So *"I could not measure"* is never an acceptable conclusion.** *"I could not photograph"*
+sometimes is — write *"widths measured, photograph owed"* rather than skipping the measurement.
+A logged-in production session is usually still open; routes are query params
+(`/operation?tab=purchase`).
+
+> ⚠️ **An UNSTYLED page reports a perfect grid and reports it as a PASS.** A real reading once
+> returned zero clips, 25px rows and a wider table — because the stylesheet had not applied and
+> nothing could truncate. **Refuse to report unless the computed font is the app's own.**
+
+> ⚠️ **A clip scan on a kit grid must include nested elements** (`td, th, td *, th *`). Scanning
+> `td, th` alone returns 0 while three clips sit on nested `truncate` spans. That trap has been
+> paid for twice.
+
+## 12 · Studying before proposing
+
+Four sources, and none may be skipped:
+
+1. **Our own flow** — the module MASTER, and the whole chain around the tab you are touching.
+   Answer both directions: *does what upstream sends still get in, and can downstream catch it?*
+2. **2990s** — the owner's other system. `apps/backend/src/components/DataGrid.tsx` there is a
+   complete AutoCount-style grid reference.
+3. **AutoCount** — the team's muscle memory. **Copy its POWER, never its ASSUMPTIONS.**
+4. **International references, chosen by PROBLEM, never waiting to be told a name** —
+   navigation and reading pane → GitHub · density and interaction → Linear · ERP workspace →
+   SAP Fiori / Dynamics · large tables → Excel / AutoCount · communication → Gmail · forms and
+   settings → Shopify Polaris · plain actions and accessibility → GOV.UK / NN/g.
+
+**Every challenge states five things:** current problem → operator impact → who does it better
+→ the Carres adaptation → the cost. **"Only different" is rejected; if there is no material
+improvement, say KEEP and say why.**

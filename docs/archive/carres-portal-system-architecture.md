@@ -17,7 +17,7 @@ You are reviewing the Carres Portal — a make-to-order furniture operations sys
 3. **`docs/UI-KIT.md`** — design laws *(corrected 2026-07-29: `§A0` stopped existing in the 2026-07-27 kit rewrite; the live sections are §8.2 interaction law and §8.3 module-tab law)*
 4. **`docs/purchasing/MASTER.md`** + **`docs/purchasing/MASTER.md`** — Purchasing's behaviour and its frozen information architecture *(corrected 2026-07-29: this line pointed at `docs/purchase-cockpit-handoff.md` §5, deleted 2026-07-27)*
 5. Module proposals in priority order:
-   - `docs/orders-panel-concept-proposal.md`
+   - `orders/MASTER.md`
    - *(`docs/purchasing-3panels-proposal.md` — DELETED 2026-07-27; Purchasing's live docs are the two named at 4 above)*
    - `docs/inventory-module-proposal.md`
    - `docs/delivery-module-proposal.md`
@@ -527,7 +527,7 @@ Send this checklist along with the docs:
 2. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/docs/COPY-STANDARD.md
 3. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/docs/UI-KIT.md
 4. *(purchase-cockpit-handoff.md — DELETED 2026-07-27, link removed)*
-5. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/docs/orders-panel-concept-proposal.md
+5. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/orders/MASTER.md
 6. *(purchasing-3panels-proposal.md — DELETED 2026-07-27, link removed)*
 7. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/docs/inventory-module-proposal.md
 8. https://github.com/wenwei4046/Carres-Portal-v2/blob/main/docs/delivery-module-proposal.md
