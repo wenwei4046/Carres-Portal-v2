@@ -1503,3 +1503,87 @@ Four negative controls, each a real edit verified on disk first: `sono` back to 
 **Reported, not fixed**: at 1920 the listing region gains **1px** of horizontal scroll (region 1207, wrapper 1206 → 1208) and P16's expand-button clip goes 6px → 7px, matching 1280 and 1440 — the honest price of content-sized columns, since the control column is the only elastic track, and the alternative is shaving a business column, which the ruling forbids; page-level scroll stays 0 everywhere · `items` still truncates on a long enough item list, as it always did, and carries a `title` · **a screenshot still could not be taken**: `preview_start` → `resize_window` → measure is the documented order, it was followed, it produces real layout numbers, and `computer{action:"screenshot"}` still times out after exactly that order. **Measuring and photographing are two different capabilities and only one of them works here.**
 
 ---
+
+### 2026-08-05 · SESSION CLOSE — the manager chat's handover, everything ruled in one place
+
+> Written so the next chat re-litigates NOTHING. Every line below is a ruling that already
+> shipped or an open item with its blocker named. **If a chat finds itself re-arguing one of
+> these, it has skipped this section.**
+
+**WHERE THE TAB STANDS.** Ten cards shipped in two days and **there is no open card on the
+Purchase Orders register itself.** Q1 risk order · Q3 the Report tab · Q5 the expand becomes
+the working area · Q7 the nine fixed columns · Q8 the action word · Q10 one PO one mode ·
+Q11 content-width rows · Q13 + its follow-up, the three 1px widths. Q2 and Q9 were ABSORBED
+(into Q5 and Q10); Q1b and Q4 were CLOSED, not deferred.
+
+**THE RULINGS THAT NOW GOVERN THIS TAB — none may be re-opened by a chat.**
+
+| | Ruled |
+|---|---|
+| **Row order** | **Operator priority, ALWAYS.** Never `PO Issued`. *"Operator 打开 Purchase Orders，是为了处理今天最重要的事情，不是看最新开的 PO."* `PO Issued` is a column and a header sort and decides nothing |
+| **One column set** | The list may **NEVER** change its columns because the panel opened. `COMPACT_KEYS` is deleted and a test asserts its absence — this is the ruling most likely to be quietly re-introduced |
+| **The nine, measured and frozen** | `96 · 88 · 83 · 95 · 136 · 135 · 140 · 206 · 192`, min-width **1208** which is DERIVED from them. Widening one without re-deriving the min-width silently steals pixels from the kit's control column |
+| **One PO, one mode** | `{poId, mode: "panel" \| "expand"}` — two different POs are structurally unrepresentable. Never a rule that says "keep them in step" |
+| **Expand = the working area** | Document data is edited there. **The right panel is ACTIVITY** — Print · Communication · Timeline — and holds the items READ-ONLY |
+| **How a field saves** (§12.7.5a) | typed value → Enter saves, Esc cancels, **no button**; mouse-picked value or a multi-field form → **an explicit Save**; a control that performs an ACT is named for the act (`Split`, never `Save`) |
+| **Read vs write tiers** | A fact may be **READ** in two tiers and **WRITTEN** in only one. Rule 1 was narrowed after it cost the panel its items list |
+| **Words** | `Check Expected Arrival` (Loo's own, over `Confirm expected arrival`) · `Contact Supplier` deleted · a status or a navigation shows `—` · **`Check` is the SEVENTH verb**, written up in COPY-STANDARD with its boundary against `Call` and `Check in` |
+| **Dates, portal-wide** | `Supplier Ready Date` · `Expected Arrival` · `Received At` · `Customer Delivery`. `Goods Arrival` · `Stock` · `Stock ETA` are RETIRED |
+| **Money** | **Never on this tab.** Verified zero occurrences; the supplier PDF and the Report tab are money-free by ruling |
+| **Density** | **40px stays.** *"Carres is queue → list → detail with constant reviewing — GitHub / Linear / Shopify Admin, not Excel data entry."* What was wanted was never 28px; it was capabilities, bought with structure |
+| **The tab boundary** (card Q12) | **role-anchor**, deadline-anchor DELETED whole: `To Order` = Issue PO · Confirm ready date · **`Purchase Orders` = Confirm tomorrow's delivery + Confirm balance delivery date** · `Receiving` = Check in only |
+
+**TWO PERMANENT RULES WERE BORN HERE AND THEY GOVERN THE WHOLE PORTAL** —
+`CLAUDE.md` **§13.2 UI Evolution Rule** (business freezes before implementation, UI does not
+freeze before operators have used it, build → review with real usage → iterate; never keep a
+feature in discussion for days when production answers in hours) and **§13.3 Feature
+Justification Rule** (a kit having a feature is not a reason to wire it — will the operator
+finish faster today?). **§13.2 was written because this chat spent a day on column widths
+without shipping anything Loo could operate. A chat that answers "let me first settle X"
+three times has committed the failure it names.**
+
+**WHAT IS OPEN, WITH ITS BLOCKER**
+
+1. **Q14 — one supplier date, two doors.** `useRecordSupplierDate`
+   (`OperationPurchaseOrders.tsx`) and `RecordSupplierAnswerModal` (`ReceivingWorkspace.tsx`)
+   both write `POST /pos/:id/tomorrow-delivery`. **The order is the whole card**: that modal
+   is also the ONLY door for `balance-date`, so the balance door must be built on the register
+   FIRST, or the action Q12 just moved arrives at its new home with nothing that can close it.
+2. **`Confirm ready date` is Loo's open case, recorded in §1 and deliberately not moved.**
+   The evidence for moving it: `PURCHASING-INFORMATION-MODEL.md` §5.3 already says a
+   requirement leaves To Order the moment a PO exists, and the ONLY door that closes this
+   action is the `Supplier Ready Date` field on the Purchase Orders expand (Q5). Queue in one
+   place, door in another — the same disease Q12 cured, one action along. **Moving it leaves
+   To Order with `Issue PO` alone: unissued belongs to To Order, issued belongs to Purchase
+   Orders.** Live exposure zero — 0 of 21 POs carry a ready date.
+3. **The rail's three permanent zeros** — `Ready to Receive` · `Completed` · `Cancelled`.
+   This tab has no receiving door so they cannot move. **Hiding a zero also hides a filter**,
+   so it is a decision, not a repair.
+4. **1px of region scroll at 1920** and P16's expand-button clip at 7px — the accepted price
+   of content-sized columns. Page-level scroll is 0 everywhere.
+
+**SIX METHOD LESSONS THIS SESSION PAID FOR — carry them, they each cost real time**
+
+1. **Widths only in a real browser.** jsdom has no widths, so the page suite structurally
+   cannot catch a truncated cell. `preview_start` → `resize_window` → measure.
+2. **A truncation scan must include NESTED elements** — `td, th, td *, th *`. A `td`-only scan
+   reported *"zero 1px clips remain"* while three were live on `truncate` spans inside the
+   cells. **The same trap was already documented in P16's record and was hit again.**
+3. **A page with no stylesheet reports a PERFECT grid.** One measurement came back with zero
+   clips and 25px rows; the computed font was Times New Roman. **Refuse to report unless the
+   computed font is Inter.**
+4. **Never quote a lint delta without linting the tree WITHOUT your change** — use a detached
+   worktree at `origin/main`, never a stash.
+5. **Read the live Worker's source commit from `wrangler deployments list`, never from
+   §17.1** — that row went stale twice in one day and each time made a no-api card look like
+   it owed a Worker deploy, which would have shipped another lane's unreleased api.
+6. **"The docs are written" is not "the docs are shipped."** One chat reported completion
+   three times with zero commits on its branch. **§13.2's own words apply to documents:
+   verify with `git show origin/main:<file>`, never with a report.**
+
+**AND ONE ABOUT RUNNING THE CHATS.** Four lanes touched Purchasing files on 2026-08-05 and
+**the card number Q12 was claimed twice and Q13 twice**, each lane renumbering around the
+other without knowing. Loo received a stale report about a defect already fixed. **Two lanes
+on Purchasing at a time is the practical ceiling**; more than that and the manager spends the
+day de-duplicating instead of deciding.
+
