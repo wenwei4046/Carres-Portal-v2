@@ -1958,11 +1958,18 @@ real column rules; the late bar is intact at 2px.
 **REPORTED, NOT SOFTENED — the one measured cost, and it was isolated with a live control.**
 On **Purchase Orders**, running the page with and without the rule (the 2px late bar held
 constant): **without → 21 clipped, all 6px**, which is P16's already-documented expand-button
-clip and **not this card's**; **with → the same 21, plus 7 × 1px.** Those seven are
-`Nice Future` in the **87px `supplier` column** — Q7's frozen minimum, sized with **zero
-slack** — so the rule shaves the last pixel of the final letter. `text-overflow: clip`, so
-there is no ellipsis to announce it. **It cannot be fixed here: 87 is Loo's frozen number and
-this card may not change a width.** Widening it to 88 is his call.
+clip and **not this card's**; **with → the same 21, plus 7 × 1px.**
+
+**THIS CHAT REPORTED ALL SEVEN AS `Nice Future` AND THAT WAS AN OVERREACH — it sampled two
+cells and generalised to the set.** Q13 measured them properly: **four `Nice Future` in the
+87px `supplier` column plus three in `sono` and `items`.** `Nice Future` is on only **4 of 21
+rows** (`Ohana` 17) and needs 86.7px, so four was the ceiling and the number should have been
+counted per column before it was written down.
+
+**CLOSED by Q13 / PR #622**, which widened `supplier` 87 → 88 — the change this card could not
+make, because 87 was Loo's frozen number. Re-measured on production afterwards: **zero 1px
+clips remain**, and the only survivors are the 21 × 6px expand-button clips that were always
+P16's.
 
 **Negative controls — ten, each a real edit verified on disk before the suite was trusted.**
 
