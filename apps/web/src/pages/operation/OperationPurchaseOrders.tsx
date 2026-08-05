@@ -15,6 +15,7 @@ import {
   poOverdueDays,
   poReceivingProgress,
   poWorkStateOf,
+  purchasingActionButton,
   purchasingActionQueue,
   purchasingSupplierCallsOf,
   railItemLabel,
@@ -50,6 +51,7 @@ import {
   useOperationPos,
   useOperationSuppliers,
   usePoLineAction,
+  useRecordBalanceDateMutation,
   useRecordReadyDate,
   useRecordSend,
   useRecordSupplierDate,
@@ -1706,28 +1708,17 @@ function PoWorkArea({
           data-testid="po-date-extend"
         >
           <SupplierDateForm po={po} confirmed={eta.confirmed} supplierName={supplierName} />
-          {calls.map((c) => (
-            <div
-              key={c.poLineId ?? c.key}
-              className="flex items-baseline gap-2 text-body leading-6"
-            >
-              <span
-                aria-hidden
-                className={[
-                  "w-1.5 h-1.5 rounded-full shrink-0 self-center",
-                  c.late ? "bg-kit-red-9" : "bg-kit-amber-9",
-                ].join(" ")}
-              />
-              <span className="text-kit-slate-12">
-                {purchasingActionQueue(c.key)}
-              </span>
-              {c.dueIso && (
-                <span className="ml-auto text-label text-kit-slate-9">
-                  due {fmtDateShort(c.dueIso)}
-                </span>
-              )}
-            </div>
-          ))}
+          {/* THE QUEUE, AND — for the balance call — ITS DOOR (Q14). The
+              tomorrow call keeps no trigger here: its door is `SupplierDateForm`
+              one line above on this same surface, and a second one would
+              re-open exactly the two-doors defect this card closes. */}
+          {calls.map((c) =>
+            c.key === "confirm_balance_delivery_date" && c.poLineId ? (
+              <BalanceDateRow key={c.poLineId} call={c} po={po} />
+            ) : (
+              <CallStatement key={c.poLineId ?? c.key} call={c} />
+            ),
+          )}
           {/* TWO RUNS, EACH NAMED (Q5). `poDateHistoryOf` filtered the ready
               kind out until now, so the first ready date an operator recorded
               would have been swallowed by the history sitting beside the
@@ -1798,6 +1789,196 @@ function PoWorkArea({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** One open call, stated. A dot for its tone, the queue word, its own due. */
+function CallStatement({
+  call,
+  children,
+}: {
+  call: PurchasingOpenCall;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex items-baseline gap-2 text-body leading-6">
+      <span
+        aria-hidden
+        className={[
+          "w-1.5 h-1.5 rounded-full shrink-0 self-center",
+          call.late ? "bg-kit-red-9" : "bg-kit-amber-9",
+        ].join(" ")}
+      />
+      <span className="text-kit-slate-12">{purchasingActionQueue(call.key)}</span>
+      {children}
+      {call.dueIso && (
+        <span className="ml-auto text-label text-kit-slate-9">
+          due {fmtDateShort(call.dueIso)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * `Confirm balance delivery date` — Q14, THE DOOR THAT LIVED ON THE WRONG TAB.
+ *
+ * Until this card the ONLY surface in the portal that could close this action
+ * was `RecordSupplierAnswerModal`, on RECEIVING — while §1's role-anchor (Loo,
+ * 2026-08-05) gives every call that ASKS THE SUPPLIER for something to the
+ * buyer. Its twin, the tomorrow call, had grown TWO doors on TWO tabs for the
+ * same reason. Q12 ruled which one stays; this is the balance half landing
+ * where its queue already was, which is Loo's own words on `Confirm ready
+ * date` the same day: **queue and door in one place.**
+ *
+ * **IT IS RENDERED FROM THE ENGINE'S ARRAY, NEVER FROM THE ITEM ROWS, AND THAT
+ * IS WHAT MAKES "ONE DOOR PER LINE" STRUCTURAL RATHER THAN A RULE SOMEBODY
+ * KEEPS.** `balanceDeliveryCallsOf` walks `po.lines`, so it can emit at most
+ * one call per LINE. The Items grid below walks `docRowsOf`, which deals ONE
+ * line out across every sales order it covers — measured on production
+ * 2026-08-05, **7 of 21 open POs carry more than one SO and they hold 18 of the
+ * 35 lines**, so a button on the item row would have given one fact two to five
+ * doors. That is the very defect this card removes, one tier down.
+ *
+ * The manner is `SupplierDateForm`'s, not `ReadyDateField`'s: this is a
+ * multi-field form, and Jess ruled those get a real button ("i cant save?").
+ * Every visible string is ruled — the queue word, `Record balance date` and
+ * `Balance date recorded` are `order-action-words`', and the line's own fact is
+ * `poReceivingProgress().pendingLabel`, R1's shipped sentence, exactly as the
+ * retired modal printed it. **`Remarks` is this surface's own live word for
+ * free text** (the date form beside it), chosen over the modal's
+ * `Note (optional)` so that one page does not spell one thing two ways.
+ */
+function BalanceDateRow({
+  call,
+  po,
+}: {
+  call: PurchasingOpenCall;
+  po: operationPoListRow;
+}) {
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState("");
+  const [remarks, setRemarks] = useState("");
+  const [remarksOpen, setRemarksOpen] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const save = useRecordBalanceDateMutation();
+
+  const line = po.purchase_order_lines.find((l) => l.id === call.poLineId) ?? null;
+  const pending = poReceivingProgress(line ? [line] : []).pendingLabel;
+
+  const close = () => {
+    setOpen(false);
+    setDate("");
+    setRemarks("");
+    setRemarksOpen(false);
+    setErr(null);
+  };
+  const submit = () => {
+    if (date === "" || save.isPending || !call.poLineId) return;
+    setErr(null);
+    save.mutate(
+      {
+        poLineId: call.poLineId,
+        newDate: date,
+        ...(remarks.trim() ? { reason: remarks.trim() } : {}),
+      },
+      {
+        onSuccess: close,
+        onError: (e) => setErr(e instanceof Error ? e.message : String(e)),
+      },
+    );
+  };
+  const keys = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") close();
+  };
+
+  return (
+    <div data-testid={`po-balance-${call.poLineId}`}>
+      <CallStatement call={call}>
+        {/* WHICH line, and how much of it is short. A PO can carry several
+            balance calls at once, so the queue word alone does not say which
+            one this row is about. */}
+        <span className="min-w-0 truncate text-label text-kit-slate-9">
+          {call.sku}
+          {pending ? ` · ${pending}` : ""}
+        </span>
+      </CallStatement>
+
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          data-testid={`po-balance-open-${call.poLineId}`}
+          className="text-body text-kit-slate-9 border-b border-dashed border-kit-slate-5 hover:text-kit-slate-12"
+        >
+          Record the balance date…
+        </button>
+      ) : (
+        <div className="py-1" data-testid={`po-balance-form-${call.poLineId}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="date"
+              value={date}
+              autoFocus
+              onChange={(e) => setDate(e.target.value)}
+              onKeyDown={keys}
+              aria-label={purchasingActionQueue("confirm_balance_delivery_date")}
+              data-testid={`po-balance-input-${call.poLineId}`}
+              className="h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+            />
+            {remarksOpen ? (
+              <input
+                type="text"
+                value={remarks}
+                autoFocus
+                onChange={(e) => setRemarks(e.target.value)}
+                onKeyDown={keys}
+                placeholder="Remarks"
+                aria-label="Remarks"
+                data-testid={`po-balance-remarks-${call.poLineId}`}
+                className="h-8 flex-1 min-w-[8rem] rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setRemarksOpen(true)}
+                data-testid={`po-balance-remarks-open-${call.poLineId}`}
+                className="text-label text-kit-slate-9 border-b border-dashed border-kit-slate-5 hover:text-kit-slate-12"
+              >
+                + Remarks
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={submit}
+              disabled={date === "" || save.isPending}
+              data-testid={`po-balance-save-${call.poLineId}`}
+              className={`${DOC_BTN} disabled:opacity-40`}
+            >
+              {save.isPending
+                ? "Saving…"
+                : purchasingActionButton("confirm_balance_delivery_date")}
+            </button>
+            <button
+              type="button"
+              onClick={close}
+              data-testid={`po-balance-cancel-${call.poLineId}`}
+              className="text-label text-kit-slate-9 hover:text-kit-slate-12"
+            >
+              Cancel
+            </button>
+          </div>
+          {err && (
+            <div
+              className="mt-1 text-label text-kit-red-11"
+              data-testid={`po-balance-error-${call.poLineId}`}
+            >
+              {err}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

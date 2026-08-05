@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -319,13 +319,22 @@ const PURCHASING_SETTINGS = {
   suppliers: [{ id: OHANA, offDays: [0] }],
 };
 
-beforeEach(() => {
+/**
+ * The api, with the PO list as a PARAMETER.
+ *
+ * Q14 needed a part-received PO and the default list has none — but ~110 tests
+ * read the default one, and the risk-order suite asserts its exact sequence, so
+ * a tenth PO in the shared array would have rewritten frozen expectations to
+ * make a new feature pass. The list is an argument instead: every existing test
+ * keeps the fixture it was written against, byte for byte.
+ */
+function mockApi(pos: unknown[] = POS) {
   apiFetch.mockReset();
   apiFetch.mockImplementation((url: string) => {
     if (url.includes("/units")) return Promise.resolve({ units: [] });
     if (url.startsWith("/api/operation/pos"))
       return Promise.resolve({
-        pos: POS,
+        pos,
         destinations: DESTINATIONS,
         messageTemplate: null,
       });
@@ -358,6 +367,10 @@ beforeEach(() => {
       return Promise.resolve(PURCHASING_SETTINGS);
     return Promise.resolve({});
   });
+}
+
+beforeEach(() => {
+  mockApi();
 });
 
 function mount() {
@@ -504,6 +517,260 @@ describe("the nine frozen columns — ONE set, always", () => {
     // and it is silent — same treatment as the checkbox column.
     expect(all[0]).toBe("");
     expect(all.filter((t) => t === "")).toHaveLength(1);
+  });
+});
+
+/**
+ * Q14 · THE SOURCE SCAN — §12.7.5 rule 3 (ONE editing surface) made countable.
+ *
+ * A RENDER TEST CANNOT GUARD THIS and the repo has paid for the lesson four
+ * times (R8 · C1 · P13 · Q7): a render test only sees the branches its fixture
+ * reaches, and a second door on another page is a branch this suite never
+ * mounts. So the whole `apps/web` tree is read from disk and the callers are
+ * counted. The two endpoints had TWO and ONE door respectively, on the wrong
+ * tab; after Q14 each has exactly one, and both are the register's.
+ *
+ * Comments are NOT stripped — the tombstones that record where the retired
+ * doors stood are counted as prose, not as calls, because they name no hook.
+ */
+describe("one supplier date, one door — counted across apps/web", () => {
+  const WEB_SRC = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+  /** Every `.ts`/`.tsx` under apps/web/src, excluding test files. */
+  function sourceFiles(dir: string, out: string[] = []): string[] {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) sourceFiles(p, out);
+      else if (/\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) out.push(p);
+    }
+    return out;
+  }
+  const files = sourceFiles(WEB_SRC);
+  const hitsFor = (needle: string) =>
+    files.filter((f) => readFileSync(f, "utf8").includes(needle));
+
+  it("the tomorrow-delivery endpoint has exactly ONE caller", () => {
+    // The URL is built in the hook, so the hook is what a caller names.
+    const callers = hitsFor("useRecordSupplierDate(");
+    expect(callers.map((f) => f.replace(WEB_SRC, "")).sort()).toEqual([
+      "/lib/queries.ts", // where it is defined
+      "/pages/operation/OperationPurchaseOrders.tsx", // the one door
+    ]);
+    // And no SECOND hook writes that endpoint any more.
+    expect(hitsFor("/tomorrow-delivery")).toHaveLength(1);
+  });
+
+  it("the balance-date endpoint has exactly ONE caller, on Purchase Orders", () => {
+    const callers = hitsFor("useRecordBalanceDateMutation(");
+    expect(callers.map((f) => f.replace(WEB_SRC, "")).sort()).toEqual([
+      "/lib/queries.ts",
+      "/pages/operation/OperationPurchaseOrders.tsx",
+    ]);
+    expect(hitsFor("/balance-date")).toHaveLength(1);
+  });
+
+  it("the Receiving modal is gone, not merely unrendered", () => {
+    // A component with no callers left behind is the dead-state disease this
+    // card exists to remove — so the FILE is gone, not just unrendered…
+    expect(
+      existsSync(join(WEB_SRC, "pages/operation/components/RecordSupplierAnswerModal.tsx")),
+    ).toBe(false);
+    // …and nothing imports it or the hook it drove. The surviving mentions are
+    // prose tombstones recording where the doors stood; a tombstone names no
+    // import, which is exactly why this scans for the `import` and not the word.
+    expect(hitsFor("from \"./RecordSupplierAnswerModal\"")).toHaveLength(0);
+    // The TRAILING PAREN is load-bearing and this assertion earned it by
+    // failing: the tombstone in `queries.ts` names the retired hook in prose,
+    // so scanning for the bare word counted a comment as a caller. A call and
+    // a definition both carry `(`; a sentence about either does not.
+    expect(hitsFor("useRecordTomorrowDeliveryMutation(")).toHaveLength(0);
+  });
+});
+
+/**
+ * Q14 · `Confirm balance delivery date` — ONE SUPPLIER DATE, ONE DOOR.
+ *
+ * Loo's role-anchor (2026-08-05): a call that ASKS THE SUPPLIER for something
+ * is the buyer's work. Until this card the only surface that could close this
+ * action was a modal on RECEIVING, and its twin — the tomorrow call — had two
+ * doors on two tabs writing one endpoint. The queue was already here; the door
+ * has joined it.
+ */
+describe("the balance-date door (Q14 — the queue and the door in one place)", () => {
+  /**
+   * THE BALANCE CALL'S OWN PO — kept OUT of the shared list on purpose (see
+   * `mockApi`). Two lines came SHORT (1 of 2 · 2 of 5), so the engine opens ONE
+   * `confirm_balance_delivery_date` per LINE; a third line is complete and must
+   * raise nothing. `short_since` gives the calls their due, and the arrival is
+   * far future so the TOMORROW call stays shut and the two cannot be confused.
+   *
+   * **Line j1 deliberately covers TWO sales orders.** `docRowsOf` deals it out
+   * into two display rows, so a door rendered off the item grid would give this
+   * ONE line TWO buttons — the two-doors defect Q14 removes, one tier down.
+   * Measured on production 2026-08-05: 7 of 21 open POs carry more than one SO,
+   * and they hold 18 of the 35 lines.
+   */
+  const SHORT_PO = {
+    id: "PO-9010",
+    supplier_id: OHANA,
+    warehouse_id: WH,
+    destination_id: KLANG,
+    status: "open",
+    sup_status: "confirmed",
+    so: 2000,
+    so_refs: [2001],
+    eta_date: "2099-09-09",
+    placed_at: "2026-07-01T08:00:00Z",
+    customer_delivery: "2099-09-30",
+    eta_revised: false,
+    orders: [],
+    purchase_order_lines: [
+      {
+        id: "j1",
+        sku: "SKU-CODY-Q",
+        qty: 2,
+        received_qty: 1,
+        short_since: "2026-07-20",
+        model_name: "Cody",
+        size: "Queen",
+        attrs: null,
+        so_rows: [
+          { so: 2000, qty: 1, remark: null },
+          { so: 2001, qty: 1, remark: null },
+        ],
+      },
+      {
+        id: "j2",
+        sku: "SKU-SONIC-K",
+        qty: 5,
+        received_qty: 2,
+        short_since: "2026-07-22",
+        model_name: "Sonic",
+        size: "King",
+        attrs: null,
+        so_rows: [{ so: 2000, qty: 5, remark: null }],
+      },
+      // Fully received → no balance owed → no call, no door.
+      {
+        id: "j3",
+        sku: "SKU-ONYX-L",
+        qty: 1,
+        received_qty: 1,
+        model_name: "Onyx",
+        size: null,
+        attrs: null,
+        so_rows: [{ so: 2000, qty: 1, remark: null }],
+      },
+    ],
+  };
+
+  /** Mount on the short PO alone, then open its work area and date extend. */
+  async function openShortPo() {
+    mockApi([SHORT_PO]);
+    mount();
+    await waitFor(() =>
+      expect(screen.getByText("PO-9010")).toBeInTheDocument(),
+    );
+    const work = await expandPo("PO-9010");
+    fireEvent.click(work.getByTestId("po-date-row"));
+    return work;
+  }
+
+  it("a part-received line offers the door; a full line does not", async () => {
+    await openShortPo();
+    // j1 (1 of 2) and j2 (2 of 5) are short; j3 is complete and raises nothing.
+    expect(screen.getByTestId("po-balance-j1")).toBeInTheDocument();
+    expect(screen.getByTestId("po-balance-j2")).toBeInTheDocument();
+    expect(screen.queryByTestId("po-balance-j3")).not.toBeInTheDocument();
+  });
+
+  /**
+   * THE STRUCTURAL ONE. The door is rendered from the ENGINE'S array, which
+   * walks `po.lines`, and never from `docRowsOf`, which deals one line out
+   * across every SO it covers. j1 covers TWO sales orders and therefore renders
+   * TWO item rows — so a door built off the grid would hand one fact two
+   * buttons, which is this card's own defect one tier down.
+   */
+  it("a line covering TWO sales orders still has exactly ONE door", async () => {
+    const work = await openShortPo();
+    // The grid really does split j1 in two — otherwise this proves nothing.
+    expect(within(work.getByTestId("po-item-row-1")).getByText("SO-2000"))
+      .toBeInTheDocument();
+    expect(within(work.getByTestId("po-item-row-2")).getByText("SO-2001"))
+      .toBeInTheDocument();
+    // …and the door still counts ONE, because it is rendered from the engine's
+    // per-LINE array and never from those rows.
+    expect(screen.getAllByTestId("po-balance-j1")).toHaveLength(1);
+    expect(screen.getAllByTestId(/^po-balance-open-/)).toHaveLength(2); // j1, j2
+  });
+
+  it("the row names WHICH line is short, and by how much", async () => {
+    await openShortPo();
+    const row = within(screen.getByTestId("po-balance-j2"));
+    expect(row.getByText(/SKU-SONIC-K/)).toBeInTheDocument();
+    // R1's own shipped sentence — 5 ordered, 2 in, 3 owed.
+    expect(row.getByText(/3 units pending delivery/)).toBeInTheDocument();
+  });
+
+  it("recording a date posts to the LINE's balance-date endpoint", async () => {
+    await openShortPo();
+    fireEvent.click(screen.getByTestId("po-balance-open-j2"));
+    fireEvent.change(screen.getByTestId("po-balance-input-j2"), {
+      target: { value: "2099-10-10" },
+    });
+    fireEvent.click(screen.getByTestId("po-balance-remarks-open-j2"));
+    fireEvent.change(screen.getByTestId("po-balance-remarks-j2"), {
+      target: { value: "van comes Friday" },
+    });
+    fireEvent.click(screen.getByTestId("po-balance-save-j2"));
+    await waitFor(() =>
+      expect(
+        apiFetch.mock.calls.some((c) => String(c[0]).includes("/balance-date")),
+      ).toBe(true),
+    );
+    const call = apiFetch.mock.calls.find((c) =>
+      String(c[0]).includes("/balance-date"),
+    )!;
+    // Keyed on the PO LINE — §3 counts this action per line, and the SO slice
+    // has no identity the endpoint would accept.
+    expect(String(call[0])).toContain("/pos/lines/j2/balance-date");
+    expect(JSON.parse(String((call[1] as { body: string }).body))).toMatchObject({
+      newDate: "2099-10-10",
+      reason: "van comes Friday",
+    });
+  });
+
+  it("the form is QUIET until asked for, and Esc records nothing", async () => {
+    await openShortPo();
+    expect(screen.queryByTestId("po-balance-form-j1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("po-balance-open-j1"));
+    // A multi-field form gets a real Save (Jess), disabled until it can act.
+    expect(screen.getByTestId("po-balance-save-j1")).toBeDisabled();
+    fireEvent.change(screen.getByTestId("po-balance-input-j1"), {
+      target: { value: "2099-10-10" },
+    });
+    fireEvent.keyDown(screen.getByTestId("po-balance-input-j1"), { key: "Escape" });
+    expect(screen.queryByTestId("po-balance-form-j1")).not.toBeInTheDocument();
+    expect(
+      apiFetch.mock.calls.some((c) => String(c[0]).includes("/balance-date")),
+    ).toBe(false);
+  });
+
+  /**
+   * THE OTHER HALF OF "ONE DOOR". The tomorrow call keeps its statement and
+   * gains no trigger: its door is `SupplierDateForm`, on this same surface a
+   * line above. A second one here would rebuild what Q14 tore down.
+   */
+  it("the TOMORROW call is stated here and has no door of its own", async () => {
+    await mountLoaded();
+    const work = await expandPo("PO-9003"); // arrives today → the call is open
+    fireEvent.click(work.getByTestId("po-date-row"));
+    // Scoped to the expand: the Current Action column says the same words on
+    // the row above, and this test is about the WORK AREA's own statement.
+    expect(work.getByText("Confirm tomorrow's delivery")).toBeInTheDocument();
+    expect(screen.queryByTestId(/^po-balance-/)).not.toBeInTheDocument();
+    // Its one door, unchanged.
+    expect(screen.getByTestId("po-date-open")).toBeInTheDocument();
   });
 });
 

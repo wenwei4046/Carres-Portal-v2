@@ -964,7 +964,6 @@ export default function OperationReceiving() {
               po={selected}
               supplier={supplierById.get(selected.supplier_id)}
               warehouseName={warehouseById.get(selected.warehouse_id)?.name ?? "—"}
-              calls={callsById.get(selected.id) ?? []}
               receiving={receiving}
               onReceiving={setReceiving}
             />
