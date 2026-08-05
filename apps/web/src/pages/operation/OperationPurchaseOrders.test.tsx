@@ -408,7 +408,9 @@ async function openPo(id: string) {
   fireEvent.click(listing().getByText(id));
   await waitFor(() =>
     expect(
-      within(screen.getByTestId("po-working-header")).getByText(id),
+      // Q10: the panel's identity row — the PO number and the actions ON it
+      // sit together at the top, and the four facts follow underneath.
+      within(screen.getByTestId("po-panel-title")).getByText(id),
     ).toBeInTheDocument(),
   );
 }
@@ -455,13 +457,22 @@ describe("the nine frozen columns — ONE set, always", () => {
   it("opening and closing the workspace changes NO column", async () => {
     await mountLoaded();
     const open = headerTexts();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
+    // Q10: the control moved to the panel's own top-right, and a row click
+    // brings the panel back — there is no "show" button to press.
+    fireEvent.click(screen.getByTestId("po-panel-close"));
     const closed = headerTexts();
-    fireEvent.click(screen.getByTestId("po-workspace-toggle"));
+    fireEvent.click(listing().getByText("PO-9001"));
     const reopened = headerTexts();
     expect(open).toEqual(NINE);
     expect(closed).toEqual(NINE);
     expect(reopened).toEqual(NINE);
+  });
+
+  /** The other way of looking at a PO must not move a column either. */
+  it("expanding a row changes NO column", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("table-expand-PO-9003"));
+    expect(headerTexts()).toEqual(NINE);
   });
 
   /** The honesty guard did not have to be kept: a column that can never hide
@@ -1007,16 +1018,22 @@ describe("the PO Issued ▼ — Excel's date menu", () => {
 });
 
 describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
-  it("the fixed header: labels left, PO number right, no letterhead, no badge", async () => {
+  it("the fixed header: labels left, PO number on the title row, no letterhead, no badge", async () => {
     await mountLoaded();
     expect(document.querySelector('img[alt="Carres"]')).toBeNull();
     const header = within(screen.getByTestId("po-working-header"));
     expect(header.getByText("PO Issued")).toBeInTheDocument();
     expect(header.getByText("Delivery To")).toBeInTheDocument();
     expect(header.getByText("Supplier")).toBeInTheDocument();
-    // The auto-selected PO is the register's FIRST row, which is now the most
-    // dangerous one rather than the oldest document (Loo, 2026-08-04).
-    expect(header.getByText("PO-9003")).toBeInTheDocument();
+    // Q10 Ⓔ: the number and the actions on it moved UP to their own row —
+    // the object's identity and its actions belong together (Fiori · BC ·
+    // GitHub · Linear). The auto-selected PO is the register's FIRST row,
+    // which is the most dangerous one rather than the oldest document.
+    const title = within(screen.getByTestId("po-panel-title"));
+    expect(title.getByText("PO-9003")).toBeInTheDocument();
+    expect(title.getByTestId("po-print-pdf")).toBeInTheDocument();
+    expect(title.getByTestId("po-panel-close")).toBeInTheDocument();
+    expect(header.queryByText("PO-9003")).toBeNull();
     // Progress belongs to the rail — the header never repeats it.
     expect(screen.queryByTestId("po-work-state")).not.toBeInTheDocument();
   });
@@ -1089,14 +1106,18 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
   // is retired (her 2026-08-02 word), and `History` is deliberately NOT taken:
   // the PO's real history will later carry revisions, ETA changes, Goods
   // Arrival changes, notes and claims.
-  it("the desk is three bands — Document · Communication · Communication History", async () => {
+  // Q10 Ⓔ took `DOCUMENT` off the desk: it headed ONE button, and its title
+  // plus hairline cost ~30px for nothing. `Print PDF` sits beside the PO
+  // number now; the three Communication controls did NOT follow it up there
+  // (measured 385.1px against 368px usable) and this band keeps its home.
+  it("the desk is two bands — Communication · Communication History", async () => {
     await mountLoaded();
     const activity = within(screen.getByTestId("po-activity"));
-    expect(activity.getByText("Document")).toBeInTheDocument();
+    expect(activity.queryByText("Document")).not.toBeInTheDocument();
     expect(activity.getByText("Communication")).toBeInTheDocument();
     expect(activity.getByText("Communication History")).toBeInTheDocument();
     expect(activity.queryByText("Activity")).not.toBeInTheDocument();
-    expect(activity.getByTestId("po-print-pdf")).toBeInTheDocument();
+    expect(activity.queryByTestId("po-print-pdf")).not.toBeInTheDocument();
     expect(activity.getByTestId("po-copy-message")).toBeInTheDocument();
     // `PO issued` was deleted: the header already states it (Jess).
     expect(screen.getByTestId("po-history").textContent).toBe("No communication yet.");
@@ -1423,7 +1444,6 @@ describe("the working area (Q5)", () => {
     expect(panel.queryByTestId("po-doc-items")).toBeNull();
     expect(panel.getByTestId("po-working-header")).toBeInTheDocument();
     expect(panel.getByTestId("po-activity")).toBeInTheDocument();
-    expect(panel.getByText("Document")).toBeInTheDocument();
     expect(panel.getByText("Communication")).toBeInTheDocument();
     expect(panel.getByText("Communication History")).toBeInTheDocument();
     expect(panel.getByTestId("po-print-pdf")).toBeInTheDocument();
@@ -1621,7 +1641,7 @@ describe("what we sent the supplier (0312)", () => {
     fireEvent.click(listing().getByText("PO-9003"));
     await waitFor(() =>
       expect(
-        within(screen.getByTestId("po-working-header")).getByText("PO-9003"),
+        within(screen.getByTestId("po-panel-title")).getByText("PO-9003"),
       ).toBeInTheDocument(),
     );
     expect(screen.queryByTestId("po-open-email")).not.toBeInTheDocument();
@@ -1666,7 +1686,7 @@ describe("what we sent the supplier (0312)", () => {
     fireEvent.click(listing().getByText("PO-9005"));
     await waitFor(() =>
       expect(
-        within(screen.getByTestId("po-working-header")).getByText("PO-9005"),
+        within(screen.getByTestId("po-panel-title")).getByText("PO-9005"),
       ).toBeInTheDocument(),
     );
     const h = within(screen.getByTestId("po-history"));
@@ -1713,7 +1733,7 @@ describe("what we sent the supplier (0312)", () => {
     fireEvent.click(listing().getByText("PO-9003"));
     await waitFor(() =>
       expect(
-        within(screen.getByTestId("po-working-header")).getByText("PO-9003"),
+        within(screen.getByTestId("po-panel-title")).getByText("PO-9003"),
       ).toBeInTheDocument(),
     );
     const grp = screen.getByTestId("po-open-whatsapp") as HTMLAnchorElement;
@@ -1732,5 +1752,165 @@ describe("what we sent the supplier (0312)", () => {
     }
     // And the bare Phase-3 labels must not come back.
     expect(desk).not.toMatch(/(^|\W)Copy(\W|$)/);
+  });
+});
+
+/**
+ * Q10 · ONE PURCHASE ORDER, ONE WAY OF LOOKING AT IT
+ * (Loo, 2026-08-05 — from a top-to-toe review of the LIVE page.)
+ *
+ * Measured at 1280 before this card: the register's table was 1203px inside a
+ * 568px listing — 635px off the right edge, taking `Customer Delivery`,
+ * `Expected Arrival` and `Current Action` with it — while the expanded row
+ * showed `PO-2038` and the panel beside it showed `PO-2032`. **Two different
+ * purchase orders on one screen.**
+ *
+ * The fix is a STATE, not a rule: ONE id, ONE mode. Two POs are structurally
+ * unrepresentable, so the tests below cannot be made to fail by an operator
+ * clicking in an unexpected order — they can only fail if somebody splits the
+ * state again.
+ */
+describe("one purchase order, one way of looking at it (Q10)", () => {
+  it("the panel and the expand can never show two different POs", async () => {
+    await mountLoaded();
+    // The panel opens on PO-9003 (the register's first row by risk).
+    expect(
+      within(screen.getByTestId("po-panel-title")).getByText("PO-9003"),
+    ).toBeInTheDocument();
+
+    // Expand a DIFFERENT row. The old page left the panel on PO-9003 and put
+    // PO-9001 in the expand — the defect this card exists for.
+    await expandPo("PO-9001");
+    expect(screen.queryByTestId("po-document")).toBeNull();
+    expect(screen.getByTestId("po-work-PO-9001")).toBeInTheDocument();
+
+    // Collapse: the panel comes back on the PO that was being worked on,
+    // never on the one it was left behind at.
+    fireEvent.click(screen.getByTestId("table-expand-PO-9001"));
+    await waitFor(() =>
+      expect(screen.getByTestId("po-document")).toBeInTheDocument(),
+    );
+    expect(
+      within(screen.getByTestId("po-panel-title")).getByText("PO-9001"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("po-panel-title")).queryByText("PO-9003"),
+    ).toBeNull();
+  });
+
+  it("expanding a row closes the panel and hands the listing its 400px back", async () => {
+    await mountLoaded();
+    expect(screen.getByTestId("po-workspace").className).toContain("w-[400px]");
+    await expandPo("PO-9003");
+    // The pane is not merely empty — it is not on the stage at all, which is
+    // what gives the register the full width its nine columns were measured
+    // for. (The pixel proof is a real browser; jsdom has no widths.)
+    expect(screen.getByTestId("po-workspace").className).toContain("hidden");
+    expect(screen.queryByTestId("po-document")).toBeNull();
+  });
+
+  it("the panel's ✕ closes it, and clicking any row brings it back", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-panel-close"));
+    expect(screen.queryByTestId("po-document")).toBeNull();
+    // Before Q10 this was a DEAD END: `openPo` only wrote the URL, so with the
+    // pane hidden a row click did nothing and the operator was stuck.
+    fireEvent.click(listing().getByText("PO-9001"));
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("po-panel-title")).getByText("PO-9001"),
+      ).toBeInTheDocument(),
+    );
+    // No "show" control was needed, and none was invented.
+    expect(screen.queryByTestId("po-workspace-toggle")).toBeNull();
+  });
+
+  it("the panel says what is ON the purchase order — without expanding the row", async () => {
+    await mountLoaded();
+    const items = within(screen.getByTestId("po-panel-items"));
+    // PO-9003 is three lines, one of them covering two sales orders → four
+    // rows, four units ordered, none received. Read WITHOUT expanding.
+    expect(screen.queryByTestId("po-work-PO-9003")).toBeNull();
+    expect(items.getByText("SO-1300")).toBeInTheDocument();
+    expect(items.getByText("SO-1301")).toBeInTheDocument();
+    // Two rows for one line — the Excel rows, one per SO × SKU.
+    expect(items.getAllByText("Cody Q")).toHaveLength(2);
+    expect(items.getByText("Sonic K")).toBeInTheDocument();
+    expect(items.getByTestId("po-panel-item-4")).toBeInTheDocument();
+    expect(items.queryByTestId("po-panel-item-5")).toBeNull();
+    expect(items.getByText("Total")).toBeInTheDocument();
+  });
+
+  /**
+   * §12.7.5 rule 1 as Loo narrowed it: **a fact may be READ in two tiers and
+   * WRITTEN in only one.** Rule 3 (ONE editing surface) is untouched, and this
+   * is what keeps it true — two editable copies of one PO line will disagree.
+   */
+  it("the panel's items block holds no editable control at all", async () => {
+    await mountLoaded();
+    const block = screen.getByTestId("po-panel-items");
+    expect(block.querySelectorAll("button")).toHaveLength(0);
+    expect(block.querySelectorAll("input")).toHaveLength(0);
+    expect(block.querySelectorAll("select")).toHaveLength(0);
+    expect(block.querySelectorAll("textarea")).toHaveLength(0);
+    // Nor the doors themselves, under any name.
+    expect(within(block).queryByText("Save")).toBeNull();
+    expect(within(block).queryByText("⋮")).toBeNull();
+  });
+
+  it("`Print PDF` sits beside the PO number, and the DOCUMENT band is gone", async () => {
+    await mountLoaded();
+    expect(
+      within(screen.getByTestId("po-panel-title")).getByTestId("po-print-pdf"),
+    ).toBeInTheDocument();
+    // The band held ONE button; its title and hairline cost ~30px for nothing.
+    expect(screen.getByTestId("po-document").textContent).not.toMatch(
+      /(^|\W)Document(\W|$)/,
+    );
+  });
+
+  /**
+   * Ⓓ — THE EXPAND LIVES INSIDE THE VISIBLE WIDTH.
+   *
+   * jsdom has no widths, so this asserts the STRUCTURE that produces them and
+   * the real numbers are measured in a browser: the record is sized to the
+   * scroller's visible width (`100cqi`) rather than to the 1205px table its
+   * cell spans, and `Description` is a `minmax(0,1fr)` track that takes what is
+   * LEFT of the five measured ones — never `flex-1`, which is what took 787px
+   * and pushed `Qty`, `Destination` and `Received` off the right edge.
+   */
+  it("the expanded record is sized to the visible width, not to the table", async () => {
+    await mountLoaded();
+    await expandPo("PO-9003");
+    const cls = screen.getByTestId("po-work-PO-9003").className;
+    expect(cls).toContain("100cqi");
+    // `sticky` was measured NOT to hold inside a table cell, so it is not left
+    // here as a class that does nothing.
+    expect(cls).not.toContain("sticky");
+    // And the scroller it is measured against really is a query container —
+    // without it, `100cqi` resolves against the page and the pin is a lie.
+    const scroller = screen
+      .getByTestId("po-listing")
+      .querySelector('[class*="container-type:inline-size"]');
+    expect(scroller).not.toBeNull();
+    expect(scroller!.className).toContain("overflow-auto");
+  });
+
+  it("Description takes what is LEFT — the six columns are exact tracks, not a flex row", async () => {
+    await mountLoaded();
+    await expandPo("PO-9003");
+    const items = screen.getByTestId("po-doc-items");
+    const header = items.firstElementChild as HTMLElement;
+    const row = screen.getByTestId("po-item-row-1");
+    for (const el of [header, row]) {
+      expect(el.className).toContain(
+        "grid-cols-[16px_64px_minmax(0,1fr)_40px_160px_64px]",
+      );
+      expect(el.className).not.toContain("flex ");
+    }
+    // The one flexible track is Description, and nothing else may grow.
+    expect(
+      (row.children[2] as HTMLElement).className,
+    ).not.toContain("flex-1");
   });
 });

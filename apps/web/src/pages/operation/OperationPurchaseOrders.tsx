@@ -107,6 +107,22 @@ import {
  *     ACTIVITY (tools + business timeline). See WorkspaceBody's comment
  *     for the full architecture; GRN and Claim will speak the same shape.
  *
+ * **ONE PURCHASE ORDER, ONE WAY OF LOOKING AT IT** (Q10 · Loo, 2026-08-05,
+ * from a top-to-toe review of the LIVE page). Measured at 1280: the register's
+ * table is 1203px inside a 568px listing — 635px off the right edge, taking
+ * `Customer Delivery`, `Expected Arrival` and `Current Action` with it — while
+ * the expanded row showed `PO-2038` and the panel beside it showed `PO-2032`.
+ * **Two different purchase orders on one screen.**
+ *
+ * The fix is a STATE, not a rule: `{ poId, mode }` — see `nextPoView`. One id
+ * feeds the panel AND the expanded set, so two POs are structurally
+ * unrepresentable, and the two ways of looking at one PO are exclusive:
+ *
+ *     click a row      → the PANEL opens on that PO
+ *     click the ⌄      → the row EXPANDS and the panel CLOSES (full listing)
+ *     collapse the ⌃   → the panel comes back, same PO
+ *     the panel's ✕    → closes it; clicking any row brings it back
+ *
  * Mission: pick today's supplier PO → update supplier progress → talk to the
  * supplier → hand over to Receiving.
  *
@@ -252,6 +268,67 @@ const PANE_BTN =
 const DOC_BTN =
   "px-3 py-1 rounded border border-kit-slate-5 text-body text-kit-slate-11 hover:text-kit-slate-12";
 
+/**
+ * ── THE ONE STATE (Q10 · Loo, 2026-08-05) ─────────────────────────────────
+ *
+ * **A purchase order is looked at in ONE of two ways, never both**: the RIGHT
+ * PANEL to read it, print it and talk to the supplier; the ROW EXPAND to change
+ * its lines. Before this card the page held those as two independent stores —
+ * `?po=` for the panel and `expandedPo` for the expand — and they drifted the
+ * first time an operator used them: the expanded row said `PO-2038` while the
+ * panel beside it said `PO-2032`.
+ *
+ * **There is ONE id and ONE mode, so two different purchase orders cannot be
+ * represented at all.** That is the same move Q5 made for "one expand at a
+ * time" (a single id, never a Set): a rule that says *keep them in step* is a
+ * rule somebody will break; a state that cannot hold two is not.
+ *
+ * `closed` is the panel's ✕ — the selection survives it, which is why clicking
+ * any row brings the panel straight back and no "show" control is needed.
+ */
+type PoMode = "panel" | "expand" | "closed";
+type PoView = { readonly poId: string | null; readonly mode: PoMode };
+type PoEvent =
+  /** A row was clicked — read this PO. */
+  | { readonly type: "open"; readonly id: string }
+  /** The row's ⌄ / ⌃ — work on this PO's lines, or stop. */
+  | { readonly type: "toggleExpand"; readonly id: string }
+  /** The panel's ✕. */
+  | { readonly type: "close" };
+
+function nextPoView(cur: PoView, ev: PoEvent): PoView {
+  switch (ev.type) {
+    case "open":
+      return { poId: ev.id, mode: "panel" };
+    case "toggleExpand":
+      // Expanding a DIFFERENT row moves the selection with it — that is the
+      // whole point: the panel can never be left behind on another PO.
+      return cur.poId === ev.id && cur.mode === "expand"
+        ? { poId: ev.id, mode: "panel" }
+        : { poId: ev.id, mode: "expand" };
+    case "close":
+      return { poId: cur.poId, mode: "closed" };
+  }
+}
+
+/** The kit takes a Set; the page has ONE id and ONE mode. */
+const NO_EXPANSION: ReadonlySet<string> = new Set<string>();
+
+/**
+ * THE WORKING AREA'S SIX COLUMNS — one recipe, spelled once (§6.6), so the
+ * header, every line and the total row cannot drift apart.
+ *
+ * **A GRID, not a flex row, and that is Q10 Ⓓ.** `Description` was `flex-1`
+ * inside a cell that spans the whole 1205px table, so it took 787px and pushed
+ * `Qty`, `Destination` and `Received` past the right edge of a 568px listing.
+ * `minmax(0, 1fr)` takes what is LEFT of the five measured tracks and can never
+ * take more; the tracks themselves are exact, so no fixed column can be
+ * squeezed either. Sum of the fixed tracks + gaps = 384px, which is what the
+ * expand needs before `Description` gets its first pixel.
+ */
+const ITEM_GRID =
+  "grid grid-cols-[16px_64px_minmax(0,1fr)_40px_160px_64px] gap-2";
+
 export default function OperationPurchaseOrders() {
   const posQ = useOperationPos({ status: "all" });
   const suppliersQ = useOperationSuppliers();
@@ -266,18 +343,22 @@ export default function OperationPurchaseOrders() {
     new Map(),
   );
   const [stateSel, setStateSel] = useState<WorkState | null>(null);
-  // ONE pane toggle survives (Jess, 2026-08-02 late — overrides her earlier
-  // "all three panes hide"): the workspace open/close, which drives Gmail's
-  // reading-pane compact mode. Its control lives in the SHELL's page-meta
-  // slot, not in a pane corner — no master grows arrows on panels.
-  const [workspaceOpen, setWorkspaceOpen] = useState(true);
   /**
-   * ONE PO EXPANDS AT A TIME (Loo's rule 2, §12.7.5) — so this is a single id,
-   * not a Set: the state cannot represent two open rows, which is stronger than
-   * a rule that closes the other one. The expand holds date pickers, dropdowns
-   * and inputs, and three open at once is a page of live controls with no focus.
+   * HOW this PO is being looked at — see `nextPoView`. WHICH PO it is lives in
+   * `?po=`, and there is only ever one of it, so the panel and the expand
+   * cannot name two different purchase orders.
+   *
+   * Jess's 2026-08-02 shell toggle is GONE with this state (Q10 Ⓐ): it lived in
+   * the shell's page-meta slot and it was a dead end — `openPo` only wrote the
+   * URL, so once the panel was hidden, clicking a row did nothing at all. The
+   * close control belongs to the panel it closes (Gmail · GitHub · Linear ·
+   * Fiori all put it at the panel's own top-right), and with it there, clicking
+   * any row brings the panel back — so no "show" button is needed.
+   *
+   * ONE PO EXPANDS AT A TIME (Loo's rule 2, §12.7.5) holds for free: `poId` is
+   * a single id, so the state cannot represent two open rows.
    */
-  const [expandedPo, setExpandedPo] = useState<string | null>(null);
+  const [mode, setMode] = useState<PoMode>("panel");
 
   const today = todayMYT();
   const pos = useMemo(() => posQ.data?.pos ?? [], [posQ.data]);
@@ -660,12 +741,22 @@ export default function OperationPurchaseOrders() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, posQ.isLoading, rows]);
 
-  const openPo = (id: string) =>
-    setParams((prev) => {
-      const n = new URLSearchParams(prev);
-      n.set("po", id);
-      return n;
-    });
+  /**
+   * The ONE reducer both surfaces go through. `poId` is written to the URL and
+   * `mode` to state, but they are decided TOGETHER by `nextPoView`, so there is
+   * no path that moves one without the other.
+   */
+  const view: PoView = { poId: selectedId, mode };
+  const dispatch = (ev: PoEvent) => {
+    const next = nextPoView(view, ev);
+    setMode(next.mode);
+    if (next.poId != null && next.poId !== view.poId)
+      setParams((prev) => {
+        const n = new URLSearchParams(prev);
+        n.set("po", next.poId as string);
+        return n;
+      });
+  };
 
   const setColFilter = (key: string) => (next: ReadonlySet<string>) =>
     setColFilters((prev) => {
@@ -1144,10 +1235,11 @@ export default function OperationPurchaseOrders() {
    */
   const visibleColumns = columns;
 
-  /** The kit takes a Set; the page keeps ONE id. */
+  /** The kit takes a Set; the page keeps ONE id and ONE mode. */
   const expandedRows = useMemo(
-    () => new Set(expandedPo ? [expandedPo] : []),
-    [expandedPo],
+    () =>
+      view.mode === "expand" && view.poId ? new Set([view.poId]) : NO_EXPANSION,
+    [view.mode, view.poId],
   );
 
   const filtered = colFilters.size > 0 || stateSel !== null;
@@ -1183,17 +1275,9 @@ export default function OperationPurchaseOrders() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <button
-              type="button"
-              onClick={() => setWorkspaceOpen((o) => !o)}
-              aria-pressed={workspaceOpen}
-              title={workspaceOpen ? "Hide purchase order" : "Show purchase order"}
-              aria-label={workspaceOpen ? "Hide purchase order" : "Show purchase order"}
-              data-testid="po-workspace-toggle"
-              className={PANE_BTN}
-            >
-              <Icon name={workspaceOpen ? "forward" : "back"} size={14} />
-            </button>
+            {/* The pane toggle LEFT this slot (Q10 Ⓐ): closing the panel is
+                the PANEL's control, and it now lives at the panel's own
+                top-right. No master grows arrows on its panels. */}
           </div>
         }
       />
@@ -1284,13 +1368,20 @@ export default function OperationPurchaseOrders() {
               the kit's expand-control column, which takes 3% of the table:
               1168 / 0.97 = 1204.1 → 1205, so even at the narrowest width every
               column still reaches its own minimum. */}
-          <div className="flex-1 min-h-0 overflow-auto">
+          {/* `container-type: inline-size` makes this scroller a query
+              container, so the expanded record can be sized to the VISIBLE
+              width (`100cqi`) rather than to the 1205px table it spans — Q10 Ⓓ.
+              Measured at 1280 before the fix: the expand's own header was
+              1171px inside 568px, so `Qty`, `Destination` and `Received` were
+              unreachable. Nothing else in the table is absolutely positioned
+              (the ▼ menus are Radix portals), so the containment costs nothing. */}
+          <div className="flex-1 min-h-0 overflow-auto [container-type:inline-size]">
             <div className="min-w-[1205px]">
               <DataTable<operationPoListRow>
               rows={rows}
               columns={visibleColumns}
               rowId={(p) => p.id}
-              onRowOpen={(p) => openPo(p.id)}
+              onRowOpen={(p) => dispatch({ type: "open", id: p.id })}
               sort={sort}
               onSortChange={setSort}
               loading={posQ.isLoading}
@@ -1302,8 +1393,7 @@ export default function OperationPurchaseOrders() {
                  Report tab set: an accessible name that invents no word. */
               expansion={{
                 expanded: expandedRows,
-                onToggle: (id) =>
-                  setExpandedPo((cur) => (cur === id ? null : id)),
+                onToggle: (id) => dispatch({ type: "toggleExpand", id }),
                 label: (p) => p.id,
                 render: (p) => (
                   <PoWorkArea
@@ -1365,30 +1455,35 @@ export default function OperationPurchaseOrders() {
           </div>
         </div>
 
-        {/* ── WORKSPACE — ONE live Purchase Order. Collapsible; when the
-             listing is hidden it takes the whole stage. ─────────────────── */}
+        {/* ── WORKSPACE — ONE live Purchase Order, and only while this PO is
+             being READ. Expanding a row closes it and hands the listing the
+             400px back (Q10): the two ways of looking at one purchase order
+             are exclusive, so the page can never show two. ─────────────── */}
         <main
           className={[
             "shrink-0 min-h-0 overflow-y-auto bg-white",
-            workspaceOpen ? "w-[400px]" : "hidden",
+            view.mode === "panel" ? "w-[400px]" : "hidden",
           ].join(" ")}
           data-testid="po-workspace"
         >
-          {selected ? (
-            <WorkspaceBody
-              po={selected}
-              supplier={supplierById.get(selected.supplier_id)}
-              warehouse={warehouseById.get(selected.warehouse_id)}
-              messageTemplate={messageTemplate}
-            />
-          ) : (
-            !posQ.isLoading &&
-            pos.length === 0 && (
-              <div className="h-full flex items-center justify-center">
-                <EmptyState title="No purchase orders." />
-              </div>
-            )
-          )}
+          {view.mode === "panel" &&
+            (selected ? (
+              <WorkspaceBody
+                po={selected}
+                supplier={supplierById.get(selected.supplier_id)}
+                warehouse={warehouseById.get(selected.warehouse_id)}
+                messageTemplate={messageTemplate}
+                labelOf={lineLabel}
+                onClose={() => dispatch({ type: "close" })}
+              />
+            ) : (
+              !posQ.isLoading &&
+              pos.length === 0 && (
+                <div className="h-full flex items-center justify-center">
+                  <EmptyState title="No purchase orders." />
+                </div>
+              )
+            ))}
         </main>
       </div>
     </div>
@@ -1460,7 +1555,24 @@ function PoWorkArea({
   const hist = useMemo(() => poDateHistoryOf(po.promises), [po.promises]);
 
   return (
-    <div data-testid={`po-work-${po.id}`}>
+    /* SIZED TO THE VISIBLE WIDTH (Q10 Ⓓ). The expanded cell spans every column,
+     * so it inherits the table's 1205px minimum — measured on production at
+     * 1280, the expand's own header came out 1171px inside a 568px listing and
+     * `Qty`, `Destination` and `Received` could not be reached at all.
+     * `100cqi` is the SCROLLER's visible width (its container-query size, set
+     * on the `overflow-auto` div), minus the kit cell's own 2rem of padding.
+     *
+     * **`position: sticky` was tried and MEASURED NOT TO WORK here, so it is
+     * not left in as a class that does nothing.** A probe with `sticky left-0`
+     * inside this `<td>` scrolled straight off (left −123 at scrollLeft 400)
+     * while the identical probe one level up, outside the table, stuck at the
+     * scrollport edge (260). A sticky element whose containing block is a
+     * table cell does not hold horizontally. It costs nothing today: expanding
+     * CLOSES the panel, so the listing is 968px and the whole record fits
+     * inside it without scrolling at all.
+     *
+     * jsdom has no widths — every number above is from a real browser. */
+    <div data-testid={`po-work-${po.id}`} className="w-[calc(100cqi-2rem)]">
       {/* ① THE TWO DATES — §12.2's ① and ②, side by side, because the whole
            question an operator answers here is *what did the factory say, and
            when does it reach us*. Both are editable; the panel carries neither
@@ -1576,13 +1688,15 @@ function PoWorkArea({
            PO at a time, so *"which lines across my open POs go to AL?"* used
            to mean opening all 21. */}
       <div className="mt-3" data-testid="po-doc-items">
-        <div className="flex gap-2 text-label uppercase tracking-wide text-kit-slate-9 border-y border-kit-slate-5 py-1">
-          <span className="w-4 font-medium">#</span>
-          <span className="w-16 font-medium">SO No.</span>
-          <span className="flex-1 min-w-0 font-medium">Description</span>
-          <span className="w-10 text-right font-medium">Qty</span>
-          <span className="w-40 font-medium">Destination</span>
-          <span className="w-16 text-right font-medium">Received</span>
+        <div
+          className={`${ITEM_GRID} text-label uppercase tracking-wide text-kit-slate-9 border-y border-kit-slate-5 py-1`}
+        >
+          <span className="font-medium">#</span>
+          <span className="font-medium">SO No.</span>
+          <span className="min-w-0 font-medium">Description</span>
+          <span className="text-right font-medium">Qty</span>
+          <span className="font-medium">Destination</span>
+          <span className="text-right font-medium">Received</span>
         </div>
         {rows.map((r, i) => (
           <LineRow
@@ -1594,17 +1708,17 @@ function PoWorkArea({
             fallbackDestName={fallbackDestName}
           />
         ))}
-        <div className="flex gap-2 py-1.5 text-body">
-          <span className="w-4" />
-          <span className="w-16" />
-          <span className="flex-1 min-w-0 text-label uppercase tracking-wide text-kit-slate-9">
+        <div className={`${ITEM_GRID} py-1.5 text-body`}>
+          <span />
+          <span />
+          <span className="min-w-0 text-label uppercase tracking-wide text-kit-slate-9">
             Total
           </span>
-          <span className="w-10 text-right font-semibold text-kit-slate-12 tabular-nums">
+          <span className="text-right font-semibold text-kit-slate-12 tabular-nums">
             {progress.ordered}
           </span>
-          <span className="w-40" />
-          <span className="w-16 text-right font-semibold text-kit-slate-12 tabular-nums">
+          <span />
+          <span className="text-right font-semibold text-kit-slate-12 tabular-nums">
             {progress.received} / {progress.ordered}
           </span>
         </div>
@@ -1779,23 +1893,61 @@ function Prop({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/**
+ * THE SIX WORDS OF THE PANEL'S ITEMS BLOCK — read-only, so five facts and no
+ * control. Narrower tracks than the expand's: the panel is 400px, of which 368
+ * is usable, and it carries no destination picker.
+ */
+const PANEL_ITEM_GRID =
+  "grid grid-cols-[16px_64px_minmax(0,1fr)_32px_56px] gap-2";
+
 function WorkspaceBody({
   po,
   supplier,
   warehouse,
   messageTemplate,
+  labelOf,
+  onClose,
 }: {
   po: operationPoListRow;
   supplier: SupplierRow | undefined;
   warehouse: { name: string; address: string | null } | undefined;
   messageTemplate: string | null;
+  labelOf: (l: operationPoListRow["purchase_order_lines"][number]) => string;
+  onClose: () => void;
 }) {
   const supplierName = supplier?.name ?? po.supplier_id;
+  const items = useMemo(() => docRowsOf(po, labelOf), [po, labelOf]);
+  const progress = poReceivingProgress(po.purchase_order_lines);
   return (
     <div className="px-4 py-4" data-testid="po-document">
-      {/* ── ① FIXED HEADER — labels left, the document number right. It
-           carries identity + the supplier's date, and NEVER grows. ───── */}
-      <div className="flex items-start gap-2" data-testid="po-working-header">
+      {/* ── ① IDENTITY + ITS ACTIONS, on one row (Q10 Ⓐ + Ⓔ).
+           `Print PDF` came UP out of the `DOCUMENT` band, which held one
+           button and spent a title and a hairline on it: the object's
+           identity and the actions on it belong together at the top (Fiori's
+           Object Page · BC's document page · GitHub · Linear). Measured:
+           `PO-2038` 100.8 + gap 8 + `Print PDF` 83.8 = 192.6px inside 368px.
+           The ✕ is the PANEL's own control — closing it is not the page's
+           business, and clicking any row brings it back. ─────────────── */}
+      <div className="flex items-start gap-2" data-testid="po-panel-title">
+        <span className="min-w-0 flex-1 text-page font-semibold font-mono text-kit-slate-12">
+          {po.id}
+        </span>
+        <PrintPdfButton poId={po.id} />
+        <button
+          type="button"
+          onClick={onClose}
+          title="Hide purchase order"
+          aria-label="Hide purchase order"
+          data-testid="po-panel-close"
+          className={PANE_BTN}
+        >
+          <Icon name="close" size={14} />
+        </button>
+      </div>
+
+      {/* ── ② FIXED HEADER — the facts this activity is ABOUT. ────────── */}
+      <div className="mt-2 flex items-start gap-2" data-testid="po-working-header">
         <div className="min-w-0 flex-1">
           <Prop label="PO Issued">
             <span className="tabular-nums">
@@ -1818,13 +1970,153 @@ function WorkspaceBody({
             )}
           </Prop>
         </div>
-        <span className="text-page font-semibold font-mono text-kit-slate-12 shrink-0">
-          {po.id}
-        </span>
       </div>
 
-      {/* ── ③ ACTIVITY — tools + the business timeline. ───────────────── */}
+      {/* ── ③ ITEMS — WHAT IS ON THE PURCHASE ORDER, read-only (Q10 Ⓔ).
+           Loo, after using the page: *"为什么你把我 right panel 里面的 listing
+           拿走？give me back."* Q5 took it out to obey §12.7.5 rule 1, and the
+           cost the rule did not predict was that clicking a row opened a panel
+           naming the supplier, the dates and the communication and never
+           saying what was ON the purchase order — two actions where there had
+           been one, on the most-asked question about a PO.
+
+           **Rule 1 is narrowed, not deleted: a fact may be READ in two tiers
+           and WRITTEN in only one.** So there is no dropdown, no date field,
+           no `Save` and no `⋮` here — the destination, the two dates and the
+           note stay in the expand, and rule 3 (ONE editing surface) is
+           untouched. A test asserts this block holds no control at all. */}
+      <div className="mt-4">
+        <DeskBand>Items</DeskBand>
+      </div>
+      <div className="mt-1" data-testid="po-panel-items">
+        <div
+          className={`${PANEL_ITEM_GRID} text-label uppercase tracking-wide text-kit-slate-9 border-b border-kit-slate-5 py-1`}
+        >
+          <span className="font-medium">#</span>
+          <span className="font-medium">SO No.</span>
+          <span className="min-w-0 font-medium">Description</span>
+          <span className="text-right font-medium">Qty</span>
+          {/* `Received`, not the pre-Q5 `Recv` — one fact, one word, and it is
+              the expand's own. REPORTED as a departure from the card's sketch:
+              both strings shipped before Q5, `Received` is the newer of the
+              two, and it fits (the panel's tracks are measured for it). */}
+          <span className="text-right font-medium">Received</span>
+        </div>
+        {items.map((r, i) => (
+          <div
+            key={r.key}
+            data-testid={`po-panel-item-${i + 1}`}
+            className={`${PANEL_ITEM_GRID} py-1.5 text-body border-b border-kit-slate-4`}
+          >
+            <span className="text-kit-slate-9 tabular-nums">{i + 1}</span>
+            <span className="text-label text-kit-slate-11 tabular-nums">
+              {r.so != null ? `SO-${r.so}` : "—"}
+            </span>
+            {/* The business name leads; the code identifies on hover — the
+                same rule the register's Items column and the expand read. */}
+            <span
+              title={r.sku}
+              className="min-w-0 truncate font-semibold text-kit-slate-12"
+            >
+              {r.label}
+            </span>
+            <span className="text-right text-kit-slate-12 tabular-nums">
+              {r.qty}
+            </span>
+            <span className="text-right tabular-nums text-kit-slate-9">
+              {r.received}
+            </span>
+          </div>
+        ))}
+        <div className={`${PANEL_ITEM_GRID} py-1.5 text-body`}>
+          <span />
+          <span />
+          <span className="min-w-0 text-label uppercase tracking-wide text-kit-slate-9">
+            Total
+          </span>
+          <span className="text-right font-semibold text-kit-slate-12 tabular-nums">
+            {progress.ordered}
+          </span>
+          <span className="text-right font-semibold text-kit-slate-12 tabular-nums">
+            {progress.received}
+          </span>
+        </div>
+      </div>
+
+      {/* ── ④ ACTIVITY — tools + the business timeline. ───────────────── */}
       <ActivityDesk po={po} supplier={supplier} template={messageTemplate} />
+    </div>
+  );
+}
+
+/**
+ * `Print PDF` — produce the document, and record NOTHING.
+ *
+ * Jess froze the boundary on 2026-08-03: **printing is producing, not
+ * delivering.** So this writes no history, moves no status, mints no revision,
+ * and may be pressed any number of times. The act the Portal records is the
+ * DOOR being opened, in the Communication band below.
+ *
+ * The pipeline is the portal's existing one, not a new one: the server
+ * assembles the money-free payload (`purchasing_po_document`, migration 0307)
+ * and the browser renders it, because Cloudflare Workers block the WASM that
+ * @react-pdf needs.
+ *
+ * It moved out of `ActivityDesk` and up beside the PO number in Q10 — the
+ * `DOCUMENT` band it used to head carried this one button and nothing else.
+ */
+function PrintPdfButton({ poId }: { poId: string }) {
+  const [printing, setPrinting] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  async function printPdf() {
+    setPrinting(true);
+    setFailed(null);
+    try {
+      const data = await apiFetch<PoTemplateData>(
+        `/api/operation/pos/${poId}/print-data`,
+      );
+      const blob = await renderPoPdf(data);
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank", "noopener,noreferrer");
+      if (!win) {
+        // Pop-up blocked — hand the operator the file instead of nothing.
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${poId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (e) {
+      // Stated in place, not in a toast that leaves: the operator is mid-task
+      // and the reason has to still be there when they look back.
+      setFailed(e instanceof Error ? e.message : "Could not open the PDF.");
+    } finally {
+      setPrinting(false);
+    }
+  }
+
+  return (
+    <div className="shrink-0 flex flex-col items-end">
+      <button
+        type="button"
+        onClick={() => void printPdf()}
+        disabled={printing}
+        data-testid="po-print-pdf"
+        className={`${DOC_BTN} font-medium disabled:opacity-40`}
+      >
+        {printing ? "Opening…" : "Print PDF"}
+      </button>
+      {failed && (
+        <p
+          className="mt-1 text-label text-kit-red-11"
+          data-testid="po-print-failed"
+        >
+          {failed}
+        </p>
+      )}
     </div>
   );
 }
@@ -1933,13 +2225,13 @@ function LineRow({
     <div>
       <div
         data-testid={`po-item-row-${index}`}
-        className="flex gap-2 py-1.5 text-body border-b border-kit-slate-4"
+        className={`${ITEM_GRID} py-1.5 text-body border-b border-kit-slate-4`}
       >
-        <span className="w-4 text-kit-slate-9 tabular-nums">{index}</span>
-        <span className="w-16 text-label text-kit-slate-11 tabular-nums">
+        <span className="text-kit-slate-9 tabular-nums">{index}</span>
+        <span className="text-label text-kit-slate-11 tabular-nums">
           {row.so != null ? `SO-${row.so}` : "—"}
         </span>
-        <span className="flex-1 min-w-0">
+        <span className="min-w-0">
           {/* The BUSINESS name leads (Jess, 2026-08-03): a buyer knows Booqit ·
               Cody · Jager, not 5539-1B(LHF). The code identifies rather than
               describes, so it lives on hover. */}
@@ -1985,10 +2277,10 @@ function LineRow({
             </button>
           )}
         </span>
-        <span className="w-10 text-right text-kit-slate-12 tabular-nums">
+        <span className="text-right text-kit-slate-12 tabular-nums">
           {row.qty}
         </span>
-        <span className="w-40 min-w-0">
+        <span className="min-w-0">
           {editing === "dest" ? (
             <select
               value={dest}
@@ -2019,7 +2311,7 @@ function LineRow({
             </button>
           )}
         </span>
-        <span className="w-16 text-right tabular-nums text-kit-slate-9">
+        <span className="text-right tabular-nums text-kit-slate-9">
           {row.received} / {row.qty}
         </span>
       </div>
@@ -2369,8 +2661,6 @@ function ActivityDesk({
   const [copied, setCopied] = useState(false);
   const [draftOpen, setDraftOpen] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [printing, setPrinting] = useState(false);
-  const [printFailed, setPrintFailed] = useState<string | null>(null);
   const send = useRecordSend(po.id);
   const saveTemplate = useSetMessageTemplate();
 
@@ -2429,49 +2719,6 @@ function ActivityDesk({
       )}&body=${encodeURIComponent(text)}`
     : null;
 
-  /**
-   * `Print PDF` — produce the document, and record NOTHING.
-   *
-   * Jess froze the boundary on 2026-08-03: **printing is producing, not
-   * delivering.** So this writes no history, moves no status, mints no
-   * revision, and may be pressed any number of times. The act that the
-   * Portal records is the DOOR being opened, one section below.
-   *
-   * The pipeline is the portal's existing one, not a new one: the server
-   * assembles the money-free payload (`purchasing_po_document`, migration
-   * 0307) and the browser renders it, because Cloudflare Workers block the
-   * WASM that @react-pdf needs. Copied from `AssignPickupDialog`, which has
-   * been the only caller of this route until now.
-   */
-  async function printPdf() {
-    setPrinting(true);
-    setPrintFailed(null);
-    try {
-      const data = await apiFetch<PoTemplateData>(
-        `/api/operation/pos/${po.id}/print-data`,
-      );
-      const blob = await renderPoPdf(data);
-      const url = URL.createObjectURL(blob);
-      const win = window.open(url, "_blank", "noopener,noreferrer");
-      if (!win) {
-        // Pop-up blocked — hand the operator the file instead of nothing.
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${po.id}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 30_000);
-    } catch (e) {
-      // Stated in the section, not in a toast that leaves: the operator is
-      // mid-task and the reason has to still be there when they look back.
-      setPrintFailed(e instanceof Error ? e.message : "Could not open the PDF.");
-    } finally {
-      setPrinting(false);
-    }
-  }
-
   async function copyMessage() {
     try {
       await navigator.clipboard.writeText(text);
@@ -2485,32 +2732,17 @@ function ActivityDesk({
   const sends = po.sends ?? [];
 
   return (
-    <section className="mt-3 pt-3 border-t border-kit-slate-5" data-testid="po-activity">
-      {/* ① DOCUMENT — the thing itself. Communication starts from the
-          document, never from the register (Jess's design principle,
-          2026-08-03), so the document is the band above the doors. */}
-      <DeskBand>Document</DeskBand>
-      <div className="mt-2">
-        <button
-          type="button"
-          onClick={() => void printPdf()}
-          disabled={printing}
-          data-testid="po-print-pdf"
-          className={`${DOC_BTN} font-medium disabled:opacity-40`}
-        >
-          {printing ? "Opening…" : "Print PDF"}
-        </button>
-        {printFailed && (
-          <p className="mt-1 text-label text-kit-red-11" data-testid="po-print-failed">
-            {printFailed}
-          </p>
-        )}
-      </div>
-
-      {/* ② COMMUNICATION — the doors out of the Portal. */}
-      <div className="mt-4">
-        <DeskBand>Communication</DeskBand>
-      </div>
+    <section className="mt-4 pt-3 border-t border-kit-slate-5" data-testid="po-activity">
+      {/* ① COMMUNICATION — the doors out of the Portal.
+          The `DOCUMENT` band that used to head this desk is GONE (Q10 Ⓔ): it
+          carried one button, and its title plus hairline cost ~30px for
+          nothing. `Print PDF` moved up beside the PO number, where the object's
+          own actions belong. The three CONTROLS below did NOT move with it and
+          that was measured, not preferred — `Print PDF` + `Copy message` +
+          `Open WhatsApp group` come to 385.1px, which does not fit 368px — and
+          Loo froze this band's home on 2026-08-03: *"Communication starts from
+          the DOCUMENT, never from the register."* */}
+      <DeskBand>Communication</DeskBand>
       <div className="mt-1 flex items-center gap-2">
         {copied && (
           <span className="text-label font-medium text-kit-green-11" data-testid="po-copied">
