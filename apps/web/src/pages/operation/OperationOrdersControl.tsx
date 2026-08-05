@@ -61,6 +61,7 @@ import {
   orderActionOverdue,
   myHolidaySet,
   deliveryDateGapFact,
+  fmtMoney,
   orderActionButton,
   orderActionChecklist,
   orderActionLine,
@@ -759,7 +760,7 @@ export function rowDotsOf(
   const money: RowDot = !m.known
     ? { state: "grey", title: "Money — no order value on record" }
     : m.owing
-      ? { state: "red", title: `Money — RM ${fmtRM(m.outstanding)} outstanding` }
+      ? { state: "red", title: `Money — ${fmtMoney(m.outstanding)} outstanding` }
       : { state: "green", title: "Money — settled" };
   // 货 — red only for the true blockers (No PO / supplier ETA late-or-overdue).
   let goods: RowDot;
@@ -844,9 +845,16 @@ function RowDots({
     </span>
   );
 }
-export function fmtRM(n: number): string {
-  return n.toLocaleString("en-MY", { maximumFractionDigits: 0 });
-}
+// C11 · `fmtRM` lived here and is DELETED (2026-08-05). It rounded to whole
+// ringgit (`maximumFractionDigits: 0`), and every one of its four call sites was
+// the amount a customer owes — this file's money dot, its row pill, its drawer
+// strip, and the Delivery module's detail pane — so all four printed RM 1,251
+// against a ledger holding RM 1,250.50. It was never the generic number
+// formatter it looked like; there was nothing else to keep it for.
+//
+// A money figure is spelt by `fmtMoney` and by nothing else. Do not add a
+// rounding one back: `money-format.ts` is the one home, and the collect label
+// takes a NUMBER precisely so a formatter cannot get into the path again.
 
 // ─── Staff ownership (migration 0232, Jess model B 2026-07-18) ───────────────
 // One soft owner per order (ops_order_control.assigned_staff). NEVER a
@@ -1910,7 +1918,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
       supplier: sid ? supplierNameById.get(sid) ?? null : null,
       logistics: logisticOf(o, partnerName),
       customer: o.customer_name,
-      amount: money.known ? fmtRM(money.outstanding) : null,
+      // C11 — the RAW number: the words module prints it to the cent. It used
+      // to arrive through a formatter that rounded, so a drawer chasing
+      // RM 1,250.50 asked for RM 1,251.
+      amount: money.known ? money.outstanding : null,
       deliveryDate:
         booking.kind === "confirmed" && booking.date ? dayMon(booking.date) : null,
       deliverySlot:
@@ -4791,7 +4802,8 @@ function OrderRow({
             supplier: supplierName,
             logistics: logi.partner,
             customer: o.customer_name,
-            amount: m.known ? fmtRM(m.outstanding) : null,
+            // C11 — the RAW number; the words module spells it (see above).
+            amount: m.known ? m.outstanding : null,
             // C3 — the fact's own two values, already formatted; the words
             // module owns the sentence and never a date (see below: this cell
             // prints the SHORT form, so they only reach the tooltip).
