@@ -6,6 +6,105 @@
 
 ---
 
+**2026-08-05 · Portal Core C13 — the red on the Orders list means something again** (PR #611 merge `55dcba22`, **no migration · no `apps/api` diff · no new field · no flag column**, web `index-D7U_hEyq.js` — DEPLOYED, all four canonicals, live md5 == local build, `SERVICE_ROLE` 0; **no Worker deploy owed, and it was measured against the REAL live Worker rather than against §17.1**)
+
+**Loo, 2026-08-04, from the card's own SQL against production:**
+
+```sql
+select coalesce(source_system,'native') src, count(*) n,
+       count(*) filter (where delivery_date < current_date) overdue
+from orders group by 1;
+--  autocount | 37 | 37      ← every archive row is overdue
+--  native    | 28 |  0      ← not one real order is
+```
+
+The page therefore showed `Overdue 37`, `37 late` on the delivery queues, and 37 red rows — and **all 37 were the AutoCount archive**: RM 0 of line value, imported 2026-07-23, deleted at go-live. The 28 real orders carry RM 108,948 of value and RM 68,593 owing, and not one was late. **An operator opening this page saw a day's work that does not exist, which is how a red pill stops being read.**
+
+**This is the disease HR-O1 already cured** (migration 0265, 2026-07-26): `hr_commission_source` sliced on `placed_at` with no `source_system` filter, so the same 37 rows sat in the attribution worklist forever. The cure there is the cure here — **exclude at the source and say so on screen** — and CLAUDE.md's standing ruling makes it the ONLY cure: *never propose a backfill, a repair worklist or a cleanup card for imported rows.*
+
+## The whole change is two predicates and a sentence
+
+**1 · `liveScope` excludes `source_system === 'autocount'`.** That memo is the single scope every facet count already ran over, so ONE filter reaches every queue, every group and every tile at once. Nothing was filtered in nine places, and no other line in the file needed a `source_system` test.
+
+**2 · `visible` drops the archive on exactly the condition `completed` already used.** The portal's own law is that *a facet must never print a number its own click cannot produce*; `liveScope` now excludes both, so an engaged facet must return both. The existing line was already the B-rebuild's own consistency rule (`if (facetActive) r = r.filter(o => controlTabOf(o) !== "completed")`), and C13 is one more conjunct on it, not a new mechanism.
+
+**This second half is what makes the card's third promise STRUCTURAL rather than a hope.** With **no** facet engaged that line never runs, so every archive row is still in the table, still openable, still readable. Server-side `search` is deliberately **not** in `facetActive`, so searching still finds one. **Excluded from WORK, never hidden from the record** — and it holds by construction rather than by a rule somebody has to remember.
+
+**3 · The footer states what was left out.** `{n} imported archive order(s) … not counted in the queues — they came from the old system.`
+
+## No word was invented, and COPY-STANDARD is owed no row
+
+The card says *"using a word COPY-STANDARD already owns. If no such word exists, STOP and ask Jess."* COPY-STANDARD has **no** archive vocabulary — measured, not assumed. But **0265's own on-screen sentence does**, and it has been live on the HR Overview since 2026-07-26 (`HrOverviewTab.tsx:158`), whose comment reads *"it states a fact, asks for nothing, and disappears by itself the day the imported rows are deleted."* That is the precedent the card itself names, so its wording was reused rather than re-derived.
+
+**Placement was a decision, not a default.** It rides the footer band `ListPageShell` already renders, which costs **zero permanent height** (§1.1's gate) and puts it on screen rather than in a `title` (the card's Done-when). It sits **beside** the `{total} orders` count it qualifies, inside one flex span, because separated by `justify-between` the reader has to work out which number the caveat is about.
+
+**A lint finding was fixed rather than shipped.** The sentence first carried its own `text-base-500` and moved rule O from 4544 to **4545**. The footer band already declares `text-meta text-base-500`, so the class was redundant — removed, colour inherited rather than restated, and the count went back to identical.
+
+## The chat stopped and asked ONCE, on the one thing the card reserved
+
+Build item 4 splits `Overdue` into two rungs by how old the miss is, and says in as many words: *"The two rungs' words are Jess's; the card does not name them."* COPY-STANDARD owns no such pair and **bans `At Risk` and `Attention` by name**. Inventing two labels would have been the exact failure the four laws exist to stop, so it went to Loo with the live reading attached — after the filter the split is **1 and 0**, so it changes nothing an operator can see today.
+
+**He ruled: do not split — `Overdue` stays whole.** Items 1–3 shipped; item 4 is struck through in the card with the ruling and its reason written in, and the two words are still his to name whenever there is real overdue volume to look at.
+
+## The two halves are proved a matched pair by a test I did not write
+
+| Control (each a real edit, each verified applied) | Fired |
+|---|---|
+| remove the `liveScope` filter | **3** |
+| remove the `visible` filter (the mirror) | **2** |
+| silence the footer sentence | **1** |
+
+**The interesting part is the overlap.** Both the first and the second control trip the page's *pre-existing* C-vocab law test — *"QUEUES speaks the NEXT verbs — a verb row filters to exactly its count"* — which passes with **both** edits in place and with **neither**, and fails with either one missing. A guard written months ago for a different reason independently catches a count disagreeing with its own click, which is stronger evidence than any test written alongside the change.
+
+**The new fixture carries BOTH provenances with an overdue order on each side** (1 native late · 2 archive late · 1 native due next week). That is the only shape that can tell *"the archive is excluded"* apart from *"everything overdue is excluded"* — a fixture with archive rows only would pass under either rule.
+
+**Two method notes.** `Overdue` is rendered **twice** on purpose (the QUEUES row and the DEADLINE bucket share `dueEntries` — the file's own comment says *"same state"*), so `getByRole` throws and the assertion runs over `getAllByRole`, which is what proves the two homes cannot drift apart. And a queue row renders `{label}{count}` with **no separator**, so `Overdue1` gives `\b1\b` no word boundary to find — the helper reads the trailing number instead of matching a boundary that is not there.
+
+## Gates — measured against a detached worktree at `origin/main`, never against a delta
+
+| | baseline `af2fe4df` | this branch |
+|---|---|---|
+| web suite | **17 failed / 2484 passed (2501)** | **17 failed / 2492 passed (2509)** |
+| page suite | — | **142 / 142** |
+| web `tsc` | — | **0** |
+| `check-design` | **8366** | **8366**, identical category for category |
+| build · `SERVICE_ROLE` | — | clean · **0** |
+
+Zero new failures; the +8 passing are this card's own tests.
+
+## Deploy — and a fetch trap that was hit and not mistaken for evidence
+
+The canonicals **flapped, and the flap crossed projects both ways**: the first poll had portal + erp new and pos + apex old, the second had them the other way round. That is the documented edge-cache behaviour, and it is exactly why **one poll cannot tell a lag from a split** — `wrangler pages deployment list` settled it (source `55dcba2` is the newest Production/main writer on **both** projects) and all four converged on a later poll.
+
+**Both directions proved on DOWNLOADED bundles, and the obvious marker was again the wrong one.** `imported archive order` greps **1 in the predecessor** `index-b8xJQC_M.js` — because the sentence is 0265's own and already live on the HR Overview, which is the whole reason no word had to be invented — so it proves nothing alone and its delta is 1 → 2. The clean markers are `orders-archive-note` (**0 → 1**) and `not counted in the queues` (**0 → 1**); the control present in BOTH is `not counted here` (**1 / 1**), the HR page's own tail, which C13 never touches.
+
+**The trap:** mid-flap, `erp.carresofficial.com/assets/index-D7U_hEyq.js` returned **200 with 1,724 bytes** — the SPA `_redirects` fallback, *not* a 404 — and a grep of that page reads as a clean **0 for every marker, including the ones that are there**. The size check caught it; the file was re-fetched (4,765,988 bytes, md5 `63507da3…` matching the local build exactly) before anything was concluded. **A 200 is not proof you fetched the asset.**
+
+**The predecessor is `index-b8xJQC_M.js`, not the `index-DkXEb2HW.js` §17.1 named** — P15 · P16 · Q10 and the 0323 lane all deployed without updating that row, so it was four ships stale. Recorded rather than silently corrected.
+
+**No Worker deploy was owed, and getting that right required correcting this repo's own record.** §17.1's API row named `3b87b0ab` from `f2517f99` (Q5's). `wrangler deployments list --env production` shows the live version is **`620bc69a`**, created 2026-08-04T11:42:31 — **two minutes after migration 0323 was applied** (tracker `20260804114009`), i.e. the **P15** lane's Worker, shipped without updating the row. Measured from that lane's own commit, `git diff d460d899..origin/main -- apps/api packages/shared supabase/migrations` is **EMPTY**. **Diffing against the recorded commit would have reported a deploy owed when none was** — an api-diff baseline read out of a stale document is not a measurement. C13 adds no api call at all: it filters an array client-side.
+
+## Production verification
+
+Reproducing the page's own predicates (`controlTabOf === 'completed'` ⇔ `status = 'delivered'`; the `Overdue` bucket ⇔ not completed AND `delivery_date < today`) against live data:
+
+```
+on_file  archive  open_before  open_after  OVERDUE_BEFORE  OVERDUE_AFTER
+   65       37        65           28            38              1
+```
+
+**The card's own arithmetic was one day stale, and it is reported rather than copied.** It measured `0 of 28` native late on 2026-08-04; overnight **SO-1203 rolled past its date** (one day late). So the queue reads **1**, not 0 — and that 1 is a genuine call. Which is precisely the case C13 exists to make visible: before this change it would have been the 38th red row in a list of 37 fictional ones.
+
+## Reported, not fixed
+
+1. **§17.7's web baseline is stale.** It documents 16 failures in 4 files; `origin/main` measures **17 in 5**, the extra being one pre-existing failure in `OperationPurchaseOrders.test.tsx` that arrived from the Purchasing lane. Identical on both trees, not this card's, and this card must not touch a Purchasing page.
+2. **§17.1's API row was four ships stale** (P15 · P16 · Q10 · the 0323 lane all deployed past it). Corrected in place, with the sharpened rule: *read the live Worker's source commit from `wrangler`, never from this table.*
+3. **An archive row's own `Deadline` cell still reads red**, because it genuinely *is* overdue. That is the record telling the truth about itself; changing it means per-row tone, which this card's Must-NOT reserves. What C13 fixes is the **counts, queues and aggregate colour** — the things that claim there is work to do.
+4. **The on-screen check is OWED.** The Browser pane does not composite in this session (`screenshot`, `read_page` and `get_page_text` all time out with *"the Browser pane is not displayed"*), so the footer sentence and the `Overdue 1` pill were proved **in the downloaded bundle and at the database**, never with eyes on the rendered page. C14 opens this same file at a real viewport and should confirm both in passing.
+5. With a facet engaged the footer reads e.g. `1 order · 37 imported archive orders are not counted in the queues`. Both halves are true and the second explains the first; noted so nobody later reads it as a mismatch.
+
+---
+
 **2026-08-04 · Purchasing Q8 — the Current Action column stops reversing its own tense** (PR #605 merge `3cb84c61`, **no migration · no api · no layout, width, column or token change**, web `index-DkXEb2HW.js` — DEPLOYED, all four canonicals, live md5 == local build, `SERVICE_ROLE` 0; **no Worker deploy owed and it was measured** against the live Worker's source commit)
 
 **Loo found this himself, first thing on 2026-08-04:** *"Confirm Arrival is unclear. Arrival of what? Customer delivery? Stock arrival? Supplier ETA? Warehouse arrival?"*

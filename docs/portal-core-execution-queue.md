@@ -1252,8 +1252,13 @@ backfill, a repair worklist or a cleanup card for imported rows.*
    no such word exists, **STOP and ask Jess** — do not invent one.
 3. The archive rows remain **reachable and readable**: they are still rows, still openable,
    still searchable. Excluded from WORK, never hidden from the record.
-4. `Overdue` splits by how old the miss is, so the top of the queue is the call you can still
-   save. The two rungs' words are Jess's; the card does not name them.
+4. ~~`Overdue` splits by how old the miss is, so the top of the queue is the call you can still
+   save. The two rungs' words are Jess's; the card does not name them.~~
+   **DEFERRED by Loo, 2026-08-05.** The chat stopped and asked rather than inventing, because
+   COPY-STANDARD owns no such pair and bans `At Risk` / `Attention` by name. He was shown the
+   live reading with the options: after the filter the split is **1 and 0**, so it changes
+   nothing an operator can see today. **Ruled: `Overdue` stays whole.** Whoever re-opens it
+   needs real overdue volume first, and the two words are still his to name.
 
 **Done when.**
 
@@ -1333,7 +1338,7 @@ truncate: the premise was 42% too wide. **Re-measure before moving a single widt
 | C4 | ⛔ **RETIRED 2026-07-28 — re-cut as C11 + C12.** PR #484 stays OPEN and untouched; it is where the unshipped work lives | [#484](https://github.com/wenwei4046/Carres-Portal-v2/pull/484) (open, not to be merged as-is) |
 | C11 | ⬜ **a money figure is the money owed** (Loo 2026-07-28) — 5 call sites, 2 failures, 1 cause. **ORDERS lane**, not alongside ⑧ D0.5c | — |
 | C12 | ⬜ **the last `Chase` leaves the portal** — 21 strings + the shared scanner. **PURCHASING lane** (one file); split its ② off if P3 must start first | — |
-| C13 | 🔨 CLAIMED 2026-08-05 — `claude/c13-orders-red-581c98` · **the red means something again** (Loo 2026-08-04) — 37 of 37 Overdue are the AutoCount archive; 0 of 28 real orders are late. Web only, no migration. **ORDERS lane** | — |
+| C13 | ✅ **LIVE** 2026-08-05 — the red means something again. `liveScope` excludes the AutoCount archive; **`Overdue` 38 → 1 on production**, and that 1 is a real call. **No migration, no `apps/api` diff.** Item 4 (splitting Overdue by the age of the miss) **DEFERRED by Loo** — COPY-STANDARD owns no such pair | [#611](https://github.com/wenwei4046/Carres-Portal-v2/pull/611) |
 | C14 | ⬜ **nothing says the same thing twice** (Loo 2026-08-04) — Delivery ≡ Actions on 31/31 rows; 30 truncated cells; 219px above the first row. **ORDERS lane, AFTER C13** | — |
 | C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
 | C6 | ✅ **LIVE** 2026-07-28 — every action opens the steps that close it; the order's PIC is the task owner | #486 |
