@@ -146,7 +146,10 @@ describe("submitOrderChangeRequestInputSchema (0257)", () => {
       lines: [{ sku: "PILLOW-1", qty: 1 }],
     });
     expect(parsed.kind === "replace_lines").toBe(false);
-    if (parsed.kind !== "replace_lines") {
+    // 0258 added a third variant (`edit_addon`), so excluding only the replace
+    // variant no longer narrows to the add variant — `lines`/`addons` exist on
+    // the add variant alone. Both other kinds must be excluded to narrow.
+    if (parsed.kind !== "replace_lines" && parsed.kind !== "edit_addon") {
       expect(parsed.lines).toHaveLength(1);
       expect(parsed.addons).toEqual([]);
     }

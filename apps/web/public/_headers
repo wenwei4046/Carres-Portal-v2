@@ -1,0 +1,51 @@
+# Cloudflare Pages response headers (served on BOTH Pages projects —
+# carres-portal / erp.carresofficial.com and carres-pos / pos.carresofficial.com,
+# because the two projects are ONE build of apps/web).
+#
+# Measured 2026-08-05 before this file existed: production answered with only
+# `x-content-type-options` and `referrer-policy`. No HSTS, no clickjacking
+# protection, no CSP — on a portal holding customer names, phones, addresses,
+# NRIC and Stripe payment paths.
+#
+# Cloudflare Pages serves `_headers` from the build output root; it is NOT
+# bundled by Vite, it is copied from `public/` verbatim. Same mechanism as the
+# `_redirects` file sitting beside it.
+
+/*
+  # Clickjacking. The portal has no legitimate embedder — nothing frames it.
+  X-Frame-Options: DENY
+
+  # The modern equivalent, which X-Frame-Options alone no longer covers.
+  Content-Security-Policy: frame-ancestors 'none'
+
+  # Force HTTPS for two years and cover subdomains. Both apexes are already
+  # HTTPS-only behind Cloudflare, so this cannot lock anyone out of a working
+  # origin. `preload` is deliberately NOT set — that is a one-way submission to
+  # a browser-vendor list and is Loo's decision, not a routine header.
+  Strict-Transport-Security: max-age=63072000; includeSubDomains
+
+  # Already live; restated here so this file is the ONE place the headers live.
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+  # No page in the portal asks for any of these. Denying them means a
+  # compromised dependency cannot silently reach the operator's hardware.
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()
+
+  # CSP is REPORT-ONLY on purpose and this is not timidity — it is the same
+  # discipline the repo applies to migrations. A wrong directive here does not
+  # warn, it BLANKS the operator's screen, and the app legitimately loads from
+  # several third-party origins (Google Fonts CSS + font files, jsDelivr for the
+  # @react-pdf font assets, Supabase for storage objects and auth, Stripe for
+  # hosted checkout redirects). Enforcing a first-draft policy against a live
+  # ERP is exactly the "verify too late" failure §13.2 was written about.
+  #
+  # `'unsafe-inline'` on style-src is REQUIRED, not laziness: Tailwind + the
+  # kit's inline `style` attributes (column widths, the resize drag) emit inline
+  # styles, and no nonce reaches them from a static host.
+  #
+  # TO ENFORCE: deploy, open both apexes, exercise POS checkout / PDF print /
+  # photo upload, read the browser console for `[Report Only]` violations, widen
+  # the policy to cover any legitimate one, THEN rename this single header to
+  # `Content-Security-Policy` and redeploy.
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://kfprgpjpaffedghytstl.supabase.co https://images.unsplash.com; connect-src 'self' https://kfprgpjpaffedghytstl.supabase.co https://api.carresofficial.com https://carres-portal-v2-api.wwch.workers.dev https://cdn.jsdelivr.net; form-action 'self' https://checkout.stripe.com https://pay.stripe.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'

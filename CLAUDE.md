@@ -1089,7 +1089,7 @@ than kept — Law 0A).
 - **principal@carres.com password='111'** — Phase 9 signoff 2026-05-09. Mitigation in `docs/runbook.md`. Rotate Week 2.
 - **9 alpha test users at password='111'** — Phase 10 ad-hoc smoke seed 2026-05-15. Rotate before sharing portal externally.
 - **Demo product catalog** (product_skus / product_models / sofa_fabrics / addons / floor_config) NOT wiped during Phase 9 cleanup — assumed Carres-branded real SKUs. If proven fictional, uncomment Layer 6 in `scripts/phase-9-cleanup.sql` and rerun.
-- **CORS `origin: "*"`** in `apps/api/src/index.ts:48`. OK for V1 (auth = Bearer header, not cookies). Tighten before opening externally.
+- ~~**CORS `origin: "*"`** in `apps/api/src/index.ts:48`~~ — **CLOSED 2026-07-18 by the POS/ERP domain split, corrected here 2026-08-05.** This row went on describing a hole that had been shut for two and a half weeks, which is how a real one gets missed. `index.ts` now takes a regex allowlist (the two portal apexes, both Pages projects including hash previews, and localhost for dev), and `cors.test.ts` asserts both directions. **Probed against the LIVE Worker 2026-08-05**: `https://pos.carresofficial.com` is echoed back; `https://evil.com` and `https://pos.carresofficial.com.evil.com` get no `Access-Control-Allow-Origin` at all. Two things that are true and are NOT holes: the allowlist admits `http://localhost` in production (harmless — CORS does not attach the Bearer token for an attacker, and the header is the auth), and it admits `*.pages.dev` preview deployments (anyone who can push a branch gets an origin; acceptable while the repo is private).
 
 ### 17.7 Pre-existing test failures (not from current sessions)
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deliveryOrderIssueGate } from "./delivery-order";
+import { deliveryOrderIssueGate, type DeliveryOrderIssueInput } from "./delivery-order";
 
 /**
  * C7 — the HARD gate moves onto issuing (`docs/ORDERS-WORKING-FLOW.md` §5).
@@ -19,7 +19,11 @@ const OK_GATE = {
   storageOwing: 0,
 };
 
-const BASE = {
+// Typed as the module's own input so the nullable fields stay nullable: without
+// this, `typeof BASE` narrows `confirmedDateIso` to `string` from the literal
+// below, and `Partial<typeof BASE>` then refuses the `null` overrides the tests
+// pass to exercise the refusal branches.
+const BASE: DeliveryOrderIssueInput = {
   bookingConfirmed: true,
   confirmedDateIso: "2026-08-20", // a Thursday
   confirmedTimeSlot: "Afternoon (12pm–3pm)",

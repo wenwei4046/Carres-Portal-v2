@@ -44,6 +44,9 @@ out/
 # Cloudflare Workers local secrets (read by `wrangler dev`)
 .dev.vars
 
+# Understand Anything
+.ua/
+
 # -----------------------------------------------------------------------------
 # Cloudflare
 # -----------------------------------------------------------------------------
@@ -148,3 +151,7 @@ tmp/
 
 # editor/tool backup files
 *.bak
+
+# Real Carres master data (12 live contact emails, 0 placeholders left).
+# The .template beside it stays tracked; the filled copy never returns to git.
+scripts/production-master-data.sql

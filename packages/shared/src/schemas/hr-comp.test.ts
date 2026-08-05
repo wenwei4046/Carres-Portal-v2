@@ -170,8 +170,7 @@ describe("resolveStaffComp", () => {
   ];
 
   it("takes the row in force for the month", () => {
-    expect(resolveStaffComp(rows, "2026" as never ? 2026 : 2026, 7).get(E.mayson)?.baseMonthly)
-      .toBe(2500);
+    expect(resolveStaffComp(rows, 2026, 7).get(E.mayson)?.baseMonthly).toBe(2500);
   });
   it("ignores a raise dated later — a raise can be recorded early", () => {
     expect(resolveStaffComp(rows, 2026, 6).get(E.mayson)?.baseMonthly).toBe(2000);
