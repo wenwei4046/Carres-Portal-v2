@@ -584,12 +584,106 @@ queue, not a flow with two holes in it.
 
 ## LATER
 
-- Purchase Return flow (2990s has it — port, don't invent) · claim → service-case
+- ~~Purchase Return flow~~ — **ANSWERED 2026-08-05, do not port it.** AutoCount's
+  `Purchase Return` / `Goods Return` / `Cancel Purchase Order` are three DOCUMENTS split by
+  which ledger they hit, and Carres has no AP in the portal to hit. They are **Resolutions**
+  here (`Return Goods` · `Refund` · `Cancel Outstanding`) — see THE THREE CONSEQUENCES.
+  2990s ported the document and not the process, and its `credit_note_ref` is the proof.
+- claim → service-case
   cross-link view (J2 covers the order side) · multi-warehouse On-hand filtering (the
   P4 note in OperationReceiving) · partner-warehouse (SSY/EU) logins after Klang proves R6
   · **Smart Cover** (staff on leave stop receiving NEW assignments automatically — needs
   leave data, which nothing tracks yet; when HR grows leave records, this becomes a card
   across orders-assign + R7 + S-line in one move).
+
+---
+
+# THE THREE CONSEQUENCES — the frame R9 · R11 · R12 sit inside
+
+> **Frozen by Loo 2026-08-05, in the same ruling that gave R9 option A.** R9 owns *how many
+> outcomes a claim may have*. **This section owns what an outcome CAUSES**, and it is the
+> half that was missing: an outcome has **THREE** consequences, not two.
+
+```
+Claim  →  Resolution  →  ┌────────────┬──────────────────────┬──────────────────────┐
+                         │ Inventory  │ Finance              │ Demand               │
+                         │ how the    │ whether money moved  │ did the CUSTOMER get │
+                         │ goods move │ — external evidence  │ their goods?         │
+                         └────────────┴──────────────────────┴──────────────────────┘
+```
+
+| Resolution | Inventory | Finance | **Demand — customer got the goods?** |
+|---|---|---|---|
+| `Replace` | receive new goods | usually none | ✅ yes |
+| `Repair` | none (goods stay) | usually none | ✅ yes |
+| `Accept As-Is` | release hold → free | **possible** — discount / compensation | ✅ yes |
+| `Return Goods` | `returned_to_supplier` | Debit Note / AP | ❌ **no** |
+| `Refund` | none | Credit Note / AP | ❌ **no** |
+| `Write Off` | `written_off` | Expense | ❌ **no** |
+| `Cancel Outstanding` | none | void the outstanding liability | ❌ **no** |
+
+**`Accept As-Is` may NOT be hard-coded to no financial consequence** (Loo, 2026-08-05). *"你
+留着,我给你折扣"* is the commonest furniture settlement there is, and a claim that swallows
+the discount leaves the customer's order carrying a cost that is simply wrong.
+
+### The demand question has ONE answer; the other six are derived
+
+Not seven business decisions — one:
+
+> **Did this resolution put the goods in the customer's hands?**
+
+```
+✅ yes  →  the requirement is satisfied. Nothing returns
+❌ no   →  the customer's order line is still live
+           →  the unfulfilled quantity returns to To Order
+           →  a HUMAN still issues the PO (the system suggests; a human issues)
+```
+
+**Why the third column had to be named at all — measured 2026-08-05:**
+
+```
+supplier_claim_close  (0291:389-460)  writes exactly three tables —
+     supplier_claims · po_history · audit_log
+     it touches NO purchase_order_lines column and NO PO status
+
+To Order's real supply figure  (apps/api/src/routes/operation/to-order.ts:542-557)
+     Σ(qty − received_qty)  over purchase_order_lines where purchase_orders.status='open'
+```
+
+**So today whether a customer's goods come back is an ACCIDENT of state, not a decision:**
+
+| | |
+|---|---|
+| goods received, then written off | `received_qty` stands → remaining falls → demand **does** return |
+| goods never arrived, PO still open | remaining stands → demand **does not** return |
+
+**Both are wrong for the same reason: nobody ever made the decision.**
+
+### Finance owns the ACTION, never the accounting
+
+The Finance queue **stays**. A challenge that `PURCHASING-WORKING-FLOW.md` §8's ban on
+*"a tick-box that only records 'I say I did it'"* would kill it was **overruled by Loo
+2026-08-05** — because the completion was never a self-declaration:
+
+> **A Finance Action completes when an EXTERNAL EVIDENCE reference is recorded** — the
+> supplier's credit-note or debit-note number, or the AP adjustment reference.
+> **The Portal does not perform accounting.** It owns *this must be done* and *it is done*.
+
+**2990s is the worked example of getting this wrong, measured 2026-08-05:**
+`purchase_returns.credit_note_ref` is free text a human types, and its only readers in that
+whole repository are **the PDF that prints it and the detail page that displays it**. Nothing
+happens because of it. **It has the field and no action. We give the field an owner and a due
+date.**
+
+**Operations never sees AP. Finance never sees photos.**
+
+**Jess's locked rule, and why it does not block R12** (recorded so it is not re-litigated):
+*"supplier claims never produce a Credit Note — credit notes are Finance-only for billing
+mistakes."* Hers is the credit note **Carres issues to a customer**; R12's queue records the
+one **a supplier issues to Carres**. **Two directions of money wearing one word** — if a
+screen ever shows both, they need separate words, and that is a business decision.
+
+---
 
 ## R9 · One claim, one outcome — and a button that splits it
 
@@ -767,6 +861,71 @@ ORDER, not a set · a reader can tell per-line from per-PO without opening the c
 `Open` never on screen) · ❌ fold R9's `Cancel Outstanding` amendment in here; that one ships
 with R9, in R9's PR.
 
+**A SECOND §9 CONTRADICTION, found independently 2026-08-05 — fix it in the same card.**
+§9 publishes the To Order test as `required_qty > po_qty`. The code asks a different
+question entirely (`apps/api/src/routes/operation/to-order.ts:542-557`):
+
+```
+Σ(qty − received_qty)     over purchase_order_lines
+                          where purchase_orders.status = 'open'
+```
+
+Two differences, both load-bearing: a **part-received** line still supplies its balance, and
+a **cancelled** PO supplies nothing at all — `po_qty` alone says neither. **This one misled
+this chat while it was writing the section above**, which is the evidence that it misleads.
+The code is the authority; the document moves.
+
+## R11 · The Inventory consequence is wired to the resolution
+
+**Lane: ④ R.** **Read THE THREE CONSEQUENCES first.** **MIGRATION: probably none — prove it.**
+
+**Goal:** choosing a resolution moves the goods, once, through the machine that already
+exists — never a second thing an operator has to remember.
+
+**ALREADY EXISTS, and it is why this card is small.** R4 / 0299 already built **three of the
+four** stock outcomes, under names that match Loo's table one for one:
+
+```
+Return Goods   →  returned_to_supplier    ✅ exists
+Write Off      →  written_off             ✅ exists
+Accept As-Is   →  back_to_stock           ✅ exists
+Replace        →  the receive engine      ✅ exists
+Repair · Refund · Cancel Outstanding      →  no stock move at all
+```
+
+**Nothing new is built. This is WIRING.** A chat that proposes new stock statuses has not
+read 0299.
+
+**Done when.** The stock move is a consequence of the resolution, and 0299's transition
+guard still refuses every illegal destination (`on_hold` may never reach `reserved`, `sold`
+or `transferred`).
+
+**Must NOT.** ❌ add a parallel stock table · ❌ re-open R4's per-claim-not-per-unit
+carry-forward — **R9 closes it by ruling** · ❌ gate the stock move on the claim closing:
+goods and paperwork move on different days (R4's own rule).
+
+## R12 · The money on a claim, and the Finance queue
+
+**Lane: ④ R + Finance.** **Read THE THREE CONSEQUENCES first — especially the Finance rule.**
+**MIGRATION: yes. Its action needs five strings in `docs/COPY-STANDARD.md`.**
+
+**Goal:** a resolution with a financial consequence raises ONE action, owned by Finance,
+that completes on evidence from outside the portal.
+
+**ALREADY EXISTS: nothing — and that is the measurement.** `supplier_claims` has **28
+columns and not one is money** (measured 2026-08-05), and `supplier-claim.ts` says so in its
+own header: *"nothing in this module speaks money"*. The cost sits in
+`purchase_order_lines.cost` and the claim has never read it.
+
+**Done when.** Finance has a queue of its own · Operations never sees AP · Finance never
+sees photos · every item completes on a reference from outside the portal · `Accept As-Is`
+can carry a discount.
+
+**Must NOT.** ❌ build a tick-box completion — the whole reason the queue survived its
+challenge is that it does not have one · ❌ build AP, a supplier ledger, or a credit-note
+document: the Portal owns the ACTION, the accountant owns the accounting · ❌ let a money
+figure reach the Claims screen — Operations does not see AP.
+
 ## Status
 
 | Card | Status | PR |
@@ -780,4 +939,6 @@ with R9, in R9's PR.
 | R7 | ✅ the Receiving design, Phase 1 — **docs + architecture only, NO migration** · RE-CUT by Loo 2026-07-29, so **it is no longer GRN duty auto-assign — that rotation is still REQUIRED and belongs to Administration / Work Assignment** (§3.16) | [#515](https://github.com/wenwei4046/Carres-Portal-v2/pull/515) |
 | R8 | ✅ | [#499](https://github.com/wenwei4046/Carres-Portal-v2/pull/499) · no migration |
 | R9 | ⬜ **one claim, one outcome — and a button that splits it** (Loo 2026-08-05, option A). AutoCount is already A: `Cancel Purchase Order` / `Goods Return` / `Purchase Return` are three documents and none holds two outcomes. **Three binding conditions:** R5 counts problem PO **LINES**, not claim documents (a split may not pollute a negotiation number) · the split is a **BUTTON** on the claim screen, never "go open a second claim" · the A→B upgrade path is written in the card (one row per claim, outcome copied, qty = whole). **`Cancel PO` leaves the outcome list for `Cancel Outstanding`** — line-level, undelivered qty only, demand returns to To Order **and lands in Overdue, correctly**. ⚠️ **Overrides `PURCHASING-WORKING-FLOW.md` §9's frozen no-per-line-cancellation rule — §9 updates in the same PR.** Build NOW: 0 claims live. Closes the R4 CF `hold-resolution-is-per-claim-not-per-unit` **by ruling** | — |
-| R10 | ⬜ **§9 says something the code does not do** — DOCS ONLY. §9 publishes a 2-rung ladder; `poReceivingProgress` runs 4 rungs where **`Receiving issue` outranks `partially_received` and §9 does not have that state at all**; §9's `Balance owed` can go negative and the code clamps; §9 says the unit is the LINE while the function returns one state per PO. **It has already misled a chat in this lane.** The code is the authority — the document moves | — |
+| R10 | ⬜ **§9 says something the code does not do** — DOCS ONLY. §9 publishes a 2-rung ladder; `poReceivingProgress` runs 4 rungs where **`Receiving issue` outranks `partially_received` and §9 does not have that state at all**; §9's `Balance owed` can go negative and the code clamps; §9 says the unit is the LINE while the function returns one state per PO. **It has already misled a chat in this lane.** The code is the authority — the document moves. **PLUS a second contradiction found independently the same day**: §9's To Order test `required_qty > po_qty` is not what the code asks either — it is `Σ(qty − received_qty)` over `status='open'` POs (`to-order.ts:542-557`), so a part-received line still supplies and a cancelled PO supplies nothing | — |
+| R11 | ⬜ **the Inventory consequence is wired to the resolution** — and it is WIRING, not building: R4 / 0299 already ships **three of the four** stock outcomes under names that match Loo's table one for one (`returned_to_supplier` · `written_off` · `back_to_stock`), and `Replace` is the receive engine. `Repair` · `Refund` · `Cancel Outstanding` move no stock at all | — |
+| R12 | ⬜ **the money on a claim, and the Finance queue** — `supplier_claims` has **28 columns and not one is money** (measured 2026-08-05); the cost sits in `purchase_order_lines.cost` and the claim has never read it. **A Finance Action completes on an EXTERNAL EVIDENCE reference** (the supplier's CN/DN number), never a tick-box — that is why §8 does not kill the queue. **2990s is the worked example of the failure**: its `purchase_returns.credit_note_ref` has exactly two readers in the whole repo, a PDF and a detail page. Operations never sees AP; Finance never sees photos. **`Accept As-Is` must be able to carry a discount** | — |
