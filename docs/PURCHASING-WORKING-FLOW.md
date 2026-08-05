@@ -571,25 +571,158 @@ contain a to-do word** (`need`, `pending`, `TBD`) — `docs/COPY-STANDARD.md`.
 **No human types a purchasing status.** Every state below is DERIVED from stored quantities,
 so two screens can never disagree and no repair job is ever needed.
 
-The unit is the **PO line**. Per line, the system stores only what somebody actually records:
+**This section is written against the code, and the code is the authority** (card R10,
+2026-08-05). What stood here before published a two-rung ladder the portal has never run, and
+it misled two chats in this lane — the second while it was reading this very section in order
+to write something else. The functions named below are the ones the screens actually render
+from; if this text and they ever disagree again, they win and this text is the defect.
+
+### What is stored
+
+**The unit of work, and of storage, is the PO line.** Per line, the system stores only what
+somebody actually records:
 
 ```
-required_qty     what the customer ordered           order_lines
-po_qty           what we ordered from the supplier   purchase_order_lines.qty
+qty              what we ordered from the supplier   purchase_order_lines.qty
 received_qty     what physically arrived good        purchase_order_lines.received_qty
 damaged_qty      arrived broken                      purchase_order_lines.damaged_qty
 wrong_item_qty   arrived, but the wrong thing        purchase_order_lines.wrong_item_qty
 ```
 
-Everything on screen is computed from those:
+Demand — what somebody still wants — is stored in two other places, and To Order reads both:
 
 ```
-To order          required_qty > po_qty
-Ordered           po_qty > 0
-Part received     0 < received_qty < po_qty
-Fully received    received_qty >= po_qty
-Balance owed      po_qty − received_qty
+qty              what the customer ordered           order_lines.qty
+remaining_qty    what a typed demand still needs     purchase_demands.remaining_qty
+                 (GENERATED: qty − issued_qty, 0320)
 ```
+
+**There is no `required_qty` column and there never was one** — the name this section
+published greps to zero across the whole repository. Typed demand, the second row above, is
+not in the old table at all, and it has been feeding To Order since 0319/0320.
+
+### What is derived, and over which lines
+
+**The unit of the derived STATE is not the line — it is whatever SET of lines the screen is
+showing.** `poReceivingProgress` (`packages/shared/src/po-receiving.ts`) is the one place
+these quantities become words. It sums the lines it is handed and returns ONE state for that
+set:
+
+| Screen | Lines handed in | So the state is |
+|---|---|---|
+| Purchase Orders row · Receiving row · Warehouse Incoming | every line of the PO | per PO |
+| the balance-delivery-date modal | one line | per line |
+
+Same function, same rule, different scope. Reading a per-line formula as the thing that
+drives a per-PO pill is exactly the mistake this section used to invite.
+
+Summed over whichever set is in scope:
+
+```
+ordered          Σ qty
+received         Σ min(qty, received_qty)
+issueQty         Σ damaged_qty  +  Σ wrong_item_qty
+pendingDelivery  Σ ( qty − min(qty, received_qty) )
+```
+
+### The receiving ladder — FOUR rungs, and the ORDER is the rule
+
+**The first rung that matches wins.** The order is not a tidy listing, it IS the rule, and
+reading these four conditions as independent tests is how the wrong formula got published.
+
+```
+1  Fully received       ordered > 0  AND  received >= ordered
+2  Receiving issue      issueQty > 0
+3  Partially received   received > 0        → prints `Partially received (8/10)`
+4  In transit           otherwise
+```
+
+Read downwards, each rung is a business decision:
+
+- **`Fully received` outranks damage on purpose.** Damaged units that have since been
+  replaced leave their counters behind; the state describes TODAY. Without this rung first,
+  a PO that was made good would stay red forever with no button to clear it.
+- **`Receiving issue` outranks `Partially received`**, and it is a state this section did
+  not have at all. 5 of 10 in with 1 damaged reads `Receiving issue` on screen — never
+  `Partially received` — because it is the row a human must act on.
+- Only rung 3 carries a count in its word.
+
+### The balance number, and why it is clamped
+
+`received_qty` is clamped to `qty` **per line, before summing**. `qty − received_qty` on its
+own can go negative, and a stray over-receipt — a data repair, a legacy import — would then
+make a PO read as more received than was ordered. Clamped, `pendingDelivery` can never be
+negative and `Fully received` can never be overshot into.
+
+**Its word is `Pending delivery`** (R1's locked vocabulary law), and the reason is business
+rather than style: the goods are not lost, the supplier simply has not sent them yet.
+Nothing may call this number Missing, Short, Lost — **or `Balance owed`, which is what this
+section used to call it.**
+
+**A damaged unit counts as pending delivery, not as received.** It physically arrived, but
+the supplier still owes a good one. That is also why `received_qty` never absorbs damaged or
+wrong-item units: the stock ledger may only ever gain sellable goods.
+
+### The register's rail runs a DIFFERENT ladder, and that is deliberate
+
+The Purchase Orders register's left rail does not run the receiving ladder. `poWorkStateOf`
+(`packages/shared/src/po-workspace.ts`) reads the PO's own status, the same clamped
+quantities and the supplier's date — and deliberately **not** damaged or wrong item, because
+this ladder answers *where are the goods?*, not *did they arrive clean?*
+
+```
+1  Cancelled              purchase_orders.status = 'cancelled'
+2  Completed              status is not 'open'  OR  ordered > 0 AND received >= ordered
+3  Ready to Receive       received > 0            ← something checked in
+4  Waiting Supplier Date  no supplier date on the PO
+5  Waiting for Goods      otherwise
+```
+
+**`Overdue` is not a rung here.** The supplier's date passing is a sub-state of
+`Waiting for Goods` and raises an ACTION; it never becomes a progress word of its own
+(Jess's state machine, 2026-08-02).
+
+**`purchase_orders.status` is a three-value enum** — `open` · `received` · `cancelled`
+(`po_status`, 0001) — and it is a stored column, not a screen word. It is not the five-word
+Operation Status axis below, and the rule that `Open` may never appear in the UI is about
+the word on screen, not about this formula.
+
+**Two ladders, two questions, and they are never merged.** A screen may show both.
+
+### What "still to buy" really asks
+
+**It is not `required_qty > po_qty`.** That test was published here, it is wrong in two ways
+that both change what gets bought, and neither of its two names is a real column — the second
+is `purchase_order_lines.qty` and is written `qty` below. What To Order computes
+(`apps/api/src/routes/operation/to-order.ts` → `netRequirements` in
+`packages/shared/src/net-requirements.ts`) is a greedy allocation of demand against supply:
+
+```
+demand    order_lines.qty                     customer orders
+        + purchase_demands.remaining_qty      typed demand, > 0 and not cancelled
+
+supply    Σ ( qty − received_qty )            purchase_order_lines
+                                              where purchase_orders.status = 'open'
+                                              and that remainder is above zero
+
+to order  demand − supply, allocated earliest deadline first
+```
+
+- **A part-received line still supplies its balance.** A PO of 10 with 6 received covers 4
+  of the demand, not 10 and not 0. The ordered quantity alone would count all 10 and under-buy.
+- **A cancelled PO supplies nothing at all.** `purchase_orders.status = 'open'` is the filter,
+  so the requirement returns to To Order the moment a PO is cancelled. The ordered quantity
+  alone would count it forever and never re-buy.
+
+**Free ready stock is a supply pool too, and it is deliberately not consumed automatically**
+(`consumeFreeStock` defaults off — goods are labelled per order). The engine computes the
+offer and a human decides whether to take it (card P10).
+
+**There is no generic `Ordered` state on screen** (Jess, 2026-08-01, final). A row whose item
+has no purchase order says `Yet to Order`; a row that has one shows the purchase order's
+number, and the list of numbers is itself the ordered set. The only order-level word is
+`Partly ordered` — some items bought, some still to buy — which is a fact about the ORDER and
+could never be said on a row.
 
 **TWO INDEPENDENT STATUS AXES — FROZEN 2026-07-29 by Loo. They are never merged:**
 
@@ -608,9 +741,9 @@ A purchase order exists only once it has been issued, so there is no state befor
 and no stored object that could occupy one.
 See [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §2–§3.
 
-**DEMAND THAT NEVER REACHED THE PLAN IS ALSO NOT IN THE TABLE ABOVE.** `required_qty` only
-means anything for a line the plan could read. Two kinds of demand cannot be described by any
-line above and **may never be silently discarded**:
+**DEMAND THAT NEVER REACHED THE PLAN IS ALSO NOT IN THE ARITHMETIC ABOVE.** A demand quantity
+only reaches "still to buy" for a line the plan could read. Two kinds of demand cannot be
+described by any formula above and **may never be silently discarded**:
 
 - **the configuration is missing** — the supplier cannot be resolved, or production working
   days are not set for that supplier × category (§2)
