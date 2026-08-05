@@ -113,7 +113,18 @@ export default function RentalConfigurePage({
       aria-label={`Configure ${model.name} · Rent-to-Own`}
       data-testid="rental-configure"
     >
-      {wizardTopbar ? <ConfigureTopbarBrand ctx={wizardTopbar} onBack={onClose} /> : null}
+      {/* The strip rides its OWN 48px row, exactly as PosConfigurePage does it
+          (b8d7e5d8, 2026-07-26). `.cfg-root.has-wizardbar` declares FOUR grid
+          rows and `.cfg-wizardbar` is the band that fills the first one —
+          height, padding, background and the bottom rule all live on that
+          class, so rendering the brand bare gives grid row 1 an unstyled,
+          zero-chrome child. That is the overlap the original fix was written
+          for; its commit message is literally "sofa header overlapped". */}
+      {wizardTopbar ? (
+        <div className="cfg-wizardbar">
+          <ConfigureTopbarBrand ctx={wizardTopbar} onBack={onClose} />
+        </div>
+      ) : null}
 
       <div className="cfg-header">
         <div className="cfg-header__left">
