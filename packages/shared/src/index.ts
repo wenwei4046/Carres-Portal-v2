@@ -1867,6 +1867,7 @@ export {
   reservedFromStockLabel,
   stockExpandLabel,
   readyStockRef,
+  proceedWaitedDays,
   readyStockDrawNote,
   READY_STOCK_DRAW_REASON,
   unitLabel,

@@ -62,6 +62,7 @@ import {
   unitsHeadline,
   unresolvedHeadline,
   freeStockLine,
+  proceedWaitedDays,
   reserveFromStockLabel,
   reservedFromStockLabel,
   stockExpandLabel,
@@ -79,7 +80,7 @@ import Modal from "@/components/kit/Modal";
 import SearchInput from "@/components/kit/SearchInput";
 import Textarea from "@/components/kit/Textarea";
 import { apiFetch } from "@/lib/api";
-import { fmtDate } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { qk } from "@/lib/queries";
 import CreatePurchaseDialog, { type Destination } from "./CreatePurchaseDialog";
 import PurchasingTabs from "./PurchasingTabs";
@@ -148,6 +149,15 @@ interface GridRow {
   so: number | null;
   delivery: string | null;
   late: boolean;
+  /**
+   * P18 — the ORDER's planned production-start date (`orders.proceed_date`).
+   *
+   * It sits on the row only to travel to the GROUP HEADER, exactly as `so` and
+   * `customer` do. It is never rendered in a cell: Loo ruled 2026-08-04 that a
+   * fact which is not per-row gets no column, and every line under one SO
+   * carries the same value. `null` on a Ready Stock demand — no order, no plan.
+   */
+  proceedDate: string | null;
   model: string;
   qty: number;
   /**
@@ -387,6 +397,7 @@ export default function OperationToOrder() {
             so: r.so,
             delivery: r.delivery ?? null,
             late: today != null && r.delivery != null && r.delivery < today,
+            proceedDate: r.proceedDate ?? null,
             model: railItemLabel(b.model, b.size ?? null),
             qty: b.qty,
             bucket,
@@ -414,6 +425,7 @@ export default function OperationToOrder() {
         so: o.so,
         delivery: o.delivery,
         late: today != null && o.delivery != null && o.delivery < today,
+        proceedDate: o.proceedDate ?? null,
         model: o.model,
         qty: o.qty,
         // Ordered TODAY sits on the current run's row (今天下了哪些);
@@ -1618,6 +1630,36 @@ export default function OperationToOrder() {
                               {r.delivery ? fmtDate(r.delivery) : W.noDeliveryDate}
                             </span>
                           )}
+                          {/* P18 — Sales' planned PRODUCTION START, an ORDER
+                              fact, so it joins the facts already on this line
+                              instead of taking a column that would print the
+                              same date on every item of the order (Loo,
+                              2026-08-04). A Ready Stock demand has no order and
+                              therefore no plan, and prints nothing.
+
+                              LABELLED where the delivery date beside it is not,
+                              deliberately: the header already carried one bare
+                              date, and a second bare date would be two
+                              unexplained dates in a row. The label is what
+                              tells them apart, and the short spelling (no
+                              weekday) is the second thing that does.
+
+                              The waiting count appears only once the day has
+                              PASSED — Loo's ruling, 2026-08-05 — so an order
+                              whose production is not yet due reads as the plain
+                              plan it is. It is left UNTONED on purpose: the row
+                              already carries the engine's own priority and a red
+                              late delivery date, and a third urgency colour here
+                              was not ruled. */}
+                          {r.proceedDate ? (
+                            <span className="text-kit-slate-11 tabular-nums">
+                              {`${W.proceedDate} ${fmtDateShort(r.proceedDate)}`}
+                              {(() => {
+                                const d = proceedWaitedDays(r.proceedDate, today);
+                                return d == null ? null : ` (${d} ${d === 1 ? "day" : "days"})`;
+                              })()}
+                            </span>
+                          ) : null}
                           {partly ? (
                             <span className="rounded-pill bg-kit-amber-3 px-2 py-0.5 text-label text-kit-amber-11">
                               {W.partlyOrdered}
