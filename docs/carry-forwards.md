@@ -317,3 +317,26 @@ copy is grey and guarded. **The inline copy in `OperationPurchaseOrders.tsx` is
 still blue**, hidden inside that file's baseline — adopting the shared
 primitive fixes it in the same move.
 
+
+- `add-line-spelt-two-ways-across-two-modules` — **A CHOSEN COST, recorded so nobody "fixes"
+  it by picking the wrong side.** P19 (2026-08-05) shipped `Add line` / `Remove` in
+  Purchasing's Create Purchase dialog, ruled by Loo; the Sales Portal's New Sales Order spells
+  the same two gestures **`Add line item` / `Remove line`**
+  (`PrincipalNewOrder.tsx:1028` · `:999`). One act, two spellings, two modules.
+
+  **Why it was chosen, stated at the time rather than reconstructed.** The alternative was to
+  take the Sales Portal's pair verbatim — zero new words — but that pair contains
+  `Remove line`, and Purchasing's own PO preview already renders `Remove`
+  (`TO_ORDER_WORDS.itemsRemove`). So option 1 cost **zero new words and one inconsistency
+  INSIDE Purchasing**, while what shipped cost **one new word and zero inconsistency inside
+  Purchasing**. A new word is a one-off — it needs a COPY-STANDARD row, which P19 wrote. An
+  inconsistency inside one module is a permanent reading cost, and the two screens sit in one
+  operator flow (create purchase → issue PO → preview). **Within-module consistency was ruled
+  to outrank cross-module consistency, and this is the bill for that ruling.**
+
+  **The rule for whoever picks it up:** if it is ever aligned, **the Sales Portal moves to
+  Purchasing's pair, not the reverse** — Purchasing's is the ruled one and has the dictionary
+  row. It is that lane's card, and it is not urgent: the two forms are different documents
+  reached by different people doing different jobs. **What is NOT allowed is a chat "tidying"
+  Purchasing back to `Add line item`** — that would re-introduce the within-module split the
+  ruling paid a new word to avoid.
