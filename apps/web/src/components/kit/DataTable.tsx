@@ -148,6 +148,34 @@ export interface DataTableProps<Row> {
   columns: readonly Column<Row>[];
   /** Stable identity — selection and React keys both read it. */
   rowId: (row: Row) => string;
+  /**
+   * **A handle on the element that actually SCROLLS** — this component's root.
+   *
+   * Added by D7-Claims, and it is a migration finding rather than a
+   * convenience: a page that restores its scroll position after closing a
+   * record (UI-KIT §8.2, ruled by card P2) has to be able to FIND the
+   * scroller, and the scroller is the kit's div, not the page's. Without it
+   * the page can only wrap this component in a second `overflow-auto`, which
+   * scrolls in jsdom, passes the test, and never scrolls in a browser —
+   * a green test over a dead feature.
+   *
+   * Optional, so the three pages that pass nothing emit byte-identical markup.
+   */
+  testId?: string;
+  /**
+   * The same element, as a ref — what the page READS and WRITES `scrollTop` on
+   * to put an operator back where they were. `testId` names it; this hands it
+   * over. Both are optional and neither changes a thing for a page that
+   * passes them.
+   */
+  rootRef?: React.Ref<HTMLDivElement>;
+  /**
+   * The same handle, per data row. The kit already stamps `data-kit="data-row"`;
+   * this is the PAGE's own name for its row, which its tests and its operators'
+   * bug reports already use. Group headers and expanded records deliberately do
+   * NOT carry it — counting rows must count rows.
+   */
+  rowTestId?: string;
   /** §8.2: clicking a row opens its record on the FIRST tab. */
   onRowOpen?: (row: Row) => void;
   /** Present = the table is selectable. Absent = no checkbox column at all. */
@@ -443,6 +471,9 @@ export default function DataTable<Row>({
   rows,
   columns,
   rowId,
+  testId,
+  rootRef,
+  rowTestId,
   onRowOpen,
   selection,
   empty,
@@ -544,7 +575,9 @@ export default function DataTable<Row>({
 
   return (
     <div
+      ref={rootRef}
       data-kit="data-table"
+      data-testid={testId}
       /* NO TOP RADIUS (card P16, Loo 2026-08-04). A rounded lip under a
        * square toolbar reads as a card floating on a page; a list grid is a
        * SHEET and meets what is above it flush. A page that wants a rounded
@@ -783,6 +816,7 @@ export default function DataTable<Row>({
                 <tr
                   key={id}
                   data-kit="data-row"
+                  data-testid={rowTestId}
                   data-selected={isSelected || undefined}
                   onClick={onRowOpen ? () => onRowOpen(row) : undefined}
                   /* HOVER IS GREY, SELECTION IS BLUE (Loo, 2026-08-03).
