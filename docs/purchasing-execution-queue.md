@@ -3492,7 +3492,124 @@ DETACHED WORKTREE at `origin/main`, never by quoting a delta.
 
 ---
 
-## Q9 · The items listing comes back to the right panel
+## Q10 · ONE purchase order, ONE way of looking at it
+
+**Lane: PURCHASE ORDERS · `OperationPurchaseOrders.tsx` only. NO migration, NO api,
+NO new word. THIS CARD ABSORBS Q9** — same file, same region; apart they would fight.
+
+> **Written from a top-to-toe review Loo asked for on the LIVE page, 2026-08-05.** Every
+> number below was measured in a real browser at 1280, not estimated. He ruled the fix
+> (option A) after seeing them.
+
+### THE MEASUREMENTS — this is the whole card
+
+```
+viewport            1280
+  rail   200  ·  listing 568  ·  panel 400
+
+the register's table   1203px wide   inside 568px   → 635px off-screen
+the expand's header    1171px wide   inside 568px   → Qty · Destination · Received unreachable
+the expand's Description column        787px        → flex-1 eats everything and evicts the rest
+
+and, at the same moment, on one screen:
+    the expanded row   PO-2038
+    the right panel    PO-2032        ← TWO DIFFERENT PURCHASE ORDERS
+```
+
+**The three columns off-screen are `Customer Delivery`, `Expected Arrival` and
+`Current Action`.** So with the panel open — its default state — **the page cannot show the
+column it exists for.** Q1's risk order and Q8's new word are both invisible.
+
+**AND THE Q1b CLOSURE WAS WRONG, which is this manager chat's error.** Q1b was closed with
+*"Q7 deletes COMPACT_KEYS, so the columns never hide again."* They no longer hide — **they
+scroll off the right edge, which is worse**: the compact set at least chose which five
+survived and had an honesty guard, and a horizontal scrollbar chooses nothing and warns
+nobody.
+
+### THE STRUCTURAL FIX — Loo's option A, and it is one state, not a rule
+
+**A purchase order is looked at in ONE of two ways, never both:**
+
+| | what it is for |
+|---|---|
+| **the right panel** | read it · print it · talk to the supplier |
+| **the row expand** | change its lines — destinations, the two dates, the note |
+
+```
+click a row            → the PANEL opens on that PO          (the row does not expand)
+click the row's  ⌄     → the row EXPANDS and the panel CLOSES → the list gets its full 968px
+collapse the expand ⌃  → the panel comes back, same PO
+the panel's  ✕         → closes it; clicking any row brings it back
+```
+
+**Make it ONE selected id and ONE mode.** `{ poId, mode: "panel" | "expand" }` — **two
+different purchase orders must be structurally unrepresentable**, exactly as Q5 made "one
+expand at a time" a single id rather than a Set. A rule that says *keep them in step* is a
+rule somebody will break; a state that cannot hold two is not.
+
+### The four other repairs, all agreed by Loo
+
+**Ⓐ The `›` toggle leaves the shell header and becomes a `✕` on the panel.**
+It is the PANEL's control, not the page's — Gmail, GitHub, Linear and Fiori all put close at
+the panel's own top-right. **And it is a dead end today**: `openPo` sets only the URL param,
+so once the panel is closed, clicking a row does nothing and the operator is stuck. With the
+✕, closing then clicking any row brings it back, and **no "show" button is needed at all.**
+
+**Ⓓ The expand must live inside the VISIBLE width, not the table's `min-w-[1205px]`.**
+The expanded cell spans every column and inherits that minimum. It should be pinned to the
+visible viewport of the scroller (`position: sticky; left: 0`) and sized to it, and
+`Description` must take what is LEFT rather than `flex-1` eating 787px and evicting three
+columns. **Measure the result in a real browser; jsdom has no widths.**
+
+**Ⓔ `Print PDF` moves up beside the PO number, and the `DOCUMENT` band is deleted.**
+Measured: `PO-2038` 100.8 + gap 8 + `Print PDF` 83.8 = **192.6px inside 368px usable** — 175px
+spare. The band held one button; its title and hairline cost ~30px for nothing. The object's
+identity and its actions belong together at the top (Fiori Object Page · BC document page ·
+GitHub · Linear).
+**The three Communication controls do NOT move up** — measured `Print PDF` + `Copy message` +
+`Open WhatsApp group` = **385.1px, which does not fit 368px** — and Loo froze that band's home
+on 2026-08-03: *"Communication starts from the DOCUMENT, never from the register."*
+
+**Ⓔ The items listing comes back to the panel, READ-ONLY** *(this was card Q9, absorbed here)*.
+Loo: *"为什么你把我 right panel 里面的 listing 拿走？give me back."* Q5 removed it to obey
+rule 1; using it, clicking a row opened a panel that named the supplier, the dates and the
+communication and **never said what was ON the purchase order**. Rule 1 is already narrowed in
+`PURCHASING-INFORMATION-MODEL.md` §12.7.5: **a fact may be READ in two tiers and WRITTEN in
+only one.** No dropdown, no date field, no `Save`, no `⋮` in the panel — editing stays in the
+expand, so rule 3 (one editing surface) is untouched.
+
+### DONE WHEN — on production, with your own eyes, quoting the numbers
+
+- **The panel and the expand can never show two different POs.** Try to make them; say what
+  the state made impossible.
+- With a row expanded, the listing is **968px** and `Customer Delivery`, `Expected Arrival`
+  and `Current Action` are all on screen. Measure and quote.
+- `PO-2032` expanded shows all six of its expand columns — `#` · `SO No.` · `Description` ·
+  `Qty` · `Destination` · `Received` — **with nothing off the right edge.**
+- Clicking a row after closing the panel with `✕` brings the panel back.
+- The panel shows `PO-2032`'s 3 items **without expanding the row**, and that block has no
+  editable control — asserted by a test.
+- `Print PDF` sits beside the PO number; the `DOCUMENT` heading greps zero.
+- Negative controls, each a real edit with its count: let the id and the panel diverge · make
+  the panel's items editable · put `Description` back to `flex-1`.
+
+### MUST NOT
+
+❌ change any column, width or token on the REGISTER (Q7's nine are measured and frozen) ·
+❌ move editing into the panel · ❌ move the Communication controls up · ❌ add a word —
+every string here already ships · ❌ touch Receiving, Orders or To Order · ❌ hold the card
+for a design round (§13.2).
+
+### REPORTED, NOT IN THIS CARD
+
+**The rail's five buckets: three read 0 and always will** (`Ready to Receive` · `Completed` ·
+`Cancelled`) — this tab has no receiving door, so nothing can move them. 200px of permanent
+navigation, three fifths of it silent. **Hiding a zero would also hide a filter the operator
+may want**, so it is a word-and-behaviour decision for Loo, not a repair.
+
+---
+
+## ~~Q9~~ · The items listing comes back to the right panel — ABSORBED BY Q10
 
 **Lane: PURCHASE ORDERS · `OperationPurchaseOrders.tsx` only. NO migration, NO api,
 NO new word. Put a block back that Q5 removed.**
@@ -3775,6 +3892,7 @@ kit's.
 | **Q5** | ✅ **the expand becomes the WORKING AREA, the right panel becomes ACTIVITY** (Loo 2026-08-04, after using the page: *"Right panel not friendly to edit detail"*) — **no migration**; web + api + shared. DOCUMENT DATA moved to the row expand where the operator types into it; ACTIVITY stayed right, and **the panel lost its date door, its items grid and its per-line ⋮ rather than keeping copies** — rule 1 (nothing in two tiers) and rule 3 (one editing surface) are the same repair. **ONE PO expands at a time is a PROPERTY**: the state is a single id, so two open rows cannot be represented — proved non-vacuous by a Set control AND a no-close control, each firing 1. **The one genuinely new thing is the route the card names, and that door had been half-built for a day**: `purchasing_record_ready_date` shipped with **0318 on 2026-08-03 and nothing ever called it**, so `Confirm ready date` had no button anywhere in the portal. **`poDateHistoryOf` also filtered the ready kind OUT**, so the first ready date an operator recorded would have been swallowed by the history sitting beside the field — two runs now, numbered separately and each NAMED, never merged (different facts, and every supplier here carries transit days). **Qty stays read-only, asserted from both ends** (no number input on the page; a route test refuses a quantity smuggled through the body). **Measured in a real browser and it CHANGED the design**: the select + `Move` + the two controls inside the 160px Destination cell came out **68px tall at the 680px compact width** — three wrapped lines — so the editing controls took their own full-width strip (**39px**, one line). **Verified on production against PO-2032 in a rolled-back transaction**: the ready date moved `expected_ready_date`, wrote exactly ONE `kind='ready_date'` promise and the `po_history` sentence, left `eta_date` alone, and the destination door moved line 2 to AL; the rollback was proved total, and **0 of 21 POs carry a ready date today** because nothing could record one. **Reported, not applied — the card asks for no Save button anywhere in the expand and TWO of the three fields are multi-field forms Jess gave Save buttons AFTER using them** (*"i cant save?"* · *"i cant save for AL"*): the new single-value field takes the ruled manner exactly (Enter saves, Esc cancels, no button), the two older doors keep hers, and the split's control is named `Split`, which is an act rather than a save. Also reported: the register column still says `Goods Arrival` beside an expand that says `Expected Arrival` for the same fact (§12.2 retires it and names this column, but the rename moves a header width Q1 measured); `Received At` has no field on the wire, exactly as §12.2 says. **FOLLOW-UP #601 `8333ef8c` closes the two things #600 left**: (a) **the §13.3 table answers FIVE powers and the ship wired ONE** — `resize` and `reorder` were both ruled ✅ **wire** by Loo the same day and were silently absent, so they are now passed (a WIRING: the arithmetic, the handle and the a11y pin are all D0.5d's, the two strings are the kit's own from `/ui`), while **footer totals and grouping stay UNWIRED with a test asserting their ABSENCE** — he refused both, and a power that quietly appears later is the failure §13.3 exists to stop; (b) **the last Done-when line is DONE, and it did not need a password after all** — a live operator session was already open, so PO-2032 was opened on production, expanded (3 lines, AL on line 1, Klang on 2-3), **line 3 changed to AL, reloaded, and it stuck**, confirmed again by reading `purchase_order_lines`. **Measured in a real browser on the deployed page**: a real drag moved `Supplier` 92 → 132 and took every pixel from `PO No.` 104 → 64 with the table width UNCHANGED at 555px and page scroll 0 (§7 held under a drag); a real drag-and-drop moved a column and the data cells followed; a reload put the company's grid back (88 · 92 · 104 · 54 · 200), which is §0.4 proved. Two controls, 4 and 4, each a real edit — the second needed because the first structurally cannot fire the §7 typed-once assertion. check-design 8367, identical category for category to `origin/main` | #600 · #601 |
 | **Q7** | ✅ **SHIPPED 2026-08-04** (PR #603 `9a3829a9`, **no migration, no api**, web `index-BscHlt88.js`) · **the frozen column set becomes real, and one date stops being spelt twice** — a REPORTING FAILURE of the manager chat, repaired: five of Loo's 2026-08-04 rulings had never reached the page. **`COMPACT_KEYS` is deleted and the HONESTY GUARD went WITH it** rather than being removed — a column that can never hide cannot be hidden while it is filtered, so the guard had nothing left to guard. `SO No.` and `Destination` are new columns over data ALREADY on the wire (`so`+`so_refs`; 0311's per-line `destination_id`), so neither needed an api change; the row prints a FLAG (`Carres Klang +1`) and the expand keeps the per-LINE value, which is why it is not the duplication §12.7.5 rule 1 bans. **The retired word was live in TWO places and the second is the one a card would miss** — the column, and **the WhatsApp draft the supplier actually receives**; zero in the file now, asserted by a SOURCE SCAN with comments deliberately NOT stripped. **The card's nine numbers reproduced EXACTLY in a real browser**, then on the DEPLOYED page at 1280×800: `96 · 87 · 83 · 94 · 135 · 135 · 140 · 206 · 192`, page scroll **0**, the LISTING REGION scrolling sideways (557 of 1205), rows **40px**, **0 clipped cells**. The min-width is **1205, not 1168**, and the arithmetic is on record: the kit's expand column takes 3%, so 1168/0.97. **Verified on production with my own eyes: `PO-2037` reads `SO-1206 +4` (all five in its title) and `PO-2032` reads `Carres Klang +1` (`Carres Klang · AL Sungai Buloh`)**, and opening/closing/re-opening the panel returns the identical nine headers all three times. Controls: restore `COMPACT_KEYS` → **20** · drop the `+N` → **2** · put the retired word back → **8**. **Reported, not fixed: `PO No.` at 83px is full to the edge on the selected row** (67px of content in 67px visible), so a row both selected AND carrying an open call would clip — unreachable today, 0 of 21 POs raise a call, and 83 is his frozen number · the other two pages keep the retired word by design (other lanes) · `Confirm Arrival` is still live and is §12.5's open question, not Q7's | #603 |
 | **Q8** | ✅ **SHIPPED 2026-08-04 — the Current Action column stops reversing its own tense** (Loo found it himself). **No migration, no api, no layout, width, column or token change**; five files, two of them source. The full string is `Confirm Goods Arrival Date`, a FUTURE question, and the register shortened it to `Confirm Arrival`, which reads as *tick that it has arrived* — **live on 16 of 21 rows**. His word `Check Expected Arrival` ships verbatim; `Waiting for Goods` (a STATUS — the rail keeps it) and `Open Receiving` (navigation) leave the action column for `—`, which §12.3 rules a real answer. **The card's one thing left to be READ, and the reading is on the record: `Contact Supplier` is DELETED where the other two BECOME `—`, and its own reason is *"the SAME action as the row above, merely late"*** — so an overdue PO carries the same KEY and the same WORD as a dateless one rather than falling silent; silence would have said *nothing to do* about the one PO in the register that is provably late. **One key, not two mapping to one string** — a second would split the column's own filter into two rows with an identical label — and **the PRECEDENCE did not move**: overdue still outranks the engine's open calls exactly as it did before. **Verified on the live database and the counts are the card's own**: 21 open POs → **16 `Check Expected Arrival` · 5 `—`**, with **0 overdue · 0 lines ever received · 0 engine calls**, so the reading has no live effect today. **"No layout change" was PROVED rather than assumed**: measured in a real browser against the app's own stylesheet at 13px Inter — a basis that reproduces Q7's own number exactly (`Confirm tomorrow's delivery` **175.4**, which is where 192px came from) — his word is **160px** with the cell's padding, longer than all four it replaces, 32px inside the column, and not the string that sets the width. Gates: web tsc 0 · shared 2122/2122 · page **89/89, the same count as baseline** (four tests re-pointed, none added or removed) · web suite 2470 passed / 16 pre-existing, zero new · **check-design 8367, identical category for category to `origin/main`, proved by linting a DETACHED WORKTREE at main**. Three controls, each a real edit verified applied: `Confirm Arrival` back → **shared 2 · web 4** · `Contact Supplier` back → **shared 2 · web 1** · `Waiting for Goods` back into the action column → **shared 2 · web 2**. **Reported, not fixed**: the two retired strings do not grep to a literal zero and the honest split is **0 live strings · 4 tombstone comments · 6 negative assertions**, because a grep counting those would forbid the guard that keeps the count at zero · **`Check` is now a portal verb in practice while COPY-STANDARD's table still says six** — the new section confines it to this one label, but the seventh-verb bar was cleared by ruling rather than by the test, and that is Loo's · an overdue row now shows nothing about its lateness except the shared word (`⚠ Overdue by N days` is in the expand; the cell's red is reserved for a late ENGINE call) — unreachable today, and tone is layout · **§12.4's hole is unchanged**: the portal still has no ACTION for *the factory has never told us when the goods reach us*, so this is a state word with no trigger, due or owner, exactly as §12.5 leaves it | — |
-| **Q9** | ⬜ **the items listing comes back to the right panel** — Loo, looking at the live page: *"为什么你把我 right panel 里面的 listing 拿走？give me back."* Q5 moved the items grid into the row expand to obey rule 1 (*nothing in two tiers*), which he had approved; **using it, clicking a row opened a panel that named the supplier, the dates and the communication and never said what was ON the purchase order** — two actions where there was one, on the most-asked question about a PO. **§13.2 is his own rule and governs: real use overrides theory, and a design found worse after deployment is refactored, not defended.** The panel gets the items back **READ-ONLY**; editing stays in the expand, so rule 3 (one editing surface) is untouched. **Rule 1 is NARROWED, not deleted: a fact may be READ in two tiers and WRITTEN in only one** | — |
+| **Q10** | ⬜ **ONE purchase order, ONE way of looking at it** — from a top-to-toe review of the LIVE page (Loo, 2026-08-05), measured in a real browser at 1280 rather than estimated: the register's table is **1203px inside 568px**, so `Customer Delivery` · `Expected Arrival` · `Current Action` are **all off-screen whenever the panel is open, which is its default state** — the page cannot show the column it exists for, and Q1's risk order and Q8's word are both invisible. The expand is **1171px inside 568px** (`Description` is `flex-1` and eats 787), which is why Loo said *"i cant see this listing at all"*. And at the same moment on one screen **the expanded row and the right panel were showing TWO DIFFERENT purchase orders** (PO-2038 vs PO-2032). Fix is his option A, built as ONE STATE rather than a rule: `{poId, mode: panel|expand}`, so two POs are structurally unrepresentable — the discipline Q5 used when it made *one expand at a time* a single id, not a Set. Expanding closes the panel and gives the list its full 968px. Four agreed repairs ride with it: the `›` toggle becomes a `✕` on the panel (**closing it today is a dead end** — `openPo` only sets the URL param and never reopens it) · the expand is pinned to the visible width instead of inheriting `min-w-[1205px]` · `Print PDF` moves beside the PO number and the one-button `DOCUMENT` band is deleted (measured 192.6px inside 368) · **the items listing comes back to the panel READ-ONLY (was Q9)**. **This card also corrects a manager-chat error: Q1b was closed saying Q7 stopped the columns hiding. They no longer hide — they scroll off the right edge, which is worse, because the compact set at least chose which five survived and had an honesty guard, and a scrollbar chooses nothing and warns nobody** | — |
+| ~~Q9~~ | ➡️ **ABSORBED BY Q10, 2026-08-05 — closed, not skipped.** Same file, same region: apart, Q9 would put the items back into a panel that Q10 closes whenever the expand is open. Its whole content is Q10's Ⓔ | — |
 | **Q6** | ✅ **SHIPPED 2026-08-04 — To Order audited; BOTH kit powers REFUSED in writing, and the refusal is a test** (Loo: *"now to order page i want also follow us"*). **No migration, no api, and NO PAGES DEPLOY OWED — proved by CHECKSUM**: the diff is comments + tests, so the build from this tip emits Q7's `index-BscHlt88.js`, byte-identical (md5 `c46f757a…`, 4,764,247) to the bundle DOWNLOADED from production, and all four canonicals were polled and serve it — re-measured after EACH of the two mid-build merges (P14, then Q7) that this branch was rebased onto. Worker not owed either, measured against the LIVE WORKER'S source commit `f2517f99` (empty diff). **P13 was already merged, so the authorised rebase was not needed.** **§13.3 answered for BOTH, on production measurements**: `resize` **refused** — a resize can only reveal what is hidden and NOTHING truncates at any viewport from 1024 to 1280; the measured defect is the opposite (Model is given 287–402px for 75px of content) and it belongs to **P16**, which fixes it for everybody instead of asking the operator to re-drag four columns every morning (§0.4 forbids remembering it); Loo's own reason on Purchase Orders — *"supplier names are different lengths"* — does not transfer, because To Order buys from exactly TWO suppliers; and the one column with the least headroom (`PO No.`, 16px spare at 1024) is the LAST, which the kit gives no handle at all. `reorder` **refused** — *"different operators watch different columns"* is a WIDE-register problem (nine columns there, four here, all in one glance with zero horizontal scroll), and Loo ruled this order himself on the real page with a stated adjacency reason (`2 │ Cody K`). **The absence is ASSERTED**, the same move #601 made for footer totals: a power that quietly appears later is the failure §13.3 exists to stop. **Date scan CLEAN in the source AND on the live page** — `Goods Arrival` · `Stock ETA` · bare `ETA` all grep 0; `colPreferred` is PINNED to §12.2's `Customer Delivery` rather than deleted, so the day the group header's bare date is labelled it cannot be re-invented as `Preferred Delivery`. Gates: web tsc 0 · page 70 → 74 · web suite 2458 passed / 16 pre-existing, zero new · shared 2121/2121 · **check-design 8367, identical category for category to `origin/main`, proved by linting a DETACHED WORKTREE at main**. Three controls, each a real edit, each fired (1 · 3 · 1) — every one made with the editor, because **this file is CRLF and `perl -0pi` has silently declined four times on this lane**. **Reported into P7, not fixed**: the group header's bare date carries TWO different facts under NO word (a customer order's `Customer Delivery` and a typed demand's `Required By`) · three ruled words have no screen consumer · the `PO No.` cell holds a status word and an action button in one column, which §12.3 forbade on the sibling page the same day. **Reported to the KIT lane**: `resize` and `reorder` come through ONE `layout` prop, so no page can answer §13.3 per power | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives, plus **G8-G10 reported by Q6's audit 2026-08-04** (an unlabelled date slot carrying two facts · three ruled words with no consumer · a status word and an action button sharing the `PO No.` column, which §12.3 forbade the same day): demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |
