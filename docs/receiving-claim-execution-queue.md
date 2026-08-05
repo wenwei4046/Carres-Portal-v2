@@ -930,6 +930,8 @@ figure reach the Claims screen — Operations does not see AP.
 
 # THE CLAIMS WORKSPACE — frozen by Loo 2026-08-05
 
+> **RESUME POINT: [`docs/CHECKPOINT-claims.md`](CHECKPOINT-claims.md)** — what was ruled, what was measured, which card sits on which TAB, and the findings this lane is carrying. Paste its §4 to start a new chat.
+
 > **Claims is not designed on its own. It is Purchasing's EXCEPTION WORKSPACE.**
 >
 > **The骨架 is right and one LAYER is missing.** Queue ✅ · List ✅ · Expand ✅ · Data ✅ ·
