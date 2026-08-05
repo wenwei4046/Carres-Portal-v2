@@ -84,17 +84,24 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
 
   it("says `Chase` nowhere — banned outright by COPY-STANDARD", () => {
     // The To Order tab kept `Chase` in THREE places for months: the stage cell,
-    // the middle-list header, and the detail pane. The cell and the header are
-    // fixed by this card; the detail pane's WhatsApp button is reported, not
-    // renamed, so it is excluded by name rather than by a softer regex.
+    // the middle-list header, and the detail pane. R8 fixed the first two and
+    // EXEMPTED the third by name — `Chase on WhatsApp`, `Nothing to chase here`
+    // and `items to chase` were stripped out of the source here before the
+    // assertion ran, because their replacement word was not ruled yet and a red
+    // guard nobody is allowed to fix teaches the next chat to delete the guard.
+    //
+    // **The carve-out is GONE (card C12, 2026-08-05), and it was already dead
+    // weight when it was removed.** Loo ruled the WhatsApp button
+    // `Open WhatsApp` on 2026-07-28, and the three strings themselves went with
+    // their file: `OperationPurchase.tsx` was deleted whole on 2026-08-01 when
+    // To Order was rebuilt from the Golden Template (#534). Measured before
+    // deleting it — the regex matched nothing in any of the nine lane files.
+    //
+    // A scanner carrying an exemption for the exact strings it exists to find
+    // is the same lie as a filter nobody can switch on, and the honest way to
+    // retire one is to check it is empty first, not to assume it.
     for (const f of LANE) {
-      const src = visibleSource(f)
-        // ChaseDetail — the WhatsApp channel button and its pane title. Its
-        // replacement word is a decision (COPY-STANDARD offers `Open WhatsApp
-        // group`, which is not literally true of the direct-phone branch), so
-        // R8 reports it and leaves it. Remove this line to see it fail.
-        .replace(/Chase \{?supplierName\}?|Chase \$\{supplierName\}|Chase on WhatsApp|Nothing to chase here|items to chase/g, " ");
-      expect(src, `${f} still says Chase`).not.toMatch(/\bChase\b/);
+      expect(visibleSource(f), `${f} still says Chase`).not.toMatch(/\bChase\b/);
     }
   });
 
