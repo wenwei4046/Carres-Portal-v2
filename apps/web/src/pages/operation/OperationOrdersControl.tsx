@@ -60,7 +60,9 @@ import {
   deliveryStepOverdue,
   orderActionOverdue,
   myHolidaySet,
-  deliveryDateGapFact,
+  // `deliveryDateGapFact` is deliberately NOT imported here (C14). The list's
+  // Delivery cell used to print it beside the Actions cell that already said
+  // the same thing; the drawer badge keeps it, and that is its one home.
   fmtMoney,
   orderActionButton,
   orderActionChecklist,
@@ -1426,42 +1428,88 @@ interface OrderColDef {
  *  Customer+Region merge into two-line cells, LOGISTIC→DELIVERY (truth-ladder
  *  words). Old keys (orderId/ref/region/logistic) retired —
  *  stale hidden-column prefs for them just no-op. */
+/*
+ * C14 (2026-08-05) — THE WHOLE TABLE RE-TABULATED FROM MEASUREMENT.
+ *
+ * ⚠ Every width comment below this line before C14 did its arithmetic against
+ * a table "~1448px" wide. **The real table is 1012px at 1440×900** (the rail
+ * takes 240px, the collapsed nav 60px, and the 8 data columns share 94% of
+ * 1012 = 951px; the ☐ and ⚑ cols take 3% each). That premise was 43% too
+ * generous, which is why C3's "the visible half is the half that acts" shipped
+ * and the cells kept truncating anyway. Re-measure before moving a unit — do
+ * not trust a number in a comment, including this one.
+ *
+ * MEASURED on PRODUCTION, 1440×900, live data, real fonts (canvas text metrics
+ * against the app's own computed styles — `truncate` clamps scrollWidth, so
+ * measuring the clipped BOX just reports the box back):
+ *
+ *   BEFORE C14 · 92 of 300 cells clipped
+ *     Deadline 30 · Delivery 30 · Actions 30 · Customer 2
+ *
+ *   need = widest live content + the cell's own padding
+ *     Status   133  (`To book` pill 64 + gap 6 + three 14px dots 50 + pad 12)
+ *     Order     74  (`CR0925 +2` 65 + 8)
+ *     Customer 185  (`MyHouse Management PLT` 173 + 12)
+ *     Deadline 147  (the overdue pill + `Wed, 22 Jul 26`)
+ *     Stock     50  (`ETA —` 41 + 12; `0/3` is narrower)
+ *     Delivery 147  ← NOT 58. See the note on the row itself.
+ *     PIC       58  (the initials chip)
+ *     Actions  207  (`Call NETS — confirm delivery date` 191 + 16)
+ *     ─────────────
+ *     total   1001  against 951 available → **50px SHORT.**
+ *
+ * So zero truncation is NOT reachable at 1440×900, and the deficit is reported
+ * rather than hidden: the 50px goes out of `customer`, whose truncation costs
+ * least (the row opens a drawer carrying the full name, the name is
+ * searchable, and only 2 of 30 rows exceed the width). Everything else fits.
+ * AFTER C14 · 2 of 300 cells clipped, both of them `customer`.
+ *
+ * The units are RELATIVE (`colScale = 94 / Σw`), so a column only grows at
+ * another's expense — the sum moved 88 → 89 and 1 unit is now 10.69px.
+ */
 const ORDER_COL_DEFS: OrderColDef[] = [
-  // Status holds TWO things since C10 (Jess 2026-07-27): the STAGE word pill
-  // (Placed / Proceed / To book / Customer confirmed / Delivered) and, beside
-  // it, the three dots. 11 → 14: the widest pill measures 135px and the three
-  // 14px icons 50px, so both fit intact (12px cell padding + 135 + 6 + 50 =
-  // 203px ≈ 14% of the table's ~1448px). The 3 points came from the two
-  // neighbours with MEASURED slack, never from Actions: deadline 13 → 12
-  // (needs 142px, had 188) and stock 11 → 9 (needs ~107px, had 159).
-  { key: "dots", label: "Status", w: 14 },
-  // C3 took 1 of the 2 points Actions grew by. `SO-1002` + `CR0418 +1` are
-  // short mono strings: 9 ≈ 130px against ~62px of content.
-  { key: "order", label: "Order", w: 9 },
-  { key: "customer", label: "Customer", w: 11 },
-  // Deadline right after Customer (Jess 2026-07-18). Wide enough for the weekday:
-  // "Sun, 20 Jul 26" + the heat pill (Jess 2026-07-19 date law). C3 took the
-  // other point from C10's own measurement: 142px needed, 12 → 11 ≈ 159px.
-  // `stock` was left alone — C10 had already cut it to its measured floor.
-  { key: "deadline", label: "Deadline", w: 11 },
-  { key: "stock", label: "Stock", w: 9 },
-  // Delivery + Actions each took a point from the cells beside them: C1's words
-  // name the party, so the strings are longer ("NETS — confirm delivery date").
-  { key: "delivery", label: "Delivery", w: 13 },
-  // PIC = the staff owner, its OWN column (Jess 2026-07-18: "add one column
-  // — assignee?"). Word law: PIC is the team's word (Issue Tracker SOP).
-  { key: "pic", label: "PIC", w: 5 },
-  // ACTIONS, plural (Jess 2026-07-27): an order can have several. Was "Manage".
-  //
-  // C3 · the truncation question Jess deferred to this card, DECIDED: the
-  // column takes 2 more units (from `order` and `deadline`, the two with slack
-  // left after C10) and the longest lines still truncate with their tooltip — that
-  // is accepted, not conceded. A row of eight columns cannot hold
-  // `Call NETS Logistics — confirm delivery date` whole without starving a
-  // neighbour, the visible half is the half that acts (verb + party), and since
-  // C2 the FULL text has a proper home one click away: the drawer lists every
-  // open action in full. The `+N` beside the pill says how much is behind it.
-  { key: "next", label: "Actions", w: 16 },
+  // Status holds the STAGE pill + C10's three dots. C10 sized it 14 for the
+  // widest pill it could ever hold (`Customer confirmed`, 135px) against a
+  // 1448px table. At the real 1012px that reservation cost 18px it was not
+  // using: live, 30 of 31 rows read `To book` (64px) and `Customer confirmed`
+  // is 0 on the stage tabs. 14 → 12.5 = 134px, which holds the LIVE worst
+  // exactly. If that stage ever fills up, this is the first column to re-check.
+  { key: "dots", label: "Status", w: 12.5 },
+  // `SO-1221` over `CR0925 +2` — two short mono lines, 65px of content in
+  // 97px. 9 → 7 = 75px.
+  { key: "order", label: "Order", w: 7 },
+  // The one column C14 leaves clipped, deliberately — see the header note.
+  // 11 → 11.5 = 123px against 185px of worst-case content, so the 2 rows that
+  // truncated before still truncate (with their `title`). It is the least-cost
+  // place to put a deficit the table genuinely does not have the pixels for.
+  { key: "customer", label: "Customer", w: 11.5 },
+  // Deadline was the LOUDEST silent failure on this page and no card had
+  // noticed: the overdue pill + `Wed, 22 Jul 26` needs 147px and the column
+  // had 119, so **all 30 rows clipped the customer's own promised date** —
+  // at the cell level, which is why a leaf-only scan missed it. 11 → 14.
+  { key: "deadline", label: "Deadline", w: 14 },
+  // `0/3` over `ETA —`: 50px of content. C10 called this "its measured floor"
+  // at 9 units, but that was 159px on a 1448px table — at 1012px it was still
+  // holding 97px for 50px of content. 9 → 5 = 53px.
+  { key: "stock", label: "Stock", w: 5 },
+  // Delivery does NOT shrink, and C14's own card expected it to. Removing the
+  // duplicated action sentence leaves the carrier name (46px) — but the widest
+  // thing this column can EVER hold is now a DATE, and a date is what the
+  // column is for: `logistics said Mon, 20 Jul` is 135px + 12 padding = 147px.
+  // (Confirmed `Mon, 20 Jul · 12pm–3pm` is 129px; the slot vocabulary is the
+  // bounded DELIVERY_TIME_SLOTS list, longest `12pm–3pm`.) Neither date line
+  // carries `truncate`, so under-sizing this column does not ellipsise — it
+  // OVERFLOWS into PIC. 13 → 14 = 150px. Live exposure today is zero (0 of 65
+  // orders carry a provisional or confirmed booking), which is exactly why it
+  // has to be sized off the reachable string rather than off today's rows.
+  { key: "delivery", label: "Delivery", w: 14 },
+  { key: "pic", label: "PIC", w: 5.5 },
+  // ACTIONS — C3 accepted this column's truncation as "not conceded" on the
+  // 1448px premise. On the real table it was 173px holding 191px of sentence,
+  // clipped on 30 of 30 rows, and the instruction is the one thing on the row
+  // a human acts on. 16 → 19.5 = 208px, which holds the live worst whole.
+  // The `+N` and the drawer still carry what a longer line would lose.
+  { key: "next", label: "Actions", w: 19.5 },
 ];
 const HIDDEN_COLS_KEY = "carres.orders.hiddenCols";
 function loadHiddenCols(): Set<string> {
@@ -2891,41 +2939,23 @@ export default function OperationOrdersControl({ onImport }: Props) {
             </div>
           </>
         }
-        toolbarSecondary={
-          /* PIC tabs on the RIGHT listing too (Jess 2026-07-18: "every staff
-             and no pic … as tab, can click to see total list of them") — the
-             SAME staffFilter the left TEAM rows drive; click either side. */
-          poolStaff.length > 0 ? (
-            <div className="w-full flex items-center gap-1.5 justify-start overflow-x-auto no-scrollbar">
-              <StaffChip
-                label="Everyone"
-                count={liveScope.length}
-                active={!staffFilter}
-                onClick={() => setStaffFilter(null)}
-              />
-              {poolStaff.map((s) => (
-                <StaffChip
-                  key={s.user_id}
-                  count={staffEntries.counts.get(s.user_id) ?? 0}
-                  active={staffFilter === s.user_id}
-                  avatar={{ text: staffInitials(s), ...avatarColor(s.user_id) }}
-                  title={`${staffLabel(s)} · ${s.email}`}
-                  onClick={() =>
-                    setStaffFilter((f) => (f === s.user_id ? null : s.user_id))
-                  }
-                />
-              ))}
-              <StaffChip
-                label="No PIC"
-                count={staffEntries.none}
-                active={staffFilter === NO_STAFF}
-                onClick={() =>
-                  setStaffFilter((f) => (f === NO_STAFF ? null : NO_STAFF))
-                }
-              />
-            </div>
-          ) : undefined
-        }
+        /* C14 (Loo 2026-08-04) — the PIC row is GONE from the toolbar; the
+           rail's TEAM group is its one home.
+           It shipped 2026-07-18 as a second door onto the SAME `staffFilter`
+           the TEAM rows already drive ("click either side"), and a second door
+           is only worth its rent if it says something the first does not.
+           MEASURED on production 2026-08-05 at 1440×900, the two read the same
+           list: toolbar `Everyone 28 · SH 11 · YJ 16 · No PIC 1` against rail
+           `Shasha 11 · Yu Jun · PO duty 16 · Khor Yee · pending 0 · No PIC 1` —
+           same facet, same counts, and the RAIL is the richer of the two (it
+           carries presence dots, the PO-duty badge and the pending roster row,
+           none of which fit on a chip).
+           It cost a permanent 37px band directly above the table, which is the
+           scarcest space on this page: 219px already sat above the first data
+           row, leaving 15 rows visible in a 900px window. Nothing is lost —
+           `Everyone` is the rail's cleared state, reached by clicking the
+           active TEAM row again. */
+        toolbarSecondary={undefined}
         bulkBar={
           selected.size > 0 ? (
             <OrdersBulkBar
@@ -3057,7 +3087,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   <KanbanRow
                     label="Owing"
                     count={owing.n}
-                    valueText={`RM ${Math.round(owing.rm).toLocaleString("en-MY")}`}
+                    /* C14 — C11's leftover, folded in. This was the portal's
+                       LAST hand-built money string: `RM ${Math.round(...)}`,
+                       so the Orders rail read `RM 74,783` while the Payments
+                       desk read `RM 74,783.00` for the same figure. One number,
+                       two spellings, two pages — this card's own concern.
+                       C11 was right to leave it (a facet total is a ROLLUP, not
+                       a collect action, and its scan deliberately does not ban
+                       `Math.round` because line 438 counts DAYS with it); the
+                       fix is the one home C11 built, never a second format
+                       call. Loo, 2026-07-28: 「收款金额必须与实际应收金额一致」. */
+                    valueText={fmtMoney(owing.rm)}
                     tone="danger"
                     active={owingOnly}
                     chip={picQueueChip}
@@ -3327,8 +3367,33 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <>
                 {/* DEADLINE (Jess 2026-07-19, B redesign) — the shared customer
                     delivery-date urgency band. Multi-select pills; SUPPLIER +
-                    LOGISTIC both read against it. "Overdue" mirrors the QUEUES
-                    Overdue row (same dueFilter state). */}
+                    LOGISTIC both read against it.
+
+                    C14 (Loo 2026-08-04) — `Overdue` has ONE home and it is the
+                    QUEUES row, not this band. The card left the choice open;
+                    the reason it went this way:
+
+                      · Both wrote the SAME `dueFilter` state, so this was one
+                        filter drawn twice, not two filters — measured live
+                        2026-08-05, `Overdue 1` in QUEUES and `Overdue 1` here.
+                      · The other three rungs are all FUTURE windows (≤3d, this
+                        week, next week). Overdue is a breach, not a window; it
+                        is the only member of this band that has already gone
+                        wrong, and reading it as rung 0 of a countdown is what
+                        made it a duplicate in the first place.
+                      · QUEUES is where a breach belongs and where it is
+                        already loudest: `danger` tone, top row, and a tooltip
+                        naming what to do about it. Demoting the page's alarm
+                        into a pill band to keep a tidy ladder would have been
+                        the worse half of the trade.
+                      · QUEUES also hides its row at zero; this band renders all
+                        of its pills always, so keeping it here would have kept
+                        a permanent `Overdue 0` on a page that has one.
+
+                    `DUE_BUCKETS` and `dueBucketOf` are UNCHANGED — the
+                    classifier must still return "Overdue" or the QUEUES row
+                    would have nothing to count and nothing to filter. Only
+                    this band's render drops the pill. */}
                 <KanbanGroup
                   title="DEADLINE"
                   testid="filter-deadline"
@@ -3336,9 +3401,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   onToggle={() => toggleGroup("DEADLINE")}
                 >
                   <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-1">
-                    {DUE_BUCKETS.map((b) => {
+                    {DUE_BUCKETS.filter((b) => b !== "Overdue").map((b) => {
                       const count = dueEntries.find((e) => e.bucket === b)?.count ?? 0;
-                      const cls = b === "Overdue" ? "pill-overdue" : b === "Due ≤3d" ? "pill-warning" : "pill-neutral";
+                      // No `pill-overdue` branch: Overdue left this band (above).
+                      const cls = b === "Due ≤3d" ? "pill-warning" : "pill-neutral";
                       return (
                         <button
                           key={b}
@@ -3353,25 +3419,53 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     })}
                   </div>
                 </KanbanGroup>
-                <KanbanGroup
-                  title="LOGISTICS"
-                  testid="filter-logistic"
-                  collapsed={collapsedGroups.has("LOGISTICS")}
-                  onToggle={() => toggleGroup("LOGISTICS")}
-                >
-                  {/* no-logistics = the "Assign logistics" QUEUE (C-vocab); here
-                      EVERY company is an option (0-count included, Jess
-                      2026-07-19) so the whole fleet is filterable. */}
-                  {logisticEntries.map((e) => (
-                    <KanbanRow
-                      key={e.carrier}
-                      label={e.carrier}
-                      count={e.count}
-                      active={logisticFilter.has(e.carrier)}
-                      onClick={() => setLogisticFilter((p) => toggleInSet(p, e.carrier))}
-                    />
-                  ))}
-                </KanbanGroup>
+                {/* C14 (Loo, 2026-08-05) — a facet row counting zero is not
+                    rendered. This REPLACES Jess's 2026-07-19 rule that "EVERY
+                    company is an option (0-count included) so the whole fleet
+                    is filterable", and the conflict was put to Loo with the
+                    live reading rather than settled in code:
+
+                      MEASURED on production 2026-08-05 — 8 carriers on the
+                      rail, 2 with orders (NETS 8 · AL 6) and SIX at zero
+                      (EU · HOUZS · SSY · TEOW · TSDD · TT). Clicking `EU`
+                      answers `No orders in this tab.`
+
+                    A filter whose only possible result is a blank table is not
+                    a filter, and P2/#494 already made "no reachable click can
+                    blank the list" law on the Purchasing lists. The fleet stays
+                    reachable where a carrier is actually CHOSEN — the bulk
+                    bar's LOGISTICS ⋮ company picker — which is what Jess's rule
+                    was protecting; this rail only narrows what is on screen.
+
+                    The counts are over `liveScope` — the whole live set, NOT
+                    the current view — so this hides only carriers the business
+                    has no live orders for at all, and a carrier reappears the
+                    moment it has one. It also means an ACTIVE carrier row can
+                    never vanish under the operator (its count does not depend
+                    on the filters), so the row that set the filter is always
+                    there to clear it. `logisticEntries` itself still lists
+                    every carrier at its true count, zeros included: the data
+                    stays faithful and the VIEW decides what is worth a row. */}
+                {logisticEntries.some((e) => e.count > 0) && (
+                  <KanbanGroup
+                    title="LOGISTICS"
+                    testid="filter-logistic"
+                    collapsed={collapsedGroups.has("LOGISTICS")}
+                    onToggle={() => toggleGroup("LOGISTICS")}
+                  >
+                    {logisticEntries
+                      .filter((e) => e.count > 0)
+                      .map((e) => (
+                        <KanbanRow
+                          key={e.carrier}
+                          label={e.carrier}
+                          count={e.count}
+                          active={logisticFilter.has(e.carrier)}
+                          onClick={() => setLogisticFilter((p) => toggleInSet(p, e.carrier))}
+                        />
+                      ))}
+                  </KanbanGroup>
+                )}
                 <KanbanGroup
                   title="SUPPLIER"
                   testid="filter-supplier"
@@ -4079,52 +4173,11 @@ function KanbanGroup({
   );
 }
 
-/** PIC tab chip — the right-side per-person tabs above the table (Jess
- *  2026-07-18). Mirrors the left TEAM rows: same staffFilter, blue =
- *  selection. */
-function StaffChip({
-  label,
-  count,
-  active,
-  onClick,
-  avatar,
-  title,
-}: {
-  /** Omitted on member chips (Jess: the avatar IS the identity — "SH no
-   *  need to show shasha"); the full name lives in the tooltip. */
-  label?: string;
-  count: number;
-  active: boolean;
-  onClick: () => void;
-  avatar?: { text: string; bg: string; fg: string };
-  title?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-pressed={active}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-meta whitespace-nowrap transition-colors ${
-        active
-          ? "border-transparent font-semibold text-[#0B0B0B]"
-          : "border-base-200 bg-white text-base-700 hover:bg-hovertint hover:border-base-300"
-      }`}
-      style={active ? { backgroundColor: "#C2E7FF" } : undefined}
-    >
-      {avatar && (
-        <span
-          className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-label font-semibold leading-none shrink-0"
-          style={{ background: avatar.bg, color: avatar.fg }}
-        >
-          {avatar.text}
-        </span>
-      )}
-      {label}
-      <span className="tabular-nums text-label text-base-500">{count}</span>
-    </button>
-  );
-}
+/* `StaffChip` (the toolbar's PIC tab chip, Jess 2026-07-18) was DELETED by C14
+ * together with the row it drew. It had exactly one caller, and that caller was
+ * a second door onto the rail's TEAM rows — see the `toolbarSecondary` comment
+ * for the measurement. Deleted rather than left behind: a component with no
+ * caller is how the next chat re-adds the row believing it was always there. */
 
 /** Team popover (0232) — the ⚙ on the STAFF band. Lists every ACTIVE operation
  *  account: [Add] opts one into the auto-assign pool; pool members get an
@@ -4712,13 +4765,17 @@ function OrderRow({
         <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} se={se} />
       </td>
       )}
-      {/* Delivery — the logistics company + the T1 booking truth (0277). C1
-          (Jess 2026-07-27) struck the last gap-word: `need booking` hid a to-do
-          inside a fact ("need" = the reader still has to work out what to do),
-          so the sub-line is now the ACTION that closes the gap —
-          `{logistics} — confirm delivery date`. Green `27 Jul · 12pm–3pm` ONLY
-          on the customer's confirmation; amber `logistics said 27 Jul` while
-          only their provisional date exists. Same vocabulary as the drawer. */}
+      {/* Delivery — the logistics company + the T1 booking truth (0277).
+          The cell answers ONE question: what do we know about the truck?
+          Line 1 is the carrier. Line 2 is a DATE and only ever a date —
+          green `27 Jul · 12pm–3pm` on the customer's confirmation, amber
+          `logistics said 27 Jul` while only their provisional day exists,
+          green `Delivered ✓` once it has gone. When there is no date yet
+          there is no line 2 (C14): what to DO about that is the Actions
+          cell's sentence, and it may not be said twice.
+          C1's gap-FACT (`{logistics} — confirm delivery date`) still exists
+          and still replaces the banned `need booking` — in the drawer badge,
+          which is where a fact slot has no Actions column beside it. */}
       {showCol("delivery") && (
       <td className="pl-1 pr-2">
         {logi.key === "unassigned" ? (
@@ -4745,18 +4802,21 @@ function OrderRow({
               >
                 logistics said {dayMon(logi.date)}
               </div>
-            ) : (
-              (() => {
-                // A FACT slot, so the action WITHOUT its verb — the neighbours
-                // in this cell are facts too (COPY-STANDARD's audit table).
-                const fact = deliveryDateGapFact(logi.partner);
-                return (
-                  <div className="t4-caption truncate" title={fact}>
-                    {fact}
-                  </div>
-                );
-              })()
-            )}
+            ) : null
+            /* C14 (Loo 2026-08-04) — nothing says the same thing twice.
+               This branch used to render `deliveryDateGapFact(logi.partner)`
+               = `NETS — confirm delivery date`, and the Actions cell one
+               column over already said `Call NETS — confirm delivery date`.
+               MEASURED on production 2026-08-05, 1440×900: the two cells
+               carried the same fact on 30 of 30 data rows, and BOTH truncated
+               (Delivery 171px of text in 129px; Actions 191px in 114px), so
+               the duplicate was paid for twice and legible neither time.
+               C1 was right that a gap needs a FACT rather than `need booking`
+               — the point stands, and the fact now has ONE home: the drawer
+               badge, where `deliveryDateGapFact` is still called and where no
+               Actions column sits beside it. Here the carrier's NAME is the
+               fact this cell owns; the verb belongs to Actions. */
+            }
           </div>
         )}
       </td>

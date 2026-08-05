@@ -61,6 +61,30 @@ describe("C11 · no money figure is rounded", () => {
     }
   });
 
+  it("no page builds a money string by hand — C14", () => {
+    // C11 shipped with ONE hand-built figure left in the lane, and reported it
+    // rather than fixing it: the Owing FACET total at
+    // `OperationOrdersControl.tsx:3060` read
+    //   `RM ${Math.round(owing.rm).toLocaleString("en-MY")}`
+    // so the Orders rail printed `RM 74,783` while the Payments desk printed
+    // `RM 74,783.00` for the identical figure (both measured live 2026-08-05).
+    //
+    // C11's own scan could not catch it. It bans `maximumFractionDigits: 0`,
+    // and this line rounded with `Math.round` instead — and banning THAT
+    // outright is not available either, because the same file counts DAYS with
+    // it (`Math.round((d - today) / 86_400_000)`), which is not money and must
+    // stay. The card said so explicitly.
+    //
+    // So the rule is about the SHAPE, not the rounding: a template that
+    // interpolates into an `RM ` prefix is a page spelling money for itself,
+    // which is exactly what `fmtMoney` exists to make unnecessary. A literal
+    // `RM 0` (the storage-exempt confirm text) is untouched — nothing is
+    // computed into it.
+    for (const file of LANE) {
+      expect(code(file)).not.toMatch(/RM\s*\$\{/);
+    }
+  });
+
   it("the collect label is reached with a NUMBER, never a formatted string", () => {
     // The compiler already refuses a string; this states the intent in the lane
     // itself, so a reader of these pages sees the rule without leaving them.
