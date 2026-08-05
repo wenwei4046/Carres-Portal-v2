@@ -80,6 +80,59 @@ import { Z_TABLE_FOOTER, Z_TABLE_HEADER } from "./overlay-layer";
 const MIN_COLUMN_PCT = 4;
 
 /**
+ * **The vertical hairline between two columns** (card P17, Loo 2026-08-05).
+ *
+ * Ruled from two photographs of the live page, seconds apart, same data.
+ * Measured before the change: **every cell in all four grids carried
+ * `border-right: 0px`** — rows had a hairline, the head had one, and there was
+ * not a single vertical rule in the table. Three complaints turned out to be
+ * one cause: the group band floated because nothing beneath it was ruled, the
+ * empty right side read as broken because Excel's whitespace only works while
+ * the GRID CONTINUES, and the page was tiring because the eye had nothing to
+ * track down.
+ *
+ * **`slate-5` is not a choice, it is the token** — `01-design-tokens` §2.1
+ * names `border` = `slate-5` and its stated use is *"table lines · card edge"*.
+ * A column separator IS a table line. No colour was invented, and the row
+ * hairline already renders in exactly this value (measured on production:
+ * `rgb(224, 225, 230)`), so a column line and a row line are the same line
+ * turned ninety degrees.
+ *
+ * **It is deliberately NOT `slate-6`.** That token is `divider` — *"section
+ * split"* — and it is right for the head's own bottom edge, where the head
+ * stops and the data starts. Using it here would make the column line change
+ * colour at the header and read as two different lines stacked, which is the
+ * opposite of something to track down.
+ *
+ * **The rule is drawn on a cell's RIGHT, so the LAST cell in a row never
+ * carries one:** it would sit 1px inside the wrapper's own border and read as
+ * a 2px edge. Everything interior gets it, and the last real column keeps its
+ * rule whenever a filler follows — which is what BOUNDS the trailing
+ * whitespace instead of leaving it open.
+ *
+ * **THE KIT'S OWN TWO COLUMNS RULE NOTHING, AND THAT IS A MEASUREMENT RATHER
+ * THAN A PREFERENCE.** P16 sized them to their contents EXACTLY — the checkbox
+ * cell is `8 + 16 + 8 = 32` and the disclosure cell `2 + 8 + 24 + 8 = 42`, so
+ * both have ZERO slack. Measured on the live page, a right border on the
+ * checkbox cell takes its content box to 15px and the 16px control overflows,
+ * which `[&_td]:overflow-hidden` then clips: a shaved checkbox on every row.
+ * Widening the column to pay for the line would move every business column
+ * 1px right, and P17 may not move a column.
+ *
+ * So the gutter's own boundary is drawn as the FIRST DATA COLUMN'S LEFT
+ * border. **The line lands on exactly the same pixel** — a border on the right
+ * of one cell and the left of the next share a boundary — but it is paid for
+ * by a column that has room. It also stops the grid ruling BETWEEN the
+ * disclosure and the checkbox: those are one gutter, not two facts, and
+ * AutoCount and Excel both separate the gutter from the data with a single
+ * line.
+ */
+const COLUMN_RULE = "border-r border-kit-slate-5";
+
+/** The same line, drawn from the other side — see `COLUMN_RULE`. */
+const GUTTER_RULE = "border-l border-kit-slate-5";
+
+/**
  * A column's Excel filter (Jess, 2026-08-01 — the AutoCount workspace: every
  * column sorts by header click and filters by its ▼). The kit renders the
  * popover — a value checklist with an optional search — and NOTHING more: the
@@ -523,6 +576,26 @@ export default function DataTable<Row>({
     ordered.length + (selection ? 1 : 0) + (expansion ? 1 : 0) + (fills ? 1 : 0);
 
   /**
+   * P17 — a data column's rules.
+   *
+   * RIGHT: every column but the last, because the last is the table's own
+   * right edge and that edge belongs to the wrapper. A filler counts as
+   * something to the right, so the last REAL column keeps its rule and bounds
+   * the whitespace.
+   *
+   * LEFT: only the first column, and only when a control gutter precedes it.
+   * That is the gutter's boundary, drawn from this side because the kit's own
+   * columns have no pixel to spare (see `COLUMN_RULE`). With no gutter the
+   * first column is the table's left edge and rules nothing — and it is the
+   * cell already carrying the 2px late bar, which must not be fought over.
+   */
+  const hasGutter = selection != null || expansion != null;
+  const columnRule = (ci: number) =>
+    `${fills || ci < ordered.length - 1 ? COLUMN_RULE : ""} ${
+      ci === 0 && hasGutter ? GUTTER_RULE : ""
+    }`;
+
+  /**
    * Resize by pointer. The FIRST drag snapshots every column's rendered width
    * as a percentage — including the ones the caller declared in `px` or as
    * `auto` — so that from the first frame onward the widths are one unit that
@@ -628,7 +701,9 @@ export default function DataTable<Row>({
           <tr className="h-10" ref={headRef}>
             {/* Header wash = slate-3 (Jess, 2026-08-02 surface law): one step
                 above the near-white strip, always lighter than the data. */}
-            {expansion && <th className="bg-kit-slate-3 border-b border-kit-slate-6" />}
+            {expansion && (
+              <th className="bg-kit-slate-3 border-b border-kit-slate-6" />
+            )}
             {selection && (
               <th className="px-2 bg-kit-slate-3 border-b border-kit-slate-6">
                 <Checkbox
@@ -692,7 +767,9 @@ export default function DataTable<Row>({
                  * header is `aria-roledescription`, never part of its name. */
                 aria-label={layout ? c.label : undefined}
                 aria-roledescription={layout?.reorderLabel}
-                className={`relative px-2 bg-kit-slate-3 border-b border-kit-slate-6 text-label font-medium text-kit-slate-12 ${
+                className={`relative px-2 bg-kit-slate-3 border-b border-kit-slate-6 ${columnRule(
+                  ci,
+                )} text-label font-medium text-kit-slate-12 ${
                   layout ? "cursor-grab" : ""
                 } ${c.align === "right" ? "text-right" : "text-left"}`}
               >
@@ -762,7 +839,15 @@ export default function DataTable<Row>({
             {/* The filler carries the header's own wash and rule so the band
              *  reaches the right edge. It holds no word — there is nothing
              *  here to sort, filter or read — and is hidden from a screen
-             *  reader for the same reason. */}
+             *  reader for the same reason.
+             *
+             *  P17 — IT IS BOUNDED, NEVER LATTICED. The last real column now
+             *  rules its own right edge, so the empty region reads as closed
+             *  rather than as a table that stopped. It is deliberately not
+             *  filled with further column lines: P16 froze Loo's ruling that
+             *  trailing whitespace SAYS *this page holds these business facts
+             *  and no more*, and fake rules out to the edge would say there
+             *  are more columns coming. */}
             {fills && (
               <th
                 aria-hidden="true"
@@ -807,6 +892,14 @@ export default function DataTable<Row>({
               return (
                 <Fragment key={`grp-${id}`}>
                 {opensGroup ? (
+                  /* P17 — THE BAND IS NOT SLICED, and that is the card's own
+                   * diagnosis followed rather than reversed: it floated
+                   * because there was *nothing BENEATH it to anchor to*, not
+                   * because it lacked rules of its own. The columns under it
+                   * are ruled now, so it sits on a lattice. Cutting the band
+                   * itself into per-column cells would draw a line through the
+                   * middle of one sentence — the customer's name and the date
+                   * are ONE statement spanning the width, not seven facts. */
                   <tr data-kit="data-group" className="border-b border-kit-slate-5">
                     <td colSpan={colSpan} className="px-2 h-9 bg-kit-slate-2 align-middle">
                       {group!.header(row)}
@@ -875,7 +968,7 @@ export default function DataTable<Row>({
                   {ordered.map((c, i) => (
                     <td
                       key={c.key}
-                      className={`px-2 text-kit-slate-12 ${
+                      className={`px-2 text-kit-slate-12 ${columnRule(i)} ${
                         !selection && !expansion && i === 0 ? `border-l-2 ${lateBar}` : ""
                       } ${c.align === "right" ? "text-right" : ""} ${
                         c.numeric ? "tabular-nums" : ""
@@ -912,14 +1005,20 @@ export default function DataTable<Row>({
         {totals && !loading && rows.length > 0 ? (
           <tfoot className={`sticky bottom-0 ${Z_TABLE_FOOTER}`}>
             <tr className="h-10" aria-label={totals.label} data-kit="data-totals">
-              {expansion && <td className="bg-kit-slate-3 border-t border-kit-slate-6" />}
-              {selection && <td className="bg-kit-slate-3 border-t border-kit-slate-6" />}
-              {ordered.map((c) => (
+              {expansion && (
+                <td className="bg-kit-slate-3 border-t border-kit-slate-6" />
+              )}
+              {selection && (
+                <td className="bg-kit-slate-3 border-t border-kit-slate-6" />
+              )}
+              {ordered.map((c, ci) => (
                 <td
                   key={c.key}
-                  className={`px-2 bg-kit-slate-3 border-t border-kit-slate-6 text-kit-slate-12 ${
-                    c.align === "right" ? "text-right" : ""
-                  } ${c.numeric ? "tabular-nums" : ""}`}
+                  className={`px-2 bg-kit-slate-3 border-t border-kit-slate-6 ${columnRule(
+                    ci,
+                  )} text-kit-slate-12 ${c.align === "right" ? "text-right" : ""} ${
+                    c.numeric ? "tabular-nums" : ""
+                  }`}
                 >
                   {totals.cell(c, rows)}
                 </td>

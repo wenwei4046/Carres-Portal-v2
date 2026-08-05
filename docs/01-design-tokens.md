@@ -157,6 +157,52 @@ own declaration, so a drift back to blue fails the suite.
 | motion-normal | 200ms |
 | motion-slow | 300ms |
 
+### 5.1 A data grid carries column separators
+
+**Ruled by Loo, 2026-08-05** (card P17), from two photographs of the live page
+taken seconds apart on the same data. Before it, **every cell in all four
+Purchasing grids measured `border-right: 0px`** — rows had a hairline, the head
+had one, and the table had no vertical rule anywhere.
+
+| | |
+|---|---|
+| **column separator** | **`border` (`slate-5`), 1px, on a cell's RIGHT** |
+
+**It is the same token as the row hairline, and that is the rule, not a
+coincidence.** §2.1 gives `border` = `slate-5` the use *"table lines · card
+edge"*; a column separator is a table line. A column line and a row line are
+one line turned ninety degrees, so they are one value.
+
+**Not `divider` (`slate-6`).** That is *"section split"* and it is right where
+the HEAD stops and the data starts — the head's bottom edge keeps it. A column
+line drawn in it would change colour at the header and read as two lines.
+
+**They are structure, not content: never dark enough to compete with the text.**
+
+**Four rules about where it stops.**
+
+- **The last cell in a row never carries one.** It would sit 1px inside the
+  table's own wrapper border and read as a 2px edge.
+- **A control gutter is ONE gutter and pays for no line.** The disclosure and
+  checkbox columns are sized to their contents EXACTLY (§7: `8+16+8 = 32` and
+  `2+8+24+8 = 42`), so a border on either shaves the control it holds — measured
+  live, a 16px checkbox overflowed a 15px box and was clipped. The gutter's
+  boundary is therefore drawn as the FIRST DATA column's LEFT border: the same
+  pixel, paid for by a column with room. There is no rule *between* the two
+  control columns — they are one gutter, not two facts.
+- **A full-width band is never sliced** — a group header, an expanded record or
+  an empty state is ONE statement spanning the width, and a rule through it
+  cuts a sentence. It is anchored by the ruled columns beneath it, which is
+  what it lacked.
+- **Trailing whitespace is bounded, never latticed.** The last real column
+  rules its own right edge so the empty region reads as closed; it is not
+  filled with further lines, because §8's trailing whitespace says *this page
+  holds these business facts and no more*, and fake rules would say more
+  columns are coming.
+
+**Enforced, not remembered.** The value is typed once, in `DataTable`'s
+`COLUMN_RULE`/`GUTTER_RULE`, and `grid-powers.test.tsx` fails if a grid renders without it.
+
 ---
 
 ## 6 · Icons
