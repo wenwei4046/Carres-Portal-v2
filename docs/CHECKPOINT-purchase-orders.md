@@ -1587,3 +1587,123 @@ other without knowing. Loo received a stale report about a defect already fixed.
 on Purchasing at a time is the practical ceiling**; more than that and the manager spends the
 day de-duplicating instead of deciding.
 
+
+### 2026-08-05 ② · A NEW MANAGER CHAT REVIEWS THE TAB — one lie found, one card approved, and the cards get their tab back
+
+> Appended, not edited — §6's append-only rule. Nothing above this line changes.
+
+**LOO'S OWN COMPLAINT OPENED IT, and it is a governance finding before it is a design one:**
+*"now i got lots card dont know belong to which tab chat — thus when you open the card, make
+sure write Purchase Orders · Card xxx. i dont know what pending now."*
+
+**RULED — every card heading names its tab.** `## <tab> · Card <n> — <one plain sentence>`.
+All **14 Q-cards were renamed** and the rule is written at the head of
+`purchasing-execution-queue.md`. The **19 P-cards were NOT touched** — they are To Order's
+lane and this manager may not edit them (the charter); that chat renames its own. Where a card
+touches two tabs both are named (`Purchase Orders + Receiving · Card Q14`); where it is
+module-wide, it says so (`Purchasing · all five tabs · Card Q12`).
+
+**THE PENDING PICTURE HE ASKED FOR — Purchase Orders, measured against git, not against a
+report.** 12 shipped (Q1 · Q2 · Q3 · Q5 · Q6 · Q7 · Q8 · Q10 · Q11 · Q12 · Q13 + follow-up),
+Q9 absorbed into Q10. **Open: Q14** (claimed, zero lines written) · **Q15 and Q16, written
+today** · **Q4 undecided.**
+
+**Q4 IS THE PROOF OF HIS COMPLAINT AND IT IS NOW WRITTEN DOWN RATHER THAN ARGUED.** Its card
+says ⛔ *blocked on Q3*; Q3 shipped 2026-08-04. The handover written 24 hours later says Q4 was
+*"CLOSED, not deferred"* and **no record of him closing it exists anywhere.** It also had **no
+row in the status table at all.** Two documents, two answers, and a third silence. **His
+ruling: 先放着 — leave it alone.** It is neither open nor closed, nobody may start it and
+nobody may delete it, and the status table now carries that sentence so the next chat does not
+have to re-derive it.
+
+---
+
+**THE DEFECT — the page is presenting our own arithmetic as the factory's word. Card Q15,
+approved.**
+
+Nothing on this tab moved in the 24 hours since the last handover, and that was measured, not
+assumed: **21 POs, all open · 0 ready dates · 0 lines received · 0 `warehouse_receipts` · 16
+with no supplier arrival date.** `PO-2038`, whose customer was promised 4 Aug, is now **one day
+PAST** that promise with the factory never having said anything.
+
+**What the register does, and when it stopped being true.** Provenance — *did the factory say
+this date, or did we?* — is decided by a NULL TEST at `OperationPurchaseOrders.tsx:517`:
+`if (po.eta_date) { confirmed: true }`. That was correct until **2026-08-03**, when
+`1ddfce7e` *"a purchase order is born with its expected arrival"* made the To Order issue path
+stamp **our own estimate** into `eta_date`. From that commit a null test can no longer tell a
+promise from a guess.
+
+**Reproduced arithmetically on production, to the day:**
+
+```
+PO-2050  Nice Future mattress   3 Aug + 7 production (Mon–Fri) + 1 transit = 13 Aug
+                                eta_date = 2026-08-13   ·  promise rows: 0
+PO-2051  Ohana bedframe         3 Aug + 7 production (Sun off)  + 1 transit = 12 Aug
+                                eta_date = 2026-08-12   ·  promise rows: 0
+```
+
+Both rows show an operator **four** signals that the factory has spoken: the date in black,
+no tooltip, `Current Action` `—`, and a place inside the rail's `Waiting for Goods 5`.
+**Nobody has asked either factory anything.** §12.2.1 is already the law it breaks —
+*"Nothing may present an estimate as a supplier's word."*
+
+**It grows, and it eats a card that shipped yesterday.** Every PO raised from 3 Aug is born
+carrying `eta_date`, so the `need_confirmation` state — `Check Expected Arrival`, the whole of
+**card Q8**, live on 16 of 21 rows — **is unreachable for every new purchase order.**
+
+**THE SHARPEST PIECE OF EVIDENCE IS THE OFFENDING CARD'S OWN TEST.** `1ddfce7e` refused to
+seed the ready date for exactly this reason — *"Seeding it with OUR estimate would score a
+supplier on a number it never gave, and nothing on screen would say so"* — and then did it to
+`eta_date`, one field over. **Stamping the date was RIGHT** (0306 refuses to open on a NULL
+arrival, so without it a shipped supplier call could never fire). What is missing is only the
+record of who said it.
+
+**No migration is needed and that was measured.** `po_supplier_promises` is append-only and
+already holds every arrival a supplier has ever given (4 rows, on PO-2031 · 2032 · 2033);
+`pos.ts:163` already reads it. **And there is no blocker underneath**: the live
+`purchasing_record_tomorrow_delivery` body carries a `v_first` branch — *"A PO that holds no
+date yet is situation A: the supplier is naming its FIRST date"* — so a dateless PO can still
+take a first supplier answer.
+
+**The second half, found on the way and folded into the same card: ONE date, TWO arithmetics.**
+
+```
+to-order.ts:1116-1124            ready = start + production (FACTORY week)
+                                 eta   = ready + transit    (OFFICE week, Law 2A)
+OperationPurchaseOrders.tsx:531  eta   = placed_at + production          ← no transit
+```
+
+Ohana and Nice Future both carry `transit_days = 1`. Recomputed over the live 16 dateless POs
+(Malaysian public holidays checked — none between 1 and 19 Aug 2026), **the missing day bites
+three rows today**: `PO-2036` is silent where it should read `same day`; `PO-2049` and
+`PO-2042` read amber `same day` where the truth is red `1d late`. One page under-warns,
+by exactly the day it forgot.
+
+---
+
+**CARD Q16 — `Confirm ready date` gets the queue to go with its door.** His own ruling of
+2026-08-05 moved the action to this tab because *"the only door that closes it is on the
+Purchase Orders expand — queue and door in one place."* **The document moved and the queue did
+not**: `purchasingSupplierCallsOf` has exactly two keys and `confirm_ready_date` is not one of
+them; it exists only in the ORDERS ladder. So this tab holds the door (Q5's field, 0318) and
+has no trigger, no due, no count and no way to turn late — **0 of 21 POs carry a ready date and
+nothing on the tab can ask for one.** §3 already carries all six of Law 2's things and
+COPY-STANDARD already carries the five strings, so **nothing new is decided by the card.**
+
+**THE FLOW FILE WAS CONTRADICTING ITSELF AGAIN AND IT IS FIXED IN THIS PASS.** §1 said RULED;
+§3 said *"To Order today, and it is §1's one OPEN case"* — **the same file, two answers, one
+day after §1 recorded that exact failure and deleted the rule that caused it.** §3's `Tab` row
+now reads Purchase Orders, with the 24-minute history kept in one bracket so nobody restores
+it. Q5's card record carried the same stale sentence and was corrected too.
+
+**RUNNING THE CHATS — the ceiling was already broken when this chat opened.** Three Purchasing
+lanes hold a CLAIM commit and zero lines of work: **Q14** (Purchase Orders) · **P5** (To Order)
+· **R10** (Receiving). Yesterday's handover set the ceiling at two and gave the reason —
+Q12 and Q13 were each claimed twice in one day. **Loo's call: stop R10.** A manager chat cannot
+end another chat from here; it is reported so he can.
+
+**WHAT THIS PASS DID NOT DO, stated so it is not mistaken for done.** No code, no migration, no
+screen — **documents only.** No browser measurement was taken: every figure above is SQL
+against production or a named source line, and **no width, tone or layout claim is made** —
+those need a real browser at a real viewport with the computed font verified as Inter, and
+Q15's own Done-when demands exactly that of whoever builds it.

@@ -337,8 +337,15 @@ PO number · supplier · items · quantity · delivery address · delivery instr
   record the latest ready date · record the outcome
 - **Completion** — the latest ready date **and** the outcome are recorded
 - **Due** — inside the arrival window: `customer date − production working days − buffer`
-- **Tab** — **To Order today, and it is §1's one OPEN case.** It is the buyer's work either
-  way; what is unsettled is which of the buyer's two tabs, and that is Loo's (§1)
+- **Tab** — **Purchase Orders** (Loo, 2026-08-05 — §1). The queue lives where the door is, and
+  the only door that closes it is the `Supplier Ready Date` field on the Purchase Orders
+  expand. **The To Order assignment is deleted, not deprecated.**
+  *(This row read "To Order today, and it is §1's one OPEN case" for the 24 minutes between
+  his ruling and this correction — §1 said RULED while §3 said OPEN, in the same file, one day
+  after §1 recorded that exact failure and deleted the rule that caused it. Written down
+  because a document that says the wrong place is worse than no document: a chat believes it.
+  **The QUEUE itself is not built — the purchasing engine has two call keys and this is not
+  one of them. That is card Q16, not a second open question.**)*
 - **Task owner** — the PO-duty holder
 - **Counted per** — one row per **PO**
 - **Re-checked when** — a ready date is saved · goods are received · the promised date moves

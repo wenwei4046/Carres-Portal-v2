@@ -13,6 +13,28 @@
 > Never run a P-chat alongside an R-chat or C4. A P-chat MAY run alongside a T/J/C1-C3
 > chat (Orders lane) or an S-chat (Service).
 
+> ## ⭐ EVERY CARD HEADING NAMES ITS TAB — Loo, 2026-08-05
+>
+> ```
+> ## <tab> · Card <number> — <one plain sentence>
+>
+> ## Purchase Orders · Card Q15 — the page stops calling our own guess a supplier's word
+> ## To Order · Card P5 — prove it with a real purchase order
+> ```
+>
+> **His words:** *"now i got lots card dont know belong to which tab chat — thus when you
+> open the card, make sure write Purchase Orders · Card xxx. i dont know what pending now."*
+>
+> Purchasing has FIVE tabs and one queue file. A heading that says only `Q13` tells the
+> reader nothing about which screen it opens, which chat owns it, or whether it collides
+> with the card above it. The tab is the first thing that must be readable.
+>
+> **Where a card touches two tabs, both are named** (`Purchase Orders + Receiving · Card Q14`);
+> where it is architecture for the whole module, say so (`Purchasing · all five tabs · Card Q12`).
+> **All 14 Q-cards were renamed on 2026-08-05. The 19 P-cards were NOT** — they are To Order's
+> lane and the Purchase Orders manager may not edit them (the charter, `CHECKPOINT-purchase-orders.md`).
+> **The To Order chat renames its own.**
+
 ## Ground truth (read before ANY card — measured on prod 2026-07-27)
 
 - **The engine already exists and mostly works.** `buildPurchaseTodayReport`
@@ -2887,7 +2909,7 @@ building.** Do not build a known-wrong thing because a card said so.
 
 ---
 
-## Q1 · The register puts the most dangerous purchase order first
+## Purchase Orders · Card Q1 — The register puts the most dangerous purchase order first
 
 **Lane: PURCHASE ORDERS · touches `apps/web/src/pages/operation/OperationPurchaseOrders.tsx`
 and `packages/shared/src/po-workspace.ts` only. NO migration. NO api change.**
@@ -3027,7 +3049,7 @@ overridden as the DEFAULT and survives as the tie-breaker and as a header sort.
 
 ---
 
-## Q2 · The factory's ready date has somewhere to land
+## Purchase Orders · Card Q2 — The factory's ready date has somewhere to land
 
 **Lane: PURCHASE ORDERS · touches `apps/api/src/routes/operation/pos.ts`,
 `packages/shared/src/schemas/operation.ts`, `packages/shared/src/po-workspace.ts` and the
@@ -3116,9 +3138,10 @@ the route and the button on the PO workspace, where the PO lives.
 > `Confirm balance delivery date` are Purchase Orders' now, and `Receiving` carries only
 > `Check in`. **The live rule is `PURCHASING-WORKING-FLOW.md` §1 — read it there, never here.**
 > Q5's own build is untouched by the change; what this note corrects is a statement of law
-> sitting in a card record. **And Q5 is the evidence for §1's one open case:** the door this
-> card built is the only thing in the portal that can close `Confirm ready date`, and it is on
-> Purchase Orders while that action's queue is still on To Order.
+> sitting in a card record. **And Q5 is the evidence Loo ruled on:** the door this card built
+> is the only thing in the portal that can close `Confirm ready date`, so on **2026-08-05 he
+> moved that action to Purchase Orders too** (§1) — queue and door in one place. The queue
+> itself is still not built; that is **card Q16**, and it is no longer an open question.
 
 Two things are therefore **REPORTED, NOT BUILT**, and the next chat must not quietly add them:
 
@@ -3150,7 +3173,7 @@ five strings are already in COPY-STANDARD.
 
 ---
 
-## Q3 · Purchasing gets its report tab
+## Purchase Orders · Card Q3 — Purchasing gets its report tab
 
 **Lane: PURCHASE ORDERS · a NEW page + a NEW api route + one line in `PurchasingTabs.tsx`.
 NO migration. Touches no existing purchasing page.**
@@ -3356,7 +3379,7 @@ then the branch), never by quoting a delta.
 
 ---
 
-## Q4 · Purchasing gets its dashboard
+## Purchase Orders · Card Q4 — Purchasing gets its dashboard
 
 **Lane: PURCHASE ORDERS. STARTS ONLY AFTER Q3 MERGES.**
 
@@ -3420,7 +3443,7 @@ Four tiles, each a count of something the engine ALREADY computes, each a door:
 shell header (`docs/03-page-patterns.md` — the five slots; a KPI in the header is a defect,
 not a variant) · ❌ invent a word · ❌ start before Q3 merges.
 
-## Q5 · The expand becomes the working area, and the right panel becomes Activity
+## Purchase Orders · Card Q5 — The expand becomes the working area, and the right panel becomes Activity
 
 **Lane: PURCHASE ORDERS · `OperationPurchaseOrders.tsx` + ONE new api route.
 NO migration — every write door already exists in production.**
@@ -3703,7 +3726,7 @@ shared **2121/2121** · build clean · **check-design 8367, IDENTICAL category f
 
 ---
 
-## Q7 · The frozen column set becomes real, and one page stops spelling one date two ways
+## Purchase Orders · Card Q7 — The frozen column set becomes real, and one page stops spelling one date two ways
 
 **Lane: PURCHASE ORDERS · `OperationPurchaseOrders.tsx` only. NO migration, NO api change.**
 
@@ -3865,7 +3888,7 @@ main (never a stash — a pop can grab another chat's parked WIP).
 
 ---
 
-## Q8 · The Current Action column stops reversing its own tense
+## Purchase Orders · Card Q8 — The Current Action column stops reversing its own tense
 
 **Lane: PURCHASE ORDERS · `packages/shared/src/po-workspace.ts` + `docs/COPY-STANDARD.md`.
 NO migration, NO api, NO layout change. Four strings and a dictionary entry.**
@@ -4025,7 +4048,7 @@ DETACHED WORKTREE at `origin/main`, never by quoting a delta.
 
 ---
 
-## Q10 · ONE purchase order, ONE way of looking at it
+## Purchase Orders · Card Q10 — ONE purchase order, ONE way of looking at it
 
 **Lane: PURCHASE ORDERS · `OperationPurchaseOrders.tsx` only. NO migration, NO api,
 NO new word. THIS CARD ABSORBS Q9** — same file, same region; apart they would fight.
@@ -4231,7 +4254,7 @@ markers proving the predecessor `index-BiJsXPig.js` was really read rather than 
 
 ---
 
-## ~~Q9~~ · The items listing comes back to the right panel — ABSORBED BY Q10
+## Purchase Orders · Card ~~Q9~~ — The items listing comes back to the right panel — ABSORBED BY Q10
 
 **Lane: PURCHASE ORDERS · `OperationPurchaseOrders.tsx` only. NO migration, NO api,
 NO new word. Put a block back that Q5 removed.**
@@ -4304,7 +4327,7 @@ width or token · ❌ hold the card for a design round.
 
 ---
 
-## Q11 · The expand's row ends where its content ends
+## Purchase Orders · Card Q11 — The expand's row ends where its content ends
 
 **Lane: PURCHASE ORDERS · `OperationPurchaseOrders.tsx` only — ONE grid template and its
 container. NO migration, NO api, NO new word, NO change to the register.**
@@ -4469,7 +4492,7 @@ table 1203, rows 40px.
 
 ---
 
-## Q12 · Receiving Boundary Review — which work is Purchasing's and which is the Warehouse's
+## Purchasing · all five tabs · Card Q12 — Receiving Boundary Review — which work is Purchasing's and which is the Warehouse's
 
 **Lane: PURCHASING ARCHITECTURE · DOCS ONLY. NO code, NO UI, NO migration.**
 **This card changes no screen. It produces a ruling and the cards that follow it.**
@@ -4663,7 +4686,7 @@ here would have picked a side by accident, which is the card's own MUST-NOT.
 
 ---
 
-## Q14 · One supplier date, one door — the second one comes out
+## Purchase Orders + Receiving · Card Q14 — One supplier date, one door — the second one comes out
 
 **Lane: PURCHASING · follow-up to Q12. Web only. NO migration.**
 *(Numbered Q13 while it was being written; **Q13 was taken by PR #622** — the `supplier`
@@ -4731,7 +4754,7 @@ endpoint, the RPC or the wire contract — **this is a UI door move, not an api 
 
 ---
 
-## Q13 · The `supplier` column widens 87 → 88, because a frozen width that truncates is not the frozen intent
+## Purchase Orders · Card Q13 — The `supplier` column widens 87 → 88, because a frozen width that truncates is not the frozen intent
 
 **Lane: PURCHASE ORDERS · `OperationPurchaseOrders.tsx` only. NO migration, NO api, NO new
 word, NO new column. Two numbers.**
@@ -4960,7 +4983,7 @@ never from a document.**
 
 ---
 
-## Q6 · To Order is audited against the same architecture
+## To Order · Card Q6 — To Order is audited against the same architecture
 
 **Lane: PURCHASING · `OperationToOrder.tsx`. NO migration. START NOW — do not wait for P13.**
 
@@ -5142,6 +5165,212 @@ through **ONE `layout` prop**, so no page can answer §13.3 per power. Here both
 the same and it cost nothing; the day a page wants one and not the other, splitting it is the
 kit's.
 
+## Purchase Orders · Card Q15 — the page stops calling our own guess a supplier's word
+
+**Lane: PURCHASE ORDERS · touches `apps/api/src/routes/operation/pos.ts`,
+`packages/shared/src/po-workspace.ts`, `packages/shared/src/purchasing-settings.ts` (or a new
+sibling) and `OperationPurchaseOrders.tsx`. NO migration — measured, not assumed.
+Approved by Loo 2026-08-05.**
+
+### The defect, and it is the page telling a lie
+
+**Ruled by §12.2.1, which is already law:** *"A date we guessed and a date a factory gave may
+never look identical. Nothing may present an estimate as a supplier's word."*
+
+The register decides which of the two it is with a NULL TEST:
+
+```
+OperationPurchaseOrders.tsx:517      if (po.eta_date) { date: po.eta_date, confirmed: true }
+```
+
+That was true until **2026-08-03**, when `1ddfce7e` *"a purchase order is born with its
+expected arrival"* made the To Order issue path stamp **our own estimate** into `eta_date`.
+Since that commit a null test can no longer tell a promise from a guess.
+
+**MEASURED ON PRODUCTION 2026-08-05 — the arithmetic reproduces exactly:**
+
+```
+PO-2050  Nice Future mattress  issued 3 Aug + 7 production (Mon–Fri) + 1 transit = 13 Aug
+         eta_date = 2026-08-13     po_supplier_promises rows: 0
+PO-2051  Ohana bedframe        issued 3 Aug + 7 production (Sun off)  + 1 transit = 12 Aug
+         eta_date = 2026-08-12     po_supplier_promises rows: 0
+```
+
+**What those two rows show an operator today:** the date in **black** (`text-kit-slate-12`),
+**no tooltip**, `Current Action` = `—`, and the left rail counting them inside
+`Waiting for Goods 5`. Four separate signals all saying *the factory has told us; the goods
+are on their way*. **Nobody has ever asked the factory anything.**
+
+**It grows.** Every PO raised from 3 Aug onward is born with `eta_date` set, so the
+`need_confirmation` state — `Check Expected Arrival`, the whole of card Q8, live on 16 of 21
+rows — **becomes unreachable for new purchase orders.**
+
+**The birth-certificate card already knew this rule and applied it one field over.** Its own
+test reads:
+
+> `NEVER writes expected_ready_date` — *"R5 grades a factory by `expected_ready_date`. Seeding
+> it with OUR estimate would score a supplier on a number it never gave, and nothing on screen
+> would say so."*
+
+It protected fact ① and left fact ② open. **Stamping `eta_date` was right** (0306's
+`purchasing_record_tomorrow_delivery` refuses to open on a NULL arrival, so without the stamp
+a shipped supplier call could never fire). **What is wrong is only that nothing records WHO
+said it.**
+
+### ALREADY EXISTS — never rebuild
+
+- **`po_supplier_promises` is the provenance record and it is append-only.** Every arrival a
+  supplier has ever given lands there as `kind='tomorrow_delivery'` — 4 rows today, on
+  PO-2031 · PO-2032 · PO-2033. A ready date lands as `kind='ready_date'` and is fact ①, **not**
+  an arrival; it must not count.
+- **`apps/api/src/routes/operation/pos.ts:163` already reads that ledger** into
+  `arrivalDatesByPo` for the `eta_revised` flag. The data is on the route already.
+- **A PO with no `eta_date` CAN still take a first supplier date.** `purchasing_record_tomorrow_delivery`
+  has a `v_first` branch: *"A PO that holds no date yet is situation A: the supplier is naming
+  its FIRST date."* Verified by reading the live `prosrc`. **There is no blocker here and no
+  migration is needed.**
+- **`transitDaysFor` exists in `packages/shared/src/purchasing-settings.ts`** and the To Order
+  issue path already uses it.
+
+### What to build — three halves of one repair
+
+**Ⓐ `confirmed` stops being a null test.**
+
+```
+now      confirmed = po.eta_date != null
+becomes  confirmed = this PO has at least one `tomorrow_delivery` row in the ledger
+```
+
+The route already has the ledger; put ONE boolean on the wire. **Provenance is a fact about
+who spoke, and it may only be read from the record of speech** — Law 8.
+
+**Ⓑ `poWorkStateOf` reads provenance, not the raw date.** Today `if (!po.etaDateIso) return
+"need_confirmation"`. A PO carrying only our own estimate has not been confirmed by anybody,
+so it is `need_confirmation` and its `Current Action` reads `Check Expected Arrival`.
+**Measured effect on the live 21: the rail moves `Waiting Supplier Date 16 → 18` and
+`Waiting for Goods 5 → 3`.** That is the honest count.
+
+**Ⓒ ONE arithmetic for the estimate, not two.** The two pages compute the same date two ways:
+
+```
+to-order.ts:1116-1124            ready = start + production (FACTORY week)
+                                 eta   = ready + transit    (OFFICE week, Law 2A)
+OperationPurchaseOrders.tsx:531  eta   = placed_at + production          ← no transit
+```
+
+**Re-measured on the live 16 dateless POs, the missing transit day bites THREE of them today**
+(Malaysian public holidays checked: none falls between 1 and 19 Aug 2026):
+
+| | today | with the transit day |
+|---|---|---|
+| **PO-2036** | silent — the page says nothing | `same day` amber |
+| **PO-2049** | `same day` amber | **`1d late` — red** |
+| **PO-2042** | `same day` amber | **`1d late` — red** |
+
+Extract ONE exported function and make **both** callers use it. A second copy is the disease
+this repository keeps paying for (`ops_order_control.balance`; C5's one figure read three
+ways; and now this).
+
+### DONE WHEN
+
+- No code decides provenance from `eta_date != null`. A source scan proves it and is quoted
+  in the PR.
+- `PO-2050` and `PO-2051` render **grey** with the existing tooltip `Expected — supplier has
+  not confirmed`, and `Check Expected Arrival` in `Current Action`. **Verified in a real
+  browser on production**, and the computed font is Inter before any figure is reported.
+- Recording a supplier answer on either of them flips that same row to black with no tooltip,
+  in the same session.
+- Exactly ONE function in `packages/shared` computes an expected arrival, and both
+  `to-order.ts` and the register call it. A test asserts production runs on the SUPPLIER's
+  week and transit on the OFFICE week (Law 2A).
+- The three rows above show the tones in the table.
+- The rail reads `Waiting Supplier Date 18 · Waiting for Goods 3`.
+- Negative controls, each a real edit verified on disk: put the null test back → fires ·
+  drop the transit day → fires · count `ready_date` rows as an arrival → fires.
+
+### MUST NOT
+
+❌ a migration — the ledger already holds every word a supplier has said · ❌ stop the issue
+path stamping `eta_date`; **0306 refuses to open on a NULL arrival and a built supplier call
+would go dark again** · ❌ gate `purchasingSupplierCallsOf` on provenance — the tomorrow call
+firing on OUR estimate is exactly the phone call that GETS the first real date, and the RPC's
+`v_first` branch was built for it · ❌ a new word, a new column, a new width, a new token —
+the grey/black/tooltip pair already exists and says all of this · ❌ delete the register's
+estimate; 16 POs would lose their arrival cell and PO-2038's warning with it · ❌ touch the
+To Order CARDS or its page — `to-order.ts` is the shared api file and the change there is one
+call site, nothing else
+
+---
+
+## Purchase Orders · Card Q16 — `Confirm ready date` gets the queue to go with its door
+
+**Lane: PURCHASE ORDERS · touches `packages/shared/src/purchasing-supplier-calls.ts`,
+`apps/api/src/routes/operation/pos.ts` and `OperationPurchaseOrders.tsx`. NO migration.
+NO new word.**
+
+### Why it exists
+
+**Loo ruled on 2026-08-05** (`PURCHASING-WORKING-FLOW.md` §1): *"Move `Confirm ready date` to
+Purchase Orders too … the only door that closes this action is on the Purchase Orders expand.
+Queue and door in one place. Delete the To Order assignment whole."*
+
+**The document moved; the queue did not.** Measured 2026-08-05:
+
+```
+packages/shared/src/purchasing-supplier-calls.ts:56
+    the purchasing engine has exactly TWO keys
+    confirm_tomorrows_delivery | confirm_balance_delivery_date
+
+`confirm_ready_date` exists only in the ORDERS ladder (order-action-words.ts:148)
+Purchase Orders raises it ZERO times
+```
+
+So this tab has the **door** (Q5's `Supplier Ready Date` field, and `purchasing_record_ready_date`
+behind it, migration 0318) and **no queue, no trigger, no due, no count, no way to turn late.**
+
+**Live cost: 0 of 21 purchase orders carry a ready date, and the tab that now owns the action
+can never tell anybody to go and get one.**
+
+### Nothing here is a new decision — §3 already carries all six of Law 2's things
+
+| | §3, `Call {supplier} — confirm ready date` |
+|---|---|
+| **Trigger** | the ready date is missing · has passed with no goods in · is later than the customer's promised date · the supplier changed it |
+| **Checklist** | production status · ready date · ready quantity · any delayed item · record the latest ready date · record the outcome |
+| **Completion** | the latest ready date **and** the outcome are recorded |
+| **Due** | `customer date − production working days − buffer` |
+| **Task owner** | the PO-duty holder |
+| **Counted per** | one PO |
+| **Calendar** | the OFFICE week, `PURCHASING_OFFICE_OFF_DAYS` (Law 2A) |
+
+The five strings are in `docs/COPY-STANDARD.md` already. **Invent nothing.**
+
+### DONE WHEN
+
+- `purchasingSupplierCallsOf` returns a third key, `confirm_ready_date`, on the same rules as
+  the two beside it — the same refusals: **no anchor, no call** (a PO with no customer date
+  cannot compute a due) and **an answer closes it only while it is still about the current
+  facts**, so a supplier who moves the ready date re-opens it by itself.
+- It appears in `Current Action` through `poCurrentActionOf` with no new precedence rule —
+  the engine's calls already outrank the state word.
+- It is counted in the facet rail like the other two, and the count equals the number of rows
+  its own click produces.
+- The `Supplier Ready Date` field on the expand CLOSES it, measured — no second door is built.
+- Verified against the live 21 in a real browser, and the number of rows raising it is
+  reported whatever it is. **If it is large, that is the measurement, not a reason to soften
+  the trigger.**
+- `PURCHASING-WORKING-FLOW.md` §3's `Tab` row for this action is corrected in the same PR.
+
+### MUST NOT
+
+❌ a migration — 0318 shipped the whole database half · ❌ a new word · ❌ touch the ORDERS
+ladder's own `confirm_ready_date` — that is the Orders lane's row on the Orders list, a
+different screen · ❌ build a second door for the ready date; Q5's field is the one · ❌ give
+it a default production number when a supplier × category has none — **P1 deleted exactly that
+habit**, and a due computed from a guessed number looks like one the factory agreed to
+
+---
+
 ## Status
 
 | Card | Status | PR |
@@ -5178,6 +5407,9 @@ kit's.
 | **Q12** | ✅ **Receiving Boundary Review — which work is Purchasing's and which is the Warehouse's** (Loo, 2026-08-05). **DOCS ONLY: no code, no UI, no migration.** He read the Receiving page and found the real defect is not a word but a ROLE MIX — `Confirm tomorrow's delivery` and `Confirm balance delivery date` are the buyer's work sitting on the warehouse's page, while only `Check in` is genuinely the warehouse's. **It is a conflict between two of his own placement rules**: the FROZEN deadline-anchor (§1, 2026-07-29 — deadline comes from goods movement, so it lives on Receiving) versus the proposed role-anchor (the buyer phones the factory; the warehouse counts goods). **Three measured pieces of evidence, and the flow file contradicts itself**: (1) §3's own six-things table already gives BOTH supplier calls to the **PO-duty holder** while §1 puts them on Receiving; (2) when §1 was frozen, `Purchase Orders` was not yet a working surface — it now owns the promise ledger, the date door and the whole Communication band; (3) **ONE supplier date has TWO doors on TWO tabs today**, `useRecordSupplierDate` on the PO page and `RecordSupplierAnswerModal` in `ReceivingWorkspace`, both writing `POST /pos/:id/tomorrow-delivery` — the one-editing-surface rule broken across pages, and proof the boundary is already unclear. (4) **Nobody can settle it from data**: 0 receipts have ever existed, so every queue there is uniform. Produces a RULING plus Receiving's four tiers (Row · Expand · Right Panel · Form) as §13 beside §12, and settles the `Current Action` question by consequence. **Guards named: Jess's 2026-08-03 queue ruling stands, `Check in` stays, and `To receive` ≠ `In transit` despite both reading 21 today.** Architecture only — the Receiving Form, DO number, photos, posting and timeline stay the Receiving module's, by Loo's own split. **RULED 2026-08-05: ROLE-ANCHOR.** Both calls move to **Purchase Orders**; the deadline-anchor rule is DELETED whole from `PURCHASING-WORKING-FLOW.md` §1 (Law 0A), every §3 action now names its tab, and Receiving's four tiers are written as `PURCHASING-INFORMATION-MODEL.md` **§13** — Loo's draft confirmed with TWO corrections (no `Communication` band on the panel; the expand must print the per-line `Outstanding`, which nothing does today). **All four measurements re-run**: ② corrected (the TAB existed on 2026-07-29 as a per-supplier kanban; the REGISTER was created 2026-08-03) and ③ narrowed (only `tomorrow-delivery` has two doors — `balance-date` has one). **`Confirm ready date` is the third action the rule reaches and it was REPORTED, NOT MOVED** — §1 records it as Loo's open case. **DOCS ONLY: no migration, no api, no `.tsx`, no screen changed** | — |
 | **Q13** | ✅ **SHIPPED 2026-08-05** (PR #622 `4552d31d`, **no migration · no api · no Worker deploy owed · no new word, column, token or row height**, web `index-DCDgFPBE.js` — DEPLOYED, all four canonicals on the FIRST poll, live md5 == the build from the MAIN TIP (`be8afdac…`, 4,768,749 bytes), `SERVICE_ROLE` 0) · **the `supplier` column widens 87 → 88** (Loo, 2026-08-05, from P17's own reported cost: *Q7 froze WHICH columns and HOW WIDE so that nothing truncates; holding 87 while it truncates keeps the number and loses the intent*). **THE MEASUREMENT REPRODUCED ON PRODUCTION BEFORE A LINE WAS WRITTEN, AND IT CORRECTS P17** — 28 clipped elements: 21 × 6px in the expand-control column (P16's documented clip, **not this card's**) and 7 × 1px, which P17 recorded as all `Nice Future`. **Four are; the other three are `SO-1206 +4` / `+3` in `sono` (94px) and `Booqit 2B(LHF) · +1` in `items` (135px)** — columns Loo did not name, so reported rather than widened. **A live control proves all seven are P17's border**: stripping every vertical rule as a browser-only style leaves only the 21; restoring them returns all seven. **THE SECOND NUMBER IS NOT OPTIONAL AND IT IS THE DURABLE PART.** The listing's min-width is DERIVED — the kit's expand-control column takes 3% of the table, so the nine pixel columns are 97% of it: 1168 → 1169, and 1169 / 0.97 = 1205.15 → **1206**. Probed live at 1280 where it binds: `88px`/`1205px` fixes `supplier` by shrinking that control column **35 → 34** and making P16's already-clipping expand button **7px → 8px**, while every business column keeps its ruled width — **so the damage is invisible to the width assertion**; `88px`/`1206px` leaves the control at 35 and the clip at 7. A new test therefore re-derives the min-width from the rendered widths, so the two cannot drift apart again. **VERIFIED IN A REAL BROWSER ON PRODUCTION AT 1280 · 1440 · 1920**: `supplier` renders **88** at all three with the other eight exactly Q7's (`96 · 88 · 83 · 94 · 135 · 135 · 140 · 206 · 192`), the **4 × 1px supplier clips are 0**, the 21 unchanged, rows **40px**, page horizontal scroll **0** everywhere; on a live row `Nice Future` measures **clientWidth 87 · scrollWidth 87 · clipped false**, its right border still 1px `rgb(224,225,230)` = slate-5, so P17's rule is intact. **Four negative controls, each a real edit verified on disk first**: 87 back → 2 · 1205 back → 2 · `items` 135 → 150 with the min-width left alone → 2 · **the same change WITH its pinned expectation updated → 1, the derived guard alone** — the one that matters, because it models a deliberate width change where no other assertion can see the min-width was left behind. One control silently declined first on CRLF, **the seventh time that trap has been paid for on this lane**. Gates: web tsc **0** · build clean · page suite **100 → 101** · full web suite **16 failed / 2555 passed (2571)** against a **DETACHED CONTROL WORKTREE at `origin/main`** measuring **17 / 2553 (2570)** — the same four §17.7 files, **zero new**, the control's extra being the documented full-suite load-flake in this very file (100/100 in isolation there) · **check-design 8340, identical category for category to that control**. **Both directions proved on DOWNLOADED bundles**: `min-w-[1206px]` **0 → 1** · `min-w-[1205px]` **1 → 0** · `"87px"` **1 → 0**; `"88px"` is 2 → 3, so it is NOT a clean marker alone and the removal is. Controls in BOTH: `po-listing` 1/1 · `"96px"` 1/1. The predecessor is P17's `index-63l6VIUk.js` fetched from its OWN deployment URL `ee0c6b7e` (md5 `43c091a9…`), never the apex, where a superseded asset returns the 1.7kB SPA fallback that greps as a clean 0 for everything. **Both bundles are EXACTLY 4,768,749 bytes** — same size, different md5, the signature of a same-length change. **No Worker deploy owed, measured against the live Worker's own source commit read from `wrangler deployments list`** (`620bc69a` from `d460d899`, serving 100%): `apps/api` and `supabase/migrations` diffs since it are EMPTY, `apps/api` references the changed shared modules **0 times each**, and the one symbol it does import, `orderActionDone`, is **byte-identical across both commits** (`200f11aa…`); `/health` 200. **The card was written as Q12 and renumbered mid-build** — the Receiving Boundary Review card took Q12 on main (`3824dc81`) while this was building; rebased, both kept. **Reported, not fixed: the three remaining 1px clips are Loo's to rule** · P16's expand-button clip is another card's · **no photograph** — the Browser pane does not composite in this session, so every figure is a real browser layout number rather than pixels anyone looked at **➡️ FOLLOW-UP SHIPPED the same day (PR #626 `963a37f1`, web `index-Dg3pY7uT.js`): Loo ruled the two columns this card reported and left alone — `sono` 94 → 95 and `items` 135 → 136, min-width 1206 → 1208 (`ceil(1171/0.97)`), so ZERO 1px clips now remain.** Holding 1206 would have taken **two** pixels from the kit control column (35 → 33, P16 clip 7px → 9px) with every business column still at its ruled width — the same invisible damage Q13 measured at one pixel. Verified on production at 1280 · 1440 · 1920: identical widths, rows 40px, page scroll 0, only P16 clips left; `SO-1206 +4` cw 78 sw 78, `Booqit 2B(LHF) · +1` cw 119 sw 119, `Nice Future` cw 87 sw 87, all **clipped false**. **A first reading was DISCARDED rather than believed** — it showed zero clips, 25px rows and a 1229px table because the stylesheet had not applied (computed font Times New Roman); the helper now refuses to measure unless the font is Inter. **An unstyled page reports a clean grid.** Also corrected here: `ed09e54d`’s *“zero 1px clips remain”* after Q13 — three did, and its scan was `td`-only while all three sit on nested `truncate` spans, P16’s own documented trap hit a second time. **The api baseline in §17.1 was stale again**: measured against it a deploy looked owed; `wrangler` says the live Worker is `0a7949bd` (P19’s, 07:01 today) and from P19’s merge the api/migrations/shared diffs are EMPTY  | #622 · #626 |
 | **Q14** | ⬜ **one supplier date, one door** — Q12's follow-up. `POST /pos/:id/tomorrow-delivery` has TWO callers on TWO tabs (`OperationPurchaseOrders.tsx:2455` · `ReceivingWorkspace.tsx:149` → `RecordSupplierAnswerModal.tsx:81`), which is §12.7.5 rule 3 broken across pages. Q12 ruled which door stays — the register's, and it is also the richer one. **The care is the ORDER**: the Receiving modal also serves `balance-date`, whose ONLY door in the portal it is, so the balance door must LAND on Purchase Orders BEFORE the modal leaves Receiving. Web only, no migration, no wire change | — |
+| **Q15** | ⬜ **the page stops calling our own guess a supplier's word** — approved by Loo 2026-08-05. Since `1ddfce7e` (2026-08-03) the To Order issue path stamps OUR OWN estimate into `eta_date`, and the register decides *did the factory say this?* with a NULL TEST — so `PO-2050` (13 Aug) and `PO-2051` (12 Aug) render BLACK with no tooltip, `Current Action` `—`, counted in `Waiting for Goods`, while `po_supplier_promises` holds **0** rows for either. Both dates reproduce exactly from `issued + production + transit`. **It grows: every PO born from 3 Aug carries a date, so `need_confirmation` — Q8's whole card, 16 of 21 rows — becomes unreachable for new POs.** Fix reads provenance from the append-only ledger (`kind='tomorrow_delivery'`), and folds in the second half: the register computes the estimate WITHOUT the transit day while To Order computes it WITH — measured to bite 3 of the 16 live rows today (PO-2036 silent → amber · PO-2049 and PO-2042 amber → red). **No migration, no new word, no width.** §12.2.1 is already the law it breaks | — |
+| **Q16** | ⬜ **`Confirm ready date` gets the queue to go with its door** — Loo ruled it onto this tab 2026-08-05 (§1) and the queue never followed: the purchasing engine has exactly TWO call keys and `confirm_ready_date` is not one of them, so this tab has the DOOR (Q5's field + `purchasing_record_ready_date`, 0318) and no trigger, no due, no count, no way to turn late. **0 of 21 POs carry a ready date and nothing can ask for one.** §3 already carries all six of Law 2's things and COPY-STANDARD already carries the five strings — **nothing new is decided here.** No migration, no new word | — |
+| Q4 | 🟡 **UNDECIDED — and the two documents disagree, which is why it is written down.** The card says ⛔ *blocked on Q3*; **Q3 shipped 2026-08-04** (#593 · #596), so the block is spent. The 2026-08-05 handover says Q4 was *"CLOSED, not deferred"* and **no record of Loo closing it exists.** **Ruled 2026-08-05: LEAVE IT ALONE** — his word was *先放着*. It is neither open nor closed; nobody may start it and nobody may delete it until he says which | — |
 | ~~Q9~~ | ➡️ **ABSORBED BY Q10, 2026-08-05 — closed, not skipped.** Same file, same region: apart, Q9 would put the items back into a panel that Q10 closes whenever the expand is open. Its whole content is Q10's Ⓔ | — |
 | **Q6** | ✅ **SHIPPED 2026-08-04 — To Order audited; BOTH kit powers REFUSED in writing, and the refusal is a test** (Loo: *"now to order page i want also follow us"*). **No migration, no api, and NO PAGES DEPLOY OWED — proved by CHECKSUM**: the diff is comments + tests, so the build from this tip emits Q7's `index-BscHlt88.js`, byte-identical (md5 `c46f757a…`, 4,764,247) to the bundle DOWNLOADED from production, and all four canonicals were polled and serve it — re-measured after EACH of the two mid-build merges (P14, then Q7) that this branch was rebased onto. Worker not owed either, measured against the LIVE WORKER'S source commit `f2517f99` (empty diff). **P13 was already merged, so the authorised rebase was not needed.** **§13.3 answered for BOTH, on production measurements**: `resize` **refused** — a resize can only reveal what is hidden and NOTHING truncates at any viewport from 1024 to 1280; the measured defect is the opposite (Model is given 287–402px for 75px of content) and it belongs to **P16**, which fixes it for everybody instead of asking the operator to re-drag four columns every morning (§0.4 forbids remembering it); Loo's own reason on Purchase Orders — *"supplier names are different lengths"* — does not transfer, because To Order buys from exactly TWO suppliers; and the one column with the least headroom (`PO No.`, 16px spare at 1024) is the LAST, which the kit gives no handle at all. `reorder` **refused** — *"different operators watch different columns"* is a WIDE-register problem (nine columns there, four here, all in one glance with zero horizontal scroll), and Loo ruled this order himself on the real page with a stated adjacency reason (`2 │ Cody K`). **The absence is ASSERTED**, the same move #601 made for footer totals: a power that quietly appears later is the failure §13.3 exists to stop. **Date scan CLEAN in the source AND on the live page** — `Goods Arrival` · `Stock ETA` · bare `ETA` all grep 0; `colPreferred` is PINNED to §12.2's `Customer Delivery` rather than deleted, so the day the group header's bare date is labelled it cannot be re-invented as `Preferred Delivery`. Gates: web tsc 0 · page 70 → 74 · web suite 2458 passed / 16 pre-existing, zero new · shared 2121/2121 · **check-design 8367, identical category for category to `origin/main`, proved by linting a DETACHED WORKTREE at main**. Three controls, each a real edit, each fired (1 · 3 · 1) — every one made with the editor, because **this file is CRLF and `perl -0pi` has silently declined four times on this lane**. **Reported into P7, not fixed**: the group header's bare date carries TWO different facts under NO word (a customer order's `Customer Delivery` and a typed demand's `Required By`) · three ruled words have no screen consumer · the `PO No.` cell holds a status word and an action button in one column, which §12.3 forbade on the sibling page the same day. **Reported to the KIT lane**: `resize` and `reorder` come through ONE `layout` prop, so no page can answer §13.3 per power | — |
 | P7 | ⬜ **To Order becomes the Planning Workspace** — the frozen information architecture ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md), 2026-07-29) made true on the tab. Carries seven measured gaps (G1-G7) incl. two positives, plus **G8-G10 reported by Q6's audit 2026-08-04** (an unlabelled date slot carrying two facts · three ruled words with no consumer · a status word and an action button sharing the `PO No.` column, which §12.3 forbade the same day): demand silently discarded, and `Check in` moving out without losing the customer fact. **Eight terminology slots OPEN — no chat may fill one** | — |
