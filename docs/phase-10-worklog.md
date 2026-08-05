@@ -6,6 +6,99 @@
 
 ---
 
+**2026-08-05 · Portal Core C14 — nothing on the Orders list says the same thing twice** (PR [#627](https://github.com/wenwei4046/Carres-Portal-v2/pull/627) merge `8a9cf936`, **no migration · no `apps/api` diff · no new word**, web `index-DisscM1J.js` — DEPLOYED, all four canonicals on the first poll, live md5 == local build, `SERVICE_ROLE` 0)
+
+**Re-measuring first is the entire entry.** The card was written 2026-08-04 and C13, P16, P17 and C11 all changed this page after it. Two of its stated facts were wrong, and one of them would have destroyed working filters.
+
+### What the card said, and what production actually said
+
+| Fact | Card | **Measured 2026-08-05, 1440×900, live data** |
+|---|---|---|
+| table width | 840px | **1012px** |
+| clipped cells | 30 / 301 | **92 / 300** — Deadline 30 · Delivery 30 · Actions 30 · Customer 2 |
+| Delivery ≡ Actions | 31 / 31 | **30 / 30 data rows** (the 31st is the `Loading more…` sentinel) |
+| `Status` = `To book` | 30 / 31 | **30 / 31** ✓ |
+| vertical above row 1 | 219px | **219px** ✓ |
+| toolbar PIC row | 37px | **37px** ✓ |
+| facet rows showing 0 | 7 | **7** ✓ (LOGISTICS 6 + TEAM 1) |
+| facet groups with no rows | 2 | **0 — the card was wrong** |
+
+Measurement method matters here: `truncate` clamps `scrollWidth` to `clientWidth`, so measuring the clipped BOX just reports the box back. Every width below is canvas text metrics taken against the app's own computed styles on the deployed page.
+
+**`CATEGORY` and `FIX DATA` are not empty — they start COLLAPSED** (`collapsedGroups` initial state) and hold six live filters: Mattress 17 · Bedframe 11 · Pillow 2 · M.P 3 · No region 5 · No PO 1. Building item 3 as written would have deleted six working filters. Neither group is touched.
+
+**Deadline was the loudest silent failure and no card had noticed it.** The overdue pill plus `Wed, 22 Jul 26` needs 147px and the column had 119, so **all 30 rows were clipping the customer's own promised date** — at the CELL level, which is why a leaf-only scan (including the card's) never saw it.
+
+The card's own headline stands and is worse than it said: **the width arithmetic in this file's column comments is against "~1448px" and the real table is 1012px**, 43% too generous. That is why C3's *"the visible half is the half that acts"* shipped and the cells kept truncating anyway.
+
+### What shipped
+
+**① The `Delivery` cell loses the sentence `Actions` already carries.** It printed `NETS — confirm delivery date` while the cell one column over printed `Call NETS — confirm delivery date` — the same fact on 30 of 30 rows, and **both cells truncated carrying it** (171px of text in 129px; 191px in 114px). The duplicate was paid for twice and legible neither time. C1 was right that a gap needs a FACT rather than the banned `need booking`; the fact now has ONE home — `deliveryDateGapFact` is untouched and still called by the drawer badge, where no Actions column sits beside it.
+
+**② The toolbar's PIC row goes, and `StaffChip` with it.** It shipped 2026-07-18 as a second door onto the same `staffFilter` the rail's TEAM rows drive ("click either side"). Measured, the two read the same list — toolbar `Everyone 28 · SH 11 · YJ 16 · No PIC 1` against rail `Shasha 11 · Yu Jun · PO duty 16 · Khor Yee · pending 0 · No PIC 1` — and the rail is the richer of the two (presence dots, PO-duty badge, pending roster row, none of which fit on a chip). `StaffChip` was deleted rather than left behind: a component with no caller is how the next chat re-adds the row believing it was always there.
+
+**③ A LOGISTICS row counting zero is not rendered — and this OVERRODE A WRITTEN RULING, so it went to Loo.** Line 3362 carried Jess's 2026-07-19 rule: *"here EVERY company is an option (0-count included, Jess 2026-07-19) so the whole fleet is filterable."* Measured live: 8 carriers, 2 with orders (NETS 8 · AL 6), **six at zero, and clicking `EU` answers `No orders in this tab.`** A filter whose only possible result is a blank table is not a filter, and P2/#494 already made *no reachable click can blank the list* law on the Purchasing lists; the fleet stays reachable where a carrier is actually CHOSEN, in the bulk bar's LOGISTICS ⋮ picker.
+
+He ruled **LOGISTICS only**. **`Khor Yee · pending 0` STAYS** — the TEAM roster row is a person, not a filter statistic, and hiding a colleague until she has work is a different fact from hiding an empty filter. It is the one zero-count row still on the rail.
+
+The counts are over `liveScope`, not the current view, so an ACTIVE carrier row can never vanish under the operator, and `logisticEntries` still lists every carrier at its true count — the data stays faithful and the VIEW decides what is worth a row.
+
+**④ `Overdue` has ONE home: the QUEUES row.** Both renders wrote the same `dueFilter`, so this was one filter drawn twice, not two filters. The DEADLINE band's other three rungs are all FUTURE windows; a breach is not a window, and reading it as rung 0 of a countdown is what made it a duplicate. QUEUES is also where it is already loudest (danger tone, top row, a tooltip naming what to do) and QUEUES hides its row at zero while the band renders its pills always. `DUE_BUCKETS` and `dueBucketOf` are unchanged — the classifier must still return `Overdue` or the QUEUES row would have nothing to count.
+
+**⑤ FOLDED IN — C11's leftover.** The Owing facet total was the portal's **last** hand-built money string, so the Orders rail read `RM 74,783` while the Payments desk read `RM 74,783.00` for the identical figure. Now `fmtMoney(owing.rm)`. **C11's scan is not widened; it gains one rule about the SHAPE** — no `` `RM ${…}` `` anywhere in the lane — because **a blanket `Math.round` ban was not available**: line 438 counts DAYS with it (`Math.round((d - today) / 86_400_000)`) and must keep it. That is exactly why C11 left this line alone and said so.
+
+### Widths — the whole table re-tabulated from measurement
+
+The 8 data columns share 94% of 1012px = **951px** (`colScale = 94 / Σw`, so a column only ever grows at another's expense).
+
+| col | w | px | need | |
+|---|---|---|---|---|
+| Status | 14 → **12.5** | 134 | 133 | ✓ |
+| Order | 9 → **7** | 75 | 74 | ✓ |
+| Customer | 11 → **11.5** | 123 | 185 | ✗ 2 rows |
+| Deadline | 11 → **14** | 150 | 147 | ✓ |
+| Stock | 9 → **5** | 53 | 50 | ✓ |
+| Delivery | 13 → **14** | 150 | 147 | ✓ |
+| PIC | 5 → **5.5** | 59 | 58 | ✓ |
+| Actions | 16 → **19.5** | 208 | **249** | ✗ 30 rows |
+
+**`Delivery` does NOT narrow, and the card expected it to.** Removing the sentence leaves the carrier name at 46px — but the widest thing the column can now hold is a DATE, and a date is what the column is for: `logistics said Mon, 20 Jul` is 135px + 12 padding = **147px** (confirmed `Mon, 20 Jul · 12pm–3pm` is 129px; the slot vocabulary is the bounded `DELIVERY_TIME_SLOTS`). Neither date line carries `truncate`, so under-sizing this column does not ellipsize — it **overflows into PIC**. Live exposure is zero today (0 of 65 orders carry a provisional or confirmed booking), which is precisely why it has to be sized off the reachable string rather than off today's rows.
+
+### Verified on production, 1440×900, before and after
+
+- clipped cells **92 → 32 of 300** — Deadline **30 → 0**, Delivery **30 → 0**, Actions 30, Customer 2
+- Delivery repeating Actions **30/30 → 0/30**; the verb-less gap fact greps **0** on the rendered page while the verb-led line greps **30**
+- exactly ONE `Overdue` button; DEADLINE reads `Due ≤3d 2 · This week 2 · Next week 3`
+- LOGISTICS reads `NETS 8 · AL 6`; **`Khor Yee · pending 0` is the only zero row left**, as ruled
+- `Everyone` chips **0**; all six STAGE tabs intact, including `Proceed 0 · Customer confirmed 0 · Delivered 0`
+- Owing **`RM 74,783.00`**, and the Payments desk reads **`RM 74,783.00`** for the same figure; `RM RM` **0** on both pages
+- rows still **40px**, page horizontal scroll **0**, first data row **219 → 174px**, listing region **666 → 711px**, fully visible rows **15 → 16**
+
+### Reported, not softened — two Done-when lines are arithmetically unreachable
+
+**Zero truncated cells.** Total measured need is **1001px against 951px available**. Worse, **my own first pass under-measured `Actions`**: I sized it to 207 (text + cell padding) and forgot the PILL's 22px internal padding, the 6px gap and the 16px `+N`. The true need is **249px**.
+
+The distribution is what settles it: **all 30 rows need exactly 249px**, and every row carries a `+N`. So `Actions` at 208.5 clips all 30, and 235 or 241 or 246 would *also* clip all 30 — **every intermediate width buys zero fewer clips.** That is why `PIC`'s genuine 30.8px of slack (28px of ink in 58.8px) was measured and then deliberately **not** taken: it would have churned the layout for nothing. Reaching 249 means starving `customer` below its pre-C14 width, and the residual is C3's already-documented accepted truncation — verb and party visible, the full text in the `title` and in the drawer.
+
+**Visible rows ≥ 19.** At 900px: top bar 45 + stage tabs 38 + table header 40 + footer 36 = 159, leaving **741px = 18.5 rows with every gap deleted.** Getting to 19 means deleting a stage-tab row or C13's footer sentence, and this card may touch neither.
+
+### Gates
+
+- web tsc **0** · build clean
+- page suite **142 → 146** · money scan **7 → 9**
+- full web suite **16 failed / 2580 passed (2596)** against a **detached control worktree at `origin/main` measuring 16 / 2574 (2590)** — the same four §17.7 files, **zero new, +6 tests**
+- **check-design 8331 against the control's 8340** — every category equal or LOWER (A −2 · E −1 · O −4 · P −1 · Q −1), nothing up
+- **Five negative controls, each a real edit verified on disk, firing 2 · 1 · 3 · 1 · 1.** Control 1's first attempt broke the parse and failed the whole file — **a control that fails to compile is not a control, it is a compile error**; it was rewritten as valid JSX and re-run.
+- Deploy markers, both directions on downloaded bundles: `Actions",w:19.5` **0 → 1** / `Actions",w:16` **1 → 0** · `Delivery",w:14` **0 → 1** / `Delivery",w:13` **1 → 0** · `Deadline",w:14` **0 → 1** / `Deadline",w:11` **1 → 0**. **The control is the sharp part: `confirm delivery date` greps 4 in BOTH**, because the string survives the card. `Everyone` was tried as a marker and rejected — it greps 2 in the live bundle.
+- No Worker deploy owed, **measured against the live Worker's own source commit read from `wrangler`, never from `CLAUDE.md`**: `0a7949bd` was created 2026-08-05T07:01:20Z and the newest api-relevant commit on main is P19's `bef687a5` at 06:57:53Z — before it. `/health` **200**.
+
+### Also reported
+
+- **No photograph was taken.** `computer{action:"screenshot"}` still times out in this session; every figure above is a real browser layout measurement, not a picture.
+- The worklog index number collided — Q13 merged mid-build and took ⑥, so this entry is ⑨. (⑧ and ③ each appear twice from earlier parallel lanes; not this card's to fix.)
+
+---
+
 **2026-08-05 · Purchasing Q13 follow-up — `sono` 94 → 95 and `items` 135 → 136** (PR #626 merge `963a37f1`, **no migration · no api · no Worker deploy owed**, web `index-Dg3pY7uT.js` — DEPLOYED, live md5 == the build from the main tip, `SERVICE_ROLE` 0)
 
 Loo ruled the two columns Q13 reported and deliberately left alone: *"Yes — widen `sono` 94→95 and `items` 135→136 as well. Same defect, same reasoning. Re-derive the min-width from the nine, as you did for supplier."*
