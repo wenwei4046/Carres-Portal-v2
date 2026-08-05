@@ -926,6 +926,155 @@ challenge is that it does not have one · ❌ build AP, a supplier ledger, or a 
 document: the Portal owns the ACTION, the accountant owns the accounting · ❌ let a money
 figure reach the Claims screen — Operations does not see AP.
 
+---
+
+# THE CLAIMS WORKSPACE — frozen by Loo 2026-08-05
+
+> **Claims is not designed on its own. It is Purchasing's EXCEPTION WORKSPACE.**
+>
+> **The骨架 is right and one LAYER is missing.** Queue ✅ · List ✅ · Expand ✅ · Data ✅ ·
+> Status ✅ — what is absent is the **Workspace layer**. **This is not a rebuild, and a chat
+> that rebuilds the page has misread this section.** Three cards already shipped on it:
+> P2 (#494) gave it the portal's click law, R8 (#499) fixed its words, D7-Claims (#612) moved
+> it onto the kit with eight measured column widths.
+
+## W1 · The reference model is SAP QM, not Zendesk (Loo, 2026-08-05)
+
+**Workflow may be borrowed from Zendesk / ServiceNow. The DATA MODEL may not.**
+
+A Zendesk ticket exists on its own. **A claim cannot** — 0288's trigger means it is born from
+a PO line and is bound to `PO · Receipt · SKU · Supplier` forever. That is SAP QM's Quality
+Notification, and it changes three things in the design:
+
+1. **THE WORKSPACE HAS NO "NEW CLAIM" BUTTON, AND NEVER WILL.** Every other Purchasing tab is
+   defined by a create verb — To Order `Issue PO` · Receiving `Check in` · Purchase Orders
+   `Issue PO`. **Claims has none, and that is why it read as having no protagonist.** Its
+   protagonist is the verb that ENDS a claim, not one that starts it.
+2. **The context header is MANDATORY and may never be collapsed** — `PO · SKU · Supplier ·
+   DO`, always on screen. QM's notification always carries its reference object, and the
+   operator opening this tab has not seen it for three weeks.
+3. **The queue aggregates by SUPPLIER and PO, not by ticket priority.** Three claims against
+   one supplier are **one phone call**, not three.
+
+## W2 · The four regions, and they are already law
+
+Loo's layout maps one-for-one onto `PURCHASING-INFORMATION-MODEL.md` §12.7.5, frozen
+2026-08-04. **Nothing new is designed here; §12.7.5 is applied to Claims:**
+
+```
+┌──────────────┐
+│ Queue        │   the rail — P2 already built it
+├──────────────┤
+│ Claim List   │   the kit table — D7-Claims already built it
+├──────────────┤
+│ Claim Form   │  →  the EXPAND · §12.7.5's WORKING AREA. Resolution is decided here
+├──────────────┤
+│ Timeline     │  →  the RIGHT PANEL · §12.7.5's ACTIVITY. History, never the editor
+└──────────────┘
+```
+
+**One editing surface (§12.7.5 rule 3). The panel does not edit.**
+
+## W3 · Consequences may be STATED before they can be EXECUTED
+
+**Loo overruled the claim that a Consequences region would ship as an empty shell, and he was
+right — but the ruling has one measurable condition, and it is the whole difference:**
+
+| | |
+|---|---|
+| **STATE the consequence** | the resolution → three-consequence mapping is a **PURE FUNCTION**. Zero migration. Every cell is a derived true sentence |
+| **EXECUTE the consequence** | R11 (Inventory) and R12 (Finance). Migrations |
+
+> **A region may say `No action required` only when it KNOWS there is none.** A region that
+> renders blank because nothing computed it looks identical on screen and is the failure this
+> condition exists to catch. **So the mapping ships in the SAME card as the region.**
+
+**`Coming soon` is REFUSED.** It is not in `docs/COPY-STANDARD.md`, it is a promise about the
+product rather than a fact about the claim, and it rots on screen after the feature lands.
+
+```
+Inventory   Receive replacement       ← the true sentence. No button yet
+Finance     No action required
+```
+
+**The region states the fact; the BUTTON states the capability.** Facts ship now, buttons
+ship with R11 · R12.
+
+## W4 · Owner — and it is NOT a new column
+
+**Measured 2026-08-05: a claim has no person.** Its four actor columns (`reported_by` ·
+`requested_by` · `responded_by` · `closed_by`) record who did a PAST event, and
+`claimNextMove`'s owner is `carres | supplier` — **a side, not a human.**
+
+**Loo ranks this above the Timeline and that ranking is accepted. The fix is not an
+`assigned_to` column on `supplier_claims`:**
+
+- `PURCHASING-WORKING-FLOW.md` **§5 already designed it** — `(action identity) → claimed by →
+  claimed at`, auto-expiring, and it explicitly forbids minting a task row per action.
+- **§3 already names the default owner** of every purchasing action: the **PO-duty holder**
+  (`org_duties`).
+- **C6 ruled the same shape for Orders**: the order's PIC owns every action of that order, and
+  no action carries an owner field.
+
+> **A claim's owner is DERIVED from `org_duties` — zero columns, a name on screen in W-1.**
+> **Taking over** is §5's Purchasing-wide mechanism, which has never been built anywhere.
+> **Claims USES it; Claims does not invent it** — a second ownership model is
+> `ops_order_control.balance`'s disease in a new coat.
+
+## W5 · The build order, and the ONE engineering call inside it
+
+```
+W-1   the Workspace layer                              ZERO MIGRATION
+W-2   R9    the seven resolutions become a real field
+W-3   R11   Inventory executes      (0299 already ships 3 of 4 — wiring)
+W-4   R12   Finance executes + the money
+W-5   R14   Receiving sees its Claims               ← THE RECEIVING LANE'S
+```
+
+**Every step is usable on its own, and the layout does not move when the later ones land** —
+that is why the regions are all present from W-1 and only their buttons appear later.
+
+**DECIDED BY THE PLAN CHAT, not escalated — it is a sequencing call, not a business rule:**
+**W-1's Resolution region reads today's `requested_action` + `supplier_response`.** It does
+NOT wait for R9. The reason is Loo's own argument for shipping the region at all — *the
+business decision already exists* — and it is true in the code today: those two columns are
+live and the panel's `What we asked` / `Settle it` blocks already render them. W-2 then
+upgrades the region's contents without moving one pixel of the layout.
+
+---
+
+## R13 · Claims becomes a Workspace (W-1)
+
+**Lane: ④ R. MIGRATION: NONE. Read W1–W5 above before anything.**
+
+**ALREADY EXISTS — do not rebuild any of it:** the queue rail (P2 #494) · the kit table and
+its eight measured widths (D7-Claims #612) · the words (R8 #499) · the 504-line claim panel
+with `The goods` · `Evidence` · `What we asked` · `Settle it` · `Closed`.
+
+**To build:** §12.7.5's two-tier split applied (expand = working area, right panel =
+Activity) · the un-collapsible context header · the Timeline's first four rungs, derived from
+`reported_at → requested_at → responded_at → closed_at` · the Consequences region **with its
+pure mapping function** · the Owner, derived from `org_duties`.
+
+**DONE WHEN:** the four regions are on screen · the Timeline reads off existing timestamps
+with **no migration** · every Consequences cell is a derived sentence and none is blank ·
+a name appears as Owner · **there is no create button and no `Coming soon` string anywhere.**
+
+**MUST NOT:** ❌ rebuild the page · ❌ add `assigned_to` to `supplier_claims` · ❌ let the
+right panel edit anything · ❌ collapse the context header · ❌ touch `OperationReceiving.tsx`.
+
+## R14 · Receiving sees its own Claims — **THE RECEIVING LANE'S CARD, NOT OURS**
+
+**Measured 2026-08-05: `OperationReceiving.tsx` mentions `claim` exactly ONCE in the whole
+file.** Receiving is effectively blind to what it produces, and a claim is born from a
+receiving exception — so the Receiving summary should carry `Claims · n open · n closed`
+without switching tabs.
+
+**⚠️ NO PURCHASING SIBLING CHAT MAY BUILD THIS.** The open carry-forward
+`receiving-queue-model-architecture-review` carries Jess's ruling of 2026-08-03: *"Do not
+modify the Receiving module in this Purchase Orders workstream."* **It is recorded here so it
+is not lost, and it is taken in the Receiving chat, on its own worktree.**
+
 ## Status
 
 | Card | Status | PR |
@@ -941,4 +1090,6 @@ figure reach the Claims screen — Operations does not see AP.
 | R9 | ⬜ **one claim, one outcome — and a button that splits it** (Loo 2026-08-05, option A). AutoCount is already A: `Cancel Purchase Order` / `Goods Return` / `Purchase Return` are three documents and none holds two outcomes. **Three binding conditions:** R5 counts problem PO **LINES**, not claim documents (a split may not pollute a negotiation number) · the split is a **BUTTON** on the claim screen, never "go open a second claim" · the A→B upgrade path is written in the card (one row per claim, outcome copied, qty = whole). **`Cancel PO` leaves the outcome list for `Cancel Outstanding`** — line-level, undelivered qty only, demand returns to To Order **and lands in Overdue, correctly**. ⚠️ **Overrides `PURCHASING-WORKING-FLOW.md` §9's frozen no-per-line-cancellation rule — §9 updates in the same PR.** Build NOW: 0 claims live. Closes the R4 CF `hold-resolution-is-per-claim-not-per-unit` **by ruling** | — |
 | R10 | ✅ **§9 rewritten against the code, 2026-08-05** — DOCS ONLY, one file, zero code. All six of the card's disagreements are closed, and **two of them came out different from the card once the code was read, which is the point of the card**. (1) **The card's own point 4 was imprecise**: `poReceivingProgress` does not return "one state per PO" — it returns one state per **SET of lines handed to it**, and there is a live caller that hands it exactly ONE (`RecordSupplierAnswerModal.tsx:181`, the balance-date sentence). §9 now publishes that as a table of screen → set → scope, because "per line vs per PO" is not a property of the function. (2) **`required_qty` is not a column and never was** — it greps to **zero** across the whole repository, so the retired formula's left-hand side named nothing; the real demand quantities are `order_lines.qty` and `purchase_demands.remaining_qty` (GENERATED, 0320), and typed demand was absent from §9's stored table altogether. Also closed: the 4-rung ladder is published **as an ORDER with each rung's business reason** · the clamp and its `Pending delivery` word (R1's locked vocabulary — `Balance owed` was a third name for the same number) · the To Order supply test · **`purchase_orders.status` is the 3-value `po_status` enum, a stored column, not the 5-word Operation Status axis** — a reader trap the old text left wide open. **Two things REPORTED and deliberately not folded in**: a SECOND on-screen ladder exists (`poWorkStateOf`, the register's rail) which reads the same clamped numbers and deliberately ignores damaged/wrong item — it is now documented beside the receiving ladder rather than merged with it, per Loo's two-axes freeze · **§9's no-per-line-cancellation ruling is untouched — that is R9's amendment and ships in R9's PR** | [#628](https://github.com/wenwei4046/Carres-Portal-v2/pull/628) · no migration |
 | R11 | ⬜ **the Inventory consequence is wired to the resolution** — and it is WIRING, not building: R4 / 0299 already ships **three of the four** stock outcomes under names that match Loo's table one for one (`returned_to_supplier` · `written_off` · `back_to_stock`), and `Replace` is the receive engine. `Repair` · `Refund` · `Cancel Outstanding` move no stock at all | — |
+| **R13** | ⬜ **Claims becomes a Workspace (W-1) — ZERO MIGRATION, and it is a LAYER, not a rebuild.** Queue · List · Expand · Data · Status all already exist. Adds §12.7.5's two-tier split, the un-collapsible `PO · SKU · Supplier · DO` header, the Timeline's first four rungs off existing timestamps, the Consequences region **with its pure mapping**, and an Owner derived from `org_duties`. **No create button — ever (SAP QM, not Zendesk). No `Coming soon`.** **DO FIRST** | — |
+| **R14** | ⬜ **Receiving sees its own Claims** — measured: `OperationReceiving.tsx` says `claim` **once** in the whole file. **⚠️ THE RECEIVING LANE'S CARD.** Jess 2026-08-03 forbids any Purchasing sibling touching that page | — |
 | R12 | ⬜ **the money on a claim, and the Finance queue** — `supplier_claims` has **28 columns and not one is money** (measured 2026-08-05); the cost sits in `purchase_order_lines.cost` and the claim has never read it. **A Finance Action completes on an EXTERNAL EVIDENCE reference** (the supplier's CN/DN number), never a tick-box — that is why §8 does not kill the queue. **2990s is the worked example of the failure**: its `purchase_returns.credit_note_ref` has exactly two readers in the whole repo, a PDF and a detail page. Operations never sees AP; Finance never sees photos. **`Accept As-Is` must be able to carry a discount** | — |
