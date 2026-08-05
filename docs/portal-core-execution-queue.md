@@ -340,7 +340,61 @@ prints its figure through one of these five sites.
 **Done when:** an owing figure with sen reads the same on the Orders row, its drawer, the
 Delivery module and the collections desk, and matches the ledger.
 
-## C12 · The last `Chase` leaves the portal (was C4's word half)
+## C12 · The last `Chase` leaves the portal — ✅ SHIPPED (PR #615)
+
+**Measured before a word was changed, and the card's own count was wrong by five.**
+**21 → 16.** ① Payments 15 (exactly as written) · ③ drawer 1 · **② Purchase 0** — those five
+strings did not survive to be renamed: `OperationPurchase.tsx` was deleted whole on
+2026-08-01 when To Order was rebuilt from the Golden Template (#534). `OperationToOrder.tsx`
+takes its place in the scanner's list and passes all twelve rules today, so it costs nothing
+and closes the same click's page.
+
+**④'s carve-out was DEAD WEIGHT when it was deleted, and that was measured rather than
+assumed** — `purchasing-words.test.ts:96` stripped `Chase on WhatsApp` · `Nothing to chase
+here` · `items to chase` before asserting, and the regex matched nothing in any of the nine
+lane files. Checked first, then removed: the honest way to retire an exemption is to prove it
+is empty, not to trust that it is.
+
+**ONE BUSINESS DECISION WENT TO LOO AND HE CHANGED THE BUILD.** The `Chased today` family
+reads `last_chased_at`, and the drawer already spelt that same column `Last message copied`
+(C1's words, and ACTION-FLOW Law 8 permits `Message copied` by name). But Payments stamps it
+when it OPENS WhatsApp, so `copied` would have been false on that branch, and the column
+stores only the time. Three options went up — say what the drawer says and accept the
+inaccuracy · make the word true by copying on both branches · defer the six strings. **Loo
+ruled the second**: `send()` now writes the clipboard on both paths, so the sentence on
+screen is exactly what the portal watched. The alternative was to blur wording to fit
+behaviour; this fixes behaviour to fit a true word.
+
+**A word was reaching the screen through a door no source scan can see.** The tone toggle
+rendered its internal key `"chase"` under a `capitalize` class, so the operator read `Chase`
+while every scanner in this repo skipped it as a lone lowercase token. The button has a real
+label now (`Reminder` / `Call text`, the drawer's own live pair for the same two templates) —
+**but the hole is unfixed and is reported, not swept**: any `{key}` under `capitalize` is
+still invisible to the guard.
+
+**Five negative controls, each a real edit verified on disk**: `Chased today` back → 1 ·
+drawer `Last chased {date}` back → 1 (**the interpolation hole; C1's own matcher could not
+see this and the file was the one it was written for**) · queue label hand-spelt → 1 ·
+interpolated `Chase` planted in To Order → 2 · carve-out restored with its string planted →
+2, then carve-out deleted with the same string → **3**, the delta of exactly 1 being the rule
+coming back to life.
+
+**Reported, not fixed** — the `>…<` matcher still spans code when a `>` from `=>` or a
+generic meets a later `<`. It is pre-existing (C1's had it), it produces **0** banned-word
+false positives on all three files today, and it is precisely why the obvious fix for the
+interpolation hole was thrown away: blanking every `{…}` first made it far worse, reporting
+four false positives in the drawer alone (`logistic: chasePartnerName,` and three `pending`
+declarations). That regression is pinned by a test against the real file.
+
+Gates: web tsc **0** · build clean · web suite **16 failed / 2536 passed** against a
+**DETACHED CONTROL WORKTREE at the same commit measuring 16 failed / 2504 passed** — the same
+four §17.7 files, test for test, so **zero new failures and +32 tests**. *(The control's FIRST
+run read 19 in 5 files; the extra was `OperationPurchaseOrders.test.tsx`, the documented
+load-timing flake, and the second run settled at 16 — recorded rather than quoted once.)*
+**check-design 8340, identical category for category to the control.** The `▲ +3` on G and I
+is main's own stale baseline, present on both trees.
+
+## C12 · The card as written (kept for the record)
 
 **Goal:** the 21 banned strings C4 found and R8 did not reach, plus the shared scanner that
 finds them. **The words are all ruled** — the last open one, the WhatsApp button, was ruled by
@@ -1337,7 +1391,7 @@ truncate: the premise was 42% too wide. **Re-measure before moving a single widt
 | C3 | ✅ **LIVE** 2026-07-27 — the `+N`, and `Confirm delivery` becomes a fact | #479 |
 | C4 | ⛔ **RETIRED 2026-07-28 — re-cut as C11 + C12.** PR #484 stays OPEN and untouched; it is where the unshipped work lives | [#484](https://github.com/wenwei4046/Carres-Portal-v2/pull/484) (open, not to be merged as-is) |
 | C11 | ⬜ **a money figure is the money owed** (Loo 2026-07-28) — 5 call sites, 2 failures, 1 cause. **ORDERS lane**, not alongside ⑧ D0.5c | — |
-| C12 | 🔨 **CLAIMED 2026-08-05 — `claude/c12-last-chase`** — the last `Chase` leaves the portal: 21 strings + the shared scanner. **PURCHASING lane** (one file); split its ② off if P3 must start first | — |
+| C12 | ✅ **LIVE 2026-08-05** — the last `Chase` leaves the portal. **The card said 21 strings and the real number was 16**: ② died with its file (`OperationPurchase.tsx` deleted whole on 2026-08-01, #534), so ① 15 + ③ 1 + ② 0. The scanner moved to `src/test/banned-words.ts`, reads JSX text that carries an interpolation, and runs on THREE pages; R8's carve-out for its own strings is deleted — measured empty first. **No migration, no api, no `packages/shared` diff** | [#615](https://github.com/wenwei4046/Carres-Portal-v2/pull/615) |
 | C13 | ✅ **LIVE** 2026-08-05 — the red means something again. `liveScope` excludes the AutoCount archive; **`Overdue` 38 → 1 on production**, and that 1 is a real call. **No migration, no `apps/api` diff.** Item 4 (splitting Overdue by the age of the miss) **DEFERRED by Loo** — COPY-STANDARD owns no such pair | [#611](https://github.com/wenwei4046/Carres-Portal-v2/pull/611) |
 | C14 | ⬜ **nothing says the same thing twice** (Loo 2026-08-04) — Delivery ≡ Actions on 31/31 rows; 30 truncated cells; 219px above the first row. **ORDERS lane, AFTER C13** | — |
 | C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
