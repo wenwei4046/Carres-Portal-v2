@@ -2,14 +2,7 @@
 // tab bar, and UI-KIT §8.3's Module-tab law says a module-tabbed page must NOT
 // render ListPageShell's breadcrumb + big title: they duplicate the active tab
 // and burn ~80px Jess does not have. Same shape as its sibling To Order.
-import {
-  Fragment,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   supplierClaimTypeLabel,
   supplierClaimStatusLabel,
@@ -27,6 +20,10 @@ import {
 } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
+import DataTable, {
+  type Column,
+  type TableSort,
+} from "@/components/kit/DataTable";
 import { SectionCard, SectionBand } from "@/components/SectionPanel";
 // R8 — UI-KIT §6.1: P2's Receiving half already extracted this row, and this
 // page shipped a third hand-written copy of it one import away from the
@@ -98,6 +95,66 @@ import SupplierClaimPanel from "./components/SupplierClaimPanel";
  * Measured while doing it: the word `Contact` appears in ZERO visible strings on
  * this screen. R3 already shipped `Call`; what was left was the two spellings
  * above, which is what Loo's ruling was really about.
+ *
+ * ── D7-Claims · the last hand-rolled `<table>` in Purchasing joins the kit ───
+ *
+ * Measured 2026-08-05 before a line was written: To Order 13 kit imports, 0
+ * hand-rolled tables · Purchase Orders 4 · Receiving 4 · **Claims 0 kit
+ * imports, 1 hand-rolled `<table>`, no header sort.** It renders through
+ * `DataTable` now. **No word changed (R8 ruled them), no filter behaviour
+ * changed (P2 ruled it), no column added and none removed** — the same eight,
+ * in the same order, and the header words are the column defs' because that is
+ * the one place `DataTable` lets them be typed.
+ *
+ * **THE ROW WAS TWO LINES TALL AND THE KIT'S ROW IS 40px, WHICH IS THE WHOLE
+ * MIGRATION.** Six cells stacked a second line under the first (the status
+ * pill, `{n} units`, the note, `DO {n}`, who reported it, the photo count).
+ * `DataTable` is `[&_td]:h-10` + `whitespace-nowrap`, so every fact moved onto
+ * ONE line, side by side. Nothing was dropped and no word was re-spelt — each
+ * one is still its own element, which is also what keeps the existing tests
+ * passing untouched.
+ *
+ * **Loo's rule ① applied, with the numbers** (P16, 2026-08-04: *"A table's
+ * WIDTH does not decide a COLUMN's width. Content does."*). Every width below
+ * is `ceil(measured) + 16 padding + 4`, measured in a REAL browser against
+ * this app's own stylesheet at 13px Inter — never estimated, and never off the
+ * rows that happen to be on screen (there are none: production holds **0
+ * claims**, so the worst string of each column came from the SOURCE it draws
+ * on — `suppliers.name`, `purchase_order_lines.sku`, the bounded label sets in
+ * `supplier-claim.ts`, and the ONE sentence the late sweep writes).
+ *
+ *     Claim    150   SC-99999 62.4 + Closed pill 60.8      1.16×
+ *     Supplier 111   Carres Internal 90.8                  1.22×
+ *     Item     181   LYYAR-1A(LHF) 95.3 + 999 units 59.4   1.13×
+ *     Problem  154   Wrong specification pill 133.9        1.15×
+ *     PO       147   PO-2050 54.6 + DO DO-5231 66          1.16×
+ *     Reported 194   Mon, 27 Jul 26 91.5 + reporter 76.2   1.12×
+ *     Next move 368  owner pill 104.4 + label 235.2        1.06×
+ *     (actions) 134  Open 54.3 + 99 photos 53.1            1.18×
+ *
+ * **`sizing="content"`, so no column absorbs the slack** — the trailing filler
+ * does, and on a wide monitor the whitespace on the right is the point.
+ *
+ * **THE ONE MEASURED COST, REPORTED RATHER THAN SOFTENED.** The columns total
+ * 1439 + the kit's 42px expand control = **1481**, and at 1440×900 this page's
+ * container is **1022**. So the grid scrolls sideways. It ALREADY DID — the
+ * hand-rolled table carried `minWidth: 1120` in the same 1022 — but the
+ * threshold moves 1120 → 1481, because putting a two-line cell on one line
+ * costs horizontal width. That is the price of the 40px law and it is the
+ * honest half of this card.
+ *
+ * **WHY THE NOTE IS NOT PAID FOR IN WIDTH, and the finding underneath it.**
+ * Sized to hold its note in full, `Problem` would be 350px rather than 154 —
+ * 200px of permanent width for a fact only a `late_delivery` claim carries.
+ * That is exactly what Loo REFUSED on the sibling page (*"both are empty on
+ * roughly 90% of rows, and a permanent column for a 10% fact is a permanently
+ * empty column"*), and his answer there was rule ③: *an inline second line,
+ * under the row, only when it has content.* **`DataTable` has no such prop** —
+ * `expansion` is the only thing under a row and rule ② reserves it for the
+ * record's own detail, which here is the claim panel. So the note rides
+ * `Problem` inline and truncates, with its full text on `title`. Nothing is
+ * unreachable; nothing invented. **The kit gap is the report, and D6 meets it
+ * on a much larger page.**
  */
 
 type Tab = "open" | "closed" | "all";
@@ -146,6 +203,62 @@ function supplierLabel(c: SupplierClaimListRow): string {
   return n ? n : "supplier";
 }
 
+/**
+ * D7-Claims — what each column is SORTED BY.
+ *
+ * `DataTable` shows the arrow; the PAGE orders the rows, which is the kit's
+ * own contract. A column appears here only if it has a NATURAL order, so the
+ * button column has none and is not sortable — a header that sorts by nothing
+ * is a control that lies.
+ *
+ * The claim number and the PO number are compared NUMERICALLY (`SC-1001` vs
+ * `SC-999`): they are sequences wearing a prefix, and a plain string compare
+ * would file 1000 before 999 the day the sequence reaches four digits.
+ *
+ * `Next move` sorts by WHO OWES IT first — that is the question the column
+ * exists to answer, and it groups the operator's own work together — then by
+ * the sentence, so the order is total and two rows can never swap between
+ * renders.
+ */
+const COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+function sortValue(c: SupplierClaimListRow, key: string): string {
+  switch (key) {
+    case "claim":
+      return c.claim_no;
+    case "supplier":
+      return c.supplier_name ?? "";
+    case "item":
+      return c.sku;
+    case "problem":
+      return supplierClaimTypeLabel(c.claim_type);
+    case "po":
+      return c.po_id;
+    case "reported":
+      return c.reported_at;
+    case "next_move":
+      return `${c.next_move.owner} ${c.next_move.label}`;
+    default:
+      return "";
+  }
+}
+
+function sortClaims(
+  rows: readonly SupplierClaimListRow[],
+  sort: TableSort | null,
+): SupplierClaimListRow[] {
+  // No sort = the order the API sent, untouched. A third header click clears
+  // back to exactly this (`DataTable` reports `null`).
+  if (!sort) return [...rows];
+  const dir = sort.dir === "asc" ? 1 : -1;
+  return [...rows].sort(
+    (a, b) =>
+      dir * COLLATOR.compare(sortValue(a, sort.key), sortValue(b, sort.key)) ||
+      // A stable tie-break so equal values never swap between renders.
+      COLLATOR.compare(a.claim_no, b.claim_no),
+  );
+}
+
 export default function OperationSupplierClaims() {
   const [tab, setTab] = useState<Tab>("open");
   const [openClaimId, setOpenClaimId] = useState<string | null>(null);
@@ -156,6 +269,8 @@ export default function OperationSupplierClaims() {
   const [problemFilter, setProblemFilter] = useState<Set<string>>(new Set());
   const [facetOpen, setFacetOpen] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  // D7-Claims — the page owns the order; the kit only draws the arrow.
+  const [sort, setSort] = useState<TableSort | null>(null);
 
   const { data, isLoading, isError, error, refetch } =
     useOperationSupplierClaims(tab);
@@ -247,8 +362,12 @@ export default function OperationSupplierClaims() {
   }, [claims, queueOnly, supplierFilter]);
 
   const rows = useMemo(
-    () => claims.filter((c) => passesQueue(c) && passesSupplier(c) && passesProblem(c)),
-    [claims, queueOnly, supplierFilter, problemFilter],
+    () =>
+      sortClaims(
+        claims.filter((c) => passesQueue(c) && passesSupplier(c) && passesProblem(c)),
+        sort,
+      ),
+    [claims, queueOnly, supplierFilter, problemFilter, sort],
   );
 
   // ── §8.2 · one ✕-able chip per pick ────────────────────────────────────────
@@ -322,6 +441,177 @@ export default function OperationSupplierClaims() {
     : tab === "open"
       ? "No open claims — every delivery so far arrived complete and on time."
       : "Nothing in this tab.";
+
+  /**
+   * The eight columns — the SAME eight, in the same order, with the same
+   * words. Every width is measured (see this file's header); every secondary
+   * fact that used to sit on a second line now sits inline, in its own
+   * element, so a cell reads left-to-right in one 40px row.
+   */
+  const columns: readonly Column<SupplierClaimListRow>[] = [
+    {
+      key: "claim",
+      label: "Claim",
+      width: "150px",
+      sortable: true,
+      cell: (c) => (
+        <span className="flex items-center gap-1.5 min-w-0">
+          <span className="font-mono font-semibold truncate">{c.claim_no}</span>
+          {c.status !== "open" && (
+            <span className="pill pill-neutral shrink-0">
+              {supplierClaimStatusLabel(c.status)}
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "supplier",
+      label: "Supplier",
+      width: "111px",
+      sortable: true,
+      cell: (c) => c.supplier_name ?? "—",
+    },
+    {
+      key: "item",
+      label: "Item",
+      width: "181px",
+      sortable: true,
+      cell: (c) => (
+        <span className="flex items-baseline gap-2 min-w-0">
+          <span className="truncate" title={c.sku}>
+            {c.sku}
+          </span>
+          <span className="shrink-0 font-mono text-label text-kit-slate-11">
+            {c.qty} unit{c.qty === 1 ? "" : "s"}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: "problem",
+      label: "Problem",
+      width: "154px",
+      sortable: true,
+      cell: (c) => (
+        <span className="flex items-center gap-2 min-w-0">
+          <span
+            className={`pill ${claimPill(c.claim_type)} shrink-0`}
+            data-testid={`claim-type-${c.claim_no}`}
+          >
+            {supplierClaimTypeLabel(c.claim_type)}
+          </span>
+          {/* The note truncates rather than buying 200px of permanent width
+              for a fact only a late claim carries — its full text is on the
+              tooltip, so nothing becomes unreachable. */}
+          {c.note && (
+            <span className="truncate text-label text-kit-slate-11" title={c.note}>
+              {c.note}
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "po",
+      label: "PO",
+      width: "147px",
+      sortable: true,
+      cell: (c) => (
+        <span className="flex items-baseline gap-2 min-w-0">
+          <span className="font-mono truncate">{c.po_id}</span>
+          {c.do_number && (
+            <span className="shrink-0 font-mono text-label text-kit-slate-11">
+              DO {c.do_number}
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "reported",
+      label: "Reported",
+      width: "194px",
+      sortable: true,
+      cell: (c) => (
+        <span className="flex items-baseline gap-2 min-w-0">
+          <span className="shrink-0">{fmtDate(c.reported_at)}</span>
+          {/* A late-delivery claim is raised by the nightly sweep, so there is
+              no human to name. Say so rather than printing a blank. */}
+          <span className="truncate text-label text-kit-slate-11">
+            {c.reported_by_name ?? "System"}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: "next_move",
+      label: "Next move",
+      width: "368px",
+      sortable: true,
+      cell: (c) =>
+        c.status === "closed" ? (
+          // A closed claim keeps BOTH sides on the row — the card's done-when,
+          // readable without opening it.
+          <span className="block truncate text-meta text-kit-slate-11">
+            Asked {supplierClaimRequestLabel(c.requested_action)} → got{" "}
+            {supplierClaimResponseLabel(c.supplier_response)}
+          </span>
+        ) : (
+          <span className="flex items-center gap-2 min-w-0">
+            <span
+              className={`pill ${c.next_move.owner === "carres" ? "pill-overdue" : "pill-warning"} shrink-0`}
+              data-testid={`claim-owner-${c.claim_no}`}
+            >
+              {claimMoveOwnerLabel(c.next_move.owner, c.supplier_name)}
+            </span>
+            <span
+              className="truncate text-meta"
+              title={c.next_move.label}
+              data-testid={`claim-next-move-${c.claim_no}`}
+            >
+              {c.next_move.label}
+            </span>
+          </span>
+        ),
+    },
+    {
+      // The Open button — no header word; it is not a fact, and it has no
+      // natural order, so it does not sort either.
+      key: "open",
+      label: " ",
+      width: "134px",
+      align: "right",
+      cell: (c) => {
+        const expanded = openClaimId === c.id;
+        return (
+          // Button FIRST, count second — the reading order the stacked cell
+          // had. Keeping it makes the before/after word dump byte-identical,
+          // which is the card's own done-when proved rather than argued.
+          <span className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                // The whole row is the click target (§8.2); the button stays
+                // for the people who reach for it, and must not toggle twice.
+                e.stopPropagation();
+                toggleClaim(c.id);
+              }}
+              className="btn-secondary text-label py-1.5 px-3 shrink-0"
+              data-testid={`claim-open-${c.claim_no}`}
+            >
+              {expanded ? "Hide" : "Open"}
+            </button>
+            {c.photo_count > 0 && !expanded && (
+              <span className="shrink-0 text-label text-kit-slate-11">
+                {c.photo_count} photo{c.photo_count === 1 ? "" : "s"}
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="h-full flex flex-col">
@@ -511,182 +801,47 @@ export default function OperationSupplierClaims() {
           )}
 
           {!isLoading && !isError && (
-            <div
-              ref={tableScrollRef}
-              data-testid="claims-table-scroll"
-              className="flex-1 min-h-0 bg-white border border-base-200 rounded-t-[12px] overflow-auto"
-            >
-              <table
-                className="w-full border-collapse text-body [&_tbody_tr:nth-child(even)]:bg-base-100/70"
-                style={{ minWidth: 1120 }}
-              >
-                <thead className="bg-base-700 border-b-2 border-primary text-white">
-                  <tr>
-                    <Th>Claim</Th>
-                    <Th>Supplier</Th>
-                    <Th>Item</Th>
-                    <Th>Problem</Th>
-                    <Th>PO</Th>
-                    <Th>Reported</Th>
-                    {/* The card's done-when, as a column. */}
-                    <Th>Next move</Th>
-                    {/* The Open button — no header word; it is not a fact. */}
-                    <Th> </Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={8}
-                        className="p-12 text-center text-meta text-base-500"
-                      >
-                        {/* An empty state that is a real answer, not a shrug —
-                            and when the queue is the thing that emptied it, the
-                            answer is the dictionary's own. */}
-                        {emptyLine}
-                      </td>
-                    </tr>
-                  )}
-                  {rows.map((c) => {
-                    const expanded = openClaimId === c.id;
-                    return (
-                      <Fragment key={c.id}>
-                        <tr
-                          className="border-t border-base-100 align-top hover:bg-primary/5 cursor-pointer"
-                          data-testid="supplier-claim-row"
-                          aria-expanded={expanded}
-                          onClick={() => toggleClaim(c.id)}
-                        >
-                          <td className="px-4 py-3 whitespace-nowrap font-mono font-semibold text-base-900">
-                            {c.claim_no}
-                            {c.status !== "open" && (
-                              <div className="mt-1">
-                                <span className="pill pill-neutral">
-                                  {supplierClaimStatusLabel(c.status)}
-                                </span>
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-base-800">
-                            {c.supplier_name ?? "—"}
-                          </td>
-                          <td className="px-4 py-3 text-base-800">
-                            <div>{c.sku}</div>
-                            <div className="font-mono text-label text-base-500 mt-0.5">
-                              {c.qty} unit{c.qty === 1 ? "" : "s"}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span
-                              className={`pill ${claimPill(c.claim_type)}`}
-                              data-testid={`claim-type-${c.claim_no}`}
-                            >
-                              {supplierClaimTypeLabel(c.claim_type)}
-                            </span>
-                            {c.note && (
-                              <div className="text-label text-base-600 mt-1">
-                                {c.note}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap font-mono text-base-700">
-                            {c.po_id}
-                            {c.do_number && (
-                              <div className="text-label text-base-500 mt-0.5">
-                                DO {c.do_number}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-base-700">
-                            {fmtDate(c.reported_at)}
-                            <div className="text-label text-base-500 mt-0.5">
-                              {/* A late-delivery claim is raised by the nightly
-                                  sweep, so there is no human to name. Say so
-                                  rather than printing a blank. */}
-                              {c.reported_by_name ?? "System"}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            {c.status === "closed" ? (
-                              // A closed claim keeps BOTH sides on the row — the
-                              // card's done-when, readable without opening it.
-                              <div className="text-meta text-base-600">
-                                Asked {supplierClaimRequestLabel(c.requested_action)}{" "}
-                                → got {supplierClaimResponseLabel(c.supplier_response)}
-                              </div>
-                            ) : (
-                              <div className="flex items-start gap-2">
-                                <span
-                                  className={`pill ${c.next_move.owner === "carres" ? "pill-overdue" : "pill-warning"} shrink-0`}
-                                  data-testid={`claim-owner-${c.claim_no}`}
-                                >
-                                  {claimMoveOwnerLabel(
-                                    c.next_move.owner,
-                                    c.supplier_name,
-                                  )}
-                                </span>
-                                <span
-                                  className="text-meta text-base-800"
-                                  data-testid={`claim-next-move-${c.claim_no}`}
-                                >
-                                  {c.next_move.label}
-                                </span>
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-right">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                // The whole row is the click target now (§8.2);
-                                // the button stays for the people who reach for
-                                // it, and must not toggle twice.
-                                e.stopPropagation();
-                                toggleClaim(c.id);
-                              }}
-                              className="btn-secondary text-label py-1.5 px-3"
-                              data-testid={`claim-open-${c.claim_no}`}
-                            >
-                              {expanded ? "Hide" : "Open"}
-                            </button>
-                            {c.photo_count > 0 && !expanded && (
-                              <div className="text-label text-base-500 mt-1">
-                                {c.photo_count} photo{c.photo_count === 1 ? "" : "s"}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                        {expanded && (
-                          <tr className="bg-base-50">
-                            <td colSpan={8} className="px-4 py-4">
-                              <SupplierClaimPanel
-                                claim={c}
-                                supplierGroupUrl={
-                                  groupUrlBySupplier.get(c.supplier_id) ?? null
-                                }
-                              />
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              rows={rows}
+              columns={columns}
+              rowId={(c) => c.id}
+              /* The scroller is the KIT's div now, so the page's scroll
+                 restore has to be able to find it. */
+              testId="claims-table-scroll"
+              rootRef={tableScrollRef}
+              rowTestId="supplier-claim-row"
+              /* Loo's rule ①: the columns take exactly what their content
+                 measured and the leftover goes to a filler holding nothing. */
+              sizing="content"
+              label="Claims"
+              empty={emptyLine}
+              sort={sort}
+              onSortChange={setSort}
+              /* §8.2 — the whole row opens the claim. */
+              onRowOpen={(c) => toggleClaim(c.id)}
+              /* Rule ②: Expand has exactly ONE job — the line details of this
+                 record. That is the claim panel, and nothing else may move in
+                 here. ONE claim is open at a time by construction: the state
+                 is a single id, so two open rows cannot be represented. */
+              expansion={{
+                expanded: openClaimId ? new Set([openClaimId]) : new Set<string>(),
+                onToggle: (id) => toggleClaim(id),
+                // The page's OWN existing words — no new string invented for
+                // the control's accessible name.
+                label: (c) => (openClaimId === c.id ? "Hide" : "Open"),
+                render: (c) => (
+                  <SupplierClaimPanel
+                    claim={c}
+                    supplierGroupUrl={groupUrlBySupplier.get(c.supplier_id) ?? null}
+                  />
+                ),
+              }}
+            />
           )}
+
         </ListPageShell>
       </div>
     </div>
-  );
-}
-
-function Th({ children }: { children: React.ReactNode }) {
-  return (
-    <th className="px-4 py-2.5 text-label font-semibold uppercase tracking-[0.02em] text-white text-left">
-      {children}
-    </th>
   );
 }
 
