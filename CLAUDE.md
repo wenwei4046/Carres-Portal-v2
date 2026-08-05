@@ -104,6 +104,31 @@ nothing still occupies a slot — three lanes sat claimed-and-empty that day.
 conflicts, deploys, rebases, test failures — **solve them yourself. Finding another bug is not
 a reason to stop; it is an instruction to fix it and continue.**
 
+**THE TEST, applied before you type a question to Loo** (his words, 2026-08-05: *"stop asking
+me technical — why i write repo and you all ignore my request, i want you write into master
+file"*). **The rule above was already written and a manager chat broke it the same day**, which
+is why it now carries a test instead of only a principle:
+
+```
+Can this be answered by reading the code, the docs, the database, or by measuring?
+    YES →  IT IS YOURS. Decide it. Say which way you went. Continue.
+    NO  →  is it about how the BUSINESS runs?
+               YES →  ask. ONE question, recommendation first.
+               NO  →  it is still yours.
+```
+
+**These are NEVER his** — decide and move: *may this card edit this file* · *is this page still
+frozen* · *which of two implementations* · *rebase, merge or deploy* · *a test fails, continue?*
+· *which column, route or file name* · *is this refactor in scope* · *should I fix what I just
+found*. **The failure has a name: dressing an engineering decision as a business decision.**
+*"Option A or B?"* about a file, a freeze, a scope or a merge is *"please do my job"*, and it is
+worse than silence because it looks like diligence.
+
+**A card is handed over TAB FIRST** — `【TAB】 — 【id】 · 【one line】`, and the paste block says
+which tab it owns and which it may not touch. The queue letters are the build line, not the
+screen, and they do not match: `R9` · `R11` · `R12` are all **Claims** and touch no Receiving
+file, while Receiving is the closed page. Loo was misled by exactly this.
+
 **Engineer-Owned Delivery.** After approval, engineering owns delivery until production is
 verified: implementation · testing · self-review · fixing what it finds · merge · deploy ·
 production verification. **Never return routine engineering as an approval request.**
