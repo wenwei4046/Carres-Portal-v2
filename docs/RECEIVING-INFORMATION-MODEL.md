@@ -41,22 +41,39 @@ into a Carres warehouse*. Writing it to make a purchase order look finished woul
 the stock ledger claim goods are on a floor they were never on — and the stock ledger is
 what the next order is sold against.
 
-### 1.2 · The two fulfilment paths, and who confirms each (frozen by Loo, 2026-08-05)
+### 1.2 · The fulfilment paths, and who confirms each (frozen by Loo, 2026-08-05)
+
+**THE GRAIN IS THE PO LINE, and it was never in question.** *"本来就是一项一项"* — Loo,
+2026-08-05, correcting a chat that asked him to choose it. Each line is fulfilled by its
+own path; a purchase order is finished when all of its lines are. **A purchase order is
+therefore free to be MIXED**, and one live one already is (PO-2032, below). Nothing may
+ask *"which path is this PO on?"* — that question has no answer and asking it is what
+produces a refusal at issue that the business never asked for.
 
 | Path | Where the goods go | Who confirms fulfilment |
 |---|---|---|
 | **Warehouse** | into a Carres warehouse | **nobody presses anything** — posting the Receiving Session IS the confirmation |
 | **Direct to customer** | the supplier or the carrier takes them straight to the customer | **Operation confirms it explicitly** — no Session can ever exist for those goods |
+| **Customer collects at the supplier** | the customer goes to the factory and takes the goods themselves | *(same category: no Carres floor, no Session. **WHO confirms it is open** — nobody on our side witnesses the handover; see §8)* |
+
+**The third path is Loo's own, 2026-08-05:** *"我们有发生过顾客去我们厂那边"* — it happens,
+so the model carries it. It is not a variant of the second: in the second a Carres-arranged
+carrier moves the goods and we can ask them; in the third **no Carres party is present at
+all**, which is why its confirmer is parked rather than guessed.
 
 - **The warehouse path gets NO extra confirm button, and that is a rule rather than a
   convenience.** §1 says the check-in itself IS the completed GRN; a second *"yes, the
   supplier finished"* press over the same goods is exactly the second data-entry step
   this module exists to remove.
 - **Fulfilment carries its OWN record: who · when · which path.** It is never inferred
-  from a quantity and never read off a Receiving status.
-- **The direct path is not a Receiving screen.** Receiving handles goods; goods that
-  never arrive here are not its work. The confirmation belongs to the buyer's side —
-  §1's role-anchor rule, one file over.
+  from a quantity and never read off a Receiving status. **`which path` is a stored value
+  of the fulfilment record**, not a re-derivation of the destination — a destination can be
+  edited after the fact, and the record must keep saying how the goods actually went.
+- **The list of paths is Loo's and is not closed by a chat.** Three are named above; a
+  fourth enters here before it enters any code.
+- **None of these is a Receiving screen.** Receiving handles goods; goods that never arrive
+  here are not its work. The confirmation belongs to the buyer's side — §1's role-anchor
+  rule, one file over.
 
 **MEASURED ON LIVE PRODUCTION, 2026-08-05 — the direct path is not hypothetical, and it
 is already stuck.** `purchasing_destinations` holds three rows, and 0307's own constraint
@@ -281,7 +298,8 @@ Event names themselves are business facts and closed:
 
 | Item | Waits for |
 |---|---|
-| **the fulfilment record itself** (who · when · which path) and the Operation confirmation for the direct-to-customer path — §1.2's rule is frozen, nothing is built, and **PO-2032 is stuck today** | its own card, on the BUYER's side, never a Receiving screen |
+| **the fulfilment record itself** (who · when · which path) and the Operation confirmation for the paths with no Carres floor — §1.2's rule is frozen, nothing is built, and **PO-2032 is stuck today** | its own card, on the BUYER's side, never a Receiving screen |
+| **WHO confirms `customer collects at the supplier`** — no Carres party witnesses that handover, so the confirmation rests on either the supplier's word or the customer's signature at the factory. **Loo's, and deliberately not guessed** | his ruling, before that path is built |
 | `receiving method` value naming (`manual` vs something better) | before migration |
 | photo TYPE taxonomy (DO / Goods / Damage / Other) | photos v2 |
 | Goods Received At lower bound (PO Date vs something finer) | before migration |

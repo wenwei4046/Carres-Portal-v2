@@ -703,12 +703,19 @@ Inventory     ←  Receiving, and nothing else
 it on this page derives that statement from `received_qty`, which is a statement about a
 **Carres floor**. The two agree only when the goods were coming to us in the first place.
 
-**Which confirms it, by path — and the warehouse path gains NO button:**
+**Fulfilment is confirmed PER LINE.** *"本来就是一项一项"* (Loo, 2026-08-05). A line is
+fulfilled by its own path and a purchase order is finished when all of its lines are, so a
+**MIXED** purchase order is normal, not an error — PO-2032 is one today. Nothing may ask
+*"which path is this PO on?"*: that question has no answer for a mixed document, and
+answering it would mean refusing at issue something the business does every week.
+
+**Who confirms it, by path — and the warehouse path gains NO button:**
 
 | Path | Who confirms fulfilment |
 |---|---|
 | goods come into a Carres warehouse | **nobody presses anything** — posting the Receiving Session IS the confirmation, and a second press over the same goods is the second data-entry step Receiving exists to remove |
 | the supplier or carrier takes the goods **straight to the customer** | **Operation confirms it explicitly** — no Receiving Session can ever exist for those goods |
+| **the customer collects at the supplier** (Loo, 2026-08-05: *"我们有发生过顾客去我们厂那边"*) | same category — no Carres floor, no Session. **WHO confirms is OPEN and not guessed**: no Carres party witnesses the handover |
 
 **Fulfilment carries its OWN record — who · when · which path.** It may never be expressed
 by writing `received_qty`, and never by reusing a Receiving status. That is this section's
