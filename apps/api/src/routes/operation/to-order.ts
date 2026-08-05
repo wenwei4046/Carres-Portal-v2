@@ -251,7 +251,7 @@ async function loadToOrder(
   const { data: orderRows, error: orderErr } = await sb
     .from("orders")
     .select(
-      "id, so, customer_name, status, delivery_date, delivery_date_tbd, placed_at, created_at",
+      "id, so, customer_name, status, delivery_date, delivery_date_tbd, placed_at, created_at, proceed_date",
     )
     .in("status", ["place", "proceed_order"]);
   if (orderErr) {
@@ -417,6 +417,13 @@ async function loadToOrder(
       committed: order.status === "proceed_order",
       so: order.so != null ? Number(order.so) : null,
       customerName: (order.customer_name as string | null) ?? null,
+      // P18 — Sales' planned production start. An ORDER fact, sliced to a bare
+      // day like every other date on this wire. It is NOT gated on `tbd`: the
+      // proceed date is a fact about the order whether or not the customer's own
+      // date is agreed, and 0165's own CHECK already keeps it <= the delivery
+      // date. A TBD order never reaches the grid anyway (the page skips a null
+      // delivery), so nothing is shown that could contradict a blank date.
+      proceedDate: ((order.proceed_date as string | null) ?? null)?.slice(0, 10) ?? null,
       modelName: c?.modelName ?? null,
       variant: c?.variant ?? null,
       variantKind: c?.variantKind ?? null,
@@ -759,7 +766,7 @@ async function loadOrderedRows(
     for (const batch of chunk(soRefs)) {
       const { data, error } = await sb
         .from("orders")
-        .select("id, so, customer_name, delivery_date, delivery_date_tbd")
+        .select("id, so, customer_name, delivery_date, delivery_date_tbd, proceed_date")
         .in("so", batch);
       if (error) return [];
       for (const o of data ?? []) orderBySo.set(Number(o.so), o as Record<string, unknown>);
@@ -816,6 +823,10 @@ async function loadOrderedRows(
           customer: null,
           so: null,
           delivery: null,
+          // P18 — a manual purchase order has no customer order behind it, so
+          // there is no planned production start to state. Null for the same
+          // reason `so`, `customer` and `delivery` above are null.
+          proceedDate: null,
           model: labelOf(l.sku),
           qty: l.qty,
         });
@@ -842,6 +853,10 @@ async function loadOrderedRows(
           !tbd && order?.delivery_date
             ? (order.delivery_date as string).slice(0, 10)
             : null,
+        // P18 — the same order fact on the receipt row. Required, not tidy: an
+        // order whose every line is bought has no demand rows left, so its group
+        // is receipts alone and this is the only place the header could read it.
+        proceedDate: ((order?.proceed_date as string | null) ?? null)?.slice(0, 10) ?? null,
       };
       if (covered.length === 0) {
         // Nothing matched — still one honest row per PO line.

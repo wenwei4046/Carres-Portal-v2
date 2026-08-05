@@ -7,7 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TO_ORDER_WORDS as W } from "@carres/shared";
 import OperationToOrder from "./OperationToOrder";
-import { fmtDate } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 
 /**
  * To Order — the Work Queue + Excel Workspace (Jess's freeze, 2026-08-01).
@@ -58,6 +58,10 @@ const TO_ORDER = {
       poId: "PO-9001", placedAt: "2026-07-30", category: "bedframe",
       supplierId: OHANA, supplierName: "Ohana", orderId: "o30", so: 1350,
       delivery: "2026-08-10", model: "Cody K", qty: 1,
+      // P18 — a RECEIPT carries the order fact too. An order whose every line
+      // is bought has no demand rows left, so this is the only place its group
+      // header could read the plan from.
+      proceedDate: "2026-07-28",
     },
   ],
   proposals: [
@@ -76,6 +80,8 @@ const TO_ORDER = {
           orderId: "o2", so: 1204, customer: "ella", qty: 1,
           summary: "Booqit · 1 Sofa", stockReady: "2026-07-20",
           delivery: "2026-07-20", // the CUSTOMER's date, already past → red
+          // P18 — PASSED (today is 2026-07-30), so the header states the wait.
+          proceedDate: "2026-07-15",
           orderBy: "2026-07-15", // overdue → folds into Today
           builds: [build("bk-e", "Booqit", "5539-1A(LHF)")],
         },
@@ -83,6 +89,10 @@ const TO_ORDER = {
           orderId: "o1", so: 1207, customer: "PETER", qty: 2,
           summary: "Booqit · 2 Sofas", stockReady: "2026-08-13",
           delivery: "2026-08-13",
+          // P18 — STILL AHEAD of today (2026-07-30). This is the live SO-1256
+          // shape, and the reason Loo ruled the count conditional: unconditional
+          // it printed `(-2 days)`.
+          proceedDate: "2026-08-01",
           orderBy: "2026-07-30",
           builds: [
             build("bk-a", "Booqit", "5539-1B(LHF)"),
@@ -1838,5 +1848,150 @@ describe("Q6 · the audit's two findings, as guards", () => {
     // both halves of that — what it is, and that the header row is still
     // the same four words.
     expect(document.querySelectorAll("colgroup col")).toHaveLength(7);
+  });
+});
+
+/**
+ * ── P18 · the order's proceed date joins the GROUP HEADER ────────────────────
+ *
+ * Loo asked for a COLUMN and the answer is a header line, on his own 2026-08-04
+ * rule: a fact that is not per-row gets no column, and every line under one SO
+ * shares this date — a column would print it three times and hold the width
+ * forever.
+ *
+ * He then ruled the FORM on 2026-08-05, from three options with the live reading
+ * attached: the waiting count appears only once the date has PASSED. Measured on
+ * production the same day, `SO-1256`'s proceed date was the NEXT day, so an
+ * unconditional count printed `(-1 days)` on the real page.
+ *
+ * Fixture time is 2026-07-30, and it holds all four cases on purpose:
+ *   ella (o2)   proceed 2026-07-15 — passed  → date + `(15 days)`
+ *   PETER (o1)  proceed 2026-08-01 — ahead   → the date alone
+ *   wong (o9)   no proceed date              → nothing at all
+ *   PO-9001     a RECEIPT with a proceed date → the header still reads it
+ */
+describe("P18 · the proceed date on the group header", () => {
+  const groups = () => [...document.querySelectorAll('[data-kit="data-group"]')];
+  const groupOf = (re: RegExp) => groups().find((g) => re.test(g.textContent ?? ""));
+
+  it("states the label and the date for an order-backed group", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    const ella = groupOf(/ella/i);
+    expect(ella).toBeTruthy();
+    expect(ella!.textContent).toContain(`${W.proceedDate} ${fmtDateShort("2026-07-15")}`);
+  });
+
+  it("adds how long it has waited once the date has PASSED", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    // 2026-07-15 → 2026-07-30 is 15 days.
+    expect(groupOf(/ella/i)!.textContent).toContain(
+      `${W.proceedDate} ${fmtDateShort("2026-07-15")} (15 days)`,
+    );
+  });
+
+  it("says the date ALONE while it is still ahead — never a negative count", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    const peter = groupOf(/Peter/);
+    expect(peter).toBeTruthy();
+    expect(peter!.textContent).toContain(`${W.proceedDate} ${fmtDateShort("2026-08-01")}`);
+    // The whole point of Loo's ruling: no parenthesised count, and above all no
+    // minus sign anywhere on the line.
+    expect(peter!.textContent).not.toMatch(/\(-?\d+ days?\)/);
+  });
+
+  it("says NOTHING for an order that has no proceed date", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    // wong's bedframe order carries none; its group must not invent one, and
+    // must not print a bare label with an em dash after it either.
+    const wong = groupOf(/wong/i);
+    expect(wong).toBeTruthy();
+    expect(wong!.textContent).not.toContain(W.proceedDate);
+  });
+
+  it("reads it off a RECEIPT too — a fully-bought order has no demand rows left", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    const receipt = groupOf(/PO-9001/);
+    expect(receipt).toBeTruthy();
+    // 2026-07-28 → 2026-07-30 is 2 days.
+    expect(receipt!.textContent).toContain(
+      `${W.proceedDate} ${fmtDateShort("2026-07-28")} (2 days)`,
+    );
+  });
+
+  it("shows NOTHING on a Ready Stock group — no order, no plan", async () => {
+    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+      if (path.startsWith("/api/operation/purchase/to-order/issue")) {
+        return route(path, init?.body ? JSON.parse(String(init.body)) : undefined);
+      }
+      if (path.startsWith("/api/operation/purchase/to-order")) {
+        return Promise.resolve({
+          ...TO_ORDER,
+          ordered: [],
+          proposals: [
+            {
+              key: `${OHANA}::bedframe`, supplierId: OHANA, supplierName: "Ohana",
+              category: "bedframe", label: "Ohana · Bedframe", orderBy: null,
+              poCount: 1, blocked: null, productionDays: 7,
+              rows: [
+                {
+                  orderId: "demand:abc-123", so: null, customer: "—",
+                  readyStock: true, destination: "Carres Klang", qty: 5,
+                  summary: "Sonic · 5", stockReady: null, delivery: null,
+                  proceedDate: null, orderBy: null,
+                  builds: [build("d1", "Sonic", "SONIC-S", 5, "Single")],
+                },
+              ],
+            },
+          ],
+        });
+      }
+      return route(path, undefined);
+    });
+    await loaded();
+
+    const ready = groupOf(/Ready Stock/);
+    expect(ready).toBeTruthy();
+    expect(ready!.textContent).toContain("Carres Klang");
+    expect(ready!.textContent).not.toContain(W.proceedDate);
+  });
+
+  it("adds NO COLUMN — the date is nowhere in a data cell", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    // The card's own Must-NOT, asserted from the DOM rather than trusted: the
+    // fact lives on the header band and on no row.
+    const rows = [...document.querySelectorAll('[data-kit="data-row"]')];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      expect(r.textContent ?? "").not.toContain(W.proceedDate);
+      expect(r.textContent ?? "").not.toContain(fmtDateShort("2026-07-15"));
+    }
+    // …and no column header carries the word either.
+    for (const th of [...document.querySelectorAll("th")]) {
+      expect(th.textContent ?? "").not.toContain(W.proceedDate);
+    }
+  });
+
+  it("keeps the customer's delivery date distinguishable from it", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    const ella = groupOf(/ella/i)!;
+    // Both dates are on the line. The delivery date is the LONG spelling with a
+    // weekday and no label; the proceed date is the SHORT spelling with one.
+    // That is what stops two dates in a row reading as one fact.
+    expect(ella.textContent).toContain(fmtDate("2026-07-20"));
+    expect(ella.textContent).toContain(`${W.proceedDate} ${fmtDateShort("2026-07-15")}`);
+    expect(fmtDate("2026-07-20")).not.toBe(fmtDateShort("2026-07-20"));
   });
 });
