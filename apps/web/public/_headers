@@ -30,6 +30,25 @@
 
   # No page in the portal asks for any of these. Denying them means a
   # compromised dependency cannot silently reach the operator's hardware.
+  #
+  # `payment=()` is safe TODAY and the reason is structural, not an oversight.
+  # This directive governs the browser's in-page Payment Request API (the Apple
+  # Pay / Google Pay sheet), and an origin in an allowlist only grants the
+  # feature to a frame THIS page embeds. Carres embeds none: Stripe is a QR code
+  # carrying the hosted-checkout URL (`StripeCollectModal.tsx`), which the
+  # customer scans on their OWN phone — a different device, a different origin,
+  # a document this header cannot reach. Measured 2026-08-05: no
+  # `@stripe/stripe-js`, no `loadStripe`, no `PaymentElement`, no
+  # `PaymentRequest` anywhere in `apps/web`.
+  #
+  # IF the POS ever moves to Stripe's embedded Payment Element WITH the Apple
+  # Pay / Google Pay wallet buttons, change this to:
+  #   payment=(self "https://checkout.stripe.com" "https://js.stripe.com")
+  # Until then the wallet buttons would render nothing and say nothing about
+  # why — this is a header that fails silently and only in production, which is
+  # the same reason the CSP below ships Report-Only. Note there is no wildcard
+  # and no subdomain matching here: `https://stripe.com` never matches
+  # `checkout.stripe.com`, so a half-remembered origin is the same as none.
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()
 
   # CSP is REPORT-ONLY on purpose and this is not timidity — it is the same

@@ -15,7 +15,6 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "types": ["@cloudflare/workers-types"],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
       "@carres/shared": ["../../packages/shared/src"],
