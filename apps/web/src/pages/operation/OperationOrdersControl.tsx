@@ -211,6 +211,28 @@ export function stageOf(o: operationOrderListRow): OperationStage {
   return "in_production";
 }
 
+/** C13 (Loo, 2026-08-04) — the imported AutoCount archive is not WORK.
+ *
+ *  Measured on prod 2026-08-04: 37 of 37 Overdue orders were the archive, and
+ *  not one of the 28 real orders was late. The page therefore showed a day's
+ *  work that does not exist, which is how a red pill stops being read.
+ *
+ *  These rows carry RM 0 of line value, were imported 2026-07-23, and are
+ *  DELETED at go-live (CLAUDE.md's standing ruling: never backfill, repair or
+ *  clean an imported row). The cure is 0265's — exclude at the source and say
+ *  so on screen.
+ *
+ *  This is a predicate about the SCOPE the counts run over, never about the
+ *  ladder: an archive row is genuinely overdue and its own Deadline cell still
+ *  says so. It stays a row, still openable, still searchable — excluded from
+ *  WORK, never hidden from the record.
+ *
+ *  `source_system` already encodes the fact (0265's own ruling); no flag
+ *  column, no migration, no api change. */
+export function isImportedArchive(o: operationOrderListRow): boolean {
+  return o.source_system === "autocount";
+}
+
 /** Which control tab an order belongs to. */
 function controlTabOf(
   o: operationOrderListRow,
@@ -1806,8 +1828,25 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   // LIVE scope (B rebuild, Jess 2026-07-18): every facet count runs over OPEN
   // orders only — the 104 delivered stopped inflating Ready/NETS/KV etc.
+  //
+  // C13 (Loo, 2026-08-04) adds the second half of the same idea: the imported
+  // AutoCount archive is not work either. ONE filter here reaches every queue,
+  // every group and every tile at once — the card's own instruction, and the
+  // reason nothing else in this file needed a `source_system` test.
   const liveScope = useMemo(
-    () => tabFiltered.filter((o) => controlTabOf(o) !== "completed"),
+    () =>
+      tabFiltered.filter(
+        (o) => controlTabOf(o) !== "completed" && !isImportedArchive(o),
+      ),
+    [tabFiltered],
+  );
+  // C13 — what the queues left out, stated on screen rather than dropped
+  // silently (0265's `legacyUnattributed` is the precedent, and its sentence is
+  // the one reused). Counted over the CURRENT tab, so the number always
+  // describes the list the operator is looking at. Zero once the imported rows
+  // are deleted at go-live, and the line disappears with them.
+  const archiveCount = useMemo(
+    () => tabFiltered.filter(isImportedArchive).length,
     [tabFiltered],
   );
   // Owing queue — the ONE count that deliberately spans closed orders too
@@ -2258,7 +2297,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
       supplierFilter.size > 0 ||
       !!staffFilter ||
       categoryFilter.size > 0;
-    if (facetActive) r = r.filter((o) => controlTabOf(o) !== "completed");
+    // C13 — the archive leaves the same way `completed` does, and for the same
+    // reason: a facet must never print a number its own click cannot produce.
+    // `liveScope` now excludes both, so an engaged facet must return both.
+    // With NO facet engaged this line never runs, which is exactly how the
+    // archive stays reachable, readable and searchable in the plain list.
+    if (facetActive)
+      r = r.filter((o) => controlTabOf(o) !== "completed" && !isImportedArchive(o));
     if (flaggedOnly) r = r.filter(hasOpenTask);
     if (escalateOnly) r = r.filter(hasEscalatedTask);
     if (nextFilter) r = r.filter((o) => nextVerbOf(o) === nextFilter);
@@ -2917,8 +2962,30 @@ export default function OperationOrdersControl({ onImport }: Props) {
         activeChips={activeChips}
         footer={
           <>
-            <span className="tabular-nums">
-              {total} {total === 1 ? "order" : "orders"}
+            {/* The record line: how many orders, then what the queues left out.
+                They sit together because the second sentence qualifies the
+                first — separated, the reader has to work out which number the
+                caveat is about. */}
+            <span className="min-w-0 flex items-baseline gap-2">
+              <span className="tabular-nums shrink-0">
+                {total} {total === 1 ? "order" : "orders"}
+              </span>
+              {/* C13 — the queues state what they left out. The wording is
+                  0265's own, live on the HR Overview since 2026-07-26: it
+                  states a fact, asks for nothing, and disappears by itself the
+                  day the imported rows are deleted. It rides the footer band
+                  the page already renders, so it costs zero permanent height,
+                  and it is on screen rather than in a `title`. Colour and size
+                  are the band's own (`text-meta text-base-500`) — inherited,
+                  never restated. The rows themselves are still here, still
+                  openable, still searchable; only the counts skip them. */}
+              {archiveCount > 0 && (
+                <span data-testid="orders-archive-note" className="truncate">
+                  {archiveCount} imported archive order
+                  {archiveCount === 1 ? " is" : "s are"} not counted in the
+                  queues — they came from the old system.
+                </span>
+              )}
             </span>
             {anyFilter && (
               <button
