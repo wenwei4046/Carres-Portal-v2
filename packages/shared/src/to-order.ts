@@ -124,6 +124,21 @@ export const TO_ORDER_WORDS = {
    * proves is noise.
    */
   partlyOrdered: "Partly ordered",
+  /**
+   * P18 — the label on the group header's SECOND date (Loo, 2026-08-05).
+   *
+   * NOT invented: `orders.proceed_date` is already spelt this way in four live
+   * places — the Sales form's `PROCEED DATE · PRODUCTION START`, the order-entry
+   * field config (`Proceed date · production start`), the Sales Order
+   * Maintenance column (`Proceed Date`) and the ops CSV header (`Proceed`).
+   *
+   * It is LABELLED and the delivery date beside it is not, and that asymmetry
+   * is the point: the header already carried one bare date, so a second bare
+   * date would be two unexplained dates on one line. The label is what tells
+   * them apart. The word is also deliberately NOT the bare `Proceed`, which
+   * COPY-STANDARD owns as an order STATE — a different fact.
+   */
+  proceedDate: "Proceed date",
   filterOverdue: "Overdue",
   /**
    * The empty state while a FILTER is narrowing — §8.2's law: no reachable
@@ -242,6 +257,40 @@ export const TO_ORDER_WORDS = {
   cancel: "Cancel",
   create: "Create",
   nextUpdate: "Available in next update.",
+
+  // ── P19 (Loo, 2026-08-05) — Create Purchase takes MANY lines ─────────────
+  /**
+   * The control that adds a row to the line list. Rendered as `+ {lineAdd}`,
+   * the same shape as `+ {createPurchase}` on the rail — the glyph is markup,
+   * the WORD is here.
+   *
+   * **It is the one genuinely new word on this card, and Loo ruled it on
+   * 2026-08-05 from three options with the alternatives' costs attached.**
+   * The Sales Portal — the very form the comparison was made against — spells
+   * the same gesture `Add line item`, and `Add item` was the third candidate;
+   * he chose `Add line`, so the pair below reads as one act on one row rather
+   * than borrowing another form's phrasing. It gains a COPY-STANDARD row in
+   * the same card, because a word on a screen with no entry there is the gap
+   * this module's own law exists to close.
+   */
+  lineAdd: "Add line",
+  /**
+   * The control that takes a row back out, before anything is submitted.
+   *
+   * **A SEPARATE ENTRY FROM `itemsRemove`, WHICH SPELLS THE SAME WORD, and the
+   * split is this file's own rule rather than an oversight.** `itemsRemove` is
+   * the PO Preview's item menu — taking a line off a purchase order that is
+   * about to be issued. This one is a form control on a row nobody has saved.
+   * Two concepts that happen to share a spelling are two entries (the
+   * `cancelDemand` / `cancel` precedent, six entries above); the same concept
+   * spelt twice is the drift `supplierLabel` warns about. A rename of either
+   * must never silently rename the other.
+   *
+   * It is never offered on a line that has already been created: that row is a
+   * record now, and a control implying it could be un-made would be a lie —
+   * the row says `createdWord` instead.
+   */
+  lineRemove: "Remove",
 
   // ── P12 (Loo, 2026-08-04) — a typed demand can be cancelled, and so can the
   //    REMAINDER of one that was part-ordered. ─────────────────────────────
@@ -552,6 +601,50 @@ export function readyStockRef(destination: string | null | undefined): string {
 }
 
 /**
+ * P18 — how long an order has been waiting past its planned production start,
+ * or `null` when that day has not come.
+ *
+ * **Loo ruled the conditional form on 2026-08-05** (option C of three). The
+ * count is what turns a date into a purchasing signal — *production was
+ * supposed to start 15 days ago and nobody has bought the goods* — but it only
+ * means that once the date has PASSED. A proceed date still ahead of today has
+ * waited nothing, and this is not hypothetical: measured on production the same
+ * day, `SO-1256`'s proceed date was TOMORROW, so an unconditional count printed
+ * `(-1 days)` on the live page.
+ *
+ * `null` therefore means *print the date alone*, and it covers all three cases
+ * that deserve it — no proceed date at all, a date in the future, and the day
+ * itself. **Zero is deliberately not returned**: `(0 days)` on the very morning
+ * production is due to start would read as a complaint about an order that is
+ * perfectly on time.
+ *
+ * Pure, and takes `today` rather than reading a clock, so a test can stand on a
+ * fixed day and the page can pass the same `today` the row's `late` flag uses —
+ * one day, one answer, no chance of the header disagreeing with the red date
+ * beside it.
+ */
+export function proceedWaitedDays(
+  proceedDate: IsoDate | null | undefined,
+  today: IsoDate | null | undefined,
+): number | null {
+  if (!proceedDate || !today) return null;
+  // String compare is safe and intended on `YYYY-MM-DD`, and it is what the
+  // page's own `late` flag already does — no Date object, so no timezone can
+  // move the boundary.
+  if (proceedDate >= today) return null;
+  const days = isoDayDiff(proceedDate, today);
+  return days != null && days > 0 ? days : null;
+}
+
+/** Whole days from `a` to `b`, both `YYYY-MM-DD`. `null` if either is unparseable. */
+function isoDayDiff(a: IsoDate, b: IsoDate): number | null {
+  const ta = Date.parse(`${a}T00:00:00Z`);
+  const tb = Date.parse(`${b}T00:00:00Z`);
+  if (Number.isNaN(ta) || Number.isNaN(tb)) return null;
+  return Math.round((tb - ta) / 86_400_000);
+}
+
+/**
  * Why the unit left the free pool, for K4's ledger.
  *
  * P10 recorded this as `other` with a note, because K4's locked five had no
@@ -812,6 +905,17 @@ export function isOnePoPerOrder(category: string): boolean {
 export interface ToOrderLine extends DemandLine {
   so: number | null;
   customerName: string | null;
+  /**
+   * P18 — `orders.proceed_date`, the planned PRODUCTION START date Sales keys
+   * on the New Sales Order form (`PROCEED DATE · PRODUCTION START`).
+   *
+   * An ORDER fact, so it is repeated on every line of the order and the engine
+   * reads it off the first one — exactly like `so` and `customerName`. It is
+   * NEVER an input to the engine's arithmetic: the raise-by date comes from the
+   * customer deadline and the production days, and this is Sales' plan sitting
+   * beside it. `null` on a Ready Stock demand, which has no order.
+   */
+  proceedDate?: IsoDate | null;
   /** `product_models.name` — what the operator recognises. */
   modelName: string | null;
   /** `product_skus.variant` — the module code a factory reads. */
@@ -972,6 +1076,13 @@ export interface ToOrderRow {
    */
   delivery: IsoDate | null;
   /**
+   * P18 — the ORDER's planned production-start date. Prints on the GROUP
+   * HEADER, never on a row: every line under `SO-1209` shares it, so a column
+   * would hold the width forever to say the same thing three times (Loo,
+   * 2026-08-04). `null` on a Ready Stock demand.
+   */
+  proceedDate: IsoDate | null;
+  /**
    * THIS ORDER's earliest raise-by — the engine's own date, carried ONLY so
    * the Work Queue can bucket the row into Today / Tomorrow / This Week /
    * Next Week. It is NEVER rendered: the GOLDEN RULE stands, the operator
@@ -1011,6 +1122,16 @@ export interface ToOrderOrderedRow {
   so: number | null;
   /** The customer's date, same meaning as a demand row's. */
   delivery: IsoDate | null;
+  /**
+   * P18 — the ORDER's planned production-start date, same meaning as a demand
+   * row's.
+   *
+   * It rides the RECEIPT row too, and that is not tidiness: an order whose
+   * every line has been bought has no demand rows left, so its group is made of
+   * receipts alone. Carrying it on demand rows only would blank the header on
+   * exactly the orders a purchaser is checking up on.
+   */
+  proceedDate: IsoDate | null;
   model: string;
   qty: number;
 }
@@ -1387,6 +1508,9 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
         // destination, and that is what the group header says instead.
         readyStock: orderLines[0].readyStock === true ? true : undefined,
         destination: orderLines[0].destinationName ?? undefined,
+        // An ORDER fact, read off the first line exactly like `so` and
+        // `customer` above — every line of the order carries the same value.
+        proceedDate: orderLines[0].proceedDate ?? null,
         // The earliest customer deadline across the order's lines — the
         // business date the operator sees (the engine's own dates never do).
         delivery: orderLines.reduce<IsoDate | null>(

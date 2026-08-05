@@ -30,6 +30,7 @@ import {
   stockExpandLabel,
   readyStockDrawNote,
   READY_STOCK_DRAW_REASON,
+  proceedWaitedDays,
   TO_ORDER_WORDS,
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
@@ -572,6 +573,7 @@ describe("Stock Ready", () => {
     summary: "",
     stockReady: null,
     delivery: null,
+    proceedDate: null,
     orderBy: null,
     builds: [],
     freeStock: 0,
@@ -1096,5 +1098,113 @@ describe("P15 · the picker's column words", () => {
     // One word may not label two things in one dialog: the FIELD is `Item`, so
     // the model COLUMN takes the grid's own word for that value.
     expect(TO_ORDER_WORDS.colModel).not.toBe(TO_ORDER_WORDS.itemLabel);
+  });
+});
+
+/**
+ * P18 — THE ORDER'S PROCEED DATE, AND THE COUNT THAT ONLY SPEAKS ONCE IT MEANS
+ * SOMETHING.
+ *
+ * Two separate claims, tested apart because they can fail apart: the engine
+ * CARRIES the order fact onto the row (so the group header has something to
+ * read), and `proceedWaitedDays` decides WHETHER a waiting count exists at all.
+ *
+ * Loo ruled the conditional form on 2026-08-05 after being shown that the
+ * unconditional one printed `(-1 days)` on live production — `SO-1256`'s proceed
+ * date was the following day.
+ */
+describe("P18 · the order's proceed date reaches the row", () => {
+  it("rides the row, read off the order's first line", () => {
+    const [sofa] = run(PETER.map((l) => line({ ...l, proceedDate: "2026-07-21" })));
+    expect(sofa.rows).toHaveLength(1);
+    expect(sofa.rows[0]!.proceedDate).toBe("2026-07-21");
+  });
+
+  it("is null when the order has none — never guessed from another date", () => {
+    const [sofa] = run(PETER);
+    // The order carries a deadline and a placedAt; neither may stand in for a
+    // plan the salesperson did not type.
+    expect(sofa.rows[0]!.proceedDate).toBeNull();
+    expect(sofa.rows[0]!.delivery).toBe("2026-08-22");
+  });
+
+  it("a READY STOCK demand has no order and therefore no proceed date", () => {
+    const [p] = run([
+      line({
+        lineId: "r1", sku: "5539-1A(LHF)", orderId: "demand:abc", so: null,
+        customerName: null, readyStock: true, destinationName: "Carres Klang",
+        buildKey: null,
+      }),
+    ]);
+    expect(p.rows[0]!.readyStock).toBe(true);
+    expect(p.rows[0]!.proceedDate).toBeNull();
+  });
+
+  it("two orders keep their own dates — it is not hoisted across the proposal", () => {
+    const [sofa] = run([
+      ...PETER.map((l) => line({ ...l, proceedDate: "2026-07-21" })),
+      ...ELLA.map((l) => line({ ...l, proceedDate: "2026-07-28" })),
+    ]);
+    const byCustomer = new Map(sofa.rows.map((r) => [r.customer, r.proceedDate]));
+    expect(byCustomer.get("PETER")).toBe("2026-07-21");
+    expect(byCustomer.get("ella")).toBe("2026-07-28");
+  });
+});
+
+describe("P18 · proceedWaitedDays", () => {
+  it("counts the days once the date has passed", () => {
+    // The card's own worked example, and the live reading on 2026-08-05.
+    expect(proceedWaitedDays("2026-07-21", "2026-08-05")).toBe(15);
+    expect(proceedWaitedDays("2026-08-04", "2026-08-05")).toBe(1);
+  });
+
+  it("says NOTHING while the date is still ahead — the live SO-1256 case", () => {
+    // Measured on production 2026-08-05: SO-1256's proceed date was 2026-08-06.
+    // An unconditional count printed `(-1 days)`; this is why Loo ruled option C.
+    expect(proceedWaitedDays("2026-08-06", "2026-08-05")).toBeNull();
+    expect(proceedWaitedDays("2026-09-01", "2026-08-05")).toBeNull();
+  });
+
+  it("says nothing ON the day itself — `(0 days)` would complain about an order that is on time", () => {
+    expect(proceedWaitedDays("2026-08-05", "2026-08-05")).toBeNull();
+  });
+
+  it("says nothing when either date is missing, rather than counting from nowhere", () => {
+    expect(proceedWaitedDays(null, "2026-08-05")).toBeNull();
+    expect(proceedWaitedDays(undefined, "2026-08-05")).toBeNull();
+    expect(proceedWaitedDays("2026-07-21", null)).toBeNull();
+    expect(proceedWaitedDays("2026-07-21", undefined)).toBeNull();
+  });
+
+  it("crosses a month and a year boundary by real days, not by arithmetic on the parts", () => {
+    expect(proceedWaitedDays("2026-07-31", "2026-08-01")).toBe(1);
+    expect(proceedWaitedDays("2025-12-31", "2026-01-01")).toBe(1);
+    // 2028 is a leap year: 28 Feb → 1 Mar is TWO days, not one.
+    expect(proceedWaitedDays("2028-02-28", "2028-03-01")).toBe(2);
+  });
+
+  it("is a pure function of the two dates — no clock, so a test is not date-fused", () => {
+    // The same pair answers the same number whenever it is asked. Several
+    // fixtures in this repo have silently changed meaning as a real date rolled
+    // past them; this one cannot.
+    expect(proceedWaitedDays("2026-07-21", "2026-08-05")).toBe(
+      proceedWaitedDays("2026-07-21", "2026-08-05"),
+    );
+  });
+});
+
+describe("P18 · the label", () => {
+  it("is the four-place live spelling, and not the STATE word `Proceed`", () => {
+    expect(TO_ORDER_WORDS.proceedDate).toBe("Proceed date");
+    // COPY-STANDARD owns bare `Proceed` as an ORDER STATE (customer confirmed,
+    // ready for PO). The date is a different fact and may not wear its word.
+    expect(TO_ORDER_WORDS.proceedDate).not.toBe("Proceed");
+  });
+
+  it("is labelled BECAUSE the delivery date next to it is not", () => {
+    // The header carried exactly one bare date before P18. Two bare dates on
+    // one line is the confusion the card's Done-when forbids, so this one takes
+    // a label — and the label must not read as the column heading of the other.
+    expect(TO_ORDER_WORDS.proceedDate).not.toBe(TO_ORDER_WORDS.colPreferred);
   });
 });

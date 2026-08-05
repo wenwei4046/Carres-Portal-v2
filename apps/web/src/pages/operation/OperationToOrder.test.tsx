@@ -7,7 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TO_ORDER_WORDS as W } from "@carres/shared";
 import OperationToOrder from "./OperationToOrder";
-import { fmtDate } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 
 /**
  * To Order — the Work Queue + Excel Workspace (Jess's freeze, 2026-08-01).
@@ -58,6 +58,10 @@ const TO_ORDER = {
       poId: "PO-9001", placedAt: "2026-07-30", category: "bedframe",
       supplierId: OHANA, supplierName: "Ohana", orderId: "o30", so: 1350,
       delivery: "2026-08-10", model: "Cody K", qty: 1,
+      // P18 — a RECEIPT carries the order fact too. An order whose every line
+      // is bought has no demand rows left, so this is the only place its group
+      // header could read the plan from.
+      proceedDate: "2026-07-28",
     },
   ],
   proposals: [
@@ -76,6 +80,8 @@ const TO_ORDER = {
           orderId: "o2", so: 1204, customer: "ella", qty: 1,
           summary: "Booqit · 1 Sofa", stockReady: "2026-07-20",
           delivery: "2026-07-20", // the CUSTOMER's date, already past → red
+          // P18 — PASSED (today is 2026-07-30), so the header states the wait.
+          proceedDate: "2026-07-15",
           orderBy: "2026-07-15", // overdue → folds into Today
           builds: [build("bk-e", "Booqit", "5539-1A(LHF)")],
         },
@@ -83,6 +89,10 @@ const TO_ORDER = {
           orderId: "o1", so: 1207, customer: "PETER", qty: 2,
           summary: "Booqit · 2 Sofas", stockReady: "2026-08-13",
           delivery: "2026-08-13",
+          // P18 — STILL AHEAD of today (2026-07-30). This is the live SO-1256
+          // shape, and the reason Loo ruled the count conditional: unconditional
+          // it printed `(-2 days)`.
+          proceedDate: "2026-08-01",
           orderBy: "2026-07-30",
           builds: [
             build("bk-a", "Booqit", "5539-1B(LHF)"),
@@ -492,7 +502,10 @@ describe("an overdue row says so on the row", () => {
 
     const bars = [...document.querySelectorAll('[data-kit="data-row"] td:first-child')];
     expect(bars.length).toBeGreaterThan(0);
-    for (const b of bars) expect(b.className).toContain("border-kit-red-9");
+    // P17 spells the bar's colour PER SIDE (`border-l-…`): an all-sides
+    // `border-kit-red-9` also painted the cell's new column rule red, and its
+    // `border-transparent` twin painted it invisible. Same bar, same red.
+    for (const b of bars) expect(b.className).toContain("border-l-kit-red-9");
 
     // Swap to the first upcoming run — NOT overdue, same table, no red.
     fireEvent.click(screen.getByTestId("to-order-overdue"));
@@ -500,8 +513,8 @@ describe("an overdue row says so on the row", () => {
     const calm = [...document.querySelectorAll('[data-kit="data-row"] td:first-child')];
     expect(calm.length).toBeGreaterThan(0);
     for (const b of calm) {
-      expect(b.className).toContain("border-transparent");
-      expect(b.className).not.toContain("border-kit-red-9");
+      expect(b.className).toContain("border-l-transparent");
+      expect(b.className).not.toContain("border-l-kit-red-9");
     }
   });
 });
@@ -713,15 +726,18 @@ describe("+ Create Purchase — the dialog stops guessing (P15)", () => {
     const dialog = await openDialog();
 
     // Nothing claimed before an item is picked.
-    expect(within(dialog).queryByTestId("cp-supplier")).toBeNull();
+    // P19 — the testid gained the line's index, because the supplier is a fact
+    // about ONE line and a dialog now holds several. The ASSERTION is P15's,
+    // byte for byte; only the row it addresses is named.
+    expect(within(dialog).queryByTestId("cp-supplier-0")).toBeNull();
 
     fireEvent.click(pickRow("SONIC-S"));
-    expect(within(dialog).getByTestId("cp-supplier")).toHaveTextContent("Nice Future");
+    expect(within(dialog).getByTestId("cp-supplier-0")).toHaveTextContent("Nice Future");
 
     // IT IS NOT A CONTROL. The supplier is derived by the server from the SKU
     // (Jess, 2026-08-03); a client that could name it could name the wrong
     // factory, so there is no input, no select and no button for it.
-    const supplier = within(dialog).getByTestId("cp-supplier");
+    const supplier = within(dialog).getByTestId("cp-supplier-0");
     expect(supplier.querySelector("input,select,button")).toBeNull();
   });
 
@@ -774,6 +790,287 @@ describe("+ Create Purchase — the dialog stops guessing (P15)", () => {
     // No item yet → the commit is refused. A demand with no product is not a
     // demand, and the button says so by being unavailable rather than failing.
     expect(screen.getByTestId("to-order-create-submit")).toBeDisabled();
+  });
+});
+
+/**
+ * P19 — Create Purchase takes many lines (Loo, 2026-08-05).
+ *
+ * The whole card is the FORM. `purchase_demands` is one row per SKU by the
+ * frozen model, so N lines is N rows from one submit and nothing in the schema
+ * or the api route moved. What these tests hold is therefore the two things a
+ * form can get wrong: that the HEADER is asked once and reaches every row, and
+ * that a partial failure behaves like the page's own frozen Issue — **what
+ * succeeded stays created.**
+ */
+describe("+ Create Purchase — many lines, one submit (P19)", () => {
+  const pickRow = (sku: string) =>
+    screen.getByText(sku, { selector: ".font-mono" }).closest("tr")!;
+
+  /** Fill line `i`: focus it, search, pick, then type the quantity and remark. */
+  function fillLine(i: number, sku: string, qty?: string, remark?: string) {
+    fireEvent.focus(document.getElementById(`cp-item-${i}`)!);
+    fireEvent.click(pickRow(sku));
+    if (qty !== undefined) {
+      fireEvent.change(document.getElementById(`cp-qty-${i}`)!, { target: { value: qty } });
+    }
+    if (remark !== undefined) {
+      fireEvent.change(document.getElementById(`cp-remark-${i}`)!, {
+        target: { value: remark },
+      });
+    }
+  }
+
+  async function openDialog() {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-create-purchase"));
+    await screen.findByTestId("to-order-create-dialog");
+    await waitFor(() => expect(pickRow("5539-CNR")).toBeTruthy());
+  }
+
+  const posted = () =>
+    apiFetch.mock.calls
+      .filter((c) => (c[1] as RequestInit | undefined)?.method === "POST")
+      .map((c) => JSON.parse(String((c[1] as RequestInit).body)));
+
+  it("three items go in on ONE submit, as three demands — the card's own case", async () => {
+    await openDialog();
+
+    fillLine(0, "SONIC-S", "2", "showroom floor");
+    fireEvent.click(screen.getByTestId("to-order-line-add"));
+    fillLine(1, "5539-CNR", "1", "");
+    fireEvent.click(screen.getByTestId("to-order-line-add"));
+    fillLine(2, "5539-2NA", "4", "left corner");
+
+    apiFetch.mockClear();
+    fireEvent.click(screen.getByTestId("to-order-create-submit"));
+
+    await waitFor(() => expect(posted()).toHaveLength(3));
+    const sent = posted();
+
+    // THE LINES CARRY WHAT IS PER-LINE...
+    expect(sent.map((s) => [s.sku, s.qty, s.remark])).toEqual([
+      ["SONIC-S", 2, "showroom floor"],
+      ["5539-CNR", 1, null],
+      ["5539-2NA", 4, "left corner"],
+    ]);
+    // ...and EVERY ONE carries the header, which was asked once. This is the
+    // half a multi-line form gets wrong: a header field that silently reaches
+    // only the first row.
+    for (const s of sent) {
+      expect(s.destinationId).toBe(KLANG);
+      expect(s.purpose).toBe("ready_stock");
+      // No supplier on the wire, on any row — P15's rule, per line now.
+      expect(s).not.toHaveProperty("supplier");
+      expect(s).not.toHaveProperty("supplierId");
+      // ❌ a price column. Purchasing prices nothing here.
+      expect(s).not.toHaveProperty("price");
+      expect(s).not.toHaveProperty("cost");
+    }
+    // Nothing is left open once every line is a record.
+    await waitFor(() => expect(screen.queryByTestId("to-order-create-dialog")).toBeNull());
+  });
+
+  it("WHAT SUCCEEDED STAYS CREATED — a bad line keeps its row, the good ones do not roll back", async () => {
+    await openDialog();
+    fillLine(0, "SONIC-S", "2");
+    fireEvent.click(screen.getByTestId("to-order-line-add"));
+    fillLine(1, "5539-CNR", "1");
+    fireEvent.click(screen.getByTestId("to-order-line-add"));
+    fillLine(2, "5539-2NA", "3");
+
+    // The MIDDLE line is refused, so the assertion cannot pass by the run
+    // simply stopping at the first failure.
+    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+      const b = init?.body ? JSON.parse(String(init.body)) : undefined;
+      if (init?.method === "POST" && b?.sku === "5539-CNR") {
+        return Promise.reject(new Error("sku_has_no_supplier"));
+      }
+      return route(path, b);
+    });
+
+    fireEvent.click(screen.getByTestId("to-order-create-submit"));
+
+    // The failure names its OWN row, in the server's own words.
+    const failed = await screen.findByTestId("to-order-line-failed-1");
+    expect(failed).toHaveTextContent("sku_has_no_supplier");
+
+    // The two that worked are RECORDS. They say so, and they no longer offer a
+    // Remove — nothing in this form can un-make a row the server accepted.
+    expect(screen.getByTestId("to-order-line-created-0")).toHaveTextContent(W.createdWord);
+    expect(screen.getByTestId("to-order-line-created-2")).toHaveTextContent(W.createdWord);
+    expect(screen.queryByTestId("to-order-line-remove-0")).toBeNull();
+    expect(screen.queryByTestId("to-order-line-remove-2")).toBeNull();
+    // ...and the one that failed keeps its way out.
+    expect(screen.getByTestId("to-order-line-remove-1")).toBeInTheDocument();
+
+    // THE DIALOG STAYS. A form that closed here would have reported nothing.
+    expect(screen.getByTestId("to-order-create-dialog")).toBeInTheDocument();
+  });
+
+  it("pressing Create again retries ONLY the line that failed — a record is never posted twice", async () => {
+    await openDialog();
+    fillLine(0, "SONIC-S", "2");
+    fireEvent.click(screen.getByTestId("to-order-line-add"));
+    fillLine(1, "5539-CNR", "1");
+
+    let refuse = true;
+    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+      const b = init?.body ? JSON.parse(String(init.body)) : undefined;
+      if (init?.method === "POST" && b?.sku === "5539-CNR" && refuse) {
+        return Promise.reject(new Error("boom"));
+      }
+      return route(path, b);
+    });
+
+    fireEvent.click(screen.getByTestId("to-order-create-submit"));
+    await screen.findByTestId("to-order-line-failed-1");
+
+    // The factory is fixed; the operator presses the same button again. There
+    // is no second control — the button that made the attempt repeats it.
+    refuse = false;
+    apiFetch.mockClear();
+    fireEvent.click(screen.getByTestId("to-order-create-submit"));
+
+    await waitFor(() => expect(posted()).toHaveLength(1));
+    // ONE call, and it is the failed line. Re-posting SONIC-S would have
+    // bought the showroom two sofas for one decision.
+    expect(posted()[0].sku).toBe("5539-CNR");
+    await waitFor(() => expect(screen.queryByTestId("to-order-create-dialog")).toBeNull());
+  });
+
+  it("a line can be added and removed, and removing the last leaves one empty line", async () => {
+    await openDialog();
+
+    fireEvent.click(screen.getByTestId("to-order-line-add"));
+    fireEvent.click(screen.getByTestId("to-order-line-add"));
+    expect(screen.getAllByTestId(/^to-order-create-line-\d+$/)).toHaveLength(3);
+
+    fireEvent.click(screen.getByTestId("to-order-line-remove-2"));
+    expect(screen.getAllByTestId(/^to-order-create-line-\d+$/)).toHaveLength(2);
+
+    // Removing every line leaves ONE empty line, never an unusable form — a
+    // dialog with no rows has no way back.
+    fireEvent.click(screen.getByTestId("to-order-line-remove-1"));
+    fireEvent.click(screen.getByTestId("to-order-line-remove-0"));
+    const left = screen.getAllByTestId(/^to-order-create-line-\d+$/);
+    expect(left).toHaveLength(1);
+    expect(document.getElementById("cp-item-0")).toHaveValue("");
+    expect(screen.getByTestId("to-order-create-submit")).toBeDisabled();
+  });
+
+  it("a half-filled line holds the button rather than being silently dropped", async () => {
+    await openDialog();
+    fillLine(0, "SONIC-S", "1");
+    expect(screen.getByTestId("to-order-create-submit")).toBeEnabled();
+
+    // A row carrying a remark and NO item: posting the others and closing would
+    // throw that typing away without saying so, so the button waits.
+    fireEvent.click(screen.getByTestId("to-order-line-add"));
+    fireEvent.change(document.getElementById("cp-remark-1")!, {
+      target: { value: "the one with the taller legs" },
+    });
+    expect(screen.getByTestId("to-order-create-submit")).toBeDisabled();
+
+    // An UNTOUCHED trailing row is the empty row at the bottom of every ERP
+    // grid, and is ignored rather than held against the operator.
+    fireEvent.change(document.getElementById("cp-remark-1")!, { target: { value: "" } });
+    expect(screen.getByTestId("to-order-create-submit")).toBeEnabled();
+  });
+
+  it("at most ONE picker is open, and it belongs to the line being filled", async () => {
+    await openDialog();
+    /* The dialog's only table is the picker: Radix marks the rest of the page
+     * `aria-hidden` while a modal is open, so the grid behind it is not in the
+     * accessibility tree and cannot be miscounted here. */
+    const pickers = () => screen.queryAllByRole("table").length;
+
+    // A freshly opened dialog behaves exactly as the single-line version did.
+    expect(pickers()).toBe(1);
+
+    // The new line takes the picker WITH it — the first does not keep a copy.
+    fireEvent.click(screen.getByTestId("to-order-line-add"));
+    expect(pickers()).toBe(1);
+    expect(within(screen.getByTestId("to-order-create-lines")).getAllByRole("table"))
+      .toHaveLength(1);
+
+    // Focus moves it back. Two open result tables cannot be REPRESENTED: the
+    // state is a single id, not a set.
+    fireEvent.focus(document.getElementById("cp-item-0")!);
+    expect(pickers()).toBe(1);
+
+    // ...and once the focused line names its item there is no picker at all,
+    // which is what makes room for the next line rather than stacking tables.
+    fillLine(0, "SONIC-S");
+    expect(pickers()).toBe(0);
+
+    // Focusing the empty line brings exactly one back.
+    fireEvent.focus(document.getElementById("cp-item-1")!);
+    expect(pickers()).toBe(1);
+  });
+
+  it("each line searches its OWN needle — one shared list would show the last thing typed", async () => {
+    await openDialog();
+    fillLine(0, "SONIC-S");
+
+    fireEvent.click(screen.getByTestId("to-order-line-add"));
+    fireEvent.change(document.getElementById("cp-item-1")!, {
+      target: { value: "5539-CNR" },
+    });
+    await waitFor(() =>
+      expect(screen.queryByText("SONIC-S", { selector: ".font-mono" })).toBeNull(),
+    );
+    // Line 0 keeps its pick while line 1 is filtered to something else.
+    expect(document.getElementById("cp-item-0")).toHaveValue("Sonic S");
+    expect(screen.getByText("5539-CNR", { selector: ".font-mono" })).toBeInTheDocument();
+  });
+
+  it("the header is asked ONCE and the line words are typed once", async () => {
+    await openDialog();
+    fireEvent.click(screen.getByTestId("to-order-line-add"));
+    fireEvent.click(screen.getByTestId("to-order-line-add"));
+
+    const dialog = screen.getByTestId("to-order-create-dialog");
+    // Three lines, and still exactly one of each header field. Source,
+    // Destination and Required By are per PURCHASE, never per line — the
+    // card's Must-NOT names all three.
+    for (const w of [W.reason, W.destination, W.requiredBy]) {
+      expect(within(dialog).getAllByText(w)).toHaveLength(1);
+    }
+    expect(dialog.querySelectorAll("#cp-purpose")).toHaveLength(1);
+    expect(dialog.querySelectorAll("#cp-dest")).toHaveLength(1);
+    expect(dialog.querySelectorAll("#cp-required")).toHaveLength(1);
+
+    // The three line words head the grid once, and every row's controls take
+    // them as their accessible name rather than repeating the ink.
+    for (const w of [W.itemLabel, W.itemsColQty, W.remark]) {
+      expect(within(dialog).getAllByText(w)).toHaveLength(1);
+    }
+    for (let i = 0; i < 3; i++) {
+      expect(document.getElementById(`cp-item-${i}`)).toHaveAttribute(
+        "aria-label",
+        W.itemLabel,
+      );
+      expect(document.getElementById(`cp-qty-${i}`)).toHaveAttribute(
+        "aria-label",
+        W.itemsColQty,
+      );
+      expect(document.getElementById(`cp-remark-${i}`)).toHaveAttribute(
+        "aria-label",
+        W.remark,
+      );
+    }
+  });
+
+  it("the surface is the kit's WIDE modal — a line list, not a question", async () => {
+    await openDialog();
+    const modal = document.querySelector('[data-kit="modal"]')!;
+    // 600px, measured on the live dialog: at 512 the picker's SKU column holds
+    // 126.8px for a 144.0px code, and P15's whole point is that the code is
+    // what tells four SKUs apart. The class is the kit's config key, never a
+    // number typed here.
+    expect(modal.className).toContain("max-w-modal-wide");
+    expect(modal.className).not.toContain("max-w-modal ");
   });
 });
 
@@ -1835,5 +2132,150 @@ describe("Q6 · the audit's two findings, as guards", () => {
     // both halves of that — what it is, and that the header row is still
     // the same four words.
     expect(document.querySelectorAll("colgroup col")).toHaveLength(7);
+  });
+});
+
+/**
+ * ── P18 · the order's proceed date joins the GROUP HEADER ────────────────────
+ *
+ * Loo asked for a COLUMN and the answer is a header line, on his own 2026-08-04
+ * rule: a fact that is not per-row gets no column, and every line under one SO
+ * shares this date — a column would print it three times and hold the width
+ * forever.
+ *
+ * He then ruled the FORM on 2026-08-05, from three options with the live reading
+ * attached: the waiting count appears only once the date has PASSED. Measured on
+ * production the same day, `SO-1256`'s proceed date was the NEXT day, so an
+ * unconditional count printed `(-1 days)` on the real page.
+ *
+ * Fixture time is 2026-07-30, and it holds all four cases on purpose:
+ *   ella (o2)   proceed 2026-07-15 — passed  → date + `(15 days)`
+ *   PETER (o1)  proceed 2026-08-01 — ahead   → the date alone
+ *   wong (o9)   no proceed date              → nothing at all
+ *   PO-9001     a RECEIPT with a proceed date → the header still reads it
+ */
+describe("P18 · the proceed date on the group header", () => {
+  const groups = () => [...document.querySelectorAll('[data-kit="data-group"]')];
+  const groupOf = (re: RegExp) => groups().find((g) => re.test(g.textContent ?? ""));
+
+  it("states the label and the date for an order-backed group", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    const ella = groupOf(/ella/i);
+    expect(ella).toBeTruthy();
+    expect(ella!.textContent).toContain(`${W.proceedDate} ${fmtDateShort("2026-07-15")}`);
+  });
+
+  it("adds how long it has waited once the date has PASSED", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    // 2026-07-15 → 2026-07-30 is 15 days.
+    expect(groupOf(/ella/i)!.textContent).toContain(
+      `${W.proceedDate} ${fmtDateShort("2026-07-15")} (15 days)`,
+    );
+  });
+
+  it("says the date ALONE while it is still ahead — never a negative count", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    const peter = groupOf(/Peter/);
+    expect(peter).toBeTruthy();
+    expect(peter!.textContent).toContain(`${W.proceedDate} ${fmtDateShort("2026-08-01")}`);
+    // The whole point of Loo's ruling: no parenthesised count, and above all no
+    // minus sign anywhere on the line.
+    expect(peter!.textContent).not.toMatch(/\(-?\d+ days?\)/);
+  });
+
+  it("says NOTHING for an order that has no proceed date", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    // wong's bedframe order carries none; its group must not invent one, and
+    // must not print a bare label with an em dash after it either.
+    const wong = groupOf(/wong/i);
+    expect(wong).toBeTruthy();
+    expect(wong!.textContent).not.toContain(W.proceedDate);
+  });
+
+  it("reads it off a RECEIPT too — a fully-bought order has no demand rows left", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    const receipt = groupOf(/PO-9001/);
+    expect(receipt).toBeTruthy();
+    // 2026-07-28 → 2026-07-30 is 2 days.
+    expect(receipt!.textContent).toContain(
+      `${W.proceedDate} ${fmtDateShort("2026-07-28")} (2 days)`,
+    );
+  });
+
+  it("shows NOTHING on a Ready Stock group — no order, no plan", async () => {
+    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+      if (path.startsWith("/api/operation/purchase/to-order/issue")) {
+        return route(path, init?.body ? JSON.parse(String(init.body)) : undefined);
+      }
+      if (path.startsWith("/api/operation/purchase/to-order")) {
+        return Promise.resolve({
+          ...TO_ORDER,
+          ordered: [],
+          proposals: [
+            {
+              key: `${OHANA}::bedframe`, supplierId: OHANA, supplierName: "Ohana",
+              category: "bedframe", label: "Ohana · Bedframe", orderBy: null,
+              poCount: 1, blocked: null, productionDays: 7,
+              rows: [
+                {
+                  orderId: "demand:abc-123", so: null, customer: "—",
+                  readyStock: true, destination: "Carres Klang", qty: 5,
+                  summary: "Sonic · 5", stockReady: null, delivery: null,
+                  proceedDate: null, orderBy: null,
+                  builds: [build("d1", "Sonic", "SONIC-S", 5, "Single")],
+                },
+              ],
+            },
+          ],
+        });
+      }
+      return route(path, undefined);
+    });
+    await loaded();
+
+    const ready = groupOf(/Ready Stock/);
+    expect(ready).toBeTruthy();
+    expect(ready!.textContent).toContain("Carres Klang");
+    expect(ready!.textContent).not.toContain(W.proceedDate);
+  });
+
+  it("adds NO COLUMN — the date is nowhere in a data cell", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    // The card's own Must-NOT, asserted from the DOM rather than trusted: the
+    // fact lives on the header band and on no row.
+    const rows = [...document.querySelectorAll('[data-kit="data-row"]')];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      expect(r.textContent ?? "").not.toContain(W.proceedDate);
+      expect(r.textContent ?? "").not.toContain(fmtDateShort("2026-07-15"));
+    }
+    // …and no column header carries the word either.
+    for (const th of [...document.querySelectorAll("th")]) {
+      expect(th.textContent ?? "").not.toContain(W.proceedDate);
+    }
+  });
+
+  it("keeps the customer's delivery date distinguishable from it", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    const ella = groupOf(/ella/i)!;
+    // Both dates are on the line. The delivery date is the LONG spelling with a
+    // weekday and no label; the proceed date is the SHORT spelling with one.
+    // That is what stops two dates in a row reading as one fact.
+    expect(ella.textContent).toContain(fmtDate("2026-07-20"));
+    expect(ella.textContent).toContain(`${W.proceedDate} ${fmtDateShort("2026-07-15")}`);
+    expect(fmtDate("2026-07-20")).not.toBe(fmtDateShort("2026-07-20"));
   });
 });

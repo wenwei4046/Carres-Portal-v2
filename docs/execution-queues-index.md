@@ -46,44 +46,98 @@ LAYER 2 · BUSINESS FLOW — per page, NEVER shared
 rule from any one tab, and a Layer 2 card may not touch a second page. `DataTable`'s own header
 already says it — *"This file spells no word."*
 
-**THE ACTIVE SET — Loo redirected the whole programme onto To Order, 2026-08-04.**
-*(He also UNFROZE To Order; the ruling and its four decisions are at the head of
-`purchasing-execution-queue.md`. The frozen LAYOUT still stands — these cards add, never
-redesign.)*
+**THE ACTIVE SET — rewritten 2026-08-05 at the end of the manager session that ran the whole
+programme. Read this block, not the archaeology below it.**
 
-| Card | Doc | Only file(s) / REGION it may edit | Runs with |
+> **What happened 2026-08-04 → 08-05.** Loo redirected everything onto Purchasing, unfroze
+> To Order and Purchase Orders, and **about twenty-five cards shipped in two days.**
+> **To Order is COMPLETE (P8–P19), the Orders list's three money/word cards are complete
+> (C11 · C12 · C13 · C14), Claims joined the kit (D7-Claims), and the grid gained column
+> separators portal-wide (P17).** Everything below is what is LEFT.
+
+### Open cards — seven, and none of them collides with another
+
+| Card | Doc | Only file(s) it may edit | Size |
 |---|---|---|---|
-| **P8** a typed demand can be saved | `purchasing-execution-queue.md` | migration · `apps/api` · `packages/shared` · **only the `CreatePurchaseDialog` region** of `OperationToOrder.tsx` | P9 · D0.5d |
-| **P9** the page says how many of each | `purchasing-execution-queue.md` | **only the rail + footer regions** of `OperationToOrder.tsx` | P8 · D0.5d |
-| **D0.5d** the grid grows five powers ✅ **BUILT 2026-08-04** — 3 shipped; layout memory refused by §0.4 (Loo's call), the record bar already exists in `PageShell` | `ui-kit-execution-queue.md` | `components/kit/**` · `pages/dev/**` | everything |
-| **P10** ready stock suggested, human takes | `purchasing-execution-queue.md` | **grid region** of `OperationToOrder.tsx` · api · shared | **AFTER D0.5d** |
+| **R10** | `receiving-claim-execution-queue.md` | **docs only** — `PURCHASING-WORKING-FLOW` §9 | tiny |
+| **Q14** | `purchasing-execution-queue.md` | Purchase Orders + api | small |
+| **P5** | `purchasing-execution-queue.md` | **writes no code** — walks the chain and reports | verification |
+| **R9** | `receiving-claim-execution-queue.md` | Claims + migration | medium |
+| **R11** | `receiving-claim-execution-queue.md` | Claims + the resolution engine | medium |
+| **R12** | `receiving-claim-execution-queue.md` | Claims + migration | medium |
+| **P7** | `purchasing-execution-queue.md` | To Order — a full rewrite | **large, and LAST** |
 
-```
-now, in parallel:   chat A → P8        chat B → P9        chat C → D0.5d
-after D0.5d merges: chat C → P10
-then:               P7 (the full Planning Workspace rewrite)
-```
+**Recommended order: R10 · Q14 · P5 in parallel now → R9 → R11 → R12 → P7 last.**
+**P7 goes last on purpose:** it rewrites the page the other cards keep touching, and P5 will
+tell us what actually hurts before anybody spends a day on a rewrite.
 
-**Three chats share ONE file (`OperationToOrder.tsx`, 1,548 lines) — so the split is by
-REGION and it is not optional.** P8 stays inside the dialog (line 1359+), P9 inside the rail
-and footer, P10 inside the grid. Git merges different regions cleanly; two chats in one region
-do not. **First to finish merges; the others rebase.** A chat that edits a region another card
-owns has broken the split even if the tests pass.
+### The one thing nobody has done, and it is P5
 
-**QUEUED, NOT NOW** — still valid, still claimable once To Order lands: **C13** · **C14**
-(Orders list) and **D7-Claims**. They collide with nothing here, but Loo's focus is To Order
-and a chat should take an active card first.
+**Twenty-five cards shipped into one chain in three days and NOT ONE PERSON HAS WALKED IT
+END TO END.** Measured 2026-08-05: `warehouse_receipts` **0** · `receiving_events` **0** ·
+`supplier_claims` **0**. Every stage after `Issue PO` has shipped and never run.
 
-**PAGES NO CARD HERE MAY TOUCH, and the reason is on the record:**
+**That is why P5 outranks the two big rewrites.** Q14 and P7 are both guesses until somebody
+has been through the chain once with a real purchase order.
 
-| Page | Why it is closed |
+### Loo's rulings from those two days — FINAL, and no chat re-asks them
+
+Each is recorded in full where it binds; this is the index, not the home.
+
+| Ruling | Home |
 |---|---|
-| **To Order** | Jess FROZE it 2026-08-01 — *"现在批准这一个 checkpoint。不要继续加功能。"* |
-| **Purchase Orders** | Phase 2 FREEZE, 2026-08-03 |
-| **Receiving** | carry-forward `receiving-queue-model-architecture-review` — *"no Purchasing sibling chat may edit that page"* |
+| Category counts print a BARE number — no unit word | P9 card |
+| **The system SUGGESTS, the human TAKES** — no free-typed quantity anywhere | P10 card |
+| Ready stock uses AutoCount's **inline expand**, never a third pane | P10 card |
+| **Layout memory REFUSED** — a grid's shape is the company's; a reload is the reset | D0.5d card |
+| **Content decides column width, not the table.** Trailing whitespace is not waste | P16 card |
+| **`Expand` has exactly ONE job** — the record's line details. Never Remark, Required By or metadata | P16 card |
+| **An inline second line is the ONE exception** to that | P16 card |
+| `Take` → **`Reserve`**; the drawer was right and the new screen moved to it | P13 card |
+| K4's reason list gains a sixth value for a To Order take | P13 card · migration 0322 |
+| **多行** — Create Purchase takes many lines | P19 card |
+| `Add line` / `Remove` — and the Sales Portal's divergence is a CHOSEN cost | COPY-STANDARD · carry-forward |
+| Proceed date lives on the GROUP HEADER, and the day-count appears **only once the date has passed** | P18 card |
+| The grid carries **column separators** — ruled from two photographs of the live page | P17 card · `01-design-tokens` §5.1 |
+| **`Confirm ready date` moves to Purchase Orders** — queue and door in one place | `PURCHASING-WORKING-FLOW` head |
+| Claims: **one claim, one outcome (option A)** + a split button + the scorecard counts PO LINES + `Cancel PO` becomes `Cancel Outstanding` | R9 card |
+| C14: delete the six LOGISTICS zero rows, **keep `Khor Yee`** — a person is not a statistic | C14 card |
 
-D0.5d is additive-only **because** two of those three render through `DataTable` today. That is
-not caution; it is the only way a kit card can run while a page is frozen.
+### Traps this programme paid for, in these two days alone
+
+- **The browser measures fine — five cards wrongly reported it broken.** `preview_start` →
+  `resize_window` → measure. Screenshots additionally need the pane displayed, which is a
+  different thing. Full rule in `docs/HOW-TO-RUN-A-CHAT.md`.
+- **A clean rebase can silently delete another lane's records.** P18 hit it; git reported no
+  conflict. Always run `git diff origin/main -- docs/ | grep '^-'` afterwards.
+- **Edits landing in the main checkout instead of the worktree** make `tsc` measure unchanged
+  code and come back green. `git diff --name-only` returning empty is the tell.
+- **Two chats built P10 at the same time.** The second detected it, compared both, found its
+  own version carried a real bug, and closed its own PR. **One card, one chat, always.**
+- **A card's own measurements go stale in days.** C14's numbers were 24 hours old and wrong
+  in three places; C13's were a day old and the live reading had changed overnight.
+  **Re-measure before building, every time.**
+
+> *(The 2026-08-04 To Order active set that stood here is gone, not archived — it named cards that all shipped. One concern, one file.)*
+
+**WHICH PAGES ARE OPEN — corrected 2026-08-05. Two of the three closures below have been
+lifted, and a chat reading the old text would refuse work that is now wanted.**
+
+| Page | State |
+|---|---|
+| **To Order** | ✅ **OPEN.** Jess's 2026-08-01 freeze was lifted by Loo on 2026-08-04. Twelve cards shipped through it since (P8–P19). The frozen LAYOUT still stands — cards add to it and redesign nothing without his approval |
+| **Purchase Orders** | ✅ **OPEN.** The 2026-08-03 Phase 2 freeze was lifted the same day; Q1–Q13 shipped through it |
+| **Claims** | ✅ **OPEN.** Its own plan chat wrote R9–R12 from Loo's rulings |
+| **Receiving** | ⛔ **STILL CLOSED.** Carry-forward `receiving-queue-model-architecture-review` — *"no Purchasing sibling chat may edit that page."* Jess ruled the queue model is reviewed in the RECEIVING chat, after Purchase Orders is complete. **This is the only closure that survives** |
+
+**What a freeze meant here, since it was misread twice.** Both freezes stopped
+*rebuild-by-reflex* after five layout rewrites in one sitting — they never stopped completion,
+and **quoting a frozen document as the reason to refuse a design is the failure CLAUDE.md's
+first rule exists to stop.** Study, challenge and propose are required on every page; the one
+prohibition is BUILDING a redesign before Loo approves it.
+
+D0.5d was additive-only because live pages render through `DataTable`, and that reason stands
+whether or not a page is frozen: an optional prop cannot reach a page that did not ask for it.
 
 **Within line ⑥ the old rule still holds: one card at a time.** C11 · C13 · C14 all edit the
 Orders list — never two at once, and never alongside a T-card, a J-card or D6.
@@ -201,7 +255,7 @@ prefix is cosmetic, and renaming either one would make a filename disagree with 
 | ① Delivery | `docs/delivery-execution-queue.md` | T1-T11 | ✅ **LINE COMPLETE** — T1-T11 shipped |
 | ② Order Journey | `docs/order-journey-execution-queue.md` | J1-J3 | ✅ **LINE COMPLETE** — J1 #385 · J2 #389 · J3 #394 |
 | ③ Service Case wizard | `docs/service-case-execution-queue.md` | S1-S6 | ✅ **LINE COMPLETE** — S1 #397 · S2 #410 · S3 #431 · S4 #449 · S5 #474 |
-| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R8 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · R6 ✅ #490 · **R8 ✅ #499** (the banned-verb sweep) — **R7 ✅ #515** — **RE-CUT 2026-07-29 (Loo) to the Receiving design, Phase 1** (docs + architecture, no migration). **It is no longer GRN duty auto-assign — that rotation is still REQUIRED and its home is the Administration / Work Assignment module, never R7** |
+| ④ Receiving & Supplier Claim | `docs/receiving-claim-execution-queue.md` | R1-R10 | R1 ✅ #401 · R2 ✅ #412 · R3 ✅ #428 · R4 ✅ #454 · R5 ✅ #475 · R6 ✅ #490 · **R8 ✅ #499** (the banned-verb sweep) — **R7 ✅ #515** — **RE-CUT 2026-07-29 (Loo) to the Receiving design, Phase 1** (docs + architecture, no migration). **It is no longer GRN duty auto-assign — that rotation is still REQUIRED and its home is the Administration / Work Assignment module, never R7** · **R9 ⬜ one claim, one outcome + a split BUTTON** (Loo 2026-08-05, option A — AutoCount is already A; R5 must count problem PO **LINES** not claim documents; `Cancel PO` → `Cancel Outstanding`, which **overrides §9 of the working flow**) · **R10 ✅ [#628](https://github.com/wenwei4046/Carres-Portal-v2/pull/628) — §9 rewritten against the code** (DOCS ONLY, one file, no migration: the 4-rung ladder published as an ORDER with each rung's reason · the clamp and its `Pending delivery` word · the real To Order supply test · the register's SECOND ladder documented beside it rather than merged. **Two of the card's own claims changed once the code was read, which is the point of the card**: `poReceivingProgress` returns one state per **SET of lines handed to it**, not per PO — a live caller hands it exactly ONE — and **`required_qty` is not a column and never was**, it greps to **zero** repo-wide, so the retired formula named nothing on its left-hand side) · **THE THREE CONSEQUENCES — the frame R9 · R11 · R12 sit inside, frozen by Loo 2026-08-05.** A Resolution causes **Inventory + Finance + DEMAND**, and the third had to be named because `supplier_claim_close` (0291:389-460) writes only `supplier_claims` · `po_history` · `audit_log` and touches **no `purchase_order_lines` column and no PO status** — so today whether a customer's goods return to the buying plan is an **ACCIDENT of state** (written off after receiving → returns; never arrived → does not). **`Accept As-Is` may NOT be hard-coded to no financial consequence** — the discount settlement is the commonest one in furniture. · **R11 ⬜ the Inventory consequence — WIRING, not building**: R4/0299 already ships three of the four stock outcomes under names matching Loo's table one for one (`returned_to_supplier` · `written_off` · `back_to_stock`), `Replace` is the receive engine, and `Repair`/`Refund`/`Cancel Outstanding` move no stock at all · **R12 ⬜ the money on a claim + the Finance queue** — `supplier_claims` has **28 columns and NOT ONE is money** (measured 2026-08-05); a Finance Action completes on an **EXTERNAL EVIDENCE reference** (the supplier's CN/DN number), never a tick-box, which is why §8's no-self-declaration rule does not kill the queue. **2990s is the worked example of the failure**: its `purchase_returns.credit_note_ref` has exactly two readers in that whole repo — a PDF and a detail page. Operations never sees AP; Finance never sees photos |
 | ⑤ Ready Stock | `docs/ready-stock-execution-queue.md` | K0-K5 | ✅ **LINE COMPLETE** — K0 #376 · K1 #400 · K2 #409 · K3 #424 · K4 #434 · K5 #451 |
 | ⑥ Portal Core | `docs/portal-core-execution-queue.md` | C1-C10 + C8b + **C11 · C12** | **C1 ✅ #461 · C2 ✅ #466 · C3 ✅ #479 · C5 ✅ #447 · C6 ✅ #486 · C7 ✅ #489 · C8 ✅ #493 (0304) · C8b ✅ #497 (0305) · C9 ✅ #472 · C10 ✅ #471** — **C4 RETIRED 2026-07-28 and re-cut as C11 + C12** (PR #484 stays open, unmerged: R8 shipped part of it, P1 deleted a file it edits, and Loo's money ruling made its own fix wrong). **C11** = a money figure is the money owed · **C12** = the last `Chase` leaves the portal |
 | ⑦ Purchasing | `docs/purchasing-execution-queue.md` | P1-P5 + **P6 · P7** | **P1 ✅ #488** (0303 — the numbers became settings) · **P2 ✅ #492 + #494 + #495** — the click law is true on all three Purchasing lists (To Order · Claims · Receiving) · **P3 ✅ #506** (0306 — the two supplier calls, and a balance date enters Delay planning too) · **P4 ✅ #513** (0307 — where the goods go; **DATABASE half only, FROZEN**; the application-code half is its own card). **The PURCHASE ORDER LIFECYCLE was redesigned and frozen 2026-07-29, then SIMPLIFIED on 2026-07-30 (the Purchasing clean restart)** — **`Draft PO` is permanently removed**, `Issue PO` is the only business action creating an official PO, there is no `Prepare PO` stage and no stored work-in-progress object, Operation Status and Supplier Status stay two axes, and the information architecture of To Order is frozen in **[`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md)** (six regions, four model rules). **P6 ✅ the terminology freeze (2026-07-29, docs only), amended 2026-07-30**: `Send PO` is RETIRED along with the verb `Send`, and so are `Prepare PO` and `Draft PO`; the five Operation Status labels are canonical in `docs/COPY-STANDARD.md`; the surviving facts are `Purchasing on Hold` / `On hold until {date}` · `Supplier not assigned` · `Set a number`. **The portal-wide verb dictionary went 6 → 7 (`Prepare`) and back to 6** when its only object was removed. **P8 ✅ #584** (migration **0320** — a demand survives being part satisfied; `issued_qty` moves only through a door and `remaining_qty` is GENERATED, so *"still to buy"* stops meaning *"has no purchase order"*. **Half the card was already shipped by #581/0319 when it was written**, so the create path was verified rather than rebuilt. **Two findings reported, not fixed: a ready-stock demand for a SOFA projects as 1** whatever quantity was typed — the frozen sofa grain, a business question — and **nobody can cancel a demand at all**: the RPC exists, there is no route and no button, and a route with no caller is what C1 deleted as a bypass). **P7 (To Order becomes the Planning Workspace, carrying the measured gaps M1 · M2) is the next card** — after P9 · P10 · D0.5d. **The two Purchasing documents are LAYERS, not versions**: the workflow file owns business rules and workflow boundaries, the information model owns regions and the facts they carry, and a rule has one canonical home and is only referenced in the other |
@@ -498,8 +552,10 @@ Purchasing          ← ④ R-cards + ⑦ P-cards. Tabs: To Order · Purchase Or
                        warehouse staff land on it through their own login (R6).
                        FIVE TABS, frozen — To Order stores no work-in-progress object,
                        not as a sixth tab (Loo 2026-07-29). Which action sits on
-                       which tab is the deadline-anchor rule: customer-anchored
-                       → To Order, goods-anchored → Receiving
+                       which tab is the ROLE-ANCHOR rule (Loo, 2026-08-05, card
+                       Q12): asking the supplier → the buyer's tabs, handling
+                       the goods → Receiving. The deadline-anchor rule it
+                       replaced is DELETED, not superseded
 Delivery            ← ✅ LIVE (① T11, PR #425) — the 3-pane module page; reads only,
                        every write hands back to the order drawer
 Stock               ← ⑤ K0 merges On Hand + Movements into ONE door with tabs

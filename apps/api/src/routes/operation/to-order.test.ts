@@ -2034,3 +2034,56 @@ describe("GET …/to-order/demand/pick-items — the picker's own read (P15)", (
     expect((body.items as { free: number }[]).every((i) => i.free === 0)).toBe(true);
   });
 });
+
+/**
+ * P18 — THE ORDER'S PROCEED DATE ON THE WIRE (Loo, 2026-08-04 / 2026-08-05).
+ *
+ * TWO tests, and they cannot replace each other. The BEHAVIOUR test proves the
+ * mapping from the order row to the wire; it CANNOT prove the column is asked
+ * for, because `makeSb` returns its fixture whatever the `select` string says —
+ * so a route that never named `proceed_date` would pass it. The SOURCE SCAN is
+ * the half that holds PostgREST: an unnamed column comes back `undefined` in
+ * production while every mock in this file stays green.
+ */
+describe("P18 · the proceed date rides the To Order wire", () => {
+  it("carries the order's proceed date onto its row, sliced to a bare day", () => {
+    const t = TABLES();
+    // A real production shape, measured 2026-08-05: a timestamp-ish value must
+    // reach the wire as `YYYY-MM-DD`, because the header compares it to `today`
+    // as a STRING.
+    (t.orders.data as Record<string, unknown>[])[0]!.proceed_date = "2026-07-21";
+    (t.orders.data as Record<string, unknown>[])[1]!.proceed_date = null;
+    return (async () => {
+      const sb = makeSb(t);
+      vi.mocked(userClient).mockReturnValue(sb as never);
+      const res = await get();
+      expect(res.status).toBe(200);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const body = (await res.json()) as any;
+      const rows = body.proposals[0].rows as { so: number; proceedDate: string | null }[];
+      const bySo = new Map(rows.map((r) => [r.so, r.proceedDate]));
+      expect(bySo.get(1207)).toBe("2026-07-21");
+      // An order with no plan says nothing rather than borrowing its neighbour's.
+      expect(bySo.get(1204)).toBeNull();
+    })();
+  });
+
+  it("the order reads NAME the column — the mock cannot prove this, PostgREST needs it", () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "to-order.ts"),
+      "utf8",
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+    // Every `.from("orders").select(...)` in this file must ask for it. There
+    // are TWO: the demand read, and the ordered/receipt read-back — and the
+    // second is not optional, because an order whose every line is bought has no
+    // demand rows left, so its group is receipts alone.
+    const selects = [
+      ...src.matchAll(/\.from\(\s*"orders"\s*\)\s*\n?\s*\.select\(\s*([\s\S]*?)\)\s*\n?\s*\./g),
+    ].map((m) => m[1]!);
+    expect(selects).toHaveLength(2);
+    for (const s of selects) expect(s).toContain("proceed_date");
+  });
+});

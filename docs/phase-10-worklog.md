@@ -6,6 +6,427 @@
 
 ---
 
+**2026-08-05 · Portal Core C14 — nothing on the Orders list says the same thing twice** (PR [#627](https://github.com/wenwei4046/Carres-Portal-v2/pull/627) merge `8a9cf936`, **no migration · no `apps/api` diff · no new word**, web `index-DisscM1J.js` — DEPLOYED, all four canonicals on the first poll, live md5 == local build, `SERVICE_ROLE` 0)
+
+**Re-measuring first is the entire entry.** The card was written 2026-08-04 and C13, P16, P17 and C11 all changed this page after it. Two of its stated facts were wrong, and one of them would have destroyed working filters.
+
+### What the card said, and what production actually said
+
+| Fact | Card | **Measured 2026-08-05, 1440×900, live data** |
+|---|---|---|
+| table width | 840px | **1012px** |
+| clipped cells | 30 / 301 | **92 / 300** — Deadline 30 · Delivery 30 · Actions 30 · Customer 2 |
+| Delivery ≡ Actions | 31 / 31 | **30 / 30 data rows** (the 31st is the `Loading more…` sentinel) |
+| `Status` = `To book` | 30 / 31 | **30 / 31** ✓ |
+| vertical above row 1 | 219px | **219px** ✓ |
+| toolbar PIC row | 37px | **37px** ✓ |
+| facet rows showing 0 | 7 | **7** ✓ (LOGISTICS 6 + TEAM 1) |
+| facet groups with no rows | 2 | **0 — the card was wrong** |
+
+Measurement method matters here: `truncate` clamps `scrollWidth` to `clientWidth`, so measuring the clipped BOX just reports the box back. Every width below is canvas text metrics taken against the app's own computed styles on the deployed page.
+
+**`CATEGORY` and `FIX DATA` are not empty — they start COLLAPSED** (`collapsedGroups` initial state) and hold six live filters: Mattress 17 · Bedframe 11 · Pillow 2 · M.P 3 · No region 5 · No PO 1. Building item 3 as written would have deleted six working filters. Neither group is touched.
+
+**Deadline was the loudest silent failure and no card had noticed it.** The overdue pill plus `Wed, 22 Jul 26` needs 147px and the column had 119, so **all 30 rows were clipping the customer's own promised date** — at the CELL level, which is why a leaf-only scan (including the card's) never saw it.
+
+The card's own headline stands and is worse than it said: **the width arithmetic in this file's column comments is against "~1448px" and the real table is 1012px**, 43% too generous. That is why C3's *"the visible half is the half that acts"* shipped and the cells kept truncating anyway.
+
+### What shipped
+
+**① The `Delivery` cell loses the sentence `Actions` already carries.** It printed `NETS — confirm delivery date` while the cell one column over printed `Call NETS — confirm delivery date` — the same fact on 30 of 30 rows, and **both cells truncated carrying it** (171px of text in 129px; 191px in 114px). The duplicate was paid for twice and legible neither time. C1 was right that a gap needs a FACT rather than the banned `need booking`; the fact now has ONE home — `deliveryDateGapFact` is untouched and still called by the drawer badge, where no Actions column sits beside it.
+
+**② The toolbar's PIC row goes, and `StaffChip` with it.** It shipped 2026-07-18 as a second door onto the same `staffFilter` the rail's TEAM rows drive ("click either side"). Measured, the two read the same list — toolbar `Everyone 28 · SH 11 · YJ 16 · No PIC 1` against rail `Shasha 11 · Yu Jun · PO duty 16 · Khor Yee · pending 0 · No PIC 1` — and the rail is the richer of the two (presence dots, PO-duty badge, pending roster row, none of which fit on a chip). `StaffChip` was deleted rather than left behind: a component with no caller is how the next chat re-adds the row believing it was always there.
+
+**③ A LOGISTICS row counting zero is not rendered — and this OVERRODE A WRITTEN RULING, so it went to Loo.** Line 3362 carried Jess's 2026-07-19 rule: *"here EVERY company is an option (0-count included, Jess 2026-07-19) so the whole fleet is filterable."* Measured live: 8 carriers, 2 with orders (NETS 8 · AL 6), **six at zero, and clicking `EU` answers `No orders in this tab.`** A filter whose only possible result is a blank table is not a filter, and P2/#494 already made *no reachable click can blank the list* law on the Purchasing lists; the fleet stays reachable where a carrier is actually CHOSEN, in the bulk bar's LOGISTICS ⋮ picker.
+
+He ruled **LOGISTICS only**. **`Khor Yee · pending 0` STAYS** — the TEAM roster row is a person, not a filter statistic, and hiding a colleague until she has work is a different fact from hiding an empty filter. It is the one zero-count row still on the rail.
+
+The counts are over `liveScope`, not the current view, so an ACTIVE carrier row can never vanish under the operator, and `logisticEntries` still lists every carrier at its true count — the data stays faithful and the VIEW decides what is worth a row.
+
+**④ `Overdue` has ONE home: the QUEUES row.** Both renders wrote the same `dueFilter`, so this was one filter drawn twice, not two filters. The DEADLINE band's other three rungs are all FUTURE windows; a breach is not a window, and reading it as rung 0 of a countdown is what made it a duplicate. QUEUES is also where it is already loudest (danger tone, top row, a tooltip naming what to do) and QUEUES hides its row at zero while the band renders its pills always. `DUE_BUCKETS` and `dueBucketOf` are unchanged — the classifier must still return `Overdue` or the QUEUES row would have nothing to count.
+
+**⑤ FOLDED IN — C11's leftover.** The Owing facet total was the portal's **last** hand-built money string, so the Orders rail read `RM 74,783` while the Payments desk read `RM 74,783.00` for the identical figure. Now `fmtMoney(owing.rm)`. **C11's scan is not widened; it gains one rule about the SHAPE** — no `` `RM ${…}` `` anywhere in the lane — because **a blanket `Math.round` ban was not available**: line 438 counts DAYS with it (`Math.round((d - today) / 86_400_000)`) and must keep it. That is exactly why C11 left this line alone and said so.
+
+### Widths — the whole table re-tabulated from measurement
+
+The 8 data columns share 94% of 1012px = **951px** (`colScale = 94 / Σw`, so a column only ever grows at another's expense).
+
+| col | w | px | need | |
+|---|---|---|---|---|
+| Status | 14 → **12.5** | 134 | 133 | ✓ |
+| Order | 9 → **7** | 75 | 74 | ✓ |
+| Customer | 11 → **11.5** | 123 | 185 | ✗ 2 rows |
+| Deadline | 11 → **14** | 150 | 147 | ✓ |
+| Stock | 9 → **5** | 53 | 50 | ✓ |
+| Delivery | 13 → **14** | 150 | 147 | ✓ |
+| PIC | 5 → **5.5** | 59 | 58 | ✓ |
+| Actions | 16 → **19.5** | 208 | **249** | ✗ 30 rows |
+
+**`Delivery` does NOT narrow, and the card expected it to.** Removing the sentence leaves the carrier name at 46px — but the widest thing the column can now hold is a DATE, and a date is what the column is for: `logistics said Mon, 20 Jul` is 135px + 12 padding = **147px** (confirmed `Mon, 20 Jul · 12pm–3pm` is 129px; the slot vocabulary is the bounded `DELIVERY_TIME_SLOTS`). Neither date line carries `truncate`, so under-sizing this column does not ellipsize — it **overflows into PIC**. Live exposure is zero today (0 of 65 orders carry a provisional or confirmed booking), which is precisely why it has to be sized off the reachable string rather than off today's rows.
+
+### Verified on production, 1440×900, before and after
+
+- clipped cells **92 → 32 of 300** — Deadline **30 → 0**, Delivery **30 → 0**, Actions 30, Customer 2
+- Delivery repeating Actions **30/30 → 0/30**; the verb-less gap fact greps **0** on the rendered page while the verb-led line greps **30**
+- exactly ONE `Overdue` button; DEADLINE reads `Due ≤3d 2 · This week 2 · Next week 3`
+- LOGISTICS reads `NETS 8 · AL 6`; **`Khor Yee · pending 0` is the only zero row left**, as ruled
+- `Everyone` chips **0**; all six STAGE tabs intact, including `Proceed 0 · Customer confirmed 0 · Delivered 0`
+- Owing **`RM 74,783.00`**, and the Payments desk reads **`RM 74,783.00`** for the same figure; `RM RM` **0** on both pages
+- rows still **40px**, page horizontal scroll **0**, first data row **219 → 174px**, listing region **666 → 711px**, fully visible rows **15 → 16**
+
+### Reported, not softened — two Done-when lines are arithmetically unreachable
+
+**Zero truncated cells.** Total measured need is **1001px against 951px available**. Worse, **my own first pass under-measured `Actions`**: I sized it to 207 (text + cell padding) and forgot the PILL's 22px internal padding, the 6px gap and the 16px `+N`. The true need is **249px**.
+
+The distribution is what settles it: **all 30 rows need exactly 249px**, and every row carries a `+N`. So `Actions` at 208.5 clips all 30, and 235 or 241 or 246 would *also* clip all 30 — **every intermediate width buys zero fewer clips.** That is why `PIC`'s genuine 30.8px of slack (28px of ink in 58.8px) was measured and then deliberately **not** taken: it would have churned the layout for nothing. Reaching 249 means starving `customer` below its pre-C14 width, and the residual is C3's already-documented accepted truncation — verb and party visible, the full text in the `title` and in the drawer.
+
+**Visible rows ≥ 19.** At 900px: top bar 45 + stage tabs 38 + table header 40 + footer 36 = 159, leaving **741px = 18.5 rows with every gap deleted.** Getting to 19 means deleting a stage-tab row or C13's footer sentence, and this card may touch neither.
+
+### Gates
+
+- web tsc **0** · build clean
+- page suite **142 → 146** · money scan **7 → 9**
+- full web suite **16 failed / 2580 passed (2596)** against a **detached control worktree at `origin/main` measuring 16 / 2574 (2590)** — the same four §17.7 files, **zero new, +6 tests**
+- **check-design 8331 against the control's 8340** — every category equal or LOWER (A −2 · E −1 · O −4 · P −1 · Q −1), nothing up
+- **Five negative controls, each a real edit verified on disk, firing 2 · 1 · 3 · 1 · 1.** Control 1's first attempt broke the parse and failed the whole file — **a control that fails to compile is not a control, it is a compile error**; it was rewritten as valid JSX and re-run.
+- Deploy markers, both directions on downloaded bundles: `Actions",w:19.5` **0 → 1** / `Actions",w:16` **1 → 0** · `Delivery",w:14` **0 → 1** / `Delivery",w:13` **1 → 0** · `Deadline",w:14` **0 → 1** / `Deadline",w:11` **1 → 0**. **The control is the sharp part: `confirm delivery date` greps 4 in BOTH**, because the string survives the card. `Everyone` was tried as a marker and rejected — it greps 2 in the live bundle.
+- No Worker deploy owed, **measured against the live Worker's own source commit read from `wrangler`, never from `CLAUDE.md`**: `0a7949bd` was created 2026-08-05T07:01:20Z and the newest api-relevant commit on main is P19's `bef687a5` at 06:57:53Z — before it. `/health` **200**.
+
+### Also reported
+
+- **No photograph was taken.** `computer{action:"screenshot"}` still times out in this session; every figure above is a real browser layout measurement, not a picture.
+- The worklog index number collided — Q13 merged mid-build and took ⑥, so this entry is ⑨. (⑧ and ③ each appear twice from earlier parallel lanes; not this card's to fix.)
+
+---
+
+**2026-08-05 · Purchasing Q13 follow-up — `sono` 94 → 95 and `items` 135 → 136** (PR #626 merge `963a37f1`, **no migration · no api · no Worker deploy owed**, web `index-Dg3pY7uT.js` — DEPLOYED, live md5 == the build from the main tip, `SERVICE_ROLE` 0)
+
+Loo ruled the two columns Q13 reported and deliberately left alone: *"Yes — widen `sono` 94→95 and `items` 135→136 as well. Same defect, same reasoning. Re-derive the min-width from the nine, as you did for supplier."*
+
+## The three numbers, and the third is derived
+
+`sono` **94 → 95** · `items` **135 → 136** · min-width **1206 → 1208** = `ceil(1171 / 0.97)`, because the kit's expand-control column takes 3% of the table.
+
+**Holding 1206 would have taken TWO pixels from that control column — measured live at 1280 before building**, which is the same trap Q13 measured at one pixel and the reason its derived test exists:
+
+| probe | ctl column | ctl clip | business clips |
+|---|---:|---:|---:|
+| `94`/`135`/`1206` — before | 35 | 7px × 21 | 3 |
+| `95`/`136`/`1206` — the half-fix | **33** | **9px** × 21 | 0 |
+| `95`/`136`/`1208` — what shipped | 35 | 7px × 21 | **0** |
+
+Every business column still renders at its ruled width in the middle row, so the damage is invisible to the assertion that pins them.
+
+## Verified on production at 1280 · 1440 · 1920 — identical at all three
+
+`min-w-[1208px]`, table 1206, columns `35 · 96 · 88 · 83 · 95 · 136 · 135 · 140 · 206 · 192`, rows **40px**, page horizontal scroll **0**, and the only clips left are P16's `ctl 7px × 21`. The three strings read in full on live rows: `SO-1206 +4` and `+3` **cw 78 · sw 78 · clipped false**, `Booqit 2B(LHF) · +1` **cw 119 · sw 119 · clipped false**, and Q13's `Nice Future` still **cw 87 · sw 87 · clipped false** on 4 rows.
+
+## A measurement was thrown away before it was believed
+
+The first reading on the deployed page returned **zero clips of any kind, 25px rows and a 1229px table**. It was wrong: the computed font was **Times New Roman** — the app's stylesheet had not applied in the pane, so nothing could truncate because nothing was styled. The CSS was fetched directly to prove the file was fine (200, 234,577 bytes, carrying the `h-10` rule), and the measurement helper now **refuses to report unless the computed font is Inter**. Every number above was taken after that guard passed. **An unstyled page reports a clean grid** — and it reports it as a pass.
+
+## A correction to another lane's record, with the reason it happened
+
+`ed09e54d` ("docs: P17 — correct the clip count, and close it") stated *"Closed by Q13 / PR #622 … Re-measured live: zero 1px clips remain."* **Three remained**, live on the deployed bundle, and the cause is method rather than carelessness:
+
+```
+scan `td, th`                →  ctl 7px × 21 only        i.e. ZERO 1px clips
+scan `td, th, td *, th *`    →  + sono 1px × 2, items 1px × 1
+```
+
+All three sit on nested `truncate` spans. **This is P16's own documented trap hit a second time** — *"the ellipsis lives on nested `truncate` spans and a `td`-only scan is exactly how the first pass missed the `PO No.` clip."* The doc is corrected in place and the rule written next to it: a clip scan on this grid must include `td *, th *`.
+
+## Gates and controls
+
+web tsc **0** · build clean · page suite **101/101** · full web suite **16 failed / 2574 passed (2590)** against a **DETACHED CONTROL WORKTREE at `origin/main`** measuring the **identical 16 / 2574 (2590)** — zero new, and no test added or removed: three expectations moved, which is the change. **check-design 8340, identical to the control.**
+
+Four negative controls, each a real edit verified on disk first: `sono` back to 94 → **2** · `items` back to 135 → **2** · min-width back to 1206 → **2** (`expected 1206 to be 1208`) · **`sono` back to 94 WITH its pinned expectation updated → 1** (`expected 1208 to be 1207`), the derived guard alone.
+
+**Both directions on DOWNLOADED bundles**: `min-w-[1208px]` **0 → 1** · `min-w-[1206px]` **1 → 0** · `"95px"` **0 → 1** · `"136px"` **0 → 1** · `"94px"` **1 → 0**; controls in BOTH `po-listing` 1/1 and `"88px"` 3/3 — Q13's own number, untouched.
+
+**No Worker deploy owed, and the baseline in §17.1 had gone stale AGAIN.** Measured against `d460d899` the api diff read as +19 lines of `to-order.ts` and a deploy would have looked owed; `wrangler deployments list` says the live Worker is **`0a7949bd`, deployed 07:01 today** — P19's — and from P19's own merge `bef687a5` the `apps/api`, `supabase/migrations` and `packages/shared` diffs to `origin/main` are all EMPTY. `/health` **200**. **The live Worker's source commit is read from `wrangler`, never from a document** — the second time in two cards that reading the table would have produced a wrong answer.
+
+**Reported, not fixed**: at 1920 the listing region gains **1px** of horizontal scroll (region 1207, wrapper 1206 → 1208) and P16's expand-button clip goes 6px → 7px, matching 1280 and 1440 — the honest price of content-sized columns, since the control column is the only elastic track, and the alternative is shaving a business column, which the ruling forbids; page-level scroll stays 0 everywhere · `items` still truncates on a long enough item list, as it always did, and carries a `title` · **a screenshot still could not be taken**: `preview_start` → `resize_window` → measure is the documented order, it was followed, it produces real layout numbers, and `computer{action:"screenshot"}` still times out after exactly that order. **Measuring and photographing are two different capabilities and only one of them works here.**
+
+---
+
+**2026-08-05 · Purchasing P18 — the order's proceed date joins the group header** (PR #623 merge `398c8fb2`, **no migration**, web `index-i_G0UkdY.js` + Worker `83d339ef` — DEPLOYED)
+
+Loo asked for a **column**. The answer is a group-header line, and the reason is his own ruling of 2026-08-04: *a table's width is not filled by inventing columns, and a fact which is not per-row does not get one.* Proceed date is an ORDER fact — every line under `SO-1209` shares it — so a column would print the same date three times and hold the width forever.
+
+**Nothing new is captured.** `orders.proceed_date` has existed since migration 0165 (Phase 11) and Sales already keys it on the New Sales Order form, labelled `PROCEED DATE · PRODUCTION START`. This card reads a date somebody already types.
+
+## The measurement came first, and it went one step past the card
+
+| | |
+|---|---|
+| `orders.proceed_date` on native orders | **23 of 28 = 82%** — the card's own figure, confirmed exactly |
+| Orders that can actually reach the To Order grid | **22 — and all 22 carry a proceed date** |
+| Waits today | **4 to 15 days** |
+
+The second row is the one the card did not have. The five orders without a proceed date **also have no delivery date**, and `OperationToOrder.tsx:368` already skips a customer order with no date (Jess's rule, ruled three times). So on live data the fact is present on every order-backed group the page can show — which is a stronger argument for putting it on the header than 82% was.
+
+## The one question, asked once, and the answer was a defect fix
+
+The card reserved exactly one decision: *the date alone, or the date plus how long it has waited.* Three options went up **with the live reading attached**, and Loo ruled **C — the count appears only once the date has PASSED**.
+
+That is not a matter of taste, and the option list is what made it visible. Measured on production the same morning, **`SO-1256`'s proceed date was the NEXT day (2026-08-06)**. The card's own sketch — `Proceed 20 Jul (16 days)`, unconditional — would have printed **`(-1 days)`** on the real page on the day it shipped.
+
+`proceedWaitedDays` therefore returns `null` in three cases, and `null` means *print the date alone*:
+
+- no proceed date at all
+- a date still ahead of today
+- **the day itself** — deliberately, because `(0 days)` on the very morning production is due to start would read as a complaint about an order that is perfectly on time
+
+It is a pure function of two ISO strings and takes `today` as an argument rather than reading a clock, so a test can stand on a fixed day, and the page hands it the same `today` the row's `late` flag already uses — one day, one answer, no chance of the header disagreeing with the red date beside it.
+
+## No word was invented, and it was checked rather than assumed
+
+`Proceed date` is already the live spelling in **four** places: the Sales form's `PROCEED DATE · PRODUCTION START`, the order-entry field config (`Proceed date · production start`), the Sales Order Maintenance column (`Proceed Date`) and the ops CSV export header (`Proceed`).
+
+It is deliberately **not** the bare `Proceed`, which `COPY-STANDARD` owns as an order **STATE** (*customer confirmed ETA — ready for PO*). Same word, different fact; a test asserts the two are not equal.
+
+**It is labelled where the delivery date beside it is not, and the asymmetry is the mechanism, not an oversight.** The header carried exactly one bare date before this card. A second bare date would be two unexplained dates in a row — the confusion the card's Done-when forbids by name. The label plus the SHORT spelling (`fmtDateShort`, no weekday, against the delivery date's long `fmtDate`) is what tells them apart, so *"cannot be confused"* is structural rather than hoped for.
+
+**A deliberate departure from the preview Loo picked, recorded rather than slipped in.** That preview read `Proceed date 21 Jul` with no year; what ships is `Proceed date 21 Jul 26`, because `fmt-date.ts` is the ONE place a date spelling may exist and a year-less format would be a second one. More information, one home.
+
+## The field is REQUIRED on the wire, and the compiler earned it
+
+`proceedDate` is a required field on `ToOrderRow` and `ToOrderOrderedRow`, not an optional one. That choice is what made `tsc` name every construction site instead of letting them default to `undefined` silently:
+
+1. a stale sort fixture in `to-order.test.ts` — whose **own comment already records `delivery` and `orderBy` having done exactly this in August 2026**, when the objects were *"`ToOrderRow` in name only"*
+2. the **receipt** row in the api's ordered read-back
+3. a **manual purchase order** with no customer order behind it — `null`, for the same reason its `so`, `customer` and `delivery` are null
+
+**The receipt half is load-bearing, not tidiness.** An order whose every line has been bought has **no demand rows left**, so its group on the grid is made of receipts alone. Carrying the fact on demand rows only would blank the header on exactly the orders a purchaser is checking up on. Both `orders` selects in the route therefore name the column, and a source scan asserts there are exactly two and that both do.
+
+## Two api tests, because one of them structurally cannot fail
+
+The behaviour test proves the mapping from `orders.proceed_date` through to the wire. It **cannot** prove the column is asked for: `makeSb` returns its fixture whatever the `select` string says, so a route that never named `proceed_date` passes it.
+
+The source scan is the half that holds PostgREST — an unnamed column comes back `undefined` in production while every mock in the file stays green. The negative control settles it: dropping `proceed_date` from the receipt select fires **only** the source scan, by name, and the behaviour test stays **green**.
+
+## Widths were measured on the live page BEFORE the code existed
+
+P17's method, and the half jsdom structurally cannot do. The exact element P18 renders was injected into the real production group header and the layout re-measured, at three viewports:
+
+| viewport | columns | table | band | rows | wrapped | truncated | page scroll |
+|---|---|---|---|---|---|---|---|
+| 1024 | `42·32·111·55·155·163·152` **identical** | 710 **identical** | 40 → 40 | 40px | no | 0 | 0 |
+| 1280 | `42·32·111·55·155·163·408` **identical** | 966 **identical** | 40 → 40 | 40px | no | 0 | 0 |
+| 1920 | `42·32·111·55·155·163·1048` **identical** | 1606 **identical** | 40 → 40 | 40px | no | 0 | 0 |
+
+Ink on the header line goes **218.6 → 429.3px** against **694px** available at the tightest viewport (measured sub-pixel with a `Range` against the header's own computed font, 13px/18px Inter).
+
+**The worst case was read out of the database rather than invented — and the invented one erred safe.** A fabricated 33-character customer name gave 813.4px; the real longest name that can reach the grid is `herng bedframe 2` (16 chars, `SO-1256`) — which is *itself* the future-date case, so it prints the short form. Every reachable order was then measured with the `Partly ordered` pill counted in:
+
+```
+SO-1256   652.2 / 694   spare  41.8
+SO-1212   670.1 / 694   spare  23.9   ← tightest
+SO-1216   645.6 / 694   spare  48.4
+SO-1284   558.5 / 694   spare 135.5
+```
+
+**Reported, not softened:** 23.9px makes this the line with the least slack on the page. A longer customer name **truncates rather than wraps** — the name carries `truncate` inside a non-wrapping flex row — so the band stays 40px and nothing clips; but the next word added to this header must be measured first.
+
+## Production verification — both branches of the ruling on one screen
+
+The deployed page, live data, 1920 → 1280 → 1024:
+
+```
+SO-1209 · Steven · Wed, 26 Aug 26 · Proceed date 22 Jul 26 (14 days)
+Ready Stock · Carres Klang
+```
+
+The **14** matches the database exactly (`proceed_date` 2026-07-22 against 2026-08-05). The Ready Stock group shows **nothing** — a manual demand has no order and therefore no plan, which is the card's first Done-when line and its Must-NOT, both on the live screen at once. Columns, table width, bands and row heights all identical to the pre-deploy baseline; header ink 410.1px, line 18px, 0 truncated, page scroll 0.
+
+**Reported: the FUTURE-date branch is NOT observable on production today.** `SO-1256` is fully ordered, so it is not on the grid in any bucket. The case that motivated Loo's ruling is proved by four shared unit tests and a page test asserting no `(-N days)` ever renders — **not** by the live screen.
+
+**Reported: no screenshot was taken.** The Browser pane does not composite in this session — but this is worth recording precisely, because several recent cards logged live measurement as impossible here: **the pane reports 0×0 until `resize_window` is called, and after that call layout is entirely real.** Every width in this entry is a genuine browser layout number.
+
+## Gates
+
+- web tsc **0** · shared tsc **0** · api tsc **2 pre-existing** (`to-order.test.ts` `TS2571` ×2 — proved untouched with `git show HEAD:`, not merely assumed from the document)
+- shared **2141/2141** · api **3 pre-existing** (`supplier/pos` ×2 · `partner/pickups` ×1)
+- full web suite **16 failed / 2563 passed** — exactly §17.7's four documented files, **zero new**
+- the three targeted suites **102 · 87 · 89** (from 90 · 85 · 81)
+- **check-design 8340, identical category for category to `origin/main`**, proved by linting a **detached worktree at main** rather than by quoting a number
+
+## Five negative controls, each a real edit verified on disk, each fired
+
+| control | fires |
+|---|---|
+| delete the header render | **5** |
+| make the count unconditional (undo Loo's ruling) | shared **2** · web **1** |
+| drop `proceed_date` from the receipt select | **1** — the SOURCE SCAN, by name |
+| drop `proceedDate` from the demand mapping | **1** |
+| put it on a row (the exact mistake the Must-NOT forbids) | **3** |
+
+**The control harness itself proved nothing on its first run.** It reported *0 occurrences* because the search strings were typed with LF newlines against CRLF files — the **fifth** time this lane has paid for that trap (`sed` stripping CR, `perl -0pi` silently declining, twice more since). It now converts to the file's own endings, re-reads from disk to confirm the edit landed, and **exits non-zero when it did not** — because a control that did not run is not a control, and a suite that passes after a failed edit is evidence of nothing.
+
+## Deploy
+
+- **Both Pages projects**, `--branch=main`: carres-portal `cc815f7c` + carres-pos `aa8784bf`. **All four canonicals on the FIRST poll.**
+- Live file **byte-identical** to the local build — `cmp` clean, not merely an md5 match (`5c423ee7…`, 4,769,316 bytes). `SERVICE_ROLE` **0**.
+- **THE OBVIOUS MARKER WAS AGAIN THE WRONG ONE, by a wide margin.** `Proceed date` greps **9** in the predecessor `index-DCDgFPBE.js` and 10 here — because the Sales form, the field config, the maintenance column and three validation messages have spelt it that way for months, which is exactly why this card had to invent no word. The clean marker is the words-object assignment **`proceedDate:"Proceed date"`, 0 → 1**. Controls present in BOTH, proving the predecessor was really read rather than 404'd: `po-work-` 1/1 · `Partly ordered` 1/1 · `Ready Stock` 2/2 · `No delivery date` 3/3 — the last three being the header's own existing words, which P18 does not touch. The predecessor was fetched at 4,768,749 bytes, a real bundle rather than the 1.7kB SPA fallback that greps as a clean 0 for everything.
+- **A Worker deploy WAS owed** and needed no import argument: P18 changes `apps/api/src/routes/operation/to-order.ts` directly. Measured against the **live Worker's own source commit read from `wrangler`** — `620bc69a` from `d460d899` (P15's) — the diff carries no migration, and besides P18's own two files only C11's `money-format.ts` + `order-action-words.ts`, whose web half was already live. **That is the documented consequence of measuring against the live Worker rather than your own branch's scope.** Worker `83d339ef` serves **100%**; `/health` **200 `{"ok":true}`**.
+
+## A method failure of my own
+
+The first pass of edits landed in the **main checkout** (`C:\Users\User\OneDrive\Desktop\Carres-Portal v2`) instead of this card's worktree — the paths differ only by the `.claude/worktrees/…` segment. Three typechecks were then run *in the worktree*, came back clean, and **proved nothing at all**, because the tree they ran on did not carry the change.
+
+Caught by `git diff --name-only` printing empty when it should have listed three files. The work was moved across by patch, and the main checkout restored to exactly its prior state: the three tracked files reverted, its three pre-existing untracked files left alone, and all three stashes intact (memory's own rule — a stash there belongs to another chat).
+
+**A green gate is only evidence if you can show the tree it ran on carried the change.** The cheap check is `git diff --numstat` before quoting any gate.
+
+---
+
+
+**2026-08-05 · Purchasing Q13 — the `supplier` column widens 87 → 88** (PR #622 merge `4552d31d`, **no migration · no api · no Worker deploy owed · no new word, column, token or row height**, web `index-DCDgFPBE.js` — DEPLOYED, all four canonicals on the FIRST poll, live md5 == the build from the main tip, `SERVICE_ROLE` 0)
+
+**Loo ruled it from P17's own reported cost**, the day after that card shipped: *Q7 froze WHICH columns and HOW WIDE so that nothing truncates. Holding 87 while it truncates keeps the number and loses the intent.*
+
+## The measurement, reproduced on production before a line was written
+
+At `https://erp.carresofficial.com/operation/procurement`, 21 live POs, table 1205 — a scan over `td, th, td *, th *`:
+
+```
+TOTAL 28 clipped
+  ctl        6px × 21   the expand button — P16's documented clip, NOT this card's
+  supplier   1px ×  4   `Nice Future`            cw 86   sw 87
+  sono       1px ×  2   `SO-1206 +4` · `+3`      cw 77   sw 78
+  items      1px ×  1   `Booqit 2B(LHF) · +1`    cw 118  sw 119
+```
+
+**A LIVE CONTROL proves all seven 1px clips are P17's border, not pre-existing.** Removing every vertical rule as a browser-only style on the deployed page and re-scanning leaves **only the 21 ctl clips**; putting them back returns all seven.
+
+**AND IT CORRECTS P17's OWN REPORT — which is the reason the number was re-measured rather than copied.** P17 recorded the seven as *"`Nice Future` in the 87px `supplier` column"*. **Four are; the other three are in `sono` (94px) and `items` (135px)** — two columns Loo did not name. His reasoning applies to them word for word, and they are still two more of Q7's frozen numbers, so they are REPORTED, not widened: the card's own MUST-NOT says so by name.
+
+## Two numbers, and the second is not optional
+
+`supplier` **87 → 88** (`Nice Future` is 70.7 at 13px Inter + the cell's `px-2` = 86.7 of content; the rule takes 1px of the box, so 87 leaves 86), and the listing's **`min-w-[1205px]` → `min-w-[1206px]`**.
+
+**THAT SECOND NUMBER IS DERIVED, AND LEAVING IT BEHIND WOULD HAVE PAID FOR THE PIXEL OUT OF THE CONTROL COLUMN.** The kit's expand-control column takes 3% of the table, so the nine pixel columns are 97% of it: 1168 → 1169, and 1169 / 0.97 = 1205.15 → 1206. Probed live at 1280, where the min-width is the binding constraint:
+
+| probe | ctl column | ctl clip | supplier clip |
+|---|---:|---:|---:|
+| `87px` / `1205px` — before | 35 | **7px** × 21 | 1px × 4 |
+| `88px` / `1205px` — the tempting half-fix | **34** | **8px** × 21 | 0 |
+| `88px` / `1206px` — what shipped | 35 | **7px** × 21 | 0 |
+
+The middle row fixes `supplier` by making P16's already-clipping expand button one pixel worse — **and every business column still renders at its ruled width, so the damage is invisible to the assertion that pins the widths.** A new test therefore reads both numbers off the rendered DOM and re-derives one from the other; change a width without the min-width, or the min-width without a width, and it fires.
+
+## Verified in a real browser on production at 1280 · 1440 · 1920
+
+`supplier` renders **88** at all three, the other eight exactly Q7's (`96 · 88 · 83 · 94 · 135 · 135 · 140 · 206 · 192`); the **4 × 1px supplier clips are 0**, the 21 unchanged (7px at 1280/1440, 6px at 1920 — P16's, varying with the 3% column's sub-pixel, not with this change), the 3 reported ones remain; rows **40px**, page horizontal scroll **0** everywhere. On a live row `Nice Future` measures **`clientWidth 87 · scrollWidth 87 · clipped false`**, its right border still 1px `rgb(224, 225, 230)` = slate-5, so P17's rule is intact. The register holds two suppliers today — `Nice Future` ×4, `Ohana` ×17.
+
+## Four negative controls, each a real edit verified on disk first
+
+| control | fires |
+|---|---:|
+| `supplier` back to `87px` | 2 |
+| `min-w-[1206px]` back to `1205px` | 2 |
+| `items` 135 → 150, min-width left alone | 2 |
+| `items` 135 → 150 **and its pinned expectation updated with it** | **1** — the derived guard alone |
+
+**The fourth is the one that matters**: it models a chat changing a width on purpose, where no other assertion can see that the min-width was left behind. One control silently declined first because the file is CRLF and a multi-line needle does not match — **the seventh time that trap has been paid for on this lane**; every control was grepped on disk before the suite was trusted.
+
+## Gates, deploy, and a method failure of my own
+
+web tsc **0** · build clean · page suite **100 → 101** · full web suite **16 failed / 2555 passed (2571)** against a **DETACHED CONTROL WORKTREE at `origin/main`** measuring **17 failed / 2553 passed (2570)** — the same four §17.7 files, test for test, so **zero new failures**; the control's extra is the documented full-suite load-flake in this very file, which passes **100/100 in isolation on the control**. **check-design 8340, IDENTICAL category for category to that control.**
+
+**Both directions proved on DOWNLOADED bundles**: `min-w-[1206px]` **0 → 1** · `min-w-[1205px]` **1 → 0** · `"87px"` **1 → 0**; `"88px"` is 2 → 3, so it is NOT a clean marker alone and the removal is. Controls present in BOTH: `po-listing` 1/1 · `"96px"` 1/1, the untouched neighbour width. The predecessor is P17's `index-63l6VIUk.js`, fetched from its OWN deployment URL `ee0c6b7e` (md5 `43c091a9…`) rather than the apex, where a superseded asset returns the 1.7kB SPA fallback that greps as a clean 0 for everything. **Both bundles are EXACTLY 4,768,749 bytes** — same size, different md5, which is the signature of a same-length change (`87`→`88`, `1205`→`1206`).
+
+**No Worker deploy was owed and it was MEASURED against the live Worker's own source commit read from `wrangler deployments list`** — `620bc69a` from `d460d899`, serving 100%. `apps/api` and `supabase/migrations` diffs since it are EMPTY; the `packages/shared` diff is another lane's, and `apps/api` references `fmtMoney` · `money-format` · `orderActionLine` · `collectPillLabel` · `order-action-words` **0 times each**, while the one symbol it does import, `orderActionDone`, is **byte-identical across both commits** (md5 of the extracted function `200f11aa…` on each). `/health` **200 `{"ok":true}`**.
+
+**A NAME COLLISION WITH A PARALLEL LANE, resolved rather than overwritten.** The card was written as **Q12**; the Receiving Boundary Review card took that number on `main` (`3824dc81`) while this one was building. Rebased onto `dd946572`, the doc conflict resolved by keeping BOTH — theirs landed first, so it keeps Q12 and this is **Q13** — and every `card Q12` reference in the source and tests was renumbered with it.
+
+**A METHOD FAILURE OF MY OWN, recorded because it nearly cost another chat's work.** The card's first draft was written into the MAIN REPOSITORY rather than into this worktree — the path omitted the worktree prefix, the exact trap P17's record already carries. The main repo turned out to hold three other modified files (another chat's parked WIP) and to sit on a different commit, so it was reverted with `git checkout --` on **that one file only**, after checking the diff was 72 insertions and **0 deletions** — i.e. that nothing of theirs was inside it.
+
+**Reported, not fixed**: the three remaining 1px clips are Loo's to rule · P16's 21-cell expand-button clip belongs to another card · the old min-width test asserted the same thing twice on consecutive lines and one copy was removed, inside lines this card was already editing · **no photograph was taken** — the Browser pane does not composite in this session, so every figure above is a real browser layout measurement on the live page rather than pixels anyone looked at.
+
+---
+
+**2026-08-05 · Purchasing Q11 — the expand's row ends where its content ends** (PR #614 merge `45adfc68`, **no migration · no api · no new word · nothing on the register touched**, web `index-B9tLrytx.js` — DEPLOYED, all four canonicals on the FIRST poll, live md5 == local build, `SERVICE_ROLE` 0; **no Worker deploy owed and it was measured against the live Worker's own source commit read from `wrangler`**)
+
+**Loo selected the expand on the live page and chose option B — content width, zero dead space — over capping the column.** The card is one grid template and its container, and what shipped is **ONE className**.
+
+## The defect, reproduced on production before anything was touched
+
+`PO-2037` expanded, panel closed, measured in a real browser:
+
+```
+                                  1920                 1280
+the record                     1575px (x 277→1852)     935px
+the Description column         1191px                  551px
+the widest ink in it            66.8px  ("Add a note…")
+dead space, name → Qty     1138–1141px  ON EVERY ONE OF FIVE LINES
+```
+
+`Description` is the one flexible track, and while the box it sits in is as wide as the pane, *take what is left* means *take the pane*. It evicted `Qty`, `Destination` and `Received` to the far right, so **a line was read by crossing the whole screen, once per line.**
+
+## The fix
+
+`w-[calc(100cqi-2rem)]` → **`w-fit max-w-[calc(100cqi-2rem)]`** on the expanded record.
+
+Measured on the DEPLOYED page, same PO:
+
+```
+the record       1575 → 474 at 1920      935 → 474 at 1280
+Description      1191 → 90
+dead space       1138 → 37–40 per line
+column origins   277 · 301 · 373 · 471 · 519 · 687 — identical for the header,
+                 all five lines and TOTAL
+0 clipped elements in the record · page horizontal scroll 0 · scanned rows still 40px
+```
+
+**474 is the record's honest content width, and it is NOT set by the grid — reported rather than filed off.** Probed live, the two DATE fields above the items have a max-content of **474** and the grid **461**, so the record takes the wider of its own children and `Description` ends with 90px for 67px of ink: ~23px of slack. Closing that means sizing the grid independently of the record, which is a second width to keep in step with the first.
+
+## The trap, measured in both directions on the deployed bundle
+
+`width: fit-content` is capped by the AVAILABLE width, and available here is the `<td>`'s — the table's own `min-w-[1205px]`, not the pane. With a fabricated **200-character** description at 1280:
+
+```
+bounded     record  935   Received ends 1212   visible edge 1217   ON SCREEN
+                          truncates: scrollWidth 1572 vs clientWidth 551, title intact
+unbounded   record 1171   Received ends 1448   231px past the edge  OFF SCREEN
+                          ← Q10's bug re-opened, the one Loo reported as
+                            "i cant see this listing at all"
+```
+
+At 1920 the same 200 characters give a record of **1563** against a 1565 ceiling, `Received` ending at 1840 inside the visible 1857, still ONE line at 46px, page scroll 0. **Content width when the content is short; the pane's width when it is long; never more.**
+
+## `ITEM_GRID` is untouched, and that is a measurement rather than a shortcut
+
+**The card's first named negative control — *"put `minmax(0,1fr)` back"* — could not be run, because the token never left. That is reported rather than dressed up.** Probed live with the record already `w-fit`, swapping `minmax(0,1fr)` for `minmax(0,auto)` gives the **same 474px record and the same six column origins in all three grids**. Identical.
+
+And the `1fr` is what keeps the three grids ALIGNED. The header, every line and `TOTAL` are three SEPARATE grids of one width; a flexible track absorbs the same slack in each, so they cannot fall out of line. **A `max-content` track would size each grid to its OWN longest string and stagger them** — which is the third control below, and it fires.
+
+## Gates, and the controls
+
+web tsc **0** · build clean · page suite **98 → 100** · full web suite **16 failed / 2504 passed — exactly §17.7's four documented files, ZERO new** (`OperationPurchaseOrders` passed 100/100 in the full run as well as in isolation, where C13 measured it flaky on main) · **check-design 8340, identical category for category to `origin/main`, proved by linting a DETACHED WORKTREE at main** — never a stash (memory's own rule: a pop grabs another chat's parked WIP).
+
+| negative control (each a real edit, verified applied) | fires |
+|---|---:|
+| drop `w-fit` (back to the fixed width) | **2** |
+| drop the `max-w` bound | **2** |
+| give the `TOTAL` row its own template | **1** |
+
+**The MUST-NOT was proved held rather than assumed**: after the deploy the register's nine columns still measure `96 · 87 · 83 · 94 · 135 · 135 · 140 · 206 · 192` — Q7's frozen minimums — the table 1203px, rows 40px.
+
+## Deployment
+
+- **Pages: DEPLOYED to both projects** (`5bb00ebd` carres-portal + `791d429d` carres-pos, both `--branch=main`), **all four canonicals on the FIRST poll**, live file md5-identical to the local build (`b9e5f4c1…`).
+- **Both directions proved on DOWNLOADED bundles with two controls, and the byte count is the sharpest part**: `w-fit max-w-[calc(100cqi-2rem)]` **0 → 1** and `"w-[calc(100cqi-2rem)]"` **1 → 0**, while `po-work-` and `100cqi` are **1 in BOTH** — the markers proving the predecessor `index-BO-R9Kej.js` was really read (fetched from Q10's OWN deployment URL `e6c8e4c6`, 4,768,607 bytes — a real bundle, not the 1.7kB SPA fallback that greps as a clean 0 for everything). The new bundle is **4,768,617 bytes, exactly ten more** — the ten characters `w-fit max-`. That also proves the toolchain reproduces production: two commits of `_headers` and shared TEST files landed on main since Q10's build and changed the bundle by nothing.
+- **Worker: NOT owed, measured against the LIVE WORKER'S OWN SOURCE COMMIT read from `wrangler deployments list`** (`620bc69a` from `d460d899`, P15's — the same figure Q10 corrected §17.1 to). `apps/api` and `supabase/migrations` are untouched since it, and the only `packages/shared` diff is three `*.test.ts` files, which no Worker bundles. `/health` **200 `{"ok":true}`**.
+
+## Reported, not fixed
+
+1. **The ~23px of slack** — the record's width is the DATES row's, not the grid's (474 vs 461).
+2. **The Browser pane does not composite in this session** (`screenshot` fails with *"the Browser pane is not displayed"*, the same limitation C13 recorded), so the expand was opened with `element.click()` rather than a synthetic pointer event. **Every width in this entry is a real browser layout number**, which is what the card asks for — but no screenshot was taken and no pointer-driven click was performed.
+
+---
+
 **2026-08-05 · Portal Core C13 — the red on the Orders list means something again** (PR #611 merge `55dcba22`, **no migration · no `apps/api` diff · no new field · no flag column**, web `index-D7U_hEyq.js` — DEPLOYED, all four canonicals, live md5 == local build, `SERVICE_ROLE` 0; **no Worker deploy owed, and it was measured against the REAL live Worker rather than against §17.1**)
 
 **Loo, 2026-08-04, from the card's own SQL against production:**

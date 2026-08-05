@@ -7300,7 +7300,7 @@ function MoneyCard({
         </div>
         {lastChasedAt && (
           <div className="text-meta text-base-400">
-            Last chased {fmtDate(lastChasedAt)}
+            Last message copied {fmtDate(lastChasedAt)}
           </div>
         )}
       </div>

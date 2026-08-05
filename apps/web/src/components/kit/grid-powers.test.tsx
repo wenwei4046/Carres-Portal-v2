@@ -143,7 +143,7 @@ describe("row expand", () => {
   it("moves the late bar onto the disclosure cell — the first cell still carries it", () => {
     render(<DataTable {...base} expansion={expansion([])} rowLate={(r) => r.id === "1"} />);
     const firstRow = document.querySelector('[data-kit="data-row"]')!;
-    expect(firstRow.querySelector("td")!.className).toContain("border-kit-red-9");
+    expect(firstRow.querySelector("td")!.className).toContain("border-l-kit-red-9");
   });
 });
 
@@ -543,5 +543,170 @@ describe("P16 · the kit draws no top corner", () => {
     render(<DataTable {...base} />);
     const root = document.querySelector('[data-kit="data-table"]')!;
     expect(root.className).not.toMatch(/rounded/);
+  });
+});
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * P17 — the grid gets its column separators (Loo, 2026-08-05)
+ *
+ * Ruled from two photographs of the live page. Measured on production before
+ * a line was written: **every cell in all four Purchasing grids carried
+ * `border-right: 0px`** — 7 on To Order, 220 on Purchase Orders, 110 on
+ * Receiving, 11 on Claims.
+ *
+ * These are CLASS assertions, and that is on purpose: jsdom has no layout, so
+ * it cannot tell whether a hairline PAINTS. What it can prove is the thing
+ * that actually regressed — that the rule is declared, on the right cells,
+ * in one token. Whether it renders was measured in a real browser.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+const RULE = /border-r\b/;
+const rowCells = () => [...document.querySelectorAll('tr[data-kit="data-row"]')[0]!.children];
+const headCells = () => [...document.querySelectorAll("thead th")];
+
+describe("P17 · a data grid carries column separators", () => {
+  it("rules every interior DATA cell of the header and of a data row", () => {
+    render(<DataTable {...base} selection={SELECTION} expansion={EXPANSION} />);
+    for (const cells of [headCells(), rowCells()]) {
+      expect(cells.length).toBe(5); // disclosure + checkbox + 3 columns
+      // cells[2] and cells[3] are data columns with a neighbour to their right.
+      for (const c of cells.slice(2, -1)) expect(c.className).toMatch(RULE);
+    }
+  });
+
+  it("costs the kit's own zero-slack columns NOTHING — the gutter rules from the other side", () => {
+    render(<DataTable {...base} selection={SELECTION} expansion={EXPANSION} />);
+    for (const cells of [headCells(), rowCells()]) {
+      // P16 sized these to their contents EXACTLY (8+16+8 and 2+8+24+8), so a
+      // right border here shaves the control it holds — measured live, the
+      // 16px checkbox overflowed a 15px box and was clipped.
+      expect(cells[0]!.className).not.toMatch(RULE); // disclosure
+      expect(cells[1]!.className).not.toMatch(RULE); // checkbox
+      // The gutter's boundary is the FIRST DATA column's left border — the
+      // same pixel, paid for by a column that has room.
+      expect(cells[2]!.className).toMatch(/border-l border-l-kit-slate-5/);
+    }
+  });
+
+  it("gives the first column NO left rule when there is no gutter to divide off", () => {
+    render(<DataTable {...base} />);
+    // No control column ⇒ column 0 IS the table's left edge, and it is also the
+    // cell carrying the 2px late bar. Two claims on one border is a fight.
+    expect(headCells()[0]!.className).not.toMatch(/border-l border-l-kit-slate-5/);
+    expect(rowCells()[0]!.className).not.toMatch(/border-l border-l-kit-slate-5/);
+  });
+
+  it("leaves the LAST cell unruled — the edge belongs to the wrapper, not to a cell", () => {
+    render(<DataTable {...base} selection={SELECTION} expansion={EXPANSION} />);
+    // A rule here would sit 1px inside the wrapper's own border and read 2px.
+    expect(headCells().at(-1)!.className).not.toMatch(RULE);
+    expect(rowCells().at(-1)!.className).not.toMatch(RULE);
+  });
+
+  /**
+   * THE CASCADE BUG THIS CARD SHIPPED ONCE AND CAUGHT ON PRODUCTION.
+   *
+   * Tailwind's `border-{color}` sets border-color on ALL FOUR SIDES, so a cell
+   * carrying both `border-kit-slate-6` (for its bottom edge) and the column
+   * rule's colour had ONE of them win by stylesheet order — not by the class
+   * attribute's order. Measured live on the first deploy: every header cell
+   * drew its column rule in slate-6, and on a page with no control gutter the
+   * first column drew it in `transparent` (the late bar's own all-sides
+   * colour), so the line was INVISIBLE on Receiving.
+   *
+   * Per-side colour utilities cannot collide. jsdom has no Tailwind cascade to
+   * measure, so the invariant is asserted structurally — which is the form
+   * that would have caught it.
+   */
+  it("colours every border PER SIDE, so no two edges can fight over one property", () => {
+    render(
+      <DataTable
+        {...base}
+        selection={SELECTION}
+        expansion={EXPANSION}
+        rowLate={(r) => r.id === "1"}
+        totals={{ label: "Totals", cell: () => null }}
+      />,
+    );
+    const cells = [...document.querySelectorAll("th, td")];
+    expect(cells.length).toBeGreaterThan(0);
+    for (const c of cells) {
+      for (const cls of c.className.split(/\s+/).filter(Boolean)) {
+        // `border-<colour>` with no side letter paints all four edges.
+        expect(cls).not.toMatch(/^border-(kit-[a-z]+-\d+|transparent)$/);
+      }
+    }
+  });
+
+  it("draws it in ONE token — slate-5, the row hairline's own value", () => {
+    render(<DataTable {...base} selection={SELECTION} expansion={EXPANSION} />);
+    for (const c of [...headCells(), ...rowCells()]) {
+      if (!RULE.test(c.className)) continue;
+      expect(c.className).toMatch(/border-r border-r-kit-slate-5/);
+      // NOT `divider` (slate-6). That is the head's own bottom edge, and a
+      // column line drawn in it changes colour at the header.
+      expect(c.className).not.toMatch(/border-r border-r-kit-slate-6/);
+    }
+  });
+
+  it("BOUNDS the trailing whitespace: the last real column rules, the filler does not", () => {
+    render(
+      <DataTable
+        {...base}
+        columns={PX_COLUMNS}
+        sizing="content"
+        totals={{ label: "Totals", cell: () => null }}
+      />,
+    );
+    // The empty region reads as CLOSED rather than as a table that stopped …
+    expect(headCells().at(-2)!.className).toMatch(RULE);
+    expect(rowCells().at(-2)!.className).toMatch(RULE);
+    // … and is never latticed with lines for columns that do not exist (P16).
+    // EVERY filler — head, body AND totals. A body-only lattice passed this
+    // test when it checked the header alone; the negative control caught it.
+    const fillers = [...document.querySelectorAll('[data-kit="table-filler"]')];
+    expect(fillers.length).toBe(2 + ROWS.length); // head + totals + one per row
+    for (const f of fillers) expect(f.className).not.toMatch(RULE);
+  });
+
+  it("does NOT slice the group band — it is one sentence, anchored from below", () => {
+    render(
+      <DataTable
+        {...base}
+        group={{ keyOf: (r) => r.ref, header: (r) => <span>{r.ref}</span> }}
+      />,
+    );
+    const bands = [...document.querySelectorAll('tr[data-kit="data-group"]')];
+    expect(bands.length).toBeGreaterThan(0);
+    for (const band of bands) {
+      // ONE cell spanning the width — never one cell per column.
+      expect(band.children).toHaveLength(1);
+      expect(band.children[0]!.className).not.toMatch(RULE);
+    }
+  });
+
+  it("does NOT slice an expanded record either", () => {
+    render(<DataTable {...base} expansion={{ ...EXPANSION, expanded: new Set(["1"]) }} />);
+    const cell = document.querySelector('[data-kit="data-expansion"] td')!;
+    expect(cell.className).not.toMatch(RULE);
+  });
+
+  it("rules the totals strip too, so a column line runs the whole grid", () => {
+    render(
+      <DataTable {...base} totals={{ label: "Totals", cell: (c) => (c.key === "qty" ? 5 : null) }} />,
+    );
+    const foot = [...document.querySelectorAll("tfoot td")];
+    expect(foot).toHaveLength(3);
+    for (const c of foot.slice(0, -1)) expect(c.className).toMatch(RULE);
+    expect(foot.at(-1)!.className).not.toMatch(RULE);
+  });
+
+  it("changes no width and no row height — the rule is structure, not a column", () => {
+    const { unmount } = render(<DataTable {...base} columns={PX_COLUMNS} sizing="content" />);
+    const withRule = [...document.querySelectorAll("col")].map((c) => c.style.width);
+    unmount();
+    // The widths are the caller's defs, untouched by P17 — no cell was added
+    // and no column was taken from to pay for a line.
+    expect(withRule).toEqual(PX_COLUMNS.map((c) => String(c.width)).concat("auto"));
   });
 });

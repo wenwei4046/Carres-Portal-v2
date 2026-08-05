@@ -445,18 +445,48 @@ against.
 
 ### The verb dictionary — portal-wide (locked 2026-07-27)
 
-**SIX verbs, six meanings. Every module uses these; no module invents a seventh.**
+**SEVEN verbs, seven meanings. Every module uses these; no module invents an eighth.**
 
 *(It was five until 2026-07-28. `Return` was added by Loo's ruling because R6 needed a word
 for "this record goes back to whoever produced it" and reached for `Send back`. **`Prepare`
 was added 2026-07-29 and RETIRED 2026-07-30** with the Purchasing clean restart: raising a
-purchase order is one act again, so the verb has no object left. **The bar for a seventh is
+purchase order is one act again, so the verb has no object left. **`Check` was added by Loo
+on 2026-08-05** — see the row below and the note under the table. **The bar for an eighth is
 the bar `Return` cleared: no existing verb fits, and the alternative is a module inventing
 its own.**)*
 
 **They govern WORKLIST ACTIONS, not form buttons.** A button inside a form that stores what
 you just typed is `Save`, and one that abandons it is `Cancel` — those are not actions, they
 never appear in a queue, and they need no verb from this table.
+
+#### The line-list controls (Loo, 2026-08-05, card P19)
+
+**A form whose body is a LIST OF LINES needs two more controls, and they are form buttons by
+the rule directly above — they take no verb from the table and they never appear in a queue.**
+They are ruled here anyway, because this document's own law is that a word on a screen has an
+entry, and both were live on Carres screens for months with none.
+
+| Concept | Canonical word | Do NOT use |
+|---|---|---|
+| Add one more line to the list being typed | **`Add line`** (rendered `+ Add line`) | Add line item · Add item · Add row · New line · Insert · `+` alone |
+| Take a line back out, before it is submitted | **`Remove`** | Delete · Remove line · Clear · Discard · `×` alone |
+
+**Loo chose from three candidates with their costs attached**, and the two he did not choose
+are recorded because each was already on a real screen and a later chat will find them:
+the Sales Portal's New Sales Order — the form the P19 comparison was made against — spells the
+same pair `Add line item` / `Remove line`, and `Add item` was the third. He ruled `Add line` /
+`Remove`, so **the Sales Portal is now the screen that disagrees with the dictionary**, and
+changing it is that lane's card, not a tidy-up anyone may do in passing.
+
+**`Remove` is deliberately NOT `Delete`.** Nothing has been stored yet: the row is typing, and
+`Delete` names the destruction of a record. Once a line HAS been created the control is gone
+altogether — a created line reads `Created`, because a form that offers to remove a record it
+cannot un-make is lying about what the press does.
+
+**Neither word may be reused for a worklist action.** `Remove` here is a form control on an
+unsaved row; taking a line off a purchase order that exists is a different act and gets its own
+entry, exactly as `Cancel`-the-action and `Cancel`-the-form-button are two entries in the
+Purchasing mirror.
 
 **The CHANNEL is not the action.** `Call {supplier} — confirm what happens next` is the same
 action whether it is done by phone, by WhatsApp or in person: outward communication whose
@@ -502,6 +532,27 @@ resolved at render time from what is on file — never a third blended word cove
 | **Upload** | evidence is attached | the file exists |
 | **Close** | a case or claim is finished and its record is sealed | the record can no longer change |
 | **Return** | a record goes BACK to the party that produced it, for them to act on | the record is with them **and its state says so on their screen** |
+| **Check** | a fact the business needs is MISSING, and somebody must establish it — by any means | the fact is **recorded in the system**. Finding out and not writing it down completes nothing |
+
+### `Check` vs `Call`, and `Check` vs `Check in` (Loo, 2026-08-05)
+
+**Added on his ruling, after he read the alternative and chose this word anyway.** The
+conflict was reported to him and is recorded here rather than re-argued.
+
+| | It names | Example |
+|---|---|---|
+| **`Call`** | going OUTWARD to a NAMED party for something only they can tell us | `Call {supplier} — confirm tomorrow's delivery` |
+| **`Check`** | a fact that is simply ABSENT. The source is not part of the action, and may be an email already sitting in the inbox, a portal, or a phone call | `Check Expected Arrival` |
+| **`Check in`** | goods have physically arrived and are being counted. A two-word phrase with its own dictionary row, and an act on GOODS rather than on a fact | `Check in from {supplier}` |
+
+**The distinction that keeps them apart is the OBJECT.** `Check` takes a missing FACT;
+`Check in` takes arriving GOODS. A reader who meets both on the Purchasing module reads two
+different objects, which is the same test the `GRN` / `Check in` document-act split already
+passed on 2026-07-28.
+
+**Why `Call` was not stretched to cover it:** on 16 of 21 live purchase orders nobody has said
+anything at all, so there is no promise to confirm and no named party who is known to hold the
+answer. `Confirm` presumes something was said; `Call` presumes we know whom to ask.
 
 Examples: `Assign logistics` · `Assign PIC` · `Assign warehouse picker` ·
 `Call {supplier} — confirm ready date` · `Call {logistics} — confirm delivery date` ·
@@ -694,7 +745,7 @@ doubt, grep the codebase and match what already ships.
 | Cancel an order | **Cancel** | Void · Abandon · Kill |
 | Purchase order (the document) | **PO** | Purchase order · P/O · Order (ambiguous with customer order) |
 | Customer's own order | **Order** (or `SO-1207`) | Sales order · Job · Ticket |
-| The To Order stages | **`Confirm ready date` · `Issue PO`** — in that display order (`docs/ACTION-FLOW-STANDARD.md` Law 4 rung 3) | Chase · Place · Follow up · Book in · **`Send PO`** · **`Prepare PO`** · **`Receive` as a To Order stage** (it left for Receiving on the deadline-anchor boundary) |
+| The To Order stages | **`Issue PO`** — one tile. `Confirm ready date` MOVED TO PURCHASE ORDERS (Loo, 2026-08-05: queue and door in one place; the door is the Purchase Orders expand, shipped 0318) | Chase · Place · Follow up · Book in · **`Send PO`** · **`Prepare PO`** · **`Receive` as a To Order stage** (it left for Receiving on the deadline-anchor boundary) |
 | Photo proving a delivery happened | **delivery photo** | POD · Proof of Delivery · e-POD |
 | Mattress + bed frame as one delivery | **Bed set** | Bedroom set · Bundle · Bed package |
 | A follow-up delivery on the same order | **Second trip** | Partial delivery · Split shipment · Back-order |
@@ -772,17 +823,22 @@ and otherwise says `—`.** Three words that used to sit in it were not actions 
 | RETIRED — never put back | Why |
 |---|---|
 | ~~`Confirm Arrival`~~ | it REVERSED the full string's tense. `Confirm Goods Arrival Date` asks the factory *which day do the goods reach us* (FUTURE); `Confirm Arrival` reads as *tick that it has arrived* (PAST). **A short form may drop WORDS; it may never drop the TENSE or the OBJECT** |
-| ~~`Contact Supplier`~~ | `Contact` is not one of the six verbs — Loo retired it 2026-07-28 and `Call` covers it. It was also a second word for a LATE version of one action, and **a late version of one action is not a second action**: lateness is shown in red, not spelt differently |
+| ~~`Contact Supplier`~~ | `Contact` is not one of the verbs — Loo retired it 2026-07-28 and `Call` covers it. It was also a second word for a LATE version of one action, and **a late version of one action is not a second action**: lateness is shown in red, not spelt differently |
 | ~~`Waiting for Goods`~~ | a STATUS wearing an action's column. It keeps its one home — the register's left rail |
 | ~~`Open Receiving`~~ | navigation, not work |
 
 > **⚠️ ONE COLLISION, REPORTED TO LOO AND OVERRULED BY HIM. Do not "fix" it back.**
-> `Check` is not one of the six verbs, and **`Check in` already means the receiving act in
-> this same module** (the document/act split, Loo 2026-07-28) — so a new hire could read
-> `Check Expected Arrival` as the receiving act. The alternative needing no new verb was
-> `Confirm expected arrival`. **He saw both and chose `Check Expected Arrival`.** It does not
-> widen the verb table: `Check` governs this one label and nothing else, and no other module
-> may reach for it.
+> `Check in` already means the receiving act in this same module (the document/act split,
+> Loo 2026-07-28) — so a new hire could read `Check Expected Arrival` as the receiving act.
+> The alternative needing no new verb was `Confirm expected arrival`. **He saw both and chose
+> `Check Expected Arrival`.**
+>
+> **RESOLVED 2026-08-05 — he opened the verb table rather than leaving an exception.**
+> The row above first said `Check` "does not widen the verb table … no other module may reach
+> for it", which left the dictionary claiming SIX verbs while a seventh was live on 16 rows —
+> the exact drift this dictionary exists to stop. **`Check` is now the seventh verb**, with
+> its meaning, its completion and its boundary against `Call` and `Check in` written in the
+> verb dictionary above. **Any module may use it, for the meaning defined there and no other.**
 
 ### The Report words (Loo, 2026-08-04 — card Q3)
 

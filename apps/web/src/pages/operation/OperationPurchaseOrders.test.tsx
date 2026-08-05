@@ -863,10 +863,19 @@ describe("nine measured minimums, and no tail", () => {
     await mountLoaded();
     expect(colWidths()).toMatchObject({
       issued: "96px",
-      supplier: "87px",
+      // THREE of the nine moved by exactly 1px, and for ONE reason (card Q13
+      // and its follow-up, Loo 2026-08-05). P17's column separator takes 1px
+      // of the BOX, not of the content, so a width measured to the pixel now
+      // clips its own worst string with no ellipsis to announce it. Measured
+      // on the live page: `Nice Future` 86 of 87 on 4 rows · `SO-1206 +4` 77
+      // of 78 on 2 · `Booqit 2B(LHF) · +1` 118 of 119 on 1.
+      // **A frozen width that truncates is not the frozen intent** — Q7 froze
+      // these numbers so that nothing truncates. The other six are Q7's,
+      // untouched, because their worst string does not reach their edge.
+      supplier: "88px",
       po: "83px",
-      sono: "94px",
-      items: "135px",
+      sono: "95px",
+      items: "136px",
       dest: "135px",
       custdel: "140px",
       arriving: "206px",
@@ -887,8 +896,49 @@ describe("nine measured minimums, and no tail", () => {
     await mountLoaded();
     const region = screen.getByTestId("po-listing");
     const scroller = region.querySelector(".overflow-auto") as HTMLElement;
-    expect(scroller.firstElementChild?.className).toContain("min-w-[1205px]");
-    expect(scroller.firstElementChild?.className).toContain("min-w-[1205px]");
+    expect(scroller.firstElementChild?.className).toContain("min-w-[1208px]");
+  });
+
+  /**
+   * THE MIN-WIDTH IS DERIVED FROM THE NINE, AND THE TWO MAY NEVER DRIFT APART
+   * (card Q13, 2026-08-05).
+   *
+   * The number is not decoration: the kit's expand-control column takes 3% of
+   * the table, so the sum of the nine pixel columns is only 97% of it. Q13
+   * MEASURED what happens when a width moves and this number does not — in
+   * `table-fixed` the browser takes the difference out of the only non-pixel
+   * track, which is that control column, and its expand button already
+   * overflows (P16's documented clip). Live at 1280: `88px`/`1205px` shrank the
+   * control 35 → 34 and made the clip 7px → 8px, while every business column
+   * kept its ruled width — i.e. the damage is INVISIBLE to the assertion above.
+   *
+   * So this reads both numbers off the rendered DOM and re-derives one from the
+   * other. Change a width without the min-width — or the min-width without a
+   * width — and it fires.
+   */
+  it("the min-width is exactly the sum of the nine over 0.97", async () => {
+    await mountLoaded();
+    /* The kit's own expand-control column is the 3% one, and it is exactly
+     * what the other 97% is measured against — so it is dropped by NOT having
+     * a `data-column`, never by looking like a percentage. A business column
+     * that turned into a percentage must fail this, not slip through it. */
+    const px = Object.entries(colWidths())
+      .filter(([k]) => k !== "null")
+      .map(([k, w]) => {
+        const m = /^(\d+)px$/.exec(String(w));
+        expect(m, `column \`${k}\` is a pixel width, got ${w}`).not.toBeNull();
+        return Number(m![1]);
+      });
+    expect(px).toHaveLength(9);
+    const sum = px.reduce((a, b) => a + b, 0);
+
+    const scroller = screen
+      .getByTestId("po-listing")
+      .querySelector(".overflow-auto") as HTMLElement;
+    const cls = String(scroller.firstElementChild?.className);
+    const min = Number(/min-w-\[(\d+)px\]/.exec(cls)?.[1]);
+
+    expect(min).toBe(Math.ceil(sum / 0.97));
   });
 
   it("every action word still carries its own title, so a clip can be read", async () => {
@@ -1884,6 +1934,8 @@ describe("one purchase order, one way of looking at it (Q10)", () => {
     await expandPo("PO-9003");
     const cls = screen.getByTestId("po-work-PO-9003").className;
     expect(cls).toContain("100cqi");
+    // Q11 turned the pin into a CEILING; it may never stop being one.
+    expect(cls).toContain("max-w-[calc(100cqi-2rem)]");
     // `sticky` was measured NOT to hold inside a table cell, so it is not left
     // here as a class that does nothing.
     expect(cls).not.toContain("sticky");
@@ -1912,5 +1964,48 @@ describe("one purchase order, one way of looking at it (Q10)", () => {
     expect(
       (row.children[2] as HTMLElement).className,
     ).not.toContain("flex-1");
+  });
+
+  /**
+   * Q11 — THE ROW ENDS WHERE ITS CONTENT ENDS.
+   *
+   * jsdom has no widths, so this asserts the two classes that PRODUCE them and
+   * the numbers are measured in a browser (PO-2037 on production: the record
+   * 1575 → 474 at 1920, 935 → 474 at 1280; `Description` 1191 → 90; the dead
+   * space between an item's name and its `Qty` 1138 → 23).
+   *
+   * The pair is the whole card. `w-fit` alone re-opens Q10's bug, because
+   * `fit-content` is capped by the AVAILABLE width and available here is the
+   * table's 1205px cell, not the pane — measured with a 200-character name at
+   * 1280: bounded, `Received` ends at 1212 inside a 1217 scrollport and the
+   * name truncates; unbounded it ends at 1448, off the right edge.
+   */
+  it("the record is content-width, and the pane is its ceiling", async () => {
+    await mountLoaded();
+    await expandPo("PO-9003");
+    const classes = screen.getByTestId("po-work-PO-9003").className.split(/\s+/);
+    expect(classes).toContain("w-fit");
+    expect(classes).toContain("max-w-[calc(100cqi-2rem)]");
+    // The pane must be a CEILING, never the width itself: a fixed width is what
+    // gave `Description` 1191px for 67px of ink. Compared as a TOKEN, because
+    // `max-w-[calc(100cqi-2rem)]` contains the fixed form as a substring.
+    expect(classes).not.toContain("w-[calc(100cqi-2rem)]");
+  });
+
+  it("the header, the item rows and TOTAL are one template, so they cannot stagger", async () => {
+    await mountLoaded();
+    await expandPo("PO-9003");
+    const items = screen.getByTestId("po-doc-items");
+    const grids = [...items.querySelectorAll<HTMLElement>("div")].filter((el) =>
+      /grid-cols-\[/.test(el.className),
+    );
+    // Header + at least one line + TOTAL, and every one of them the same recipe.
+    expect(grids.length).toBeGreaterThanOrEqual(3);
+    const templates = new Set(
+      grids.map((el) => (el.className.match(/grid-cols-\[[^\]]+\]/) ?? [""])[0]),
+    );
+    expect([...templates]).toEqual([
+      "grid-cols-[16px_64px_minmax(0,1fr)_40px_160px_64px]",
+    ]);
   });
 });

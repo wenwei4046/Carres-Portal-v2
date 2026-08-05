@@ -1356,3 +1356,234 @@ first structurally cannot fire that assertion** — with no handle there is noth
 the header's accessible name, so the test would have passed either way and proved nothing. A
 `perl -0pi` attempt silently declined on this CRLF file, the fourth time that trap has been
 paid for, so both were redone as real edits.
+
+---
+
+### 2026-08-05 · Q13 SHIPPED — the `supplier` column widens 87 → 88 (PR #622)
+
+**No migration · no api · no Worker deploy owed · no new word, column, token or row height.**
+Two numbers and a test. Web `index-DCDgFPBE.js` — DEPLOYED (carres-portal `215c8960` +
+carres-pos `7800b6e3`, both `--branch=main`), **all four canonicals on the FIRST poll**, live
+file md5-identical to the local build (`be8afdac…`, 4,768,749 bytes), `SERVICE_ROLE` **0**.
+
+**Loo ruled it from P17's own reported cost:** *Q7 froze WHICH columns and HOW WIDE so that
+nothing truncates. Holding 87 while it truncates keeps the number and loses the intent.*
+
+**THE MEASUREMENT REPRODUCED ON PRODUCTION BEFORE A LINE WAS WRITTEN, and it CORRECTS P17.**
+28 clipped elements over `td, th, td *, th *`: 21 × 6px in the expand-control column (P16's
+documented clip, not this card's) and **7 × 1px**. P17 recorded all seven as *"`Nice Future`
+in the 87px `supplier` column"*. **Four are; the other three are `SO-1206 +4` and `+3` in
+`sono` (94px) and `Booqit 2B(LHF) · +1` in `items` (135px)** — two columns Loo did not name,
+reported below rather than widened. **A live control proves all seven are P17's border**:
+removing every vertical rule as a browser-only style leaves only the 21; putting them back
+returns all seven.
+
+**THE SECOND NUMBER IS NOT OPTIONAL, AND THAT IS THE DURABLE PART.** The listing's min-width
+is DERIVED — the kit's expand-control column takes 3% of the table, so the nine pixel columns
+are 97% of it: 1168 → 1169, and 1169 / 0.97 = 1205.15 → **1206**. Probed live at 1280, where
+the min-width binds:
+
+| probe | ctl column | ctl clip | supplier clip |
+|---|---:|---:|---:|
+| `87px` / `1205px` — before | 35 | **7px** × 21 | 1px × 4 |
+| `88px` / `1205px` — the tempting half-fix | **34** | **8px** × 21 | 0 |
+| `88px` / `1206px` — what shipped | 35 | **7px** × 21 | 0 |
+
+The middle row fixes `supplier` by making P16's already-clipping expand button one pixel
+worse — **and every business column still renders at its ruled width, so the damage is
+invisible to the width assertion.** A new test therefore re-derives the min-width from the
+rendered column widths; the two cannot drift apart again.
+
+**VERIFIED IN A REAL BROWSER ON PRODUCTION AT 1280 · 1440 · 1920.** `supplier` renders **88**
+at all three and the other eight are Q7's exactly (`96 · 88 · 83 · 94 · 135 · 135 · 140 ·
+206 · 192`); the **4 × 1px `supplier` clips are 0**, the 21 are unchanged (7px at 1280/1440,
+6px at 1920 — P16's, varying with the 3% column's sub-pixel), the 3 reported ones remain;
+rows **40px**, page horizontal scroll **0** everywhere. On a live row `Nice Future` measures
+`clientWidth 87 · scrollWidth 87 · clipped false`, its right border still 1px
+`rgb(224, 225, 230)` = slate-5, so P17's rule is intact. Only two suppliers exist on the
+register today (`Nice Future` ×4, `Ohana` ×17).
+
+**Four negative controls, each a real edit verified on disk first:** `supplier` back to 87 →
+**2** · min-width back to 1205 → **2** · `items` 135 → 150 with the min-width left alone →
+**2** · **`items` 135 → 150 AND its pinned expectation updated with it → 1, the derived guard
+alone.** The fourth is the one that matters: it models a chat changing a width on purpose,
+where no other assertion can see the min-width was left behind. One control silently declined
+first because the file is CRLF and a multi-line needle does not match — **the seventh time
+that trap has been paid for on this lane.**
+
+**Gates.** web tsc **0** · build clean · `OperationPurchaseOrders` **100 → 101** · full web
+suite **16 failed / 2555 passed (2571)** against a **DETACHED CONTROL WORKTREE at
+`origin/main`** measuring **17 failed / 2553 passed (2570)** — the same four §17.7 files, test
+for test, so **zero new failures**; the control's extra is the documented full-suite load-flake
+in this very file, which passes **100/100 in isolation on the control**. **check-design 8340,
+IDENTICAL category for category to that control.**
+
+**Both directions proved on DOWNLOADED bundles.** `min-w-[1206px]` **0 → 1** ·
+`min-w-[1205px]` **1 → 0** · `"87px"` **1 → 0** · `"88px"` 2 → 3 (so `"88px"` is NOT a clean
+marker alone — the removal is). Controls present in BOTH: `po-listing` 1/1 and `"96px"` 1/1,
+the untouched neighbour width. The predecessor is P17's `index-63l6VIUk.js`, fetched from its
+OWN deployment URL `ee0c6b7e` (4,768,749 bytes, md5 `43c091a9…` — the figure §17.1 already
+carried), never the apex, where a superseded asset returns the 1.7kB SPA fallback that greps
+as a clean 0 for everything. **Both bundles are EXACTLY 4,768,749 bytes** — same size,
+different md5, which is the signature of a same-length change (`87`→`88`, `1205`→`1206`).
+
+**No Worker deploy was owed and it was MEASURED against the live Worker's own source commit
+read from `wrangler deployments list`** — `620bc69a` from `d460d899`, still serving 100%.
+`apps/api` and `supabase/migrations` diffs since it are EMPTY; the `packages/shared` diff is
+another lane's, and `apps/api` references `fmtMoney` · `money-format` · `orderActionLine` ·
+`collectPillLabel` · `order-action-words` **0 times each**, while the one symbol it does
+import, `orderActionDone`, is **byte-identical across both commits** (md5 of the extracted
+function `200f11aa…` on each). `/health` **200 `{"ok":true}`**. This card touches two
+`apps/web` files and a doc.
+
+**REPORTED, NOT FIXED**
+
+1. **Three 1px clips remain and they are not in the column Loo named** — `sono` × 2, `items`
+   × 1. His reasoning applies word for word, but these are two more of Q7's frozen numbers
+   and **widening them is his ruling, not this card's**; the card's MUST-NOT says so by name.
+2. **P16's 21 × 6px expand-button clip is untouched** and belongs to another card.
+3. **The card was written as Q12 and renumbered Q13 mid-build** — the Receiving Boundary
+   Review card took Q12 on `main` (`3824dc81`) while this one was being built. Rebased; the
+   doc conflict was resolved by keeping both.
+4. **No photograph.** The Browser pane does not composite in this session, so every figure
+   above is a real browser layout measurement on the live page rather than pixels anyone
+   looked at.
+
+---
+
+### 2026-08-05 · Q13 FOLLOW-UP SHIPPED — `sono` 94 → 95 and `items` 135 → 136 (PR #626)
+
+**Loo ruled the two columns Q13 reported and left alone — `sono` 94 → 95 and `items` 135 → 136** (PR #626 merge `963a37f1`, **no migration · no api · no Worker deploy owed**, web `index-Dg3pY7uT.js` — DEPLOYED, live md5 == the build from the main tip, `SERVICE_ROLE` 0)
+
+Loo ruled the two columns Q13 reported and deliberately left alone: *"Yes — widen `sono` 94→95 and `items` 135→136 as well. Same defect, same reasoning. Re-derive the min-width from the nine, as you did for supplier."*
+
+## The three numbers, and the third is derived
+
+`sono` **94 → 95** · `items` **135 → 136** · min-width **1206 → 1208** = `ceil(1171 / 0.97)`, because the kit's expand-control column takes 3% of the table.
+
+**Holding 1206 would have taken TWO pixels from that control column — measured live at 1280 before building**, which is the same trap Q13 measured at one pixel and the reason its derived test exists:
+
+| probe | ctl column | ctl clip | business clips |
+|---|---:|---:|---:|
+| `94`/`135`/`1206` — before | 35 | 7px × 21 | 3 |
+| `95`/`136`/`1206` — the half-fix | **33** | **9px** × 21 | 0 |
+| `95`/`136`/`1208` — what shipped | 35 | 7px × 21 | **0** |
+
+Every business column still renders at its ruled width in the middle row, so the damage is invisible to the assertion that pins them.
+
+## Verified on production at 1280 · 1440 · 1920 — identical at all three
+
+`min-w-[1208px]`, table 1206, columns `35 · 96 · 88 · 83 · 95 · 136 · 135 · 140 · 206 · 192`, rows **40px**, page horizontal scroll **0**, and the only clips left are P16's `ctl 7px × 21`. The three strings read in full on live rows: `SO-1206 +4` and `+3` **cw 78 · sw 78 · clipped false**, `Booqit 2B(LHF) · +1` **cw 119 · sw 119 · clipped false**, and Q13's `Nice Future` still **cw 87 · sw 87 · clipped false** on 4 rows.
+
+## A measurement was thrown away before it was believed
+
+The first reading on the deployed page returned **zero clips of any kind, 25px rows and a 1229px table**. It was wrong: the computed font was **Times New Roman** — the app's stylesheet had not applied in the pane, so nothing could truncate because nothing was styled. The CSS was fetched directly to prove the file was fine (200, 234,577 bytes, carrying the `h-10` rule), and the measurement helper now **refuses to report unless the computed font is Inter**. Every number above was taken after that guard passed. **An unstyled page reports a clean grid** — and it reports it as a pass.
+
+## A correction to another lane's record, with the reason it happened
+
+`ed09e54d` ("docs: P17 — correct the clip count, and close it") stated *"Closed by Q13 / PR #622 … Re-measured live: zero 1px clips remain."* **Three remained**, live on the deployed bundle, and the cause is method rather than carelessness:
+
+```
+scan `td, th`                →  ctl 7px × 21 only        i.e. ZERO 1px clips
+scan `td, th, td *, th *`    →  + sono 1px × 2, items 1px × 1
+```
+
+All three sit on nested `truncate` spans. **This is P16's own documented trap hit a second time** — *"the ellipsis lives on nested `truncate` spans and a `td`-only scan is exactly how the first pass missed the `PO No.` clip."* The doc is corrected in place and the rule written next to it: a clip scan on this grid must include `td *, th *`.
+
+## Gates and controls
+
+web tsc **0** · build clean · page suite **101/101** · full web suite **16 failed / 2574 passed (2590)** against a **DETACHED CONTROL WORKTREE at `origin/main`** measuring the **identical 16 / 2574 (2590)** — zero new, and no test added or removed: three expectations moved, which is the change. **check-design 8340, identical to the control.**
+
+Four negative controls, each a real edit verified on disk first: `sono` back to 94 → **2** · `items` back to 135 → **2** · min-width back to 1206 → **2** (`expected 1206 to be 1208`) · **`sono` back to 94 WITH its pinned expectation updated → 1** (`expected 1208 to be 1207`), the derived guard alone.
+
+**Both directions on DOWNLOADED bundles**: `min-w-[1208px]` **0 → 1** · `min-w-[1206px]` **1 → 0** · `"95px"` **0 → 1** · `"136px"` **0 → 1** · `"94px"` **1 → 0**; controls in BOTH `po-listing` 1/1 and `"88px"` 3/3 — Q13's own number, untouched.
+
+**No Worker deploy owed, and the baseline in §17.1 had gone stale AGAIN.** Measured against `d460d899` the api diff read as +19 lines of `to-order.ts` and a deploy would have looked owed; `wrangler deployments list` says the live Worker is **`0a7949bd`, deployed 07:01 today** — P19's — and from P19's own merge `bef687a5` the `apps/api`, `supabase/migrations` and `packages/shared` diffs to `origin/main` are all EMPTY. `/health` **200**. **The live Worker's source commit is read from `wrangler`, never from a document** — the second time in two cards that reading the table would have produced a wrong answer.
+
+**Reported, not fixed**: at 1920 the listing region gains **1px** of horizontal scroll (region 1207, wrapper 1206 → 1208) and P16's expand-button clip goes 6px → 7px, matching 1280 and 1440 — the honest price of content-sized columns, since the control column is the only elastic track, and the alternative is shaving a business column, which the ruling forbids; page-level scroll stays 0 everywhere · `items` still truncates on a long enough item list, as it always did, and carries a `title` · **a screenshot still could not be taken**: `preview_start` → `resize_window` → measure is the documented order, it was followed, it produces real layout numbers, and `computer{action:"screenshot"}` still times out after exactly that order. **Measuring and photographing are two different capabilities and only one of them works here.**
+
+---
+
+### 2026-08-05 · SESSION CLOSE — the manager chat's handover, everything ruled in one place
+
+> Written so the next chat re-litigates NOTHING. Every line below is a ruling that already
+> shipped or an open item with its blocker named. **If a chat finds itself re-arguing one of
+> these, it has skipped this section.**
+
+**WHERE THE TAB STANDS.** Ten cards shipped in two days and **there is no open card on the
+Purchase Orders register itself.** Q1 risk order · Q3 the Report tab · Q5 the expand becomes
+the working area · Q7 the nine fixed columns · Q8 the action word · Q10 one PO one mode ·
+Q11 content-width rows · Q13 + its follow-up, the three 1px widths. Q2 and Q9 were ABSORBED
+(into Q5 and Q10); Q1b and Q4 were CLOSED, not deferred.
+
+**THE RULINGS THAT NOW GOVERN THIS TAB — none may be re-opened by a chat.**
+
+| | Ruled |
+|---|---|
+| **Row order** | **Operator priority, ALWAYS.** Never `PO Issued`. *"Operator 打开 Purchase Orders，是为了处理今天最重要的事情，不是看最新开的 PO."* `PO Issued` is a column and a header sort and decides nothing |
+| **One column set** | The list may **NEVER** change its columns because the panel opened. `COMPACT_KEYS` is deleted and a test asserts its absence — this is the ruling most likely to be quietly re-introduced |
+| **The nine, measured and frozen** | `96 · 88 · 83 · 95 · 136 · 135 · 140 · 206 · 192`, min-width **1208** which is DERIVED from them. Widening one without re-deriving the min-width silently steals pixels from the kit's control column |
+| **One PO, one mode** | `{poId, mode: "panel" \| "expand"}` — two different POs are structurally unrepresentable. Never a rule that says "keep them in step" |
+| **Expand = the working area** | Document data is edited there. **The right panel is ACTIVITY** — Print · Communication · Timeline — and holds the items READ-ONLY |
+| **How a field saves** (§12.7.5a) | typed value → Enter saves, Esc cancels, **no button**; mouse-picked value or a multi-field form → **an explicit Save**; a control that performs an ACT is named for the act (`Split`, never `Save`) |
+| **Read vs write tiers** | A fact may be **READ** in two tiers and **WRITTEN** in only one. Rule 1 was narrowed after it cost the panel its items list |
+| **Words** | `Check Expected Arrival` (Loo's own, over `Confirm expected arrival`) · `Contact Supplier` deleted · a status or a navigation shows `—` · **`Check` is the SEVENTH verb**, written up in COPY-STANDARD with its boundary against `Call` and `Check in` |
+| **Dates, portal-wide** | `Supplier Ready Date` · `Expected Arrival` · `Received At` · `Customer Delivery`. `Goods Arrival` · `Stock` · `Stock ETA` are RETIRED |
+| **Money** | **Never on this tab.** Verified zero occurrences; the supplier PDF and the Report tab are money-free by ruling |
+| **Density** | **40px stays.** *"Carres is queue → list → detail with constant reviewing — GitHub / Linear / Shopify Admin, not Excel data entry."* What was wanted was never 28px; it was capabilities, bought with structure |
+| **The tab boundary** (card Q12) | **role-anchor**, deadline-anchor DELETED whole: `To Order` = Issue PO · Confirm ready date · **`Purchase Orders` = Confirm tomorrow's delivery + Confirm balance delivery date** · `Receiving` = Check in only |
+
+**TWO PERMANENT RULES WERE BORN HERE AND THEY GOVERN THE WHOLE PORTAL** —
+`CLAUDE.md` **§13.2 UI Evolution Rule** (business freezes before implementation, UI does not
+freeze before operators have used it, build → review with real usage → iterate; never keep a
+feature in discussion for days when production answers in hours) and **§13.3 Feature
+Justification Rule** (a kit having a feature is not a reason to wire it — will the operator
+finish faster today?). **§13.2 was written because this chat spent a day on column widths
+without shipping anything Loo could operate. A chat that answers "let me first settle X"
+three times has committed the failure it names.**
+
+**WHAT IS OPEN, WITH ITS BLOCKER**
+
+1. **Q14 — one supplier date, two doors.** `useRecordSupplierDate`
+   (`OperationPurchaseOrders.tsx`) and `RecordSupplierAnswerModal` (`ReceivingWorkspace.tsx`)
+   both write `POST /pos/:id/tomorrow-delivery`. **The order is the whole card**: that modal
+   is also the ONLY door for `balance-date`, so the balance door must be built on the register
+   FIRST, or the action Q12 just moved arrives at its new home with nothing that can close it.
+2. **`Confirm ready date` is Loo's open case, recorded in §1 and deliberately not moved.**
+   The evidence for moving it: `PURCHASING-INFORMATION-MODEL.md` §5.3 already says a
+   requirement leaves To Order the moment a PO exists, and the ONLY door that closes this
+   action is the `Supplier Ready Date` field on the Purchase Orders expand (Q5). Queue in one
+   place, door in another — the same disease Q12 cured, one action along. **Moving it leaves
+   To Order with `Issue PO` alone: unissued belongs to To Order, issued belongs to Purchase
+   Orders.** Live exposure zero — 0 of 21 POs carry a ready date.
+3. **The rail's three permanent zeros** — `Ready to Receive` · `Completed` · `Cancelled`.
+   This tab has no receiving door so they cannot move. **Hiding a zero also hides a filter**,
+   so it is a decision, not a repair.
+4. **1px of region scroll at 1920** and P16's expand-button clip at 7px — the accepted price
+   of content-sized columns. Page-level scroll is 0 everywhere.
+
+**SIX METHOD LESSONS THIS SESSION PAID FOR — carry them, they each cost real time**
+
+1. **Widths only in a real browser.** jsdom has no widths, so the page suite structurally
+   cannot catch a truncated cell. `preview_start` → `resize_window` → measure.
+2. **A truncation scan must include NESTED elements** — `td, th, td *, th *`. A `td`-only scan
+   reported *"zero 1px clips remain"* while three were live on `truncate` spans inside the
+   cells. **The same trap was already documented in P16's record and was hit again.**
+3. **A page with no stylesheet reports a PERFECT grid.** One measurement came back with zero
+   clips and 25px rows; the computed font was Times New Roman. **Refuse to report unless the
+   computed font is Inter.**
+4. **Never quote a lint delta without linting the tree WITHOUT your change** — use a detached
+   worktree at `origin/main`, never a stash.
+5. **Read the live Worker's source commit from `wrangler deployments list`, never from
+   §17.1** — that row went stale twice in one day and each time made a no-api card look like
+   it owed a Worker deploy, which would have shipped another lane's unreleased api.
+6. **"The docs are written" is not "the docs are shipped."** One chat reported completion
+   three times with zero commits on its branch. **§13.2's own words apply to documents:
+   verify with `git show origin/main:<file>`, never with a report.**
+
+**AND ONE ABOUT RUNNING THE CHATS.** Four lanes touched Purchasing files on 2026-08-05 and
+**the card number Q12 was claimed twice and Q13 twice**, each lane renumbering around the
+other without knowing. Loo received a stale report about a defect already fixed. **Two lanes
+on Purchasing at a time is the practical ceiling**; more than that and the manager spends the
+day de-duplicating instead of deciding.
+

@@ -23,6 +23,21 @@
 > **这一段是给 LOO 的。跟 Jess 讲话的规矩在 §15 和各个 checkpoint 的 §0，两边不冲突：
 > Jess 要的是 COO 级的挑战，Loo 要的是「先研究、先批评、给我选项、然后做完」。**
 
+### 第 0 步 · 先讲清楚你是哪一种 chat
+
+| | 做什么 | 写不写 code |
+|---|---|---|
+| **PLAN / manager chat** | 研究 → 批评 → 给选项 → 写卡 | **一行都不写** |
+| **BUILD chat** | 做一张卡，做到上线 | 写，而且做完自己部署 |
+
+**开场第一句就要讲明你是哪一种。** 一个 PLAN chat 开始写 code，就是抢了 BUILD chat 的活，
+而且它写的东西没有卡、没有 claim、没有人知道。
+
+**这一条是 Loo 2026-08-05 加的：「study … only advise me」。**
+被叫来研究的 chat，**任务是建议，不是动手**。研究完给建议就停，等他点头。
+
+---
+
 ### 开场三步 —— 先研究，不准先讲话
 
 **第 1 步 · 读法律**
@@ -31,15 +46,82 @@
 再加**你正在碰的那个 module 的 working-flow 档**。
 **必须用 `Read` 工具真的读，transcript 要看得到。** 讲「我读过了」不算。
 
-**第 2 步 · 读别人怎么做**
-`docs/2990s-copy-and-gaps-audit-2026-07-24.md`（19 项对照）
-`C:\Users\User\OneDrive\Desktop\2990s`（Loo 自己另一套系统，`DataGrid.tsx` 是 AutoCount 式表格的完整参考）
-**AutoCount 是团队每天在用的东西** —— 点表头排序、每栏漏斗、拖栏位、底部合计、右键选单、`Transfer From/To`、`View Flow`。抄能力，**不抄它没有 queue、没有负责人、没有 due date 那一套**。
+**第 2 步 · 读别人怎么做 —— 四个来源，一个都不准跳**
+
+**① 我们自己的流程。** 你碰哪个 module 就读它的 working-flow 档，**整个 Purchasing 五个
+tab 是一条链，不是五个独立页面**：
+
+```
+Create Purchase → To Order → Purchase Orders → Receiving → Claims
+```
+
+改任何一个 tab 之前，先答得出：**我这个改动，上游送进来的东西还进得来吗？下游还接得住吗？**
+（`docs/PURCHASING-WORKING-FLOW.md` 是流程，`docs/PURCHASING-INFORMATION-MODEL.md` 是资讯架构，
+两个都读，它们不重复。）
+
+**② 2990s** —— Loo 自己另一套系统。`docs/2990s-copy-and-gaps-audit-2026-07-24.md`（19 项对照）
++ `C:\Users\User\OneDrive\Desktop\2990s`。`apps/backend/src/components/DataGrid.tsx` 是
+AutoCount 式表格的完整参考（拖栏宽 · 拖栏序 · group by · 行内展开 · 记住 layout · 右键选单）。
+
+**③ AutoCount** —— 团队每天在用的东西，所以它的习惯就是他们的肌肉记忆。抄它的**能力**：
+点表头排序 · 每栏漏斗 · 底部合计 · `Transfer From / Transfer To` · `View Flow` ·
+每行 `Error Message` · `Void` 和 `Delete` 分开 · 打单时看得到库存。
+**不抄它的假设**：1,737 笔没有 queue、没有负责人、没有 due date 的清单；17 栏会计术语；窗中窗中窗。
+**这条是常法：抄 AutoCount 的 POWER，永远不抄它的 ASSUMPTION。**
+
+**④ 国际参考 —— 按「问题」去找，不准等 Loo 讲名字。**
+名单在 `CLAUDE.md` §0 步骤 3-5，那里是唯一的家，不要在别处重抄：
+导航／阅读区 → GitHub · 密度、间距、互动 → **Linear** · ERP 工作区 → SAP Fiori / Dynamics ·
+大表格 → Excel / AutoCount · 沟通 → Gmail · 表单与设定 → Shopify Polaris ·
+朴素动作与无障碍 → GOV.UK / Nielsen Norman Group。
+
+每一条挑战要讲满：**现在什么问题 → 操作员受什么影响 → 谁做得比较好 → Carres 怎么改 → 代价 → 建议**。
+**「只是不一样」会被打回。没有实质进步就说「保持原样」，讲清楚为什么。**
+
+**⑤ UI KIT 对齐 —— 这一条不是建议，是硬规矩。**
+`01-design-tokens` · `02-components` · `03-page-patterns` 是**词汇表**。
+- **锁死不准动**：token 的**数值**（间距 · 颜色 · 字体 · 图标）、component 的内部实作。
+- **可以改的是「怎么组合」** —— 版面、层次、可读性，那是你的责任。
+- **需要的 component 不存在 → 停下来，请求把它加进 kit。不准就地画一个「就这一次」。**
+- 已经有的 kit component 就用它。**页面里手写一个 `<table>` 就是错的**（D7-Claims 就是在补这个）。
+- Loo 2026-08-04 三条铁律，每一页都适用：
+  **内容决定栏宽，不是表格宽度决定** · **Expand 只有一个职责** · **inline 第二行是唯一例外**。
 
 **第 3 步 · 看真东西，量真数字**
 开真页面（`pnpm -C apps/web exec vite`，记得先 copy `.env.production` → `.env.local`）。
 用 SQL 量。**宽度要在真浏览器量 —— jsdom 没有宽度，页面测试结构上就抓不到被切掉的字。**
 **猜的数字一律不准写。**
+
+> #### ⚠️ 浏览器是能用的 —— 至少有五张卡以为不能用，白白少做了验证
+>
+> 症状：`screenshot` 超时、viewport 读到 `0×0`、`No preview is open`。
+> **那不是坏了，是窗口还没开 / 还没给尺寸。**
+>
+> **正确顺序，三步，缺一步就会以为它坏了：**
+> ```
+> 1. preview_start  { url: "https://erp.carresofficial.com/..." }   ← 先开窗
+> 2. resize_window  { width: 1440, height: 900 }                    ← 一定要给尺寸
+> 3. screenshot / javascript_tool                                   ← 现在才是真的
+> ```
+> **`resize_window` 之前 layout 全部是 0；之后每一个数字都是真的。**
+>
+> **量数字和截图是两件事，不要混（2026-08-05 实测更正）：**
+>
+> | | 要什么 | 靠不靠得住 |
+> |---|---|---|
+> | **JS 量宽度 / 颜色 / 文字** | `preview_start` + `resize_window` | ✅ **一定可以**，这是你的主要工具 |
+> | **截图** | 还要那个浏览器窗格**真的显示在画面上** | ⚠️ 窗格没显示就会超时 |
+>
+> **所以「量不到」永远不是可以接受的结论 —— 量一定量得到。**
+> **「截不到图」有时候是真的**，那就照实写「宽度已量，照片欠着」，
+> 不要因为截不到图就连量都不量。
+> 截图缩得太小看不到 1px 的线 → **把 viewport 调小到 800 左右**，截图就是 1:1。
+>
+> 已经登入的 production session 通常还在，直接开 `erp.carresofficial.com` 就有资料。
+> 路由是 query param：`/operation?tab=purchase`，不是 `/operation/to-order`。
+>
+> **「这个 session 没办法截图 / 没办法量」不再是可以接受的结论。** 先照上面三步做过，
+> 还是不行才写进报告。
 
 ### 中场两步 —— 先批评，再建议
 
@@ -102,6 +184,23 @@ Loo 回一个字母
 - **画面先画 ASCII 给他看，他点头才写 code。** 就算他说「直接做」也一样。
 - **结论先讲，理由后讲。**
 - **不要长篇大表。** 一次讲一件事。
+
+### ⚠️ Rebase 之后一定要检查：你有没有默默吃掉别人的记录
+
+**2026-08-05，P18 真的踩到了。** 它 rebase 到 P19 上面，git **完全没有报冲突**，
+却把 P19 写的 bundle 记录和 worklog 索引行**整行删掉了** —— 因为两个人写在同一段、
+用了同一个编号。
+
+**没有冲突不等于没有损失。** rebase 或 merge 之后，做这一步：
+
+```bash
+git diff origin/main -- docs/ | grep '^-' | grep -v '^---'
+```
+
+**任何一行是「减号」而且不是你自己写的 → 你吃掉了别人的东西，去 `origin/main` 捞回来。**
+
+同一天还有一个：**编辑落在主 checkout，不是自己的 worktree** —— 结果 `tsc` 跑的是
+没改过的 code，一片绿。**改完第一件事先 `git diff --name-only`，看到空的就是你改错地方了。**
 
 ### 不准做
 

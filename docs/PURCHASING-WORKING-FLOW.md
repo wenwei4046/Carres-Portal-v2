@@ -43,32 +43,93 @@
 Purchasing   [ To Order ]  [ Purchase Orders ]  [ Receiving ]  [ Claims ]  [ Settings ]
 ```
 
-Buying and receiving are the same job on the same PO, done by the same people. Receiving is
-**not** a separate menu item: warehouse staff reach it through their own login landing page,
-which removes the only usability reason for splitting it out. `Settings` is manager-only.
+Buying and receiving are one continuous flow on the same PO, and that is why they are five
+tabs of one module rather than two menu items. **They are not done by the same people**, and
+the rule below turns on exactly that: the PO-duty holder buys, the receiving duty holder
+counts, and the two duties are held by different people who rotate. Receiving is still **not**
+a separate menu item — warehouse staff reach it through their own login landing page, which
+removes the only usability reason for splitting it out. `Settings` is manager-only.
 
-**HOW THE WORK DIVIDES BETWEEN THE TABS — FROZEN 2026-07-29 by Loo. This is the governing
-rule, and it is measurable:**
+*(This paragraph read "the same job … done by the same people" until 2026-08-05. It was the
+plain-language cover under which two of the buyer's actions sat on the warehouse's page for a
+week: if it is all one team, it does not matter which tab a thing is on. It does matter, and
+Q12 is what it cost to find out.)*
 
-> **Work whose deadline is derived from the CUSTOMER commitment belongs to To Order.**
-> **Work whose deadline is derived from the physical movement or arrival of GOODS belongs to
-> Receiving.**
+**HOW THE WORK DIVIDES BETWEEN THE TABS — RULED 2026-08-05 by Loo (card Q12). This is the
+governing rule, and it is measurable:**
 
-Every action's Due is written in §3, so no case has to be argued:
+> **ROLE-ANCHOR. Work done by ASKING THE SUPPLIER for something belongs to the buyer.**
+> **Work done by HANDLING THE GOODS belongs to Receiving.**
+
+The test is the OBJECT of the work, never its deadline: a phone call takes a fact the factory
+holds, and a check-in takes units on a floor. Every action's task owner is written in §3, so
+no case has to be argued — the buyer's actions are the PO-duty holder's, Receiving's are the
+receiving duty holder's, and **the rule and the owner now say the same thing**.
 
 ```
-To Order    Issue PO · Confirm ready date
-Receiving   Confirm tomorrow's delivery · Check in · Confirm balance delivery date
-Claims      Confirm what happens next
+To Order          Issue PO
+Purchase Orders   Confirm ready date · Confirm tomorrow's delivery · Confirm balance delivery date
+Receiving         Check in
+Claims            Confirm what happens next
 ```
 
 **Every action of the module has exactly one home** — none in two tabs, none in none.
 
-The sentence above about buying and receiving being the same job stays true of the PEOPLE and
-of the tab bar. It is **not** the rule that decides which tab an action lives on. Neither is
-*"goods are not yet secured → To Order"*: issuing the PO is itself what secures the goods
-(§4 rung 3), so read literally that sentence would put `Confirm ready date` on the wrong side.
-It survives only as a plain-language explanation for a person.
+**§1 DECIDES THE BUYER / WAREHOUSE BOUNDARY AND NOTHING ELSE.** Which of the buyer's tabs an
+action lives on is a second, different question — *has a purchase order been issued yet?* —
+and its home is [`PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §12.1:
+To Order asks *what do we not have yet*, Purchase Orders asks *what did we already ask for,
+and where is it*. `Issue PO` is the act that creates the document, so it can only be To Order's.
+
+**WHY THE DEADLINE RULE WAS DROPPED.** From 2026-07-29 to 2026-08-05 this section sorted work
+by **where its deadline came from** — a customer commitment sent it to To Order, the movement
+or arrival of goods sent it to Receiving — and that put both supplier calls on the warehouse's
+page. *(Its wording is deliberately not reproduced here: a retired rule quoted in full reads
+like a live one to the next person who greps this file.)* Three things measured on 2026-08-05
+defeated it:
+
+- **This file already contradicted it.** §3 has given `Confirm tomorrow's delivery` and
+  `Confirm balance delivery date` to the **PO-duty holder** — the buyer — since the day it was
+  written, while §1 put them on Receiving. One file, two answers, both frozen.
+- **The tab the work belongs to did not exist in its present form when the work was assigned
+  away from it.** On 2026-07-29 the `Purchase Orders` tab rendered a per-supplier kanban
+  (Nice Future Mattress · Ohana Sofa · Ohana Bed Frame). The Supplier Execution Register — the
+  promise ledger, the date door, `Print PDF` and the whole Communication band — was created on
+  **2026-08-03**, five days after the boundary was frozen.
+- **One supplier date had already grown TWO doors on TWO tabs**, both writing
+  `POST /api/operation/pos/:id/tomorrow-delivery`. The boundary was unclear enough that the
+  same fact grew a second editing surface without either lane noticing — and the richer of the
+  two, the one carrying the reason, the remarks and the shift, is the one on Purchase Orders.
+  The business had already moved the work; the document had not.
+
+**A deadline is a property of the CLOCK; a tab is a place a person works.** The old rule sorted
+work by when it turns late, and people are not organised that way.
+
+**`Confirm ready date` — RULED BY LOO, 2026-08-05. It belongs to Purchase Orders.**
+
+> *"Move `Confirm ready date` to Purchase Orders too — same ruling. §5.3 already says a
+> requirement leaves To Order the moment a PO exists, and the only door that closes this
+> action is on the Purchase Orders expand. Queue and door in one place. Delete the To Order
+> assignment whole."*
+
+**The queue lives where the door is. Both are Purchase Orders. The To Order assignment is
+deleted, not deprecated** — no "moved, see below", no second version kept for reference.
+
+**The code was already there and only these documents were not, measured 2026-08-05.**
+`OperationToOrder.tsx` and `to-order.ts` mention `Confirm ready date` **zero times**; the
+Purchase Orders expand carries the field AND the RPC behind it — `purchasing_record_ready_date`
+(migration **0318**, an append-only `po_supplier_promises` ledger plus the current answer on
+`purchase_orders.expected_ready_date`), reached through `apps/api/src/routes/operation/pos.ts`.
+
+**That also RETIRES P7's gap G6**, which reads *"`Confirm ready date` cannot be closed — no
+route in the portal writes `expected_ready_date`; the queue can only grow."* True when it was
+written and false since 0318. **A gap that has been closed and left on the list is a chat-day
+spent rebuilding something that exists** — the same trap the PO print renderer set.
+
+**Live effect today: none. 0 of 21 purchase orders carry a ready date**, so no row moves
+either way. This is a document correction, and the reason it still matters is the one the
+Claims chat paid for hours earlier: a document that says the wrong place is worse than no
+document, because a chat believes it.
 
 **To Order is the PLANNING WORKSPACE and it stores no work-in-progress object of its own**
 (Loo, 2026-07-30 — the Purchasing clean restart). How its information is organised — the six
@@ -189,6 +250,10 @@ purchasing needs and Orders did not: **what it is counted per**, and **what make
 re-check it**. Without those two, a queue count and its list disagree, and a finished action
 stays on screen.
 
+**Each one also names its TAB** (Q12, 2026-08-05). It is written per action rather than left
+to §1's rule because that is what makes the rule checkable: an action naming no tab, or two,
+is the defect the rule exists to stop.
+
 **The exact wording of every action** — queue tile, row line, button, done message, empty
 state — lives in the dictionary in `docs/COPY-STANDARD.md`. This file never spells a label a
 second time.
@@ -214,6 +279,8 @@ document.
   `Call {supplier} — confirm ready date`. Folding the two together would leave `Issue PO`
   open with nothing left to issue, which is the one thing an action may never do
 - **Due** — the order-by date (§2's formula). Red once it has passed
+- **Tab** — **To Order.** It is the buyer's, and no purchase order exists yet for a register
+  of issued purchase orders to hold
 - **Task owner** — the PO-duty holder (`org_duties`)
 - **Counted per** — one row per **supplier**, showing how many lines it holds. The queue
   count and the visible rows both count suppliers, and each row states its line count
@@ -270,6 +337,8 @@ PO number · supplier · items · quantity · delivery address · delivery instr
   record the latest ready date · record the outcome
 - **Completion** — the latest ready date **and** the outcome are recorded
 - **Due** — inside the arrival window: `customer date − production working days − buffer`
+- **Tab** — **To Order today, and it is §1's one OPEN case.** It is the buyer's work either
+  way; what is unsettled is which of the buyer's two tabs, and that is Loo's (§1)
 - **Task owner** — the PO-duty holder
 - **Counted per** — one row per **PO**
 - **Re-checked when** — a ready date is saved · goods are received · the promised date moves
@@ -288,6 +357,8 @@ The action the portal is missing today.
   answer · record the quantity they will send
 - **Completion** — an answer is recorded: **shipping**, or **delayed with a new date**
 - **Due** — the day it appears. It is a one-day action
+- **Tab** — **Purchase Orders** (moved there from Receiving by §1's role-anchor ruling,
+  2026-08-05). It asks the factory for a fact; nothing has arrived for anybody to handle
 - **Task owner** — the PO-duty holder
 - **Counted per** — one row per **PO**
 - **Re-checked when** — the expected date moves · goods are received
@@ -303,6 +374,8 @@ delay conversation, and it never opens a call to the customer.
   supplier's delivery order number · photos
 - **Completion** — the received quantity is recorded for each line
 - **Due** — the day the goods arrive
+- **Tab** — **Receiving.** It is the ONLY action of the module that handles goods, and after
+  the 2026-08-05 ruling it is the only action that tab carries
 - **Task owner** — the receiving duty holder
 - **Counted per** — one row per **arrival**, not per PO. A PO that arrives in three
   deliveries is three check-ins
@@ -321,6 +394,9 @@ for the balance turns one purchase into two and nothing reconciles afterwards.
   record the reason
 - **Completion** — a date for the balance is recorded
 - **Due** — the working day after the short delivery
+- **Tab** — **Purchase Orders** (moved there from Receiving by §1's role-anchor ruling,
+  2026-08-05). **A count DISCOVERS it and a phone call CLOSES it**, and the tab follows the
+  work, not the discovery — the shortfall is goods that have not arrived
 - **Task owner** — the PO-duty holder
 - **Counted per** — one row per **PO line**
 - **Re-checked when** — goods are received · the PO is stopped by Operations
@@ -330,6 +406,9 @@ for the balance turns one purchase into two and nothing reconciles afterwards.
 **Already built** — the claim lifecycle (R2 · R3 · R4, `supplier_claims`). It is named here
 because it belongs to the purchasing flow, not because it is work: this file must not
 describe it a second way. See `docs/receiving-claim-execution-queue.md`.
+
+- **Tab** — **Claims.** It is the buyer's work under §1 and it has its own tab, so the
+  role-anchor ruling of 2026-08-05 moved nothing here.
 
 **The verb is `Call`, not `Contact`** (Loo, 2026-07-28). The portal has exactly five verbs and
 `Contact` was a sixth for behaviour `Call` already covers: reach the outside party · get an
@@ -356,6 +435,11 @@ future supply (0299) — otherwise the planner keeps believing goods are coming 
 
 Display order is not a gate chain. **A PO can carry several open actions at once**, and one
 never hides another (Law 1).
+
+**This is a RANKING, not a screen.** Since the 2026-08-05 ruling the five actions do not all
+appear on one tab — rung 1 pairs `Check in` (Receiving) with a call that is now Purchase
+Orders' — so each surface ranks the actions it carries, by this order. Which tab carries which
+is §1's, and is not restated here.
 
 ## 5 · Gates
 
@@ -419,20 +503,28 @@ the drawer on its FIRST tab, and closing keeps the filter and the scroll — one
 every module.
 
 **The queue tiles** (each is a count of open actions, and its name IS the action). **They are
-not one set on one screen — each lives on exactly ONE tab**, decided by §1's deadline-anchor
-rule. A chat that reads this as a single list will build a tile for an action the tab cannot
-count:
+not one set on one screen — each lives on exactly ONE tab**, decided by §1's role-anchor rule.
+A chat that reads this as a single list will build a tile for an action the tab cannot count:
 
 ```
-To Order    Issue PO  ·  Confirm ready date
-Receiving   Confirm tomorrow's delivery  ·  Check in  ·  Confirm balance delivery date
-Claims      Confirm what happens next
+To Order          Issue PO
+Purchase Orders   Confirm ready date  ·  Confirm tomorrow's delivery  ·  Confirm balance delivery date
+Receiving         Check in
+Claims            Confirm what happens next
 ```
 
-**On To Order the three rank in that order** (`docs/ACTION-FLOW-STANDARD.md` Law 4 rung 3,
-frozen 2026-07-29): a broken supplier commitment first, then work already prepared, then work
-not yet started. **All three words are ruled** and their five strings live in
-`docs/COPY-STANDARD.md`, the canonical home.
+**To Order now carries ONE tile, `Issue PO`** — Loo moved `Confirm ready date` to Purchase
+Orders on 2026-08-05 (the ruling is at the head of this file). The ranking question it used to
+raise is gone with it: one tile has nothing to rank against.
+
+**On Purchase Orders the three rank `Confirm ready date` first**
+(`docs/ACTION-FLOW-STANDARD.md` Law 4 rung 3): a broken supplier commitment outranks the two
+delivery calls. **All three words are ruled** and their five strings live in
+`docs/COPY-STANDARD.md`, the canonical home. *(This paragraph twice said something that had
+stopped being true: first "the three rank in that order" printed in reverse, a leftover from
+when the rung held `Send PO` — corrected by Q12 on 2026-08-05; then the two-tile version it was
+corrected INTO, which Loo's ruling retired hours later. Both are recorded rather than quietly
+replaced, because this paragraph is the one that keeps going stale.)*
 
 **The last tile is `Confirm what happens next`, not `Claims`.** A tile's name IS its action
 (COPY-STANDARD); `Claims` is the TAB, which is a place, and a place and an action may not
@@ -479,25 +571,158 @@ contain a to-do word** (`need`, `pending`, `TBD`) — `docs/COPY-STANDARD.md`.
 **No human types a purchasing status.** Every state below is DERIVED from stored quantities,
 so two screens can never disagree and no repair job is ever needed.
 
-The unit is the **PO line**. Per line, the system stores only what somebody actually records:
+**This section is written against the code, and the code is the authority** (card R10,
+2026-08-05). What stood here before published a two-rung ladder the portal has never run, and
+it misled two chats in this lane — the second while it was reading this very section in order
+to write something else. The functions named below are the ones the screens actually render
+from; if this text and they ever disagree again, they win and this text is the defect.
+
+### What is stored
+
+**The unit of work, and of storage, is the PO line.** Per line, the system stores only what
+somebody actually records:
 
 ```
-required_qty     what the customer ordered           order_lines
-po_qty           what we ordered from the supplier   purchase_order_lines.qty
+qty              what we ordered from the supplier   purchase_order_lines.qty
 received_qty     what physically arrived good        purchase_order_lines.received_qty
 damaged_qty      arrived broken                      purchase_order_lines.damaged_qty
 wrong_item_qty   arrived, but the wrong thing        purchase_order_lines.wrong_item_qty
 ```
 
-Everything on screen is computed from those:
+Demand — what somebody still wants — is stored in two other places, and To Order reads both:
 
 ```
-To order          required_qty > po_qty
-Ordered           po_qty > 0
-Part received     0 < received_qty < po_qty
-Fully received    received_qty >= po_qty
-Balance owed      po_qty − received_qty
+qty              what the customer ordered           order_lines.qty
+remaining_qty    what a typed demand still needs     purchase_demands.remaining_qty
+                 (GENERATED: qty − issued_qty, 0320)
 ```
+
+**There is no `required_qty` column and there never was one** — the name this section
+published greps to zero across the whole repository. Typed demand, the second row above, is
+not in the old table at all, and it has been feeding To Order since 0319/0320.
+
+### What is derived, and over which lines
+
+**The unit of the derived STATE is not the line — it is whatever SET of lines the screen is
+showing.** `poReceivingProgress` (`packages/shared/src/po-receiving.ts`) is the one place
+these quantities become words. It sums the lines it is handed and returns ONE state for that
+set:
+
+| Screen | Lines handed in | So the state is |
+|---|---|---|
+| Purchase Orders row · Receiving row · Warehouse Incoming | every line of the PO | per PO |
+| the balance-delivery-date modal | one line | per line |
+
+Same function, same rule, different scope. Reading a per-line formula as the thing that
+drives a per-PO pill is exactly the mistake this section used to invite.
+
+Summed over whichever set is in scope:
+
+```
+ordered          Σ qty
+received         Σ min(qty, received_qty)
+issueQty         Σ damaged_qty  +  Σ wrong_item_qty
+pendingDelivery  Σ ( qty − min(qty, received_qty) )
+```
+
+### The receiving ladder — FOUR rungs, and the ORDER is the rule
+
+**The first rung that matches wins.** The order is not a tidy listing, it IS the rule, and
+reading these four conditions as independent tests is how the wrong formula got published.
+
+```
+1  Fully received       ordered > 0  AND  received >= ordered
+2  Receiving issue      issueQty > 0
+3  Partially received   received > 0        → prints `Partially received (8/10)`
+4  In transit           otherwise
+```
+
+Read downwards, each rung is a business decision:
+
+- **`Fully received` outranks damage on purpose.** Damaged units that have since been
+  replaced leave their counters behind; the state describes TODAY. Without this rung first,
+  a PO that was made good would stay red forever with no button to clear it.
+- **`Receiving issue` outranks `Partially received`**, and it is a state this section did
+  not have at all. 5 of 10 in with 1 damaged reads `Receiving issue` on screen — never
+  `Partially received` — because it is the row a human must act on.
+- Only rung 3 carries a count in its word.
+
+### The balance number, and why it is clamped
+
+`received_qty` is clamped to `qty` **per line, before summing**. `qty − received_qty` on its
+own can go negative, and a stray over-receipt — a data repair, a legacy import — would then
+make a PO read as more received than was ordered. Clamped, `pendingDelivery` can never be
+negative and `Fully received` can never be overshot into.
+
+**Its word is `Pending delivery`** (R1's locked vocabulary law), and the reason is business
+rather than style: the goods are not lost, the supplier simply has not sent them yet.
+Nothing may call this number Missing, Short, Lost — **or `Balance owed`, which is what this
+section used to call it.**
+
+**A damaged unit counts as pending delivery, not as received.** It physically arrived, but
+the supplier still owes a good one. That is also why `received_qty` never absorbs damaged or
+wrong-item units: the stock ledger may only ever gain sellable goods.
+
+### The register's rail runs a DIFFERENT ladder, and that is deliberate
+
+The Purchase Orders register's left rail does not run the receiving ladder. `poWorkStateOf`
+(`packages/shared/src/po-workspace.ts`) reads the PO's own status, the same clamped
+quantities and the supplier's date — and deliberately **not** damaged or wrong item, because
+this ladder answers *where are the goods?*, not *did they arrive clean?*
+
+```
+1  Cancelled              purchase_orders.status = 'cancelled'
+2  Completed              status is not 'open'  OR  ordered > 0 AND received >= ordered
+3  Ready to Receive       received > 0            ← something checked in
+4  Waiting Supplier Date  no supplier date on the PO
+5  Waiting for Goods      otherwise
+```
+
+**`Overdue` is not a rung here.** The supplier's date passing is a sub-state of
+`Waiting for Goods` and raises an ACTION; it never becomes a progress word of its own
+(Jess's state machine, 2026-08-02).
+
+**`purchase_orders.status` is a three-value enum** — `open` · `received` · `cancelled`
+(`po_status`, 0001) — and it is a stored column, not a screen word. It is not the five-word
+Operation Status axis below, and the rule that `Open` may never appear in the UI is about
+the word on screen, not about this formula.
+
+**Two ladders, two questions, and they are never merged.** A screen may show both.
+
+### What "still to buy" really asks
+
+**It is not `required_qty > po_qty`.** That test was published here, it is wrong in two ways
+that both change what gets bought, and neither of its two names is a real column — the second
+is `purchase_order_lines.qty` and is written `qty` below. What To Order computes
+(`apps/api/src/routes/operation/to-order.ts` → `netRequirements` in
+`packages/shared/src/net-requirements.ts`) is a greedy allocation of demand against supply:
+
+```
+demand    order_lines.qty                     customer orders
+        + purchase_demands.remaining_qty      typed demand, > 0 and not cancelled
+
+supply    Σ ( qty − received_qty )            purchase_order_lines
+                                              where purchase_orders.status = 'open'
+                                              and that remainder is above zero
+
+to order  demand − supply, allocated earliest deadline first
+```
+
+- **A part-received line still supplies its balance.** A PO of 10 with 6 received covers 4
+  of the demand, not 10 and not 0. The ordered quantity alone would count all 10 and under-buy.
+- **A cancelled PO supplies nothing at all.** `purchase_orders.status = 'open'` is the filter,
+  so the requirement returns to To Order the moment a PO is cancelled. The ordered quantity
+  alone would count it forever and never re-buy.
+
+**Free ready stock is a supply pool too, and it is deliberately not consumed automatically**
+(`consumeFreeStock` defaults off — goods are labelled per order). The engine computes the
+offer and a human decides whether to take it (card P10).
+
+**There is no generic `Ordered` state on screen** (Jess, 2026-08-01, final). A row whose item
+has no purchase order says `Yet to Order`; a row that has one shows the purchase order's
+number, and the list of numbers is itself the ordered set. The only order-level word is
+`Partly ordered` — some items bought, some still to buy — which is a fact about the ORDER and
+could never be said on a row.
 
 **TWO INDEPENDENT STATUS AXES — FROZEN 2026-07-29 by Loo. They are never merged:**
 
@@ -516,9 +741,9 @@ A purchase order exists only once it has been issued, so there is no state befor
 and no stored object that could occupy one.
 See [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) §2–§3.
 
-**DEMAND THAT NEVER REACHED THE PLAN IS ALSO NOT IN THE TABLE ABOVE.** `required_qty` only
-means anything for a line the plan could read. Two kinds of demand cannot be described by any
-line above and **may never be silently discarded**:
+**DEMAND THAT NEVER REACHED THE PLAN IS ALSO NOT IN THE ARITHMETIC ABOVE.** A demand quantity
+only reaches "still to buy" for a line the plan could read. Two kinds of demand cannot be
+described by any formula above and **may never be silently discarded**:
 
 - **the configuration is missing** — the supplier cannot be resolved, or production working
   days are not set for that supplier × category (§2)

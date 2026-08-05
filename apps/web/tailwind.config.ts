@@ -178,14 +178,40 @@ export default {
         // font-stretch in CSS. Falls back to Inter / system-ui.
         price: ["Archivo", "Inter", "system-ui", "sans-serif"],
       },
-      /* ⭐ THE OVERLAY SIZES (card D0.5b) — ONE modal width, ONE drawer width,
+      /* ⭐ THE OVERLAY SIZES (card D0.5b) — TWO modal widths, ONE drawer width,
        * ONE dialog height cap. They are named config keys rather than
        * `max-w-lg` / `max-h-[85vh]` in a component for the same reason the type
        * scale is: a number typed into a component is a number the next
        * component types differently. §8 has not written the portal's width
-       * table yet — `PageShell` (D0.5c) does, and takes these over. */
+       * table yet — `PageShell` (D0.5c) does, and takes these over.
+       *
+       * ⭐ P19 ADDED THE SECOND MODAL WIDTH (2026-08-05) AND THE NUMBER IS
+       * MEASURED, NOT CHOSEN. D0.5b's *"a modal that can be told its width is
+       * four widths by next quarter"* is answered by the SHAPE of the change,
+       * not by refusing it: the set is CLOSED at two, both values live here,
+       * and `Modal`'s prop is a union of one literal — so a page still cannot
+       * type a number. Widening `modal` itself was the alternative and was
+       * rejected: its own comment is the reason, most modals really are a
+       * question and two buttons.
+       *
+       * Where 600 comes from, measured in a real browser on the LIVE dialog at
+       * 1440×900 against the app's own stylesheet (P16's method). The binding
+       * string is the longest SKU the picker can offer,
+       * `SVC-DISPOSE-BEDFRAME` — 144.0px of 12px JetBrains Mono — and the
+       * picker's SKU column is 30% of the table less 16px of cell padding:
+       *
+       *     modal   SKU column   available   144.0 of ink fits?
+       *      512      142.8        126.8     NO  ← clipping on production today
+       *      560      157.2        141.2     NO
+       *      600      169.2        153.2     YES, 9.2px of headroom
+       *
+       * The algebraic minimum is 583; 600 is the round number above it, and
+       * the 9.2px is deliberate — P16 shipped a column at exactly its
+       * measurement once and the browser ellipsized it, because text metrics
+       * are fractional and box widths round. */
       maxWidth: {
         modal: "512px", // a question, an answer, and two buttons
+        "modal-wide": "600px", // a header and a LINE LIST — see above
         drawer: "560px", // a record read beside the list it came from
       },
       maxHeight: {

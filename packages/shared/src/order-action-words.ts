@@ -22,8 +22,16 @@
  * reading `Call  — confirm ready date` would be worse than the honest
  * `Call supplier — confirm ready date`.
  *
- * PURE — no clock, no I/O, no locale beyond the caller's own money string.
+ * PURE — no clock, no I/O. It owns no date spelling (`fmt-date.ts` is that one
+ * home) and, since C11, it owns no money spelling either: the amount arrives as
+ * a NUMBER and is printed by `fmtMoney`. That line used to read "no locale
+ * beyond the caller's own money string", and the caller's own money string is
+ * exactly what put `Collect RM RM 11,246.00` on 28 live rows — this module
+ * already owned half the money spelling (the `RM ` prefix) and delegated the
+ * half that could go wrong.
  */
+
+import { fmtMoney } from "./money-format";
 
 export type OrderActionKey =
   // `send_po` is RETIRED and the verb `Send` with it, and it stays banned from
@@ -48,8 +56,22 @@ export interface OrderActionParties {
   supplier?: string | null;
   logistics?: string | null;
   customer?: string | null;
-  /** `Collect RM {amount}` — the caller's formatted integer, WITHOUT "RM". */
-  amount?: string | null;
+  /**
+   * `Collect RM {amount}` — the amount owed, as a NUMBER.
+   *
+   * **C11: it is a number on purpose, and that is the whole fix.** It used to be
+   * "the caller's formatted integer, WITHOUT RM", which asked every caller to
+   * remember two things this module already knew — and both were got wrong on
+   * live screens: the collections desk passed an already-`RM`-prefixed string
+   * (`Collect RM RM 11,246.00`, on all 28 rows) and four other call sites passed
+   * a formatter that threw the sen away (`RM 1,251` for RM 1,250.50).
+   *
+   * A number can be neither. The prefix and the two decimals are `fmtMoney`'s,
+   * so a sixth caller cannot reintroduce either shape — `tsc` refuses the string
+   * before a reviewer sees it. `null` still means "we do not know", which is a
+   * different thing from zero and still prints no figure.
+   */
+  amount?: number | null;
   /** C3 — the `Delivering {date} · {slot}` FACT. Both already formatted by the
    *  caller (`27 Jul`, `12pm–3pm`): this module owns WORDS and never dates.
    *  Absent → the bare `Delivering`, which is the right thing to print in a
@@ -94,10 +116,13 @@ function party(name: string | null | undefined, role: string): string {
 }
 
 /** The money half of the collect action. `null` amount = we do not know it, so
- *  the label says what to do without inventing a figure. */
+ *  the label says what to do without inventing a figure — which is a different
+ *  answer from zero, and zero still prints (`RM 0.00`).
+ *
+ *  C11 — the SPELLING is `fmtMoney`'s and never this module's, and never a
+ *  caller's: two decimals always, one `RM`, one home. */
 function amountBit(p: OrderActionParties): string | null {
-  const a = (p.amount ?? "").trim();
-  return a.length > 0 ? `RM ${a}` : null;
+  return p.amount == null ? null : fmtMoney(p.amount);
 }
 
 const WORDS: readonly OrderActionWord[] = [
@@ -291,7 +316,8 @@ export function orderActionQueue(key: OrderActionKey): string {
  * One row's line — verb + named party + measurable object.
  *
  * `collect` is the one action whose object is money, so it reads
- * `Collect RM 2,455 from John Tan` from `{ amount, customer }`.
+ * `Collect RM 2,455.00 from John Tan` from `{ amount, customer }` — the amount
+ * a NUMBER, printed to the cent by `fmtMoney` (C11).
  */
 export function orderActionLine(
   key: OrderActionKey,
@@ -307,10 +333,10 @@ export function orderActionLine(
 
 /**
  * The money PILL — the amount without the customer, for the narrow second pill
- * in the Actions column (`Collect RM 2,455`). The row line names the customer;
- * the pill sits beside their name already.
+ * in the Actions column (`Collect RM 2,455.00`). The row line names the
+ * customer; the pill sits beside their name already.
  */
-export function collectPillLabel(amount: string | null | undefined): string {
+export function collectPillLabel(amount: number | null | undefined): string {
   const money = amountBit({ amount });
   return money ? `Collect ${money}` : "Collect";
 }

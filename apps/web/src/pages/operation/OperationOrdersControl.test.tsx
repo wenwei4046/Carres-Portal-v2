@@ -1293,16 +1293,30 @@ describe("orders export", () => {
   it("DEADLINE band is multi-select — two buckets can be active at once (B redesign)", () => {
     wrap(<OperationOrdersControl />);
     const grp = within(screen.getByTestId("filter-deadline"));
-    const overdue = grp.getByRole("button", { name: /^Overdue/ });
+    // C14 — the band's buckets are the three FUTURE windows now; `Overdue`
+    // moved to its one home in QUEUES, so this reads over two survivors.
+    const dueSoon = grp.getByRole("button", { name: /^Due ≤3d/ });
     const nextWeek = grp.getByRole("button", { name: /^Next week/ });
-    fireEvent.click(overdue);
+    fireEvent.click(dueSoon);
     fireEvent.click(nextWeek);
-    expect(overdue).toHaveAttribute("aria-pressed", "true");
+    expect(dueSoon).toHaveAttribute("aria-pressed", "true");
     expect(nextWeek).toHaveAttribute("aria-pressed", "true");
     // A second click clears just that one (still multi, independent).
-    fireEvent.click(overdue);
-    expect(overdue).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(dueSoon);
+    expect(dueSoon).toHaveAttribute("aria-pressed", "false");
     expect(nextWeek).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("the DEADLINE band holds only future windows — Overdue is not one of them (C14)", () => {
+    wrap(<OperationOrdersControl />);
+    const grp = within(screen.getByTestId("filter-deadline"));
+    // The group's own collapse toggle is a button too; the PILLS are the ones
+    // that carry a trailing count.
+    const pills = grp
+      .getAllByRole("button")
+      .map((b) => b.textContent?.trim() ?? "")
+      .filter((t) => /\d$/.test(t));
+    expect(pills).toEqual(["Due ≤3d 0", "This week 0", "Next week 0"]);
   });
 });
 
@@ -2202,20 +2216,46 @@ describe("Delivery column (T1 booking truth)", () => {
       .find((r) => r.textContent?.includes(`SO-${so}`))!;
   }
 
-  it("confirmed → date · slot; provisional → logistics said; assigned-no-date → the action that closes it; every banned gap-word renders NOWHERE", () => {
+  it("confirmed → date · slot; provisional → logistics said; every banned gap-word renders NOWHERE", () => {
     wrap(<OperationOrdersControl />);
     expect(within(row(2001)).getByText("27 Jul · 9–11 AM")).toBeInTheDocument();
     expect(within(row(2002)).getByText(/logistics said 27 Jul/)).toBeInTheDocument();
-    expect(within(row(2003)).getByText("NETS — confirm delivery date")).toBeInTheDocument();
     expect(screen.queryByText(/unscheduled/i)).toBeNull();
     expect(screen.queryByText(/not booked/i)).toBeNull();
     expect(screen.queryByText(/need booking/i)).toBeNull();
-    // The FACT slot carries the action WITHOUT its verb — its neighbours in
-    // that cell are facts too. The Actions pill is a separate, verb-led string
-    // and on these rows it is still the STOCK action (goods lead the ladder).
+  });
+
+  it("C14 · assigned-with-no-date shows the CARRIER and not the sentence Actions already carries", () => {
+    wrap(<OperationOrdersControl />);
+    // SO-2003 is the gap row: a carrier, no provisional date, no confirmation.
+    // Until C14 this cell printed `NETS — confirm delivery date` while the
+    // Actions cell one column over printed `Call NETS — confirm delivery
+    // date`. MEASURED on production 2026-08-05: the same fact on 30 of 30 data
+    // rows, and BOTH cells truncated carrying it.
+    const cell = within(row(2003));
+    expect(cell.getByText("NETS")).toBeInTheDocument();
+    expect(cell.queryByText("NETS — confirm delivery date")).toBeNull();
+  });
+
+  it("C14 · the sentence is gone from the whole LIST, not just from one fixture row", () => {
+    // A per-row assertion only proves the branch its fixture reaches. This one
+    // is over the rendered page: the verb-less gap fact may not appear at all.
+    wrap(<OperationOrdersControl />);
+    // The verb-LESS form is the duplicate; an exact-string query, because
+    // `Call NETS — confirm delivery date` legitimately ends the same way and a
+    // loose regex would match the very line this card is protecting.
+    expect(screen.queryByText("NETS — confirm delivery date")).toBeNull();
+    // ...and that protected line is still there. Same words, one home each:
+    // `deliveryDateGapFact` still lives, in the drawer badge.
     expect(
-      within(row(2003)).getByText(/^NETS — confirm delivery date$/),
-    ).toHaveClass("t4-caption");
+      screen.getAllByText(/Call NETS — confirm delivery date/).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("C14 · the toolbar's PIC chip row is gone — the rail's TEAM group is its one home", () => {
+    wrap(<OperationOrdersControl />);
+    // `Everyone` was the row's clear-state chip and existed nowhere else.
+    expect(screen.queryByRole("button", { name: /^Everyone/ })).toBeNull();
   });
 
   it("a provisional row never paints the green booking text (green is the customer's yes only)", () => {
@@ -2310,7 +2350,10 @@ describe("The three dots (C10 · Law 6 · ORDERS-WORKING-FLOW §7)", () => {
     expect(rowDotsOf(o, READY, NO_ETA, NO_LOGI)[2].state).toBe("green");
     const red = rowDotsOf(makeRow({ id: "y", so: 2, ...owing }), READY, NO_ETA, NO_LOGI)[2];
     expect(red.state).toBe("red");
-    expect(red.title).toBe("Money — RM 4,000 outstanding");
+    // C11 — to the cent. This read `RM 4,000` until 2026-08-05, which was the
+    // rounding half of the bug: the dot's own tooltip built its money string by
+    // hand, beside the label rather than through it.
+    expect(red.title).toBe("Money — RM 4,000.00 outstanding");
     // An order nobody has priced: 37 live rows look like this. A number nobody
     // knows may not paint an alarm (ORDERS-WORKING-FLOW §2).
     const unpriced = makeRow({
@@ -2526,7 +2569,8 @@ describe("Actions column · +N and the delivering FACT (C3)", () => {
   it("the +N names what it is hiding and opens the drawer's full list", () => {
     wrap(<OperationOrdersControl />);
     const more = within(row(3001)).getByTestId("next-more");
-    expect(more.getAttribute("title")).toContain("Collect RM 2,455 from John Tan");
+    // C11 — the figure carries its sen (it read `RM 2,455` before 2026-08-05).
+    expect(more.getAttribute("title")).toContain("Collect RM 2,455.00 from John Tan");
     fireEvent.click(more);
     expect(screen.getByTestId("drawer-stub")).toHaveAttribute("data-order-id", "three");
   });
@@ -2641,15 +2685,25 @@ describe("The imported archive is excluded from WORK, never from the record (C13
     ).toBe(false);
   });
 
-  it("Overdue counts the real order only — 1, not 3, in BOTH of its homes", () => {
+  it("Overdue counts the real order only — 1, not 3 — and says it in ONE place", () => {
     wrap(<OperationOrdersControl />);
-    // `Overdue` is deliberately rendered twice — the QUEUES row and the
-    // DEADLINE bucket share `dueEntries` (the file's own comment: "same state").
-    // Asserting over both at once is what proves they cannot drift apart.
+    // C13 asserted this over BOTH homes, because `Overdue` was rendered twice
+    // (the QUEUES row and the DEADLINE bucket, sharing `dueEntries`) and
+    // reading both at once proved they could not drift.
+    // C14 removed the drift by removing the second home: two renders of one
+    // filter is the duplication this card exists to end, so the stronger
+    // assertion is now that there is exactly ONE of them.
     const overdues = screen.getAllByRole("button", { name: /^Overdue/ });
-    expect(overdues).toHaveLength(2);
-    // 1 = the native miss. 3 = what the page said before this card.
-    for (const b of overdues) expect(queueCount(b)).toBe(1);
+    expect(overdues).toHaveLength(1);
+    // 1 = the native miss. 3 = what the page said before C13.
+    expect(queueCount(overdues[0])).toBe(1);
+    // ...and it is the QUEUES row, not the DEADLINE band: a breach is not a
+    // future window, and QUEUES is where the page keeps its alarm.
+    expect(
+      within(screen.getByTestId("filter-deadline")).queryByRole("button", {
+        name: /^Overdue/,
+      }),
+    ).toBeNull();
   });
 
   it("the DELIVERY group skips the archive too — ONE filter reaches every count", () => {
@@ -2665,17 +2719,28 @@ describe("The imported archive is excluded from WORK, never from the record (C13
   });
 
   it("the LOGISTICS facet reads the same scope — a third independent memo", () => {
+    // Give ONE native and ONE archive row the same carrier. `logisticEntries`
+    // is a different memo from `dueEntries`, which is C13's point: the rule is
+    // that ONE filter in `liveScope` reaches every count.
+    listHookState.data = {
+      orders: MIXED.map((o) =>
+        o.id === "n-late" || o.id === "a-late-1"
+          ? { ...o, delivery_partners: { id: "p-nets", name: "NETS" } }
+          : o,
+      ),
+    };
     wrap(<OperationOrdersControl />);
     const grp = within(screen.getByTestId("filter-logistic"));
-    // `logisticEntries` buckets every open order by carrier; with none picked,
-    // the no-carrier row holds the 2 real orders and neither archive row.
-    const counts = grp
-      .getAllByRole("button")
-      .map(queueCount)
-      .filter((n) => !Number.isNaN(n));
-    expect(counts.length).toBeGreaterThan(0);
-    // 3 or 4 is only reachable by counting an archive row as work.
-    for (const n of counts) expect(n).toBeLessThanOrEqual(2);
+    // 1, not 2 — the archive row carries the same carrier and is not work.
+    expect(queueCount(grp.getByRole("button", { name: /^NETS/ }))).toBe(1);
+  });
+
+  it("a carrier with no live orders gets no row, and an empty fleet gets no group (C14)", () => {
+    // Every fixture row is carrier-less, so every carrier counts 0. Before C14
+    // the whole fleet rendered anyway (Jess 2026-07-19) and each row was a
+    // click that could only answer `No orders in this tab.`
+    wrap(<OperationOrdersControl />);
+    expect(screen.queryByTestId("filter-logistic")).toBeNull();
   });
 
   it("the archive rows are STILL in the table — readable, openable, searchable", () => {
@@ -2688,13 +2753,11 @@ describe("The imported archive is excluded from WORK, never from the record (C13
 
   it("clicking Overdue returns exactly the order the count promised", () => {
     wrap(<OperationOrdersControl />);
-    fireEvent.click(
-      within(screen.getByTestId("filter-deadline")).getByRole("button", {
-        name: /^Overdue/,
-      }),
-    );
+    // C14 — `Overdue` now has one home (QUEUES), so this is no longer scoped
+    // to the DEADLINE band. The law under test is unchanged.
+    fireEvent.click(screen.getByRole("button", { name: /^Overdue/ }));
     // The portal's own law: a facet must never print a number its own click
-    // cannot produce. 1 on the pill → 1 row on the click.
+    // cannot produce. 1 on the row → 1 row on the click.
     expect(rowsBySo()).toEqual(["2001"]);
   });
 

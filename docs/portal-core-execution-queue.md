@@ -299,11 +299,51 @@ a WORD sweep and a MONEY law. One card, one concern; they are C12 and C11.
 three files to 0 on its own base. Nothing else in the repo is affected — `supabase/migrations`,
 `apps/api` and `packages/shared` each have **0** files in its diff.
 
-## C11 · A money figure is the money owed (Loo's ruling, 2026-07-28)
+## C11 · A money figure is the money owed — ✅ SHIPPED (PR #619)
 
-**This is not a wording card.** COPY-STANDARD has said `RM 1,250.00` all along; Loo restated it
-on 2026-07-28 with the reason attached — *"收款金额必须与实际应收金额一致，不允许为了视觉统一改变
-金额显示"* — and it is now written into the money section with the two shapes that break it.
+**The fix is a TYPE, not five edits.** `OrderActionParties.amount` was a `string`, and that is
+the whole cause: a string says nothing about whether it is already prefixed or already rounded,
+so both were things a caller could hand the words module — and one caller did each. It is a
+**`number`** now. The module owns the prefix and the two decimals, the caller owns neither, and
+a sixth caller is refused by `tsc` rather than by a reviewer. Four `@ts-expect-error` lines —
+each the exact mistake a live screen made — fail the BUILD if the field ever goes back.
+
+**The card's own premise about `fmtRM` was wrong, measured before anything was touched.** It
+says *"exported and used for non-money too (it is the generic number formatter). Do not widen
+it."* On today's `main` it had **FOUR call sites and all four were `outstanding`** — this file's
+money dot, its row pill, its drawer strip, and the Delivery pane. The three other `fmtRM`s in
+the repo are *separate local functions* in catalog/sofa files. So it was not widened and not
+kept: it is **DELETED**, and the rounding shape stops existing in the money path
+(`maximumFractionDigits:0` greps **1 → 0** in the built bundle).
+
+**One spelling, and it is identity rather than agreement.** `packages/shared/src/money-format.ts`
+is the one home; `apps/web/src/lib/format-currency.rm` **re-exports** it, and
+`OperationPayments`' own local `rm` — a FOURTH copy of the same six lines — is deleted. A test
+asserts `rm === fmtMoney`, not that they produce the same output: the negative control for it is
+a second body that is byte-identical in output and it still fires, because two implementations
+that merely agree is the arrangement under which the third one (a rounding one) grew unnoticed.
+
+**Loo's ruling, unchanged:** *"收款金额必须与实际应收金额一致，不允许为了视觉统一改变金额显示"* —
+COPY-STANDARD has said `RM 1,250.00` all along, and the two shapes that broke it are now
+unexpressible rather than merely forbidden.
+
+**Five negative controls, each a real edit verified on disk**: `amount` back to `string` → **8**
+tsc errors · a rounding `fmtMoney` → **7** · `collectPillLabel(rm(…))` back on the desk → **1** ·
+`fmtRM` reintroduced → **2** · a second `rm` body → **1**.
+
+Gates: shared tsc **0** · web tsc **0** · build clean · shared **2136/2136** (control 2129, +7) ·
+web **16 failed / 2543 passed** against a **DETACHED CONTROL WORKTREE at `origin/main` measuring
+16 / 2536** — the same four §17.7 files, so **zero new failures and +7 tests** ·
+**check-design 8340, identical category for category to the control** (the `▲ +3` on G and I is
+main's own stale baseline, present on both trees). **The control build emitted
+`index-B4JoYeUj.js`, byte-for-byte the bundle §17.1 records as live**, so the toolchain
+demonstrably reproduces production.
+
+**Reported, not fixed:** `Money` (`components/Money.tsx`) still rounds — it is the display
+COMPONENT for prices and live totals, its own recipe, and the card's NOT-in-scope names exactly
+that. It does not render an amount owed on any of the five surfaces.
+
+**What it said, and what was measured:**
 
 **The bug, measured, not inferred** (run against the live shared module):
 
@@ -340,7 +380,61 @@ prints its figure through one of these five sites.
 **Done when:** an owing figure with sen reads the same on the Orders row, its drawer, the
 Delivery module and the collections desk, and matches the ledger.
 
-## C12 · The last `Chase` leaves the portal (was C4's word half)
+## C12 · The last `Chase` leaves the portal — ✅ SHIPPED (PR #615)
+
+**Measured before a word was changed, and the card's own count was wrong by five.**
+**21 → 16.** ① Payments 15 (exactly as written) · ③ drawer 1 · **② Purchase 0** — those five
+strings did not survive to be renamed: `OperationPurchase.tsx` was deleted whole on
+2026-08-01 when To Order was rebuilt from the Golden Template (#534). `OperationToOrder.tsx`
+takes its place in the scanner's list and passes all twelve rules today, so it costs nothing
+and closes the same click's page.
+
+**④'s carve-out was DEAD WEIGHT when it was deleted, and that was measured rather than
+assumed** — `purchasing-words.test.ts:96` stripped `Chase on WhatsApp` · `Nothing to chase
+here` · `items to chase` before asserting, and the regex matched nothing in any of the nine
+lane files. Checked first, then removed: the honest way to retire an exemption is to prove it
+is empty, not to trust that it is.
+
+**ONE BUSINESS DECISION WENT TO LOO AND HE CHANGED THE BUILD.** The `Chased today` family
+reads `last_chased_at`, and the drawer already spelt that same column `Last message copied`
+(C1's words, and ACTION-FLOW Law 8 permits `Message copied` by name). But Payments stamps it
+when it OPENS WhatsApp, so `copied` would have been false on that branch, and the column
+stores only the time. Three options went up — say what the drawer says and accept the
+inaccuracy · make the word true by copying on both branches · defer the six strings. **Loo
+ruled the second**: `send()` now writes the clipboard on both paths, so the sentence on
+screen is exactly what the portal watched. The alternative was to blur wording to fit
+behaviour; this fixes behaviour to fit a true word.
+
+**A word was reaching the screen through a door no source scan can see.** The tone toggle
+rendered its internal key `"chase"` under a `capitalize` class, so the operator read `Chase`
+while every scanner in this repo skipped it as a lone lowercase token. The button has a real
+label now (`Reminder` / `Call text`, the drawer's own live pair for the same two templates) —
+**but the hole is unfixed and is reported, not swept**: any `{key}` under `capitalize` is
+still invisible to the guard.
+
+**Five negative controls, each a real edit verified on disk**: `Chased today` back → 1 ·
+drawer `Last chased {date}` back → 1 (**the interpolation hole; C1's own matcher could not
+see this and the file was the one it was written for**) · queue label hand-spelt → 1 ·
+interpolated `Chase` planted in To Order → 2 · carve-out restored with its string planted →
+2, then carve-out deleted with the same string → **3**, the delta of exactly 1 being the rule
+coming back to life.
+
+**Reported, not fixed** — the `>…<` matcher still spans code when a `>` from `=>` or a
+generic meets a later `<`. It is pre-existing (C1's had it), it produces **0** banned-word
+false positives on all three files today, and it is precisely why the obvious fix for the
+interpolation hole was thrown away: blanking every `{…}` first made it far worse, reporting
+four false positives in the drawer alone (`logistic: chasePartnerName,` and three `pending`
+declarations). That regression is pinned by a test against the real file.
+
+Gates: web tsc **0** · build clean · web suite **16 failed / 2536 passed** against a
+**DETACHED CONTROL WORKTREE at the same commit measuring 16 failed / 2504 passed** — the same
+four §17.7 files, test for test, so **zero new failures and +32 tests**. *(The control's FIRST
+run read 19 in 5 files; the extra was `OperationPurchaseOrders.test.tsx`, the documented
+load-timing flake, and the second run settled at 16 — recorded rather than quoted once.)*
+**check-design 8340, identical category for category to the control.** The `▲ +3` on G and I
+is main's own stale baseline, present on both trees.
+
+## C12 · The card as written (kept for the record)
 
 **Goal:** the 21 banned strings C4 found and R8 did not reach, plus the shared scanner that
 finds them. **The words are all ruled** — the last open one, the WhatsApp button, was ruled by
@@ -1321,6 +1415,26 @@ truncate: the premise was 42% too wide. **Re-measure before moving a single widt
 - A test asserts the `Delivery` cell no longer contains the action sentence.
 - No word is added. Every surviving string is one COPY-STANDARD already audits.
 
+### FOLDED IN by the manager, 2026-08-05 — C11's leftover belongs to this card
+
+C11 shipped and reported one thing it deliberately did not fix, **measured live**:
+
+```
+Orders,   Owing facet   RM 74,783        ← rounded by hand at OperationOrdersControl.tsx:3060
+Payments, same figure   RM 74,783.00
+```
+
+**One number, two spellings, two pages.** That is this card's own concern — *nothing says the
+same thing twice* — so it lands here rather than in a card of its own. C11 was right to leave
+it: a facet total is a ROLLUP, not a collect action, and its source scan deliberately does not
+ban `Math.round` because that line would fail it.
+
+**Use `fmtMoney`, the one home C11 built.** Do not hand-format, and do not widen C11's scan —
+this is one call site, and after it the scan may ban `Math.round` in this file too.
+
+**Loo's standing ruling covers it:** 「收款金额必须与实际应收金额一致，不允许为了视觉统一改变金
+额显示」. A rollup that drops the cents to look tidy is the same trade he refused.
+
 **Must NOT.**
 
 - ❌ remove a STAGE tab because it counts zero. A stage is not a queue — P2's ruling; there is
@@ -1336,10 +1450,10 @@ truncate: the premise was 42% too wide. **Re-measure before moving a single widt
 | C2 | ✅ **LIVE** 2026-07-27 — two layers; the drawer lists every open action | #466 |
 | C3 | ✅ **LIVE** 2026-07-27 — the `+N`, and `Confirm delivery` becomes a fact | #479 |
 | C4 | ⛔ **RETIRED 2026-07-28 — re-cut as C11 + C12.** PR #484 stays OPEN and untouched; it is where the unshipped work lives | [#484](https://github.com/wenwei4046/Carres-Portal-v2/pull/484) (open, not to be merged as-is) |
-| C11 | ⬜ **a money figure is the money owed** (Loo 2026-07-28) — 5 call sites, 2 failures, 1 cause. **ORDERS lane**, not alongside ⑧ D0.5c | — |
-| C12 | ⬜ **the last `Chase` leaves the portal** — 21 strings + the shared scanner. **PURCHASING lane** (one file); split its ② off if P3 must start first | — |
+| C11 | ✅ **a money figure is the money owed** (Loo 2026-07-28) — the cause was a `string` parameter; it is a `number`, so both failures are now compile errors. `fmtRM` DELETED (its 4 call sites were all `outstanding` — the card's premise was wrong). One money spelling, asserted by identity | [#619](https://github.com/wenwei4046/Carres-Portal-v2/pull/619) |
+| C12 | ✅ **LIVE 2026-08-05** — the last `Chase` leaves the portal. **The card said 21 strings and the real number was 16**: ② died with its file (`OperationPurchase.tsx` deleted whole on 2026-08-01, #534), so ① 15 + ③ 1 + ② 0. The scanner moved to `src/test/banned-words.ts`, reads JSX text that carries an interpolation, and runs on THREE pages; R8's carve-out for its own strings is deleted — measured empty first. **No migration, no api, no `packages/shared` diff** | [#615](https://github.com/wenwei4046/Carres-Portal-v2/pull/615) |
 | C13 | ✅ **LIVE** 2026-08-05 — the red means something again. `liveScope` excludes the AutoCount archive; **`Overdue` 38 → 1 on production**, and that 1 is a real call. **No migration, no `apps/api` diff.** Item 4 (splitting Overdue by the age of the miss) **DEFERRED by Loo** — COPY-STANDARD owns no such pair | [#611](https://github.com/wenwei4046/Carres-Portal-v2/pull/611) |
-| C14 | ⬜ **nothing says the same thing twice** (Loo 2026-08-04) — Delivery ≡ Actions on 31/31 rows; 30 truncated cells; 219px above the first row. **ORDERS lane, AFTER C13** | — |
+| C14 | ✅ **LIVE 2026-08-05** — nothing says the same thing twice. **Clipped cells 92 → 32** on production (the card said 30; the real figure was 3× that, because it missed Deadline 30 and Actions 30). **The card's "2 facet groups with no rows" was WRONG** — `CATEGORY` and `FIX DATA` are COLLAPSED, not empty, and hold six live filters; deleting them would have deleted working filters. Delivery ≡ Actions **30/30 → 0/30**; the toolbar PIC row and `StaffChip` deleted; `Overdue` one home (QUEUES); six zero-count LOGISTICS rows gone **and `Khor Yee · pending 0` kept — Loo ruled, because a person is not a filter statistic**; the Owing total through `fmtMoney` (`RM 74,783` → `RM 74,783.00`, agreeing with Payments). **No migration, no `apps/api` diff, no new word.** **Zero truncation and ≥19 rows are BOTH arithmetically unreachable at 1440×900 and the arithmetic is in the PR** | [#627](https://github.com/wenwei4046/Carres-Portal-v2/pull/627) |
 | C5 | ✅ **LIVE** 2026-07-27 — the money gate reads `orders.paid` | #447 |
 | C6 | ✅ **LIVE** 2026-07-28 — every action opens the steps that close it; the order's PIC is the task owner | #486 |
 | C7 | ✅ **LIVE** 2026-07-28 — the DO issues itself, and the hard gate moves onto issuing. **No migration** | #489 |

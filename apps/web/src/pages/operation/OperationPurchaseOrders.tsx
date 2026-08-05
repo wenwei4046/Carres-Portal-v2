@@ -319,12 +319,26 @@ const NO_EXPANSION: ReadonlySet<string> = new Set<string>();
  * header, every line and the total row cannot drift apart.
  *
  * **A GRID, not a flex row, and that is Q10 Ⓓ.** `Description` was `flex-1`
- * inside a cell that spans the whole 1205px table, so it took 787px and pushed
+ * inside a cell that spans the whole 1208px table, so it took 787px and pushed
  * `Qty`, `Destination` and `Received` past the right edge of a 568px listing.
  * `minmax(0, 1fr)` takes what is LEFT of the five measured tracks and can never
  * take more; the tracks themselves are exact, so no fixed column can be
  * squeezed either. Sum of the fixed tracks + gaps = 384px, which is what the
  * expand needs before `Description` gets its first pixel.
+ *
+ * **Q11 DID NOT CHANGE THIS LINE, AND THE REASON IS A MEASUREMENT.** "Take what
+ * is left" only eats the screen while the record it sits in is as wide as the
+ * screen; the record is `w-fit` now (see `PoWorkArea`), so *left over* is the
+ * record's own content width and this track resolves to the description's own
+ * size. Probed on production with PO-2037 open: swapping this token for
+ * `minmax(0,auto)` gives the SAME record width (474px) and the SAME six column
+ * origins (277 · 301 · 373 · 471 · 519 · 687) in all three grids — identical,
+ * so the token that was already here stays.
+ *
+ * What the `1fr` still buys is ALIGNMENT: the header, every line and the TOTAL
+ * are three separate grids of one width, and a flexible track absorbs the same
+ * slack in each, so they cannot fall out of line. A `max-content` track would
+ * size each grid to its OWN longest string and stagger them.
  */
 const ITEM_GRID =
   "grid grid-cols-[16px_64px_minmax(0,1fr)_40px_160px_64px] gap-2";
@@ -950,8 +964,15 @@ export default function OperationPurchaseOrders() {
       key: "supplier",
       label: "Supplier",
       // Measured, not guessed: the widest supplier name needs 87px
-      // (`Nice Future`, 70.7 + the cell's own 16).
-      width: "87px",
+      // (`Nice Future`, 70.7 + the cell's own 16) — and 88 once the column
+      // carries P17's separator, which takes 1px of the BOX rather than of
+      // the content. Widened by Loo, 2026-08-05 (card Q13), from P17's own
+      // reported cost: at 87 the live page clipped `Nice Future` by exactly
+      // 1px on 4 rows, with `text-overflow: clip`, so no ellipsis said so.
+      // **A frozen width that truncates is not the frozen intent** — Q7 froze
+      // these numbers so that nothing truncates, and 87 stopped delivering
+      // that the day the rule landed.
+      width: "88px",
       sortable: true,
       filter: filterFor("supplier", supplierOptions, { searchable: true }),
       cell: (p) => supplierNameOf(p.supplier_id),
@@ -1002,7 +1023,12 @@ export default function OperationPurchaseOrders() {
       // 这张 PO 是哪几个 Sales Order 组成的."* The data has been on the wire
       // since the register shipped (`so` + `so_refs`) and no column read it.
       label: "SO No.",
-      width: "94px",
+      // 94 → 95, Loo 2026-08-05 (card Q13 follow-up), the same ruling that
+      // took `supplier` to 88: P17's separator takes 1px of the BOX, so 94
+      // left `SO-1206 +4` 77px of content for 78px of ink and clipped it on
+      // 2 live rows with no ellipsis. **A frozen width that truncates is not
+      // the frozen intent.**
+      width: "95px",
       sortable: true,
       filter: filterFor("sono", soOptions, { searchable: true }),
       cell: (p) => {
@@ -1027,7 +1053,14 @@ export default function OperationPurchaseOrders() {
       // a scrollbar is exactly what Loo forbade. `Booqit 1B(…)` still
       // truncates first among the word columns, which was Q1's argument and
       // survives it.
-      width: "135px",
+      //
+      // 135 → 136, Loo 2026-08-05 (card Q13 follow-up), the same ruling that
+      // took `supplier` to 88 and `sono` to 95: P17's separator takes 1px of
+      // the BOX, so 135 left `Booqit 2B(LHF) · +1` 118px of content for 119px
+      // of ink. **The column still truncates on a long enough item list — it
+      // always did, and it has a `title` — but it may not lose its last pixel
+      // to a border.**
+      width: "136px",
       sortable: true,
       filter: filterFor("items", itemsOptions, { searchable: true }),
       cell: (p) => (
@@ -1364,19 +1397,34 @@ export default function OperationPurchaseOrders() {
               scrollbar is the thing he forbade** — an operator who wants a
               different balance has resize and reorder (PR 601).
 
-              The number is the sum of the nine measured minimums (1168) plus
+              The number is the sum of the nine measured minimums (1171) plus
               the kit's expand-control column, which takes 3% of the table:
-              1168 / 0.97 = 1204.1 → 1205, so even at the narrowest width every
-              column still reaches its own minimum. */}
+              1171 / 0.97 = 1207.22 → 1208, so even at the narrowest width every
+              column still reaches its own minimum.
+
+              IT IS DERIVED, NOT DECORATIVE, and card Q13 measured what happens
+              when it is left behind. Widening a column and holding the old
+              min-width does not shrink a business column — `table-fixed` takes
+              the pixel out of the only non-pixel track, the kit's 3% control
+              column, whose expand button ALREADY overflows it (P16's
+              documented clip). Measured live at 1280 on the deployed page,
+              where this min-width is the binding constraint: `sono`/`items` at
+              95/136 with the min-width left at 1206 → control 35px → **33px**
+              and P16's clip 7px → **9px**, while every business column still
+              renders at its ruled width, i.e. the damage is INVISIBLE to the
+              assertion that pins them; at 1208 the control is back to 35px and
+              the clip to 7px with the business clips gone. **A test derives
+              this number from the column widths, so the two cannot drift apart
+              again.** */}
           {/* `container-type: inline-size` makes this scroller a query
               container, so the expanded record can be sized to the VISIBLE
-              width (`100cqi`) rather than to the 1205px table it spans — Q10 Ⓓ.
+              width (`100cqi`) rather than to the 1208px table it spans — Q10 Ⓓ.
               Measured at 1280 before the fix: the expand's own header was
               1171px inside 568px, so `Qty`, `Destination` and `Received` were
               unreachable. Nothing else in the table is absolutely positioned
               (the ▼ menus are Radix portals), so the containment costs nothing. */}
           <div className="flex-1 min-h-0 overflow-auto [container-type:inline-size]">
-            <div className="min-w-[1205px]">
+            <div className="min-w-[1208px]">
               <DataTable<operationPoListRow>
               rows={rows}
               columns={visibleColumns}
@@ -1556,7 +1604,7 @@ function PoWorkArea({
 
   return (
     /* SIZED TO THE VISIBLE WIDTH (Q10 Ⓓ). The expanded cell spans every column,
-     * so it inherits the table's 1205px minimum — measured on production at
+     * so it inherits the table's 1208px minimum — measured on production at
      * 1280, the expand's own header came out 1171px inside a 568px listing and
      * `Qty`, `Destination` and `Received` could not be reached at all.
      * `100cqi` is the SCROLLER's visible width (its container-query size, set
@@ -1571,8 +1619,30 @@ function PoWorkArea({
      * CLOSES the panel, so the listing is 968px and the whole record fits
      * inside it without scrolling at all.
      *
+     * **AND CONTENT-WIDTH SINCE Q11 (Loo, 2026-08-05), WHICH IS WHY THE `w-` IS
+     * NOW A `max-w-`.** Pinned to the visible width the record was ALWAYS the
+     * whole pane, so `Description` — the one flexible track — held 1191px at
+     * 1920 for 67px of ink and pushed `Qty`, `Destination` and `Received` to the
+     * far edge: 1138px of nothing between an item's name and its quantity, on
+     * every line, five lines on PO-2037. `w-fit` ends the row where its content
+     * ends and leaves the slack on the RIGHT, where empty space reads as empty.
+     * Measured on production, PO-2037: the record goes 1575 → 474 at 1920 and
+     * 935 → 474 at 1280, and `Description` 1191 → 90.
+     *
+     * **THE BOUND IS LOAD-BEARING AND IT IS NOT DECORATION.** `width:fit-content`
+     * is capped by the AVAILABLE width, and available here is the `<td>`'s —
+     * i.e. the table's `min-w-[1208px]`, not the pane. Measured with a 200-char
+     * description at 1280: bounded, the record is 935 and `Received` ends at
+     * 1212, inside the 1217 scrollport, and the name truncates (scrollWidth 1871
+     * against clientWidth 551); with the `max-w` removed the record is 1171 and
+     * `Received` ends at 1448 — 231px past the right edge, which is Q10's bug
+     * re-opened. Never remove it.
+     *
      * jsdom has no widths — every number above is from a real browser. */
-    <div data-testid={`po-work-${po.id}`} className="w-[calc(100cqi-2rem)]">
+    <div
+      data-testid={`po-work-${po.id}`}
+      className="w-fit max-w-[calc(100cqi-2rem)]"
+    >
       {/* ① THE TWO DATES — §12.2's ① and ②, side by side, because the whole
            question an operator answers here is *what did the factory say, and
            when does it reach us*. Both are editable; the panel carries neither
