@@ -24,7 +24,7 @@
 |---|---|---|---|
 | 1 | Orders — **List** redesign | 🟡 in progress | `ORDERS_LIST_SPEC.md` |
 | 2 | Orders — **Detail** panel/drawer | 🟡 in progress | `docs/ORDER-DETAIL-INFORMATION-MODEL.md` (frozen 2026-07-28 — the highest business rule for this page) |
-| 3 | **Purchasing / Procurement** | ✅ **SHIPPED** (all 5 tabs, P1-P4) · flow locked 2026-07-27 · **PO lifecycle + To Order information architecture frozen 2026-07-29** | `docs/PURCHASING-WORKING-FLOW.md` + `docs/PURCHASING-INFORMATION-MODEL.md` |
+| 3 | **Purchasing / Procurement** | ✅ **SHIPPED** (all 5 tabs, P1-P4) · flow locked 2026-07-27 · **PO lifecycle + To Order information architecture frozen 2026-07-29** | `docs/purchasing/MASTER.md` + `docs/purchasing/MASTER.md` |
 | 4 | **Payments / Collections** desk | 🟢 shipped, extensions pending | `docs/master-sheet-operating-model.md` |
 | 5 | **Catalog** (Product & Maintenance, 9-tab) | 🟢 shipped | `docs/superpowers/plans/2026-06-25-2990s-products-9tab-parity-roadmap.md` |
 | 6 | **POS** (dealer/showroom) | 🟢 shipped | `docs/superpowers/plans/2026-06-20-pos-2990s-alignment.md` |
@@ -108,11 +108,11 @@ The order detail is the **hub** — every other module (stock, payments, procure
 > build from.**
 >
 > **Read these instead:**
-> - [`docs/PURCHASING-WORKING-FLOW.md`](PURCHASING-WORKING-FLOW.md) — how Purchasing behaves
+> - [`docs/purchasing/MASTER.md`](purchasing/MASTER.md) — how Purchasing behaves
 >   (the ONE flow file)
-> - [`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md) — the To Order
+> - [`docs/purchasing/MASTER.md`](purchasing/MASTER.md) — the To Order
 >   information architecture, **frozen 2026-07-29**
-> - [`docs/PURCHASING-NEXT.md`](PURCHASING-NEXT.md) — what shipped and
+> - [`docs/purchasing/MASTER.md`](purchasing/MASTER.md) — what shipped and
 >   what is next
 
 **What this section claimed, and why every line of it had to go** (kept so the correction is
@@ -195,7 +195,7 @@ There is no standalone stock panel proposal yet, but **Purchasing (#3) depends o
 ## Cross-cutting proposals
 
 ### A. Combined-Ref split by lead token  🟡 (spec + dormant helper; not wired)
-**Full spec:** deleted 2026-07-27 — the live rule is `docs/PURCHASING-WORKING-FLOW.md`.
+**Full spec:** deleted 2026-07-27 — the live rule is `docs/purchasing/MASTER.md`.
 
 **The rule:** one customer holds several Ref numbers; the prefix names the goods (`CR…` vs `TCF…` = different products). The **lead (first) token** of a combined Ref identifies the order; trailing tokens are "delivered-with" cross-refs. So `CR1127+TCF0477` and `TCF0477+CR1127` are **two different orders**, not one.
 

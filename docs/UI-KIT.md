@@ -1482,7 +1482,7 @@ stage would show a blank screen, not every row.
 
 > **⚠️ To Order's COMPOSITION changed on 2026-07-30 and its SHAPE is not yet re-decided.**
 > The frozen purchasing information model
-> ([`docs/PURCHASING-INFORMATION-MODEL.md`](PURCHASING-INFORMATION-MODEL.md)) moves
+> (docs/purchasing/MASTER.md)) moves
 > `Check in` out of To Order to Receiving and leaves To Order with **no stored
 > work-in-progress object at all**. So the three cells this paragraph describes are no longer
 > the three that will be there. **The stage-vs-queue rule below is unchanged and still decides it** — the

@@ -13,12 +13,12 @@ Paste this into a fresh chat:
 > 2. `docs/COPY-STANDARD.md` — microcopy rules + canonical vocabulary
 > 3. `docs/UI-KIT.md` §8.2 (interaction law) + §8.3 (module-tab law) — **corrected
 >    2026-07-29: `§A0` no longer exists; the kit was rewritten 2026-07-27**
-> 4. `docs/PURCHASING-INFORMATION-MODEL.md` — the Purchasing information architecture,
+> 4. `docs/purchasing/MASTER.md` — the Purchasing information architecture,
 >    frozen 2026-07-29. **This replaces the two dead pointers this list used to carry**
 >    (`purchase-cockpit-handoff.md` §5 and `purchasing-3panels-proposal.md`, both DELETED
 >    2026-07-27 — a chat following them was being sent to files that do not exist)
 > 5. `docs/orders-panel-concept-proposal.md` — Orders sibling (same discipline)
-> 6. `docs/PURCHASING-WORKING-FLOW.md` — how Purchasing behaves (the ONE flow file)
+> 6. `docs/purchasing/MASTER.md` — how Purchasing behaves (the ONE flow file)
 >
 > Live-poke `https://erp.carresofficial.com/operation?tab=purchase` for the visual/interaction language.
 >

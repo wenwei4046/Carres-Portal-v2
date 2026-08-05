@@ -100,7 +100,7 @@ case from start to finish; it never changes and is never repeated on an action.
 > purchase order is ONE act: `Issue PO` creates the formal Purchase Order, and nothing is
 > stored before it. **No act is called `Send PO`, and the verb `Send` is retired with it.**
 
-- **This action is DEFINED ONCE, in `docs/PURCHASING-WORKING-FLOW.md` §3** — trigger,
+- **This action is DEFINED ONCE, in `docs/purchasing/MASTER.md` §3** — trigger,
   checklist, completion, due, task owner, counted per, re-checked when. **Orders DISPLAYS
   them; it never re-states them**, the same discipline this file already applies to the
   arrival window below.
@@ -111,7 +111,7 @@ case from start to finish; it never changes and is never repeated on an action.
 - Checklist: production status · ready date · ready quantity · any delayed item · record the latest ready date · record the outcome
 - Completion: latest ready date recorded AND outcome recorded
 - Due: red once inside the arrival window. **The window and every number in it are owned by
-  `docs/PURCHASING-WORKING-FLOW.md` §2 — Orders reads them, never re-states them.**
+  `docs/purchasing/MASTER.md` §2 — Orders reads them, never re-states them.**
   `arrival window = customer date − production working days − order-by buffer`.
 - Task Owner: the module assigns it
 
@@ -276,7 +276,7 @@ second customer conversation: it opens **Stage 1** of the delay recovery above.
 - Checklist: logistics contacted the customer · proposed date · customer-confirmed date · customer-confirmed slot · the response · the reason if unresolved · (for condominiums) driver name · driver phone · vehicle number · lift or registration requirement
 - Completion: a customer-confirmed date AND slot exist. **A date logistics proposed is a fact, not a confirmation**
 - **The slot length comes from the building type** — a condominium, apartment or office takes a half-day; landed and retail take a full day (`docs/COPY-STANDARD.md`)
-- Due: a settable number of working days before the customer's date — **1 today, Jess may set 5** (`docs/PURCHASING-WORKING-FLOW.md` §2 holds every settable number)
+- Due: a settable number of working days before the customer's date — **1 today, Jess may set 5** (docs/purchasing/MASTER.md)
 - Task Owner: the module assigns it
 
 **`Issue delivery order`**

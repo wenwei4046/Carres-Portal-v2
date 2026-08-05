@@ -54,11 +54,11 @@ tab 是一条链，不是五个独立页面**：
 > ⭐⭐ **碰 Purchasing 的话，只有四份档，而且只有一个大门。**
 >
 > ```
-> ① docs/PURCHASING-MODULE-MAP.md      ← 大门，永远先读这一份
+> ① docs/purchasing/MASTER.md      ← 大门，永远先读这一份
 >                                        现在画面上真的有什么，一个 tab 一节
-> ② docs/PURCHASING-WORKING-FLOW.md    ← 业务规则（§10 = claim model）
-> ③ docs/PURCHASING-INFORMATION-MODEL.md ← 资讯怎么摆
-> ④ docs/PURCHASING-NEXT.md            ← 还没做的卡，只有还没做的
+> ② docs/purchasing/MASTER.md    ← 业务规则（§10 = claim model）
+> ③ docs/purchasing/MASTER.md ← 资讯怎么摆
+> ④ docs/purchasing/MASTER.md            ← 还没做的卡，只有还没做的
 > ```
 >
 > **没有一个 chat 要读四份。读大门，大门告诉你翻哪一份的哪一节。**
@@ -75,7 +75,7 @@ Create Purchase → To Order → Purchase Orders → Receiving → Claims
 ```
 
 改任何一个 tab 之前，先答得出：**我这个改动，上游送进来的东西还进得来吗？下游还接得住吗？**
-（`docs/PURCHASING-WORKING-FLOW.md` 是流程，`docs/PURCHASING-INFORMATION-MODEL.md` 是资讯架构，
+（`docs/purchasing/MASTER.md` 是流程，`docs/purchasing/MASTER.md` 是资讯架构，
 两个都读，它们不重复。）
 
 **② 2990s** —— Loo 自己另一套系统。`docs/2990s-copy-and-gaps-audit-2026-07-24.md`（19 项对照）

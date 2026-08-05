@@ -239,7 +239,7 @@ Footer      `{n} orders` · Clear filters
 ```
 
 Business rules this example depends on, owned by
-`docs/PURCHASING-WORKING-FLOW.md` and not by this file: the planning engine
+`docs/purchasing/MASTER.md` and not by this file: the planning engine
 owns the schedule and operators own the purchase order · `Issue PO` is the one
 act that creates a purchase order · the engine's `Order By` never reaches the
 screen — it decides which navigator row a demand sits in.

@@ -35,7 +35,7 @@ the job* — those are the same sentence only when the goods were coming to us i
 first place.
 
 **`received_qty` and the Receiving status may NEVER be borrowed to express fulfilment.**
-[`PURCHASING-WORKING-FLOW.md`](PURCHASING-WORKING-FLOW.md) §9 already rules that a
+[`docs/purchasing/MASTER.md`](purchasing/MASTER.md) §9 already rules that a
 quantity means exactly one thing, and `received_qty` means *units physically received
 into a Carres warehouse*. Writing it to make a purchase order look finished would make
 the stock ledger claim goods are on a floor they were never on — and the stock ledger is
