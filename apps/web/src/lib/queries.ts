@@ -3982,9 +3982,17 @@ export function useRecordSupplierDate(poId: string | null) {
         `/api/operation/pos/${encodeURIComponent(poId ?? "")}/tomorrow-delivery`,
         { method: "POST", body: JSON.stringify(input) },
       ),
-    onSuccess: () => {
+    onSuccess: async () => {
       // Every PO list view — the register reads one, the workspace another.
-      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      // Q14 — INHERITED FROM THE DOOR THIS ONE REPLACED, not new behaviour.
+      // A `delayed` answer moves the PO's expected arrival AND reaches the
+      // ladder's own store, so Delay planning opens by itself on every
+      // customer order the PO covers. The retired Receiving hook re-read both
+      // of these; consolidating onto this door without them would have made a
+      // recorded delay leave a stale Orders board.
+      await qc.invalidateQueries({ queryKey: qk.operation.purchaseToday() });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
     },
   });
 }
@@ -5556,52 +5564,24 @@ export function useChasePoEventMutation(
 }
 
 /**
- * P3 · `Call {supplier} — confirm tomorrow's delivery` — record the answer.
+ * Q14 — `useRecordTomorrowDeliveryMutation` STOOD HERE and is deleted.
  *
- * Two answers and no third (`PURCHASING-WORKING-FLOW.md` §3). A `delayed`
- * answer moves the PO's expected arrival AND reaches the ladder's own store, so
- * **Delay planning opens by itself** on every customer order the PO covers —
- * which is why this invalidates the ORDERS queries too, not only the PO list.
+ * It was the SECOND hook writing `POST /pos/:id/tomorrow-delivery`, and its
+ * only caller was `RecordSupplierAnswerModal` on the Receiving tab. Loo's
+ * role-anchor (2026-08-05) gives every supplier call to the buyer, so the
+ * surviving door is `useRecordSupplierDate` on the Purchase Orders register —
+ * the richer one, carrying the delay reason, the remarks and the day-shift.
+ *
+ * **Its cache invalidation was NOT deleted with it, and that is the half a
+ * straight removal would have lost.** This hook re-read the ORDERS queries
+ * because a `delayed` answer opens Delay planning on every customer order the
+ * PO covers; `useRecordSupplierDate` re-read only the PO list. Consolidating
+ * onto the narrower door would have left a recorded delay showing a stale
+ * Orders board — so the wider set moved up to the surviving hook.
  */
-export interface RecordTomorrowDeliveryVars {
-  poId: string;
-  answer: "shipping" | "delayed";
-  newDate?: string;
-  reason?: string;
-}
 export interface SupplierCallResponse {
   ok: boolean;
   result: Record<string, unknown>;
-}
-
-export function useRecordTomorrowDeliveryMutation(
-  opts?: Partial<
-    UseMutationOptions<SupplierCallResponse, ApiError, RecordTomorrowDeliveryVars>
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<SupplierCallResponse, ApiError, RecordTomorrowDeliveryVars>({
-    mutationFn: ({ poId, answer, newDate, reason }) =>
-      apiFetch<SupplierCallResponse>(
-        `/api/operation/pos/${encodeURIComponent(poId)}/tomorrow-delivery`,
-        {
-          method: "POST",
-          body: JSON.stringify(
-            answer === "delayed"
-              ? { answer, newDate, ...(reason ? { reason } : {}) }
-              : { answer, ...(reason ? { reason } : {}) },
-          ),
-        },
-      ),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.pos() });
-      await qc.invalidateQueries({ queryKey: qk.operation.purchaseToday() });
-      // The delay lands on the ORDERS board, so the board must re-read.
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
 }
 
 /**

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -284,6 +287,55 @@ describe("OperationReceiving — Read Mode", () => {
     );
     // A button that could only refuse is not an action.
     expect(screen.queryByTestId("start-receiving")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Q14 — THE TWO SUPPLIER CALLS ARE OFF THIS TAB, AND MAY NOT COME BACK.
+ *
+ * Loo's role-anchor (`PURCHASING-WORKING-FLOW.md` §1, 2026-08-05): work done by
+ * ASKING THE SUPPLIER for something belongs to the buyer; work done by HANDLING
+ * THE GOODS belongs to Receiving. `Confirm tomorrow's delivery` had a door here
+ * AND on the register, both writing one endpoint; `Confirm balance delivery
+ * date` had its ONLY door here. Both now live on the Purchase Orders expand.
+ *
+ * **PO-2002 is why this suite can prove it**: 1 of 4 received, so the engine
+ * genuinely opens a balance call on it — before Q14 this page drew a button.
+ */
+describe("OperationReceiving — the supplier calls are the buyer's (Q14)", () => {
+  it("a part-received PO shows NO supplier-call button", async () => {
+    wrap();
+    await ready();
+    await openRow("PO-2002");
+    // The PO really is short — otherwise no call could have been raised and
+    // this test would pass by measuring nothing.
+    expect(screen.getByTestId("receiving-summary-received")).toHaveTextContent(
+      "1 / 4",
+    );
+    expect(screen.queryByTestId(/^receiving-balance-/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(/^receiving-tomorrow-/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Record balance date")).not.toBeInTheDocument();
+    expect(screen.queryByText("Record answer")).not.toBeInTheDocument();
+  });
+
+  it("Receiving's own work is untouched — Start Receiving still leads", async () => {
+    wrap();
+    await ready();
+    await openRow("PO-2002");
+    // The ONE loud element is still the module's own action; removing the two
+    // calls must not have taken the tab's actual job with them.
+    expect(screen.getByTestId("start-receiving")).toBeInTheDocument();
+  });
+
+  it("no dead call state is left behind on the workspace", () => {
+    // Dead state no click can reach is the `ops_order_control.balance` disease
+    // in its other form — the card names it, so it is asserted, not assumed.
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "components", "ReceivingWorkspace.tsx"),
+      "utf8",
+    );
+    for (const dead of ["answerFor", "onAnswer", "setAnswerFor", "PurchasingOpenCall"])
+      expect(src).not.toContain(dead);
   });
 });
 
