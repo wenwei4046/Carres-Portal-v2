@@ -51,6 +51,12 @@
 **① 我们自己的流程。** 你碰哪个 module 就读它的 working-flow 档，**整个 Purchasing 五个
 tab 是一条链，不是五个独立页面**：
 
+> ⭐ **碰 Purchasing 的话，先读 [`docs/PURCHASING-MODULE-MAP.md`](PURCHASING-MODULE-MAP.md)。**
+> 那是「现在画面上真的有什么」—— 每个 tab 的每一块、每一颗按钮、每一支 API、每一张表。
+> **Loo 2026-08-05 下令写的**：一个 chat 花了四轮设计一个 2026-07-27 就上线的东西，因为它
+> 读的是上一个 chat 的笔记，不是那一页。**checkpoint 的「已量过」清单是起点，不是天花板；
+> grep 找不到你没想到的按钮。要读档案。**
+
 ```
 Create Purchase → To Order → Purchase Orders → Receiving → Claims
 ```
