@@ -257,13 +257,12 @@ committed to it.
 
 ### The action order
 
-Within To Order, actions rank:
+**Within To Order there is now ONE action** — Loo moved `Confirm ready date` to Purchase
+Orders on 2026-08-05 (queue and door in one place; the door is the Purchase Orders expand,
+shipped by migration 0318). One action has nothing to rank against.
 
 ```
-1  Confirm ready date
-     an existing supplier commitment is missing or broken
-
-2  Issue PO
+1  Issue PO
      demand is not yet on any purchase order
 ```
 
@@ -491,7 +490,7 @@ Recorded so nobody re-derives them, and so a future contradiction is traceable.
 | Deliberately excluded, time-boxed and snoozed demand produces no output at all | 2026-07-29 |
 | The freshness fact already exists on this workspace | 2026-07-29 |
 | The two unreachable narrowing conditions were deleted whole by R8 | 2026-07-28 |
-| `Confirm ready date` has no path in the portal that can close it | P5, 2026-07-29 |
+| ~~`Confirm ready date` has no path in the portal that can close it~~ — **CLOSED by migration 0318**: `purchasing_record_ready_date` writes the promise ledger and the current answer, reached from the Purchase Orders expand. The action moved there with its door (Loo, 2026-08-05) | P5, 2026-07-29 |
 | No Draft PO table, function, RLS policy, column or `po_status` value exists; the `po_status` enum is `open, received, cancelled` | 2026-07-30 |
 | The unused `draftPoExists` split had ZERO producers, so removing it changed no reachable behaviour beyond the word on screen | 2026-07-30 |
 

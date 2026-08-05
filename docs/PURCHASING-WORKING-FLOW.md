@@ -67,8 +67,8 @@ no case has to be argued — the buyer's actions are the PO-duty holder's, Recei
 receiving duty holder's, and **the rule and the owner now say the same thing**.
 
 ```
-To Order          Issue PO · Confirm ready date
-Purchase Orders   Confirm tomorrow's delivery · Confirm balance delivery date
+To Order          Issue PO
+Purchase Orders   Confirm ready date · Confirm tomorrow's delivery · Confirm balance delivery date
 Receiving         Check in
 Claims            Confirm what happens next
 ```
@@ -105,13 +105,31 @@ defeated it:
 **A deadline is a property of the CLOCK; a tab is a place a person works.** The old rule sorted
 work by when it turns late, and people are not organised that way.
 
-**`Confirm ready date` IS THE ONE OPEN CASE, AND IT IS LOO'S** (raised by Q12 on 2026-08-05,
-deliberately not ruled there). It is the buyer's work under this rule, so §1 is satisfied
-wherever it sits — but the SECOND boundary above points it at Purchase Orders, and so does the
-code: the only door in the portal that can close it is the `Supplier Ready Date` field on the
-Purchase Orders expand (shipped Q5), while its QUEUE is on To Order. **Measured 2026-08-05:
-0 of 21 purchase orders carry a ready date**, so nothing on screen moves today either way. It
-stays on To Order until he rules it.
+**`Confirm ready date` — RULED BY LOO, 2026-08-05. It belongs to Purchase Orders.**
+
+> *"Move `Confirm ready date` to Purchase Orders too — same ruling. §5.3 already says a
+> requirement leaves To Order the moment a PO exists, and the only door that closes this
+> action is on the Purchase Orders expand. Queue and door in one place. Delete the To Order
+> assignment whole."*
+
+**The queue lives where the door is. Both are Purchase Orders. The To Order assignment is
+deleted, not deprecated** — no "moved, see below", no second version kept for reference.
+
+**The code was already there and only these documents were not, measured 2026-08-05.**
+`OperationToOrder.tsx` and `to-order.ts` mention `Confirm ready date` **zero times**; the
+Purchase Orders expand carries the field AND the RPC behind it — `purchasing_record_ready_date`
+(migration **0318**, an append-only `po_supplier_promises` ledger plus the current answer on
+`purchase_orders.expected_ready_date`), reached through `apps/api/src/routes/operation/pos.ts`.
+
+**That also RETIRES P7's gap G6**, which reads *"`Confirm ready date` cannot be closed — no
+route in the portal writes `expected_ready_date`; the queue can only grow."* True when it was
+written and false since 0318. **A gap that has been closed and left on the list is a chat-day
+spent rebuilding something that exists** — the same trap the PO print renderer set.
+
+**Live effect today: none. 0 of 21 purchase orders carry a ready date**, so no row moves
+either way. This is a document correction, and the reason it still matters is the one the
+Claims chat paid for hours earlier: a document that says the wrong place is worse than no
+document, because a chat believes it.
 
 **To Order is the PLANNING WORKSPACE and it stores no work-in-progress object of its own**
 (Loo, 2026-07-30 — the Purchasing clean restart). How its information is organised — the six
@@ -489,19 +507,24 @@ not one set on one screen — each lives on exactly ONE tab**, decided by §1's 
 A chat that reads this as a single list will build a tile for an action the tab cannot count:
 
 ```
-To Order          Issue PO  ·  Confirm ready date
-Purchase Orders   Confirm tomorrow's delivery  ·  Confirm balance delivery date
+To Order          Issue PO
+Purchase Orders   Confirm ready date  ·  Confirm tomorrow's delivery  ·  Confirm balance delivery date
 Receiving         Check in
 Claims            Confirm what happens next
 ```
 
-**On To Order the TWO rank `Confirm ready date` first, then `Issue PO`**
-(`docs/ACTION-FLOW-STANDARD.md` Law 4 rung 3): a broken supplier commitment before demand that
-is not on any purchase order yet. **Both words are ruled** and their five strings live in
-`docs/COPY-STANDARD.md`, the canonical home. *(This paragraph said "the three rank in that
-order" and printed them in the reverse order — a leftover from when the rung held three actions
-and `Send PO` was one of them. Law 4 and COPY-STANDARD have both said two, in this order, since
-`Send PO` and `Prepare PO` were retired on 2026-07-29/30; corrected by Q12, 2026-08-05.)*
+**To Order now carries ONE tile, `Issue PO`** — Loo moved `Confirm ready date` to Purchase
+Orders on 2026-08-05 (the ruling is at the head of this file). The ranking question it used to
+raise is gone with it: one tile has nothing to rank against.
+
+**On Purchase Orders the three rank `Confirm ready date` first**
+(`docs/ACTION-FLOW-STANDARD.md` Law 4 rung 3): a broken supplier commitment outranks the two
+delivery calls. **All three words are ruled** and their five strings live in
+`docs/COPY-STANDARD.md`, the canonical home. *(This paragraph twice said something that had
+stopped being true: first "the three rank in that order" printed in reverse, a leftover from
+when the rung held `Send PO` — corrected by Q12 on 2026-08-05; then the two-tile version it was
+corrected INTO, which Loo's ruling retired hours later. Both are recorded rather than quietly
+replaced, because this paragraph is the one that keeps going stale.)*
 
 **The last tile is `Confirm what happens next`, not `Claims`.** A tile's name IS its action
 (COPY-STANDARD); `Claims` is the TAB, which is a place, and a place and an action may not

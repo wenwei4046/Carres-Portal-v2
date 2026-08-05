@@ -745,7 +745,7 @@ doubt, grep the codebase and match what already ships.
 | Cancel an order | **Cancel** | Void · Abandon · Kill |
 | Purchase order (the document) | **PO** | Purchase order · P/O · Order (ambiguous with customer order) |
 | Customer's own order | **Order** (or `SO-1207`) | Sales order · Job · Ticket |
-| The To Order stages | **`Confirm ready date` · `Issue PO`** — in that display order (`docs/ACTION-FLOW-STANDARD.md` Law 4 rung 3) | Chase · Place · Follow up · Book in · **`Send PO`** · **`Prepare PO`** · **`Receive` as a To Order stage** (it left for Receiving on the deadline-anchor boundary) |
+| The To Order stages | **`Issue PO`** — one tile. `Confirm ready date` MOVED TO PURCHASE ORDERS (Loo, 2026-08-05: queue and door in one place; the door is the Purchase Orders expand, shipped 0318) | Chase · Place · Follow up · Book in · **`Send PO`** · **`Prepare PO`** · **`Receive` as a To Order stage** (it left for Receiving on the deadline-anchor boundary) |
 | Photo proving a delivery happened | **delivery photo** | POD · Proof of Delivery · e-POD |
 | Mattress + bed frame as one delivery | **Bed set** | Bedroom set · Bundle · Bed package |
 | A follow-up delivery on the same order | **Second trip** | Partial delivery · Split shipment · Back-order |

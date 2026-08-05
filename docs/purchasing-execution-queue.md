@@ -1198,7 +1198,7 @@ Every one was measured on 2026-07-29. **They are facts, not estimates.**
 | **G2** | **Supplier resolution runs by TWO different rules in one module.** Planning resolves by the item's own supplier alone; PO creation additionally falls back to which categories a supplier covers. A requirement invisible to one and buyable in the other is one requirement with two truths. **One rule, shared** | `purchase.ts` + `CreatePOModal.tsx` |
 | **G3** | **Intentionally held demand produces no output at all.** Deliberately excluded, time-boxed and snoozed demand is dropped with nothing on screen. It must state **what · who · why · until when**, and it may **never share a status or an empty state** with Missing configuration | `purchase.ts` |
 | **G5** | **`Check in` must leave To Order, and no information may leave with it.** To Order's receiving stage states the **customer name / SO number** per entry; the Receiving tab does not carry that fact. **The To Order implementation is not removed until Receiving carries: PO · supplier · customer name · SO number · warehouse · ETA · quantity still to receive** | `OperationPurchase.tsx` → `OperationReceiving.tsx` |
-| **G6** | **`Confirm ready date` cannot be closed.** No route in the portal writes `purchase_orders.expected_ready_date`; the only supplier-facing write inserts one audit sentence and touches no date. The queue can only grow. **This is P5's finding and P5 still owns the fix** — P6 must not ship a To Order whose second queue is permanently red without saying so on screen | `apps/api` |
+| **G6** | ~~**`Confirm ready date` cannot be closed.**~~ **CLOSED — migration 0318 built the door** (`purchasing_record_ready_date`: an append-only `po_supplier_promises` ledger plus the current answer on `purchase_orders.expected_ready_date`, reached from the Purchase Orders expand via `routes/operation/pos.ts`). True when written, false since 0318. **A closed gap left on the list is a chat-day spent rebuilding what exists** — the same trap the PO print renderer set. Loo moved the QUEUE to Purchase Orders on 2026-08-05 so it now sits with its door | `apps/api` |
 
 ### G8-G10 — reported by Q6's audit, 2026-08-04. Measured on production, not estimated.
 
@@ -3075,6 +3075,15 @@ merging them into one unlabelled list would make the slip count meaningless. Kee
 measured within ONE kind.
 
 ### THE BOUNDARY — read this before you widen the card
+
+> **⛔ SUPERSEDED 2026-08-05 by Loo. The paragraph below was true when this card was written
+> and is now the opposite of the rule.** He moved the QUEUE to Purchase Orders to join the
+> door this card built: *"queue and door in one place. Delete the To Order assignment whole."*
+> The three laws (`PURCHASING-WORKING-FLOW` · `PURCHASING-INFORMATION-MODEL` ·
+> `COPY-STANDARD`) now read `To Order → Issue PO` and
+> `Purchase Orders → Confirm ready date · Confirm tomorrow's delivery · Confirm balance
+> delivery date`. **Kept rather than deleted because it explains why the door shipped without
+> its queue** — but no chat may build from it.
 
 **`Confirm ready date` as a QUEUE lives on the To Order tab, not here.**
 `docs/PURCHASING-WORKING-FLOW.md` §1's frozen deadline-anchor rule assigns
