@@ -863,14 +863,19 @@ describe("nine measured minimums, and no tail", () => {
     await mountLoaded();
     expect(colWidths()).toMatchObject({
       issued: "96px",
-      // 87 → 88, Loo 2026-08-05 (card Q13). P17's separator takes 1px of the
-      // BOX, so 87 left `Nice Future` 86px of content for 87px of ink and
-      // clipped it on 4 live rows with no ellipsis. The other eight are Q7's,
-      // untouched.
+      // THREE of the nine moved by exactly 1px, and for ONE reason (card Q13
+      // and its follow-up, Loo 2026-08-05). P17's column separator takes 1px
+      // of the BOX, not of the content, so a width measured to the pixel now
+      // clips its own worst string with no ellipsis to announce it. Measured
+      // on the live page: `Nice Future` 86 of 87 on 4 rows · `SO-1206 +4` 77
+      // of 78 on 2 · `Booqit 2B(LHF) · +1` 118 of 119 on 1.
+      // **A frozen width that truncates is not the frozen intent** — Q7 froze
+      // these numbers so that nothing truncates. The other six are Q7's,
+      // untouched, because their worst string does not reach their edge.
       supplier: "88px",
       po: "83px",
-      sono: "94px",
-      items: "135px",
+      sono: "95px",
+      items: "136px",
       dest: "135px",
       custdel: "140px",
       arriving: "206px",
@@ -891,7 +896,7 @@ describe("nine measured minimums, and no tail", () => {
     await mountLoaded();
     const region = screen.getByTestId("po-listing");
     const scroller = region.querySelector(".overflow-auto") as HTMLElement;
-    expect(scroller.firstElementChild?.className).toContain("min-w-[1206px]");
+    expect(scroller.firstElementChild?.className).toContain("min-w-[1208px]");
   });
 
   /**
