@@ -574,7 +574,7 @@ export default function DealerPos({
           signedName: draft.customer.name.trim(),
           ...(draft.customer.email?.trim() ? { customerEmail: draft.customer.email.trim() } : {}),
           ...(composedRentalAddress ? { customerAddress: composedRentalAddress } : {}),
-          ...(actingDealerId ? { dealerId: actingDealerId } : {}),
+          ...(bodyDealerId ? { dealerId: bodyDealerId } : {}),
           ...(draft.salespersonId ? { salespersonId: draft.salespersonId } : {}),
           // 0275 — the rental now mints a Sales Order, and an order needs a
           // delivery date to reach operations. The wizard already collected it.
