@@ -18,6 +18,9 @@ import {
   productionWorkingDaysFor,
   purchasingActionButton,
   purchasingActionQueue,
+  purchasingCallCalendarDays,
+  purchasingCallCalendarOf,
+  callCalendarBucketOf,
   purchasingSupplierCallsOf,
   railItemLabel,
   workWeekOffDaysFor,
@@ -27,9 +30,12 @@ import {
   type PoWorkState,
   type ProductSkuDto,
   type PurchasingOpenCall,
-  type PurchasingSupplierCallKey,
 } from "@carres/shared";
 import PurchasingTabs from "./PurchasingTabs";
+// The shared rail recipe (extracted 2026-08-03). Its own docblock told the
+// next chat to open this page to delete the inline pair and import these —
+// done with T2, so the rail recipe has one home again (§2.2).
+import { RailGroup, RailItem } from "./components/workspace-rail";
 import DataTable, {
   type Column,
   type ColumnFilter,
@@ -266,6 +272,18 @@ function workStateOf(po: operationPoListRow, today: string): WorkState {
 // every date column — here and, after Jess's live review, portal-wide —
 // speaks the same presets and the same Custom Date Range.
 
+/**
+ * `Fri 7 Aug` — a rail day row's word (Loo, 2026-08-06 · §2.4: weekday + date
+ * on EVERY row, one format; never a bare weekday, never Today/Tomorrow; the
+ * full date stays on the hover). Composed from the portal's own two date
+ * spellings so no third format is invented. To Order's rail holds the same
+ * one-line compose; merging the two copies belongs to a card that owns both
+ * pages — this one may not touch To Order.
+ */
+function railDayLabel(iso: string): string {
+  return `${fmtDate(iso).slice(0, 3)} ${fmtDateShort(iso).replace(/ \d{2}$/, "")}`;
+}
+
 /** The document's quiet control — one recipe, spelled once (§6.6). */
 /** Pane hide/expand chevron — one recipe, spelled once (§6.6). */
 const PANE_BTN =
@@ -363,8 +381,14 @@ export default function OperationPurchaseOrders() {
     new Map(),
   );
   const [stateSel, setStateSel] = useState<WorkState | null>(null);
-  /** Slice 1 — the CALLS rail: one selected call queue, or null = all. */
-  const [callSel, setCallSel] = useState<PurchasingSupplierCallKey | null>(null);
+  /**
+   * T2 — the CALLS calendar's one selected row, or null = all. A string key
+   * (`overdue` · `later` · `day:2026-08-06`) rather than a discriminated
+   * object, so equality is `===` and the testid IS the state. Day rows are
+   * VIEWS, never actions — a call cannot be made early — so a click only
+   * narrows the listing; nothing is pre-ticked or pulled forward.
+   */
+  const [calSel, setCalSel] = useState<string | null>(null);
   /**
    * HOW this PO is being looked at — see `nextPoView`. WHICH PO it is lives in
    * `?po=`, and there is only ever one of it, so the panel and the expand
@@ -678,9 +702,27 @@ export default function OperationPurchaseOrders() {
   const passesState = (p: operationPoListRow, sel: WorkState | null) =>
     sel === null || workStateOf(p, today) === sel;
 
-  /** Slice 1 — a call tile filters to the POs carrying that OPEN call. */
-  const passesCall = (p: operationPoListRow, sel: PurchasingSupplierCallKey | null) =>
-    sel === null || callsOf(p).some((c) => c.key === sel);
+  /**
+   * T2 — the CALLS calendar's five day columns, and each open call's row key.
+   * `purchasingCallCalendarDays` is the engine's own window (today + four more
+   * OFFICE working days, weekends and `myHolidaySet()` public holidays both
+   * skipped), so the rail and the engine cannot disagree about which day a
+   * due belongs to. A dueless call keys to null — it has no day and can never
+   * be late (P1/T7), so it shows in the unfiltered listing only.
+   */
+  const calDays = useMemo(
+    () => purchasingCallCalendarDays({ todayIso: today }),
+    [today],
+  );
+  const calKeyOf = (c: PurchasingOpenCall): string | null => {
+    const b = callCalendarBucketOf(c, calDays, today);
+    if (!b) return null;
+    return b.kind === "day" ? `day:${b.dayIso}` : b.kind;
+  };
+
+  /** A calendar row filters to the POs carrying an open call on it. */
+  const passesCal = (p: operationPoListRow, sel: string | null) =>
+    sel === null || callsOf(p).some((c) => calKeyOf(c) === sel);
 
   function passesCol(
     po: operationPoListRow,
@@ -725,7 +767,7 @@ export default function OperationPurchaseOrders() {
 
   const rows = useMemo(() => {
     const base = searched.filter(
-      (p) => passesState(p, stateSel) && passesCall(p, callSel) && passesAllCols(p),
+      (p) => passesState(p, stateSel) && passesCal(p, calSel) && passesAllCols(p),
     );
     const sorted = [...base];
     if (sort) {
@@ -777,47 +819,33 @@ export default function OperationPurchaseOrders() {
     }
     return sorted;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searched, stateSel, callSel, colFilters, sort, callsByPo, riskByPo, supplierById]);
+  }, [searched, stateSel, calSel, colFilters, sort, callsByPo, riskByPo, supplierById]);
 
   const stateCounts = useMemo(() => {
     const m = new Map<WorkState, number>();
     for (const s of WORK_STATES) m.set(s, 0);
     for (const p of searched) {
-      if (!passesAllCols(p) || !passesCall(p, callSel)) continue;
+      if (!passesAllCols(p) || !passesCal(p, calSel)) continue;
       const st = workStateOf(p, today);
       m.set(st, (m.get(st) ?? 0) + 1);
     }
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searched, colFilters, callsByPo, callSel]);
+  }, [searched, colFilters, callsByPo, calSel]);
 
   /**
-   * Slice 1 — the CALLS rail counts, in the workflow's own order (§4: the
-   * three questions are asked in order). Counted per PO (the balance call's
-   * per-LINE detail stays on the row), each with its late tally — the same
-   * `· N late` shape the delivery queues carry. Computed with the OTHER
-   * dimensions applied, so a visible number always matches its click.
+   * T2 — the CALLS calendar's counts: supplier CALLS due per row, from the
+   * engine's own dues (the balance call counts per PO LINE, exactly as the
+   * engine returns it). Computed with the OTHER dimensions applied, so a
+   * visible number always matches its click.
    */
-  const CALL_KEYS: readonly PurchasingSupplierCallKey[] = [
-    "confirm_ready_date",
-    "confirm_tomorrows_delivery",
-    "confirm_balance_delivery_date",
-  ];
-  const callCounts = useMemo(() => {
-    const m = new Map<PurchasingSupplierCallKey, { n: number; late: number }>();
-    for (const k of CALL_KEYS) m.set(k, { n: 0, late: 0 });
+  const callCalendar = useMemo(() => {
+    const all: PurchasingOpenCall[] = [];
     for (const p of searched) {
       if (!passesAllCols(p) || !passesState(p, stateSel)) continue;
-      const calls = callsOf(p);
-      for (const k of CALL_KEYS) {
-        const mine = calls.filter((c) => c.key === k);
-        if (mine.length === 0) continue;
-        const cur = m.get(k)!;
-        cur.n += 1;
-        if (mine.some((c) => c.late)) cur.late += 1;
-      }
+      all.push(...callsOf(p));
     }
-    return m;
+    return purchasingCallCalendarOf(all, { todayIso: today });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searched, colFilters, callsByPo, stateSel]);
 
@@ -1364,11 +1392,11 @@ export default function OperationPurchaseOrders() {
     [view.mode, view.poId],
   );
 
-  const filtered = colFilters.size > 0 || stateSel !== null || callSel !== null;
+  const filtered = colFilters.size > 0 || stateSel !== null || calSel !== null;
   const clearAll = () => {
     setColFilters(new Map());
     setStateSel(null);
-    setCallSel(null);
+    setCalSel(null);
   };
 
   return (
@@ -1415,114 +1443,68 @@ export default function OperationPurchaseOrders() {
           aria-label="Purchase order register"
           data-testid="po-rail"
         >
-          {/* ── CALLS (Slice 1) — the engine's three supplier questions, in
-               the order the workflow asks them (§4). Count = POs carrying the
-               OPEN call; `· N late` = its overdue tail. The tile is the queue
-               `Confirm ready date` never had: 19 of 24 live POs sat in
-               Waiting Supplier Date with no call, no due and no count. ── */}
-          <div>
-            <div className="flex items-center px-1.5">
-              <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
-                Calls
-              </span>
-            </div>
-            <div className="mt-1 flex flex-col gap-0.5">
-              {CALL_KEYS.map((k) => {
-                const c = callCounts.get(k) ?? { n: 0, late: 0 };
-                const on = callSel === k;
-                return (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => setCallSel(on ? null : k)}
-                    aria-pressed={on}
-                    data-testid={`po-rail-call-${k}`}
-                    className={[
-                      "relative flex items-center gap-2 px-2 py-1.5 rounded-control text-left text-body w-full",
-                      on
-                        ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
-                        : "text-kit-slate-11 hover:bg-kit-slate-3",
-                    ].join(" ")}
-                  >
-                    {on && (
-                      <span
-                        aria-hidden
-                        className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
-                      />
-                    )}
-                    <span className="flex-1 truncate">
-                      {purchasingActionQueue(k)}
-                    </span>
-                    <span className="tabular-nums text-label text-kit-slate-9">
-                      {c.n}
-                      {c.late > 0 && (
-                        <span className="text-kit-red-11"> · {c.late} late</span>
-                      )}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center px-1.5">
-              <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
-                Supplier Progress
-              </span>
-            </div>
-            <div className="mt-1 flex flex-col gap-0.5">
-              <button
-                type="button"
-                onClick={() => setStateSel(null)}
-                aria-pressed={stateSel === null}
-                data-testid="po-rail-state-all"
-                className={[
-                  "relative flex items-center gap-2 px-2 py-1.5 rounded-control text-left text-body w-full",
-                  stateSel === null
-                    ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
-                    : "text-kit-slate-11 hover:bg-kit-slate-3",
-                ].join(" ")}
-              >
-                {stateSel === null && (
-                  <span
-                    aria-hidden
-                    className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
-                  />
-                )}
-                <span className="flex-1 truncate">All</span>
-              </button>
-              {WORK_STATES.map((st) => {
-                const n = stateCounts.get(st) ?? 0;
-                const on = stateSel === st;
-                return (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => setStateSel(on ? null : st)}
-                    aria-pressed={on}
-                    data-testid={`po-rail-state-${st}`}
-                    className={[
-                      "relative flex items-center gap-2 px-2 py-1.5 rounded-control text-left text-body w-full",
-                      on
-                        ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
-                        : "text-kit-slate-11 hover:bg-kit-slate-3",
-                    ].join(" ")}
-                  >
-                    {on && (
-                      <span
-                        aria-hidden
-                        className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
-                      />
-                    )}
-                    <span className="flex-1 truncate">{WORK_STATE_LABEL[st]}</span>
-                    <span className="tabular-nums text-label text-kit-slate-9">
-                      {n}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {/* ── CALLS (T2, frozen with Loo 2026-08-06) — the week's factory
+               calls as a rolling five-office-working-day window. Overdue is
+               red and ABOVE the days, rendered only above zero; a zero-count
+               day STILL renders (purchasing is planned work); Later holds
+               everything beyond the window, only above zero. Counts are the
+               engine's own dues. Day rows are VIEWS — a call cannot be made
+               early — so a click only narrows the listing. No duty chip here:
+               identity's one home is the Team panel (§2.2). ── */}
+          <RailGroup title="Calls">
+            {callCalendar.overdue > 0 && (
+              <RailItem
+                label="Overdue"
+                count={callCalendar.overdue}
+                active={calSel === "overdue"}
+                onClick={() => setCalSel(calSel === "overdue" ? null : "overdue")}
+                danger
+                title={`${callCalendar.overdue} call${callCalendar.overdue === 1 ? "" : "s"} late`}
+                testId="po-rail-call-overdue"
+              />
+            )}
+            {callCalendar.days.map((d) => (
+              <RailItem
+                key={d.dayIso}
+                label={railDayLabel(d.dayIso)}
+                count={d.count}
+                active={calSel === `day:${d.dayIso}`}
+                onClick={() =>
+                  setCalSel(calSel === `day:${d.dayIso}` ? null : `day:${d.dayIso}`)
+                }
+                title={fmtDate(d.dayIso)}
+                testId={`po-rail-call-day-${d.dayIso}`}
+              />
+            ))}
+            {callCalendar.later > 0 && (
+              <RailItem
+                label="Later"
+                count={callCalendar.later}
+                active={calSel === "later"}
+                onClick={() => setCalSel(calSel === "later" ? null : "later")}
+                title={`Due after ${fmtDate(calDays[calDays.length - 1])}`}
+                testId="po-rail-call-later"
+              />
+            )}
+          </RailGroup>
+          <RailGroup title="Supplier Progress">
+            <RailItem
+              label="All"
+              active={stateSel === null}
+              onClick={() => setStateSel(null)}
+              testId="po-rail-state-all"
+            />
+            {WORK_STATES.map((st) => (
+              <RailItem
+                key={st}
+                label={WORK_STATE_LABEL[st]}
+                count={stateCounts.get(st) ?? 0}
+                active={stateSel === st}
+                onClick={() => setStateSel(stateSel === st ? null : st)}
+                testId={`po-rail-state-${st}`}
+              />
+            ))}
+          </RailGroup>
         </nav>
 
         {/* ── LISTING — the AutoCount work listing (kit DataTable) ──────── */}

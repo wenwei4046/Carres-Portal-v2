@@ -386,3 +386,150 @@ describe("provenance never gates the TOMORROW call (the po-workspace ruling, now
     expect(b).not.toBeNull();
   });
 });
+
+/* ── T2 · The CALLS calendar (frozen with Loo, 2026-08-06) ────────────────── */
+
+import {
+  callCalendarBucketOf,
+  purchasingCallCalendarDays,
+  purchasingCallCalendarOf,
+  type PurchasingOpenCall,
+} from "./purchasing-supplier-calls";
+
+/** A hand-made open call — the calendar is pure arithmetic over dues, so the
+ *  tests state the due directly and one test proves the end-to-end seam. */
+function call(over: Partial<PurchasingOpenCall> = {}): PurchasingOpenCall {
+  return {
+    key: "confirm_tomorrows_delivery",
+    poId: "PO-1",
+    supplierId: "sup-1",
+    dueIso: null,
+    late: false,
+    ...over,
+  };
+}
+
+describe("purchasingCallCalendarDays — five rows, today always first", () => {
+  it("rolls over a weekend: Thu 6 Aug starts Thu·Fri·Mon·Tue·Wed (the frozen sketch)", () => {
+    expect(purchasingCallCalendarDays(on("2026-08-06"))).toEqual([
+      "2026-08-06",
+      "2026-08-07",
+      "2026-08-10",
+      "2026-08-11",
+      "2026-08-12",
+    ]);
+  });
+
+  it("skips a public holiday inside the window exactly as a weekend", () => {
+    // Mon 24 Aug 26, with Tue 25 (Maulidur Rasul) and Mon 31 (Merdeka) as
+    // holidays: both vanish from the window like the weekend between them.
+    const days = purchasingCallCalendarDays({
+      todayIso: "2026-08-24",
+      holidays: new Set(["2026-08-25", "2026-08-31"]),
+    });
+    expect(days).toEqual([
+      "2026-08-24",
+      "2026-08-26",
+      "2026-08-27",
+      "2026-08-28",
+      "2026-09-01",
+    ]);
+  });
+
+  it("reads the LIVE Malaysian set when none is injected (Merdeka, certain:true)", () => {
+    // Thu 27 Aug 26 → Mon 31 Aug is National Day in `myHolidaySet()`.
+    const days = purchasingCallCalendarDays({ todayIso: "2026-08-27" });
+    expect(days).toEqual([
+      "2026-08-27",
+      "2026-08-28",
+      "2026-09-01",
+      "2026-09-02",
+      "2026-09-03",
+    ]);
+  });
+
+  it("a non-working today is STILL the first row — dues cannot hide overnight", () => {
+    expect(purchasingCallCalendarDays(on("2026-08-02"))).toEqual([
+      "2026-08-02", // Sunday — the operator opened the page on it
+      "2026-08-03",
+      "2026-08-04",
+      "2026-08-05",
+      "2026-08-06",
+    ]);
+  });
+});
+
+describe("callCalendarBucketOf — a due files under exactly one row", () => {
+  const opts = on("2026-08-06"); // Thu
+  const days = purchasingCallCalendarDays(opts);
+
+  it("late → Overdue, whatever the due says", () => {
+    expect(
+      callCalendarBucketOf(call({ dueIso: "2026-08-05", late: true }), days, "2026-08-06"),
+    ).toEqual({ kind: "overdue" });
+  });
+
+  it("due today → today's row; due at the window edge → the last row", () => {
+    expect(
+      callCalendarBucketOf(call({ dueIso: "2026-08-06" }), days, "2026-08-06"),
+    ).toEqual({ kind: "day", dayIso: "2026-08-06" });
+    expect(
+      callCalendarBucketOf(call({ dueIso: "2026-08-12" }), days, "2026-08-06"),
+    ).toEqual({ kind: "day", dayIso: "2026-08-12" });
+  });
+
+  it("beyond the window → Later", () => {
+    expect(
+      callCalendarBucketOf(call({ dueIso: "2026-08-13" }), days, "2026-08-06"),
+    ).toEqual({ kind: "later" });
+  });
+
+  it("no due → NO row (P1/T7): a call that cannot be late plans no day", () => {
+    expect(callCalendarBucketOf(call(), days, "2026-08-06")).toBeNull();
+  });
+
+  it("a FACTORY-Saturday due files under the office's last day before it, never after", () => {
+    // The ready-date due walks the factory's own week, so an Ohana (Mon–Sat)
+    // due can be Sat 8 Aug — a day this office rail does not print. Filing it
+    // under Mon 10 would surface it when it is already late; Fri 7 is the
+    // office's final working day to make that call.
+    expect(
+      callCalendarBucketOf(call({ key: "confirm_ready_date", dueIso: "2026-08-08" }), days, "2026-08-06"),
+    ).toEqual({ kind: "day", dayIso: "2026-08-07" });
+  });
+});
+
+describe("purchasingCallCalendarOf — the rail's own numbers", () => {
+  it("counts calls per row, keeps zero-count days, and totals Overdue/Later", () => {
+    const cal = purchasingCallCalendarOf(
+      [
+        call({ poId: "A", dueIso: "2026-08-04", late: true }),
+        call({ poId: "B", dueIso: "2026-08-05", late: true }),
+        call({ poId: "C", dueIso: "2026-08-06" }),
+        call({ poId: "D", dueIso: "2026-08-07" }),
+        call({ poId: "E", dueIso: "2026-08-07", key: "confirm_balance_delivery_date" }),
+        call({ poId: "F", dueIso: "2026-08-20" }),
+        call({ poId: "G", dueIso: null }), // dueless — no row anywhere
+      ],
+      on("2026-08-06"),
+    );
+    expect(cal.overdue).toBe(2);
+    expect(cal.later).toBe(1);
+    expect(cal.days).toEqual([
+      { dayIso: "2026-08-06", count: 1 },
+      { dayIso: "2026-08-07", count: 2 },
+      { dayIso: "2026-08-10", count: 0 }, // zero-count day rows still exist
+      { dayIso: "2026-08-11", count: 0 },
+      { dayIso: "2026-08-12", count: 0 },
+    ]);
+  });
+
+  it("end to end through the engine: an eta-tomorrow PO's call lands on today's row", () => {
+    // Thu 30 Jul eta, asked on Wed 29 → the tomorrow call is due Wed 29.
+    const calls = purchasingSupplierCallsOf(po({ etaDateIso: "2026-07-30" }), on("2026-07-29"));
+    expect(calls).toHaveLength(1);
+    const cal = purchasingCallCalendarOf(calls, on("2026-07-29"));
+    expect(cal.days[0]).toEqual({ dayIso: "2026-07-29", count: 1 });
+    expect(cal.overdue).toBe(0);
+  });
+});

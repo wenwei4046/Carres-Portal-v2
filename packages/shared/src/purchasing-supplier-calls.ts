@@ -377,6 +377,107 @@ export function purchasingSupplierCallsOf(
   ];
 }
 
+/* ── The CALLS calendar (T2, frozen with Loo 2026-08-06) ──────────────────
+ *
+ * The Purchase Orders rail plans the week's factory calls as a rolling
+ * FIVE-office-working-day window: `Overdue` (red, above the days), today +
+ * four more working days, `Later` (beyond the window). Day rows are VIEWS,
+ * never actions — a call cannot be made early — so everything here is
+ * arithmetic over the engine's own dues and nothing else.
+ */
+
+/** Exactly five day rows. Today is ALWAYS the first row — even on a
+ *  non-working day the operator opens the page on, because "what is due
+ *  today" must have a row to be read from — and the rest are the office
+ *  working days after it (weekends AND public holidays skipped, the same
+ *  `wd()` every due in this file is computed with). */
+export function purchasingCallCalendarDays(
+  opts: SupplierCallOptions,
+): IsoDate[] {
+  const today = day(opts.todayIso);
+  if (!today) return [];
+  const w = wd(opts);
+  const days: IsoDate[] = [today];
+  let cur: IsoDate = today;
+  while (days.length < 5) {
+    cur = addWorkingDays(cur, 1, w);
+    days.push(cur);
+  }
+  return days;
+}
+
+export type CallCalendarBucket =
+  | { kind: "overdue" }
+  | { kind: "day"; dayIso: IsoDate }
+  | { kind: "later" };
+
+/**
+ * Which calendar row one open call belongs to — `null` for a call with no
+ * due: it has no day and can never be late (P1/T7), so it lives in the
+ * unfiltered listing only. A due nobody computed is never given a row.
+ *
+ * A due can land OFF the rendered days while still inside the window: the
+ * ready-date due's last leg walks the FACTORY's week, so an Ohana due can be
+ * a Saturday the office rail does not print. It files under the LAST rendered
+ * day on or before it — the office's final working day to make that call
+ * before the due passes — never the day after, which would first be reachable
+ * when the call is already late.
+ */
+export function callCalendarBucketOf(
+  call: PurchasingOpenCall,
+  days: readonly IsoDate[],
+  todayIso: IsoDate,
+): CallCalendarBucket | null {
+  if (call.late) return { kind: "overdue" };
+  const due = day(call.dueIso);
+  if (!due) return null;
+  const last = days[days.length - 1];
+  if (last === undefined || due > last) return { kind: "later" };
+  const today = day(todayIso);
+  let row: IsoDate | null = null;
+  for (const d of days) {
+    if (d <= due) row = d;
+  }
+  // `late === false` means due >= today, and today is always row one, so a
+  // floor always exists; the fallback only guards an empty days array.
+  return row ? { kind: "day", dayIso: row } : today ? { kind: "day", dayIso: today } : null;
+}
+
+export interface PurchasingCallCalendar {
+  /** Late calls — rendered red, above the day rows, only when > 0. */
+  overdue: number;
+  /** The five day rows, in order. A zero-count day STILL renders: purchasing
+   *  is planned work, and an empty day is a fact about the plan. */
+  days: { dayIso: IsoDate; count: number }[];
+  /** Dues beyond the window — rendered only when > 0. Never "Next Week"
+   *  (§2.4: it starts lying on Thursday). */
+  later: number;
+}
+
+/** The rail's counts: supplier CALLS per row (the balance call counts per PO
+ *  line, exactly as the engine returns it), from the engine's own dues. */
+export function purchasingCallCalendarOf(
+  calls: readonly PurchasingOpenCall[],
+  opts: SupplierCallOptions,
+): PurchasingCallCalendar {
+  const days = purchasingCallCalendarDays(opts);
+  const byDay = new Map<IsoDate, number>(days.map((d) => [d, 0]));
+  let overdue = 0;
+  let later = 0;
+  for (const c of calls) {
+    const b = callCalendarBucketOf(c, days, opts.todayIso);
+    if (!b) continue;
+    if (b.kind === "overdue") overdue += 1;
+    else if (b.kind === "later") later += 1;
+    else byDay.set(b.dayIso, (byDay.get(b.dayIso) ?? 0) + 1);
+  }
+  return {
+    overdue,
+    days: days.map((d) => ({ dayIso: d, count: byDay.get(d) ?? 0 })),
+    later,
+  };
+}
+
 /**
  * The two queue COUNTS, over a whole list of POs.
  *

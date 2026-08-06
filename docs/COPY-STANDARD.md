@@ -431,6 +431,19 @@ headings it needs from this list and adds none.
 | `Problem` | what went wrong (claim type, delay reason, issue type) |
 | `Stock` · `Region` · `Category` · `Store` | facts about the record |
 | `Due` | when it turns late |
+| `Calls` | who to ring, planned on a rolling calendar — `Overdue` · day rows · `Later` (Loo, 2026-08-06, the Purchase Orders CALLS calendar; the same noun the Orders drawer's who-to-ring panel already carries below) |
+
+**The rail calendar's own three words** (Loo, 2026-08-06 — the Purchasing MASTER §2.4 rulings,
+recorded here so the dictionary holds them too):
+
+- **A day row prints WEEKDAY + DATE — `Thu 6 Aug` — one format on every row.** Never a bare
+  weekday (`Monday` is ambiguous — which Monday?), never `Today` / `Tomorrow` on a rail
+  (relative words rot in screenshots and re-sort themselves overnight; the Delivery calendar's
+  three VIEWS keep their own ruled names — a view is not a day row). The full date stays on
+  hover.
+- **`Overdue`** — red, above the day rows, rendered only above zero.
+- **`Later`** — everything beyond a rolling window. Never `Next Week`, which starts lying on
+  Thursday. Never `Upcoming` · `Future` · `Beyond`.
 
 **A heading is a NOUN and never an action** — `Queues` holds actions, it is not one.
 A group with one row still gets its heading: a lone unlabelled row reads as a stray.
