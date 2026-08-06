@@ -196,8 +196,8 @@ isolation — **run twice before calling one a regression.**
 | API | `https://carres-portal-v2-api.wwch.workers.dev` + `api.carresofficial.com` |
 | DB | Supabase `kfprgpjpaffedghytstl` — staging IS production |
 | Migration tail | `0324`. **Verify against the tracker before numbering.** |
-| Live web bundle | last recorded `index-CRIryebD.js` from main tip `1f46c598` (2026-08-06). **Verified converged on all four canonical URLs** — `erp` · `pos` · `carres-portal.pages.dev` · `carres-pos.pages.dev` |
-| Live Worker | last recorded version `f376144a` from main tip `1f46c598` (2026-08-06), `--env production`, custom domain answering |
+| Live web bundle | **`index-mu-xOZEB.js`** from main tip `e5c639a2` (D1, 2026-08-06) — carres-portal `feddcb13` + carres-pos `dfe7aaea`, **all four canonicals on the first poll**, live md5 == local build (`9d6a6f98…`, 4,773,176 bytes), `SERVICE_ROLE` **0**. Both directions on DOWNLOADED bundles: `po_skus` **0 → 1**; controls `no PO raised yet` **1/1** and `Issue PO` **10/10** — both survive the card, so they prove the predecessor (`index-CRIryebD.js`, a real 4,773,113-byte file) was really read while proving nothing about the change |
+| Live Worker | **`78e44123-e851-43ce-8c81-a71a7fb8e8c3`** from main tip `e5c639a2` (D1, 2026-08-06) — deployed `--env production`; wrangler echoed `PUBLIC_WEB_URL: https://pos.carresofficial.com` + the `api.carresofficial.com` custom domain + the 09:00-MYT cron. `/health` **200 `{"ok":true}`**. **It was owed and needed no argument**: D1 adds a batched PO lookup to `routes/operation/orders.ts`. Predecessor `f376144a`, read from `wrangler deployments list`, never from this table |
 
 > **⚠️ `0318` and `0319` are IN THE REPOSITORY AND ABSENT FROM THE TRACKER**, measured
 > 2026-08-06 — `supabase_migrations.schema_migrations` jumps `0317 → 0320`, while
