@@ -286,6 +286,34 @@ export interface StockInfo {
   short?: { sku: string; need: number; have: number }[];
 }
 
+/**
+ * D1 (2026-08-06) — **has ANYTHING been ordered for this order?**
+ *
+ * ONE helper, because the question is asked in two places (the Stock cell's
+ * readiness and the drawer's journey strip) and they answered it differently
+ * until this card: both read `order_lines.source_po` alone, a column **only the
+ * AutoCount importer writes.** A native order's purchase order lives in
+ * `purchase_orders`, linked by `so` / `so_refs[]`, and reaches the list as
+ * `po_skus` (added by D1 to the list route).
+ *
+ * **Measured on production before the fix:** of 28 live orders, **19 were
+ * covered by a real purchase order and 0 carried `source_po`** — and
+ * `order_supplier_threads`, the other link the list already selects, holds ZERO
+ * rows. Four orders (`SO-1206` · `SO-1213` · `SO-1216` · `SO-1257`) showed a red
+ * *"Stock — no PO raised yet"* dot and an `Issue PO` instruction over goods
+ * Purchasing had already bought. The DRAWER's own Items tab read both sources,
+ * so the list and the drawer disagreed about the same order.
+ *
+ * **`po_skus` ABSENT is UNKNOWN, never "no PO"** — the three-way discipline
+ * `photoOnFile` and `deliveryOrderIssued` already follow. A browser on this
+ * build against a pre-D1 Worker therefore reproduces the pre-D1 answer exactly
+ * rather than accusing an order of something it cannot see.
+ */
+export function orderHasPurchaseOrder(o: operationOrderListRow): boolean {
+  if ((o.order_lines ?? []).some((l) => !!l.source_po)) return true;
+  return (o.po_skus?.length ?? 0) > 0;
+}
+
 /** Stock cell — HYBRID of pipeline stage + a live free-stock check.
  *
  *  Later stages are read from the pipeline, NOT recounted: ready_to_dispatch+
@@ -314,11 +342,9 @@ export function stockReadiness(
   // Early stages: real free-stock check, only when the live map is present AND
   // every line SKU is a known catalog SKU (else we can't honestly compute it).
   const lines = o.order_lines ?? [];
-  // An AutoCount-imported line carries its PO in source_po (not a portal PO), so
-  // "has a PO" ⇒ at least Waiting, never "No PO" — keeps the list STOCK pill in
-  // sync with the order-detail readiness (Jess 2026-07-02, inside/outside tally).
-  const hasPo = lines.some((l) => !!l.source_po);
-  const noStock: StockInfo = hasPo ? { state: "awaiting" } : { state: "unknown" };
+  const noStock: StockInfo = orderHasPurchaseOrder(o)
+    ? { state: "awaiting" }
+    : { state: "unknown" };
   if (!availableBySku || lines.length === 0) return noStock;
 
   const needBySku = new Map<string, number>();
@@ -1983,8 +2009,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
         line: orderActionLine(na.key, actionParties),
       },
       // The same test the ladder's RUNG 1 makes: goods with no purchase order
-      // anywhere are goods nobody has ordered.
-      hasPo: (o.order_lines ?? []).some((l) => !!l.source_po),
+      // anywhere are goods nobody has ordered — and D1 made "anywhere" mean
+      // both sources, so this reads the SAME helper `stockReadiness` reads.
+      // Before D1 it read `source_po` alone and the strip could say "no PO" on
+      // an order the drawer's own Items tab showed a purchase order for.
+      hasPo: orderHasPurchaseOrder(o),
       // The ladder's own two-signal ready rule (live free stock OR the Master
       // import's per-line ready flag) — not the drawer's line readiness.
       goodsReady:

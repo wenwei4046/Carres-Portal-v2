@@ -9,6 +9,8 @@ import OperationOrdersControl, {
   nextActionOf,
   openActionsOf,
   stockEtaOf,
+  stockReadiness,
+  orderHasPurchaseOrder,
   slackDays,
   logisticStateOf,
   rowDotsOf,
@@ -2776,5 +2778,80 @@ describe("The imported archive is excluded from WORK, never from the record (C13
     // …and the real work is untouched: the one genuine miss still counts.
     for (const b of screen.getAllByRole("button", { name: /^Overdue/ }))
       expect(queueCount(b)).toBe(1);
+  });
+});
+
+// ── D1 · the list can see a real purchase order (2026-08-06) ─────────────────
+//
+// Before D1 the only PO evidence on the wire was `order_lines.source_po`, a
+// column ONLY the AutoCount importer writes. Measured on production: 19 of 28
+// live orders were covered by a real purchase order and 0 carried `source_po`,
+// so the ladder told an operator to `Issue PO` on goods already bought
+// (SO-1206 · SO-1213 · SO-1216 · SO-1257).
+describe("D1 — a native order covered by a real purchase order", () => {
+  const MS = [{ sku: "mattress:MAT-1", qty: 1 }];
+  // A native order whose SKU is NOT in the free-stock map: exactly the shape
+  // that used to fall through to `unknown` → `Issue PO`.
+  const native = (extra: Partial<operationOrderListRow> = {}) =>
+    makeRow({
+      id: "d1",
+      so: 1206,
+      status: "place",
+      order_lines: [{ sku: "mattress:MAT-1", qty: 1 }],
+      ...extra,
+    });
+  // The map is present and does NOT hold this SKU — the live case.
+  const otherSkus = new Map<string, number>([["mattress:OTHER", 5]]);
+
+  it("po_skus present → the goods are ON ORDER, not unordered", () => {
+    const o = native({ po_skus: ["mattress:MAT-1"] });
+    expect(orderHasPurchaseOrder(o)).toBe(true);
+    expect(stockReadiness(o, otherSkus).state).toBe("awaiting");
+    expect(nextActionOf(o, stockReadiness(o, otherSkus), MS).label).not.toBe(
+      "Issue PO",
+    );
+  });
+
+  it("po_skus present → the goods dot stops saying no PO was raised", () => {
+    const o = native({ po_skus: ["mattress:MAT-1"] });
+    const [goods] = rowDotsOf(
+      o,
+      stockReadiness(o, otherSkus),
+      stockEtaOf(o),
+      { key: "unassigned", partner: null, date: null, slot: null },
+    );
+    expect(goods.title).not.toMatch(/no PO raised/i);
+  });
+
+  it("NEGATIVE CONTROL — the same order with NO po_skus still reads Issue PO", () => {
+    const o = native();
+    expect(orderHasPurchaseOrder(o)).toBe(false);
+    expect(stockReadiness(o, otherSkus).state).toBe("unknown");
+    expect(nextActionOf(o, stockReadiness(o, otherSkus), MS).label).toBe(
+      "Issue PO",
+    );
+  });
+
+  it("an EMPTY po_skus array is not a purchase order", () => {
+    expect(orderHasPurchaseOrder(native({ po_skus: [] }))).toBe(false);
+  });
+
+  it("po_skus ABSENT is UNKNOWN, not a claim — a pre-D1 Worker behaves as before", () => {
+    // The field is optional on purpose. Absent must reproduce the pre-D1
+    // answer exactly rather than accuse an order of something we cannot see.
+    const o = native();
+    expect(o.po_skus).toBeUndefined();
+    expect(orderHasPurchaseOrder(o)).toBe(false);
+  });
+
+  it("the AutoCount source_po path is untouched", () => {
+    const o = makeRow({
+      id: "d1b",
+      so: 900,
+      status: "place",
+      source_system: "autocount",
+      order_lines: [{ sku: "MS01-K", qty: 1, source_po: "PO-OLD" }],
+    });
+    expect(orderHasPurchaseOrder(o)).toBe(true);
   });
 });
