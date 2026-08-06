@@ -120,6 +120,35 @@ Orders and Report all run it. To Order runs the same shell with a launcher rail.
 > `stock_planner`; `po_duty_editor` is *the person who edits the rota*. The rota is
 > **`ops_po_duty`** (month → user). Live: Jul = Shasha · Aug = **Yu Jun (CR004)** · Sep = Khor Yee.
 
+**THE DUTY MODEL** (Jess 2026-07-24, LOCKED · cover ruled by Loo 2026-08-06). Two rotating
+duties, offset by ONE month, one 3-person office team — there is no warehouse crew:
+
+```
+        PO duty (issue + call)    GRN duty (receive)    no duty this month
+Jul     Shasha                    Yu Jun                Khor Yee
+Aug     Yu Jun                    Khor Yee              Shasha
+Sep     Khor Yee                  Shasha                Yu Jun
+```
+
+- **GRN duty is COMPUTED — the next month's PO holder from the same rota (offset-1). No
+  second table, no second API.** The person who ordered never receives (segregation of
+  duties). Urgent orders may bypass the rotation; a manager may override (`DutySelect`).
+- **BUDDY COVER.** The member with NO duty this month covers EITHER duty. **The absence
+  signal and the cutoff are the Orders pool's own law** (`staff.ts`, Jess round-3 —
+  reused, never respelt): before 10:00 MYT late ≠ absent; from 10:00 with no heartbeat
+  today the holder is absent TODAY and the free member covers; the holder logging in later
+  takes the duty straight back; `away` (planned leave) covers from the start. **The two
+  hat-wearers never cover each other** — that would put issuing and receiving in one pair
+  of hands. Both absent → the remaining member does both and the Team panel says so to a
+  manager. **Nothing is reassigned in data: duty is DERIVED, so cover changes the answer
+  to "who, today?", never a row.**
+- **WHERE IDENTITY SHOWS (Loo, 2026-08-06): the Team panel is the ONE home.** It already
+  states `PO DUTY` and **must gain a `GRN DUTY` row (not built — §10)**. A page never
+  repeats a duty block and no rail carries a duty chip. A per-row avatar circle appears
+  ONLY where rows can carry DIFFERENT names — Claims (owner = the month it was opened).
+  To Order and the supplier calls carry no per-row identity: the whole surface belongs to
+  the month's holder, and repeating one name down a page is noise.
+
 ## 2.3 · The numbers the engine reads
 
 Seven, all manager-editable on **Settings**, all audited (who · when · what it was before).
@@ -139,6 +168,19 @@ supplier work week        per supplier (Ohana works Saturday)
 Seven portal verbs: `Assign · Call · Issue · Upload · Close · Return · Check`.
 Retired and permanently banned from reuse: `Chase` · `Send` (as an action) · `Contact` ·
 `Prepare` · `Draft PO`.
+
+**FIELDS AND ACTIONS ARE TWO LAYERS AND NEVER SHARE A NAME** (Loo, 2026-08-06).
+`Expected Arrival` is a FIELD — our own arithmetic. `Confirm ready date` ·
+`Confirm tomorrow's delivery` · `Confirm balance delivery date` are ACTIONS — a
+conversation with the supplier. `Check Expected Arrival` was proposed as the call's name
+and REJECTED: naming the call after the field re-merges the two mouths the provenance work
+separated (the operator is not checking our estimate; they are asking the factory).
+
+**DATES ON A RAIL PRINT WEEKDAY + DATE — `Thu 6 Aug` — on every row, one format**
+(Loo, 2026-08-06). Never a bare weekday (`Monday` is ambiguous — which Monday?), never
+`Today` / `Tomorrow` (relative words rot in screenshots and re-sort themselves overnight).
+The full date stays on hover. `Later` is the word for beyond a rolling window — never
+`Next Week`, which starts lying on Thursday.
 
 ## 2.5 · A measurement trap that has cost this module real time
 
@@ -349,6 +391,26 @@ answer was already on the page, unread.
 - **One editing surface per fact.** The expand is the working area; the right panel is Activity.
 
 ### APPROVED EVOLUTION
+- **THE CALLS CALENDAR** (frozen with Loo, 2026-08-06 — card T2's mission). The rail gains
+  a `CALLS` group shaped as a **rolling five-WORKING-day window from today**:
+
+  ```
+  CALLS
+    Overdue          red · above the calendar · rendered only when > 0
+    Thu 6 Aug        today — always the first day row
+    Fri 7 Aug        §2.4's date law: weekday + date, one format, full date on hover
+    Mon 10 Aug
+    Tue 11 Aug
+    Wed 12 Aug       zero-count day rows STILL render — purchasing is planned work
+    Later            everything beyond the window · rendered only when > 0
+  ```
+
+  Counts are the engine's own dues per day. The window skips PUBLIC HOLIDAYS exactly as it
+  skips weekends (`myHolidaySet()` until the Working Calendar ships — §10). **Day rows are
+  VIEWS, never actions: a call cannot be made early**, so a click only narrows the listing
+  — no pre-tick, no pull-forward (that is To Order's calendar, a different machine).
+  Actions keep the three frozen strings (§2.4). No duty chip on this rail (§2.2 — the
+  Team panel is identity's one home). Same `NavRow` pattern as To Order's rail.
 - **`Confirm ready date` needs the queue to go with its door** (Loo, 2026-08-05 — see the
   ⚠️ under WORKFLOW). A third key in `purchasingSupplierCallsOf` on the same rules as the two
   beside it: **no anchor, no call**, and an answer closes it only while it still names the
@@ -861,3 +923,6 @@ blanks. Every row carries **who changed it, when, and what it was before**.
 | **`DecisionGuideCard`** | Approved as a **portal-wide kit component**, not a Claims feature. One card under the selector, updating live: title → 1–2 sentences → max 3 `Typical examples` → max 3 `What happens next`. **Never a hover tooltip for business guidance** (users do not discover them; mobile cannot hover; staff stop reading after the first week). **Content from a configuration object, never hard-coded in the component.** Next homes: `Deliver To` · `Receiving Method` · `Purpose` · `Delivery Status` · `Payment Result`. |
 | **The September supplier switch** | Approved. Nice Future stops; a subscription-model mattress supplier takes over. |
 | **PO revisions** | **RULED OUT, not deferred.** A sent PO is never edited. |
+| **The Working Calendar** | Approved 2026-08-06. Public holidays live in code (`packages/shared/src/my-holidays.ts`) and a manager cannot edit them — but the real fact is *"is Carres working that day?"*, which only the office can answer (a gazetted holiday can be a working day, and the company can close on an ordinary one). Settings gains ONE company calendar: the official list auto-loads each year, a manager marks a day working / adds a closure, audited like every Settings number. **Every engine — order-by, the CALLS calendar, delivery arithmetic — reads this ONE calendar.** Until built, `myHolidaySet()` stands. |
+| **`View Flow`** | Approved 2026-08-06 — **the ONE function worth porting from AutoCount's PO-register menu** (2990s' `RelationshipMap` is the worked example): one click shows the whole chain SO → PO → Receiving → Claim for a document. Everything else on that menu was reviewed with Loo the same day and is either already here or REJECTED: blank `New` (bypasses PURCHASING DEMAND, the single entry) · `Edit` (a sent PO is never edited) · `Delete` (red line — `Cancel` keeps the record) · AP/invoice transfers (Purchasing never touches money). |
+| **Team panel `GRN DUTY` row** | Approved 2026-08-06 — the panel states PO duty and must state GRN duty too (§2.2). One home for identity; no page repeats it. |
