@@ -207,7 +207,7 @@ function ReadMode({
             type="button"
             onClick={onStart}
             data-testid="start-receiving"
-            className="mt-2 px-3 py-1.5 rounded-control bg-kit-blue-9 text-white text-body font-medium hover:bg-kit-blue-10"
+            className="mt-2 px-3 py-1.5 rounded-control bg-kit-blue-9 text-white text-body font-medium hover:brightness-95"
           >
             Start Receiving
           </button>

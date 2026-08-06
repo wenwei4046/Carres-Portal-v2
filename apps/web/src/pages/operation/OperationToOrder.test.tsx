@@ -325,9 +325,11 @@ describe("the PO Schedule — a purchase calendar, not a menu", () => {
 describe("the grid — business language only", () => {
   it("T1 — every fact has a column; the order's facts print ONCE, aligned", async () => {
     await loaded();
-    // The seven, in Loo's approved order (2026-08-06): the identity columns
-    // are BACK as headers — their facts render on the aligned ORDER line, so
-    // the header words finally name what sits under them.
+    // The NINE, in Loo's approved order (T1 2026-08-06, extended by T1.1 the
+    // same day): the identity columns render their facts on the aligned ORDER
+    // line, and the two T1.1 additions are the two facts that were homeless —
+    // `Proceed date`, which T1 parked under `Supplier` in an unheaded span,
+    // and `Ready Stock`, which had no home on screen at all.
     const heads = [...document.querySelectorAll("thead th")]
       .map((t) => (t.textContent ?? "").trim())
       .filter((t) => t.length > 0);
@@ -335,9 +337,11 @@ describe("the grid — business language only", () => {
       W.colSoNo,
       W.colCustomer,
       W.colPreferred,
+      W.proceedDate,
       W.supplierLabel,
       W.colQty,
       W.colModel,
+      W.colReadyStock,
       W.colPoNo,
     ]);
     expect(screen.queryByText("Category")).toBeNull();
@@ -1325,13 +1329,20 @@ describe("P16 · the grid's width system — content sizes the column", () => {
    * columns; below ~1180px the grid scrolls sideways rather than truncating
    * (Loo, 2026-08-06 — Purchase Orders' own behaviour). */
   const RULED = {
-    so: "95px",
+    // T1.1 re-measured three of these in a real browser on live data:
+    //   so    95 → 99   the order line's `Ready Stock` (79) ellipsised by 2px
+    //   po   163 → 175  the cell now holds the order line's pill + one number,
+    //                   and holds no button at all (G10 closed)
+    //   proceed/readystock  new, measured the same way
+    so: "99px",
     customer: "181px",
     delivery: "163px",
+    proceed: "143px",
     supplier: "111px",
     qty: "55px",
     model: "155px",
-    po: "163px",
+    readystock: "99px",
+    po: "175px",
   };
 
   it("gives every column the pixel width its own content measured", async () => {
@@ -1358,7 +1369,7 @@ describe("P16 · the grid's width system — content sizes the column", () => {
           ] as HTMLElement
         ).style.width,
     );
-    expect(dataCols.length).toBe(7);
+    expect(dataCols.length).toBe(9);
     for (const w of dataCols) expect(w).toMatch(/^\d+px$/);
   });
 
@@ -1377,9 +1388,11 @@ describe("P16 · the grid's width system — content sizes the column", () => {
       W.colSoNo,
       W.colCustomer,
       W.colPreferred,
+      W.proceedDate,
       W.supplierLabel,
       W.colQty,
       W.colModel,
+      W.colReadyStock,
       W.colPoNo,
     ]);
   });
@@ -1397,7 +1410,7 @@ describe("P16 · the grid's width system — content sizes the column", () => {
     expect(src).not.toMatch(/flex-1 min-h-0 flex flex-col rounded-card/);
   });
 
-  it("reads SO No. · Customer · Customer Delivery · Supplier · Qty · Model · PO No. — T1's order", async () => {
+  it("reads SO No. · Customer · Customer Delivery · Proceed date · Supplier · Qty · Model · Ready Stock · PO No.", async () => {
     await loaded();
     const heads = [...document.querySelectorAll("thead th")]
       .map((th) => (th.textContent ?? "").trim())
@@ -1406,9 +1419,11 @@ describe("P16 · the grid's width system — content sizes the column", () => {
       W.colSoNo,
       W.colCustomer,
       W.colPreferred,
+      W.proceedDate,
       W.supplierLabel,
       W.colQty,
       W.colModel,
+      W.colReadyStock,
       W.colPoNo,
     ]);
   });
@@ -1935,9 +1950,24 @@ describe("P12 — Cancel on a demand row", () => {
     cancelFails = null;
   });
 
+  /**
+   * T1.1 — `Cancel` LEFT THE `PO No.` CELL (MASTER §3's gap G10: one column,
+   * one job) and lives in the row's own ⊞ beside `Reserve`. The claims below
+   * are unchanged; what changed is that the button is reached the way every
+   * other row ACT is reached. Opening every expandable row is deliberately
+   * blunt — it keeps "exactly one row can be cancelled" a claim about the
+   * whole sheet rather than about the one row a fixture happens to open.
+   */
+  const openRowActions = () => {
+    for (const b of document.querySelectorAll('[data-testid^="table-expand-"]')) {
+      fireEvent.click(b);
+    }
+  };
+
   it("a typed demand row offers Cancel; a customer requirement never does", async () => {
     await loadedWithDemand([PART_ORDERED, ...TO_ORDER.proposals]);
     fireEvent.click(screen.getByTestId("to-order-overdue"));
+    openRowActions();
     const sheet = screen.getByTestId("to-order-sheet");
     /**
      * EXACTLY ONE, and that is the load-bearing assertion. Cancelling a
@@ -1950,6 +1980,7 @@ describe("P12 — Cancel on a demand row", () => {
 
   it("the dialog states what is being cancelled — the REMAINDER, and nobody types it", async () => {
     await loadedWithDemand();
+    openRowActions();
     fireEvent.click(screen.getAllByRole("button", { name: W.cancelDemand })[0]);
 
     const dialog = await screen.findByTestId("to-order-cancel-dialog");
@@ -1965,6 +1996,7 @@ describe("P12 — Cancel on a demand row", () => {
 
   it("a reason is mandatory — the confirm button will not arm without one", async () => {
     await loadedWithDemand();
+    openRowActions();
     fireEvent.click(screen.getAllByRole("button", { name: W.cancelDemand })[0]);
     await screen.findByTestId("to-order-cancel-dialog");
 
@@ -1982,6 +2014,7 @@ describe("P12 — Cancel on a demand row", () => {
 
   it("confirming sends the demand's id and the reason, and nothing else", async () => {
     await loadedWithDemand();
+    openRowActions();
     fireEvent.click(screen.getAllByRole("button", { name: W.cancelDemand })[0]);
     await screen.findByTestId("to-order-cancel-dialog");
     fireEvent.change(screen.getByLabelText(W.cancelReason), {
@@ -2002,6 +2035,7 @@ describe("P12 — Cancel on a demand row", () => {
   it("a refusal stays in the dialog with the reason intact", async () => {
     cancelFails = "already cancelled";
     await loadedWithDemand();
+    openRowActions();
     fireEvent.click(screen.getAllByRole("button", { name: W.cancelDemand })[0]);
     await screen.findByTestId("to-order-cancel-dialog");
     fireEvent.change(screen.getByLabelText(W.cancelReason), { target: { value: "oops" } });
@@ -2017,6 +2051,7 @@ describe("P12 — Cancel on a demand row", () => {
 
   it("an ordered row offers no Cancel — its PO cell is a receipt, not a decision", async () => {
     await loadedWithDemand([]);
+    openRowActions();
     const sheet = screen.getByTestId("to-order-sheet");
     // The fixture's ordered receipt (PO-9001) is all that is left; nothing is
     // cancellable, and the PO cell prints its number exactly as before.
@@ -2225,11 +2260,11 @@ describe("Q6 · the audit's two findings, as guards", () => {
     expect(document.querySelectorAll('thead th[draggable="true"]')).toHaveLength(0);
     // …while the two powers the page DOES wire are untouched by the refusal.
     expect(document.querySelectorAll('[data-kit="data-group"]').length).toBeGreaterThan(0);
-    // ⊞ + ☑ + T1's seven business columns + P16's filler. The TENTH is not
-    // a column: it carries no word, no sort and no filter, and `P16 · the
-    // grid's width system` above pins both halves of that — what it is, and
-    // that the header row is still the same seven words.
-    expect(document.querySelectorAll("colgroup col")).toHaveLength(10);
+    // ⊞ + ☑ + the NINE business columns (T1's seven, plus T1.1's `Proceed
+    // date` and `Ready Stock`) + P16's filler. The TWELFTH is not a column: it
+    // carries no word, no sort and no filter, and `P16 · the grid's width
+    // system` above pins both halves of that.
+    expect(document.querySelectorAll("colgroup col")).toHaveLength(12);
   });
 });
 
@@ -2262,7 +2297,7 @@ describe("P18 · the proceed date on the group header", () => {
 
     const ella = groupOf(/ella/i);
     expect(ella).toBeTruthy();
-    expect(ella!.textContent).toContain(`${W.proceedDate} ${fmtDateShort("2026-07-15")}`);
+    expect(ella!.textContent).toContain(fmtDateShort("2026-07-15"));
   });
 
   it("adds how long it has waited once the date has PASSED", async () => {
@@ -2271,7 +2306,7 @@ describe("P18 · the proceed date on the group header", () => {
 
     // 2026-07-15 → 2026-07-30 is 15 days.
     expect(groupOf(/ella/i)!.textContent).toContain(
-      `${W.proceedDate} ${fmtDateShort("2026-07-15")} (15 days)`,
+      `${fmtDateShort("2026-07-15")} (15 days)`,
     );
   });
 
@@ -2281,7 +2316,7 @@ describe("P18 · the proceed date on the group header", () => {
 
     const peter = groupOf(/Peter/);
     expect(peter).toBeTruthy();
-    expect(peter!.textContent).toContain(`${W.proceedDate} ${fmtDateShort("2026-08-01")}`);
+    expect(peter!.textContent).toContain(fmtDateShort("2026-08-01"));
     // The whole point of Loo's ruling: no parenthesised count, and above all no
     // minus sign anywhere on the line.
     expect(peter!.textContent).not.toMatch(/\(-?\d+ days?\)/);
@@ -2294,7 +2329,11 @@ describe("P18 · the proceed date on the group header", () => {
     // must not print a bare label with an em dash after it either.
     const wong = groupOf(/wong/i);
     expect(wong).toBeTruthy();
-    expect(wong!.textContent).not.toContain(W.proceedDate);
+    // T1.1 — the LABEL now lives in the column header (permanently on screen),
+    // so the claim is about the CELL: the proceed column of this order line is
+    // empty, and no invented date or em dash stands in for the missing plan.
+    const cells = [...wong!.querySelectorAll("td")];
+    expect((cells[5]?.textContent ?? "").trim()).toBe("");
   });
 
   it("reads it off a RECEIPT too — a fully-bought order has no demand rows left", async () => {
@@ -2305,7 +2344,7 @@ describe("P18 · the proceed date on the group header", () => {
     expect(receipt).toBeTruthy();
     // 2026-07-28 → 2026-07-30 is 2 days.
     expect(receipt!.textContent).toContain(
-      `${W.proceedDate} ${fmtDateShort("2026-07-28")} (2 days)`,
+      `${fmtDateShort("2026-07-28")} (2 days)`,
     );
   });
 
@@ -2346,21 +2385,35 @@ describe("P18 · the proceed date on the group header", () => {
     expect(ready!.textContent).not.toContain(W.proceedDate);
   });
 
-  it("adds NO COLUMN — the date is nowhere in a data cell", async () => {
+  /**
+   * ⭐ T1.1 REVERSED P18'S "NO COLUMN", and Loo reversed it himself.
+   *
+   * P18's rule was *a fact that is not per-row gets no column* — sound, and it
+   * produced a date printed in an unheaded SPAN under `Supplier · Qty · Model`.
+   * Shown the live page on 2026-08-06 he named exactly that: *"proceed date out
+   * at first column"*, *"now we got header title or not?"*. **A fact under a
+   * header that names something else is worse than a column that is blank on
+   * item rows**, because a blank cell under a true header still reads as *see
+   * the line above*, and a date under `Supplier` reads as a lie.
+   *
+   * So the claim inverts: the column EXISTS, it is blank on every item row,
+   * and the header — not the cell — carries the word.
+   */
+  it("has its own column, blank on every item row, labelled by its header", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
 
-    // The card's own Must-NOT, asserted from the DOM rather than trusted: the
-    // fact lives on the header band and on no row.
+    const head = [...document.querySelectorAll("thead th[data-column]")].find(
+      (th) => (th as HTMLElement).dataset.column === "proceed",
+    );
+    expect(head?.textContent).toContain(W.proceedDate);
+
     const rows = [...document.querySelectorAll('[data-kit="data-row"]')];
     expect(rows.length).toBeGreaterThan(0);
     for (const r of rows) {
-      expect(r.textContent ?? "").not.toContain(W.proceedDate);
+      // [0]=⊞ [1]=☑ [2]=SO [3]=Customer [4]=Delivery [5]=Proceed date.
+      expect(([...r.querySelectorAll("td")][5]?.textContent ?? "").trim()).toBe("");
       expect(r.textContent ?? "").not.toContain(fmtDateShort("2026-07-15"));
-    }
-    // …and no column header carries the word either.
-    for (const th of [...document.querySelectorAll("th")]) {
-      expect(th.textContent ?? "").not.toContain(W.proceedDate);
     }
   });
 
@@ -2369,11 +2422,14 @@ describe("P18 · the proceed date on the group header", () => {
     fireEvent.click(screen.getByTestId("to-order-overdue"));
 
     const ella = groupOf(/ella/i)!;
-    // Both dates are on the line. The delivery date is the LONG spelling with a
-    // weekday and no label; the proceed date is the SHORT spelling with one.
-    // That is what stops two dates in a row reading as one fact.
-    expect(ella.textContent).toContain(fmtDate("2026-07-20"));
-    expect(ella.textContent).toContain(`${W.proceedDate} ${fmtDateShort("2026-07-15")}`);
+    // T1.1 — what tells the two dates apart is no longer a label INSIDE one of
+    // them; it is that each sits in its own column under its own header. The
+    // spellings stay different anyway (long with a weekday for the customer's
+    // date, short for the plan), which is what keeps them readable when the
+    // grid is scrolled sideways and only one header is in view.
+    const cells = [...ella.querySelectorAll("td")];
+    expect((cells[4]?.textContent ?? "").trim()).toBe(fmtDate("2026-07-20"));
+    expect((cells[5]?.textContent ?? "").trim()).toContain(fmtDateShort("2026-07-15"));
     expect(fmtDate("2026-07-20")).not.toBe(fmtDateShort("2026-07-20"));
   });
 });

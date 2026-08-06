@@ -1209,7 +1209,10 @@ export default function OperationToOrder() {
        */
       key: "so",
       label: W.colSoNo,
-      width: "95px",
+      // T1.1 re-measured it: the widest string this column holds is not `SO No.`
+      // and not `SO-1286` — it is the ORDER LINE's own `Ready Stock` (79), which
+      // ellipsised by two pixels at T1's 95. + 16 padding + the 4px guard.
+      width: "99px",
       sortable: true,
       filter: filterFor("so", soOptions, { searchable: true }),
       cell: () => null,
@@ -1232,6 +1235,36 @@ export default function OperationToOrder() {
       width: "163px",
       sortable: true,
       filter: filterFor("delivery", deliveryOptions, { range: true }),
+      cell: () => null,
+    },
+    {
+      /**
+       * T1.1 (Loo, 2026-08-06) — SALES' PLANNED PRODUCTION START, IN ITS OWN
+       * COLUMN.
+       *
+       * T1 printed it in the order line's middle SPAN, under the headers
+       * `Supplier · Qty · Model`, and Loo caught exactly that: *"proceed date
+       * out at first column"* + *"now we got header title or not?"*. A fact
+       * sitting under a header that names something else is the defect this
+       * whole grid was rebuilt to end, and the span made the page one
+       * unheaded region again.
+       *
+       * BLANK on an item row, like the three identity columns: it is an ORDER
+       * fact and every item under one order carries the same value (Loo,
+       * 2026-08-04). It carries NO in-cell label any more — the header is the
+       * label now, so the cell prints the date alone.
+       *
+       * No sort and no ▼: the column is blank on every row the table sorts,
+       * so both controls would act on values the operator cannot see.
+       */
+      key: "proceed",
+      label: W.proceedDate,
+      // MEASURED in a real browser on live data: `22 Jul 26 (15 days)` is 123
+      // (the header's own floor is 86), + 16 of padding + P16's 4px sub-pixel
+      // guard. A first pass at 138 was ONE pixel short of the content and the
+      // browser would have ellipsised it — the same rounding the `PO No.`
+      // column paid for in P16.
+      width: "143px",
       cell: () => null,
     },
     {
@@ -1292,53 +1325,76 @@ export default function OperationToOrder() {
         ),
     },
     {
+      /**
+       * ⭐ T1.1 · READY STOCK — the buyer's first question, answered without a
+       * click (Loo, 2026-08-06: *"i need to add to show ready stock like
+       * autocount"*).
+       *
+       * WHAT WAS WRONG, MEASURED: the free-stock number existed on every row
+       * since P10 and could only be reached by noticing a ⊞ that renders ONLY
+       * where stock exists — so the fact that answers *must I buy this at all*
+       * was visible exactly where it was already too late to be a surprise.
+       * Production the day this shipped: **91 free units across 50 SKUs**, and
+       * ONE row on the page said so.
+       *
+       * THE COLUMN IS THE FACT; THE EXPAND IS THE ACT. `Reserve` stays behind
+       * the ⊞ — it writes the stock register and it may not sit one stray
+       * click from a scanning finger — but the NUMBER is now scanned like any
+       * other, sorted like any other, and a row with nothing available prints
+       * nothing at all rather than a `0` that reads as an answer.
+       *
+       * An ordered row prints nothing either: a receipt has no decision left.
+       */
+      key: "readystock",
+      label: W.colReadyStock,
+      // Header floor: `Ready Stock` 62.4 + 2 + the sort arrow 14 + 16 of
+      // padding = 94.4. The content is one or two digits.
+      width: "99px",
+      align: "right",
+      numeric: true,
+      sortable: true,
+      cell: (r) =>
+        r.freeStock > 0 && !poOf(r) ? (
+          <span
+            className="text-kit-green-11"
+            title={freeStockLine(stockWarehouse ?? "", r.freeStock)}
+            data-testid={`to-order-free-${r.key}`}
+          >
+            {r.freeStock}
+          </span>
+        ) : null,
+    },
+    {
       key: "po",
       label: W.colPoNo,
-      // The widest thing this cell holds is P12's pair: `Yet to Order` (73.9)
-      // + the flex gap (8) + the `Cancel` button (61.1) = 143, + 16 padding.
-      // A `PO-2047` receipt needs 72.
-      width: "163px",
+      // ⭐ T1.1 — the width is now set by the ORDER LINE, not by the item row:
+      // `Partly ordered` (86.6) + the gap (8) + `PO-2053` (60.4) = 155, + 16
+      // of padding. An item row holds `Yet to Order` (73.9) or one number and
+      // no longer holds a button at all (see the cell).
+      width: "175px",
       sortable: true,
       filter: filterFor("po", poOptions),
       cell: (r) => {
         const po = poOf(r);
         // Not "no data" — WORK. Muted, unclickable, filterable by name.
         //
-        // ── P12 (Loo, 2026-08-04) — `Cancel` RIDES THIS CELL, and the reason is
-        // that this column already asks the question the button answers.
+        // ── T1.1 · G10 IS CLOSED — `Cancel` HAS LEFT THIS CELL.
         //
-        // `PO No.` asks *did this become a purchase order?* On a row still to
-        // buy it says `Yet to Order`; `Cancel` is the other answer to the same
-        // question — *it never will.* A seventh column would have had to be
-        // paid for out of another column's content; riding this cell is paid
-        // for out of nothing.
+        // P12 put the button here in 2026-08-04 on a real argument (`PO No.`
+        // asks *did this become a purchase order?* and `Cancel` answers *it
+        // never will*), and MASTER §3 has carried it as gap **G10** ever since
+        // for the equally real reason that §9's own rule forbids one column
+        // holding a status word AND an action.
         //
-        // P16 re-measured it rather than inheriting the claim: the pair needs
-        // `Yet to Order` 73.9 + the 8px gap + the button 61.1 = 143, and this
-        // column is 163 less 16 of padding = 147 of usable width. It is the
-        // string that SETS the column, so it fits exactly and at every
-        // viewport — the width no longer depends on what the table was given.
-        //
-        // ONLY A ROW THAT IS ITS OWN DEMAND GETS IT. A customer requirement is
-        // not cancellable here at all — that is the Orders module's act on the
-        // customer's order, and a second door to it would be a second truth.
+        // What settles it is not the argument but the SCAN: this column is the
+        // one an operator reads down to answer *what is left to buy today*, and
+        // a destructive button repeated down it is noise on every row it does
+        // not apply to. **A fact is scanned; an act is chosen.** So the act
+        // moved to the row's own ⊞ beside `Reserve` — the two things you can
+        // DO to a row now live in one place — and this cell went back to
+        // answering one question.
         if (!po) {
-          const demandId = demandIdOf(r);
-          return (
-            <span className="flex items-center gap-2 min-w-0">
-              <span className="text-kit-slate-11 truncate">{W.yetToOrder}</span>
-              {demandId ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setCancelRow(r)}
-                  data-testid={`to-order-cancel-${r.key}`}
-                >
-                  {W.cancelDemand}
-                </Button>
-              ) : null}
-            </span>
-          );
+          return <span className="text-kit-slate-11 truncate">{W.yetToOrder}</span>;
         }
         // The number is the receipt AND the door to the next step: it lands
         // on Purchase Orders with THIS document opened.
@@ -1431,29 +1487,40 @@ export default function OperationToOrder() {
         ),
       },
       {
-        span: 3,
+        /* T1.1 — the proceed date in the column that NAMES it. The label is
+           gone from the cell: repeating the header inside every cell is what
+           a header exists to stop. */
+        content: r.proceedDate ? (
+          <span className="text-kit-slate-11 tabular-nums">
+            {fmtDateShort(r.proceedDate)}
+            {waited == null ? "" : ` (${waited} ${waited === 1 ? "day" : "days"})`}
+          </span>
+        ) : null,
+      },
+      /* Supplier · Qty · Model · Ready Stock — an order line has none of the
+         four by construction, and T1.1 leaves the span EMPTY rather than
+         parking an order fact under an item header (the defect Loo caught). */
+      { span: 4, content: null },
+      {
+        /* T1.1 — `Partly ordered` joins the numbers it is derived from. Both
+           answer this column's own question (*did this become a purchase
+           order?*): the pill says SOME of it did, the numbers say which. */
         content:
-          r.proceedDate || partly ? (
-            <span className="flex items-center gap-2">
-              {r.proceedDate ? (
-                <span className="text-kit-slate-11 tabular-nums">
-                  {`${W.proceedDate} ${fmtDateShort(r.proceedDate)}`}
-                  {waited == null ? "" : ` (${waited} ${waited === 1 ? "day" : "days"})`}
-                </span>
-              ) : null}
+          partly || (g && g.pos.length > 0) ? (
+            <span className="flex items-center gap-2 min-w-0">
               {partly ? (
-                <span className="rounded-pill bg-kit-amber-3 px-2 py-0.5 text-label text-kit-amber-11">
+                <span className="shrink-0 rounded-pill bg-kit-amber-3 px-2 py-0.5 text-label text-kit-amber-11">
                   {W.partlyOrdered}
                 </span>
               ) : null}
-            </span>
-          ) : null,
-      },
-      {
-        content:
-          g && g.pos.length > 0 ? (
-            <span className="block truncate text-kit-blue-11 tabular-nums">
-              {g.pos.join(" · ")}
+              {g && g.pos.length > 0 ? (
+                <span
+                  className="truncate text-kit-blue-11 tabular-nums"
+                  title={g.pos.join(" · ")}
+                >
+                  {g.pos.join(" · ")}
+                </span>
+              ) : null}
             </span>
           ) : null,
       },
@@ -1787,9 +1854,24 @@ export default function OperationToOrder() {
                    * untouched", and it is what makes the ⊞ itself the marker:
                    * its presence says there is something to decide, and the
                    * number rides its label so a screen reader gets it too. */
+                  /* ⭐ T1.1 — THE ⊞ IS WHERE THE ROW'S ACTS LIVE, and it is now
+                   * the ONLY place they live.
+                   *
+                   * P10 built this expand for `Reserve` and made the control
+                   * itself the marker that stock existed. T1.1 moved that
+                   * SIGNAL into its own column — the number is a fact, and a
+                   * fact belongs where it can be scanned and sorted — which
+                   * leaves the expand doing the thing it is actually good at:
+                   * holding what you can DO to this row, off the scan path.
+                   *
+                   * Two acts, one door: `Reserve` (P10) and `Cancel` (P12,
+                   * evicted from the `PO No.` cell — G10). A row can offer
+                   * either, both, or neither, and a row with neither has no
+                   * control at all, exactly as before. */
                   expansion={{
                     expanded,
-                    expandable: (r) => r.freeStock > 0 && !poOf(r),
+                    expandable: (r) =>
+                      !poOf(r) && (r.freeStock > 0 || demandIdOf(r) != null),
                     label: (r) => stockExpandLabel(r.model, r.freeStock),
                     onToggle: (id) =>
                       setExpanded((s) => {
@@ -1803,17 +1885,31 @@ export default function OperationToOrder() {
                         className="flex items-center gap-3 text-body"
                         data-testid={`to-order-stock-${r.key}`}
                       >
-                        <span className="text-kit-slate-11">
-                          {freeStockLine(stockWarehouse ?? "", r.freeStock)}
-                        </span>
-                        <Button
-                          size="sm"
-                          onClick={() => reserveStock(r)}
-                          disabled={reserving != null}
-                          data-testid={`to-order-reserve-${r.key}`}
-                        >
-                          {reserveFromStockLabel(r.freeStock)}
-                        </Button>
+                        {r.freeStock > 0 ? (
+                          <>
+                            <span className="text-kit-slate-11">
+                              {freeStockLine(stockWarehouse ?? "", r.freeStock)}
+                            </span>
+                            <Button
+                              size="sm"
+                              onClick={() => reserveStock(r)}
+                              disabled={reserving != null}
+                              data-testid={`to-order-reserve-${r.key}`}
+                            >
+                              {reserveFromStockLabel(r.freeStock)}
+                            </Button>
+                          </>
+                        ) : null}
+                        {demandIdOf(r) ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setCancelRow(r)}
+                            data-testid={`to-order-cancel-${r.key}`}
+                          >
+                            {W.cancelDemand}
+                          </Button>
+                        ) : null}
                         {reserveError.get(r.key) ? (
                           <span className="text-kit-red-11">{reserveError.get(r.key)}</span>
                         ) : null}
@@ -1828,6 +1924,24 @@ export default function OperationToOrder() {
                   group={{
                     keyOf: (r) => r.orderId ?? r.key,
                     cells: groupCells,
+                    /* ⭐ WHITE, RULED — NOT A GREY BAND (Loo, on the live page,
+                     * 2026-08-06: *"every customer is grey too — i confused"*).
+                     *
+                     * The band was the obvious answer and it was wrong HERE for
+                     * a reason the other Purchasing tabs do not have: this grid
+                     * carries a group line every two or three rows, so six
+                     * bands down one screen stop reading as structure and start
+                     * reading as stripes. One band under a header is a
+                     * hierarchy; six is a pattern the eye follows instead of
+                     * the data.
+                     *
+                     * BOTH of Loo's own references settle it the same way — the
+                     * Orders list is white throughout, and AutoCount's `SO Batch
+                     * Posting` parents are white with a rule. And the portal's
+                     * surface law already said it: grey is CHROME (the app
+                     * background, the header strip, the table head); a
+                     * customer's order is DATA, and data is white. */
+                    tone: "plain",
                     selection: {
                       state: groupSelState,
                       onToggle: groupSelToggle,
@@ -1849,7 +1963,7 @@ export default function OperationToOrder() {
                     label: W.total,
                     cells: (rows) => [
                       {
-                        span: 7,
+                        span: 9,
                         content: (
                           <span className="tabular-nums" data-testid="to-order-total">
                             {`${W.total} · ${unitsHeadline(

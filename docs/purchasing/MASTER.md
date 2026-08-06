@@ -230,12 +230,18 @@ LEFT 200px    PO SCHEDULE  rolling calendar of configured PO days, red OVERDUE r
 
 RIGHT         toolbar  pill search · selection state · Issue pill (exists ONLY while
                        something is selected) · quiet `Updated hh:mm`, never a Refresh
-              grid     SEVEN aligned columns (Loo's approved mock, 2026-08-06):
-                       ☑ · SO No. · Customer · Customer Delivery · Supplier · Qty ·
-                       Model · PO No.   widths 95 · 181 · 163 · 111 · 55 · 155 · 163
-                       ONE aligned ORDER LINE per customer order carries SO · customer ·
-                       date · (middle span: Proceed date + waited days · Partly ordered
-                       pill) · its PO numbers; item rows leave the identity cells blank.
+              grid     NINE aligned columns (T1's seven + T1.1's two, 2026-08-06):
+                       ☑ · SO No. · Customer · Customer Delivery · Proceed date ·
+                       Supplier · Qty · Model · Ready Stock · PO No.
+                       widths 99 · 181 · 163 · 143 · 111 · 55 · 155 · 99 · 175
+                       ONE aligned ORDER LINE per customer order, WHITE with a
+                       `slate-6` rule above it — never a grey band (Loo, T1.1: six
+                       bands down one sheet read as stripes, and grey is chrome while
+                       an order is data). It carries SO · customer · date · proceed
+                       date + waited days, and in the PO cell the `Partly ordered`
+                       pill beside the numbers; item rows leave the identity cells
+                       blank. The Supplier‥Ready Stock span on an order line is EMPTY:
+                       no order fact is ever parked under an item header.
                        A Ready Stock group prints `Required By {date}` in the Delivery
                        column and its destination under Customer.
                        The order line's ☑ toggles ALL its builds (all / indeterminate /
@@ -245,14 +251,18 @@ RIGHT         toolbar  pill search · selection state · Issue pill (exists ONLY
                        portal's Excel date ▼ (Overdue · presets · month buckets ·
                        Custom Date Range…), the PO filter speaks business
                        (`Yet to Order` + the real numbers).
-                       Below ~1200px the grid SCROLLS SIDEWAYS, never truncates.
+                       Below 1255px the grid SCROLLS SIDEWAYS, never truncates —
+                       Purchase Orders' own behaviour; deleting a business column to
+                       avoid a scrollbar is forbidden.
               totals   `Total · N units` — ALWAYS ON, counts the visible sheet
               footer   units per category for what is TICKED (P9) · Clear filters
 ```
 
 **Controls** `to-order-create-purchase` · `to-order-issue` · `to-order-retry` ·
 `to-order-cancel-dialog`/`-qty`/`-submit` · `to-order-clear-filters` · `to-order-footer-clear`
-· `to-order-total` · `kit-table-group-{orderId}` (the order line's ☑)
+· `to-order-total` · `kit-table-group-{orderId}` (the order line's ☑) ·
+`to-order-free-{row}` (the Ready Stock number) · `table-expand-{row}` → `to-order-reserve-{row}`
+· `to-order-cancel-{row}` (both acts, one door — see FROZEN RULES)
 
 **Create Purchase** is a multi-line dialog (`+ Add line` / `Remove`, 600px wide). One POST per
 line; a created line can never post twice because the loop walks only rows that are not
@@ -271,6 +281,21 @@ numbers can never disagree. A cancel stamps `cancelled_at` and lets the remainde
   the operator sees the CUSTOMER's date.
 - **Issue = zero popups, zero toasts.** Rows update in place; a partial failure stays with
   `Retry` until it succeeds.
+- **⭐ A FACT IS SCANNED; AN ACT IS CHOSEN** (Loo, T1.1, 2026-08-06). A fact the buyer reads
+  down the page gets a COLUMN — `Ready Stock` is the case that named the rule: the free-stock
+  number existed on every row since P10 and could only be reached by noticing a ⊞, so the
+  answer to *must I buy this at all* was invisible (measured the day it shipped: **91 free
+  units across 50 SKUs**, ONE row on the page saying so). An ACT stays behind the row's ⊞,
+  where a scanning finger cannot reach it by accident: `Reserve` writes the stock register and
+  `Cancel Purchase` cannot be undone from any screen. **Two acts, one door — G10 is CLOSED**
+  and the `PO No.` cell answers one question again.
+- **THE ORDER LINE IS WHITE, RULED — NEVER A GREY BAND.** Measured on the live page: the band
+  was `bg-kit-slate-2`, a step the palette does not publish, so it had rendered as NOTHING and
+  the order line was byte-identical to the item rows under it. Painting it grey fixed the
+  hierarchy and broke the reading (*"every customer is grey too — i confused"*): a group line
+  every two rows makes six bands a stripe pattern. The separation is a `slate-6` rule above
+  the line — the `divider` token, whose stated use is *section split* — and grey stays what
+  the surface law says it is: chrome.
 - **No Status pills, no Sort By, no Group By** — two filter doors for one fact is the Excel sin.
   The `PO No.` column IS the status answer: `Yet to Order` / the number / the order line's
   amber `Partly ordered` pill. **No Status column is ever added beside it.**
@@ -299,16 +324,16 @@ numbers can never disagree. A cancel stamps `cancelled_at` and lets the remainde
 
 ### APPROVED EVOLUTION
 - **The Planning Workspace** — the frozen information architecture made true on this tab.
-  Five measured gaps carry it: **G1** demand whose supplier cannot be resolved is silently
+  FOUR measured gaps carry it: **G1** demand whose supplier cannot be resolved is silently
   discarded · **G2** supplier resolution runs by TWO different rules in one module (planning
   by the item's own supplier; PO creation also by category coverage) · **G3** intentionally
   held demand produces no output at all — it must state what · who · why · until when ·
   **G5** `Check in` must leave To Order and **Receiving must gain PO · supplier · customer name
-  · SO number · warehouse · ETA · quantity-still-to-receive FIRST**, or information is deleted ·
-  **G10** the `PO No.` cell holds a status word and an action button in one column, which §9's
-  own rule forbids. *(G8 — the group header's bare date carrying two facts under no word — was
-  CLOSED by T1, 2026-08-06: the customer's date sits under the `Customer Delivery` header and a
-  typed demand prints `Required By {date}`.)*
+  · SO number · warehouse · ETA · quantity-still-to-receive FIRST**, or information is deleted.
+  *(**G8** and **G10** are CLOSED, 2026-08-06. G8 by T1: the customer's date sits under the
+  `Customer Delivery` header and a typed demand prints `Required By {date}`. G10 by T1.1:
+  `Cancel` left the `PO No.` cell for the row's ⊞, on the rule a fact is scanned and an act is
+  chosen.)*
 - **The September switch** — Nice Future stops supplying; a new mattress supplier takes over on
   the subscription model. Sofa and bedframe unchanged.
 
