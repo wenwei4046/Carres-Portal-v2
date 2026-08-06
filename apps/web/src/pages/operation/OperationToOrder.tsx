@@ -70,6 +70,7 @@ import {
   unitsHeadline,
   unresolvedHeadline,
   freeStockLine,
+  onPoLine,
   proceedWaitedDays,
   reserveFromStockLabel,
   reservedFromStockLabel,
@@ -204,6 +205,20 @@ interface GridRow {
   freeStock: number;
   /** P10 — units of this build already taken from ready stock. */
   takenFromStock: number;
+  /**
+   * T3 — units of this build an OPEN purchase order already covers. `qty` is
+   * already net of it, which is the whole reason it is on the row: a quantity
+   * that fell with nothing beside it cannot be checked by the person who has
+   * to sign the purchase order.
+   *
+   * `0` on an ordered row (a receipt decides nothing) and `0` on a build whose
+   * every line was FULLY covered — such a build never reaches this grid at
+   * all, because it has nothing left to buy.
+   */
+  coveredByOpenPo: number;
+  /** T3 — the purchase orders behind it, for the cell's hover. Empty = no
+   *  title; a reference is never invented. */
+  coveredByOpenPoPos: string[];
 }
 
 /**
@@ -438,6 +453,8 @@ export default function OperationToOrder() {
             orderedPo: null,
             freeStock: b.freeStock ?? 0,
             takenFromStock: b.takenFromStock ?? 0,
+            coveredByOpenPo: b.coveredByOpenPo ?? 0,
+            coveredByOpenPoPos: b.coveredByOpenPoPos ?? [],
           });
         }
       }
@@ -470,6 +487,11 @@ export default function OperationToOrder() {
         // so it is never offered stock and never opens.
         freeStock: 0,
         takenFromStock: 0,
+        // T3 — the same reason: this row IS a purchase order. Its own number is
+        // in the `PO No.` cell, and repeating it as coverage would say the
+        // document covers itself.
+        coveredByOpenPo: 0,
+        coveredByOpenPoPos: [],
       });
     }
     return rows;
@@ -1158,8 +1180,14 @@ export default function OperationToOrder() {
   /**
    * ── Grid columns — T1, the AutoCount-aligned grid (Loo, 2026-08-06) ──────
    *
-   * ORDER (Loo's approved mock):
-   *   ☑ · SO No. · Customer · Customer Delivery · Supplier · Qty · Model · PO No.
+   * ORDER (Loo's approved mock, + T1.1's two and T3's one):
+   *   ☑ · SO No. · Customer · Customer Delivery · Proceed date · Supplier ·
+   *   Qty · Model · Ready Stock · On PO · PO No.
+   *
+   * The last three are the buyer's own question in order — *is it in the
+   * warehouse · is it already bought · did I buy it today* — and they sit
+   * beside each other for that reason (2990s' MRP row: `Stock · PO
+   * Outstanding · Shortage`).
    *
    * The free-text group sentence is retired: Loo ruled it hard to read.
    * EVERY fact gets a column, and the ORDER's facts (SO · customer · date)
@@ -1176,14 +1204,17 @@ export default function OperationToOrder() {
    * word + 2 + 14 (arrow) + 2 + 24 (▼) + 16 (padding).
    *
    *   col                worst content (measured 2026-08-06)   → width
-   *   SO No.             header floor (`SO No.` 36.8 + 58)         95
+   *   SO No.             the ORDER LINE's `Ready Stock` 79 + 16     99
    *   Customer           `Myhouse Management Plt` 160.5 + 16*     181
    *   Customer Delivery  `Required By 30 Aug 26` 142.9 + 16**     163
+   *   Proceed date       `22 Jul 26 (15 days)` 123 + 16           143
    *   Supplier           `Carres Internal`  90.8 + 16             111
    *   Qty                header floor 50.8                         55
    *   Model              `Mattress Protector SS` 134.3 + 16       155
-   *   PO No.             `Yet to Order` + gap + `Cancel` 143      163
-   *                                                             ── 923
+   *   Ready Stock        header floor `Ready Stock` 62.4 + 32       99
+   *   On PO              header floor `On PO` 34.7 + 32 (T3)       71
+   *   PO No.             `Partly ordered` + gap + `PO-2053` 155   175
+   *                                                             ── 1252
    *   * the longest customer name in production today (22 chars, found with
    *     SQL over `orders.customer_name`, display-cased). A name is the one
    *     string with no upper bound, so a longer future name truncates with
@@ -1193,10 +1224,14 @@ export default function OperationToOrder() {
    *     `Wed, 30 Aug 26` (100 + 16); the widest thing the column holds is
    *     what sizes it.
    *
-   * BELOW ~1200px THE GRID SCROLLS SIDEWAYS instead of truncating — Loo's
-   * own T1 ruling, Purchase Orders' existing behaviour (its nine columns
-   * min at 1208). 923 + 42 + 32 of gutters = 997, inside a 1280 laptop with
-   * the 200px rail; smaller windows scroll.
+   * THE GRID SCROLLS SIDEWAYS below its own width instead of truncating —
+   * Loo's own T1 ruling, Purchase Orders' existing behaviour (its nine columns
+   * min at 1208). 1252 + the ☑ 42 + the ⊞ 32 = 1326, so on a 1280 laptop with
+   * the 200px rail the grid scrolls, and that is the ruled behaviour rather
+   * than a regression: **deleting a business column to avoid a scrollbar is
+   * forbidden.** T3 measured the alternative — shrinking `Customer` or
+   * `Model` — and refused it: both already sit at their own worst string, so
+   * the saving would come straight out of a truncated customer name.
    *
    * `sizing="content"` still hands the slack to the kit's filler: no column
    * absorbs it, and trailing whitespace keeps saying *these facts, no more*.
@@ -1365,6 +1400,69 @@ export default function OperationToOrder() {
         ) : null,
     },
     {
+      /**
+       * ⭐ T3 · ON PO — what is already bought and on its way (Loo, 2026-08-06).
+       *
+       * WHAT WAS WRONG, MEASURED: `net-requirements.ts` has netted open
+       * purchase orders out of demand since it was written, and the number
+       * left the engine nowhere — `coveredByOpenPo` had ZERO readers in the
+       * whole repository. A partly covered line therefore printed its REDUCED
+       * quantity with nothing beside it: the grid says `Qty 1` where the
+       * customer ordered 3, and the two units on `PO-2051` are stated on no
+       * screen. The buyer cannot answer *why 1?* and so cannot check the plan
+       * before signing it.
+       *
+       * THE THIRD OF FOUR NUMBERS. 2990s' MRP screen puts them side by side —
+       * `Qty Needed · Stock · PO Outstanding · Shortage`. This page already
+       * had two of them (`Ready Stock` = in the warehouse, `Qty` = still to
+       * buy); this is the third, and it is the one that explains the fourth.
+       *
+       * NEUTRAL INK, NOT GREEN, and the difference is the operator's: `Ready
+       * Stock` is green because it is something you can TAKE today (`Reserve`
+       * is one click away, behind the ⊞). This is informational — the goods
+       * are bought, nothing here can be done about them — so it reads like
+       * `Qty`, the other number on this grid that is simply true.
+       *
+       * BLANK AT ZERO. A `0` reads as an answer somebody worked out; a blank
+       * reads as *nothing to say*, which is what it means. Same rule
+       * `Ready Stock` ships on.
+       *
+       * A FACT, SO A COLUMN, AND IT TAKES NO ACTION (MASTER §3's own rule).
+       * The ⊞ still holds the two acts and only them.
+       *
+       * ⚠️ A FULLY COVERED LINE IS NOT ON THIS GRID AT ALL and this column
+       * cannot say so — the line is dropped upstream in `buildToOrder` because
+       * nothing is left to buy. **Measured on production 2026-08-06: 41 of 78
+       * eligible demand lines are covered by an open purchase order and ALL 41
+       * are covered in full, so this column is blank on every live row today.**
+       * That is the column working as ruled, not a defect; the number appears
+       * the first time a line is PARTLY covered (3 ordered, 2 on a PO). The
+       * demand returns by itself if the purchase order is cancelled — the
+       * engine reads `status = 'open'` and nothing else.
+       */
+      key: "onpo",
+      label: W.colOnPo,
+      // Header floor, MEASURED in a real browser (see the P16 block above):
+      // `On PO` 11px/500 = 34.7 + 2 + the sort arrow 14 + 16 of padding = 66.7,
+      // + P16's 4px sub-pixel guard. The content is one or two digits (43
+      // units sit on open POs across the whole live database).
+      width: "71px",
+      align: "right",
+      numeric: true,
+      sortable: true,
+      // No ▼: the values are 1 · 2, exactly the list Jess ruled not worth a
+      // button on `Qty`.
+      cell: (r) =>
+        r.coveredByOpenPo > 0 && !poOf(r) ? (
+          <span
+            title={onPoLine(r.coveredByOpenPo, r.coveredByOpenPoPos) ?? undefined}
+            data-testid={`to-order-onpo-${r.key}`}
+          >
+            {r.coveredByOpenPo}
+          </span>
+        ) : null,
+    },
+    {
       key: "po",
       label: W.colPoNo,
       // ⭐ T1.1 — the width is now set by the ORDER LINE, not by the item row:
@@ -1497,10 +1595,13 @@ export default function OperationToOrder() {
           </span>
         ) : null,
       },
-      /* Supplier · Qty · Model · Ready Stock — an order line has none of the
-         four by construction, and T1.1 leaves the span EMPTY rather than
-         parking an order fact under an item header (the defect Loo caught). */
-      { span: 4, content: null },
+      /* Supplier · Qty · Model · Ready Stock · On PO — an order line has none
+         of the five by construction, and T1.1 leaves the span EMPTY rather
+         than parking an order fact under an item header (the defect Loo
+         caught). T3 widened the span by one when `On PO` joined: the cover is
+         a fact about an ITEM, and summing five items' cover onto the order
+         line would put an item number under an order's own row. */
+      { span: 5, content: null },
       {
         /* T1.1 — `Partly ordered` joins the numbers it is derived from. Both
            answer this column's own question (*did this become a purchase

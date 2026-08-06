@@ -325,11 +325,13 @@ describe("the PO Schedule — a purchase calendar, not a menu", () => {
 describe("the grid — business language only", () => {
   it("T1 — every fact has a column; the order's facts print ONCE, aligned", async () => {
     await loaded();
-    // The NINE, in Loo's approved order (T1 2026-08-06, extended by T1.1 the
-    // same day): the identity columns render their facts on the aligned ORDER
-    // line, and the two T1.1 additions are the two facts that were homeless —
-    // `Proceed date`, which T1 parked under `Supplier` in an unheaded span,
-    // and `Ready Stock`, which had no home on screen at all.
+    // The TEN, in Loo's approved order (T1 2026-08-06, extended by T1.1 the
+    // same day and by T3): the identity columns render their facts on the
+    // aligned ORDER line; the two T1.1 additions are the two facts that were
+    // homeless — `Proceed date`, which T1 parked under `Supplier` in an
+    // unheaded span, and `Ready Stock`, which had no home on screen at all —
+    // and T3's `On PO` is the third, computed by the engine since the day it
+    // was written and read by nobody.
     const heads = [...document.querySelectorAll("thead th")]
       .map((t) => (t.textContent ?? "").trim())
       .filter((t) => t.length > 0);
@@ -342,6 +344,7 @@ describe("the grid — business language only", () => {
       W.colQty,
       W.colModel,
       W.colReadyStock,
+      W.colOnPo,
       W.colPoNo,
     ]);
     expect(screen.queryByText("Category")).toBeNull();
@@ -1342,6 +1345,13 @@ describe("P16 · the grid's width system — content sizes the column", () => {
     qty: "55px",
     model: "155px",
     readystock: "99px",
+    // T3 — the header's own floor, measured in a real browser with the kit's
+    // own header classes and the app's own font (`500 11px Inter`): the word
+    // `On PO` is 34.1, and the whole cell — word + the 2px gap + the 14px sort
+    // arrow + 16 of `px-2` padding — is 66.1. + P16's 4px sub-pixel guard.
+    // (The SAME measurement reproduces `Ready Stock` at 98.9 → the 99 above,
+    // which is what says the method is the shipped one.)
+    onpo: "71px",
     po: "175px",
   };
 
@@ -1369,7 +1379,7 @@ describe("P16 · the grid's width system — content sizes the column", () => {
           ] as HTMLElement
         ).style.width,
     );
-    expect(dataCols.length).toBe(9);
+    expect(dataCols.length).toBe(10);
     for (const w of dataCols) expect(w).toMatch(/^\d+px$/);
   });
 
@@ -1393,6 +1403,7 @@ describe("P16 · the grid's width system — content sizes the column", () => {
       W.colQty,
       W.colModel,
       W.colReadyStock,
+      W.colOnPo,
       W.colPoNo,
     ]);
   });
@@ -1410,7 +1421,7 @@ describe("P16 · the grid's width system — content sizes the column", () => {
     expect(src).not.toMatch(/flex-1 min-h-0 flex flex-col rounded-card/);
   });
 
-  it("reads SO No. · Customer · Customer Delivery · Proceed date · Supplier · Qty · Model · Ready Stock · PO No.", async () => {
+  it("reads SO No. · Customer · Customer Delivery · Proceed date · Supplier · Qty · Model · Ready Stock · On PO · PO No.", async () => {
     await loaded();
     const heads = [...document.querySelectorAll("thead th")]
       .map((th) => (th.textContent ?? "").trim())
@@ -1424,6 +1435,7 @@ describe("P16 · the grid's width system — content sizes the column", () => {
       W.colQty,
       W.colModel,
       W.colReadyStock,
+      W.colOnPo,
       W.colPoNo,
     ]);
   });
@@ -1875,6 +1887,78 @@ describe("P10 · ready stock on the grid", () => {
     expect(document.body.textContent ?? "").not.toMatch(/\b(take|took|taken|takes)\b/i);
     expect(document.body.textContent ?? "").toContain("reserved 2 from stock");
   });
+
+  /**
+   * ── T3 · ON PO — the answer to *why 1?* (Loo, 2026-08-06) ─────────────────
+   *
+   * The engine has netted open purchase orders out of demand since it was
+   * written and the number reached NOBODY: a partly covered line printed its
+   * reduced quantity with nothing beside it, so the grid said `Qty 1` where
+   * the customer ordered 3 and the two units on `PO-2051` were stated on no
+   * screen. This is the third of 2990s' four numbers, and the one that
+   * explains the fourth.
+   */
+  describe("T3 · On PO", () => {
+    /** The same payload with a partial open-PO cover on ella's build. */
+    function withCover(n: number, pos: string[] = []) {
+      const body = withOffer(0);
+      const row = body.proposals[0].rows[0] as unknown as Record<string, unknown>;
+      const b = (row.builds as Record<string, unknown>[])[0];
+      b.coveredByOpenPo = n;
+      b.coveredByOpenPoPos = pos;
+      row.coveredByOpenPo = n;
+      row.coveredByOpenPoPos = pos;
+      return body;
+    }
+
+    it("prints the number on the row", async () => {
+      await loadedWith(withCover(2));
+      expect(screen.getByTestId(`to-order-onpo-${rowKey}`)).toHaveTextContent("2");
+    });
+
+    it("names the purchase orders behind it, on the hover", async () => {
+      await loadedWith(withCover(2, ["PO-2051"]));
+      expect(screen.getByTestId(`to-order-onpo-${rowKey}`)).toHaveAttribute(
+        "title",
+        "2 on PO-2051",
+      );
+    });
+
+    it("ships the number with NO hover when the api could not resolve one", async () => {
+      // An invented reference is worse than a bare number: an operator can
+      // phone a purchase order that does not exist.
+      await loadedWith(withCover(2));
+      expect(screen.getByTestId(`to-order-onpo-${rowKey}`)).not.toHaveAttribute("title");
+    });
+
+    it("is BLANK at zero — a `0` reads as an answer somebody worked out", async () => {
+      await loadedWith(withCover(0));
+      expect(screen.queryByTestId(`to-order-onpo-${rowKey}`)).toBeNull();
+    });
+
+    it("says nothing on an ordered row — a receipt's own number is in PO No.", async () => {
+      await loadedWith(withCover(2));
+      expect(screen.queryByTestId("to-order-onpo-po:PO-9001:o30")).toBeNull();
+    });
+
+    it("is neutral ink, NOT the green Ready Stock owns", async () => {
+      // Green means *you can take this today*; this number is information.
+      await loadedWith(withCover(2));
+      expect(screen.getByTestId(`to-order-onpo-${rowKey}`).className).not.toMatch(/green/);
+    });
+
+    it("carries NO action — the cell is a fact, the ⊞ holds the acts", async () => {
+      await loadedWith(withCover(2));
+      const cell = screen.getByTestId(`to-order-onpo-${rowKey}`).closest("td")!;
+      expect(cell.querySelectorAll("button, a, input")).toHaveLength(0);
+    });
+
+    it("the ORDER LINE says nothing — the cover is a fact about an ITEM", async () => {
+      await loadedWith(withCover(2));
+      const group = document.querySelector('[data-kit="data-group"]')!;
+      expect(group.querySelectorAll('[data-testid^="to-order-onpo-"]')).toHaveLength(0);
+    });
+  });
 });
 
 /**
@@ -2260,11 +2344,11 @@ describe("Q6 · the audit's two findings, as guards", () => {
     expect(document.querySelectorAll('thead th[draggable="true"]')).toHaveLength(0);
     // …while the two powers the page DOES wire are untouched by the refusal.
     expect(document.querySelectorAll('[data-kit="data-group"]').length).toBeGreaterThan(0);
-    // ⊞ + ☑ + the NINE business columns (T1's seven, plus T1.1's `Proceed
-    // date` and `Ready Stock`) + P16's filler. The TWELFTH is not a column: it
-    // carries no word, no sort and no filter, and `P16 · the grid's width
-    // system` above pins both halves of that.
-    expect(document.querySelectorAll("colgroup col")).toHaveLength(12);
+    // ⊞ + ☑ + the TEN business columns (T1's seven, T1.1's `Proceed date` and
+    // `Ready Stock`, T3's `On PO`) + P16's filler. The THIRTEENTH is not a
+    // column: it carries no word, no sort and no filter, and `P16 · the grid's
+    // width system` above pins both halves of that.
+    expect(document.querySelectorAll("colgroup col")).toHaveLength(13);
   });
 });
 
