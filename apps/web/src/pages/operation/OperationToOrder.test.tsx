@@ -2586,24 +2586,35 @@ describe("T1 · the aligned order line", () => {
     expect(document.getElementById("kit-table-group-o30")).toBeNull();
   });
 
-  it("the Total strip is ALWAYS on and counts the visible sheet's units", async () => {
+  it("the Total strip is ALWAYS on and counts what is still TO BUY", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
-    // Fri + Overdue: the receipt (1) + 7 demand units = 8. Nothing needs to
-    // be ticked — the strip answers for the SHEET, the footer for the pick.
+    /**
+     * T6 CHANGED WHAT THIS COUNTS, and the receipts are why. It summed every
+     * visible row while the only receipts on the sheet were a handful of POs
+     * from the last fortnight; T6 puts every order an open purchase order
+     * already covers back on the page — 35 of 62 rows on live data — so
+     * summing the sheet would have said `71 units` on a day the buyer had 20
+     * to place. The rail's category counts have skipped bought rows since P9,
+     * so this is the two numbers agreeing rather than contradicting each other
+     * 200px apart. Fri + Overdue = 7 demand units; PO-9001's receipt is not
+     * work and no longer counts.
+     */
     expect(screen.getByTestId("to-order-total")).toHaveTextContent(
-      `${W.total} · 8 units`,
+      `${W.total} · 7 units`,
     );
     // Untick everything; the strip does not move (always on).
     fireEvent.click(document.getElementById("kit-table-select-all")!);
     expect(screen.getByTestId("to-order-total")).toHaveTextContent(
-      `${W.total} · 8 units`,
+      `${W.total} · 7 units`,
     );
     // A filter narrows the sheet, so it narrows the total with it.
     fireEvent.click(screen.getByTestId("to-order-cat-sofa"));
     expect(screen.getByTestId("to-order-total")).toHaveTextContent(
       `${W.total} · 3 units`,
     );
+    // …and it now agrees with the rail, which has always counted this way.
+    expect(screen.getByTestId("to-order-cat-sofa")).toHaveTextContent("3");
   });
 
   it("a Ready Stock group prints `Required By` with its date — G8's bare date is named", async () => {
