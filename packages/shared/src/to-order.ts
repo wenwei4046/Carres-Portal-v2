@@ -381,6 +381,24 @@ export const TO_ORDER_WORDS = {
   nextStep: "Next: confirm the ready date in Purchase Orders",
   openPurchaseOrders: "Open Purchase Orders",
 
+  // ── T1 (Loo, 2026-08-06) — the AutoCount-aligned grid ────────────────────
+  /**
+   * The always-on strip under the grid: `Total · 21 units`. **Not a new
+   * word** — COPY-STANDARD's Report table rules `Total` by name ("the last
+   * row"), and AutoCount's own footer says it; this entry is the mirror.
+   * The unit half is `unitsHeadline`, COPY-STANDARD's own Numbers pair.
+   */
+  total: "Total",
+  /**
+   * The date ▼'s custom-range section and its apply button — BOTH live on
+   * Purchase Orders' date columns since 2026-08-02 (Jess's Excel date ▼,
+   * frozen on the Register and "built to flow back to every date column in
+   * the portal", `excel-date-filter.ts`'s own docblock). Mirrored here the
+   * day the flow-back reached this page; no spelling is invented.
+   */
+  customDateRange: "Custom Date Range…",
+  apply: "Apply",
+
   empty: "No purchase orders to issue.",
 } as const;
 

@@ -315,22 +315,44 @@ describe("the PO Schedule — a purchase calendar, not a menu", () => {
 });
 
 describe("the grid — business language only", () => {
-  it("carries only what belongs to an ITEM — the order's own facts moved to the group", async () => {
+  it("T1 — every fact has a column; the order's facts print ONCE, aligned", async () => {
     await loaded();
-    // Supplier · Qty · Model · PO No. — what is true of one piece of goods.
-    for (const label of [W.supplierLabel, W.colModel, W.colQty, W.colPoNo]) {
-      expect(screen.getByText(label)).toBeInTheDocument();
-    }
-    // SO No. · Customer · Customer Delivery are facts about the ORDER, so they
-    // are stated ONCE on the group header and are no longer column headers
-    // (Loo, 2026-08-03 — AutoCount's own shape).
-    const heads = [...document.querySelectorAll("thead th")].map((t) => t.textContent ?? "");
-    for (const gone of [W.colSoNo, W.colCustomer, W.colPreferred]) {
-      expect(heads.some((h) => h.includes(gone))).toBe(false);
-    }
+    // The seven, in Loo's approved order (2026-08-06): the identity columns
+    // are BACK as headers — their facts render on the aligned ORDER line, so
+    // the header words finally name what sits under them.
+    const heads = [...document.querySelectorAll("thead th")]
+      .map((t) => (t.textContent ?? "").trim())
+      .filter((t) => t.length > 0);
+    expect(heads).toEqual([
+      W.colSoNo,
+      W.colCustomer,
+      W.colPreferred,
+      W.supplierLabel,
+      W.colQty,
+      W.colModel,
+      W.colPoNo,
+    ]);
     expect(screen.queryByText("Category")).toBeNull();
     expect(screen.queryByText(/Order by/i)).toBeNull();
     expect(screen.queryByText("Stock ready")).toBeNull();
+  });
+
+  it("T1 — an ITEM row leaves the identity cells blank; the order line fills them", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    // PETER's order: the group line says SO-1207 · Peter · the date; his two
+    // item rows say none of it — the fact is stated once, in its column.
+    const rows = [...document.querySelectorAll('[data-kit="data-row"]')];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      const tds = [...r.querySelectorAll("td")];
+      // [0]=⊞ gutter, [1]=☑, [2]=SO No., [3]=Customer, [4]=Delivery.
+      expect(tds[2]?.textContent ?? "").toBe("");
+      expect(tds[3]?.textContent ?? "").toBe("");
+      expect(tds[4]?.textContent ?? "").toBe("");
+    }
+    const sheet = screen.getByTestId("to-order-sheet");
+    expect((sheet.textContent ?? "").match(/Peter/g)?.length).toBe(1);
   });
 
   it("speaks the CUSTOMER's date — red when past, a dash when TBD, sorted soonest first", async () => {
@@ -423,11 +445,11 @@ describe("the Excel reflexes — header sort, per-column filters", () => {
   it("a header click sorts by Model; a second click reverses", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
-    // SO No. is no longer a column — it is the group header's first fact — so
-    // this asserts a sort on something an ITEM actually carries.
+    // td[7] is the Model cell under T1's ten-col grid: ⊞ · ☑ · SO No. ·
+    // Customer · Delivery · Supplier · Qty · MODEL · PO No. · filler.
     const models = () =>
       [...document.querySelectorAll('[data-kit="data-row"]')].map(
-        (tr) => tr.querySelectorAll("td")[3]?.textContent ?? "",
+        (tr) => tr.querySelectorAll("td")[7]?.textContent ?? "",
       );
     fireEvent.click(screen.getByTestId("table-sort-model"));
     const asc = models();
@@ -451,15 +473,62 @@ describe("the Excel reflexes — header sort, per-column filters", () => {
     expect(screen.getByText("SO-1204")).toBeInTheDocument();
   });
 
-  // THE DELIVERY ▼ IS GONE, with its column (Loo, 2026-08-03). The date moved
-  // onto the group header, and filtering to ONE specific delivery date is the
-  // single capability this page lost — recorded here rather than quietly
-  // dropped, so that if it is missed it comes back as its own decision.
-  it("no column filter survives for a fact that now lives on the group header", async () => {
+  // T1 (Loo, 2026-08-06) — THE THREE ▼ ARE BACK WITH THEIR COLUMNS. The one
+  // capability 2026-08-03 recorded as lost (filtering to a delivery date) was
+  // missed and returns as its own decision, on the portal's shared Excel date
+  // machinery.
+  it("the SO No. and Customer ▼ are back and narrow the sheet", async () => {
     await loaded();
-    expect(document.querySelector('[data-testid="table-filter-delivery"]')).toBeNull();
-    expect(document.querySelector('[data-testid="table-filter-so"]')).toBeNull();
-    expect(document.querySelector('[data-testid="table-filter-customer"]')).toBeNull();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    const sheet = () => within(screen.getByTestId("to-order-sheet"));
+    fireEvent.click(screen.getByTestId("table-filter-so"));
+    fireEvent.click(screen.getByLabelText("SO-1300"));
+    expect(sheet().getByText("SO-1300")).toBeInTheDocument();
+    expect(sheet().queryByText("SO-1204")).toBeNull();
+    fireEvent.click(screen.getByTestId("table-filter-clear-so"));
+    // Customer speaks the display spelling — `PETER` is typed, `Peter` reads.
+    fireEvent.click(screen.getByTestId("table-filter-customer"));
+    fireEvent.click(screen.getByLabelText("Peter"));
+    expect(sheet().getByText("SO-1207")).toBeInTheDocument();
+    expect(sheet().queryByText("SO-1300")).toBeNull();
+  });
+
+  it("the Delivery ▼ speaks Excel — Overdue · presets · the data's months · a custom range", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    fireEvent.click(screen.getByTestId("table-filter-delivery"));
+    // Overdue leads (the fact an operator hunts), then Excel's own six.
+    for (const label of [W.filterOverdue, "Today", "This Week", "This Month", "Last Month"]) {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+    // The months the sheet holds — Jul + Aug 2026 in this fixture.
+    expect(screen.getByLabelText("Aug 2026")).toBeInTheDocument();
+    expect(screen.getByLabelText("Jul 2026")).toBeInTheDocument();
+    // The custom pair is offered under them.
+    expect(screen.getByTestId("table-filter-range-from-delivery")).toBeInTheDocument();
+
+    // `Overdue` narrows to the customer whose date has passed.
+    fireEvent.click(screen.getByLabelText(W.filterOverdue));
+    expect(screen.getByText("SO-1204")).toBeInTheDocument();
+    expect(screen.queryByText("SO-1207")).toBeNull();
+    fireEvent.click(screen.getByLabelText(W.filterOverdue));
+
+    // A month bucket narrows to it (Excel ORs a checklist).
+    fireEvent.click(screen.getByLabelText("Jul 2026"));
+    expect(screen.getByText("SO-1204")).toBeInTheDocument();
+    expect(screen.queryByText("SO-1300")).toBeNull();
+    fireEvent.click(screen.getByLabelText("Jul 2026"));
+
+    // The custom range reaches exactly the days it names.
+    fireEvent.change(screen.getByTestId("table-filter-range-from-delivery"), {
+      target: { value: "2026-08-10" },
+    });
+    fireEvent.change(screen.getByTestId("table-filter-range-to-delivery"), {
+      target: { value: "2026-08-20" },
+    });
+    fireEvent.click(screen.getByTestId("table-filter-range-apply-delivery"));
+    expect(screen.getByText("SO-1300")).toBeInTheDocument(); // 15 Aug
+    expect(screen.queryByText("SO-1204")).toBeNull(); // 20 Jul
   });
 
   it("there are no Status pills — the PO column IS the status door", async () => {
@@ -1242,9 +1311,20 @@ describe("Supplier on the row", () => {
  */
 describe("P16 · the grid's width system — content sizes the column", () => {
   /* The measured minimums. `ceil(worst string + 16px of cell padding) + 4`,
-   * or the header's own floor where that is wider (`Qty`). Changing one of
-   * these is a MEASUREMENT, taken in a browser — never a guess in this file. */
-  const RULED = { supplier: "111px", qty: "55px", model: "155px", po: "163px" };
+   * or the header's own floor where that is wider (`SO No.` · `Customer
+   * Delivery` · `Qty`). Changing one of these is a MEASUREMENT, taken in a
+   * browser — never a guess in this file. T1 added the three identity
+   * columns; below ~1180px the grid scrolls sideways rather than truncating
+   * (Loo, 2026-08-06 — Purchase Orders' own behaviour). */
+  const RULED = {
+    so: "95px",
+    customer: "181px",
+    delivery: "163px",
+    supplier: "111px",
+    qty: "55px",
+    model: "155px",
+    po: "163px",
+  };
 
   it("gives every column the pixel width its own content measured", async () => {
     await loaded();
@@ -1270,7 +1350,7 @@ describe("P16 · the grid's width system — content sizes the column", () => {
           ] as HTMLElement
         ).style.width,
     );
-    expect(dataCols.length).toBe(4);
+    expect(dataCols.length).toBe(7);
     for (const w of dataCols) expect(w).toMatch(/^\d+px$/);
   });
 
@@ -1282,10 +1362,13 @@ describe("P16 · the grid's width system — content sizes the column", () => {
     // Hidden from a screen reader: there is no fact in it to read out.
     expect(filler!.getAttribute("aria-hidden")).toBe("true");
     // It is NOT a column — it never enters `columns`, so it cannot be sorted,
-    // filtered or reordered, and the header row is still the four words.
+    // filtered or reordered, and the header row is still the seven words.
     expect(screen.getAllByRole("columnheader").map((h) => h.textContent!.trim())).toEqual([
       "",
       "",
+      W.colSoNo,
+      W.colCustomer,
+      W.colPreferred,
       W.supplierLabel,
       W.colQty,
       W.colModel,
@@ -1306,12 +1389,20 @@ describe("P16 · the grid's width system — content sizes the column", () => {
     expect(src).not.toMatch(/flex-1 min-h-0 flex flex-col rounded-card/);
   });
 
-  it("reads Supplier · Qty · Model · PO No. — the order's own facts left", async () => {
+  it("reads SO No. · Customer · Customer Delivery · Supplier · Qty · Model · PO No. — T1's order", async () => {
     await loaded();
     const heads = [...document.querySelectorAll("thead th")]
       .map((th) => (th.textContent ?? "").trim())
       .filter((t) => t.length > 0);
-    expect(heads).toEqual([W.supplierLabel, W.colQty, W.colModel, W.colPoNo]);
+    expect(heads).toEqual([
+      W.colSoNo,
+      W.colCustomer,
+      W.colPreferred,
+      W.supplierLabel,
+      W.colQty,
+      W.colModel,
+      W.colPoNo,
+    ]);
   });
 });
 
@@ -2126,12 +2217,11 @@ describe("Q6 · the audit's two findings, as guards", () => {
     expect(document.querySelectorAll('thead th[draggable="true"]')).toHaveLength(0);
     // …while the two powers the page DOES wire are untouched by the refusal.
     expect(document.querySelectorAll('[data-kit="data-group"]').length).toBeGreaterThan(0);
-    // ⊞ + ☑ + the four business columns + P16's filler. The count was 6
-    // before P16 and the SEVENTH is not a column: it carries no word, no
-    // sort and no filter, and `P16 · the grid's width system` above pins
-    // both halves of that — what it is, and that the header row is still
-    // the same four words.
-    expect(document.querySelectorAll("colgroup col")).toHaveLength(7);
+    // ⊞ + ☑ + T1's seven business columns + P16's filler. The TENTH is not
+    // a column: it carries no word, no sort and no filter, and `P16 · the
+    // grid's width system` above pins both halves of that — what it is, and
+    // that the header row is still the same seven words.
+    expect(document.querySelectorAll("colgroup col")).toHaveLength(10);
   });
 });
 
@@ -2277,5 +2367,135 @@ describe("P18 · the proceed date on the group header", () => {
     expect(ella.textContent).toContain(fmtDate("2026-07-20"));
     expect(ella.textContent).toContain(`${W.proceedDate} ${fmtDateShort("2026-07-15")}`);
     expect(fmtDate("2026-07-20")).not.toBe(fmtDateShort("2026-07-20"));
+  });
+});
+
+/**
+ * ── T1 · the AutoCount-aligned grid (Loo, 2026-08-06) ───────────────────────
+ *
+ * Loo ruled the free-text group sentence hard to read and approved the exact
+ * mock: order facts on their own ALIGNED row, every fact in a column, a group
+ * ☑ that toggles the order's builds, and an always-on `Total · N units`
+ * strip. These tests pin the mock's own shape.
+ */
+describe("T1 · the aligned order line", () => {
+  const groups = () => [...document.querySelectorAll('[data-kit="data-group"]')];
+  const groupOf = (re: RegExp) => groups().find((g) => re.test(g.textContent ?? ""));
+
+  it("the order line is CELLS, not a sentence — SO, customer and date in their columns", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+
+    const peter = groupOf(/Peter/)!;
+    const tds = [...peter.querySelectorAll("td")];
+    // ⊞ gutter · ☑ · SO No. · Customer · Delivery · the 3-col middle span ·
+    // PO No. · filler — TEN cols, EIGHT cells (the span merges three).
+    // The FACT under its HEADER is the whole card: each sits in its own cell.
+    const texts = tds.map((t) => (t.textContent ?? "").trim());
+    expect(texts).toContain("SO-1207");
+    expect(texts).toContain("Peter");
+    expect(texts).toContain(fmtDate("2026-08-13"));
+    // …three separate cells, never one concatenated sentence.
+    expect(texts.some((t) => t.includes("SO-1207") && t.includes("Peter"))).toBe(false);
+  });
+
+  it("the group ☑ ticks and unticks ALL its builds — one press, one meaning", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    // PETER's two sofa builds arrive pre-ticked (the engine's own plan), so
+    // his group box reads CHECKED.
+    const box = document.getElementById(`kit-table-group-o1`)!;
+    expect(box).not.toBeNull();
+    expect(box.getAttribute("data-state")).toBe("checked");
+
+    // One press unticks both builds: 5 selected → 3.
+    fireEvent.click(box);
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("3 selected");
+    expect(box.getAttribute("data-state")).toBe("unchecked");
+
+    // Press again: both come back.
+    fireEvent.click(box);
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 selected");
+  });
+
+  it("SOME ticked = the indeterminate dash, and its press completes the group", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    // Untick ONE of PETER's two builds by its own row ☑ — build-level
+    // selection is frozen and stays the real record.
+    fireEvent.click(rowBox(`${OHANA}::sofa`, "o1", "bk-a"));
+    const box = document.getElementById(`kit-table-group-o1`)!;
+    expect(box.getAttribute("data-state")).toBe("indeterminate");
+    // A press on SOME means "give me all of it" — Excel's own select-all rule.
+    fireEvent.click(box);
+    expect(box.getAttribute("data-state")).toBe("checked");
+    expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("5 selected");
+  });
+
+  it("a receipt group gets NO box — nothing on it can be picked", async () => {
+    await loaded();
+    // Friday's default view holds only PO-9001, the receipt.
+    expect(document.getElementById("kit-table-group-o30")).toBeNull();
+  });
+
+  it("the Total strip is ALWAYS on and counts the visible sheet's units", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    // Fri + Overdue: the receipt (1) + 7 demand units = 8. Nothing needs to
+    // be ticked — the strip answers for the SHEET, the footer for the pick.
+    expect(screen.getByTestId("to-order-total")).toHaveTextContent(
+      `${W.total} · 8 units`,
+    );
+    // Untick everything; the strip does not move (always on).
+    fireEvent.click(document.getElementById("kit-table-select-all")!);
+    expect(screen.getByTestId("to-order-total")).toHaveTextContent(
+      `${W.total} · 8 units`,
+    );
+    // A filter narrows the sheet, so it narrows the total with it.
+    fireEvent.click(screen.getByTestId("to-order-cat-sofa"));
+    expect(screen.getByTestId("to-order-total")).toHaveTextContent(
+      `${W.total} · 3 units`,
+    );
+  });
+
+  it("a Ready Stock group prints `Required By` with its date — G8's bare date is named", async () => {
+    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+      if (path.startsWith("/api/operation/purchase/to-order/issue")) {
+        return route(path, init?.body ? JSON.parse(String(init.body)) : undefined);
+      }
+      if (path.startsWith("/api/operation/purchase/to-order")) {
+        return Promise.resolve({
+          ...TO_ORDER,
+          ordered: [],
+          proposals: [
+            {
+              key: `${OHANA}::bedframe`, supplierId: OHANA, supplierName: "Ohana",
+              category: "bedframe", label: "Ohana · Bedframe", orderBy: null,
+              poCount: 1, blocked: null, productionDays: 7,
+              rows: [
+                {
+                  orderId: "demand:abc-123", so: null, customer: "—",
+                  readyStock: true, destination: "Carres Klang", qty: 5,
+                  summary: "Sonic · 5", stockReady: null, delivery: "2026-08-15",
+                  proceedDate: null, orderBy: null,
+                  builds: [build("d1", "Sonic", "SONIC-S", 5, "Single")],
+                },
+              ],
+            },
+          ],
+        });
+      }
+      return route(path, undefined);
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-day-2026-07-31")); // lift time narrowing
+
+    const ready = groupOf(/Ready Stock/)!;
+    expect(ready).toBeTruthy();
+    // The typed demand's date carries ITS name — the create dialog's own word,
+    // short spelling (a labelled date, P18's pairing rule).
+    expect(ready.textContent).toContain(`${W.requiredBy} ${fmtDateShort("2026-08-15")}`);
+    // …and never the customer's bare long spelling.
+    expect(ready.textContent).not.toContain(fmtDate("2026-08-15"));
   });
 });
