@@ -2817,6 +2817,20 @@ export interface operationOrderListRow {
    *  exactly what shipped before this card. */
   paid?: number | string | null;
   order_addons?: { qty: number; unit_price?: number | string | null }[];
+  /**
+   * D1 (2026-08-06) — the SKUs a real PURCHASE ORDER covers for this order,
+   * linked the drawer's own way (`purchase_orders.so` or `so_refs[]`).
+   *
+   * Before this the list's only PO evidence was `order_lines.source_po`, which
+   * ONLY the AutoCount importer writes, so the ladder read every native order
+   * as "nothing ordered". Measured on production: 19 of 28 live orders were
+   * covered by a real PO and 0 carried `source_po`.
+   *
+   * OPTIONAL on purpose, and `undefined` must behave as "we do not know",
+   * never as "there is no PO": a browser on this build against a pre-D1 Worker
+   * then falls back to exactly the pre-D1 answer instead of accusing.
+   */
+  po_skus?: string[];
   delivery_partner_id: string | null;
   /** Migration 0147 (item h, 2026-05-23) — order-level LP request/accept/reject
    *  state. Set by `operation_confirm_proceed_request_v3` when Operation

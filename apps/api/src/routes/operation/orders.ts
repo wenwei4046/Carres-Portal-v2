@@ -195,7 +195,93 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json({ orders: data ?? [] });
+
+  // ── D1 · THE LIST CAN SEE A PURCHASE ORDER ─────────────────────────────────
+  // The Orders ladder asks "has anything been ordered?" and, until this block,
+  // the only evidence on the wire was `order_lines.source_po` — a column ONLY
+  // the AutoCount importer writes. `order_supplier_threads.po_id` was selected
+  // and is dead weight: that table holds ZERO rows.
+  //
+  // MEASURED on production 2026-08-06, which is why this is a defect and not a
+  // nicety: of 28 live orders, 19 are covered by a REAL purchase order and 0
+  // carry `source_po`. Four of them — SO-1206 · SO-1213 · SO-1216 · SO-1257 —
+  // showed a red "no PO raised yet" dot and an `Issue PO` instruction over
+  // goods Purchasing had already bought.
+  //
+  // The link is the DRAWER'S OWN, not a new one: a PO serves an order through
+  // `so` or through `so_refs[]` (see the detail route below, which has used
+  // exactly this pair since it was written). Batched into ONE `or` over the
+  // page's SO numbers, plus one line fetch — two round trips for the whole
+  // list, never one per order.
+  //
+  // What rides the wire is `po_skus`: the DISTINCT SKUs a purchase order covers
+  // for that order. That is the smallest thing that answers the ladder's
+  // question, and it is the same shape the drawer already builds (`poSkus`).
+  // A page with no covered orders adds `[]` to every row and nothing else.
+  const orders = data ?? [];
+  const soNumbers = [
+    ...new Set(
+      orders
+        .map((o: { so?: number | null }) => o.so)
+        .filter((s): s is number => typeof s === "number" && Number.isFinite(s)),
+    ),
+  ];
+  const poSkusBySo = new Map<number, Set<string>>();
+  if (soNumbers.length > 0) {
+    const inList = soNumbers.join(",");
+    const { data: pos, error: e_pos } = await sb
+      .from("purchase_orders")
+      .select("id, so, so_refs")
+      .or(`so.in.(${inList}),so_refs.ov.{${inList}}`);
+    if (e_pos) {
+      const m = mapPgError(e_pos);
+      return c.json(m.body, m.status);
+    }
+    const poRows = pos ?? [];
+    if (poRows.length > 0) {
+      const { data: poLines, error: e_lines } = await sb
+        .from("purchase_order_lines")
+        .select("po_id, sku")
+        .in(
+          "po_id",
+          poRows.map((p: { id: string }) => p.id),
+        );
+      if (e_lines) {
+        const m = mapPgError(e_lines);
+        return c.json(m.body, m.status);
+      }
+      const skusByPo = new Map<string, string[]>();
+      for (const l of poLines ?? []) {
+        const row = l as { po_id: string; sku: string | null };
+        if (!row.sku) continue;
+        const arr = skusByPo.get(row.po_id);
+        if (arr) arr.push(row.sku);
+        else skusByPo.set(row.po_id, [row.sku]);
+      }
+      for (const p of poRows) {
+        const po = p as { id: string; so: number | null; so_refs: number[] | null };
+        const skus = skusByPo.get(po.id) ?? [];
+        if (skus.length === 0) continue;
+        // ONE purchase order may serve several sales orders (the consolidated
+        // PO is the normal case here), so every SO it names gets the same set.
+        const served = new Set<number>();
+        if (typeof po.so === "number") served.add(po.so);
+        for (const r of po.so_refs ?? []) served.add(r);
+        for (const so of served) {
+          const set = poSkusBySo.get(so) ?? new Set<string>();
+          for (const s of skus) set.add(s);
+          poSkusBySo.set(so, set);
+        }
+      }
+    }
+  }
+
+  return c.json({
+    orders: orders.map((o: { so?: number | null }) => ({
+      ...o,
+      po_skus: [...(poSkusBySo.get(o.so ?? -1) ?? [])],
+    })),
+  });
 });
 
 // ----- GET /:id detail -----

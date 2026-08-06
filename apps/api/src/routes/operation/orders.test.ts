@@ -107,6 +107,127 @@ describe("GET /api/operation/orders", () => {
     expect(limit).toHaveBeenCalledWith(200);
   });
 
+  // ── D1 · the list carries the SKUs a real purchase order covers ───────────
+  //
+  // Before D1 the only PO evidence on the wire was `order_lines.source_po`, a
+  // column ONLY the AutoCount importer writes, so the Orders ladder read every
+  // NATIVE order as "nothing ordered". Measured on production 2026-08-06: 19 of
+  // 28 live orders were covered by a real purchase order and 0 carried
+  // `source_po`. The link is the DRAWER's own — `purchase_orders.so` or
+  // `so_refs[]` — batched over the page rather than one query per order.
+  describe("D1 — po_skus", () => {
+    /** Three tables, three answers: orders · purchase_orders · lines. */
+    function mockWithPos(
+      orders: Record<string, unknown>[],
+      pos: Record<string, unknown>[],
+      poLines: Record<string, unknown>[],
+    ) {
+      const from = vi.fn((table: string) => {
+        if (table === "purchase_orders") {
+          const or = vi.fn().mockResolvedValue({ data: pos, error: null });
+          return { select: vi.fn(() => ({ or })) };
+        }
+        if (table === "purchase_order_lines") {
+          const inFn = vi.fn().mockResolvedValue({ data: poLines, error: null });
+          return { select: vi.fn(() => ({ in: inFn })) };
+        }
+        const chain: Record<string, unknown> = {};
+        for (const k of ["in", "eq", "ilike", "or", "not", "is", "order"])
+          chain[k] = vi.fn(() => chain);
+        chain.limit = vi.fn().mockResolvedValue({ data: orders, error: null });
+        return { select: vi.fn(() => chain) };
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue({ from } as any);
+      return from;
+    }
+
+    async function get() {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request("http://t/api/operation/orders", {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      return (await res.json()) as { orders: { so: number; po_skus: string[] }[] };
+    }
+
+    it("a PO linked through so_refs[] puts its SKUs on the order", async () => {
+      mockWithPos(
+        [{ ...ORDER_ROW, so: 1206 }],
+        [{ id: "PO-2049", so: null, so_refs: [1206] }],
+        [{ po_id: "PO-2049", sku: "mattress:MAT-1" }],
+      );
+      const body = await get();
+      expect(body.orders[0]?.po_skus).toEqual(["mattress:MAT-1"]);
+    });
+
+    it("a PO linked through its own so also counts", async () => {
+      mockWithPos(
+        [{ ...ORDER_ROW, so: 1206 }],
+        [{ id: "PO-1", so: 1206, so_refs: null }],
+        [{ po_id: "PO-1", sku: "sofa:SOF-1" }],
+      );
+      expect((await get()).orders[0]?.po_skus).toEqual(["sofa:SOF-1"]);
+    });
+
+    it("ONE consolidated PO serves EVERY sales order it names", async () => {
+      mockWithPos(
+        [
+          { ...ORDER_ROW, id: "a", so: 1206 },
+          { ...ORDER_ROW, id: "b", so: 1213 },
+        ],
+        [{ id: "PO-9", so: null, so_refs: [1206, 1213] }],
+        [{ po_id: "PO-9", sku: "mattress:MAT-1" }],
+      );
+      const body = await get();
+      expect(body.orders[0]?.po_skus).toEqual(["mattress:MAT-1"]);
+      expect(body.orders[1]?.po_skus).toEqual(["mattress:MAT-1"]);
+    });
+
+    it("an order NO purchase order names gets an empty list, never another order's SKUs", async () => {
+      mockWithPos(
+        [
+          { ...ORDER_ROW, id: "a", so: 1206 },
+          { ...ORDER_ROW, id: "b", so: 9999 },
+        ],
+        [{ id: "PO-9", so: null, so_refs: [1206] }],
+        [{ po_id: "PO-9", sku: "mattress:MAT-1" }],
+      );
+      const body = await get();
+      expect(body.orders[1]?.po_skus).toEqual([]);
+    });
+
+    it("a PO with no lines contributes nothing", async () => {
+      mockWithPos(
+        [{ ...ORDER_ROW, so: 1206 }],
+        [{ id: "PO-EMPTY", so: null, so_refs: [1206] }],
+        [],
+      );
+      expect((await get()).orders[0]?.po_skus).toEqual([]);
+    });
+
+    it("ONE batched query for the whole page — never one per order", async () => {
+      const from = mockWithPos(
+        [
+          { ...ORDER_ROW, id: "a", so: 1206 },
+          { ...ORDER_ROW, id: "b", so: 1213 },
+          { ...ORDER_ROW, id: "c", so: 1216 },
+        ],
+        [{ id: "PO-9", so: null, so_refs: [1206] }],
+        [{ po_id: "PO-9", sku: "mattress:MAT-1" }],
+      );
+      await get();
+      const poCalls = from.mock.calls.filter((c) => c[0] === "purchase_orders");
+      const lineCalls = from.mock.calls.filter(
+        (c) => c[0] === "purchase_order_lines",
+      );
+      expect(poCalls).toHaveLength(1);
+      expect(lineCalls).toHaveLength(1);
+    });
+  });
+
   it("returns status='place' rows in the response (pipeline v2 'Placed' column)", async () => {
     const PLACE_ROW = {
       ...ORDER_ROW,

@@ -54,7 +54,7 @@ open ops_tasks         1
 
 **Of the 28 live orders:** 22 carry a promised date · 1 is past it · 14 have a logistics
 company · 18 have taken some money · 25 are priced · **19 are covered by a real purchase
-order** · **0 carry `order_lines.source_po`.** That last pair is §5.1.
+order** · **0 carry `order_lines.source_po`.** That last pair is §5.1 — **the defect it caused was FIXED by D1 on 2026-08-06**, and the numbers are kept because they are what the fix was measured against.
 
 **There is no single overall Order Status, and there never will be.** Business facts, actions,
 module stages and exceptions are stored independently — `booking_stage`, `line_received`,
@@ -489,36 +489,34 @@ conversation — it opens §6 stage 1.**
 - **Orders never re-states a Purchasing number.** Production days, the buffer and the PO days
   have one home.
 
-### 5.1 · 🔴 THE ORDERS LIST CANNOT SEE PURCHASING'S PURCHASE ORDERS
+### 5.1 · ✅ THE LIST SEES PURCHASING'S PURCHASE ORDERS — fixed by D1, 2026-08-06
 
-**This is the sharpest finding of the audit, it is measured, and it is named per order.**
-
-The ladder asks *"has anything been ordered?"* through `goodsUnordered`, which is
-`stockReadiness(...).state === "unknown"`. That state is reached when a line's SKU is absent
-from the live free-stock map — and the only PO evidence `stockReadiness` consults is
-**`order_lines.source_po`**, which **only the AutoCount importer writes.**
+**"Has anything been ordered?" has TWO sources and the list now reads both**, through ONE
+helper (`orderHasPurchaseOrder`) that the Stock cell and the drawer's journey strip share, so
+they can never answer it differently again:
 
 ```
-live orders                                    28
-covered by a REAL purchase order (so_refs)     19
-carrying order_lines.source_po                  0
-order_supplier_threads rows                     0     ← the other possible link, EMPTY
+order_lines.source_po     the AutoCount importer's PO
+po_skus                   the SKUs a REAL purchase order covers, linked the drawer's own
+                          way — purchase_orders.so OR so_refs[] — batched over the page
 ```
 
-**The list API does select `order_supplier_threads(... po_id ...)` — and that table holds zero
-rows, so the join is dead weight.** The drawer is better off: `hasPoForSku` checks the detail
-payload's real `purchase_orders` **and** `source_po`.
+**What it was before, and why it is written down rather than forgotten.** The only evidence on
+the wire was `source_po`, a column **only the AutoCount importer writes**;
+`order_supplier_threads`, the other link the list already selected, holds **ZERO rows**.
+Measured on production: **19 of 28 live orders were covered by a real purchase order and 0
+carried `source_po`**, so **`SO-1206` · `SO-1213` · `SO-1216` · `SO-1257`** showed a red
+*"Stock — no PO raised yet"* dot and an **`Issue PO`** instruction over goods Purchasing had
+already bought — while the drawer, which read both sources, disagreed with its own list.
 
-**MEASURED CONSEQUENCE, with the orders named:** 10 live orders reach `unknown`, and **4 of
-them already have a purchase order** — **`SO-1206` · `SO-1213` · `SO-1216` · `SO-1257`.**
-On those four the list shows a **red goods dot reading *"Stock — no PO raised yet"*** and an
-**`Issue PO`** instruction, while Purchasing has already bought the goods. **The list and the
-drawer answer the same question two different ways on the same order.**
-
-**This is IMPLEMENTATION DEBT, not a business change.** The frozen rule is right — *goods with
-no purchase order anywhere are goods nobody has ordered* — and the code reads the wrong column
-for "anywhere". **Reported, not fixed** (this audit changes no application code); the fix is a
-build slice, and it is the first one recommended.
+**FROZEN RULES this adds**
+- **`po_skus` ABSENT is UNKNOWN, never "no PO."** The three-way discipline `photoOnFile` and
+  `deliveryOrderIssued` already follow: a browser on a new build against a pre-D1 Worker
+  reproduces the pre-D1 answer exactly rather than accusing an order of something it cannot see.
+- **An EMPTY `po_skus` array is a real answer** — no purchase order names this order.
+- **ONE consolidated purchase order serves EVERY sales order it names.** The consolidated PO is
+  the normal case here, so each SO in `so_refs[]` gets the same SKU set.
+- **ONE batched query for the whole page, never one per order** — asserted by a test.
 
 ---
 
@@ -790,7 +788,7 @@ carrier's working days and capacity are not a fact about this customer's order.
 
 | # | Defect | Evidence |
 |---|---|---|
-| **D1** 🔴 | **The list cannot see a purchase order.** `stockReadiness` reads only `order_lines.source_po`; `order_supplier_threads` is empty. **4 named live orders show `Issue PO` over a real PO.** | §5.1 |
+| ~~**D1**~~ | ✅ **FIXED 2026-08-06** — the list reads both PO sources through one shared helper. See §5.1 |
 | **D2** 🔴 | **A third receiving door lives in the Orders drawer** (`useReceiveLine`), duplicating the Receiving Workspace. | §9.5 |
 | **D3** 🟡 | **The drawer computes `stage` a SECOND time** (its own IIFE at line ~1469) instead of importing the list's exported `stageOf`. Two spellings of one derivation, in two files. | read |
 | **D4** 🟡 | **The drawer computes money a second way for its own header.** The list hands down `holdAmount` from the shared `orderMoney`, and the drawer separately fetches `order_payments` for `Collected` — the one ledger the shared rule refuses to read. **The drawer's Collected and the row's Outstanding can disagree.** | read |
