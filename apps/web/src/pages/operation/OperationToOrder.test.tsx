@@ -248,12 +248,20 @@ describe("the PO Schedule — a purchase calendar, not a menu", () => {
     // never swallowed by the next run.
     expect(within(nav).getByTestId("to-order-overdue")).toHaveTextContent(W.filterOverdue);
     expect(within(nav).getByTestId("to-order-overdue")).toHaveTextContent("4");
-    // Rolling from Thursday: Friday · Monday · Wednesday — 3 configured
-    // days, 3 rows, no Today (Thursday is not a PO day), no stale Monday.
-    expect(within(nav).getByTestId("to-order-day-2026-07-31")).toHaveTextContent("Friday");
+    // Rolling from Thursday: Fri · Mon · Wed — 3 configured days, 3 rows, no
+    // Today (Thursday is not a PO day), no stale Monday. Each row prints
+    // weekday + DATE in one format (Loo, 2026-08-06: `Fri 31 Jul`, never a
+    // bare weekday), and the full spelling stays on the hover.
+    expect(within(nav).getByTestId("to-order-day-2026-07-31")).toHaveTextContent("Fri 31 Jul");
     expect(within(nav).getByTestId("to-order-day-2026-07-31")).toHaveTextContent("0");
-    expect(within(nav).getByTestId("to-order-day-2026-08-03")).toHaveTextContent("Monday");
-    expect(within(nav).getByTestId("to-order-day-2026-08-05")).toHaveTextContent("Wednesday");
+    expect(within(nav).getByTestId("to-order-day-2026-08-03")).toHaveTextContent("Mon 3 Aug");
+    expect(within(nav).getByTestId("to-order-day-2026-08-05")).toHaveTextContent("Wed 5 Aug");
+    // Never the bare weekday word alone.
+    expect(within(nav).queryByText(/^Friday$/)).toBeNull();
+    // The hover keeps the full date.
+    expect(
+      within(nav).getByTestId("to-order-day-2026-07-31").getAttribute("title"),
+    ).toContain(fmtDate("2026-07-31"));
     expect(within(nav).queryByText(W.navToday)).toBeNull();
     // The retired vocabulary stays retired.
     expect(within(nav).queryByText("Tomorrow")).toBeNull();

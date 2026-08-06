@@ -62,7 +62,6 @@ import {
   ordersHeadline,
   poScheduleBucket,
   poScheduleDays,
-  weekdayName,
   posCreatedLine,
   railItemLabel,
   selectedShort,
@@ -233,6 +232,17 @@ function clockLabel(ms: number): string {
   const h = d.getHours();
   const h12 = h % 12 === 0 ? 12 : h % 12;
   return `${h12}:${String(d.getMinutes()).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
+/**
+ * `Fri 7 Aug` — a rail day row's word (Loo, 2026-08-06: weekday + date on
+ * EVERY row, one format; never a bare weekday, never Today/Tomorrow). The
+ * full spelling stays on the hover (`countWord`). Composed from the portal's
+ * own two date spellings — the weekday off `fmtDate`, the day+month off
+ * `fmtDateShort` less its year — so no third date format is invented.
+ */
+function railDayLabel(iso: string): string {
+  return `${fmtDate(iso).slice(0, 3)} ${fmtDateShort(iso).replace(/ \d{2}$/, "")}`;
 }
 
 /** `mee yee` → `Mee Yee`, `PETER` → `Peter` — display only, the record keeps
@@ -1499,7 +1509,7 @@ export default function OperationToOrder() {
               active={viewSet.has(day)}
               onClick={() => toggleView(day)}
               testId={`to-order-day-${day}`}
-              name={weekdayName(day)}
+              name={railDayLabel(day)}
               count={String(timeCounts.get(day)?.size ?? 0)}
               countWord={`${ordersHeadline(timeCounts.get(day)?.size ?? 0)} · ${fmtDate(day)}`}
             />
