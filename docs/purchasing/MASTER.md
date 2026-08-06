@@ -330,9 +330,26 @@ Tables: `purchase_orders` **24** · `purchase_order_lines` **38** · `po_history
   (0318 shipped the database half); no new word; no second door — the expand's field is the
   one. **A supplier × category with no production number gets NO due rather than a default:
   P1 deleted exactly that habit.**
-- **Recording a ready date deliberately does not move the expected arrival**, and the cost is
-  now visible: `PO-2052` shows the factory's real 12 Aug beside a stale self-computed 14 Aug.
-  Whether the two dates should be linked is a business decision and has not been taken.
+- **A ready date the factory gives MOVES the expected arrival — and never overwrites it**
+  (Loo, 2026-08-06). Today it does not, and `PO-2052` is the cost: the factory's real
+  `Ready Date` of 12 Aug sits beside a self-computed `Expected Arrival` of 14 Aug, when
+  12 Aug + Ohana's 1 transit day is 13 Aug. **The rule: recording a ready date writes a new
+  expected arrival of `ready date + transit working days on the OFFICE week` (Law 2A), and the
+  new date becomes the one the register shows.** A supplier × category with no transit number
+  gets NO new arrival rather than a guessed one — P1's habit, unchanged.
+  **His condition is the important half — the old date is kept and stays visible:**
+  *"it should NOT overwrite — show original and new date; obvious is the new day, the original
+  hidden but you can still see this is updated."*
+  **Nothing new is built for that and that was measured before he chose it.** The ledger is
+  already append-only, so no date is ever destroyed; the cell already prints the `(revised)`
+  marker (`OperationPurchaseOrders.tsx:1194`, fed by `eta_revised` at `pos.ts:408`), and the
+  expand already prints the numbered history (`poDateHistoryOf`). **The column does not grow:**
+  the cell's own docblock already names `25 Aug 26  8d late (revised)` as the widest string it
+  holds. **He was shown the two alternatives and rejected both** — printing both dates inline
+  (`13 Aug 1̶4̶ ̶A̶u̶g̶`) needs roughly 70px more in a column frozen at 206px, which would take
+  pixels from one of his own nine widths; hover-only is invisible on a tablet.
+  **Deliberately still separate: `expected_ready_date` and `eta_date` remain two columns and
+  two facts.** This links them at the moment of recording; it does not merge them.
 - **Prove it with a real PO, end to end** — the line has never run. Two gates have no home yet
   (a PO cannot be issued twice for the same customer line and quantity; a check-in cannot be
   posted twice for the same supplier DO number), and **whoever is on an action must show on
