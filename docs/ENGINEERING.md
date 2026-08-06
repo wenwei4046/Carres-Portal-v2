@@ -166,6 +166,13 @@ Measured 2026-08-05 on `origin/main`: **web 17 failed / 2,484 passed of 2,501.**
 `OperationPurchaseOrders.test.tsx` and two others also flake under full-suite load and pass in
 isolation — **run twice before calling one a regression.**
 
+**Re-measured 2026-08-06 (T5), and the flake is now sized.** The five files above run
+together: **16 failed / 151 passed of 167**, byte-identical with and without that card's
+change. The SAME tree under FULL-suite load: **26 failed / 2,638 passed of 2,664** — ten more
+failures that are load, not code, and `OperationPurchaseOrders.test.tsx` passes **123/123**
+alone. **A full-suite number is not a baseline; compare the same files at the same
+concurrency, or you will chase somebody else's timeout.**
+
 ---
 
 ## 8 · Git
@@ -196,7 +203,8 @@ isolation — **run twice before calling one a regression.**
 | API | `https://carres-portal-v2-api.wwch.workers.dev` + `api.carresofficial.com` |
 | DB | Supabase `kfprgpjpaffedghytstl` — staging IS production |
 | Migration tail | `0325`. **Verify against the tracker before numbering.** |
-| Live web bundle | **`index-CMEMMgoB.js`** from main tip `29e81044` (T1.1, 2026-08-06) — carres-portal `c9148bc5` + carres-pos `86da5014`. **`pos.carresofficial.com` IS A SECOND PAGES PROJECT (`carres-pos`) AND NEEDS ITS OWN DEPLOY** — this deploy pushed only `carres-portal` first and pos sat on the predecessor through ten minutes of polling; T2 had deployed both, which is why its four canonicals converged on the first poll. **Deploy both, then poll.** Live md5 == local build (`d455473d…`, 4,776,493 bytes), `SERVICE_ROLE` **0**. On DOWNLOADED bundles vs predecessor `index-DLbYeDo7.js` (4,775,949 bytes, matching the T2 row): `bg-kit-slate-2` **6 → 0** (the phantom token, gone from production) · `Ready Stock` **2 → 3** (the new column header) · `border-t-kit-slate-6` **5 → 6** (the white, ruled order line) |
+| Live web bundle | **`index-DUH-N-iD.js`** from main tip `ab5ac3c2` (T5, 2026-08-06) — carres-portal `2da52678` + carres-pos `bae6b0c7`, **both deployed before polling** (the rule the T1.1 row below was written to teach), and all FOUR canonicals — `erp` · `pos` · both `.pages.dev` — converged on the first poll. Live md5 == local build (`16cf9e15…`, **4,776,869 bytes**), `SERVICE_ROLE` **0**, `api.carresofficial.com/health` **200 `{"ok":true}`**. On DOWNLOADED bundles vs predecessor `index-CMEMMgoB.js` (4,776,493 bytes, matching the row below to the byte): `receiving-arrival-` **0 → 1** (the arrival cell, carrying `data-tone`) · `text-kit-amber-11` **5 → 6** (the amber our-own-estimate warning) · `Goods Arrival` **2 → 2** — **no new word, which is the ruling made measurable.** **The Worker was NOT redeployed and is not owed one**: T5 touched `apps/web` and `docs/` only, so neither `apps/api` nor `packages/shared` — what the Worker bundles — changed |
+| Previous web bundle | **`index-CMEMMgoB.js`** from main tip `29e81044` (T1.1, 2026-08-06) — carres-portal `c9148bc5` + carres-pos `86da5014`. **`pos.carresofficial.com` IS A SECOND PAGES PROJECT (`carres-pos`) AND NEEDS ITS OWN DEPLOY** — this deploy pushed only `carres-portal` first and pos sat on the predecessor through ten minutes of polling; T2 had deployed both, which is why its four canonicals converged on the first poll. **Deploy both, then poll.** Live md5 == local build (`d455473d…`, 4,776,493 bytes), `SERVICE_ROLE` **0**. On DOWNLOADED bundles vs predecessor `index-DLbYeDo7.js` (4,775,949 bytes, matching the T2 row): `bg-kit-slate-2` **6 → 0** (the phantom token, gone from production) · `Ready Stock` **2 → 3** (the new column header) · `border-t-kit-slate-6` **5 → 6** (the white, ruled order line) |
 | Live Worker | **version `885b5eda-7f00-4048-9ecd-7b58679e3322`** from main tip `29e81044` (T1.1, 2026-08-06) — deployed `--env production`; wrangler echoed the `api.carresofficial.com` custom domain. `/health` **200 `{"ok":true}`**. **Owed by the md5 rule, not the changed-file list**: the dry-run bundle at the main tip (`7f9063a7…`) differs from the dry-run at the predecessor's source commit `aed7e5a4` (`b889826f…`), the only code diff being `packages/shared/src/to-order.ts` (+1 word mirror). Predecessor `3264d196` |
 
 > **⚠️ `0318` and `0319` are IN THE REPOSITORY AND ABSENT FROM THE TRACKER**, measured
