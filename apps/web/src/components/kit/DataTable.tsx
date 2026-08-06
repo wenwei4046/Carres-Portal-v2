@@ -196,6 +196,18 @@ export interface TableSort {
   dir: "asc" | "desc";
 }
 
+/**
+ * One cell of an ALIGNED group row or a spanned totals strip (T1, Loo's
+ * approved AutoCount mock, 2026-08-06). Entries walk the DATA columns left to
+ * right; `span` merges the next N columns into one cell (default 1). The kit
+ * renders the boxes; every word inside is the caller's.
+ */
+export interface GroupRowCell {
+  span?: number;
+  align?: "left" | "right";
+  content: ReactNode;
+}
+
 export interface DataTableProps<Row> {
   rows: readonly Row[];
   columns: readonly Column<Row>[];
@@ -302,7 +314,35 @@ export interface DataTableProps<Row> {
   group?: {
     keyOf: (row: Row) => string;
     /** Rendered inside one full-width cell. The caller owns every word. */
-    header: (row: Row) => ReactNode;
+    header?: (row: Row) => ReactNode;
+    /**
+     * **T1 — the group line as ALIGNED CELLS** (Loo's approved mock,
+     * 2026-08-06: *every fact in a column; order facts on their own aligned
+     * row*). When present, `header` is ignored and the group line renders one
+     * `<td>` per entry, walking the data columns left to right with `span`
+     * merging neighbours — so an order's SO number, customer and date sit
+     * UNDER the headers that name them, AutoCount's own shape, instead of in
+     * a free-text sentence a reader must parse.
+     *
+     * Optional, like every D0.5d power, and for the same reason: a page that
+     * passes `header` alone renders byte-identical markup to what it did.
+     */
+    cells?: (row: Row) => readonly GroupRowCell[];
+    /**
+     * **T1 — a ☑ on the group line**: a convenience toggle over the group's
+     * rows (all on / some = the indeterminate DASH / none). Renders only when
+     * the table has `selection` and `state` returns non-null — a group with
+     * nothing selectable gets an empty cell, not a dead box, exactly as
+     * `selection.selectable` rules for rows. Selection MEANING stays the
+     * caller's: the kit reports the press and paints the state.
+     */
+    selection?: {
+      /** `null` = no checkbox at all for this group. */
+      state: (row: Row) => boolean | "indeterminate" | null;
+      onToggle: (row: Row) => void;
+      /** The box's accessible name — the caller's words. */
+      label: (row: Row) => string;
+    };
   };
   /**
    * **D0.5d power 3 — a row opens.** AutoCount's `SO Batch Posting` ⊞: the row
@@ -365,7 +405,15 @@ export interface DataTableProps<Row> {
   totals?: {
     /** What the strip is, for a screen reader — the caller's word. */
     label: string;
-    cell: (column: Column<Row>, rows: readonly Row[]) => ReactNode;
+    cell?: (column: Column<Row>, rows: readonly Row[]) => ReactNode;
+    /**
+     * **T1 — the strip as SPANNED cells** instead of one per column, for a
+     * total that reads as a sentence (`Total · 21 units`) rather than a digit
+     * marooned under one column. Same shape as `group.cells`; when present,
+     * `cell` is ignored. Optional — a page passing `cell` alone renders
+     * byte-identical markup.
+     */
+    cells?: (rows: readonly Row[]) => readonly GroupRowCell[];
   };
   /*
    * **D0.5d power 5 — the record bar — is NOT here, because it already
@@ -891,7 +939,61 @@ export default function DataTable<Row>({
                 (rowIndex === 0 || group.keyOf(row) !== group.keyOf(rows[rowIndex - 1]!));
               return (
                 <Fragment key={`grp-${id}`}>
-                {opensGroup ? (
+                {opensGroup && group ? (
+                  group.cells ? (
+                    /* T1 — the ALIGNED group line (Loo, 2026-08-06). The order's
+                     * facts sit in the table's own columns, so the header words
+                     * name them and the eye reads DOWN a column instead of
+                     * parsing a sentence. P17's "the band is not sliced" ruled a
+                     * free-text band; a band whose content IS columnar is the
+                     * opposite case, and each cell keeps the column rule so the
+                     * lattice runs through it. */
+                    <tr data-kit="data-group" className="border-b border-kit-slate-5">
+                      {expansion && <td className="px-2 h-9 bg-kit-slate-2 align-middle" />}
+                      {selection && (
+                        <td
+                          className="px-2 h-9 bg-kit-slate-2 align-middle"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {(() => {
+                            const s = group.selection?.state(row);
+                            return group.selection && s != null ? (
+                              <Checkbox
+                                id={`kit-table-group-${group.keyOf(row)}`}
+                                ariaLabel={group.selection.label(row)}
+                                checked={s}
+                                onCheckedChange={() => group.selection!.onToggle(row)}
+                              />
+                            ) : null;
+                          })()}
+                        </td>
+                      )}
+                      {(() => {
+                        let at = 0;
+                        return group.cells(row).map((c, i) => {
+                          const start = at;
+                          const span = c.span ?? 1;
+                          at += span;
+                          return (
+                            <td
+                              key={i}
+                              colSpan={span}
+                              className={`px-2 h-9 bg-kit-slate-2 align-middle ${
+                                fills || at < ordered.length ? COLUMN_RULE : ""
+                              } ${start === 0 && hasGutter ? GUTTER_RULE : ""} ${
+                                c.align === "right" ? "text-right" : ""
+                              }`}
+                            >
+                              {c.content}
+                            </td>
+                          );
+                        });
+                      })()}
+                      {fills && (
+                        <td aria-hidden="true" data-kit="table-filler" className="h-9 bg-kit-slate-2" />
+                      )}
+                    </tr>
+                  ) : (
                   /* P17 — THE BAND IS NOT SLICED, and that is the card's own
                    * diagnosis followed rather than reversed: it floated
                    * because there was *nothing BENEATH it to anchor to*, not
@@ -902,9 +1004,10 @@ export default function DataTable<Row>({
                    * are ONE statement spanning the width, not seven facts. */
                   <tr data-kit="data-group" className="border-b border-kit-slate-5">
                     <td colSpan={colSpan} className="px-2 h-9 bg-kit-slate-2 align-middle">
-                      {group!.header(row)}
+                      {group.header?.(row)}
                     </td>
                   </tr>
+                  )
                 ) : null}
                 <tr
                   key={id}
@@ -1011,7 +1114,26 @@ export default function DataTable<Row>({
               {selection && (
                 <td className="bg-kit-slate-3 border-t border-t-kit-slate-6" />
               )}
-              {ordered.map((c, ci) => (
+              {totals.cells
+                ? (() => {
+                    let at = 0;
+                    return totals.cells(rows).map((c, i) => {
+                      const span = c.span ?? 1;
+                      at += span;
+                      return (
+                        <td
+                          key={i}
+                          colSpan={span}
+                          className={`px-2 bg-kit-slate-3 border-t border-t-kit-slate-6 ${
+                            fills || at < ordered.length ? COLUMN_RULE : ""
+                          } text-kit-slate-12 ${c.align === "right" ? "text-right" : ""}`}
+                        >
+                          {c.content}
+                        </td>
+                      );
+                    });
+                  })()
+                : ordered.map((c, ci) => (
                 <td
                   key={c.key}
                   className={`px-2 bg-kit-slate-3 border-t border-t-kit-slate-6 ${columnRule(
@@ -1020,7 +1142,7 @@ export default function DataTable<Row>({
                     c.numeric ? "tabular-nums" : ""
                   }`}
                 >
-                  {totals.cell(c, rows)}
+                  {totals.cell?.(c, rows)}
                 </td>
               ))}
               {fills && (
