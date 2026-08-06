@@ -362,6 +362,51 @@ describe("GET /api/operation/purchase/to-order", () => {
     ]);
   });
 
+  /**
+   * ── T3 · what an open purchase order already covers, and WHICH one ────────
+   *
+   * The supply read has always aggregated the open lines into one number per
+   * SKU. T3 carries the DOCUMENT alongside it — `po_id` IS the PO number — so
+   * the grid can say `2 on PO-2051` instead of leaving a fallen quantity
+   * unexplained. No second query, no migration.
+   */
+  it("carries the cover AND the purchase order behind it onto the row", async () => {
+    const t = TABLES();
+    // ella's build is one line of one unit; make it two so a cover of one
+    // leaves something still to buy — a FULLY covered line is dropped, which
+    // is the case the next test pins.
+    (t.order_lines.data as { id: string; qty: number }[]).find((l) => l.id === "e1")!.qty = 2;
+    t.purchase_order_lines = {
+      data: [{ po_id: "PO-2051", sku: "5539-1A(LHF)", qty: 1, received_qty: 0 }],
+      error: null,
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    const ella = body.proposals[0].rows.find((r: { orderId: string }) => r.orderId === "o2");
+    expect(ella.qty).toBe(1); // 2 asked for, 1 already bought
+    expect(ella.coveredByOpenPo).toBe(1); // …and this is why
+    expect(ella.coveredByOpenPoPos).toEqual(["PO-2051"]);
+  });
+
+  it("a RECEIVED purchase-order line covers nothing — the goods are here already", async () => {
+    const t = TABLES();
+    (t.order_lines.data as { id: string; qty: number }[]).find((l) => l.id === "e1")!.qty = 2;
+    t.purchase_order_lines = {
+      data: [{ po_id: "PO-2051", sku: "5539-1A(LHF)", qty: 1, received_qty: 1 }],
+      error: null,
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    const ella = body.proposals[0].rows.find((r: { orderId: string }) => r.orderId === "o2");
+    expect(ella.qty).toBe(2);
+    expect(ella.coveredByOpenPo).toBe(0);
+    expect(ella.coveredByOpenPoPos).toEqual([]);
+  });
+
   it("never lets an accessory reach the page, supplier or not", async () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);

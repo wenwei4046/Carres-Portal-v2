@@ -25,6 +25,7 @@ import {
   poScheduleBucket,
   weekdayName,
   freeStockLine,
+  onPoLine,
   reserveFromStockLabel,
   reservedFromStockLabel,
   stockExpandLabel,
@@ -578,6 +579,8 @@ describe("Stock Ready", () => {
     builds: [],
     freeStock: 0,
     takenFromStock: 0,
+    coveredByOpenPo: 0,
+    coveredByOpenPoPos: [],
   };
 
   it("sinks a row with no date in BOTH directions", () => {
@@ -618,6 +621,130 @@ describe("what leaves To Order", () => {
     const ps = run(ELLA, { supply: { openPoBySku: { "5539-1A(LHF)": 1 } } });
     expect(ps).toHaveLength(1);
     expect(ps[0].rows[0].builds[0].lines.map((l) => l.sku)).toEqual(["5539-2A(RHF)"]);
+  });
+});
+
+// ── 12b · T3 · what an open purchase order already covers ───────────────────
+//
+// The number the engine has always computed and never handed to anyone.
+// `coveredByOpenPo` had ZERO readers in the repository before this card, so a
+// partly covered line printed a REDUCED quantity with nothing beside it.
+
+describe("T3 · On PO", () => {
+  /** One mattress line, its own build — the shape a partial cover needs. */
+  const MAT = (over: Partial<ToOrderLine> = {}) =>
+    line({
+      lineId: "m1", sku: "H1401S-K", orderId: "o7", so: 1290, customerName: "ng",
+      category: "mattress", supplierId: NICE_FUTURE, leadDays: 7, modelName: "Haven",
+      deadline: "2026-08-20", offDays: OFFICE_OFF_DAYS, qty: 3,
+      ...over,
+    });
+
+  it("carries the cover onto the build and the row, beside the remainder it explains", () => {
+    const r = run([MAT()], { supply: { openPoBySku: { "H1401S-K": 2 } } })[0].rows[0];
+    expect(r.qty).toBe(1); // what is still to buy — the engine already netted it
+    expect(r.coveredByOpenPo).toBe(2); // …and this is why it is 1 and not 3
+    expect(r.builds[0].coveredByOpenPo).toBe(2);
+  });
+
+  it("names the purchase orders behind the number", () => {
+    const r = run([MAT()], {
+      supply: { openPoBySku: { "H1401S-K": 2 } },
+      openPoRefs: { "H1401S-K": [{ poId: "PO-2051", qty: 2 }] },
+    })[0].rows[0];
+    expect(r.coveredByOpenPoPos).toEqual(["PO-2051"]);
+    expect(onPoLine(r.coveredByOpenPo, r.coveredByOpenPoPos)).toBe("2 on PO-2051");
+  });
+
+  it("names EVERY purchase order a cover spans, in draw order", () => {
+    const r = run([MAT({ qty: 4 })], {
+      supply: { openPoBySku: { "H1401S-K": 3 } },
+      openPoRefs: {
+        "H1401S-K": [
+          { poId: "PO-2044", qty: 1 },
+          { poId: "PO-2051", qty: 2 },
+        ],
+      },
+    })[0].rows[0];
+    expect(r.qty).toBe(1);
+    expect(r.coveredByOpenPoPos).toEqual(["PO-2044", "PO-2051"]);
+    expect(onPoLine(3, r.coveredByOpenPoPos)).toBe("3 on PO-2044 · PO-2051");
+  });
+
+  it("replays the ENGINE's own draw — an earlier customer's units are NOT named again", () => {
+    // The point of the replay, and the bug a naive `take the first PO` would
+    // ship: `early` (qty 1, earliest deadline) eats PO-2044's single unit and
+    // leaves the grid fully covered. `late` then draws 2 units, and they come
+    // out of PO-2051 — so its hover must say PO-2051 and NOT PO-2044, or an
+    // operator phones the wrong factory about the wrong document.
+    //
+    // It also shows why this column is quiet by construction: the pool is
+    // drained earliest-deadline first, so at most ONE line per SKU can end up
+    // PARTLY covered — the one the pool ran out on. Every line before it is
+    // covered in full and leaves the grid.
+    const ps = run(
+      [
+        MAT({ lineId: "early", orderId: "oe", so: 1, qty: 1, deadline: "2026-08-10" }),
+        MAT({ lineId: "late", orderId: "ol", so: 2, qty: 3, deadline: "2026-08-20" }),
+      ],
+      {
+        supply: { openPoBySku: { "H1401S-K": 3 } },
+        openPoRefs: {
+          "H1401S-K": [
+            { poId: "PO-2044", qty: 1 },
+            { poId: "PO-2051", qty: 2 },
+          ],
+        },
+      },
+    );
+    expect(ps[0].rows.map((r) => r.orderId)).toEqual(["ol"]);
+    const late = ps[0].rows[0];
+    expect(late.qty).toBe(1);
+    expect(late.coveredByOpenPo).toBe(2);
+    expect(late.coveredByOpenPoPos).toEqual(["PO-2051"]);
+  });
+
+  it("ships the number alone when no reference can be resolved — never an invented one", () => {
+    const r = run([MAT()], { supply: { openPoBySku: { "H1401S-K": 2 } } })[0].rows[0];
+    expect(r.coveredByOpenPo).toBe(2);
+    expect(r.coveredByOpenPoPos).toEqual([]);
+    expect(onPoLine(2, [])).toBeNull();
+  });
+
+  it("a FULLY covered line is not on the grid at all — nothing left to buy", () => {
+    // Stated as a test so the absence is never read as a lost number. It is
+    // the same rule a stock-covered line has always run on, and the demand
+    // comes back by itself if the purchase order is cancelled.
+    const ps = run([MAT()], { supply: { openPoBySku: { "H1401S-K": 3 } } });
+    expect(ps).toEqual([]);
+  });
+
+  it("reads 0 with no open purchase orders at all", () => {
+    const r = run([MAT()])[0].rows[0];
+    expect(r.coveredByOpenPo).toBe(0);
+    expect(r.coveredByOpenPoPos).toEqual([]);
+  });
+
+  it("a row is the sum of its builds' — by construction", () => {
+    const r = run(
+      [
+        MAT({ lineId: "a", sku: "H1401S-K", qty: 2 }),
+        MAT({ lineId: "b", sku: "H1401S-Q", qty: 2 }),
+      ],
+      {
+        supply: { openPoBySku: { "H1401S-K": 1, "H1401S-Q": 1 } },
+        openPoRefs: {
+          "H1401S-K": [{ poId: "PO-2044", qty: 1 }],
+          "H1401S-Q": [{ poId: "PO-2044", qty: 1 }],
+        },
+      },
+    )[0].rows[0];
+    expect(r.coveredByOpenPo).toBe(
+      r.builds.reduce((s, b) => s + b.coveredByOpenPo, 0),
+    );
+    expect(r.coveredByOpenPo).toBe(2);
+    // One document, named ONCE however many builds drew from it.
+    expect(r.coveredByOpenPoPos).toEqual(["PO-2044"]);
   });
 });
 

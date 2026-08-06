@@ -1881,6 +1881,7 @@ export {
   unitsHeadline,
   categoryUnitsLine,
   freeStockLine,
+  onPoLine,
   reserveFromStockLabel,
   reservedFromStockLabel,
   stockExpandLabel,

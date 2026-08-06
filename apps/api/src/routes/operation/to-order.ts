@@ -546,10 +546,21 @@ async function loadToOrder(
   // Every OPEN purchase order line, unfiltered — same reason as the catalog: a
   // SKU may not go into an `.in()` list. Open POs are a small live slice.
   const openPoBySku: Record<string, number> = {};
+  /**
+   * T3 — the same supply, per DOCUMENT, so the grid can NAME what covers a
+   * line rather than printing a bare number. `po_id` IS the PO number
+   * (`purchase_orders.id` = `PO-2051`), so this costs one more column on a
+   * query already being run — no second read, no migration.
+   *
+   * Sorted by PO number, and the ORDER IS THE CONTRACT: `buildToOrder` replays
+   * the engine's draw over this list, so an unstable order would make one
+   * refresh name a different purchase order for the same unit.
+   */
+  const openPoRefs: Record<string, { poId: string; qty: number }[]> = {};
   {
     const { data: poLines, error: poErr } = await sb
       .from("purchase_order_lines")
-      .select("sku, qty, received_qty, purchase_orders!inner(status)")
+      .select("po_id, sku, qty, received_qty, purchase_orders!inner(status)")
       .eq("purchase_orders.status", "open");
     if (poErr) {
       const m = mapPgError(poErr);
@@ -560,6 +571,17 @@ async function loadToOrder(
       if (remaining <= 0) continue;
       const sku = r.sku as string;
       openPoBySku[sku] = (openPoBySku[sku] ?? 0) + remaining;
+      const poId = (r.po_id as string | null) ?? null;
+      if (poId) (openPoRefs[sku] ??= []).push({ poId, qty: remaining });
+    }
+    // One PO may hold two lines of one SKU — merge them, so a hover names a
+    // document once and the pool it drains matches `openPoBySku` exactly.
+    for (const [sku, refs] of Object.entries(openPoRefs)) {
+      const merged = new Map<string, number>();
+      for (const r of refs) merged.set(r.poId, (merged.get(r.poId) ?? 0) + r.qty);
+      openPoRefs[sku] = [...merged]
+        .map(([poId, qty]) => ({ poId, qty }))
+        .sort((a, b) => (a.poId < b.poId ? -1 : a.poId > b.poId ? 1 : 0));
     }
   }
 
@@ -659,6 +681,7 @@ async function loadToOrder(
       name: (s.name as string) ?? "",
     })),
     supply: { openPoBySku },
+    openPoRefs,
     freeStock,
     options: {
       today,

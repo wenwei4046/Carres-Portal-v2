@@ -214,9 +214,10 @@ presses `Reserve`. Whole records only — a bulk record that would over-reserve 
 split. Every draw records a reason on K4's dated ledger.
 
 ### WHAT IS ON SCREEN TODAY
-`OperationToOrder.tsx` · route `/operation?tab=purchase` · *measured 2026-08-06: the grid
-rebuilt AutoCount-aligned (T1, approved by Loo on the exact mock), widths measured in a real
-browser, the longest customer name counted with SQL.*
+`OperationToOrder.tsx` · route `/operation?tab=purchase` · *measured 2026-08-06, after T3
+shipped: the grid rebuilt AutoCount-aligned (T1, approved by Loo on the exact mock), widths
+measured in a real browser with the kit's own header classes, the longest customer name and the
+open-PO cover both counted with SQL.*
 
 ```
 LEFT 200px    PO SCHEDULE  rolling calendar of configured PO days, red OVERDUE row above it
@@ -230,10 +231,16 @@ LEFT 200px    PO SCHEDULE  rolling calendar of configured PO days, red OVERDUE r
 
 RIGHT         toolbar  pill search · selection state · Issue pill (exists ONLY while
                        something is selected) · quiet `Updated hh:mm`, never a Refresh
-              grid     NINE aligned columns (T1's seven + T1.1's two, 2026-08-06):
+              grid     TEN aligned columns (T1's seven + T1.1's two + T3's one,
+                       2026-08-06):
                        ☑ · SO No. · Customer · Customer Delivery · Proceed date ·
-                       Supplier · Qty · Model · Ready Stock · PO No.
-                       widths 99 · 181 · 163 · 143 · 111 · 55 · 155 · 99 · 175
+                       Supplier · Qty · Model · Ready Stock · On PO · PO No.
+                       widths 99 · 181 · 163 · 143 · 111 · 55 · 155 · 99 · 71 · 175
+                       The last three are the buyer's question in order — *is it
+                       in the warehouse · is it already bought · did I buy it
+                       today* (2990s' MRP row: `Stock · PO Outstanding ·
+                       Shortage`). `On PO` is NEUTRAL ink, never green: green is
+                       `Ready Stock`, something you can take today.
                        ONE aligned ORDER LINE per customer order, WHITE with a
                        `slate-6` rule above it — never a grey band (Loo, T1.1: six
                        bands down one sheet read as stripes, and grey is chrome while
@@ -251,9 +258,11 @@ RIGHT         toolbar  pill search · selection state · Issue pill (exists ONLY
                        portal's Excel date ▼ (Overdue · presets · month buckets ·
                        Custom Date Range…), the PO filter speaks business
                        (`Yet to Order` + the real numbers).
-                       Below 1255px the grid SCROLLS SIDEWAYS, never truncates —
-                       Purchase Orders' own behaviour; deleting a business column to
-                       avoid a scrollbar is forbidden.
+                       Below its own 1326px (the ten + the ☑ + the ⊞) the grid
+                       SCROLLS SIDEWAYS, never truncates — Purchase Orders' own
+                       behaviour; deleting a business column, or shrinking one
+                       below its measured content, to avoid a scrollbar is
+                       forbidden.
               totals   `Total · N units` — ALWAYS ON, counts the visible sheet
               footer   units per category for what is TICKED (P9) · Clear filters
 ```
@@ -261,7 +270,8 @@ RIGHT         toolbar  pill search · selection state · Issue pill (exists ONLY
 **Controls** `to-order-create-purchase` · `to-order-issue` · `to-order-retry` ·
 `to-order-cancel-dialog`/`-qty`/`-submit` · `to-order-clear-filters` · `to-order-footer-clear`
 · `to-order-total` · `kit-table-group-{orderId}` (the order line's ☑) ·
-`to-order-free-{row}` (the Ready Stock number) · `table-expand-{row}` → `to-order-reserve-{row}`
+`to-order-free-{row}` (the Ready Stock number) · `to-order-onpo-{row}` (the On PO number) ·
+`table-expand-{row}` → `to-order-reserve-{row}`
 · `to-order-cancel-{row}` (both acts, one door — see FROZEN RULES)
 
 **Create Purchase** is a multi-line dialog (`+ Add line` / `Remove`, 600px wide). One POST per
@@ -289,6 +299,28 @@ numbers can never disagree. A cancel stamps `cancelled_at` and lets the remainde
   where a scanning finger cannot reach it by accident: `Reserve` writes the stock register and
   `Cancel Purchase` cannot be undone from any screen. **Two acts, one door — G10 is CLOSED**
   and the `PO No.` cell answers one question again.
+- **⭐ `On PO` IS THE THIRD OF FOUR NUMBERS, AND IT ANSWERS *WHY 1?*** (T3, Loo, 2026-08-06).
+  `net-requirements.ts` has netted open purchase orders out of demand since the day it was
+  written (`coveredByOpenPo`), and the number **had ZERO readers in the repository**: a fully
+  covered line was dropped and a PARTLY covered line printed its REDUCED quantity with nothing
+  beside it. The grid said `Qty 1` where the customer ordered 3, and the two units on `PO-2051`
+  were stated on no screen — so the buyer could not check the plan before signing it. 2990s'
+  MRP row is the reference (`Qty Needed · Stock · PO Outstanding · Shortage`); this page already
+  had two of the four, and `On PO` is the third. **Neutral ink, blank at zero, no ▼, and no act
+  in the cell** — a fact is scanned, an act is chosen. The hover names the purchase orders
+  behind the number (`2 on PO-2051`), recovered by replaying the ENGINE's own allocation order
+  over the API's per-document list; **when it cannot be resolved the number ships alone — a
+  reference is never invented**, because an operator can phone a PO number that does not exist.
+  **No migration, no new query**: `po_id` IS the PO number, and it rode a query already run.
+- **⚠️ A FULLY COVERED LINE IS NOT ON THIS GRID, AND THAT IS NOT A BUG.** It has nothing left to
+  buy, so it leaves the workspace exactly as a stock-covered line does. **The demand is NOT
+  lost**: the engine reads `status = 'open'` and nothing else, so cancelling the purchase order
+  brings the requirement straight back. The consequence to hold on to is that **the pool drains
+  earliest-deadline first, so at most ONE line per SKU can ever be PARTLY covered** — the one
+  the pool ran out on. **Measured on production the day T3 shipped: 78 eligible demand lines,
+  41 of them covered by an open purchase order and ALL 41 covered in FULL (43 units across 24
+  SKUs), 0 partly — so the column is blank on every live row today.** It is a correctness
+  instrument, not a busy one, and the next chat must not read the blank as a defect.
 - **THE ORDER LINE IS WHITE, RULED — NEVER A GREY BAND.** Measured on the live page: the band
   was `bg-kit-slate-2`, a step the palette does not publish, so it had rendered as NOTHING and
   the order line was byte-identical to the item rows under it. Painting it grey fixed the
@@ -330,6 +362,18 @@ numbers can never disagree. A cancel stamps `cancelled_at` and lets the remainde
   held demand produces no output at all — it must state what · who · why · until when ·
   **G5** `Check in` must leave To Order and **Receiving must gain PO · supplier · customer name
   · SO number · warehouse · ETA · quantity-still-to-receive FIRST**, or information is deleted.
+  **G11 — MEASURED BY T3, NOT RULED, AND IT IS THE BIGGER HALF OF THE SAME DEFECT.** T3 put the
+  cover on the rows that SURVIVE. On production today **not one row survives with a cover**: all
+  41 covered demand lines are covered in full, so what actually happens to them is that they
+  VANISH — `SO-1210`'s two lines are fully on open purchase orders, so the customer's whole
+  order line disappears from To Order and the operator asking *where is SO-1210?* gets no answer
+  anywhere on the page. **The workspace can only be checked by what it shows, and today it
+  cannot show a demand it has already satisfied.** Options, with the recommendation first:
+  ① a `Fully on PO` row-state that KEEPS the order line on the grid inside the ordered window,
+  greyed, with the PO numbers in `PO No.` — the shape `Ordered rows STAY on the grid` already
+  ships, so it is the existing rule applied to a second way of being finished · ② a rail count
+  (`On PO · n`) that lists them on demand · ③ leave it, and answer the question in Purchase
+  Orders. **This is a listing rule — what the grid is FOR — so it is Loo's, not engineering's.**
   *(**G8** and **G10** are CLOSED, 2026-08-06. G8 by T1: the customer's date sits under the
   `Customer Delivery` header and a typed demand prints `Required By {date}`. G10 by T1.1:
   `Cancel` left the `PO No.` cell for the row's ⊞, on the rule a fact is scanned and an act is
