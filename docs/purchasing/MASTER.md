@@ -312,6 +312,12 @@ Tables: `purchase_orders` **24** · `purchase_order_lines` **38** · `po_history
   supplier call would go dark — and **do NOT gate the tomorrow call on provenance**: firing on
   our own estimate is exactly the phone call that gets the first real date, and the RPC's
   `v_first` branch was built for it.
+  **The rail moves with it, and Loo ruled it 2026-08-06: LET THEM MOVE.** Reading provenance
+  turns those five into `Need Supplier Confirmation`, so the counts go
+  `16 → 21` and `Waiting Goods 8 → 3`. He was shown the alternative — grey the date and freeze
+  the rail — and rejected it: a quiet queue that says *goods are coming* about a factory nobody
+  has phoned is the same lie one level up. **A louder queue whose number is true beats a calm
+  one whose number is not.**
 - **ONE arithmetic for the expected arrival, not two.** `to-order.ts:1116-1124` computes
   `production` on the FACTORY's week then `transit` on the OFFICE week (Law 2A);
   `OperationPurchaseOrders.tsx:533` computes `placed_at + production` and **never adds
