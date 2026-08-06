@@ -177,7 +177,30 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 
 ---
 
-## 8 · Modules
+## 8 · The architecture, and the modules
+
+> ### ⭐⭐ [`docs/ERP-ARCHITECTURE.md`](docs/ERP-ARCHITECTURE.md) — **the blueprint. Read it before any cross-module design.**
+>
+> **Loo, 2026-08-06: Orders V1 is FROZEN as the reference implementation.** It is not polished
+> further unless a production-critical defect appears. Nine engineering-debt items were found by
+> reading it end to end and measuring production, and **every one of them was the same defect —
+> an unowned record**, not a missing feature.
+>
+> The architecture answers four questions and only four: **what each module OWNS · what ACTIONS
+> belong to it · what it only SUMMARISES · what it LINKS to instead of owning.** Its four
+> ownership laws bind every module:
+>
+> ```
+> A · One record, one owner
+> B · A summary is READ-ONLY, forever — it may never gain a form
+> C · A door, never a duplicate — two forms for one act make two records
+> D · A derived fact has ONE arithmetic — not two that currently agree
+> ```
+>
+> **When the architecture and a module MASTER disagree, the ARCHITECTURE wins** — a MASTER
+> describes one module, and every boundary defect found so far lived *between* two of them.
+
+## 8.1 · Modules
 
 | Module | What it owns | MASTER |
 |---|---|---|

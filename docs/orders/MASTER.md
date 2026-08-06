@@ -1,5 +1,19 @@
 # ORDERS — MASTER
 
+> ## ⛔ ORDERS V1 IS FROZEN — the reference implementation (Loo, 2026-08-06)
+>
+> **It has completed its purpose.** It is the only place in the business where the whole
+> customer journey was built end to end, and its measured record is the evidence base for
+> [`../ERP-ARCHITECTURE.md`](../ERP-ARCHITECTURE.md).
+>
+> **Do not spend engineering time polishing V1.** The bar is a **production-critical defect** —
+> D1 (the list telling an operator to buy goods already bought, on 4 named orders) and D2 (a
+> receive written with no record) cleared it; **D3 · D4 · D5 · D8 · D9 do not.**
+>
+> **Every one of those five is a question about where a responsibility belongs, not a bug**, and
+> the architecture is where that is answered. **Some of them will disappear because the
+> responsibility moves to another module.** §12 keeps them for that decision, not for a fix.
+>
 > **The only Orders document.** Overwritten when something is re-ruled; never versioned.
 > **You read `CLAUDE.md` and this file.** Open `COPY-STANDARD.md` for a word,
 > `ACTION-FLOW-STANDARD.md` for the engine law, `01/02/03-*.md` for a token, `ENGINEERING.md`
