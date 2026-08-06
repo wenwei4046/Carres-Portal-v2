@@ -272,8 +272,24 @@ describe("PUT /api/operation/orders/:id/control", () => {
 });
 
 // =====================================================================
-// POST /api/operation/orders/:id/receive-line  (GRN, migration 0208)
+// D2 (2026-08-06) — the `POST /:id/receive-line` suite STOOD HERE and is
+// deleted with the route it tested.
+//
+// The route booked units into the stock register and stamped `line_received`
+// WITHOUT opening a Receiving Session — no `warehouse_receipts` row, no
+// `receiving_events` entry, and it never moved
+// `purchase_order_lines.received_qty`. Measured on production before removal:
+// used ZERO times, while the Receiving Workspace had posted 3 sessions.
+//
+// Receiving happens in ONE place. A test for a deleted route is a test that
+// argues the route should come back; the guard that matters now is the one
+// below, which asserts the door is GONE.
 // =====================================================================
+
+/* The per-table mock below is SHARED — the loan-sofa and loan-return suites
+   use it too. It was defined inside the deleted receive-line block and is kept
+   here verbatim: deleting a helper because its first caller went is how a
+   removal takes working tests with it. */
 /** Per-table mock: routes each `.from(table)` to its own result, is thenable so
  *  `await select().eq()` resolves, and captures insert/upsert rows. */
 function tableSb(tables: Record<string, { data?: unknown; error?: unknown }>) {
@@ -313,126 +329,21 @@ function tableSb(tables: Record<string, { data?: unknown; error?: unknown }>) {
   return { from, captured };
 }
 
-describe("POST /api/operation/orders/:id/receive-line", () => {
-  const RL_URL = `http://t/api/operation/orders/${ORDER_ID}/receive-line`;
-
-  it("401 without Authorization", async () => {
-    const res = await app.fetch(new Request(RL_URL, { method: "POST", body: "{}" }), env);
-    expect(res.status).toBe(401);
-  });
-
-  it("403 for dealer role", async () => {
-    const jwt = await makeJwt("dealer");
-    const res = await app.fetch(
-      new Request(RL_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: "X", qty: 1 }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
-  });
-
-  it("422 on an invalid body (qty 0)", async () => {
+describe("D2 — receiving has ONE door", () => {
+  it("POST /:id/receive-line is gone — an old tab meets a 404, never a silent write", async () => {
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
-      new Request(RL_URL, {
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/receive-line`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: "X", qty: 0 }),
+        body: JSON.stringify({ sku: "mattress:MAT-1", qty: 1, condition: "new" }),
       }),
       env,
     );
-    expect(res.status).toBe(422);
-  });
-
-  it("422 when the SKU isn't a line on the order", async () => {
-    const sb = tableSb({
-      orders: { data: { id: ORDER_ID, so: 1146, warehouse_id: "wh1" } },
-      order_lines: { data: [{ sku: "Other", qty: 1, source_po: null }] },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(RL_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: "Mattress X", qty: 1 }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("200 — books n units reserved to the SO, bumps line_received, flips to Ready when full", async () => {
-    const sb = tableSb({
-      orders: { data: { id: ORDER_ID, so: 1146, warehouse_id: "wh1" } },
-      order_lines: { data: [{ sku: "Mattress X", qty: 2, source_po: "PO/1" }] },
-      ops_order_control: { data: { line_received: { "Mattress X": 1 }, line_stock_status: {} } },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(RL_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: "Mattress X", qty: 1, condition: "exhibition" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      result: { received: number; lineReceived: number; lineQty: number; ready: boolean };
-    };
-    expect(body.result).toMatchObject({ received: 1, lineReceived: 2, lineQty: 2, ready: true });
-
-    const ins = sb.captured.inserts.find((i) => i.table === "ops_stock_items");
-    expect(ins).toBeTruthy();
-    expect(ins!.rows as unknown[]).toHaveLength(1);
-    expect((ins!.rows as Record<string, unknown>[])[0]).toMatchObject({
-      sku: "Mattress X",
-      status: "reserved",
-      reserved_ref: "SO-1146",
-      condition: "exhibition",
-    });
-
-    const up = sb.captured.upserts.find((u) => u.table === "ops_order_control");
-    const row = up!.rows as { line_received: Record<string, number>; line_stock_status: Record<string, string> };
-    expect(row.line_received["Mattress X"]).toBe(2);
-    expect(row.line_stock_status["Mattress X"]).toBe("ready");
-  });
-
-  it("200 — partial receive does NOT flip to Ready", async () => {
-    const sb = tableSb({
-      orders: { data: { id: ORDER_ID, so: 1146, warehouse_id: "wh1" } },
-      order_lines: { data: [{ sku: "Mattress X", qty: 2, source_po: null }] },
-      ops_order_control: { data: null },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(RL_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: "Mattress X", qty: 1 }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { result: { ready: boolean; lineReceived: number } };
-    expect(body.result).toMatchObject({ ready: false, lineReceived: 1 });
-    const up = sb.captured.upserts.find((u) => u.table === "ops_order_control");
-    expect((up!.rows as Record<string, unknown>).line_stock_status).toBeUndefined();
+    expect(res.status).toBe(404);
   });
 });
 
-// =====================================================================
-// Sofa loan flow (migration 0209)
-// =====================================================================
 describe("POST /api/operation/orders/:id/loan-sofa", () => {
   const URL = `http://t/api/operation/orders/${ORDER_ID}/loan-sofa`;
   const ITEM = "00000000-0000-0000-0000-0000000000f1";

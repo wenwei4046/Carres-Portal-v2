@@ -45,8 +45,6 @@ import {
   type OpsStockEmergencyResponse,
   type OpsStockEmergencyRaiseInput,
   type OpsStockEmergencyDecideInput,
-  type ReceiveLineInput,
-  type ReceiveLineResult,
   type LoanSofaInput,
   type BorrowLoanInput,
   type UpdateLoanInput,
@@ -7529,27 +7527,17 @@ export function useMarkUrgentStockOrdered() {
   );
 }
 
-/** GRN per-line receive (migration 0208) — book n units of one order line into
- *  stock (reserved to the SO). Refreshes the order detail + control overlay +
- *  the ops-stock listing so the Recv X/N + readiness update. */
-export function useReceiveLine(orderId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: ReceiveLineInput) =>
-      apiFetch<{ result: ReceiveLineResult }>(
-        `/api/operation/orders/${orderId}/receive-line`,
-        catalogJson("POST", input),
-      ).then((r) => r.result),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
-      void qc.invalidateQueries({
-        queryKey: qk.operation.orderControl(orderId),
-        exact: true,
-      });
-      void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
-    },
-  });
-}
+// D2 (2026-08-06) — `useReceiveLine` STOOD HERE and is deleted with
+// `POST /operation/orders/:id/receive-line`.
+//
+// It booked units into the stock register and stamped `line_received` WITHOUT
+// opening a Receiving Session: no `warehouse_receipts` row, no
+// `receiving_events` entry, and it never touched
+// `purchase_order_lines.received_qty`. That is a second RECORD of one act, not
+// a second door onto it. Measured before removal: used ZERO times, while the
+// Receiving Workspace had posted 3 sessions.
+//
+// Receiving happens in ONE place. Do not add this hook back.
 
 // ── Sofa loan flow (migration 0209) ──────────────────────────────────────────
 const loansKey = (orderId: string | null) =>

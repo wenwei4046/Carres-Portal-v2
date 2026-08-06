@@ -472,17 +472,26 @@ payload rather than manufacturing a `submitted` event nobody performed.**
   3 received of 3 with 1 damaged, so it reads `Fully received` and the damaged unit is
   invisible on the rail.** That is the published precedence working as ruled.
 
-### 🔴 A THIRD RECEIVING DOOR IS LIVE, AND THE ORDERS AUDIT NAMED IT
+### ✅ RECEIVING HAS ONE DOOR — the third one is deleted (D2, 2026-08-06)
 
-**Confirmed 2026-08-06 by the Orders reality audit.** `OrderDetailDrawer.tsx` calls
-`useReceiveLine` → `POST /operation/orders/:id/receive-line`, rendered on the Items tab as
-**`Goods arrived at the warehouse (GRN)`**. It writes a receive **without opening a Receiving
-Session**, so it produces no `warehouse_receipts` row and no `receiving_events` entry.
+The Orders drawer used to call `useReceiveLine` → `POST /operation/orders/:id/receive-line`,
+rendered on its Items tab as **`Goods arrived at the warehouse (GRN)`**. It booked units into
+the stock register and stamped `ops_order_control.line_received` **without opening a Receiving
+Session**: no `warehouse_receipts` row, no `receiving_events` entry, and it never moved
+`purchase_order_lines.received_qty`. **Two surfaces recorded one physical act two different
+ways, and no surface could reconcile them.**
 
-**This module already ruled that two doors onto one act is the thing to remove**, and this is
-the door that survived — because it lives in another module’s file. **The record and the
-completion evidence for a receive belong here**; the Orders drawer may show it and must not
-write it. Closing it is a build slice, and it is Receiving’s, not Orders’.
+**Measured on production before removal: it had been used ZERO times** — `line_received` empty
+on all 65 control rows and 0 units reserved to an SO — while this module's Receiving Workspace
+had posted **3** sessions through `office_receive_post`. That measurement is what made the
+removal an engineering decision rather than a business question.
+
+**The route is DELETED, not left unrendered**, on this module's own C1 ruling: *a live route
+with no caller is a bypass one curl away.* An old tab now meets a loud 404 instead of quietly
+writing an untraceable receive, and a guard asserts exactly that.
+
+**The Orders drawer still SHOWS the received count and hands over through the PO row's
+`Check in` link.** Orders may show cross-module work; it may not write it.
 
 ### THINGS A CHAT GETS WRONG HERE
 - **The rail is a PROGRESS rail, not an action queue.** There is no `Check in` queue tile.

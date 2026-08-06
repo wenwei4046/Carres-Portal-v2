@@ -28,7 +28,6 @@ import {
   matchStockRows,
   aggregateStorageFeesByRef,
   aggregateBalancesByRef,
-  receiveLineInput,
   loanSofaInput,
   borrowLoanInput,
   updateLoanInput,
@@ -41,7 +40,6 @@ import {
   type MissingLineCandidate,
   type OrderLineRef,
   type StockEtaImportResult,
-  type ReceiveLineResult,
   type SofaLoanDto,
   type BalancePayStatus,
 } from "@carres/shared";
@@ -1537,162 +1535,23 @@ orderControlRouter.post("/append-missing-lines", async (c) => {
   return c.json({ result });
 });
 
-// POST /:id/receive-line — GRN per-line partial receive (migration 0208). Books
-// n units of ONE order line into ops_stock_items (reserved to this SO), bumps the
-// line's received count, and auto-flips the line to Ready once fully received.
-// Works WITHOUT a portal PO (AutoCount orders carry only a text source_po).
-// Operation/principal; userClient/RLS is the security boundary.
-orderControlRouter.post("/:id/receive-line", async (c) => {
-  const auth = c.var.auth;
-  requireOperationOrPrincipal(auth.role);
-
-  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
-  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
-  const orderId = idCheck.data;
-
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    throw new HTTPException(400, { message: "Body must be valid JSON" });
-  }
-  const parsed = receiveLineInput.safeParse(body);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    const path = issue && issue.path.length > 0 ? issue.path.join(".") : "<root>";
-    return c.json(
-      {
-        error: "invalid_input",
-        code: "invalid_param",
-        message: `Invalid receive-line input at ${path}: ${issue?.message ?? "validation failed"}`,
-      },
-      422,
-    );
-  }
-  const { sku, qty, condition, location, doNumber } = parsed.data;
-  void location; // reserved for a future per-unit location stamp
-
-  const sb = userClient(c.env, auth.jwt);
-
-  // The order → so (for the reserved_ref) + warehouse.
-  const { data: order, error: ordErr } = await sb
-    .from("orders")
-    .select("id, so, warehouse_id")
-    .eq("id", orderId)
-    .maybeSingle();
-  if (ordErr) {
-    const m = mapPgError(ordErr);
-    return c.json(m.body, m.status);
-  }
-  if (!order) throw new HTTPException(404, { message: "Order not found" });
-
-  // Resolve a warehouse to book into: the order's, else the Carres/Klang default,
-  // else the first — ops_stock_items.warehouse_id is NOT NULL.
-  let warehouseId = (order.warehouse_id as string | null) ?? null;
-  if (!warehouseId) {
-    const { data: whs, error: whErr } = await sb
-      .from("warehouses")
-      .select("id, name")
-      .order("created_at", { ascending: true });
-    if (whErr) {
-      const m = mapPgError(whErr);
-      return c.json(m.body, m.status);
-    }
-    warehouseId =
-      (whs ?? []).find((w) => /carres|klang/i.test(String(w.name)))?.id ??
-      (whs ?? [])[0]?.id ??
-      null;
-  }
-  if (!warehouseId) {
-    return c.json(
-      { error: "no_warehouse", code: "invalid_param", message: "No warehouse to book stock into" },
-      422,
-    );
-  }
-
-  // The order line(s) for this sku → ordered qty + source PO (combine duplicates).
-  const { data: lineRows, error: lineErr } = await sb
-    .from("order_lines")
-    .select("sku, qty, source_po")
-    .eq("order_id", orderId);
-  if (lineErr) {
-    const m = mapPgError(lineErr);
-    return c.json(m.body, m.status);
-  }
-  const matching = (lineRows ?? []).filter((l) => (l.sku as string) === sku);
-  if (matching.length === 0) {
-    return c.json(
-      { error: "not_a_line", code: "invalid_param", message: "That SKU is not a line on this order" },
-      422,
-    );
-  }
-  const lineQty = matching.reduce((s, l) => s + Number(l.qty || 0), 0);
-  const sourcePo =
-    (matching.find((l) => l.source_po)?.source_po as string | null) ?? null;
-
-  // Current received count + status for this line (from the overlay).
-  const { data: ctrl, error: ctrlErr } = await sb
-    .from("ops_order_control")
-    .select("line_received, line_stock_status")
-    .eq("order_id", orderId)
-    .maybeSingle();
-  if (ctrlErr) {
-    const m = mapPgError(ctrlErr);
-    return c.json(m.body, m.status);
-  }
-  const existingReceived =
-    (ctrl?.line_received as Record<string, number> | null) ?? {};
-  const existingStatus =
-    (ctrl?.line_stock_status as Record<string, string> | null) ?? {};
-  const already = Number(existingReceived[sku] ?? 0);
-  const lineReceived = already + qty;
-
-  // Book the units into ops_stock_items, reserved to this SO.
-  const soRef = `SO-${order.so}`;
-  const today = new Date().toISOString().slice(0, 10);
-  const unitRows = Array.from({ length: qty }, () => ({
-    sku,
-    warehouse_id: warehouseId,
-    condition,
-    status: "reserved",
-    reserved_ref: soRef,
-    po_no: sourcePo,
-    source_ref: doNumber ?? null,
-    date_in: today,
-  }));
-  const { error: insErr } = await sb.from("ops_stock_items").insert(unitRows);
-  if (insErr) {
-    const m = mapPgError(insErr);
-    return c.json(m.body, m.status);
-  }
-
-  // Persist the received count; auto-flip to Ready when fully received.
-  const ready = lineReceived >= lineQty;
-  const controlPatch: {
-    order_id: string;
-    updated_by: string;
-    line_received: Record<string, number>;
-    line_stock_status?: Record<string, string>;
-  } = {
-    order_id: orderId,
-    updated_by: auth.id,
-    line_received: { ...existingReceived, [sku]: lineReceived },
-  };
-  if (ready) {
-    controlPatch.line_stock_status = { ...existingStatus, [sku]: "ready" };
-  }
-  const { error: upErr } = await sb
-    .from("ops_order_control")
-    .upsert(controlPatch, { onConflict: "order_id" });
-  if (upErr) {
-    const m = mapPgError(upErr);
-    return c.json(m.body, m.status);
-  }
-
-  const result: ReceiveLineResult = { received: qty, lineReceived, lineQty, ready };
-  return c.json({ result });
-});
-
+// D2 (2026-08-06) — `POST /:id/receive-line` STOOD HERE and is DELETED.
+//
+// It booked units into `ops_stock_items` reserved to the SO and stamped
+// `ops_order_control.line_received`, but it opened NO Receiving Session: no
+// `warehouse_receipts` row, no `receiving_events` entry, and it never moved
+// `purchase_order_lines.received_qty`. Two surfaces therefore recorded one
+// physical act two different ways.
+//
+// Measured on production before removal: **used zero times** — `line_received`
+// empty on all 65 control rows and 0 units reserved to an SO — while the
+// Receiving Workspace had posted 3 sessions through `office_receive_post`.
+//
+// The route is deleted rather than left unrendered, because Purchasing's own C1
+// ruling is that **a live route with no caller is a bypass one curl away**: an
+// old tab now meets a loud 404 instead of quietly writing an untraceable
+// receive. Receiving happens in ONE place — the Receiving Workspace.
+//
 // ── Sofa loan flow (migration 0209) ──────────────────────────────────────────
 // GET /:id/loans — the order's loans (joined with the loaned unit's sku + cond).
 orderControlRouter.get("/:id/loans", async (c) => {
