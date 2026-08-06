@@ -51,6 +51,21 @@ describe("no banned word reaches the screen (C12 · portal-wide)", () => {
       expectString: "Open Purchase Order",
     });
   });
+
+  /**
+   * Added when layer ③ landed (2026-08-05). The Claims TABLE is scanned by the
+   * Purchasing lane suite; the PANEL inside its expanded row never was, and the
+   * panel is where every claim decision is actually worded — what we asked, what
+   * the supplier answered, what happens to the item, and now what we are doing
+   * for the customer. A guard that stops at the page and not at the panel is the
+   * same hole this file exists to close, one level down.
+   */
+  describe("the claim panel", () => {
+    itSaysNoBannedWord(
+      join(PAGES, "operation", "components", "SupplierClaimPanel.tsx"),
+      { minStrings: 40, expectString: "Customer Resolution" },
+    );
+  });
 });
 
 /**

@@ -636,6 +636,78 @@ do not take the five-string shape.
 | `No receiving activity yet.` | Activity empty state | **Never `Nothing received yet`** (Jess, 2026-08-03) — that reads as *the goods have not come*, which is a different fact and usually a false one. What is empty is the RECORD. |
 | `Open in Claims` | Exceptions section | A DOOR, never a form. The claim already exists; the receive that recorded the problem opened it. |
 
+### The Claims decision words (ruled by Loo, 2026-08-05 — transcribed here 2026-08-06)
+
+These are **Loo's own spellings**, taken from his ruling of 2026-08-05 (the claim model in
+`docs/purchasing/MASTER.md` §6). They were ruled but never written down here, which is exactly
+the gap this file exists to close: a word that has been ruled and is not in the dictionary is a
+word the next chat re-invents.
+
+**A claim carries FOUR layers and they may never be collapsed:**
+
+```
+Customer Problem → Supplier Response → Carres Resolution → Carres Execution
+```
+
+**The test that keeps them apart is his:** *can both be true at the same time?* **If yes, they
+are two fields, not one list.** The customer cancelled AND the mattress is destroyed — under
+one list the operator has to choose which truth to record, i.e. has to lie.
+
+| Word | Where | Why this word |
+|---|---|---|
+| `The Item` | claim section | What this claim is ABOUT — the reference object (`PO · SKU · Supplier · DO`). **Not on screen yet**: it is the Workspace layer's un-collapsible header. |
+| `Customer Resolution` | claim section + its picker | *What are we doing for the CUSTOMER?* **Live 2026-08-06.** |
+| `Item Outcome` | claim section + its picker | *What happened to THIS item?* **Live 2026-08-06** — it renamed `The goods`, which named the noun rather than the decision, and with a second decision beside it the two must read apart at a glance. |
+| `Supplier Response` | claim section | What the supplier said. **The screen still says `What {supplier} answered`** — that names the party, which this file otherwise asks for, so the rename waits for the Workspace layer rather than being taken in passing. |
+| `Next Action` | claim region | What is owed now. **Not on screen yet** — the region belongs to the Workspace layer. |
+| `What are we doing for the customer?` | under `Customer Resolution` | The section's own question, so the picker never has to be guessed at. |
+| `What happened to this item?` | under `Item Outcome` | Its twin. Two decisions, two questions, and a reader who can tell them apart without being told. |
+| `Save what we are doing` | the resolution's button | Parallel to `Save what happened` beside it — both name the record being written, not the thing decided. |
+| `Recorded {date}` | beside that button | A FACT: a resolution stays editable while the claim is open, so the screen says when the one on file was set. |
+| `Nothing recorded — this claim closed without one.` | closed claim, no resolution | A closed claim with a blank here is finished, not neglected. Never a bare `—`. |
+
+**`Customer Resolution` — the four options, and the one line each carries.** The line is a
+DEFINITION, never a consequence: consequences are `f(Resolution, Execution)` and Carres
+Execution is frozen-but-unbuilt, so a line naming stock, money or an outstanding quantity would
+be a guess wearing a screen's authority.
+
+| Option | The line under it |
+|---|---|
+| `Replace` | `The customer gets a NEW item.` |
+| `Repair` | `The SAME item is repaired and goes back to the SAME customer.` |
+| `Accept As-Is` | `The customer keeps this item as it is.` |
+| `No Replacement Required` | `Nothing more goes to the customer for this item.` |
+
+**`Item Outcome` — the three, unchanged since 0299:** `Put back in stock` · `Returned to
+supplier` · `Written off`.
+
+**Removed from the resolution list, and they do not go back**: `Return to Supplier` and
+`Write Off` (they answer what happened to the ITEM) · `Cancel Outstanding` (renamed
+`No Replacement Required`) · `Reject` · `Deliver Remaining` · `Replacement` ·
+`Return and Replace` (all four are SUPPLIER answers, not Carres decisions).
+
+**`Repair` appears on BOTH the supplier's answer list and this one, and that is not a
+collision.** The supplier saying *"we will repair it"* is their answer; Carres deciding the
+customer gets a repair is our decision. They are different fields, they are allowed to
+disagree, and preserving that disagreement is the whole reason the layers are kept apart.
+
+> **`Refund` HAS NO ENTRY, and that is the ruling.** Supplier credit note? cash? offset
+> against future purchases? **The business meaning is not frozen and nobody may guess it.** It
+> is not built and it is not deleted. This row exists so the next chat does not read its
+> absence as an oversight and invent one.
+
+**Two collisions, both settled by law already in this file:**
+
+1. Loo spelt the waiting state `Waiting Internal Resolution`. **The dictionary already locked
+   `Case owner decision required`** (2026-07-27, in the exception-lifecycle row below) for the
+   same meaning. **The locked one wins** — one meaning, one word, and the older lock is the one
+   the rest of the portal's exception vocabulary is built around.
+2. **`Return` is a locked VERB** meaning *a record goes BACK to the party that produced it*
+   (the verb dictionary). **`Return to Supplier` is about GOODS**, and it is Loo's newer and
+   more specific ruling. **Both stand.** They are two senses of one spelling, exactly as
+   `Recovery` is: the verb is a record's move, the Item Outcome is a physical one, and neither
+   may be renamed to avoid the other.
+
 ### Receiving and supplier-exception words (locked 2026-07-27)
 
 One vocabulary for every module that waits on a supplier. Never invent a synonym.

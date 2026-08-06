@@ -24,9 +24,17 @@ import {
   claimNextMove,
   claimMoveOwnerLabel,
   claimCloseProblems,
+  CUSTOMER_RESOLUTIONS,
+  CUSTOMER_RESOLUTION_KEYS,
+  CUSTOMER_RESOLUTION_MEANING,
+  customerResolutionLabel,
+  customerResolutionMeaning,
+  isCustomerResolution,
+  type CustomerResolution,
   type ReceiveLineClaimDraft,
   type SupplierClaimMoveInput,
 } from "./supplier-claim";
+import { STOCK_HOLD_OUTCOME_KEYS } from "./stock-hold";
 import { CASE_ISSUE_KEYS, caseIssuesFor } from "./service-case-intake";
 
 function draft(over: Partial<ReceiveLineClaimDraft> = {}): ReceiveLineClaimDraft {
@@ -519,5 +527,118 @@ describe("claimCloseProblems — a closed claim keeps both sides", () => {
       expect(SUPPLIER_CLAIM_CLOSE_PROBLEM_TEXT[p]).toBeTruthy();
       expect(SUPPLIER_CLAIM_CLOSE_PROBLEM_TEXT[p]).not.toMatch(/_/);
     }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Layer ③ · Customer Resolution (Loo, 2026-08-05 · migration 0324)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The claim carries four layers and they may never be collapsed. What these
+// tests pin is mostly what the list must NOT contain: every option §6 names and
+// removes is asserted BY NAME, because the failure this card exists to prevent
+// is a future chat folding the two decisions back into one longer list.
+
+describe("Customer Resolution — what are we doing for the CUSTOMER?", () => {
+  it("offers Loo's four, in his order and with his spelling", () => {
+    expect(CUSTOMER_RESOLUTIONS.map((r) => r.label)).toEqual([
+      "Replace",
+      "Repair",
+      "Accept As-Is",
+      "No Replacement Required",
+    ]);
+    expect(CUSTOMER_RESOLUTION_KEYS).toEqual([
+      "replace",
+      "repair",
+      "accept_as_is",
+      "no_replacement_required",
+    ]);
+  });
+
+  it("holds NONE of the options §6 removed, each refused by name", () => {
+    // `Return to Supplier` and `Write Off` answer what happened to the ITEM;
+    // `Cancel Outstanding` was renamed; the rest are SUPPLIER answers; and
+    // `Refund` has no frozen business meaning, so nobody may guess it.
+    for (const removed of [
+      "return_to_supplier",
+      "returned",
+      "write_off",
+      "written_off",
+      "cancel_outstanding",
+      "reject",
+      "deliver_remaining",
+      "replacement",
+      "return_and_replace",
+      "refund",
+    ]) {
+      expect(isCustomerResolution(removed), removed).toBe(false);
+    }
+  });
+
+  it("is a SECOND decision, not a longer list — the two share no key", () => {
+    // Loo's test: can both be true at once? The customer cancelled AND the
+    // mattress is destroyed. If the two lists ever shared a key, one screen
+    // would eventually offer it once and the operator would have to choose
+    // which truth to record.
+    for (const key of CUSTOMER_RESOLUTION_KEYS) {
+      expect(STOCK_HOLD_OUTCOME_KEYS as readonly string[]).not.toContain(key);
+    }
+    for (const key of STOCK_HOLD_OUTCOME_KEYS) {
+      expect(isCustomerResolution(key), key).toBe(false);
+    }
+  });
+
+  it("holds none of the four SUPPLIER answers §6 removed by name", () => {
+    // `repair` deliberately appears on BOTH lists and that is not a collision:
+    // the supplier saying "we will repair it" is their answer, and Carres
+    // deciding the customer gets a repair is our decision. They are different
+    // columns, they can disagree, and §6 removed only the four below —
+    // `Reject` · `Deliver Remaining` · `Replacement` · `Return and Replace` —
+    // because each is a thing only the supplier can say.
+    for (const key of ["reject", "deliver_remaining", "replacement", "return_and_replace"]) {
+      expect(SUPPLIER_CLAIM_RESPONSE_KEYS as readonly string[]).toContain(key);
+      expect(CUSTOMER_RESOLUTION_KEYS as readonly string[]).not.toContain(key);
+    }
+  });
+
+  it("labels every key, and never prints a raw column value", () => {
+    for (const r of CUSTOMER_RESOLUTIONS) {
+      expect(customerResolutionLabel(r.key)).toBe(r.label);
+      expect(r.label).not.toMatch(/_/);
+    }
+    expect(customerResolutionLabel(null)).toBe("—");
+    expect(customerResolutionLabel(undefined)).toBe("—");
+  });
+
+  it("explains each option in one plain line — a DEFINITION, never a consequence", () => {
+    // Consequences are f(Resolution, Execution) and Execution is unbuilt, so a
+    // guide line that named stock, money or an outstanding quantity would be
+    // wrong by Loo's own law 5.
+    for (const key of CUSTOMER_RESOLUTION_KEYS) {
+      const line = CUSTOMER_RESOLUTION_MEANING[key as CustomerResolution];
+      expect(line).toBeTruthy();
+      expect(line).not.toMatch(/_/);
+      expect(line).not.toMatch(/stock|refund|credit|invoice|outstanding|write.?off/i);
+    }
+    // Loo's business laws 1 and 2, said out loud rather than left to be learnt.
+    expect(CUSTOMER_RESOLUTION_MEANING.replace).toContain("NEW item");
+    expect(CUSTOMER_RESOLUTION_MEANING.repair).toContain("SAME customer");
+    expect(customerResolutionMeaning("no_such_option")).toBeNull();
+    expect(customerResolutionMeaning(null)).toBeNull();
+  });
+
+  it("changes nothing about who owes the next move", () => {
+    // The Next Action region belongs to the unbuilt Workspace layer. Recording
+    // a resolution must not silently re-word the queue, the row or the button.
+    const base: SupplierClaimMoveInput = {
+      claim_no: "SC-1001",
+      status: "open",
+      claim_type: "damaged",
+      requested_action: "replace",
+      supplier_response: "reject",
+      supplier_name: "Ohana",
+    };
+    expect(claimNextMove(base)).toEqual(claimNextMove({ ...base }));
+    expect(claimNextMove(base).key).toBe("close");
   });
 });

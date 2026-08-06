@@ -4,10 +4,13 @@ import { useMemo, useState } from "react";
 import { Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import {
+  CUSTOMER_RESOLUTIONS,
   STOCK_HOLD_OUTCOMES,
   STOCK_HOLD_RESOLVE_PROBLEM_TEXT,
   SUPPLIER_CLAIM_RESPONSES,
   claimCloseProblems,
+  customerResolutionLabel,
+  customerResolutionMeaning,
   heldUnitsLine,
   holdOutcomeNeedsNote,
   holdResolveProblems,
@@ -21,6 +24,7 @@ import {
 import {
   useOperationSupplierClaimPhotos,
   useSupplierClaimCloseMutation,
+  useSupplierClaimCustomerResolutionMutation,
   useSupplierClaimHoldResolveMutation,
   useSupplierClaimRequestMutation,
   useSupplierClaimResponseMutation,
@@ -55,6 +59,44 @@ import { buildSupplierClaimMessage } from "@/lib/wa-templates";
  * gated on the claim being closed: the goods and the paperwork move on
  * different days, and tying them would teach people to close a claim early just
  * to clear a shelf.
+ *
+ * ── Layer ③ · Customer Resolution (Loo, 2026-08-05 · migration 0324) ────────
+ *
+ * The panel answered three questions and never the one the CUSTOMER is waiting
+ * on. **`Customer Resolution` is a SECOND decision beside `Item Outcome`, never
+ * a replacement for it**, and Loo's test is what makes that structural: *can
+ * both be true at the same time?* The customer cancelled AND the mattress is
+ * destroyed. Under one list the operator must choose which truth to record —
+ * must LIE. So there are two pickers, side by side, and neither narrows the
+ * other.
+ *
+ * `Item Outcome` is the same picker R4 shipped, under the name Loo ruled for it
+ * — `The goods` was the only heading on this panel that did not say what the
+ * control decides, and with a second decision beside it the two must be
+ * readable apart at a glance.
+ *
+ * **THREE THINGS THIS SECTION DELIBERATELY DOES NOT DO**, each one a rule
+ * rather than an omission:
+ *
+ *   1. **No consequence is shown.** Consequences are `f(Resolution, Execution)`
+ *      and Carres Execution is frozen-but-unbuilt, so a Stock / Finance /
+ *      Demand line computed from the resolution alone would be wrong by Loo's
+ *      own law 5. The line under each option is a DEFINITION — what the option
+ *      means for the customer — and it stops there.
+ *   2. **It is not gated on the supplier's answer.** A customer who cancels
+ *      does not wait for the factory to reply. Same reasoning R4 used for the
+ *      goods: tying two things that move on different days teaches people to
+ *      record a false step to unlock a real one.
+ *   3. **It does not gate the close.** `Close claim` still asks for both sides
+ *      and nothing more — a third condition would be a new business rule, and
+ *      this card was ruled to build layer ③, not to re-rule the close.
+ *
+ * Unlike the ask, the resolution stays EDITABLE while the claim is open. The
+ * ask freezes when the answer lands because the two-field design exists to
+ * preserve a disagreement; a resolution has no counterpart to disagree with,
+ * and Loo's business law 2 explicitly contemplates Carres changing it — a
+ * repair becomes a replacement the moment we decide the customer cannot wait.
+ * Every change is written to `po_history` and the audit log by the RPC.
  */
 
 export default function SupplierClaimPanel({
@@ -73,6 +115,7 @@ export default function SupplierClaimPanel({
   const responseM = useSupplierClaimResponseMutation();
   const closeM = useSupplierClaimCloseMutation();
   const holdM = useSupplierClaimHoldResolveMutation();
+  const resolutionM = useSupplierClaimCustomerResolutionMutation();
 
   const asks = useMemo(() => requestedActionsFor(claim.claim_type), [claim.claim_type]);
   const [ask, setAsk] = useState<string>("");
@@ -81,6 +124,15 @@ export default function SupplierClaimPanel({
   const [closeNote, setCloseNote] = useState("");
   const [outcome, setOutcome] = useState<string>("");
   const [outcomeNote, setOutcomeNote] = useState("");
+  // Layer ③ — seeded from what is already on file, because the resolution stays
+  // editable while the claim is open. The panel is keyed by claim id, so a
+  // different claim mounts a fresh copy of this state rather than inheriting it.
+  const [resolution, setResolution] = useState<string>(
+    claim.customer_resolution ?? "",
+  );
+  const [resolutionNote, setResolutionNote] = useState(
+    claim.customer_resolution_note ?? "",
+  );
 
   const supplier = claim.supplier_name ?? "supplier";
   const closeProblems = claimCloseProblems(claim);
@@ -135,6 +187,13 @@ export default function SupplierClaimPanel({
   });
   const outcomeNoteRequired = holdOutcomeNeedsNote(outcome);
 
+  // Layer ③ — nothing to save until something actually changed. A button that
+  // re-writes the same answer teaches people to press it for reassurance.
+  const resolutionChanged =
+    resolution !== "" &&
+    (resolution !== (claim.customer_resolution ?? "") ||
+      resolutionNote.trim() !== (claim.customer_resolution_note ?? ""));
+
   return (
     <div className="grid gap-5 md:grid-cols-2" data-testid={`claim-panel-${claim.claim_no}`}>
       {/* ── left: the evidence ───────────────────────────────────────────── */}
@@ -170,16 +229,154 @@ export default function SupplierClaimPanel({
           )}
         </div>
 
-        {/* R4 · the goods themselves */}
+        {/* ③ · what we are doing for the CUSTOMER — a SECOND decision, above
+            the item's outcome because that is the order Loo froze, and beside
+            it because both can be true at once. */}
+        <div className="mt-5" data-testid="claim-customer-resolution">
+          <SectionTitle>Customer Resolution</SectionTitle>
+
+          {claim.status === "closed" ? (
+            <div className="text-body text-base-800">
+              {claim.customer_resolution ? (
+                <>
+                  <span className="font-semibold">
+                    {customerResolutionLabel(claim.customer_resolution)}
+                  </span>
+                  {claim.customer_resolution_at && (
+                    <span className="text-label text-base-500 ml-2">
+                      {fmtDate(claim.customer_resolution_at)}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="text-meta text-base-500">
+                  {/* A fact, not a shrug: the claim is finished and this was
+                      never answered. There is nothing left to do about it. */}
+                  Nothing recorded — this claim closed without one.
+                </span>
+              )}
+              {claim.customer_resolution_note && (
+                <div className="text-meta text-base-600 mt-1">
+                  {claim.customer_resolution_note}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="text-meta text-base-500">
+                What are we doing for the customer?
+              </div>
+
+              {/* A NAMED group, because the panel now legitimately holds two
+                  buttons reading `Replace` and two reading `Repair` — the
+                  supplier saying it and Carres deciding it are different
+                  facts. The heading disambiguates them on screen; the group's
+                  accessible name does the same for a screen reader. */}
+              <div
+                className="flex flex-wrap gap-1.5"
+                role="group"
+                aria-label="Customer Resolution"
+                data-testid="customer-resolution-options"
+              >
+                {CUSTOMER_RESOLUTIONS.map((r) => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    onClick={() => setResolution(r.key)}
+                    aria-pressed={resolution === r.key}
+                    className={`text-meta px-2.5 py-1 rounded border ${
+                      resolution === r.key
+                        ? "bg-base-900 text-white border-base-900 font-semibold"
+                        : "bg-white text-base-700 border-base-200 hover:border-base-400"
+                    }`}
+                    data-testid={`customer-resolution-${r.key}`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* What the option MEANS, never what follows from it: with Carres
+                  Execution unbuilt, no stock, money or demand consequence is
+                  known yet, and a screen may only show what is true now. */}
+              {resolution && (
+                <div
+                  className="text-meta text-base-700"
+                  data-testid="customer-resolution-meaning"
+                >
+                  {customerResolutionMeaning(resolution)}
+                </div>
+              )}
+
+              {resolution && (
+                <input
+                  value={resolutionNote}
+                  onChange={(e) => setResolutionNote(e.target.value)}
+                  maxLength={500}
+                  placeholder="Anything worth keeping (optional)"
+                  className="w-full text-meta rounded border border-base-200 px-2 py-1.5 focus:outline-none focus:border-base-400"
+                  data-testid="customer-resolution-note"
+                />
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!resolutionChanged || resolutionM.isPending}
+                  onClick={() =>
+                    void resolutionM.mutateAsync({
+                      claimId: claim.id,
+                      customer_resolution: resolution,
+                      note: resolutionNote.trim() || undefined,
+                    })
+                  }
+                  className="btn-primary text-meta py-1.5 px-3 disabled:opacity-40"
+                  data-testid="customer-resolution-save"
+                >
+                  {resolutionM.isPending ? "Saving…" : "Save what we are doing"}
+                </button>
+                {claim.customer_resolution_at && (
+                  <span
+                    className="text-label text-base-500"
+                    data-testid="customer-resolution-recorded"
+                  >
+                    Recorded {fmtDate(claim.customer_resolution_at)}
+                  </span>
+                )}
+              </div>
+              {resolutionM.isError && (
+                <div className="text-label text-danger">
+                  {resolutionM.error?.message ?? "Couldn't save."}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* R4 · the item itself — the SECOND of the two decisions, under the
+            name Loo ruled for it (2026-08-05). `The goods` named the noun; the
+            heading has to name what the picker DECIDES now that a second
+            decision sits above it. */}
         <div className="mt-5" data-testid="claim-held-stock">
-          <SectionTitle>The goods</SectionTitle>
+          <SectionTitle>Item Outcome</SectionTitle>
           <div className="text-meta text-base-800">
             {heldUnitsLine(claim.held_units, claim.hold_reason)}
           </div>
 
           {claim.held_units > 0 && (
             <div className="space-y-2 mt-2">
-              <div className="flex flex-wrap gap-1.5">
+              {/* The twin of the question above it. Two decisions, two
+                  questions, and a reader who can tell them apart without
+                  being told which is which. */}
+              <div className="text-meta text-base-500">
+                What happened to this item?
+              </div>
+              <div
+                className="flex flex-wrap gap-1.5"
+                role="group"
+                aria-label="Item Outcome"
+                data-testid="item-outcome-options"
+              >
                 {STOCK_HOLD_OUTCOMES.map((o) => (
                   <button
                     key={o.key}
@@ -289,7 +486,13 @@ export default function SupplierClaimPanel({
             </div>
           ) : (
             <div className="space-y-2">
-              <div className="flex flex-wrap gap-1.5">
+              {/* Named for the same reason as the resolution group above. */}
+              <div
+                className="flex flex-wrap gap-1.5"
+                role="group"
+                aria-label="What we asked"
+                data-testid="claim-ask-options"
+              >
                 {asks.map((a) => (
                   <button
                     key={a.key}
@@ -386,7 +589,12 @@ export default function SupplierClaimPanel({
             </div>
           ) : (
             <div className="space-y-2">
-              <div className="flex flex-wrap gap-1.5">
+              <div
+                className="flex flex-wrap gap-1.5"
+                role="group"
+                aria-label={`What ${supplier} answered`}
+                data-testid="claim-answer-options"
+              >
                 {SUPPLIER_CLAIM_RESPONSES.map((r) => (
                   <button
                     key={r.key}
