@@ -154,6 +154,28 @@ export const TO_ORDER_WORDS = {
    * this at all*, and AutoCount answers it with a column. So does this.
    */
   colReadyStock: "Ready Stock",
+  /**
+   * T3 (Loo, 2026-08-06) — the ON PO column's header.
+   *
+   * **The fact the engine computed and never showed anyone.**
+   * `net-requirements.ts` has netted open purchase orders out of demand since
+   * the day it was written (`coveredByOpenPo`), and the number left the engine
+   * nowhere: a line whose remainder is 0 is dropped from the grid, and a partly
+   * covered line prints its REDUCED quantity with nothing beside it. The buyer
+   * reads `Qty 1` where the customer ordered 3 and cannot answer *why 1?* —
+   * the only two answers on screen are `Ready Stock` (in the warehouse) and
+   * this one (already bought, not yet arrived).
+   *
+   * `PO` is COPY-STANDARD's ruled word for the document, so the header composes
+   * it rather than inventing a noun (`On Order` · `Incoming` · `Open PO` were
+   * all available and all say the same thing in a word the dictionary does not
+   * hold). The COPY-STANDARD row was written with this card.
+   *
+   * **Neutral ink, never green.** `Ready Stock` is green because it is
+   * something you can take TODAY; this number is information — the goods are
+   * bought and the operator can do nothing with them here.
+   */
+  colOnPo: "On PO",
   filterOverdue: "Overdue",
   /**
    * The empty state while a FILTER is narrowing — §8.2's law: no reachable
@@ -590,6 +612,25 @@ export function soCountLabel(n: number): string {
 /** `Carres Klang: 2 available` — the expanded row's one sentence. */
 export function freeStockLine(warehouse: string, n: number): string {
   return `${warehouse}: ${n} available`;
+}
+
+/**
+ * `2 on PO-2051` — the `On PO` cell's hover, or `null` when no purchase order
+ * could be named (T3, 2026-08-06).
+ *
+ * **The number alone ships when the reference cannot be resolved.** The engine
+ * nets an aggregate pool per SKU, so the purchase orders behind a covered unit
+ * are known only because `buildToOrder` replays the engine's own allocation
+ * order over the caller's per-PO list. A caller that hands no list gets no
+ * title — an invented reference is worse than a bare number, because an
+ * operator can phone a PO number that does not exist.
+ *
+ * The `·` separator is the grid's own (the order line already joins its
+ * purchase orders with it).
+ */
+export function onPoLine(n: number, pos: readonly string[]): string | null {
+  if (n <= 0 || pos.length === 0) return null;
+  return `${n} on ${pos.join(" · ")}`;
 }
 
 /** `Reserve 2` — the button. It carries the number BECAUSE nothing else may. */
@@ -1034,6 +1075,19 @@ export interface BuildToOrderInput {
    * warehouse that has stock, rather than a change to the page.
    */
   freeStock?: Record<string, readonly { id: string; qty: number }[]>;
+  /**
+   * T3 — the OPEN purchase-order lines behind `supply.openPoBySku`, keyed by
+   * the same `sku` the pool is keyed on, in a stable caller-chosen order.
+   *
+   * The engine drains an aggregate NUMBER per SKU, so it cannot say which
+   * document covered which unit. This list lets `buildToOrder` replay that
+   * same draw — same order, same amounts — and name them exactly, without
+   * changing the engine's allocation.
+   *
+   * Absent → the cover NUMBER still travels and the hover simply does not
+   * exist. A reference is never guessed.
+   */
+  openPoRefs?: Record<string, readonly { poId: string; qty: number }[]>;
 }
 
 // ── Outputs ─────────────────────────────────────────────────────────────────
@@ -1087,6 +1141,28 @@ export interface ToOrderBuild {
   /** P10 — units of this build already taken from ready stock (display only;
    *  `qty` is already net of it). */
   takenFromStock: number;
+  /**
+   * T3 — units of this build that an OPEN purchase order already covers.
+   *
+   * `qty` IS already net of it — the engine subtracted it before this file saw
+   * the line, which is exactly why the number has to be carried: without it a
+   * quantity that fell has nothing on screen saying what took it.
+   *
+   * **A build whose every line was FULLY covered is not here at all**, and that
+   * is not a bug. Such a line has nothing left to buy, so it leaves the
+   * workspace the same way a line covered by a reserved unit does. What
+   * survives to carry a number above zero is a PARTLY covered line — 3 asked
+   * for, 2 on a purchase order, 1 still to buy. The demand comes straight back
+   * if that purchase order is cancelled: the engine reads `status = 'open'`
+   * and nothing else, so nothing is lost, only unstated.
+   */
+  coveredByOpenPo: number;
+  /**
+   * T3 — the purchase orders `coveredByOpenPo` came from, in the engine's own
+   * draw order. EMPTY when the caller passed no `openPoRefs`; the number ships
+   * alone rather than with a guessed document.
+   */
+  coveredByOpenPoPos: string[];
 }
 
 export interface ToOrderRow {
@@ -1127,6 +1203,10 @@ export interface ToOrderRow {
   freeStock: number;
   /** P10 — Σ of the builds'. `qty` is already net of it. */
   takenFromStock: number;
+  /** T3 — Σ of the builds'. `qty` is already net of it. */
+  coveredByOpenPo: number;
+  /** T3 — the purchase orders behind it, deduped, in draw order. */
+  coveredByOpenPoPos: string[];
 }
 
 /**
@@ -1347,6 +1427,55 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
   for (const r of net.lines) toOrderByLine.set(r.line.lineId, r.toOrder);
 
   /**
+   * ── T3 — WHAT AN OPEN PURCHASE ORDER ALREADY COVERS ──────────────────────
+   *
+   * The engine has computed this per line since the day it was written and it
+   * reached nobody: `buildToOrder` drops a fully covered line (nothing left to
+   * buy) and prints a partly covered line's REDUCED quantity with nothing
+   * beside it. So the grid says `Qty 1` where the customer ordered 3, and the
+   * two units on `PO-2051` are stated on no screen — the buyer cannot answer
+   * *why 1?* and cannot check the plan.
+   *
+   * NO NEW ARITHMETIC. `coveredByOpenPo` is read off the engine's result, and
+   * the DOCUMENTS behind it are recovered by replaying the engine's own draw:
+   * `net.lines` comes back in allocation order (earliest deadline, then
+   * earliest placed — the same property P10's stock offer relies on), so
+   * draining the caller's per-PO list in that order, by exactly the units the
+   * engine allocated, names each line's purchase orders precisely. The engine
+   * is untouched: it still drains one aggregate number per SKU.
+   */
+  const coveredByLine = new Map<string, number>();
+  const poRefsByLine = new Map<string, string[]>();
+  {
+    const refPool = new Map<string, { poId: string; qty: number }[]>();
+    for (const [sku, refs] of Object.entries(input.openPoRefs ?? {})) {
+      refPool.set(
+        sku,
+        refs.map((r) => ({ poId: r.poId, qty: Math.max(0, r.qty) })),
+      );
+    }
+    for (const r of net.lines) {
+      coveredByLine.set(r.line.lineId, r.coveredByOpenPo);
+      let need = r.coveredByOpenPo;
+      if (need <= 0) continue;
+      const recs = refPool.get(r.line.sku);
+      if (!recs) continue;
+      const named: string[] = [];
+      for (const rec of recs) {
+        if (need <= 0) break;
+        if (rec.qty <= 0) continue;
+        const take = Math.min(need, rec.qty);
+        rec.qty -= take;
+        need -= take;
+        named.push(rec.poId);
+      }
+      if (named.length > 0) poRefsByLine.set(r.line.lineId, named);
+    }
+  }
+  /** Deduped, order preserved — one purchase order is named once. */
+  const namePos = (ids: readonly string[]): string[] => [...new Set(ids)];
+
+  /**
    * P10 — WHAT FREE READY STOCK COULD COVER, offered and never taken.
    *
    * `consumeFreeStock` stays OFF (Jess, 2026-07-21: goods are labelled per
@@ -1512,6 +1641,17 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
           freeStock: offerByLine.get(members[0]!.lineId)?.qty ?? 0,
           freeStockItemIds: offerByLine.get(members[0]!.lineId)?.itemIds ?? [],
           takenFromStock: members.reduce((s, m) => s + (m.takenFromStock ?? 0), 0),
+          // T3 — summed over the members that SURVIVED to this build. A member
+          // whose cover was total is not among them (it left at the filter
+          // above), so this number can only ever come from a partly covered
+          // line, and it always stands beside the remainder it explains.
+          coveredByOpenPo: members.reduce(
+            (s, m) => s + (coveredByLine.get(m.lineId) ?? 0),
+            0,
+          ),
+          coveredByOpenPoPos: namePos(
+            members.flatMap((m) => poRefsByLine.get(m.lineId) ?? []),
+          ),
         });
       }
 
@@ -1572,6 +1712,8 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
         // happening to match.
         freeStock: builds.reduce((s, b) => s + b.freeStock, 0),
         takenFromStock: builds.reduce((s, b) => s + b.takenFromStock, 0),
+        coveredByOpenPo: builds.reduce((s, b) => s + b.coveredByOpenPo, 0),
+        coveredByOpenPoPos: namePos(builds.flatMap((b) => b.coveredByOpenPoPos)),
       });
     }
 
