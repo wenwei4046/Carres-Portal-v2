@@ -242,7 +242,9 @@ and resolve it · set a reorder point.
 **OWNS**
 - The **carrier**: who they are, their working days, closed dates, capacity, notice period,
   geography and staging rules.
-- The **trip**: what goes on which van on which day, including a split across trips.
+- The **trip DERIVATION** — the trip is **not a record; it is a derived view** (§6.2, frozen):
+  confirmed bookings grouped by **carrier + delivery date**, including a split across trips.
+  Delivery owns the ONE derivation rule (Law D).
 - The **proof**: the delivery photo and the signed document.
 
 **ACTIONS** — assign a carrier · arrange a trip · issue the delivery order · record the
@@ -254,8 +256,9 @@ whether money holds it.
 **LINKS TO** — the customer order.
 
 > ### THE ONE BOUNDARY THAT CHANGES FROM V1, AND IT IS SMALL
-> **The BOOKING (a promise to a customer) stays with the Customer Order. The TRIP and the
-> CARRIER move here.** V1 blurred them: a customer's confirmed date and a carrier's capacity
+> **The BOOKING (a promise to a customer) stays with the Customer Order. The TRIP QUESTION and
+> the CARRIER move here** — and the trip itself is a derived view, never a record (§6.2).
+> V1 blurred them: a customer's confirmed date and a carrier's capacity
 > lived in the same drawer, which is why a global carrier rule ended up editable from one
 > customer's order (D5).
 >
@@ -462,10 +465,46 @@ here.
    (read-only), it does not own the clock.
 ```
 
-**② Does the delivery TRIP become a first-class record?**
-V1 has bookings and booking groups on the order. A trip that carries several customers' goods on
-one van is a real object with its own day, driver and capacity. **If yes, Delivery owns it and
-the order links to it. If no, the order keeps a booking and a van is never modelled.**
+**② Does the delivery TRIP become a first-class record? — FROZEN 2026-08-06: NO.
+See §6.2 — the trip is a DERIVED VIEW over confirmed bookings.**
+
+## §6.2 · DECISION ② — THE DELIVERY TRIP, frozen 2026-08-06
+
+> **The trip is NOT a first-class business record. It is a DERIVED VIEW.**
+> Ruled by the §6.1 reference pattern, and verified against production before freezing.
+
+```
+TRIP  =  a VIEW over confirmed bookings, grouped by  CARRIER + DELIVERY DATE
+
+  DELIVERY        owns the ONE derivation rule (Law D)
+  CUSTOMER ORDER  keeps the BOOKING — the promise to the customer (§3.2)
+  NOBODY          writes a trip. A derived view has no writer; to change it
+                  you change its source, the booking, through the order's door.
+```
+
+**The business owns BOOKINGS. A trip is simply one way of VIEWING those bookings, not a
+separate business entity** (Loo, 2026-08-06).
+
+**Why a view and not a record — measured, then reasoned.** Production: 65 orders,
+0 confirmed bookings, 0 rows in any trip store, 8 carriers — **all external** — and 1
+registered vehicle. **The van is the carrier's, not Carres'**: driver, plate and route are
+another company's morning decision, and the portal records only what it OBSERVED. A trip
+table would be a record whose distinguishing fields Carres can never fill.
+
+**Every question a trip answers, the view answers:** capacity = count of confirmed bookings
+per carrier + day against `daily_capacity` (the calendar already computes exactly this) ·
+piggyback-vs-paid-urgent = whether another booking already holds that carrier + day · the
+WhatsApp manifest sent to the carrier = generated from the view. Multi-leg staging
+(HOUZS → Balakong → AL collects) needs no trip either: a warehouse-to-warehouse leg is a
+stock movement (Stock's record, §3.5); the final leg is the delivery (the booking).
+
+**The upgrade clause:** the day a fact must attach to the VAN itself and to no order — a
+per-trip carrier cost, an own-fleet dispatch, a signed loading manifest — the trip becomes a
+first-class record THEN, owned by Delivery, and the migration is a grouping of the bookings
+that already exist. Until that fact exists, a trip table is an unowned record — V1's disease.
+
+> *Naming note: `ops_order_control.delivery_trips` (0282) is unaffected — it is the
+> append-only history of bookings a later confirmation replaced, not a trip store.*
 
 **③ Does Purchasing own the goods until they are received, or does the customer order?**
 Today a demand belongs to the order and a PO belongs to Purchasing, and the seam between them
