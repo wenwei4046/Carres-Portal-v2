@@ -472,6 +472,18 @@ payload rather than manufacturing a `submitted` event nobody performed.**
   3 received of 3 with 1 damaged, so it reads `Fully received` and the damaged unit is
   invisible on the rail.** That is the published precedence working as ruled.
 
+### 🔴 A THIRD RECEIVING DOOR IS LIVE, AND THE ORDERS AUDIT NAMED IT
+
+**Confirmed 2026-08-06 by the Orders reality audit.** `OrderDetailDrawer.tsx` calls
+`useReceiveLine` → `POST /operation/orders/:id/receive-line`, rendered on the Items tab as
+**`Goods arrived at the warehouse (GRN)`**. It writes a receive **without opening a Receiving
+Session**, so it produces no `warehouse_receipts` row and no `receiving_events` entry.
+
+**This module already ruled that two doors onto one act is the thing to remove**, and this is
+the door that survived — because it lives in another module’s file. **The record and the
+completion evidence for a receive belong here**; the Orders drawer may show it and must not
+write it. Closing it is a build slice, and it is Receiving’s, not Orders’.
+
 ### THINGS A CHAT GETS WRONG HERE
 - **The rail is a PROGRESS rail, not an action queue.** There is no `Check in` queue tile.
 - **`Current Action` is NOT limited to `Check in`** — `callsById` is still computed and can
