@@ -1077,6 +1077,160 @@ without switching tabs.
 modify the Receiving module in this Purchase Orders workstream."* **It is recorded here so it
 is not lost, and it is taken in the Receiving chat, on its own worktree.**
 
+---
+
+# R15 · RECEIVING ARCHITECTURE REFACTOR — the boundary, frozen before any page is touched
+
+> **Loo, 2026-08-06, and it is a STOP order before it is a card:**
+>
+> *"不要做 Claims。不要做 Receiving UI。先把 Purchasing → Receiving 的边界冻结 …
+> 它现在的问题不是排版，而是页面职责定义错了。"*
+>
+> **He named this card `R8`. R8 IS TAKEN** — the banned-verb sweep, shipped 2026-07-28 as
+> PR #499 — so it is numbered R15 here. Nothing else about his ruling is changed. *(Q12 and
+> Q13 collided the same way one day earlier; a second R8 would have made the queue unreadable
+> in the same week.)*
+
+**Lane: ④ RECEIVING · ARCHITECTURE. DOCS ONLY — no code, no UI, no migration.**
+**It produces a RULING and the cards that follow it. A chat that opens `OperationReceiving.tsx`
+has broken this card.**
+
+**The order is his, and it is the whole point — the queue is not refactored before the
+boundary is frozen, and the page is not built before the queue is refactored:**
+
+```
+✅ Freeze Purchasing boundary
+        ↓
+✅ Freeze Receiving boundary
+        ↓
+✅ Refactor Receiving Queue   →  Session, no longer PO
+        ↓
+✅ Build Receiving
+        ↓
+✅ Claims
+```
+
+## The four questions this card answers — his, verbatim
+
+```
+1 · Purchase Orders 结束在哪里?
+2 · Receiving 从哪里开始?
+3 · 什么 Event 会把 PO 移进 Receiving?
+4 · Receiving Queue 改成 Session, 不再是 PO
+```
+
+## What he ruled, recorded before anything is measured against it
+
+**Phase 1 — Purchase Orders is SUPPLIER MANAGEMENT and nothing else.**
+
+```
+Queue:  Waiting Supplier Confirmation · Supplier Confirmed · Production · Ready to Ship
+Work:   Chase supplier · Update ETA · Get DO · Arrange delivery to warehouse
+Ends:   Supplier Fulfilment Started   →  the PO moves into Receiving by itself
+```
+
+**Phase 2 — Receiving is PHYSICAL RECEIVING and shows only what has started fulfilment.**
+
+```
+Queue:  Waiting DO · Truck Coming · Truck Arrived · Receiving · Partial · Ready to Post
+Row:    ONE TRUCK, not one PO   —   `Truck A · Ohana · DO-8821`
+```
+
+**So today's 22 rows disappear from Receiving — not because of a date filter, but because the
+supplier has not started fulfilment.** *(His own sentence: "不是因为 Today。而是: Supplier 根本
+还没开始 fulfilment。")*
+
+## THE MEASUREMENT — what the two pages hold on live production, 2026-08-06
+
+**Why the refactor is right, in four numbers:** Purchase Orders and Receiving read the **same
+list from the same source**. Purchase Orders shows **24 POs**; Receiving's work queue shows
+**22 of those same 24**; **5 of Receiving's 6 columns** also sit on Purchase Orders; and of
+those 22, **16 have no arrival date at all** and **0 are arriving within three days**. The
+earliest arrival on file is **12 Aug**. Receiving is today a second copy of the PO list.
+
+**Two live defects found while measuring, neither of them layout, both to be fixed by the
+refactor rather than patched now:**
+
+- **`COMPACT_KEYS` is alive on Receiving** and hides columns whenever the right pane opens —
+  **the pane is open by default**, so the table drops to four columns and the two that vanish
+  are `Goods Arrival` and `Received`. **`Received` is the one column Purchase Orders does not
+  have** (Q7 removed it), so **no list in the portal can show how many units arrived** — only
+  the one PO you have selected. Its compact set also still names `issued`, a column that
+  exists only on Purchase Orders, copied across and never corrected. **This is the exact
+  mechanism Loo killed on Purchase Orders in Q7** (*"Operator 的眼睛会一直重新学习页面"*).
+- **Receiving's `Current Action` still ranks the supplier calls first**, and Q14 moved both of
+  those doors to Purchase Orders. Today 0 calls are open so nothing shows; the day one opens,
+  Receiving names an action it has no button for.
+
+## THREE COLLISIONS — each is measured, and each needs Loo, not a chat
+
+**① Phase 1's four queues are the SUPPLIER's own status axis, and the supplier has never
+touched it.** `po_sup_status` has existed since 0001 with ten values, and his four map onto it
+almost one for one (`pending` · `acknowledged` · `in_production` · `shipped`/`ready_for_pickup`).
+
+```
+live:  pending 22 · delivered 2 · everything else 0
+       10 suppliers, 2 have a login, 0 POs ever moved by a supplier
+```
+
+`PURCHASING-WORKING-FLOW.md` §9 freezes that axis as the supplier portal's and the partner
+portal's — *"not a Purchasing decision to redefine"*. **So a queue that reads that column reads
+22 / 0 / 0 / 0 for ever.** The only inbound fact Carres actually records is the phone call:
+`po_supplier_promises` holds **6 rows — 1 ready date · 4 tomorrow-delivery · 1 balance date**.
+**Recommendation: the queue is driven by what Carres RECORDS, never by what the factory
+presses** — otherwise Phase 1 depends on eight suppliers who have no login.
+
+**② `One truck = One Session` contradicts a frozen v1 rule, and this card is where that gets
+ruled.** `RECEIVING-INFORMATION-MODEL.md` §2 says one DO may span several POs and **each PO
+gets its own Session in v1**. His list row is a TRUCK, so a van carrying two POs is one row
+and two Sessions. §8 of that same file already parks *"one-van-many-POs single-session
+convenience — measured pain, own card"*. **This is that card. It is a change to a frozen rule
+and must be written as one, not slipped in.**
+
+**③ Phase 2's first three queues have no data source today.**
+
+```
+Waiting DO      purchase_orders.do_number      0 of 24   (the DO number is typed at
+                                                          RECEIVING time, not before)
+Truck Coming    procurement_partner_id          0 of 24
+Truck Arrived   pickup_date 0 · partner_confirmed_at 0
+```
+
+**So `Waiting DO · Truck Coming · Truck Arrived` cannot be computed from anything that exists.**
+Either this card adds those captures (a migration, and Phase 1's *"Get DO"* and *"Arrange
+delivery"* are exactly where they would be captured), or the queue ships with fewer rungs and
+grows. **Naming three empty queues without saying which is which is how a page looks finished
+and answers nothing.**
+
+## The entry event (his question 3) — recommendation, with its reason
+
+**The first supplier promise recorded against the PO.** It is the only inbound fact that moves
+today (6 rows against 0 for every alternative), it is already append-only with who and when
+(0306), and **it is recorded by Carres**, so it does not wait for a factory to log in. `Get DO`
+is the stronger business signal and has **zero rows** — it becomes the entry event the day
+Phase 1 starts capturing it, and the card should say so rather than choosing it now and
+shipping an empty Receiving.
+
+## DONE WHEN
+
+- The boundary is written into `PURCHASING-WORKING-FLOW.md` §1 (where Purchase Orders ends)
+  and `RECEIVING-INFORMATION-MODEL.md` §1 (where Receiving begins) — **one place each, the
+  losing text DELETED whole**, never annotated.
+- The entry event is named, and it is a fact the system records today.
+- Both queue ladders are published with their rungs IN ORDER, and every rung says which stored
+  fact computes it. **A rung with no source is listed as not-yet-computable, not drawn.**
+- The `one truck = one Session` change to §2's v1 rule is written as an amendment with Loo's
+  ruling attached.
+- The two live defects above are named in the follow-up build card, **not fixed here.**
+
+## MUST NOT
+
+❌ touch `OperationReceiving.tsx`, `ReceivingWorkspace.tsx` or any page · ❌ write a migration ·
+❌ build Claims (R13 is explicitly deferred behind this) · ❌ invent a queue word — every rung
+needs a `docs/COPY-STANDARD.md` row before it reaches a screen · ❌ redefine the supplier
+status axis alone: two external portals run their whole lifecycle on it · ❌ decide collision
+② or ③ in code.
+
 ## Status
 
 | Card | Status | PR |
@@ -1092,6 +1246,7 @@ is not lost, and it is taken in the Receiving chat, on its own worktree.**
 | R9 | ⬜ **one claim, one outcome — and a button that splits it** (Loo 2026-08-05, option A). AutoCount is already A: `Cancel Purchase Order` / `Goods Return` / `Purchase Return` are three documents and none holds two outcomes. **Three binding conditions:** R5 counts problem PO **LINES**, not claim documents (a split may not pollute a negotiation number) · the split is a **BUTTON** on the claim screen, never "go open a second claim" · the A→B upgrade path is written in the card (one row per claim, outcome copied, qty = whole). **`Cancel PO` leaves the outcome list for `Cancel Outstanding`** — line-level, undelivered qty only, demand returns to To Order **and lands in Overdue, correctly**. ⚠️ **Overrides `PURCHASING-WORKING-FLOW.md` §9's frozen no-per-line-cancellation rule — §9 updates in the same PR.** Build NOW: 0 claims live. Closes the R4 CF `hold-resolution-is-per-claim-not-per-unit` **by ruling** | — |
 | R10 | ✅ **§9 rewritten against the code, 2026-08-05** — DOCS ONLY, one file, zero code. All six of the card's disagreements are closed, and **two of them came out different from the card once the code was read, which is the point of the card**. (1) **The card's own point 4 was imprecise**: `poReceivingProgress` does not return "one state per PO" — it returns one state per **SET of lines handed to it**, and there is a live caller that hands it exactly ONE (`RecordSupplierAnswerModal.tsx:181`, the balance-date sentence). §9 now publishes that as a table of screen → set → scope, because "per line vs per PO" is not a property of the function. (2) **`required_qty` is not a column and never was** — it greps to **zero** across the whole repository, so the retired formula's left-hand side named nothing; the real demand quantities are `order_lines.qty` and `purchase_demands.remaining_qty` (GENERATED, 0320), and typed demand was absent from §9's stored table altogether. Also closed: the 4-rung ladder is published **as an ORDER with each rung's business reason** · the clamp and its `Pending delivery` word (R1's locked vocabulary — `Balance owed` was a third name for the same number) · the To Order supply test · **`purchase_orders.status` is the 3-value `po_status` enum, a stored column, not the 5-word Operation Status axis** — a reader trap the old text left wide open. **Two things REPORTED and deliberately not folded in**: a SECOND on-screen ladder exists (`poWorkStateOf`, the register's rail) which reads the same clamped numbers and deliberately ignores damaged/wrong item — it is now documented beside the receiving ladder rather than merged with it, per Loo's two-axes freeze · **§9's no-per-line-cancellation ruling is untouched — that is R9's amendment and ships in R9's PR** | [#628](https://github.com/wenwei4046/Carres-Portal-v2/pull/628) · no migration |
 | R11 | ⬜ **the Inventory consequence is wired to the resolution** — and it is WIRING, not building: R4 / 0299 already ships **three of the four** stock outcomes under names that match Loo's table one for one (`returned_to_supplier` · `written_off` · `back_to_stock`), and `Replace` is the receive engine. `Repair` · `Refund` · `Cancel Outstanding` move no stock at all | — |
+| **R15** | ⬜ **RECEIVING ARCHITECTURE REFACTOR — DO THIS FIRST, and it is a STOP order.** Loo, 2026-08-06: *"不要做 Claims。不要做 Receiving UI。先把 Purchasing → Receiving 的边界冻结"* — the page's problem is not layout, it is that its JOB is defined wrong. **DOCS ONLY.** Purchase Orders = supplier management, ending at `Supplier Fulfilment Started`; Receiving = physical receiving, showing only what has started, **one row = ONE TRUCK, not one PO**. **He named it R8; R8 is TAKEN (#499), so it is R15.** Measured: the two tabs read the SAME source — 24 POs vs 22, 5 of 6 columns shared, 16 of 22 with no arrival date, **0 arriving within 3 days**. **Three collisions needing his ruling**: his four Phase-1 queues ARE the supplier axis, which §9 freezes as the supplier portal's and which **no supplier has ever moved** (22 pending, 2 of 10 suppliers have a login) · `one truck = one Session` contradicts §2's frozen *one PO per Session (v1)* · `Waiting DO · Truck Coming · Truck Arrived` have **0 rows of source data each**. **R13 · R9 · R11 · R12 all sit BEHIND this** | — |
 | **R13** | ⬜ **Claims becomes a Workspace (W-1) — ZERO MIGRATION, and it is a LAYER, not a rebuild.** Queue · List · Expand · Data · Status all already exist. Adds §12.7.5's two-tier split, the un-collapsible `PO · SKU · Supplier · DO` header, the Timeline's first four rungs off existing timestamps, the Consequences region **with its pure mapping**, and an Owner derived from `org_duties`. **No create button — ever (SAP QM, not Zendesk). No `Coming soon`.** **DO FIRST** | — |
 | **R14** | ⬜ **Receiving sees its own Claims** — measured: `OperationReceiving.tsx` says `claim` **once** in the whole file. **⚠️ THE RECEIVING LANE'S CARD.** Jess 2026-08-03 forbids any Purchasing sibling touching that page | — |
 | R12 | ⬜ **the money on a claim, and the Finance queue** — `supplier_claims` has **28 columns and not one is money** (measured 2026-08-05); the cost sits in `purchase_order_lines.cost` and the claim has never read it. **A Finance Action completes on an EXTERNAL EVIDENCE reference** (the supplier's CN/DN number), never a tick-box — that is why §8 does not kill the queue. **2990s is the worked example of the failure**: its `purchase_returns.credit_note_ref` has exactly two readers in the whole repo, a PDF and a detail page. Operations never sees AP; Finance never sees photos. **`Accept As-Is` must be able to carry a discount** | — |
