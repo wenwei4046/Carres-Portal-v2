@@ -178,7 +178,9 @@ browser, the longest customer name counted with SQL.*
 
 ```
 LEFT 200px    PO SCHEDULE  rolling calendar of configured PO days, red OVERDUE row above it
-                           which the next run may never swallow
+                           which the next run may never swallow; every day row prints
+                           weekday + date in ONE format (`Fri 7 Aug` — Loo 2026-08-06,
+                           never a bare weekday, never Today/Tomorrow; full date on hover)
               CATEGORY     All · Mattress · Bedframe · Sofa · Pillow · Mattress Protector,
                            with UNIT counts (bare numbers)
               + Create Purchase        the manual entrance — may never be missing
