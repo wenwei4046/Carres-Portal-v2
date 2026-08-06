@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
+  poDateHistoryOf,
   poReceivingProgress,
   purchasingActionQueue,
   purchasingSupplierCallsOf,
@@ -52,7 +53,9 @@ import { RailGroup, RailItem } from "./components/workspace-rail";
  *     PO Issued · Supplier · PO No. · Items · Goods Arrival · Received ·
  *     Current Action. Default order = PO Issued OLDEST first, the register's
  *     own law: the operator starts at the delivery that has been waiting
- *     longest, never at the biggest number.
+ *     longest, never at the biggest number. `Goods Arrival` COLOURS WHEN IT IS
+ *     LATE (T5, Loo 2026-08-06) — red for a date the factory GAVE, amber for
+ *     our own estimate; see the column.
  *
  *   WORKSPACE (400px) — ONE PO's Receiving Session work. Read Mode →
  *     Start Receiving → Receiving Mode → Save → Posted. See
@@ -282,6 +285,23 @@ export default function OperationReceiving() {
   const progressById = useMemo(() => {
     const m = new Map<string, ReturnType<typeof poReceivingProgress>>();
     for (const p of live) m.set(p.id, poReceivingProgress(p.purchase_order_lines));
+    return m;
+  }, [live]);
+
+  /**
+   * WHO SAID THE ARRIVAL DATE — the promise ledger, and nothing else.
+   *
+   * `eta_date` has held our own estimate since 2026-08-03, so a null test on
+   * it can no longer tell a promise from a guess (§4's frozen rule; that test
+   * broke once and was repaired 2026-08-06). `poDateHistoryOf` is the ONE
+   * reader of the ledger and keeps the ready-date run apart, so *"finished on
+   * the 12th"* can never be printed as *"with you on the 14th, and they said
+   * so."* The register reads it exactly this way.
+   */
+  const supplierGaveArrival = useMemo(() => {
+    const m = new Map<string, boolean>();
+    for (const p of live)
+      m.set(p.id, poDateHistoryOf(p.promises).currentDate != null);
     return m;
   }, [live]);
 
@@ -630,12 +650,47 @@ export default function OperationReceiving() {
       label: "Goods Arrival",
       width: "104px",
       sortable: true,
-      cell: (p) =>
-        p.eta_date ? (
-          <span className="tabular-nums">{fmtDateShort(p.eta_date)}</span>
-        ) : (
-          <span className="text-kit-slate-9">—</span>
-        ),
+      /**
+       * A LATE TRUCK MUST LOOK LATE (T5, Loo 2026-08-06).
+       *
+       * This date had exactly TWO states — the date, or a grey dash — so on
+       * the one page whose whole job is goods physically turning up, a truck
+       * three days late was pixel-identical to one arriving on time. The only
+       * red on the row was `Current Action`.
+       *
+       * **`late` is the SAME answer that column already prints** — the
+       * engine's own open calls (`callsById`), never a second clock on one
+       * page. Purchase Orders' `Expected Arrival` reads its own `late` the
+       * identical way, so one date cannot turn late on two tabs on two days.
+       *
+       * **The TONE is §4's frozen law: red is reserved for a date the factory
+       * GAVE.** Our own arithmetic warns AMBER — it never accuses a supplier
+       * of breaking a promise nobody made, and the operator's next move is
+       * opposite in each case (a phone call to make vs a promise already
+       * broken). Provenance is the promise ledger, read through
+       * `poDateHistoryOf` above.
+       *
+       * No new word: the colour is the whole change.
+       */
+      cell: (p) => {
+        if (!p.eta_date) return <span className="text-kit-slate-9">—</span>;
+        const late = (callsById.get(p.id) ?? []).some((c) => c.late);
+        const promised = supplierGaveArrival.get(p.id) ?? false;
+        return (
+          <span
+            data-testid={`receiving-arrival-${p.id}`}
+            data-tone={late ? (promised ? "promised" : "estimate") : "plain"}
+            className={[
+              "tabular-nums",
+              late ? (promised ? "text-kit-red-11" : "text-kit-amber-11") : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {fmtDateShort(p.eta_date)}
+          </span>
+        );
+      },
     },
     {
       key: "received",

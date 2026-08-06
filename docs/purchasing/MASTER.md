@@ -528,24 +528,55 @@ Damaged or wrong units become `on_hold` at the moment of receipt and stop counti
 supply (0299), and a claim is raised automatically (0288's trigger).
 
 ### WHAT IS ON SCREEN TODAY
-`OperationReceiving.tsx`, 983 lines · route `/operation?tab=receiving` · *measured 2026-08-05:
-docblock, rail definition and `actionWordOf` read; not read line by line.*
+`OperationReceiving.tsx`, 1036 lines · route `/operation?tab=receiving` · ***measured
+2026-08-06, after T5 shipped: the file read END TO END — the rail is TWO QUEUES with two
+independent facet sets, which the previous entry did not say.***
 
 ```
-LEFT 200px   RECEIVING PROGRESS  Receiving issue (danger) · Partially received ·
+LEFT 200px   QUEUES              To receive  ·  Goods Received      ← always both,
+                                 never hidden at zero (a switch, not a facet).
+                                 `?queue=received` rides the URL.
+
+             ── while `To receive` is open ──
+             RECEIVING PROGRESS  Receiving issue (danger) · Partially received ·
                                  In transit · Fully received
              SUPPLIER            per factory
-             SOURCE              last
 
-CENTRE       SEVEN columns: PO Issued · Supplier · PO No. · Items · Goods Arrival ·
-             Received · Current Action.  Default order = PO Issued OLDEST first.
+             ── while `Goods Received` is open (its OWN facets, held apart) ──
+             RECEIVED            Today · This week · This month · Earlier
+             SUPPLIER            per factory
+             SOURCE              last, and only once TWO desks have filed
+
+CENTRE       `To receive` — SEVEN columns: PO Issued · Supplier · PO No. · Items ·
+             Goods Arrival · Received · Current Action.
+             Default order = PO Issued OLDEST first.
+             `Goods Arrival` COLOURS WHEN IT IS LATE (T5, 2026-08-06) — red for a
+             date the factory GAVE, amber for our own estimate, plain when it is
+             not late, the existing grey dash when there is none. No new word:
+             the colour is the whole change.
+             ⚠️ MEASURED: `Goods Arrival` and `Received` are OUTSIDE the
+             reading-pane compact set (`COMPACT_KEYS`), so with the workspace pane
+             open — the default — neither renders. The operator sees the colour by
+             putting the pane away or by sorting on the column (the honesty guard
+             never hides a sorted column). NOT changed by T5, which was ruled to
+             touch nothing but the colour; whether the compact set is right is a
+             Workspace-layer question.
+
+             `Goods Received` — SIX columns: Received · GRN No. · Supplier ·
+             PO No. · Supplier DO No. · Units. No Status column: the queue itself
+             is the status, and it holds POSTED records only.
 
 RIGHT 400px  ONE PO's Receiving Session. Receiving Mode takes the stage rather than
              opening an overlay — five lines with three numbers each do not fit in 400px.
+             On `Goods Received` the pane is the read-only record (`?receipt=`, its
+             own key — a PO and a Session are two documents).
 ```
 
 **Controls** `receiving-rail` · `receiving-listing` · `receiving-workspace-toggle`/`-pane`/
-`-page` · `receiving-clear-filters`
+`-page` · `receiving-clear-filters` · `receiving-queue-to-receive`/`-received` ·
+`receiving-rail-state-{state}`/`-supplier-{id}`/`-bucket-{key}`/`-rec-supplier-{name}`/
+`-source-{key}` · `receiving-arrival-{poId}` (the arrival cell, carrying `data-tone`
+`promised` · `estimate` · `plain`)
 
 ### API + DATA
 `POST /operation/pos/:id/office-receive` (→ `office_receive_post`, 0315) ·
@@ -603,6 +634,17 @@ payload rather than manufacturing a `submitted` event nobody performed.**
 - **The Save button NAMES the gap** (`Save — add a DO number`). A grey button that will not say
   why is a puzzle.
 - **No `GRN` tab, ever.** GRN is a document OF Receiving, not a module.
+- **A LATE TRUCK MUST LOOK LATE — and §4's colour law is the SAME law here** (T5, approved by
+  Loo 2026-08-06). `Goods Arrival` had exactly two states, the date or a grey dash, so on the
+  one page whose whole job is goods physically turning up a truck three days late was
+  pixel-identical to one arriving on time; the only red on the row was `Current Action`.
+  **Red is reserved for a date the FACTORY GAVE. Our own arithmetic warns AMBER and never
+  accuses a supplier of breaking a promise nobody made** — the two need opposite next moves.
+  **Provenance is the promise ledger, `poDateHistoryOf(...).currentDate`, never a null test on
+  `eta_date`** (which has held our own estimate since 2026-08-03). **`late` is the engine's own
+  open calls** — the identical expression `Current Action` and Purchase Orders' `Expected
+  Arrival` already read, so one date cannot turn late on two tabs on two different days. **A
+  second clock or a second provenance test on this page is a defect, not a refinement.**
 - **The receiving ladder is FOUR rungs and the ORDER is the rule:** `fully_received` →
   `receiving_issue` → `partially_received` → `in_transit`. **Live consequence today: PO-2054 is
   3 received of 3 with 1 damaged, so it reads `Fully received` and the damaged unit is
@@ -633,8 +675,8 @@ writing an untraceable receive, and a guard asserts exactly that.
 - **The rail is a PROGRESS rail, not an action queue.** There is no `Check in` queue tile.
 - **`Current Action` is NOT limited to `Check in`** — `callsById` is still computed and can
   render either supplier call. Today's data reaches only `Check in`; that is a DATA fact.
-- **`OperationReceiving.tsx` says `claim` exactly ONCE in 983 lines.** Receiving is blind to
-  what it produces.
+- **`OperationReceiving.tsx` says `claim` exactly ONCE in 1036 lines** (re-counted 2026-08-06,
+  after T5). Receiving is blind to what it produces.
 
 ### APPROVED EVOLUTION
 - **The rail becomes a QUEUE model** (`To Receive` / `Received`), ruled by Jess 2026-08-03.
@@ -643,7 +685,10 @@ writing an untraceable receive, and a guard asserts exactly that.
   modify the Receiving module in this Purchase Orders workstream."*
   **UNRESOLVED:** Q14, a Purchase Orders card, edited this file on 2026-08-05. Either her
   ruling is narrower than it reads (the RAIL only), or Q14 crossed it. **Somebody must say
-  which, or the next card guesses.**
+  which, or the next card guesses.** *(T5 is not that guess: Loo lifted the boundary for it
+  EXPLICITLY on 2026-08-06, and T5 is a Receiving-owned card on its own worktree touching
+  `OperationReceiving.tsx` and its tests and nothing else. The open question is still about
+  PURCHASE ORDERS cards reaching in.)*
 
 ---
 
