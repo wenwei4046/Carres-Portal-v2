@@ -27,8 +27,10 @@
  * later consumer can never disagree about what a number means.
  */
 
+import { myHolidaySet } from "./my-holidays";
+import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
 import { z } from "zod";
-import { DEFAULT_OFF_DAYS } from "./working-days";
+import { addWorkingDays, DEFAULT_OFF_DAYS } from "./working-days";
 
 /** The categories purchasing can buy. A guarantee or a service has no factory. */
 export const PURCHASING_CATEGORIES = ["sofa", "bedframe", "mattress"] as const;
@@ -172,6 +174,67 @@ export function transitDaysFor(
   if (!supplierId) return null;
   const row = settings.suppliers.find((s) => s.id === supplierId);
   return row?.transitDays ?? null;
+}
+
+/**
+ * WHEN THE GOODS REACH US — **the ONE arithmetic, and there may never be a
+ * second** (Loo's §4 Approved Evolution, 2026-08-05).
+ *
+ * It was written twice and the two copies disagreed:
+ *
+ *   `to-order.ts`                  today + production (FACTORY week)
+ *                                        + transit    (OFFICE week)   ← Law 2A
+ *   `OperationPurchaseOrders.tsx`  placed_at + production (FACTORY week)
+ *                                                                     ← no transit
+ *
+ * Both live suppliers carry `transitDays = 1`, so the register was short by
+ * exactly the day it forgot. Recomputed over the 16 dateless POs on production
+ * (2026-08-05; no Malaysian public holiday falls between 1 and 19 Aug 2026)
+ * **the missing day bites three rows**: `PO-2036` was silent where it should
+ * read `same day`, and `PO-2049` + `PO-2042` read amber `same day` where the
+ * truth is red `1d late`. **A page that under-warns is worse than one that says
+ * nothing**, because silence is honest and a wrong colour is not.
+ *
+ * **TWO CALENDARS, NAMED** (Law 2A). Production is counted on the FACTORY's own
+ * week — Ohana works Saturday and Nice Future does not — and transit on the
+ * OFFICE week, because moving the goods is arranged by us. A caller that lets
+ * `working-days.ts` default is counting on `[0]`, the WAREHOUSE week, which
+ * nobody chose for this.
+ *
+ * **NULL IS A REAL ANSWER.** No production number, no transit number, or no
+ * start date → no arrival at all, never a guessed one. P1 deleted exactly that
+ * habit, and an arrival nobody chose is a date the register would then paint as
+ * a measurement.
+ *
+ * `fromIso` is the day the clock starts, and it is the CALLER's fact: `today`
+ * for a purchase order being born, `placed_at` for one already issued. Passing
+ * it in is what lets both callers share this function without either of them
+ * reading a clock inside it.
+ */
+export function expectedArrivalOf(
+  settings: Pick<PurchasingSettings, "productionDays" | "suppliers">,
+  args: {
+    supplierId: string | null | undefined;
+    category: string | null | undefined;
+    fromIso: string | null | undefined;
+    /** Malaysian public holidays. Omitted → the live Selangor set. */
+    holidays?: ReadonlySet<string>;
+  },
+): string | null {
+  const from = (args.fromIso ?? "").slice(0, 10);
+  if (from.length !== 10) return null;
+  const production = productionWorkingDaysFor(settings, args.supplierId, args.category);
+  const transit = transitDaysFor(settings, args.supplierId);
+  if (production == null || transit == null) return null;
+  const holidays = args.holidays ?? myHolidaySet();
+  const ready = addWorkingDays(from, production, {
+    offDays: workWeekOffDaysFor(settings, args.supplierId),
+    holidays,
+  });
+  return addWorkingDays(ready, transit, {
+    offDays: PURCHASING_OFFICE_OFF_DAYS,
+    holidays,
+  });
 }
 
 /**
