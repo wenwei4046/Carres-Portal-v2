@@ -1016,6 +1016,14 @@ export {
   type SupplierClaimMoveInput,
   type SupplierClaimMoveOwner,
   type SupplierClaimCloseProblem,
+  // Layer ③ · what are we doing for the CUSTOMER (Loo, 2026-08-05 · 0324)
+  CUSTOMER_RESOLUTIONS,
+  CUSTOMER_RESOLUTION_KEYS,
+  CUSTOMER_RESOLUTION_MEANING,
+  customerResolutionLabel,
+  customerResolutionMeaning,
+  isCustomerResolution,
+  type CustomerResolution,
 } from "./supplier-claim";
 
 // R6 · The warehouse files its own receiving — a queued call to R1's engine

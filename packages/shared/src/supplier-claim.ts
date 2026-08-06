@@ -277,6 +277,101 @@ export function responseNeedsNote(response: string | null | undefined): boolean 
   return response === "reject" || response === "other_agreement";
 }
 
+// ── Customer Resolution · what are we doing for the CUSTOMER? ────────────────
+//
+// Loo's claim model, ruled 2026-08-05 (docs/purchasing/MASTER.md §6). The claim
+// carries FOUR layers and they may never be collapsed:
+//
+//   Customer Problem → Supplier Response → Carres Resolution → Carres Execution
+//
+// This file already held two of them: the problem (`claim_type`) and the
+// supplier's answer (`supplier_response`). What was missing is the one decision
+// the CUSTOMER is waiting on, and it is a SECOND decision beside the item's
+// outcome (`STOCK_HOLD_OUTCOMES` in stock-hold.ts), never a replacement for it.
+//
+// **The test that keeps them apart is Loo's own: can both be true at the same
+// time?** The customer cancelled AND the mattress is destroyed. Under one list
+// the operator has to choose which truth to record — has to LIE. Under two,
+// both are recorded, which is why this is four options here and three there.
+//
+// ── What is deliberately NOT in this list, and why ──────────────────────────
+//   · `Return to Supplier` — it LOOPS BACK ("send it back and wait for their
+//     next word" resolves nothing for the customer). It is an EXECUTION move,
+//     and it is an Item Outcome, where it already lives.
+//   · `Write Off` — answers what happened to the ITEM. Item Outcome, likewise.
+//   · `Cancel Outstanding` — replaced by `No Replacement Required`. The rename
+//     changed what the option DOES: SC-1014 is 3 ordered / 3 received, so its
+//     outstanding is 0 and `Cancel Outstanding` could not have been pressed at
+//     all, while `No Replacement Required` is exactly the true answer there.
+//   · `Reject` · `Deliver Remaining` · `Replacement` · `Return and Replace` —
+//     every one of them is a SUPPLIER answer, not a Carres decision. They are
+//     `SUPPLIER_CLAIM_RESPONSES` above and they stay there.
+//   · `Refund` — **NOT built and NOT deleted.** Supplier credit note? cash?
+//     offset against future purchases? The business meaning is not frozen and
+//     nobody may guess it.
+//
+// ── And what this module must NOT do ────────────────────────────────────────
+// **Consequences are `f(Resolution, Execution)`, never `f(Resolution)`** (Loo's
+// law 5). Carres Execution — `Return to Supplier · Collect Defective Item ·
+// Replace First · Collect First · Exchange on Collection` — is frozen and NOT
+// built, so nothing here derives a Stock, Finance or Demand consequence. A
+// screen may only show what is true right now, and with Execution unknown,
+// none of those three is yet known at all.
+
+export type CustomerResolution =
+  | "replace"
+  | "repair"
+  | "accept_as_is"
+  | "no_replacement_required";
+
+export const CUSTOMER_RESOLUTIONS = [
+  { key: "replace", label: "Replace" },
+  { key: "repair", label: "Repair" },
+  { key: "accept_as_is", label: "Accept As-Is" },
+  { key: "no_replacement_required", label: "No Replacement Required" },
+] as const satisfies readonly CaseOption<CustomerResolution>[];
+
+export const CUSTOMER_RESOLUTION_KEYS = CUSTOMER_RESOLUTIONS.map((r) => r.key) as [
+  CustomerResolution,
+  ...CustomerResolution[],
+];
+
+export function customerResolutionLabel(key: string | null | undefined): string {
+  if (!key) return "—";
+  return CUSTOMER_RESOLUTIONS.find((r) => r.key === key)?.label ?? key;
+}
+
+export function isCustomerResolution(key: string | null | undefined): boolean {
+  return !!key && CUSTOMER_RESOLUTIONS.some((r) => r.key === key);
+}
+
+/**
+ * One line under the selected option, so a new hire can tell the four apart.
+ *
+ * **A DEFINITION, never a consequence.** Each line says what the option MEANS
+ * for the customer and stops there — it does not say what happens to stock, to
+ * money or to the outstanding quantity, because with Execution unbuilt none of
+ * those is known (law 5 above). The first two are Loo's own business laws 1 and
+ * 2, written out; the second two restate the option's own words, which is all
+ * they can honestly say until `Refund` and Execution are ruled.
+ *
+ * COPY-STANDARD, "The Claims decision words" — locked strings like any label.
+ */
+export const CUSTOMER_RESOLUTION_MEANING: Record<CustomerResolution, string> = {
+  replace: "The customer gets a NEW item.",
+  repair: "The SAME item is repaired and goes back to the SAME customer.",
+  accept_as_is: "The customer keeps this item as it is.",
+  no_replacement_required: "Nothing more goes to the customer for this item.",
+};
+
+export function customerResolutionMeaning(
+  key: string | null | undefined,
+): string | null {
+  return isCustomerResolution(key)
+    ? CUSTOMER_RESOLUTION_MEANING[key as CustomerResolution]
+    : null;
+}
+
 // ── Who owes the next move ───────────────────────────────────────────────────
 //
 // The card's test: "every open claim shows who owes the next move". It is
@@ -537,6 +632,11 @@ export interface SupplierClaimRow {
   responded_at: string | null;
   closed_at: string | null;
   close_note: string | null;
+  // Layer ③ — what we are doing for the CUSTOMER (0324). A SECOND decision
+  // beside the item's outcome, never a replacement for it.
+  customer_resolution: CustomerResolution | null;
+  customer_resolution_note: string | null;
+  customer_resolution_at: string | null;
 }
 
 /** The one-line sentence a claim row shows — "3 units · Damaged · MS01-K".

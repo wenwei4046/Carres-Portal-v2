@@ -502,36 +502,55 @@ what makes *"what we wanted vs what we got"* worth reading later. Close is refus
 and server-side, unless both sides are on file.
 
 ### WHAT IS ON SCREEN TODAY
-`OperationSupplierClaims.tsx` 854 lines + `SupplierClaimPanel.tsx` 504 lines ·
-route `/operation?tab=claims` · ***measured 2026-08-05: the panel was read END TO END, all 504
-lines.***
+`OperationSupplierClaims.tsx` 854 lines + `SupplierClaimPanel.tsx` 712 lines ·
+route `/operation?tab=claims` · ***measured 2026-08-06, after layer ③ shipped: both files read
+END TO END, and the four columns and one row were counted in production with SQL.***
 
 ```
 LEFT 200px   QUEUES    Confirm what happens next        ← the only queue tile
              SUPPLIER · PROBLEM
 CENTRE       kit DataTable, eight measured widths 150 · 111 · 181 · 154 · 147 · 194 · 368 · 134
              status picker Open / Closed / All — a STAGE, one is always on
+             ⚠ NO column was added for the resolution — the grid already totals 1481 in a
+               1022 container, and layer ③ is a decision you make in the panel, not a fact you
+               scan the list for
 RIGHT        NOTHING. There is no right panel on this tab.
 ```
 
-**The expanded row** — a 2-column grid, and the whole 504-line panel lives inside the kit
+**The expanded row** — a 2-column grid, and the whole 712-line panel lives inside the kit
 table's `expansion`:
 
 ```
-LEFT                                     RIGHT
-  Evidence          photos, or             What we asked      ask buttons → [ Send to {supplier} ]
-                    "No photo — a late                          or [ Save what we asked ] · [ Copy ]
-                     delivery has nothing                        once recorded → read-only prose
-                     to photograph."
-  The goods         "{n} unit on hold"     What {supplier} answered
-                    ○ Put back in stock      ○ Replacement · Deliver remaining · Repair ·
-                    ○ Returned to supplier     Return & replace · Reject · Other agreement
-                    ○ Write off              note REQUIRED for reject / other agreement
-                    note REQUIRED for        [ Save {supplier}'s answer ]
-                      write off
-                    [ Save what happened ]  Settle it          note (optional) · [ Close claim ]
-  Closed            date + close note
+LEFT                                       RIGHT
+  Evidence             photos, or            What we asked    ask buttons → [ Send to {supplier} ]
+                       "No photo — a late                       or [ Save what we asked ] · [ Copy ]
+                        delivery has nothing                     once recorded → read-only prose
+                        to photograph."
+  Customer Resolution  "What are we doing    What {supplier} answered
+   ← LAYER ③, LIVE       for the customer?"    ○ Replacement · Deliver remaining · Repair ·
+     2026-08-06        ○ Replace                 Return & replace · Reject · Other agreement
+                       ○ Repair               note REQUIRED for reject / other agreement
+                       ○ Accept As-Is         [ Save {supplier}'s answer ]
+                       ○ No Replacement Required
+                       one DEFINITION line under the pick
+                       note (optional) · [ Save what we are doing ] · Recorded {date}
+                       closed claim → read-only, or
+                       "Nothing recorded — this claim closed without one."
+  Item Outcome         "{n} unit on hold"    Settle it        note (optional) · [ Close claim ]
+   ← renamed from       "What happened to                      STILL gated on both sides and
+     `The goods`         this item?"                           NOTHING ELSE — layer ③ does not
+     2026-08-06        ○ Put back in stock                     gate the close
+                       ○ Returned to supplier
+                       ○ Write off
+                       note REQUIRED for write off
+                       [ Save what happened ]
+  Closed               date + close note
 ```
+
+**Each decision's buttons sit in a `role="group"` carrying its section's name.** The panel now
+holds two buttons reading `Replace` and two reading `Repair` — the supplier saying it and
+Carres deciding it are different facts about different parties — so the heading disambiguates
+them for a reader and the group's accessible name does the same for a screen reader.
 
 > **THE FACT MOST CHATS GET WRONG.** The item-outcome picker **already exists and Claims is its
 > only home**: `STOCK_HOLD_OUTCOMES` (`packages/shared/src/stock-hold.ts`) is imported by
@@ -541,12 +560,16 @@ LEFT                                     RIGHT
 
 ### API + DATA
 `GET /operation/supplier-claims` · `GET /:id/photos` · `POST /:id/request` · `/:id/response` ·
-`/:id/hold-resolve` · `/:id/close`
-`supplier_claims` — **28 columns, not one is money**; **1 live row**.
+`/:id/hold-resolve` · `/:id/close` · **`/:id/customer-resolution`** (0324)
+`supplier_claims` — **32 columns, not one is money**; **1 live row**. Migration **0324** added
+the four: `customer_resolution` · `_note` · `_at` · `_by`, all NULLable with no backfill.
 
 **`SC-1014`**, a full end-to-end test on 2026-08-05: `PO-2054 · JAGER-SS · damaged · qty 1 ·
 DO-P5-0001 · 1 photo`, reported → requested `replace` → responded `replacement` → closed, **all
-four timestamps present** — real data for a timeline to render against.
+four timestamps present** — real data for a timeline to render against. **It is CLOSED, so it
+carries no resolution and never can**, and its panel prints
+`Nothing recorded — this claim closed without one.` rather than a blank. Re-measured after
+0324: still 1 row, still all four timestamps, `customer_resolution` NULL.
 
 ### FROZEN RULES — the claim model, ruled by Loo 2026-08-05
 
@@ -560,12 +583,17 @@ Customer Problem → Supplier Response → Carres Resolution → Carres Executio
 **The test that keeps them apart:** *can both be true at the same time?* **If yes, they are two
 fields, not one list.**
 
-**TWO decisions, because they answer two different questions:**
+**TWO decisions, because they answer two different questions. BOTH ARE ON SCREEN (2026-08-06):**
 
-| | Asks | Options |
-|---|---|---|
-| **Customer Resolution** | what are we doing for the CUSTOMER? | `Replace` · `Repair` · `Accept As-Is` · `No Replacement Required` |
-| **Item Outcome** | what happened to THIS item? | `Put Back in Stock` · `Return to Supplier` · `Write Off` |
+| | Asks | Options | Stored |
+|---|---|---|---|
+| **Customer Resolution** | what are we doing for the CUSTOMER? | `Replace` · `Repair` · `Accept As-Is` · `No Replacement Required` | `supplier_claims.customer_resolution` (0324) |
+| **Item Outcome** | what happened to THIS item? | `Put Back in Stock` · `Return to Supplier` · `Write Off` | `ops_stock_items.status` via `ops_stock_resolve_hold` (0299) |
+
+**`Repair` is on BOTH the supplier's answer list and the resolution list, and that is not a
+collision.** The supplier saying *"we will repair it"* is their answer; Carres deciding the
+customer gets a repair is our decision. Different columns, allowed to disagree — preserving the
+disagreement is why the layers are kept apart at all.
 
 **The worked case, and it is why the split exists.** The customer cancelled AND the mattress is
 destroyed. Under one list the operator must choose which truth to record — **must lie**. Under
@@ -614,33 +642,62 @@ supplier-claim route at all** — it is a service case. **If that changes, the e
 refurbish door must be settled in the SAME change**, or the refurbish path hands a held unit
 back to the pool with no claim ever answered.
 
-### THE PANEL LOO FROZE, 2026-08-05
+### THE PANEL LOO FROZE, 2026-08-05 — three of six built, 2026-08-06
 
 ```
-The Item              what this claim is about        (today: `The goods`)
-Customer Resolution   what are we doing for the customer?     ← NEW, the whole V1 gap
-Item Outcome          what happened to this item?             ← EXISTS, rename only
-Evidence              photos
-Supplier Response     what did the supplier say?
-Decision Guide        live guidance under the selected option
+The Item              what this claim is about              NOT BUILT — it is the Workspace
+                                                            layer's un-collapsible header
+Customer Resolution   what are we doing for the customer?   ✅ LIVE 2026-08-06
+Item Outcome          what happened to this item?           ✅ LIVE — renamed from `The goods`
+Evidence              photos                                ✅ already there
+Supplier Response     what did the supplier say?            the screen says `What {supplier}
+                                                            answered` — see below
+Decision Guide        live guidance under the selected      PART built: one DEFINITION line per
+                      option                                option, and nothing more
 ```
 
-**Words still owed to `COPY-STANDARD.md`** — measured 2026-08-05, all zero today:
-`Customer Resolution` · `Item Outcome` · `The Item` · `Accept As-Is` · `No Replacement
-Required` · `Supplier Response` · `Next Action` · `Resolution` · `Typical examples` ·
-`What happens next` · `Refund`.
+**`Supplier Response` was NOT taken to screen, and that is a decision.** The live heading is
+`What {supplier} answered`, which NAMES THE PARTY — the thing COPY-STANDARD asks for everywhere
+else. Renaming it to the generic noun is a Workspace-layer call about section headings, not
+part of recording a resolution, so it waits for that card rather than being taken in passing.
 
-**Two collisions to settle before they reach a screen.** The dictionary already locked
-**`Case owner decision required`** (2026-07-27) for the state Loo spelt
-`Waiting Internal Resolution` — same meaning, one must die, and **the locked one has never
-appeared on any screen** (grep returns 0). And **`Return`** is a locked VERB meaning *a record
-goes back to the party that produced it*; `Return to Supplier` is about GOODS.
+**`Decision Guide` stops at a DEFINITION and may not grow into a consequence here.** Each
+option carries one line saying what it means for the customer (`The customer gets a NEW item.`
+— Loo's law 1, verbatim). **`What happens next` and `Typical examples` are NOT built**, because
+both would state a consequence, and consequences are `f(Resolution, Execution)` with Execution
+unbuilt. A guide that named stock, money or the outstanding quantity would be a guess wearing a
+screen's authority — law 5, applied.
+
+**The words are now IN `COPY-STANDARD.md`** (§ *The Claims decision words*, written 2026-08-06,
+attributed to Loo's ruling of 2026-08-05): `Customer Resolution` · `Item Outcome` · `The Item` ·
+`Accept As-Is` · `No Replacement Required` · `Supplier Response` · `Next Action`, the four
+definition lines, the two questions, the button and the closed-claim line. **`Refund` has a row
+that records it as NOT ruled**, so its absence cannot be read as an oversight.
+
+**Both collisions are settled, by law already in the dictionary — apply them, do not re-open:**
+
+1. Loo's `Waiting Internal Resolution` **loses** to the already-locked
+   `Case owner decision required` (2026-07-27). One meaning, one word, and the older lock is
+   what the rest of the portal's exception vocabulary is built around.
+2. **`Return` (the verb — a record goes back to whoever produced it) and `Return to Supplier`
+   (an Item Outcome about GOODS) BOTH STAND.** Two senses of one spelling, exactly as `Recovery`
+   is; neither is renamed to avoid the other. Recorded in COPY-STANDARD.
 
 ### APPROVED EVOLUTION
+- **NOTHING TELLS ANYONE TO PICK A RESOLUTION.** Layer ③ ships the decision and no prompt for
+  it: `claimNextMove` is untouched, so the queue tile, the `Next move` column and the row line
+  say exactly what they said before. **That is deliberate** — Loo's law 4 names the state
+  (`Supplier Response: Rejected` → a waiting state → `Next Action: Select Resolution`), and
+  `Next Action` is a REGION of the unbuilt Workspace layer; wiring it would silently re-word a
+  dictionary-locked queue from inside a panel card. **The next card on this tab should be that
+  wiring, and until it lands a resolution is found only by opening the row.** Reported, not
+  softened.
 - **The Workspace layer.** §12.7.5's two-tier split, the un-collapsible `PO · SKU · Supplier ·
-  DO` header, a Timeline off the four existing timestamps (**no migration**), the Consequences
-  region with its mapping, and the Owner. **⚠️ There is no right panel today** — `w-[400px]`
-  greps 0 in that page — so this CREATES the second tier rather than moving things between two.
+  DO` header (= `The Item`), a Timeline off the four existing timestamps (**no migration** —
+  and 0324 adds a fifth, `customer_resolution_at`), the Consequences region with its mapping,
+  the `Supplier Response` heading rename, and the Owner. **⚠️ There is no right panel today** —
+  `w-[400px]` greps 0 in that page — so this CREATES the second tier rather than moving things
+  between two.
 - **One claim, ONE outcome, and a button that splits it.** Loo ruled option A on AutoCount's own
   evidence (`Cancel Purchase Order` / `Goods Return` / `Purchase Return` are three documents and
   none holds two outcomes). Three binding conditions: **R5 counts problem PO LINES, never claim
@@ -649,6 +706,11 @@ goes back to the party that produced it*; `Return to Supplier` is about GOODS.
   BUTTON**, never *"go and open a second claim"* · **the A→B upgrade path is written down while
   it is free** (every claim becomes one child row: outcome copied, quantity equal to the whole).
   A claim with a NULL `po_line_id` is counted BY NAME, never dropped.
+- **The close does not ask for a resolution, and a claim can still close without one.** 0291's
+  gate is "both sides on file" and 0324 left it exactly there — a third condition is a NEW
+  business rule and layer ③ was not ruled to make one. If Loo wants a claim to be unclosable
+  until the customer's side is decided, that is one constraint and one sentence, and it is his
+  call, not engineering's.
 - **Item Outcome wired to the resolution** — pure WIRING: 0299 already ships
   `returned_to_supplier` · `written_off` · `back_to_stock`, and `Replace` is the receive engine.
   `Repaired` and `Disposed` are NOT built: 0299's guard admits exactly three destinations, so

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
+  CUSTOMER_RESOLUTION_KEYS,
   HELD_STOCK_STATUS,
   STOCK_HOLD_OUTCOME_KEYS,
   SUPPLIER_CLAIM_LATE,
@@ -34,12 +35,20 @@ import type { AppEnv } from "../../types";
  * reserved or delivered until somebody says what happened to it. The claim is
  * where that is said, because the claim is the thing that knows the answer.
  *
+ * Layer ③ adds the CUSTOMER (0324). `Customer Resolution` answers "what are we
+ * doing for the customer?" and is a SECOND decision beside the item's outcome,
+ * never a replacement for it — the customer can cancel AND the mattress be
+ * destroyed, and a single list would force the operator to record only one of
+ * the two. It derives no consequence: consequences are f(Resolution, Execution)
+ * and Carres Execution is frozen-but-unbuilt (Loo, 2026-08-05).
+ *
  *   GET  /                — the queue (status filter, names, who owes next)
  *   GET  /:id/photos      — signed URLs for that claim's evidence
  *   POST /:id/request     — what WE ask the supplier to do
  *   POST /:id/response    — what the SUPPLIER answered
  *   POST /:id/close       — settle it (refuses unless both sides are on file)
  *   POST /:id/hold-resolve — R4: what happened to the quarantined units
+ *   POST /:id/customer-resolution — layer ③: what we are doing for the customer
  *
  * Role: operation + principal, on every route. `supplier_claims` RLS admits
  * every internal role (principal/operation/finance/bd) for SELECT; this
@@ -85,7 +94,7 @@ supplierClaimsRouter.get("/", async (c) => {
   let q = sb
     .from("supplier_claims")
     .select(
-      "id, claim_no, po_id, po_line_id, supplier_id, sku, product_category, claim_type, qty, status, do_number, photos, note, reported_by, reported_at, requested_action, requested_at, supplier_response, supplier_response_note, responded_at, closed_at, close_note",
+      "id, claim_no, po_id, po_line_id, supplier_id, sku, product_category, claim_type, qty, status, do_number, photos, note, reported_by, reported_at, requested_action, requested_at, supplier_response, supplier_response_note, responded_at, closed_at, close_note, customer_resolution, customer_resolution_note, customer_resolution_at",
     )
     .order("reported_at", { ascending: false })
     .limit(DEFAULT_LIMIT);
@@ -398,6 +407,41 @@ supplierClaimsRouter.post("/:id/hold-resolve", async (c) => {
     p_outcome: parsed.data.outcome,
     p_note: note || null,
   });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data ?? {});
+});
+
+// ----- Layer ③ · what we are doing for the CUSTOMER -------------------------
+//
+// Beside the item's outcome, never instead of it. Loo's test (2026-08-05): can
+// both be true at the same time? The customer cancelled AND the mattress is
+// destroyed — so two fields, two doors, and this one touches no stock.
+//
+// Deliberately NOT gated on the supplier's answer: a customer who cancels does
+// not wait for the factory to reply. Re-recordable while the claim is open and
+// refused once closed — the RPC decides both, exactly as with the other moves.
+const customerResolutionSchema = z.object({
+  customer_resolution: z.enum(CUSTOMER_RESOLUTION_KEYS),
+  note: noteSchema,
+});
+
+supplierClaimsRouter.post("/:id/customer-resolution", async (c) => {
+  gate(c);
+  const parsed = await parseJsonBody(c, customerResolutionSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc(
+    "supplier_claim_record_customer_resolution",
+    {
+      p_claim_id: c.req.param("id"),
+      p_resolution: parsed.data.customer_resolution,
+      p_note: parsed.data.note ?? null,
+    },
+  );
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);

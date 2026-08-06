@@ -23,6 +23,7 @@ const requestMutate = vi.fn();
 const responseMutate = vi.fn();
 const closeMutate = vi.fn();
 const holdMutate = vi.fn();
+const resolutionMutate = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -40,6 +41,7 @@ vi.mock("@/lib/queries", async () => {
     useSupplierClaimResponseMutation: () => mutation(responseMutate),
     useSupplierClaimCloseMutation: () => mutation(closeMutate),
     useSupplierClaimHoldResolveMutation: () => mutation(holdMutate),
+    useSupplierClaimCustomerResolutionMutation: () => mutation(resolutionMutate),
   };
 });
 
@@ -79,6 +81,9 @@ function row(over: Partial<SupplierClaimListRow> = {}): SupplierClaimListRow {
     responded_at: null,
     closed_at: null,
     close_note: null,
+    customer_resolution: null,
+    customer_resolution_note: null,
+    customer_resolution_at: null,
     line_pending: null,
     held_units: 0,
     hold_reason: null,
@@ -123,6 +128,8 @@ beforeEach(() => {
   responseMutate.mockReset();
   closeMutate.mockReset();
   holdMutate.mockReset();
+  resolutionMutate.mockReset();
+  resolutionMutate.mockResolvedValue({});
   photosQuery.mockReturnValue({ data: { photos: [] }, isLoading: false, isError: false });
   suppliersQuery.mockReturnValue({
     data: {
@@ -290,6 +297,19 @@ describe("R3 — recording the two sides", () => {
     fireEvent.click(screen.getByTestId(`claim-open-${claim.claim_no}`));
   }
 
+  /**
+   * The ask chips, scoped to their own group.
+   *
+   * Layer ③ put a `Customer Resolution` picker on this same panel, and it
+   * legitimately carries a `Replace` and a `Repair` of its own — the supplier
+   * saying it and Carres deciding it are different facts about different
+   * parties. So a bare `getByRole("button", { name: "Replace" })` now finds
+   * two, correctly. Each decision's chips sit in a `role="group"` with the
+   * section's own name, which is how a screen reader tells them apart too.
+   */
+  const askChips = () => within(screen.getByTestId("claim-ask-options"));
+  const answerChips = () => within(screen.getByTestId("claim-answer-options"));
+
   it("offers Jess's five asks, sends the message and stamps what we asked", async () => {
     openPanel(DAMAGED);
     for (const label of [
@@ -299,14 +319,14 @@ describe("R3 — recording the two sides", () => {
       "Repair",
       "Return for inspection",
     ]) {
-      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+      expect(askChips().getByRole("button", { name: label })).toBeInTheDocument();
     }
     // Never the machine word for a late claim's ask.
     expect(
-      screen.queryByRole("button", { name: "Deliver remaining" }),
+      askChips().queryByRole("button", { name: "Deliver remaining" }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Replace" }));
+    fireEvent.click(askChips().getByRole("button", { name: "Replace" }));
     fireEvent.click(screen.getByTestId("claim-send-ask"));
     await waitFor(() =>
       expect(requestMutate).toHaveBeenCalledWith({
@@ -325,7 +345,7 @@ describe("R3 — recording the two sides", () => {
 
   it("the WhatsApp message leads with the supplier's OWN delivery note", () => {
     openPanel(DAMAGED);
-    fireEvent.click(screen.getByRole("button", { name: "Replace" }));
+    fireEvent.click(askChips().getByRole("button", { name: "Replace" }));
     expect(screen.getByText(/DO DO-5231 \(PO PO-2050\)/)).toBeInTheDocument();
     expect(screen.getByText(/Please \*replace\* for the 2 units\./)).toBeInTheDocument();
   });
@@ -335,7 +355,7 @@ describe("R3 — recording the two sides", () => {
       data: { suppliers: [{ id: "s1", name: "Ohana", whatsapp_group_url: null }] },
     });
     openPanel(DAMAGED);
-    fireEvent.click(screen.getByRole("button", { name: "Replace" }));
+    fireEvent.click(askChips().getByRole("button", { name: "Replace" }));
     expect(
       screen.getByText(/WhatsApp group is not saved\. Ask a manager to add it/),
     ).toBeInTheDocument();
@@ -365,7 +385,7 @@ describe("R3 — recording the two sides", () => {
   it("records the supplier's answer, and does NOT narrow it to what we asked", async () => {
     openPanel(row({ requested_action: "replace", requested_at: "2026-07-27T03:00:00Z" }));
     // They may answer anything — including something other than Replace.
-    fireEvent.click(screen.getByRole("button", { name: "Repair" }));
+    fireEvent.click(answerChips().getByRole("button", { name: "Repair" }));
     fireEvent.click(screen.getByTestId("claim-save-answer"));
     await waitFor(() =>
       expect(responseMutate).toHaveBeenCalledWith({
@@ -858,5 +878,191 @@ describe("OperationSupplierClaims — the goods (R4)", () => {
       }),
     );
     expect(screen.queryByTestId("hold-outcome-returned")).not.toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Layer ③ · Customer Resolution (Loo, 2026-08-05)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The panel answered three questions and never the one the CUSTOMER waits on.
+// The test that made it a second FIELD rather than four more options in an
+// existing list is Loo's own — can both be true at the same time? — and the
+// third test below is that sentence written as code.
+
+describe("Customer Resolution — the second decision", () => {
+  function openClaim(claim: SupplierClaimListRow) {
+    claimsQuery.mockReturnValue(
+      ok({ claims: [claim], counts: { open: 1, closed: 0, all: 1 } }),
+    );
+    render(wrap(<OperationSupplierClaims />));
+    fireEvent.click(screen.getByTestId(`claim-open-${claim.claim_no}`));
+  }
+
+  it("asks what we are doing for the customer, and offers Loo's four", () => {
+    openClaim(row());
+    const panel = screen.getByTestId("claim-customer-resolution");
+    expect(panel).toHaveTextContent("Customer Resolution");
+    expect(panel).toHaveTextContent("What are we doing for the customer?");
+    expect(screen.getByTestId("customer-resolution-replace")).toHaveTextContent(
+      "Replace",
+    );
+    expect(screen.getByTestId("customer-resolution-repair")).toHaveTextContent(
+      "Repair",
+    );
+    expect(screen.getByTestId("customer-resolution-accept_as_is")).toHaveTextContent(
+      "Accept As-Is",
+    );
+    expect(
+      screen.getByTestId("customer-resolution-no_replacement_required"),
+    ).toHaveTextContent("No Replacement Required");
+  });
+
+  it("offers no option that answers a different question", () => {
+    // Every one of these is named and removed in the MASTER: two are ITEM
+    // outcomes, the rest are the supplier's own answers, and `Refund` has no
+    // frozen business meaning.
+    openClaim(row({ held_units: 1, hold_reason: "damaged" }));
+    const panel = screen.getByTestId("claim-customer-resolution");
+    for (const gone of [
+      "Return to Supplier",
+      "Write Off",
+      "Cancel Outstanding",
+      "Reject",
+      "Deliver remaining",
+      "Return and Replace",
+      "Refund",
+    ]) {
+      expect(panel, gone).not.toHaveTextContent(gone);
+    }
+  });
+
+  it("BOTH decisions are on screen at once — the customer cancelled AND the item is destroyed", () => {
+    // The worked case that produced the split. Under one list the operator
+    // would have to choose which of the two truths to record.
+    openClaim(row({ held_units: 1, hold_reason: "damaged" }));
+    expect(screen.getByTestId("claim-customer-resolution")).toBeInTheDocument();
+    expect(screen.getByTestId("claim-held-stock")).toHaveTextContent("Item Outcome");
+
+    fireEvent.click(
+      screen.getByTestId("customer-resolution-no_replacement_required"),
+    );
+    fireEvent.click(screen.getByTestId("hold-outcome-written_off"));
+    // Neither picker cleared the other: both answers are still selected.
+    expect(
+      screen.getByTestId("customer-resolution-no_replacement_required"),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("hold-outcome-written_off")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("records the resolution, with its optional note", async () => {
+    openClaim(row());
+    fireEvent.click(screen.getByTestId("customer-resolution-repair"));
+    fireEvent.change(screen.getByTestId("customer-resolution-note"), {
+      target: { value: "Customer agreed to wait for the repair" },
+    });
+    fireEvent.click(screen.getByTestId("customer-resolution-save"));
+    await waitFor(() => expect(resolutionMutate).toHaveBeenCalled());
+    expect(resolutionMutate).toHaveBeenCalledWith({
+      claimId: "c1",
+      customer_resolution: "repair",
+      note: "Customer agreed to wait for the repair",
+    });
+  });
+
+  it("explains the selected option in one line, and names no consequence", () => {
+    openClaim(row());
+    fireEvent.click(screen.getByTestId("customer-resolution-replace"));
+    const guide = screen.getByTestId("customer-resolution-meaning");
+    expect(guide).toHaveTextContent("The customer gets a NEW item.");
+    // Consequences are f(Resolution, Execution) and Execution is unbuilt, so
+    // nothing here may claim what happens to stock or money.
+    expect(guide).not.toHaveTextContent(/stock|refund|credit|outstanding/i);
+  });
+
+  it("does NOT wait for the supplier — a customer who cancels does not wait for the factory", () => {
+    openClaim(row());
+    expect(screen.getByTestId("customer-resolution-replace")).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId("customer-resolution-replace"));
+    expect(screen.getByTestId("customer-resolution-save")).not.toBeDisabled();
+  });
+
+  it("has nothing to save until something changes", () => {
+    openClaim(
+      row({
+        customer_resolution: "replace",
+        customer_resolution_at: "2026-08-05T09:00:00Z",
+      }),
+    );
+    // The recorded answer is pre-selected and the button is dead: pressing it
+    // would write the same answer again.
+    expect(screen.getByTestId("customer-resolution-replace")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("customer-resolution-save")).toBeDisabled();
+    expect(screen.getByTestId("customer-resolution-recorded")).toHaveTextContent(
+      "Recorded",
+    );
+
+    // Loo's law 2: Carres may switch a repair to a replacement when the
+    // customer cannot wait, so an OPEN claim's resolution stays editable.
+    fireEvent.click(screen.getByTestId("customer-resolution-repair"));
+    expect(screen.getByTestId("customer-resolution-save")).not.toBeDisabled();
+  });
+
+  it("a closed claim shows what was decided, read-only", () => {
+    openClaim(
+      row({
+        status: "closed",
+        requested_action: "replace",
+        requested_at: "2026-08-05T08:22:00Z",
+        supplier_response: "replacement",
+        responded_at: "2026-08-05T08:23:00Z",
+        closed_at: "2026-08-05T08:23:48Z",
+        customer_resolution: "replace",
+        customer_resolution_note: "New unit promised for 12 Aug",
+        customer_resolution_at: "2026-08-05T08:23:00Z",
+      }),
+    );
+    const panel = screen.getByTestId("claim-customer-resolution");
+    expect(panel).toHaveTextContent("Replace");
+    expect(panel).toHaveTextContent("New unit promised for 12 Aug");
+    expect(screen.queryByTestId("customer-resolution-save")).not.toBeInTheDocument();
+  });
+
+  it("a claim closed without one states the fact rather than showing a blank", () => {
+    // SC-1014 in production is exactly this row: settled before the field
+    // existed. A blank would read as "nobody decided anything today".
+    openClaim(
+      row({
+        status: "closed",
+        requested_action: "replace",
+        requested_at: "2026-08-05T08:22:00Z",
+        supplier_response: "replacement",
+        responded_at: "2026-08-05T08:23:00Z",
+        closed_at: "2026-08-05T08:23:48Z",
+      }),
+    );
+    expect(screen.getByTestId("claim-customer-resolution")).toHaveTextContent(
+      "Nothing recorded — this claim closed without one.",
+    );
+  });
+
+  it("does not gate the close — the close still asks for both sides and nothing more", () => {
+    openClaim(
+      row({
+        requested_action: "replace",
+        requested_at: "2026-08-05T08:22:00Z",
+        supplier_response: "replacement",
+        responded_at: "2026-08-05T08:23:00Z",
+      }),
+    );
+    // No resolution on file, and `Close claim` is still offered.
+    expect(screen.queryByTestId("claim-close-blocked")).not.toBeInTheDocument();
+    expect(screen.getByTestId("claim-close")).not.toBeDisabled();
   });
 });

@@ -3525,6 +3525,12 @@ export interface SupplierClaimListRow {
   responded_at: string | null;
   closed_at: string | null;
   close_note: string | null;
+  /** Layer ③ (0324) — what we are doing for the CUSTOMER. A SECOND decision
+   *  beside the item's outcome, never a replacement for it: the customer can
+   *  cancel AND the item be destroyed, and both must be recordable. */
+  customer_resolution: string | null;
+  customer_resolution_note: string | null;
+  customer_resolution_at: string | null;
   /** Does the PO line still owe us units? Read for late claims only; null =
    *  could not tell (the line was deleted), which counts as still pending. */
   line_pending: boolean | null;
@@ -3599,6 +3605,8 @@ export interface SupplierClaimMoveResult {
   /** R4 — the hold resolution answers with what it moved. */
   outcome?: string;
   units?: number;
+  /** Layer ③ — what we are doing for the customer. */
+  customer_resolution?: string;
 }
 
 function useSupplierClaimMove<TInput>(
@@ -3642,6 +3650,33 @@ export function useSupplierClaimRequestMutation(
 ) {
   return useSupplierClaimMove<{ requested_action: string; note?: string }>(
     (id) => `/api/operation/supplier-claims/${id}/request`,
+    opts,
+  );
+}
+
+/**
+ * Layer ③ — what we are doing for the CUSTOMER (0324).
+ *
+ * A SECOND decision beside the item's outcome, never a replacement for it, and
+ * NOT gated on the supplier's answer: a customer who cancels does not wait for
+ * the factory to reply. The server allows re-recording while the claim is open
+ * (Carres may switch a repair to a replacement when the customer cannot wait)
+ * and refuses it once the claim is closed.
+ *
+ * It moves no stock, so unlike the hold resolution it invalidates nothing but
+ * the claim list.
+ */
+export function useSupplierClaimCustomerResolutionMutation(
+  opts?: Partial<
+    UseMutationOptions<
+      SupplierClaimMoveResult,
+      ApiError,
+      { claimId: string; customer_resolution: string; note?: string }
+    >
+  >,
+) {
+  return useSupplierClaimMove<{ customer_resolution: string; note?: string }>(
+    (id) => `/api/operation/supplier-claims/${id}/customer-resolution`,
     opts,
   );
 }

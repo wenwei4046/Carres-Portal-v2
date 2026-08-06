@@ -246,7 +246,7 @@ transcript.**
 | | |
 |---|---|
 | **Phase** | 10 — post-launch, per-module architecture |
-| **Purchasing** | six tabs live. Claims is the active lane: the claim model was frozen 2026-08-05 (two decisions — Customer Resolution and Item Outcome) and the Workspace layer is unbuilt |
+| **Purchasing** | six tabs live. Claims is the active lane: the claim model was frozen 2026-08-05 (two decisions — Customer Resolution and Item Outcome), **Customer Resolution shipped 2026-08-06 (0324)**, and the Workspace layer — including the `Next Action` region that would tell anyone to pick one — is still unbuilt |
 | **Documentation** | converted to Constitution + one MASTER per module on 2026-08-05. **Purchasing only.** |
 | **Production** | web + api live on Cloudflare; Supabase `kfprgpjpaffedghytstl`. Bundle hashes, the migration tail and test baselines live in [`docs/ENGINEERING.md`](docs/ENGINEERING.md) — **read them from there, never from memory, and re-measure with `wrangler` before quoting.** |
 | **Open risks** | [`docs/carry-forwards.md`](docs/carry-forwards.md). Two passwords still on `111` (principal + 9 alpha users) — rotate before any external sharing. |
