@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import {
-  addWorkingDays,
   buildToOrder,
   DEMAND_PURPOSE_DEFAULT,
   DEMAND_PURPOSE_VALUES,
+  expectedArrivalOf,
   isToOrderCategory,
   myHolidaySet,
   planFromDocuments,
@@ -14,7 +14,6 @@ import {
   readyStockRef,
   stockMatchKey,
   toOrderBuilds,
-  transitDaysFor,
   railItemLabel,
   workWeekOffDaysFor,
   type DemandPickItem,
@@ -1099,9 +1098,23 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
    *                    + transit working days     (on the OFFICE week — moving
    *                                                goods is arranged by us)
    *
+   * **THE ARITHMETIC ITSELF LIVES IN `expectedArrivalOf` AND NOWHERE ELSE**
+   * (Loo, 2026-08-05). It was written a second time on the register, without
+   * the transit leg, and the register therefore under-warned by exactly the day
+   * it forgot on three live rows. This call and the register's now read the
+   * same function; only `fromIso` differs, because a PO being born starts its
+   * clock today and one already issued starts it at `placed_at`.
+   *
    * It is stamped ONCE and then frozen: §2 — "a PO already sent is never
    * re-computed", because its dates were true when it was sent and moving them
    * would rewrite a promise the supplier already made.
+   *
+   * **AND IT IS OUR ESTIMATE, WHICH THE REGISTER NOW SAYS OUT LOUD.** Stamping
+   * it here is deliberate and stays: 0306 refuses to open the tomorrow call on
+   * a NULL arrival, so removing the stamp would take a shipped supplier call
+   * dark. What was wrong was downstream — the register read *"a date exists"*
+   * as *"the factory promised"*. Provenance now comes from
+   * `po_supplier_promises`, so this stamp can be honest without being silent.
    *
    * `expected_ready_date` is deliberately NOT written here. That column is the
    * factory's PROMISE and R5 grades the factory by it; seeding it with our own
@@ -1112,18 +1125,11 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
    * one (P1's law), and the purchase order is still raised — the goods matter
    * more than the estimate, and the gap is visible as an empty arrival.
    */
-  const settings = res.data.settings;
-  const transit = transitDaysFor(settings, supplierId);
-  const production = productionWorkingDaysFor(settings, supplierId, category);
-  let etaDate: string | null = null;
-  if (transit != null && production != null) {
-    const holidays = myHolidaySet();
-    const ready = addWorkingDays(todayIso(), production, {
-      offDays: workWeekOffDaysFor(settings, supplierId),
-      holidays,
-    });
-    etaDate = addWorkingDays(ready, transit, { offDays: [0, 6], holidays });
-  }
+  const etaDate = expectedArrivalOf(res.data.settings, {
+    supplierId,
+    category,
+    fromIso: todayIso(),
+  });
 
   // Where the goods go, in ONE statement over every document the batch made. A
   // fresh purchase order has received nothing, so the destination guard permits

@@ -12,8 +12,8 @@ import {
   poCurrentActionOf,
   poOverdueDays,
   poWorkStateOf,
+  type PoWorkspacePo,
 } from "./po-workspace";
-import type { SupplierCallPo } from "./purchasing-supplier-calls";
 
 /**
  * The Supplier Workspace's ONE action source (Jess, 2026-08-02).
@@ -26,12 +26,19 @@ const TODAY = "2026-08-05"; // a Wednesday
 import { PO_WORK_STATE_LABEL } from "./po-workspace";
 const PO_WORK_STATE_LABEL_NEED = PO_WORK_STATE_LABEL.need_confirmation;
 
-function po(over: Partial<SupplierCallPo> = {}): SupplierCallPo {
+/**
+ * The default PO is the one that BROKE (Loo, 2026-08-05): it carries an
+ * `etaDateIso` — our own estimate, stamped at birth since 2026-08-03 — and no
+ * supplier answer at all. Under the old null test it read `Waiting for Goods`;
+ * every test below stands on the two fields being independent.
+ */
+function po(over: Partial<PoWorkspacePo> = {}): PoWorkspacePo {
   return {
     poId: "PO-1",
     supplierId: "sup-1",
     status: "open",
     etaDateIso: null,
+    supplierArrivalDateIso: null,
     tomorrowAnswerAboutDateIso: null,
     lines: [
       {
@@ -47,6 +54,12 @@ function po(over: Partial<SupplierCallPo> = {}): SupplierCallPo {
   };
 }
 
+/** A supplier who NAMED the date. 0306 moves `eta_date` with every answer, so
+ *  the two fields agree the moment a factory has spoken. */
+function answered(date: string, over: Partial<PoWorkspacePo> = {}): PoWorkspacePo {
+  return po({ etaDateIso: date, supplierArrivalDateIso: date, ...over });
+}
+
 describe("poWorkStateOf — the SUPPLIER PROGRESS vocabulary", () => {
   it("no supplier date → Waiting Supplier Date", () => {
     expect(poWorkStateOf(po(), TODAY)).toBe("need_confirmation");
@@ -54,30 +67,60 @@ describe("poWorkStateOf — the SUPPLIER PROGRESS vocabulary", () => {
   });
 
   it("a future supplier date → Waiting for Goods", () => {
-    expect(poWorkStateOf(po({ etaDateIso: "2026-09-01" }), TODAY)).toBe("waiting");
+    expect(poWorkStateOf(answered("2026-09-01"), TODAY)).toBe("waiting");
+  });
+
+  /**
+   * THE DEFECT THIS FIELD EXISTS FOR (Loo, 2026-08-05). Five live POs —
+   * `PO-2050`..`2054` — carried an arrival date with ZERO supplier answers
+   * behind it, and the page counted every one of them in `Waiting for Goods`.
+   * Waiting for goods means a factory named a day; our own arithmetic naming
+   * one leaves the PO exactly where it was.
+   */
+  it("OUR OWN ESTIMATE IS NOT A PROMISE — a stamped eta with no answer still waits for the supplier", () => {
+    const estimateOnly = po({ etaDateIso: "2026-09-01" });
+    expect(poWorkStateOf(estimateOnly, TODAY)).toBe("need_confirmation");
+    // …and it is the SAME state as a PO with no date at all, so a new purchase
+    // order can still be found in the queue that asks the factory the question.
+    expect(poWorkStateOf(po(), TODAY)).toBe("need_confirmation");
+  });
+
+  it("a ready date is fact ① and is never provenance for the arrival", () => {
+    // `PO-2052`: the factory really did say it would be FINISHED on 12 Aug, and
+    // the arrival beside it is still our own 14 Aug. The ready date reaches
+    // `expected_ready_date` and its own promise run — never this field.
+    const po2052 = po({ etaDateIso: "2026-08-14", supplierArrivalDateIso: null });
+    expect(poWorkStateOf(po2052, TODAY)).toBe("need_confirmation");
   });
 
   it("READY means goods ARRIVED — a date merely passing is NOT arrival", () => {
     // Jess's state machine (2026-08-02): the day passing without goods is
     // OVERDUE, a sub-state of waiting — never Ready.
-    expect(poWorkStateOf(po({ etaDateIso: "2026-08-01" }), TODAY)).toBe("waiting");
-    const partial = po({ etaDateIso: "2026-09-01" });
+    expect(poWorkStateOf(answered("2026-08-01"), TODAY)).toBe("waiting");
+    const partial = answered("2026-09-01");
     partial.lines[0].receivedQty = 1;
     expect(poWorkStateOf(partial, TODAY)).toBe("ready");
   });
 
   it("poOverdueDays counts only a PASSED date with nothing arrived", () => {
-    expect(poOverdueDays(po({ etaDateIso: "2026-08-01" }), TODAY)).toBe(4);
-    expect(poOverdueDays(po({ etaDateIso: TODAY }), TODAY)).toBeNull();
-    expect(poOverdueDays(po({ etaDateIso: "2026-09-01" }), TODAY)).toBeNull();
+    expect(poOverdueDays(answered("2026-08-01"), TODAY)).toBe(4);
+    expect(poOverdueDays(answered(TODAY), TODAY)).toBeNull();
+    expect(poOverdueDays(answered("2026-09-01"), TODAY)).toBeNull();
     expect(poOverdueDays(po(), TODAY)).toBeNull();
-    const arrived = po({ etaDateIso: "2026-08-01" });
+    const arrived = answered("2026-08-01");
     arrived.lines[0].receivedQty = 2;
     expect(poOverdueDays(arrived, TODAY)).toBeNull();
   });
 
+  it("a promise can be broken; OUR OWN GUESS CANNOT — no Overdue on an estimate", () => {
+    // `⚠ Overdue by 4 days` against a number nobody agreed to accuses the
+    // factory of missing a date it was never told. The PO is
+    // `need_confirmation`, whose Current Action is the identical job.
+    expect(poOverdueDays(po({ etaDateIso: "2026-08-01" }), TODAY)).toBeNull();
+  });
+
   it("everything received → Completed; cancelled stays its own bucket", () => {
-    const done = po({ etaDateIso: "2026-08-01" });
+    const done = answered("2026-08-01");
     done.lines[0].receivedQty = 2;
     expect(poWorkStateOf(done, TODAY)).toBe("completed");
     expect(poWorkStateOf(po({ status: "cancelled" }), TODAY)).toBe("cancelled");
@@ -99,16 +142,30 @@ describe("poCurrentActionOf — ONE action, engine first", () => {
     // its real home (the rail's `PO_WORK_STATE_LABEL`) and this returns null,
     // which the register prints as `—`.
     expect(
-      poCurrentActionOf(po({ etaDateIso: "2026-09-01" }), { todayIso: TODAY }),
+      poCurrentActionOf(answered("2026-09-01"), { todayIso: TODAY }),
     ).toBeNull();
     expect(PO_WORK_STATE_LABEL.waiting).toBe("Waiting for Goods");
+  });
+
+  it("an ESTIMATE-only PO is not quiet — it asks the factory the question", () => {
+    // The same far-off date with nobody's word behind it. Before provenance
+    // this printed `—`, and `PO-2050`..`2054` sat on the register saying the
+    // operator had nothing to do while the factory had never been asked.
+    const a = poCurrentActionOf(po({ etaDateIso: "2026-09-01" }), {
+      todayIso: TODAY,
+    });
+    expect(a).toEqual({
+      kind: "state",
+      key: "need_confirmation",
+      word: PO_STATE_ACTION_WORD.need_confirmation,
+    });
   });
 
   it("ready carries NO action — navigation is not work (§12.3)", () => {
     // Quiet-ready: goods partially in AND the balance answer still names the
     // current received qty (call closed). An unanswered shortfall keeps the
     // BALANCE call open and outranks the silence — Law 7 working.
-    const ready = po({ etaDateIso: "2026-09-01" });
+    const ready = answered("2026-09-01");
     ready.lines[0].receivedQty = 1;
     ready.lines[0].balanceAnswerAboutQty = 1;
     expect(poCurrentActionOf(ready, { todayIso: TODAY })).toBeNull();
@@ -119,7 +176,7 @@ describe("poCurrentActionOf — ONE action, engine first", () => {
     // and the job is the one the column already names. It still outranks the
     // engine's late call, exactly as it did when the word was the retired
     // `Contact Supplier` — the PRECEDENCE did not move, only the word.
-    const a = poCurrentActionOf(po({ etaDateIso: "2026-08-01" }), {
+    const a = poCurrentActionOf(answered("2026-08-01"), {
       todayIso: TODAY,
     });
     expect(a).toEqual({
@@ -137,14 +194,27 @@ describe("poCurrentActionOf — ONE action, engine first", () => {
   it("LAW 7 — the engine's open call BEATS the quiet state word", () => {
     // Arriving tomorrow → the tomorrow's-delivery call is open; the header
     // must carry the CALL, never the quieter Waiting for Goods.
-    const a = poCurrentActionOf(po({ etaDateIso: "2026-08-06" }), {
-      todayIso: TODAY,
-    });
+    const a = poCurrentActionOf(answered("2026-08-06"), { todayIso: TODAY });
     expect(a?.kind).toBe("call");
   });
 
+  /**
+   * **THE CALL IS NOT GATED ON PROVENANCE, DELIBERATELY** (Loo, 2026-08-05:
+   * *"do NOT gate the tomorrow call on provenance"*). Firing on our own
+   * estimate is exactly the phone call that GETS the first real date — silence
+   * it and the PO with no supplier word would also have no way to acquire one.
+   * This is why the provenance field lives on `PoWorkspacePo` and not on
+   * `SupplierCallPo`: the engine structurally cannot read it.
+   */
+  it("the tomorrow call fires on OUR OWN estimate — that call is how the real date arrives", () => {
+    const estimateOnly = po({ etaDateIso: "2026-08-06" });
+    const a = poCurrentActionOf(estimateOnly, { todayIso: TODAY });
+    expect(a?.kind).toBe("call");
+    expect(a?.kind === "call" && a.call.key).toBe("confirm_tomorrows_delivery");
+  });
+
   it("completed and cancelled carry no hero — the work is over", () => {
-    const done = po({ etaDateIso: "2026-08-01" });
+    const done = answered("2026-08-01");
     done.lines[0].receivedQty = 2;
     expect(poCurrentActionOf(done, { todayIso: TODAY })).toBeNull();
     expect(

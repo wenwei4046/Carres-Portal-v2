@@ -51,7 +51,7 @@ Create Purchase ─▶ To Order ─▶ Purchase Orders ─▶ Receiving ─▶ C
 **Before you change any tab, answer both:** does what upstream sends still get in, and can
 downstream still catch it?
 
-**Live scale, measured 2026-08-05.** Every row is TEST data — at go-live the database starts
+**Live scale, measured 2026-08-06.** Every row is TEST data — at go-live the database starts
 clean. These numbers are evidence about whether CODE WORKS, never about business volume.
 
 ```
@@ -60,6 +60,9 @@ purchase_order_lines 38   units ordered     47
 received / damaged / wrong    4 / 1 / 0
 warehouse_receipts 3      receiving_events   3      supplier_claims 1     units on_hold 0
 suppliers 10  —  5 have no WhatsApp group, 0 of 10 have a phone
+
+po_supplier_promises 6  —  4 arrivals across 3 POs · 1 ready date · 1 balance
+                           SIX POs hold an arrival date; only THREE were given one.
 ```
 
 ---
@@ -83,7 +86,8 @@ Orders and Report all run it. To Order runs the same shell with a launcher rail.
 | action words (queue · line · button · done · empty) | `packages/shared/src/order-action-words.ts` — `PurchasingActionKey`, six keys |
 | the supplier calls and their due dates | `packages/shared/src/purchasing-supplier-calls.ts` |
 | the receiving ladder (4 rungs; the ORDER is the rule) | `packages/shared/src/po-receiving.ts` |
-| PO risk order | `comparePoRisk`, `packages/shared/src/po-workspace.ts` |
+| PO risk order · work state · **who said the arrival date** | `comparePoRisk` · `poWorkStateOf` · `PoWorkspacePo.supplierArrivalDateIso`, `packages/shared/src/po-workspace.ts` |
+| **when the goods reach us — the ONE arithmetic** | `expectedArrivalOf`, `packages/shared/src/purchasing-settings.ts`. Production on the FACTORY's week + transit on the OFFICE week. **Both the issue path and the register call it; a third spelling is the defect it was extracted to end.** |
 | claim lifecycle, asks, answers, close gates | `packages/shared/src/supplier-claim.ts` |
 | quarantine outcomes + status mapping | `packages/shared/src/stock-hold.ts` |
 | the engine's numbers | `packages/shared/src/purchasing-settings.ts` + `purchasing_settings` |
@@ -224,6 +228,13 @@ Confirm balance delivery date   per PO LINE, after a short delivery
 **Every promise is kept, never overwritten** — `po_supplier_promises` is append-only and each
 row names what it was made ABOUT, so a factory that slips again re-opens the call by itself.
 
+**AND IT IS THE PROVENANCE OF THE ARRIVAL DATE** (Loo, 2026-08-05; built). `purchase_orders`
+holds ONE arrival date and it may have come from either of two mouths — the factory's, or our
+own arithmetic at issue time. **The ledger is what tells them apart**: an arrival is the
+supplier's word only while a `tomorrow_delivery` promise stands behind it. A `ready_date`
+promise is fact ① and never counts, because *"finished on the 12th"* is not *"with you on the
+14th"*. Read once, through `poDateHistoryOf(...).currentDate`.
+
 > **⚠️ ONLY TWO OF THE THREE ARE ACTUALLY ASKED.** Measured 2026-08-05:
 > `purchasingSupplierCallsOf` (`packages/shared/src/purchasing-supplier-calls.ts:55`) has
 > exactly two keys — `confirm_tomorrows_delivery` · `confirm_balance_delivery_date`.
@@ -236,12 +247,18 @@ row names what it was made ABOUT, so a factory that slips again re-opens the cal
 > APPROVED EVOLUTION below; nothing about it is undecided.
 
 ### WHAT IS ON SCREEN TODAY
-`OperationPurchaseOrders.tsx`, 3,167 lines · route `/operation/procurement` · *measured
-2026-08-05 from its docblock and its 44 named controls; not read line by line.*
+`OperationPurchaseOrders.tsx`, 3,207 lines · route `/operation/procurement` · *measured
+2026-08-06 from its docblock and its 44 named controls; the arrival/provenance path read line
+by line.*
 
 ```
 LEFT 200px   CALLS        Overdue · Today · Tomorrow
-             WORK STATUS  Need Supplier Confirmation · Waiting Goods · Ready to Receive · Completed
+             WORK STATUS  the RAIL's own words, and they are not the tile names an
+                          earlier draft of this file carried:
+                          Waiting Supplier Date · Waiting for Goods · Ready to Receive ·
+                          Completed · Cancelled            (PO_WORK_STATE_LABEL)
+                          Live 2026-08-06: 19 · 3 · 0 · 2 · 0 — and before provenance
+                          shipped it read 16 · 6, because three POs wore our own estimate
 
 CENTRE       NINE frozen columns, ONE fixed set:
              PO Issued · Supplier · PO No. · SO No. · Items · Destination ·
@@ -269,6 +286,10 @@ RIGHT 400px  WORKING HEADER → REFERENCE LAYER → SUPPLIER FOLLOW-UP →
 Tables: `purchase_orders` **24** · `purchase_order_lines` **38** · `po_history` **23** ·
 `po_sends` **3** · `po_revisions` **2** · `po_supplier_promises` **6**
 
+**`GET /operation/pos` already ships every promise per PO** (`promises`, read since 0310 for the
+date history), which is why provenance needed **no migration and no new wire field** — the
+answer was already on the page, unread.
+
 ### FROZEN RULES
 - **The nine columns NEVER change because the panel opened.** No compact variant. When they do
   not fit, the LISTING REGION scrolls sideways — deleting a business column to avoid a
@@ -284,49 +305,27 @@ Tables: `purchase_orders` **24** · `purchase_order_lines` **38** · `po_history
   moves no status, mints no revision and has no limit.
 - **Communication is not part of the PO lifecycle** — never a status, never a stage.
 - **Row order is risk to the customer's promise**, and clearing a header sort returns to it.
-- **Red is reserved for a date the factory GAVE.** Our own estimate warns amber. **⚠️ The code
-  can no longer tell the two apart — see APPROVED EVOLUTION. The rule stands; its test is
-  broken.**
+- **Red is reserved for a date the factory GAVE.** Our own estimate warns amber, greys the
+  date, prints `· expected` on the expand, and makes the supplier draft ASK for a date instead
+  of quoting ours back at them. **Provenance is the promise ledger, never a null test on
+  `eta_date`** — that test broke on 2026-08-03 and was repaired 2026-08-06. `same day` stays
+  amber either way: tight is not broken.
+- **A promise can be broken; our own guess cannot.** `Overdue` counts only against a date the
+  supplier named. A PO whose estimate has run out is `Waiting Supplier Date`, and its Current
+  Action is already the identical phone call.
+- **THE RAIL MOVES WITH PROVENANCE — LET IT** (Loo, 2026-08-06). He was shown the alternative
+  — grey the date and freeze the counts — and rejected it: *a quiet queue that says goods are
+  coming about a factory nobody has phoned is the same lie one level up.* **A louder queue
+  whose number is true beats a calm one whose number is not.** Measured on the day it shipped,
+  `Waiting Supplier Date` 16 → 19 and `Waiting for Goods` 6 → 3. *(His ruling quoted 16 → 21
+  and 8 → 3, counted before `PO-2052` and `PO-2054` were received; the rule is what binds, not
+  the two POs that finished in between.)*
+- **The expected arrival has ONE arithmetic** — `expectedArrivalOf`: production on the
+  FACTORY's week, transit on the OFFICE week. The register spelt it a second time without the
+  transit leg and under-warned by exactly the day it forgot.
 - **One editing surface per fact.** The expand is the working area; the right panel is Activity.
 
 ### APPROVED EVOLUTION
-- **The page must stop calling our own arithmetic a supplier's word** (Loo, 2026-08-05).
-  Provenance is decided by a NULL TEST — `OperationPurchaseOrders.tsx:519`,
-  `if (po.eta_date) { confirmed: true }`. That was correct until **2026-08-03**, when commit
-  `1ddfce7e` *"a purchase order is born with its expected arrival"* made the To Order issue
-  path stamp **our own estimate** into `eta_date`. A null test can no longer tell a promise
-  from a guess. **Measured on production 2026-08-05: FIVE POs carry an arrival date with ZERO
-  supplier answers behind it** — `PO-2050` · `2051` · `2052` · `2053` · `2054`, and it was two
-  that morning; the arithmetic reproduces exactly (`issued + production on the supplier's week
-  + transit on the office week`). Each renders **black, no tooltip**, `Current Action` `—`, and
-  is counted in `Waiting Goods` — four signals saying the factory has spoken when nobody has
-  asked it anything. **`PO-2052` is the sharpest: it holds a REAL ready date (12 Aug) beside a
-  self-computed arrival (14 Aug), both in black.** **It grows and it eats a rule that shipped
-  the day before**: every PO born from 3 Aug carries a date, so `Need Supplier Confirmation`
-  becomes unreachable for new purchase orders. **Fix, and no migration is needed:**
-  `po_supplier_promises` is append-only and already holds every arrival a supplier has ever
-  given (`kind='tomorrow_delivery'`; a `ready_date` row is fact ① and must NOT count), and
-  `pos.ts:163` already reads it — so `confirmed` becomes *"is there a recorded supplier
-  answer"*, and `poWorkStateOf` reads provenance rather than the raw date. **Do NOT stop the
-  issue path stamping `eta_date`** — 0306 refuses to open on a NULL arrival and a shipped
-  supplier call would go dark — and **do NOT gate the tomorrow call on provenance**: firing on
-  our own estimate is exactly the phone call that gets the first real date, and the RPC's
-  `v_first` branch was built for it.
-  **The rail moves with it, and Loo ruled it 2026-08-06: LET THEM MOVE.** Reading provenance
-  turns those five into `Need Supplier Confirmation`, so the counts go
-  `16 → 21` and `Waiting Goods 8 → 3`. He was shown the alternative — grey the date and freeze
-  the rail — and rejected it: a quiet queue that says *goods are coming* about a factory nobody
-  has phoned is the same lie one level up. **A louder queue whose number is true beats a calm
-  one whose number is not.**
-- **ONE arithmetic for the expected arrival, not two.** `to-order.ts:1116-1124` computes
-  `production` on the FACTORY's week then `transit` on the OFFICE week (Law 2A);
-  `OperationPurchaseOrders.tsx:533` computes `placed_at + production` and **never adds
-  transit**. Both live suppliers carry `transit_days = 1`. Recomputed over the 16 dateless POs
-  (Malaysian public holidays checked — none between 1 and 19 Aug 2026) **the missing day bites
-  three rows**: `PO-2036` is silent where it should read `same day`; `PO-2049` and `PO-2042`
-  read amber `same day` where the truth is red `1d late`. **One page under-warns by exactly the
-  day it forgot.** Extract one exported function and make both callers use it — a second copy
-  is the disease this repository keeps paying for.
 - **`Confirm ready date` needs the queue to go with its door** (Loo, 2026-08-05 — see the
   ⚠️ under WORKFLOW). A third key in `purchasingSupplierCallsOf` on the same rules as the two
   beside it: **no anchor, no call**, and an answer closes it only while it still names the
@@ -337,7 +336,9 @@ Tables: `purchase_orders` **24** · `purchase_order_lines` **38** · `po_history
   one. **A supplier × category with no production number gets NO due rather than a default:
   P1 deleted exactly that habit.**
 - **A ready date the factory gives MOVES the expected arrival — and never overwrites it**
-  (Loo, 2026-08-06). Today it does not, and `PO-2052` is the cost: the factory's real
+  (Loo, 2026-08-06). **The arithmetic it needs already exists**: `expectedArrivalOf`'s transit
+  leg is the same office-week count, so this card writes a call, not a calendar. Today it does
+  not, and `PO-2052` is the cost: the factory's real
   `Ready Date` of 12 Aug sits beside a self-computed `Expected Arrival` of 14 Aug, when
   12 Aug + Ohana's 1 transit day is 13 Aug. **The rule: recording a ready date writes a new
   expected arrival of `ready date + transit working days on the OFFICE week` (Law 2A), and the

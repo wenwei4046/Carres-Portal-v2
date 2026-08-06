@@ -161,6 +161,11 @@ const POS = [
   {
     // The date PASSED and nothing arrived → Overdue, which since Q8 carries
     // the same action as a dateless PO: `Check Expected Arrival`.
+    //
+    // **THE PROMISE IS WHAT MAKES IT OVERDUE** (Loo, 2026-08-05). Overdue means
+    // a factory missed a day IT named; our own estimate running out is not a
+    // broken promise, so this PO must carry the supplier's answer or it is
+    // simply a PO nobody has phoned yet.
     id: "PO-9004",
     supplier_id: OHANA,
     warehouse_id: WH,
@@ -173,6 +178,17 @@ const POS = [
     customer_delivery: null,
     eta_revised: false,
     orders: [],
+    promises: [
+      {
+        kind: "tomorrow_delivery",
+        answer: "shipping",
+        about_date: "2026-01-20",
+        previous_date: null,
+        new_date: null,
+        reason: null,
+        recorded_at: "2026-01-12T02:00:00Z",
+      },
+    ],
     purchase_order_lines: [line("d1", "SKU-CODY-Q", 1, "Cody", "Queen")],
   },
   {
@@ -312,11 +328,18 @@ const CATALOG = {
   skus: [{ sku: "SKU-JAGER-K", modelId: "m-jager", variant: null }],
   models: [{ id: "m-jager", name: "Jager", category: "bedframe" }],
 };
+/**
+ * **`transitDays` is not decoration** — it is the leg the register used to
+ * forget (Loo, 2026-08-05). `expectedArrivalOf` counts production on the
+ * FACTORY's week and transit on the OFFICE week, and a supplier with no
+ * transit number gets no arrival at all, so a fixture missing it would take
+ * PO-9007's estimate away entirely and quietly delete the estimate case.
+ */
 const PURCHASING_SETTINGS = {
   productionDays: [
     { supplierId: OHANA, category: "bedframe", workingDays: 7 },
   ],
-  suppliers: [{ id: OHANA, offDays: [0] }],
+  suppliers: [{ id: OHANA, offDays: [0], transitDays: 1 }],
 };
 
 /**
@@ -1098,6 +1121,197 @@ describe("the gap's tone says WHO gave the date", () => {
     expect(work2.getAllByTestId("po-arrival-gap")[0].getAttribute("data-tone")).toBe(
       "estimate",
     );
+  });
+});
+
+/**
+ * THE PAGE STOPS CALLING OUR OWN ARITHMETIC A SUPPLIER'S WORD
+ * (Loo, 2026-08-05 — §4 Approved Evolution, items 1 and 2 together).
+ *
+ * Provenance was a NULL TEST — `if (po.eta_date) { confirmed: true }` — and it
+ * was correct until 2026-08-03, when commit `1ddfce7e` made the To Order issue
+ * path stamp OUR OWN estimate into `eta_date`. From that day the register could
+ * not tell a promise from a guess: measured on production 2026-08-05, FIVE POs
+ * carried an arrival date with ZERO supplier answers behind it, each rendering
+ * black, with `Current Action` `—`, counted in `Waiting for Goods`.
+ *
+ * **Every test here fails on the code as it stood that morning — except the
+ * last, which is the negative control**: a PO that HAS earned its provenance
+ * must not lose it to the fix. `eta_date` alone can no longer make a PO look
+ * answered; only `po_supplier_promises` can.
+ */
+describe("provenance — who actually said the arrival date", () => {
+  /**
+   * The rail is where the defect GREW: every PO born from 3 Aug carried a date,
+   * so `Waiting Supplier Date` was becoming unreachable for new purchase orders
+   * and the queue that asks the factory the question would have emptied itself.
+   *
+   * PO-9003 (arrives today), PO-9009 (2099) and PO-9007 (no date at all) have
+   * one thing in common: nobody has phoned the factory. The old null test put
+   * the first two in `Waiting for Goods` and left this tile holding ONE row.
+   */
+  it("a stamped date with no supplier answer still counts as Waiting Supplier Date", async () => {
+    await mountLoaded();
+    const need = screen.getByTestId("po-rail-state-need_confirmation");
+    expect(need).toHaveTextContent("Waiting Supplier Date");
+    expect(need).toHaveTextContent("3");
+    // …and the four that a factory really has answered — 9001, 9004, 9005,
+    // 9008, each carrying a `tomorrow_delivery` promise on the wire.
+    expect(screen.getByTestId("po-rail-state-waiting")).toHaveTextContent("4");
+  });
+
+  it("the tile's count and its click agree — a rail that lies is worse than no rail", async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId("po-rail-state-need_confirmation"));
+    expect(
+      listing()
+        .getAllByText(/^PO-9\d{3}$/)
+        .map((el) => el.textContent)
+        .sort(),
+    ).toEqual(["PO-9003", "PO-9007", "PO-9009"]);
+  });
+
+  /** A date the operator can see is grey and says so on hover. Before the fix
+   *  PO-9009 was black with no tooltip — indistinguishable from PO-9001, whose
+   *  factory really did name the day. */
+  it("an estimate wearing eta_date is GREY and says the supplier has not confirmed", async () => {
+    await mountLoaded();
+    const estimate = within(
+      listing().getByText("PO-9009").closest("tr") as HTMLElement,
+    ).getByText("9 Sep 99");
+    expect(estimate.getAttribute("title")).toBe(
+      "Expected — supplier has not confirmed",
+    );
+    expect(estimate.className).toContain("text-kit-slate-9");
+
+    const promised = within(
+      listing().getByText("PO-9001").closest("tr") as HTMLElement,
+    ).getByText(/30 Dec 99/);
+    expect(promised.getAttribute("title")).toBeNull();
+  });
+
+  /**
+   * PO-2052's OWN SHAPE, and the sharpest live row: a REAL ready date of
+   * 12 Aug beside a self-computed arrival of 14 Aug, both printed black. The
+   * factory said when it FINISHES; it has never said when the goods REACH us,
+   * and counting the first as provenance for the second tells the same lie in a
+   * more convincing voice. Its own fixture, because no PO in the shared list
+   * carries a ready date WITHOUT an arrival answer beside it.
+   */
+  it("a ready date is NOT provenance for the arrival — PO-2052's own shape", async () => {
+    mockApi([
+      {
+        id: "PO-9012",
+        supplier_id: OHANA,
+        warehouse_id: WH,
+        status: "open",
+        sup_status: "confirmed",
+        so: 2200,
+        so_refs: null,
+        eta_date: "2099-08-14", // ours
+        expected_ready_date: "2099-08-12", // theirs — a DIFFERENT fact
+        placed_at: "2026-06-01T08:00:00Z",
+        customer_delivery: "2099-12-31",
+        eta_revised: false,
+        orders: [],
+        promises: [
+          {
+            kind: "ready_date",
+            answer: "ready_date",
+            about_date: null,
+            previous_date: null,
+            new_date: "2099-08-12",
+            reason: null,
+            recorded_at: "2026-06-02T02:00:00Z",
+          },
+        ],
+        purchase_order_lines: [line("l1", "SKU-SONIC-K", 1, "Sonic", "King")],
+      },
+    ]);
+    mount();
+    await waitFor(() =>
+      expect(screen.getByText("PO-9012")).toBeInTheDocument(),
+    );
+    const arrival = within(
+      listing().getByText("PO-9012").closest("tr") as HTMLElement,
+    ).getByText("14 Aug 99");
+    expect(arrival.getAttribute("title")).toBe(
+      "Expected — supplier has not confirmed",
+    );
+    expect(
+      screen.getByTestId("po-rail-state-need_confirmation"),
+    ).toHaveTextContent("1");
+  });
+
+  it("a PO answered on BOTH questions keeps its arrival confirmed", async () => {
+    await mountLoaded();
+    // PO-9008 carries both runs — a `ready_date` promise AND a
+    // `tomorrow_delivery` one — so reading them apart must not cost it the
+    // provenance it has genuinely earned.
+    const row = listing().getByText("PO-9008").closest("tr") as HTMLElement;
+    expect(within(row).getByText("5 Dec 99").getAttribute("title")).toBeNull();
+  });
+
+  /**
+   * ITEM 2 — ONE ARITHMETIC. PO-9007 is issued Mon 2 Mar 2099 on Ohana's week
+   * (Sunday off, Saturday worked): 7 production working days is Tue 10 Mar, and
+   * ONE transit day on the OFFICE week is Wed 11 Mar. The register used to
+   * print 10 Mar — the day the factory FINISHES — because it computed
+   * `placed_at + production` and never added transit, while the issue path did.
+   */
+  it("the estimate carries the TRANSIT day — one arithmetic, not two", async () => {
+    await mountLoaded();
+    const row = listing().getByText("PO-9007").closest("tr") as HTMLElement;
+    expect(within(row).getByText(/11 Mar 99/)).toBeInTheDocument();
+    expect(within(row).queryByText(/10 Mar 99/)).toBeNull();
+  });
+
+  /** The one screen a FACTORY reads. Quoting our own arithmetic back to them
+   *  as `Expected Arrival` presents a guess as their agreement — and leaves the
+   *  question we actually needed to ask unasked. */
+  it("the supplier draft ASKS for the date when no supplier has given one", async () => {
+    await mountLoaded();
+    await openPo("PO-9009");
+    fireEvent.click(screen.getByTestId("po-wa-toggle"));
+    const draft = screen.getByTestId("po-wa-message") as HTMLTextAreaElement;
+    expect(draft.value).toContain("Please confirm the arrival date.");
+    expect(draft.value).not.toContain("Expected Arrival:");
+  });
+
+  /**
+   * A promise can be broken; our own guess cannot. `⚠ Overdue by N days`
+   * against a number nobody agreed to accuses a factory of missing a date it
+   * was never told. Its own list, so the frozen risk order above keeps the
+   * fixture it was written against.
+   */
+  it("an estimate that has run out is NOT overdue — nobody promised it", async () => {
+    mockApi([
+      {
+        id: "PO-9011",
+        supplier_id: OHANA,
+        warehouse_id: WH,
+        status: "open",
+        sup_status: "confirmed",
+        so: 2100,
+        so_refs: null,
+        eta_date: "2026-01-20", // long past, and OUR OWN — no promises at all
+        placed_at: "2026-01-10T08:00:00Z",
+        customer_delivery: null,
+        eta_revised: false,
+        orders: [],
+        purchase_order_lines: [line("k1", "SKU-CODY-Q", 1, "Cody", "Queen")],
+      },
+    ]);
+    mount();
+    await waitFor(() =>
+      expect(screen.getByText("PO-9011")).toBeInTheDocument(),
+    );
+    const work = await expandPo("PO-9011");
+    expect(work.queryByTestId("po-overdue")).toBeNull();
+    // The job is unchanged — it is simply named honestly.
+    expect(
+      screen.getByTestId("po-rail-state-need_confirmation"),
+    ).toHaveTextContent("1");
   });
 });
 

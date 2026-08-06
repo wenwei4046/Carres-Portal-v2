@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  addWorkingDays,
   comparePoRisk,
+  expectedArrivalOf,
   myHolidaySet,
   ordinalLabel,
   poDateHistoryOf,
@@ -21,10 +21,10 @@ import {
   railItemLabel,
   type PoCurrentAction,
   type PoRiskRow,
+  type PoWorkspacePo,
   type PoWorkState,
   type ProductSkuDto,
   type PurchasingOpenCall,
-  type SupplierCallPo,
 } from "@carres/shared";
 import PurchasingTabs from "./PurchasingTabs";
 import DataTable, {
@@ -150,12 +150,24 @@ function todayMYT(): string {
   }).format(new Date());
 }
 
-function callPoOf(po: operationPoListRow): SupplierCallPo {
+/**
+ * The list row → the workspace's own shape.
+ *
+ * **`supplierArrivalDateIso` is what the SUPPLIER said, and it is read from the
+ * promise ledger rather than from `eta_date`** (Loo, 2026-08-05). `eta_date`
+ * has held our own estimate since 2026-08-03, so a null test on it can no
+ * longer tell a promise from a guess — see `PoWorkspacePo` for the five live
+ * POs that measured the damage. `poDateHistoryOf` keeps the arrival run and the
+ * ready-date run apart, so `currentDate` is the arrival the factory named and a
+ * ready date can never be mistaken for one.
+ */
+function callPoOf(po: operationPoListRow): PoWorkspacePo {
   return {
     poId: po.id,
     supplierId: po.supplier_id,
     status: po.status,
     etaDateIso: po.eta_date,
+    supplierArrivalDateIso: poDateHistoryOf(po.promises).currentDate,
     tomorrowAnswerAboutDateIso: po.tomorrow_answer_about_date ?? null,
     lines: po.purchase_order_lines.map((l) => ({
       id: l.id,
@@ -241,21 +253,10 @@ const WORK_STATE_LABEL = PO_WORK_STATE_LABEL;
 const WORK_STATES = PO_WORK_STATES;
 
 function workStateOf(po: operationPoListRow, today: string): WorkState {
-  return poWorkStateOf(
-    {
-      status: po.status,
-      etaDateIso: po.eta_date,
-      lines: po.purchase_order_lines.map((l) => ({
-        id: l.id,
-        sku: l.sku,
-        qty: l.qty,
-        receivedQty: l.received_qty,
-        shortSinceIso: l.short_since ?? null,
-        balanceAnswerAboutQty: l.balance_answer_about_qty ?? null,
-      })),
-    },
-    today,
-  );
+  // ONE mapping — `callPoOf`. Spelling the row out a second time here is how
+  // the work state came to read `eta_date` while the Current Action read the
+  // engine; they are the same PO and they now go through the same door.
+  return poWorkStateOf(callPoOf(po), today);
 }
 
 // The Excel date ▼ machinery lives in ONE lib (`excel-date-filter.ts`) so
@@ -496,51 +497,60 @@ export default function OperationPurchaseOrders() {
     return refs.length > 1 ? `${head} +${refs.length - 1}` : head;
   };
 
-  const prodDaysByPair = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of settingsQ.data?.productionDays ?? [])
-      m.set(`${r.supplierId}|${r.category}`, r.workingDays);
-    return m;
-  }, [settingsQ.data]);
-  const offDaysBySupplier = useMemo(() => {
-    const m = new Map<string, readonly number[] | null>();
-    for (const r of settingsQ.data?.suppliers ?? []) m.set(r.id, r.offDays);
-    return m;
-  }, [settingsQ.data]);
   const holidays = useMemo(() => myHolidaySet(), []);
 
-  /** The listing's ONE arrival answer per PO: the supplier's confirmed date,
-   *  else the engine's default (issued + production working days on the
-   *  supplier's week). No setting → no default, never a silent 7 (P1). */
+  /**
+   * The listing's ONE arrival answer per PO — **the date, and who said it.**
+   *
+   * `confirmed` USED TO BE `po.eta_date != null` and that was a lie from
+   * 2026-08-03, the day the To Order issue path began stamping our own estimate
+   * into `eta_date`. It is now a question about the promise ledger — *has a
+   * supplier ever named an arrival for this PO* — which is the only place an
+   * answer to it has ever lived. `poDateHistoryOf` is the one reader of that
+   * ledger, and it keeps the ready-date run separate, so the factory saying
+   * *"it will be FINISHED on the 12th"* can never be printed as *"it will
+   * ARRIVE on the 14th, and they told us so."*
+   *
+   * The DATE shown is still `eta_date`: 0306 moves it on every `delayed`
+   * answer, so once a supplier has spoken the stored date IS their current
+   * word. Only when there is no stored date at all does the register fall back
+   * to the estimate — 16 of the live 24 POs, all issued before the birth stamp
+   * existed — and it computes it with `expectedArrivalOf`, the SAME function
+   * the issue path stamps with. This page used to spell that arithmetic itself
+   * and forget the transit leg (Loo, 2026-08-05).
+   *
+   * No production or transit number → no date at all, never a silent 7 (P1).
+   */
   const etaByPo = useMemo(() => {
     const m = new Map<string, { date: string | null; confirmed: boolean }>();
+    const settings = settingsQ.data;
     for (const po of pos) {
-      if (po.eta_date) {
-        m.set(po.id, { date: po.eta_date, confirmed: true });
+      const supplierDate = poDateHistoryOf(po.promises).currentDate;
+      if (po.eta_date || supplierDate) {
+        m.set(po.id, {
+          date: po.eta_date ?? supplierDate,
+          confirmed: supplierDate != null,
+        });
         continue;
       }
       const line = po.purchase_order_lines[0];
       const modelId = line ? skuBySku.get(line.sku)?.modelId : undefined;
-      const cat = modelId ? modelCategoryById.get(modelId) : undefined;
-      const days =
-        cat != null ? prodDaysByPair.get(`${po.supplier_id}|${cat}`) : undefined;
-      const off = offDaysBySupplier.get(po.supplier_id);
-      if (days == null || off == null) {
-        m.set(po.id, { date: null, confirmed: false });
-        continue;
-      }
       m.set(po.id, {
-        date: addWorkingDays((po.placed_at ?? "").slice(0, 10), days, {
-          offDays: off,
-          holidays,
-        }),
+        date: settings
+          ? expectedArrivalOf(settings, {
+              supplierId: po.supplier_id,
+              category: modelId ? modelCategoryById.get(modelId) : undefined,
+              fromIso: po.placed_at,
+              holidays,
+            })
+          : null,
         confirmed: false,
       });
     }
     return m;
-  }, [pos, skuBySku, modelCategoryById, prodDaysByPair, offDaysBySupplier, holidays]);
+  }, [pos, skuBySku, modelCategoryById, settingsQ.data, holidays]);
   const etaOf = (po: operationPoListRow) =>
-    etaByPo.get(po.id) ?? { date: po.eta_date, confirmed: po.eta_date != null };
+    etaByPo.get(po.id) ?? { date: po.eta_date, confirmed: false };
 
   /** The engine's open calls per PO — the ONLY urgency source on this page. */
   const callsByPo = useMemo(() => {
@@ -2653,7 +2663,20 @@ function SupplierDateForm({
   confirmed: boolean;
   supplierName: string;
 }) {
-  const held = confirmed ? (po.eta_date ?? null) : null;
+  /**
+   * The date this call is ABOUT — `purchase_orders.eta_date`, because that is
+   * literally what `purchasing_record_tomorrow_delivery` reads
+   * (`v_about := v_po.eta_date`) and refuses to run without.
+   *
+   * **It does NOT key on `confirmed`, and that is load-bearing.** Provenance
+   * now says *the supplier has never named an arrival*, which is true of a PO
+   * carrying our own estimate — but the RPC still holds that estimate as the
+   * date being answered. Tying `held` to provenance would send `shipping` with
+   * a `firstDate` the RPC ignores for that answer, and the supplier's real date
+   * would be recorded as a promise about our guess and then dropped. The form's
+   * arithmetic must match the door's; only the WORDING follows provenance.
+   */
+  const held = po.eta_date ?? null;
   // INLINE EDIT, the same manner as the line surface (Jess, 2026-08-02): the
   // extend is QUIET until you ask to record something. A Remarks box standing
   // open on a panel nobody is editing is furniture, and a Reason picker that
@@ -2713,7 +2736,11 @@ function SupplierDateForm({
         data-testid="po-date-open"
         className="text-body text-kit-slate-9 border-b border-dashed border-kit-slate-5 hover:text-kit-slate-12"
       >
-        {held == null ? "Record the supplier's date…" : "Record a new date…"}
+        {/* `a NEW date` only once there IS an old one the supplier gave. A PO
+            wearing our own estimate has had no supplier date at all, so it asks
+            for the first — the string this page already carried, now reaching
+            the POs that always needed it. */}
+        {confirmed ? "Record a new date…" : "Record the supplier's date…"}
       </button>
     );
   }
@@ -2919,11 +2946,24 @@ function ActivityDesk({
   const items = po.purchase_order_lines
     .map((l) => `${l.sku} ×${l.qty}`)
     .join("\n");
-  const arriving = po.eta_date
-    ? // §12.2 ② — the ONE word for this fact, everywhere it appears, and a
-      // message a supplier holds is the place it matters most.
-      `Expected Arrival: ${fmtDate(po.eta_date)}`
-    : "Please confirm the arrival date.";
+  /**
+   * WHAT THE SUPPLIER IS TOLD — and the register's provenance rule reaches
+   * here too, because this is the one screen a FACTORY reads (Loo, 2026-08-05).
+   *
+   * `po.eta_date` alone used to decide it, so a PO born with our own estimate
+   * sent the factory `Expected Arrival: 14 Aug` — our arithmetic handed back to
+   * them as though it were their agreement, and the very question we needed to
+   * ask went unasked. When no supplier has named an arrival the draft asks for
+   * one; that sentence already existed on this page for the dateless case, and
+   * it is simply reaching the POs that always needed it.
+   *
+   * §12.2 ② — `Expected Arrival` is the ONE word for this fact everywhere it
+   * appears, and a message a supplier holds is where it matters most.
+   */
+  const arriving =
+    po.eta_date && poDateHistoryOf(po.promises).currentDate
+      ? `Expected Arrival: ${fmtDate(po.eta_date)}`
+      : "Please confirm the arrival date.";
 
   /** The ONE company-wide draft, filled in. A template with no placeholders
    *  still works — it is simply sent as written. */

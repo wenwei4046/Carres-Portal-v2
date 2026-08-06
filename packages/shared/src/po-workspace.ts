@@ -220,8 +220,49 @@ export function comparePoRisk(a: PoRiskRow, b: PoRiskRow): number {
   return a.poId.localeCompare(b.poId);
 }
 
+/**
+ * A purchase order as the WORKSPACE reads it — the call engine's shape plus
+ * the one fact the engine deliberately does not see.
+ *
+ * **THE PROVENANCE OF THE ARRIVAL DATE IS ITS OWN FIELD, and that is Loo's
+ * ruling of 2026-08-05: *the page must stop calling our own arithmetic a
+ * supplier's word.*** Until then provenance was a NULL TEST —
+ * `if (po.eta_date) { confirmed: true }` — which was correct until 2026-08-03,
+ * when commit `1ddfce7e` *"a purchase order is born with its expected arrival"*
+ * made the To Order issue path stamp OUR OWN estimate into `eta_date`. From
+ * that day a null test could no longer tell a promise from a guess: measured on
+ * production 2026-08-05, **FIVE POs carried an arrival date with ZERO supplier
+ * answers behind it** (`PO-2050` · `2051` · `2052` · `2053` · `2054`), each
+ * rendering black with no tooltip, `Current Action` `—`, and counted in
+ * `Waiting for Goods` — four signals saying the factory had spoken when nobody
+ * had asked it anything. It GREW: every PO born from 3 Aug carries a date, so
+ * `Waiting Supplier Date` was becoming unreachable for new purchase orders.
+ *
+ * **It is NOT on `SupplierCallPo`, and that is structural rather than tidy.**
+ * The call engine must keep firing on our own estimate — *"do NOT gate the
+ * tomorrow call on provenance"* — because that phone call is exactly how the
+ * first real date is obtained. A field the engine cannot see cannot be read by
+ * it in some later edit.
+ */
+export interface PoWorkspacePo extends SupplierCallPo {
+  /**
+   * The arrival date **the SUPPLIER actually gave**, or null when they never
+   * have. It comes from `po_supplier_promises` — append-only, and already
+   * holding every arrival any supplier has ever named — read through
+   * `poDateHistoryOf(...).currentDate`, so there is one reading of the ledger.
+   *
+   * **A `ready_date` promise is fact ① and must NOT count here.** It says when
+   * the factory finishes MAKING it, not when the goods reach us; `PO-2052`
+   * holds a real ready date of 12 Aug beside a self-computed arrival of 14 Aug,
+   * and counting the first as provenance for the second would re-tell exactly
+   * the lie this field exists to stop. `poDateHistoryOf` keeps the two runs
+   * apart already, which is why this reads `currentDate` and never `readyCurrentDate`.
+   */
+  supplierArrivalDateIso: string | null;
+}
+
 export function poWorkStateOf(
-  po: Pick<SupplierCallPo, "status" | "etaDateIso" | "lines">,
+  po: Pick<PoWorkspacePo, "status" | "supplierArrivalDateIso" | "lines">,
   // Kept for signature stability (poOverdueDays and every caller pass it);
   // the state itself stopped reading the clock when READY became "goods
   // arrived" rather than "the date came" (Jess's machine, 2026-08-02).
@@ -237,7 +278,10 @@ export function poWorkStateOf(
   // NOT arrival — that is Overdue, a sub-state of waiting (Jess's state
   // machine, 2026-08-02, which corrected the earlier date-based rule).
   if (p.received > 0) return "ready";
-  if (!po.etaDateIso) return "need_confirmation";
+  // WAITING FOR GOODS means a factory has named a day. A date only WE computed
+  // leaves the PO exactly where it was before we computed it: waiting for the
+  // supplier to say something. This reads the promise, never `eta_date`.
+  if (!po.supplierArrivalDateIso) return "need_confirmation";
   return "waiting";
 }
 
@@ -246,13 +290,19 @@ export function poWorkStateOf(
  * `waiting`, never its own progress bucket (Jess: progress is the goods'
  * stage; contacting the supplier is an ACTION). Returns the day count
  * (>= 1) or null.
+ *
+ * **It measures the SUPPLIER's date and no other.** A promise can be broken;
+ * our own estimate cannot, and `⚠ Overdue by 3 days` printed against a number
+ * nobody ever agreed to is the same lie in a louder voice. Such a PO is
+ * `need_confirmation`, whose Current Action is already `Confirm Goods Arrival
+ * Date` — the identical job, without the accusation.
  */
 export function poOverdueDays(
-  po: Pick<SupplierCallPo, "status" | "etaDateIso" | "lines">,
+  po: Pick<PoWorkspacePo, "status" | "supplierArrivalDateIso" | "lines">,
   todayIso: string,
 ): number | null {
   if (poWorkStateOf(po, todayIso) !== "waiting") return null;
-  const eta = po.etaDateIso;
+  const eta = po.supplierArrivalDateIso;
   if (!eta || eta >= todayIso) return null;
   const ms = Date.parse(`${todayIso}T00:00:00Z`) - Date.parse(`${eta}T00:00:00Z`);
   const days = Math.round(ms / 86_400_000);
@@ -282,7 +332,7 @@ export type PoCurrentAction =
  * `Contact Supplier`.
  */
 export function poCurrentActionOf(
-  po: SupplierCallPo,
+  po: PoWorkspacePo,
   opts: { todayIso: string },
 ): PoCurrentAction | null {
   const state = poWorkStateOf(po, opts.todayIso);

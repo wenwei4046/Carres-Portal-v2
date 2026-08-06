@@ -25,6 +25,7 @@ export {
   PRODUCTION_WORKING_DAYS_RANGE,
   WEEKDAYS,
   SUNDAY,
+  expectedArrivalOf,
   isPurchasingCategory,
   isPurchasingNumberKey,
   productionWorkingDaysFor,
@@ -910,6 +911,7 @@ export {
   type PoDatePromise,
   type PoRiskRow,
   type PoRiskRung,
+  type PoWorkspacePo,
   type PoWorkState,
 } from "./po-workspace";
 
