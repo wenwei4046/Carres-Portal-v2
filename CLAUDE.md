@@ -57,11 +57,17 @@ Build  →  Reality  →  Architecture review  →  If approved  →  Overwrite 
 implementation; **UI layout does not freeze before operators have used it.** A design that is
 worse in practice is CHANGED, not defended — *"we decided that before"* is not a reason.
 
-### Law 3 · Override Law — a MASTER is never permanent
+### Law 3 · Override Law — a MASTER is never permanent, and it holds ONE truth
 **A better architecture always wins.** When one is approved, **overwrite** the MASTER.
 Never create `MASTER-v2` · `MASTER-final` · `MASTER-revised` · a checkpoint · an execution
 queue · a planning queue. **There is only `MASTER`, continuously overwritten. Git history is
 the archive; documents do not carry history.**
+
+**THE MASTER OVERWRITE LAW (Loo, 2026-08-06).** When an approved workflow, operator
+journey, ownership or business rule changes: **delete the obsolete version completely and
+rewrite with the approved one.** Never append beside it, never keep legacy text, never keep
+an alternative version, never cite a superseded document as if it still ruled. **Git is the
+only history; a MASTER always contains exactly one current truth.**
 
 ### Law 4 · Challenge Law — every chat must ask
 ```

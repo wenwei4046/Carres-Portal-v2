@@ -276,13 +276,12 @@ promise is fact ① and never counts, because *"finished on the 12th"* is not *"
 by line.*
 
 ```
-LEFT 200px   CALLS        Overdue · Today · Tomorrow
-             WORK STATUS  the RAIL's own words, and they are not the tile names an
-                          earlier draft of this file carried:
+LEFT 200px   SUPPLIER PROGRESS — the rail's ONE group (measured: no CALLS
+                          group exists on screen; the engine's calls surface on
+                          the rows and the Current Action column):
                           Waiting Supplier Date · Waiting for Goods · Ready to Receive ·
                           Completed · Cancelled            (PO_WORK_STATE_LABEL)
-                          Live 2026-08-06: 19 · 3 · 0 · 2 · 0 — and before provenance
-                          shipped it read 16 · 6, because three POs wore our own estimate
+                          Live 2026-08-06: 19 · 3 · 0 · 2 · 0
 
 CENTRE       NINE frozen columns, ONE fixed set:
              PO Issued · Supplier · PO No. · SO No. · Items · Destination ·
@@ -837,7 +836,7 @@ blanks. Every row carries **who changed it, when, and what it was before**.
 
 | Decision | Ruling |
 |---|---|
-| **Where an action lives** | The tab that owns the WORK owns the door AND its queue. `Confirm tomorrow's delivery` currently has a door on Purchase Orders and **no queue tile anywhere** — §1/§7 of the old flow file still assign it to Receiving. **Open.** |
+| **Where an action lives** | The tab that owns the WORK owns the door AND its queue. `Confirm tomorrow's delivery` currently has a door on Purchase Orders and **no queue tile anywhere**. **Open.** |
 | **Two status axes, never merged** | `purchase_orders.status` is a 3-value stored enum. The 5-word Operation Status is derived and never stored. A reader who confuses them will "fix" one to match the other. |
 | **A quantity means exactly one thing** | No column is ever reused for a second meaning — that is how `ops_order_control.balance` became a lock reading a column nobody wrote. |
 | **Deliberately not stored** | `in_transit_qty` · `ready_for_collection_qty` · `supplier_confirmed_qty`. **A column nobody writes is worse than a missing one.** |
