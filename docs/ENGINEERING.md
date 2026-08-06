@@ -196,8 +196,8 @@ isolation — **run twice before calling one a regression.**
 | API | `https://carres-portal-v2-api.wwch.workers.dev` + `api.carresofficial.com` |
 | DB | Supabase `kfprgpjpaffedghytstl` — staging IS production |
 | Migration tail | `0324`. **Verify against the tracker before numbering.** |
-| Live web bundle | last recorded `index-DVBECbVe.js` from main tip `1206ee43` (2026-08-06), both Pages projects |
-| Live Worker | last recorded version `17f0d7e3` from main tip `1206ee43` (2026-08-06) |
+| Live web bundle | last recorded `index-CRIryebD.js` from main tip `1f46c598` (2026-08-06). **Verified converged on all four canonical URLs** — `erp` · `pos` · `carres-portal.pages.dev` · `carres-pos.pages.dev` |
+| Live Worker | last recorded version `f376144a` from main tip `1f46c598` (2026-08-06), `--env production`, custom domain answering |
 
 > **⚠️ `0318` and `0319` are IN THE REPOSITORY AND ABSENT FROM THE TRACKER**, measured
 > 2026-08-06 — `supabase_migrations.schema_migrations` jumps `0317 → 0320`, while
