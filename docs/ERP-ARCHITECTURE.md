@@ -287,10 +287,11 @@ do not chase payment for goods you cannot deliver).
 > RELEASE a delivery without FORGIVING the money, and the two answers part company on exactly
 > that order.
 
-> ### STORAGE — A DECISION LOO OWES, AND IT IS IN §6
-> V1 puts the storage fee on the customer order. It is a charge for **warehouse time**, its
-> rate depends on the **catalog category**, and its clock starts when a **warehouse** fact
-> becomes true. It is not obvious it belongs to the order at all.
+> ### STORAGE — FROZEN (§6.1, Decision ①)
+> **Money In owns the FEE** — the rate table, the one arithmetic, the charge, the collection
+> and the waiver. The Customer Order owns the TRIGGER and the HOLD (the clock runs from the
+> PROMISE — *you did not collect*, never *your goods are here*). Stock is the WITNESS.
+> The rate asks the CATALOG for the category, which closes D9's storage half by ownership.
 
 ---
 
@@ -399,12 +400,67 @@ owns its meaning.
 **These cannot be settled by reading code, measuring the database, or applying a law already
 ruled. They are the only things this document leaves open.**
 
-**① Where does STORAGE live?**
-It is a charge for warehouse time, priced by catalog category, started by a warehouse fact, and
-collected from a customer. V1 put it on the order.
-*Options: the customer order (a charge to this customer) · Money In (a chargeable item) ·
-Stock (rent for space).* **My recommendation: Money In owns the CHARGE, Stock owns the CLOCK,
-the Customer Order owns the HOLD.** It is a decision because it splits one thing three ways.
+**① Where does STORAGE live? — FROZEN 2026-08-06. See §6.1, and it is the
+reference pattern for every future cross-module ownership question.**
+
+## §6.1 · DECISION ① — STORAGE, frozen 2026-08-06, and it is the REFERENCE PATTERN
+
+> **One business concern, three modules, and the split is by RECORD, not by feature.**
+> Verified against the V1 implementation before freezing — two of the three lines were already
+> true in code, and the third was corrected by measurement rather than accepted as proposed.
+
+```
+CUSTOMER ORDER   owns the TRIGGER and the HOLD
+                   the clock starts from the PROMISE — the delivery deadline plus the
+                   grace week — because the customer owes for not collecting, never for
+                   our goods sitting in our own supply chain. And whether an uncollected
+                   fee stops the delivery is a decision about the promise.
+
+MONEY IN         owns the FEE
+                   the rate table and the arithmetic (ONE function — Law D), the charge,
+                   the collection (a `storage` payment with a receipt), and the WAIVER —
+                   writing off a receivable is a money decision, manager-gated.
+
+STOCK            owns the WITNESS
+                   the warehouse facts: when a unit physically arrived (`date_in`,
+                   135/135 units carry it), where it sits, what condition. Stock
+                   TESTIFIES; it does not own the clock and it does not price anything.
+```
+
+**Why the clock is the ORDER's and not Stock's — measured, then reasoned.** The V1
+implementation reads ZERO warehouse facts (grepped across all three storage files:
+`ops_stock_items` never appears), and that is not an accident: Jess's own rule anchors the
+clock on *the next same weekday after the delivery deadline*. **The business meaning is "you
+did not collect", not "your goods are here"** — goods arriving three weeks early are our
+supply-chain timing and may never bill the customer. A supplier-late stretch already moves the
+anchor rather than billing it, which is the same principle applied from the other side.
+
+**The one V1 defect this ruling fixes when built:** the fee's RATE depends on the catalog
+category, and V1 resolves it with the prefix-only `storageCategoryForSku` — **wrong for every
+live SKU** (D9). Under this ruling Money In's arithmetic asks the CATALOG, closing that hole as
+a side effect of correct ownership.
+
+**The RELEASE discipline survives verbatim (C9):** a manager may lift the HOLD without
+forgiving the FEE. The hold is the order's; the fee is Money In's; releasing one never touches
+the other — that is the three-way split working, and it was proven in V1 before it was named
+here.
+
+### The reference pattern, for every future cross-module question
+
+```
+1  Find the RECORDS inside the feature — a "feature" that needs three owners is
+   three records wearing one name.
+2  Give each record to the module whose QUESTION it answers
+      trigger/hold → the module that owns the promise
+      money        → the module that owns money
+      physical     → the module that owns the physical world
+3  The test for each line:  "if the customer cancelled, is it still true?"
+      dies with the customer  → the order's
+      still true              → it was never the order's
+4  One arithmetic, owned by ONE of them, called by the rest (Law D).
+5  A module that merely KNOWS something relevant is a WITNESS — it testifies
+   (read-only), it does not own the clock.
+```
 
 **② Does the delivery TRIP become a first-class record?**
 V1 has bookings and booking groups on the order. A trip that carries several customers' goods on
