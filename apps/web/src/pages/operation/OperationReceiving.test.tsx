@@ -121,6 +121,10 @@ let receivingResponse: { sessions: unknown[]; events: unknown[] } = {
   events: [],
 };
 
+/** The listing's rows, when a suite needs its OWN purchase orders (T5's four
+ *  arrival states). Null = the shared `POS` above. */
+let posOverride: unknown[] | null = null;
+
 function wrap() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -156,6 +160,7 @@ async function openRow(poId: string) {
 
 beforeEach(() => {
   receivingResponse = { sessions: [], events: [] };
+  posOverride = null;
   apiFetchMock.mockReset();
   apiFetchMock.mockImplementation((path: string) => {
     if (typeof path !== "string") return Promise.resolve({});
@@ -168,7 +173,8 @@ beforeEach(() => {
       return Promise.resolve({ suppliers: SUPPLIERS });
     if (path.includes("/api/operation/warehouse"))
       return Promise.resolve({ warehouses: WAREHOUSES });
-    if (path.includes("/api/operation/pos")) return Promise.resolve({ pos: POS });
+    if (path.includes("/api/operation/pos"))
+      return Promise.resolve({ pos: posOverride ?? POS });
     return Promise.resolve({});
   });
 });
@@ -622,5 +628,135 @@ describe("OperationReceiving — the Goods Received register", () => {
     expect(
       screen.queryByTestId("receiving-rail-state-in_transit"),
     ).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * T5 — A LATE TRUCK MUST LOOK LATE, and the colour may not claim the factory
+ * promised something it never did (approved by Loo, 2026-08-06).
+ *
+ * `Goods Arrival` had exactly two states — the date, or a grey dash — so on the
+ * one page whose whole job is goods physically turning up, a truck three days
+ * late was pixel-identical to one arriving on time.
+ *
+ * The law it obeys is §4's, unchanged: **red is reserved for a date the FACTORY
+ * GAVE**, and provenance is the promise ledger (`poDateHistoryOf`), never a null
+ * test on `eta_date` — `eta_date` has held our own estimate since 2026-08-03.
+ * Our own arithmetic warns AMBER and never accuses anyone.
+ *
+ * The dates are built RELATIVE to the page's own MYT today, because the page
+ * reads the real clock: a hardcoded fixture would stop being late on a date this
+ * suite cannot predict.
+ */
+function isoFromToday(days: number): string {
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+  }).format(new Date());
+  return new Date(Date.parse(`${today}T00:00:00Z`) + days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+/** A PO the arrival column can be read off. `promised` files a real
+ *  `tomorrow_delivery` promise — the only thing that makes the date the
+ *  supplier's word. */
+function arrivalPo(id: string, etaIso: string | null, promised: boolean) {
+  return {
+    id,
+    supplier_id: "sup-nf",
+    warehouse_id: "wh-klang",
+    status: "open",
+    sup_status: "in_production",
+    so: 1001,
+    so_refs: null,
+    eta_date: etaIso,
+    placed_at: "2026-07-01T00:00:00Z",
+    purchase_order_lines: [
+      { id: `${id}-l1`, sku: "MS01", qty: 2, received_qty: 0 },
+    ],
+    promises:
+      promised && etaIso
+        ? [
+            {
+              kind: "tomorrow_delivery",
+              answer: "delayed",
+              about_date: isoFromToday(-10),
+              previous_date: isoFromToday(-10),
+              new_date: etaIso,
+              reason: "factory_delay",
+              recorded_at: "2026-07-20T02:00:00Z",
+            },
+          ]
+        : [],
+  };
+}
+
+describe("OperationReceiving — a late truck looks late (T5)", () => {
+  /** The column lives outside the reading-pane's compact set, so the pane is
+   *  put away first — exactly what an operator scanning arrivals does. */
+  async function openArrivals() {
+    posOverride = [
+      // The factory NAMED this day and it has passed — a broken promise.
+      arrivalPo("PO-3001", isoFromToday(-3), true),
+      // Same day, but nobody ever promised it: it is our own arithmetic.
+      arrivalPo("PO-3002", isoFromToday(-3), false),
+      // Still ahead of us — nothing to warn about, whoever said it.
+      arrivalPo("PO-3003", isoFromToday(20), true),
+      // No date at all.
+      arrivalPo("PO-3004", null, false),
+    ];
+    wrap();
+    await ready();
+    fireEvent.click(screen.getByTestId("receiving-workspace-toggle"));
+    await waitFor(() =>
+      expect(listing().getByText("Goods Arrival")).toBeInTheDocument(),
+    );
+  }
+
+  it("reddens a date the FACTORY gave once it has passed", async () => {
+    await openArrivals();
+    const cell = listing().getByTestId("receiving-arrival-PO-3001");
+    expect(cell).toHaveAttribute("data-tone", "promised");
+    expect(cell).toHaveClass("text-kit-red-11");
+  });
+
+  it("warns AMBER on our own late estimate — never red", async () => {
+    await openArrivals();
+    const cell = listing().getByTestId("receiving-arrival-PO-3002");
+    expect(cell).toHaveAttribute("data-tone", "estimate");
+    expect(cell).toHaveClass("text-kit-amber-11");
+    // The whole point: a guess may not wear a broken promise's colour.
+    expect(cell).not.toHaveClass("text-kit-red-11");
+  });
+
+  it("leaves a date that is not late alone", async () => {
+    await openArrivals();
+    const cell = listing().getByTestId("receiving-arrival-PO-3003");
+    expect(cell).toHaveAttribute("data-tone", "plain");
+    expect(cell).not.toHaveClass("text-kit-red-11");
+    expect(cell).not.toHaveClass("text-kit-amber-11");
+  });
+
+  it("keeps the existing grey dash when there is no date", async () => {
+    await openArrivals();
+    const row = listing().getByText("PO-3004").closest("tr")!;
+    expect(
+      within(row).queryByTestId("receiving-arrival-PO-3004"),
+    ).not.toBeInTheDocument();
+    expect(within(row).getByText("—")).toHaveClass("text-kit-slate-9");
+  });
+
+  it("reads provenance from the promise ledger, never from `eta_date`", () => {
+    // The test that broke on 2026-08-03 and was repaired on 2026-08-06: a null
+    // check on `eta_date` cannot tell a promise from a guess, because the issue
+    // path stamps our own estimate into that very column. PO-3001 and PO-3002
+    // above carry the SAME `eta_date` and read two different colours, which no
+    // null test could produce — and the source may not spell one either.
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "OperationReceiving.tsx"),
+      "utf8",
+    );
+    expect(src).toContain("poDateHistoryOf");
+    expect(src).not.toMatch(/eta_date\s*(!=|!==|==|===)\s*null/);
   });
 });
