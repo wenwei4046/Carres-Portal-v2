@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import {
+  arrivalFromReadyDate,
   assignPickupPartnerInput,
   cancelPoInput,
   chasePoEventInput,
@@ -1656,10 +1657,50 @@ operationPosRouter.post("/:id/ready-date", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, recordReadyDateInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
+
+  // Slice 1 (Loo, 2026-08-06): a ready date the factory gives MOVES the
+  // expected arrival — new arrival = ready date + transit working days on the
+  // OFFICE week, computed with `arrivalFromReadyDate`, the ONE spelling of
+  // that leg (the same function `expectedArrivalOf` calls — Law D; a plpgsql
+  // copy is exactly the second spelling the register bug came from). No
+  // transit number → null → the RPC keeps the old arrival rather than
+  // guessing one (P1). Both lookups fail-SOFT to null: the ready date must
+  // still record even when the settings read hiccups.
+  const poId = c.req.param("id");
+  let newEta: string | null = null;
+  try {
+    const [poRow, transitRow] = await Promise.all([
+      sb.from("purchase_orders").select("supplier_id").eq("id", poId).maybeSingle(),
+      sb
+        .from("purchasing_supplier_settings")
+        .select("supplier_id, transit_days"),
+    ]);
+    const supplierId = (poRow?.data as { supplier_id?: string } | null)?.supplier_id;
+    if (supplierId) {
+      const suppliers = ((transitRow?.data ?? []) as Array<{
+        supplier_id: string;
+        transit_days: number | null;
+      }>).map((r) => ({
+        id: r.supplier_id,
+        name: "",
+        categories: [] as const,
+        offDays: null,
+        transitDays: r.transit_days ?? null,
+      }));
+      newEta = arrivalFromReadyDate(
+        { suppliers },
+        { supplierId, readyDateIso: parsed.data.newDate },
+      );
+    }
+  } catch {
+    newEta = null;
+  }
+
   const { data, error } = await sb.rpc("purchasing_record_ready_date", {
-    p_po_id: c.req.param("id"),
+    p_po_id: poId,
     p_new_date: parsed.data.newDate,
     p_reason: parsed.data.reason ?? null,
+    p_new_eta: newEta,
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });

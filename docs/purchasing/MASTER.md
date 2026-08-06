@@ -340,35 +340,62 @@ supplier's word only while a `tomorrow_delivery` promise stands behind it. A `re
 promise is fact ① and never counts, because *"finished on the 12th"* is not *"with you on the
 14th"*. Read once, through `poDateHistoryOf(...).currentDate`.
 
-> **⚠️ ONLY TWO OF THE THREE ARE ACTUALLY ASKED.** Measured 2026-08-05:
-> `purchasingSupplierCallsOf` (`packages/shared/src/purchasing-supplier-calls.ts:55`) has
-> exactly two keys — `confirm_tomorrows_delivery` · `confirm_balance_delivery_date`.
-> **`confirm_ready_date` is not in the purchasing engine at all**; it exists only in the ORDERS
-> ladder (`order-action-words.ts:148`), which is a different screen. So this tab has the DOOR
-> (the `Supplier Ready Date` field on the expand, and `purchasing_record_ready_date`,
-> migration 0318) and **no queue, no trigger, no due, no count and no way to turn late.**
-> Loo ruled the action onto this tab on 2026-08-05 — *"queue and door in one place"* — and the
-> queue never followed. **1 of 24 POs carries a ready date.** Building it is in
-> APPROVED EVOLUTION below; nothing about it is undecided.
+**All three calls are in the engine** (T2, 2026-08-06). `purchasingSupplierCallsOf` carries
+`confirm_ready_date` · `confirm_tomorrows_delivery` · `confirm_balance_delivery_date`. The
+ready-date call opens on an open PO that still owes goods when the factory has neither a
+STANDING ready date nor a STANDING arrival promise (standing = about a day not yet passed —
+S4's rule, so a factory that slips re-opens the call by itself). Its due is
+`customer date − buffer (OFFICE week) − production working days (FACTORY week)`; a
+supplier × category with no production number, or a PO with no customer date, gets NO due and
+can never turn late (P1/T7). The facts are OPT-IN on `SupplierCallPo` — a caller that does not
+carry them (Receiving's mapping) asks no ready-date question. **And a ready date the factory
+gives MOVES the expected arrival** (0325): the API computes
+`ready date + transit working days` with `arrivalFromReadyDate` — the ONE spelling, shared
+with `expectedArrivalOf` — and the RPC records it in the same transaction as the promise row;
+no transit number → the old arrival stands, never a guessed one. The previous arrival is
+never destroyed: the ledger is append-only, `po_history` prints old → new, and the cell keeps
+its `(revised)` marker.
 
 ### WHAT IS ON SCREEN TODAY
-`OperationPurchaseOrders.tsx`, 3,207 lines · route `/operation/procurement` · *measured
-2026-08-06 from its docblock and its 44 named controls; the arrival/provenance path read line
-by line.*
+`OperationPurchaseOrders.tsx` · route `/operation/procurement` · *measured 2026-08-06, after
+T2 shipped: the rail rebuilt on screen, the calendar walked in tests against the frozen
+sketch's own dates.*
 
 ```
-LEFT 200px   SUPPLIER PROGRESS — the rail's ONE group (measured: no CALLS
-                          group exists on screen; the engine's calls surface on
-                          the rows and the Current Action column):
+LEFT 200px   CALLS      — the week's factory calls, a rolling FIVE-office-
+                          working-day window (T2, frozen with Loo 2026-08-06):
+                          Overdue      red · above the days · only when > 0
+                          Thu 6 Aug    today — always the first day row
+                          …            weekday + date on EVERY row, one format
+                                       (§2.4); full date on hover; zero-count
+                                       day rows STILL render
+                          Later        beyond the window · only when > 0
+                          Counts = the engine's own dues (a dueless call plans
+                          no day — P1/T7 — and shows in the unfiltered listing
+                          only). Public holidays skip exactly as weekends
+                          (`myHolidaySet()` until the Working Calendar, §10).
+                          Day rows are VIEWS — a click only narrows the
+                          listing; a call cannot be made early. No duty chip
+                          (§2.2). A factory-Saturday due files under the
+                          office's LAST day on or before it, never the day
+                          after (it would first surface already late).
+             SUPPLIER PROGRESS
                           Waiting Supplier Date · Waiting for Goods · Ready to Receive ·
                           Completed · Cancelled            (PO_WORK_STATE_LABEL)
-                          Live 2026-08-06: 19 · 3 · 0 · 2 · 0
+                          Both groups draw the shared rail recipe
+                          (`components/workspace-rail.tsx`) — the inline copy
+                          this page carried is deleted (its own docblock's
+                          instruction, done with T2).
 
 CENTRE       NINE frozen columns, ONE fixed set:
              PO Issued · Supplier · PO No. · SO No. · Items · Destination ·
              Customer Delivery · Expected Arrival · Current Action
              widths 96 · 88 · 83 · 95 · 136 · 135 · 140 · 206 · 192, min-width 1208
              default order = RISK TO THE CUSTOMER'S PROMISE
+             Current Action on a dateless PO now reads the ENGINE's own
+             `Confirm ready date` — a real due underneath the same word, in
+             place of the state word `Check Expected Arrival` (Q8's sameness
+             held: overdue and dateless still read ONE word)
 
 RIGHT 400px  WORKING HEADER → REFERENCE LAYER → SUPPLIER FOLLOW-UP →
              RECEIVING SUMMARY → ACTIVITY
@@ -393,6 +420,12 @@ Tables: `purchase_orders` **24** · `purchase_order_lines` **38** · `po_history
 **`GET /operation/pos` already ships every promise per PO** (`promises`, read since 0310 for the
 date history), which is why provenance needed **no migration and no new wire field** — the
 answer was already on the page, unread.
+
+**`purchasing_record_ready_date` is 4-arg since 0325** (`p_po_id, p_new_date, p_reason,
+p_new_eta`) — the old 3-arg signature is DROPPED, not overloaded, and a sanity block aborts
+the migration if two signatures survive. The arithmetic is NOT in plpgsql: the API computes
+`p_new_eta` with the shared `arrivalFromReadyDate` (Law D — one spelling) and the RPC only
+records it.
 
 ### FROZEN RULES
 - **The nine columns NEVER change because the panel opened.** No compact variant. When they do
@@ -430,57 +463,11 @@ answer was already on the page, unread.
 - **One editing surface per fact.** The expand is the working area; the right panel is Activity.
 
 ### APPROVED EVOLUTION
-- **THE CALLS CALENDAR** (frozen with Loo, 2026-08-06 — card T2's mission). The rail gains
-  a `CALLS` group shaped as a **rolling five-WORKING-day window from today**:
-
-  ```
-  CALLS
-    Overdue          red · above the calendar · rendered only when > 0
-    Thu 6 Aug        today — always the first day row
-    Fri 7 Aug        §2.4's date law: weekday + date, one format, full date on hover
-    Mon 10 Aug
-    Tue 11 Aug
-    Wed 12 Aug       zero-count day rows STILL render — purchasing is planned work
-    Later            everything beyond the window · rendered only when > 0
-  ```
-
-  Counts are the engine's own dues per day. The window skips PUBLIC HOLIDAYS exactly as it
-  skips weekends (`myHolidaySet()` until the Working Calendar ships — §10). **Day rows are
-  VIEWS, never actions: a call cannot be made early**, so a click only narrows the listing
-  — no pre-tick, no pull-forward (that is To Order's calendar, a different machine).
-  Actions keep the three frozen strings (§2.4). No duty chip on this rail (§2.2 — the
-  Team panel is identity's one home). Same `NavRow` pattern as To Order's rail.
-- **`Confirm ready date` needs the queue to go with its door** (Loo, 2026-08-05 — see the
-  ⚠️ under WORKFLOW). A third key in `purchasingSupplierCallsOf` on the same rules as the two
-  beside it: **no anchor, no call**, and an answer closes it only while it still names the
-  current facts. **Nothing here is a new decision** — the trigger, checklist, completion,
-  due (`customer date − production working days − buffer`), owner (the PO-duty holder) and
-  count (one PO) are ruled, and COPY-STANDARD already carries the five strings. No migration
-  (0318 shipped the database half); no new word; no second door — the expand's field is the
-  one. **A supplier × category with no production number gets NO due rather than a default:
-  P1 deleted exactly that habit.**
-- **A ready date the factory gives MOVES the expected arrival — and never overwrites it**
-  (Loo, 2026-08-06). **The arithmetic it needs already exists**: `expectedArrivalOf`'s transit
-  leg is the same office-week count, so this card writes a call, not a calendar. Today it does
-  not, and `PO-2052` is the cost: the factory's real
-  `Ready Date` of 12 Aug sits beside a self-computed `Expected Arrival` of 14 Aug, when
-  12 Aug + Ohana's 1 transit day is 13 Aug. **The rule: recording a ready date writes a new
-  expected arrival of `ready date + transit working days on the OFFICE week` (Law 2A), and the
-  new date becomes the one the register shows.** A supplier × category with no transit number
-  gets NO new arrival rather than a guessed one — P1's habit, unchanged.
-  **His condition is the important half — the old date is kept and stays visible:**
-  *"it should NOT overwrite — show original and new date; obvious is the new day, the original
-  hidden but you can still see this is updated."*
-  **Nothing new is built for that and that was measured before he chose it.** The ledger is
-  already append-only, so no date is ever destroyed; the cell already prints the `(revised)`
-  marker (`OperationPurchaseOrders.tsx:1194`, fed by `eta_revised` at `pos.ts:408`), and the
-  expand already prints the numbered history (`poDateHistoryOf`). **The column does not grow:**
-  the cell's own docblock already names `25 Aug 26  8d late (revised)` as the widest string it
-  holds. **He was shown the two alternatives and rejected both** — printing both dates inline
-  (`13 Aug 1̶4̶ ̶A̶u̶g̶`) needs roughly 70px more in a column frozen at 206px, which would take
-  pixels from one of his own nine widths; hover-only is invisible on a tablet.
-  **Deliberately still separate: `expected_ready_date` and `eta_date` remain two columns and
-  two facts.** This links them at the moment of recording; it does not merge them.
+*(The CALLS calendar, the `Confirm ready date` queue and "a ready date MOVES the expected
+arrival" all SHIPPED with T2 on 2026-08-06 — 0325 + the engine's third call + the rail — and
+their rules now live under WORKFLOW and WHAT IS ON SCREEN TODAY above. Still separate,
+deliberately: `expected_ready_date` and `eta_date` remain two columns and two facts — 0325
+links them at the moment of recording; it does not merge them.)*
 - **Prove it with a real PO, end to end** — the line has never run. Two gates have no home yet
   (a PO cannot be issued twice for the same customer line and quantity; a check-in cannot be
   posted twice for the same supplier DO number), and **whoever is on an action must show on
@@ -937,7 +924,7 @@ blanks. Every row carries **who changed it, when, and what it was before**.
 
 | Decision | Ruling |
 |---|---|
-| **Where an action lives** | The tab that owns the WORK owns the door AND its queue. `Confirm tomorrow's delivery` currently has a door on Purchase Orders and **no queue tile anywhere**. **Open.** |
+| **Where an action lives** | The tab that owns the WORK owns the door AND its queue. **CLOSED by T2 (2026-08-06): the CALLS calendar on Purchase Orders is the queue for all three supplier calls** — each call's due files under its day, `Overdue` holds the late ones, and the door (the expand) sits on the same tab. |
 | **Two status axes, never merged** | `purchase_orders.status` is a 3-value stored enum. The 5-word Operation Status is derived and never stored. A reader who confuses them will "fix" one to match the other. |
 | **A quantity means exactly one thing** | No column is ever reused for a second meaning — that is how `ops_order_control.balance` became a lock reading a column nobody wrote. |
 | **Deliberately not stored** | `in_transit_qty` · `ready_for_collection_qty` · `supplier_confirmed_qty`. **A column nobody writes is worse than a missing one.** |

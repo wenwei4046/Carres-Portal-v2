@@ -2463,13 +2463,18 @@ describe("POST /api/operation/pos/:id/ready-date", () => {
       p_po_id: PO_ID,
       p_new_date: "2026-09-10",
       p_reason: null,
+      // Slice 1 (0325): the computed `ready + transit` arrival rides along;
+      // null here because the mock supplies no transit number — P1: no
+      // number, no guessed arrival, and the RPC then keeps the old date.
+      p_new_eta: null,
     });
-    // The RPC's signature is (text, date, text): a missing or extra key is
-    // PGRST202 in production and a green test without this assertion.
+    // The RPC's signature is (text, date, text, date): a missing or extra key
+    // is PGRST202 in production and a green test without this assertion.
     assertRpcCallShape(rpc, "purchasing_record_ready_date", [
       "p_po_id",
       "p_new_date",
       "p_reason",
+      "p_new_eta",
     ]);
   });
 

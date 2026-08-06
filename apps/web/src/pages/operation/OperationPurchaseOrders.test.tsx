@@ -931,12 +931,17 @@ describe("the default order — risk to the customer's promise", () => {
       "PO-9001",
       // rung 3 — they land ON the customer's day.
       "PO-9005",
-      // rung 5 — nothing to say. Inside the rung the nearer customer date
-      // first, and a PO with no customer date LAST: the two finished POs sit
-      // beside the quiet one, which is what "nothing to do" looks like.
+      // rung 4 — an open call that is not late. Slice 1: 9009's arrival is
+      // OUR OWN estimate with no supplier answer behind it, so the engine now
+      // opens `Confirm ready date` on it (dueless — the fixture settings
+      // carry no order-by buffer, and a due nobody can compute is never
+      // invented).
+      "PO-9009",
+      // rung 5 — nothing to say. 9006 is finished; 9008 has BOTH answers
+      // standing (ready date + arrival), which since Slice 1 is exactly what
+      // "quiet" means on this register.
       "PO-9006",
       "PO-9008",
-      "PO-9009",
       "PO-9002",
     ]);
   });
@@ -964,9 +969,9 @@ describe("the default order — risk to the customer's promise", () => {
       "PO-9007",
       "PO-9001",
       "PO-9005",
+      "PO-9009",
       "PO-9006",
       "PO-9008",
-      "PO-9009",
       "PO-9002",
     ]);
   });
@@ -1424,8 +1429,8 @@ describe("nine measured minimums, and no tail", () => {
 
   it("every action word still carries its own title, so a clip can be read", async () => {
     await mountLoaded();
-    const cell = listing().getAllByText("Check Expected Arrival")[0];
-    expect(cell.getAttribute("title")).toBe("Check Expected Arrival");
+    const cell = listing().getAllByText("Confirm ready date")[0];
+    expect(cell.getAttribute("title")).toBe("Confirm ready date");
   });
 });
 
@@ -1455,10 +1460,11 @@ describe("Current Action survives the workspace being open", () => {
     // Compact is the default. The word must be present ENTIRE — the bug was a
     // silent `clip`, so a partial match would have passed all along.
     expect(
-      listing().getAllByText("Check Expected Arrival").length,
+      listing().queryAllByText("Confirm balance delivery date").length +
+        listing().getAllByText("Confirm ready date").length,
     ).toBeGreaterThan(0);
-    const cell = listing().getAllByText("Check Expected Arrival")[0];
-    expect(cell.getAttribute("title")).toBe("Check Expected Arrival");
+    const cell = listing().getAllByText("Confirm ready date")[0];
+    expect(cell.getAttribute("title")).toBe("Confirm ready date");
   });
 });
 
@@ -1688,8 +1694,10 @@ describe("the ONE Current Action source (Law 7)", () => {
 
   it("the register's column reads the shared engine, and `—` is a real answer", async () => {
     await mountLoaded();
+    // Slice 1: a dateless PO's action is the ENGINE's `confirm_ready_date`
+    // call now — the queue word, with a clock — not the state word.
     expect(
-      listing().getAllByText("Check Expected Arrival").length,
+      listing().getAllByText("Confirm ready date").length,
     ).toBeGreaterThan(0);
     // Q8 (Loo, 2026-08-04 · §12.3): a status and a navigation are not
     // actions, so a PO whose goods are on the way says nothing. `—` here is
@@ -1703,12 +1711,14 @@ describe("the ONE Current Action source (Law 7)", () => {
     await mountLoaded();
     // PO-9004's supplier date passed and nothing came; PO-9007 never had one.
     // Both need the same phone call, so both read the same word — a late
-    // version of one action is not a second action (Loo, 2026-08-04).
+    // version of one action is not a second action (Loo, 2026-08-04). Since
+    // Slice 1 that shared word is the ENGINE's own `Confirm ready date` —
+    // Q8's sameness held, and both rows gained a real due underneath it.
     expect(
-      actionCellOf("PO-9004").getByText("Check Expected Arrival"),
+      actionCellOf("PO-9004").getByText("Confirm ready date"),
     ).toBeInTheDocument();
     expect(
-      actionCellOf("PO-9007").getByText("Check Expected Arrival"),
+      actionCellOf("PO-9007").getByText("Confirm ready date"),
     ).toBeInTheDocument();
     // The three retired words are gone from the whole register, not just from
     // these two rows — `Waiting for Goods` only as the RAIL's own label.
@@ -2488,5 +2498,92 @@ describe("one purchase order, one way of looking at it (Q10)", () => {
     expect([...templates]).toEqual([
       "grid-cols-[16px_64px_minmax(0,1fr)_40px_160px_64px]",
     ]);
+  });
+});
+
+/* ── T2 · the CALLS calendar rail (frozen with Loo, 2026-08-06) ──────────── */
+
+import { purchasingCallCalendarDays } from "@carres/shared";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+
+describe("the CALLS calendar rail (T2)", () => {
+  /** The window the page itself computes — today + four more OFFICE working
+   *  days, weekends AND `myHolidaySet()` holidays skipped. The engine is the
+   *  one spelling of it, so the test asks the engine, never a hand copy. */
+  const days = () => purchasingCallCalendarDays({ todayIso: TODAY });
+
+  it("renders exactly five day rows, today first — zero-count days INCLUDED", async () => {
+    await mountLoaded();
+    const w = days();
+    expect(w).toHaveLength(5);
+    expect(w[0]).toBe(TODAY);
+    for (const d of w) {
+      expect(screen.getByTestId(`po-rail-call-day-${d}`)).toBeInTheDocument();
+    }
+    // The fixtures' one near-term call (PO-9003, arriving today) is already
+    // LATE, so every day row is a zero — and a zero-count day still renders,
+    // printing its 0: purchasing is planned work, and an empty day is a fact
+    // about the plan, never a hidden row.
+    for (const d of w) {
+      expect(
+        within(screen.getByTestId(`po-rail-call-day-${d}`)).getByText("0"),
+      ).toBeInTheDocument();
+    }
+  });
+
+  it("every day row prints weekday + date in ONE format, full date on hover (§2.4)", async () => {
+    await mountLoaded();
+    for (const d of days()) {
+      const row = screen.getByTestId(`po-rail-call-day-${d}`);
+      const label = `${fmtDate(d).slice(0, 3)} ${fmtDateShort(d).replace(/ \d{2}$/, "")}`;
+      expect(within(row).getByText(label)).toBeInTheDocument();
+      // never a bare weekday, never Today/Tomorrow
+      expect(label).toMatch(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2}$/);
+      expect(row.getAttribute("title")).toBe(fmtDate(d));
+    }
+  });
+
+  it("Overdue is red, above the days, and narrows the listing to the late calls", async () => {
+    await mountLoaded();
+    // PO-9003 arrives today, so its tomorrow call fell due the working day
+    // before — late. The row therefore exists, wears the danger tone, and
+    // sits ABOVE the first day row.
+    const overdue = screen.getByTestId("po-rail-call-overdue");
+    expect(within(overdue).getByText("Overdue").className).toContain("text-kit-red-11");
+    const rail = screen.getByTestId("po-rail");
+    const order = [...rail.querySelectorAll("[data-testid^='po-rail-call-']")].map(
+      (el) => el.getAttribute("data-testid"),
+    );
+    expect(order[0]).toBe("po-rail-call-overdue");
+
+    expect(hasRow("PO-9001")).toBe(true);
+    fireEvent.click(overdue);
+    // a VIEW, never an action: the listing narrows, nothing else happens
+    expect(hasRow("PO-9003")).toBe(true);
+    expect(hasRow("PO-9001")).toBe(false);
+    // clicking the lit row clears it
+    fireEvent.click(screen.getByTestId("po-rail-call-overdue"));
+    expect(hasRow("PO-9001")).toBe(true);
+  });
+
+  it("a day row's click narrows too, and an empty day empties the sheet honestly", async () => {
+    await mountLoaded();
+    const d = days()[2];
+    fireEvent.click(screen.getByTestId(`po-rail-call-day-${d}`));
+    // no call is due that day in the fixtures → no PO passes; the register
+    // says so instead of quietly ignoring the click
+    expect(hasRow("PO-9003")).toBe(false);
+    expect(hasRow("PO-9001")).toBe(false);
+    fireEvent.click(screen.getByTestId(`po-rail-call-day-${d}`));
+    expect(hasRow("PO-9001")).toBe(true);
+  });
+
+  it("Later renders only above zero — the fixtures have no beyond-window due", async () => {
+    await mountLoaded();
+    // Far-future ETAs open no tomorrow call at all (the window test guards
+    // the trigger), and the fixtures' ready-date calls are DUELESS (no
+    // order-by buffer in the settings mock) — a call with no due plans no
+    // day and never reaches `Later` (P1/T7).
+    expect(screen.queryByTestId("po-rail-call-later")).toBeNull();
   });
 });
