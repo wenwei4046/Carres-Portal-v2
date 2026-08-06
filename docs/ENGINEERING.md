@@ -195,9 +195,18 @@ isolation — **run twice before calling one a regression.**
 | Web | `https://carres-portal.pages.dev` · `pos.carresofficial.com` (dealer/showroom/bd) · `erp.carresofficial.com` (internal). **TWO Pages projects, ONE build** |
 | API | `https://carres-portal-v2-api.wwch.workers.dev` + `api.carresofficial.com` |
 | DB | Supabase `kfprgpjpaffedghytstl` — staging IS production |
-| Migration tail | `0323`. **Verify against the tracker before numbering.** |
-| Live web bundle | last recorded `index-8yEXF9xX.js` from main tip `41287939` (2026-08-05) |
-| Live Worker | last recorded `0a7949bd` from main tip `bef687a5` (2026-08-05) |
+| Migration tail | `0324`. **Verify against the tracker before numbering.** |
+| Live web bundle | last recorded `index-DVBECbVe.js` from main tip `1206ee43` (2026-08-06), both Pages projects |
+| Live Worker | last recorded version `17f0d7e3` from main tip `1206ee43` (2026-08-06) |
+
+> **⚠️ `0318` and `0319` are IN THE REPOSITORY AND ABSENT FROM THE TRACKER**, measured
+> 2026-08-06 — `supabase_migrations.schema_migrations` jumps `0317 → 0320`, while
+> `purchase_demands` (0319's table) is live. So they were applied by hand through the SQL
+> editor, which §5 already names as the thing that has caused two collisions. **Not a P0**
+> (the red line is an applied migration missing from the REPOSITORY, and both files are
+> present), but it means `0323` was NOT the tracker's tail by name and a chat numbering from
+> the tracker alone would have been misled. **Number from the MAX of all three sources, as the
+> Constitution says.** Reconciling the two rows is somebody's follow-up.
 
 **Full deployment history** → [`ENGINEERING.md`](ENGINEERING.md) and
 [`ENGINEERING.md`](ENGINEERING.md). **Open carry-forwards** →
