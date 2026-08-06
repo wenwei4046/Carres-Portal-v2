@@ -15,10 +15,15 @@ import {
   poOverdueDays,
   poReceivingProgress,
   poWorkStateOf,
+  productionWorkingDaysFor,
   purchasingActionButton,
   purchasingActionQueue,
+  purchasingCallCalendarDays,
+  purchasingCallCalendarOf,
+  callCalendarBucketOf,
   purchasingSupplierCallsOf,
   railItemLabel,
+  workWeekOffDaysFor,
   type PoCurrentAction,
   type PoRiskRow,
   type PoWorkspacePo,
@@ -27,6 +32,10 @@ import {
   type PurchasingOpenCall,
 } from "@carres/shared";
 import PurchasingTabs from "./PurchasingTabs";
+// The shared rail recipe (extracted 2026-08-03). Its own docblock told the
+// next chat to open this page to delete the inline pair and import these —
+// done with T2, so the rail recipe has one home again (§2.2).
+import { RailGroup, RailItem } from "./components/workspace-rail";
 import DataTable, {
   type Column,
   type ColumnFilter,
@@ -263,6 +272,18 @@ function workStateOf(po: operationPoListRow, today: string): WorkState {
 // every date column — here and, after Jess's live review, portal-wide —
 // speaks the same presets and the same Custom Date Range.
 
+/**
+ * `Fri 7 Aug` — a rail day row's word (Loo, 2026-08-06 · §2.4: weekday + date
+ * on EVERY row, one format; never a bare weekday, never Today/Tomorrow; the
+ * full date stays on the hover). Composed from the portal's own two date
+ * spellings so no third format is invented. To Order's rail holds the same
+ * one-line compose; merging the two copies belongs to a card that owns both
+ * pages — this one may not touch To Order.
+ */
+function railDayLabel(iso: string): string {
+  return `${fmtDate(iso).slice(0, 3)} ${fmtDateShort(iso).replace(/ \d{2}$/, "")}`;
+}
+
 /** The document's quiet control — one recipe, spelled once (§6.6). */
 /** Pane hide/expand chevron — one recipe, spelled once (§6.6). */
 const PANE_BTN =
@@ -360,6 +381,14 @@ export default function OperationPurchaseOrders() {
     new Map(),
   );
   const [stateSel, setStateSel] = useState<WorkState | null>(null);
+  /**
+   * T2 — the CALLS calendar's one selected row, or null = all. A string key
+   * (`overdue` · `later` · `day:2026-08-06`) rather than a discriminated
+   * object, so equality is `===` and the testid IS the state. Day rows are
+   * VIEWS, never actions — a call cannot be made early — so a click only
+   * narrows the listing; nothing is pre-ticked or pulled forward.
+   */
+  const [calSel, setCalSel] = useState<string | null>(null);
   /**
    * HOW this PO is being looked at — see `nextPoView`. WHICH PO it is lives in
    * `?po=`, and there is only ever one of it, so the panel and the expand
@@ -552,14 +581,45 @@ export default function OperationPurchaseOrders() {
   const etaOf = (po: operationPoListRow) =>
     etaByPo.get(po.id) ?? { date: po.eta_date, confirmed: false };
 
+  /**
+   * The `confirm_ready_date` facts (Slice 1, Loo 2026-08-06) — the engine's
+   * OPT-IN: without them it asks no ready-date question, so this page is the
+   * one place the call can open (Receiving's own mapping never carries them).
+   * Held back until Settings loads — a call whose due cannot be computed yet
+   * would flicker in dueless and then grow a clock.
+   */
+  const readyFactsOf = (po: operationPoListRow) => {
+    const settings = settingsQ.data;
+    if (!settings) return {};
+    const line = po.purchase_order_lines[0];
+    const modelId = line ? skuBySku.get(line.sku)?.modelId : undefined;
+    const category = modelId ? modelCategoryById.get(modelId) ?? null : null;
+    return {
+      expectedReadyDateIso: po.expected_ready_date ?? null,
+      customerDeliveryIso: po.customer_delivery ?? null,
+      readyDateDue: {
+        productionWorkingDays: productionWorkingDaysFor(settings, po.supplier_id, category),
+        factoryOffDays: workWeekOffDaysFor(settings, po.supplier_id),
+        bufferDays: settings.orderByBufferDays,
+      },
+    };
+  };
+
   /** The engine's open calls per PO — the ONLY urgency source on this page. */
   const callsByPo = useMemo(() => {
     const m = new Map<string, PurchasingOpenCall[]>();
     for (const po of pos) {
-      m.set(po.id, purchasingSupplierCallsOf(callPoOf(po), { todayIso: today }));
+      m.set(
+        po.id,
+        purchasingSupplierCallsOf(
+          { ...callPoOf(po), ...readyFactsOf(po) },
+          { todayIso: today },
+        ),
+      );
     }
     return m;
-  }, [pos, today]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pos, today, settingsQ.data, skuBySku, modelCategoryById]);
 
   const callsOf = (po: operationPoListRow) => callsByPo.get(po.id) ?? [];
 
@@ -569,10 +629,17 @@ export default function OperationPurchaseOrders() {
   const actionByPo = useMemo(() => {
     const m = new Map<string, PoCurrentAction | null>();
     for (const po of pos) {
-      m.set(po.id, poCurrentActionOf(callPoOf(po), { todayIso: today }));
+      m.set(
+        po.id,
+        poCurrentActionOf(
+          { ...callPoOf(po), ...readyFactsOf(po) },
+          { todayIso: today },
+        ),
+      );
     }
     return m;
-  }, [pos, today]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pos, today, settingsQ.data, skuBySku, modelCategoryById]);
   const actionOf = (po: operationPoListRow) => actionByPo.get(po.id) ?? null;
   const actionKeyOf = (a: PoCurrentAction | null): string =>
     a == null ? F_NONE : a.kind === "call" ? a.call.key : a.key;
@@ -635,6 +702,28 @@ export default function OperationPurchaseOrders() {
   const passesState = (p: operationPoListRow, sel: WorkState | null) =>
     sel === null || workStateOf(p, today) === sel;
 
+  /**
+   * T2 — the CALLS calendar's five day columns, and each open call's row key.
+   * `purchasingCallCalendarDays` is the engine's own window (today + four more
+   * OFFICE working days, weekends and `myHolidaySet()` public holidays both
+   * skipped), so the rail and the engine cannot disagree about which day a
+   * due belongs to. A dueless call keys to null — it has no day and can never
+   * be late (P1/T7), so it shows in the unfiltered listing only.
+   */
+  const calDays = useMemo(
+    () => purchasingCallCalendarDays({ todayIso: today }),
+    [today],
+  );
+  const calKeyOf = (c: PurchasingOpenCall): string | null => {
+    const b = callCalendarBucketOf(c, calDays, today);
+    if (!b) return null;
+    return b.kind === "day" ? `day:${b.dayIso}` : b.kind;
+  };
+
+  /** A calendar row filters to the POs carrying an open call on it. */
+  const passesCal = (p: operationPoListRow, sel: string | null) =>
+    sel === null || callsOf(p).some((c) => calKeyOf(c) === sel);
+
   function passesCol(
     po: operationPoListRow,
     colKey: string,
@@ -678,7 +767,7 @@ export default function OperationPurchaseOrders() {
 
   const rows = useMemo(() => {
     const base = searched.filter(
-      (p) => passesState(p, stateSel) && passesAllCols(p),
+      (p) => passesState(p, stateSel) && passesCal(p, calSel) && passesAllCols(p),
     );
     const sorted = [...base];
     if (sort) {
@@ -730,19 +819,35 @@ export default function OperationPurchaseOrders() {
     }
     return sorted;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searched, stateSel, colFilters, sort, callsByPo, riskByPo, supplierById]);
+  }, [searched, stateSel, calSel, colFilters, sort, callsByPo, riskByPo, supplierById]);
 
   const stateCounts = useMemo(() => {
     const m = new Map<WorkState, number>();
     for (const s of WORK_STATES) m.set(s, 0);
     for (const p of searched) {
-      if (!passesAllCols(p)) continue;
+      if (!passesAllCols(p) || !passesCal(p, calSel)) continue;
       const st = workStateOf(p, today);
       m.set(st, (m.get(st) ?? 0) + 1);
     }
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searched, colFilters, callsByPo]);
+  }, [searched, colFilters, callsByPo, calSel]);
+
+  /**
+   * T2 — the CALLS calendar's counts: supplier CALLS due per row, from the
+   * engine's own dues (the balance call counts per PO LINE, exactly as the
+   * engine returns it). Computed with the OTHER dimensions applied, so a
+   * visible number always matches its click.
+   */
+  const callCalendar = useMemo(() => {
+    const all: PurchasingOpenCall[] = [];
+    for (const p of searched) {
+      if (!passesAllCols(p) || !passesState(p, stateSel)) continue;
+      all.push(...callsOf(p));
+    }
+    return purchasingCallCalendarOf(all, { todayIso: today });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searched, colFilters, callsByPo, stateSel]);
 
   // ── Selection: ?po= is the one source; first row auto-selects. ──────────
 
@@ -1287,10 +1392,11 @@ export default function OperationPurchaseOrders() {
     [view.mode, view.poId],
   );
 
-  const filtered = colFilters.size > 0 || stateSel !== null;
+  const filtered = colFilters.size > 0 || stateSel !== null || calSel !== null;
   const clearAll = () => {
     setColFilters(new Map());
     setStateSel(null);
+    setCalSel(null);
   };
 
   return (
@@ -1337,65 +1443,68 @@ export default function OperationPurchaseOrders() {
           aria-label="Purchase order register"
           data-testid="po-rail"
         >
-          <div>
-            <div className="flex items-center px-1.5">
-              <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
-                Supplier Progress
-              </span>
-            </div>
-            <div className="mt-1 flex flex-col gap-0.5">
-              <button
-                type="button"
-                onClick={() => setStateSel(null)}
-                aria-pressed={stateSel === null}
-                data-testid="po-rail-state-all"
-                className={[
-                  "relative flex items-center gap-2 px-2 py-1.5 rounded-control text-left text-body w-full",
-                  stateSel === null
-                    ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
-                    : "text-kit-slate-11 hover:bg-kit-slate-3",
-                ].join(" ")}
-              >
-                {stateSel === null && (
-                  <span
-                    aria-hidden
-                    className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
-                  />
-                )}
-                <span className="flex-1 truncate">All</span>
-              </button>
-              {WORK_STATES.map((st) => {
-                const n = stateCounts.get(st) ?? 0;
-                const on = stateSel === st;
-                return (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => setStateSel(on ? null : st)}
-                    aria-pressed={on}
-                    data-testid={`po-rail-state-${st}`}
-                    className={[
-                      "relative flex items-center gap-2 px-2 py-1.5 rounded-control text-left text-body w-full",
-                      on
-                        ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
-                        : "text-kit-slate-11 hover:bg-kit-slate-3",
-                    ].join(" ")}
-                  >
-                    {on && (
-                      <span
-                        aria-hidden
-                        className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
-                      />
-                    )}
-                    <span className="flex-1 truncate">{WORK_STATE_LABEL[st]}</span>
-                    <span className="tabular-nums text-label text-kit-slate-9">
-                      {n}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {/* ── CALLS (T2, frozen with Loo 2026-08-06) — the week's factory
+               calls as a rolling five-office-working-day window. Overdue is
+               red and ABOVE the days, rendered only above zero; a zero-count
+               day STILL renders (purchasing is planned work); Later holds
+               everything beyond the window, only above zero. Counts are the
+               engine's own dues. Day rows are VIEWS — a call cannot be made
+               early — so a click only narrows the listing. No duty chip here:
+               identity's one home is the Team panel (§2.2). ── */}
+          <RailGroup title="Calls">
+            {callCalendar.overdue > 0 && (
+              <RailItem
+                label="Overdue"
+                count={callCalendar.overdue}
+                active={calSel === "overdue"}
+                onClick={() => setCalSel(calSel === "overdue" ? null : "overdue")}
+                danger
+                title={`${callCalendar.overdue} call${callCalendar.overdue === 1 ? "" : "s"} late`}
+                testId="po-rail-call-overdue"
+              />
+            )}
+            {callCalendar.days.map((d) => (
+              <RailItem
+                key={d.dayIso}
+                label={railDayLabel(d.dayIso)}
+                count={d.count}
+                active={calSel === `day:${d.dayIso}`}
+                onClick={() =>
+                  setCalSel(calSel === `day:${d.dayIso}` ? null : `day:${d.dayIso}`)
+                }
+                title={fmtDate(d.dayIso)}
+                testId={`po-rail-call-day-${d.dayIso}`}
+              />
+            ))}
+            {callCalendar.later > 0 && (
+              <RailItem
+                label="Later"
+                count={callCalendar.later}
+                active={calSel === "later"}
+                onClick={() => setCalSel(calSel === "later" ? null : "later")}
+                title={`Due after ${fmtDate(calDays[calDays.length - 1])}`}
+                testId="po-rail-call-later"
+              />
+            )}
+          </RailGroup>
+          <RailGroup title="Supplier Progress">
+            <RailItem
+              label="All"
+              active={stateSel === null}
+              onClick={() => setStateSel(null)}
+              testId="po-rail-state-all"
+            />
+            {WORK_STATES.map((st) => (
+              <RailItem
+                key={st}
+                label={WORK_STATE_LABEL[st]}
+                count={stateCounts.get(st) ?? 0}
+                active={stateSel === st}
+                onClick={() => setStateSel(stateSel === st ? null : st)}
+                testId={`po-rail-state-${st}`}
+              />
+            ))}
+          </RailGroup>
         </nav>
 
         {/* ── LISTING — the AutoCount work listing (kit DataTable) ──────── */}

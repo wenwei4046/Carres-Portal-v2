@@ -231,9 +231,41 @@ export function expectedArrivalOf(
     offDays: workWeekOffDaysFor(settings, args.supplierId),
     holidays,
   });
+  return arrivalFromReadyDate(settings, {
+    supplierId: args.supplierId,
+    readyDateIso: ready,
+    holidays,
+  });
+}
+
+/**
+ * THE TRANSIT LEG on its own — when the goods reach us, counted from a day the
+ * factory says they are FINISHED (Slice 1, Loo 2026-08-06: *"a ready date the
+ * factory gives MOVES the expected arrival — and never overwrites it"*).
+ *
+ * `expectedArrivalOf` calls this for its own second half, so the two share ONE
+ * spelling of `ready + transit on the OFFICE week` (Law 2A / Law D) — the
+ * register's earlier bug was exactly a second spelling that forgot this leg.
+ *
+ * NULL IS A REAL ANSWER: no transit number for this supplier → no arrival,
+ * never a guessed one (P1). `PO-2052` is the worked example: ready 12 Aug +
+ * Ohana's 1 transit day = 13 Aug, while the self-computed arrival said 14 Aug.
+ */
+export function arrivalFromReadyDate(
+  settings: Pick<PurchasingSettings, "suppliers">,
+  args: {
+    supplierId: string | null | undefined;
+    readyDateIso: string | null | undefined;
+    holidays?: ReadonlySet<string>;
+  },
+): string | null {
+  const ready = (args.readyDateIso ?? "").slice(0, 10);
+  if (ready.length !== 10) return null;
+  const transit = transitDaysFor(settings, args.supplierId);
+  if (transit == null) return null;
   return addWorkingDays(ready, transit, {
     offDays: PURCHASING_OFFICE_OFF_DAYS,
-    holidays,
+    holidays: args.holidays ?? myHolidaySet(),
   });
 }
 

@@ -14,6 +14,7 @@
 import { poReceivingProgress } from "./po-receiving";
 import {
   purchasingSupplierCallsOf,
+  readyDateCallOf,
   type PurchasingOpenCall,
   type SupplierCallPo,
 } from "./purchasing-supplier-calls";
@@ -238,11 +239,15 @@ export function comparePoRisk(a: PoRiskRow, b: PoRiskRow): number {
  * had asked it anything. It GREW: every PO born from 3 Aug carries a date, so
  * `Waiting Supplier Date` was becoming unreachable for new purchase orders.
  *
- * **It is NOT on `SupplierCallPo`, and that is structural rather than tidy.**
- * The call engine must keep firing on our own estimate — *"do NOT gate the
- * tomorrow call on provenance"* — because that phone call is exactly how the
- * first real date is obtained. A field the engine cannot see cannot be read by
- * it in some later edit.
+ * **The TOMORROW call may never read it** — *"do NOT gate the tomorrow call
+ * on provenance"* — because that phone call must keep firing on our own
+ * estimate: it is exactly how the first real date is obtained. Until Slice 1
+ * this was structural (the field was absent from `SupplierCallPo`); the
+ * `confirm_ready_date` call now carries it there as an OPT-IN fact, because
+ * its own ruled trigger is the reverse — a factory whose arrival promise
+ * stands has moved past the ready-date question. The rule therefore lives as
+ * a test now: `tomorrowDeliveryCallOf` fires with `supplierArrivalDateIso`
+ * present and unread, and a change that gates it fails there.
  */
 export interface PoWorkspacePo extends SupplierCallPo {
   /**
@@ -338,6 +343,13 @@ export function poCurrentActionOf(
   const state = poWorkStateOf(po, opts.todayIso);
   if (state === "completed" || state === "cancelled") return null;
   if (poOverdueDays(po, opts.todayIso) != null) {
+    // Q8 stands: overdue is the SAME action a dateless PO carries, merely
+    // late. Since Slice 1 that action IS the engine's `confirm_ready_date`
+    // call when the caller carries the facts — both rows then read one word
+    // AND hold a real due. A caller without the facts (Receiving's mapping)
+    // keeps the state word, exactly as before.
+    const ready = readyDateCallOf(po, opts);
+    if (ready) return { kind: "call", call: ready };
     return {
       kind: "state",
       key: "need_confirmation",
