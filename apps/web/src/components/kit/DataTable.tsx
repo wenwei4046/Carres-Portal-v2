@@ -329,6 +329,26 @@ export interface DataTableProps<Row> {
      */
     cells?: (row: Row) => readonly GroupRowCell[];
     /**
+     * ⭐ HOW THE GROUP LINE SEPARATES ITSELF (Loo, 2026-08-06, on the live
+     * page — *"every customer is grey too — i confused"*).
+     *
+     * `"band"` (DEFAULT, and what every page rendered before this prop) — the
+     * line wears the header's own grey.
+     *
+     * `"plain"` — the line stays WHITE and is separated by a RULE instead: the
+     * `divider` token (`slate-6`, whose stated use is *section split*) above
+     * it, because each group IS a section. Reach for it when groups are
+     * FREQUENT: one grey band under a header is structure, but six of them
+     * down a twenty-row sheet is a stripe pattern, and the eye starts reading
+     * the stripes instead of the data.
+     *
+     * **It is the shape BOTH of Loo's own references use** — AutoCount's `SO
+     * Batch Posting` parents are white with a rule, and the portal's Orders
+     * list is white throughout. Grey is CHROME (the surface law); a customer's
+     * order is DATA.
+     */
+    tone?: "band" | "plain";
+    /**
      * **T1 — a ☑ on the group line**: a convenience toggle over the group's
      * rows (all on / some = the indeterminate DASH / none). Renders only when
      * the table has `selection` and `state` returns non-null — a group with
@@ -638,6 +658,18 @@ export default function DataTable<Row>({
    * cell already carrying the 2px late bar, which must not be fought over.
    */
   const hasGutter = selection != null || expansion != null;
+
+  /**
+   * The group line's separation — see `group.tone`. `band` keeps the grey every
+   * page had before the prop existed; `plain` keeps the line white and puts a
+   * `divider` rule above it instead, which is what a SECTION break looks like
+   * everywhere else in this portal.
+   */
+  const plainGroup = group?.tone === "plain";
+  const groupCellWash = plainGroup ? "" : "bg-kit-slate-3";
+  const groupRowClass = plainGroup
+    ? "border-b border-kit-slate-5 [&>td]:border-t [&>td]:border-t-kit-slate-6"
+    : "border-b border-kit-slate-5";
   const columnRule = (ci: number) =>
     `${fills || ci < ordered.length - 1 ? COLUMN_RULE : ""} ${
       ci === 0 && hasGutter ? GUTTER_RULE : ""
@@ -948,11 +980,11 @@ export default function DataTable<Row>({
                      * free-text band; a band whose content IS columnar is the
                      * opposite case, and each cell keeps the column rule so the
                      * lattice runs through it. */
-                    <tr data-kit="data-group" className="border-b border-kit-slate-5">
-                      {expansion && <td className="px-2 h-9 bg-kit-slate-2 align-middle" />}
+                    <tr data-kit="data-group" className={groupRowClass}>
+                      {expansion && <td className={`px-2 h-9 align-middle ${groupCellWash}`} />}
                       {selection && (
                         <td
-                          className="px-2 h-9 bg-kit-slate-2 align-middle"
+                          className={`px-2 h-9 align-middle ${groupCellWash}`}
                           onClick={(e) => e.stopPropagation()}
                         >
                           {(() => {
@@ -978,7 +1010,7 @@ export default function DataTable<Row>({
                             <td
                               key={i}
                               colSpan={span}
-                              className={`px-2 h-9 bg-kit-slate-2 align-middle ${
+                              className={`px-2 h-9 align-middle ${groupCellWash} ${
                                 fills || at < ordered.length ? COLUMN_RULE : ""
                               } ${start === 0 && hasGutter ? GUTTER_RULE : ""} ${
                                 c.align === "right" ? "text-right" : ""
@@ -990,7 +1022,7 @@ export default function DataTable<Row>({
                         });
                       })()}
                       {fills && (
-                        <td aria-hidden="true" data-kit="table-filler" className="h-9 bg-kit-slate-2" />
+                        <td aria-hidden="true" data-kit="table-filler" className="h-9 bg-kit-slate-3" />
                       )}
                     </tr>
                   ) : (
@@ -1002,8 +1034,8 @@ export default function DataTable<Row>({
                    * itself into per-column cells would draw a line through the
                    * middle of one sentence — the customer's name and the date
                    * are ONE statement spanning the width, not seven facts. */
-                  <tr data-kit="data-group" className="border-b border-kit-slate-5">
-                    <td colSpan={colSpan} className="px-2 h-9 bg-kit-slate-2 align-middle">
+                  <tr data-kit="data-group" className={groupRowClass}>
+                    <td colSpan={colSpan} className={`px-2 h-9 align-middle ${groupCellWash}`}>
                       {group.header?.(row)}
                     </td>
                   </tr>
@@ -1091,7 +1123,7 @@ export default function DataTable<Row>({
                   <tr data-kit="data-expansion" data-row={id}>
                     <td
                       colSpan={colSpan}
-                      className="!h-auto !overflow-visible !whitespace-normal border-b border-kit-slate-5 bg-kit-slate-2 px-4 py-3 align-top"
+                      className="!h-auto !overflow-visible !whitespace-normal border-b border-kit-slate-5 bg-kit-slate-3 px-4 py-3 align-top"
                     >
                       {expansion!.render(row)}
                     </td>

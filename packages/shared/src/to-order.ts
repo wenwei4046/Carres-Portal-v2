@@ -139,6 +139,21 @@ export const TO_ORDER_WORDS = {
    * COPY-STANDARD owns as an order STATE — a different fact.
    */
   proceedDate: "Proceed date",
+  /**
+   * T1.1 (Loo, 2026-08-06) — the READY STOCK column's header.
+   *
+   * The same business term the rail and the group line already print for typed
+   * demand, in its third role: *how many of this item are already standing in
+   * the warehouse.* Loo asked for it by name — *"i need to add to show ready
+   * stock like autocount"* — after the number spent its whole life behind a ⊞
+   * that only appeared where stock existed: measured 2026-08-06, the warehouse
+   * held **91 free units across 50 SKUs** and exactly ONE row on the page said
+   * so.
+   *
+   * A buyer's first question is not *what do I order* — it is *must I order
+   * this at all*, and AutoCount answers it with a column. So does this.
+   */
+  colReadyStock: "Ready Stock",
   filterOverdue: "Overdue",
   /**
    * The empty state while a FILTER is narrowing — §8.2's law: no reachable

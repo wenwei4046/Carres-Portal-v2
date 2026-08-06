@@ -1012,7 +1012,7 @@ export default function OperationPurchaseOrders() {
                 data-testid={late ? "po-dot-late" : "po-dot-open"}
                 className={[
                   "w-1.5 h-1.5 rounded-full shrink-0",
-                  late ? "bg-kit-red-9" : "bg-kit-amber-9",
+                  late ? "bg-kit-red-9" : "bg-kit-amber-11",
                 ].join(" ")}
               />
             )}
@@ -1817,7 +1817,7 @@ function CallStatement({
         aria-hidden
         className={[
           "w-1.5 h-1.5 rounded-full shrink-0 self-center",
-          call.late ? "bg-kit-red-9" : "bg-kit-amber-9",
+          call.late ? "bg-kit-red-9" : "bg-kit-amber-11",
         ].join(" ")}
       />
       <span className="text-kit-slate-12">{purchasingActionQueue(call.key)}</span>
