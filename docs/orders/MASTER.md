@@ -518,6 +518,15 @@ already bought — while the drawer, which read both sources, disagreed with its
   the normal case here, so each SO in `so_refs[]` gets the same SKU set.
 - **ONE batched query for the whole page, never one per order** — asserted by a test.
 
+**VERIFIED ON PRODUCTION, and the gap is named rather than papered over.** The app serves the
+new bundle with its stylesheet applied (computed font **Inter** — the guard against an unstyled
+page reporting a clean pass), `po_skus` greps **0 → 1** on downloaded bundles, and the four
+orders are still covered at the database: **SO-1206 → PO-2036 · PO-2037 (7 SKUs)** ·
+**SO-1213 → PO-2036 (4)** · **SO-1216 → PO-2036 · PO-2037 (7)** · **SO-1257 → PO-2047 (2)**.
+**What was NOT verified with eyes: the authenticated Orders screen.** The browser pane holds no
+operator session and entering a password is a red line, so those four rows reading differently
+rests on the tests, the two negative controls and the bundle greps.
+
 ---
 
 # §6 · Delay planning
