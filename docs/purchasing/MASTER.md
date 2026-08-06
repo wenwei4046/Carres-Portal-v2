@@ -214,24 +214,45 @@ presses `Reserve`. Whole records only — a bulk record that would over-reserve 
 split. Every draw records a reason on K4's dated ledger.
 
 ### WHAT IS ON SCREEN TODAY
-`OperationToOrder.tsx`, 1,965 lines · route `/operation?tab=purchase` · *measured 2026-08-05
-from its docblock and its named controls; not read line by line.*
+`OperationToOrder.tsx` · route `/operation?tab=purchase` · *measured 2026-08-06: the grid
+rebuilt AutoCount-aligned (T1, approved by Loo on the exact mock), widths measured in a real
+browser, the longest customer name counted with SQL.*
 
 ```
 LEFT 200px    PO SCHEDULE  rolling calendar of configured PO days, red OVERDUE row above it
-                           which the next run may never swallow
-              CATEGORY     All · Mattress · Bedframe · Sofa, with UNIT counts (bare numbers)
+                           which the next run may never swallow; every day row prints
+                           weekday + date in ONE format (`Fri 7 Aug` — Loo 2026-08-06,
+                           never a bare weekday, never Today/Tomorrow; full date on hover)
+              CATEGORY     All · Mattress · Bedframe · Sofa · Pillow · Mattress Protector,
+                           with UNIT counts (bare numbers)
               + Create Purchase        the manual entrance — may never be missing
+              the rail is WHITE on the canvas grey, the other four tabs' base
 
 RIGHT         toolbar  pill search · selection state · Issue pill (exists ONLY while
                        something is selected) · quiet `Updated hh:mm`, never a Refresh
-              grid     SIX frozen columns · header-click sort · per-column ▼ filter
-                       the PO filter speaks business: `Not Ordered` / `Ordered`
-              footer   units per category
+              grid     SEVEN aligned columns (Loo's approved mock, 2026-08-06):
+                       ☑ · SO No. · Customer · Customer Delivery · Supplier · Qty ·
+                       Model · PO No.   widths 95 · 181 · 163 · 111 · 55 · 155 · 163
+                       ONE aligned ORDER LINE per customer order carries SO · customer ·
+                       date · (middle span: Proceed date + waited days · Partly ordered
+                       pill) · its PO numbers; item rows leave the identity cells blank.
+                       A Ready Stock group prints `Required By {date}` in the Delivery
+                       column and its destination under Customer.
+                       The order line's ☑ toggles ALL its builds (all / indeterminate /
+                       none); selection itself stays BUILD-level, frozen.
+                       Header-click sort on every column · per-column ▼: SO No. and
+                       Customer are searchable checklists, Customer Delivery is the
+                       portal's Excel date ▼ (Overdue · presets · month buckets ·
+                       Custom Date Range…), the PO filter speaks business
+                       (`Yet to Order` + the real numbers).
+                       Below ~1200px the grid SCROLLS SIDEWAYS, never truncates.
+              totals   `Total · N units` — ALWAYS ON, counts the visible sheet
+              footer   units per category for what is TICKED (P9) · Clear filters
 ```
 
 **Controls** `to-order-create-purchase` · `to-order-issue` · `to-order-retry` ·
 `to-order-cancel-dialog`/`-qty`/`-submit` · `to-order-clear-filters` · `to-order-footer-clear`
+· `to-order-total` · `kit-table-group-{orderId}` (the order line's ☑)
 
 **Create Purchase** is a multi-line dialog (`+ Add line` / `Remove`, 600px wide). One POST per
 line; a created line can never post twice because the loop walks only rows that are not
@@ -251,25 +272,43 @@ numbers can never disagree. A cancel stamps `cancelled_at` and lets the remainde
 - **Issue = zero popups, zero toasts.** Rows update in place; a partial failure stays with
   `Retry` until it succeeds.
 - **No Status pills, no Sort By, no Group By** — two filter doors for one fact is the Excel sin.
+  The `PO No.` column IS the status answer: `Yet to Order` / the number / the order line's
+  amber `Partly ordered` pill. **No Status column is ever added beside it.**
 - **The engine owns the schedule; operators own the PO.** `Hold` / `Skip` / `Next-Run` /
   `Postpone` are banned forever. The two exceptions are `Change Required Date` and
   `Cancel Purchase`.
 - **A sofa line with no modules carries its own quantity**; a group of more than one line is a
   build and collapses to 1.
+- **The grid is ALIGNED, never a sentence** (T1, Loo 2026-08-06). An order's facts print once,
+  on their own row, each in the column whose header names it — a free-text group header was
+  ruled hard to read and may not come back.
+- **Ordered rows STAY on the grid** in their 14-day window (AutoCount's Posted/Partial habit);
+  a PO number is the door to Purchase Orders with that document open — the PDF button lives
+  there, never here.
 - `resize` and `reorder` are **REFUSED here in writing** (Q6) and a test asserts their absence:
-  nothing truncates at any viewport from 1024 up, and there are four columns, not nine.
+  content sizes every column, nothing truncates at 1280, and **below ~1200px the grid scrolls
+  sideways rather than truncating** — Purchase Orders' own behaviour.
+- **NO `Ref` column, ever** (Loo, 2026-08-06). CR/TCF refs (`source_ref`) are AutoCount /
+  Master-Sheet IMPORT artifacts — test data only. Go-live starts clean with no such import, so
+  **no feature may depend on `source_ref` existing** and the ruling is recorded here so the
+  column never comes back.
+- **An order with no delivery date does not reach operation** (Loo, 2026-08-06). The SALES
+  portal enforces the date at entry; To Order's guard (a dateless customer order is not listed)
+  is a backstop, not the enforcement. **The enforcement build belongs to the Orders module,
+  not Purchasing.** A Ready Stock demand is exempt: its empty date means *buy on the next run*.
 
 ### APPROVED EVOLUTION
 - **The Planning Workspace** — the frozen information architecture made true on this tab.
-  Six measured gaps carry it: **G1** demand whose supplier cannot be resolved is silently
+  Five measured gaps carry it: **G1** demand whose supplier cannot be resolved is silently
   discarded · **G2** supplier resolution runs by TWO different rules in one module (planning
   by the item's own supplier; PO creation also by category coverage) · **G3** intentionally
   held demand produces no output at all — it must state what · who · why · until when ·
   **G5** `Check in` must leave To Order and **Receiving must gain PO · supplier · customer name
   · SO number · warehouse · ETA · quantity-still-to-receive FIRST**, or information is deleted ·
-  **G8** the group header's bare date carries TWO facts under NO word (a customer's
-  `Customer Delivery` and a typed demand's `Required By`) · **G10** the `PO No.` cell holds a
-  status word and an action button in one column, which §9's own rule forbids.
+  **G10** the `PO No.` cell holds a status word and an action button in one column, which §9's
+  own rule forbids. *(G8 — the group header's bare date carrying two facts under no word — was
+  CLOSED by T1, 2026-08-06: the customer's date sits under the `Customer Delivery` header and a
+  typed demand prints `Required By {date}`.)*
 - **The September switch** — Nice Future stops supplying; a new mattress supplier takes over on
   the subscription model. Sofa and bedframe unchanged.
 

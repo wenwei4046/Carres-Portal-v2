@@ -67,4 +67,12 @@
   # photo upload, read the browser console for `[Report Only]` violations, widen
   # the policy to cover any legitimate one, THEN rename this single header to
   # `Content-Security-Policy` and redeploy.
-  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://kfprgpjpaffedghytstl.supabase.co https://images.unsplash.com; connect-src 'self' https://kfprgpjpaffedghytstl.supabase.co https://api.carresofficial.com https://carres-portal-v2-api.wwch.workers.dev https://cdn.jsdelivr.net; form-action 'self' https://checkout.stripe.com https://pay.stripe.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'
+  # `frame-src 'self' blob:` was added 2026-08-06 BEFORE any enforcement, from a
+  # static audit rather than a console violation. `GenerateInvoiceOverlay.tsx`
+  # builds its preview with `URL.createObjectURL(blob)` (line 197) and feeds it
+  # straight to `<iframe src>` (line 401). With no `frame-src`, that iframe falls
+  # back to `default-src 'self'`, which does NOT admit `blob:` — so enforcing the
+  # policy as it stood would have blanked the invoice preview and said nothing
+  # about why. This is exactly the failure mode the Report-Only note above
+  # describes, caught one step earlier.
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://kfprgpjpaffedghytstl.supabase.co https://images.unsplash.com; connect-src 'self' https://kfprgpjpaffedghytstl.supabase.co https://api.carresofficial.com https://carres-portal-v2-api.wwch.workers.dev https://cdn.jsdelivr.net; frame-src 'self' blob:; form-action 'self' https://checkout.stripe.com https://pay.stripe.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'
