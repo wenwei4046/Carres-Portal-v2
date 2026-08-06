@@ -25,11 +25,15 @@ import { areaForAddress, detectState, locationForAddress } from "@/lib/region";
 import {
   type CoreCat,
   type ItemKind,
-  lineCategory,
   lineSize,
   accShort,
   lineKind,
 } from "@/lib/line-category";
+import {
+  legacyKeywordCategory,
+  type CategoryOf,
+} from "@carres/shared";
+import { useCategoryOf } from "@/lib/use-category-of";
 import { apiFetch } from "@/lib/api";
 import { orderBookingDay, orderControlOf } from "@/lib/order-booking";
 import { personLabel, personInitials, avatarColor } from "@/lib/staff-avatar";
@@ -980,16 +984,18 @@ export function orderActionSignalsOf(
   o: operationOrderListRow,
   stock: StockInfo,
   lines: { sku: string; qty: number }[],
+  categoryOf: CategoryOf = legacyKeywordCategory,
 ): OrderActionSignals {
   const se = stockEtaOf(o);
   // The stock-arrival window: MS/BF = deadline−7d, sofa = −5d. Still a flat
   // per-category number — the supplier master holds production time as free
   // text, so nothing can compute a real one yet (ORDERS-WORKING-FLOW §3).
+  // Category through THE resolver (V2 §3.1) — both pages pass the same one.
   const hasMsbf = lines.some((l) => {
-    const c = lineCategory(l.sku);
+    const c = categoryOf(l.sku);
     return c === "mattress" || c === "bedframe";
   });
-  const hasSofa = lines.some((l) => lineCategory(l.sku) === "sofa");
+  const hasSofa = lines.some((l) => categoryOf(l.sku) === "sofa");
   const money = moneyOf(o);
   return {
     completed: controlTabOf(o) === "completed",
@@ -1039,8 +1045,11 @@ export function openActionsOf(
   o: operationOrderListRow,
   stock: StockInfo,
   lines: { sku: string; qty: number }[],
+  categoryOf: CategoryOf = legacyKeywordCategory,
 ): OrderOpenAction[] {
-  return orderActionsInDisplayOrder(orderActionSignalsOf(o, stock, lines));
+  return orderActionsInDisplayOrder(
+    orderActionSignalsOf(o, stock, lines, categoryOf),
+  );
 }
 
 /** One action, one word — the label is never typed here. */
@@ -1060,8 +1069,9 @@ export function nextActionOf(
   o: operationOrderListRow,
   stock: StockInfo,
   lines: { sku: string; qty: number }[],
+  categoryOf: CategoryOf = legacyKeywordCategory,
 ): NextAction {
-  const s = orderActionSignalsOf(o, stock, lines);
+  const s = orderActionSignalsOf(o, stock, lines, categoryOf);
   const top = displayOrderAction(openOrderActions(s));
   if (!top) return act(orderIsDelivering(s) ? "delivering" : "done", "neutral");
   return top.locked
@@ -1173,24 +1183,32 @@ const CORE_ORDER: CoreCat[] = ["mattress", "bedframe", "sofa"];
  *  the 3 core types PLUS the two key accessories — an order matches when it has
  *  at least one line of that type. Each option carries its own predicate so core
  *  (lineCategory) and accessory (accShort) matching live in one list. */
-function orderHasCore(o: operationOrderListRow, cat: CoreCat): boolean {
-  return (o.order_lines ?? []).some((l) => lineCategory(l.sku) === cat);
+function orderHasCore(
+  o: operationOrderListRow,
+  cat: CoreCat,
+  categoryOf: CategoryOf,
+): boolean {
+  return (o.order_lines ?? []).some((l) => categoryOf(l.sku) === cat);
 }
-function orderHasAcc(o: operationOrderListRow, name: string): boolean {
+function orderHasAcc(
+  o: operationOrderListRow,
+  name: string,
+  categoryOf: CategoryOf,
+): boolean {
   return (o.order_lines ?? []).some(
-    (l) => lineCategory(l.sku) === "acc" && accShort(l.sku) === name,
+    (l) => categoryOf(l.sku) === "accessory" && accShort(l.sku) === name,
   );
 }
 const CATEGORY_OPTS: {
   key: string;
   label: string;
-  match: (o: operationOrderListRow) => boolean;
+  match: (o: operationOrderListRow, categoryOf: CategoryOf) => boolean;
 }[] = [
-  { key: "mattress", label: "Mattress", match: (o) => orderHasCore(o, "mattress") },
-  { key: "bedframe", label: "Bedframe", match: (o) => orderHasCore(o, "bedframe") },
-  { key: "sofa", label: "Sofa", match: (o) => orderHasCore(o, "sofa") },
-  { key: "pillow", label: "Pillow", match: (o) => orderHasAcc(o, "Pillow") },
-  { key: "mp", label: "M.P", match: (o) => orderHasAcc(o, "M.P") },
+  { key: "mattress", label: "Mattress", match: (o, c) => orderHasCore(o, "mattress", c) },
+  { key: "bedframe", label: "Bedframe", match: (o, c) => orderHasCore(o, "bedframe", c) },
+  { key: "sofa", label: "Sofa", match: (o, c) => orderHasCore(o, "sofa", c) },
+  { key: "pillow", label: "Pillow", match: (o, c) => orderHasAcc(o, "Pillow", c) },
+  { key: "mp", label: "M.P", match: (o, c) => orderHasAcc(o, "M.P", c) },
 ];
 
 /** Primary supplier of an order = the supplier of its FIRST core line
@@ -1202,13 +1220,14 @@ function primarySupplierId(
   o: operationOrderListRow,
   skuMeta: Map<string, { supplierId: string | null; category: string | null }>,
   suppliers: { id: string; cat_covered: string[] | null }[],
+  categoryOf: CategoryOf = legacyKeywordCategory,
 ): string | null {
   for (const l of o.order_lines ?? []) {
     const meta = skuMeta.get(l.sku);
     const cat =
       meta?.category && (CORE_ORDER as readonly string[]).includes(meta.category)
         ? meta.category
-        : (lineCategory(l.sku) as string);
+        : (categoryOf(l.sku) as string);
     if (!(CORE_ORDER as readonly string[]).includes(cat)) continue;
     const covering = suppliers.filter((s) => (s.cat_covered ?? []).includes(cat));
     const supplierId = meta?.supplierId ?? (covering.length === 1 ? covering[0].id : null);
@@ -1235,6 +1254,7 @@ function unitTotal(lines: { sku: string; qty: number }[]): number {
  *  {acc,3,"Pillow"}, {service,1,"Disposal"}]. */
 function itemTags(
   lines: { sku: string; qty: number }[],
+  categoryOf: CategoryOf = legacyKeywordCategory,
 ): { kind: ItemKind; qty: number; name: string }[] {
   // Core grouped by (category, size) so each size carries its OWN qty (Jess:
   // "1× MS(K)" + "2× MS(Q)", never a lazy "3× MS(K,Q)"). Sofas have no K/Q/S
@@ -1244,10 +1264,13 @@ function itemTags(
   for (const l of lines) {
     const q = Number(l.qty || 0);
     if (q <= 0) continue;
-    const cat = lineCategory(l.sku);
-    if (cat === "acc") {
+    const cat = categoryOf(l.sku);
+    if (cat === "accessory" || cat === "service" || cat === "guarantee") {
       const name = accShort(l.sku);
-      const e = rest.get(name) ?? { qty: 0, kind: lineKind(l.sku) };
+      const e = rest.get(name) ?? {
+        qty: 0,
+        kind: cat === "service" ? "service" : "acc",
+      };
       e.qty += q;
       rest.set(name, e);
       continue;
@@ -1290,17 +1313,24 @@ function tagLabel(t: { kind: ItemKind; qty: number; name: string }): string {
 }
 
 /** Flat single-line rollup (CSV export + tooltips). */
-function itemRollup(lines: { sku: string; qty: number }[]): string {
-  return itemTags(lines).map(tagLabel).join(" · ") || "—";
+function itemRollup(
+  lines: { sku: string; qty: number }[],
+  categoryOf: CategoryOf = legacyKeywordCategory,
+): string {
+  return itemTags(lines, categoryOf).map(tagLabel).join(" · ") || "—";
 }
 
 /** Units of ONE core category (Mattress / Bedframe / Sofa) on an order — the
  *  per-category count the MS / BF / Sofa columns show. Sums each line's qty
  *  whose `lineCategory` matches; accessories / services never count. */
-export function catQty(lines: { sku: string; qty: number }[], cat: CoreCat): number {
+export function catQty(
+  lines: { sku: string; qty: number }[],
+  cat: CoreCat,
+  categoryOf: CategoryOf = legacyKeywordCategory,
+): number {
   let t = 0;
   for (const l of lines)
-    if (lineCategory(l.sku) === cat) t += Number(l.qty || 0);
+    if (categoryOf(l.sku) === cat) t += Number(l.qty || 0);
   return t;
 }
 
@@ -1345,6 +1375,7 @@ const EXPORT_HEADER = [
 function exportRow(
   o: operationOrderListRow,
   partnerName: Map<string, string>,
+  categoryOf: CategoryOf = legacyKeywordCategory,
 ): string[] {
   const ls = o.order_lines ?? [];
   const loc = locationForAddress(o.customer_address ?? null);
@@ -1357,7 +1388,7 @@ function exportRow(
     o.customer_phone ?? "",
     o.customer_address ?? "",
     String(unitTotal(ls)),
-    itemRollup(ls),
+    itemRollup(ls, categoryOf),
     o.delivery_date_tbd ? "TBD" : o.delivery_date ?? "",
     o.proceed_date ?? "",
     loc.label ?? "",
@@ -1371,11 +1402,12 @@ function exportRow(
 export function buildOrdersCsv(
   rows: operationOrderListRow[],
   partnerName: Map<string, string>,
+  categoryOf: CategoryOf = legacyKeywordCategory,
 ): string {
   const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
   return [
     EXPORT_HEADER.join(","),
-    ...rows.map((o) => exportRow(o, partnerName).map(cell).join(",")),
+    ...rows.map((o) => exportRow(o, partnerName, categoryOf).map(cell).join(",")),
   ].join("\n");
 }
 
@@ -1386,6 +1418,7 @@ export function buildOrdersPrintHtml(
   rows: operationOrderListRow[],
   partnerName: Map<string, string>,
   title: string,
+  categoryOf: CategoryOf = legacyKeywordCategory,
 ): string {
   const esc = (v: string) =>
     v.replace(/[&<>]/g, (ch) => (ch === "&" ? "&amp;" : ch === "<" ? "&lt;" : "&gt;"));
@@ -1393,7 +1426,7 @@ export function buildOrdersPrintHtml(
   const body = rows
     .map(
       (o) =>
-        `<tr>${exportRow(o, partnerName).map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`,
+        `<tr>${exportRow(o, partnerName, categoryOf).map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`,
     )
     .join("");
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
@@ -1697,6 +1730,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
     () => new Map(suppliers.map((s) => [s.id, s.name])),
     [suppliers],
   );
+  // THE category resolver (V2 §3.1 — ask the catalog): normalized catalog
+  // match → keyword fallback, one chain for the facet, the tags, the columns
+  // and the action signals. Shares useCatalog's cache with skuMeta below.
+  const categoryOf = useCategoryOf();
   const skuMeta = useMemo(() => {
     const modelCat = new Map(
       (catalogQ.data?.models ?? []).map((m) => [m.id, m.category as string]),
@@ -1950,7 +1987,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // NEXT-verb counts over OPEN orders — the C-vocab QUEUES rows read these,
   // so queue numbers equal the NEXT column by construction.
   const nextVerbOf = (o: operationOrderListRow) =>
-    nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []).label;
+    nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? [], categoryOf)
+      .label;
   /** J3 — the drawer's journey strip, computed HERE and handed down.
    *
    *  The card's DONE WHEN is "the strip agrees with the ladder/queues for the
@@ -1977,12 +2015,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
     // order is worth — that is "we do not know", never "settled".
     const money = moneyOf(o);
     const holdAmount = money.known ? money.outstanding : null;
-    const na = nextActionOf(o, stock, o.order_lines ?? []);
+    const na = nextActionOf(o, stock, o.order_lines ?? [], categoryOf);
     // ONE signals object for the whole strip: the open actions AND their C6
     // checklists read it, so a step can never be measured against a different
     // reading of the order than the action it belongs to.
-    const actionSignals = orderActionSignalsOf(o, stock, o.order_lines ?? []);
-    const sid = primarySupplierId(o, skuMeta, suppliers);
+    const actionSignals = orderActionSignalsOf(
+      o,
+      stock,
+      o.order_lines ?? [],
+      categoryOf,
+    );
+    const sid = primarySupplierId(o, skuMeta, suppliers, categoryOf);
     // C3 — the drawer is the ONE surface that prints the delivering FACT in
     // full (`Delivering 27 Jul · 12pm–3pm`). The Orders row and the Delivery
     // detail pane both sit beside a cell that already carries the booked day,
@@ -2092,7 +2135,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const today = todayIso();
     const stat = new Map<string, { n: number; late: number }>();
     for (const o of liveScope) {
-      const a = nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []);
+      const a = nextActionOf(
+        o,
+        stockReadiness(o, availableBySku),
+        o.order_lines ?? [],
+        categoryOf,
+      );
       if (a.key !== "delay_planning" && a.key !== "arrange_new_delivery_date")
         continue;
       const cur = stat.get(a.label) ?? { n: 0, late: 0 };
@@ -2203,7 +2251,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       liveScope.filter((o) => {
         if (stockBucketOf(o, availableBySku) === "Ready") return false;
         if (!purchasingSettings) return false;
-        const cats = CORE_ORDER.filter((c) => orderHasCore(o, c));
+        const cats = CORE_ORDER.filter((c) => orderHasCore(o, c, categoryOf));
         return poUrgentBypass(
           o.delivery_date_tbd ? null : o.delivery_date,
           purchasingUrgentWindowDays(purchasingSettings, cats),
@@ -2248,7 +2296,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const supplierEntries = useMemo(() => {
     const m = new Map<string, number>();
     for (const o of liveScope) {
-      const sid = primarySupplierId(o, skuMeta, suppliers);
+      const sid = primarySupplierId(o, skuMeta, suppliers, categoryOf);
       if (!sid) continue;
       m.set(sid, (m.get(sid) ?? 0) + 1);
     }
@@ -2262,9 +2310,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
       CATEGORY_OPTS.map((opt) => ({
         key: opt.key,
         label: opt.label,
-        count: liveScope.filter(opt.match).length,
+        count: liveScope.filter((o) => opt.match(o, categoryOf)).length,
       })),
-    [liveScope],
+    [liveScope, categoryOf],
   );
 
   // STAFF facet counts — per pool member + "No PIC", over the current tab.
@@ -2409,7 +2457,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       r = r.filter((o) => logisticFilter.has(logisticOf(o, partnerName) ?? NO_CARRIER));
     if (supplierFilter.size > 0)
       r = r.filter((o) => {
-        const sid = primarySupplierId(o, skuMeta, suppliers);
+        const sid = primarySupplierId(o, skuMeta, suppliers, categoryOf);
         return sid !== null && supplierFilter.has(sid);
       });
     if (staffFilter)
@@ -2419,11 +2467,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
     if (owingOnly) r = r.filter((o) => moneyOf(o).owing);
     if (categoryFilter.size > 0) {
       const opts = CATEGORY_OPTS.filter((c) => categoryFilter.has(c.key));
-      r = r.filter((o) => opts.some((c) => c.match(o)));
+      r = r.filter((o) => opts.some((c) => c.match(o, categoryOf)));
     }
     return [...r].sort(compareBySlack);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, supplierFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, skuMeta, suppliers, tasksByOrder]);
+  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, supplierFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, skuMeta, suppliers, tasksByOrder, categoryOf]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -2500,12 +2548,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
   function exportSelectedCsv() {
     downloadCsv(
       `orders-${selectedOrders.length}.csv`,
-      buildOrdersCsv(selectedOrders, partnerName),
+      buildOrdersCsv(selectedOrders, partnerName, categoryOf),
     );
     setBulkMenu(null);
   }
   function printSelected() {
-    openPrint(buildOrdersPrintHtml(selectedOrders, partnerName, "Orders"));
+    openPrint(buildOrdersPrintHtml(selectedOrders, partnerName, "Orders", categoryOf));
     setBulkMenu(null);
   }
 
@@ -3692,6 +3740,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 o={o}
                 partnerName={partnerName}
                 availableBySku={availableBySku}
+                categoryOf={categoryOf}
                 tasks={orderTasks(o)}
                 selected={selected.has(o.id)}
                 onToggle={() => toggleOne(o.id)}
@@ -3710,7 +3759,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                    prove which supplier, and the line falls back to the role
                    word rather than to a blank. */
                 supplierName={(() => {
-                  const sid = primarySupplierId(o, skuMeta, suppliers);
+                  const sid = primarySupplierId(o, skuMeta, suppliers, categoryOf);
                   return sid ? supplierNameById.get(sid) ?? null : null;
                 })()}
                 onNextAction={(verb) => {
@@ -4568,10 +4617,14 @@ function OrderRow({
   hasPendingChange,
   supplierName,
   onNextAction,
+  categoryOf,
 }: {
   o: operationOrderListRow;
   partnerName: Map<string, string>;
   availableBySku?: Map<string, number>;
+  /** THE category resolver (V2 §3.1) — handed down so the row's MS/BF/Sofa
+   *  columns and Next pill read the same catalog answer as the facets. */
+  categoryOf: CategoryOf;
   /** Open follow-up ops_tasks for this order (#2) — drives the flag + Action cell. */
   tasks: OpsTask[];
   selected: boolean;
@@ -4601,9 +4654,9 @@ function OrderRow({
   const stock = stockReadiness(o, availableBySku);
   const se = stockEtaOf(o);
   const loc = locationForAddress(o.customer_address ?? null);
-  const msQty = catQty(lines, "mattress");
-  const bfQty = catQty(lines, "bedframe");
-  const sofaQty = catQty(lines, "sofa");
+  const msQty = catQty(lines, "mattress", categoryOf);
+  const bfQty = catQty(lines, "bedframe", categoryOf);
+  const sofaQty = catQty(lines, "sofa", categoryOf);
 
   const logi = logisticStateOf(o, partnerName);
   const completed = controlTabOf(o) === "completed";
@@ -4883,7 +4936,7 @@ function OrderRow({
           // T7's "Upload delivery photo" (no photo on file) and, since C2,
           // "Collect RM …" — money is its own track and it SURVIVES delivery
           // (ORDERS-WORKING-FLOW §3). Delivered is not paid.
-          const na = nextActionOf(o, stock, lines);
+          const na = nextActionOf(o, stock, lines, categoryOf);
           if (!na.label) return null;
           if (completed && na.key === "done") return null;
           const m = moneyOf(o);

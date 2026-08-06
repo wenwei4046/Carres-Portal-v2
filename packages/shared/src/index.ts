@@ -1620,6 +1620,20 @@ export {
 // cosmetic case/separator drift (the catalog is empty) — the ops stock-reserve link.
 export { deriveSkuCode, normalizeSkuKey } from "./sku-code";
 
+// V2 · THE category rule (ERP-ARCHITECTURE §3.1 / §4) — the ONE answer to
+// "what kind of product is this?". Every module asks the catalog through this;
+// the keyword rule below survives only as its internal fallback.
+export {
+  CATALOG_CATEGORIES,
+  makeCategoryOf,
+  categoryEntriesFromCatalog,
+  legacyKeywordCategory,
+  storageCategoryOf,
+  type CatalogCategory,
+  type CatalogCategoryEntry,
+  type CategoryOf,
+} from "./catalog-category";
+
 // Order-line classification + readiness (D1, 2026-07-26) — moved from
 // apps/web/src/lib so the API booking gate and the drawer badge read ONE rule.
 export {

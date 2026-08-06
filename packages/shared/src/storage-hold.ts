@@ -39,6 +39,7 @@
  * release; only `released` changes. That is what keeps the money action open on
  * a released order — Jess: "an override must never quietly forgive money".
  */
+import type { CategoryOf } from "./catalog-category";
 import { computeOrderStorage } from "./schemas/ops-order-control";
 
 export interface StorageHoldInput {
@@ -55,6 +56,9 @@ export interface StorageHoldInput {
   importedSof?: number | string | null;
   /** The order's line SKUs — they decide which rate applies (MS/BF · sofa). */
   skus: readonly string[];
+  /** V2 (Decision ①) — the catalog resolver (`makeCategoryOf`); the rate asks
+   *  the CATALOG. Omitted → the one fallback chain answers. */
+  categoryOf?: CategoryOf;
   /** Today, as an ISO date. Handed in so this stays pure. */
   asOf: string;
   /** `ops_order_control.storage_collected_at` — the fee is in. */
@@ -90,6 +94,7 @@ export function storageHold({
   importedMsbf,
   importedSof,
   skus,
+  categoryOf,
   asOf,
   collectedAt,
   waiverStatus,
@@ -102,6 +107,7 @@ export function storageHold({
     storageFrom,
     override: hasOverride ? n(override) : null,
     skus,
+    categoryOf,
     asOf,
   });
   const imported = n(importedMsbf) + n(importedSof);

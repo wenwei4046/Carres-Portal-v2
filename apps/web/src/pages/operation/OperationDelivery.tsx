@@ -35,6 +35,7 @@ import {
   usePurchasingSettings,
   type operationOrderListRow,
 } from "@/lib/queries";
+import { useCategoryOf } from "@/lib/use-category-of";
 import { orderBookingDay, orderControlOf } from "@/lib/order-booking";
 import { fmtDate } from "@/lib/fmt-date";
 import { cjkClassName } from "@/lib/cjk";
@@ -130,6 +131,7 @@ export default function OperationDelivery() {
   const ordersQ = useOperationOrders();
   const partnersQ = useDeliveryPartners();
   const stockQ = useOperationStock();
+  const categoryOf = useCategoryOf();
 
   const [view, setView] = useState<ViewKey>("queues");
   const [queueFilter, setQueueFilter] = useState<Set<DeliveryQueueKey>>(new Set());
@@ -211,7 +213,14 @@ export default function OperationDelivery() {
   const rows = useMemo(() => {
     const out: DeliveryRow[] = [];
     for (const o of orders) {
-      const next = nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []);
+      // categoryOf: the SAME resolver the Orders list passes, so the two pages
+      // structurally cannot name one order differently (§2 frozen rule).
+      const next = nextActionOf(
+        o,
+        stockReadiness(o, availableBySku),
+        o.order_lines ?? [],
+        categoryOf,
+      );
       const def = deliveryQueueForLabel(next.label);
       const anchor = def ? deliveryStepAnchor(o, def.key) : null;
       const state = logisticStateOf(o, partnerNameById);
@@ -246,7 +255,7 @@ export default function OperationDelivery() {
       });
     }
     return sortDeliveryRows(out);
-  }, [orders, availableBySku, partnerNameById, holidayOpts, today, queueLeads]);
+  }, [orders, availableBySku, partnerNameById, holidayOpts, today, queueLeads, categoryOf]);
 
   /** The board itself — the queue-carrying rows, in delivery-risk order. */
   const board = useMemo(

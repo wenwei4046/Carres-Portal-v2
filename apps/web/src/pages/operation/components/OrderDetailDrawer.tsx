@@ -52,6 +52,7 @@ import { toast } from "sonner";
 import {
   purchasingActionButton,
   computeStorageFee,
+  storageCategoryForSku,
   defaultStorageStart,
   normalizeSkuKey,
   DELIVERY_TIME_SLOTS,
@@ -113,6 +114,7 @@ import {
   type operationOrderDetailLine,
   type operationOrderDetailPo,
 } from "@/lib/queries";
+import { useCategoryOf } from "@/lib/use-category-of";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { orderStatusPill } from "@/lib/status-pill";
@@ -1508,6 +1510,8 @@ function DrawerBody({
   // Collected. Fetched at the drawer level so the header sticker + status strip +
   // Money card all read ONE Outstanding.
   const paymentsQuery = useOrderPayments(order.id);
+  // THE category resolver (V2 §3.1 — ask the catalog); shared catalog cache.
+  const categoryOf = useCategoryOf();
   // The order's assigned logistic NAME (ops_assigned_logistic is a partner id) —
   // drives the default stock Location (final consolidation point, not supplier).
   const { data: partnersData } = useDeliveryPartners();
@@ -1551,11 +1555,15 @@ function DrawerBody({
     if (po.eta_date)
       for (const pl of po.lines)
         if (!poEtaBySku.has(pl.sku)) poEtaBySku.set(pl.sku, po.eta_date);
-  const hasMsbf = lines.some((l) => {
-    const c = lineCategory(l.sku);
-    return c === "mattress" || c === "bedframe";
-  });
-  const hasSof = lines.some((l) => lineCategory(l.sku) === "sofa");
+  // Storage scope through the ONE category chain (V2 Decision ① / D9) — the
+  // same `storageCategoryForSku(sku, categoryOf)` the Payments desk and the
+  // server-side dispatch gate ask, so the three can never disagree again.
+  const hasMsbf = lines.some(
+    (l) => storageCategoryForSku(l.sku, categoryOf) === "msbf",
+  );
+  const hasSof = lines.some(
+    (l) => storageCategoryForSku(l.sku, categoryOf) === "sof",
+  );
   // Contact-by basis (Jess): operation must reach the customer N days BEFORE the
   // deadline to confirm stock + timing. N = ops_order_control.contact_by_days
   // (default 3, editable per order); a daily cron (migration 0197) drops the

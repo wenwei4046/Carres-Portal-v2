@@ -43,6 +43,7 @@ import {
   type SofaLoanDto,
   type BalancePayStatus,
 } from "@carres/shared";
+import { catalogCategoryOf } from "../../lib/catalog-category-of";
 import { requireDuty } from "../../lib/duties";
 import { mapPgError } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
@@ -126,7 +127,8 @@ async function loadBookingContext(
   // C5: the `order_payments` read is GONE. It holds zero rows and no live
   // payment path writes it, so summing it made "collected" RM 0 for every
   // order and the gate refused bookings for customers who had already paid.
-  const [linesRes, addonsRes, controlRes, reservedRes] = await Promise.all([
+  const [linesRes, addonsRes, controlRes, reservedRes, categoryOf] =
+    await Promise.all([
     sb.from("order_lines").select("sku, qty, unit_price").eq("order_id", orderId),
     sb.from("order_addons").select("qty, unit_price").eq("order_id", orderId),
     sb
@@ -143,6 +145,7 @@ async function loadBookingContext(
       .select("sku, qty")
       .eq("status", "reserved")
       .eq("reserved_ref", soRef),
+    catalogCategoryOf(sb),
   ]);
   for (const r of [linesRes, addonsRes, controlRes, reservedRes]) {
     if (r.error) {
@@ -168,6 +171,7 @@ async function loadBookingContext(
     importedMsbf: (ctrl?.storage_fee_msbf as number | string | null) ?? null,
     importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
     skus: lines.map((l) => l.sku),
+    categoryOf,
     asOf: new Date().toISOString().slice(0, 10),
     collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
     waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,

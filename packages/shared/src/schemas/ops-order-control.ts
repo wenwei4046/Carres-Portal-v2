@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  legacyKeywordCategory,
+  storageCategoryOf,
+  type CategoryOf,
+} from "../catalog-category";
 import { DELIVERY_REASON_KEYS } from "../delivery-reasons";
 
 /**
@@ -627,33 +632,33 @@ export interface ReceiveLineResult {
 
 // ── Storage scope + collect-before-delivery gate ─────────────────────────────
 /** Storage-fee scope of a SKU: mattress/bed frame bills at the MS/BF rate, sofa
- *  at the SOF rate, everything else is out of scope. Verbatim port of
- *  OperationPayments' `catOf` so the panel, the drawer, and the server-side
- *  delivery gate all categorise a line the SAME way (one definition, three
- *  consumers). */
+ *  at the SOF rate, everything else is out of scope.
+ *
+ *  V2 (Decision ①): the rate asks the CATALOG — pass `categoryOf` built from
+ *  product_skus ⋈ product_models (`makeCategoryOf`). Without it the ONE
+ *  fallback chain answers (the keyword rule inside catalog-category), which
+ *  replaced the old prefix-only rule here — that rule read "other" for every
+ *  live SKU (D9), so the fee computed zero the moment storage was turned on. */
 export type StorageCategory = "msbf" | "sof" | "other";
-export function storageCategoryForSku(sku: string): StorageCategory {
-  const s = sku.trim().toLowerCase();
-  if (
-    s.startsWith("mattress:") ||
-    s.startsWith("bedframe:") ||
-    /^ms\d/.test(s) ||
-    /^bf\d/.test(s)
-  )
-    return "msbf";
-  if (s.startsWith("sofa:") || /^(sof|sf)\d/.test(s)) return "sof";
-  return "other";
+export function storageCategoryForSku(
+  sku: string,
+  categoryOf?: CategoryOf,
+): StorageCategory {
+  return storageCategoryOf((categoryOf ?? legacyKeywordCategory)(sku));
 }
 
 /** Whether an order's lines pull in the MS/BF and/or Sofa storage rate. */
-export function orderStorageScope(skus: ReadonlyArray<string>): {
+export function orderStorageScope(
+  skus: ReadonlyArray<string>,
+  categoryOf?: CategoryOf,
+): {
   hasMsbf: boolean;
   hasSof: boolean;
 } {
   let hasMsbf = false;
   let hasSof = false;
   for (const sku of skus) {
-    const cat = storageCategoryForSku(sku);
+    const cat = storageCategoryForSku(sku, categoryOf);
     if (cat === "msbf") hasMsbf = true;
     else if (cat === "sof") hasSof = true;
   }
@@ -678,6 +683,8 @@ export function computeOrderStorage(opts: {
   override: number | null;
   skus: ReadonlyArray<string>;
   asOf: string;
+  /** V2 (Decision ①) — the catalog resolver; the rate asks the CATALOG. */
+  categoryOf?: CategoryOf;
 }): {
   hasMsbf: boolean;
   hasSof: boolean;
@@ -685,7 +692,7 @@ export function computeOrderStorage(opts: {
   amount: number;
   due: boolean;
 } {
-  const { hasMsbf, hasSof } = orderStorageScope(opts.skus);
+  const { hasMsbf, hasSof } = orderStorageScope(opts.skus, opts.categoryOf);
   // No ETA fallback — storage is owed only when the operator set storageFrom.
   const fee = computeStorageFee({
     startDate: opts.storageFrom,

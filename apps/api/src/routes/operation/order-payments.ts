@@ -10,6 +10,7 @@ import {
   deliveryReasonLabel,
   storageHold,
 } from "@carres/shared";
+import { catalogCategoryOf } from "../../lib/catalog-category-of";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -349,7 +350,7 @@ async function storageFeeOf(
   orderId: string,
 ): Promise<number | null> {
   try {
-    const [ctrlRes, linesRes] = await Promise.all([
+    const [ctrlRes, linesRes, categoryOf] = await Promise.all([
       sb
         .from("ops_order_control")
         .select(
@@ -358,6 +359,7 @@ async function storageFeeOf(
         .eq("order_id", orderId)
         .maybeSingle(),
       sb.from("order_lines").select("sku").eq("order_id", orderId),
+      catalogCategoryOf(sb),
     ]);
     const ctrl = ctrlRes?.data ?? null;
     if (!ctrl) return null;
@@ -368,6 +370,7 @@ async function storageFeeOf(
       importedSof: ctrl.storage_fee_sof ?? null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       skus: (linesRes?.data ?? []).map((l: any) => String(l.sku)),
+      categoryOf,
       asOf: new Date().toISOString().slice(0, 10),
       collectedAt: ctrl.storage_collected_at ?? null,
       waiverStatus: ctrl.storage_waiver_status ?? null,

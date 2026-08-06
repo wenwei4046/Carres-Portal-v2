@@ -17,6 +17,7 @@ import {
   PAYMENT_STATUSES,
   collectPillLabel,
   computeStorageFee,
+  storageCategoryForSku,
   orderActionLine,
   orderActionQueue,
   orderMoney,
@@ -32,6 +33,7 @@ import { rm } from "@/lib/format-currency";
 import { fmtDate } from "@/lib/fmt-date";
 import { orderStatusPill } from "@/lib/status-pill";
 import { useOrderPayments, useRecordPayment } from "@/lib/queries";
+import { useCategoryOf } from "@/lib/use-category-of";
 import { renderReceiptPdf } from "@/lib/pdf/render";
 import { useAuth } from "@/lib/auth";
 import { areaForAddress, detectState } from "@/lib/region";
@@ -139,15 +141,12 @@ function num(v: number | string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Item-category check for storage scope: mattress/bed frame → MS/BF rate, sofa
- *  → SOF rate. Mirrors OperationOrdersControl.lineCategory but grouped. */
-function catOf(sku: string): "msbf" | "sof" | "other" {
-  const s = sku.trim().toLowerCase();
-  if (s.startsWith("mattress:") || s.startsWith("bedframe:") || /^ms\d/.test(s) || /^bf\d/.test(s))
-    return "msbf";
-  if (s.startsWith("sofa:") || /^(sof|sf)\d/.test(s)) return "sof";
-  return "other";
-}
+// The local `catOf` copy is DELETED (V2 Decision ① / D9, 2026-08-06). It was
+// the FOURTH derivation of "what kind of product is this?" — prefix-only, so
+// it read "other" for every live SKU and the storage fee computed zero. The
+// ONE answer is `storageCategoryForSku(sku, categoryOf)` with the catalog
+// resolver from `useCategoryOf()` — the same chain the drawer and the server
+// gate ask.
 
 // C11 — this file's own `rm` body is DELETED (2026-08-05). It was the FOURTH
 // copy of the same six lines, and a fourth copy is how the fifth one came to
@@ -378,6 +377,7 @@ export default function OperationPayments() {
   const [collectFor, setCollectFor] = useState<Row | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const today = todayIso();
+  const categoryOf = useCategoryOf();
 
   const { data, isLoading, isError, error, refetch, dataUpdatedAt } = useQuery<{
     rows: RawPaymentRow[];
@@ -403,8 +403,12 @@ export default function OperationPayments() {
         ? r.ops_order_control[0] ?? null
         : r.ops_order_control;
       const lines = r.order_lines ?? [];
-      const hasMsbf = lines.some((l) => catOf(l.sku) === "msbf");
-      const hasSof = lines.some((l) => catOf(l.sku) === "sof");
+      const hasMsbf = lines.some(
+        (l) => storageCategoryForSku(l.sku, categoryOf) === "msbf",
+      );
+      const hasSof = lines.some(
+        (l) => storageCategoryForSku(l.sku, categoryOf) === "sof",
+      );
       const storageFrom = ctrl?.storage_from ?? null;
       const storageOverride = num(ctrl?.storage_fee_override);
       // Storage free-window basis: a recorded extension's snapshotted original
@@ -479,7 +483,7 @@ export default function OperationPayments() {
         lastChasedAt: ctrl?.last_chased_at ?? null,
       };
     });
-  }, [data, today]);
+  }, [data, today, categoryOf]);
 
   const baseRows = useMemo(
     () => (view === "all" ? rows : rows.filter(isOwingRow)),

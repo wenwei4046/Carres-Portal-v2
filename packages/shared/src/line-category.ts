@@ -47,7 +47,7 @@ export function lineCategory(sku: string): CoreCat | "acc" {
     return "mattress";
   if (/^ms[0-9]/.test(n)) return "mattress";
   if (/^bf[0-9]/.test(n)) return "bedframe";
-  if (/^sf[0-9]/.test(n)) return "sofa";
+  if (/^(?:sf|sof)[0-9]/.test(n)) return "sofa";
   return "acc";
 }
 

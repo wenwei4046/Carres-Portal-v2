@@ -1,4 +1,5 @@
 import { storageHold } from "@carres/shared";
+import { catalogCategoryOf } from "./catalog-category-of";
 
 /**
  * Collect-before-delivery gate (balance job — Jess 2026-06-23: collect the
@@ -27,7 +28,7 @@ export async function storageBlock(
   orderId: string,
 ): Promise<{ message: string; amount: number } | null> {
   try {
-    const [controlRes, linesRes] = await Promise.all([
+    const [controlRes, linesRes, categoryOf] = await Promise.all([
       sb
         .from("ops_order_control")
         .select(
@@ -36,6 +37,7 @@ export async function storageBlock(
         .eq("order_id", orderId)
         .maybeSingle(),
       sb.from("order_lines").select("sku").eq("order_id", orderId),
+      catalogCategoryOf(sb),
     ]);
 
     const control = controlRes?.data ?? null;
@@ -50,6 +52,7 @@ export async function storageBlock(
       importedMsbf: control.storage_fee_msbf ?? null,
       importedSof: control.storage_fee_sof ?? null,
       skus,
+      categoryOf,
       asOf: new Date().toISOString().slice(0, 10),
       collectedAt: control.storage_collected_at ?? null,
       waiverStatus: control.storage_waiver_status ?? null,
