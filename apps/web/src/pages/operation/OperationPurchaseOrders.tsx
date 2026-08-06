@@ -15,16 +15,19 @@ import {
   poOverdueDays,
   poReceivingProgress,
   poWorkStateOf,
+  productionWorkingDaysFor,
   purchasingActionButton,
   purchasingActionQueue,
   purchasingSupplierCallsOf,
   railItemLabel,
+  workWeekOffDaysFor,
   type PoCurrentAction,
   type PoRiskRow,
   type PoWorkspacePo,
   type PoWorkState,
   type ProductSkuDto,
   type PurchasingOpenCall,
+  type PurchasingSupplierCallKey,
 } from "@carres/shared";
 import PurchasingTabs from "./PurchasingTabs";
 import DataTable, {
@@ -360,6 +363,8 @@ export default function OperationPurchaseOrders() {
     new Map(),
   );
   const [stateSel, setStateSel] = useState<WorkState | null>(null);
+  /** Slice 1 — the CALLS rail: one selected call queue, or null = all. */
+  const [callSel, setCallSel] = useState<PurchasingSupplierCallKey | null>(null);
   /**
    * HOW this PO is being looked at — see `nextPoView`. WHICH PO it is lives in
    * `?po=`, and there is only ever one of it, so the panel and the expand
@@ -552,14 +557,45 @@ export default function OperationPurchaseOrders() {
   const etaOf = (po: operationPoListRow) =>
     etaByPo.get(po.id) ?? { date: po.eta_date, confirmed: false };
 
+  /**
+   * The `confirm_ready_date` facts (Slice 1, Loo 2026-08-06) — the engine's
+   * OPT-IN: without them it asks no ready-date question, so this page is the
+   * one place the call can open (Receiving's own mapping never carries them).
+   * Held back until Settings loads — a call whose due cannot be computed yet
+   * would flicker in dueless and then grow a clock.
+   */
+  const readyFactsOf = (po: operationPoListRow) => {
+    const settings = settingsQ.data;
+    if (!settings) return {};
+    const line = po.purchase_order_lines[0];
+    const modelId = line ? skuBySku.get(line.sku)?.modelId : undefined;
+    const category = modelId ? modelCategoryById.get(modelId) ?? null : null;
+    return {
+      expectedReadyDateIso: po.expected_ready_date ?? null,
+      customerDeliveryIso: po.customer_delivery ?? null,
+      readyDateDue: {
+        productionWorkingDays: productionWorkingDaysFor(settings, po.supplier_id, category),
+        factoryOffDays: workWeekOffDaysFor(settings, po.supplier_id),
+        bufferDays: settings.orderByBufferDays,
+      },
+    };
+  };
+
   /** The engine's open calls per PO — the ONLY urgency source on this page. */
   const callsByPo = useMemo(() => {
     const m = new Map<string, PurchasingOpenCall[]>();
     for (const po of pos) {
-      m.set(po.id, purchasingSupplierCallsOf(callPoOf(po), { todayIso: today }));
+      m.set(
+        po.id,
+        purchasingSupplierCallsOf(
+          { ...callPoOf(po), ...readyFactsOf(po) },
+          { todayIso: today },
+        ),
+      );
     }
     return m;
-  }, [pos, today]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pos, today, settingsQ.data, skuBySku, modelCategoryById]);
 
   const callsOf = (po: operationPoListRow) => callsByPo.get(po.id) ?? [];
 
@@ -569,10 +605,17 @@ export default function OperationPurchaseOrders() {
   const actionByPo = useMemo(() => {
     const m = new Map<string, PoCurrentAction | null>();
     for (const po of pos) {
-      m.set(po.id, poCurrentActionOf(callPoOf(po), { todayIso: today }));
+      m.set(
+        po.id,
+        poCurrentActionOf(
+          { ...callPoOf(po), ...readyFactsOf(po) },
+          { todayIso: today },
+        ),
+      );
     }
     return m;
-  }, [pos, today]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pos, today, settingsQ.data, skuBySku, modelCategoryById]);
   const actionOf = (po: operationPoListRow) => actionByPo.get(po.id) ?? null;
   const actionKeyOf = (a: PoCurrentAction | null): string =>
     a == null ? F_NONE : a.kind === "call" ? a.call.key : a.key;
@@ -635,6 +678,10 @@ export default function OperationPurchaseOrders() {
   const passesState = (p: operationPoListRow, sel: WorkState | null) =>
     sel === null || workStateOf(p, today) === sel;
 
+  /** Slice 1 — a call tile filters to the POs carrying that OPEN call. */
+  const passesCall = (p: operationPoListRow, sel: PurchasingSupplierCallKey | null) =>
+    sel === null || callsOf(p).some((c) => c.key === sel);
+
   function passesCol(
     po: operationPoListRow,
     colKey: string,
@@ -678,7 +725,7 @@ export default function OperationPurchaseOrders() {
 
   const rows = useMemo(() => {
     const base = searched.filter(
-      (p) => passesState(p, stateSel) && passesAllCols(p),
+      (p) => passesState(p, stateSel) && passesCall(p, callSel) && passesAllCols(p),
     );
     const sorted = [...base];
     if (sort) {
@@ -730,19 +777,49 @@ export default function OperationPurchaseOrders() {
     }
     return sorted;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searched, stateSel, colFilters, sort, callsByPo, riskByPo, supplierById]);
+  }, [searched, stateSel, callSel, colFilters, sort, callsByPo, riskByPo, supplierById]);
 
   const stateCounts = useMemo(() => {
     const m = new Map<WorkState, number>();
     for (const s of WORK_STATES) m.set(s, 0);
     for (const p of searched) {
-      if (!passesAllCols(p)) continue;
+      if (!passesAllCols(p) || !passesCall(p, callSel)) continue;
       const st = workStateOf(p, today);
       m.set(st, (m.get(st) ?? 0) + 1);
     }
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searched, colFilters, callsByPo]);
+  }, [searched, colFilters, callsByPo, callSel]);
+
+  /**
+   * Slice 1 — the CALLS rail counts, in the workflow's own order (§4: the
+   * three questions are asked in order). Counted per PO (the balance call's
+   * per-LINE detail stays on the row), each with its late tally — the same
+   * `· N late` shape the delivery queues carry. Computed with the OTHER
+   * dimensions applied, so a visible number always matches its click.
+   */
+  const CALL_KEYS: readonly PurchasingSupplierCallKey[] = [
+    "confirm_ready_date",
+    "confirm_tomorrows_delivery",
+    "confirm_balance_delivery_date",
+  ];
+  const callCounts = useMemo(() => {
+    const m = new Map<PurchasingSupplierCallKey, { n: number; late: number }>();
+    for (const k of CALL_KEYS) m.set(k, { n: 0, late: 0 });
+    for (const p of searched) {
+      if (!passesAllCols(p) || !passesState(p, stateSel)) continue;
+      const calls = callsOf(p);
+      for (const k of CALL_KEYS) {
+        const mine = calls.filter((c) => c.key === k);
+        if (mine.length === 0) continue;
+        const cur = m.get(k)!;
+        cur.n += 1;
+        if (mine.some((c) => c.late)) cur.late += 1;
+      }
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searched, colFilters, callsByPo, stateSel]);
 
   // ── Selection: ?po= is the one source; first row auto-selects. ──────────
 
@@ -1287,10 +1364,11 @@ export default function OperationPurchaseOrders() {
     [view.mode, view.poId],
   );
 
-  const filtered = colFilters.size > 0 || stateSel !== null;
+  const filtered = colFilters.size > 0 || stateSel !== null || callSel !== null;
   const clearAll = () => {
     setColFilters(new Map());
     setStateSel(null);
+    setCallSel(null);
   };
 
   return (
@@ -1337,6 +1415,55 @@ export default function OperationPurchaseOrders() {
           aria-label="Purchase order register"
           data-testid="po-rail"
         >
+          {/* ── CALLS (Slice 1) — the engine's three supplier questions, in
+               the order the workflow asks them (§4). Count = POs carrying the
+               OPEN call; `· N late` = its overdue tail. The tile is the queue
+               `Confirm ready date` never had: 19 of 24 live POs sat in
+               Waiting Supplier Date with no call, no due and no count. ── */}
+          <div>
+            <div className="flex items-center px-1.5">
+              <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+                Calls
+              </span>
+            </div>
+            <div className="mt-1 flex flex-col gap-0.5">
+              {CALL_KEYS.map((k) => {
+                const c = callCounts.get(k) ?? { n: 0, late: 0 };
+                const on = callSel === k;
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setCallSel(on ? null : k)}
+                    aria-pressed={on}
+                    data-testid={`po-rail-call-${k}`}
+                    className={[
+                      "relative flex items-center gap-2 px-2 py-1.5 rounded-control text-left text-body w-full",
+                      on
+                        ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
+                        : "text-kit-slate-11 hover:bg-kit-slate-3",
+                    ].join(" ")}
+                  >
+                    {on && (
+                      <span
+                        aria-hidden
+                        className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
+                      />
+                    )}
+                    <span className="flex-1 truncate">
+                      {purchasingActionQueue(k)}
+                    </span>
+                    <span className="tabular-nums text-label text-kit-slate-9">
+                      {c.n}
+                      {c.late > 0 && (
+                        <span className="text-kit-red-11"> · {c.late} late</span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div>
             <div className="flex items-center px-1.5">
               <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">

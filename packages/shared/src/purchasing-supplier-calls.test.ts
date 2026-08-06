@@ -239,6 +239,150 @@ describe("both at once — Law 1: one action never hides another", () => {
       ],
     });
     const counts = purchasingSupplierCallCounts([p], on("2026-07-31"));
-    expect(counts).toEqual({ tomorrow: 1, balance: 2, balancePos: 1 });
+    expect(counts).toEqual({ readyDate: 0, tomorrow: 1, balance: 2, balancePos: 1 });
+  });
+});
+
+/* ── Slice 1 · `Call {supplier} — confirm ready date` (Loo, 2026-08-06) ──── */
+
+import { readyDateCallOf } from "./purchasing-supplier-calls";
+
+/** A PO that CARRIES the ready-date facts (the opt-in) with nothing answered. */
+function readyPo(over: Partial<SupplierCallPo> = {}): SupplierCallPo {
+  return po({
+    etaDateIso: null,
+    expectedReadyDateIso: null,
+    supplierArrivalDateIso: null,
+    customerDeliveryIso: "2026-07-31", // Fri
+    readyDateDue: {
+      productionWorkingDays: 2,
+      factoryOffDays: [0], // Mon–Sat factory (Ohana-like)
+      bufferDays: 1,
+    },
+    ...over,
+  });
+}
+
+describe("readyDateCallOf — the queue the door never had", () => {
+  it("does NOT exist for a caller that never carried the facts (opt-in)", () => {
+    // `po()` has no `expectedReadyDateIso` at all — Receiving's own mapping.
+    expect(readyDateCallOf(po(), on("2026-07-27"))).toBeNull();
+    expect(
+      purchasingSupplierCallsOf(po({ etaDateIso: null }), on("2026-07-27")),
+    ).toEqual([]);
+  });
+
+  it("opens on an open PO owing goods with no ready date and no arrival answer", () => {
+    const a = readyDateCallOf(readyPo(), on("2026-07-27"));
+    expect(a).not.toBeNull();
+    expect(a!.key).toBe("confirm_ready_date");
+    // due = Fri 31 − 1 buffer (office) = Thu 30, − 2 production (Mon–Sat
+    // factory) = Tue 28. Not late on Mon 27.
+    expect(a!.dueIso).toBe("2026-07-28");
+    expect(a!.late).toBe(false);
+  });
+
+  it("turns late the working day after its due", () => {
+    const a = readyDateCallOf(readyPo(), on("2026-07-29"));
+    expect(a!.late).toBe(true);
+  });
+
+  it("counts production on the FACTORY's week, not the office's", () => {
+    // Same PO, but a Mon–Fri factory: Thu 30 − 2 = Tue 28 either way here, so
+    // anchor on a Monday customer date where the weeks diverge:
+    // customer Mon 08-03 − 1 buffer (office) = Fri 31.
+    //   Mon–Sat factory: 31 − 2 = Wed 29… no — Thu 30, Wed 29 → Wed 29? walk:
+    //   Fri31 −1 → Thu30, −2 → Wed29.  Mon–Fri factory: identical mid-week.
+    // Diverge across a weekend instead: customer Tue 07-28, buffer 0 →
+    //   Tue 28 − 2 on Mon–Sat = Sat 07-25? no: Mon 27, Sat 25 → Sat 07-25.
+    //   Tue 28 − 2 on Mon–Fri = Fri 07-24.
+    const sat = readyDateCallOf(
+      readyPo({
+        customerDeliveryIso: "2026-07-28",
+        readyDateDue: { productionWorkingDays: 2, factoryOffDays: [0], bufferDays: 0 },
+      }),
+      on("2026-07-20"),
+    );
+    const weekdayOnly = readyDateCallOf(
+      readyPo({
+        customerDeliveryIso: "2026-07-28",
+        readyDateDue: { productionWorkingDays: 2, factoryOffDays: [0, 6], bufferDays: 0 },
+      }),
+      on("2026-07-20"),
+    );
+    expect(sat!.dueIso).toBe("2026-07-25");
+    expect(weekdayOnly!.dueIso).toBe("2026-07-24");
+  });
+
+  it("a standing ready date closes it; one that slipped past re-opens it", () => {
+    const standing = readyPo({ expectedReadyDateIso: "2026-07-30" });
+    expect(readyDateCallOf(standing, on("2026-07-27"))).toBeNull();
+    // The 30th passed, goods still owed → the answer names a dead fact.
+    expect(readyDateCallOf(standing, on("2026-07-31"))).not.toBeNull();
+  });
+
+  it("a standing ARRIVAL promise makes the question moot; a stale one does not", () => {
+    const standing = readyPo({ supplierArrivalDateIso: "2026-07-30" });
+    expect(readyDateCallOf(standing, on("2026-07-27"))).toBeNull();
+    expect(readyDateCallOf(standing, on("2026-07-31"))).not.toBeNull();
+  });
+
+  it("no production number, or no customer date → the call opens with NO due and is never late (P1/T7)", () => {
+    const unrated = readyDateCallOf(
+      readyPo({
+        readyDateDue: { productionWorkingDays: null, factoryOffDays: [0], bufferDays: 1 },
+      }),
+      on("2026-07-27"),
+    );
+    expect(unrated).not.toBeNull();
+    expect(unrated!.dueIso).toBeNull();
+    expect(unrated!.late).toBe(false);
+    const dateless = readyDateCallOf(
+      readyPo({ customerDeliveryIso: null }),
+      on("2026-07-27"),
+    );
+    expect(dateless).not.toBeNull();
+    expect(dateless!.dueIso).toBeNull();
+  });
+
+  it("a settled or non-open PO has nothing to ask", () => {
+    expect(
+      readyDateCallOf(
+        readyPo({ lines: [line({ qty: 3, receivedQty: 3 })] }),
+        on("2026-07-27"),
+      ),
+    ).toBeNull();
+    expect(readyDateCallOf(readyPo({ status: "received" }), on("2026-07-27"))).toBeNull();
+  });
+
+  it("rides purchasingSupplierCallsOf after the tomorrow call, and the counts see it", () => {
+    // Tomorrow call open (eta tomorrow, no answer) AND ready-date facts stale.
+    const both = readyPo({ etaDateIso: "2026-07-28" });
+    const calls = purchasingSupplierCallsOf(both, on("2026-07-27"));
+    expect(calls.map((c) => c.key)).toEqual([
+      "confirm_tomorrows_delivery",
+      "confirm_ready_date",
+    ]);
+    const counts = purchasingSupplierCallCounts([both, po()], on("2026-07-27"));
+    expect(counts.readyDate).toBe(1);
+  });
+});
+
+describe("provenance never gates the TOMORROW call (the po-workspace ruling, now a test)", () => {
+  it("fires on our own estimate even when the arrival provenance field rides along", () => {
+    // eta is OUR stamp (no supplier answer) and the provenance field is
+    // present-and-null; the call must open exactly as it always has.
+    const a = tomorrowDeliveryCallOf(
+      po({ etaDateIso: "2026-07-28", supplierArrivalDateIso: null, expectedReadyDateIso: null }),
+      on("2026-07-27"),
+    );
+    expect(a).not.toBeNull();
+    // And a STANDING supplier arrival suppresses only the READY call — the
+    // tomorrow call still runs on its own answer test, nothing else.
+    const b = tomorrowDeliveryCallOf(
+      po({ etaDateIso: "2026-07-28", supplierArrivalDateIso: "2026-07-28", expectedReadyDateIso: null }),
+      on("2026-07-27"),
+    );
+    expect(b).not.toBeNull();
   });
 });
