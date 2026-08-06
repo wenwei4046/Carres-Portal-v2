@@ -931,12 +931,17 @@ describe("the default order — risk to the customer's promise", () => {
       "PO-9001",
       // rung 3 — they land ON the customer's day.
       "PO-9005",
-      // rung 5 — nothing to say. Inside the rung the nearer customer date
-      // first, and a PO with no customer date LAST: the two finished POs sit
-      // beside the quiet one, which is what "nothing to do" looks like.
+      // rung 4 — an open call that is not late. Slice 1: 9009's arrival is
+      // OUR OWN estimate with no supplier answer behind it, so the engine now
+      // opens `Confirm ready date` on it (dueless — the fixture settings
+      // carry no order-by buffer, and a due nobody can compute is never
+      // invented).
+      "PO-9009",
+      // rung 5 — nothing to say. 9006 is finished; 9008 has BOTH answers
+      // standing (ready date + arrival), which since Slice 1 is exactly what
+      // "quiet" means on this register.
       "PO-9006",
       "PO-9008",
-      "PO-9009",
       "PO-9002",
     ]);
   });
@@ -964,9 +969,9 @@ describe("the default order — risk to the customer's promise", () => {
       "PO-9007",
       "PO-9001",
       "PO-9005",
+      "PO-9009",
       "PO-9006",
       "PO-9008",
-      "PO-9009",
       "PO-9002",
     ]);
   });
@@ -1424,8 +1429,8 @@ describe("nine measured minimums, and no tail", () => {
 
   it("every action word still carries its own title, so a clip can be read", async () => {
     await mountLoaded();
-    const cell = listing().getAllByText("Check Expected Arrival")[0];
-    expect(cell.getAttribute("title")).toBe("Check Expected Arrival");
+    const cell = listing().getAllByText("Confirm ready date")[0];
+    expect(cell.getAttribute("title")).toBe("Confirm ready date");
   });
 });
 
@@ -1455,10 +1460,11 @@ describe("Current Action survives the workspace being open", () => {
     // Compact is the default. The word must be present ENTIRE — the bug was a
     // silent `clip`, so a partial match would have passed all along.
     expect(
-      listing().getAllByText("Check Expected Arrival").length,
+      listing().queryAllByText("Confirm balance delivery date").length +
+        listing().getAllByText("Confirm ready date").length,
     ).toBeGreaterThan(0);
-    const cell = listing().getAllByText("Check Expected Arrival")[0];
-    expect(cell.getAttribute("title")).toBe("Check Expected Arrival");
+    const cell = listing().getAllByText("Confirm ready date")[0];
+    expect(cell.getAttribute("title")).toBe("Confirm ready date");
   });
 });
 
@@ -1688,8 +1694,10 @@ describe("the ONE Current Action source (Law 7)", () => {
 
   it("the register's column reads the shared engine, and `—` is a real answer", async () => {
     await mountLoaded();
+    // Slice 1: a dateless PO's action is the ENGINE's `confirm_ready_date`
+    // call now — the queue word, with a clock — not the state word.
     expect(
-      listing().getAllByText("Check Expected Arrival").length,
+      listing().getAllByText("Confirm ready date").length,
     ).toBeGreaterThan(0);
     // Q8 (Loo, 2026-08-04 · §12.3): a status and a navigation are not
     // actions, so a PO whose goods are on the way says nothing. `—` here is
@@ -1703,12 +1711,14 @@ describe("the ONE Current Action source (Law 7)", () => {
     await mountLoaded();
     // PO-9004's supplier date passed and nothing came; PO-9007 never had one.
     // Both need the same phone call, so both read the same word — a late
-    // version of one action is not a second action (Loo, 2026-08-04).
+    // version of one action is not a second action (Loo, 2026-08-04). Since
+    // Slice 1 that shared word is the ENGINE's own `Confirm ready date` —
+    // Q8's sameness held, and both rows gained a real due underneath it.
     expect(
-      actionCellOf("PO-9004").getByText("Check Expected Arrival"),
+      actionCellOf("PO-9004").getByText("Confirm ready date"),
     ).toBeInTheDocument();
     expect(
-      actionCellOf("PO-9007").getByText("Check Expected Arrival"),
+      actionCellOf("PO-9007").getByText("Confirm ready date"),
     ).toBeInTheDocument();
     // The three retired words are gone from the whole register, not just from
     // these two rows — `Waiting for Goods` only as the RAIL's own label.

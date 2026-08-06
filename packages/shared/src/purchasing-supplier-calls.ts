@@ -53,6 +53,7 @@ import {
 export const PURCHASING_OFFICE_OFF_DAYS: readonly number[] = [0, 6];
 
 export type PurchasingSupplierCallKey =
+  | "confirm_ready_date"
   | "confirm_tomorrows_delivery"
   | "confirm_balance_delivery_date";
 
@@ -79,6 +80,24 @@ export interface SupplierCallLine {
   balanceAnswerAboutQty: number | null;
 }
 
+/**
+ * The due-date inputs of the `confirm_ready_date` call — Slice 1 (Loo,
+ * 2026-08-06). The due is the order-by arithmetic read backwards from the
+ * customer's date: `customer date − buffer (OFFICE week) − production working
+ * days (the FACTORY's own week)` — the same two calendars, in the same roles,
+ * as `expectedArrivalOf` and net-requirements' `raiseBy` (Law D: one shape,
+ * not a new one).
+ */
+export interface ReadyDateDueInputs {
+  /** Production working days for THIS supplier × category — `null` when the
+   *  pair has no number, which yields NO due, never a default (P1). */
+  productionWorkingDays: number | null;
+  /** The factory's own non-working weekdays (`workWeekOffDaysFor`). */
+  factoryOffDays: readonly number[] | null;
+  /** The order-by buffer (Settings). `null` → no due, never a default. */
+  bufferDays: number | null;
+}
+
 /** One PO, as the API hands it over. */
 export interface SupplierCallPo {
   poId: string;
@@ -90,6 +109,24 @@ export interface SupplierCallPo {
   /** `about_date` of the latest `tomorrow_delivery` promise, else null. */
   tomorrowAnswerAboutDateIso: string | null;
   lines: readonly SupplierCallLine[];
+  /**
+   * ── The `confirm_ready_date` facts (Slice 1) — OPT-IN AS A GROUP ─────────
+   * `expectedReadyDateIso === undefined` means the caller does not CARRY the
+   * ready-date facts, and the engine then asks no ready-date question at all —
+   * a call computed from ignorance would open on POs whose factory has already
+   * answered. A caller that knows (`OperationPurchaseOrders`) passes `null`
+   * for "no ready date on file", which is the state the action exists to end.
+   */
+  /** `purchase_orders.expected_ready_date` — the factory's ready promise. */
+  expectedReadyDateIso?: string | null;
+  /** The arrival the SUPPLIER actually gave (`poDateHistoryOf(...).currentDate`,
+   *  the promise ledger) — a factory that already named the van day has moved
+   *  past the ready-date question. */
+  supplierArrivalDateIso?: string | null;
+  /** The customer's date (`customer_delivery`) — the due's anchor. */
+  customerDeliveryIso?: string | null;
+  /** Due arithmetic inputs; `null`/missing pieces → no due, never a default. */
+  readyDateDue?: ReadyDateDueInputs | null;
 }
 
 export interface SupplierCallOptions {
@@ -130,6 +167,88 @@ function outstandingOf(l: SupplierCallLine): number {
   const q = Math.max(0, Number(l.qty ?? 0));
   const r = Math.max(0, Math.min(q, Number(l.receivedQty ?? 0)));
   return q - r;
+}
+
+/**
+ * `Call {supplier} — confirm ready date` — Slice 1 (approved by Loo,
+ * 2026-08-06; the door shipped with 0318 and this is its queue).
+ *
+ * - **Trigger** — an open PO still owes goods and the factory has neither a
+ *   STANDING ready date nor a STANDING arrival promise. Standing means "about
+ *   a day that has not passed": a ready date that slipped by with goods still
+ *   owed is an answer about nothing, and the call re-opens by itself — the
+ *   same S4 rule the two calls beside it run on.
+ * - **Completion** — a ready date is recorded (`purchasing_record_ready_date`,
+ *   the append-only ledger + `expected_ready_date`).
+ * - **Due** — `customer date − buffer (OFFICE week) − production working days
+ *   (FACTORY week)`: the day the factory had to start for the promise to hold.
+ *   A supplier × category with no production number, or a PO with no customer
+ *   date, gets NO due rather than a default (P1) — the call still opens; it
+ *   simply can never turn late (T7: a step that cannot be late is not urgent).
+ * - **Counted per** — PO.
+ * - **Owner** — the PO-duty holder (display-side, `ops_po_duty`; the engine
+ *   carries no people).
+ *
+ * A factory whose ARRIVAL promise still stands is not asked when it will
+ * finish making the goods — it already told us when the van comes. When that
+ * arrival passes with nothing received, `poCurrentActionOf`'s overdue branch
+ * keeps its precedence (Q8: the same action, merely late) — this call opens
+ * underneath it so the CALLS rail counts a true, dated, late-capable call
+ * instead of a state word with no clock.
+ */
+export function readyDateCallOf(
+  po: SupplierCallPo,
+  opts: SupplierCallOptions,
+): PurchasingOpenCall | null {
+  if (po.status !== "open") return null;
+  // Opt-in gate: a caller that does not carry the ready-date facts cannot ask
+  // the question (see the interface note). `null` IS carrying them.
+  if (po.expectedReadyDateIso === undefined) return null;
+
+  const today = day(opts.todayIso);
+  if (!today) return null;
+
+  const outstanding = po.lines.reduce((s, l) => s + outstandingOf(l), 0);
+  if (outstanding <= 0) return null;
+
+  // A ready date about a day still to come is a standing answer.
+  const ready = day(po.expectedReadyDateIso);
+  if (ready && ready >= today) return null;
+
+  // A standing arrival promise makes the ready-date question moot.
+  const arrival = day(po.supplierArrivalDateIso ?? null);
+  if (arrival && arrival >= today) return null;
+
+  const cust = day(po.customerDeliveryIso ?? null);
+  const due = po.readyDateDue ?? null;
+  let dueIso: string | null = null;
+  if (
+    cust &&
+    due &&
+    due.productionWorkingDays != null &&
+    due.bufferDays != null
+  ) {
+    const w = wd(opts);
+    // Buffer on the OFFICE week, production on the FACTORY's own week — the
+    // same two calendars `expectedArrivalOf` walks, in reverse (Law 2A).
+    const arriveBy = subtractWorkingDays(cust, due.bufferDays, w);
+    dueIso = subtractWorkingDays(arriveBy, due.productionWorkingDays, {
+      offDays:
+        due.factoryOffDays && due.factoryOffDays.length > 0
+          ? due.factoryOffDays
+          : // `workWeekOffDaysFor`'s own fallback, mirrored: Sunday-off.
+            [0],
+      holidays: opts.holidays ?? myHolidaySet(),
+    });
+  }
+
+  return {
+    key: "confirm_ready_date",
+    poId: po.poId,
+    supplierId: po.supplierId,
+    dueIso,
+    late: dueIso !== null && today > dueIso,
+  };
 }
 
 /**
@@ -250,8 +369,10 @@ export function purchasingSupplierCallsOf(
   opts: SupplierCallOptions,
 ): PurchasingOpenCall[] {
   const tomorrow = tomorrowDeliveryCallOf(po, opts);
+  const ready = readyDateCallOf(po, opts);
   return [
     ...(tomorrow ? [tomorrow] : []),
+    ...(ready ? [ready] : []),
     ...balanceDeliveryCallsOf(po, opts),
   ];
 }
@@ -268,11 +389,13 @@ export function purchasingSupplierCallsOf(
 export function purchasingSupplierCallCounts(
   pos: readonly SupplierCallPo[],
   opts: SupplierCallOptions,
-): { tomorrow: number; balance: number; balancePos: number } {
+): { readyDate: number; tomorrow: number; balance: number; balancePos: number } {
+  let readyDate = 0;
   let tomorrow = 0;
   let balance = 0;
   let balancePos = 0;
   for (const po of pos) {
+    if (readyDateCallOf(po, opts)) readyDate += 1;
     if (tomorrowDeliveryCallOf(po, opts)) tomorrow += 1;
     const b = balanceDeliveryCallsOf(po, opts);
     if (b.length > 0) {
@@ -280,5 +403,5 @@ export function purchasingSupplierCallCounts(
       balancePos += 1;
     }
   }
-  return { tomorrow, balance, balancePos };
+  return { readyDate, tomorrow, balance, balancePos };
 }
