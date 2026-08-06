@@ -40,13 +40,34 @@ is the single most expensive defect this document can carry.**
 shelf.** It is the buyer's module. It does not own goods movement (that is Receiving's
 warehouse half and Stock) and it does not own money (that is Finance).
 
-**Six tabs, one chain:**
+**One entry, one chain** (Loo, 2026-08-06 — the operator-journey ruling):
 
 ```
-Create Purchase ─▶ To Order ─▶ Purchase Orders ─▶ Receiving ─▶ Claims
-                                                       │
-                       Report (read-only)   ·   Settings (manager-only)
+PURCHASING DEMAND ─▶ To Order ─▶ Purchase Orders ─▶ Receiving ─▶ Claims
+  the SINGLE entry
+  into the module            Report (read-only)   ·   Settings (manager-only)
 ```
+
+**PURCHASING DEMAND is the single entry into Purchasing.** Everything the module
+buys enters as a demand first; nothing reaches a purchase order any other way.
+Its sources:
+
+```
+Customer Orders · Ready Stock · Display · Office · Warranty ·
+Spare Parts (future) · other approved purchasing requests
+```
+
+**To Order does not own the SOURCE of a demand.** It owns reviewing,
+consolidating and issuing purchase orders from ALL purchasing demands,
+whatever door they entered by. `Create Purchase` is the door that TYPES a
+demand in by hand — an entrance to the demand, never a second entry into the
+module.
+
+*Measured reality behind the ruling (2026-08-06):* typed demands live in
+`purchase_demands` with `purpose ∈ ready_stock · display · office · warranty`
+(0323's gate; Spare Parts and Other are not offered anywhere yet).
+Customer-order demand is COMPUTED from order lines rather than stored as rows
+— one entry in the business model, two representations in code today.
 
 **Before you change any tab, answer both:** does what upstream sends still get in, and can
 downstream still catch it?
@@ -134,8 +155,11 @@ It cannot tell you about a button you have not imagined. **Read the file.**
 # §3 · To Order
 
 ### MISSION
-Decide which customer orders become purchase orders **today**. Purchase Orders MANAGES the
-documents once they exist.
+Decide which **purchasing demands** become purchase orders **today** — demand from every
+source (§1: Customer Orders · Ready Stock · Display · Office · Warranty · future Spare
+Parts · other approved requests), reviewed, consolidated and issued in one place. **To
+Order does not own where a demand came from; it owns what happens to all of them.**
+Purchase Orders MANAGES the documents once they exist.
 
 ### WORKFLOW
 The engine computes a plan per PO day and pre-selects exactly its own plan (`orderBy ≤ today`).
