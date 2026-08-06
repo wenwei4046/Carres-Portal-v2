@@ -66,7 +66,7 @@ One shared rule: `packages/shared/src/order-money.ts`. Money spelling:
 
 | What | Why it is not built |
 |---|---|
-| **`order_payments` gaining a real reader** | The Record-payment button writes a ledger nothing reads, so it moves nothing. **The fix is one audited RPC that writes `orders.paid` too — never by summing the ledger**, because the raw-create door writes the same deposit into BOTH and adding them reads a half-paid order as settled. |
+| **`order_payments` gaining a real reader** — *re-measured 2026-08-06: still **0 rows**, and the Orders audit found the DRAWER fetches this ledger for its own `Collected` figure while the shared money rule refuses to read it, so the drawer and the row can disagree* | The Record-payment button writes a ledger nothing reads, so it moves nothing. **The fix is one audited RPC that writes `orders.paid` too — never by summing the ledger**, because the raw-create door writes the same deposit into BOTH and adding them reads a half-paid order as settled. |
 | **The storage-waiver lever on this desk** | Approved; the manager decision and its two named outcomes already exist on the order. |
 | **A collection-velocity figure** | Approved as a review number. Blocked by the same rule the stock review follows: **a figure withholds itself until the records can back it.** |
 | **Bulk remind** | Approved, and it must obey the portal's message law: ONE message per counterparty, never one per order. |

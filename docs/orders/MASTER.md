@@ -24,6 +24,38 @@
 **One table. One row = one customer order.** Every order in the business lands here; a click
 opens the drawer, which has full control.
 
+## 1.1 · MEASURED REALITY — 2026-08-06, and this is the baseline
+
+> **How it was measured.** `packages/shared/src/order-actions.ts` (496) · `order-money.ts` (145)
+> · `order-action-due.ts` (169) · `order-action-checklist.ts` (168) · `storage-hold.ts` (124)
+> **read end to end.** `OperationOrdersControl.tsx` (5,121) — **all logic read end to end**
+> (lines 1–2740: stage derivation, readiness, money, the ladder mapping, every facet, every
+> bulk action); the JSX render was read structurally (rail groups, column defs, cell order).
+> `OrderDetailDrawer.tsx` (7,717) — **read structurally, not line by line**: its tab union, all
+> 44 panel titles, its two-column shell, every hook and every endpoint it writes. Database
+> figures are live SQL.
+
+```
+orders                65      live (not AutoCount)      28
+ops_order_control     65      with a PIC                65    ← the assignment sweep works
+
+booking confirmed      0      delay_decision             0     delivery_photos    0
+do_number              0      delivered                  0     order_payments     0
+storage_from           0      balance keyed              0     line_etas          3
+open ops_tasks         1
+```
+
+> ### 🔴 THE HEADLINE: **everything after "assign logistics" has never run.**
+> Zero confirmed bookings · zero delivery orders · zero deliveries · zero photos · zero
+> payments through the ledger · zero storage · zero delay decisions. **Roughly half of this
+> module is shipped, tested and unexercised.** Every rule below about booking, the DO, the
+> delivery day, the photo, storage and the delay clocks is proved by tests and by rolled-back
+> transactions — **not by one real order having been through it.**
+
+**Of the 28 live orders:** 22 carry a promised date · 1 is past it · 14 have a logistics
+company · 18 have taken some money · 25 are priced · **19 are covered by a real purchase
+order** · **0 carry `order_lines.source_po`.** That last pair is §5.1.
+
 **There is no single overall Order Status, and there never will be.** Business facts, actions,
 module stages and exceptions are stored independently — `booking_stage`, `line_received`,
 `delivery_photos` each record their own thing — and the view is COMPUTED at read time. **No row
@@ -180,9 +212,31 @@ All · Placed · Proceed · To book · Customer confirmed · Delivered
 
 ### WHAT IS ON SCREEN TODAY
 `apps/web/src/pages/operation/OperationOrdersControl.tsx`, **5,121 lines** ·
-route `/operation/orders` · *measured 2026-08-05 from the docblock, the tab definition and the
-imported engine modules; **not read line by line.*** It merges three legacy surfaces — the
-6-column kanban, the AutoCount triage Inbox and the flat read-only feed — into one table.
+route `/operation/orders` · ***measured 2026-08-06 — every line of logic read end to end;
+the JSX read structurally.*** It merges three legacy surfaces — the 6-column kanban, the
+AutoCount triage Inbox and the flat read-only feed — into one table.
+
+**The nine rail groups, in render order:** `QUEUES` (danger) · `DELIVERY` · `TEAM` ·
+`DEADLINE` · `LOGISTICS` · `SUPPLIER` · `REGION` · `CATEGORY` · `FIX DATA`.
+`FILTERS`, `FIX DATA` and `CATEGORY` start **collapsed**.
+
+**QUEUES holds, in order:** `Overdue` · `Owing` (with the money total) · the four STOCK action
+queues (`Issue PO` · `Confirm ready date` · `Delay planning` · `Arrange new delivery date`) ·
+`Supplier late` · `Follow-up` · `For manager review`. **A row with a count of zero is not
+rendered.** The two delay queues carry a `N · M late` tail from their own office-calendar
+deadline; the other queues carry none.
+
+**Every count runs over `liveScope`** = the current tab, minus completed, minus the AutoCount
+archive. **`Owing` and the delivery-photo queue are the two deliberate exceptions** — both span
+delivered orders, because the money and the proof outlive the delivery.
+
+**The bulk bar writes:** assign logistics (loops the ops-assign endpoint) · create follow-up
+tasks · mark completed (**server-scoped to AutoCount rows only**) · **No storage** (writes
+`storage_fee_override = 0`) · CSV · Print.
+
+**The auto-assign sweep is SERVER-SIDE and fires once per page load from ANY operation
+session** — a staff member receives their share the moment THEY open the portal, with no
+manager session. A non-manager is defaulted to their own PIC filter on first load, once.
 
 ```
 FACET RAIL     QUEUES (the module's open actions, danger group first) ·
@@ -320,11 +374,62 @@ concept, not a member of any region**, and its admission test admits no new memb
 
 ### WHAT IS ON SCREEN TODAY
 `apps/web/src/pages/operation/components/OrderDetailDrawer.tsx`, **7,717 lines** ·
-*measured 2026-08-05 from its imports, its named sub-components and the shipped card records;
-**not read line by line** — it is the largest file in the web app.*
+***measured 2026-08-06 — read STRUCTURALLY, not line by line***: its tab union, all 44 panel
+titles, its two-column shell, every hook it calls and every endpoint it writes were read; the
+individual panel bodies were not. **It is the largest file in the web app and nobody has read
+it end to end, including this audit.**
 
-Sub-components measured: `OrderJourneyHeader` 420 · `OrderDocuments` 303 ·
-`DelayPlanningPanel` 132 · `BookingSpine` 69.
+**It renders IN PLACE of the list**, not as an overlay — the sidebar and right rail stay.
+`‹ n of m ›` steps through the SAME filtered, sorted list the table shows.
+
+```
+FULL-WIDTH BAND    save bar (renders nothing until something is edited)
+                   the journey strip · the OPEN ACTION LIST with its C6 checklists
+                   the Delay-planning FORM — only while the ladder has that action open
+                   the operator's own free-text note
+
+LEFT 280px         ① Identity          CustomerIdentityCard
+(collapses to 56)  ② Current Action    CallsPanel        — ALWAYS visible, never hidden
+                   ③ Current Issues    CurrentIssuesPanel — renders NOTHING when healthy
+                   ④ Progress          JourneyCard (the spine)
+                   ⑤ the section rail  Loan · Documents · [Cases] · Activity
+
+RIGHT              the selected tab owns the whole column
+```
+
+**EIGHT tabs, and FOUR of them live on the SPINE, not the rail** — `items · delivery ·
+balance · storage` are spine steps; `loan · documents · cases · activity` are the rail's
+utilities. **`Cases` is the only tab that comes and goes**: an order with no case shows
+nothing, because a permanent tab reading `0` on every clean order is the empty box the law
+forbids.
+
+**Sub-components measured:** `OrderJourneyHeader` 420 · `OrderDocuments` 303 ·
+`DelayPlanningPanel` 132 · `BookingSpine` 69 · `CustomerIdentityCard` · `CallsPanel` ·
+`CurrentIssuesPanel` · `JourneyCard` · `MoneyCard` · `StorageCard` · `PaymentForm` ·
+`BookingBlock` · `PartnerRulesEditor` · `DeliveryPhotoRow` · `ReceiveLineModal` ·
+`LoanSofaModal` · `ActionsMenu`.
+
+### WHAT THE DRAWER WRITES — the full list, and it crosses four modules
+
+| Hook | Endpoint | Whose record |
+|---|---|---|
+| `useSaveOrderControl` | `PUT /operation/orders/:id/control` | Orders |
+| `useUpdateOrder` · change requests | `/orders/:id/...` | Orders |
+| `useRecordPayment` · `useVoidPayment` | `/operation/orders/:id/payments` | **Payment** |
+| `useConfirmBooking` | `/operation/orders/:id/booking/confirm` | **Delivery** |
+| `useIssueDeliveryOrder` | `/operation/orders/:id/delivery-order` | **Delivery** |
+| `useUploadDeliveryPhoto` · `useDeliveryPhotos` | delivery photos | **Delivery** |
+| `useSetPartnerDeliveryRules` | partner rules | **Delivery / carrier config** |
+| **`useReceiveLine`** | **`/operation/orders/:id/receive-line`** | **Purchasing / Receiving** |
+| `/api/ops/stock/release` · reserve picker | stock register | **Stock** |
+| `useLoanSofa` | `/operation/orders/:id/loan-sofa` | **Stock** |
+| `useRecheckStockMutation` | re-derives readiness | Stock (read) |
+
+> 🔴 **`useReceiveLine` is a THIRD receiving door**, and it is inside the Orders drawer.
+> Purchasing's own record says the Office receives through the Receiving Workspace and that
+> *"two doors onto one act is the thing this slice removes"* — this is the door that survived.
+> **It is named in Purchasing's §5 as a known third door; this audit confirms it is live, in
+> this file, on the Items tab (`Goods arrived at the warehouse (GRN)`).**
 
 **The drawer is NOT migrated to `DetailShell`, and that is a RULING, not a gap.** L4 requires a
 4-tuple of persistent facts; on the live drawer those four sit in four different blocks, and the
@@ -383,6 +488,37 @@ conversation — it opens §6 stage 1.**
   future supply (0299), or the planner keeps believing goods are coming that never will.
 - **Orders never re-states a Purchasing number.** Production days, the buffer and the PO days
   have one home.
+
+### 5.1 · 🔴 THE ORDERS LIST CANNOT SEE PURCHASING'S PURCHASE ORDERS
+
+**This is the sharpest finding of the audit, it is measured, and it is named per order.**
+
+The ladder asks *"has anything been ordered?"* through `goodsUnordered`, which is
+`stockReadiness(...).state === "unknown"`. That state is reached when a line's SKU is absent
+from the live free-stock map — and the only PO evidence `stockReadiness` consults is
+**`order_lines.source_po`**, which **only the AutoCount importer writes.**
+
+```
+live orders                                    28
+covered by a REAL purchase order (so_refs)     19
+carrying order_lines.source_po                  0
+order_supplier_threads rows                     0     ← the other possible link, EMPTY
+```
+
+**The list API does select `order_supplier_threads(... po_id ...)` — and that table holds zero
+rows, so the join is dead weight.** The drawer is better off: `hasPoForSku` checks the detail
+payload's real `purchase_orders` **and** `source_po`.
+
+**MEASURED CONSEQUENCE, with the orders named:** 10 live orders reach `unknown`, and **4 of
+them already have a purchase order** — **`SO-1206` · `SO-1213` · `SO-1216` · `SO-1257`.**
+On those four the list shows a **red goods dot reading *"Stock — no PO raised yet"*** and an
+**`Issue PO`** instruction, while Purchasing has already bought the goods. **The list and the
+drawer answer the same question two different ways on the same order.**
+
+**This is IMPLEMENTATION DEBT, not a business change.** The frozen rule is right — *goods with
+no purchase order anywhere are goods nobody has ordered* — and the code reads the wrong column
+for "anywhere". **Reported, not fixed** (this audit changes no application code); the fix is a
+build slice, and it is the first one recommended.
 
 ---
 
@@ -590,6 +726,40 @@ re-rendered, a written row cannot be un-written.
 
 ---
 
+# §9.5 · MODULE OWNERSHIP — where the record and the completion evidence live
+
+**Orders may SHOW and TRIGGER cross-module work. It owns the record only where this table says
+so.** Audited 2026-08-06 by tracing every write the list and the drawer make.
+
+| Concern | Orders is | The RECORD lives in | Completion evidence |
+|---|---|---|---|
+| the customer order · stages · PIC | **THE OWNER** | `orders` · `ops_order_control` | the stage and the assignment stamps |
+| the action engine | **THE OWNER** | nothing stored — derived | an action closes when its own outcome is recorded |
+| delay planning | **THE OWNER** | `ops_order_control.delay_decision*` (0304/0305) | the decision + the supplier date it was about |
+| storage hold and its release | **THE OWNER** | `ops_order_control.storage_*` | `storage_waiver_status` + `storage_fee_override` |
+| the money GATE and the arithmetic | **THE OWNER** | `orders.paid` | `outstanding = 0` |
+| collecting the money | **a trigger** | `order_payments` — [`../payment/MASTER.md`](../payment/MASTER.md) | **0 rows: the ledger has no reader; `orders.paid` is the truth** |
+| buying the goods | **a SUMMARY, and a broken one** | `purchase_orders` — [`../purchasing/MASTER.md`](../purchasing/MASTER.md) | the PO exists · `received_qty` |
+| receiving the goods | 🔴 **a DUPLICATED WORKFLOW** | `warehouse_receipts` · `receiving_events` — Purchasing | a posted Receiving Session |
+| reserving / releasing a unit | **a trigger** | `ops_stock_items` — [`../stock/MASTER.md`](../stock/MASTER.md) | the unit's status + `reserved_ref` |
+| booking a delivery | **THE OWNER of the record** | `ops_order_control.booking_*` | a customer-confirmed date **and** slot |
+| the delivery WORKSPACE | a VIEW | nothing — [`../delivery/MASTER.md`](../delivery/MASTER.md) | — |
+| carrier rules | 🟡 **a duplicated editor** | the partner's own config | — |
+| a customer complaint | **a link** | `service_cases` — [`../service/MASTER.md`](../service/MASTER.md) | the customer confirmed |
+| a supplier claim | **not present** | `supplier_claims` — Purchasing | — |
+
+**Two ownership defects, both reported and neither fixed here:**
+
+🔴 **Receiving is genuinely duplicated.** `useReceiveLine` writes a receive from the Orders
+drawer, and Purchasing's Receiving Workspace writes another through `office_receive_post`.
+**One act, two doors, two records.** Purchasing already ruled that two doors onto one act is
+the thing to remove; this is the one that survived because it lives in another module's file.
+
+🟡 **`PartnerRulesEditor` edits carrier configuration from inside one order's drawer.** A
+carrier's working days and capacity are not a fact about this customer's order.
+
+---
+
 # §10 · Cross-object decisions
 
 | Decision | Ruling |
@@ -613,3 +783,18 @@ re-rendered, a written row cannot be un-written.
 | **The drawer through `DetailShell`** | Approved as the destination; blocked because L4's persistent-facts tuple does not exist on the drawer yet. **Not a gap — a ruling.** |
 | **The delivery-appointment task moving to Logistics** | Approved the day the partner portal covers appointments. Today only NETS has a login and that portal has no appointment screen. |
 | **`order_payments` gaining a real reader** | The Record-payment button writes a ledger nothing reads. The fix is one audited RPC that writes `orders.paid` too — **never by summing the ledger**, because the raw-create door double-writes. |
+
+# §12 · Implementation debt found by the 2026-08-06 audit
+
+**Not architecture. Each one is a build slice, and none of them changes a business rule.**
+
+| # | Defect | Evidence |
+|---|---|---|
+| **D1** 🔴 | **The list cannot see a purchase order.** `stockReadiness` reads only `order_lines.source_po`; `order_supplier_threads` is empty. **4 named live orders show `Issue PO` over a real PO.** | §5.1 |
+| **D2** 🔴 | **A third receiving door lives in the Orders drawer** (`useReceiveLine`), duplicating the Receiving Workspace. | §9.5 |
+| **D3** 🟡 | **The drawer computes `stage` a SECOND time** (its own IIFE at line ~1469) instead of importing the list's exported `stageOf`. Two spellings of one derivation, in two files. | read |
+| **D4** 🟡 | **The drawer computes money a second way for its own header.** The list hands down `holdAmount` from the shared `orderMoney`, and the drawer separately fetches `order_payments` for `Collected` — the one ledger the shared rule refuses to read. **The drawer's Collected and the row's Outstanding can disagree.** | read |
+| **D5** 🟡 | **Carrier rules are edited from one order's drawer.** | §9.5 |
+| **D6** 🟡 | **`Issues module coming — needs the ops_issues table`** is a live tooltip on the Actions menu. A promise about the product on an operator's screen. | panel titles |
+| **D7** 🟡 | **The `deliver_today` checklist is empty by ruling**, so an operator expanding the day's own action sees nothing. Correct by the rule (*nobody records "goods loaded"*), and worth knowing before somebody calls it a bug. | `order-action-checklist.ts` |
+| **D8** ⚪ | **`stockWindowDays` is still a flat 7 / 5** in `orderActionSignalsOf`, while Purchasing's real production numbers are 7 · 7 · **14** and manager-editable. The Orders ladder therefore turns the ready-date call red on a sofa **nine days later** than Purchasing's own window says it should. | read + Purchasing §2.3 |
