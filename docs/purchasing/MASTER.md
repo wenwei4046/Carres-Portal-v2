@@ -36,9 +36,9 @@ is the single most expensive defect this document can carry.**
 
 # §1 · Overview
 
-**Purchasing buys what customers have already ordered, and what the warehouse needs on the
-shelf.** It is the buyer's module. It does not own goods movement (that is Receiving's
-warehouse half and Stock) and it does not own money (that is Finance).
+**Purchasing turns approved purchasing demand into goods on a Carres floor.** It is the
+buyer's module. It does not own goods movement (that is Receiving's warehouse half and
+Stock) and it does not own money (that is Finance).
 
 **One entry, one chain** (Loo, 2026-08-06 — the operator-journey ruling):
 
