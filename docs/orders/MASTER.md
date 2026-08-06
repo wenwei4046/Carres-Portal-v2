@@ -420,16 +420,20 @@ forbids.
 | `useIssueDeliveryOrder` | `/operation/orders/:id/delivery-order` | **Delivery** |
 | `useUploadDeliveryPhoto` · `useDeliveryPhotos` | delivery photos | **Delivery** |
 | `useSetPartnerDeliveryRules` | partner rules | **Delivery / carrier config** |
-| **`useReceiveLine`** | **`/operation/orders/:id/receive-line`** | **Purchasing / Receiving** |
 | `/api/ops/stock/release` · reserve picker | stock register | **Stock** |
 | `useLoanSofa` | `/operation/orders/:id/loan-sofa` | **Stock** |
 | `useRecheckStockMutation` | re-derives readiness | Stock (read) |
 
-> 🔴 **`useReceiveLine` is a THIRD receiving door**, and it is inside the Orders drawer.
-> Purchasing's own record says the Office receives through the Receiving Workspace and that
-> *"two doors onto one act is the thing this slice removes"* — this is the door that survived.
-> **It is named in Purchasing's §5 as a known third door; this audit confirms it is live, in
-> this file, on the Items tab (`Goods arrived at the warehouse (GRN)`).**
+> ✅ **D2, 2026-08-06 — the third receiving door is GONE.** `useReceiveLine` and
+> `POST /operation/orders/:id/receive-line` are **deleted**, with the modal and its suite.
+> It booked units into the stock register and stamped `line_received` **without opening a
+> Receiving Session** — no `warehouse_receipts` row, no `receiving_events` entry, and it never
+> moved `purchase_order_lines.received_qty`. **That is a second RECORD of one act, not a second
+> door onto it.** Measured before removal: **used zero times** (`line_received` empty on all 65
+> control rows, 0 units reserved to an SO) while the Receiving Workspace had posted 3 sessions.
+> **The route was deleted rather than left unrendered** — Purchasing's own C1 ruling: *a live
+> route with no caller is a bypass one curl away.* The received count STAYS on the Items tab as
+> a FACT; the hand-over is the PO row's existing `Check in` link.
 
 **The drawer is NOT migrated to `DetailShell`, and that is a RULING, not a gap.** L4 requires a
 4-tuple of persistent facts; on the live drawer those four sit in four different blocks, and the
@@ -747,7 +751,7 @@ so.** Audited 2026-08-06 by tracing every write the list and the drawer make.
 | the money GATE and the arithmetic | **THE OWNER** | `orders.paid` | `outstanding = 0` |
 | collecting the money | **a trigger** | `order_payments` — [`../payment/MASTER.md`](../payment/MASTER.md) | **0 rows: the ledger has no reader; `orders.paid` is the truth** |
 | buying the goods | **a SUMMARY, and a broken one** | `purchase_orders` — [`../purchasing/MASTER.md`](../purchasing/MASTER.md) | the PO exists · `received_qty` |
-| receiving the goods | 🔴 **a DUPLICATED WORKFLOW** | `warehouse_receipts` · `receiving_events` — Purchasing | a posted Receiving Session |
+| receiving the goods | **a SUMMARY** — the count is read, never written (D2) | `warehouse_receipts` · `receiving_events` — Purchasing | a posted Receiving Session |
 | reserving / releasing a unit | **a trigger** | `ops_stock_items` — [`../stock/MASTER.md`](../stock/MASTER.md) | the unit's status + `reserved_ref` |
 | booking a delivery | **THE OWNER of the record** | `ops_order_control.booking_*` | a customer-confirmed date **and** slot |
 | the delivery WORKSPACE | a VIEW | nothing — [`../delivery/MASTER.md`](../delivery/MASTER.md) | — |
@@ -757,10 +761,8 @@ so.** Audited 2026-08-06 by tracing every write the list and the drawer make.
 
 **Two ownership defects, both reported and neither fixed here:**
 
-🔴 **Receiving is genuinely duplicated.** `useReceiveLine` writes a receive from the Orders
-drawer, and Purchasing's Receiving Workspace writes another through `office_receive_post`.
-**One act, two doors, two records.** Purchasing already ruled that two doors onto one act is
-the thing to remove; this is the one that survived because it lives in another module's file.
+✅ **Receiving was genuinely duplicated and is FIXED (D2, 2026-08-06).** The Orders drawer's
+write door is deleted; the Items tab reads the count and hands over to the Receiving Workspace.
 
 🟡 **`PartnerRulesEditor` edits carrier configuration from inside one order's drawer.** A
 carrier's working days and capacity are not a fact about this customer's order.
@@ -798,7 +800,7 @@ carrier's working days and capacity are not a fact about this customer's order.
 | # | Defect | Evidence |
 |---|---|---|
 | ~~**D1**~~ | ✅ **FIXED 2026-08-06** — the list reads both PO sources through one shared helper. See §5.1 |
-| **D2** 🔴 | **A third receiving door lives in the Orders drawer** (`useReceiveLine`), duplicating the Receiving Workspace. | §9.5 |
+| ~~**D2**~~ | ✅ **FIXED 2026-08-06** — the door, the hook, the route and its suite are deleted; a guard asserts the route now 404s. See §9.5 |
 | **D3** 🟡 | **The drawer computes `stage` a SECOND time** (its own IIFE at line ~1469) instead of importing the list's exported `stageOf`. Two spellings of one derivation, in two files. | read |
 | **D4** 🟡 | **The drawer computes money a second way for its own header.** The list hands down `holdAmount` from the shared `orderMoney`, and the drawer separately fetches `order_payments` for `Collected` — the one ledger the shared rule refuses to read. **The drawer's Collected and the row's Outstanding can disagree.** | read |
 | **D5** 🟡 | **Carrier rules are edited from one order's drawer.** | §9.5 |

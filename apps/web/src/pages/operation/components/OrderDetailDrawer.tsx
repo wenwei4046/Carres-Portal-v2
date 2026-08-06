@@ -50,12 +50,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  checkedInDone,
   purchasingActionButton,
   computeStorageFee,
   defaultStorageStart,
   normalizeSkuKey,
-  STOCK_LOCATIONS,
   DELIVERY_TIME_SLOTS,
   isSundayIso,
   orderMoney,
@@ -94,7 +92,6 @@ import {
   qk,
   useOperationOrder,
   useRecheckStockMutation,
-  useReceiveLine,
   useOrderLoans,
   useLoanSofa,
   useOperationSuppliers,
@@ -1391,12 +1388,6 @@ function DrawerBody({
   // §10 Generate invoice — the full-screen charges + live-preview overlay.
   const [invoiceOverlayOpen, setInvoiceOverlayOpen] = useState(false);
   // GRN — receive an open linked PO right here (Jess: receive in the order).
-  // GRN per-line partial receive (migration 0208) — the "Book in" stepper target.
-  const [receiveLine, setReceiveLine] = useState<{
-    sku: string;
-    qty: number;
-    received: number;
-  } | null>(null);
   // Sofa loan (migration 0209) — the pending "loan this sofa" DO prompt target.
   const [loanTarget, setLoanTarget] = useState<{ itemId: string; sku: string } | null>(
     null,
@@ -2612,15 +2603,6 @@ function DrawerBody({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {receiveLine && (
-        <ReceiveLineModal
-          orderId={order.id}
-          sku={receiveLine.sku}
-          lineQty={receiveLine.qty}
-          alreadyReceived={receiveLine.received}
-          onClose={() => setReceiveLine(null)}
-        />
-      )}
       {loanTarget && (
         <LoanSofaModal
           orderId={order.id}
@@ -3415,29 +3397,31 @@ function DrawerBody({
                                   >
                                     {lineReceivedOf(l.sku)}/{l.qty}
                                   </span>
-                                  {lineReceivedOf(l.sku) < l.qty && (
-                                    /* R8 (2026-07-28) — the GRN document/act
-                                       split. `GRN` is still the name of the
-                                       PAPER (the column header above keeps it),
-                                       but this is a human DOING something, and
-                                       the act is `Check in`. COPY-STANDARD's
-                                       mechanical test: "+ the piece of paper"
-                                       does not mean what "+ GRN" meant. */
-                                    <Btn
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setReceiveLine({
-                                          sku: l.sku,
-                                          qty: l.qty,
-                                          received: lineReceivedOf(l.sku),
-                                        });
-                                      }}
-                                      title="Goods arrived at the warehouse — records a GRN against this line"
-                                    >
-                                      {purchasingActionButton("check_in")}
-                                    </Btn>
-                                  )}
+                                  {/* D2 (2026-08-06) — the WRITE door is GONE.
+                                      A per-line receive used to open
+                                      `ReceiveLineModal` → POST /receive-line,
+                                      which booked units into the stock register
+                                      and stamped this counter **without opening
+                                      a Receiving Session**: no
+                                      `warehouse_receipts` row, no
+                                      `receiving_events` entry, and it never
+                                      touched `purchase_order_lines.received_qty`.
+                                      That is not a second door onto one act —
+                                      it is a second RECORD of it.
+
+                                      Measured before removal: it had been used
+                                      **zero** times (`line_received` empty on
+                                      all 65 control rows, 0 units reserved to an
+                                      SO) while the Receiving Workspace had
+                                      posted 3 sessions. Purchasing's own C1
+                                      ruling applies — *a live route with no
+                                      caller is a bypass one curl away*.
+
+                                      The count STAYS, because it is a fact worth
+                                      reading; the hand-over to Receiving is the
+                                      PO row's existing `Check in` link, one
+                                      block down. Orders may SHOW cross-module
+                                      work and may not WRITE it. */}
                                 </span>
                               )}
                             </td>
@@ -4549,136 +4533,11 @@ function addonsSum(
   );
 }
 
-/** GRN "Book in" stepper (migration 0208) — receive n units of one order line
- *  into stock (reserved to the SO), WITHOUT a portal PO. Fully-received lines
- *  auto-flip to Ready. */
-function ReceiveLineModal({
-  orderId,
-  sku,
-  lineQty,
-  alreadyReceived,
-  onClose,
-}: {
-  orderId: string;
-  sku: string;
-  lineQty: number;
-  alreadyReceived: number;
-  onClose: () => void;
-}) {
-  const remaining = Math.max(0, lineQty - alreadyReceived);
-  const [qty, setQty] = useState(String(remaining || 1));
-  const [condition, setCondition] = useState<"new" | "exhibition" | "old">("new");
-  const [location, setLocation] = useState("");
-  const [doNumber, setDoNumber] = useState("");
-  const receive = useReceiveLine(orderId);
-  const n = Number(qty);
-  const valid = Number.isFinite(n) && n >= 1 && n <= 999;
-  const field = `mt-0.5 ${fieldCls}`; // THE one input recipe (components/Field)
-
-  function submit() {
-    if (!valid) return;
-    receive.mutate(
-      {
-        sku,
-        qty: n,
-        condition,
-        location: location.trim() || undefined,
-        doNumber: doNumber.trim() || undefined,
-      },
-      {
-        onSuccess: (r) => {
-          // R8 — the dictionary's own done message for `Check in`.
-          toast.success(
-            `${checkedInDone(r.lineReceived, r.lineQty)}${r.ready ? " · Ready" : ""}`,
-          );
-          onClose();
-        },
-        onError: (e) => toast.error(`Couldn't record the GRN — ${e.message}`),
-      },
-    );
-  }
-
-  return (
-    /* R8 — the TITLE is the act, so it is `Check in`. `GRN` survives as the name
-       of the document Jess's team already says (the AutoCount doc), and it keeps
-       the column header and the error line below; it may never be the verb. */
-    <Modal title={purchasingActionButton("check_in")} onClose={onClose}>
-      <div className="space-y-3">
-        <div className="text-meta text-base-600">
-          <span className="font-semibold text-meta text-foreground">{sku}</span>
-          <span className="ml-2 text-base-400">
-            received {alreadyReceived}/{lineQty}
-          </span>
-        </div>
-        <label className="block">
-          <span className="text-meta text-base-500">Arrived now (units)</span>
-          <input
-            type="number"
-            min={1}
-            max={remaining || 999}
-            value={qty}
-            onChange={(e) => setQty(e.target.value)}
-            className={field}
-          />
-          {remaining > 0 && (
-            <span className="text-meta text-base-400">remaining {remaining}</span>
-          )}
-        </label>
-        <label className="block">
-          <span className="text-meta text-base-500">Condition</span>
-          <select
-            value={condition}
-            onChange={(e) =>
-              setCondition(e.target.value as "new" | "exhibition" | "old")
-            }
-            className={field}
-          >
-            <option value="new">New</option>
-            <option value="exhibition">Exhibition</option>
-            <option value="old">Old</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-meta text-base-500">Location (optional)</span>
-          {/* Dropdown of real sites (Jess) — free text bred typos. */}
-          <select
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            className={field}
-          >
-            <option value="">—</option>
-            {STOCK_LOCATIONS.filter((s) => s !== "at-supplier").map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-meta text-base-500">DO / receipt # (optional)</span>
-          <input
-            value={doNumber}
-            onChange={(e) => setDoNumber(e.target.value)}
-            placeholder="e.g. RF2607"
-            className={field}
-          />
-        </label>
-        <div className="flex items-center justify-end gap-2 pt-1">
-          <Btn variant="ghost" onClick={onClose} disabled={receive.isPending}>
-            Cancel
-          </Btn>
-          {/* The modal's own hero (a modal is its own surface — v4 §2). */}
-          <Btn variant="hero" onClick={submit} disabled={!valid || receive.isPending}>
-            {receive.isPending ? "Checking in…" : purchasingActionButton("check_in")}
-          </Btn>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-/** Loan-a-sofa DO prompt (migration 0209) — issue the loan DO + mark the picked
- *  free sofa on-loan to the order. The real sofa line stays Waiting. */
+// D2 (2026-08-06) — `ReceiveLineModal` and its `useReceiveLine` hook STOOD HERE
+// and are deleted with the route they called. Receiving happens in ONE place, the
+// Receiving Workspace, which opens a Session and writes the event; this modal wrote
+// neither. It had never been used. Do not add a receive form to this drawer again —
+// the hand-over is the PO row's `Check in` link.
 function LoanSofaModal({
   orderId,
   soRef,
