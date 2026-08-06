@@ -610,17 +610,42 @@ describe("Stock Ready", () => {
 // ── 12 · a secured requirement leaves the workspace ─────────────────────────
 
 describe("what leaves To Order", () => {
-  it("drops a line an open purchase order already covers", () => {
+  /**
+   * ⭐ T6 REVERSED THE OLD RULE, and Loo reversed it on measured production:
+   * 41 of 78 eligible demand lines were covered by an open purchase order and
+   * every one of them was covered in FULL, so whole customer orders vanished
+   * from the sheet and *"where is SO-1210?"* was answered on no screen.
+   *
+   * A fully covered build now STAYS, as a RECEIPT — it carries the quantity
+   * that purchase order bought and `fullyOnPo`, which is what stops it being
+   * ticked, counted or issued anywhere downstream.
+   */
+  it("keeps a fully covered line as a receipt, never drops it", () => {
     const covered = run(ELLA, {
       supply: { openPoBySku: { "5539-1A(LHF)": 1, "5539-2A(RHF)": 1 } },
     });
-    expect(covered).toHaveLength(0);
+    expect(covered).toHaveLength(1);
+    const b = covered[0].rows[0].builds[0];
+    expect(b.fullyOnPo).toBe(true);
+    // The number a receipt states is what was BOUGHT, never a `0` under `Qty`.
+    expect(b.qty).toBeGreaterThan(0);
+    expect(b.coveredByOpenPo).toBe(2);
   });
 
   it("keeps the workspace when only part is covered", () => {
     const ps = run(ELLA, { supply: { openPoBySku: { "5539-1A(LHF)": 1 } } });
     expect(ps).toHaveLength(1);
     expect(ps[0].rows[0].builds[0].lines.map((l) => l.sku)).toEqual(["5539-2A(RHF)"]);
+    // Partly covered is NOT a receipt — there is still something to buy.
+    expect(ps[0].rows[0].builds[0].fullyOnPo).toBe(false);
+  });
+
+  it("a line with nothing to buy and no cover to explain it still leaves", () => {
+    // The filter did not become "keep everything": a line the STOCK netting
+    // emptied (the api reduces `qty` before the engine sees it) has no receipt
+    // to show and no purchase order to name, so it goes as it always did.
+    const ps = run([{ ...ELLA[0], qty: 0 }, { ...ELLA[1], qty: 0 }]);
+    expect(ps).toHaveLength(0);
   });
 });
 
@@ -681,7 +706,7 @@ describe("T3 · On PO", () => {
     // It also shows why this column is quiet by construction: the pool is
     // drained earliest-deadline first, so at most ONE line per SKU can end up
     // PARTLY covered — the one the pool ran out on. Every line before it is
-    // covered in full and leaves the grid.
+    // covered in FULL, and since T6 those stay on the sheet as receipts.
     const ps = run(
       [
         MAT({ lineId: "early", orderId: "oe", so: 1, qty: 1, deadline: "2026-08-10" }),
@@ -697,8 +722,15 @@ describe("T3 · On PO", () => {
         },
       },
     );
-    expect(ps[0].rows.map((r) => r.orderId)).toEqual(["ol"]);
-    const late = ps[0].rows[0];
+    // T6 — both rows are on the sheet: `early` as a receipt naming the
+    // document its unit came from, `late` as the one thing still to buy.
+    const byOrder = new Map(ps[0].rows.map((r) => [r.orderId, r]));
+    expect([...byOrder.keys()].sort()).toEqual(["oe", "ol"]);
+    const early = byOrder.get("oe")!;
+    expect(early.builds[0].fullyOnPo).toBe(true);
+    expect(early.coveredByOpenPoPos).toEqual(["PO-2044"]);
+    const late = byOrder.get("ol")!;
+    expect(late.builds[0].fullyOnPo).toBe(false);
     expect(late.qty).toBe(1);
     expect(late.coveredByOpenPo).toBe(2);
     expect(late.coveredByOpenPoPos).toEqual(["PO-2051"]);
@@ -711,12 +743,20 @@ describe("T3 · On PO", () => {
     expect(onPoLine(2, [])).toBeNull();
   });
 
-  it("a FULLY covered line is not on the grid at all — nothing left to buy", () => {
-    // Stated as a test so the absence is never read as a lost number. It is
-    // the same rule a stock-covered line has always run on, and the demand
-    // comes back by itself if the purchase order is cancelled.
-    const ps = run([MAT()], { supply: { openPoBySku: { "H1401S-K": 3 } } });
-    expect(ps).toEqual([]);
+  it("a FULLY covered line stays as a receipt — T6 reversed T3's absence", () => {
+    // T3 asserted this line was gone and called the absence correct. Loo saw
+    // the live page and ruled otherwise: a customer order that disappears
+    // because somebody already bought it leaves *"where is SO-1210?"*
+    // answerable nowhere. It stays, carrying what was bought and the document.
+    const ps = run([MAT()], {
+      supply: { openPoBySku: { "H1401S-K": 3 } },
+      openPoRefs: { "H1401S-K": [{ poId: "PO-2051", qty: 3 }] },
+    });
+    expect(ps).toHaveLength(1);
+    const b = ps[0].rows[0].builds[0];
+    expect(b.fullyOnPo).toBe(true);
+    expect(b.qty).toBe(3);
+    expect(b.coveredByOpenPoPos).toEqual(["PO-2051"]);
   });
 
   it("reads 0 with no open purchase orders at all", () => {
@@ -1067,13 +1107,19 @@ describe("P10 · the free-stock offer", () => {
   });
 
   it("a line already covered by an open purchase order is offered nothing", () => {
-    // It has left the workspace; offering it stock would be offering to solve
-    // a problem that no longer exists.
+    // T6 keeps the line on the sheet as a receipt, so the claim moves from
+    // "it is gone" to the one that always mattered: nothing is OFFERED. There
+    // is nothing left to buy, so reserving stock against it would solve a
+    // problem that no longer exists — and would lock a unit for nobody.
     const ps = run([MAT({ qty: 2 })], {
       supply: { openPoBySku: { "H1401S-K": 2 } },
       freeStock: { "haven|K": [{ id: "i1", qty: 1 }] },
     });
-    expect(ps).toEqual([]);
+    expect(ps).toHaveLength(1);
+    const b = ps[0].rows[0].builds[0];
+    expect(b.fullyOnPo).toBe(true);
+    expect(b.freeStock).toBe(0);
+    expect(b.freeStockItemIds).toEqual([]);
   });
 
   it("carries what was already taken onto the row, and the quantity is already net of it", () => {

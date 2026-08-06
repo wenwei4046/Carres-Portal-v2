@@ -450,7 +450,31 @@ export default function OperationToOrder() {
             model: railItemLabel(b.model, b.size ?? null),
             qty: b.qty,
             bucket,
-            orderedPo: null,
+            /**
+             * ⭐ T6 (Loo, 2026-08-06) — A BUILD ALREADY BOUGHT IN FULL IS A
+             * RECEIPT, and it takes the receipt's own field.
+             *
+             * It used to be dropped by the engine, and with it whole customer
+             * orders: measured on production, 41 of 78 eligible demand lines
+             * were covered and every one of them covered in FULL, so `SO-1210`
+             * vanished and *"where is SO-1210?"* was answered on no screen.
+             *
+             * Writing the purchase order into `orderedPo` — the same field a
+             * row read back off a recent PO uses — is what makes the rest of
+             * the page correct without one new rule: `poOf` answers, so the row
+             * is not selectable, not counted on the rail, not in the category
+             * footer, never in a batch, and its `PO No.` cell is already the
+             * blue link that opens that document. Every one of those places
+             * asks the same question, *does this row have a purchase order?*,
+             * and the answer is now honestly yes.
+             *
+             * The FIRST id, because the cell shows one link; the rest ride the
+             * hover (`onPoLine`). It may be a purchase order raised for another
+             * customer — the engine nets per SKU, earliest deadline first — and
+             * §3 records that, because the number answers *where are these
+             * units coming from*, not *this is your document*.
+             */
+            orderedPo: b.fullyOnPo ? (b.coveredByOpenPoPos?.[0] ?? null) : null,
             freeStock: b.freeStock ?? 0,
             takenFromStock: b.takenFromStock ?? 0,
             coveredByOpenPo: b.coveredByOpenPo ?? 0,
@@ -1500,7 +1524,15 @@ export default function OperationToOrder() {
         return (
           <button
             type="button"
-            title="Open Purchase Order"
+            /* T6 — when the row is a receipt because an open purchase order
+               already covers it, the hover names EVERY document behind it
+               (`onPoLine`); the cell can only show one link. A row read back
+               off a PO of its own keeps the plain word. */
+            title={
+              r.coveredByOpenPoPos.length > 0
+                ? (onPoLine(r.coveredByOpenPo, r.coveredByOpenPoPos) ?? "Open Purchase Order")
+                : "Open Purchase Order"
+            }
             className="text-kit-blue-11 tabular-nums hover:underline"
             onClick={() =>
               navigate(
@@ -2067,8 +2099,20 @@ export default function OperationToOrder() {
                         span: 9,
                         content: (
                           <span className="tabular-nums" data-testid="to-order-total">
+                            {/* T6 — the total counts what is still TO BUY, and
+                                that is a repair the receipts forced. It used to
+                                sum every visible row, which was harmless while
+                                the only receipts on the sheet were a handful of
+                                POs raised in the last fortnight. T6 puts every
+                                order an open PO already covers back on the
+                                page — 35 of 62 rows on live data the day it
+                                shipped — so summing the sheet would have said
+                                `71 units` on a day the buyer had 20 to place.
+                                The rail's category counts have skipped bought
+                                rows since P9; this makes the two agree instead
+                                of contradicting each other 200px apart. */}
                             {`${W.total} · ${unitsHeadline(
-                              rows.reduce((n, r) => n + r.qty, 0),
+                              rows.reduce((n, r) => (poOf(r) ? n : n + r.qty), 0),
                             )}`}
                           </span>
                         ),

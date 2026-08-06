@@ -241,6 +241,10 @@ RIGHT         toolbar  pill search · selection state · Issue pill (exists ONLY
                        today* (2990s' MRP row: `Stock · PO Outstanding ·
                        Shortage`). `On PO` is NEUTRAL ink, never green: green is
                        `Ready Stock`, something you can take today.
+                       A row every unit of which is already on an open purchase
+                       order is a RECEIPT (T6): it stays, prints that PO number
+                       as the same blue link, cannot be ticked and is in no
+                       total. `Total · N units` counts what is still TO BUY.
                        ONE aligned ORDER LINE per customer order, WHITE with a
                        `slate-6` rule above it — never a grey band (Loo, T1.1: six
                        bands down one sheet read as stripes, and grey is chrome while
@@ -291,6 +295,29 @@ numbers can never disagree. A cancel stamps `cancelled_at` and lets the remainde
   the operator sees the CUSTOMER's date.
 - **Issue = zero popups, zero toasts.** Rows update in place; a partial failure stays with
   `Retry` until it succeeds.
+- **⭐ AN ORDER ALREADY BOUGHT STAYS ON THE SHEET, WITH ITS PURCHASE ORDER** (Loo, 2026-08-06 —
+  T6, closing G11). A demand line every unit of which sits on an open purchase order used to be
+  DROPPED by the engine, and with it the whole customer order when all its lines were covered:
+  measured that day, **41 of 78 eligible demand lines were covered and every one of them in
+  FULL**, so `SO-1210` vanished and *"where is SO-1210?"* was answered on no screen. **A
+  workspace can only be checked by what it shows.**
+  It returns as a **RECEIPT — the exact shape an already-ordered row has had since
+  2026-08-01** — which is what keeps it out of the selection, the rail counts, the category
+  footer and `Issue` without one new rule: every one of those already asks *does this row have a
+  purchase order?* `validateIssuePlan` refuses it server-side as `already_on_po`, because a rule
+  that lives only in the browser is not a rule.
+  **The number it shows may be a purchase order raised for ANOTHER customer.** The engine nets
+  per SKU, earliest deadline first, so units go to whoever needs them soonest — measured, **18 of
+  54 covered demand rows**. It answers *where are these units coming from*, never *this is your
+  document*, and **it can change between refreshes** when a more urgent order joins the pool.
+  Nothing is lost when it moves; the allocation moved. Loo was shown this and took the trade for
+  a real number over a vague word.
+- **`Total` counts what is still TO BUY, not every row on the sheet** — the receipts forced the
+  repair. It summed the visible rows while the only receipts were a handful of POs from the last
+  fortnight; with T6 the sheet carries **35 of 62** rows that are already bought, and summing it
+  said `71 units` on a day the buyer had 32 to place. The rail's category counts have skipped
+  bought rows since P9, so this is two numbers on one screen agreeing instead of contradicting
+  each other 200px apart.
 - **⭐ A FACT IS SCANNED; AN ACT IS CHOSEN** (Loo, T1.1, 2026-08-06). A fact the buyer reads
   down the page gets a COLUMN — `Ready Stock` is the case that named the rule: the free-stock
   number existed on every row since P10 and could only be reached by noticing a ⊞, so the
@@ -362,22 +389,10 @@ numbers can never disagree. A cancel stamps `cancelled_at` and lets the remainde
   held demand produces no output at all — it must state what · who · why · until when ·
   **G5** `Check in` must leave To Order and **Receiving must gain PO · supplier · customer name
   · SO number · warehouse · ETA · quantity-still-to-receive FIRST**, or information is deleted.
-  **G11 — MEASURED BY T3, NOT RULED, AND IT IS THE BIGGER HALF OF THE SAME DEFECT.** T3 put the
-  cover on the rows that SURVIVE. On production today **not one row survives with a cover**: all
-  41 covered demand lines are covered in full, so what actually happens to them is that they
-  VANISH — `SO-1210`'s two lines are fully on open purchase orders, so the customer's whole
-  order line disappears from To Order and the operator asking *where is SO-1210?* gets no answer
-  anywhere on the page. **The workspace can only be checked by what it shows, and today it
-  cannot show a demand it has already satisfied.** Options, with the recommendation first:
-  ① a `Fully on PO` row-state that KEEPS the order line on the grid inside the ordered window,
-  greyed, with the PO numbers in `PO No.` — the shape `Ordered rows STAY on the grid` already
-  ships, so it is the existing rule applied to a second way of being finished · ② a rail count
-  (`On PO · n`) that lists them on demand · ③ leave it, and answer the question in Purchase
-  Orders. **This is a listing rule — what the grid is FOR — so it is Loo's, not engineering's.**
-  *(**G8** and **G10** are CLOSED, 2026-08-06. G8 by T1: the customer's date sits under the
-  `Customer Delivery` header and a typed demand prints `Required By {date}`. G10 by T1.1:
+  *(**G8** · **G10** · **G11** are CLOSED, 2026-08-06. G8 by T1: the customer's date sits under
+  the `Customer Delivery` header and a typed demand prints `Required By {date}`. G10 by T1.1:
   `Cancel` left the `PO No.` cell for the row's ⊞, on the rule a fact is scanned and an act is
-  chosen.)*
+  chosen. G11 by T6 — see FROZEN RULES.)*
 - **The September switch** — Nice Future stops supplying; a new mattress supplier takes over on
   the subscription model. Sofa and bedframe unchanged.
 

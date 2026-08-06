@@ -1163,6 +1163,29 @@ export interface ToOrderBuild {
    * alone rather than with a guessed document.
    */
   coveredByOpenPoPos: string[];
+  /**
+   * ⭐ T6 (Loo, 2026-08-06) — EVERY unit of this build is already on an open
+   * purchase order, so there is nothing left to buy.
+   *
+   * Such a build used to be DROPPED, and with it the whole customer order when
+   * all of its lines were covered — measured on production the day this
+   * shipped: **78 eligible demand lines, 41 covered, all 41 covered in full**,
+   * so `SO-1210` simply vanished and the page answered *"where is SO-1210?"*
+   * nowhere. Loo ruled it stays, with its real purchase-order number.
+   *
+   * It reaches the grid as a RECEIPT — the same shape an already-ordered row
+   * has had since 2026-08-01 — which is what keeps it out of the selection, the
+   * totals, the rail counts and `Issue` without a single new rule: every one of
+   * those already asks *does this row have a purchase order?*
+   *
+   * **`coveredByOpenPoPos` may name a purchase order raised for ANOTHER
+   * customer.** The engine nets per SKU, earliest deadline first, so the units
+   * go to whoever needs them soonest — measured, 18 of 54 covered demand rows.
+   * The number answers *where are these units coming from*, never *this is your
+   * document*, and it can change between refreshes when a more urgent order
+   * joins the pool. Nothing is lost when it moves; the allocation moved.
+   */
+  fullyOnPo?: boolean;
 }
 
 export interface ToOrderRow {
@@ -1476,6 +1499,17 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
   const namePos = (ids: readonly string[]): string[] => [...new Set(ids)];
 
   /**
+   * T6 — what a line's row says under `Qty`: what is still to BUY, or, when a
+   * purchase order already covers every unit, what that purchase order carries.
+   * One expression, so the quantity a receipt shows and the quantity that made
+   * it a receipt can never disagree.
+   */
+  const shownQtyOf = (m: { lineId: string; qty: number }): number => {
+    const buy = toOrderByLine.get(m.lineId) ?? m.qty;
+    return buy > 0 ? buy : (coveredByLine.get(m.lineId) ?? 0);
+  };
+
+  /**
    * P10 — WHAT FREE READY STOCK COULD COVER, offered and never taken.
    *
    * `consumeFreeStock` stays OFF (Jess, 2026-07-21: goods are labelled per
@@ -1545,8 +1579,14 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
   // group 1 — supplier × category
   const byPair = new Map<string, ToOrderLine[]>();
   for (const l of eligible) {
-    // A line already covered by an open PO or by stock has left this workspace.
-    if ((toOrderByLine.get(l.lineId) ?? 0) <= 0) continue;
+    // T6 — a line with nothing left to buy STAYS when an open purchase order
+    // is the reason (it becomes a receipt below); it leaves only when there is
+    // no reason to show at all.
+    if (
+      (toOrderByLine.get(l.lineId) ?? 0) <= 0 &&
+      (coveredByLine.get(l.lineId) ?? 0) <= 0
+    )
+      continue;
     const k = `${l.supplierId}::${l.category}`;
     const arr = byPair.get(k);
     if (arr) arr.push(l);
@@ -1619,20 +1659,50 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
           // more than one can only exist under a real build key — a synthetic
           // `line::` key is unique per line — so this cannot collapse anything
           // that is not a build.
+          /**
+           * T6 — the number this build is ABOUT. Normally what is still to
+           * buy; on a build every unit of which is already on an open purchase
+           * order, what that purchase order carries. A receipt states the
+           * quantity it bought, exactly as an already-ordered row does — and a
+           * `0` under `Qty` would be an answer nobody asked for.
+           */
           qty:
             isOnePoPerOrder(category) && members.length > 1
               ? 1
-              : members.reduce((s, m) => s + (toOrderByLine.get(m.lineId) ?? m.qty), 0),
+              : members.reduce((s, m) => s + shownQtyOf(m), 0),
+          fullyOnPo: members.every(
+            (m) =>
+              (toOrderByLine.get(m.lineId) ?? m.qty) <= 0 &&
+              (coveredByLine.get(m.lineId) ?? 0) > 0,
+          ),
           title:
             (nameCount.get(named) ?? 0) > 1
               ? `${unitLabel(category, 1)} ${i} — ${named}`
               : named,
           spec: buildSpec(members),
           codes: members.map((m) => m.sku).join(" · "),
-          lines: members.map((m) => ({
+          /**
+           * WHAT A PURCHASE ORDER WOULD CARRY — so a member with nothing left
+           * to buy is not on it. T6 keeps a covered MODULE inside its build
+           * (the sofa is still one sofa, and the build must name every part it
+           * is made of); this list is the order CONTENT, and a line of zero
+           * units is a line the factory should never be sent.
+           *
+           * A fully covered build keeps its members here for the same reason
+           * its `qty` states what was bought: it is a receipt, it is refused by
+           * `validateIssuePlan`, and an empty list would describe nothing.
+           */
+          lines: (members.every(
+            (m) =>
+              (toOrderByLine.get(m.lineId) ?? m.qty) <= 0 &&
+              (coveredByLine.get(m.lineId) ?? 0) > 0,
+          )
+            ? members
+            : members.filter((m) => (toOrderByLine.get(m.lineId) ?? m.qty) > 0)
+          ).map((m) => ({
             lineId: m.lineId,
             sku: m.sku,
-            qty: toOrderByLine.get(m.lineId) ?? m.qty,
+            qty: shownQtyOf(m),
             cost: m.cost,
           })),
           // A build of MODULES gets no offer — see the field's own comment.
@@ -1641,10 +1711,10 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
           freeStock: offerByLine.get(members[0]!.lineId)?.qty ?? 0,
           freeStockItemIds: offerByLine.get(members[0]!.lineId)?.itemIds ?? [],
           takenFromStock: members.reduce((s, m) => s + (m.takenFromStock ?? 0), 0),
-          // T3 — summed over the members that SURVIVED to this build. A member
-          // whose cover was total is not among them (it left at the filter
-          // above), so this number can only ever come from a partly covered
-          // line, and it always stands beside the remainder it explains.
+          // T3 — how many units an open purchase order already covers. On a
+          // PARTLY covered build it stands beside the remainder it explains
+          // (`On PO 2` next to `Qty 1`); on a fully covered one (T6) it IS the
+          // build, and `fullyOnPo` below says so.
           coveredByOpenPo: members.reduce(
             (s, m) => s + (coveredByLine.get(m.lineId) ?? 0),
             0,
@@ -1794,6 +1864,12 @@ export interface ToOrderBuildRef {
   /** `King` · `Queen`, or null where the category has no size at all. */
   size: string | null;
   lineIds: string[];
+  /**
+   * T6 — every unit is already on an open purchase order, so this build is a
+   * RECEIPT and may not be issued. It rides the ref because the issue gate
+   * reads refs, not builds, and a rule the gate cannot see is not a rule.
+   */
+  fullyOnPo?: boolean;
 }
 
 /**
@@ -1827,6 +1903,7 @@ export function toOrderBuilds(proposal: ToOrderProposal): ToOrderBuildRef[] {
         qty: b.qty,
         size: b.size,
         lineIds: b.lines.map((l) => l.lineId),
+        fullyOnPo: b.fullyOnPo,
       });
     }
   }
@@ -1862,7 +1939,9 @@ export type IssuePlanError =
   | "duplicate_build"
   | "unknown_build"
   | "sofa_merge"
-  | "batch_too_large";
+  | "batch_too_large"
+  /** T6 — the build is on the sheet as a receipt; every unit is already bought. */
+  | "already_on_po";
 
 export interface IssuePlanCheck {
   ok: boolean;
@@ -1932,6 +2011,22 @@ export function validateIssuePlan(
           ok: false,
           code: "unknown_build",
           message: "Something on this plan is no longer waiting to be ordered.",
+          count: active.length,
+        };
+      }
+      /**
+       * T6 — a fully covered build is on the sheet now, as a RECEIPT. The page
+       * cannot tick one (`selectable` refuses a row with a purchase order), so
+       * this can only be reached by a stale tab or a hand-made request — and
+       * either way it would buy goods that are already bought. Refused HERE,
+       * server-side, because a rule that lives only in the browser is not a
+       * rule.
+       */
+      if (b.fullyOnPo) {
+        return {
+          ok: false,
+          code: "already_on_po",
+          message: "Something on this plan is already on a purchase order.",
           count: active.length,
         };
       }
