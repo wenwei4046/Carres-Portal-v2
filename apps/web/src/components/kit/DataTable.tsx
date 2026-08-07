@@ -251,6 +251,23 @@ export interface DataTableProps<Row> {
     /** What the select-all box is called for a screen reader. */
     label: string;
     /**
+     * **What ONE row's box is called** — added by S1 (Sales Orders), and it is
+     * a defect repair rather than a convenience.
+     *
+     * Without it the box is named off `rowId`, which is this file's one
+     * surviving spelled word (`Select {id}`) and is only readable while the
+     * page's row identity happens to be readable. Orders keys its rows by the
+     * database uuid — every other surface on that page does — so migrating it
+     * would have had a screen reader announce
+     * `Select 0f3a…-…-…` on all thirty rows, and the operator's own name for
+     * the row (`Select SO-1221`) would have been lost to the move.
+     *
+     * OPTIONAL, and unpassed it changes nothing: the three pages that render
+     * this file today key their rows by a word a human reads, and emit
+     * byte-identical markup.
+     */
+    rowLabel?: (row: Row) => string;
+    /**
      * Rows that can be picked at all. A row failing this renders an EMPTY
      * cell (not a disabled box) and leaves the select-all arithmetic — a
      * done row is not "unselected", it is out of the question.
@@ -1093,7 +1110,14 @@ export default function DataTable<Row>({
                       {(selection.selectable?.(row) ?? true) ? (
                         <Checkbox
                           id={`kit-table-row-${id}`}
-                          ariaLabel={`Select ${id}`}
+                          /* A TERNARY, not `??`: guard §10.1 forbids a `??`
+                           * fallback to a string, and it is right to — a
+                           * fallback is how a word reaches the screen without
+                           * a caller. This is the same shape `selectable` and
+                           * `expandable` already use for the same reason. */
+                          ariaLabel={
+                            selection.rowLabel ? selection.rowLabel(row) : `Select ${id}`
+                          }
                           checked={isSelected}
                           onCheckedChange={() => selection.onToggleRow(id)}
                         />
