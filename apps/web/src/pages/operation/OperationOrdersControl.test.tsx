@@ -527,6 +527,57 @@ describe("OperationOrdersControl · Stock column", () => {
   });
 });
 
+/* ───────────────────────────────────────────────────────────────────────────
+ * S1 (2026-08-07) — the list renders through `kit/DataTable`.
+ *
+ * Two guards, and both exist because S1 replaced something that could not go
+ * wrong quietly with something that can. The other 150-odd tests in this file
+ * are the migration's real proof: they assert what an operator sees, they were
+ * written against the hand-written table, and they were not touched.
+ * ────────────────────────────────────────────────────────────────────────── */
+describe("OperationOrdersControl · S1 · the kit renders the table", () => {
+  it("budgets the whole table — a list grid never scrolls sideways (§7)", () => {
+    listHookState.data = { orders: [makeRow({ id: "w1", so: 9001 })] };
+    wrap(<OperationOrdersControl />);
+    const cols = Array.from(screen.getByRole("table").querySelectorAll("col")).map(
+      (c) => (c as HTMLElement).style.width,
+    );
+    expect(cols).toHaveLength(10); // select + Follow-up + the 8 business columns
+
+    // `Follow-up` is the ONE column sized in PIXELS, and that is load-bearing:
+    // its header is a WORD of fixed width, a `th` wraps rather than ellipsises,
+    // and a percentage of a table that changes width cannot protect it. This
+    // shipped as a percentage first and wrapped in a real browser the moment
+    // the nav was expanded (850px table). jsdom has no layout, so no unit test
+    // can catch the wrap — it can only pin the pixel that prevents it.
+    expect(cols[1]).toBe("72px");
+
+    // Everything else is a share of the table, and the shares must land on the
+    // whole: over it, the browser renormalises every column and C14's measured
+    // widths stop meaning anything; under it, `table-fixed` hands the slack
+    // back out and does the same. 72px is 7.11% of C14's 1012px reference.
+    const pct = cols.filter((w) => w.endsWith("%")).map(Number.parseFloat);
+    expect(pct).toHaveLength(9);
+    expect(pct.reduce((a, b) => a + b, 0)).toBeCloseTo(100 - (72 / 1012) * 100, 6);
+  });
+
+  it("persists no column shape — F58's localStorage key died with the hand-written table", () => {
+    // Loo ruled it on 2026-08-04 (grid-findings F61): "no page may persist
+    // column order, width or visibility". The kit's own guard (grid-powers,
+    // rule L) scans only the kit, so F58 was invisible to it — this asserts it
+    // from the page's side, which is where the violation actually lived.
+    const wrote: string[] = [];
+    const spy = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation((k: string) => void wrote.push(k));
+    listHookState.data = { orders: [makeRow({ id: "w2", so: 9002 })] };
+    wrap(<OperationOrdersControl />);
+    expect(localStorage.getItem("carres.orders.hiddenCols")).toBeNull();
+    expect(wrote).not.toContain("carres.orders.hiddenCols");
+    spy.mockRestore();
+  });
+});
+
 describe("OperationOrdersControl · listing columns (A1–A4)", () => {
   function oneRow(partial: Partial<operationOrderListRow> & { id: string; so: number }) {
     listHookState.data = { orders: [makeRow(partial)] };
@@ -588,14 +639,21 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       source_ref: ["TCF2024/06-461"],
     });
     wrap(<OperationOrdersControl />);
-    // ONE header row (9 columns). The follow-up flag is the 2nd column (icon-only
-    // header). C rebuild (Jess 2026-07-18): the 三线点 Status dots lead; SO+Ref
-    // merge into Order, Customer absorbs Region (caption line), LOGISTIC became
-    // Delivery (truth-ladder words) and the "Actions" pills close the row.
+    // ONE header row (10 columns). C rebuild (Jess 2026-07-18): the 三线点
+    // Status dots lead; SO+Ref merge into Order, Customer absorbs Region
+    // (caption line), LOGISTIC became Delivery (truth-ladder words) and the
+    // "Actions" pills close the row.
+    //
+    // S1 (2026-08-07) — the follow-up column's header is a WORD, not the flag
+    // icon it carried while this page hand-wrote its own `<th>`. `Column.label`
+    // is a `string` in `kit/DataTable` (and in every grid engine measured for
+    // card 01), so no column here can be headed by a picture. The word is the
+    // QUEUES rail's own — `Follow-up`, §3 — so the rail row and the column say
+    // one thing once. The CELL is unchanged and still icon-only.
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
-      "", // follow-up flag — icon-only header
+      "Follow-up",
       "Status",
       "Order",
       "Customer",
@@ -606,14 +664,23 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Actions", // every action as a tone-coloured pill (Jess 2026-07-19/27)
     ]);
     // SO (emphasis) + Ref (caption) share the Order cell; the phone tooltip
-    // stays on that cell; the Status cell names the pipeline STAGE in words.
+    // stays with those two lines; the Status cell names the pipeline STAGE in
+    // words.
     const row = screen.getByTestId("order-row");
     expect(within(row).getByText("SO-3012")).toBeInTheDocument();
     expect(within(row).getByText("Tan Ah Kow")).toBeInTheDocument();
     expect(within(row).getByText("TCF2024/06-461")).toBeInTheDocument();
     const orderCell = within(row).getByText("SO-3012").closest("td")!;
-    expect(orderCell).toHaveAttribute("title", "012-3456789");
     expect(within(row).getByText("TCF2024/06-461").closest("td")).toBe(orderCell);
+    // S1 — the phone tooltip hangs on the two-line BLOCK, not on the `<td>`:
+    // the kit owns the cell and offers no per-cell `title`, and a tooltip
+    // belongs to the thing it describes rather than to the padding around it.
+    // What matters to an operator is unchanged — hover the SO number, read the
+    // phone — so that is what this asserts.
+    expect(within(row).getByText("SO-3012").closest("[title]")).toHaveAttribute(
+      "title",
+      "012-3456789",
+    );
     // Status (Jess 2026-07-19): the Status cell shows the STAGE word (same
     // vocabulary as the tabs). A native placed order reads "Placed" as a pill.
     const stagePill = within(row).getByText("Placed");

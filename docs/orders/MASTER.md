@@ -243,10 +243,15 @@ All · Placed · Proceed · To book · Customer confirmed · Delivered
 - **Delivered** · **All**.
 
 ### WHAT IS ON SCREEN TODAY
-`apps/web/src/pages/operation/OperationOrdersControl.tsx`, **5,121 lines** ·
+`apps/web/src/pages/operation/OperationOrdersControl.tsx`, **5,152 lines** ·
 route `/operation/orders` · ***measured 2026-08-06 — every line of logic read end to end;
 the JSX read structurally.*** It merges three legacy surfaces — the 6-column kanban, the
 AutoCount triage Inbox and the flat read-only feed — into one table.
+
+**The table itself is `kit/DataTable` since S1 (2026-08-07).** The page owns the columns, the
+cells, the sort order and the 30-row window; the `<table>`, the `<tr>`, the widths, the 40px,
+the sticky head, the select box and the column rules are the kit's. **Orders is no longer the
+one register in the portal outside the kit.**
 
 **The nine rail groups, in render order:** `QUEUES` (danger) · `DELIVERY` · `TEAM` ·
 `DEADLINE` · `LOGISTICS` · `SUPPLIER` · `REGION` · `CATEGORY` · `FIX DATA`.
@@ -301,120 +306,163 @@ FACET COUNTS only, never the rows.
 FACET RAIL     QUEUES (the module's open actions, danger group first) ·
                DEADLINE (Overdue · Due ≤3d · This week · Next week) ·
                TEAM (per PIC) · LOGISTICS · CATEGORY · FIX DATA · Owing
-TABLE          Status(pill + 3 dots) · Order · Customer · Deadline · Stock ·
-               Delivery · PIC · Actions(verb-led line + `+N`)
+TABLE          ☐ · Follow-up · Status(pill + 3 dots) · Order · Customer ·
+               Deadline · Stock · Delivery · PIC · Actions(verb-led line + `+N`)
                rows 40px · default order = risk to the promise
-FOOTER         the count band
+FOOTER         the count band, and the `Loading more…` statement while the
+               30-row window is short of the total
 ```
 
 **Measured on production 2026-08-05 at 1440×900:** table 1012px in 951px available, 32 clipped
 cells of 300 (all `Actions`, which needs 249px on every row and gets 208.5), 16 fully visible
 rows. **The residual truncation is ACCEPTED** — the verb and the party are visible, the full
-text is in the `title` and in the drawer.
+text is in the `title` and in the drawer. **`Actions` is still 208.5px after S1 and its
+truncation is unchanged**; what S1 moved is below, measured the same way.
 
-### ✅ S1 · APPROVED TO BUILD 2026-08-07 — the list stops hand-writing its table
+### ✅ S1 · SHIPPED 2026-08-07 — the list renders through `kit/DataTable`
 
-> **Approved after Card 01 returned READY, and NOT before.** The sequence is the point and it
-> is now Constitution (`CLAUDE.md` §4): prove the capability, then build. **Law 4 still binds —
-> approved-to-build is not "stop thinking". If you would not design it this way today, say so
-> before you type.**
+**The migration is done and the card is closed.** `OperationOrdersControl.tsx` no longer
+hand-writes a `<table>`: the eight business columns are `Column` objects, the header word is
+typed once in the column def, and the `<tr>`, the widths, the 40px, the sticky head, the
+select box, the row washes and the column rules are `kit/DataTable`'s. Same eight columns,
+same data, same 30-row window, same risk order.
 
-# ▶︎ BUILD KICKOFF — paste nothing, the card is here
-
-```text
-BUILD CARD · S1 · Sales Orders migration.   git pull first.
-
-READ ONLY   CLAUDE.md  +  docs/orders/MASTER.md §3 (this block).
-            Card 01 already returned READY — zero engine changes required.
-            Do NOT re-research. Do NOT re-map capabilities. Do NOT redesign.
-            Do NOT touch row height, windowing, virtualisation or density.
-
-SHIP ONE    OperationOrdersControl.tsx renders through kit/DataTable.
-THING       Same 8 columns · same 40px · same widths · same data ·
-            same 30-row window (pass the ALREADY-SLICED rows).
-
-CARRY       the append trigger moves off the <tr> sentinel inside <tbody>
-            onto the scroller — DataTable's `rootRef` exists for exactly this
-            the ⚑ column takes a WORD (`Column.label` is `string`)
-DELETE      carres.orders.hiddenCols — F61's ruling, not a choice
-
-THEN        test → self-review → PR → merge → deploy → verify production.
-            Overwrite this block in the same PR.
-            Do NOT come back for approval on engineering.
+**WHAT WENT WITH THE HAND-WRITTEN TABLE**
 ```
+carres.orders.hiddenCols  the localStorage store of column visibility.
+                          Loo RULED against it 2026-08-04 (grid-findings F58 ·
+                          F61) and the kit has nowhere to put it. The `⋮ Show
+                          columns` popover and its `N/M` chip went with it —
+                          the ⋮ held nothing else.
+the <tr> sentinel         the append trigger moved onto the SCROLLER, through
+                          `DataTable.rootRef`, at the same 240px threshold.
+                          The `Loading more… (N of M)` statement moved to the
+                          FOOTER count band — same words, beside the number it
+                          qualifies.
+the page's own <Th>       and its header hex, its colgroup and its wrapper
+                          frame (P16: a list grid is a SHEET, not a card).
+```
+**Measured, not asserted:** the design guard's rule L — *"a browser-persisted UI-shape key in
+`pages/**`"* — fell **8 → 6**. Rule G (*a hand-rolled table*) fell 682 → 678. No guard rule
+rose.
 
-**The four reasons to interrupt the owner are the Constitution's, unchanged:** a new business
-rule · an approved UI/workflow/word must change · production data modified irreversibly ·
-long-term architecture must change. **A truncated cell, a failing test, a rebase and a deploy
-are none of them.**
+**WHAT IS AVAILABLE BUT NOT WIRED, AND WHY.** Header-click sort and the per-column ▼ are one
+prop away now, and S1 passes neither. `CLAUDE.md` §2: *"a feature is wired only if it makes the
+operator finish faster today; 'the kit has it' is not an answer."* Sort needs the PAGE to
+reorder rows against `compareBySlack` — the page's own answer to *what is most urgent* — and
+what an operator should be allowed to sort away from that is a decision, not a prop. **It is
+the next card's question and it is now cheap to answer.**
 
-**REPORTED WITH THE APPROVAL, and deliberately NOT in this card:** `Actions` truncates on 30 of
-30 rows and this MASTER marks that ACCEPTED (see above) on an arithmetic assuming all eight
-columns are visible at once. **S1 changes no width, so the defect survives S1 untouched.** It
-is the next card's question, not this one's.
+### ⚠ THE WIDTH BUDGET MOVED, AND THE CARD'S "SAME WIDTHS" COULD NOT HOLD
 
-**THE MEASURED PROBLEM.** `OperationOrdersControl.tsx` renders a hand-written `<table>` with
-its own `<Th>`, its own colgroup and its own header hex. **It is the only register in the
-portal that does not use `kit/DataTable`** — seven files do, and every one is Purchasing
-(`../research/grid-findings.md` F33 · F40). Two consequences are measured, not argued:
+The card said *same widths*. **It is arithmetically unsatisfiable and the build measured why**,
+so the record is here rather than in a chat:
 
 ```
-① Every kit power is absent here. The page has NO header sort, NO per-column ▼,
-   no column rules, no totals strip — `onSortChange` + `expansion` + `groupBy` +
-   `contextMenu` grep to ZERO in 5,150 lines (F40). The buyer has all four on
-   To Order; the operator who lives on Orders all day has none.
-
-② It stores hidden columns in `localStorage` (`carres.orders.hiddenCols`, F58),
-   which Loo RULED against on 2026-08-04 — "no page may persist column order,
-   width or visibility" (F61). The guard that enforces that law scans two kit
-   files and no page (F59), so the ruling is violated in production today.
+kit/DataTable OWNS the select column at a FIXED 4%   (the page spent 3%)
+`Column.label` is a `string`, so ⚑ takes a WORD.
+   `Follow-up` measures 54.4px at the th's text-label + the kit's px-2
+   → the column is 72px, IN PIXELS                   (the page spent 3%)
+────────────────────────────────────────────────────────────────────────
+at C14's 1012px reference that is 7.11%, so the two control columns
+cost 11.11% where they cost 6%
+→ 5.11% MUST come out of the eight.  The only question is WHICH.
 ```
 
-**THE PROPOSAL — a MOVE, not a feature.** Same eight columns, same 40px, same widths, same
-data, same 30-row append. Only the table element changes.
+> ### ⛔ AND THE ⚑ COLUMN IS SIZED IN PIXELS, WHICH ONLY A REAL BROWSER COULD TELL US
+>
+> **S1 first shipped that column as a percentage — 7.25%, tuned to the 1012px table C14
+> measured — and the header WRAPPED the first time the page was opened in Chromium.** At
+> 1440×900 with the nav EXPANDED the table is **850px**, and 7.25% of that is 61.6px against a
+> word that needs 70.4px. `Follow-up` rendered as "Follow-" over "up".
+>
+> **All 155 unit tests passed while it wrapped, and they always would have: jsdom has no
+> layout engine.** A percentage of a table that changes width cannot protect a word whose width
+> is fixed — only a pixel can. The kit already documents the recipe (`Column.width`: *"a string
+> = raw CSS width — fixed interior columns … the international recipe"*).
+>
+> **The rule this leaves behind: a column whose HEADER is the widest thing it will ever hold is
+> sized in pixels, not percent.** The unit test now pins `72px` and says why — it cannot catch
+> the wrap, it can only hold the pixel that prevents it.
+>
+> **Measured in Chromium after the fix, both nav states, live dev server:**
+> ```
+> nav EXPANDED   table  850px   ⚑ 72px, one line   no sideways scroll
+> nav COLLAPSED  table 1022px   ⚑ 72px, one line   no sideways scroll
+>                Status 134.9 · Order 75.5 · Deadline 151.1 · Stock 54.0 ·
+>                PIC 59.4 · Actions 210.5   ← every one of C14's, to the pixel
+>                Customer 106.7 · Delivery 116.3   ← the two that pay
+> ```
+**Answered by measuring in Chromium at the real 1012px, on C14's own worst-case strings,
+before and after in the same harness.** Two allocations were built and rejected first:
 
 ```
-GAINED, because the kit already has them and no new code writes them
-    header-click sort · per-column ▼ · column rules · totals strip · row washes
-DELETED, because the kit has nowhere to put it
-    carres.orders.hiddenCols — F58's violation dies with the hand-written table
-NOT IN THIS PROPOSAL
-    windowing · new columns · row expansion · right-click menu · any density change
+ALL ON `customer`, per C14's own deficit rule   →  123px → 77px,
+    and `Tan Ah Kow` truncates.  REJECTED — an ordinary human name is
+    not an edge case, and a rule written to absorb 50px does not
+    survive being asked for 95px.
+EVEN SPLIT customer + delivery                  →  `Tan Ah Kow` still
+    loses 5px.  REJECTED — a symmetrical number is not an argument.
+1 / 2 · `delivery` pays TWICE `customer`        →  SHIPPED
+    customer 123 → 105px  ·  delivery 150 → 114px
+    Actions · Deadline · Status · Order · Stock · PIC keep C14's
+    width TO THE DIGIT, and the budget still lands on the whole table.
 ```
+**`delivery` pays the larger share because it carries the least, and this module already ruled
+why:** §3's frozen rule is that *"the `Delivery` cell never repeats the sentence `Actions`
+already carries"* — the row says what to DO about missing logistics one column to the right,
+every time — and C14 records this column's live exposure to its sizing string as **zero of 65
+orders**. A customer's name is read on every row and nothing else on the row says it.
 
-**WHY IT DOES NOT WAIT FOR WINDOWING.** The list is windowed today by append
-(`ROWS_PER_BATCH = 30` + an IntersectionObserver, `:1601` · `:2449`), and at 77 live orders
-(§1.1) the measured interaction cost is ~30ms (F66). **Passing the kit the ALREADY-WINDOWED
-slice keeps that exactly.** Windowing the kit properly is a separate card and a later one.
+**C14's reason for not squeezing `delivery` was a hazard the kit REMOVES** — *"neither date
+line carries `truncate`, so under-sizing this column does not ellipsise, it OVERFLOWS into
+PIC."* The kit clips every cell, so nothing can bleed into PIC; all three of that cell's lines
+now carry `truncate` + a `title`, so the clip shows an ellipsis instead of half a glyph.
 
-**~~WHAT WOULD OVERTURN IT~~ — CHECKED 2026-08-07. VERDICT: READY.**
-The falsifier this proposal named was *a kit power Orders needs that `DataTable` cannot
-express*. All three sources were read first-hand — `OperationOrdersControl.tsx` (5,150),
-`kit/DataTable.tsx` (1,193) and 2990s' proven implementation (`DataGrid.tsx` 1,551 +
-`MfgSalesOrdersList.tsx`) — and mapped across 28 capabilities.
-
-**Nothing is 🟡 COPY REQUIRED and nothing is 🔴 ENGINE GAP. Zero engine changes are required.**
-Header filters and header-click sort are GAINED, because the kit has them and this page has
-neither. Everything the page does today it can keep doing.
-
-**Two items are PAGE-side, and are named so this does not read as a pure prop-swap:**
+**AND THE KIT'S UNIFORM `px-2` COSTS EVERY COLUMN 4px OF CONTENT BOX.** The page's cells padded
+8–12px each. Measured deltas, same strings, before → after:
 ```
-· the append trigger moves from a <tr> sentinel inside <tbody> (:3731) to the
-  scroller — `DataTable`'s `rootRef` already exists for exactly this
-· the ⚑ follow-up column needs a WORD; `Column.label` is `string` in BOTH
-  engines, so no grid here can carry an icon-only header
+Actions   −135 / −78 / −78  →  IDENTICAL.  The column is 208.5px in both.
+Status    −19 → −24   Order −34 → −43   Deadline −8/−5/−18 → −12/−9/−22
+Stock       0 → −2    (`ETA —`, and it ellipsises)
+Customer  −85 → −108  (the deficit; the name is in the title + drawer + search)
 ```
-**One deletion is REQUIRED, not optional:** `carres.orders.hiddenCols` (:1540) violates Loo's
-2026-08-04 layout-memory ruling (`../research/grid-findings.md` F58 · F61). The kit has nowhere
-to store it, so the migration ends it.
+**Every one of those cells already truncated before S1** except `Stock`, and the MASTER already
+marks the residual ACCEPTED. **`Actions` — the one thing on the row a human acts on — is
+untouched**, which is what the card asked for and what was verified first.
 
-**Card 01 was the capability mapping. The approval came after it, on 2026-08-07, and the order
-of those two events is the rule this module now carries** (`CLAUDE.md` §4).
+> 🟡 **REPORTED, NOT FIXED — and the next card that re-tabulates this page starts here.**
+>
+> **① A 15px flag icon now occupies 73px, because its HEADER needs the word.** `Follow-up` is
+> the widest thing that column will ever hold and it is in the HEAD, not the data — the cell is
+> one tooltipped icon whose colour is the whole state. 7.25% is more than `Stock` (5.28) or
+> `PIC` (5.81) get, on a table C14 measured **50px SHORT of its own content**. Either the kit
+> learns an icon header (`Column.label` would have to stop being a `string`, which reaches
+> three FROZEN pages) or the flag stops being a column. **S1 does not decide it** — the
+> migration was approved with the word, and a build card does not reopen an approved rule.
+>
+> **② `Deadline` is clipped and deliberately has NO `truncate`.** S1 added one and took it back
+> out: the ellipsis reserves its own width, so `Wed, 22 Jul 2` became `Wed, 22 Ju…` and the
+> operator lost the MONTH to gain a signal they could already see. A date is read left to right
+> and its tail is the year. **Re-measure before reaching for that again.**
+>
+> **③ `Actions` still truncates on every row**, exactly as before. The MASTER marks it ACCEPTED
+> on an arithmetic that assumed all eight columns must be visible at once, and **a frozen
+> identity gutter would change the assumption.** Still open, still not this card's.
 
-**WHAT IS NOT SETTLED AND MUST NOT BE ASSUMED SETTLED.** 🟡 `Actions` truncates on 30 of 30
-rows (measured above, marked ACCEPTED) — that arithmetic assumed all eight columns must be
-visible at once, and a frozen identity gutter would change the assumption. **This proposal
-does not touch it, and the next chat should ask whether ACCEPTED still holds.**
+### ONE KIT CHANGE, AND IT WAS A DEFECT REPAIR
+
+Card 01 mapped 28 capabilities and found nothing missing. **It missed one, and the build
+found it:** `selection` names the select-all box but had no word for a ROW's box — that name
+was built from `rowId`. Orders keys its rows by the database uuid, as every write on the page
+does, so the migration would have had a screen reader announce `Select 0f3a…` on all thirty
+rows and would have LOST the operator's own name for the row.
+
+`selection.rowLabel?: (row) => string` is now an optional prop, passed here as
+`Select SO-1221`. **Optional is the kit's own rule for exactly this reason** — *"a changed
+signature reaches a frozen page; a new optional prop cannot"* — and the three pages that pass
+nothing emit byte-identical markup. **Card 01's verdict stands: zero ENGINE changes. This is a
+missing word, and the kit's own §10.1 says a word is never the kit's to supply.**
 
 ### API + DATA
 `GET /api/operation/orders` is the single source of stage derivation — the control table is the
