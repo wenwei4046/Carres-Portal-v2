@@ -39,7 +39,11 @@ import ModuleHeader from "./components/ModuleHeader";
 import FollowUpForm from "./components/FollowUpForm";
 import ImportStockEtaDialog from "./components/ImportStockEtaDialog";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
-import DataTable, { type Column, type TableSort } from "@/components/kit/DataTable";
+import DataTable, {
+  type Column,
+  type ColumnFilter,
+  type TableSort,
+} from "@/components/kit/DataTable";
 import { SectionBand, SectionCard } from "@/components/SectionPanel";
 import { TASKS_KEY } from "./components/rail/TasksPanel";
 import {
@@ -1252,6 +1256,67 @@ export function logisticStateOf(
  * > one window size. There is no cheap width to take them from — C14 sized
  * > every column to its CELLS, which are wider than any header here.
  */
+// ─── S2.2 · HEADER FILTER DROPDOWNS ──────────────────────────────────────────
+/**
+ * **The ▼ Excel put on every header, on the four columns where it is not a
+ * second home for a filter that already has one.**
+ *
+ * 2990 gives EVERY column a funnel (`DataGrid.tsx:342-345`, Commander
+ * 2026-05-29 — *"没有 drop-down 菜单让我去做选择"*), and `kit/DataTable` already
+ * renders the popover Jess approved on 2026-08-01. What could not be copied
+ * wholesale is WHICH columns, and the reason is this module's own frozen rule:
+ *
+ * > **Nothing on the list says the same thing twice.** … `Overdue` has exactly
+ * > ONE home (the QUEUES rail).
+ *
+ * **Almost every column on this table already has a rail facet.** So the test
+ * is not *does 2990 have a ▼* — it is *does this ▼ create a SECOND filter, or
+ * a second DOOR onto the one that exists*:
+ *
+ * ```
+ * order      no rail facet           →  ▼ owns its own state       WIRED
+ * customer   no rail facet           →  ▼ owns its own state       WIRED
+ * deadline   DEADLINE  Set<DueBucket>→  ▼ WRITES THE RAIL'S SET    WIRED
+ * delivery   LOGISTICS Set<string>   →  ▼ WRITES THE RAIL'S SET    WIRED
+ * ────────────────────────────────────────────────────────────────────────
+ * dots       the stage TABS          →  a THIRD home for the stage  NOT WIRED
+ * stock      stockFilter  — SINGLE   →  the ▼ is a checklist, and
+ * pic        staffFilter  — SINGLE       binding it means widening
+ * next       nextFilter   — SINGLE       the RAIL to multi-select   NOT WIRED
+ * ```
+ *
+ * > ### ⛔ AND THE LAST THREE ARE A CARD BOUNDARY, NOT A JUDGEMENT
+ * >
+ * > `stockFilter` · `staffFilter` · `nextFilter` are `T | null` — clicking a
+ * > second PIC in the rail REPLACES the first. The kit's ▼ is a multi-select
+ * > checklist, so wiring it to those three means widening them to sets, and
+ * > that changes what the RAIL does. **The S2 card is explicit:** *"DO NOT
+ * > TOUCH Queues … Only rendering behaviour INSIDE the grid changes.
+ * > Everything outside the grid stays OperationOrdersControl's."* Widening a
+ * > rail facet from single to multi-select is not rendering behaviour inside
+ * > the grid — it is the rail's own contract, and three of the four are
+ * > QUEUES rows by name.
+ * >
+ * > **So it is reported, not decided.** Whether an operator may hold two PICs
+ * > or two stock states at once is a real question with a real answer, and it
+ * > belongs to whichever card owns the rail — not to a grid-wiring card that
+ * > would answer it as a side effect.
+ *
+ * **The cascade is Excel's and To Order already ships it** — each ▼ lists the
+ * values that survive every OTHER narrowing on the page, so the options a menu
+ * offers are the options that can actually return a row.
+ */
+export const ORDER_FILTER_COLUMNS: ReadonlySet<string> = new Set([
+  "order",
+  "customer",
+  "deadline",
+  "delivery",
+]);
+
+/** A row with no value in a filtered column still has to be selectable —
+ *  Excel's `(Blanks)`, in this portal's words (COPY-STANDARD: never a code). */
+export const F_NO_VALUE = " none";
+
 export type OrderSortValue = string | number;
 
 /** 2990's comparator: numeric when both sides really are numbers, else
@@ -1365,6 +1430,22 @@ export function orderSortValueOf(
       return ctx.nextVerbOf(o);
     default:
       return null;
+  }
+}
+
+/**
+ * The value a ▼ lists and matches on, for the two columns that own their own
+ * filter state. **It is read from the same place the CELL is**, so a menu can
+ * never offer a value the column does not show.
+ */
+export function orderColFilterValueOf(key: string, o: operationOrderListRow): string {
+  switch (key) {
+    case "order":
+      return String(o.so);
+    case "customer":
+      return o.customer_name?.trim() || F_NO_VALUE;
+    default:
+      return F_NO_VALUE;
   }
 }
 
@@ -2098,6 +2179,22 @@ export default function OperationOrdersControl({ onImport }: Props) {
         }
       : null);
   const [staffFilter, setStaffFilter] = useState<string | null>(null);
+  /**
+   * ─── S2.2 · THE COLUMN ▼ ────────────────────────────────────────────────
+   *
+   * **Only the two columns that have NO rail home carry their own state.**
+   * `Deadline` and `Delivery` get a ▼ too, and it writes the SET THE RAIL
+   * ALREADY OWNS (`dueFilter` · `logisticFilter`) rather than a second one —
+   * so clicking `Due ≤3d` in the rail lights the `Deadline` ▼ and clearing
+   * either clears both. **One truth, two doors** (the architecture's Law C is
+   * about two RECORDS, not two surfaces onto one).
+   *
+   * That is also why the other four columns are NOT wired, and it is a
+   * measurement rather than a preference — see `ORDER_FILTER_COLUMNS`.
+   */
+  const [colFilters, setColFilters] = useState<ReadonlyMap<string, ReadonlySet<string>>>(
+    new Map(),
+  );
   // Owing queue filter (B rebuild) — orders with money outstanding, closed
   // ones included (§7: owing survives Delivered).
   const [owingOnly, setOwingOnly] = useState(false);
@@ -2722,6 +2819,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
       const opts = CATEGORY_OPTS.filter((c) => categoryFilter.has(c.key));
       r = r.filter((o) => opts.some((c) => c.match(o)));
     }
+    /* S2.2 — the column ▼, applied LAST of the narrowings and BEFORE the sort.
+       `Deadline` and `Delivery` are already applied above, because their ▼
+       writes the rail's own set; only the two columns that own their state
+       are left to apply here. */
+    for (const [k, sel] of colFilters) {
+      if (sel.size === 0) continue;
+      r = r.filter((o) => sel.has(orderColFilterValueOf(k, o)));
+    }
     /* S2.1 — the DEFAULT order first, always. A column sort is then applied on
        top of it, and `Array.prototype.sort` is stable, so two rows the operator
        sorted to the same value keep `compareBySlack`'s order between them: the
@@ -2738,7 +2843,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       ),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, supplierFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, skuMeta, suppliers, tasksByOrder, sort, sortCtx]);
+  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, supplierFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, skuMeta, suppliers, tasksByOrder, sort, sortCtx, colFilters]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -3212,6 +3317,119 @@ export default function OperationOrdersControl({ onImport }: Props) {
     return d.w * colScale - GUTTER_DEFICIT_PCT * (DEFICIT_SHARE[key] ?? 0);
   };
   const dataLabel = (key: string) => ORDER_COL_DEFS.find((c) => c.key === key)!.label;
+
+  /* ── S2.2 · the ▼ ──────────────────────────────────────────────────────────
+     THE CASCADE, and it is the whole reason these lists are computed rather
+     than taken from `visible`: each menu offers the values that survive every
+     OTHER narrowing on the page, so an option a menu shows is an option that
+     can actually return a row. To Order ships the same rule (`filteredExcept`)
+     and the portal's facet law (§8.2) is the same sentence for the rail.
+
+     `visible` already has this column's own filter applied, so listing from it
+     would leave a menu holding only what is already ticked — no way back. */
+  const optionBase = (except: string) =>
+    visible.filter((o) =>
+      [...colFilters.entries()].every(
+        ([k, sel]) => k === except || sel.size === 0 || sel.has(orderColFilterValueOf(k, o)),
+      ),
+    );
+  /** Every row the ▼'s own filter is hiding, so its list can offer them back. */
+  const withOwnFilterLifted = (key: string) => {
+    const sel = colFilters.get(key);
+    if (!sel || sel.size === 0) return optionBase(key);
+    const shown = new Set(optionBase(key).map((o) => o.id));
+    return [
+      ...optionBase(key),
+      ...tabFiltered.filter(
+        (o) =>
+          !shown.has(o.id) &&
+          [...colFilters.entries()].every(
+            ([k, s]) => k === key || s.size === 0 || s.has(orderColFilterValueOf(k, o)),
+          ),
+      ),
+    ];
+  };
+
+  const setColFilter = (key: string) => (next: ReadonlySet<string>) =>
+    setColFilters((m) => {
+      const n = new Map(m);
+      if (next.size === 0) n.delete(key);
+      else n.set(key, next);
+      return n;
+    });
+
+  /** A ▼ for a column that owns its own state. */
+  const ownFilterFor = (
+    key: string,
+    label: string,
+    toLabel: (v: string) => string,
+    opts: { searchable?: boolean; compare?: (a: string, b: string) => number } = {},
+  ): ColumnFilter => {
+    const values = [...new Set(withOwnFilterLifted(key).map((o) => orderColFilterValueOf(key, o)))];
+    values.sort(
+      opts.compare ??
+        ((a, b) => (a === F_NO_VALUE ? 1 : b === F_NO_VALUE ? -1 : a.localeCompare(b))),
+    );
+    return {
+      options: values.map((v) => ({ value: v, label: v === F_NO_VALUE ? "—" : toLabel(v) })),
+      selected: colFilters.get(key) ?? new Set<string>(),
+      onChange: setColFilter(key),
+      label: `Filter ${label}`,
+      clearLabel: "Clear",
+      ...(opts.searchable ? { searchPlaceholder: `Search ${label.toLowerCase()}` } : {}),
+    };
+  };
+
+  /** A ▼ that writes a set the RAIL already owns — one truth, two doors. */
+  const railFilterFor = (
+    label: string,
+    options: ColumnFilter["options"],
+    selected: ReadonlySet<string>,
+    onChange: (next: ReadonlySet<string>) => void,
+    searchable = false,
+  ): ColumnFilter => ({
+    options,
+    selected,
+    onChange,
+    label: `Filter ${label}`,
+    clearLabel: "Clear",
+    ...(searchable ? { searchPlaceholder: `Search ${label.toLowerCase()}` } : {}),
+  });
+
+  const columnFilterFor = (key: string): ColumnFilter | undefined => {
+    switch (key) {
+      case "order":
+        return ownFilterFor("order", "Order", (v) => `SO-${v}`, {
+          searchable: true,
+          compare: (a, b) => Number(a) - Number(b),
+        });
+      case "customer":
+        return ownFilterFor("customer", "Customer", (v) => v, { searchable: true });
+      /* The rail's own DEADLINE group, in the header. The words come from
+         `DUE_BUCKETS` — the ONE list the rail rows also read — so the header
+         and the rail structurally cannot spell a bucket two ways. */
+      case "deadline":
+        return railFilterFor(
+          "Deadline",
+          dueEntries.map((d) => ({ value: d.bucket, label: d.bucket })),
+          dueFilter as ReadonlySet<string>,
+          (next) => setDueFilter(new Set(next as ReadonlySet<DueBucket>)),
+        );
+      /* The rail's LOGISTICS group, and its option list is the RAIL's own
+         (`logisticEntries`) — including the 0-count partners Jess ruled must
+         stay pickable, so the ▼ and the rail offer exactly the same companies. */
+      case "delivery":
+        return railFilterFor(
+          "Delivery",
+          logisticEntries.map((l) => ({ value: l.carrier, label: l.carrier })),
+          logisticFilter,
+          (next) => setLogisticFilter(new Set(next)),
+          true,
+        );
+      default:
+        return undefined;
+    }
+  };
   const baseColumns: readonly Column<OrdersGridRow>[] = [
     {
       /* ⚑ FOLLOW-UP — the one column S1 changes, and only its HEAD.
@@ -3306,9 +3524,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
   /* S2.1 — which columns sort is read off `ORDER_SORTABLE_COLUMNS`, never
      typed a second time here: the set and the sort value are the same list, so
      a header cannot grow an arrow the comparator has no answer for. */
-  const columns: readonly Column<OrdersGridRow>[] = baseColumns.map((c) =>
-    ORDER_SORTABLE_COLUMNS.has(c.key) ? { ...c, sortable: true } : c,
-  );
+  const columns: readonly Column<OrdersGridRow>[] = baseColumns.map((c) => {
+    const next: Column<OrdersGridRow> = ORDER_SORTABLE_COLUMNS.has(c.key)
+      ? { ...c, sortable: true }
+      : { ...c };
+    /* S2.2 — same discipline as the sort: the set and the builder are the one
+       list, so a header cannot grow a ▼ the page has no menu for. */
+    if (ORDER_FILTER_COLUMNS.has(c.key)) {
+      const f = columnFilterFor(c.key);
+      if (f) next.filter = f;
+    }
+    return next;
+  });
 
   return (
     /* Shell pattern (Loo 2026-08-02, applied to Orders on his order — this
