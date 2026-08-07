@@ -509,6 +509,7 @@ BUILD CARD · S2 · connect the grid powers.   git pull first.
 READ ONLY   CLAUDE.md  +  this §3.   Card 01 already returned READY.
 
 ONE CAPABILITY PER COMMIT, IN THIS ORDER. Never one huge PR.
+   S2.0  Make main GREEN         → ✅ SHIPPED 2026-08-08, recorded below
    S2.1  Header sorting          → ✅ SHIPPED 2026-08-08, recorded below
    S2.2  Header filter dropdowns → commit
    S2.3  Footer totals           → commit   ⚠ see the conflict below
@@ -553,6 +554,59 @@ already returns to `null`, which is `compareBySlack`, so §2.3 survives sorting 
 **THEN** test → self-review → PR → merge → deploy → verify production **per capability**.
 **Do NOT come back for approval on engineering.** The four reasons to interrupt are the
 Constitution's, and a truncated cell is not one of them.
+
+### ✅ S2.0 · SHIPPED 2026-08-08 — main is GREEN, and the tests were the ones that were wrong
+
+**231 files · 2,700 tests · 0 failures.** Was 16 failures across 4 suites, reproduced on a
+clean `d0cede0c` checkout, so they predate S2 entirely. **Every one was a test asserting UI a
+RULING had removed, and no component was touched** — `git status` on the whole card lists four
+`.test.tsx` files and nothing else.
+
+```
+OperationOrders          7  the drawer's ActionBar buttons
+OhanaSofaTab             4  "the Receive button is absent"
+OrderCustomerCard        4  "the card has an Edit button"
+NiceFutureMattressTab    1  "the row shows the supplier + warehouse"
+```
+
+**ONE RULING CAUSED NINE OF THE SIXTEEN.** Jess, 2026-07-11 — *every panel's actions live in
+its header ⋮; the redundant inline button is gone.* The drawer's stage actions moved into the ⋮
+(`OrderDetailDrawer.tsx:7266-7269`: *"the per-stage 'next step' lives in the ⋮ now — no sentence
+row"*) and so did the customer card's Edit. **Test 15 in that same file had already followed the
+move a card earlier; the stage tests never did**, which is exactly how a suite rots one ruling at
+a time. The words moved with them: `Assign delivery partner` → **`Assign logistics`** ·
+`Issue POs` → **`Issue PO`** · `Attach DO & mark delivered` → **`Mark delivered`** (from the
+action dictionary, not spelled in the test) · `Transfer to ready (stock on-hand)` →
+**`Transfer to ready`**. `Waiting for them to push it to operation` greps **0 times in `src`** —
+the sentence row it belonged to was deleted, so that test was reading for a string, not a
+behaviour.
+
+**THE OTHER SEVEN WERE THREE MORE RULINGS.** Loo's **Direct-Receive escape hatch** (2026-05-11)
+put a `Direct receive →` link on every non-terminal state, so *"the receive testid is absent"*
+became false **and correct** — the receive RPC only requires `status='open'`, so operation can
+legitimately receive whenever the DO arrives via the supplier. Loo's **row redesign C+D**
+(2026-05-18) dropped the Supplier column (*"redundant per supplier tab"*) and the Warehouse
+column (*"only 1 WH currently, zero info"*).
+
+**NOTHING WAS DELETED TO GO GREEN — THE ASSERTIONS WERE INVERTED OR RE-AIMED.** A deleted
+assertion lets the removed thing quietly come back; an inverted one fails the day it does and
+names the ruling that would have to be reopened first. The three tests guarding real
+`update_order` behaviour — PATCH only the changed field · a too-short name is refused · a no-op
+Save just closes — were **kept exactly as written** and simply enter through the door that
+exists (`startEditRef`, which IS the ⋮'s handle). **Three control cases were added** so the new
+assertions cannot pass vacuously: a completed order offers no Abandon, a delivered partner does
+offer the primary check-in, and the supplier name is asserted ABSENT rather than not-asserted.
+
+> ### 🔴 AND THE CARD FOUND SOMETHING THAT IS NOT A TEST PROBLEM — **D9**
+>
+> Four of these tests could not reach the branch they named **no matter what stock the fixture
+> declared**, and the reason is a live rule: `lineCategory()` reads `SOFA-NORD-3S` as an
+> **accessory**, and §7 rules that accessories never block a delivery. So the line reported
+> `1/1 ready` on **zero units**, `allReceived` went true, and the drawer's ladder answered
+> `ready` — *goods secured* — for an order with no goods. **In a test that wasted a day; in
+> production that is an order told it can be delivered.** Filed as **D9 🔴** with its live
+> exposure named as the open question. **Not fixed here** — it reaches Stock and Purchasing, and
+> S2.0's mandate was the tests.
 
 ### ✅ S2.1 · SHIPPED 2026-08-08 — the operator sorts, and the third click gives the risk order back
 
@@ -1182,3 +1236,6 @@ carrier's working days and capacity are not a fact about this customer's order.
 | **D6** 🟡 | **`Issues module coming — needs the ops_issues table`** is a live tooltip on the Actions menu. A promise about the product on an operator's screen. | panel titles |
 | **D7** 🟡 | **The `deliver_today` checklist is empty by ruling**, so an operator expanding the day's own action sees nothing. Correct by the rule (*nobody records "goods loaded"*), and worth knowing before somebody calls it a bug. | `order-action-checklist.ts` |
 | **D8** ⚪ | **`stockWindowDays` is still a flat 7 / 5** in `orderActionSignalsOf`, while Purchasing's real production numbers are 7 · 7 · **14** and manager-editable. The Orders ladder therefore turns the ready-date call red on a sofa **nine days later** than Purchasing's own window says it should. | read + Purchasing §2.3 |
+| **D9** 🔴 | **`lineCategory()` calls a sofa an ACCESSORY when its SKU is neither canonical nor a known keyword — and an accessory is ALWAYS READY.** `packages/shared/src/line-category.ts:28-51` resolves a `sofa:` head, then a keyword list, then `^sf[0-9]`, then falls through to `acc`. `SOFA-NORD-3S` matches none of the three. **The consequence is not cosmetic:** §7 rules that *"accessories never block a delivery"*, so a mis-read line reports ready with **zero units on hand**, `allReceived` goes true, and the drawer's ladder answers `ready` — goods-secured — for an order whose goods do not exist. Found 2026-08-08 by S2.0, which is how four tests had been passing against a fixture they thought was a sofa. **Live exposure is the open question and it is answerable in SQL** — canonical SKUs are safe; the risk is AutoCount free-text. **Nothing was changed: this reaches Stock and Purchasing, not just Orders.** | measured — the Items panel labels the line `Accessory` while the header reads `1/1 ready` on zero stock |
+| **D10** 🟡 | **Two dead surfaces are still compiled into the bundle, and both had live test suites.** `OperationOrders.tsx` (450 lines, the 6-column kanban) is imported by **nothing** — §3 records that the list merged it away — and `OrderCustomerCard` (in the drawer) is exported, rendered nowhere, and superseded by `CustomerIdentityCard` (Jess 2026-07-17 rev 4). **Purchasing's own C1 ruling applies to the second one:** its `startEditRef` door has no caller, so the safe-edit mode is unreachable, **and the `status === 'place'` gate that used to guard it is gone from the component** — whoever re-mounts it inherits an editor with no gate. | `grep` — the only non-test reference to each is its own declaration |
+| **D11** ⚪ | **`receive-po-<id>` names TWO different controls** in `ProcurementTabContent` — the primary `Check in` button and the always-available `Direct receive →` escape hatch. A test cannot tell them apart by handle, only by word. | read |

@@ -225,6 +225,97 @@ beforeEach(() => {
   refetchSpy.mockClear();
 });
 
+/**
+ * Opens the drawer's ⋮ header menu.
+ *
+ * 2026-08-08 — **Jess 2026-07-11 moved every panel's actions into its header
+ * ⋮**, and `OrderDetailDrawer.tsx:7266-7269` still carries the ruling in its
+ * own words: *"Stage actions — the per-stage 'next step' lives in the ⋮ now
+ * (no sentence row). Gated by pipelineStatus so only the relevant one shows."*
+ * Test 15 below already followed that move; the stage-action tests did not,
+ * and that is the whole reason they were red.
+ */
+function openActionsMenu() {
+  fireEvent.click(screen.getByRole("button", { name: /More actions/ }));
+}
+
+/**
+ * ⚠️ **The drawer reads the DETAIL response, never the list row.** Six of the
+ * failing tests set `operation_stage` on the LIST row only, and `makeDetail()`
+ * hard-codes `ready_to_dispatch` with the sofa in stock — so every one of them
+ * was driving a drawer that never changed state. Measured 2026-08-08 by
+ * dumping the ⋮ for all six stages: **identical menu every time.**
+ *
+ * This helper makes the detail the thing the test sets, so a stage assertion
+ * is actually about the stage it names.
+ */
+function setDetailStage(
+  operation_stage: string | null,
+  extra: Partial<ReturnType<typeof makeDetail>> = {},
+  orderExtra: Record<string, unknown> = {},
+) {
+  const base = makeDetail();
+  detailHookState = {
+    ...detailHookState,
+    data: {
+      ...base,
+      ...extra,
+      order: { ...base.order, operation_stage, ...orderExtra },
+    } as ReturnType<typeof makeDetail>,
+  };
+}
+
+/**
+ * ⚠️ **A CORE-GOODS SKU, and the fixture's own one is not.**
+ *
+ * `makeDetail()` orders `SOFA-NORD-3S`, which reads like a sofa and is not one.
+ * `lineCategory()` (`packages/shared/src/line-category.ts:28-51`) resolves a
+ * canonical head before a colon (`sofa:…`), then a keyword list, then
+ * `^sf[0-9]`. `SOFA-NORD-3S` matches none of the three and falls through to
+ * **`acc`** — and **an accessory is ALWAYS ready** (§7: "accessories never
+ * block a delivery").
+ *
+ * So `allReceived` is true no matter what stock says, the drawer's ladder
+ * answers `ready` on every rung, and a stage test can never reach the branch
+ * it names. Zeroing the stock fixtures changed nothing for exactly this
+ * reason. **Measured 2026-08-08:** the Items panel labels that line
+ * `Accessory` while the header reads `1/1 ready` with zero on hand.
+ *
+ * The four stage tests below therefore order a SKU the current rule actually
+ * recognises. The rest of the file keeps `SOFA-NORD-3S` — it is what the
+ * warehouse fixtures are keyed to, and those tests do not depend on the
+ * category.
+ */
+const CORE_SOFA_SKU = "sofa:nordic:3-seater";
+
+/** The detail half of "no goods anywhere", on a line that can actually be short. */
+const NO_STOCK = {
+  stockBalances: [] as { sku: string; warehouse_id: string; qty: number; reserved: number }[],
+  freeUnits: [],
+  lines: [{ sku: CORE_SOFA_SKU, qty: 1, unit_price: 4500 }],
+};
+
+/**
+ * Empties the OTHER stock source. Readiness does not come from
+ * `detail.stockBalances` alone — the drawer folds in live free stock from
+ * `useOperationWarehouse().byWarehouse`, which the shared fixture seeds with 5
+ * units at `wh-1`. Both have to be empty before the ladder leaves `ready`,
+ * and `ready` outranks every rung below it (Loo: 货齐 > 排物流).
+ */
+function setNoStockAnywhere() {
+  warehouseHookState = {
+    data: {
+      warehouses: [{ id: "wh-1", name: "KL Warehouse", address: "Subang" }],
+      byWarehouse: {
+        "wh-1": [{ sku: CORE_SOFA_SKU, qty: 0, reserved: 0, low_stock_status: "ok" }],
+      },
+      totalsBySku: {},
+    },
+    isLoading: false,
+    isError: false,
+  };
+}
+
 describe("OperationOrders — kanban", () => {
   it("1. renders all 6 Pipeline v2 stage columns including Placed and Confirmed", () => {
     setLoaded([
@@ -333,17 +424,26 @@ describe("OperationOrders — kanban", () => {
     expect(screen.getByTestId("order-detail-drawer")).toBeInTheDocument();
   });
 
-  it("6. drawer shows the right action buttons for ready_to_dispatch", () => {
+  it("6. the drawer ⋮ offers Assign logistics once the goods are in", () => {
+    // 2026-08-08 — this asserted `Assign delivery partner` on the drawer body.
+    // TWO rulings moved it, and test 15 above already followed the first one:
+    //   · Jess 2026-07-11 — every panel's actions live in its header ⋮; the
+    //     ActionBar's sentence row and its buttons are gone.
+    //   · the word is `Assign logistics` (COPY-STANDARD's own; the module says
+    //     "logistic", never "delivery partner").
+    // The default fixture has the sofa in stock, so the drawer's ladder reads
+    // `ready` — and `ready` beats `scheduled` on purpose (Loo: 货齐 > 排物流).
     setLoaded([
       makeOrder({ id: "ord-1", so: 9001, customer_name: "Click Me", operation_stage: "ready_to_dispatch" }),
     ]);
     render(wrap(<OperationOrders />));
     fireEvent.click(screen.getByText("Click Me"));
+    openActionsMenu();
     expect(
-      screen.getByRole("button", { name: /Assign delivery partner/ }),
+      screen.getByRole("button", { name: /Assign logistics/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Abandon/ }),
+      screen.getByRole("button", { name: /Abandon order/ }),
     ).toBeInTheDocument();
   });
 
@@ -506,60 +606,70 @@ describe("OperationOrders — kanban", () => {
     expect(screen.getByRole("button", { name: /Print DO/ })).toBeInTheDocument();
   });
 
-  it("16. drawer in_production action bar shows Re-check stock + Issue POs + Abandon", () => {
+
+  it("16. the ⋮ on a not-yet-procured order offers Issue PO + Re-check stock + Abandon", () => {
+    // Was `Issue POs`, plural. The word is `Issue PO` — one PO per supplier,
+    // and Purchasing owns that string (Orders DISPLAYS it, never re-states it).
     setLoaded([
       makeOrder({ id: "ord-1", so: 9001, customer_name: "Alice", operation_stage: "in_production" }),
     ]);
-    detailHookState = {
-      ...detailHookState,
-      data: {
-        ...makeDetail(),
-        order: {
-          ...makeDetail().order,
-          operation_stage: "in_production",
-        },
-        // Force a shortage so "Issue POs" surfaces.
-        stockBalances: [
-          { sku: "SOFA-NORD-3S", warehouse_id: "wh-1", qty: 0, reserved: 0 },
-        ],
-      },
-    };
+    setNoStockAnywhere();
+    setDetailStage("in_production", NO_STOCK);
     render(wrap(<OperationOrders />));
     fireEvent.click(screen.getByText("Alice"));
+    openActionsMenu();
+    expect(screen.getByRole("button", { name: /Issue PO/ })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Re-check stock/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Issue POs/ }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Abandon/ }),
+      screen.getByRole("button", { name: /Abandon order/ }),
     ).toBeInTheDocument();
   });
 
-  it("17. drawer dispatched stage shows only Mark delivered (no Abandon)", () => {
+  it("17. the ⋮ on a dispatched order offers Mark delivered — and Abandon is still there", () => {
+    // Two changes, and the second is a REAL behaviour change, not a rename:
+    //   · `Attach DO & mark delivered` → `Mark delivered`, taken from the
+    //     action dictionary (`orderActionButton("deliver_today")`) rather than
+    //     spelled here. The drawer's own comment explains why it is NOT
+    //     `Issue delivery order`: issuing happens earlier and elsewhere, and
+    //     one word on two acts is the defect C6 fixed.
+    //   · Abandon is now offered at EVERY non-completed stage (`active =
+    //     pipelineStatus !== "completed"`). The old test asserted its absence
+    //     on dispatched; that is no longer true, and test 25 below pins where
+    //     it genuinely does disappear so this is not just a loosened claim.
     setLoaded([
       makeOrder({ id: "ord-1", so: 9001, customer_name: "Alice", operation_stage: "dispatched" }),
     ]);
-    detailHookState = {
-      ...detailHookState,
-      data: {
-        ...makeDetail(),
-        order: {
-          ...makeDetail().order,
-          operation_stage: "dispatched",
-          delivery_partner_id: "p-1",
-        },
-      },
-    };
+    setNoStockAnywhere();
+    setDetailStage("dispatched", NO_STOCK, { delivery_partner_id: "p-1" });
     render(wrap(<OperationOrders />));
     fireEvent.click(screen.getByText("Alice"));
+    openActionsMenu();
     expect(
-      screen.getByRole("button", { name: /Attach DO & mark delivered/ }),
+      screen.getByRole("button", { name: /Mark delivered/ }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /Abandon/ }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: /Abandon order/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("25. a completed order's ⋮ offers NO stage action and NO Abandon", () => {
+    // The control case for 17. Without it, "Abandon is everywhere" would be
+    // asserted nowhere and the `active` gate could be deleted with a green bar.
+    setLoaded([
+      makeOrder({ id: "ord-1", so: 9001, customer_name: "Alice", operation_stage: "delivered" }),
+    ]);
+    setDetailStage("delivered", NO_STOCK, { status: "delivered" });
+    render(wrap(<OperationOrders />));
+    fireEvent.click(screen.getByText("Alice"));
+    openActionsMenu();
+    expect(screen.queryByRole("button", { name: /Abandon order/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Issue PO/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Assign logistics/ })).toBeNull();
+    // …but the document exports survive a completed order, which is the whole
+    // point of keeping the menu mounted.
+    expect(screen.getByRole("button", { name: /Download/ })).toBeInTheDocument();
   });
 
   it("18. order with status='place' lands in the Placed column", () => {
@@ -594,30 +704,32 @@ describe("OperationOrders — kanban", () => {
         operation_stage: "confirmed",
       }),
     ]);
-    detailHookState = {
-      ...detailHookState,
-      data: {
-        ...makeDetail(),
-        order: {
-          ...makeDetail().order,
-          status: "proceed_order",
-          operation_stage: "confirmed",
-        },
-      },
-    };
+    setNoStockAnywhere();
+    setDetailStage("confirmed", NO_STOCK, { status: "proceed_order" });
     render(wrap(<OperationOrders />));
     fireEvent.click(screen.getByText("Alice"));
+    openActionsMenu();
     expect(
       screen.getByRole("button", { name: /Confirm proceed/ }),
     ).toBeInTheDocument();
     // Abandon is the second action on confirmed — keep it visible so
     // operation can reject without a stage trip first.
     expect(
-      screen.getByRole("button", { name: /Abandon/ }),
+      screen.getByRole("button", { name: /Abandon order/ }),
     ).toBeInTheDocument();
   });
 
-  it("20. drawer ActionBar on stage='placed' shows informational copy and no buttons", () => {
+  it("20. a raw Place order has NO sentence row — the ⋮ carries the next step", () => {
+    // This asserted the copy "Waiting for them to push it to operation".
+    // **That sentence no longer exists anywhere in `src`** (grepped: 0 hits).
+    // Jess 2026-07-11 removed the ActionBar's sentence row outright — the
+    // per-stage next step moved into the ⋮ — so the test was reading for a
+    // string the ruling deleted, not for a behaviour that broke.
+    //
+    // What is worth guarding survives and is asserted instead: a raw Place
+    // order that nobody has procured sits on the ladder's bottom rung
+    // (`needs_setup`), so the step it offers is `Issue PO` and NOT the
+    // downstream ones.
     setLoaded([
       makeOrder({
         id: "ord-placed",
@@ -627,25 +739,17 @@ describe("OperationOrders — kanban", () => {
         operation_stage: null,
       }),
     ]);
-    detailHookState = {
-      ...detailHookState,
-      data: {
-        ...makeDetail(),
-        order: {
-          ...makeDetail().order,
-          status: "place",
-          operation_stage: null,
-        },
-      },
-    };
+    setNoStockAnywhere();
+    setDetailStage(null, NO_STOCK, { status: "place" });
     render(wrap(<OperationOrders />));
     fireEvent.click(screen.getByText("Awaiting Push"));
     expect(
-      screen.getByText(/Waiting for them to push it to operation/),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /Confirm proceed/ }),
-    ).not.toBeInTheDocument();
+      screen.queryByText(/Waiting for them to push it to operation/),
+    ).toBeNull();
+    openActionsMenu();
+    expect(screen.getByRole("button", { name: /Issue PO/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Assign logistics/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Mark delivered/ })).toBeNull();
   });
 
   it("21. clicking a column header toggles its expanded state", () => {
@@ -700,20 +804,16 @@ describe("OperationOrders — kanban", () => {
         operation_stage: "in_production",
       }),
     ]);
-    detailHookState = {
-      ...detailHookState,
-      data: {
-        ...makeDetail(),
-        order: {
-          ...makeDetail().order,
-          operation_stage: "in_production",
-        },
-      },
-    };
+    setNoStockAnywhere();
+    setDetailStage("in_production", NO_STOCK);
     render(wrap(<OperationOrders />));
     fireEvent.click(screen.getByText("Alice"));
+    openActionsMenu();
+    // The parenthetical moved off the label and onto the item's `title`
+    // ("Mark stock on-hand → ready (manual bridge)") when the action became a
+    // ⋮ MenuItem — a menu row is one short verb phrase, not a sentence.
     expect(
-      screen.getByRole("button", { name: /Transfer to ready \(stock on-hand\)/ }),
+      screen.getByRole("button", { name: /Transfer to ready/ }),
     ).toBeInTheDocument();
   });
 
@@ -759,8 +859,9 @@ describe("OperationOrders — kanban", () => {
     };
     render(wrap(<OperationOrders />));
     fireEvent.click(screen.getByText("Alice"));
+    openActionsMenu();
     fireEvent.click(
-      screen.getByRole("button", { name: /Transfer to ready \(stock on-hand\)/ }),
+      screen.getByRole("button", { name: /^Transfer to ready$/ }),
     );
 
     // Pre-flight surfaces the shortage warning.
