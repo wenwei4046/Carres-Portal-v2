@@ -46,6 +46,10 @@ On a conflict, Business wins.
 
 ## 3 · The five documentation laws
 
+**Rules exist to build a better product.** If following one produces a worse product, STOP —
+study, measure, challenge, then improve the rule. A better product beats an older rule; better
+evidence beats older documentation.
+
 ### Law 1 · One Project Constitution, one MASTER per module
 `CLAUDE.md` + `docs/<module>/MASTER.md`. **Two files to start work. Never eight.**
 Old queues and checkpoints live in `docs/archive/` — **no chat reads them.**
@@ -57,6 +61,16 @@ Build  →  Reality  →  Architecture review  →  If approved  →  Overwrite 
 **Documentation is not the source of truth. The repository is.** Business rules freeze before
 implementation; **UI layout does not freeze before operators have used it.** A design that is
 worse in practice is CHANGED, not defended — *"we decided that before"* is not a reason.
+**Reality outranks documentation.** If observation and the document disagree, measure again,
+then update the document. Never defend an outdated document.
+
+Hypothesis —validate→ Finding —survive→ Principle. A HYPOTHESIS is an idea not yet checked and
+may never be written as a Finding. A FINDING is checked and carries its evidence. A PRINCIPLE is
+a Finding that SURVIVED — challenge, other projects, real operation. It is admitted only when
+the evidence is strong enough AND its boundary is explicit: a Principle must be falsifiable.
+Every Principle names the Findings it rests on; if one is overwritten it returns to review in
+the same change. **Principles guide research; they never replace research.** No Principle is
+permanent — it holds only until better evidence replaces it.
 
 ### Law 3 · Override Law — a MASTER is never permanent, and it holds ONE truth
 **A better architecture always wins.** When one is approved, **overwrite** the MASTER.
@@ -77,6 +91,9 @@ If I joined Carres today, would I still design it this way?
 If the answer is **no**, you must state: **Current → Problem → Better design → Trade-off →
 Recommendation.** *"The MASTER says so, therefore I follow"* is the failure this law exists to
 stop. **A chat that saw a problem and said nothing has failed, even if it shipped perfectly.**
+**Be a critical product architect.** Challenge assumptions, challenge documentation, challenge
+previous decisions. Never defend the repository, never defend documentation, never defend a
+previous decision — defend the product, and build something better.
 
 ### Law 5 · Simplicity Law — the default action is REDUCE
 Before touching any document, ask: **can the project have one file fewer?**
@@ -100,21 +117,14 @@ not a new guideline  →  fold the rule into this Constitution
 6  Overwrite the MASTER in the same PR.
 ```
 
-**TWO CHATS PER MODULE IS THE CEILING** (Loo, 2026-08-05 — restored here because it lived in
-the Purchasing queue file the migration archived). On 2026-08-05 four lanes touched Purchasing:
-the card number Q12 was claimed twice and Q13 twice, each lane renumbering around the other
-without knowing, and Loo received a stale report about a defect already fixed. **Past two, the
-manager spends the day de-duplicating instead of deciding.** A chat that only CLAIMS and writes
-nothing still occupies a slot — three lanes sat claimed-and-empty that day.
+**TWO CHATS PER MODULE IS THE CEILING.** Past that point, coordination cost grows faster than
+delivery. A chat that has claimed a lane still occupies a lane, even if no code has been written.
 
 **Only ONE thing may interrupt the owner: a business rule.** Technical problems, bugs, wording
 conflicts, deploys, rebases, test failures — **solve them yourself. Finding another bug is not
 a reason to stop; it is an instruction to fix it and continue.**
 
-**THE TEST, applied before you type a question to Loo** (his words, 2026-08-05: *"stop asking
-me technical — why i write repo and you all ignore my request, i want you write into master
-file"*). **The rule above was already written and a manager chat broke it the same day**, which
-is why it now carries a test instead of only a principle:
+**THE TEST, applied before you type a question to the owner:**
 
 ```
 Can this be answered by reading the code, the docs, the database, or by measuring?
@@ -228,16 +238,9 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 | **HR** | people, commission, targets, cost | [`docs/hr/MASTER.md`](docs/hr/MASTER.md) |
 | **Rental** | rent-to-own agreements, billing and buyout | [`docs/rental/MASTER.md`](docs/rental/MASTER.md) |
 
-**Two module boundaries were MEASURED rather than assumed, and both follow the rule *use the
-business objects the repository already has*:**
-
-- **Portal Core is not a module.** Its fourteen cards were all Orders-list and Orders-drawer
-  work, so its rules live in the Orders MASTER.
-- **Inventory and Ready Stock are ONE module.** The portal has a single `Stock` door with three
-  tabs; two masters would be two names for one screen.
-
 **A module gets a folder only when it is a real operator surface with measured reality.**
 Never create an empty master for symmetry.
+**Architectural reasoning belongs in ADRs, not in the Constitution.**
 
 ## 9 · The four laws that outrank anything pasted into a chat
 
