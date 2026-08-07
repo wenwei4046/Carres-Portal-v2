@@ -464,6 +464,62 @@ signature reaches a frozen page; a new optional prop cannot"* — and the three 
 nothing emit byte-identical markup. **Card 01's verdict stands: zero ENGINE changes. This is a
 missing word, and the kit's own §10.1 says a word is never the kit's to supply.**
 
+# ▶︎ S2 · APPROVED TO BUILD 2026-08-08 — wire the powers S1 made reachable
+
+> **S1 was INFRASTRUCTURE. It replaced the table renderer and deliberately wired nothing.**
+> S2 is IMPLEMENTATION, not another research card. **Do NOT create a new Orders page** — keep
+> amending `OperationOrdersControl.tsx`, which is where the business lives.
+
+```text
+BUILD CARD · S2 · connect the grid powers.   git pull first.
+READ ONLY   CLAUDE.md  +  this §3.   Card 01 already returned READY.
+
+ONE CAPABILITY PER COMMIT, IN THIS ORDER. Never one huge PR.
+   S2.1  Header sorting          → commit
+   S2.2  Header filter dropdowns → commit
+   S2.3  Footer totals           → commit   ⚠ see the conflict below
+   S2.4  Grouping                → commit   ⚠ see the conflict below
+   S2.5  Expansion               → commit
+
+COPY 2990's behaviour. Do NOT redesign any of them.
+   2990s/apps/backend/src/components/DataGrid.tsx  (+ MfgSalesOrdersList.tsx)
+
+DO NOT TOUCH   Queues · business rules · Actions · the drawer · permissions · API.
+               Only rendering behaviour INSIDE the grid changes.
+               Everything outside the grid stays OperationOrdersControl's.
+
+IF A CAPABILITY CANNOT BE COPIED FROM 2990 — STOP AND REPORT.
+Do not invent a replacement without approval.
+```
+
+**TWO CONFLICTS ARE ALREADY MEASURED. They are reported here so the build does not discover
+them at the keyboard.**
+
+**🔴 S2.3 · 2990 HAS NO FOOTER TOTALS. Nothing to copy.** Verified first-hand 2026-08-08:
+`tfoot` · `totalRow` · `footerTotal` · `sumRow` return **two hits in 1,551 lines and both are
+`totalRows`, a GROUP's row count** (`DataGrid.tsx:761-763`), not a totals strip. The source for
+S2.3 is therefore **Carres' own kit** (`DataTable.totals`, D0.5d power 4) **and To Order's live
+usage of it** — not 2990. **That is a source change, not an invention, so it needs no approval;
+but the card may not claim it copied 2990.**
+
+**🟡 S2.4 · GROUPING REORDERS ROWS, AND ROW ORDER IS FROZEN.** §2.3 rules the order is *risk to
+the promise* — `compareBySlack` — and the kit emits a group header whenever the key CHANGES
+from the row above, so **grouping and the frozen order cannot both hold.** Purchasing hit this
+exact wall and its answer is on record (`../purchasing/MASTER.md` §3: re-cluster after every
+sort so an order's items stay together). **Grouping an Orders row by anything is a BUSINESS
+question — what an operator may be allowed to reorder away from risk — so S2.4 STOPS and asks
+before it builds.**
+
+**SORTING'S DIVISION OF LABOUR DIFFERS AND THAT IS NOT A DEFECT.** 2990 sorts INSIDE its grid
+(`sortedRows`, `col.sortFn`, `DataGrid.tsx:685-689`); Carres' kit states *"The PAGE sorts the
+rows; the kit only shows the arrow."* **So S2.1 copies 2990's BEHAVIOUR — asc ⇄ desc ⇄ off —
+into the page's own comparator, and does not move sorting into the kit.** The third click
+already returns to `null`, which is `compareBySlack`, so §2.3 survives sorting by construction.
+
+**THEN** test → self-review → PR → merge → deploy → verify production **per capability**.
+**Do NOT come back for approval on engineering.** The four reasons to interrupt are the
+Constitution's, and a truncated cell is not one of them.
+
 ### API + DATA
 `GET /api/operation/orders` is the single source of stage derivation — the control table is the
 kanban-as-table, so stage logic lives in one place. `ops_order_control` carries the operational
