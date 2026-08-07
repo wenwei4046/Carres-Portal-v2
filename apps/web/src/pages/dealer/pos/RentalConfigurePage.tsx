@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, Check, Plus, Repeat, X } from "lucide-react";
+import { ArrowLeft, Check, Minus, Plus, Repeat, X } from "lucide-react";
 import type { CatalogResponse, PosRentalPlan, ProductModelDto } from "@carres/shared";
 import { newLocalId } from "../new-order/configurators";
 import type { DraftLine } from "../new-order/draft";
 import { rentalAttrs } from "./rental-cart";
 import ConfigureTopbarBrand, { type WizardTopbarCtx } from "./ConfigureTopbarBrand";
+import MattressPlan, { footprintForVariant } from "./MattressPlan";
 
 /**
  * Rent-to-Own configure surface (Loo 2026-07-26).
@@ -24,9 +25,19 @@ import ConfigureTopbarBrand, { type WizardTopbarCtx } from "./ConfigureTopbarBra
  * what the whole contract comes to — are both on screen at the same time,
  * because "RM59" without "× 84 = RM4,956" is how people mis-buy credit.
  *
- * Quantity is fixed at 1 and has no stepper: one rented item is one signed
- * agreement with one Stripe subscription and one tracked asset. Renting two
- * means two lines, which is honest rather than clever.
+ * QUANTITY (Loo, 2026-08-06 — "option to add quantity needs to be done first").
+ * The stepper sets how many UNITS, and each unit still becomes its OWN
+ * agreement: `submitRentalCart` mints `qty` agreements for this line. That is
+ * not a compromise, it is what the schema permits. `rental_agreements` (0249)
+ * carries a single `sku`, `term_months`, `monthly_fee` and
+ * `stripe_subscription_id`, and its whole endgame is singular — `buyout_at`,
+ * `buyout_amount`, `ownership_transfer_at`, `ownership_doc_url` (the signed
+ * request-to-buy form) and one `status`. One agreement covering two mattresses
+ * could never let a customer buy out one and keep renting the other, could not
+ * have one unit repossessed while the other stays active, and would put two
+ * items on one signed ownership form. So quantity is the operator's shortcut
+ * for repeating the 1:1:1 — one agreement, one subscription, one tracked
+ * asset — never an exception to it.
  */
 
 export interface RentalOfferCard {
@@ -70,8 +81,10 @@ export default function RentalConfigurePage({
 
   const [skuCode, setSkuCode] = useState<string | null>(skus.length === 1 ? skus[0].sku : null);
   const [planId, setPlanId] = useState<string | null>(null);
+  const [qty, setQty] = useState(1);
 
   const sku = skus.find((s) => s.sku === skuCode) ?? null;
+  const footprint = useMemo(() => footprintForVariant(sku?.variant), [sku?.variant]);
 
   // Terms available for the picked size, cheapest-monthly last so the longest
   // (and cheapest per month) commitment is not the accidental default.
@@ -91,7 +104,9 @@ export default function RentalConfigurePage({
     onAdd({
       localId: newLocalId(),
       sku: sku.sku,
-      qty: 1,
+      // UNITS, not agreements. `submitRentalCart` expands this into `qty`
+      // separate agreements — see the quantity note in this file's header.
+      qty,
       unitPrice: plan.monthlyFee,
       label: `${model.name} · ${sku.variant} · ${termLabel(plan.termMonths)} rental`,
       attrs: rentalAttrs({
@@ -154,11 +169,15 @@ export default function RentalConfigurePage({
           <div className="cfg-header__totalLabel">Per month</div>
           <div className="cfg-header__totalNum" data-testid="rental-cfg-monthly">
             <sup>RM</sup>
-            {plan ? plan.monthlyFee.toLocaleString("en-MY") : "—"}
+            {plan ? (plan.monthlyFee * qty).toLocaleString("en-MY") : "—"}
           </div>
+          {/* Both figures are what the CUSTOMER pays, so both carry the
+              quantity. Showing a per-unit fee beside a whole-cart total is how
+              people mis-read credit, which is the same reason the contract
+              total sits here at all instead of a click away. */}
           <div className="cfg-header__totalNote" data-testid="rental-cfg-contract">
             {plan
-              ? `× ${plan.termMonths} months = ${rm(contractTotal)}`
+              ? `${qty > 1 ? `${qty} × RM${plan.monthlyFee.toLocaleString("en-MY")} · ` : ""}× ${plan.termMonths} months = ${rm(contractTotal * qty)}`
               : "Pick a term"}
           </div>
         </div>
@@ -180,7 +199,33 @@ export default function RentalConfigurePage({
       </div>
 
       <div className="cfg-body">
-        <div className="cfg-grid cfg-grid--full">
+        {/* Plan-view canvas (left) + controls (right) — the same `cfg-grid`
+            1.4fr/1fr split PosConfigurePage uses (Loo 2026-08-06: "need the
+            same ui like this"). This page previously opted into
+            `cfg-grid--full`, the modifier that collapses the grid to one
+            column, because it had no canvas to put on the left. Removing the
+            modifier is what re-opens the left column; the block below is what
+            fills it. The drawing itself is shared, not copied — see
+            ./MattressPlan. */}
+        <div className="cfg-grid">
+          <div className="cfg-canvas">
+            <div className="cfg-canvas__head">
+              <div>
+                <span className="pos-eyebrow" style={{ color: "var(--c-burnt)" }}>
+                  Rent-to-Own
+                </span>
+                <h2 className="cfg-canvas__title">
+                  {model.name}
+                  {sku ? ` · ${footprint?.label ?? sku.variant}` : ""}
+                </h2>
+              </div>
+              <span className="cfg-canvas__detail">
+                {footprint ? `Footprint ${footprint.w} × ${footprint.d} cm` : "Pick a size"}
+              </span>
+            </div>
+            <MattressPlan footprint={footprint} />
+          </div>
+
           <div className="cfg-controls">
             {/* ── Size — identical to the bought-mattress picker ───────────── */}
             <div className="cfg-section">
@@ -252,6 +297,43 @@ export default function RentalConfigurePage({
               )}
             </div>
 
+            {/* ── Quantity — the same stepper the bought page uses ─────────── */}
+            <div className="cfg-section">
+              <div className="cfg-section__head">
+                <span className="pos-eyebrow">Quantity</span>
+                {/* "agreements", not "pieces". The bought page counts pieces
+                    because a piece is what leaves the warehouse; here each unit
+                    is also a separate signed contract with its own RA number,
+                    and the operator has to be able to say that out loud before
+                    the customer signs. */}
+                <span className="cfg-section__detail">
+                  {qty} agreement{qty === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div className="cfg-stepper">
+                <button
+                  type="button"
+                  className="cfg-stepperBtn"
+                  onClick={() => setQty(Math.max(1, qty - 1))}
+                  disabled={qty <= 1}
+                  aria-label="Decrease quantity"
+                >
+                  <Minus size={16} strokeWidth={1.75} />
+                </button>
+                <span className="cfg-stepperVal" data-testid="rental-cfg-qty">
+                  {qty}
+                </span>
+                <button
+                  type="button"
+                  className="cfg-stepperBtn"
+                  onClick={() => setQty(qty + 1)}
+                  aria-label="Increase quantity"
+                >
+                  <Plus size={16} strokeWidth={1.75} />
+                </button>
+              </div>
+            </div>
+
             {/* What the store must be able to say out loud before adding. */}
             <div className="cfg-section">
               <div className="cfg-section__head">
@@ -269,7 +351,10 @@ export default function RentalConfigurePage({
               >
                 <li>
                   <Repeat size={11} strokeWidth={2} style={{ verticalAlign: -1 }} /> One rented
-                  item = one agreement. Renting two means adding it twice.
+                  item = one agreement.{" "}
+                  {qty > 1
+                    ? `This line signs ${qty} separate agreements, each with its own RA number.`
+                    : "Two units means two agreements, each with its own RA number."}
                 </li>
                 <li>A rental cannot share an order with items bought outright.</li>
                 <li>

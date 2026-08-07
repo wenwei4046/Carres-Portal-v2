@@ -515,8 +515,23 @@ export default function DealerPos({
     [draft, catalogQ.data],
   );
 
+  /**
+   * True for the WHOLE rental submit, which may mint several agreements in a
+   * loop. Every other flag in `submitDisabled` is a SALE-path flag:
+   * `handleSubmit` hands a rental cart to `submitRentalCart` and returns before
+   * `setUploading(true)`, and that function never touches `createOrder`. So
+   * before this existed, the rental Complete button stayed live for the entire
+   * in-flight window and a second click minted a second `RA-` agreement —
+   * ERP-ARCHITECTURE Law C, two forms for one act make two records.
+   */
+  const [rentalSubmitting, setRentalSubmitting] = useState(false);
+
   const submitDisabled =
-    !confirmReady || uploading || createOrder.isPending || !effectiveDealerId;
+    !confirmReady ||
+    uploading ||
+    createOrder.isPending ||
+    rentalSubmitting ||
+    !effectiveDealerId;
 
   /**
    * Submit pipeline (ported verbatim from the legacy wizard):
@@ -552,8 +567,22 @@ export default function DealerPos({
 
     setSubmitError(null);
     const done: { agreementNo: string; label: string; so: number | null }[] = [];
+    setRentalSubmitting(true);
     try {
-      for (const { line, rental } of plans) {
+      // `line.qty` is UNITS, and a unit is an agreement. `rental_agreements`
+      // (0249) holds ONE sku, ONE monthly_fee, ONE stripe_subscription_id and a
+      // singular endgame — `buyout_at`, `buyout_amount`,
+      // `ownership_transfer_at`, `ownership_doc_url`, one `status` — so a row
+      // covering two mattresses could never buy out one and keep renting the
+      // other, nor repossess one while the other stays active. There is no
+      // quantity column to write to and adding one would break all of that, so
+      // the expansion happens HERE and the 1:1:1 (agreement · subscription ·
+      // tracked asset) survives. Sequential on purpose, same as the outer loop:
+      // a mid-way failure names exactly which RA numbers already exist.
+      const units = plans.flatMap(({ line, rental }) =>
+        Array.from({ length: Math.max(1, line.qty) }, () => ({ line, rental })),
+      );
+      for (const { line, rental } of units) {
         const res = await createRentalAgreement.mutateAsync({
           planId: rental.planId,
           customerName: draft.customer.name.trim(),
@@ -606,6 +635,11 @@ export default function DealerPos({
           ? `${done.map((d) => d.agreementNo).join(", ")} created, then it failed: ${msg}. Do NOT retry the whole cart — check Admin → Rental first.`
           : msg,
       );
+    } finally {
+      // `finally`, not the end of `try` — a mid-loop failure must re-arm the
+      // button so the store can act on `submitError`, which names exactly which
+      // agreements already exist.
+      setRentalSubmitting(false);
     }
   }
 
@@ -910,6 +944,11 @@ export default function DealerPos({
 
   function startAnotherOrder() {
     setSubmitted(null);
+    // A rental finishes into `rentalDone`, not `submitted`, so resetting only
+    // the sale flag left the done panel on screen over an empty cart. Clearing
+    // it HERE rather than at each call site means every future "start over"
+    // door gets it for free.
+    setRentalDone(null);
     setSubmitError(null);
     setStripeCollectAmount(null);
     setStripeCollected(0);
@@ -1015,8 +1054,16 @@ export default function DealerPos({
             type="button"
             className="pos-wordmark"
             onClick={() => {
-              if (submitted) startAnotherOrder();
+              // Three states, and the third one had no branch at all: sitting on
+              // step 1 with nothing submitted, this handler ran no statement and
+              // the logo was a live, focusable, silent button. An operator who
+              // clicks a dead control twice stops trying it on the screens where
+              // it DOES work, so the meaning is now total: finished → next sale,
+              // mid-wizard → back to the catalog, already at the catalog → leave
+              // POS through the door the shell already owns.
+              if (submitted || rentalDone) startAnotherOrder();
               else if (step !== 1) setStep(1);
+              else onExit?.();
             }}
             aria-label="Back to catalog"
             data-testid="pos-logo-home"
@@ -1347,7 +1394,15 @@ export default function DealerPos({
       {/* Footer — step 3 only (step 1 advances via the cart; step 2's wizard
           owns its own Back/Next). Prototype-styled bar: ghost Back · Total ·
           primary Complete order. */}
-      {!submitted && step === 3 && (
+      {/* `!rentalDone` is load-bearing, not defensive. A SALE sets `submitted`
+          and every "we have finished" guard in this file reads that flag — but
+          the rental path sets `rentalDone` INSTEAD and never calls
+          `setSubmitted`. So this bar kept rendering under the done panel after a
+          rental was created: the operator saw the Complete button still there,
+          read that as "nothing happened", and clicked it again. That is the
+          same defect as `rentalSubmitting` above, one layer up — the guard
+          stops the double-click, this stops the screen inviting it. */}
+      {!submitted && !rentalDone && step === 3 && (
         <footer
           className="shrink-0"
           style={{
