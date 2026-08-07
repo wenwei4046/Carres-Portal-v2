@@ -135,6 +135,20 @@ mapping what each side already does — one table, no solutions — and the answ
 READY. Only NOT READY licenses an engine card, and only for the capabilities the mapping named.
 **Redesigning a thing that already supports the case is the most expensive way to be wrong.**
 
+**AND THE MAPPING HAS THREE OUTCOMES, NEVER TWO** (Loo, 2026-08-07). *Another repo has it* is
+**not** *we have it* — the question is what moves TODAY, and copying and inventing are not the
+same work:
+
+```
+🟢 READY          ours supports it today — migrate, change nothing
+🟡 COPY REQUIRED  ours does not; a proven implementation elsewhere does.
+                  STILL NOT READY TODAY, but it needs no invention.
+🔴 ENGINE GAP     nobody has solved it. Design · research · validate · build.
+```
+
+**A NOT READY verdict must keep 🟡 and 🔴 apart.** Merged, they cost the same on paper and an
+order of magnitude apart in reality, and the next card cannot be prioritised.
+
 **TWO CHATS PER MODULE IS THE CEILING.** Past that point, coordination cost grows faster than
 delivery. A chat that has claimed a lane still occupies a lane, even if no code has been written.
 
