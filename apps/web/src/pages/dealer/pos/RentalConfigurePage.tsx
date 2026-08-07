@@ -4,7 +4,7 @@ import { ArrowLeft, Check, Minus, Plus, Repeat, X } from "lucide-react";
 import type { CatalogResponse, PosRentalPlan, ProductModelDto } from "@carres/shared";
 import { newLocalId } from "../new-order/configurators";
 import type { DraftLine } from "../new-order/draft";
-import { rentalAttrs } from "./rental-cart";
+import { rentalAttrs, rentalOf } from "./rental-cart";
 import ConfigureTopbarBrand, { type WizardTopbarCtx } from "./ConfigureTopbarBrand";
 import MattressPlan, { footprintForVariant } from "./MattressPlan";
 
@@ -62,12 +62,17 @@ export default function RentalConfigurePage({
   onAdd,
   onClose,
   wizardTopbar,
+  editLine,
 }: {
   card: RentalOfferCard;
   catalog: CatalogResponse;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
   wizardTopbar?: WizardTopbarCtx;
+  /** Cart-line EDIT (the ✎ pencil). Present = re-open this line prefilled and
+   *  REPLACE it on emit; absent = a fresh add. Same contract PosConfigurePage
+   *  has for a bought line, so the two pencils behave identically. */
+  editLine?: DraftLine;
 }) {
   const { model, plansBySku } = card;
 
@@ -79,9 +84,15 @@ export default function RentalConfigurePage({
       .sort((a, b) => a.variant.localeCompare(b.variant, undefined, { numeric: true }));
   }, [catalog.skus, model.id, plansBySku]);
 
-  const [skuCode, setSkuCode] = useState<string | null>(skus.length === 1 ? skus[0].sku : null);
-  const [planId, setPlanId] = useState<string | null>(null);
-  const [qty, setQty] = useState(1);
+  // EDIT seed. The plan id is read back out of `attrs.rental` rather than
+  // re-derived from the sku, because a sku can carry several terms and only the
+  // stored plan says which one the customer actually signed for.
+  const editRental = editLine ? rentalOf(editLine) : null;
+  const [skuCode, setSkuCode] = useState<string | null>(
+    editLine?.sku ?? (skus.length === 1 ? skus[0].sku : null),
+  );
+  const [planId, setPlanId] = useState<string | null>(editRental?.planId ?? null);
+  const [qty, setQty] = useState(editLine?.qty ?? 1);
 
   const sku = skus.find((s) => s.sku === skuCode) ?? null;
   const footprint = useMemo(() => footprintForVariant(sku?.variant), [sku?.variant]);
@@ -102,7 +113,9 @@ export default function RentalConfigurePage({
   function add() {
     if (!sku || !plan) return;
     onAdd({
-      localId: newLocalId(),
+      // Keep the edited line's id so the caller replaces IN PLACE rather than
+      // appending a second line beside the one being edited.
+      localId: editLine?.localId ?? newLocalId(),
       sku: sku.sku,
       // UNITS, not agreements. `submitRentalCart` expands this into `qty`
       // separate agreements — see the quantity note in this file's header.
@@ -193,7 +206,15 @@ export default function RentalConfigurePage({
             title={!sku ? "Pick a size first" : !plan ? "Pick how long they rent for" : undefined}
             data-testid="rental-cfg-add"
           >
-            <Plus size={16} strokeWidth={1.75} /> Add to Cart
+            {editLine ? (
+              <>
+                <Check size={16} strokeWidth={1.75} /> Update item
+              </>
+            ) : (
+              <>
+                <Plus size={16} strokeWidth={1.75} /> Add to Cart
+              </>
+            )}
           </button>
         </div>
       </div>

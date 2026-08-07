@@ -128,6 +128,12 @@ describe("lineEditTarget", () => {
       "bed_mattress",
     );
   });
+  it("routes a rental line to the RENTAL page — a rented mattress is not a bought one", () => {
+    // The shape `rentalAttrs` really builds. Asserting with `{ rental: true }`
+    // would pass for a reason production never produces.
+    const attrs = { rental: { planId: "plan-1", termMonths: 84, monthlyFee: 69 } };
+    expect(lineEditTarget(line({ sku: "LUMI-Q", attrs }), EDIT_CATALOG)).toBe("rental");
+  });
   it("accessory / unknown-sku / preset-sofa lines are not editable", () => {
     expect(lineEditTarget(line({ sku: "PROT-1" }), EDIT_CATALOG)).toBeNull();
     expect(lineEditTarget(line({ sku: "GONE-1" }), EDIT_CATALOG)).toBeNull();

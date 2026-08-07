@@ -729,19 +729,36 @@ export default function CatalogStep({
           configurators (Loo 2026-07-26). Checked BEFORE them so a model that is
           both sold and rented opens the right one. */}
       {(() => {
-        const card = rentalCardId
-          ? rentalCards.find((c) => c.model.id === rentalCardId) ?? null
-          : null;
+        // The ✎ on a rental line lands HERE, not on PosConfigurePage: a rental
+        // has a term and no outright price, so the bought surface would show
+        // RM0 and offer a Remark price adjustment that means nothing. The card
+        // is found by SKU when editing (the line knows its sku, not its model).
+        const editingRental =
+          editingLine && lineEditTarget(editingLine, catalog) === "rental" ? editingLine : null;
+        const card = editingRental
+          ? rentalCards.find((c) => c.plansBySku.has(editingRental.sku)) ?? null
+          : rentalCardId
+            ? rentalCards.find((c) => c.model.id === rentalCardId) ?? null
+            : null;
         if (!card) return null;
+        const closeRental = () => {
+          setRentalCardId(null);
+          setEditingLine(null);
+        };
         return (
           <RentalConfigurePage
+            // Remount per line/model so the seeded size · term · quantity are
+            // fresh state, never carried from the previous open.
+            key={editingRental?.localId ?? card.model.id}
             card={card}
             catalog={catalog}
+            editLine={editingRental ?? undefined}
             onAdd={(line) => {
-              addLine(line);
-              setRentalCardId(null);
+              if (editingRental) replaceEditedLine(line);
+              else addLine(line);
+              closeRental();
             }}
-            onClose={() => setRentalCardId(null)}
+            onClose={closeRental}
             wizardTopbar={topbarContext ? { contextLabel: topbarContext } : undefined}
           />
         );
@@ -756,6 +773,10 @@ export default function CatalogStep({
         // The SAME surfaces serve the cart-line EDIT (Loo 2026-07-12): the ✎
         // pencil sets `editingLine` → its model is resolved from the sku, the
         // page opens PREFILLED, and the emit REPLACES the line in place.
+        // A rental edit is served by the block ABOVE. Without this the same
+        // `editingLine` would resolve to its mattress model here and mount
+        // PosConfigurePage on top — two configurators for one pencil.
+        if (editingLine && lineEditTarget(editingLine, catalog) === "rental") return null;
         const editSku = editingLine ? catalog.skus.find((s) => s.sku === editingLine.sku) : null;
         const editModel = editSku
           ? index.productModels.find((m) => m.id === editSku.modelId) ?? null

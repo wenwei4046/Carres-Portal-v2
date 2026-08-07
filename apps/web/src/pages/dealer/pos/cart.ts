@@ -13,9 +13,10 @@ import type { DraftAddon, DraftLine } from "../new-order/draft";
  *  CatalogStep's routing never drift:
  *    - `sofa_build`  → SofaConfigurePage (the stored geometry back on canvas)
  *    - `bed_mattress` → PosConfigurePage (size / options / specials restored)
+ *    - `rental` → RentalConfigurePage (size / term / quantity restored)
  *    - null → not editable in a configurator (accessory / service / preset
  *      lines — qty is already editable in the cart itself). */
-export type LineEditTarget = "sofa_build" | "bed_mattress";
+export type LineEditTarget = "sofa_build" | "bed_mattress" | "rental";
 export function lineEditTarget(
   line: DraftLine,
   catalog: CatalogResponse,
@@ -29,6 +30,13 @@ export function lineEditTarget(
   if (!model) return null;
   const attrs = line.attrs as Record<string, unknown> | null;
   if (attrs?.sofa_build) return model.category === "sofa" ? "sofa_build" : null;
+  // BEFORE the category test, because a rented mattress is still a mattress
+  // MODEL and would otherwise open the OUTRIGHT-SALE configurator: RM0 (a
+  // rental's money lives in `rental_plans`, never on the sku), plus a Remark
+  // price adjustment and a PWP bar that mean nothing to a rental. The pencil
+  // stays, the operator must be able to change size, term and quantity — it
+  // just has to open the surface that knows what those words mean.
+  if (attrs?.rental) return "rental";
   if (model.category === "mattress" || model.category === "bedframe") return "bed_mattress";
   return null;
 }
