@@ -100,6 +100,34 @@ owns a record Orders was also writing (D2).
 
 ---
 
+# §2.1 · Naming and navigation
+
+**A page is named after the operator's primary responsibility.** Usually that is a business
+object; sometimes it is an accepted ERP operation (`Receiving`); cross-cutting system pages
+(`Reports`, `Settings`) are exceptions. **Never the screen form (`List`), never an action
+(`To Order`), never a state.**
+
+```
+Sales
+└── Sales Order
+
+Purchasing
+├── SO Batch Purchase
+├── Manual Purchase
+├── Purchase Order
+├── Receiving
+└── Supplier Claim
+
+Portal
+├── Reports
+└── Settings
+```
+
+**This is navigation, not workflow.** How the operator moves between these pages — which one
+feeds which — is the module MASTER's, and it changes when the business changes.
+
+---
+
 # §3 · Module by module
 
 Each module answers the four questions in the same order. **`OWNS` is the contract; everything

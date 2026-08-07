@@ -16,7 +16,7 @@
 | I am working on | Read |
 |---|---|
 | anything | **§1 · §2 first — they are short and they bind every tab** |
-| Batch Purchase · Manual Purchase (today: To Order) | **§3** |
+| SO Batch Purchase · Manual Purchase (today: To Order) | **§3** |
 | Purchase Orders | **§4** |
 | Receiving | **§5** |
 | Claims | **§6** |
@@ -45,24 +45,26 @@ ruling. **APPROVED, NOT YET BUILT**; today's screens are §3–§8's measured
 blocks):
 
 ```
-SALES                    PURCHASING
-Sales Orders  ····read···▶ Batch Purchase  ─┐
-                                            ├─▶ Purchase Orders ─▶ Receiving ─▶ Claims
-                           Manual Purchase ─┘
-                                                Report (read-only) · Settings (manager)
+SALES                       PURCHASING
+Sales Order  ····read···▶ SO Batch Purchase ─┐
+                                             ├─▶ Purchase Order ─▶ Receiving ─▶ Supplier Claim
+                          Manual Purchase   ─┘
 ```
 
 ```
-Sales             Sales Orders      every customer order. SALES owns it.
+Sales        Sales Order         every customer order. SALES owns it.
 
-Purchasing        Batch Purchase    only the customer orders PURCHASING still
-                                    has to act on — a filtered purchasing
-                                    workspace, never a second Sales Orders page
-                  Manual Purchase   purchases nobody's customer asked for:
-                                    Ready Stock · Display · Office · Warranty ·
-                                    Spare Parts · and whatever is added next
-                  Purchase Orders   every issued PO, whichever lane bore it
-                  Receiving · Claims · Report · Settings
+Purchasing   SO Batch Purchase   only the customer orders PURCHASING still has
+                                 to act on — a filtered purchasing workspace,
+                                 never a second Sales Order page
+             Manual Purchase     purchases nobody's customer asked for:
+                                 Ready Stock · Display · Office · Warranty ·
+                                 Spare Parts · and whatever is added next
+             Purchase Order      every issued PO, whichever lane bore it
+             Receiving · Supplier Claim
+
+Reports and Settings are PORTAL pages, not Purchasing pages
+(`../ERP-ARCHITECTURE.md` §2.1).
 ```
 
 **SALES ORDERS IS NOT A PURCHASING TAB** (Loo, 2026-08-06 — his refinement of
@@ -70,7 +72,7 @@ the same day's ruling). Purchasing READS the sales orders; it does not carry
 them. The two answer different questions and the difference is the whole
 point: *what did the customer buy?* is every order, while *which orders need
 buying today?* is a filtered few — an order already covered by stock never
-reaches Batch Purchase at all.
+reaches SO Batch Purchase at all.
 
 > **`PortalSidebar` is available on every operation screen**
 > (`OperationApp.tsx:243`) and provides navigation between Orders and
@@ -231,13 +233,13 @@ It cannot tell you about a button you have not imagined. **Read the file.**
 
 ---
 
-# §3 · Batch Purchase *(on screen today as `To Order`)*
+# §3 · SO Batch Purchase *(on screen today as `To Order`)*
 
 ### MISSION
 Review, consolidate and issue purchase orders for **demand the engine generated from
 customer orders**. Purchase Orders MANAGES the documents once they exist.
 
-> **APPROVED, NOT YET BUILT (Loo, 2026-08-06):** this tab becomes **`Batch Purchase`**,
+> **APPROVED, NOT YET BUILT (Jess, 2026-08-07):** this tab becomes **`SO Batch Purchase`**,
 > and the hand-typed purposes (Ready Stock · Display · Office · Warranty · Spare Parts)
 > leave it for their own tab, **`Manual Purchase`** — with a FULL-PAGE create workspace,
 > never the 600px dialog. **Both lanes issue their own POs** (§1). Everything below
@@ -822,7 +824,7 @@ writing an untraceable receive, and a guard asserts exactly that.
 
 ---
 
-# §6 · Claims
+# §6 · Supplier Claim
 
 ### MISSION
 Resolve the exception a receiving produced — and Claims owns the defective item's whole life.
@@ -1068,6 +1070,9 @@ that records it as NOT ruled**, so its absence cannot be read as an oversight.
 ---
 
 # §7 · Report
+
+> **This page belongs to the PORTAL layer, not to Purchasing**
+> (`../ERP-ARCHITECTURE.md` §2.1). It lives here until it moves.
 
 ### MISSION
 How many did we buy this month — and every number is a door.
