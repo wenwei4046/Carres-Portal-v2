@@ -14,7 +14,7 @@
 
 Carres sells furniture. This portal runs the business end to end — a customer order is taken,
 the goods are bought from a factory, they arrive, they are delivered, the money is collected.
-Nine roles use it. **Loo is the Chairman and has no coding background; Jess is the COO.**
+Nine roles use it. **Jess is the boss and has no coding background.**
 
 **The operator is the design target.** Low English, low computer literacy, switching between
 states all day. The portal must lead a new hire step by step: *what to do today*, with the
@@ -78,7 +78,7 @@ Never create `MASTER-v2` · `MASTER-final` · `MASTER-revised` · a checkpoint �
 queue · a planning queue. **There is only `MASTER`, continuously overwritten. Git history is
 the archive; documents do not carry history.**
 
-**THE MASTER OVERWRITE LAW (Loo, 2026-08-06).** When an approved workflow, operator
+**THE MASTER OVERWRITE LAW (Jess, 2026-08-06).** When an approved workflow, operator
 journey, ownership or business rule changes: **delete the obsolete version completely and
 rewrite with the approved one.** Never append beside it, never keep legacy text, never keep
 an alternative version, never cite a superseded document as if it still ruled. **Git is the
@@ -144,7 +144,7 @@ worse than silence because it looks like diligence.
 **A card is handed over TAB FIRST** — `【TAB】 — 【id】 · 【one line】`, and the paste block says
 which tab it owns and which it may not touch. The queue letters are the build line, not the
 screen, and they do not match: `R9` · `R11` · `R12` are all **Claims** and touch no Receiving
-file, while Receiving is the closed page. Loo was misled by exactly this.
+file, while Receiving is the closed page.
 
 **Engineer-Owned Delivery.** After approval, engineering owns delivery until production is
 verified: implementation · testing · self-review · fixing what it finds · merge · deploy ·
@@ -169,8 +169,8 @@ production data must be modified irreversibly · long-term architecture must cha
 
 ## 5 · Red lines — never, in any circumstance
 
-1. **Never DROP / TRUNCATE / DELETE** without Loo's explicit confirmation **in the current
-   conversation**. *"He said OK before"* is not permission.
+1. **Never DROP / TRUNCATE / DELETE** without the owner's explicit confirmation **in the current
+   conversation**. *"She said OK before"* is not permission.
 2. **Never modify RLS** without explaining what changes and why.
 3. **Never write a secret in code.** `SUPABASE_SERVICE_ROLE_KEY` lives only in Cloudflare
    Workers secrets — never in source, never in `apps/web`, never in a log or a response.
@@ -255,27 +255,23 @@ Never create an empty master for symmetry.
 
 ---
 
-## 10 · How to talk to Loo and Jess
+## 10 · How to talk to the owner
 
-**Loo** — Chairman, no coding background.
+**Jess** — the boss, and no coding background.
 - **Conclusion first**, reasoning after. **Simple Chinese, short sentences.** English technical
   terms are kept (`Supabase`, `RLS`, `migration`, `PO`, `SKU`).
-- **Steps 1 2 3.** If he says he does not understand, **rewrite — do not repeat.**
-- **ASCII sketch before code**, every time, even when he says "just do it".
+- **Steps 1 2 3.** If she says she does not understand, **rewrite — do not repeat.**
+- **ASCII sketch before code**, every time, even when she says "just do it".
 - **One question at a time.** Wait for the answer before asking the next.
 - **Options with a named recommendation, never a bare menu**, and never the same question twice.
-- Anything he must paste elsewhere is written in **English**.
-
-**Jess** — COO, and the boss of the Operation portal.
-- Be a **critical advisor, not a yes-man.** Think the solution through before speaking; cite how
-  mature products solve it, but land the conclusion in Carres reality.
-- **A screenshot from her means: list every problem top to bottom**, marked 🔴 / 🟡, without
-  being asked.
+- **Cite how mature products solve it**, then land the conclusion in Carres reality.
+- **A screenshot means: list every problem top to bottom**, marked 🔴 / 🟡, without being asked.
 - **She agrees, then you build.** A settled decision is not reopened unless she reopens it.
 - **Count before you propose UI.** Measure fill rates with SQL; empty fields do not reach the
   screen.
+- Anything she must paste elsewhere is written in **English**.
 
-**Both:** never hand back a menu of engineering choices; never ask five things at once; never
+**Never** hand back a menu of engineering choices; never ask five things at once; never
 criticise without a fix; **never say "I read the document" without a `Read` call in the
 transcript.**
 
