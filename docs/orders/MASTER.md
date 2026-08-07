@@ -353,10 +353,29 @@ NOT IN THIS PROPOSAL
 (§1.1) the measured interaction cost is ~30ms (F66). **Passing the kit the ALREADY-WINDOWED
 slice keeps that exactly.** Windowing the kit properly is a separate card and a later one.
 
-**WHAT WOULD OVERTURN IT.** A kit power Orders needs that `DataTable` cannot express — its
-nine facet rail groups, its bulk bar, its three dots or its `+N` action cell failing to render
-through the kit's `cell` accessor. **That is a reading of `DataTable.tsx` against
-`OperationOrdersControl.tsx`, and it has not been done.** Do it before building.
+**~~WHAT WOULD OVERTURN IT~~ — CHECKED 2026-08-07. VERDICT: READY.**
+The falsifier this proposal named was *a kit power Orders needs that `DataTable` cannot
+express*. All three sources were read first-hand — `OperationOrdersControl.tsx` (5,150),
+`kit/DataTable.tsx` (1,193) and 2990s' proven implementation (`DataGrid.tsx` 1,551 +
+`MfgSalesOrdersList.tsx`) — and mapped across 28 capabilities.
+
+**Nothing is 🟡 COPY REQUIRED and nothing is 🔴 ENGINE GAP. Zero engine changes are required.**
+Header filters and header-click sort are GAINED, because the kit has them and this page has
+neither. Everything the page does today it can keep doing.
+
+**Two items are PAGE-side, and are named so this does not read as a pure prop-swap:**
+```
+· the append trigger moves from a <tr> sentinel inside <tbody> (:3731) to the
+  scroller — `DataTable`'s `rootRef` already exists for exactly this
+· the ⚑ follow-up column needs a WORD; `Column.label` is `string` in BOTH
+  engines, so no grid here can carry an icon-only header
+```
+**One deletion is REQUIRED, not optional:** `carres.orders.hiddenCols` (:1540) violates Loo's
+2026-08-04 layout-memory ruling (`../research/grid-findings.md` F58 · F61). The kit has nowhere
+to store it, so the migration ends it.
+
+**This is the capability mapping, not an approval to build.** The proposal above is still
+PROPOSED, NOT LAW.
 
 **WHAT IS NOT SETTLED AND MUST NOT BE ASSUMED SETTLED.** 🟡 `Actions` truncates on 30 of 30
 rows (measured above, marked ACCEPTED) — that arithmetic assumed all eight columns must be
