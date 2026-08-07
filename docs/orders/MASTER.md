@@ -312,12 +312,46 @@ cells of 300 (all `Actions`, which needs 249px on every row and gets 208.5), 16 
 rows. **The residual truncation is ACCEPTED** — the verb and the party are visible, the full
 text is in the `title` and in the drawer.
 
-### ⚠️ PROPOSED, NOT LAW — S1 · the list stops hand-writing its table (2026-08-07)
+### ✅ S1 · APPROVED TO BUILD 2026-08-07 — the list stops hand-writing its table
 
-> **Nothing here is frozen. A chat that builds from this block has built from a proposal.**
-> It is written down only so the next chat challenges it instead of re-deriving a weaker copy
-> — the failure `../research/grid-findings.md` F62 records. **Law 4 applies: if you would not
-> design it this way today, say so.**
+> **Approved after Card 01 returned READY, and NOT before.** The sequence is the point and it
+> is now Constitution (`CLAUDE.md` §4): prove the capability, then build. **Law 4 still binds —
+> approved-to-build is not "stop thinking". If you would not design it this way today, say so
+> before you type.**
+
+# ▶︎ BUILD KICKOFF — paste nothing, the card is here
+
+```text
+BUILD CARD · S1 · Sales Orders migration.   git pull first.
+
+READ ONLY   CLAUDE.md  +  docs/orders/MASTER.md §3 (this block).
+            Card 01 already returned READY — zero engine changes required.
+            Do NOT re-research. Do NOT re-map capabilities. Do NOT redesign.
+            Do NOT touch row height, windowing, virtualisation or density.
+
+SHIP ONE    OperationOrdersControl.tsx renders through kit/DataTable.
+THING       Same 8 columns · same 40px · same widths · same data ·
+            same 30-row window (pass the ALREADY-SLICED rows).
+
+CARRY       the append trigger moves off the <tr> sentinel inside <tbody>
+            onto the scroller — DataTable's `rootRef` exists for exactly this
+            the ⚑ column takes a WORD (`Column.label` is `string`)
+DELETE      carres.orders.hiddenCols — F61's ruling, not a choice
+
+THEN        test → self-review → PR → merge → deploy → verify production.
+            Overwrite this block in the same PR.
+            Do NOT come back for approval on engineering.
+```
+
+**The four reasons to interrupt the owner are the Constitution's, unchanged:** a new business
+rule · an approved UI/workflow/word must change · production data modified irreversibly ·
+long-term architecture must change. **A truncated cell, a failing test, a rebase and a deploy
+are none of them.**
+
+**REPORTED WITH THE APPROVAL, and deliberately NOT in this card:** `Actions` truncates on 30 of
+30 rows and this MASTER marks that ACCEPTED (see above) on an arithmetic assuming all eight
+columns are visible at once. **S1 changes no width, so the defect survives S1 untouched.** It
+is the next card's question, not this one's.
 
 **THE MEASURED PROBLEM.** `OperationOrdersControl.tsx` renders a hand-written `<table>` with
 its own `<Th>`, its own colgroup and its own header hex. **It is the only register in the
@@ -374,8 +408,8 @@ neither. Everything the page does today it can keep doing.
 2026-08-04 layout-memory ruling (`../research/grid-findings.md` F58 · F61). The kit has nowhere
 to store it, so the migration ends it.
 
-**This is the capability mapping, not an approval to build.** The proposal above is still
-PROPOSED, NOT LAW.
+**Card 01 was the capability mapping. The approval came after it, on 2026-08-07, and the order
+of those two events is the rule this module now carries** (`CLAUDE.md` §4).
 
 **WHAT IS NOT SETTLED AND MUST NOT BE ASSUMED SETTLED.** 🟡 `Actions` truncates on 30 of 30
 rows (measured above, marked ACCEPTED) — that arithmetic assumed all eight columns must be
