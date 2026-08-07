@@ -312,6 +312,57 @@ cells of 300 (all `Actions`, which needs 249px on every row and gets 208.5), 16 
 rows. **The residual truncation is ACCEPTED** — the verb and the party are visible, the full
 text is in the `title` and in the drawer.
 
+### ⚠️ PROPOSED, NOT LAW — S1 · the list stops hand-writing its table (2026-08-07)
+
+> **Nothing here is frozen. A chat that builds from this block has built from a proposal.**
+> It is written down only so the next chat challenges it instead of re-deriving a weaker copy
+> — the failure `../research/grid-findings.md` F62 records. **Law 4 applies: if you would not
+> design it this way today, say so.**
+
+**THE MEASURED PROBLEM.** `OperationOrdersControl.tsx` renders a hand-written `<table>` with
+its own `<Th>`, its own colgroup and its own header hex. **It is the only register in the
+portal that does not use `kit/DataTable`** — seven files do, and every one is Purchasing
+(`../research/grid-findings.md` F33 · F40). Two consequences are measured, not argued:
+
+```
+① Every kit power is absent here. The page has NO header sort, NO per-column ▼,
+   no column rules, no totals strip — `onSortChange` + `expansion` + `groupBy` +
+   `contextMenu` grep to ZERO in 5,150 lines (F40). The buyer has all four on
+   To Order; the operator who lives on Orders all day has none.
+
+② It stores hidden columns in `localStorage` (`carres.orders.hiddenCols`, F58),
+   which Loo RULED against on 2026-08-04 — "no page may persist column order,
+   width or visibility" (F61). The guard that enforces that law scans two kit
+   files and no page (F59), so the ruling is violated in production today.
+```
+
+**THE PROPOSAL — a MOVE, not a feature.** Same eight columns, same 40px, same widths, same
+data, same 30-row append. Only the table element changes.
+
+```
+GAINED, because the kit already has them and no new code writes them
+    header-click sort · per-column ▼ · column rules · totals strip · row washes
+DELETED, because the kit has nowhere to put it
+    carres.orders.hiddenCols — F58's violation dies with the hand-written table
+NOT IN THIS PROPOSAL
+    windowing · new columns · row expansion · right-click menu · any density change
+```
+
+**WHY IT DOES NOT WAIT FOR WINDOWING.** The list is windowed today by append
+(`ROWS_PER_BATCH = 30` + an IntersectionObserver, `:1601` · `:2449`), and at 77 live orders
+(§1.1) the measured interaction cost is ~30ms (F66). **Passing the kit the ALREADY-WINDOWED
+slice keeps that exactly.** Windowing the kit properly is a separate card and a later one.
+
+**WHAT WOULD OVERTURN IT.** A kit power Orders needs that `DataTable` cannot express — its
+nine facet rail groups, its bulk bar, its three dots or its `+N` action cell failing to render
+through the kit's `cell` accessor. **That is a reading of `DataTable.tsx` against
+`OperationOrdersControl.tsx`, and it has not been done.** Do it before building.
+
+**WHAT IS NOT SETTLED AND MUST NOT BE ASSUMED SETTLED.** 🟡 `Actions` truncates on 30 of 30
+rows (measured above, marked ACCEPTED) — that arithmetic assumed all eight columns must be
+visible at once, and a frozen identity gutter would change the assumption. **This proposal
+does not touch it, and the next chat should ask whether ACCEPTED still holds.**
+
 ### API + DATA
 `GET /api/operation/orders` is the single source of stage derivation — the control table is the
 kanban-as-table, so stage logic lives in one place. `ops_order_control` carries the operational

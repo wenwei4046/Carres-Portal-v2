@@ -98,6 +98,21 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
   would satisfy the guard while breaking the law it serves. **A reload is the reset.**
 - **The 40px row law binds the rows you SCAN.** The expanded cell is the ONE cell allowed to be
   tall and to wrap.
+- **40px is the international default, measured 2026-08-07 — not merely our own habit.**
+  AG Grid's Quartz theme ships **42px**; the two denser references anyone cites are a Windows
+  desktop control (AutoCount ~17px) and another repo (2990s 28px), neither a web-grid standard.
+  **And the floor is set by the CONTROLS, not the type:** the kit's expand button is 24px and
+  its checkbox 16px at any row height, so a 24px control fills 60% of a 40px row and **86% of a
+  28px one.** Any density change below ~32px therefore moves `badge-height` too — a second
+  token. *(Evidence: `docs/research/grid-findings.md` F64 · F69 · F70. What a synthetic
+  harness could NOT measure — readability, scan speed, click accuracy — stays UNKNOWN, so the
+  live question is whether in-row controls stay 24px, not "40 or 28".)*
+- **The grid renders every row it is given, and the cost is now measured.** At 1,500 rows a
+  header-click sort costs **~900ms** and one keystroke **~640ms**; the DOM holds 2,095 `<tr>`
+  and 24,854 cells (F64 · F65). **AG Grid caps rendered rows at 500 and SAP Fiori at ~200
+  before lazy-loading; `DataTable` has no cap of any kind** (F68). The cost is linear in rows
+  and **flat in density** — 100ms is crossed at ~200–350 rows, so this is a WINDOWING question
+  and never a row-height one.
 - **Every optional power is OPTIONAL and no signature moved** — that is the only reason a kit
   card can run while pages are frozen. **A page must justify wiring a power** (`§13.3` of the
   Constitution's design philosophy); an unwired power's ABSENCE is asserted by a test, because a

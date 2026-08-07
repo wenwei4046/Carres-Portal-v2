@@ -52,8 +52,15 @@ Carres kit/DataTable.tsx          1,193 / 1,193  props + docblocks read end to e
                                                  the render body read structurally
 Carres kit/GridToolbar.tsx           46 / 46     read end to end
 Carres kit/grid-layout.ts           106 / 106    read end to end
-Carres kit/grid-powers.test.tsx      ~30 / 712   ONLY the §0.4 storage guard
-Carres OperationToOrder.tsx         120 / 2,501  the docblock and imports ONLY
+Carres kit/grid-powers.test.tsx     712 / 712    read end to end   (2026-08-07)
+Carres OperationToOrder.tsx       2,501 / 2,501  read end to end   (2026-08-07)
+Carres kit/DataTable.tsx          1,193 / 1,193  render body ALSO read (2026-08-07)
+Carres 4 Purchasing tabs                        column widths + `sizing` + wrapper
+                                                only; the pages themselves UNREAD:
+                                                PurchaseOrders 3,316 · Receiving 1,038
+                                                · SupplierClaims 854 · Report 327
+BROWSER                            real Chrome 1440x900 against the real DataTable
+                                                — §4.7 and §4.8
 Carres archive/2990s-copy-audit     140 / 140    read end to end
 Carres archive/…-MODEL.md §12.7     143 / 143    read end to end (via git show)
 Carres git log — DataTable/grid                 14 commits, subjects + 2 read in full
@@ -61,12 +68,16 @@ AutoCount                          8 screenshots — no code, no database, ever
 2990s  repo total                              253,898 lines — the rest UNREAD
 ```
 
-> **NOT DONE, and it is named rather than glossed:** `OperationOrdersControl.tsx` (5,150) and
-> `OperationToOrder.tsx` (2,501) — **the two pages this whole file is about** — were GREPPED,
-> not read. This file's own TRAPS section says `grep` cannot inventory a page and that four
-> false claims came from doing exactly this. **And nothing has been measured in a browser:
-> every width, row-count and density figure quoted here is copied from someone else's earlier
-> measurement or estimated from an image.** `CLAUDE.md` requires a real browser twice.
+> **~~NOT DONE~~ — BOTH CLOSED 2026-08-07.** `OperationToOrder.tsx` and
+> `grid-powers.test.tsx` have now been read end to end, and **§4.7 is the first browser
+> measurement anyone has taken in this programme.** Every figure in §1–§4.6 remains
+> second-hand or estimated from an image; only §4.7 and §4.8 were measured here.
+>
+> **STILL NOT DONE, and named rather than glossed:** the four other Purchasing pages
+> (`OperationPurchaseOrders.tsx` 3,316 · `OperationReceiving.tsx` 1,038 ·
+> `OperationSupplierClaims.tsx` 854 · `OperationPurchasingReport.tsx` 327) were read only for
+> their column widths, their `sizing` prop and their wrapper. **They are four of the seven
+> `DataTable` callers, so any change to the kit lands on pages nobody in this file has read.**
 
 > **The first version of this file did not name `apps/web/src/components/kit/DataTable.tsx`
 > at all** — it studied another company's grid end to end while the grid this company already
@@ -738,6 +749,164 @@ columns `⊞ · Select · Status · Error Message · PO Doc. No. · Debtor Code 
 
 ---
 
+# 4.7 · MEASURED IN A REAL BROWSER — 2026-08-07, the first time anyone has
+
+> **This closes the oldest UNKNOWN in this file.** Every density, viewport and scale figure
+> ABOVE this section is copied from someone else's measurement or estimated from an image.
+> These were taken in Chrome at 1440×900 against the REAL
+> `apps/web/src/components/kit/DataTable.tsx`, driving To Order's ten frozen columns at their
+> frozen widths with `group` · `expansion` · `selection` · `totals` · `sizing="content"` wired
+> exactly as `OperationToOrder.tsx` wires them.
+>
+> **The instrument was a throwaway Vite entry, deleted in the same session.** Reproducible:
+> mount `DataTable` with the ten widths in Purchasing MASTER §3, feed it N synthetic rows
+> clustered ~2.4 per order, read the numbers back off the DOM.
+
+**F64 · Geometry at 1440×900, 1,500 item rows over 593 order lines.**
+```
+scroller box             1240 × 752
+sticky head / totals     40 / 40
+rows FULLY visible       FLAT     40px 16 · 32px 21 · 28px 24
+                         GROUPED  40px 11 item + 5 order line
+                                  32px 15 + 6
+                                  28px 17 + 7
+DOM                      2,095 <tr> · 24,854 cells — every row, no window
+horizontal overflow      88px   (grid needs 1326, gets 1238)
+vertical slack           40px 22 · 32px 14 · 28px 10
+expand btn / checkbox    24px / 16px  — UNCHANGED at every density
+type                     13px/18px    — UNCHANGED at every density
+```
+
+**F65 · Interaction cost, 1,500 rows, 40px.**
+```
+mount 1,500 rows           1,013 ms
+header-click sort            900 – 957 ms
+one keystroke in search      640 – 657 ms
+clear the search           1,107 ms
+open 12 expansions           604 ms  (577 of it React render)
+```
+
+**F66 · The cost is linear in ROWS and flat in DENSITY.**
+```
+rows      sort            one keystroke
+  62      27 – 37 ms       14 ms          ← To Order's live scale
+ 500     222 – 270 ms     113 ms
+1500     900 – 957 ms     640 – 657 ms
+
+≈ 0.6 ms per row per interaction. The 100 ms "instant" threshold falls at ~200–350 rows.
+
+scroll median   40px 14.2 · 32px 16.1 · 28px 14.4 ms
+sort            40px 934 ms · 28px 758 ms
+```
+**Density buys rows on screen and nothing else. A claim that a denser row is faster has not
+been measured.**
+
+**F67 · 2990s did not hit a limit of its virtualiser — it never wired the option that solves
+its case.** Read first-hand at `2990s/apps/backend/src/components/DataGrid.tsx`:
+```js
+// Skipped when grouped or expandable (variable row heights) ...
+const canVirtualize = ... && groupedCount === 0 && !expandable && ...
+estimateSize: () => 30,
+```
+`measureElement` and `getItemKey` grep **zero** in that file. TanStack Virtual's own API
+documents `measureElement` as the option "called when the virtualizer needs to dynamically
+measure the size of an item", and states items need not be uniform height.
+
+**F68 · The international answer to variable-height expansion, first-hand.**
+```
+AG Grid    detailRowHeight defaults to 300px FIXED.
+           "When using Auto Height ... Row Virtualisation will not happen."
+           "Do not use Auto Height if you have many rows."
+           Row buffer 10 rows either side.
+           HARD CAP 500 maximum rendered rows, "to prevent browser crashes".
+           Default row height 42px (Quartz).
+SAP Fiori  Responsive table ~200 items at once; above that use growing (lazy load)
+           up to 1,000, "and make sure the user can filter". Selection cap 200.
+Carres     no cap of any kind — 2,095 <tr> measured (F64).
+```
+Carres' expanded cell is `!h-auto` today, the exact shape AG Grid names as the thing that
+kills virtualisation. **Measured: To Order's expanded body renders at 53px** — one sentence
+and two buttons — so a fixed height costs this page nothing.
+
+**F69 · 40px is not an outlier; it is the international default.**
+`row-compact = 40` (F37) against **AG Grid Quartz 42px**. The two denser references are a
+Windows desktop control (AutoCount ~17px, F53) and another repo's own choice (2990s 28px,
+F17). **Neither is a web-grid standard, and the web-grid standard sits 2px above Carres.**
+
+**F70 · The density floor is set by the CONTROLS, not by the type.**
+The expand button is 24px and the checkbox 16px at every density (F64); `badge-height = 24`
+is its own token. A 24px control fills 60% of a 40px row, 75% of 32px, **86% of 28px**.
+**Carres cannot reach AutoCount's density without moving a SECOND token**, and ~32px is the
+floor reachable without one.
+
+---
+
+# 4.8 · MEASURED — how each Purchasing tab spends its width, 2026-08-07
+
+**F71 · Two of the five tabs do not get the pixel widths they declare.** Measured by
+rendering each tab's REAL declared widths through the real `DataTable` at 1440×900:
+```
+tab                sizing      declared   rendered   honoured
+To Order           "content"    1,252px    1,252px   YES
+Supplier Claims    "content"    1,439px    1,439px   YES
+Purchase Orders    ABSENT       1,171px    1,201px   NO — every column stretched
+Receiving          ABSENT       1,078px    1,238px   NO — +10 to +22px per column
+Report             ABSENT       37/15/15/15/15 %     percentage widths
+```
+`sizing` absent means `"fill"`, and `"fill"` treats a px width as a SHARE. **The widths on
+Purchase Orders and Receiving were measured in a browser by an earlier card and are then
+redistributed by the kit.** The Report tab is the last page still on percentages, which
+`DataTable`'s own doc comment warns against by name (*"percentage columns inflate on wide
+monitors and open holes between neighbours"*, Jess 2026-08-01).
+
+**F72 · Three width mechanisms and two different scrollbars in ONE module.**
+```
+Purchase Orders   min-w-[1208px] on a PAGE wrapper   (OperationPurchaseOrders.tsx:1548)
+Receiving         min-w-[880px] — ONLY while the workspace is CLOSED  (…:937)
+To Order/Claims   the kit's own filler, sizing="content"
+Report            percentages
+
+At a 900px pane:
+Purchase Orders   the PAGE pane scrolls — the header scrolls away with it
+Receiving         the KIT's box scrolls — header stays — 180px hidden
+To Order          the KIT's box scrolls — 396px hidden
+Supplier Claims   the KIT's box scrolls — 583px hidden
+```
+**An operator who learns the gesture on one tab does not have it on the next.**
+
+**F73 · OBSERVED on production, six screenshots supplied by Loo, 2026-08-07.**
+Twenty problems, listed by the tab they were seen on. Screens, never code.
+```
+To Order         `On PO` truncated to "On"; `PO No.` entirely off-screen
+                 no affordance says the sheet continues to the right
+                 each item row's four identity cells blank ≈ 700px
+                 3 of 6 category rows permanently 0
+Purchase Orders  `Customer Delivery` cut to "Cust… Deliv…", every date "4 Aug 2…"
+                 the detail panel OVERLAYS the grid rather than narrowing it
+                 an unexplained coloured dot on every PO No.
+Claims           `Next move` truncated
+                 the empty-state sentence renders off-centre — it centres on the
+                 1,439px table, not on the visible width
+                 lands on `Open 0` when `All` holds 1
+                 a single rail row reading 0
+Receiving        `Current Action` reads "Check in" on all 24 rows — a column with
+                 no information on it
+                 no customer name / SO number / ETA / quantity-outstanding on the
+                 row — this is MASTER §5's own gap G5, seen
+Report           4 data rows in ~730px of white; `Category` ≈ 550px for "Sofa"
+                 footer sentence clipped at the viewport edge
+                 rail category order ≠ table category order
+Settings         🔴 the literal string `was {0}` on screen — a Postgres array
+                 printed raw at OperationPurchasingSettings.tsx:79
+                 (`change.oldValue` is not translated before display)
+                 one supplier row carries the `was` line, the other does not
+```
+**The common shape: on four of six tabs the column that dies is the LAST one, and on three of
+those it is the column that answers the tab's own question** — `On PO`/`PO No.` (*did I buy
+it*), `Customer Delivery` (*when do they want it*), `Next move` (*what do I do*).
+
+---
+
 # 5 · REJECTED — claims made during this investigation and disproved
 
 | Claim | Verdict | What the measurement said |
@@ -745,7 +914,7 @@ columns `⊞ · Select · Status · Error Message · PO Doc. No. · Debtor Code 
 | "2990s has no Best Fit" | **FALSE** | `autoFit` exists — see F1. It estimates rather than measures, which is a different criticism |
 | "46 2990s pages bypass their own DataGrid" | **FALSE** | 20 of the 46 also import it; ~26 are Detail/form pages where a layout table is correct — F25 |
 | "Carres customer names are mixed Chinese and Latin" | **FALSE** | 0 of 77 carry a non-ASCII byte. A `cjkClassName` helper is applied to every name and nothing triggers it |
-| "TanStack + react-virtual solves expanded-tree virtualisation" | **NOT VERIFIED** | The package is installed in neither repo and its source was never read — F26 |
+| "TanStack + react-virtual solves expanded-tree virtualisation" | **VERIFIED 2026-08-07, and it reverses the reason** | The library documents `measureElement` for exactly this and does not require uniform heights. **2990s' `!expandable` switch was its own choice, not a limit of the tool** — `measureElement` and `getItemKey` grep zero in its DataGrid — F67 |
 | "The portal has no module menu on a working page" | **FALSE** | `PortalSidebar` is mounted unconditionally on every operation screen and carries both Orders and Purchasing; only `GlobalTopBar` is suppressed |
 | "2990s' MRP four-number row" (as first stated) | **SECOND-HAND** | Originally quoted from Carres' own Purchasing MASTER. Later confirmed first-hand — F24 |
 | "Carres has no grid engine" (implied by this file's own silence) | **FALSE** | `kit/DataTable.tsx` is 1,193 lines and SEVEN files render through it — F32 · F33. The first version of this file never named it |
@@ -763,13 +932,21 @@ contradicts it.
 
 # 6 · UNKNOWN
 
-- Whether any engine — TanStack, AG Grid, or something written here — sustains **expansion plus
-  virtualisation** at a 28px row over 500–1,500 rows. **Never measured in a browser by anyone.**
+- ~~Whether any engine sustains expansion plus virtualisation over 500–1,500 rows.~~
+  **HALF CLOSED 2026-08-07.** The UN-virtualised half is now measured (§4.7: 1,013ms mount,
+  ~900ms per sort, ~640ms per keystroke at 1,500 rows), and the international answer to the
+  variable-height expansion is on record (F68). **Still open: whether a WINDOWED
+  `kit/DataTable` holds its group line and its expanded record correctly — nobody has built
+  one to measure.**
 - Whether 2990s' 1,567-row Sales Order list is genuinely un-virtualised in practice. F4 and F5
   are read from source; the render was never observed.
-- Row height for Carres. **The token is 40 and it is LOCKED (F37)**, so the live question is
-  40 vs 28, not 28 vs 24, and it is the owner's — token values are not a build card's to move.
-  Nobody has put three operators in front of both.
+- Row height for Carres. **The token is 40 and it is LOCKED (F37).** 2026-08-07 added two
+  facts that narrow the question rather than answer it: **AG Grid's own default is 42px
+  (F69)**, so 40 is already the web-grid norm; and **the 24px control floors any change at
+  ~32px (F70)**, so the reachable range is 40→32 and nothing below it without moving
+  `badge-height` too. **Still nobody has put three operators in front of two densities**, and
+  a synthetic harness cannot measure readability, scan speed or click accuracy — it says so
+  itself. The live question is therefore *do the in-row controls stay 24px*, not *40 or 28*.
 - ~~How many Sales Orders an operator has OPEN AT ONCE.~~ **CLOSED 2026-08-07 — Jess ruled
   both scopes, and they are two axes, not one.** `docs/orders/MASTER.md` §2.2 (OWNER SCOPE) and
   §3 (DATE SCOPE):
