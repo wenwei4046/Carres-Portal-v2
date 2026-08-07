@@ -1141,6 +1141,64 @@ blanks. Every row carries **who changed it, when, and what it was before**.
 
 ---
 
+# ▶︎ P20 · APPROVED TO BUILD 2026-08-08 — ONE width mechanism across the five tabs
+
+> **Runs in PARALLEL with Orders S2 and may not collide with it.** Different module, different
+> files. **PAGE-SIDE ONLY — `kit/DataTable.tsx` may NOT be touched by this card**, because S2's
+> chat is the one that owns the kit this week. A change that needs the kit STOPS and waits.
+
+**MEASURED, and the evidence is already committed** — `../research/grid-findings.md` §4.8
+(F71 · F72 · F73) plus six production screenshots Loo supplied 2026-08-07.
+
+```
+THE DEFECT, in one line: three width mechanisms and TWO different scrollbars
+in one module, so a gesture learned on one tab does not work on the next.
+
+tab               sizing      declares   renders   honoured   who scrolls @900px
+To Order          "content"    1,252px   1,252px   YES        the KIT's box
+Supplier Claims   "content"    1,439px   1,439px   YES        the KIT's box (583px hidden)
+Purchase Orders   ABSENT       1,171px   1,201px   NO         the PAGE pane — header scrolls away
+Receiving         ABSENT       1,078px   1,238px   NO         the KIT's box
+Report            ABSENT       37/15/15/15/15 %    —          percentages
+```
+`sizing` absent means `"fill"`, and `"fill"` treats a declared px as a SHARE — so **widths an
+earlier card measured in a browser are silently redistributed.**
+
+```text
+BUILD CARD · P20.   git pull first.   ONE commit per item, never one PR.
+
+P20.1  Purchase Orders + Receiving pass sizing="content".
+       Their px widths were browser-measured; stop redistributing them.
+P20.2  ONE scrollbar. Purchase Orders scrolls the PAGE pane because of a
+       hand-written min-w-[1208px] wrapper (:1548); Receiving's min-w-[880px]
+       is CONDITIONAL on the workspace being closed (:937). Both go — the
+       kit's own box is the scroller on the other three.
+P20.3  Report leaves percentages. `DataTable`'s own doc warns by name:
+       "percentage columns inflate on wide monitors and open holes between
+       neighbours" (Jess 2026-08-01). Widths must be measured, not guessed.
+P20.4  🔴 Settings prints the literal `was {0}` on screen —
+       OperationPurchasingSettings.tsx:79 renders `change.oldValue` raw and
+       the stored value is a Postgres array. A work week must read as days.
+P20.5  Receiving's `Current Action` reads "Check in" on all 24 rows.
+       A column identical on every row carries no information.
+P20.6  Claims lands on `Open 0` while `All` holds 1, and its empty-state
+       sentence centres on the 1,439px table instead of the visible width.
+
+OUT OF SCOPE, NAMED   sticky columns (NO engine has them — F72; it is the
+                      obvious fix and it needs the kit, so it is NOT this card)
+                      · queues · business rules · api · any column deleted to
+                      avoid a scrollbar, which §3 already forbids.
+
+STOP AND REPORT if any item needs kit/DataTable.tsx.
+```
+
+**WHY THE LAST COLUMN MATTERS AND THIS IS NOT COSMETIC.** On four of the six screenshots the
+column that falls off the right edge is the one answering the tab's own question — `On PO` /
+`PO No.` (*did I buy it*), `Customer Delivery` (*when do they want it*), `Next move` (*what do
+I do*). **The operator's answer is the thing that goes missing.**
+
+---
+
 # §10 · Approved Evolution — decided, deliberately not implemented
 
 > **This is architecture, not a to-do list.** Everything here has been ruled; none of it is
