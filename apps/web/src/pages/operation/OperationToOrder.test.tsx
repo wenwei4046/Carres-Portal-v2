@@ -362,7 +362,15 @@ describe("the grid — business language only", () => {
     for (const r of rows) {
       const tds = [...r.querySelectorAll("td")];
       // [0]=⊞ gutter, [1]=☑, [2]=SO No., [3]=Customer, [4]=Delivery.
-      expect(tds[2]?.textContent ?? "").toBe("");
+      //
+      // The SO cell carries 2990s' continuation marker and nothing else
+      // (`Mrp.module.css:348`): with nine columns the grid is 1,255px, so on a
+      // narrower window the only columns an operator can see are the four that
+      // are deliberately blank, and a screen of already-bought orders read as
+      // blank blocks. One glyph, no width, no colour — and never the ORDER's
+      // own number, which is stated once above.
+      expect(tds[2]?.textContent ?? "").toBe("↳");
+      expect(tds[2]?.textContent ?? "").not.toMatch(/SO-/);
       expect(tds[3]?.textContent ?? "").toBe("");
       expect(tds[4]?.textContent ?? "").toBe("");
     }
