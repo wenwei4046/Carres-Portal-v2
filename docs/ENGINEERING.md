@@ -203,8 +203,8 @@ concurrency, or you will chase somebody else's timeout.**
 | API | `https://carres-portal-v2-api.wwch.workers.dev` + `api.carresofficial.com` |
 | DB | Supabase `kfprgpjpaffedghytstl` — staging IS production |
 | Migration tail | `0325`. **Verify against the tracker before numbering.** |
-| Live web bundle | **`index-DJ_dwjW1.js`** from main tip `ce59cc34` (the torn-order fix, 2026-08-07) — carres-portal `d36535eb` + carres-pos `d78e43f0`, both projects deployed before polling and **all four canonicals converged on the FIRST poll**. Live md5 == local build (`ac00218c…`, 4,777,744 bytes), `SERVICE_ROLE` **0**. Verified in a real browser on live data before shipping: sorting by `Qty` gives **36 group headers, ZERO duplicates**, first element on the sheet is an order line (it was 64 headers for 47 orders, 17 of them split). |
-| Live Worker | **version `88516ff6-1b80-445d-9bb8-71d5187818b5`** from main tip `b93d652b` (T6, 2026-08-06) — still current, and **nothing is owed**: the dry-run bundle at `ce59cc34` (`4bb2fac8…`) is byte-identical to the one this version was built from, because the fix touched `apps/web` only. `/health` **200 `{"ok":true}`**. Predecessor `9402d994` |
+| Live web bundle | **`index-fPWjYV-6.js`** from main tip `d07bc3c1` (2026-08-07) — carres-portal `91630c27` + carres-pos `e97622e0`, both deployed before polling, all four canonicals converged on the second poll. Live md5 == local build (`aa5a2726…`), `SERVICE_ROLE` **0**. Verified in a real browser on live data before shipping: **60 bought rows → 0 red bars, 60 muted; 27 work rows → 9 red, 0 muted**, and every item row carries the `↳` marker. |
+| Live Worker | **version `88516ff6-1b80-445d-9bb8-71d5187818b5`** from main tip `b93d652b` (T6, 2026-08-06) — still current and **nothing owed**: the last two changes touched `apps/web` only and the dry-run bundle is byte-identical (`4bb2fac8…`). `/health` **200 `{"ok":true}`**. Predecessor `9402d994` |
 
 
 > **⚠️ `0318` and `0319` are IN THE REPOSITORY AND ABSENT FROM THE TRACKER**, measured
