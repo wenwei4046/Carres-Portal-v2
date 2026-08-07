@@ -72,14 +72,16 @@ point: *what did the customer buy?* is every order, while *which orders need
 buying today?* is a filtered few — an order already covered by stock never
 reaches Batch Purchase at all.
 
-> **THIS MAP NEEDS A MODULE-LEVEL MENU AND THE PORTAL HAS NONE ON A WORKING
-> PAGE** (measured 2026-08-06): `GlobalTopBar` is suppressed on the Orders and
-> Purchasing routes (`OperationApp.tsx:254-260`) and carries no module entries
-> anyway — only 🔔 ❓ ⚙. So an operator inside Purchasing has no way to reach
-> Sales, which is the original complaint this whole ruling started from. **The
-> menu is the first thing this map owes**, and it is what AutoCount gets right:
-> its sidebar never disappears (`2990s/apps/backend/src/lib/nav-items.ts` keeps
-> `Sales Order` and `Procurement` as permanent groups).
+> **`PortalSidebar` is available on every operation screen**
+> (`OperationApp.tsx:243`) and provides navigation between Orders and
+> Purchasing. `GlobalTopBar` is suppressed on working pages
+> (`OperationApp.tsx:254-260`), but it is not responsible for module navigation.
+>
+> **The navigation difference from AutoCount is not reachability — it is
+> information architecture.** AutoCount exposes all business documents
+> permanently in the navigation; Carres exposes modules first, then reveals
+> documents inside the module. **Navigation decisions are based on operator
+> workflow, not on implementation history or another ERP.**
 
 **THE SPLIT IS BY JOB, NEVER BY TABLE.** Both lanes may store their demand in
 `purchase_demands`; what differs is the OPERATOR'S INTENT, and that is what a
@@ -1122,6 +1124,7 @@ blanks. Every row carries **who changed it, when, and what it was before**.
 
 | Decision | Ruling |
 |---|---|
+| **Navigation never defines ownership** | Architecture decisions are justified by business ownership. Navigation may support those decisions, but navigation never defines ownership. |
 | **Where an action lives** | The tab that owns the WORK owns the door AND its queue. **CLOSED by T2 (2026-08-06): the CALLS calendar on Purchase Orders is the queue for all three supplier calls** — each call's due files under its day, `Overdue` holds the late ones, and the door (the expand) sits on the same tab. |
 | **Two status axes, never merged** | `purchase_orders.status` is a 3-value stored enum. The 5-word Operation Status is derived and never stored. A reader who confuses them will "fix" one to match the other. |
 | **A quantity means exactly one thing** | No column is ever reused for a second meaning — that is how `ops_order_control.balance` became a lock reading a column nobody wrote. |
