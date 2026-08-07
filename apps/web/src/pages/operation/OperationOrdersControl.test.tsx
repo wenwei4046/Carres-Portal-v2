@@ -15,6 +15,8 @@ import OperationOrdersControl, {
   logisticStateOf,
   rowDotsOf,
   isImportedArchive,
+  compareOrderSortValues,
+  ORDER_SORTABLE_COLUMNS,
 } from "./OperationOrdersControl";
 import type {
   StockInfo,
@@ -575,6 +577,147 @@ describe("OperationOrdersControl · S1 · the kit renders the table", () => {
     expect(localStorage.getItem("carres.orders.hiddenCols")).toBeNull();
     expect(wrote).not.toContain("carres.orders.hiddenCols");
     spy.mockRestore();
+  });
+});
+
+describe("OperationOrdersControl · S2.1 · the operator sorts the list", () => {
+  function clickSort(key: string) {
+    fireEvent.click(screen.getByTestId(`table-sort-${key}`));
+  }
+
+  it("cycles asc ⇄ desc ⇄ OFF, and OFF is the page's own risk order", () => {
+    // Three orders with no deadline → identical slack, so `compareBySlack`
+    // ties on all three and the DEFAULT order is the order they arrived in.
+    // That is what makes the third click assertable: if it returned anything
+    // other than `compareBySlack`, this list would not come back.
+    listHookState.data = {
+      orders: [
+        makeRow({ id: "x1", so: 3003 }),
+        makeRow({ id: "x2", so: 3001 }),
+        makeRow({ id: "x3", so: 3002 }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    expect(rowsBySo()).toEqual(["3003", "3001", "3002"]);
+
+    clickSort("order");
+    expect(rowsBySo()).toEqual(["3001", "3002", "3003"]);
+    clickSort("order");
+    expect(rowsBySo()).toEqual(["3003", "3002", "3001"]);
+    // The third click is the whole reason §2.3 survives sorting: `null` IS
+    // `compareBySlack`, so the risk order is one click away and never
+    // something the operator has to rebuild by hand.
+    clickSort("order");
+    expect(rowsBySo()).toEqual(["3003", "3001", "3002"]);
+  });
+
+  it("tells a screen reader which way the sorted column runs", () => {
+    listHookState.data = { orders: [makeRow({ id: "x1", so: 3001 })] };
+    wrap(<OperationOrdersControl />);
+    const th = () => screen.getByTestId("table-sort-order").closest("th")!;
+    expect(th().getAttribute("aria-sort")).toBeNull();
+    clickSort("order");
+    expect(th().getAttribute("aria-sort")).toBe("ascending");
+    clickSort("order");
+    expect(th().getAttribute("aria-sort")).toBe("descending");
+  });
+
+  it("SORTS THE WHOLE LIST, not the 30 rows already on screen", () => {
+    // The one way this feature can be quietly wrong. The page renders a 30-row
+    // window; sorting that window shuffles rows the operator can already see
+    // and claims to have ordered 35. The smallest SO here is deliberately the
+    // LAST of 35 — outside the first window — so a windowed sort could not
+    // possibly bring it to the top.
+    listHookState.data = {
+      orders: Array.from({ length: 35 }, (_, i) => makeRow({ id: `w${i}`, so: 5035 - i })),
+    };
+    wrap(<OperationOrdersControl />);
+    expect(screen.getAllByTestId("order-row")).toHaveLength(30);
+    expect(rowsBySo()[0]).toBe("5035");
+
+    clickSort("order");
+    expect(rowsBySo()[0]).toBe("5001");
+    expect(screen.getAllByTestId("order-row")).toHaveLength(30);
+  });
+
+  it("puts a BLANK last in both directions — Excel's rule, so ascending Deadline does not open on every undated order", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({ id: "d1", so: 4001, delivery_date: "2026-09-01" }),
+        makeRow({ id: "d2", so: 4002, delivery_date: null }),
+        makeRow({ id: "d3", so: 4003, delivery_date: "2026-08-20" }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    clickSort("deadline");
+    expect(rowsBySo()).toEqual(["4003", "4001", "4002"]);
+    clickSort("deadline");
+    expect(rowsBySo()).toEqual(["4001", "4003", "4002"]);
+  });
+
+  it("sorts a STATE column WORST FIRST, so the first click never buries the work", () => {
+    // Stock: `No PO` → `Waiting` → `Ready`. Ascending means on a sorted column
+    // exactly what it means in the default order.
+    listHookState.data = {
+      orders: [
+        makeRow({ id: "s1", so: 6001, status: "proceed_order", operation_stage: "ready_to_dispatch" }),
+        makeRow({ id: "s2", so: 6002, status: "proceed_order", operation_stage: "in_production" }),
+        makeRow({ id: "s3", so: 6003 }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    clickSort("stock");
+    expect(rowsBySo()).toEqual(["6003", "6002", "6001"]);
+  });
+
+  it("offers the control on every column that has a sort value, and on no other", () => {
+    listHookState.data = { orders: [makeRow({ id: "x1", so: 3001 })] };
+    wrap(<OperationOrdersControl />);
+    const offered = Array.from(
+      screen.getByRole("table").querySelectorAll("[data-testid^='table-sort-']"),
+    ).map((b) => b.getAttribute("data-testid")!.replace("table-sort-", ""));
+    // A header with an arrow the comparator has no answer for is worse than a
+    // header with no arrow: the operator clicks, nothing moves, and they stop
+    // trusting the whole row of them.
+    expect(new Set(offered)).toEqual(ORDER_SORTABLE_COLUMNS);
+  });
+
+  it("⚑ Follow-up does NOT sort — its header wraps under the arrow", () => {
+    // MEASURED in Chromium against the kit's own header markup, both nav
+    // states: the column's content box is 56px and `Follow-up` plus the sort
+    // arrow needs 68px. It is the one label on this table with a HYPHEN, so it
+    // is the one that can WRAP rather than merely overflow — "Follow-" over
+    // "up", which is the exact defect S1 shipped once and pinned 72px to stop.
+    //
+    // jsdom has no layout engine and can never catch the wrap (S1's own
+    // finding). This holds the DECISION the measurement produced.
+    listHookState.data = { orders: [makeRow({ id: "x1", so: 3001 })] };
+    wrap(<OperationOrdersControl />);
+    expect(screen.queryByTestId("table-sort-follow_up")).toBeNull();
+    // …and the word is still there, unsorted and unwrapped.
+    expect(screen.getByRole("columnheader", { name: /Follow-up/ })).toBeTruthy();
+  });
+});
+
+describe("compareOrderSortValues (S2.1 — 2990's comparator, DataGrid.tsx:689-699)", () => {
+  it("compares numbers as numbers, not as text", () => {
+    // The failure this prevents: `10` before `9` because "10" < "9".
+    expect(compareOrderSortValues(9, 10, "asc")).toBeLessThan(0);
+    expect(compareOrderSortValues(9, 10, "desc")).toBeGreaterThan(0);
+    // …including numbers that arrive as strings, which is 2990's own rule.
+    expect(compareOrderSortValues("9", "10", "asc")).toBeLessThan(0);
+  });
+
+  it("compares words as words", () => {
+    expect(compareOrderSortValues("Ann", "Zed", "asc")).toBeLessThan(0);
+    expect(compareOrderSortValues("Ann", "Zed", "desc")).toBeGreaterThan(0);
+  });
+
+  it("keeps a blank LAST in both directions", () => {
+    expect(compareOrderSortValues("", "Ann", "asc")).toBeGreaterThan(0);
+    expect(compareOrderSortValues("", "Ann", "desc")).toBeGreaterThan(0);
+    expect(compareOrderSortValues("Ann", "", "desc")).toBeLessThan(0);
+    expect(compareOrderSortValues("", "", "asc")).toBe(0);
   });
 });
 
