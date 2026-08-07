@@ -362,11 +362,37 @@ so the record is here rather than in a chat:
 kit/DataTable OWNS the select column at a FIXED 4%   (the page spent 3%)
 `Column.label` is a `string`, so ⚑ takes a WORD.
    `Follow-up` measures 54.4px at the th's text-label + the kit's px-2
-   → the column needs 7.25%                          (the page spent 3%)
+   → the column is 72px, IN PIXELS                   (the page spent 3%)
 ────────────────────────────────────────────────────────────────────────
-the two control columns now cost 11.25% where they cost 6%
-→ 5.25% MUST come out of the eight.  The only question is WHICH.
+at C14's 1012px reference that is 7.11%, so the two control columns
+cost 11.11% where they cost 6%
+→ 5.11% MUST come out of the eight.  The only question is WHICH.
 ```
+
+> ### ⛔ AND THE ⚑ COLUMN IS SIZED IN PIXELS, WHICH ONLY A REAL BROWSER COULD TELL US
+>
+> **S1 first shipped that column as a percentage — 7.25%, tuned to the 1012px table C14
+> measured — and the header WRAPPED the first time the page was opened in Chromium.** At
+> 1440×900 with the nav EXPANDED the table is **850px**, and 7.25% of that is 61.6px against a
+> word that needs 70.4px. `Follow-up` rendered as "Follow-" over "up".
+>
+> **All 155 unit tests passed while it wrapped, and they always would have: jsdom has no
+> layout engine.** A percentage of a table that changes width cannot protect a word whose width
+> is fixed — only a pixel can. The kit already documents the recipe (`Column.width`: *"a string
+> = raw CSS width — fixed interior columns … the international recipe"*).
+>
+> **The rule this leaves behind: a column whose HEADER is the widest thing it will ever hold is
+> sized in pixels, not percent.** The unit test now pins `72px` and says why — it cannot catch
+> the wrap, it can only hold the pixel that prevents it.
+>
+> **Measured in Chromium after the fix, both nav states, live dev server:**
+> ```
+> nav EXPANDED   table  850px   ⚑ 72px, one line   no sideways scroll
+> nav COLLAPSED  table 1022px   ⚑ 72px, one line   no sideways scroll
+>                Status 134.9 · Order 75.5 · Deadline 151.1 · Stock 54.0 ·
+>                PIC 59.4 · Actions 210.5   ← every one of C14's, to the pixel
+>                Customer 106.7 · Delivery 116.3   ← the two that pay
+> ```
 **Answered by measuring in Chromium at the real 1012px, on C14's own worst-case strings,
 before and after in the same harness.** Two allocations were built and rejected first:
 
@@ -377,10 +403,10 @@ ALL ON `customer`, per C14's own deficit rule   →  123px → 77px,
     survive being asked for 95px.
 EVEN SPLIT customer + delivery                  →  `Tan Ah Kow` still
     loses 5px.  REJECTED — a symmetrical number is not an argument.
-1.75 / 3.5 · `delivery` pays TWICE `customer`   →  SHIPPED
+1 / 2 · `delivery` pays TWICE `customer`        →  SHIPPED
     customer 123 → 105px  ·  delivery 150 → 114px
     Actions · Deadline · Status · Order · Stock · PIC keep C14's
-    width TO THE DIGIT, and the colgroup still sums to exactly 100%.
+    width TO THE DIGIT, and the budget still lands on the whole table.
 ```
 **`delivery` pays the larger share because it carries the least, and this module already ruled
 why:** §3's frozen rule is that *"the `Delivery` cell never repeats the sentence `Actions`

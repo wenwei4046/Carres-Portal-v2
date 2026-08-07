@@ -536,23 +536,29 @@ describe("OperationOrdersControl · Stock column", () => {
  * written against the hand-written table, and they were not touched.
  * ────────────────────────────────────────────────────────────────────────── */
 describe("OperationOrdersControl · S1 · the kit renders the table", () => {
-  it("spends exactly 100% of the table — a list grid never scrolls sideways (§7)", () => {
+  it("budgets the whole table — a list grid never scrolls sideways (§7)", () => {
     listHookState.data = { orders: [makeRow({ id: "w1", so: 9001 })] };
     wrap(<OperationOrdersControl />);
-    // The kit's own select column is a FIXED 4% (the page cannot set it) and
-    // `Follow-up` now carries a word, so the two control columns cost 10.5%
-    // where they cost 6%. `customer` pays the 4.5% difference — this module's
-    // own rule for where a width deficit goes (C14). If a later card moves a
-    // unit, this is the sum that must still land on 100: over it, the browser
-    // normalises every column and C14's measurements stop meaning anything;
-    // under it, `table-fixed` hands the slack back out and does the same.
-    const cols = Array.from(screen.getByRole("table").querySelectorAll("col"));
-    const total = cols.reduce(
-      (s, c) => s + Number.parseFloat((c as HTMLElement).style.width),
-      0,
+    const cols = Array.from(screen.getByRole("table").querySelectorAll("col")).map(
+      (c) => (c as HTMLElement).style.width,
     );
     expect(cols).toHaveLength(10); // select + Follow-up + the 8 business columns
-    expect(total).toBeCloseTo(100, 6);
+
+    // `Follow-up` is the ONE column sized in PIXELS, and that is load-bearing:
+    // its header is a WORD of fixed width, a `th` wraps rather than ellipsises,
+    // and a percentage of a table that changes width cannot protect it. This
+    // shipped as a percentage first and wrapped in a real browser the moment
+    // the nav was expanded (850px table). jsdom has no layout, so no unit test
+    // can catch the wrap — it can only pin the pixel that prevents it.
+    expect(cols[1]).toBe("72px");
+
+    // Everything else is a share of the table, and the shares must land on the
+    // whole: over it, the browser renormalises every column and C14's measured
+    // widths stop meaning anything; under it, `table-fixed` hands the slack
+    // back out and does the same. 72px is 7.11% of C14's 1012px reference.
+    const pct = cols.filter((w) => w.endsWith("%")).map(Number.parseFloat);
+    expect(pct).toHaveLength(9);
+    expect(pct.reduce((a, b) => a + b, 0)).toBeCloseTo(100 - (72 / 1012) * 100, 6);
   });
 
   it("persists no column shape — F58's localStorage key died with the hand-written table", () => {

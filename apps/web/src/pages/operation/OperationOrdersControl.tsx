@@ -1558,18 +1558,27 @@ const ORDER_COL_DEFS: OrderColDef[] = [
  *   · `Column.label` is a `string` in BOTH engines, so the ⚑ header takes a
  *     WORD. The module's word for it is `Follow-up` (the QUEUES rail row, §3),
  *     and a second word for one thing is the C1 defect the kit exists to stop.
- *     **MEASURED in Chromium, not estimated: `Follow-up` is 54.4px at the
- *     `th`'s own `text-label` (11px/500), and the kit pads `px-2`, so the
- *     column needs 70.4px = 6.96%.** It is set at **7.25%** for ~3px of
- *     rendering slack. A `th` carries neither `truncate` nor
- *     `whitespace-nowrap`, so an under-sized one does not ellipsise — it WRAPS
- *     ("Follow-" over "up"), which is how the first draft of this card shipped
- *     at 6.5% and why the number is measured now.
  *
- * `4 + 7.25 = 11.25%` where the two control columns cost `6%`, so **5.25% has
- * to come out of the eight**, and the only question a build card gets to
- * answer is WHICH. It was answered by measuring, in Chromium at the real
- * 1012px, on C14's own worst-case strings — before and after, same harness:
+ * ⭐ **AND THAT COLUMN IS SIZED IN PIXELS, NOT PERCENT — a real browser is why.**
+ * `Follow-up` measures **54.4px** at the `th`'s own `text-label` (11px/500) and
+ * the kit pads `px-2`, so the column needs **70.4px — a FIXED number, at every
+ * table width.** A `th` carries neither `truncate` nor `whitespace-nowrap`, so
+ * an under-sized one does not ellipsise: it WRAPS, "Follow-" over "up".
+ *
+ * This card first shipped it as a percentage (7.25%, tuned to the 1012px table
+ * C14 measured) and **the header wrapped the moment it was opened in a real
+ * browser** — at 1440×900 with the nav EXPANDED the table is 850px, and 7.25%
+ * of that is 61.6px. jsdom has no layout and every unit test passed. **A
+ * percentage cannot protect a fixed-width word; only a pixel can.** The kit
+ * documents exactly this (`Column.width`: *"a string = raw CSS width — fixed
+ * interior columns … the international recipe"*), and now the word survives
+ * every window size instead of one.
+ *
+ * At C14's 1012px reference table, 72px is 7.11%, so `4 + 7.11 = 11.11%` where
+ * the two control columns cost `6%`: **5.11% has to come out of the eight**,
+ * and the only question a build card gets to answer is WHICH. It was answered
+ * by measuring, in Chromium at the real 1012px, on C14's own worst-case
+ * strings — before and after, same harness:
  *
  * ```
  * ALL OF IT ON `customer`, per C14's "the deficit goes out of customer"
@@ -1625,10 +1634,16 @@ const ORDER_COL_DEFS: OrderColDef[] = [
  *    the migration was approved with the word, and a build card does not
  *    reopen an approved rule. It reports the price.
  */
-const FOLLOW_UP_PCT = 7.25;
-/** 4% (the kit's select column) + `Follow-up` − the 6% the two gutters cost
- *  before S1. */
-const GUTTER_DEFICIT_PCT = 4 + FOLLOW_UP_PCT - 6;
+/** `Follow-up` (54.4px) + the kit's `px-2` (16px) + ~2px of rendering slack.
+ *  PIXELS, deliberately — see the block above. */
+const FOLLOW_UP_WIDTH = "72px";
+/** C14's reference table: 1440×900, nav collapsed, 240px rail. The percentage
+ *  columns are budgeted against it; at any other width the browser scales them
+ *  and `Follow-up` keeps its 72px, which is the whole point of the pixel. */
+const REFERENCE_TABLE_PX = 1012;
+/** 4% (the kit's select column) + `Follow-up` at the reference width − the 6%
+ *  the two gutters cost before S1. */
+const GUTTER_DEFICIT_PCT = 4 + (72 / REFERENCE_TABLE_PX) * 100 - 6;
 /** Who pays it, and in what proportion — `delivery` carries twice `customer`'s
  *  share, for the reason measured above. The shares SUM TO 1, so the table
  *  still lands on exactly 100% whatever they are; the S1 width test asserts it. */
@@ -2964,7 +2979,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
          colour is still the whole state. */
       key: "follow_up",
       label: "Follow-up",
-      width: FOLLOW_UP_PCT,
+      width: FOLLOW_UP_WIDTH,
       headerTitle: "Flag an order for follow-up — amber while open, red once overdue",
       cell: (r) => <FollowUpFlag order={r.o} tasks={r.tasks} onFlag={openFollowUp} />,
     },
