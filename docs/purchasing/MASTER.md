@@ -45,24 +45,41 @@ ruling. **APPROVED, NOT YET BUILT**; today's screens are §3–§8's measured
 blocks):
 
 ```
-Sales Orders ─▶ Batch Purchase  ─┐
-                                 ├─▶ Purchase Orders ─▶ Receiving ─▶ Claims
-                Manual Purchase ─┘
-                                     Report (read-only) · Settings (manager)
+SALES                    PURCHASING
+Sales Orders  ····read···▶ Batch Purchase  ─┐
+                                            ├─▶ Purchase Orders ─▶ Receiving ─▶ Claims
+                           Manual Purchase ─┘
+                                                Report (read-only) · Settings (manager)
 ```
 
 ```
-Purchasing        Sales Orders      every customer order — a DOOR to the one
-                                    canonical page (/operation/orders), never
-                                    a second list
-                  Batch Purchase    demand the engine generated from customer
-                                    orders — review, consolidate, issue
+Sales             Sales Orders      every customer order. SALES owns it.
+
+Purchasing        Batch Purchase    only the customer orders PURCHASING still
+                                    has to act on — a filtered purchasing
+                                    workspace, never a second Sales Orders page
                   Manual Purchase   purchases nobody's customer asked for:
                                     Ready Stock · Display · Office · Warranty ·
                                     Spare Parts · and whatever is added next
                   Purchase Orders   every issued PO, whichever lane bore it
                   Receiving · Claims · Report · Settings
 ```
+
+**SALES ORDERS IS NOT A PURCHASING TAB** (Loo, 2026-08-06 — his refinement of
+the same day's ruling). Purchasing READS the sales orders; it does not carry
+them. The two answer different questions and the difference is the whole
+point: *what did the customer buy?* is every order, while *which orders need
+buying today?* is a filtered few — an order already covered by stock never
+reaches Batch Purchase at all.
+
+> **THIS MAP NEEDS A MODULE-LEVEL MENU AND THE PORTAL HAS NONE ON A WORKING
+> PAGE** (measured 2026-08-06): `GlobalTopBar` is suppressed on the Orders and
+> Purchasing routes (`OperationApp.tsx:254-260`) and carries no module entries
+> anyway — only 🔔 ❓ ⚙. So an operator inside Purchasing has no way to reach
+> Sales, which is the original complaint this whole ruling started from. **The
+> menu is the first thing this map owes**, and it is what AutoCount gets right:
+> its sidebar never disappears (`2990s/apps/backend/src/lib/nav-items.ts` keeps
+> `Sales Order` and `Procurement` as permanent groups).
 
 **THE SPLIT IS BY JOB, NEVER BY TABLE.** Both lanes may store their demand in
 `purchase_demands`; what differs is the OPERATOR'S INTENT, and that is what a
