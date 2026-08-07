@@ -20,8 +20,17 @@
 2990s  MfgSalesOrdersList.tsx    1,669 / 1,669   read end to end
 2990s  Mrp.tsx                    ~1,100 / 1,452  ~76%
 Carres OperationOrdersControl.tsx 5,150 / 5,150  read end to end
+Carres kit/DataTable.tsx          1,193 / 1,193  props + docblocks read end to end;
+                                                 the render body read structurally
+Carres kit/GridToolbar.tsx           46 / 46     read end to end
+Carres kit/grid-layout.ts        UNREAD (106)  · grid-powers.test.tsx UNREAD (712)
 2990s  repo total                              253,898 lines — the rest UNREAD
 ```
+
+> **The first version of this file did not name `apps/web/src/components/kit/DataTable.tsx`
+> at all** — it studied another company's grid end to end while the grid this company already
+> ships on six pages went unread. §4.5 is that reading. The correction is recorded because
+> the omission, not any single number, is what a plan built on this file would have inherited.
 
 ---
 
@@ -101,9 +110,24 @@ groupValue    → stable key with an explicit blank ("(none)" / "(blank)")
 The export fallback chain is `exportValue → filterValue → rendered text → groupValue`, and
 `searchValue` is never exported.
 
-**F10 · `defaultHidden` ships 18 columns visible of 32, ported from another ERP.**
-The comment attributes it to Houzs's "19 of 25 columns visible by default". Three places handle
-the "pristine layout" overlay this negative flag requires.
+**F10 · `defaultHidden` ships 21 columns visible of 42, ported from another ERP.**
+Re-counted 2026-08-07 in `MfgSalesOrdersList.tsx`: the header grid declares **42** columns and
+**21** carry `defaultHidden: true`. The drill-down grid is a separate set — **15** columns, **1**
+hidden. *(The earlier "18 of 32" was wrong on both halves.)*
+The attribution lives in `DataGrid.tsx`, not in the page:
+```js
+* Used to match Houzs "19 of 25 columns visible by default" semantics.
+```
+and a second spelling names a different pair:
+```js
+/* HOUZS port — when the persisted layout is pristine (no order +
+   no hidden customisations yet) apply `defaultHidden: true` from the
+   column spec so the grid starts with Houzs's 19-of-25 / 34-of-44
+   visible-by-default semantics. */
+```
+Neither pair matches the 21-of-42 the file actually ships. **Three places handle the "pristine
+layout" overlay this negative flag requires** — confirmed: the toggle, `effectiveHidden`, and the
+Columns popover each recompute `columns.filter((c) => c.defaultHidden)` for themselves.
 
 **F11 · The row context menu is resolved at open time, not per row up front.**
 ```ts
@@ -115,8 +139,14 @@ The Sales Order page builds 11 items gated on `status`, `has_children`, `has_und
 ```jsx
 {(col?.filterType === 'numbering' || filterValues.length > 8) && ( ...type-to-find box... )}
 ```
-Nine columns declare it, all document-number columns (Doc No · SO No · DO No · SI No · DR No ·
-CN No). Its distinct values are 1:1 with rows.
+**Nine columns declare it across eight page files** — re-counted 2026-08-07 by grepping
+`filterType: '` over `pages/*.tsx`: `date` 60 · `number` 9 · `numbering` 9 · `enum` 3. Every
+`numbering` column is a document-number column, and the labels are:
+```
+Note No.  ·  Return No. (×2)  ·  DO No.  ·  Transfer From (SO)
+Invoice No.  ·  SO No.  ·  + ConsignmentOrders  ·  + MfgSalesOrdersList
+```
+Its distinct values are 1:1 with rows.
 
 **F13 · The filter dropdown builds a Set over ALL rows every time it opens.**
 ```js
@@ -213,8 +243,16 @@ filtered children.
                                 the rest are mostly Detail / form pages
 ```
 
-**F26 · Neither repo has a table library.**
-2990s: `@tanstack/react-query` + `@tanstack/react-virtual`, no table package. Carres: neither.
+**F26 · Neither repo has a table library, and only ONE of them has a virtualiser.**
+Re-measured 2026-08-07, `grep -rn "tanstack" --include=package.json`:
+```
+2990s  apps/backend   @tanstack/react-query ^5.62.11   @tanstack/react-virtual ^3.14.2
+2990s  apps/pos       @tanstack/react-query ^5.62.11
+Carres apps/web       @tanstack/react-query ^5.59.16   ← and NOTHING else
+```
+`@tanstack/react-table`, `ag-grid`, `react-data-grid` and `handsontable` grep **0** in both.
+**Carres has no virtualiser of any kind installed** — the earlier "Carres: neither" said only
+that it has no table package and read as if the two repos were equally equipped.
 
 ---
 
@@ -252,12 +290,139 @@ stockWindowDays: hasMsbf ? 7 : hasSofa ? 5 : 7,
 Purchasing's own production values are 7 · 7 · 14 and manager-editable. Both the settings hook
 and the catalog map are already in that component's memory, unread by the engine.
 
-**F30 · Two greys fail WCAG AA on white.**
-`#A8A8A8` measures 2.4 : 1 (AA needs 4.5). Used for the TBD label and completed dates.
-`#6B7280` measures 5.1 : 1 and passes.
+**F30 · One grey fails WCAG AA on white; the other passes with less margin than was claimed.**
+Recomputed 2026-08-07 from the sRGB relative-luminance formula.
+```
+#A8A8A8  on #FFFFFF   2.38 : 1     FAILS (AA body text needs 4.5)
+#6B7280  on #FFFFFF   4.83 : 1     passes        (earlier stated 5.1 : 1 — wrong)
+```
+Both are hard-coded in `OperationOrdersControl.tsx`:
+```jsx
+<span className="tabular-nums" style={{ fontSize: "12px", color: "#A8A8A8" }}>
+<span className="text-label font-medium" style={{ color: "#A8A8A8" }}>TBD</span>
+: { bg: "#F3F4F6", fg: "#6B7280" }; // 7d+ — neutral grey
+```
 
 **F31 · `OrderDetailDrawer.tsx` is 7,576 lines.** The list returns it in place of itself
 rather than navigating, so the detail surface cannot become its own route without changing that.
+```
+import OrderDetailDrawer from "./components/OrderDetailDrawer";   OperationOrdersControl.tsx:36
+<OrderDetailDrawer                                               OperationOrdersControl.tsx:2600
+```
+
+---
+
+# 4.5 · FINDINGS — the grid Carres already ships, measured 2026-08-07
+
+> **This section did not exist in the first version of this file.** Everything in §1–§3 is
+> another company's engine; everything here is ours.
+
+**F32 · Carres owns a grid engine: `apps/web/src/components/kit/DataTable.tsx`, 1,193 lines.**
+Its own opening line states its provenance:
+```js
+ * DataTable — the ONE list table (UI-KIT §7, card D0.5c).
+ * **Extracted from the Orders table, not designed fresh** — §7 says so by name,
+```
+
+**F33 · SEVEN files render through it, and every one of them is Purchasing.**
+`grep -arln "kit/DataTable"` (note `-a` — see TRAPS):
+```
+pages/dev/UiShowcase.tsx
+pages/operation/CreatePurchaseDialog.tsx
+pages/operation/OperationPurchaseOrders.tsx
+pages/operation/OperationPurchasingReport.tsx
+pages/operation/OperationReceiving.tsx
+pages/operation/OperationSupplierClaims.tsx
+pages/operation/OperationToOrder.tsx
+```
+**No Sales / Orders file is on the list.**
+
+**F34 · Which powers each page has actually wired, counted by grepping the props it passes.**
+```
+OperationToOrder          selection group expansion totals sizing rowLate rowMuted onSortChange
+OperationPurchaseOrders   expansion layout rowMuted onSortChange
+OperationPurchasingReport expansion totals
+OperationSupplierClaims   expansion sizing onSortChange
+OperationReceiving        onSortChange
+```
+`layout` (resize + reorder) is wired on exactly ONE page. `group` on exactly one.
+
+**F35 · The kit table does NOT own sorting, filtering, searching or exporting. The PAGE does.**
+```js
+/** The active sort. The PAGE sorts the rows; the kit only shows the arrow. */
+sort?: TableSort | null;
+```
+```js
+ * popover — a value checklist with an optional search — and NOTHING more: the
+ * page owns which rows survive, exactly as it owns formatting.
+```
+`export`, `xlsx` and `csv` grep **0** in the file. There is no global search prop; search lives
+in `GridToolbar`, which passes it straight to the page. **This is the opposite division of
+labour from §1's engine, where `DataGrid` owns sort, filter, search, group and XLSX export.**
+
+**F36 · The kit table has NO column show/hide, no `Columns` popover and no auto-fit.**
+`defaultHidden`, `hidden`, `visibleColumns` and `autoFit` all grep 0. `Column<Row>` carries
+exactly: `key · label · width · align · numeric · headerTitle · sortable · filter · cell` —
+**one value accessor**, against §1 F9's five.
+
+**F37 · The row height is 40px in the component and it is a LOCKED TOKEN, not a choice.**
+```jsx
+className="w-full table-fixed border-separate border-spacing-0 text-body
+           [&_td]:h-10 [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:align-middle"
+```
+`docs/01-design-tokens.md`:
+```
+| **row-compact** | **40 — the portal's table row** |
+**Rows are 40px FIXED and content adapts to the row, never the reverse.**
+```
+`docs/02-components.md`: *"Rows are 40px fixed. Content adapts to the row."*
+**2990s' 28px (§1 F17) and Carres' 40px are not the same decision made twice — they are two
+different locked numbers, and one of them is locked by this company's own token file.**
+
+**F38 · Layout memory is REFUSED BY LAW in Carres, so §1 F7 is not portable.**
+```js
+ * **Layout MEMORY is deliberately absent, and it is the finding this card
+ * carries.** §0.4 rules that *"the UI, the workflow and the
+ * navigation … no per-user store of UI shape"*, and guard rule L enforces it.
+```
+`docs/ui/MASTER.md` §4: *"There is no `storageKey` anywhere … **A reload is the reset.**"*
+and §7 lists **Layout memory — REFUSED, not deferred**, naming it as the owner's call.
+
+**F39 · The kit table has no virtualisation of any kind.** `virtual` greps 0 in
+`DataTable.tsx`, and F26 shows no virtualiser is installed in the repository. Its expansion
+comment states the height rule the 2990s engine could not hold:
+```js
+ * The expanded cell is the ONE cell in this table that may be taller than
+ * 40px and may wrap: it is not a row of the list, it is the record. The
+ * 40px law binds the rows you scan, or nothing could ever open.
+```
+
+**F40 · The one page with the most rows renders through NO grid at all.**
+`OperationOrdersControl.tsx` is 5,150 lines and the combined count of
+`onSortChange` + `expansion` + `groupBy` + `contextMenu` in it is **0** (corroborates F28).
+`Th` is a hand-written `<th>` with inline `style`:
+```jsx
+      className={`px-2 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
+      /* v4 header: DARK 12/600 cool ink (warm #4A4335 retired). */
+      style={{ color: "#374151", fontSize: "12px", letterSpacing: "0.04em" }}
+```
+
+**F41 · Live row volumes, both target pages, measured by SQL 2026-08-07.**
+```sql
+orders (none cancelled)     77      autocount 37 · live 40
+order_lines                184
+ops_order_control           75
+purchase_demands             4      (Purchasing MASTER §1 still says 2 — stale)
+purchase_orders             24      purchase_order_lines 38
+ops_stock_items            135
+```
+**Neither page renders more than about 130 rows today.** Every row is TEST data
+(`CLAUDE.md` §6), so these are evidence about what the code does, never about volume.
+
+**F42 · Two `WHAT IS ON SCREEN TODAY` line counts are stale.**
+`wc -l`, 2026-08-07: `OperationOrdersControl.tsx` **5,150** (Orders MASTER §3 says 5,121) ·
+`OrderDetailDrawer.tsx` **7,576** (Orders MASTER §4 says 7,717) ·
+`OperationToOrder.tsx` **2,501**.
 
 ---
 
@@ -271,6 +436,10 @@ rather than navigating, so the detail surface cannot become its own route withou
 | "TanStack + react-virtual solves expanded-tree virtualisation" | **NOT VERIFIED** | The package is installed in neither repo and its source was never read — F26 |
 | "The portal has no module menu on a working page" | **FALSE** | `PortalSidebar` is mounted unconditionally on every operation screen and carries both Orders and Purchasing; only `GlobalTopBar` is suppressed |
 | "2990s' MRP four-number row" (as first stated) | **SECOND-HAND** | Originally quoted from Carres' own Purchasing MASTER. Later confirmed first-hand — F24 |
+| "Carres has no grid engine" (implied by this file's own silence) | **FALSE** | `kit/DataTable.tsx` is 1,193 lines and SEVEN files render through it — F32 · F33. The first version of this file never named it |
+| "`defaultHidden` ships 18 of 32" | **FALSE** | 21 of 42 on the header grid, 1 of 15 on the drill-down — F10 |
+| "`#6B7280` measures 5.1 : 1" | **FALSE** | 4.83 : 1. It still passes AA, so the conclusion held while the number did not — F30 |
+| "`OperationSupplierClaims.tsx` does not use the kit table" | **FALSE** | It imports it at line 23 and wires `expansion` + `sizing` + `onSortChange`. Plain `grep` returned nothing; `grep -a` returned six hits. **The NUL trap was documented in this very file and still caught this investigation** |
 
 **Re-open condition for every row above:** a first-hand reading of the current source that
 contradicts it.
@@ -283,9 +452,17 @@ contradicts it.
   virtualisation** at a 28px row over 500–1,500 rows. **Never measured in a browser by anyone.**
 - Whether 2990s' 1,567-row Sales Order list is genuinely un-virtualised in practice. F4 and F5
   are read from source; the render was never observed.
-- Row height 28 vs 24 for Carres. Waits on three operators using both.
+- Row height for Carres. **The token is 40 and it is LOCKED (F37)**, so the live question is
+  40 vs 28, not 28 vs 24, and it is the owner's — token values are not a build card's to move.
+  Nobody has put three operators in front of both.
+- **How many Sales Orders exist at once after go-live.** Today's 77 rows are TEST data
+  (`CLAUDE.md` §6) and cannot answer it. **Nothing about virtualisation can be settled until
+  this is a number**, and it is a business fact, not a measurement.
 - Whether the five value accessors (F9) are the right shape for Carres, or whether fewer
-  express the same five jobs.
+  express the same five jobs. Carres' own column carries ONE (F36) and has not yet needed more.
+- Whether `kit/DataTable`'s expansion holds up when the expanded body is large. Claims already
+  renders a 712-line panel inside it (Purchasing MASTER §6); **never measured on screen.**
+- `kit/grid-layout.ts` (106) and `kit/grid-powers.test.tsx` (712) — not read.
 - `Mrp.tsx` ~350 lines unread (toolbar and summary region).
 - `SalesOrderDetail.tsx` 3,699 lines — never opened.
 - The other ~100 pages of 2990s — never opened.
@@ -297,6 +474,18 @@ contradicts it.
 - **Line numbers rot.** Grep the code fragment in each finding, not the number.
 - **`--fs-12` in 2990s is 11px.** Its type scale is remapped (`main.css`); variable names there
   do not match their values. Do not copy a number by its name.
+  ```css
+  --fs-11: 11px;   --fs-12: 11px;   --fs-13: 12px;   --fs-14: 13px;
+  ```
+  **And `--fs-10` is not declared at all**, so `font-size: var(--fs-10, 10px)` in the grid header
+  renders the literal fallback. A reader chasing the variable finds nothing and concludes the
+  header is unstyled.
+- **A finding's own trap does not protect the next reading of it.** The NUL-byte trap below was
+  already written in this file, and the 2026-08-07 pass still recorded a false claim about
+  `OperationSupplierClaims.tsx` from a plain `grep`. **Put `-a` in the command, not in a note.**
+- **Reading another company's engine end to end is not coverage.** The first version of this
+  file read 3,735 lines of 2990s and did not open the 1,193-line grid this company ships. A
+  coverage table can be complete about the wrong repository.
 - **`OperationSupplierClaims.tsx` holds a NUL byte** (a deliberate sort-key separator). Shell
   `grep` treats the whole file as binary and returns nothing without `-a`. Node's
   `readFileSync(…, "utf8")` is unaffected.
