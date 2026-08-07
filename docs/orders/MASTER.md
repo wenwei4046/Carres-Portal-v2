@@ -354,6 +354,39 @@ what an operator should be allowed to sort away from that is a decision, not a p
 the next card's question and it is now cheap to answer.**
 **→ S2.1 answered it on 2026-08-08 and sort is now wired; the ▼ is S2.2's.**
 
+### 🔴 S1 REGRESSION, SEEN BY LOO ON A NARROW WINDOW 2026-08-08 — `Follow-up` NO LONGER SHRINKS
+
+**Observed on production, not measured in a harness, and that is the point.** On a ~1130px
+window the eight business columns collapse to a few characters each — `Order` reads `S(`,
+`Customer` reads `W. K.`, `Stock` reads one letter — **while `Follow-up`, which holds one flag
+icon, is among the widest columns on the sheet.**
+
+```
+BEFORE S1   ⚑ was 3% — a SHARE. It shrank with everything else.
+AFTER  S1   ⚑ is 72px — FIXED. It keeps its space while the data loses theirs.
+            (S1 had to: `Column.label` is a string, so the icon became the word
+            `Follow-up`, and at a percentage it wrapped to `Follow-` / `up`.)
+
+→ the narrower the window, the LARGER the share one flag icon takes.
+  At a ~550px table that is ~13% for the flag plus 4% for the checkbox:
+  a sixth of the sheet is control columns.
+```
+
+**Why no measurement caught it:** every width reading in `../research/grid-findings.md` §4.7
+and every S1/S2.1 harness ran at 1440×900 or wider, where the loss is invisible. **The defect
+only exists below the measured window, so an operator's eye found what the instrument could
+not.** Re-measure at ≤1130px before claiming any width is safe.
+
+**NOT FIXED HERE, and it is not S2's.** S2 wires grid powers and changes no width. This is the
+first line of the width card (S3), and it joins the same defect family already measured in
+Purchasing: `../research/grid-findings.md` §4.8 F71–F73 — three width mechanisms, two
+scrollbars, and on four of six tabs **the column that falls off the edge is the one answering
+the tab's own question.** Here the column that survives is the one answering nothing.
+
+**🟡 SEEN IN THE SAME PASS, in the drawer, which every current card names DO NOT TOUCH:** the
+items table's `PO` and `ITEM` headers render on top of each other (`PIOEM`). Recorded so it is
+not lost; it belongs to whoever next opens §4.
+
 ### ⚠ THE WIDTH BUDGET MOVED, AND THE CARD'S "SAME WIDTHS" COULD NOT HOLD
 
 The card said *same widths*. **It is arithmetically unsatisfiable and the build measured why**,
