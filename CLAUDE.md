@@ -196,10 +196,9 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 
 > ### ⭐⭐ [`docs/ERP-ARCHITECTURE.md`](docs/ERP-ARCHITECTURE.md) — **the blueprint. Read it before any cross-module design.**
 >
-> **Loo, 2026-08-06: Orders V1 is FROZEN as the reference implementation.** It is not polished
-> further unless a production-critical defect appears. Nine engineering-debt items were found by
-> reading it end to end and measuring production, and **every one of them was the same defect —
-> an unowned record**, not a missing feature.
+> **Implementations provide evidence; they do not define architecture.** Nine engineering-debt
+> items were found by studying Orders V1 end to end and measuring production, and **every one of
+> them was the same defect — an unowned record**, not a missing feature.
 >
 > The architecture answers four questions and only four: **what each module OWNS · what ACTIONS
 > belong to it · what it only SUMMARISES · what it LINKS to instead of owning.** Its four

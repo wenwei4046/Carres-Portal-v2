@@ -4,9 +4,10 @@
 > It answers four questions and only four: **what each module OWNS · what ACTIONS belong to it ·
 > what it only SUMMARISES from somewhere else · what it LINKS to instead of owning.**
 >
-> **Orders V1 is FROZEN as the reference implementation** (Loo, 2026-08-06). It is not polished
-> further unless a production-critical defect appears. What it taught is written here; what it
-> owns is decided here.
+> **Orders V1 is no longer the reference implementation.** Measured behaviour remains valid
+> until replaced by better evidence. Approved architecture decisions may replace existing
+> implementations incrementally. **Implementations provide evidence; they do not define
+> architecture.**
 >
 > **When this document and a module MASTER disagree, this document wins** — a MASTER describes
 > one module, and every boundary defect the audits found lived *between* two of them.
@@ -521,11 +522,11 @@ everything about sequencing** — and it is the first thing a build plan needs.
 
 ---
 
-# §7 · What Orders V1 remains
+# §7 · What Orders V1 leaves behind
 
-**The reference implementation, frozen.** It is the only place in the business where the whole
-customer journey has been built end to end, and its measured record is the evidence base for
-everything above.
+**The evidence base.** It is the only place in the business where the whole customer journey
+has been built end to end, and its measured record is what everything above rests on.
+**Measured behaviour is the evidence base for architectural decisions; it is not a template.**
 
 **Kept as law, not as code:**
 
@@ -542,6 +543,7 @@ what it OBSERVED                 is not an action
 about where a responsibility belongs**, and this document is where that is answered.
 **Some of them will disappear because the responsibility moves.**
 
-**V1 is touched again only for a production-critical defect** — and D1 and D2 were exactly
-that: one told an operator to buy goods already bought, the other let a receive be written with
-no record. **The rest are architecture, and architecture is decided here first.**
+**A redesign changes only the responsibility being redesigned.** Unrelated responsibilities
+remain unchanged until they have their own approved decision. D1 and D2 were fixed in place
+because each was a production-critical defect; **the rest are architecture, and architecture is
+decided here first.**

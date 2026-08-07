@@ -1,14 +1,15 @@
 # ORDERS — MASTER
 
-> ## ⛔ ORDERS V1 IS FROZEN — the reference implementation (Loo, 2026-08-06)
+> ## ORDERS V1 — historical implementation evidence
 >
-> **It has completed its purpose.** It is the only place in the business where the whole
-> customer journey was built end to end, and its measured record is the evidence base for
+> **Orders V1 is historical implementation evidence. It is not the architectural template.**
+> It is the only place in the business where the whole customer journey was built end to end,
+> and its measured record is the evidence base for
 > [`../ERP-ARCHITECTURE.md`](../ERP-ARCHITECTURE.md).
 >
-> **Do not spend engineering time polishing V1.** The bar is a **production-critical defect** —
-> D1 (the list telling an operator to buy goods already bought, on 4 named orders) and D2 (a
-> receive written with no record) cleared it; **D3 · D4 · D5 · D8 · D9 do not.**
+> **Each responsibility evolves independently. A redesign changes only the responsibility being
+> redesigned.** D1 and D2 were fixed in place as production-critical defects;
+> **D3 · D4 · D5 · D8 · D9 were not.**
 >
 > **Every one of those five is a question about where a responsibility belongs, not a bug**, and
 > the architecture is where that is answered. **Some of them will disappear because the
