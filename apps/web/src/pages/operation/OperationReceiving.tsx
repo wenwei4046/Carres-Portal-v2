@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
+  PO_STATE_ACTION_SHORT,
+  poCurrentActionOf,
   poDateHistoryOf,
   poReceivingProgress,
   purchasingActionQueue,
   purchasingSupplierCallsOf,
   receivingRecordNo,
   type PoReceivingState,
+  type PoWorkspacePo,
   type PurchasingOpenCall,
-  type SupplierCallPo,
   type WarehouseReceiptRow,
 } from "@carres/shared";
 import {
@@ -137,14 +139,28 @@ function todayMYT(): string {
   }).format(new Date());
 }
 
-/** The list row → the supplier-call engine's own shape. ONE mapping, so the
- *  rail counts and the Current Action column can never read a PO two ways. */
-export function supplierCallPoOf(po: operationPoListRow): SupplierCallPo {
+/**
+ * The list row → the engine's own shape. ONE mapping, so the rail counts, the
+ * Current Action column and the arrival colouring can never read a PO three
+ * ways.
+ *
+ * **`supplierArrivalDateIso` is here since card P20.5, and it is the fact the
+ * mapping was missing.** It is the promise ledger's current date — what the
+ * FACTORY said, never our own `eta_date` — and `poWorkStateOf` is built on it:
+ * *"WAITING FOR GOODS means a factory has named a day. A date only WE computed
+ * leaves the PO exactly where it was before we computed it."* Without it every
+ * PO on this tab looked like `need_confirmation` to the shared engine, and this
+ * page silently answered its own question instead. The Purchase Orders tab has
+ * always passed it (its `callPoOf`), which is why the two tabs disagreed about
+ * the same PO.
+ */
+export function supplierCallPoOf(po: operationPoListRow): PoWorkspacePo {
   return {
     poId: po.id,
     supplierId: po.supplier_id,
     status: po.status,
     etaDateIso: po.eta_date,
+    supplierArrivalDateIso: poDateHistoryOf(po.promises).currentDate,
     tomorrowAnswerAboutDateIso: po.tomorrow_answer_about_date ?? null,
     lines: (po.purchase_order_lines ?? []).map((l) => ({
       id: l.id,
@@ -401,14 +417,57 @@ export default function OperationReceiving() {
   }
 
   /**
-   * The row's Current Action, from the words this module already owns: the
-   * engine's open supplier calls first, then `Check in` while the PO still
-   * owes units. Counted from QUANTITIES, never from a status word somebody
-   * typed (PURCHASING-WORKING-FLOW §9).
+   * ⭐ THE ROW'S CURRENT ACTION — THE SHARED SOURCE FIRST (card P20.5).
+   *
+   * **What was measured.** Loo's screenshot showed `Check in` on all 24 rows,
+   * and a column identical on every row carries no information. The cause was
+   * not the data. Re-measured against production 2026-08-08: 22 open POs, and
+   * **21 of them have no arrival promise from any factory at all** — nobody has
+   * said when the goods come. The one thing an operator cannot do to those 21
+   * is check them in, and this column was telling them to.
+   *
+   * **The cause was a SECOND ARITHMETIC.** This function used to be the page's
+   * own rule — engine calls, else `Check in` whenever the PO still owed a unit,
+   * which is true of every open PO from the minute it is issued. Meanwhile
+   * Purchase Orders read the shared `poCurrentActionOf`, whose own doc calls
+   * itself *"ONE Current Action per PO — or none"* (Law 7). Two tabs, one PO,
+   * two different answers — architecture law D, and the same defect T5 fixed
+   * for `Goods Arrival` when it ruled that one date may not turn late on two
+   * tabs on two days.
+   *
+   * So the shared source speaks FIRST and this page adds exactly one thing the
+   * shared source cannot know, because it belongs to this tab and no other:
+   * **`Check in` is the act performed HERE**, and it is offered only when the
+   * shared source is silent — i.e. a factory has named a day (`waiting`) or
+   * goods are already partly in (`ready`). A PO nobody has dated gets the
+   * question that is actually open, in the word Purchase Orders already prints
+   * for it.
+   *
+   * **THE ONE REMAINING GAP, STATED RATHER THAN HIDDEN.** Purchase Orders
+   * passes the `confirm_ready_date` facts (`expected_ready_date` + the
+   * production/buffer arithmetic, which need the settings and the catalog);
+   * this page does not carry them, so it gets the state word
+   * `Confirm Goods Arrival Date` where that tab gets the dated
+   * `Confirm ready date` call. That is the degradation `poCurrentActionOf`
+   * documents by name — *"a caller without the facts (Receiving's mapping)
+   * keeps the state word"* — not a new drift, and passing HALF the facts would
+   * be worse: the call would fire with no due and could never be late, so the
+   * same word would mean two different urgencies on two tabs, which is exactly
+   * what T7 and T5 forbid. Closing it means one extracted hook feeding both
+   * pages, and that touches the frozen Purchase Orders page — its own card.
    */
   function actionWordOf(p: operationPoListRow): string | null {
-    const calls = callsById.get(p.id) ?? [];
-    if (calls.length > 0) return purchasingActionQueue(calls[0].key);
+    const shared = poCurrentActionOf(supplierCallPoOf(p), { todayIso: today });
+    if (shared) {
+      // The REGISTER's short spelling, never the workspace hero's full
+      // sentence (Jess, 2026-08-02: 19 rows repeating a seven-word sentence
+      // become wallpaper). `Check Expected Arrival` is Loo's own word for this
+      // slot, chosen from a preview in card Q8, and it is what Purchase Orders
+      // prints in the identical column — so the two tabs say ONE thing.
+      return shared.kind === "call"
+        ? purchasingActionQueue(shared.call.key)
+        : PO_STATE_ACTION_SHORT[shared.key];
+    }
     if ((progressById.get(p.id)?.pendingDelivery ?? 0) > 0)
       return purchasingActionQueue("check_in");
     return null;
