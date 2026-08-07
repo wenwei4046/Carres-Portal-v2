@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import OhanaSofaTab from "./OhanaSofaTab";
+import { purchasingActionButton } from "@carres/shared";
 import type { CatalogResponse } from "@carres/shared";
 import type {
   DeliveryPartnersListResponse,
@@ -217,44 +218,94 @@ describe("OhanaSofaTab — AssignPickupDialog (factory_pickup ready_for_pickup)"
 describe("OhanaSofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
   // The factory_pickup branch carve-outs that exist BECAUSE Sofa is the only
   // channel with factory_pickup supplier kind. NiceFutureMattress + Ohana
-  // BedFrame both fall through to the catch-all "Receive →" branch (covered
-  // in ProcurementTabContent.test.tsx).
-  it("shows Assign partner button (NOT Receive) when sup_status is ready_for_pickup", () => {
+  // BedFrame both fall through to the catch-all check-in branch (covered in
+  // ProcurementTabContent.test.tsx).
+  //
+  // ─────────────────────────────────────────────────────────────────────────
+  // 2026-08-08 — THESE FOUR ASSERTED A RULE THAT WAS DELIBERATELY REPLACED.
+  //
+  // They each said `queryByTestId('receive-po-…')` is NOT in the document.
+  // That was true until **Loo's Direct-Receive escape hatch (2026-05-11)**,
+  // which is written into `ProcurementTabContent.tsx:466-481`: the receive RPC
+  // `operation_receive_po_with_do` (0076) only requires `status='open'` and
+  // leaves `sup_status` unconstrained, so **operation CAN legitimately receive
+  // at any pickup-pipeline stage** when the DO arrives via the supplier or
+  // warehouse-direct channel, skipping the partner's own "Mark Arrived".
+  // Every non-terminal state therefore renders a small `Direct receive →`
+  // link, and it carries that same testid.
+  //
+  // So the tests were failing on a fact that is now CORRECT. What they were
+  // really guarding is untouched and is what they assert now: at these four
+  // states the PRIMARY action is the stage-specific text or CTA, and the
+  // full `Check in` button is NOT offered. The two controls are told apart by
+  // their words — `Check in` (the primary) vs `Direct receive →` (the hatch) —
+  // because they share one testid.
+  //
+  // 🟡 REPORTED, NOT FIXED — that shared testid is the reason this took a
+  // measurement instead of a glance. `receive-po-<id>` names two different
+  // controls with two different meanings; a test cannot tell them apart by
+  // handle, only by word. Renaming one reaches the component, and the S2 card
+  // rules components DO NOT TOUCH, so it is written down here instead.
+  // ─────────────────────────────────────────────────────────────────────────
+  const CHECK_IN = purchasingActionButton("check_in");
+
+  /** The primary check-in button — NOT the `Direct receive →` escape hatch. */
+  function primaryCheckIn() {
+    return screen.queryByRole("button", { name: CHECK_IN });
+  }
+  /** The always-available escape hatch (Loo, 2026-05-11). */
+  function escapeHatch() {
+    return screen.queryByRole("button", { name: "Direct receive →" });
+  }
+
+  it("shows Assign partner as the primary action when sup_status is ready_for_pickup", () => {
     posListState = [
       makeSofaPo({ id: "PO-3005", sup_status: "ready_for_pickup" }),
     ];
     render(wrap(<OhanaSofaTab />));
     expect(screen.getByTestId("assign-pickup-PO-3005")).toBeInTheDocument();
-    expect(screen.queryByTestId("receive-po-PO-3005")).not.toBeInTheDocument();
+    expect(primaryCheckIn()).toBeNull();
+    expect(escapeHatch()).toBeInTheDocument();
   });
 
-  it("shows 'awaiting accept' text (NOT Receive) when sup_status is pickup_assigned", () => {
+  it("shows 'awaiting accept' and no primary check-in when sup_status is pickup_assigned", () => {
     posListState = [
       makeSofaPo({ id: "PO-3006", sup_status: "pickup_assigned" }),
     ];
     render(wrap(<OhanaSofaTab />));
-    expect(screen.queryByTestId("receive-po-PO-3006")).not.toBeInTheDocument();
+    expect(primaryCheckIn()).toBeNull();
+    expect(escapeHatch()).toBeInTheDocument();
     const row = screen.getByTestId("po-row-PO-3006");
     expect(row.textContent).toContain("awaiting accept");
   });
 
-  it("shows 'pickup scheduled' text (NOT Receive) when sup_status is pickup_accepted (regression guard)", () => {
+  it("shows 'pickup scheduled' and no primary check-in when sup_status is pickup_accepted (regression guard)", () => {
     posListState = [
       makeSofaPo({ id: "PO-3007", sup_status: "pickup_accepted" }),
     ];
     render(wrap(<OhanaSofaTab />));
-    expect(screen.queryByTestId("receive-po-PO-3007")).not.toBeInTheDocument();
+    expect(primaryCheckIn()).toBeNull();
+    expect(escapeHatch()).toBeInTheDocument();
     const row = screen.getByTestId("po-row-PO-3007");
     expect(row.textContent).toContain("pickup scheduled");
   });
 
-  it("shows 'in transit' text (NOT Receive) when sup_status is picked_up (regression guard)", () => {
+  it("shows 'in transit' and no primary check-in when sup_status is picked_up (regression guard)", () => {
     posListState = [
       makeSofaPo({ id: "PO-3008", sup_status: "picked_up" }),
     ];
     render(wrap(<OhanaSofaTab />));
-    expect(screen.queryByTestId("receive-po-PO-3008")).not.toBeInTheDocument();
+    expect(primaryCheckIn()).toBeNull();
+    expect(escapeHatch()).toBeInTheDocument();
     const row = screen.getByTestId("po-row-PO-3008");
     expect(row.textContent).toContain("in transit");
+  });
+
+  it("DOES offer the primary check-in once the partner has delivered — the control case", () => {
+    // Without this, all four assertions above would still pass if the button
+    // vanished from the page entirely, and the suite would be guarding nothing.
+    posListState = [makeSofaPo({ id: "PO-3009", sup_status: "delivered" })];
+    render(wrap(<OhanaSofaTab />));
+    expect(primaryCheckIn()).toBeInTheDocument();
   });
 });

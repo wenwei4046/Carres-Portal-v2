@@ -123,9 +123,32 @@ describe("NiceFutureMattressTab", () => {
     // resolved through the catalog map.
     expect(screen.getByTestId("po-row-PO-NF-001")).toBeInTheDocument();
     expect(screen.getByText("Carres Cloud · King")).toBeInTheDocument();
-    // Supplier name resolves via the supplier-by-id map.
-    expect(screen.getByText("Nice Future Bedding")).toBeInTheDocument();
-    // Warehouse name resolves via the warehouse-by-id map.
-    expect(screen.getByText("KL Warehouse")).toBeInTheDocument();
+  });
+
+  /**
+   * 2026-08-08 — THE TWO ASSERTIONS THAT USED TO LIVE ABOVE ARE NOW THIS ONE,
+   * INVERTED, BECAUSE A RULING REMOVED THE COLUMNS THEY READ.
+   *
+   * They asserted `Nice Future Bedding` and `KL Warehouse` render on the row.
+   * **Loo's row redesign (C+D, 2026-05-18) dropped both columns on purpose**,
+   * and `ProcurementTabContent.tsx:259-266` still carries the reason in its
+   * own words: the Supplier column is *"redundant per supplier tab"* — this
+   * whole tab IS Nice Future — and the Warehouse column is *"only 1 WH
+   * currently, zero info."* The five columns are now `PO # · Items · Orders ·
+   * Status · Action`.
+   *
+   * The maps did not go away; they moved. `supplierById` / `warehouseById`
+   * still resolve, and their names still render — inside `AssignPickupDialog`
+   * and `PoDetailModal`, neither of which this test opens.
+   *
+   * So the assertion is inverted rather than deleted. A deleted assertion
+   * lets the column quietly come back; this one fails the day it does, and
+   * names the ruling that would have to be reopened first.
+   */
+  it("does NOT put the supplier or the warehouse on the row — C+D dropped both columns", () => {
+    render(wrap(<NiceFutureMattressTab />));
+    const row = screen.getByTestId("po-row-PO-NF-001");
+    expect(row.textContent).not.toContain("Nice Future Bedding");
+    expect(row.textContent).not.toContain("KL Warehouse");
   });
 });
