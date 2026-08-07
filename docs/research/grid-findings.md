@@ -486,6 +486,24 @@ Sales Order      ⏮ ⏪ ◀  Record 1435 of 1567  ▶ ⏩ ⏭   (second shot, s
 measured.** It is not Carres' scale on day one — `CLAUDE.md` §6 rules the database starts clean
 — but it is the scale the same business already operates at.
 
+**F43a · OBSERVED — F43's 1,765 / 1,567 are LIFETIME REGISTERS, not a working set, and one of
+the eight screenshots says so on the same screen.**
+`Sales Order Batch Posting` carries a filter statement at its bottom-left and a count at its
+foot, and they must be read together:
+```
+×  ☑ [ Processing Date ]  [ Is this month ]                          Edit Filter
+⏮ ⏪ ◀   Record 31 of 31   ▶ ⏩ ⏭
+```
+**Thirty-one sales orders this month.** The `New Sales Order` form's title bar corroborates the
+lifetime figure independently:
+```
+New Sales Order - [Next Possible No: SO-001614] - CARRES SDN. BHD. - AutoCount Accounting (Ver: 2.2)
+```
+≈1,614 sales orders ever issued, against a register showing 1,567.
+**The two registers (Sales Order, Purchase Order) open with NO filter chip and load everything;
+the batch screen opens filtered to this month.** So AutoCount itself answers the scale question
+two different ways on two screens, and **which one Carres should copy has never been asked.**
+
 **F44 · OBSERVED — AutoCount has a NAMED, DEFAULTABLE layout manager, and Carres' operators
 already use it.** The header right-click menu carries `Load Layout · Reset Layout · Save
 Layout · Layout Manager`, and the `Load Layout` dialog on the live Sales Order register lists:
@@ -633,6 +651,7 @@ columns `⊞ · Select · Status · Error Message · PO Doc. No. · Debtor Code 
 | "`#6B7280` measures 5.1 : 1" | **FALSE** | 4.83 : 1. It still passes AA, so the conclusion held while the number did not — F30 |
 | "`OperationSupplierClaims.tsx` does not use the kit table" | **FALSE** | It imports it at line 23 and wires `expansion` + `sizing` + `onSortChange`. Plain `grep` returned nothing; `grep -a` returned six hits. **The NUL trap was documented in this very file and still caught this investigation** |
 | "The scale question cannot be answered today" | **FALSE** | It could always have been answered by looking at the tool the business runs on: **1,765 POs and 1,567 SOs**, printed on the foot of every AutoCount register — F43. **Nobody had looked** |
+| "1,567 is the scale a Carres grid must survive" | **UNSOUND** | Stated on 2026-08-07 from the register's footer while a filter chip on ANOTHER of the same eight screenshots read `Is this month · Record 31 of 31`. **A count without its filter is not a measurement** — F43a. The claim was made and corrected inside one session |
 | Every AutoCount statement in §1–§4.5 and in both module MASTERs | **SECOND-HAND until 2026-08-07** | All of it was quoted from Loo and Jess through Carres' own documents. §4.6 is the first first-hand reading, and it is screenshots — an OBSERVATION of a screen, never of the code behind it |
 
 **Re-open condition for every row above:** a first-hand reading of the current source that
@@ -649,10 +668,13 @@ contradicts it.
 - Row height for Carres. **The token is 40 and it is LOCKED (F37)**, so the live question is
   40 vs 28, not 28 vs 24, and it is the owner's — token values are not a build card's to move.
   Nobody has put three operators in front of both.
-- ~~How many Sales Orders exist at once after go-live.~~ **CLOSED 2026-08-07 by F43** — the
-  same business runs 1,567 SOs and 1,765 POs in AutoCount today. Carres starts clean
-  (`CLAUDE.md` §6), so the open part is now only *how fast it gets there*, which is a business
-  fact and still nobody's measurement.
+- **How many Sales Orders an operator has OPEN AT ONCE.** F43 gave two numbers and F43a shows
+  they answer different questions: **1,567 lifetime** on an unfiltered register, **31 this
+  month** on a filtered one. **A list that defaults to everything and a list that defaults to a
+  window are two different products**, and nothing in this repository has ever chosen. Until it
+  is chosen, every statement about virtualisation is an argument about an unasked question.
+- **What the operator actually does with the list.** Nobody in this investigation has watched
+  one work. Every finding here is code and screenshots.
 - **Whether ANY browser grid holds ~1,500 rows at a 40px row with expansion open.** F43 turned
   this from hypothetical into the actual target and NOTHING has changed about the answer:
   **still never measured in a browser by anyone.** AutoCount clears it on a desktop control,
