@@ -15,7 +15,7 @@
 | Web UI | **Radix primitives** (behaviour) + the Carres kit (appearance) + `lucide-react` + `sonner` + `react-day-picker`. **NOT shadcn/ui** |
 | API | Hono v4 on Cloudflare Workers (Wrangler) |
 | Shared | zod schemas + db-types + domain types + adapters in `packages/shared` |
-| DB | Supabase Postgres + RLS + RPCs + Auth + Storage |
+| DB | Supabase Postgres + RLS + RPCs + Auth + Storage — project `kfprgpjpaffedghytstl` |
 | Deploy | Cloudflare Pages (web) + Cloudflare Workers (api) |
 | Packages | pnpm v9 + workspaces + Turborepo |
 

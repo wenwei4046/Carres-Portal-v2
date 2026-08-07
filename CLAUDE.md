@@ -48,6 +48,7 @@ On a conflict, Business wins.
 
 ### Law 1 · One Project Constitution, one MASTER per module
 `CLAUDE.md` + `docs/<module>/MASTER.md`. **Two files to start work. Never eight.**
+Old queues and checkpoints live in `docs/archive/` — **no chat reads them.**
 
 ### Law 2 · Build first. Freeze after validation. Then overwrite the MASTER
 ```
@@ -92,7 +93,7 @@ not a new guideline  →  fold the rule into this Constitution
 ```
 0  Say which kind of chat you are.  PLAN writes no code.  BUILD ships one thing.
 1  Read this file + the module MASTER.  Nothing else first.
-2  Look at the REAL page and measure REAL numbers.  A guessed number is never written down.
+2  Measure.  Every proposal runs the DECISION GATE below — no exception.
 3  Challenge (Law 4).  Problems get 🔴/🟡 and a fix, never a complaint alone.
 4  Ask ONE decision at a time — 2-3 options, each with its cost, recommendation first.
 5  Approved → build → test → PR → merge → deploy → verify production.  Do not come back.
@@ -141,10 +142,18 @@ production verification. **Never return routine engineering as an approval reque
 The four reasons to interrupt: a new business rule · an approved UI/workflow/word must change ·
 production data must be modified irreversibly · long-term architecture must change.
 
-**Measuring is not optional.** Widths are measured in a real browser (jsdom has no widths, so a
-page test structurally cannot catch a truncated cell). Counts are measured with SQL. **`grep`
-answers only "is the word I already thought of present?" — it cannot inventory a page. Read the
-file.**
+⛔ DECISION GATE — before PROPOSING or freezing any architecture, workflow, business
+   rule, information model or shared behaviour:
+   ① Name the decision in one line.
+   ② List the primary evidence it needs, and what is EXCLUDED and why. Study only that.
+      If something excluded turns out to matter, STOP and re-list before continuing.
+   ③ Label every statement FACT · INFERENCE · RECOMMENDATION · UNKNOWN. Every FACT
+      points to primary evidence — file:line, SQL, schema, measurement, observation.
+   ④ Every recommendation states what would OVERTURN it; the falsifier must name a
+      file, a measurement, a schema or an observable event.
+   Do not freeze a decision that still depends on an UNKNOWN. External systems are
+   EVIDENCE, never specification. Freeze concepts; implementation choices are decided
+   by building, not by reading.
 
 ---
 
@@ -270,16 +279,11 @@ transcript.**
 
 ---
 
-## 11 · Current freeze
+## 11 · Where current state lives
 
-| | |
-|---|---|
-| **Phase** | 10 — post-launch, per-module architecture |
-| **Purchasing** | six tabs live. Claims is the active lane: the claim model was frozen 2026-08-05 (two decisions — Customer Resolution and Item Outcome), **Customer Resolution shipped 2026-08-06 (0324)**, and the Workspace layer — including the `Next Action` region that would tell anyone to pick one — is still unbuilt |
-| **Documentation** | Constitution + one MASTER per **every** module since 2026-08-05 (the full migration, PR #637). Old queues and checkpoints live in `docs/archive/` — no chat reads them |
-| **Architecture** | [`docs/ERP-ARCHITECTURE.md`](docs/ERP-ARCHITECTURE.md) is the blueprint (2026-08-06). **Orders V1 is FROZEN as the reference implementation** — touched only for a production-critical defect (D1 · D2 cleared that bar and shipped; D3 · D4 · D5 · D8 · D9 do not, and are held for the architecture, not for fixing). **§6 decisions: ① storage OWNERSHIP FROZEN (§6.1, the reference pattern) · ② delivery trip FROZEN (§6.2 — a DERIVED VIEW over confirmed bookings, never a record) · ③ goods ownership before receipt · ④ claim entrances · ⑤ migrate-vs-replace — ③–⑤ OPEN, and ③ is next when Loo says so.** |
-| **Production** | web + api live on Cloudflare; Supabase `kfprgpjpaffedghytstl`. Bundle hashes, the migration tail and test baselines live in [`docs/ENGINEERING.md`](docs/ENGINEERING.md) — **read them from there, never from memory, and re-measure with `wrangler` before quoting.** |
-| **Open risks** | [`docs/carry-forwards.md`](docs/carry-forwards.md). Two passwords still on `111` (principal + 9 alpha users) — rotate before any external sharing. |
+**The Constitution holds no project state.** A module's status lives in that module's
+MASTER · production and environment facts in [`ENGINEERING.md`](docs/ENGINEERING.md) ·
+open risks in [`carry-forwards.md`](docs/carry-forwards.md). **Re-measure before quoting any of them.**
 
 ---
 
