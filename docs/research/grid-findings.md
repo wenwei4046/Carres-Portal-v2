@@ -23,9 +23,22 @@ Carres OperationOrdersControl.tsx 5,150 / 5,150  read end to end
 Carres kit/DataTable.tsx          1,193 / 1,193  props + docblocks read end to end;
                                                  the render body read structurally
 Carres kit/GridToolbar.tsx           46 / 46     read end to end
-Carres kit/grid-layout.ts        UNREAD (106)  · grid-powers.test.tsx UNREAD (712)
+Carres kit/grid-layout.ts           106 / 106    read end to end
+Carres kit/grid-powers.test.tsx      ~30 / 712   ONLY the §0.4 storage guard
+Carres OperationToOrder.tsx         120 / 2,501  the docblock and imports ONLY
+Carres archive/2990s-copy-audit     140 / 140    read end to end
+Carres archive/…-MODEL.md §12.7     143 / 143    read end to end (via git show)
+Carres git log — DataTable/grid                 14 commits, subjects + 2 read in full
+AutoCount                          8 screenshots — no code, no database, ever
 2990s  repo total                              253,898 lines — the rest UNREAD
 ```
+
+> **NOT DONE, and it is named rather than glossed:** `OperationOrdersControl.tsx` (5,150) and
+> `OperationToOrder.tsx` (2,501) — **the two pages this whole file is about** — were GREPPED,
+> not read. This file's own TRAPS section says `grep` cannot inventory a page and that four
+> false claims came from doing exactly this. **And nothing has been measured in a browser:
+> every width, row-count and density figure quoted here is copied from someone else's earlier
+> measurement or estimated from an image.** `CLAUDE.md` requires a real browser twice.
 
 > **The first version of this file did not name `apps/web/src/components/kit/DataTable.tsx`
 > at all** — it studied another company's grid end to end while the grid this company already
@@ -418,6 +431,67 @@ ops_stock_items            135
 ```
 **Neither page renders more than about 130 rows today.** Every row is TEST data
 (`CLAUDE.md` §6), so these are evidence about what the code does, never about volume.
+
+**F61 · THE LAYOUT-MEMORY QUESTION IS NOT OPEN. Loo RULED it on 2026-08-04, with a
+measurement, and the ruling forbids exactly what F58 does.** Commit `540710c5`:
+```
+docs: Loo ruled the layout-memory question — §0.4 stands, a grid's shape is the company's
+
+`storageKey` is not to be added to DataTable, and no page may persist column
+order, width or visibility.
+
+The measurement decided it: localStorage remembers a BROWSER, not a person.
+Counted on prod today, five active operation accounts — jess, khoryee, shasha,
+yujun and a shared operation@carres.com. In one office that means two people on
+one machine overwrite each other's layout, and one person on two machines drags
+it twice.
+
+AutoCount does persist per-user layouts and it is deliberately not copied. That
+is this programme's standing rule: copy AutoCount's grid POWERS, never its
+assumptions.
+```
+**F44 (AutoCount's named layout manager) was already seen and already refused, with reasons.**
+The escape hatch is named in the same ruling: *"a COMPANY default column order — one person
+arranges it, everyone gets it"*. **F58 is therefore not a law being bent; it is a dated ruling
+being violated in production.**
+
+**F62 · THE RESEARCH THIS FILE EXISTS TO DO HAS ALREADY BEEN DONE TWICE, AND BOTH TIMES IT WAS
+ARCHIVED WHERE `CLAUDE.md` LAW 1 FORBIDS A CHAT TO READ IT.**
+```
+docs/archive/PURCHASING-INFORMATION-MODEL.md §12.7   2026-08-04, 143 lines
+    "TREE GRID — the Information Architecture review Loo asked for"
+    SAP Fiori · Business Central · D365 F&O · Oracle Fusion · Odoo · AutoCount,
+    all six measured into one table. SAP's own Tree Table guideline quoted
+    verbatim AGAINST the reviewer's hope. Six stated COSTS. Four negative rules.
+    A portable test. Marked REVIEW, NOT LAW.
+
+docs/archive/2990s-copy-and-gaps-audit-2026-07-24.md  12,907 bytes
+    19 items, each with the 2990s file path, why, and an effort estimate,
+    split P1 / P2 / P3 / Defer — plus an explicit DO-NOT-COPY ruling
+    (Service Case: "build fresh per Zendesk-style pattern").
+    Its own header: "Read this before any new module discussion so fresh
+    chats don't re-discover the same gaps."
+```
+**Both were written to stop a fresh chat re-deriving them. Both are in `docs/archive/`, which
+`CLAUDE.md` Law 1 rules "no chat reads".** The 2026-08-07 investigation re-derived a weaker
+version of both. **This is not a documentation defect; it is the reason this file exists.**
+
+**F63 · §12.7 already answered the question a grid plan has to answer, and its answer is
+against a tree.** Quoted from it, which quotes SAP:
+```
+"You should only show trees with a lot of hierarchical data as a last resort …
+ Neither the tree table nor the grid table are responsive."
+```
+and its own portable test:
+```
+Build the expand when the operator must read a fact that lives on the LINE,
+across MANY documents, in one pass. Otherwise the panel is enough and the
+expand is decoration.
+```
+It also records the sharpest counter-evidence, found inside the asker's own screenshots:
+**AutoCount's Purchase Order list is FLAT; only `SO Batch Posting` is hierarchical** —
+corroborated first-hand here by F54 (one SO repeated flat down the PO register) and F50
+(the batch screen's nested child grid).
 
 **F58 · The Sales Order page STORES COLUMN VISIBILITY IN `localStorage` — in production.**
 ```js
