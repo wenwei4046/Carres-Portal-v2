@@ -136,8 +136,25 @@ finish; it never changes and is never repeated on an action.
 - **Opening an account is joining; disabling it is leaving.** An operation account joins the
   pool on its FIRST login and is dealt a share on that same page load. A generic, non-person
   account never joins. **Managers are never dealt orders.**
-- **Everyone sees every order.** No per-owner row filter; anyone may open any order. The PIC
-  says who is answerable, not who is allowed.
+- **OWNER SCOPE — ruled by Jess 2026-08-07, and it replaces the two sentences that used to sit
+  here and in §3 saying opposite-sounding things.**
+  ```
+  Sales Order is a SHARED REGISTER: every authorised operator may view and open
+  every order.
+
+  On first load a NON-MANAGER defaults to My Orders.
+  A MANAGER defaults to Everyone.
+
+  The owner filter is a STARTING VIEW, never an access restriction.
+  The operator may switch to Everyone at any time.
+  ```
+  **The PIC says who is answerable, not who is allowed.** The old pair —
+  *"no per-owner row filter"* beside *"a non-manager is defaulted to their own PIC filter"* —
+  read as a contradiction and was not one; the missing word was **starting view**.
+  Verified in code the same day: `OperationOrdersControl.tsx:2295-2307` defaults a non-manager
+  to their own `staffFilter` once (ref-guarded, `if (isManager) return`), and the `TEAM` rail
+  group renders for everyone — only `TeamPopover` (pool management) is manager-gated.
+  **Nothing in code changes; this freezes what already ships.**
 - **Only a manager may assign by hand** (`ops_manager`; the web hides the control, the API
   answers 403).
 - **The sweep only re-spreads what the SYSTEM handed out.** Unowned orders and orders with
@@ -251,7 +268,34 @@ tasks · mark completed (**server-scoped to AutoCount rows only**) · **No stora
 
 **The auto-assign sweep is SERVER-SIDE and fires once per page load from ANY operation
 session** — a staff member receives their share the moment THEY open the portal, with no
-manager session. A non-manager is defaulted to their own PIC filter on first load, once.
+manager session. **The owner scope on first load is §2.2's OWNER SCOPE rule; it is stated
+once, there.**
+
+### DATE SCOPE — ruled by Jess 2026-08-07
+```
+No default date window.
+`All` means every non-cancelled order the server returns.
+NEVER default Sales Order to This Month.
+```
+**Sales Order is the REGISTER; SO Batch Purchase is the work queue and defaults to the current
+purchasing window.** An order that is old AND still unpaid, undelivered or in service is
+exactly the one a month window would hide, and it is the one that must not disappear quietly.
+**AutoCount already separates these two uses and its own screens are the evidence** — its
+`Sales Order` register loads all 1,567 with no filter chip; its `Sales Order Batch Posting`
+opens on `Processing Date · Is this month · Record 31 of 31`
+(`../research/grid-findings.md` F43 · F43a).
+
+**How the page performs while showing everything is an ENGINEERING problem and may never
+narrow this scope.** It is a gate on the build, not a reason to re-open the ruling.
+**Verified unchanged in code:** `OperationOrdersControl.tsx:1561` defaults the tab to `all`,
+`:1903-1906` returns `orders` unfiltered on that tab, and `liveScope` (`:1918`) narrows the
+FACET COUNTS only, never the rows.
+
+> 🟡 **The one gap this ruling exposes, reported not fixed.** The rule says *"the operator may
+> switch to Everyone at any time"*, and today **`Everyone` is not a control with a name** — it
+> is the cleared state, reached by clicking the ALREADY-ACTIVE `TEAM` row a second time
+> (`OperationOrdersControl.tsx:2985`). Access is real; discoverability is not. **Whoever next
+> touches the TEAM rail owes it a named row.**
 
 ```
 FACET RAIL     QUEUES (the module's open actions, danger group first) ·

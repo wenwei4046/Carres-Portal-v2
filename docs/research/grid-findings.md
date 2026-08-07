@@ -763,11 +763,19 @@ contradicts it.
 - Row height for Carres. **The token is 40 and it is LOCKED (F37)**, so the live question is
   40 vs 28, not 28 vs 24, and it is the owner's — token values are not a build card's to move.
   Nobody has put three operators in front of both.
-- **How many Sales Orders an operator has OPEN AT ONCE.** F43 gave two numbers and F43a shows
-  they answer different questions: **1,567 lifetime** on an unfiltered register, **31 this
-  month** on a filtered one. **A list that defaults to everything and a list that defaults to a
-  window are two different products**, and nothing in this repository has ever chosen. Until it
-  is chosen, every statement about virtualisation is an argument about an unasked question.
+- ~~How many Sales Orders an operator has OPEN AT ONCE.~~ **CLOSED 2026-08-07 — Jess ruled
+  both scopes, and they are two axes, not one.** `docs/orders/MASTER.md` §2.2 (OWNER SCOPE) and
+  §3 (DATE SCOPE):
+  ```
+  DATE SCOPE    no default window, ever. `All` = every non-cancelled order.
+  OWNER SCOPE   non-manager defaults to My Orders · manager defaults to Everyone.
+                A STARTING VIEW, never an access restriction.
+  ```
+  **The consequence for this file: the browser measurement is now a GATE, not a curiosity.**
+  Defaulting to the whole register is a promise that ~1,500 rows must hold, and the ruling
+  states in writing that performance may never narrow the scope. Measured the same day: 77
+  live orders split **38 · 37 · 2 unassigned** over two PICs, so a non-manager's first screen
+  is about half the register today and about a third once the third operator joins.
 - **What the operator actually does with the list.** Nobody in this investigation has watched
   one work. Every finding here is code and screenshots.
 - **Whether ANY browser grid holds ~1,500 rows at a 40px row with expansion open.** F43 turned
