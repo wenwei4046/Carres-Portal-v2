@@ -301,3 +301,59 @@ describe("the freshness stamp", () => {
     expect(screen.queryByText(/refresh/i)).toBeNull();
   });
 });
+
+/**
+ * ⭐ P20.3 — THE REPORT RUNS THE MODULE'S ONE WIDTH MECHANISM.
+ *
+ * It was the last Purchasing grid still declaring `37/15/15/15/15 %`, the exact
+ * recipe `DataTable`'s own doc warns about by name: *"percentage columns
+ * inflate on wide monitors and open holes between neighbours"* (Jess,
+ * 2026-08-01). 37% of a 1,040px pane is 385px of column for `Mattress`, so the
+ * figures sat a third of a screen from the word they describe and the hole GREW
+ * with the monitor.
+ *
+ * **The real widths are MEASURED IN A BROWSER, never here** — jsdom has no
+ * layout, so this pins the CONTRACT a browser then renders. A later chat that
+ * shaves one to close the trailing whitespace, or reaches for a percentage
+ * again, fails here instead of shipping.
+ */
+describe("P20.3 · measured pixels, and no percentage left", () => {
+  const colWidths = () => {
+    const table = screen.getByRole("table");
+    const cols = [...table.querySelectorAll<HTMLElement>("colgroup col")].map(
+      (c) => c.style.width,
+    );
+    const keys = within(table)
+      .getAllByRole("columnheader")
+      .map((th) => th.getAttribute("data-column"));
+    return { cols, keys };
+  };
+
+  it("every column is a measured pixel and the filler takes the slack", () => {
+    mockLines();
+    render(wrap(<OperationPurchasingReport />));
+    const { cols, keys } = colWidths();
+
+    // The kit's own disclosure column is first and fixed — `sizing="content"`
+    // is what makes it a pixel instead of a 3% share of nothing.
+    expect(cols[0]).toBe("42px");
+
+    const business = Object.fromEntries(
+      keys.map((k, i) => [k, cols[i]]).filter(([k]) => k !== null),
+    );
+    expect(business).toEqual({
+      category: "83px",
+      pos: "60px",
+      ordered: "61px",
+      received: "66px",
+      outstanding: "82px",
+    });
+
+    // A `%` anywhere is the defect this card removed, under any new number.
+    expect(cols.filter((w) => w.includes("%"))).toHaveLength(0);
+    // The filler is last and is the ONLY elastic track on the table, so the
+    // slack lands in trailing whitespace rather than between two figures.
+    expect(cols.at(-1)).toBe("auto");
+    expect(cols.filter((w) => w === "auto")).toHaveLength(1);
+  });
+});

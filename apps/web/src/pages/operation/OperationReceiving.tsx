@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
+  PO_STATE_ACTION_SHORT,
+  poCurrentActionOf,
   poDateHistoryOf,
   poReceivingProgress,
   purchasingActionQueue,
   purchasingSupplierCallsOf,
   receivingRecordNo,
   type PoReceivingState,
+  type PoWorkspacePo,
   type PurchasingOpenCall,
-  type SupplierCallPo,
   type WarehouseReceiptRow,
 } from "@carres/shared";
 import {
@@ -137,14 +139,28 @@ function todayMYT(): string {
   }).format(new Date());
 }
 
-/** The list row → the supplier-call engine's own shape. ONE mapping, so the
- *  rail counts and the Current Action column can never read a PO two ways. */
-export function supplierCallPoOf(po: operationPoListRow): SupplierCallPo {
+/**
+ * The list row → the engine's own shape. ONE mapping, so the rail counts, the
+ * Current Action column and the arrival colouring can never read a PO three
+ * ways.
+ *
+ * **`supplierArrivalDateIso` is here since card P20.5, and it is the fact the
+ * mapping was missing.** It is the promise ledger's current date — what the
+ * FACTORY said, never our own `eta_date` — and `poWorkStateOf` is built on it:
+ * *"WAITING FOR GOODS means a factory has named a day. A date only WE computed
+ * leaves the PO exactly where it was before we computed it."* Without it every
+ * PO on this tab looked like `need_confirmation` to the shared engine, and this
+ * page silently answered its own question instead. The Purchase Orders tab has
+ * always passed it (its `callPoOf`), which is why the two tabs disagreed about
+ * the same PO.
+ */
+export function supplierCallPoOf(po: operationPoListRow): PoWorkspacePo {
   return {
     poId: po.id,
     supplierId: po.supplier_id,
     status: po.status,
     etaDateIso: po.eta_date,
+    supplierArrivalDateIso: poDateHistoryOf(po.promises).currentDate,
     tomorrowAnswerAboutDateIso: po.tomorrow_answer_about_date ?? null,
     lines: (po.purchase_order_lines ?? []).map((l) => ({
       id: l.id,
@@ -401,14 +417,57 @@ export default function OperationReceiving() {
   }
 
   /**
-   * The row's Current Action, from the words this module already owns: the
-   * engine's open supplier calls first, then `Check in` while the PO still
-   * owes units. Counted from QUANTITIES, never from a status word somebody
-   * typed (PURCHASING-WORKING-FLOW §9).
+   * ⭐ THE ROW'S CURRENT ACTION — THE SHARED SOURCE FIRST (card P20.5).
+   *
+   * **What was measured.** Loo's screenshot showed `Check in` on all 24 rows,
+   * and a column identical on every row carries no information. The cause was
+   * not the data. Re-measured against production 2026-08-08: 22 open POs, and
+   * **21 of them have no arrival promise from any factory at all** — nobody has
+   * said when the goods come. The one thing an operator cannot do to those 21
+   * is check them in, and this column was telling them to.
+   *
+   * **The cause was a SECOND ARITHMETIC.** This function used to be the page's
+   * own rule — engine calls, else `Check in` whenever the PO still owed a unit,
+   * which is true of every open PO from the minute it is issued. Meanwhile
+   * Purchase Orders read the shared `poCurrentActionOf`, whose own doc calls
+   * itself *"ONE Current Action per PO — or none"* (Law 7). Two tabs, one PO,
+   * two different answers — architecture law D, and the same defect T5 fixed
+   * for `Goods Arrival` when it ruled that one date may not turn late on two
+   * tabs on two days.
+   *
+   * So the shared source speaks FIRST and this page adds exactly one thing the
+   * shared source cannot know, because it belongs to this tab and no other:
+   * **`Check in` is the act performed HERE**, and it is offered only when the
+   * shared source is silent — i.e. a factory has named a day (`waiting`) or
+   * goods are already partly in (`ready`). A PO nobody has dated gets the
+   * question that is actually open, in the word Purchase Orders already prints
+   * for it.
+   *
+   * **THE ONE REMAINING GAP, STATED RATHER THAN HIDDEN.** Purchase Orders
+   * passes the `confirm_ready_date` facts (`expected_ready_date` + the
+   * production/buffer arithmetic, which need the settings and the catalog);
+   * this page does not carry them, so it gets the state word
+   * `Confirm Goods Arrival Date` where that tab gets the dated
+   * `Confirm ready date` call. That is the degradation `poCurrentActionOf`
+   * documents by name — *"a caller without the facts (Receiving's mapping)
+   * keeps the state word"* — not a new drift, and passing HALF the facts would
+   * be worse: the call would fire with no due and could never be late, so the
+   * same word would mean two different urgencies on two tabs, which is exactly
+   * what T7 and T5 forbid. Closing it means one extracted hook feeding both
+   * pages, and that touches the frozen Purchase Orders page — its own card.
    */
   function actionWordOf(p: operationPoListRow): string | null {
-    const calls = callsById.get(p.id) ?? [];
-    if (calls.length > 0) return purchasingActionQueue(calls[0].key);
+    const shared = poCurrentActionOf(supplierCallPoOf(p), { todayIso: today });
+    if (shared) {
+      // The REGISTER's short spelling, never the workspace hero's full
+      // sentence (Jess, 2026-08-02: 19 rows repeating a seven-word sentence
+      // become wallpaper). `Check Expected Arrival` is Loo's own word for this
+      // slot, chosen from a preview in card Q8, and it is what Purchase Orders
+      // prints in the identical column — so the two tabs say ONE thing.
+      return shared.kind === "call"
+        ? purchasingActionQueue(shared.call.key)
+        : PO_STATE_ACTION_SHORT[shared.key];
+    }
     if ((progressById.get(p.id)?.pendingDelivery ?? 0) > 0)
       return purchasingActionQueue("check_in");
     return null;
@@ -551,6 +610,30 @@ export default function OperationReceiving() {
    * and ruling 1 narrows this list to posted records, so status stops being a
    * concept here at all). `Units` counts UNITS, not product lines: the pane's
    * `Total` is the same number.
+   *
+   * ── P20.1 · EVERY WIDTH BELOW IS MEASURED, AND TWO OF THEM MOVED ──────────
+   *
+   * This page passed no `sizing`, which means `"fill"` — a declared pixel is
+   * spent as a SHARE and the browser tops every column up out of the slack. So
+   * the numbers here were never tested against their own content: the grid
+   * DECLARED 1,078px and RENDERED 1,238px, i.e. 160px of make-up.
+   * `sizing="content"` takes that away, and what it uncovered is measured
+   * below in a real browser against the app's own stylesheet (13px Inter, the
+   * kit cell's `px-2` = 16, and P17's column rule = 1 more of the BOX):
+   *
+   *   `units`  `auto` → 61   an `auto` column FIGHTS the filler for the slack,
+   *                          which is the mechanism this card exists to end.
+   *                          Header + its sort arrow 43.1 (the widest thing it
+   *                          holds — a four-digit count is 33.7) + 16 + 1.
+   *   `grn`    132  → 142    `GRN-310726-1234` on the SELECTED row is
+   *                          font-mono semibold behind a 2px bar and a 6px gap
+   *                          = 125 + 16 + 1. At 132 it clipped, with
+   *                          `text-overflow: clip`, so nothing said so.
+   *
+   * The other four clear their content and are untouched: `received` 88 (the
+   * header's 64.4 + 17 = 82) · `supplier` 104 (`Nice Future` 70.7 + 17 = 88) ·
+   * `po` 104 (font-mono `PO-2040` 54.6 + 17 = 72) · `do` 132 (the header
+   * `Supplier DO No.` 100.1 + 17 = 118, wider than `DO-P5-0001`'s 78).
    */
   const recordColumns: readonly Column<WarehouseReceiptRow>[] = [
     {
@@ -562,7 +645,7 @@ export default function OperationReceiving() {
       ),
     },
     {
-      key: "grn", label: "GRN No.", width: "132px", sortable: true,
+      key: "grn", label: "GRN No.", width: "142px", sortable: true,
       cell: (r) => (
         <span className="flex items-center gap-1.5">
           {r.id === params.get("receipt") && (
@@ -582,12 +665,35 @@ export default function OperationReceiving() {
     { key: "do", label: "Supplier DO No.", width: "132px", sortable: true,
       cell: (r) => <span className="font-mono">{r.do_number ?? "—"}</span> },
     {
-      key: "units", label: "Units", width: "auto", align: "right", numeric: true,
+      key: "units", label: "Units", width: "61px", align: "right", numeric: true,
       sortable: true,
       cell: (r) => (r.lines ?? []).reduce((a, l) => a + (l.received_now ?? 0), 0),
     },
   ];
 
+  /**
+   * ── P20.1 · THE SEVEN, MEASURED AGAINST WHAT THEY HOLD ────────────────────
+   *
+   * Same finding as `recordColumns` above, same method: `"fill"` was topping
+   * every column up out of the pane's slack, so three of these numbers had
+   * never had to carry their own content. Measured in a real browser (13px
+   * Inter · the cell's `px-2` = 16 · P17's rule = 1 of the BOX):
+   *
+   *   `arriving` 104 → 105   the HEADER is the widest thing here, not the
+   *                          date: `Goods Arrival` + its sort arrow = 87.75,
+   *                          + 17 = 104.75. One pixel short is still a clip.
+   *   `received`  72 →  82   header `Received` + arrow 64.4 + 17 = 81.4. It
+   *                          was 10px short — the header, not the `999 / 999`.
+   *   `action`  auto → 193   an `auto` column fights the filler for the slack.
+   *                          193 is Purchase Orders' OWN width for this exact
+   *                          column, arrived at from the same measurement, so
+   *                          `Current Action` is now one width on both tabs.
+   *
+   * The other four clear their content: `issued` 88 (header 69.2 + 17 = 87) ·
+   * `supplier` 104/92 (`Nice Future` 70.7 + 17 = 88) · `po` 104 (font-mono
+   * `PO-2040` behind the 2px bar = 62.6 + 17 = 80) · `items` 150 (it truncates
+   * by design, with its own `title`, so the header's 62 is the floor).
+   */
   const columns: readonly Column<operationPoListRow>[] = [
     {
       key: "issued",
@@ -648,7 +754,7 @@ export default function OperationReceiving() {
     {
       key: "arriving",
       label: "Goods Arrival",
-      width: "104px",
+      width: "105px",
       sortable: true,
       /**
        * A LATE TRUCK MUST LOOK LATE (T5, Loo 2026-08-06).
@@ -695,7 +801,7 @@ export default function OperationReceiving() {
     {
       key: "received",
       label: "Received",
-      width: "72px",
+      width: "82px",
       align: "right",
       numeric: true,
       sortable: true,
@@ -707,14 +813,22 @@ export default function OperationReceiving() {
     {
       key: "action",
       label: "Current Action",
-      width: "auto",
+      width: "193px",
       sortable: true,
       cell: (p) => {
         const w = actionWordOf(p);
         if (!w) return <span className="text-kit-slate-9">—</span>;
         const late = (callsById.get(p.id) ?? []).some((c) => c.late);
         return (
-          <span className={late ? "text-kit-red-11" : "text-kit-slate-12"}>
+          /* The `title` is Purchase Orders' own escape hatch for this exact
+             column, wired here for the same reason: 193 carries five of the
+             six queue words, and `Confirm balance delivery date` (184.7 + 17 =
+             202) is the one exception Q1 named. It repeats the word already on
+             screen, so COPY-STANDARD gains nothing to spell. */
+          <span
+            title={w}
+            className={late ? "text-kit-red-11" : "text-kit-slate-12"}
+          >
             {w}
           </span>
         );
@@ -933,45 +1047,67 @@ export default function OperationReceiving() {
               permanent pixels. Untouched by this slice. */}
           {queue === "to_receive" && <WarehouseReceiptsPanel />}
 
-          <div className="flex-1 min-h-0 overflow-auto">
-            <div className={workspaceOpen ? "" : "min-w-[880px]"}>
-              {queue === "received" ? (
-                <DataTable<WarehouseReceiptRow>
-                  rows={recordRows}
-                  columns={recordColumns}
-                  rowId={(r) => r.id}
-                  onRowOpen={(r) => openRecord(r.id)}
-                  sort={sort}
-                  onSortChange={setSort}
-                  loading={recordsQ.isLoading}
-                  label="Goods received"
-                  empty={
-                    <EmptyState
-                      title="Nothing received yet."
-                      detail="A record appears here the moment goods are checked in."
-                    />
-                  }
+          {/* ⭐ ONE SCROLLBAR, AND IT IS THE KIT'S (card P20.2).
+               Two hand-written divs used to sit here: an `overflow-auto` pane
+               and a `min-w-[880px]` child that was CONDITIONAL on the workspace
+               being closed — so the grid changed which element scrolled, and
+               whether it scrolled at all, depending on a record being open.
+               A gesture that works only sometimes is worse than one that never
+               works, because the operator stops trusting it.
+
+               Both go. The kit's own box is the scroller on all four grids now,
+               which is also what puts the `sticky top-0` header back on duty:
+               it sticks against the KIT's box, so while the page pane was the
+               scroller the column names simply scrolled away.
+
+               The min-width is not replaced by anything: it existed to stop
+               `"fill"` redistributing these widths, and P20.1 ended that by
+               measuring them and passing `sizing="content"`. Below their sum
+               the kit's box scrolls — deleting a column to avoid that is what
+               §3 forbids. */}
+          {queue === "received" ? (
+            <DataTable<WarehouseReceiptRow>
+              rows={recordRows}
+              columns={recordColumns}
+              /* P20.1 — the same mechanism the other four tabs run. Each
+                 column takes exactly what it measured and the leftover
+                 goes to the kit's filler, which holds nothing. */
+              sizing="content"
+              rowId={(r) => r.id}
+              onRowOpen={(r) => openRecord(r.id)}
+              sort={sort}
+              onSortChange={setSort}
+              loading={recordsQ.isLoading}
+              label="Goods received"
+              empty={
+                <EmptyState
+                  title="Nothing received yet."
+                  detail="A record appears here the moment goods are checked in."
                 />
-              ) : (
-                <DataTable<operationPoListRow>
-                  rows={rows}
-                  columns={visibleColumns}
-                  rowId={(p) => p.id}
-                  onRowOpen={(p) => openPo(p.id)}
-                  sort={sort}
-                  onSortChange={setSort}
-                  loading={posQ.isLoading}
-                  label="Receiving"
-                  empty={
-                    <EmptyState
-                      title="No purchase orders."
-                      detail="Issue one from To Order."
-                    />
-                  }
+              }
+            />
+          ) : (
+            <DataTable<operationPoListRow>
+              rows={rows}
+              columns={visibleColumns}
+              /* P20.1 — see `columns`. Both grids on this tab run the one
+                 mechanism, or a gesture learned on one queue would stop
+                 working on the other. */
+              sizing="content"
+              rowId={(p) => p.id}
+              onRowOpen={(p) => openPo(p.id)}
+              sort={sort}
+              onSortChange={setSort}
+              loading={posQ.isLoading}
+              label="Receiving"
+              empty={
+                <EmptyState
+                  title="No purchase orders."
+                  detail="Issue one from To Order."
                 />
-              )}
-            </div>
-          </div>
+              }
+            />
+          )}
           <div className="shrink-0 flex items-center gap-3 px-3 h-10 border-t border-kit-slate-5 text-meta text-kit-slate-11">
             <span>
               {queue === "received"

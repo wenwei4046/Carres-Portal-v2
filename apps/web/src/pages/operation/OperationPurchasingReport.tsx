@@ -103,20 +103,59 @@ export default function OperationPurchasingReport() {
     setCategory(null);
   };
 
+  /**
+   * ── P20.3 · THE PERCENTAGES GO, AND THE NUMBERS ARE MEASURED ──────────────
+   *
+   * This was the last grid in the module still declaring `37/15/15/15/15 %`,
+   * and `DataTable`'s own doc warns about exactly that recipe BY NAME: *"a
+   * number = percentage of the table width … percentage columns inflate on wide
+   * monitors and open holes between neighbours"* (Jess, 2026-08-01). It is not
+   * a theoretical warning here — 37% of a 1,040px pane is 385px of column for
+   * the word `Mattress`, so the report's own figures sat a third of a screen
+   * away from the thing they describe, and the gap GREW with the monitor.
+   *
+   * MEASURED in a real browser against the app's own stylesheet, like every
+   * other width in this module (13px Inter · the kit cell's `px-2` = 16 · P17's
+   * column rule = 1 more of the BOX). These columns are not sortable and carry
+   * no filter, so a header is plain text — no arrow, no ▼:
+   *
+   *   Category     header 48.6 · widest label `Accessory` 65.3  →  83
+   *   POs          header 21.4                                  →  60
+   *   Ordered      header 43.0                                  →  61
+   *   Received     header 48.4                                  →  66
+   *   Outstanding  header 64.3                                  →  82
+   *
+   * **THE FOUR NUMBER COLUMNS CARRY A STATED FIVE-DIGIT GUARD (42.2), AND THAT
+   * IS AN ALLOWANCE RATHER THAN A MEASUREMENT — so it is said out loud.** Every
+   * row in the database today is TEST data (§6), so today's counts measure
+   * whether the code works and say nothing about volume; a report row
+   * aggregates a whole month of units, and a column that clips a figure with
+   * `text-overflow: clip` gives the reader a WRONG NUMBER with nothing on
+   * screen to say so. Three of the four are set by their header anyway; only
+   * `POs` is set by the guard.
+   *
+   * The slack goes to the kit's filler (`sizing="content"` below), never
+   * BETWEEN two figures — which is the whole of Loo's rule ①.
+   */
   const columns: Column<PoReportRow>[] = [
     {
       key: "category",
       label: W.colCategory,
-      // 97, not 100 — `DataTable` puts its own 3% column in front for the
-      // disclosure (read out of its colgroup, not assumed).
-      width: 37,
+      width: "83px",
       cell: (r) => <span className="truncate">{r.label}</span>,
     },
-    { key: "pos", label: W.colPos, width: 15, align: "right", numeric: true, cell: (r) => r.pos },
+    {
+      key: "pos",
+      label: W.colPos,
+      width: "60px",
+      align: "right",
+      numeric: true,
+      cell: (r) => r.pos,
+    },
     {
       key: "ordered",
       label: W.colOrdered,
-      width: 15,
+      width: "61px",
       align: "right",
       numeric: true,
       cell: (r) => r.ordered,
@@ -124,7 +163,7 @@ export default function OperationPurchasingReport() {
     {
       key: "received",
       label: W.colReceived,
-      width: 15,
+      width: "66px",
       align: "right",
       numeric: true,
       cell: (r) => r.received,
@@ -132,7 +171,7 @@ export default function OperationPurchasingReport() {
     {
       key: "outstanding",
       label: W.colOutstanding,
-      width: 15,
+      width: "82px",
       align: "right",
       numeric: true,
       // PRINTED, never left as `19 − 0` for the reader to subtract — the
@@ -238,6 +277,12 @@ export default function OperationPurchasingReport() {
           <DataTable<PoReportRow>
             rows={report.rows}
             columns={columns}
+            /* P20.3 — the fifth and last Purchasing grid onto the ONE width
+               mechanism. Without this the measured pixels above are spent as
+               SHARES and the report is back to percentages under another
+               name. The leftover goes to the kit's filler, which holds no
+               word and no figure. */
+            sizing="content"
             rowId={(r) => r.key || "none"}
             label={W.tableLabel}
             loading={q.isLoading}

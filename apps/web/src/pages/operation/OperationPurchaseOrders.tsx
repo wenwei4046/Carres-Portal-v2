@@ -1054,11 +1054,16 @@ export default function OperationPurchaseOrders() {
   //
   // Every width below is MEASURED in a real browser against the app's own
   // stylesheet (13px Inter, the DataTable cell's `px-2` = 16px, header = the
-  // word + 2 + the ▼'s 24 + 16). They are MINIMUMS, not preferences: the
-  // region carries `min-w-[PO_LISTING_MIN_PX]` and scrolls below it, and above
-  // it the fixed table hands the slack out. **Do not re-derive one by
-  // guessing** — jsdom has no widths, so no page test can catch a clipped
-  // cell; only the browser can.
+  // word + 2 + the ▼'s 24 + 16).
+  //
+  // **SINCE P20.1 THEY ARE EXACT, NOT MINIMUMS.** `sizing="content"` gives a
+  // column what its def asks for and NOTHING more, and the slack goes to the
+  // kit's filler — so a width here is what renders on a 1280 laptop and on a
+  // 1920 monitor alike. Before it, the absent prop meant `"fill"`, which spends
+  // a declared pixel as a SHARE: measured at 900px the nine declared 1,171 and
+  // rendered 1,201, so no column was the width its own comment states.
+  // **Do not re-derive one by guessing** — jsdom has no widths, so no page test
+  // can catch a clipped cell; only the browser can.
   const columns: readonly Column<operationPoListRow>[] = [
     {
       key: "issued",
@@ -1344,9 +1349,21 @@ export default function OperationPurchaseOrders() {
       // minimum of the longest word that fits (`Confirm tomorrow's delivery`
       // = 175.4 + the cell's 16 = 192 exactly). The one 201px string,
       // `Confirm balance delivery date`, was already the exception Q1 named
-      // and it still keeps its own `title`. Above the min-width the fixed
-      // table hands the slack out, so on any real monitor this is wider.
-      width: "192px",
+      // and it still keeps its own `title`.
+      //
+      // P20.1 · 192 → 193, and it is Q13's pixel arriving at the LAST column.
+      // P17 draws a column's rule on its RIGHT and skips the last one, because
+      // the last column's right edge is the wrapper's own border — but under
+      // `sizing="content"` a FILLER follows every column, so the last real
+      // column now rules its own edge like the other eight (kit `columnRule`:
+      // `fills || ci < length - 1`). That rule takes 1px of the BOX, not of the
+      // content, which is exactly the defect Q13 measured on `supplier`,
+      // `sono` and `items`: re-measured in a browser against the app's own
+      // stylesheet, `Confirm tomorrow's delivery` is 175.44 + the cell's 16 +
+      // the rule's 1 = 192.44, so 192 clips it by half a pixel with
+      // `text-overflow: clip` and nothing on screen says so.
+      // **A frozen width that truncates is not the frozen intent.**
+      width: "193px",
       sortable: true,
       filter: filterFor("action", actionOptions),
       cell: (p) => {
@@ -1509,106 +1526,109 @@ export default function OperationPurchaseOrders() {
 
         {/* ── LISTING — the AutoCount work listing (kit DataTable) ──────── */}
         <div
-          className="flex-1 min-w-0 min-h-0 flex flex-col border-r border-kit-slate-5 bg-white"
+          className="flex-1 min-w-0 min-h-0 flex flex-col border-r border-kit-slate-5 bg-white [container-type:inline-size]"
           data-testid="po-listing"
         >
-          {/* ONE min-width, always (Q7 · Loo, 2026-08-04). The LISTING region
-              scrolls horizontally below it; the page never does. AutoCount's
-              own grid scrolls, and **deleting business information to avoid a
-              scrollbar is the thing he forbade** — an operator who wants a
-              different balance has resize and reorder (PR 601).
+          {/* ⭐ ONE SCROLLBAR, AND IT IS THE KIT'S (card P20.2).
+               The region used to carry a hand-written `overflow-auto` div with a
+               `min-w-[1214px]` child inside it, which forced the PAGE PANE to be
+               the scroller — and the kit's `<thead>` is `sticky top-0` against
+               the KIT's box, so on the one tab whose rows run longest the column
+               headers scrolled away and the operator lost the names of the
+               numbers. To Order and Claims already let the kit's own box scroll;
+               this makes the gesture the same on all four grids.
 
-              The number is the sum of the nine measured minimums (1171) plus
-              the kit's expand-control column, which takes 3% of the table:
-              1171 / 0.97 = 1207.22 → 1208, so even at the narrowest width every
-              column still reaches its own minimum.
+               The min-width went WITH it and nothing was lost: it existed to stop
+               `"fill"` redistributing the nine measured widths, and P20.1 ended
+               that by passing `sizing="content"` — the columns now take exactly
+               what they measured and the kit's box scrolls below their sum.
+               AutoCount's own grid scrolls, and **deleting business information
+               to avoid a scrollbar is the thing Loo forbade** — an operator who
+               wants a different balance has resize and reorder (PR 601).
 
-              IT IS DERIVED, NOT DECORATIVE, and card Q13 measured what happens
-              when it is left behind. Widening a column and holding the old
-              min-width does not shrink a business column — `table-fixed` takes
-              the pixel out of the only non-pixel track, the kit's 3% control
-              column, whose expand button ALREADY overflows it (P16's
-              documented clip). Measured live at 1280 on the deployed page,
-              where this min-width is the binding constraint: `sono`/`items` at
-              95/136 with the min-width left at 1206 → control 35px → **33px**
-              and P16's clip 7px → **9px**, while every business column still
-              renders at its ruled width, i.e. the damage is INVISIBLE to the
-              assertion that pins them; at 1208 the control is back to 35px and
-              the clip to 7px with the business clips gone. **A test derives
-              this number from the column widths, so the two cannot drift apart
-              again.** */}
-          {/* `container-type: inline-size` makes this scroller a query
-              container, so the expanded record can be sized to the VISIBLE
-              width (`100cqi`) rather than to the 1208px table it spans — Q10 Ⓓ.
-              Measured at 1280 before the fix: the expand's own header was
-              1171px inside 568px, so `Qty`, `Destination` and `Received` were
-              unreachable. Nothing else in the table is absolutely positioned
-              (the ▼ menus are Radix portals), so the containment costs nothing. */}
-          <div className="flex-1 min-h-0 overflow-auto [container-type:inline-size]">
-            <div className="min-w-[1208px]">
-              <DataTable<operationPoListRow>
-              rows={rows}
-              columns={visibleColumns}
-              rowId={(p) => p.id}
-              onRowOpen={(p) => dispatch({ type: "open", id: p.id })}
-              sort={sort}
-              onSortChange={setSort}
-              loading={posQ.isLoading}
-              rowMuted={(p) => p.status === "cancelled"}
-              /* THE WORKING AREA (Q5, Loo 2026-08-04). The mechanism is
-                 D0.5d's — the kit renders the control and the tall cell, and
-                 this page renders the contents and owns which row is open. The
-                 label is the record's own name, which is the precedent the
-                 Report tab set: an accessible name that invents no word. */
-              expansion={{
-                expanded: expandedRows,
-                onToggle: (id) => dispatch({ type: "toggleExpand", id }),
-                label: (p) => p.id,
-                render: (p) => (
-                  <PoWorkArea
-                    po={p}
-                    supplierName={supplierNameOf(p.supplier_id)}
-                    calls={callsOf(p)}
-                    labelOf={lineLabel}
-                    eta={etaOf(p)}
-                    today={today}
-                    destinations={destinations}
-                    fallbackDestName={
-                      warehouseById.get(p.warehouse_id)?.name ?? "—"
-                    }
-                  />
-                ),
-              }}
-              /* THE GRID IS THE OPERATOR'S (Q5, Loo 2026-08-04). §13.3 asks
-                 one question of every kit power — *will this make the operator
-                 finish faster today?* — and he answered these two by name:
-                 resize because supplier names are different lengths and one
-                 width cannot suit them all, reorder because different
-                 operators watch different columns. So this is a WIRING, not a
-                 feature: the arithmetic, the handle and the a11y repair are
-                 all D0.5d's, and the two strings are the kit's own, verbatim
-                 from `/ui` — they are accessible names for a drag, never a
-                 visible word, so nothing here is invented.
+               `container-type: inline-size` moves UP onto the pane, because the
+               element it sat on is gone and a page may not style the kit's div.
+               It is what lets the expanded record be sized to the VISIBLE width
+               (`100cqi`) instead of the ~1,214px table it spans — Q10 Ⓓ, measured
+               at 1280 before that fix: the expand's own header was 1171px inside
+               568px, so `Qty`, `Destination` and `Received` were unreachable.
+               Nothing here is absolutely positioned (the ▼ menus are Radix
+               portals), so the containment costs nothing.
 
-                 It is deliberately NOT remembered (§0.4 — a grid's shape is
-                 the company's): a reload is the reset, which is why there is
-                 no reset control and no word for one. Footer totals and row
-                 grouping stay UNWIRED — Loo ruled both unproven the same day,
-                 and *"the kit has it"* is not an answer. */
-              layout={{
-                resizeLabel: "Drag to resize",
-                reorderLabel: "Drag to reorder",
-              }}
-              label="Purchase orders"
-              empty={
-                <EmptyState
-                  title="No purchase orders."
-                  detail="Issue one from To Order."
-                />
-              }
+               **IT IS 2px WIDER THAN THE SCROLLPORT AND THE RECORD PAYS FOR
+               THAT**, which is why `PoWorkArea`'s ceiling gained a `- 2px`:
+               measured in a browser, this pane is 900 while the kit's scrollport
+               inside its 1px borders is 898. */}
+          <DataTable<operationPoListRow>
+          rows={rows}
+          columns={visibleColumns}
+          /* P20.1 — ONE width mechanism across the five Purchasing tabs.
+             Every width above was MEASURED in a browser and `"fill"` (the
+             absence of this prop) spends them as SHARES, so a measurement
+             became a ratio the moment the pane was wider than their sum:
+             declared 1,171 · rendered 1,201 at 900px, i.e. no column had
+             the width its own comment states. `"content"` gives each
+             column exactly what it asks for and hands the slack to the
+             kit's filler, which is what To Order and Claims already do. */
+          sizing="content"
+          rowId={(p) => p.id}
+          onRowOpen={(p) => dispatch({ type: "open", id: p.id })}
+          sort={sort}
+          onSortChange={setSort}
+          loading={posQ.isLoading}
+          rowMuted={(p) => p.status === "cancelled"}
+          /* THE WORKING AREA (Q5, Loo 2026-08-04). The mechanism is
+             D0.5d's — the kit renders the control and the tall cell, and
+             this page renders the contents and owns which row is open. The
+             label is the record's own name, which is the precedent the
+             Report tab set: an accessible name that invents no word. */
+          expansion={{
+            expanded: expandedRows,
+            onToggle: (id) => dispatch({ type: "toggleExpand", id }),
+            label: (p) => p.id,
+            render: (p) => (
+              <PoWorkArea
+                po={p}
+                supplierName={supplierNameOf(p.supplier_id)}
+                calls={callsOf(p)}
+                labelOf={lineLabel}
+                eta={etaOf(p)}
+                today={today}
+                destinations={destinations}
+                fallbackDestName={
+                  warehouseById.get(p.warehouse_id)?.name ?? "—"
+                }
               />
-            </div>
-          </div>
+            ),
+          }}
+          /* THE GRID IS THE OPERATOR'S (Q5, Loo 2026-08-04). §13.3 asks
+             one question of every kit power — *will this make the operator
+             finish faster today?* — and he answered these two by name:
+             resize because supplier names are different lengths and one
+             width cannot suit them all, reorder because different
+             operators watch different columns. So this is a WIRING, not a
+             feature: the arithmetic, the handle and the a11y repair are
+             all D0.5d's, and the two strings are the kit's own, verbatim
+             from `/ui` — they are accessible names for a drag, never a
+             visible word, so nothing here is invented.
+
+             It is deliberately NOT remembered (§0.4 — a grid's shape is
+             the company's): a reload is the reset, which is why there is
+             no reset control and no word for one. Footer totals and row
+             grouping stay UNWIRED — Loo ruled both unproven the same day,
+             and *"the kit has it"* is not an answer. */
+          layout={{
+            resizeLabel: "Drag to resize",
+            reorderLabel: "Drag to reorder",
+          }}
+          label="Purchase orders"
+          empty={
+            <EmptyState
+              title="No purchase orders."
+              detail="Issue one from To Order."
+            />
+          }
+          />
           <div className="shrink-0 flex items-center gap-3 px-3 h-10 border-t border-kit-slate-5 text-meta text-kit-slate-11">
             <span>{rows.length} purchase orders</span>
             {filtered && (
@@ -1728,8 +1748,22 @@ function PoWorkArea({
      * so it inherits the table's 1208px minimum — measured on production at
      * 1280, the expand's own header came out 1171px inside a 568px listing and
      * `Qty`, `Destination` and `Received` could not be reached at all.
-     * `100cqi` is the SCROLLER's visible width (its container-query size, set
-     * on the `overflow-auto` div), minus the kit cell's own 2rem of padding.
+     * `100cqi` is the LISTING PANE's width (its container-query size, set on
+     * `po-listing`), minus the kit cell's own 2rem of padding — and minus 2px,
+     * which is card P20.2's whole cost. Until P20.2 the query container WAS
+     * the scroller, a page-owned `overflow-auto` div, so `100cqi` was the
+     * scrollport exactly. That div is gone — the kit's box is the one scroller
+     * now — and a page may not put a class on the kit's div, so the container
+     * moved up one level to the pane. The pane is 2px wider than the scrollport
+     * because the kit's box carries a 1px border on each side: MEASURED in a
+     * browser, pane 900 → `kit.clientWidth` 898, and `calc(100cqi - 2rem - 2px)`
+     * lands on 866, which is exactly `898 - 32`.
+     *
+     * On a platform with CLASSIC (space-taking) scrollbars a vertical bar would
+     * make the ceiling ~15px generous, because the pane does not know about it.
+     * That is a soft cap, not Q10's bug — the failure Q10 fixed was 231px past
+     * the edge — and it is written down here rather than left to be
+     * rediscovered.
      *
      * **`position: sticky` was tried and MEASURED NOT TO WORK here, so it is
      * not left in as a class that does nothing.** A probe with `sticky left-0`
@@ -1752,7 +1786,7 @@ function PoWorkArea({
      *
      * **THE BOUND IS LOAD-BEARING AND IT IS NOT DECORATION.** `width:fit-content`
      * is capped by the AVAILABLE width, and available here is the `<td>`'s —
-     * i.e. the table's `min-w-[1208px]`, not the pane. Measured with a 200-char
+     * i.e. the whole ~1,214px table, not the pane. Measured with a 200-char
      * description at 1280: bounded, the record is 935 and `Received` ends at
      * 1212, inside the 1217 scrollport, and the name truncates (scrollWidth 1871
      * against clientWidth 551); with the `max-w` removed the record is 1171 and
@@ -1762,7 +1796,7 @@ function PoWorkArea({
      * jsdom has no widths — every number above is from a real browser. */
     <div
       data-testid={`po-work-${po.id}`}
-      className="w-fit max-w-[calc(100cqi-2rem)]"
+      className="w-fit max-w-[calc(100cqi-2rem-2px)]"
     >
       {/* ① THE TWO DATES — §12.2's ① and ②, side by side, because the whole
            question an operator answers here is *what did the factory say, and

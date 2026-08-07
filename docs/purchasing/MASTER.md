@@ -1141,61 +1141,76 @@ blanks. Every row carries **who changed it, when, and what it was before**.
 
 ---
 
-# ▶︎ P20 · APPROVED TO BUILD 2026-08-08 — ONE width mechanism across the five tabs
+# ▶︎ P20 · SHIPPED 2026-08-08 — ONE width mechanism across the five tabs
 
-> **Runs in PARALLEL with Orders S2 and may not collide with it.** Different module, different
-> files. **PAGE-SIDE ONLY — `kit/DataTable.tsx` may NOT be touched by this card**, because S2's
-> chat is the one that owns the kit this week. A change that needs the kit STOPS and waits.
+> **The card is DONE and this block is the record of what it changed.** Six commits, one per
+> item, page-side only. **`kit/DataTable.tsx` was never touched** — `sizing` is an existing
+> prop, so nothing here needed the kit and nothing waited on S2.
 
-**MEASURED, and the evidence is already committed** — `../research/grid-findings.md` §4.8
-(F71 · F72 · F73) plus six production screenshots Loo supplied 2026-08-07.
+**THE DEFECT WAS: three width mechanisms and TWO different scrollbars in one module, so a
+gesture learned on one tab did not work on the next.** All five tabs now run one mechanism.
 
 ```
-THE DEFECT, in one line: three width mechanisms and TWO different scrollbars
-in one module, so a gesture learned on one tab does not work on the next.
-
-tab               sizing      declares   renders   honoured   who scrolls @900px
-To Order          "content"    1,252px   1,252px   YES        the KIT's box
-Supplier Claims   "content"    1,439px   1,439px   YES        the KIT's box (583px hidden)
-Purchase Orders   ABSENT       1,171px   1,201px   NO         the PAGE pane — header scrolls away
-Receiving         ABSENT       1,078px   1,238px   NO         the KIT's box
-Report            ABSENT       37/15/15/15/15 %    —          percentages
-```
-`sizing` absent means `"fill"`, and `"fill"` treats a declared px as a SHARE — so **widths an
-earlier card measured in a browser are silently redistributed.**
-
-```text
-BUILD CARD · P20.   git pull first.   ONE commit per item, never one PR.
-
-P20.1  Purchase Orders + Receiving pass sizing="content".
-       Their px widths were browser-measured; stop redistributing them.
-P20.2  ONE scrollbar. Purchase Orders scrolls the PAGE pane because of a
-       hand-written min-w-[1208px] wrapper (:1548); Receiving's min-w-[880px]
-       is CONDITIONAL on the workspace being closed (:937). Both go — the
-       kit's own box is the scroller on the other three.
-P20.3  Report leaves percentages. `DataTable`'s own doc warns by name:
-       "percentage columns inflate on wide monitors and open holes between
-       neighbours" (Jess 2026-08-01). Widths must be measured, not guessed.
-P20.4  🔴 Settings prints the literal `was {0}` on screen —
-       OperationPurchasingSettings.tsx:79 renders `change.oldValue` raw and
-       the stored value is a Postgres array. A work week must read as days.
-P20.5  Receiving's `Current Action` reads "Check in" on all 24 rows.
-       A column identical on every row carries no information.
-P20.6  Claims lands on `Open 0` while `All` holds 1, and its empty-state
-       sentence centres on the 1,439px table instead of the visible width.
-
-OUT OF SCOPE, NAMED   sticky columns (NO engine has them — F72; it is the
-                      obvious fix and it needs the kit, so it is NOT this card)
-                      · queues · business rules · api · any column deleted to
-                      avoid a scrollbar, which §3 already forbids.
-
-STOP AND REPORT if any item needs kit/DataTable.tsx.
+tab               sizing      declares    renders    who scrolls
+To Order          "content"   1,252px     1,252px    the KIT's box     (unchanged)
+Supplier Claims   "content"   1,439px     1,439px    the KIT's box     (unchanged)
+Purchase Orders   "content"   1,172px     1,172px    the KIT's box     <- was "fill", PAGE pane
+Receiving         "content"     826px       826px    the KIT's box     <- was "fill", 2 wrappers
+Report            "content"     352px       352px    the KIT's box     <- was 37/15/15/15/15 %
 ```
 
-**WHY THE LAST COLUMN MATTERS AND THIS IS NOT COSMETIC.** On four of the six screenshots the
-column that falls off the right edge is the one answering the tab's own question — `On PO` /
+**EVERY WIDTH IS NOW EXACT, NOT A MINIMUM.** `"fill"` (the absence of the prop) spends a
+declared pixel as a SHARE, so a browser measurement became a ratio the moment the pane was
+wider than the sum. Under `"content"` a column gets what its def asks for and the slack goes
+to the kit's filler, which holds no word and no figure.
+
+## What each item found — and the findings are worth more than the fixes
+
+| Item | What was actually wrong |
+|---|---|
+| **P20.1** | Purchase Orders' `action` needed **192 -> 193**: `"content"` puts a filler after the last column, so it now carries P17's rule, which takes 1px of the BOX — Q13's pixel arriving one column later. **Receiving's widths had never had to carry their own content**: `arriving` 104 -> 105 · `received` 72 -> 82 · `grn` 132 -> 142 · two `auto` columns -> 193 / 61. `fill` had been topping them up out of the pane's slack — 160px of make-up. |
+| **P20.2** | The kit's `<thead>` is `sticky top-0` **against the KIT's box**, so while a page-owned pane was the scroller the column headers scrolled away with the rows. Receiving's min-width was CONDITIONAL on the workspace being closed — which element scrolled changed with a record being open. |
+| **P20.3** | 37% of a ~1,040px pane is 385px of column for the word `Mattress`, and the hole GREW with the monitor. Measured: 83 · 60 · 61 · 66 · 82, with a **stated** five-digit guard on the number columns — an allowance, not a measurement, and said so. |
+| **P20.4** 🔴 | The entire audit trail in production is TWO rows, both `supplier_work_week` — so the only two history lines this page had ever shown read `was {0}` and `was {0,6}`. `po_days` held the identical defect, waiting for a manager's first change. |
+| **P20.5** | **The cause was not the data.** 22 open POs and **21 have no arrival promise from any factory** — the one thing an operator cannot do to those 21 is check them in. Receiving was answering its own question (`Check in` whenever a PO owed a unit, true of every open PO from issue) while Purchase Orders read the shared `poCurrentActionOf` — **two tabs, one PO, two answers.** |
+| **P20.6** | The empty sentence asserted *"every delivery so far arrived complete and on time"* while a closed claim sat in the table. And it centred on the 1,439px TABLE: measured, its centre is pinned at **721px at every pane width**, so below a ~700px pane it is off-screen and the operator lands on a blank grid. |
+
+## Rulings this card is now evidence for
+
+- **A width measured under `"fill"` was never really tested.** Five of Receiving's and Report's
+  numbers only worked because the browser was topping them up. **A page that declares pixels
+  must pass `sizing="content"`, or the pixels are decoration.**
+- **`container-type: inline-size` belongs on the PANE, not on a scroller.** A page cannot style
+  the kit's box, so the pane is the only handle on the visible width. It is **2px wider than
+  the scrollport** (the kit's 1px borders), which `PoWorkArea`'s ceiling now pays for
+  explicitly and the empty state deliberately does not.
+- **`sticky left-0` inside a `<td>` does not hold horizontally.** Measured by Q10, re-used here
+  rather than re-probed. It is never left in as a class that does nothing.
+- **A second arithmetic hides as a page convenience.** P20.5's `Check in` and P20.4's raw
+  `oldValue` were both a page answering a question a shared module already owns.
+
+## Left open, deliberately — NOT LAW, and each names what would close it
+
+- 🟡 **Receiving cannot ask `Confirm ready date`.** Purchase Orders passes the ready-date facts
+  (`expected_ready_date` + the production/buffer arithmetic, which need the settings and catalog
+  queries); Receiving does not, so it gets the state word `Check Expected Arrival` where that
+  tab gets the dated call. That is the degradation `poCurrentActionOf` documents by name.
+  **Passing HALF the facts would be worse** — the call would fire with no due and could never be
+  late, so one word would mean two urgencies on two tabs (T7 · T5). *Closes when: one extracted
+  hook feeds both pages. It touches the frozen Purchase Orders page, so it is its own card.*
+- 🔴 **Sticky columns — still nobody's.** F72 stands: no engine here has them, it is the obvious
+  fix for a 1,439px grid, and it needs the kit.
+- 🟡 **Report's number columns carry a five-digit guard, not a measurement.** Every row today is
+  TEST data (§6), so nothing on screen can size them honestly. *Closes when: real volume exists
+  and the widest figure can be measured.*
+- **Whether `Open` should stay Claims' landing tab when it is empty is the OWNER'S**, and it was
+  NOT changed. A work queue opening on the work, with a rail stating `Closed` and `All` beside
+  it, is a true screen; only what it said was wrong.
+
+**WHY THE LAST COLUMN MATTERED AND THIS WAS NOT COSMETIC.** On four of the six screenshots the
+column that fell off the right edge was the one answering the tab's own question — `On PO` /
 `PO No.` (*did I buy it*), `Customer Delivery` (*when do they want it*), `Next move` (*what do
-I do*). **The operator's answer is the thing that goes missing.**
+I do*). **The operator's answer was the thing that went missing.**
 
 ---
 
