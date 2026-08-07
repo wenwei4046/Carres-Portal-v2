@@ -14,15 +14,22 @@
 
 ## ⭐ PRIOR ART — read these BEFORE re-deriving anything below
 
-**Three pieces of this question were already answered, two of them live in `docs/archive/`,
-and `CLAUDE.md` Law 1 rules that no chat reads that folder.** That rule exists to stop old
-QUEUES polluting a new chat; it buried finished RESEARCH with them. **The research stays where
-it is. This pointer is what makes it reachable** — path, date, and its one-line conclusion, so
-the next chat can go and challenge it instead of re-deriving a weaker copy (F62).
+**Three pieces of this question were already answered. One is archived, one was DELETED and
+survives only in git, and one is a commit message.** None of the three is reachable from a
+living document, which is why the 2026-08-07 pass re-derived weaker copies of all of them
+(F62). **This pointer is what makes them reachable** — an exact retrieval command, a date, and
+the one-line conclusion, so the next chat can go and challenge them.
 
-| Where | When | What it already settled |
+> **EVERY PATH BELOW WAS RUN, NOT REMEMBERED.** The first version of this table named
+> `docs/archive/PURCHASING-INFORMATION-MODEL.md`. **That file does not exist** — it was written
+> from a shell line whose `2>/dev/null ||` swallowed the failure and fell through to `git show`,
+> and the guessed path was recorded instead of the one the content came from. A pointer table
+> is the one document where an unverified path costs the most. **Run the command before you
+> trust the row.**
+
+| How to reach it | When | What it already settled |
 |---|---|---|
-| `docs/archive/PURCHASING-INFORMATION-MODEL.md` **§12.7** | 2026-08-04 | **Tree Grid vs Header+Lines**, measured across SAP Fiori · Business Central · D365 F&O · Oracle Fusion · Odoo · AutoCount. Answer: **not a tree** — a document has exactly two levels. Carries six stated COSTS, four negative rules, and a portable test for when an expand is justified. **Marked REVIEW, not law.** |
+| ```git show 434fcf15^:docs/PURCHASING-INFORMATION-MODEL.md``` → **§12.7**, lines ≈665-852. *(The file was DELETED by `434fcf15`, Loo's Documentation Law reorganisation, 2026-08-05. It is in no folder — `grep -rn "12.7" docs/` will not find it.)* | 2026-08-04 | **Tree Grid vs Header+Lines**, measured across SAP Fiori · Business Central · D365 F&O · Oracle Fusion · Odoo · AutoCount. Answer: **not a tree** — a document has exactly two levels. Carries six stated COSTS, four negative rules, and a portable test for when an expand is justified. **Marked REVIEW, not law.** |
 | `docs/archive/2990s-copy-and-gaps-audit-2026-07-24.md` | 2026-07-24 | **The 2990s copy list** — 19 items, each with its 2990s file path, its reason and an effort estimate, split P1 / P2 / P3 / Defer, plus explicit DO-NOT-COPY rulings. |
 | git `540710c5` (`docs/ui-kit-execution-queue.md`) | 2026-08-04 | **Layout memory: RULED, closed.** No page may persist column order, width or visibility. AutoCount's per-user layouts were seen and refused. The escape hatch is a COMPANY default order, not a per-user one. |
 
