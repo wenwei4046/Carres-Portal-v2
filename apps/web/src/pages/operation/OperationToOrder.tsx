@@ -484,9 +484,25 @@ export default function OperationToOrder() {
       }
     }
     const demandKeys = new Set(rows.map((r) => r.key));
-    for (const o of orderedRows) {
-      const key = `po:${o.poId}:${o.orderId ?? o.so ?? "manual"}`;
-      if (demandKeys.has(key)) continue;
+    /**
+     * ⭐ A RECEIPT ROW'S KEY MUST BE UNIQUE, and it was not (Loo, on the live
+     * page 2026-08-07: *"wrong"*).
+     *
+     * `po:{poId}:{orderId}` is one key for what the wire sends as one row PER
+     * BUILD, so a purchase order carrying three pieces for one customer minted
+     * **three rows with the same key**. React saw duplicate keys and placed
+     * them where it liked: measured on live data, `SO-1257` rendered as TWO
+     * fragments fourteen orders apart, each with its own order line, and the
+     * first five rows on the sheet had no order line above them at all. It
+     * looked like a sorting bug and it was a keying bug — `rowByKey` and the
+     * selection were reading a colliding map the whole time.
+     *
+     * The ordinal is the row's position in the server's own list, so it is
+     * stable for a given answer and needs nothing new on the wire.
+     */
+    orderedRows.forEach((o, i) => {
+      const key = `po:${o.poId}:${o.orderId ?? o.so ?? "manual"}:${i}`;
+      if (demandKeys.has(key)) return;
       rows.push({
         key,
         proposalKey: null,
@@ -517,7 +533,7 @@ export default function OperationToOrder() {
         coveredByOpenPo: 0,
         coveredByOpenPoPos: [],
       });
-    }
+    });
     return rows;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planned, orderedRows, today, poDays, scheduleDays]);
@@ -693,6 +709,38 @@ export default function OperationToOrder() {
         }
       });
     }
+    /**
+     * ⭐ A CUSTOMER ORDER IS NEVER TORN APART BY A SORT (Loo, on the live page,
+     * 2026-08-07: *"wrong"*).
+     *
+     * MEASURED before the fix: sorting by `PO No.` produced **64 group headers
+     * for 47 orders — 17 orders split into two or more fragments**, each with
+     * its own header, scattered down the sheet, and the first row on screen was
+     * an item with no order line above it at all.
+     *
+     * The cause is structural, not a bad comparator: the kit emits a group
+     * header whenever the key CHANGES from the row above (`DataTable`'s own
+     * contract — the page's sort decides grouping and the kit re-orders
+     * nothing), so a sort on any per-ITEM fact interleaves orders and the
+     * grouping shatters. T1 introduced the order line and never asked what a
+     * column sort would do to it.
+     *
+     * So the sort is applied and then the rows are RE-CLUSTERED by order, each
+     * order taking the position of its best row. Two guarantees come out of it:
+     * an order's items stay together and under their own line, and the sort
+     * still means what the header says — click `Qty` and the order holding the
+     * biggest quantity comes first. `Array.prototype.sort` is stable, so the
+     * within-order order the comparator just produced survives untouched.
+     */
+    const firstAt = new Map<string, number>();
+    sorted.forEach((r, i) => {
+      const k = r.orderId ?? r.key;
+      if (!firstAt.has(k)) firstAt.set(k, i);
+    });
+    sorted.sort(
+      (a, b) =>
+        (firstAt.get(a.orderId ?? a.key) ?? 0) - (firstAt.get(b.orderId ?? b.key) ?? 0),
+    );
     return sorted;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters, sort, rowPo]);

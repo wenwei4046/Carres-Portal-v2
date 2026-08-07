@@ -608,15 +608,15 @@ describe("ordered rows — the receipt stays on the sheet", () => {
     await loaded();
     // The default view IS the first upcoming run — the receipt is already there.
     expect(screen.getByText("SO-1350")).toBeInTheDocument();
-    expect(document.getElementById("kit-table-row-po:PO-9001:o30")).toBeNull(); // no checkbox
-    expect(screen.getByTestId("row-po-po:PO-9001:o30")).toHaveTextContent("PO-9001");
+    expect(document.getElementById("kit-table-row-po:PO-9001:o30:0")).toBeNull(); // no checkbox
+    expect(screen.getByTestId("row-po-po:PO-9001:o30:0")).toHaveTextContent("PO-9001");
     // It is DONE work — it must not inflate the rail's counts.
     expect(screen.getByTestId("to-order-day-2026-07-31")).toHaveTextContent("0");
   });
 
   it("its PO No. lands on Purchase Orders with THAT document opened", async () => {
     await loaded();
-    fireEvent.click(screen.getByTestId("row-po-po:PO-9001:o30"));
+    fireEvent.click(screen.getByTestId("row-po-po:PO-9001:o30:0"));
     expect(navigate).toHaveBeenCalledWith(
       "/operation/procurement/hookka-bedframe?po=PO-9001",
     );
@@ -1277,7 +1277,7 @@ describe("Supplier on the row", () => {
     // carries it too — its supplier may have no demand at all today, which is
     // why the name rides the wire instead of being resolved from proposals.
     expect(within(sheet).getAllByText("Ohana").length).toBeGreaterThan(1);
-    expect(within(sheet).getByTestId("row-po-po:PO-9001:o30")).toBeInTheDocument();
+    expect(within(sheet).getByTestId("row-po-po:PO-9001:o30:0")).toBeInTheDocument();
   });
 
 
@@ -1856,7 +1856,7 @@ describe("P10 · ready stock on the grid", () => {
     const body = withOffer(2);
     await loadedWith(body);
     // The receipt row in the fixture carries a PO number and no control.
-    expect(screen.queryByTestId("table-expand-po:PO-9001:o30")).toBeNull();
+    expect(screen.queryByTestId("table-expand-po:PO-9001:o30:0")).toBeNull();
   });
 
   /**
@@ -1938,7 +1938,7 @@ describe("P10 · ready stock on the grid", () => {
 
     it("says nothing on an ordered row — a receipt's own number is in PO No.", async () => {
       await loadedWith(withCover(2));
-      expect(screen.queryByTestId("to-order-onpo-po:PO-9001:o30")).toBeNull();
+      expect(screen.queryByTestId("to-order-onpo-po:PO-9001:o30:0")).toBeNull();
     });
 
     it("is neutral ink, NOT the green Ready Stock owns", async () => {

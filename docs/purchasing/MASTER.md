@@ -295,6 +295,20 @@ numbers can never disagree. A cancel stamps `cancelled_at` and lets the remainde
   the operator sees the CUSTOMER's date.
 - **Issue = zero popups, zero toasts.** Rows update in place; a partial failure stays with
   `Retry` until it succeeds.
+- **⭐ A CUSTOMER ORDER IS NEVER TORN APART — AND A RECEIPT ROW'S KEY IS UNIQUE** (Loo, on the
+  live page 2026-08-07: *"wrong"*). Measured: sorting the grid produced **64 group headers for
+  47 orders — 17 orders split into fragments** scattered down the sheet, and the first five rows
+  had no order line above them at all. It read as a sorting bug and it was a KEYING bug: a
+  receipt row was keyed `po:{poId}:{orderId}` while the wire sends one row per BUILD, so a
+  purchase order carrying three pieces for one customer minted **three rows with the same key**
+  — React placed them where it liked, and `rowByKey` and the selection had been reading a
+  colliding map the whole time. The key now carries the row's ordinal.
+  **Both halves stay, because they are two different rules.** The key is unique, AND the page
+  re-clusters after every sort so an order's items stay under their own line whatever column is
+  clicked — the kit emits a header when the key CHANGES from the row above (its own contract:
+  the page's sort decides grouping), so a sort on any per-ITEM fact would interleave orders and
+  shatter the grouping. The sort still means what the header says: click `Qty` and the order
+  holding the biggest quantity comes first.
 - **⭐ AN ORDER ALREADY BOUGHT STAYS ON THE SHEET, WITH ITS PURCHASE ORDER** (Loo, 2026-08-06 —
   T6, closing G11). A demand line every unit of which sits on an open purchase order used to be
   DROPPED by the engine, and with it the whole customer order when all its lines were covered:
