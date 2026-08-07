@@ -295,6 +295,23 @@ numbers can never disagree. A cancel stamps `cancelled_at` and lets the remainde
   the operator sees the CUSTOMER's date.
 - **Issue = zero popups, zero toasts.** Rows update in place; a partial failure stays with
   `Retry` until it succeeds.
+- **⭐ A BOUGHT ROW READS AS DONE FROM THE LEFT EDGE, AND RED STAYS ON WORK** (Loo, 2026-08-07,
+  on the live page). T6 put every already-bought order back on the sheet and they arrived
+  wearing the **overdue bar** — the page telling an operator to act now about goods somebody
+  had already bought — and otherwise looking identical to work, with the only distinguishing
+  fact, the purchase-order number, sitting past 900px of table. Measured after the fix: **60
+  bought rows, 0 red bars, 60 muted; 27 work rows, 9 red, 0 muted.**
+  `rowLate` now asks `!poOf(r)` — `01-design-tokens` §2.2 gives red exactly one job and a row
+  with a purchase order has no claim on it — and a bought row wears the kit's `rowMuted`, the
+  same wash Purchase Orders puts on a cancelled document. **The ORDER LINE above stays
+  full-strength:** who the customer is and when they want it is still worth reading.
+- **An ITEM row prints `↳` in the `SO No.` cell and nothing else.** The identity columns are
+  blank on an item row by design (the fact is stated once), which was fine while the goods sat
+  beside them; at nine columns the grid is 1,255px, so on a narrower window the only columns
+  visible are the four that are deliberately empty and the sheet reads as blank blocks. The
+  marker is **2990s' own answer** (`Mrp.module.css:348-353`): a literal glyph in a cell, never a
+  `padding-left` indent, because it survives a column resize and copies into Excel as a
+  character instead of vanishing.
 - **⭐ A CUSTOMER ORDER IS NEVER TORN APART — AND A RECEIPT ROW'S KEY IS UNIQUE** (Loo, on the
   live page 2026-08-07: *"wrong"*). Measured: sorting the grid produced **64 group headers for
   47 orders — 17 orders split into fragments** scattered down the sheet, and the first five rows

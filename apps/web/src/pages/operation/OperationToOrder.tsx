@@ -1322,7 +1322,23 @@ export default function OperationToOrder() {
       width: "99px",
       sortable: true,
       filter: filterFor("so", soOptions, { searchable: true }),
-      cell: () => null,
+      /**
+       * ⭐ AN ITEM ROW IS NEVER BLANK FROM THE LEFT EDGE (Loo, 2026-08-07).
+       *
+       * The identity columns are blank on an item row on purpose — the fact is
+       * stated once, on the order line. That was fine while the goods sat right
+       * beside them; with nine columns the grid is 1,255px, so on a narrower
+       * window the ONLY columns an operator can see are the four that are
+       * deliberately empty, and a screen of already-bought orders reads as a
+       * page of blank blocks. His screenshot is exactly that.
+       *
+       * The marker is 2990s' own answer (`Mrp.module.css:348-353`): a literal
+       * `↳` in a cell, never a `padding-left` indent, because it survives a
+       * column resize and it copies into Excel as a character rather than as
+       * vanished whitespace. One glyph, the quietest ink in the palette, and
+       * the parent/child shape is legible with no colour and no extra width.
+       */
+      cell: () => <span className="text-kit-slate-9">↳</span>,
     },
     {
       key: "customer",
@@ -1996,7 +2012,34 @@ export default function OperationToOrder() {
                    * passed, and that date never renders (the GOLDEN RULE).
                    * The bar states the STATE, not the date, so the rule holds
                    * and the row stops looking calm. */
-                  rowLate={(r) => r.bucket === "overdue"}
+                  /**
+                   * ⭐ RED IS FOR WORK, NOT FOR HISTORY (Loo, on the live page
+                   * 2026-08-07). T6 put every already-bought order back on the
+                   * sheet and they arrived wearing the overdue bar — the page
+                   * was telling an operator to act now about goods somebody had
+                   * already bought. `01-design-tokens` §2.2 gives red exactly
+                   * one job in this portal; a row with a purchase order has no
+                   * claim on it.
+                   */
+                  rowLate={(r) => !poOf(r) && r.bucket === "overdue"}
+                  /**
+                   * ⭐ AND A BOUGHT ROW MUST READ AS DONE FROM THE LEFT EDGE.
+                   *
+                   * T6 shipped these rows looking identical to work, and the
+                   * only thing telling them apart — the purchase-order number —
+                   * sits in the LAST column, past 900px of table. Loo's
+                   * screenshot is a screen full of orders with nothing on them:
+                   * the identity cells are blank on an item row by design, so
+                   * the left half of a bought row carried no information at all.
+                   *
+                   * `rowMuted` is the kit's own washed-out row, already used on
+                   * Purchase Orders for a cancelled document — *this is on the
+                   * register, and it is not your work*. Same meaning here, and
+                   * it reads at any horizontal scroll position. The ORDER LINE
+                   * above stays full-strength: who the customer is and when
+                   * they want it is still a fact worth reading.
+                   */
+                  rowMuted={(r) => Boolean(poOf(r))}
                   /* ── Q6 · WHY THERE IS STILL NO `layout` PROP (re-answered
                    * for T1's seven columns, 2026-08-06) — CLAUDE.md §2's own
                    * question, answered per power rather than left silent.
