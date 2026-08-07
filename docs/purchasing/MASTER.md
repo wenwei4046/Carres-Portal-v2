@@ -16,7 +16,7 @@
 | I am working on | Read |
 |---|---|
 | anything | **§1 · §2 first — they are short and they bind every tab** |
-| To Order / Create Purchase | **§3** |
+| Batch Purchase · Manual Purchase (today: To Order) | **§3** |
 | Purchase Orders | **§4** |
 | Receiving | **§5** |
 | Claims | **§6** |
@@ -40,34 +40,52 @@ is the single most expensive defect this document can carry.**
 buyer's module. It does not own goods movement (that is Receiving's warehouse half and
 Stock) and it does not own money (that is Finance).
 
-**One entry, one chain** (Loo, 2026-08-06 — the operator-journey ruling):
+**TWO WAYS A PO IS BORN, ONE WAY IT LIVES** (Loo, 2026-08-06 — the navigation
+ruling. **APPROVED, NOT YET BUILT**; today's screens are §3–§8's measured
+blocks):
 
 ```
-PURCHASING DEMAND ─▶ To Order ─▶ Purchase Orders ─▶ Receiving ─▶ Claims
-  the SINGLE entry
-  into the module            Report (read-only)   ·   Settings (manager-only)
+Sales Orders ─▶ Batch Purchase  ─┐
+                                 ├─▶ Purchase Orders ─▶ Receiving ─▶ Claims
+                Manual Purchase ─┘
+                                     Report (read-only) · Settings (manager)
 ```
 
-**PURCHASING DEMAND is the single entry into Purchasing.** Everything the module
-buys enters as a demand first; nothing reaches a purchase order any other way.
-Its sources:
-
 ```
-Customer Orders · Ready Stock · Display · Office · Warranty ·
-Spare Parts (future) · other approved purchasing requests
+Purchasing        Sales Orders      every customer order — a DOOR to the one
+                                    canonical page (/operation/orders), never
+                                    a second list
+                  Batch Purchase    demand the engine generated from customer
+                                    orders — review, consolidate, issue
+                  Manual Purchase   purchases nobody's customer asked for:
+                                    Ready Stock · Display · Office · Warranty ·
+                                    Spare Parts · and whatever is added next
+                  Purchase Orders   every issued PO, whichever lane bore it
+                  Receiving · Claims · Report · Settings
 ```
 
-**To Order does not own the SOURCE of a demand.** It owns reviewing,
-consolidating and issuing purchase orders from ALL purchasing demands,
-whatever door they entered by. `Create Purchase` is the door that TYPES a
-demand in by hand — an entrance to the demand, never a second entry into the
-module.
+**THE SPLIT IS BY JOB, NEVER BY TABLE.** Both lanes may store their demand in
+`purchase_demands`; what differs is the OPERATOR'S INTENT, and that is what a
+page is organised around. Customer-driven buying runs on the PO days with an
+engine plan; internal buying is keyed in when somebody needs something.
 
-*Measured reality behind the ruling (2026-08-06):* typed demands live in
-`purchase_demands` with `purpose ∈ ready_stock · display · office · warranty`
-(0323's gate; Spare Parts and Other are not offered anywhere yet).
-Customer-order demand is COMPUTED from order lines rather than stored as rows
-— one entry in the business model, two representations in code today.
+**A PO CARRIES THE REASON IT WAS BORN FOR.** *"Supplier doesn't care — the PO
+is ours"* (Loo): the factory receives a PDF either way, so consolidating a
+customer's mattress with the shelf's into one document buys nothing and costs
+the answer to *why did we buy this?* Two lanes therefore issue their own POs,
+and Report can split the month by reason — `Customer Sales · Ready Stock ·
+Display · Office · Warranty` — instead of reconstructing it.
+
+> **🔴 What this ruling needs and the database does not have (measured
+> 2026-08-06): `purchase_orders` carries NO reason column and
+> `purchase_order_lines` carries no link back to its demand.** Until one
+> exists the split report cannot be built at all. It is the first thing the
+> build owes.
+
+*Measured reality (2026-08-06):* typed demands live in `purchase_demands` with
+`purpose ∈ ready_stock · display · office · warranty` (0323's gate; Spare Parts
+and Other are not offered yet). Customer-order demand is COMPUTED from order
+lines rather than stored as rows.
 
 **Before you change any tab, answer both:** does what upstream sends still get in, and can
 downstream still catch it?
@@ -194,14 +212,17 @@ It cannot tell you about a button you have not imagined. **Read the file.**
 
 ---
 
-# §3 · To Order
+# §3 · Batch Purchase *(on screen today as `To Order`)*
 
 ### MISSION
-Decide which **purchasing demands** become purchase orders **today** — demand from every
-source (§1: Customer Orders · Ready Stock · Display · Office · Warranty · future Spare
-Parts · other approved requests), reviewed, consolidated and issued in one place. **To
-Order does not own where a demand came from; it owns what happens to all of them.**
-Purchase Orders MANAGES the documents once they exist.
+Review, consolidate and issue purchase orders for **demand the engine generated from
+customer orders**. Purchase Orders MANAGES the documents once they exist.
+
+> **APPROVED, NOT YET BUILT (Loo, 2026-08-06):** this tab becomes **`Batch Purchase`**,
+> and the hand-typed purposes (Ready Stock · Display · Office · Warranty · Spare Parts)
+> leave it for their own tab, **`Manual Purchase`** — with a FULL-PAGE create workspace,
+> never the 600px dialog. **Both lanes issue their own POs** (§1). Everything below
+> describes the single `To Order` tab as it stands today.
 
 ### WORKFLOW
 The engine computes a plan per PO day and pre-selects exactly its own plan (`orderBy ≤ today`).
