@@ -426,6 +426,157 @@ ops_stock_items            135
 
 ---
 
+# 4.6 · FINDINGS — AutoCount, FIRST-HAND, observed 2026-08-07
+
+> **Everything §1–§4.5 is source code. This section is not.** It is eight screenshots of the
+> live `CARRES SDN. BHD.` company file in `AutoCount Accounting (Ver: 2.2)`, supplied by Jess.
+> **A screenshot proves what is on the screen, never what the code does** — every finding here
+> is an OBSERVATION and is labelled as one. Before this section, every AutoCount statement in
+> this repository was second-hand, quoted from Carres' own MASTER files.
+
+**F43 · OBSERVED — the live registers hold 1,765 and 1,567 rows.**
+The record navigator at the foot of each register:
+```
+Purchase Order   ⏮ ⏪ ◀  Record 823 of 1765   ▶ ⏩ ⏭
+Sales Order      ⏮ ⏪ ◀  Record 1470 of 1567  ▶ ⏩ ⏭
+Sales Order      ⏮ ⏪ ◀  Record 1435 of 1567  ▶ ⏩ ⏭   (second shot, same file)
+```
+**This is the business's real scale, and it lands inside the 500–1,500 band §6 named as never
+measured.** It is not Carres' scale on day one — `CLAUDE.md` §6 rules the database starts clean
+— but it is the scale the same business already operates at.
+
+**F44 · OBSERVED — AutoCount has a NAMED, DEFAULTABLE layout manager, and Carres' operators
+already use it.** The header right-click menu carries `Load Layout · Reset Layout · Save
+Layout · Layout Manager`, and the `Load Layout` dialog on the live Sales Order register lists:
+```
+Name        Is Default
+SO1             ☑
+```
+**This is not 2990s' unnamed per-browser `localStorage` (F7). It is a named layout with a
+company default** — a different design, and the one `docs/ui/MASTER.md` §7 hands to the owner.
+
+**F45 · OBSERVED — `Post to PO` is a COLUMN ON THE SALES ORDER LINE.**
+The `New Sales Order` entry form's line grid, left to right:
+```
+Item Code · Description · Description 2 · Further Description · Qty · Unit Price
+· Creditor Code · PO Doc No. · Post to PO · Total (ex)
+```
+**The buying decision is captured at SALES ORDER ENTRY, per line.** `Sales Order Batch Posting`
+then harvests what was already keyed. Carres does the opposite — `net-requirements.ts` COMPUTES
+demand from order lines and no order line carries a creditor. **The two SO-Batch screens look
+alike and are fed by opposite mechanisms.**
+
+**F46 · OBSERVED — the Sales Order register carries operator-invented `New-` / `Old-` column
+pairs.** Visible headers, in render order:
+```
+Doc… · Cancel… · Subscri… · TBC · Ag… · Date · Delivery Location · New-Ref. · Old-SO Re…
+· Processi… · New-S… · Old-Shi… · Old-Delivery Da… · New-Deliv… · Delivered D… · Balance
+· Balance … · PO Doc No. · Logistic Remark · Remark 1 · Remark 2 · Remark 3 · Debtor Name
+· Phone · … · … · Delivery Addr…
+```
+**Four `New-`/`Old-` pairs and four free-text remark columns.** The operators built a revision
+log out of columns because the tool offered nowhere else to put one.
+
+**F47 · OBSERVED — the right-click ROW menu is AutoCount's workflow engine.**
+```
+New · Edit · View · Preview · Print · Delete · Refresh · View Flow
+Copy to a new Purchase Order
+Partial/Full Transfer to new Cancel PO
+Partial/Full Transfer to new Goods Received Note
+Partial/Full Transfer to new Purchase Invoice
+Partial/Full Transfer to new Cash Purchase
+View Document Status Change Log
+```
+**Work is chosen by the operator from a menu, not computed.** `View Flow` sits both here and as
+a top-level toolbar button on every register.
+
+**F48 · OBSERVED — the full column right-click menu, verbatim and in order.**
+```
+Sort Ascending · Sort Descending · Clear All Sorting
+Group By This Column · Hide Group By Box · Hide This Column · Column Chooser
+Best Fit · Best Fit (all columns)
+Filter Editor… · Hide Find Panel · Show Auto Filter Row
+☑ Auto Width · ☑ Auto Filter
+Expand All · Collapse All · Set Column Caption
+Load Layout · Reset Layout · Save Layout · Layout Manager
+Export to Excel 97-2003 · Export to Excel · Export to Pdf · Export to Rtf
+· Export to Html · Export to Text · Export to Xml
+Print Grid
+```
+**Seven export formats plus Print Grid.** `Set Column Caption` lets an operator rename a header.
+
+**F49 · OBSERVED — TWO filter doors on one grid, at once.** A global `Enter text to search…`
+box with a `Find` button top-right of every register, AND a per-column `Auto Filter Row`
+(`☑ Auto Filter` in F48's menu). Purchasing MASTER §3 bans exactly this pairing by name
+(*"two filter doors for one fact is the Excel sin"*) — the ban is now confirmed against the
+thing it was written about.
+
+**F50 · OBSERVED — the row expansion is a NESTED GRID with its own header row, not a panel.**
+On `Sales Order Batch Posting`, opening a row reveals one child grid whose columns are:
+```
+Status · Posting Creditor Code · Outstanding Qty · Posting Qty · Posting Unit Price
+· PO Doc No. · Numbering · Item Code · Description · Delivery Date · Location · UOM
+· Qty · Unit Price
+```
+Carres' kit expansion is `render: (row) => ReactNode` — the caller draws anything, and Claims
+puts a 712-line panel inside it. **These are two different things wearing one word.**
+
+**F51 · OBSERVED — status is a FILLED CELL BACKGROUND, never a pill.**
+`Posted` on a green fill · `Partial` on a yellow fill · `Completed` on a green fill, each
+painting the whole `Status` cell edge to edge.
+
+**F52 · OBSERVED — a persistent, clearable filter statement sits at the BOTTOM-LEFT.**
+```
+× ☑ [ Processing Date ] [ Is this month ]                              Edit Filter
+```
+The `×` clears it, the ☑ disables it without deleting it, and `Edit Filter` opens the editor.
+Carres' `PageShell.chips` is the same idea and already ships.
+
+**F53 · OBSERVED — the row height is roughly 17–18px, and every register uses the same one.**
+Estimated from the Purchase Order screenshot: 36 data rows span y≈193 to y≈790, giving
+≈17px per row. **This is an estimate from an image, not a browser measurement, and it must be
+re-taken in a browser before any number is written into a design.** For scale against the two
+numbers that ARE measured: 2990s is 28px (F17) and Carres is 40px and locked (F37).
+
+**F54 · OBSERVED — one Sales Order appears on MANY Purchase Order rows, flat and ungrouped.**
+On the Purchase Order register, `SO-000951` occupies three consecutive rows, `SO-000952` two,
+`SO-000450` two, `SO-000404` two. The register is one row per PO with the SO repeated; it is
+not grouped by SO, and the `Group By` band above it is empty.
+
+**F55 · OBSERVED — `PO Doc No.` holds a COMMA-SEPARATED LIST of blue links.**
+On both the Sales Order register and SO Batch Posting:
+```
+PO/2608-026, PO/2608-027        PO/2505-MS01-111, P…        PO/2507-BF03-131, PO…
+GR-000690, GR-000716            GR-000711, GR-000733        CR0573 + CR0585
+```
+**One cell, many documents, each its own link** — and the `Ref` column does the same with a `+`
+separator instead of a comma.
+
+**F56 · OBSERVED — the navigation exposes every document type permanently.**
+```
+Purchase   Purchase Request · Request Quotation · Purchase Order · Goods Received Note
+           · Purchase Invoice · Cash Purchase · Purchase Return | Cancel Purchase Order
+           · Goods Return · Purchase Consignment · Purchase Consignment Return
+           | 5 reports
+
+Sales      Quotation · Sales Order · Delivery Order · Invoice · Cash Sale · Credit Note
+           | Debit Note · Cancel Sales Order · Delivery Return · Consignment
+           · Consignment Return | BI - Sales Overview | 7 reports
+```
+`SO Batch Purchase` is its own TOP-LEVEL menu item, between `Purchase` and
+`General Maintenance`. Purchasing MASTER §1 describes this arrangement second-hand; this is
+the first-hand version of it.
+
+**F57 · OBSERVED — `Sales Order Batch Posting`'s own chrome.**
+Filter Options (`Date · Debtor · Item Group · Item Type · Sales Order Status`, each a
+`No filter` dropdown) · Posting Options (`Posting Date` · `Group By: Sales Order No.`) ·
+buttons `Inquiry · Check All · Uncheck All · Post to PO · Cancel · Hide Options` ·
+columns `⊞ · Select · Status · Error Message · PO Doc. No. · Debtor Code · Ref · Debtor Name
+· Doc. Date · Doc. No. · Processing Date · Remark4` · `Record 31 of 31`.
+**`Error Message` is a COLUMN**, so a failed posting states its reason on the row.
+
+---
+
 # 5 · REJECTED — claims made during this investigation and disproved
 
 | Claim | Verdict | What the measurement said |
@@ -440,6 +591,8 @@ ops_stock_items            135
 | "`defaultHidden` ships 18 of 32" | **FALSE** | 21 of 42 on the header grid, 1 of 15 on the drill-down — F10 |
 | "`#6B7280` measures 5.1 : 1" | **FALSE** | 4.83 : 1. It still passes AA, so the conclusion held while the number did not — F30 |
 | "`OperationSupplierClaims.tsx` does not use the kit table" | **FALSE** | It imports it at line 23 and wires `expansion` + `sizing` + `onSortChange`. Plain `grep` returned nothing; `grep -a` returned six hits. **The NUL trap was documented in this very file and still caught this investigation** |
+| "The scale question cannot be answered today" | **FALSE** | It could always have been answered by looking at the tool the business runs on: **1,765 POs and 1,567 SOs**, printed on the foot of every AutoCount register — F43. **Nobody had looked** |
+| Every AutoCount statement in §1–§4.5 and in both module MASTERs | **SECOND-HAND until 2026-08-07** | All of it was quoted from Loo and Jess through Carres' own documents. §4.6 is the first first-hand reading, and it is screenshots — an OBSERVATION of a screen, never of the code behind it |
 
 **Re-open condition for every row above:** a first-hand reading of the current source that
 contradicts it.
@@ -455,9 +608,14 @@ contradicts it.
 - Row height for Carres. **The token is 40 and it is LOCKED (F37)**, so the live question is
   40 vs 28, not 28 vs 24, and it is the owner's — token values are not a build card's to move.
   Nobody has put three operators in front of both.
-- **How many Sales Orders exist at once after go-live.** Today's 77 rows are TEST data
-  (`CLAUDE.md` §6) and cannot answer it. **Nothing about virtualisation can be settled until
-  this is a number**, and it is a business fact, not a measurement.
+- ~~How many Sales Orders exist at once after go-live.~~ **CLOSED 2026-08-07 by F43** — the
+  same business runs 1,567 SOs and 1,765 POs in AutoCount today. Carres starts clean
+  (`CLAUDE.md` §6), so the open part is now only *how fast it gets there*, which is a business
+  fact and still nobody's measurement.
+- **Whether ANY browser grid holds ~1,500 rows at a 40px row with expansion open.** F43 turned
+  this from hypothetical into the actual target and NOTHING has changed about the answer:
+  **still never measured in a browser by anyone.** AutoCount clears it on a desktop control,
+  which is not evidence about a web page.
 - Whether the five value accessors (F9) are the right shape for Carres, or whether fewer
   express the same five jobs. Carres' own column carries ONE (F36) and has not yet needed more.
 - Whether `kit/DataTable`'s expansion holds up when the expanded body is large. Claims already
