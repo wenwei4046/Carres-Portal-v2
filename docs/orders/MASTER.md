@@ -352,6 +352,7 @@ operator finish faster today; 'the kit has it' is not an answer."* Sort needs th
 reorder rows against `compareBySlack` — the page's own answer to *what is most urgent* — and
 what an operator should be allowed to sort away from that is a decision, not a prop. **It is
 the next card's question and it is now cheap to answer.**
+**→ S2.1 answered it on 2026-08-08 and sort is now wired; the ▼ is S2.2's.**
 
 ### ⚠ THE WIDTH BUDGET MOVED, AND THE CARD'S "SAME WIDTHS" COULD NOT HOLD
 
@@ -475,7 +476,7 @@ BUILD CARD · S2 · connect the grid powers.   git pull first.
 READ ONLY   CLAUDE.md  +  this §3.   Card 01 already returned READY.
 
 ONE CAPABILITY PER COMMIT, IN THIS ORDER. Never one huge PR.
-   S2.1  Header sorting          → commit
+   S2.1  Header sorting          → ✅ SHIPPED 2026-08-08, recorded below
    S2.2  Header filter dropdowns → commit
    S2.3  Footer totals           → commit   ⚠ see the conflict below
    S2.4  Grouping                → commit   ⚠ see the conflict below
@@ -519,6 +520,80 @@ already returns to `null`, which is `compareBySlack`, so §2.3 survives sorting 
 **THEN** test → self-review → PR → merge → deploy → verify production **per capability**.
 **Do NOT come back for approval on engineering.** The four reasons to interrupt are the
 Constitution's, and a truncated cell is not one of them.
+
+### ✅ S2.1 · SHIPPED 2026-08-08 — the operator sorts, and the third click gives the risk order back
+
+**Eight of the nine columns sort. The cycle is 2990's** — `asc ⇄ desc ⇄ OFF`, and **`OFF` is not
+"no sort", it is `compareBySlack`**, so §2.3's frozen row order is one click away and is never
+something an operator has to rebuild by hand. **The sort runs on `visible`, never on the 30
+rendered rows** — sorting a window shuffles the rows already on screen and silently claims to
+have ordered 65; a test pins it with the smallest value deliberately placed outside the window.
+
+**The division of labour is Carres', not 2990's, and the card said so before the build.** 2990
+sorts inside its grid; `kit/DataTable` rules *"the PAGE sorts the rows; the kit only shows the
+arrow"*. So **2990's COMPARATOR** (`DataGrid.tsx:689-699` — numeric when both sides are numbers,
+`localeCompare` otherwise, **blanks LAST in both directions**) lives in the page, one sort value
+per column, and **nothing about sorting moved into the kit.** The default order is applied first
+and `Array.prototype.sort` is stable, so **`compareBySlack` survives inside every tie.**
+
+**THREE RULES, and every column obeys one:**
+```
+a WORD   sorts A → Z          Order · Customer · PIC · Actions
+a STATE  sorts WORST FIRST    Status · Deadline · Stock · Delivery — so the FIRST
+                              click never buries the work at the bottom
+a BLANK  sorts LAST in BOTH directions — Excel's rule, and 2990 spells it too
+                              (`(a || '~')`, `:682`). Without it, ascending
+                              `Deadline` opens on every undated order there is.
+```
+**A rank is never typed twice:** the stage rank IS `TABS`, the stock rank IS `STOCK_BUCKETS`
+(Law D — a derived fact has ONE arithmetic). **A TBD date sorts with the blanks**, because it is
+no date, not a late one.
+
+### ⛔ ⚑ `Follow-up` DOES NOT SORT, AND ONLY A REAL BROWSER COULD SAY SO
+
+**Measured in Chromium, both nav states, with the arrow actually in the DOM** — a sortable
+header renders its chevron only on hover or once sorted, so measuring the resting header proves
+nothing. The harness renders the real `kit/DataTable` at the two live table widths and
+reproduces C14's columns to the digit at 1022px.
+
+```
+column      content box        label      verdict
+            850 / 1022 px    + arrow
+Follow-up    56.0   56.6       68.4     WRAPS "Follow-" / "up" — at BOTH widths
+Stock        28.1   37.9       46.0     arrow 17.9 / 8.1 past the content box
+PIC          32.5   43.3       34.0     0.2–1.6 over at 850, absorbed by the padding
+Order        45.8   59.4       46.0     — and both stay on ONE line
+Status · Customer · Deadline · Delivery · Actions   fit at both widths
+```
+
+**`Follow-up` is the one label on this table with a HYPHEN, and a hyphen is a break
+opportunity** — which is why being over the content box is not on its own the test. `Stock`,
+`PIC` and `Order` are all over it at 850px and every one stays on one line: a single word with
+no break opportunity can only overflow. **S1 shipped that wrap once and pinned 72px to stop it;
+sorting the column would hand back the pixel S1 paid for.** Nothing is lost — the QUEUES rail
+already carries `Follow-up` and `For manager review` as FILTERS, and **a filter beats a sort for
+*show me my flags*: it removes the other rows instead of stacking them underneath.**
+
+> 🟡 **REPORTED, NOT FIXED — `Stock` loses its arrow at ONE of the two widths.** With the nav
+> EXPANDED the arrow runs 9.9px past the column's border and `Delivery`'s header background
+> paints over it; with the nav COLLAPSED it lands flush against the rule, tight but whole.
+> **Kept sortable on purpose:** the rows visibly reorder and `aria-sort` is correct for a screen
+> reader, and the alternative is losing worst-first stock ordering over 9 pixels at one window
+> size. There is no cheap width to take them from — C14 sized every column to its CELLS.
+
+**Measured, not asserted:** every design-guard rule is byte-identical to `d0cede0c` with and
+without this change — **no guard rule rose.** `tsc` clean, `v4-guard` clean, the page's suite
+**165 passing**.
+
+> 🔴 **AND THE WEB SUITE WAS ALREADY RED BEFORE THIS CARD OPENED.** 16 failures across
+> `OperationOrders.test.tsx` (7) · `OhanaSofaTab` (4) · `NiceFutureMattressTab` (1) ·
+> `OrderCustomerCard` (4), **reproduced on a clean `d0cede0c` checkout — identical set, identical
+> count.** They are stale tests asserting UI their components no longer render (`OrderCustomerCard`
+> looks for an `Edit` button on a card that is now read-only rows, which may be §4's *"the right
+> panel does not edit"* landing correctly and the test never following). **Not fixed here** —
+> the S2 card names the drawer and business rules as DO NOT TOUCH, and deciding which side is
+> out of date is a card, not a line. **A red suite on main means every future card starts unable
+> to tell its own failures from the inherited ones.**
 
 ### API + DATA
 `GET /api/operation/orders` is the single source of stage derivation — the control table is the

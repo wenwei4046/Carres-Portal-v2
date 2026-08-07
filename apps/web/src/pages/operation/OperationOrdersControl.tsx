@@ -39,7 +39,7 @@ import ModuleHeader from "./components/ModuleHeader";
 import FollowUpForm from "./components/FollowUpForm";
 import ImportStockEtaDialog from "./components/ImportStockEtaDialog";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
-import DataTable, { type Column } from "@/components/kit/DataTable";
+import DataTable, { type Column, type TableSort } from "@/components/kit/DataTable";
 import { SectionBand, SectionCard } from "@/components/SectionPanel";
 import { TASKS_KEY } from "./components/rail/TasksPanel";
 import {
@@ -1155,6 +1155,219 @@ export function logisticStateOf(
   return { key: "need_booking", partner, date: null, slot: null };
 }
 
+// ─── S2.1 · HEADER SORT ──────────────────────────────────────────────────────
+/**
+ * **The operator reorders the list, and the third click gives it back.**
+ *
+ * Copied from 2990's grid, which is the behaviour the team already has in its
+ * hands — the comparator from `DataGrid.tsx:689-699`, the click cycle from
+ * `:946-950`:
+ *
+ * ```
+ * click 1  asc        click 2  desc        click 3  OFF
+ * ```
+ *
+ * **The third click is why §2.3 survives sorting by construction.** `null` is
+ * not "no sort", it is `compareBySlack` — risk to the customer's promise — so
+ * the page's own answer to *what is most urgent* is one click away and is
+ * never something an operator has to reconstruct by hand.
+ *
+ * **The division of labour differs from 2990's and that is not a defect.**
+ * 2990 sorts INSIDE its grid (`sortedRows`); `kit/DataTable` rules that *"the
+ * PAGE sorts the rows; the kit only shows the arrow"*, and it already spells
+ * the three-click cycle in its header button. So what lives here is 2990's
+ * COMPARATOR plus one sort value per column, and nothing about sorting moved
+ * into the kit.
+ *
+ * **THE SORT RUNS ON `visible`, NEVER ON THE 30 RENDERED ROWS.** Sorting a
+ * window sorts nothing — it shuffles the same 30 rows the operator can already
+ * see and silently claims to have ordered 65. The window is taken after.
+ *
+ * **THREE RULES, AND EVERY COLUMN BELOW OBEYS ONE OF THEM.**
+ * ```
+ * a WORD   sorts A → Z            Order · Customer · PIC · Actions
+ * a STATE  sorts WORST FIRST      Status · Deadline · Stock · Delivery
+ *          — ascending therefore means on a sorted column exactly what it
+ *            means in the default order, so the FIRST click never buries
+ *            the work at the bottom of the list.
+ * a BLANK  sorts LAST, in BOTH directions — Excel's rule, and 2990 already
+ *          spells it in its own filter list (`(a || '~')`, `:682`). Without
+ *          it, ascending `Deadline` opens on every undated order there is.
+ * ```
+ * A rank is never typed twice: the stage rank IS `TABS` and the stock rank IS
+ * `STOCK_BUCKETS` (Law D — a derived fact has ONE arithmetic).
+ *
+ * ### ⛔ AND ⚑ `Follow-up` DOES NOT SORT, BECAUSE ITS HEADER WRAPS
+ *
+ * **Measured in Chromium against the kit's own header markup, in BOTH nav
+ * states and with the arrow actually in the DOM** — a sortable header renders
+ * the chevron only on hover or once sorted, so the measurement is taken with
+ * the column SORTED, which is the same markup the hover branch emits. The
+ * harness renders the real `kit/DataTable` at the two live table widths, and
+ * it reproduces C14's columns to the digit at 1022px (`Status 134.7 · Order
+ * 75.4 · Deadline 150.8 · Stock 53.9 · PIC 59.3 · Actions 210.1`).
+ *
+ * ```
+ * column      content box          label      verdict, at 850 / 1022
+ *             850px    1022px    + arrow
+ * Follow-up    56.0      56.6      68.4    WRAPS "Follow-" / "up", BOTH widths
+ * Stock        28.1      37.9      46.0    arrow spills 17.9 / 8.1 past the
+ *                                          content box — cut off at 850,
+ *                                          flush against the rule at 1022
+ * PIC          32.5      43.3      34.0    spills 1.6 at 850 — into the th's
+ *                                          own 8px padding, so still whole
+ * Order        45.8      59.4      46.0    spills 0.2 at 850, same
+ * Status       94.3     118.7      49      fits
+ * Customer     71.2      90.5      67      fits
+ * Deadline    107.5     134.8      62      fits
+ * Delivery     79.0     100.0      59      fits
+ * Actions     156.1     194.1      72      fits
+ * ```
+ *
+ * **`Follow-up` is the one label on this table with a HYPHEN, and a hyphen is
+ * a break opportunity.** That is why it is the ONLY one that wraps, and why
+ * being over the content box is not on its own the test: `Stock`, `PIC` and
+ * `Order` are all over it at 850px and every one of them stays on one line,
+ * because a single word with no break opportunity can only overflow. S1
+ * shipped the wrap once and pinned 72px to stop it; making the column sortable
+ * would hand back the pixel S1 paid for.
+ *
+ * **Nothing is lost, and that is the reason this is a decision rather than a
+ * concession.** The QUEUES rail already carries `Follow-up` and
+ * `For manager review` as FILTERS, and a filter beats a sort for *show me my
+ * flags* — it removes the other rows instead of stacking them underneath.
+ * Widening the column is the other answer, and it is not this card's: the
+ * MASTER already records the flag column's width as an OPEN question whose
+ * two answers (an icon header in the kit, or the flag stops being a column)
+ * both reach beyond Orders.
+ *
+ * > 🟡 **REPORTED, NOT FIXED — `Stock` loses its arrow at ONE of the two nav
+ * > widths.** `Stock` + the chevron need 46px against a 28.1px content box
+ * > with the nav EXPANDED, so the arrow runs 9.9px past the column's own
+ * > border and is painted over by `Delivery`'s header background. With the
+ * > nav COLLAPSED the content box is 37.9px and the arrow lands flush against
+ * > the column rule — tight, but whole. **It is kept sortable on purpose:**
+ * > the rows visibly reorder, `aria-sort` is correct for a screen reader, and
+ * > the alternative is losing the worst-first stock ordering over 9 pixels at
+ * > one window size. There is no cheap width to take them from — C14 sized
+ * > every column to its CELLS, which are wider than any header here.
+ */
+export type OrderSortValue = string | number;
+
+/** 2990's comparator: numeric when both sides really are numbers, else
+ *  `localeCompare`. The BLANK branch is deliberately not multiplied by the
+ *  direction — that is what keeps empties at the bottom either way. */
+export function compareOrderSortValues(
+  a: OrderSortValue,
+  b: OrderSortValue,
+  dir: "asc" | "desc",
+): number {
+  const ea = a === "";
+  const eb = b === "";
+  if (ea || eb) return ea && eb ? 0 : ea ? 1 : -1;
+  const sign = dir === "asc" ? 1 : -1;
+  const na = Number(a);
+  const nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return (na - nb) * sign;
+  return String(a).localeCompare(String(b)) * sign;
+}
+
+/** The pipeline's own order, read off `TABS` so the sorted column and the
+ *  stage tabs cannot drift apart. */
+const STAGE_ORDER: SettledTab[] = TABS.filter((t) => t.key !== "all").map(
+  (t) => t.key as SettledTab,
+);
+/** Best → worst, exactly as `LogisticStateKey` declares them. The sort value
+ *  counts from the WORST end, so ascending opens on the orders nobody has
+ *  arranged yet. */
+const LOGISTIC_BEST_FIRST: readonly LogisticStateKey[] = [
+  "delivered",
+  "confirmed",
+  "provisional",
+  "need_booking",
+  "unassigned",
+];
+/** Index counted from the worst end of a best-first ladder. */
+function worstFirst(ladder: readonly string[], key: string): number {
+  return ladder.length - 1 - ladder.indexOf(key);
+}
+
+/**
+ * **The columns that sort — the ONE list, read by the column defs AND by the
+ * sort itself.** A header that offers an arrow the list cannot honour is worse
+ * than a header with no arrow: the operator clicks, nothing moves, and they
+ * stop trusting the whole row of them.
+ */
+export const ORDER_SORTABLE_COLUMNS: ReadonlySet<string> = new Set([
+  /* `follow_up` is deliberately ABSENT — its header wraps under the arrow.
+     The measurement is in the block above. */
+  "dots",
+  "order",
+  "customer",
+  "deadline",
+  "stock",
+  "delivery",
+  "pic",
+  "next",
+]);
+
+/** What a sort value needs that an order row does not carry by itself. */
+export interface OrderSortContext {
+  availableBySku?: Map<string, number>;
+  partnerName: Map<string, string>;
+  staffById: Map<string, OpsStaffMember>;
+  nextVerbOf: (o: operationOrderListRow) => string;
+}
+
+/**
+ * One column's sort value. `null` = that column does not sort, and the header
+ * gets no control at all — a dead arrow is a promise the grid cannot keep.
+ *
+ * Every value below is read from the SAME helper the cell renders from, so a
+ * sorted column can never disagree with what it is showing.
+ */
+export function orderSortValueOf(
+  key: string,
+  o: operationOrderListRow,
+  ctx: OrderSortContext,
+): OrderSortValue | null {
+  switch (key) {
+    case "dots":
+      return STAGE_ORDER.indexOf(controlTabOf(o, ctx.availableBySku));
+    case "order":
+      return o.so;
+    case "customer":
+      return o.customer_name ?? "";
+    /* A TBD date is not a late date — it is no date, and it sorts with the
+       blanks rather than pretending to be the soonest or the furthest. */
+    case "deadline":
+      return o.delivery_date_tbd ? "" : (o.delivery_date ?? "");
+    case "stock":
+      return worstFirst(STOCK_BUCKETS, stockBucketOf(o, ctx.availableBySku));
+    case "delivery":
+      return worstFirst(
+        LOGISTIC_BEST_FIRST,
+        logisticStateOf(o, ctx.partnerName).key,
+      );
+    /* The PERSON's name, not their user id — the column shows a name and a
+       sort must order what the eye is reading. */
+    case "pic": {
+      const u = ownerOf(o);
+      if (!u) return "";
+      const m = ctx.staffById.get(u);
+      return m ? staffLabel(m) : u;
+    }
+    /* The verb the row is already showing. Sorting the instruction column
+       GROUPS identical work together — `Issue PO` beside `Issue PO` — which is
+       what a word column is for; which action is most urgent is the QUEUES
+       rail's job and stays there. */
+    case "next":
+      return ctx.nextVerbOf(o);
+    default:
+      return null;
+  }
+}
+
 /** Item category short-form (Master Sheet model): core goods Mattress / Bedframe
  *  / Sofa need POs + stock; everything else is accessory/service. Native SKUs
  *  carry a `mattress:` / `bedframe:` / `sofa:` prefix; AutoCount free-text SKUs
@@ -1694,6 +1907,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // (only ~30 <tr> in the DOM until the user scrolls).
   const ROWS_PER_BATCH = 30;
   const [renderCount, setRenderCount] = useState(ROWS_PER_BATCH);
+  /* S2.1 — the column the operator sorted by, or `null` for the page's own
+     risk order. Session-only, like every other list control here: §0.4 rules
+     out a per-user store of UI shape, and a sort an operator cannot remember
+     setting is a list that lies to them tomorrow morning. */
+  const [sort, setSort] = useState<TableSort | null>(null);
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkMenu, setBulkMenu] = useState<
@@ -2021,6 +2239,19 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // so queue numbers equal the NEXT column by construction.
   const nextVerbOf = (o: operationOrderListRow) =>
     nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []).label;
+  /* S2.1 — everything a sort value needs that the order row does not carry.
+     Each entry is the SAME helper the matching cell renders from, so a sorted
+     column can never disagree with what it is showing. */
+  const sortCtx: OrderSortContext = useMemo(
+    () => ({
+      availableBySku,
+      partnerName,
+      staffById,
+      nextVerbOf: (o) =>
+        nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []).label,
+    }),
+    [availableBySku, partnerName, staffById],
+  );
   /** J3 — the drawer's journey strip, computed HERE and handed down.
    *
    *  The card's DONE WHEN is "the strip agrees with the ladder/queues for the
@@ -2491,9 +2722,23 @@ export default function OperationOrdersControl({ onImport }: Props) {
       const opts = CATEGORY_OPTS.filter((c) => categoryFilter.has(c.key));
       r = r.filter((o) => opts.some((c) => c.match(o)));
     }
-    return [...r].sort(compareBySlack);
+    /* S2.1 — the DEFAULT order first, always. A column sort is then applied on
+       top of it, and `Array.prototype.sort` is stable, so two rows the operator
+       sorted to the same value keep `compareBySlack`'s order between them: the
+       risk order survives INSIDE every tie instead of being replaced by
+       whatever order the server happened to send. (2990 sorts its own default
+       order the same way — `DataGrid.tsx:701`, `[...filteredRows].sort`.) */
+    const ordered = [...r].sort(compareBySlack);
+    if (!sort || !ORDER_SORTABLE_COLUMNS.has(sort.key)) return ordered;
+    return ordered.sort((a, b) =>
+      compareOrderSortValues(
+        orderSortValueOf(sort.key, a, sortCtx) ?? "",
+        orderSortValueOf(sort.key, b, sortCtx) ?? "",
+        sort.dir,
+      ),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, supplierFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, skuMeta, suppliers, tasksByOrder]);
+  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, supplierFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, skuMeta, suppliers, tasksByOrder, sort, sortCtx]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -2952,14 +3197,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
    * word is typed ONCE, here, and the width comes from `ORDER_COL_DEFS` so
    * C14's measured units stay the single source of both.
    *
-   * **`sortable` and `filter` are deliberately NOT passed on any column.**
-   * The kit has both and this page now has somewhere to put them — but
-   * `CLAUDE.md` §2 rules that *"a feature is wired only if it makes the
-   * operator finish faster today; 'the kit has it' is not an answer"*, and
-   * header sort needs the PAGE to reorder rows against a default order
-   * (`compareBySlack`) that is itself the page's answer to *what is most
-   * urgent*. That is a decision with a cost, not a prop. S1 ships the MOVE;
-   * what to sort by is the next card's question.
+   * **S2.1 answered S1's open question and every column now sorts.** S1 passed
+   * `sortable` on nothing and said why: reordering rows away from
+   * `compareBySlack` is a decision, not a prop. The decision is made — the
+   * third click returns the risk order, so nothing is reordered AWAY from it
+   * for longer than the operator wants — and the rule for each column's
+   * direction is one block, at `orderSortValueOf`. `filter` is still passed
+   * nowhere; that is S2.2's.
    */
   const dataWidth = (key: string) => {
     const d = ORDER_COL_DEFS.find((c) => c.key === key)!;
@@ -2968,7 +3212,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     return d.w * colScale - GUTTER_DEFICIT_PCT * (DEFICIT_SHARE[key] ?? 0);
   };
   const dataLabel = (key: string) => ORDER_COL_DEFS.find((c) => c.key === key)!.label;
-  const columns: readonly Column<OrdersGridRow>[] = [
+  const baseColumns: readonly Column<OrdersGridRow>[] = [
     {
       /* ⚑ FOLLOW-UP — the one column S1 changes, and only its HEAD.
          `Column.label` is a `string` in both engines, so no grid the portal
@@ -3059,6 +3303,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
       ),
     },
   ];
+  /* S2.1 — which columns sort is read off `ORDER_SORTABLE_COLUMNS`, never
+     typed a second time here: the set and the sort value are the same list, so
+     a header cannot grow an arrow the comparator has no answer for. */
+  const columns: readonly Column<OrdersGridRow>[] = baseColumns.map((c) =>
+    ORDER_SORTABLE_COLUMNS.has(c.key) ? { ...c, sortable: true } : c,
+  );
 
   return (
     /* Shell pattern (Loo 2026-08-02, applied to Orders on his order — this
@@ -3797,6 +4047,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
         label="Orders"
         empty="No orders in this tab."
         onRowOpen={(r) => setOpenOrderId(r.o.id)}
+        /* S2.1 — the kit paints the arrow, the PAGE reorders the rows. The
+           third click hands `null` back, which is `compareBySlack`. */
+        sort={sort}
+        onSortChange={setSort}
         selection={{
           selected,
           onToggleRow: toggleOne,
