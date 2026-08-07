@@ -117,6 +117,24 @@ not a new guideline  →  fold the rule into this Constitution
 6  Overwrite the MASTER in the same PR.
 ```
 
+**A DECISION THAT STAYS IN THE CHAT IS A DECISION THAT DIES.** The moment the owner agrees to
+something, it is written to its file and committed **before the conversation moves on** — not
+at the end, not in the next card. A plan nobody wrote down gets re-derived weaker by the next
+chat; a plan written as LAW gets obeyed instead of challenged. **So every line written wears
+its own label:**
+
+```
+FACT      measured, cited      →  the research file.  Binds nobody.
+RULING    the OWNER's word     →  the MASTER.  Binds until the owner changes it.
+PROPOSAL  YOURS                →  the MASTER, marked NOT LAW, carrying its own
+                                  falsifier.  Must be CHALLENGED, never obeyed.
+```
+
+**PROVE THE CAPABILITY BEFORE DESIGNING THE ENGINE.** *"Can X move onto Y?"* is answered by
+mapping what each side already does — one table, no solutions — and the answer is READY or NOT
+READY. Only NOT READY licenses an engine card, and only for the capabilities the mapping named.
+**Redesigning a thing that already supports the case is the most expensive way to be wrong.**
+
 **TWO CHATS PER MODULE IS THE CEILING.** Past that point, coordination cost grows faster than
 delivery. A chat that has claimed a lane still occupies a lane, even if no code has been written.
 
