@@ -10,6 +10,7 @@ import {
   SUNDAY,
   WEEKDAYS,
   lastChangeFor,
+  settingValueLabel,
   workWeekLabel,
   type PurchasingCategory,
   type PurchasingNumberKey,
@@ -73,10 +74,27 @@ function ChangeLine({
 }) {
   const change = lastChangeFor(settings, settingKey, supplierId, category);
   if (!change) return null;
+  /**
+   * 🔴 P20.4 — THIS LINE USED TO PRINT `· was {0}`.
+   *
+   * `oldValue` is `purchasing_setting_changes.old_value`, a plain `text`
+   * column, and the two array-valued keys are recorded with `v_old::text` — so
+   * for those keys the history carries the DATABASE's spelling of an array and
+   * this line rendered it raw. Measured in production 2026-08-08: the entire
+   * audit trail was two rows, both `supplier_work_week`, so the only two
+   * history lines this page has ever shown read `· was {0}` and `· was {0,6}`.
+   *
+   * A work week must read as DAYS. `settingValueLabel` is the one place that
+   * decides — it reads the same `workWeekLabel` the row above it uses for the
+   * CURRENT value, so the history and the value can never disagree about what
+   * `Mon–Sat` means, and `po_days` (the identical defect, waiting for the first
+   * change) reads through it too.
+   */
+  const was = settingValueLabel(settingKey, change.oldValue);
   return (
     <div className="text-label text-base-500 mt-1" data-testid="setting-change-line">
       {change.changedBy ?? "—"} · {fmtDate(change.changedAt)}
-      {change.oldValue ? ` · was ${change.oldValue}` : ""}
+      {was ? ` · was ${was}` : ""}
     </div>
   );
 }

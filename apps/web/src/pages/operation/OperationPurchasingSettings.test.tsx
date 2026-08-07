@@ -190,3 +190,84 @@ describe("Purchasing → Settings", () => {
     expect(text).toContain("Earliest date a store may sell");
   });
 });
+
+/**
+ * 🔴 P20.4 — THE HISTORY LINE PRINTED A POSTGRES ARRAY ON SCREEN.
+ *
+ * `oldValue` is a plain `text` column and the two array-valued keys are
+ * recorded with `v_old::text`, so the history carries the DATABASE's spelling.
+ * This line rendered it raw. Measured in production 2026-08-08 the ENTIRE audit
+ * trail was two rows, both `supplier_work_week` — so `· was {0}` and
+ * `· was {0,6}` were not a corner case, they were the only two history lines
+ * this page had ever shown.
+ *
+ * `po_days` is the same defect with no history rows yet, so it is pinned here
+ * before a manager's first change finds it.
+ */
+describe("P20.4 · a work week reads as days", () => {
+  const withArrayHistory = () =>
+    settingsQuery.mockReturnValue({
+      data: settings({
+        lastChanges: [
+          // PRODUCTION's own two rows, verbatim.
+          {
+            settingKey: "supplier_work_week",
+            supplierId: OHANA,
+            category: null,
+            oldValue: "{0}",
+            newValue: "{0,6}",
+            changedBy: "Jess",
+            changedAt: "2026-08-03T03:08:24.000Z",
+          },
+          {
+            settingKey: "supplier_work_week",
+            supplierId: NICE,
+            category: null,
+            oldValue: "{0,6}",
+            newValue: "{0}",
+            changedBy: "Jess",
+            changedAt: "2026-08-03T03:08:16.000Z",
+          },
+          {
+            settingKey: "po_days",
+            supplierId: null,
+            category: null,
+            oldValue: "{1,3,5}",
+            newValue: "{1,2,3,4,5}",
+            changedBy: "Jess",
+            changedAt: "2026-08-03T03:09:00.000Z",
+          },
+        ],
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+  it("no history line prints an array literal anywhere on the page", () => {
+    withArrayHistory();
+    const { container } = render(wrap(<OperationPurchasingSettings />));
+    const text = container.textContent ?? "";
+    for (const sql of ["{0}", "{0,6}", "{1,3,5}", "{1,2,3,4,5}"]) {
+      expect(text).not.toContain(sql);
+    }
+  });
+
+  it("each one reads as the days it means", () => {
+    withArrayHistory();
+    const { container } = render(wrap(<OperationPurchasingSettings />));
+    const text = container.textContent ?? "";
+    // `{0}` = off Sunday only → the factory works Monday to Saturday.
+    expect(text).toContain("was Mon–Sat");
+    // `{0,6}` = off Sunday and Saturday.
+    expect(text).toContain("was Mon–Fri");
+    // PO days stores the days the office SENDS, the other way round, and must
+    // still read as days.
+    expect(text).toContain("was Mon Wed Fri");
+  });
+
+  it("a plain number is untouched — only the two array keys are translated", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const row = screen.getByTestId("production-row-sofa");
+    expect(within(row).getByTestId("setting-change-line").textContent).toContain("was 10");
+  });
+});
