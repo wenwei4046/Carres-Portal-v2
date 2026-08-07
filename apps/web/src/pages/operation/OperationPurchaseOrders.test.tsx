@@ -1381,40 +1381,59 @@ describe("nine measured minimums, and no tail", () => {
     expect(colWidths()).toEqual(open);
   });
 
-  /** Item 6 of the card: the region scrolls rather than losing a column.
-   *  Deleting business information to avoid a scrollbar is what Loo forbade. */
-  it("the listing region keeps ONE min-width and scrolls below it", async () => {
+  /**
+   * ⭐ ONE SCROLLER, AND IT IS THE KIT'S (card P20.2).
+   *
+   * This replaces the assertion that the region held a `min-w-[1214px]` child.
+   * The intent is unchanged and is Loo's — *the region scrolls rather than
+   * losing a column* — but the MECHANISM is: the min-width existed only to stop
+   * `"fill"` redistributing the nine measured widths, and P20.1 ended that by
+   * passing `sizing="content"`. What was left was a second scroller wrapping
+   * the kit's own, and a `sticky top-0` header sticks to the KIT's box — so
+   * while the page pane scrolled, the column names scrolled away with it.
+   *
+   * jsdom has no layout, so this pins the STRUCTURE a browser then scrolls:
+   * exactly one scrolling element under the listing, and it is the kit's.
+   */
+  it("the listing has ONE scroller, it is the kit's box, and no page min-width", async () => {
     await mountLoaded();
     const region = screen.getByTestId("po-listing");
-    const scroller = region.querySelector(".overflow-auto") as HTMLElement;
-    expect(scroller.firstElementChild?.className).toContain("min-w-[1214px]");
+
+    const scrollers = region.querySelectorAll(".overflow-auto");
+    expect(scrollers).toHaveLength(1);
+    expect((scrollers[0] as HTMLElement).dataset.kit).toBe("data-table");
+
+    // A hand-written min-width is what forced the PAGE to be the scroller.
+    // Not "not 1214" — NONE, or the next chat re-adds one with a new number.
+    expect(region.querySelector('[class*="min-w-["]')).toBeNull();
+
+    // The query container moved onto the pane when the div it lived on went;
+    // without it `100cqi` resolves against the viewport and the expanded
+    // record's ceiling is a lie. It is the PANE now, not a descendant.
+    expect(region.className).toContain("container-type:inline-size");
+    expect(region.querySelector('[class*="container-type:inline-size"]')).toBeNull();
   });
 
   /**
-   * THE MIN-WIDTH IS DERIVED FROM THE NINE, AND THE TWO MAY NEVER DRIFT APART
-   * (card Q13, 2026-08-05).
+   * NO TRACK ON THIS TABLE CAN SILENTLY ABSORB A PIXEL (Q13 → P20).
    *
-   * The number is not decoration: the kit's expand-control column takes 3% of
-   * the table, so the sum of the nine pixel columns is only 97% of it. Q13
-   * MEASURED what happens when a width moves and this number does not — in
-   * `table-fixed` the browser takes the difference out of the only non-pixel
-   * track, which is that control column, and its expand button already
-   * overflows (P16's documented clip). Live at 1280: `88px`/`1205px` shrank the
-   * control 35 → 34 and made the clip 7px → 8px, while every business column
-   * kept its ruled width — i.e. the damage is INVISIBLE to the assertion above.
+   * Q13's finding was that `table-fixed` pays for every unclaimed pixel out of
+   * the only NON-pixel track, and on this page that track was the kit's own
+   * expand-control column at 3% — whose button already overflowed it (P16's
+   * documented clip). Live at 1280: a stale min-width shrank the control 35 →
+   * 33 and grew the clip 7 → 9, while every business column kept its ruled
+   * width, i.e. the damage was INVISIBLE to the width assertion above.
    *
-   * So this reads both numbers off the rendered DOM and re-derives one from the
-   * other. Change a width without the min-width — or the min-width without a
-   * width — and it fires.
+   * P20 removes the failure mode rather than re-measuring it. Under
+   * `sizing="content"` the control column is a hard 42px and the ONLY elastic
+   * track is the kit's filler, which holds no data. This is what the old
+   * `min-width = sum / 0.97` derivation was really protecting, so it replaces
+   * that test instead of joining it — the min-width itself is gone (P20.2).
    */
-  it("the min-width is exactly the sum of the nine plus the control column", async () => {
+  it("the control column is a fixed 42px, and the filler is the only elastic track", async () => {
     await mountLoaded();
-    /* The kit's own expand-control column is the one without a `data-column`,
-     * and that is how it is dropped here — never by looking like a percentage.
-     * A business column that turned into a percentage must FAIL this, not slip
-     * through it. Under `sizing="content"` (P20.1) the control column is a hard
-     * 42px rather than a 3% share, so the derivation is plain addition and the
-     * only track that could silently absorb a pixel is gone. */
+    /* Every business column is a pixel — a column that turned into a
+     * percentage must FAIL this, not slip through it. */
     const px = Object.entries(colWidths())
       .filter(([k]) => k !== "null")
       .map(([k, w]) => {
@@ -1423,25 +1442,15 @@ describe("nine measured minimums, and no tail", () => {
         return Number(m![1]);
       });
     expect(px).toHaveLength(9);
-    const sum = px.reduce((a, b) => a + b, 0);
 
-    const scroller = screen
-      .getByTestId("po-listing")
-      .querySelector(".overflow-auto") as HTMLElement;
-    const cls = String(scroller.firstElementChild?.className);
-    const min = Number(/min-w-\[(\d+)px\]/.exec(cls)?.[1]);
-
-    /* The kit's own control column, read off the SAME colgroup rather than
-     * typed here — so if the kit ever re-sizes it, this fires instead of
-     * quietly holding a number that stopped being true. */
-    const control = (
-      screen
-        .getByRole("table")
-        .querySelector("colgroup col") as HTMLElement
-    ).style.width;
-    expect(control).toBe("42px");
-
-    expect(min).toBe(sum + Number(control.replace("px", "")));
+    const cols = [
+      ...screen.getByRole("table").querySelectorAll<HTMLElement>("colgroup col"),
+    ].map((c) => c.style.width);
+    // The kit's expand control, first and fixed.
+    expect(cols[0]).toBe("42px");
+    // The filler, last and the ONLY `auto` in the whole colgroup.
+    expect(cols.at(-1)).toBe("auto");
+    expect(cols.filter((w) => w === "auto")).toHaveLength(1);
   });
 
   it("every action word still carries its own title, so a clip can be read", async () => {
@@ -2448,17 +2457,20 @@ describe("one purchase order, one way of looking at it (Q10)", () => {
     const cls = screen.getByTestId("po-work-PO-9003").className;
     expect(cls).toContain("100cqi");
     // Q11 turned the pin into a CEILING; it may never stop being one.
-    expect(cls).toContain("max-w-[calc(100cqi-2rem)]");
+    // P20.2 · the `- 2px` is the kit's own 1px border on each side. The query
+    // container used to BE the scroller (a page-owned `overflow-auto` div), so
+    // `100cqi` was the scrollport exactly; that div is gone and the container
+    // moved up to the pane, which is 2px wider. Measured in a browser: pane
+    // 900 → scrollport 898, and `calc(100cqi - 2rem - 2px)` = 866 = 898 − 32.
+    expect(cls).toContain("max-w-[calc(100cqi-2rem-2px)]");
     // `sticky` was measured NOT to hold inside a table cell, so it is not left
     // here as a class that does nothing.
     expect(cls).not.toContain("sticky");
-    // And the scroller it is measured against really is a query container —
+    // And the thing it is measured against really is a query container —
     // without it, `100cqi` resolves against the page and the pin is a lie.
-    const scroller = screen
-      .getByTestId("po-listing")
-      .querySelector('[class*="container-type:inline-size"]');
-    expect(scroller).not.toBeNull();
-    expect(scroller!.className).toContain("overflow-auto");
+    // It is the PANE itself now, not a descendant of it.
+    const pane = screen.getByTestId("po-listing");
+    expect(pane.className).toContain("container-type:inline-size");
   });
 
   it("Description takes what is LEFT — the six columns are exact tracks, not a flex row", async () => {
@@ -2498,11 +2510,11 @@ describe("one purchase order, one way of looking at it (Q10)", () => {
     await expandPo("PO-9003");
     const classes = screen.getByTestId("po-work-PO-9003").className.split(/\s+/);
     expect(classes).toContain("w-fit");
-    expect(classes).toContain("max-w-[calc(100cqi-2rem)]");
+    expect(classes).toContain("max-w-[calc(100cqi-2rem-2px)]");
     // The pane must be a CEILING, never the width itself: a fixed width is what
     // gave `Description` 1191px for 67px of ink. Compared as a TOKEN, because
-    // `max-w-[calc(100cqi-2rem)]` contains the fixed form as a substring.
-    expect(classes).not.toContain("w-[calc(100cqi-2rem)]");
+    // `max-w-[calc(…)]` contains the fixed form as a substring.
+    expect(classes).not.toContain("w-[calc(100cqi-2rem-2px)]");
   });
 
   it("the header, the item rows and TOTAL are one template, so they cannot stagger", async () => {

@@ -988,53 +988,67 @@ export default function OperationReceiving() {
               permanent pixels. Untouched by this slice. */}
           {queue === "to_receive" && <WarehouseReceiptsPanel />}
 
-          <div className="flex-1 min-h-0 overflow-auto">
-            <div className={workspaceOpen ? "" : "min-w-[880px]"}>
-              {queue === "received" ? (
-                <DataTable<WarehouseReceiptRow>
-                  rows={recordRows}
-                  columns={recordColumns}
-                  /* P20.1 — the same mechanism the other four tabs run. Each
-                     column takes exactly what it measured and the leftover
-                     goes to the kit's filler, which holds nothing. */
-                  sizing="content"
-                  rowId={(r) => r.id}
-                  onRowOpen={(r) => openRecord(r.id)}
-                  sort={sort}
-                  onSortChange={setSort}
-                  loading={recordsQ.isLoading}
-                  label="Goods received"
-                  empty={
-                    <EmptyState
-                      title="Nothing received yet."
-                      detail="A record appears here the moment goods are checked in."
-                    />
-                  }
+          {/* ⭐ ONE SCROLLBAR, AND IT IS THE KIT'S (card P20.2).
+               Two hand-written divs used to sit here: an `overflow-auto` pane
+               and a `min-w-[880px]` child that was CONDITIONAL on the workspace
+               being closed — so the grid changed which element scrolled, and
+               whether it scrolled at all, depending on a record being open.
+               A gesture that works only sometimes is worse than one that never
+               works, because the operator stops trusting it.
+
+               Both go. The kit's own box is the scroller on all four grids now,
+               which is also what puts the `sticky top-0` header back on duty:
+               it sticks against the KIT's box, so while the page pane was the
+               scroller the column names simply scrolled away.
+
+               The min-width is not replaced by anything: it existed to stop
+               `"fill"` redistributing these widths, and P20.1 ended that by
+               measuring them and passing `sizing="content"`. Below their sum
+               the kit's box scrolls — deleting a column to avoid that is what
+               §3 forbids. */}
+          {queue === "received" ? (
+            <DataTable<WarehouseReceiptRow>
+              rows={recordRows}
+              columns={recordColumns}
+              /* P20.1 — the same mechanism the other four tabs run. Each
+                 column takes exactly what it measured and the leftover
+                 goes to the kit's filler, which holds nothing. */
+              sizing="content"
+              rowId={(r) => r.id}
+              onRowOpen={(r) => openRecord(r.id)}
+              sort={sort}
+              onSortChange={setSort}
+              loading={recordsQ.isLoading}
+              label="Goods received"
+              empty={
+                <EmptyState
+                  title="Nothing received yet."
+                  detail="A record appears here the moment goods are checked in."
                 />
-              ) : (
-                <DataTable<operationPoListRow>
-                  rows={rows}
-                  columns={visibleColumns}
-                  /* P20.1 — see `columns`. Both grids on this tab run the one
-                     mechanism, or a gesture learned on one queue would stop
-                     working on the other. */
-                  sizing="content"
-                  rowId={(p) => p.id}
-                  onRowOpen={(p) => openPo(p.id)}
-                  sort={sort}
-                  onSortChange={setSort}
-                  loading={posQ.isLoading}
-                  label="Receiving"
-                  empty={
-                    <EmptyState
-                      title="No purchase orders."
-                      detail="Issue one from To Order."
-                    />
-                  }
+              }
+            />
+          ) : (
+            <DataTable<operationPoListRow>
+              rows={rows}
+              columns={visibleColumns}
+              /* P20.1 — see `columns`. Both grids on this tab run the one
+                 mechanism, or a gesture learned on one queue would stop
+                 working on the other. */
+              sizing="content"
+              rowId={(p) => p.id}
+              onRowOpen={(p) => openPo(p.id)}
+              sort={sort}
+              onSortChange={setSort}
+              loading={posQ.isLoading}
+              label="Receiving"
+              empty={
+                <EmptyState
+                  title="No purchase orders."
+                  detail="Issue one from To Order."
                 />
-              )}
-            </div>
-          </div>
+              }
+            />
+          )}
           <div className="shrink-0 flex items-center gap-3 px-3 h-10 border-t border-kit-slate-5 text-meta text-kit-slate-11">
             <span>
               {queue === "received"
