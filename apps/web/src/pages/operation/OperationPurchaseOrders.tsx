@@ -1054,11 +1054,16 @@ export default function OperationPurchaseOrders() {
   //
   // Every width below is MEASURED in a real browser against the app's own
   // stylesheet (13px Inter, the DataTable cell's `px-2` = 16px, header = the
-  // word + 2 + the ▼'s 24 + 16). They are MINIMUMS, not preferences: the
-  // region carries `min-w-[PO_LISTING_MIN_PX]` and scrolls below it, and above
-  // it the fixed table hands the slack out. **Do not re-derive one by
-  // guessing** — jsdom has no widths, so no page test can catch a clipped
-  // cell; only the browser can.
+  // word + 2 + the ▼'s 24 + 16).
+  //
+  // **SINCE P20.1 THEY ARE EXACT, NOT MINIMUMS.** `sizing="content"` gives a
+  // column what its def asks for and NOTHING more, and the slack goes to the
+  // kit's filler — so a width here is what renders on a 1280 laptop and on a
+  // 1920 monitor alike. Before it, the absent prop meant `"fill"`, which spends
+  // a declared pixel as a SHARE: measured at 900px the nine declared 1,171 and
+  // rendered 1,201, so no column was the width its own comment states.
+  // **Do not re-derive one by guessing** — jsdom has no widths, so no page test
+  // can catch a clipped cell; only the browser can.
   const columns: readonly Column<operationPoListRow>[] = [
     {
       key: "issued",
@@ -1344,9 +1349,21 @@ export default function OperationPurchaseOrders() {
       // minimum of the longest word that fits (`Confirm tomorrow's delivery`
       // = 175.4 + the cell's 16 = 192 exactly). The one 201px string,
       // `Confirm balance delivery date`, was already the exception Q1 named
-      // and it still keeps its own `title`. Above the min-width the fixed
-      // table hands the slack out, so on any real monitor this is wider.
-      width: "192px",
+      // and it still keeps its own `title`.
+      //
+      // P20.1 · 192 → 193, and it is Q13's pixel arriving at the LAST column.
+      // P17 draws a column's rule on its RIGHT and skips the last one, because
+      // the last column's right edge is the wrapper's own border — but under
+      // `sizing="content"` a FILLER follows every column, so the last real
+      // column now rules its own edge like the other eight (kit `columnRule`:
+      // `fills || ci < length - 1`). That rule takes 1px of the BOX, not of the
+      // content, which is exactly the defect Q13 measured on `supplier`,
+      // `sono` and `items`: re-measured in a browser against the app's own
+      // stylesheet, `Confirm tomorrow's delivery` is 175.44 + the cell's 16 +
+      // the rule's 1 = 192.44, so 192 clips it by half a pixel with
+      // `text-overflow: clip` and nothing on screen says so.
+      // **A frozen width that truncates is not the frozen intent.**
+      width: "193px",
       sortable: true,
       filter: filterFor("action", actionOptions),
       cell: (p) => {
@@ -1518,25 +1535,25 @@ export default function OperationPurchaseOrders() {
               scrollbar is the thing he forbade** — an operator who wants a
               different balance has resize and reorder (PR 601).
 
-              The number is the sum of the nine measured minimums (1171) plus
-              the kit's expand-control column, which takes 3% of the table:
-              1171 / 0.97 = 1207.22 → 1208, so even at the narrowest width every
-              column still reaches its own minimum.
+              The number is the sum of the nine measured minimums (1172) plus
+              the kit's expand-control column (42).
 
               IT IS DERIVED, NOT DECORATIVE, and card Q13 measured what happens
-              when it is left behind. Widening a column and holding the old
-              min-width does not shrink a business column — `table-fixed` takes
-              the pixel out of the only non-pixel track, the kit's 3% control
-              column, whose expand button ALREADY overflows it (P16's
-              documented clip). Measured live at 1280 on the deployed page,
-              where this min-width is the binding constraint: `sono`/`items` at
-              95/136 with the min-width left at 1206 → control 35px → **33px**
-              and P16's clip 7px → **9px**, while every business column still
-              renders at its ruled width, i.e. the damage is INVISIBLE to the
-              assertion that pins them; at 1208 the control is back to 35px and
-              the clip to 7px with the business clips gone. **A test derives
-              this number from the column widths, so the two cannot drift apart
-              again.** */}
+              when it is left behind. **P20.1 makes the derivation PLAIN
+              ADDITION**: under `sizing="content"` the control column is a hard
+              42px — the 24px disclosure button in its 8+8 padding and 2px late
+              bar — instead of the 3% share that made this number `1171 / 0.97`.
+              Q13's own finding is what that share cost: `table-fixed` took
+              every unpaid pixel out of the only non-pixel track, which WAS the
+              control column, and its button already overflowed it (P16's
+              documented clip). Measured live at 1280 with the old share:
+              `sono`/`items` at 95/136 against a stale 1206 → control 35px →
+              **33px** and P16's clip 7px → **9px**, while every business column
+              still rendered at its ruled width, i.e. the damage was INVISIBLE
+              to the assertion that pins them. A fixed 42px cannot absorb a
+              pixel, so that failure mode is gone rather than re-measured.
+              **A test derives this number from the column widths, so the two
+              cannot drift apart again.** */}
           {/* `container-type: inline-size` makes this scroller a query
               container, so the expanded record can be sized to the VISIBLE
               width (`100cqi`) rather than to the 1208px table it spans — Q10 Ⓓ.
@@ -1545,10 +1562,19 @@ export default function OperationPurchaseOrders() {
               unreachable. Nothing else in the table is absolutely positioned
               (the ▼ menus are Radix portals), so the containment costs nothing. */}
           <div className="flex-1 min-h-0 overflow-auto [container-type:inline-size]">
-            <div className="min-w-[1208px]">
+            <div className="min-w-[1214px]">
               <DataTable<operationPoListRow>
               rows={rows}
               columns={visibleColumns}
+              /* P20.1 — ONE width mechanism across the five Purchasing tabs.
+                 Every width above was MEASURED in a browser and `"fill"` (the
+                 absence of this prop) spends them as SHARES, so a measurement
+                 became a ratio the moment the pane was wider than their sum:
+                 declared 1,171 · rendered 1,201 at 900px, i.e. no column had
+                 the width its own comment states. `"content"` gives each
+                 column exactly what it asks for and hands the slack to the
+                 kit's filler, which is what To Order and Claims already do. */
+              sizing="content"
               rowId={(p) => p.id}
               onRowOpen={(p) => dispatch({ type: "open", id: p.id })}
               sort={sort}

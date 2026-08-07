@@ -551,6 +551,30 @@ export default function OperationReceiving() {
    * and ruling 1 narrows this list to posted records, so status stops being a
    * concept here at all). `Units` counts UNITS, not product lines: the pane's
    * `Total` is the same number.
+   *
+   * ── P20.1 · EVERY WIDTH BELOW IS MEASURED, AND TWO OF THEM MOVED ──────────
+   *
+   * This page passed no `sizing`, which means `"fill"` — a declared pixel is
+   * spent as a SHARE and the browser tops every column up out of the slack. So
+   * the numbers here were never tested against their own content: the grid
+   * DECLARED 1,078px and RENDERED 1,238px, i.e. 160px of make-up.
+   * `sizing="content"` takes that away, and what it uncovered is measured
+   * below in a real browser against the app's own stylesheet (13px Inter, the
+   * kit cell's `px-2` = 16, and P17's column rule = 1 more of the BOX):
+   *
+   *   `units`  `auto` → 61   an `auto` column FIGHTS the filler for the slack,
+   *                          which is the mechanism this card exists to end.
+   *                          Header + its sort arrow 43.1 (the widest thing it
+   *                          holds — a four-digit count is 33.7) + 16 + 1.
+   *   `grn`    132  → 142    `GRN-310726-1234` on the SELECTED row is
+   *                          font-mono semibold behind a 2px bar and a 6px gap
+   *                          = 125 + 16 + 1. At 132 it clipped, with
+   *                          `text-overflow: clip`, so nothing said so.
+   *
+   * The other four clear their content and are untouched: `received` 88 (the
+   * header's 64.4 + 17 = 82) · `supplier` 104 (`Nice Future` 70.7 + 17 = 88) ·
+   * `po` 104 (font-mono `PO-2040` 54.6 + 17 = 72) · `do` 132 (the header
+   * `Supplier DO No.` 100.1 + 17 = 118, wider than `DO-P5-0001`'s 78).
    */
   const recordColumns: readonly Column<WarehouseReceiptRow>[] = [
     {
@@ -562,7 +586,7 @@ export default function OperationReceiving() {
       ),
     },
     {
-      key: "grn", label: "GRN No.", width: "132px", sortable: true,
+      key: "grn", label: "GRN No.", width: "142px", sortable: true,
       cell: (r) => (
         <span className="flex items-center gap-1.5">
           {r.id === params.get("receipt") && (
@@ -582,12 +606,35 @@ export default function OperationReceiving() {
     { key: "do", label: "Supplier DO No.", width: "132px", sortable: true,
       cell: (r) => <span className="font-mono">{r.do_number ?? "—"}</span> },
     {
-      key: "units", label: "Units", width: "auto", align: "right", numeric: true,
+      key: "units", label: "Units", width: "61px", align: "right", numeric: true,
       sortable: true,
       cell: (r) => (r.lines ?? []).reduce((a, l) => a + (l.received_now ?? 0), 0),
     },
   ];
 
+  /**
+   * ── P20.1 · THE SEVEN, MEASURED AGAINST WHAT THEY HOLD ────────────────────
+   *
+   * Same finding as `recordColumns` above, same method: `"fill"` was topping
+   * every column up out of the pane's slack, so three of these numbers had
+   * never had to carry their own content. Measured in a real browser (13px
+   * Inter · the cell's `px-2` = 16 · P17's rule = 1 of the BOX):
+   *
+   *   `arriving` 104 → 105   the HEADER is the widest thing here, not the
+   *                          date: `Goods Arrival` + its sort arrow = 87.75,
+   *                          + 17 = 104.75. One pixel short is still a clip.
+   *   `received`  72 →  82   header `Received` + arrow 64.4 + 17 = 81.4. It
+   *                          was 10px short — the header, not the `999 / 999`.
+   *   `action`  auto → 193   an `auto` column fights the filler for the slack.
+   *                          193 is Purchase Orders' OWN width for this exact
+   *                          column, arrived at from the same measurement, so
+   *                          `Current Action` is now one width on both tabs.
+   *
+   * The other four clear their content: `issued` 88 (header 69.2 + 17 = 87) ·
+   * `supplier` 104/92 (`Nice Future` 70.7 + 17 = 88) · `po` 104 (font-mono
+   * `PO-2040` behind the 2px bar = 62.6 + 17 = 80) · `items` 150 (it truncates
+   * by design, with its own `title`, so the header's 62 is the floor).
+   */
   const columns: readonly Column<operationPoListRow>[] = [
     {
       key: "issued",
@@ -648,7 +695,7 @@ export default function OperationReceiving() {
     {
       key: "arriving",
       label: "Goods Arrival",
-      width: "104px",
+      width: "105px",
       sortable: true,
       /**
        * A LATE TRUCK MUST LOOK LATE (T5, Loo 2026-08-06).
@@ -695,7 +742,7 @@ export default function OperationReceiving() {
     {
       key: "received",
       label: "Received",
-      width: "72px",
+      width: "82px",
       align: "right",
       numeric: true,
       sortable: true,
@@ -707,14 +754,22 @@ export default function OperationReceiving() {
     {
       key: "action",
       label: "Current Action",
-      width: "auto",
+      width: "193px",
       sortable: true,
       cell: (p) => {
         const w = actionWordOf(p);
         if (!w) return <span className="text-kit-slate-9">—</span>;
         const late = (callsById.get(p.id) ?? []).some((c) => c.late);
         return (
-          <span className={late ? "text-kit-red-11" : "text-kit-slate-12"}>
+          /* The `title` is Purchase Orders' own escape hatch for this exact
+             column, wired here for the same reason: 193 carries five of the
+             six queue words, and `Confirm balance delivery date` (184.7 + 17 =
+             202) is the one exception Q1 named. It repeats the word already on
+             screen, so COPY-STANDARD gains nothing to spell. */
+          <span
+            title={w}
+            className={late ? "text-kit-red-11" : "text-kit-slate-12"}
+          >
             {w}
           </span>
         );
@@ -939,6 +994,10 @@ export default function OperationReceiving() {
                 <DataTable<WarehouseReceiptRow>
                   rows={recordRows}
                   columns={recordColumns}
+                  /* P20.1 — the same mechanism the other four tabs run. Each
+                     column takes exactly what it measured and the leftover
+                     goes to the kit's filler, which holds nothing. */
+                  sizing="content"
                   rowId={(r) => r.id}
                   onRowOpen={(r) => openRecord(r.id)}
                   sort={sort}
@@ -956,6 +1015,10 @@ export default function OperationReceiving() {
                 <DataTable<operationPoListRow>
                   rows={rows}
                   columns={visibleColumns}
+                  /* P20.1 — see `columns`. Both grids on this tab run the one
+                     mechanism, or a gesture learned on one queue would stop
+                     working on the other. */
+                  sizing="content"
                   rowId={(p) => p.id}
                   onRowOpen={(p) => openPo(p.id)}
                   sort={sort}

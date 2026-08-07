@@ -1365,7 +1365,12 @@ describe("nine measured minimums, and no tail", () => {
       dest: "135px",
       custdel: "140px",
       arriving: "206px",
-      action: "192px",
+      // P20.1 · 192 → 193. `sizing="content"` puts a FILLER after the last
+      // column, so `action` now carries P17's right-hand rule like the other
+      // eight — and that rule takes 1px of the BOX, which is Q13's finding
+      // arriving one column later. Re-measured in a browser: `Confirm
+      // tomorrow's delivery` 175.44 + the cell's 16 + the rule's 1 = 192.44.
+      action: "193px",
     });
     expect(Object.values(colWidths()).filter((v) => v === "auto")).toHaveLength(0);
   });
@@ -1382,7 +1387,7 @@ describe("nine measured minimums, and no tail", () => {
     await mountLoaded();
     const region = screen.getByTestId("po-listing");
     const scroller = region.querySelector(".overflow-auto") as HTMLElement;
-    expect(scroller.firstElementChild?.className).toContain("min-w-[1208px]");
+    expect(scroller.firstElementChild?.className).toContain("min-w-[1214px]");
   });
 
   /**
@@ -1402,12 +1407,14 @@ describe("nine measured minimums, and no tail", () => {
    * other. Change a width without the min-width — or the min-width without a
    * width — and it fires.
    */
-  it("the min-width is exactly the sum of the nine over 0.97", async () => {
+  it("the min-width is exactly the sum of the nine plus the control column", async () => {
     await mountLoaded();
-    /* The kit's own expand-control column is the 3% one, and it is exactly
-     * what the other 97% is measured against — so it is dropped by NOT having
-     * a `data-column`, never by looking like a percentage. A business column
-     * that turned into a percentage must fail this, not slip through it. */
+    /* The kit's own expand-control column is the one without a `data-column`,
+     * and that is how it is dropped here — never by looking like a percentage.
+     * A business column that turned into a percentage must FAIL this, not slip
+     * through it. Under `sizing="content"` (P20.1) the control column is a hard
+     * 42px rather than a 3% share, so the derivation is plain addition and the
+     * only track that could silently absorb a pixel is gone. */
     const px = Object.entries(colWidths())
       .filter(([k]) => k !== "null")
       .map(([k, w]) => {
@@ -1424,7 +1431,17 @@ describe("nine measured minimums, and no tail", () => {
     const cls = String(scroller.firstElementChild?.className);
     const min = Number(/min-w-\[(\d+)px\]/.exec(cls)?.[1]);
 
-    expect(min).toBe(Math.ceil(sum / 0.97));
+    /* The kit's own control column, read off the SAME colgroup rather than
+     * typed here — so if the kit ever re-sizes it, this fires instead of
+     * quietly holding a number that stopped being true. */
+    const control = (
+      screen
+        .getByRole("table")
+        .querySelector("colgroup col") as HTMLElement
+    ).style.width;
+    expect(control).toBe("42px");
+
+    expect(min).toBe(sum + Number(control.replace("px", "")));
   });
 
   it("every action word still carries its own title, so a clip can be read", async () => {
@@ -1685,11 +1702,16 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
 describe("the ONE Current Action source (Law 7)", () => {
   /** Since Q7 the row carries three columns that can be empty (SO No.,
    *  Destination, Current Action), so a `—` must be asked for BY COLUMN. */
+  /* `Current Action` is the last BUSINESS cell, which since P20.1 is no longer
+   * the last `<td>`: `sizing="content"` puts the kit's filler after it, so
+   * `td:last-child` selected an `aria-hidden` empty cell and every assertion
+   * below failed on a table that renders perfectly. The filler is excluded by
+   * the name the kit stamps on it, never by counting from the right. */
   const actionCellOf = (poNo: string) =>
     within(
-      listing().getByText(poNo).closest("tr")!.querySelector(
-        "td:last-child",
-      ) as HTMLElement,
+      [
+        ...listing().getByText(poNo).closest("tr")!.querySelectorAll("td"),
+      ].filter((td) => td.dataset.kit !== "table-filler").pop() as HTMLElement,
     );
 
   it("the register's column reads the shared engine, and `—` is a real answer", async () => {
