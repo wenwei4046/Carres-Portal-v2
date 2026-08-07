@@ -419,6 +419,47 @@ ops_stock_items            135
 **Neither page renders more than about 130 rows today.** Every row is TEST data
 (`CLAUDE.md` §6), so these are evidence about what the code does, never about volume.
 
+**F58 · The Sales Order page STORES COLUMN VISIBILITY IN `localStorage` — in production.**
+```js
+const HIDDEN_COLS_KEY = "carres.orders.hiddenCols";
+function loadHiddenCols(): Set<string> {
+  if (typeof localStorage === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(HIDDEN_COLS_KEY);
+```
+`OperationOrdersControl.tsx:1540-1544`, with `saveHiddenCols` writing it back and a checkbox
+list at `:2959`. **This is a per-user store of UI shape — the exact thing `docs/ui/MASTER.md`
+§4 says does not exist anywhere (*"There is no `storageKey` anywhere … A reload is the
+reset"*) and §7 lists as REFUSED.**
+
+**F59 · The guard that is said to enforce that law scans TWO FILES, and neither is a page.**
+```js
+const SOURCES = ["DataTable.tsx", "grid-layout.ts"].map((f) => ({
+  file: f,
+  code: stripComments(readFileSync(join(DIR, f), "utf8")),
+}));
+...
+      expect(code, file).not.toMatch(/\b(?:localStorage|sessionStorage|indexedDB)\b/);
+```
+`kit/grid-powers.test.tsx:388-396`. The kit's own docblock states *"guard rule L enforces
+it"* — **it enforces it on the kit only.** F58 is invisible to it.
+
+**F60 · The Sales Order page has hand-rolled a large part of the kit it does not use.**
+Measured in `OperationOrdersControl.tsx`:
+```jsx
+:3605  className="w-full border-collapse text-body table-fixed [&_td]:h-[40px] [&_td]:py-1
+               [&_td]:align-middle [&_td]:overflow-hidden [&_td]:whitespace-nowrap"
+:1496  const ORDER_COL_DEFS: OrderColDef[] = [ … { key, label, w } … ]   ← percentage widths
+:1675  const colScale = 94 / (visibleColDefs.reduce((s, d) => s + d.w, 0) || 94);
+:2959  checked={showCol(d.key)}                                          ← a column chooser
+:4017  <BulkMenuItem icon={Download} label="Export CSV" onClick={onExport} />
+:2688  activeChips.push({ label: `Search: ${search}`, onClear: () => setSearch("") });
+```
+`table-fixed` · 40px rows · a percentage colgroup that rescales to 94% · a column chooser ·
+CSV export · filter chips — **all of it typed a second time, beside a kit that already ships
+four of the six.** What it does NOT have is the four powers the kit does ship: sort, group,
+expand, per-column filter (F40).
+
 **F42 · Two `WHAT IS ON SCREEN TODAY` line counts are stale.**
 `wc -l`, 2026-08-07: `OperationOrdersControl.tsx` **5,150** (Orders MASTER §3 says 5,121) ·
 `OrderDetailDrawer.tsx` **7,576** (Orders MASTER §4 says 7,717) ·
