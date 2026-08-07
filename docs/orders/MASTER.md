@@ -511,7 +511,7 @@ READ ONLY   CLAUDE.md  +  this §3.   Card 01 already returned READY.
 ONE CAPABILITY PER COMMIT, IN THIS ORDER. Never one huge PR.
    S2.0  Make main GREEN         → ✅ SHIPPED 2026-08-08, recorded below
    S2.1  Header sorting          → ✅ SHIPPED 2026-08-08, recorded below
-   S2.2  Header filter dropdowns → commit
+   S2.2  Header filter dropdowns → ✅ SHIPPED 2026-08-08, recorded below
    S2.3  Footer totals           → commit   ⚠ see the conflict below
    S2.4  Grouping                → commit   ⚠ see the conflict below
    S2.5  Expansion               → commit
@@ -635,6 +635,79 @@ a BLANK  sorts LAST in BOTH directions — Excel's rule, and 2990 spells it too
 **A rank is never typed twice:** the stage rank IS `TABS`, the stock rank IS `STOCK_BUCKETS`
 (Law D — a derived fact has ONE arithmetic). **A TBD date sorts with the blanks**, because it is
 no date, not a late one.
+
+### ✅ S2.2 · SHIPPED 2026-08-08 — the header ▼, on the four columns where it is a DOOR and not a second home
+
+**FOUR columns filter from their header. Four deliberately do not, and that split is this
+module's own frozen rule doing its job**, not a shortcut:
+
+> **Nothing on the list says the same thing twice.** … `Overdue` has exactly ONE home
+> (the QUEUES rail).
+
+2990 puts a funnel on **every** column (`DataGrid.tsx:342-345`, Commander 2026-05-29 —
+*"没有 drop-down 菜单让我去做选择"*), and the kit already renders the popover Jess approved on
+2026-08-01. What could not be copied wholesale is WHICH columns, because **almost every column
+here already has a rail facet.** So the test is not *does 2990 have a ▼* — it is **does this ▼
+create a second FILTER, or a second DOOR onto the one that exists**:
+
+```
+order      no rail facet             →  the ▼ owns its own state      WIRED
+customer   no rail facet             →  the ▼ owns its own state      WIRED
+deadline   DEADLINE   Set<DueBucket> →  the ▼ WRITES THE RAIL'S SET   WIRED
+delivery   LOGISTICS  Set<string>    →  the ▼ WRITES THE RAIL'S SET   WIRED
+──────────────────────────────────────────────────────────────────────────
+dots       the stage TABS own it     →  a THIRD home for the stage    NOT WIRED
+stock      stockFilter  — SINGLE-select
+pic        staffFilter  — SINGLE-select
+next       nextFilter   — SINGLE-select                               NOT WIRED
+```
+
+**`Deadline` and `Delivery` do not keep a set of their own.** Ticking `Due ≤3d` in the header
+is the same act as clicking it in the rail; clearing either clears both. **One truth, two
+doors** — the architecture's Law C is about two RECORDS, not two surfaces onto one. A test
+asserts it **in both directions**, which is the only way to tell that apart from two states
+that merely agree today.
+
+**THE CASCADE IS EXCEL'S, AND TO ORDER ALREADY SHIPPED IT.** Each ▼ lists the values that
+survive every OTHER narrowing, so an option a menu offers is an option that can return a row.
+**With one correction the rule needs:** a column's ▼ is computed with **its own filter LIFTED**.
+Filter it by itself and ticking one value makes every other value vanish — no way back except
+Clear. Pinned by its own test.
+
+> ### ⛔ THE LAST THREE ARE A CARD BOUNDARY, NOT A JUDGEMENT
+>
+> `stockFilter` · `staffFilter` · `nextFilter` are `T | null` — clicking a second PIC in the
+> rail REPLACES the first. The kit's ▼ is a multi-select checklist, so wiring it to those three
+> means **widening them to sets, and that changes what the RAIL does.** The S2 card is explicit:
+> *"DO NOT TOUCH Queues … Only rendering behaviour INSIDE the grid changes."* Widening a rail
+> facet from single to multi-select is not rendering behaviour inside the grid — and three of
+> the four are QUEUES rows by name.
+>
+> **Whether an operator may hold two PICs or two stock states at once is a real question with a
+> real answer, and it belongs to the card that owns the rail** — not to a grid-wiring card that
+> would answer it as a side effect.
+
+**MEASURED IN CHROMIUM AT FOUR WIDTHS, and the fourth is there because of `8340b0f0`** — the
+S1 regression Loo caught at ~1130px, whose lesson was *"re-measure at ≤1130px before calling any
+width safe."* The ▼ button is **24px**. The header row stays **40px** and every label stays on
+**one line** at all four:
+
+```
+table width   1022 (nav collapsed)   890 (~1130px viewport)   850 (nav expanded)   700
+order            fits, 3.4 spare        +7.0 into padding      +10.2  ▼ 2px clipped   +22.2 ✂
+customer         fits, 13.1 spare       +1.7 into padding      +6.2   fits inside     +23.0 ✂
+deadline         fits, 62.6 spare       fits                   fits                   fits
+delivery         fits, 30.8 spare       fits                   fits                   +8.6  ✂
+```
+
+**At the width Loo actually reported the ▼ fits** — the spill at 890px is into the `th`'s own
+8px padding, not past its border. `Order` is the tightest column and the first that would lose
+its ▼ if anything else joined the header.
+
+> 🟡 **REPORTED, NOT FIXED — below ~800px the `Order` ▼ is clipped by its neighbour.** Same
+> class as S2.1's `Stock` arrow: the label stays whole, the control is what gets overpainted.
+> **It is not fixed here because the fix is a WIDTH**, and `8340b0f0` already rules widths out
+> of S2 (*"S2 wires grid powers and changes no width"*). It joins that card's list.
 
 ### ⛔ ⚑ `Follow-up` DOES NOT SORT, AND ONLY A REAL BROWSER COULD SAY SO
 

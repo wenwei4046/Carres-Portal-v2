@@ -17,6 +17,7 @@ import OperationOrdersControl, {
   isImportedArchive,
   compareOrderSortValues,
   ORDER_SORTABLE_COLUMNS,
+  ORDER_FILTER_COLUMNS,
 } from "./OperationOrdersControl";
 import type {
   StockInfo,
@@ -577,6 +578,152 @@ describe("OperationOrdersControl · S1 · the kit renders the table", () => {
     expect(localStorage.getItem("carres.orders.hiddenCols")).toBeNull();
     expect(wrote).not.toContain("carres.orders.hiddenCols");
     spy.mockRestore();
+  });
+});
+
+describe("OperationOrdersControl · S2.2 · the operator filters from the header ▼", () => {
+  function openFilter(key: string) {
+    fireEvent.click(screen.getByTestId(`table-filter-${key}`));
+  }
+  /** Tick one value in the open ▼, by the word the operator reads. */
+  function tick(label: string | RegExp) {
+    fireEvent.click(screen.getByLabelText(label));
+  }
+
+  it("narrows the list to the ticked value, and untickng gives every row back", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({ id: "f1", so: 4101, customer_name: "Tan Ah Kow" }),
+        makeRow({ id: "f2", so: 4102, customer_name: "Lim Bee Lian" }),
+        makeRow({ id: "f3", so: 4103, customer_name: "Tan Ah Kow" }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    expect(rowsBySo()).toHaveLength(3);
+
+    openFilter("customer");
+    tick("Tan Ah Kow");
+    expect(rowsBySo()).toEqual(["4101", "4103"]);
+
+    tick("Tan Ah Kow");
+    expect(rowsBySo()).toHaveLength(3);
+  });
+
+  it("ticks are OR inside one column — Excel's checklist, not a second AND", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({ id: "g1", so: 4201, customer_name: "Ann" }),
+        makeRow({ id: "g2", so: 4202, customer_name: "Bee" }),
+        makeRow({ id: "g3", so: 4203, customer_name: "Cee" }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    openFilter("customer");
+    tick("Ann");
+    tick("Cee");
+    expect(rowsBySo()).toEqual(["4201", "4203"]);
+  });
+
+  it("two different columns are AND — a row must pass both", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({ id: "h1", so: 4301, customer_name: "Ann" }),
+        makeRow({ id: "h2", so: 4302, customer_name: "Ann" }),
+        makeRow({ id: "h3", so: 4303, customer_name: "Bee" }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    openFilter("customer");
+    tick("Ann");
+    fireEvent.keyDown(document, { key: "Escape" });
+    openFilter("order");
+    tick("SO-4302");
+    expect(rowsBySo()).toEqual(["4302"]);
+  });
+
+  it("CASCADES — a column's ▼ only offers values the OTHER filters can still return", () => {
+    // The rule this pins is the reason the lists are computed rather than read
+    // off the rendered rows: an option that returns nothing is a dead end the
+    // operator has to discover by clicking. To Order ships the same cascade
+    // (`filteredExcept`) and the rail's facet law (§8.2) is the same sentence.
+    listHookState.data = {
+      orders: [
+        makeRow({ id: "i1", so: 4401, customer_name: "Ann" }),
+        makeRow({ id: "i2", so: 4402, customer_name: "Bee" }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    openFilter("customer");
+    tick("Ann");
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    openFilter("order");
+    // Ann's order is offered; Bee's is not — the Customer ▼ already excluded it.
+    expect(screen.getByLabelText("SO-4401")).toBeInTheDocument();
+    expect(screen.queryByLabelText("SO-4402")).toBeNull();
+  });
+
+  it("a filtered column can still WIDEN itself — its own ticks do not shrink its list", () => {
+    // The trap the cascade creates if the column filters its own menu: tick
+    // one value and every other value vanishes, so there is no way back except
+    // Clear. The ▼ must list what it would offer with its OWN filter lifted.
+    listHookState.data = {
+      orders: [
+        makeRow({ id: "j1", so: 4501, customer_name: "Ann" }),
+        makeRow({ id: "j2", so: 4502, customer_name: "Bee" }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    openFilter("customer");
+    tick("Ann");
+    expect(screen.getByLabelText("Bee")).toBeInTheDocument();
+    tick("Bee");
+    expect(rowsBySo()).toEqual(["4501", "4502"]);
+  });
+
+  it("offers a ▼ on exactly the four columns S2.2 wired, and on no other", () => {
+    listHookState.data = { orders: [makeRow({ id: "k1", so: 4601 })] };
+    wrap(<OperationOrdersControl />);
+    const offered = Array.from(
+      screen.getByRole("table").querySelectorAll("[data-testid^='table-filter-']"),
+    )
+      .map((b) => b.getAttribute("data-testid")!.replace("table-filter-", ""))
+      // the search box inside an OPEN popover shares the prefix
+      .filter((k) => !k.startsWith("search-"));
+    expect(new Set(offered)).toEqual(ORDER_FILTER_COLUMNS);
+  });
+
+  it("the Deadline ▼ and the DEADLINE rail are ONE filter, not two", () => {
+    // The frozen rule is that nothing on this list says the same thing twice.
+    // A ▼ holding its own set would be a SECOND home for one narrowing, and the
+    // two would drift the first time either changed. This asserts the state is
+    // shared IN BOTH DIRECTIONS — which is the only way to tell "one truth,
+    // two doors" apart from "two truths that happen to agree right now".
+    const soon = new Date();
+    soon.setDate(soon.getDate() + 2);
+    const dueSoon = soon.toISOString().slice(0, 10);
+    listHookState.data = {
+      orders: [
+        makeRow({ id: "m1", so: 4701, delivery_date: dueSoon }),
+        makeRow({ id: "m2", so: 4702, delivery_date: null }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    const railRow = () =>
+      within(screen.getByTestId("filter-deadline")).getByRole("button", {
+        name: /Due ≤3d/,
+      });
+
+    // ① rail → ▼. Engage the rail, and the header's box is ALREADY ticked.
+    fireEvent.click(railRow());
+    expect(rowsBySo()).toEqual(["4701"]);
+    openFilter("deadline");
+    expect(screen.getByLabelText("Due ≤3d")).toBeChecked();
+
+    // ② ▼ → rail. Untick in the header, and the rail row lets go too.
+    tick("Due ≤3d");
+    expect(railRow().getAttribute("aria-pressed")).toBe("false");
+    expect(rowsBySo()).toHaveLength(2);
   });
 });
 
