@@ -2845,6 +2845,45 @@ export default function OperationOrdersControl({ onImport }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, supplierFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, skuMeta, suppliers, tasksByOrder, sort, sortCtx, colFilters]);
 
+  /**
+   * ─── S2.3 · THE FOOTER TOTAL ─────────────────────────────────────────────
+   *
+   * **Computed over `visible` — the WHOLE filtered list — and never over the
+   * rows the kit hands back.** The kit's `totals.cells(rows)` is given exactly
+   * what it rendered, and this page renders a **30-row window**. Summing that
+   * callback's argument would print the total of thirty orders under a footer
+   * band that says `30 of 65` one line below, and it would CHANGE as the
+   * operator scrolls. **That is the same defect S2.1 had to design around for
+   * the sort**, arriving through a different door, so the argument is
+   * deliberately ignored and a test pins it.
+   *
+   * **WHAT IT STATES, and each half is a decision.**
+   *
+   * · **The money, not the count.** The footer band already prints
+   *   `{total} orders` two lines down; §3's frozen rule is that nothing on
+   *   this list says the same thing twice. **Nothing on screen states the
+   *   money for the CURRENT view** — the `Owing` rail row carries a total, but
+   *   that is one fixed queue over every order, not what these filters left.
+   *   Money is also what a footer totals in the tool the team already uses.
+   *
+   * · **What it could NOT price, out loud.** `orderMoney` answers `unknown`
+   *   when an order has neither priced lines nor a keyed balance, and §4's
+   *   rule is *"not priced", never RM 0*. A sum that silently skipped those
+   *   would be a smaller number wearing a complete number's clothes.
+   *
+   * **`fmtMoney` spells the figure, as every money figure on this page does.**
+   */
+  const viewTotal = useMemo(() => {
+    let outstanding = 0;
+    let unpriced = 0;
+    for (const o of visible) {
+      const m = moneyOf(o);
+      if (!m.known) unpriced += 1;
+      else outstanding += m.outstanding;
+    }
+    return { outstanding, unpriced };
+  }, [visible]);
+
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
     let mx: string | null = null;
@@ -4278,6 +4317,26 @@ export default function OperationOrdersControl({ onImport }: Props) {
            third click hands `null` back, which is `compareBySlack`. */
         sort={sort}
         onSortChange={setSort}
+        /* S2.3 — ONE spanned sentence, not a digit marooned under a column:
+           this table has no money column for a per-column aggregate to land
+           under. The callback's `rows` argument is the 30-row WINDOW and is
+           deliberately unused — see `viewTotal`. */
+        totals={{
+          label: "Total for this view",
+          cells: () => [
+            {
+              span: ORDER_COL_DEFS.length + 1,
+              content: (
+                <span className="tabular-nums" data-testid="orders-view-total">
+                  {`Total · ${fmtMoney(viewTotal.outstanding)} outstanding`}
+                  {viewTotal.unpriced > 0
+                    ? ` · ${viewTotal.unpriced} not priced`
+                    : ""}
+                </span>
+              ),
+            },
+          ],
+        }}
         selection={{
           selected,
           onToggleRow: toggleOne,

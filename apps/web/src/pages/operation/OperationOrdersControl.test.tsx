@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { fmtMoney } from "@carres/shared";
 import OperationOrdersControl, {
   buildOrdersCsv,
   buildOrdersPrintHtml,
@@ -578,6 +579,101 @@ describe("OperationOrdersControl · S1 · the kit renders the table", () => {
     expect(localStorage.getItem("carres.orders.hiddenCols")).toBeNull();
     expect(wrote).not.toContain("carres.orders.hiddenCols");
     spy.mockRestore();
+  });
+});
+
+describe("OperationOrdersControl · S2.3 · the footer total", () => {
+  const strip = () => screen.queryByTestId("orders-view-total");
+
+  it("TOTALS THE WHOLE FILTERED LIST, not the 30 rows on screen", () => {
+    // THE defect this capability invites. The kit hands `totals.cells(rows)`
+    // exactly what it rendered, and this page renders a 30-row window — so
+    // summing that argument prints the total of thirty under a footer band
+    // that says "30 of 35" one line below, and the number CHANGES as the
+    // operator scrolls. 35 orders × RM 100 each; a windowed sum says 3,000.
+    listHookState.data = {
+      orders: Array.from({ length: 35 }, (_, i) =>
+        makeRow({
+          id: `t${i}`,
+          so: 7000 + i,
+          order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 100 }],
+        }),
+      ),
+    };
+    wrap(<OperationOrdersControl />);
+    expect(screen.getAllByTestId("order-row")).toHaveLength(30);
+    expect(strip()!.textContent).toContain(fmtMoney(3500));
+  });
+
+  it("follows the filter — it is the total for THIS view, not for every order", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({
+          id: "v1", so: 7101, customer_name: "Ann",
+          order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 500 }],
+        }),
+        makeRow({
+          id: "v2", so: 7102, customer_name: "Bee",
+          order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 300 }],
+        }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    expect(strip()!.textContent).toContain(fmtMoney(800));
+
+    fireEvent.click(screen.getByTestId("table-filter-customer"));
+    fireEvent.click(screen.getByLabelText("Ann"));
+    expect(strip()!.textContent).toContain(fmtMoney(500));
+  });
+
+  it("SAYS what it could not price instead of counting it as nothing", () => {
+    // §4's rule is "not priced", never RM 0. An order with no priced lines and
+    // no keyed balance is UNKNOWN, and a sum that silently skipped it would be
+    // a smaller number wearing a complete number's clothes.
+    listHookState.data = {
+      orders: [
+        makeRow({
+          id: "u1", so: 7201,
+          order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 250 }],
+        }),
+        // No priced lines and no keyed balance → `orderMoney` answers UNKNOWN.
+        makeRow({ id: "u2", so: 7202, order_lines: [] }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    expect(strip()!.textContent).toContain(fmtMoney(250));
+    expect(strip()!.textContent).toContain("1 not priced");
+  });
+
+  it("says nothing about pricing when every order in view is priced", () => {
+    listHookState.data = {
+      orders: [makeRow({
+        id: "p1", so: 7301,
+        order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 250 }],
+      })],
+    };
+    wrap(<OperationOrdersControl />);
+    expect(strip()!.textContent).not.toContain("not priced");
+  });
+
+  it("does not draw at all when the view is empty — a total of nothing is not a total", () => {
+    listHookState.data = { orders: [] };
+    wrap(<OperationOrdersControl />);
+    expect(strip()).toBeNull();
+  });
+
+  it("spells its figure with fmtMoney and nothing else", () => {
+    // The frozen rule: one spelling, asserted by identity, never by two
+    // implementations agreeing. A hand-rolled `RM ${n}` would pass every test
+    // above and diverge the day the shared format changes.
+    listHookState.data = {
+      orders: [makeRow({
+        id: "f1", so: 7401,
+        order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 1234567 }],
+      })],
+    };
+    wrap(<OperationOrdersControl />);
+    expect(strip()!.textContent).toContain(fmtMoney(1234567));
   });
 });
 
