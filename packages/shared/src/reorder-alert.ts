@@ -32,7 +32,7 @@
  * alerts are card K5; the monthly plan is K2. K1 has exactly three states.
  */
 
-import { lineCategory, accShort } from "./line-category";
+import { lineClass, accShort } from "./line-category";
 
 /**
  * The accessory types that come in by sea container and therefore need an
@@ -50,7 +50,9 @@ export const IMPORT_LEAD_DAYS_DEFAULT = 60;
  * operator already sees elsewhere) or `null`.
  */
 export function importAccessoryKind(sku: string): ImportAccessoryKind | null {
-  if (lineCategory(sku) !== "acc") return null;
+  // D9 — `lineClass`, not `lineCategory`: a SKU nothing recognised must not be
+  // forecast as a container of pillows.
+  if (lineClass(sku) !== "acc") return null;
   const short = accShort(sku);
   return (IMPORT_ACCESSORY_KINDS as readonly string[]).includes(short)
     ? (short as ImportAccessoryKind)

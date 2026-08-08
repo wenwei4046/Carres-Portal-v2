@@ -1107,6 +1107,9 @@ export {
   deliveryGroupOf,
   orderDeliveryGroups,
   deliveryScopeSentence,
+  isUnknownGood,
+  isOutsideTheTrip,
+  unknownGoodsSkus,
   type DeliveryGroupDef,
   type DeliveryGroupKey,
 } from "./delivery-groups";
@@ -1634,14 +1637,17 @@ export { deriveSkuCode, normalizeSkuKey } from "./sku-code";
 // Order-line classification + readiness (D1, 2026-07-26) — moved from
 // apps/web/src/lib so the API booking gate and the drawer badge read ONE rule.
 export {
+  lineClass,
   lineCategory,
   lineSize,
   stockMatchKey,
   accShort,
+  accessoryType,
   lineKind,
   lineSortRank,
   defaultLineLocation,
   type CoreCat,
+  type LineClass,
   type ItemKind,
 } from "./line-category";
 export {
