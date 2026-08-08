@@ -1524,6 +1524,83 @@ function unitTotal(lines: { sku: string; qty: number }[]): number {
   return t;
 }
 
+/**
+ * ⭐ S2.5 — WHAT NAMES AN ORDER LINE, and the card's own candidate was the
+ * wrong column.
+ *
+ * §3's S2.5 block flagged one thing to settle before building: `order_lines`
+ * carries `{ sku, qty, unit_price }` with **no description**, R4 requires
+ * *"human words, not codes"*, and it named the catalog's `variant` as the
+ * human label. **Measured on production 2026-08-08, `variant` does not carry
+ * a human word at all** — it is a SIZE or a MODULE CODE:
+ *
+ * ```
+ *   sku            variant      product_skus.description
+ *   B1201S-K       King         Mattress B1201S 183X190CM
+ *   5539-CNR       CNR          Sofa Booqit CNR
+ *   5539-2A(RHF)   2A(RHF)      Sofa Booqit 2A(RHF)
+ *   CODY-Q         Queen        Bedframe Cody 152X190CM
+ * ```
+ *
+ * **`description` is the label, and it is already on the wire.** It is
+ * 209/209 filled, it equals neither the sku nor `name + variant` on any row,
+ * and it is the ONE field carrying R4's three parts at once — the noun (what
+ * it is), the model, and the spec (the physical size). The API generates it
+ * for bed sizes and the catalog admin may type it (`catalog.ts:754`), it
+ * rides `GET /api/catalog` through `productSkuFromRow`, and this page ALREADY
+ * calls `useCatalog()` for the SUPPLIER facet. **So the label costs no fetch,
+ * no route, no migration — it costs three fields on a map that exists.**
+ *
+ * **THE FALLBACK IS NOT AN EDGE, IT IS A WHOLE POPULATION — and it is also
+ * not a degradation.** Measured 2026-08-08 over 184 live lines:
+ *
+ * ```
+ *   source              orders   lines   matched a catalog row
+ *   autocount              37      94      0        ← none, ever
+ *   native (POS)           32      82     81
+ *   rental                  8       8      8
+ * ```
+ *
+ * Zero of 94 AutoCount lines have a catalog row, so a fallback that shrugged
+ * would blank half the list. It does not have to: **the AutoCount "SKU" IS
+ * free text a human typed** — `Breeze FirmCare-B1201F-Q` · `Essential Memory
+ * Pillow(L)` · `Mattress Disposal` · `No Lift Per Floor Charge` — and on that
+ * population it is frequently MORE human than the catalog's own label would
+ * be. So the fallback prints it verbatim.
+ *
+ * **`fromCatalog` is kept because the two are not the same claim.** A
+ * catalogued line is named by OUR record; a free-text line is named by
+ * whatever AutoCount was given. The panel spends no pixels on the difference
+ * today — nothing on screen turns on it — but the caller can tell them apart
+ * without re-deriving the join, which is what stops the next card guessing.
+ *
+ * **What this deliberately does NOT do: invent a name.** No composing a title
+ * out of `lineClass` + `lineSize` when the record has none — that would put a
+ * word on screen that no one entered, which is the failure the card named.
+ * When nothing is known the SKU string is what there is, and it is shown.
+ *
+ * **FALSIFIER:** a NATIVE order line whose sku has no catalog row — then this
+ * prints a bare code with no human word in it. Live today: 1 of 82
+ * (`M1201F-K`, and no `M1201F%` sku exists at all, so it is a deleted-catalog
+ * artefact of the trial data §6 says is thrown away at go-live). If a second
+ * appears from the POS path, the fallback stops being cosmetic and
+ * `order_lines` needs to store the description AT SALE — a line must not be
+ * renamed by a later catalog edit anyway.
+ */
+export function orderItemLines(
+  lines: { sku: string; qty: number }[],
+  skuMeta: Map<string, { label?: string | null }>,
+): { qty: number; label: string; fromCatalog: boolean }[] {
+  return lines.map((l) => {
+    const label = skuMeta.get(l.sku)?.label?.trim();
+    return {
+      qty: Number(l.qty || 0),
+      label: label || l.sku,
+      fromCatalog: !!label,
+    };
+  });
+}
+
 /** Roll a line list up into boxed TAGS, one per category, ordered core →
  *  accessories → services. qty + name come back SEPARATE so the cell can drop
  *  the qty on single-category orders (the left total already says it — avoids
@@ -2031,6 +2108,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
      out a per-user store of UI shape, and a sort an operator cannot remember
      setting is a list that lies to them tomorrow morning. */
   const [sort, setSort] = useState<TableSort | null>(null);
+  /* S2.5 — which rows are unfolded. Controlled, like `selected`, and
+     session-only for the same §0.4 reason as `sort`: an unfold an operator
+     cannot remember making is a list that looks different tomorrow morning
+     for no reason they can name. */
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkMenu, setBulkMenu] = useState<
@@ -2107,11 +2189,31 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const modelCat = new Map(
       (catalogQ.data?.models ?? []).map((m) => [m.id, m.category as string]),
     );
-    const m = new Map<string, { supplierId: string | null; category: string | null }>();
+    /* S2.5 — the model's NAME joins the map beside its category, for the one
+       case `description` cannot cover: a SKU whose description was never
+       written. `Booqit · CNR` still says which product; `CNR` alone does not. */
+    const modelName = new Map(
+      (catalogQ.data?.models ?? []).map((m) => [m.id, m.name]),
+    );
+    const m = new Map<
+      string,
+      { supplierId: string | null; category: string | null; label: string | null }
+    >();
     for (const s of catalogQ.data?.skus ?? []) {
+      /* THE LABEL, in the order the evidence ranks it (see `orderItemLines`):
+         `description` first — it is 209/209 filled and the only field that
+         carries noun + model + spec at once. Then `{model} · {variant}`, which
+         is what the card originally proposed and what remains true when a
+         description is missing. Then NOTHING — `null` hands the decision back
+         to the caller, which prints the sku verbatim rather than inventing a
+         name out of the classifier. */
+      const model = modelName.get(s.modelId)?.trim() ?? "";
+      const variant = s.variant?.trim() ?? "";
+      const composed = model && variant ? `${model} · ${variant}` : model || variant;
       m.set(s.sku, {
         supplierId: s.supplierId ?? null,
         category: modelCat.get(s.modelId) ?? null,
+        label: s.description?.trim() || composed || null,
       });
     }
     return m;
@@ -2964,6 +3066,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Partial tick → the header checkbox shows an indeterminate dash (Gmail).
   const somePagedSelected =
     !allPagedSelected && pagedIds.some((id) => selected.has(id));
+  function toggleExpanded(id: string) {
+    setExpandedRows((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }
   function toggleOne(id: string) {
     setSelected((s) => {
       const n = new Set(s);
@@ -4383,6 +4493,41 @@ export default function OperationOrdersControl({ onImport }: Props) {
             },
           ],
         }}
+        /* ⭐ S2.5 — EXPANSION. The one grid power that buys something the
+           drawer structurally cannot: the drawer renders IN PLACE of the list,
+           so until now the only way to see what an order CONTAINS was to lose
+           the list you were reading — and the Items column was removed from
+           this table entirely (`itemRollup` survives only in the CSV/print
+           export). This is §4's R4 · Contents, and R4's whole contract is
+           `what · how many · which spec`.
+
+           WHAT IS DELIBERATELY NOT IN HERE. 2990's drill-down carries `UNIT
+           COST · LINE COST · MARGIN`; §4 R5 rules **never cost, never
+           margin**, so the SHAPE is copied and those three columns are not.
+           Nor is stock, PO or GRN state: R4 *"proves nothing"*, the row's own
+           `Stock` cell and `Actions` cell already answer that, and a second
+           home for one fact is ownership Law C.
+
+           IT COSTS NO BUSINESS COLUMN ANYTHING, and that is why this card
+           could finally run. #692 measured the chevron at 3% of a
+           percentage-sized table — −24 to −28px off the eight columns,
+           `Actions` worst. Orders is `sizing="content"` since S3.1, where the
+           kit fixes the gutter at a flat **42px**, and S3.2 freed **42px** off
+           the ⚑ column. Paid to the pixel; the width test below asserts it. */
+        expansion={{
+          expanded: expandedRows,
+          onToggle: toggleExpanded,
+          /* `aria-expanded` carries open/closed, so the word never flips —
+             it only has to name the object, by the operator's own name for
+             the row (the same reason `selection.rowLabel` exists). */
+          label: (r) => `Show items in SO-${r.o.so}`,
+          /* The kit's own rule: "a row with nothing to open gets no control,
+             not a dead one." An order with no lines simply has no chevron. */
+          expandable: (r) => (r.o.order_lines ?? []).length > 0,
+          render: (r) => (
+            <OrderItemsPanel lines={r.o.order_lines ?? []} skuMeta={skuMeta} />
+          ),
+        }}
         selection={{
           selected,
           onToggleRow: toggleOne,
@@ -5234,6 +5379,67 @@ interface OrdersGridRow {
   /** C1 — the order's primary supplier NAME, so the action line can say
    *  "Call Ohana — confirm ready date". Null → the role word "supplier". */
   supplierName: string | null;
+}
+
+/**
+ * ⭐ S2.5 · THE EXPANSION — R4 · Contents, and nothing else.
+ *
+ * **The SHAPE is 2990's** (`MfgSalesOrdersList.tsx:574` — the expand is the
+ * record's line items, every caller, no exceptions). **Three things it has and
+ * this does not, each for a stated reason:**
+ *
+ * 1. **`UNIT COST · LINE COST · MARGIN`** — §4 R5: *never cost, never margin*.
+ * 2. **A fetch, with loading and error states.** 2990's drill-down calls
+ *    `useMfgSalesOrderDetail(docNo)` when you open it. Carres does not need
+ *    to: `order_lines` is already embedded in the list response the row was
+ *    drawn from. **A state that cannot occur does not get a branch.**
+ * 3. **A grid — sortable, groupable, resizable, with a persisted layout.**
+ *    Measured on production 2026-08-08: **77 orders hold 1–8 lines, median 2**,
+ *    and only 3 orders carry more than five. A configurable grid over two rows
+ *    is furniture, and F61 forbids persisting a layout anyway.
+ *
+ * So it is a plain list: `qty` right-aligned against the label, in the order
+ * the order records them. **No de-duplication and no rollup** — two lines of
+ * the same SKU is what AutoCount booked (one live order carries `Essential
+ * Memory Pillow(L)` twice), and merging them would show a record that does not
+ * exist. `itemTags` stays where it is: it answers *what kind of goods* in one
+ * line for the CSV, and it cannot answer *which mattress*, which is the whole
+ * question R4 opens on.
+ *
+ * The `×` is `tagLabel`'s own glyph, so the export and the panel count the
+ * same way.
+ */
+function OrderItemsPanel({
+  lines,
+  skuMeta,
+}: {
+  lines: { sku: string; qty: number }[];
+  skuMeta: Map<string, { label?: string | null }>;
+}) {
+  const items = orderItemLines(lines, skuMeta);
+  return (
+    <div data-testid="order-items-panel">
+      <div className="text-label uppercase tracking-[0.04em] text-base-500 mb-1.5">
+        Items
+      </div>
+      <ul className="flex flex-col gap-1">
+        {items.map((it, i) => (
+          /* KEYED BY INDEX ON PURPOSE — the sku is NOT unique within an order
+             (production carries a repeated pillow line), so keying by it would
+             collapse two real lines into one React child. */
+          <li key={i} className="flex items-baseline gap-2 text-body">
+            <span className="tabular-nums text-base-500 w-10 shrink-0 text-right">
+              {it.qty}×
+            </span>
+            {/* The expanded cell is the ONE cell the kit lets wrap, so a long
+                AutoCount string reads whole instead of ending in an ellipsis
+                — which is the entire point of unfolding it. */}
+            <span className="min-w-0">{it.label}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 /* Status (Jess 2026-07-19): the pipeline STAGE in words — same vocabulary as
