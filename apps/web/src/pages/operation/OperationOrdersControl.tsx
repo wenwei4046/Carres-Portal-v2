@@ -44,6 +44,7 @@ import DataTable, {
   type ColumnFilter,
   type TableSort,
 } from "@/components/kit/DataTable";
+import KitIcon from "@/components/kit/Icon";
 import { SectionBand, SectionCard } from "@/components/SectionPanel";
 import { TASKS_KEY } from "./components/rail/TasksPanel";
 import {
@@ -1932,9 +1933,23 @@ const ORDER_COL_DEFS: OrderColDef[] = [
  *    the migration was approved with the word, and a build card does not
  *    reopen an approved rule. It reports the price.
  */
-/** `Follow-up` (54.4px) + the kit's `px-2` (16px) + ~2px of rendering slack.
- *  PIXELS, deliberately — see the block above. */
-const FOLLOW_UP_WIDTH = "72px";
+/** ⭐ S3.2 — 30px, and it used to be 72.
+ *
+ *  The cell is ONE 15px flag. It cost 72 because `Column.label` was a `string`
+ *  and the head therefore needed the WORD `Follow-up` (52.4px + the kit's 16).
+ *  `8340b0f0` is what that bought: on a ~1130px window this column kept its 72
+ *  while `Order` collapsed to `S(` — **the column that survived was the one
+ *  answering nothing.**
+ *
+ *  S3.2 adds `Column.headerContent` to the kit — OPTIONAL and additive, so the
+ *  three FROZEN pages that pass nothing emit byte-identical markup — and the
+ *  head draws the flag instead of spelling it. **The word is not lost:** it is
+ *  still `label`, still the accessible name, still the tooltip. Only the pixels
+ *  changed: 14px icon + the kit's `px-2` 16 = 30.
+ *
+ *  **42px back to the eight business columns**, which is what S2.5's expansion
+ *  gutter costs at 1198px table width — with room to spare. */
+const FOLLOW_UP_WIDTH = "30px";
 /* S3.1 DELETED `REFERENCE_TABLE_PX` · `GUTTER_DEFICIT_PCT` · `DEFICIT_SHARE`.
    All three existed to answer ONE question — which business column pays for the
    two gutters when the table is narrower than its content — and Loo's later
@@ -3476,7 +3491,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
          with the word hidden in a `title`. The CELL is unchanged — the flag's
          colour is still the whole state. */
       key: "follow_up",
+      /* The WORD stays here — COPY-STANDARD's, the QUEUES rail's own — and it
+         is what a screen reader and a hover still get. `headerContent` only
+         changes what is PAINTED. */
       label: "Follow-up",
+      headerContent: <KitIcon name="flag" size={14} />,
       width: FOLLOW_UP_WIDTH,
       headerTitle: "Flag an order for follow-up — amber while open, red once overdue",
       cell: (r) => <FollowUpFlag order={r.o} tasks={r.tasks} onFlag={openFollowUp} />,

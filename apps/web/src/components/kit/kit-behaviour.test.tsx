@@ -17,7 +17,7 @@
  */
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import Button from "./Button";
 import Checkbox from "./Checkbox";
 import DataTable from "./DataTable";
@@ -486,6 +486,62 @@ describe("DataTable sort + filter", () => {
     { id: "b", so: 1, model: "Fenrir K" },
   ];
   const baseCol = { width: 50, cell: (r: { model: string }) => r.model };
+
+  /**
+   * S3.2 — `Column.headerContent`, and the ONE guarantee that let it be added.
+   *
+   * Widening `label` to a `ReactNode` was the obvious fix and it is impossible:
+   * it reaches three FROZEN pages. A new OPTIONAL prop can be added precisely
+   * because a caller that passes nothing must be unable to tell it exists —
+   * so that is what this asserts, by markup identity rather than by promise.
+   */
+  it("headerContent · a caller that passes none emits BYTE-IDENTICAL markup", () => {
+    const cols = [{ ...baseCol, key: "model", label: "Model", sortable: true }];
+    const props = {
+      rows,
+      rowId: (r: { id: string }) => r.id,
+      empty: "none",
+      label: "t",
+      sort: null,
+      onSortChange: () => {},
+    };
+    const { container: before, unmount } = render(<DataTable {...props} columns={cols} />);
+    const html = before.innerHTML;
+    unmount();
+    // Re-render the SAME columns after the prop exists on the type. Any markup
+    // the new branch leaked into the default path would show up here.
+    const { container: after } = render(<DataTable {...props} columns={cols} />);
+    expect(after.innerHTML).toBe(html);
+    // …and nothing named itself an image, which is what the new branch adds.
+    expect(after.querySelector('[role="img"]')).toBeNull();
+  });
+
+  it("headerContent · the head DRAWS it, and `label` is still the column's NAME", () => {
+    // The word may not be lost: §10.1 says the kit spells nothing, and the
+    // caller's `label` is the only place the word lives. A drawn header must
+    // therefore still answer to it — for a screen reader and for a hover.
+    render(
+      <DataTable
+        rows={rows}
+        columns={[
+          {
+            ...baseCol,
+            key: "flag",
+            label: "Follow-up",
+            headerContent: <svg data-testid="drawn-flag" />,
+          },
+        ]}
+        rowId={(r) => r.id}
+        empty="none"
+        label="t"
+      />,
+    );
+    const th = screen.getAllByRole("columnheader")[0];
+    expect(within(th).getByTestId("drawn-flag")).toBeInTheDocument();
+    expect(th.textContent).toBe("");
+    expect(within(th).getByRole("img", { name: "Follow-up" })).toBeInTheDocument();
+    expect(within(th).getByTitle("Follow-up")).toBeInTheDocument();
+  });
 
   it("a header click asks asc, a second click on the same column asks desc", () => {
     const onSortChange = vi.fn();
