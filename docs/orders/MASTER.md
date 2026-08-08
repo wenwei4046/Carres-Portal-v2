@@ -651,6 +651,11 @@ offer the primary check-in, and the supplier name is asserted ABSENT rather than
 >
 > ## ✅ D9 · SHIPPED 2026-08-08 — an unrecognised SKU no longer claims it is safe to deliver
 >
+> **Live on `a7daf937`** — web bundle `index-CTbZKTLN.js` across all four canonicals, Worker
+> version `fa58a642`. **The Worker was owed even though D9 changed no `apps/api` file**:
+> `order-control.ts` imports `bookingConfirmGate`, and the gate's answer moved. Deploy proof in
+> [`ENGINEERING.md`](../ENGINEERING.md) §9.
+>
 > **The headline number, re-measured before the build and again after it:**
 > ```
 >                                                    before      after
