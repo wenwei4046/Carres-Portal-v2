@@ -354,6 +354,66 @@ what an operator should be allowed to sort away from that is a decision, not a p
 the next card's question and it is now cheap to answer.**
 **→ S2.1 answered it on 2026-08-08 and sort is now wired; the ▼ is S2.2's.**
 
+# ▶︎ S3 · APPROVED TO BUILD 2026-08-08 — the width card, and it unblocks S2.5
+
+> **Everything now waits on this.** S2.5 is blocked on it (measured, #692), the ⚑ regression is
+> it (`8340b0f0`), and `Actions` truncating on 30 of 30 rows has been marked ACCEPTED on an
+> arithmetic this card overturns.
+
+**⭐ THE DECISION, AND IT IS NOT A NEW ONE — IT IS TWO OF LOO'S OWN RULINGS, OPPOSED.**
+
+```
+Orders    2026-07-09  the table is ALWAYS exactly the container width, NEVER scrolls
+                      sideways; long content ellipsis-truncates
+To Order  2026-08-06  below its own width the grid SCROLLS SIDEWAYS, never truncates —
+                      "deleting a business column, or shrinking one below its measured
+                       content, to avoid a scrollbar is FORBIDDEN"
+```
+
+**One owner, two rulings, opposite directions, two pages — and the older one has now produced
+the failure the newer one exists to forbid.** Measured on production at ~1130px: `Order` reads
+`S(`, `Customer` reads `W. K.`, `Stock` reads one letter. **Every one of those is a column
+shrunk below its measured content, which the 2026-08-06 ruling names and bans.**
+
+> **S3 applies the LATER, MORE SPECIFIC ruling to Orders.** This is not a new law and not a
+> reversal on the merits — it is the same owner's own rule, applied where its own stated
+> failure has now appeared. **If Loo wants Orders to keep truncating instead, that is one
+> sentence and S3 stops.**
+
+```text
+BUILD CARD · S3.   git pull, then read CLAUDE.md + docs/orders/MASTER.md §3.
+
+S3.1  Orders columns become CONTENT-SIZED — sizing="content", px widths
+      measured in a real browser against each column's worst live string,
+      exactly as To Order and Purchase Orders already are. Below the sum the
+      grid scrolls sideways. It stops squeezing.
+      ⚠ MEASURE AT ≤1130px. Every earlier width reading in this programme ran
+        at 1440x900, where the defect is invisible (8340b0f0).
+
+S3.2  FREE THE ⚑'s 72px. It holds a 15px flag; it costs 72 because its HEADER
+      needs the word. That needs `Column.label` to stop being `string` —
+      A KIT CHANGE, reaching three FROZEN pages, so it is OPTIONAL and
+      additive or it does not ship. If the kit refuses, S3.2 STOPS and reports;
+      S3.1 stands on its own.
+
+S3.3  RE-OPEN `Actions`. §3 marks its 30-of-30 truncation ACCEPTED on the
+      premise that all eight columns must be visible at once. S3.1 removes
+      that premise. Re-measure and state whether ACCEPTED still holds.
+
+DO NOT TOUCH   queues · business rules · the action ladder · the drawer ·
+               permissions · api · row height · row ORDER (§2.3 is frozen,
+               and S2.4 was refused on it).
+
+THEN  test → self-review → PR → merge → deploy → verify production.
+```
+
+**WHAT UNBLOCKS S2.5, stated so the next card does not re-derive it:** #692 measured the
+expansion chevron at 3% — **−24 to −28px taken from the eight business columns, `Actions`
+worst.** Freeing the ⚑'s 72px pays for that gutter about three times over. **S2.5 is not
+refused; it is queued behind this.**
+
+---
+
 ### 🔴 S1 REGRESSION, SEEN BY LOO ON A NARROW WINDOW 2026-08-08 — `Follow-up` NO LONGER SHRINKS
 
 **Observed on production, not measured in a harness, and that is the point.** On a ~1130px
