@@ -607,6 +607,46 @@ offer the primary check-in, and the supplier name is asserted ABSENT rather than
 > production that is an order told it can be delivered.** Filed as **D9 🔴** with its live
 > exposure named as the open question. **Not fixed here** — it reaches Stock and Purchasing, and
 > S2.0's mandate was the tests.
+>
+> ### 🔴🔴 THE OPEN QUESTION IS ANSWERED. D9 IS LIVE, AND IT IS 1 IN 6 ORDERS.
+> **Measured on production 2026-08-08** by replaying `lineCategory()`'s exact branches in SQL
+> over every line of every non-cancelled order:
+> ```
+> live orders                                              77
+> orders touching a MISREAD sku                            17
+> orders whose EVERY line classifies as `acc`              12   ← 16% of the register
+> misread lines                                            36
+> ```
+> **Those twelve orders can never fail a stock check.** Every line reads as an accessory, §7
+> says an accessory never blocks delivery, so the ladder answers *goods secured* without ever
+> asking the warehouse. **The build chat's guess that canonical SKUs are safe was right and
+> beside the point — the damage is in the free-text ones, and they are the majority of the
+> sofa book.**
+>
+> **What is being misread, verbatim from production:**
+> ```
+> SOFA MODULES read as accessories — 10 skus
+>   5539-1A(LHF) · 5539-1B(LHF) · 5539-2A(RHF) · 5539-2B(LHF) · 5539-CNR ·
+>   5539-L(RHF) · 5539-STOOL · LYYAR-1A(LHF) · LYYAR-1A(RHF) · TELLUC-1S
+>   (LHF/RHF = left/right hand facing · CNR = corner. These are the SAME
+>    strings Purchasing prints on live POs — PO-2031 carries `5539-2A(RHF)`.)
+>
+> MATTRESS-SHAPED read as accessories — 3 skus
+>   M1201F-K · N1001S-Q · GRT-MATTRESS-15Y
+>   `M1401F-K` IS classified mattress because the list holds `m140`.
+>   `M1201F-K` is one digit away and falls through. One product family,
+>   two answers.
+> ```
+> **THE CAUSE IS THE SHAPE OF THE RULE, NOT A MISSING ENTRY.** `lineCategory()` ends in
+> `return "acc"` — an unknown SKU is silently declared an accessory, and an accessory is
+> declared safe. **The default is the most dangerous of the four answers.** Adding `5539` and
+> `lyyar` to the keyword list fixes today's twelve orders and rebuilds the trap for the next
+> model Ohana names. **Whoever takes D9 must decide what an UNRECOGNISED sku is allowed to
+> claim** — and *"it does not block delivery"* cannot be it.
+>
+> **Bounded honestly:** `CLAUDE.md` §6 rules every live row is TEST data, so 12/77 is evidence
+> about the CODE, never about business volume. **It is not evidence about severity, which is
+> the same at any volume.** Re-run the query at go-live.
 
 ### ✅ S2.1 · SHIPPED 2026-08-08 — the operator sorts, and the third click gives the risk order back
 
