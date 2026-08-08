@@ -647,6 +647,43 @@ offer the primary check-in, and the supplier name is asserted ABSENT rather than
 > **Bounded honestly:** `CLAUDE.md` §6 rules every live row is TEST data, so 12/77 is evidence
 > about the CODE, never about business volume. **It is not evidence about severity, which is
 > the same at any volume.** Re-run the query at go-live.
+>
+> ## ▶︎ D9 · APPROVED TO BUILD 2026-08-08 — ahead of S2.3
+>
+> **It runs in PARALLEL with S2 and cannot collide:** S2 owns
+> `pages/operation/OperationOrdersControl.tsx`; D9 owns
+> `packages/shared/src/line-category.ts` and whatever reads it. **Neither touches the other's
+> file. If D9 needs to edit the Orders page, STOP and wait.**
+>
+> ```text
+> BUILD CARD · D9 · an unrecognised SKU may not claim it is safe to deliver.
+> git pull, then read CLAUDE.md + docs/orders/MASTER.md §12 (this block).
+>
+> THE DECISION FIRST, and it is the whole card:
+>   `lineCategory()` ends in `return "acc"`, and §7 says an accessory never
+>   blocks delivery. So "I do not recognise this" silently becomes "this
+>   cannot stop a delivery". Adding `5539` + `lyyar` to the keyword list
+>   fixes today's twelve orders and REBUILDS THE TRAP for the next model
+>   Ohana names. Do not stop at the keyword list.
+>
+>   An unrecognised SKU must reach the operator as UNKNOWN, never as safe.
+>   §2.5's own discipline already exists for exactly this — `photoOnFile`
+>   and `deliveryOrderIssued` are THREE-WAY (`true` / `false` / `null` =
+>   we cannot see), and null raises nothing and claims nothing. Readiness
+>   is the one that guesses instead.
+>
+> MEASURE FIRST, then build. The SQL that produced 77 / 17 / 12 / 36 is in
+> this block — re-run it, do not trust the number.
+>
+> DO NOT TOUCH   the Orders page (S2 owns it) · the drawer · the api ·
+>                any migration. This is a shared-rule card.
+>
+> THEN  test → self-review → PR → merge → deploy → verify production.
+> ```
+>
+> **WHY IT GOES AHEAD OF S2.3.** S2.3 is a totals strip — useful. D9 tells an operator to
+> deliver goods the warehouse does not have. **A wrong number on a footer costs a glance; a
+> wrong readiness costs a customer.**
 
 ### ✅ S2.1 · SHIPPED 2026-08-08 — the operator sorts, and the third click gives the risk order back
 
