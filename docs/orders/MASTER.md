@@ -34,6 +34,80 @@
 
 ---
 
+# §0 · THE CHARTER — FROZEN 2026-08-08 (Loo). Phase 1 of the Golden Template.
+
+> **Sales Order is the operational home of the customer order: find any order, see what needs
+> attention, understand the whole journey — while EXECUTION stays with the module that owns it.**
+
+**IT IS NOT A PURE WORK QUEUE AND NOT A PURE REGISTER.** Loo rejected the narrower purpose
+*"which orders need me today"* on the ground that a customer phones and the operator must find
+that order and see what is happening to it. **Both must hold.**
+
+```
+1  What needs my attention?        今天先处理什么
+2  What is happening with this?    这张单现在发生什么
+```
+
+**ONE PAGE, TWO USES — and the two frozen scope rulings already decide how they coexist:**
+```
+DATE SCOPE   `All` = every non-cancelled order, never a month window   → the REGISTER is the scope
+OWNER SCOPE  a non-manager defaults to My Orders                       → the WORK is the default filter
+                                                                          A STARTING VIEW, never a wall
+= the page is already "my work, inside the whole register". There is no mode switch to design.
+```
+
+### WHAT SALES ORDER OWNS
+```
+✓ the customer order's identity          ✓ the customer
+✓ WHAT WAS ORDERED (order_lines)         ✓ the customer's promise / required date
+✓ PIC / ownership                        ✓ the order's history
+✓ overall risk / issue VISIBILITY        ✓ the cross-module journey SUMMARY
+```
+
+### WHAT IT DOES NOT OWN — it may only READ · SUMMARISE · LINK
+```
+✗ issuing or managing a purchase order    ✗ receiving goods / GRN
+✗ supplier claim settlement               ✗ delivery planning execution
+✗ payment collection accounting           ✗ service-case execution
+```
+
+> ### ⚠️ AND THE NEXT ACTION IS A SUMMARY, NOT A POSSESSION (corrected on the draft, 2026-08-08)
+> The draft listed *"overall operational next action"* under OWNS. **It is not Orders'.**
+> `Issue PO` is Purchasing's act, `Call {logistics} — confirm delivery date` is Delivery's,
+> `Collect RM {amount}` is Payment's — and §1 already rules *"the same action is never defined
+> in two files"*, with `packages/shared/order-actions.ts` SHARED and the Delivery page rendering
+> the same computation. **Orders owns WHICH ACTION LEADS on the row. It does not own the
+> action.** Left under OWNS, this is the first door through which action logic walks back into
+> Orders — the exact failure this Charter exists to close.
+>
+> **Same distinction on the items:** Orders owns *what the customer ORDERED*. It does not own
+> their STATE — stock is Stock's, received is Receiving's, bought is Purchasing's.
+
+**THE BOUNDARY, drawn once:**
+```
+Customer Order → SALES ORDER (operational home)
+                   ├── Purchasing  "what is happening?"
+                   ├── Receiving   "what was received?"
+                   ├── Delivery    "what is booked?"
+                   ├── Payment     "what is still owed?"
+                   └── Service     "what issue is open?"
+Sales Order is the CUSTOMER-ORDER VIEW of the truth. Each module keeps its own truth.
+```
+This is `../ERP-ARCHITECTURE.md` Law B applied — *a summary is READ-ONLY, forever; it may
+never gain a form.*
+
+### ⭐ AND THE RULING THAT GOVERNS THE WHOLE REBUILD
+```
+The old OperationOrdersControl's business logic is EVIDENCE, not a UI SPECIFICATION.
+
+    keep what it KNOWS   ≠   keep how it DRAWS
+```
+**Every element of the old page — `Journey · Health · Calls · Current Issues · Tabs · Queue ·
+Calendar · Team` — is re-asked: does Sales Order need this fact, and if so where does it live?
+Nothing survives merely because it is already there.**
+
+---
+
 # ⛔ START HERE — SALES ORDER IS NOT FINISHED, AND THE LAST PROGRAMME MISSED WHY
 
 > **Loo, 2026-08-08, on the live page:** *"my page now all messy and don't know how to work —
