@@ -53,6 +53,11 @@ let partnersHookState: {
   isError: boolean;
 };
 let stockHookState: { data: operationStockResponse | undefined };
+/** S2.5 — the catalog bundle, which is where the ITEM LABEL comes from.
+ *  `undefined` is the default and is byte-identical to what ran before this
+ *  card: the real hook's fetch never resolves under the test client either,
+ *  so every pre-S2.5 test sees the same empty `skuMeta` it always saw. */
+let catalogHookState: { data: { models: unknown[]; skus: unknown[] } | undefined };
 
 vi.mock("@/lib/queries", async () => {
   const actual =
@@ -62,6 +67,7 @@ vi.mock("@/lib/queries", async () => {
     useOperationOrders: () => listHookState,
     useDeliveryPartners: () => partnersHookState,
     useOperationStock: () => stockHookState,
+    useCatalog: () => catalogHookState,
   };
 });
 
@@ -232,6 +238,9 @@ beforeEach(() => {
   // Default: no stock snapshot loaded → Stock column falls back to stage-only
   // state (the pre-existing behaviour the original tests assume).
   stockHookState = { data: undefined };
+  // Default: no catalog → every item label falls back to the SKU string, which
+  // is exactly what an AutoCount order does on production.
+  catalogHookState = { data: undefined };
 });
 
 describe("OperationOrdersControl", () => {
@@ -562,12 +571,23 @@ describe("OperationOrdersControl · S1 · the kit renders the table", () => {
     const cols = Array.from(screen.getByRole("table").querySelectorAll("col")).map(
       (c) => (c as HTMLElement).style.width,
     );
-    // select + Follow-up + the 8 business columns + the kit's trailing FILLER,
-    // which is what `sizing="content"` adds and what makes the pixels hold:
-    // without something `auto` to take the slack, `table-fixed` shares it back
-    // out over the columns and a measured width becomes a ratio again.
-    expect(cols).toHaveLength(11);
+    // expand + select + Follow-up + the 8 business columns + the kit's
+    // trailing FILLER, which is what `sizing="content"` adds and what makes
+    // the pixels hold: without something `auto` to take the slack,
+    // `table-fixed` shares it back out over the columns and a measured width
+    // becomes a ratio again.
+    expect(cols).toHaveLength(12);
     expect(cols.at(-1)).toBe("auto");
+
+    // ⭐ S2.5 — THE EXPANSION GUTTER, AND THE WHOLE REASON IT COULD BE ADDED.
+    // #692 measured this chevron at 3% of a PERCENTAGE-sized table: −24 to
+    // −28px taken off the eight business columns, `Actions` worst, which is
+    // why S2.5 was blocked. At `sizing="content"` the kit fixes it at a flat
+    // 42px instead — and S3.2 freed exactly 42px off the ⚑ column (72 → 30).
+    // The two numbers below are that trade, and the eight business widths
+    // asserted further down are UNCHANGED from S3.3. Not one column paid.
+    expect(cols[0]).toBe("42px"); // expansion — S3.2's 42px, spent here
+    expect(cols[1]).toBe("32px"); // selection — the kit's own, untouched
 
     // NOT ONE PERCENTAGE SURVIVES. This is the assertion that would have
     // caught the regression, and it is the whole of S3.1 in one line.
@@ -578,7 +598,7 @@ describe("OperationOrdersControl · S1 · the kit renders the table", () => {
     // strings are still the right strings — but three of its numbers were
     // short, all for one reason: it budgeted 8–12px of padding and the kit's
     // uniform `px-2` is 16 (S1 recorded the 4px; S3.1 pays it).
-    expect(cols.slice(1, 10)).toEqual([
+    expect(cols.slice(2, 11)).toEqual([
       "30px", // Follow-up — S3.2: the head DRAWS the flag (14) + px-2 (16)
       "139px", // Status    pill + gap + three 14px dots = 122.3, + px-2
       "87px", // Order      `CR0925 +2` 70.2 + 16
@@ -605,6 +625,191 @@ describe("OperationOrdersControl · S1 · the kit renders the table", () => {
     expect(localStorage.getItem("carres.orders.hiddenCols")).toBeNull();
     expect(wrote).not.toContain("carres.orders.hiddenCols");
     spy.mockRestore();
+  });
+});
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * S2.5 (2026-08-08) — EXPANSION. §4's R4 · Contents, on the list.
+ *
+ * The capability is *see what one order contains without losing the list*.
+ * The drawer renders IN PLACE of the list, and the Items column was removed
+ * from this table, so before this card there was no answer on this screen.
+ * ────────────────────────────────────────────────────────────────────────── */
+describe("OperationOrdersControl · S2.5 · expansion", () => {
+  /** The catalog shape `useCatalog` returns — only the fields the label reads. */
+  function catalog(
+    skus: { sku: string; variant: string; description: string | null }[],
+  ) {
+    return {
+      data: {
+        models: [{ id: "m1", name: "Booqit", category: "sofa" }],
+        skus: skus.map((s, i) => ({
+          id: `s${i}`,
+          modelId: "m1",
+          sku: s.sku,
+          variant: s.variant,
+          description: s.description,
+          supplierId: null,
+        })),
+      },
+    };
+  }
+  const openRow = (id: string) =>
+    fireEvent.click(screen.getByTestId(`table-expand-${id}`));
+
+  it("unfolds the ORDER'S OWN LINES — every one of them, in the order recorded", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({
+          id: "x1",
+          so: 8801,
+          order_lines: [
+            { sku: "mattress:MAT-1", qty: 2 },
+            { sku: "Essential Memory Pillow(L)", qty: 2 },
+            // The SAME sku twice — production carries exactly this, and it is
+            // why the panel keys by index and neither merges nor de-dupes.
+            { sku: "Essential Memory Pillow(L)", qty: 1 },
+          ],
+        }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    expect(screen.queryByTestId("order-items-panel")).toBeNull();
+    openRow("x1");
+    const panel = within(screen.getByTestId("order-items-panel"));
+    expect(panel.getAllByRole("listitem")).toHaveLength(3);
+    expect(panel.getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "2×mattress:MAT-1",
+      "2×Essential Memory Pillow(L)",
+      "1×Essential Memory Pillow(L)",
+    ]);
+  });
+
+  it("NAMES THE LINE FROM `description`, not from `variant` — the card's own open item", () => {
+    // §3's S2.5 block named `variant` as the human label. Measured on
+    // production, `variant` is a SIZE or a MODULE CODE ("CNR", "King") and
+    // `description` is the only field carrying noun + model + spec at once.
+    catalogHookState = catalog([
+      { sku: "5539-CNR", variant: "CNR", description: "Sofa Booqit CNR" },
+    ]);
+    listHookState.data = {
+      orders: [makeRow({ id: "x2", so: 8802, order_lines: [{ sku: "5539-CNR", qty: 1 }] })],
+    };
+    wrap(<OperationOrdersControl />);
+    openRow("x2");
+    const panel = within(screen.getByTestId("order-items-panel"));
+    expect(panel.getByText("Sofa Booqit CNR")).toBeInTheDocument();
+    expect(panel.queryByText("CNR")).toBeNull();
+    expect(panel.queryByText("5539-CNR")).toBeNull();
+  });
+
+  it("falls back to `{model} · {variant}` when the SKU carries no description", () => {
+    catalogHookState = catalog([
+      { sku: "5539-CNR", variant: "CNR", description: null },
+    ]);
+    listHookState.data = {
+      orders: [makeRow({ id: "x3", so: 8803, order_lines: [{ sku: "5539-CNR", qty: 1 }] })],
+    };
+    wrap(<OperationOrdersControl />);
+    openRow("x3");
+    expect(
+      within(screen.getByTestId("order-items-panel")).getByText("Booqit · CNR"),
+    ).toBeInTheDocument();
+  });
+
+  it("prints an AutoCount SKU VERBATIM — it invents no name for a line it cannot look up", () => {
+    // 0 of 94 live AutoCount lines match a catalog row, and the string they
+    // carry is free text a human typed. Composing a title out of the
+    // classifier would put a word on screen that nobody entered.
+    catalogHookState = catalog([
+      { sku: "5539-CNR", variant: "CNR", description: "Sofa Booqit CNR" },
+    ]);
+    listHookState.data = {
+      orders: [
+        makeRow({
+          id: "x4",
+          so: 8804,
+          source_system: "autocount",
+          order_lines: [{ sku: "Breeze FirmCare-B1201F-Q", qty: 1 }],
+        }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    openRow("x4");
+    expect(
+      within(screen.getByTestId("order-items-panel")).getByText(
+        "Breeze FirmCare-B1201F-Q",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("gives an order with NO lines no control at all — not a dead one", () => {
+    listHookState.data = {
+      orders: [makeRow({ id: "x5", so: 8805, order_lines: [] })],
+    };
+    wrap(<OperationOrdersControl />);
+    expect(screen.queryByTestId("table-expand-x5")).toBeNull();
+  });
+
+  it("does NOT open the drawer — unfolding a row is not opening it", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({ id: "x6", so: 8806, order_lines: [{ sku: "mattress:MAT-1", qty: 1 }] }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    openRow("x6");
+    expect(screen.getByTestId("order-items-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("drawer-stub")).toBeNull();
+  });
+
+  it("SPENDS NO MONEY WORD — R5 bans cost and margin, and price is not R4's either", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({
+          id: "x7",
+          so: 8807,
+          order_lines: [{ sku: "mattress:MAT-1", qty: 2, unit_price: 2500 }],
+        }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    openRow("x7");
+    // 2990's drill-down carries UNIT COST · LINE COST · MARGIN beside the
+    // line. The SHAPE was copied; those columns were not.
+    expect(screen.getByTestId("order-items-panel").textContent).not.toMatch(
+      /RM|2,?500|5,?000|cost|margin/i,
+    );
+  });
+
+  it("names the control by the OPERATOR'S name for the row, and lets the row state itself", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({ id: "x8", so: 8808, order_lines: [{ sku: "mattress:MAT-1", qty: 1 }] }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    const btn = screen.getByTestId("table-expand-x8");
+    expect(btn).toHaveAccessibleName("Show items in SO-8808");
+    // The WORD never flips — `aria-expanded` is what changes.
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(btn);
+    expect(btn).toHaveAttribute("aria-expanded", "true");
+    expect(btn).toHaveAccessibleName("Show items in SO-8808");
+  });
+
+  it("remembers nothing across a remount — §0.4 bans a stored UI shape", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({ id: "x9", so: 8809, order_lines: [{ sku: "mattress:MAT-1", qty: 1 }] }),
+      ],
+    };
+    const first = wrap(<OperationOrdersControl />);
+    openRow("x9");
+    expect(screen.getByTestId("order-items-panel")).toBeInTheDocument();
+    first.unmount();
+    wrap(<OperationOrdersControl />);
+    expect(screen.queryByTestId("order-items-panel")).toBeNull();
   });
 });
 
@@ -1064,6 +1269,9 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // and the next assertion is the one that proves it.
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
+      "", // S2.5 — the expansion gutter. Its head is BLANK on purpose: the
+      //     control belongs to each row, and a word over it would name a
+      //     column that holds no data.
       "", // select-all checkbox
       "", // ⚑ Follow-up — a drawn flag, named below
       "Status",
@@ -1079,8 +1287,8 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // still ANSWER to its name, or the column becomes unnameable to a screen
     // reader and to anyone hovering it — and `Follow-up` is the QUEUES rail's
     // own word, so the rail row and the column must still say one thing once.
-    expect(within(head[1]).getByRole("img", { name: "Follow-up" })).toBeInTheDocument();
-    expect(within(head[1]).getByTitle("Follow-up")).toBeInTheDocument();
+    expect(within(head[2]).getByRole("img", { name: "Follow-up" })).toBeInTheDocument();
+    expect(within(head[2]).getByTitle("Follow-up")).toBeInTheDocument();
     // SO (emphasis) + Ref (caption) share the Order cell; the phone tooltip
     // stays with those two lines; the Status cell names the pipeline STAGE in
     // words.
@@ -1202,11 +1410,13 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // header present
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toContain("Deadline");
-    // Deadline sits right after Customer (Jess 2026-07-18): index 5 —
-    // select · flag · Status dots · Order · Customer · Deadline.
+    // Deadline sits right after Customer (Jess 2026-07-18): index 6 —
+    // expand · select · flag · Status dots · Order · Customer · Deadline.
+    // (S2.5 added the leading expansion gutter; the ORDER of the business
+    // columns is unchanged, which is what this test is actually about.)
     const cells = within(screen.getByTestId("order-row")).getAllByRole("cell");
-    expect(cells[5].textContent).not.toBe("—");
-    expect(cells[5].textContent).toMatch(/\d/);
+    expect(cells[6].textContent).not.toBe("—");
+    expect(cells[6].textContent).toMatch(/\d/);
   });
 
   it("windows to the first 30 rows + shows the load-more sentinel (infinite scroll)", () => {

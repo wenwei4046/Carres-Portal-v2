@@ -354,11 +354,12 @@ what an operator should be allowed to sort away from that is a decision, not a p
 the next card's question and it is now cheap to answer.**
 **→ S2.1 answered it on 2026-08-08 and sort is now wired; the ▼ is S2.2's.**
 
-# ▶︎ S3 · APPROVED TO BUILD 2026-08-08 — the width card, and it unblocks S2.5
+# ✅ S3 · SHIPPED 2026-08-08 — the width card, and it unblocked S2.5
 
-> **Everything now waits on this.** S2.5 is blocked on it (measured, #692), the ⚑ regression is
-> it (`8340b0f0`), and `Actions` truncating on 30 of 30 rows has been marked ACCEPTED on an
-> arithmetic this card overturns.
+> **Everything waited on this, and all of it is now paid.** S2.5 was blocked on it (measured,
+> #692) and **shipped the same day S3.2 freed its 42px**; the ⚑ regression was it (`8340b0f0`);
+> and `Actions` truncating on 30 of 30 rows had been marked ACCEPTED on an arithmetic this card
+> overturned.
 
 **⭐ THE DECISION, AND IT IS NOT A NEW ONE — IT IS TWO OF LOO'S OWN RULINGS, OPPOSED.**
 
@@ -542,10 +543,11 @@ party that appears nowhere else on the row.
 afford otherwise"*; it now means *"one action line truncates when one customer's name is long,
 and its content is on the row twice already."*
 
-**WHAT UNBLOCKS S2.5, stated so the next card does not re-derive it:** #692 measured the
-expansion chevron at 3% — **−24 to −28px taken from the eight business columns, `Actions`
-worst.** Freeing the ⚑'s 72px pays for that gutter about three times over. **S2.5 is not
-refused; it is queued behind this.**
+**WHAT THIS UNBLOCKED — and S2.5 spent it the same day.** #692 measured the expansion chevron at
+3% — **−24 to −28px taken from the eight business columns, `Actions` worst.** At `sizing="content"`
+that gutter is a flat 42px instead, and S3.2 freed exactly 42. **S2.5 shipped on it, and every
+one of the eight widths below is unchanged** — re-measured in Chromium at 1130px with the gutter
+present (§3 · S2.5).
 
 ---
 
@@ -708,8 +710,11 @@ ONE CAPABILITY PER COMMIT, IN THIS ORDER. Never one huge PR.
    S2.1  Header sorting          → ✅ SHIPPED 2026-08-08, recorded below
    S2.2  Header filter dropdowns → ✅ SHIPPED 2026-08-08, recorded below
    S2.3  Footer totals           → ✅ SHIPPED 2026-08-08, recorded below
-   S2.4  Grouping                → commit   ⚠ see the conflict below
-   S2.5  Expansion               → ⛔ BLOCKED ON WIDTH 2026-08-08, recorded below
+   S2.4  Grouping                → ⛔ REFUSED 2026-08-08, recorded below
+   S2.5  Expansion               → ✅ SHIPPED 2026-08-08, recorded below
+
+S2 IS CLOSED. All five capabilities are answered — three wired, one refused,
+one shipped once the width card paid for it.
 
 COPY 2990's behaviour. Do NOT redesign any of them.
    2990s/apps/backend/src/components/DataGrid.tsx  (+ MfgSalesOrdersList.tsx)
@@ -988,81 +993,111 @@ a BLANK  sorts LAST in BOTH directions — Excel's rule, and 2990 spells it too
 (Law D — a derived fact has ONE arithmetic). **A TBD date sorts with the blanks**, because it is
 no date, not a late one.
 
-### ⛔ S2.5 · BLOCKED ON WIDTH 2026-08-08 — measured, not argued, and NOT refused on principle
+### ✅ S2.5 · SHIPPED 2026-08-08 — the expansion, and the label was a different column than the card thought
 
-**S2.5 is the one capability of the five that is worth having and cannot be paid for.** Nothing
-was built. The reason is a number:
+**The list can now answer *what did they buy* without losing itself.** The drawer *"renders IN
+PLACE of the list, not as an overlay"*, and the Items column was removed from this table
+entirely (`itemRollup` survives only in the CSV/print export) — so until this card there was
+**no answer to R4 on this screen at all**. Expand is the one grid power that buys something the
+drawer structurally cannot.
 
-> **The kit's expansion chevron is not free — it is a THIRD gutter column at 3%**, and Orders
-> sizes in percentages, so that 3% comes straight out of the eight business columns.
-
-**MEASURED IN CHROMIUM, the same table with and without `expansion`, on C14's own worst-case
-strings:**
+**IT COST NO BUSINESS COLUMN ANYTHING, AND THAT IS THE WHOLE REASON IT COULD RUN.** #692 blocked
+it on a number: the chevron is a third gutter at **3%** of a percentage-sized table, −24 to −28px
+taken off the eight business columns with `Actions` worst. S3.1 made every column a measured
+PIXEL, where the kit fixes that gutter at a flat **42px**; S3.2 freed exactly **42px** off the ⚑.
+**Measured in Chromium at 1130px — Loo's own regression width — after the change:**
 
 ```
-                    1022 (nav collapsed)   890 (~1130px vp)   850 (nav expanded)
-Actions                  −6.4 px               −5.7               −5.4
-Deadline                 −4.6                  −4.1               −3.8
-Status                   −4.2                  −3.6               −3.5
-Delivery                 −3.5                  −3.1               −2.9
-Customer                 −3.3                  −2.8               −2.7
-Order                    −2.3                  −2.0               −2.0
-PIC                      −1.9                  −1.6               −1.5
-Stock                    −1.7                  −1.5               −1.4
-────────────────────────────────────────────────────────────────────────────
-TAKEN FROM THE EIGHT   −28.5 px              −24.4              −23.2
+expand      42.0    select    32.0    ⚑ Follow-up  30.0
+Status     139.0    Order     87.0    Customer    189.0    Deadline  154.0
+Stock       54.0    Delivery 160.0    PIC          58.0    Actions   331.0
+                                              table 1276px in a 1130px viewport → scrolls
 ```
 
-**AND IT LANDS ON THE EXACT DEFECT THE OWNER REPORTED THE DAY BEFORE.** `8340b0f0` records Loo
-on production at ~1130px: the eight columns collapse to a few characters each — `Order` reads
-`S(`, `Customer` reads `W. K.` — while ⚑ keeps its 72px. **S2.5 would take another 24px out of
-those same eight columns**, and `Actions`, the one thing on the row a human acts on, pays the
-most of anyone. The screenshot pair shows it: `Call NETS — confirm delivery dat…` loses another
-character at every width.
+**Every business width is byte-identical to S3.3's.** The width test asserts the gutter and the
+eight together, so the trade cannot be silently un-paid later.
 
-**THE STANDING RULING IS ALREADY WRITTEN AND IT IS NOT MINE TO SET ASIDE.** `8340b0f0`:
-*"Not fixed here and not S2's — **S2 wires grid powers and changes no width.** It is the first
-line of the width card."* Every route to expansion changes width: the kit renders the gutter
-unconditionally when `expansion` is passed, there is no prop to suppress it, and reclaiming the
-3% from the declared column percentages is the same change wearing different arithmetic.
-**S1's own width test refuses it in one line** — the colgroup goes from 10 entries to 11 and
-stops summing to `100 − (72/1012)·100`.
+### ⭐ THE OPEN ITEM: `variant` WAS THE WRONG COLUMN, AND `description` WAS ALREADY ON THE WIRE
 
-### THIS IS A SEQUENCING PROBLEM, NOT A REFUSAL — AND THE PIXELS THAT PAY FOR IT ARE ALREADY NAMED
+**#692 flagged one thing to settle first — `order_lines` carries `{ sku, qty, unit_price }` with
+no description, R4 requires *"human words, not codes"*, and it named the catalog's `variant` as
+the human label. Measured on production, `variant` carries no human word at all.** It is a SIZE
+or a MODULE CODE:
 
-**S2.4 was refused because grouping is a worse answer to a question the rail already answers
-better. S2.5 is the opposite: the capability is genuinely additive and nothing else on this page
-does its job.** The drawer *"renders IN PLACE of the list, not as an overlay"* — so today the
-only way to see one order's contents is to lose the list you were reading. **Expand is the one
-grid power that buys something the drawer structurally cannot.**
+```
+sku            variant     product_skus.description
+B1201S-K       King        Mattress B1201S 183X190CM
+CODY-Q         Queen       Bedframe Cody 152X190CM
+5539-CNR       CNR         Sofa Booqit CNR
+5539-2A(RHF)   2A(RHF)     Sofa Booqit 2A(RHF)
+```
 
-**The width card is what unblocks it, and its own finding already names the candidate:** ⚑ is
-*"a 15px flag icon occupying 73px, because its HEADER needs the word"*, and `8340b0f0` puts it
-sharper — *"the column that SURVIVES is the one answering nothing."* **Freeing that 72px pays
-for the 3% gutter roughly three times over.** So the order is: **the width card, then S2.5** —
-not S2.5 squeezed in ahead of it.
+**`description` is the label.** 209/209 filled, equal to neither the sku nor `name + variant` on
+any row, and the only field carrying R4's three parts at once — the noun (*what it is*), the
+model, and the spec (*the physical size*). **This is S3.3's lesson a second time: the method was
+right and the column was wrong.** C14 measured the wrong string; #692 named the wrong field.
 
-> **What this card does NOT do, deliberately:** it does not decide the ⚑ column's fate. That
-> reaches the kit (`Column.label` would have to stop being a `string`, which touches three
-> FROZEN pages) and it is the width card's to answer. **A build card does not reopen an
-> approved rule to make room for itself.**
+**It cost no fetch, no route and no migration.** The API already generates it for bed sizes and
+the catalog admin may type it (`catalog.ts:754`); it already rides `GET /api/catalog` through
+`productSkuFromRow`; and this page **already** called `useCatalog()` for the SUPPLIER facet. The
+whole change is three fields on a map that existed.
 
-**WHAT S2.5 SHOULD SHOW WHEN IT RUNS, so the next card does not re-derive it.** 2990 answers
-this consistently across every caller — `ConsignmentOrders`, `Customers`, `DeliveryPlanning`,
-and `MfgSalesOrdersList` — the expand is **the record's line items**
-(`renderExpansion: (row) => <ExpandedSoLines docNo={row.doc_no} />`). That is §4's **R4 ·
-Contents** — *what did they buy* — whose normal state is UNREAD and whose first trigger is
-*"the customer is asking"*, which is exactly the moment an operator must not lose the list.
-**Copy 2990's SHAPE, never its columns:** its drill-down carries `UNIT COST · LINE COST ·
-MARGIN`, and §4 R5 rules **never cost, never margin**.
+### THE FALLBACK IS A WHOLE POPULATION, NOT AN EDGE — AND IT IS NOT A DEGRADATION
 
-> 🟡 **AND ONE THING TO SETTLE FIRST:** the list row carries `order_lines` as
-> `{ sku, qty, unit_price }` with **no description**, and `skuMeta` holds only
-> `{ supplierId, category }`. R4 requires *"human words, not codes"*. The catalog's `variant`
-> is the human label (`Carres Cloud · King`, already rendered by `ProcurementTabContent`), so
-> it is reachable — but an AutoCount free-text SKU has no catalog row and would fall back to
-> the code. **Whether that fallback is acceptable is R4's question, and it is cheaper to answer
-> before the width card than after.**
+**Measured 2026-08-08 over 184 live lines. The split is by SOURCE, not by chance:**
+
+```
+source        orders   lines   matched a catalog row
+autocount         37      94     0      ← none. not "some".
+native (POS)      32      82    81
+rental             8       8     8
+```
+
+**Zero of 94.** A fallback that shrugged would blank half the list. It does not have to:
+**the AutoCount "SKU" IS free text a human typed** — `Breeze FirmCare-B1201F-Q` · `Essential
+Memory Pillow(L)` · `Mattress Disposal` · `No Lift Per Floor Charge` — and on that population it
+is frequently MORE human than a catalog label would be. **So it is printed verbatim, and the
+card's instruction *"do not invent a name"* is obeyed literally**: nothing is composed out of
+`lineClass` + `lineSize` to dress a line the record cannot name. When nothing is known, the
+string that IS there is what is shown.
+
+> **FALSIFIER, and it already has one instance.** A NATIVE line whose sku has no catalog row
+> prints a bare code with no human word in it. Live today: **1 of 82** — `M1201F-K`, and no
+> `M1201F%` sku exists at all, so it is a deleted-catalog artefact of the trial data §6 throws
+> away at go-live. **If a second appears from the POS path, the fallback stops being cosmetic
+> and `order_lines` must store the description AT SALE** — a line should not be renamed by a
+> later catalog edit anyway.
+
+### WHAT WAS COPIED FROM 2990, AND THE THREE THINGS THAT WERE NOT
+
+**The SHAPE is 2990's** — the expand is the record's line items, every caller, no exceptions
+(`MfgSalesOrdersList.tsx:574`). Three of its parts were left behind, each for a stated reason:
+
+| 2990 has | Carres does not | Why |
+|---|---|---|
+| `UNIT COST · LINE COST · MARGIN` | — | §4 **R5: never cost, never margin.** A test asserts no money word reaches the panel. |
+| a fetch, with loading + error states | — | `order_lines` is already embedded in the list response the row was drawn from. **A state that cannot occur does not get a branch.** |
+| a full grid — sort, group, resize, persisted layout | — | Measured: **77 orders hold 1–8 lines, median 2**; only 3 carry more than five. A configurable grid over two rows is furniture, and F61 forbids persisting a layout. |
+
+**Nor does it carry stock, PO or GRN state.** R4 *"proves nothing"*; the row's own `Stock` and
+`Actions` cells already answer that, and a second home for one fact is ownership Law C.
+
+**No de-duplication and no rollup.** Two lines of the same SKU is what AutoCount booked (one live
+order carries `Essential Memory Pillow(L)` twice) and merging them would show a record that does
+not exist — so the panel keys by INDEX, not by sku. `itemTags` stays where it is: it answers
+*what kind of goods* in one line for the CSV and **cannot** answer *which mattress*, which is the
+question R4 opens on.
+
+**The control's word is `Show items in SO-1221`** — the operator's own name for the row, the same
+reason `selection.rowLabel` exists. `aria-expanded` carries open/closed, so the word never flips.
+An order with no lines gets **no control at all**, which is the kit's own rule rather than a dead
+chevron. Nothing is remembered across a remount (§0.4).
+
+> 🟡 **FOUND IN PASSING, NOT FIXED HERE — the drawer's Items panel keys its rows by `l.sku`**
+> (`OrderDetailDrawer.tsx:3327`), and a sku is NOT unique within an order. Two real lines collapse
+> to one React child on exactly the live order above. **The drawer is DO-NOT-TOUCH for every S2
+> card**, so it is recorded rather than taken; it is one word (`key={i}`) whenever a card owns
+> that file.
 
 ### ✅ S2.3 · SHIPPED 2026-08-08 — the footer total, and it counts the LIST, not the window
 
