@@ -514,7 +514,7 @@ ONE CAPABILITY PER COMMIT, IN THIS ORDER. Never one huge PR.
    S2.2  Header filter dropdowns → ✅ SHIPPED 2026-08-08, recorded below
    S2.3  Footer totals           → ✅ SHIPPED 2026-08-08, recorded below
    S2.4  Grouping                → commit   ⚠ see the conflict below
-   S2.5  Expansion               → commit
+   S2.5  Expansion               → ⛔ BLOCKED ON WIDTH 2026-08-08, recorded below
 
 COPY 2990's behaviour. Do NOT redesign any of them.
    2990s/apps/backend/src/components/DataGrid.tsx  (+ MfgSalesOrdersList.tsx)
@@ -792,6 +792,82 @@ a BLANK  sorts LAST in BOTH directions — Excel's rule, and 2990 spells it too
 **A rank is never typed twice:** the stage rank IS `TABS`, the stock rank IS `STOCK_BUCKETS`
 (Law D — a derived fact has ONE arithmetic). **A TBD date sorts with the blanks**, because it is
 no date, not a late one.
+
+### ⛔ S2.5 · BLOCKED ON WIDTH 2026-08-08 — measured, not argued, and NOT refused on principle
+
+**S2.5 is the one capability of the five that is worth having and cannot be paid for.** Nothing
+was built. The reason is a number:
+
+> **The kit's expansion chevron is not free — it is a THIRD gutter column at 3%**, and Orders
+> sizes in percentages, so that 3% comes straight out of the eight business columns.
+
+**MEASURED IN CHROMIUM, the same table with and without `expansion`, on C14's own worst-case
+strings:**
+
+```
+                    1022 (nav collapsed)   890 (~1130px vp)   850 (nav expanded)
+Actions                  −6.4 px               −5.7               −5.4
+Deadline                 −4.6                  −4.1               −3.8
+Status                   −4.2                  −3.6               −3.5
+Delivery                 −3.5                  −3.1               −2.9
+Customer                 −3.3                  −2.8               −2.7
+Order                    −2.3                  −2.0               −2.0
+PIC                      −1.9                  −1.6               −1.5
+Stock                    −1.7                  −1.5               −1.4
+────────────────────────────────────────────────────────────────────────────
+TAKEN FROM THE EIGHT   −28.5 px              −24.4              −23.2
+```
+
+**AND IT LANDS ON THE EXACT DEFECT THE OWNER REPORTED THE DAY BEFORE.** `8340b0f0` records Loo
+on production at ~1130px: the eight columns collapse to a few characters each — `Order` reads
+`S(`, `Customer` reads `W. K.` — while ⚑ keeps its 72px. **S2.5 would take another 24px out of
+those same eight columns**, and `Actions`, the one thing on the row a human acts on, pays the
+most of anyone. The screenshot pair shows it: `Call NETS — confirm delivery dat…` loses another
+character at every width.
+
+**THE STANDING RULING IS ALREADY WRITTEN AND IT IS NOT MINE TO SET ASIDE.** `8340b0f0`:
+*"Not fixed here and not S2's — **S2 wires grid powers and changes no width.** It is the first
+line of the width card."* Every route to expansion changes width: the kit renders the gutter
+unconditionally when `expansion` is passed, there is no prop to suppress it, and reclaiming the
+3% from the declared column percentages is the same change wearing different arithmetic.
+**S1's own width test refuses it in one line** — the colgroup goes from 10 entries to 11 and
+stops summing to `100 − (72/1012)·100`.
+
+### THIS IS A SEQUENCING PROBLEM, NOT A REFUSAL — AND THE PIXELS THAT PAY FOR IT ARE ALREADY NAMED
+
+**S2.4 was refused because grouping is a worse answer to a question the rail already answers
+better. S2.5 is the opposite: the capability is genuinely additive and nothing else on this page
+does its job.** The drawer *"renders IN PLACE of the list, not as an overlay"* — so today the
+only way to see one order's contents is to lose the list you were reading. **Expand is the one
+grid power that buys something the drawer structurally cannot.**
+
+**The width card is what unblocks it, and its own finding already names the candidate:** ⚑ is
+*"a 15px flag icon occupying 73px, because its HEADER needs the word"*, and `8340b0f0` puts it
+sharper — *"the column that SURVIVES is the one answering nothing."* **Freeing that 72px pays
+for the 3% gutter roughly three times over.** So the order is: **the width card, then S2.5** —
+not S2.5 squeezed in ahead of it.
+
+> **What this card does NOT do, deliberately:** it does not decide the ⚑ column's fate. That
+> reaches the kit (`Column.label` would have to stop being a `string`, which touches three
+> FROZEN pages) and it is the width card's to answer. **A build card does not reopen an
+> approved rule to make room for itself.**
+
+**WHAT S2.5 SHOULD SHOW WHEN IT RUNS, so the next card does not re-derive it.** 2990 answers
+this consistently across every caller — `ConsignmentOrders`, `Customers`, `DeliveryPlanning`,
+and `MfgSalesOrdersList` — the expand is **the record's line items**
+(`renderExpansion: (row) => <ExpandedSoLines docNo={row.doc_no} />`). That is §4's **R4 ·
+Contents** — *what did they buy* — whose normal state is UNREAD and whose first trigger is
+*"the customer is asking"*, which is exactly the moment an operator must not lose the list.
+**Copy 2990's SHAPE, never its columns:** its drill-down carries `UNIT COST · LINE COST ·
+MARGIN`, and §4 R5 rules **never cost, never margin**.
+
+> 🟡 **AND ONE THING TO SETTLE FIRST:** the list row carries `order_lines` as
+> `{ sku, qty, unit_price }` with **no description**, and `skuMeta` holds only
+> `{ supplierId, category }`. R4 requires *"human words, not codes"*. The catalog's `variant`
+> is the human label (`Carres Cloud · King`, already rendered by `ProcurementTabContent`), so
+> it is reachable — but an AutoCount free-text SKU has no catalog row and would fall back to
+> the code. **Whether that fallback is acceptable is R4's question, and it is cheaper to answer
+> before the width card than after.**
 
 ### ✅ S2.3 · SHIPPED 2026-08-08 — the footer total, and it counts the LIST, not the window
 
