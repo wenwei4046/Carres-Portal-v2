@@ -81,7 +81,23 @@ const HEX_RE = /#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g;
 const HEX_ALLOW = [/(^|\/)index\.css$/, /design-standard/, /\/lib\/pdf\//, /\/pages\/print\//];
 // Pages that HAVE adopted the shell and must keep it (grows as pages migrate).
 const MUST_USE_SHELL = ["pages/operation/OperationOrdersControl.tsx"];
-const SHELL_IMPORT_RE = /from\s+["']@\/components\/(ListPageShell|PageHeader)["']/;
+/**
+ * The shell, in either of its two spellings.
+ *
+ * `components/ListPageShell` is the live shell on ten pages. `components/kit/
+ * PageShell` is the SAME arrangement extracted into the kit (card D0.5c —
+ * *"Extracted from `components/ListPageShell.tsx`, not designed fresh"*), and
+ * `docs/ui/MASTER.md` §7 lists real pages rendering through it as APPROVED.
+ *
+ * It was missing here, and that is a gap rather than a policy: this rule exists
+ * to stop a list page being drawn without a shell, and the kit's shell is the
+ * STRICTER of the two — it takes no `className`, and `variant="list"` has no
+ * KPI slot at the type level. A guard that fails the stricter shell pushes new
+ * pages onto the looser one, which is the opposite of what it is for.
+ * Found by SO-1 (2026-08-08), the first page built on the kit shell.
+ */
+const SHELL_IMPORT_RE =
+  /from\s+["']@\/components\/(ListPageShell|PageHeader|kit\/PageShell)["']/;
 const OPT_OUT_RE = /design-standard:\s*not-a-list-page/;
 const LIST_MARKER_RE = /<table[\s>]|<DataGrid[\s/>]/;
 

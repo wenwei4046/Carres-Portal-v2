@@ -17,6 +17,26 @@ import OperationDashboard from "./OperationDashboard";
 // table (merges the old kanban + Inbox + All-orders). The legacy kanban
 // `OperationOrders` is retained as a file (+ its test) but no longer routed.
 import OperationOrdersControl from "./OperationOrdersControl";
+// ⭐ SO-1 (Loo, 2026-08-08) — the Sales Orders register.
+//
+// `/operation/orders` mounts ONE page and the constant below says which. The
+// card's own words: *"Current implementation stays intact, restorable within
+// one minute, readable as migration evidence. Delete nothing."*
+//
+//   RESTORE THE OLD REGISTER = change ONE line:
+//       const OrdersPage = OperationOrdersControl;
+//
+// `OperationOrdersControl` is not deleted, not renamed and not edited by this
+// card. It stays compiled — `OperationDelivery` imports its ladder, and the new
+// register imports its `moneyOf` / `stageOf` so one arithmetic serves all three
+// (ERP-ARCHITECTURE Law D). Both pages take the same `onImport` prop, so the
+// swap is genuinely one identifier and the route below is untouched.
+// The `typeof` annotation is not decoration — it is what makes "restorable in
+// one minute" a fact the COMPILER keeps true. The day the register's props stop
+// matching the old page's, this line fails to build instead of the restore
+// failing at 9am on a Monday.
+import SalesOrdersRegister from "./SalesOrdersRegister";
+const OrdersPage: typeof OperationOrdersControl = SalesOrdersRegister;
 // T11 (2026-07-27) — the Delivery module: the ONE new sidebar item in the
 // build plan. Tab-state driven like Payments / Stock (only orders and
 // procurement are path-driven), so `?tab=delivery` deep-links it.
@@ -291,17 +311,13 @@ export default function OperationApp() {
             <Route
               path="orders"
               element={
-                <OperationOrdersControl
-                  onImport={() => changeTab("ops-import")}
-                />
+                <OrdersPage onImport={() => changeTab("ops-import")} />
               }
             />
             <Route
               path="orders/:stage"
               element={
-                <OperationOrdersControl
-                  onImport={() => changeTab("ops-import")}
-                />
+                <OrdersPage onImport={() => changeTab("ops-import")} />
               }
             />
           </Routes>
