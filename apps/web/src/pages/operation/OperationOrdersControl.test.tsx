@@ -579,7 +579,7 @@ describe("OperationOrdersControl · S1 · the kit renders the table", () => {
     // short, all for one reason: it budgeted 8–12px of padding and the kit's
     // uniform `px-2` is 16 (S1 recorded the 4px; S3.1 pays it).
     expect(cols.slice(1, 10)).toEqual([
-      "72px", // Follow-up — the header WORD, pinned since S1
+      "30px", // Follow-up — S3.2: the head DRAWS the flag (14) + px-2 (16)
       "139px", // Status    pill + gap + three 14px dots = 122.3, + px-2
       "87px", // Order      `CR0925 +2` 70.2 + 16
       "189px", // Customer  `MyHouse Management PLT` 172.5 + 16
@@ -1056,16 +1056,16 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // (caption line), LOGISTIC became Delivery (truth-ladder words) and the
     // "Actions" pills close the row.
     //
-    // S1 (2026-08-07) — the follow-up column's header is a WORD, not the flag
-    // icon it carried while this page hand-wrote its own `<th>`. `Column.label`
-    // is a `string` in `kit/DataTable` (and in every grid engine measured for
-    // card 01), so no column here can be headed by a picture. The word is the
-    // QUEUES rail's own — `Follow-up`, §3 — so the rail row and the column say
-    // one thing once. The CELL is unchanged and still icon-only.
+    // S1 (2026-08-07) headed the follow-up column with the WORD, because
+    // `Column.label` was a `string` and no column could be headed by a picture.
+    // S3.2 (2026-08-08) added `Column.headerContent` to the kit — optional and
+    // additive — so the head DRAWS the flag again and the column costs 30px
+    // instead of 72. **The word did not go anywhere**: it is still `label`,
+    // and the next assertion is the one that proves it.
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
-      "Follow-up",
+      "", // ⚑ Follow-up — a drawn flag, named below
       "Status",
       "Order",
       "Customer",
@@ -1075,6 +1075,12 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "PIC", // staff owner — its own column (Jess 2026-07-18)
       "Actions", // every action as a tone-coloured pill (Jess 2026-07-19/27)
     ]);
+    // ⚑ THE WORD SURVIVES AS THE NAME. A header that draws a picture must
+    // still ANSWER to its name, or the column becomes unnameable to a screen
+    // reader and to anyone hovering it — and `Follow-up` is the QUEUES rail's
+    // own word, so the rail row and the column must still say one thing once.
+    expect(within(head[1]).getByRole("img", { name: "Follow-up" })).toBeInTheDocument();
+    expect(within(head[1]).getByTitle("Follow-up")).toBeInTheDocument();
     // SO (emphasis) + Ref (caption) share the Order cell; the phone tooltip
     // stays with those two lines; the Status cell names the pipeline STAGE in
     // words.

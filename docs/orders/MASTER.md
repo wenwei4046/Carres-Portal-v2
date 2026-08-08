@@ -390,7 +390,7 @@ S3.1 ✅ SHIPPED — Orders columns are CONTENT-SIZED — sizing="content", px w
       ⚠ MEASURE AT ≤1130px. Every earlier width reading in this programme ran
         at 1440x900, where the defect is invisible (8340b0f0).
 
-S3.2  FREE THE ⚑'s 72px. It holds a 15px flag; it costs 72 because its HEADER
+S3.2 ✅ SHIPPED — FREED THE ⚑'s 72px. It holds a 15px flag; it costs 72 because its HEADER
       needs the word. That needs `Column.label` to stop being `string` —
       A KIT CHANGE, reaching three FROZEN pages, so it is OPTIONAL and
       additive or it does not ship. If the kit refuses, S3.2 STOPS and reports;
@@ -462,6 +462,47 @@ inflating, which is the half of `sizing="content"` that makes a measurement mean
 > arrow: S2.1 measured the arrow needing 46px against a 37.9px content box and being painted
 > over by `Delivery`'s header. Nothing was done about it — the column simply stopped being
 > squeezed.
+
+### ✅ S3.2 · SHIPPED 2026-08-08 — the flag column costs 30px, and the kit did not refuse
+
+**72px → 30px. 42px back to the eight business columns, and the word did not move.**
+
+The cell was always ONE 15px flag. It cost 72 because `Column.label` is a `string`, so the head
+had to SPELL it — `Follow-up` is 52.4px + the kit's 16. `8340b0f0` is what that bought: on a
+~1130px window this column kept its 72 while `Order` collapsed to `S(`. **The column that
+survived was the one answering nothing.**
+
+### THE KIT DID NOT REFUSE, BECAUSE IT WAS NOT ASKED TO CHANGE A SIGNATURE
+
+Widening `label` to `ReactNode` was the obvious fix and it is impossible — it reaches three
+FROZEN pages. **`Column.headerContent?: ReactNode` is OPTIONAL and additive**, which is the same
+door S1 used for `selection.rowLabel`: *"a changed signature reaches a frozen page; a new
+optional prop cannot."*
+
+**The word is not lost, and §10.1 is why it may not be.** `label` stays required, stays the
+column's NAME, and is still the accessible name and the `title`. **Measured: the header's
+accessible name reads `Follow-up` before AND after.** A screen reader and a hover get exactly
+what they got; only the pixels changed. A kit test asserts both halves — that a caller passing
+nothing emits **byte-identical markup**, and that a drawn header still answers to its name.
+
+```
+                        before            after
+th width                72px              30px
+content box             56.0              14.0
+header needs            52.4 (the WORD)   14.0 (the drawn flag)
+wraps?                  no                no
+accessible name         Follow-up         Follow-up
+table width             1198px            1156px
+```
+
+> ### ⭐ AND THE 42px IS EXACTLY WHAT S2.5 COSTS — TO THE PIXEL
+>
+> #692 measured the expansion chevron at 3% of a percentage-sized table. **Orders is
+> `sizing="content"` since S3.1, and at content sizing the kit fixes that gutter at a flat
+> `42px`** (`expansion && <col style={{ width: fills ? "42px" : "3%" }} />`). S3.2 freed
+> **42px.** The gutter is paid for and not one business column pays anything.
+>
+> **S2.5 is unblocked.**
 
 **WHAT UNBLOCKS S2.5, stated so the next card does not re-derive it:** #692 measured the
 expansion chevron at 3% — **−24 to −28px taken from the eight business columns, `Actions`
