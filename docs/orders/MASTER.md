@@ -383,7 +383,7 @@ shrunk below its measured content, which the 2026-08-06 ruling names and bans.**
 ```text
 BUILD CARD · S3.   git pull, then read CLAUDE.md + docs/orders/MASTER.md §3.
 
-S3.1  Orders columns become CONTENT-SIZED — sizing="content", px widths
+S3.1 ✅ SHIPPED — Orders columns are CONTENT-SIZED — sizing="content", px widths
       measured in a real browser against each column's worst live string,
       exactly as To Order and Purchase Orders already are. Below the sum the
       grid scrolls sideways. It stops squeezing.
@@ -406,6 +406,62 @@ DO NOT TOUCH   queues · business rules · the action ladder · the drawer ·
 
 THEN  test → self-review → PR → merge → deploy → verify production.
 ```
+
+### ✅ S3.1 · SHIPPED 2026-08-08 — the columns stop being a share of the window
+
+**Every column is now a MEASURED PIXEL and the grid scrolls below their sum.** The eight
+business columns, the ⚑ and the kit's select box total **1,198px**; below that the kit's own box
+scrolls sideways, and above it the slack goes to the kit's filler — **no column grows and none
+shrinks.**
+
+**THE MECHANISM WAS THE DEFECT.** A percentage makes a column's width a function of the WINDOW
+instead of its CONTENT, so a narrow window silently spends C14's measurements down to nothing.
+That is `Order` reading `S(`. `sizing="content"` + px widths ends it, and
+`REFERENCE_TABLE_PX` · `GUTTER_DEFICIT_PCT` · `DEFICIT_SHARE` are **deleted** — all three
+existed to answer *which business column pays for the gutters*, and the later ruling says
+nobody does.
+
+### ⭐ C14's METHOD WAS RIGHT AND THREE OF ITS NUMBERS WERE SHORT — ONE CAUSE
+
+Re-measured in Chromium in each cell's **real markup**, 2026-08-08:
+
+```
+column     C14   S3.1   the measured cell                              why it moved
+Status     133 → 139    pill + gap + three 14px dots      = 122.3      padding
+Order       74 →  87    `CR0925 +2` mono 13/600           =  70.2      + string
+Customer   185 → 189    `MyHouse Management PLT`          = 172.5      padding
+Deadline   147 → 154    heat badge + gap + `Wed, 22 Jul 26` = 137.9    padding
+Stock       50 →  54    `ETA —`                           =  37.6      padding
+Delivery   147 → 160    `logistics said Mon, 20 Jul`      = 143.9      + string
+PIC         58 →  58    the chip 24; header + arrow 34                 unchanged
+Actions    207 → 253    verb line + `+N`                  = 236.2      + string
+```
+
+**Every width is `measured cell + 16px`, and 16 is the cause.** C14 budgeted 8–12px of cell
+padding; **the kit's uniform `px-2` is 16.** S1 already recorded that four-pixel loss —
+*"the kit's uniform `px-2` costs every column 4px of content box"* — and S3.1 is where it is
+finally paid rather than absorbed. Two strings also simply measured wider than C14's note
+(`CR0925 +2` is 70.2, not 65; `logistics said Mon, 20 Jul` is 143.9, not 135).
+
+### MEASURED, NOT ASSERTED — AT FOUR WIDTHS INCLUDING LOO'S OWN
+
+```
+table container   1400    1022    890 (~1130px window)    850
+table width       1398    1198    1198                    1198
+scrolls?           no     YES     YES                     YES
+columns off their declared px          NONE at any width
+CELLS CLIPPED                          ZERO at any width
+header row                             40px, no wrap, at every width
+```
+
+At 1400 the FILLER takes the slack — the columns stay exactly their measured pixels instead of
+inflating, which is the half of `sizing="content"` that makes a measurement mean something on a
+1920 monitor as well as a 1280 laptop.
+
+> ✅ **AND IT CLOSES S2.1's REPORTED 🟡 FOR FREE.** `Stock` at 54px now holds its own sort
+> arrow: S2.1 measured the arrow needing 46px against a 37.9px content box and being painted
+> over by `Delivery`'s header. Nothing was done about it — the column simply stopped being
+> squeezed.
 
 **WHAT UNBLOCKS S2.5, stated so the next card does not re-derive it:** #692 measured the
 expansion chevron at 3% — **−24 to −28px taken from the eight business columns, `Actions`

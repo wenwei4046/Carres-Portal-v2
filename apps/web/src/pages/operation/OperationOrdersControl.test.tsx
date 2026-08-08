@@ -540,29 +540,55 @@ describe("OperationOrdersControl · Stock column", () => {
  * written against the hand-written table, and they were not touched.
  * ────────────────────────────────────────────────────────────────────────── */
 describe("OperationOrdersControl · S1 · the kit renders the table", () => {
-  it("budgets the whole table — a list grid never scrolls sideways (§7)", () => {
+  it("S3.1 · EVERY column is a measured PIXEL — not one is a share of the table", () => {
+    // ─────────────────────────────────────────────────────────────────────
+    // THIS TEST USED TO ASSERT THE OPPOSITE, AND THE RULE IT ASSERTED IS THE
+    // ONE THAT BROKE. It required the nine widths to sum to exactly
+    // `100 − (72/1012)·100` percent — "a list grid never scrolls sideways" —
+    // and it passed on the day Loo opened production at ~1130px and found
+    // `Order` reading `S(` and `Customer` reading `W. K.` (8340b0f0).
+    //
+    // A percentage IS the defect. It makes a column's width a function of the
+    // window instead of its content, so a narrow window silently spends
+    // C14's measurements down to nothing — and every earlier reading in this
+    // programme ran at 1440×900, where that is invisible.
+    //
+    // S3 applies Loo's own LATER, more specific ruling (To Order, 2026-08-06):
+    // "deleting a business column, or shrinking one below its measured
+    // content, to avoid a scrollbar is FORBIDDEN." The grid scrolls instead.
+    // ─────────────────────────────────────────────────────────────────────
     listHookState.data = { orders: [makeRow({ id: "w1", so: 9001 })] };
     wrap(<OperationOrdersControl />);
     const cols = Array.from(screen.getByRole("table").querySelectorAll("col")).map(
       (c) => (c as HTMLElement).style.width,
     );
-    expect(cols).toHaveLength(10); // select + Follow-up + the 8 business columns
+    // select + Follow-up + the 8 business columns + the kit's trailing FILLER,
+    // which is what `sizing="content"` adds and what makes the pixels hold:
+    // without something `auto` to take the slack, `table-fixed` shares it back
+    // out over the columns and a measured width becomes a ratio again.
+    expect(cols).toHaveLength(11);
+    expect(cols.at(-1)).toBe("auto");
 
-    // `Follow-up` is the ONE column sized in PIXELS, and that is load-bearing:
-    // its header is a WORD of fixed width, a `th` wraps rather than ellipsises,
-    // and a percentage of a table that changes width cannot protect it. This
-    // shipped as a percentage first and wrapped in a real browser the moment
-    // the nav was expanded (850px table). jsdom has no layout, so no unit test
-    // can catch the wrap — it can only pin the pixel that prevents it.
-    expect(cols[1]).toBe("72px");
+    // NOT ONE PERCENTAGE SURVIVES. This is the assertion that would have
+    // caught the regression, and it is the whole of S3.1 in one line.
+    expect(cols.filter((w) => w.endsWith("%"))).toEqual([]);
 
-    // Everything else is a share of the table, and the shares must land on the
-    // whole: over it, the browser renormalises every column and C14's measured
-    // widths stop meaning anything; under it, `table-fixed` hands the slack
-    // back out and does the same. 72px is 7.11% of C14's 1012px reference.
-    const pct = cols.filter((w) => w.endsWith("%")).map(Number.parseFloat);
-    expect(pct).toHaveLength(9);
-    expect(pct.reduce((a, b) => a + b, 0)).toBeCloseTo(100 - (72 / 1012) * 100, 6);
+    // Every width is `measured cell + the kit's own px-2 (16px)`, re-measured
+    // in Chromium in each cell's real markup. C14's METHOD is kept and its
+    // strings are still the right strings — but three of its numbers were
+    // short, all for one reason: it budgeted 8–12px of padding and the kit's
+    // uniform `px-2` is 16 (S1 recorded the 4px; S3.1 pays it).
+    expect(cols.slice(1, 10)).toEqual([
+      "72px", // Follow-up — the header WORD, pinned since S1
+      "139px", // Status    pill + gap + three 14px dots = 122.3, + px-2
+      "87px", // Order      `CR0925 +2` 70.2 + 16
+      "189px", // Customer  `MyHouse Management PLT` 172.5 + 16
+      "154px", // Deadline  heat badge + gap + `Wed, 22 Jul 26` = 137.9, + 16
+      "54px", // Stock      `ETA —` 37.6 + 16
+      "160px", // Delivery  `logistics said Mon, 20 Jul` 143.9 + 16
+      "58px", // PIC        the initials chip (24) — header + arrow needs 34
+      "253px", // Actions   verb line + `+N` = 236.2, + 16
+    ]);
   });
 
   it("persists no column shape — F58's localStorage key died with the hand-written table", () => {

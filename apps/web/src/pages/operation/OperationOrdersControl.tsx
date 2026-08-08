@@ -1797,48 +1797,52 @@ interface OrderColDef {
  * another's expense — the sum moved 88 → 89 and 1 unit is now 10.69px.
  */
 const ORDER_COL_DEFS: OrderColDef[] = [
-  // Status holds the STAGE pill + C10's three dots. C10 sized it 14 for the
-  // widest pill it could ever hold (`Customer confirmed`, 135px) against a
-  // 1448px table. At the real 1012px that reservation cost 18px it was not
-  // using: live, 30 of 31 rows read `To book` (64px) and `Customer confirmed`
-  // is 0 on the stage tabs. 14 → 12.5 = 134px, which holds the LIVE worst
-  // exactly. If that stage ever fills up, this is the first column to re-check.
-  { key: "dots", label: "Status", w: 12.5 },
-  // `SO-1221` over `CR0925 +2` — two short mono lines, 65px of content in
-  // 97px. 9 → 7 = 75px.
-  { key: "order", label: "Order", w: 7 },
-  // The one column C14 leaves clipped, deliberately — see the header note.
-  // 11 → 11.5 = 123px against 185px of worst-case content, so the 2 rows that
-  // truncated before still truncate (with their `title`). It is the least-cost
-  // place to put a deficit the table genuinely does not have the pixels for.
-  { key: "customer", label: "Customer", w: 11.5 },
-  // Deadline was the LOUDEST silent failure on this page and no card had
-  // noticed: the overdue pill + `Wed, 22 Jul 26` needs 147px and the column
-  // had 119, so **all 30 rows clipped the customer's own promised date** —
-  // at the cell level, which is why a leaf-only scan missed it. 11 → 14.
-  { key: "deadline", label: "Deadline", w: 14 },
-  // `0/3` over `ETA —`: 50px of content. C10 called this "its measured floor"
-  // at 9 units, but that was 159px on a 1448px table — at 1012px it was still
-  // holding 97px for 50px of content. 9 → 5 = 53px.
-  { key: "stock", label: "Stock", w: 5 },
-  // Delivery does NOT shrink, and C14's own card expected it to. Removing the
-  // duplicated action sentence leaves the carrier name (46px) — but the widest
-  // thing this column can EVER hold is now a DATE, and a date is what the
-  // column is for: `logistics said Mon, 20 Jul` is 135px + 12 padding = 147px.
-  // (Confirmed `Mon, 20 Jul · 12pm–3pm` is 129px; the slot vocabulary is the
-  // bounded DELIVERY_TIME_SLOTS list, longest `12pm–3pm`.) Neither date line
-  // carries `truncate`, so under-sizing this column does not ellipsise — it
-  // OVERFLOWS into PIC. 13 → 14 = 150px. Live exposure today is zero (0 of 65
-  // orders carry a provisional or confirmed booking), which is exactly why it
-  // has to be sized off the reachable string rather than off today's rows.
-  { key: "delivery", label: "Delivery", w: 14 },
-  { key: "pic", label: "PIC", w: 5.5 },
-  // ACTIONS — C3 accepted this column's truncation as "not conceded" on the
-  // 1448px premise. On the real table it was 173px holding 191px of sentence,
-  // clipped on 30 of 30 rows, and the instruction is the one thing on the row
-  // a human acts on. 16 → 19.5 = 208px, which holds the live worst whole.
-  // The `+N` and the drawer still carry what a longer line would lose.
-  { key: "next", label: "Actions", w: 19.5 },
+  /* ⭐ S3.1 — EVERY WIDTH IS `measured cell + the kit's own px-2 (16px)`,
+     RE-MEASURED IN CHROMIUM 2026-08-08 in each cell's real markup.
+     C14's table above is kept because its METHOD is right and its strings are
+     still the right strings — but three of its numbers were short, and all
+     three for one reason: **C14 budgeted 8–12px of cell padding and the kit's
+     uniform `px-2` is 16.** S1 already recorded that ("the kit's uniform px-2
+     costs every column 4px of content box"); S3.1 is where it is paid.
+       Order     74 → 87   (`CR0925 +2` measures 70.2, not 65)
+       Delivery 147 → 160  (`logistics said Mon, 20 Jul` measures 143.9)
+       Stock     50 → 54   (`ETA —` 37.6 + 16)
+     Nothing here is a share any more, so raising one costs no other column
+     anything — the grid scrolls instead. */
+  // The stage pill + gap 6 + C10's three 14px dots = 122.3 measured, on the
+  // LIVE worst pill (`To book`). `Customer confirmed` composes to 192.7 and is
+  // 0 rows live; the pill truncates and the dots never do, which is C10's own
+  // design. **If that stage fills up this is still the first column to
+  // re-check** — and now re-checking costs one number, not a redistribution.
+  { key: "dots", label: "Status", w: 139 },
+  // `CR0925 +2`, mono 13/600 — the wider of the cell's two lines.
+  { key: "order", label: "Order", w: 87 },
+  // `MyHouse Management PLT` 172.5. C14 could only afford 123 and S1 cut it to
+  // 105: this is the column the old arithmetic robbed hardest, and the first
+  // it pays back in full.
+  { key: "customer", label: "Customer", w: 189 },
+  // The heat badge + gap-1.5 + `Wed, 22 Jul 26` composes to 137.9. §3 records
+  // that this cell deliberately carries NO `truncate` (an ellipsis costs the
+  // MONTH to signal something already visible) — so under-sizing it clipped a
+  // real date. At 154 it no longer can.
+  { key: "deadline", label: "Deadline", w: 154 },
+  // `ETA —` 37.6 + 16. Also the width that ends S2.1's reported 🟡: the sort
+  // arrow needed 46px against a 37.9px content box and was painted over by
+  // `Delivery`. It fits now.
+  { key: "stock", label: "Stock", w: 54 },
+  // `logistics said Mon, 20 Jul` 143.9 — the widest string this column can
+  // EVER hold, not the widest it holds today (live exposure is 0 of 65).
+  { key: "delivery", label: "Delivery", w: 160 },
+  // The initials chip. C14's 58 is kept: the chip measures 24 and the header
+  // plus its sort arrow needs 34, so 58 covers both with room and no column
+  // pays for the slack.
+  { key: "pic", label: "PIC", w: 58 },
+  /* The verb line + the `+N` chip composes to 236.2. C14 budgeted 207 and §3
+     then measured the LIVE page on 2026-08-05 — "32 clipped cells of 300 (all
+     `Actions`, which needs 249px on every row and gets 208.5)". 253 clears
+     both readings. This is the column §3 marks ACCEPTED-as-truncating;
+     S3.3 re-opens that verdict against this number. */
+  { key: "next", label: "Actions", w: 253 },
 ];
 /**
  * ⭐ THE WIDTH BUDGET, AND THE ONE COLUMN S1 HAD TO MOVE.
@@ -1931,17 +1935,12 @@ const ORDER_COL_DEFS: OrderColDef[] = [
 /** `Follow-up` (54.4px) + the kit's `px-2` (16px) + ~2px of rendering slack.
  *  PIXELS, deliberately — see the block above. */
 const FOLLOW_UP_WIDTH = "72px";
-/** C14's reference table: 1440×900, nav collapsed, 240px rail. The percentage
- *  columns are budgeted against it; at any other width the browser scales them
- *  and `Follow-up` keeps its 72px, which is the whole point of the pixel. */
-const REFERENCE_TABLE_PX = 1012;
-/** 4% (the kit's select column) + `Follow-up` at the reference width − the 6%
- *  the two gutters cost before S1. */
-const GUTTER_DEFICIT_PCT = 4 + (72 / REFERENCE_TABLE_PX) * 100 - 6;
-/** Who pays it, and in what proportion — `delivery` carries twice `customer`'s
- *  share, for the reason measured above. The shares SUM TO 1, so the table
- *  still lands on exactly 100% whatever they are; the S1 width test asserts it. */
-const DEFICIT_SHARE: Record<string, number> = { customer: 1 / 3, delivery: 2 / 3 };
+/* S3.1 DELETED `REFERENCE_TABLE_PX` · `GUTTER_DEFICIT_PCT` · `DEFICIT_SHARE`.
+   All three existed to answer ONE question — which business column pays for the
+   two gutters when the table is narrower than its content — and Loo's later
+   ruling (To Order, 2026-08-06) says nobody does: "deleting a business column,
+   or shrinking one below its measured content, to avoid a scrollbar is
+   FORBIDDEN". The grid scrolls instead, so there is no deficit to share. */
 
 export default function OperationOrdersControl({ onImport }: Props) {
   const params = useParams<{ stage?: string }>();
@@ -2042,7 +2041,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // C14's unit → percentage scale, unchanged: the eight columns share 94% of
   // the table and Σw is 89, so one unit is 1.0562%. What changed in S1 is who
   // pays for the two control columns — see GUTTER_DEFICIT_PCT.
-  const colScale = 94 / ORDER_COL_DEFS.reduce((s, d) => s + d.w, 0);
 
   // Server applies the search; we always fetch the full list and bucket
   // client-side so every tab shows its true count.
@@ -3349,12 +3347,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
    * direction is one block, at `orderSortValueOf`. `filter` is still passed
    * nowhere; that is S2.2's.
    */
-  const dataWidth = (key: string) => {
-    const d = ORDER_COL_DEFS.find((c) => c.key === key)!;
-    // `customer` and `delivery` split what the two control columns cost —
-    // measured, and the measurement is in the GUTTER_DEFICIT_PCT block.
-    return d.w * colScale - GUTTER_DEFICIT_PCT * (DEFICIT_SHARE[key] ?? 0);
-  };
+  /* S3.1 — a px string, straight from the def. No scale, no deficit: the
+     column asks for the width its content was MEASURED at and `sizing="content"`
+     gives it exactly that, handing the slack to the kit's filler. */
+  const dataWidth = (key: string) =>
+    `${ORDER_COL_DEFS.find((c) => c.key === key)!.w}px`;
   const dataLabel = (key: string) => ORDER_COL_DEFS.find((c) => c.key === key)!.label;
 
   /* ── S2.2 · the ▼ ──────────────────────────────────────────────────────────
@@ -4307,6 +4304,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
       <DataTable
         rows={gridRows}
         columns={columns}
+        /* S3.1 — the LATER, MORE SPECIFIC of Loo's two width rulings (To Order,
+           2026-08-06): below its own width the grid SCROLLS SIDEWAYS and never
+           shrinks a business column below its measured content. The 2026-07-09
+           "never scrolls sideways" rule produced exactly the failure this one
+           forbids — `Order` reading `S(` on a 1130px window. */
+        sizing="content"
         rowId={(r) => r.o.id}
         rowTestId="order-row"
         rootRef={listBoxRef}
