@@ -587,7 +587,7 @@ describe("OperationOrdersControl · S1 · the kit renders the table", () => {
       "54px", // Stock      `ETA —` 37.6 + 16
       "160px", // Delivery  `logistics said Mon, 20 Jul` 143.9 + 16
       "58px", // PIC        the initials chip (24) — header + arrow needs 34
-      "253px", // Actions   verb line + `+N` = 236.2, + 16
+      "331px", // Actions   S3.3: the widest BOUNDED line (330.1) + 16
     ]);
   });
 

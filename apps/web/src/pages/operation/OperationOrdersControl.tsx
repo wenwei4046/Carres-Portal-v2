@@ -1838,12 +1838,36 @@ const ORDER_COL_DEFS: OrderColDef[] = [
   // plus its sort arrow needs 34, so 58 covers both with room and no column
   // pays for the slack.
   { key: "pic", label: "PIC", w: 58 },
-  /* The verb line + the `+N` chip composes to 236.2. C14 budgeted 207 and §3
-     then measured the LIVE page on 2026-08-05 — "32 clipped cells of 300 (all
-     `Actions`, which needs 249px on every row and gets 208.5)". 253 clears
-     both readings. This is the column §3 marks ACCEPTED-as-truncating;
-     S3.3 re-opens that verdict against this number. */
-  { key: "next", label: "Actions", w: 253 },
+  /* ⭐ S3.3 — 331, AND C14's STRING WAS NEARLY THE NARROWEST OF ITS FAMILY.
+     §3 marked this column's 30-of-30 truncation ACCEPTED on the premise that
+     all eight columns must fit at once. S3.1 removed that premise, so S3.3
+     re-measured — and found the number every card has sized against was the
+     wrong one. Measured 2026-08-08, `+N` chip included, + the kit's px-2:
+
+       Collect RM 1,234,567.00 from MyHouse Management PLT   397.9  UNBOUNDED
+       Call Nice Future Bedding — confirm ready date         330.1  ← the
+       Call HOUZS — arrange new delivery date                293.4    widest
+       Collect RM 2,250.00 from Tan Ah Kow                   275.8    BOUNDED
+       Delivering Mon, 20 Jul · 12pm–3pm                     256.4
+       Check in from Nice Future Bedding                     255.1
+       Call NETS — confirm delivery date                     252.2  ← C14's
+       Issue PO to Nice Future Bedding                       238.3
+
+     **The width is a function of the PARTY, not of the template**, and C14
+     measured on a day whose live party was `NETS` — four characters. Seven of
+     the eleven reachable lines are wider than the 253 S3.1 derived from it.
+
+     331 HOLDS EVERY BOUNDED LINE WHOLE. Logistics and suppliers are
+     CONFIGURATION (`CLAUDE.md` §6) — a short, known, slow-changing list — so
+     every action naming one of them now fits.
+
+     THE ONE THAT STILL TRUNCATES IS `Collect … from {customer}`, and it is the
+     right one to accept: a customer name is UNBOUNDED, so no number retires
+     this, and **it is the only action line whose information is fully repeated
+     on the same row** — the customer is two columns left, and the money is in
+     the footer total and the `Owing` rail. Every other line names a party that
+     appears nowhere else on the row. */
+  { key: "next", label: "Actions", w: 331 },
 ];
 /**
  * ⭐ THE WIDTH BUDGET, AND THE ONE COLUMN S1 HAD TO MOVE.

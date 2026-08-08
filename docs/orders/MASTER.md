@@ -396,7 +396,7 @@ S3.2 ✅ SHIPPED — FREED THE ⚑'s 72px. It holds a 15px flag; it costs 72 bec
       additive or it does not ship. If the kit refuses, S3.2 STOPS and reports;
       S3.1 stands on its own.
 
-S3.3  RE-OPEN `Actions`. §3 marks its 30-of-30 truncation ACCEPTED on the
+S3.3 ✅ SHIPPED — RE-OPENED `Actions`. §3 marks its 30-of-30 truncation ACCEPTED on the
       premise that all eight columns must be visible at once. S3.1 removes
       that premise. Re-measure and state whether ACCEPTED still holds.
 
@@ -503,6 +503,44 @@ table width             1198px            1156px
 > **42px.** The gutter is paid for and not one business column pays anything.
 >
 > **S2.5 is unblocked.**
+
+### ✅ S3.3 · SHIPPED 2026-08-08 — ACCEPTED does not hold, and C14's string was the wrong one
+
+**`Actions` is 331px. The verdict §3 recorded is overturned — but not by re-running C14's
+measurement. By finding that C14 measured the wrong string.**
+
+Measured 2026-08-08, the `+N` chip included, + the kit's `px-2`:
+
+```
+Collect RM 1,234,567.00 from MyHouse Management PLT   397.9   UNBOUNDED
+Call Nice Future Bedding — confirm ready date         330.1   ← the widest BOUNDED
+Call HOUZS — arrange new delivery date                293.4
+Collect RM 2,250.00 from Tan Ah Kow                   275.8
+Delivering Mon, 20 Jul · 12pm–3pm                     256.4
+Check in from Nice Future Bedding                     255.1
+Call NETS — confirm delivery date                     252.2   ← C14's, and every
+Issue PO to Nice Future Bedding                       238.3     card sized to it
+```
+
+> **THE WIDTH IS A FUNCTION OF THE PARTY, NOT OF THE TEMPLATE** — and C14 measured on a day
+> whose live party was `NETS`, four characters. **Seven of the eleven reachable lines are wider
+> than the 253 S3.1 derived from it**, and C14's own string is nearly the NARROWEST of the
+> party-named family. The "widest LIVE content" method is right for a column whose content is
+> data; it is wrong for one whose content is COMPOSED from a template and a configuration list.
+
+**331 HOLDS EVERY BOUNDED LINE WHOLE.** Logistics companies and suppliers are CONFIGURATION
+(`CLAUDE.md` §6 — *"what must survive is configuration: suppliers, SKUs, production days,
+rates"*): a short, known, slow-changing list. Every action naming one of them now fits.
+
+**THE ONE THAT STILL TRUNCATES IS `Collect … from {customer}`, and it is the right one to
+accept.** A customer name is UNBOUNDED, so **no number retires this** — and it is the only
+action line whose information is fully repeated on the same row: the customer is two columns
+left, and the money is in S2.3's footer total and the `Owing` rail. Every other line names a
+party that appears nowhere else on the row.
+
+**So ACCEPTED is replaced, not renewed.** It used to mean *"every row truncates and we cannot
+afford otherwise"*; it now means *"one action line truncates when one customer's name is long,
+and its content is on the row twice already."*
 
 **WHAT UNBLOCKS S2.5, stated so the next card does not re-derive it:** #692 measured the
 expansion chevron at 3% — **−24 to −28px taken from the eight business columns, `Actions`
