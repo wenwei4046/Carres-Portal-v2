@@ -545,6 +545,39 @@ sort so an order's items stay together). **Grouping an Orders row by anything is
 question — what an operator may be allowed to reorder away from risk — so S2.4 STOPS and asks
 before it builds.**
 
+> ### ⛔ S2.4 IS REFUSED, 2026-08-08 — and NO new ruling was needed to refuse it
+>
+> **§2.3 already answers this, and it is already frozen.** The card was right to stop; it was
+> wrong that a decision was owed. Grouping is not a new question awaiting approval — it is a
+> request to REVERSE a frozen rule, and **nobody has offered a reason to.**
+>
+> ```
+> §3  MISSION      "ordered by risk to the customer's promise"
+> §2.3 FROZEN      primary = risk · secondary = the promised date · tertiary = value
+>                  "A large order weeks away never outranks a small one going out tomorrow."
+>
+> Grouping puts whatever sorts first at the top. The most urgent order sits
+> wherever its group landed. That is the ONE thing this page exists to prevent.
+> ```
+>
+> **AND THE PAGE ALREADY HAS WHAT GROUPING BUYS.** The facet rail is nine groups —
+> `QUEUES · DELIVERY · TEAM · DEADLINE · LOGISTICS · SUPPLIER · REGION · CATEGORY · FIX DATA` —
+> and a click filters to one. S2.2 added four header ▼ on top. **Grouping would be a tenth door
+> onto facts that already have one, which is the duplication §3's own frozen rule bans.**
+>
+> **WHY 2990 HAS IT AND WE DO NOT — the standing rule, applied.** 2990's Sales Order list has
+> **no facet rail and no action ladder** (§2 F22: *"no owner, queue or next-action concept
+> anywhere in the 1,669 lines"*). It groups because grouping is the only way to find anything
+> in a flat register. **We are not missing its power; we already solved the problem it solves,
+> better. Copying it would be copying the ASSUMPTION.**
+>
+> **What would REOPEN it:** an operator observed doing a job the rail cannot do — needing every
+> logistics company on screen AT ONCE rather than one at a time. **That is an observation of a
+> person, not an argument about a grid**, and none exists. The owner may reopen §2.3 at any
+> time; nothing here asks them to.
+>
+> **S2.4 is CLOSED. Go straight to S2.5 · Expansion.**
+
 **SORTING'S DIVISION OF LABOUR DIFFERS AND THAT IS NOT A DEFECT.** 2990 sorts INSIDE its grid
 (`sortedRows`, `col.sortFn`, `DataGrid.tsx:685-689`); Carres' kit states *"The PAGE sorts the
 rows; the kit only shows the arrow."* **So S2.1 copies 2990's BEHAVIOUR — asc ⇄ desc ⇄ off —
