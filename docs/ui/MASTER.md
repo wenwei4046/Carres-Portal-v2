@@ -155,6 +155,50 @@ P 594 · Q 111 make the debt countable for the first time.
 > Its sibling is `../orders/MASTER.md`'s own ⛔ START HERE block, which records why: ten cards
 > upgraded how a table is DRAWN and not one asked what the operator should SEE.
 
+### ⛔⛔ THE ENTRY GATE — the chat produces these BEFORE it advises anything
+
+> **A promise to read has already been tried here and it failed.**
+> `../research/grid-findings.md` TRAPS: *"A Study Receipt does not prove the conclusions came
+> from the reading. One was produced at the start of this investigation and four false claims
+> followed it."* **So this gate asks for no receipt. It asks for five things that cannot be
+> produced without reading, and that are worth having on their own.**
+
+```
+A · THREE VERBATIM LINES, each with file:line — one from a module MASTER, one
+    from grid-findings, one from 2990's own source. THE LINE, not a summary.
+
+B · ONE THING IN THIS RECORD IT DISAGREES WITH, with its evidence.
+    Law 4 is not optional. A chat that agrees with everything has not read it —
+    and every good finding of the last programme came from a contradiction:
+    the PRIOR ART path that did not exist · "measured in Chromium" that had
+    measured a header with no arrow in it · C14 sizing `Actions` off nearly the
+    NARROWEST party-named line · Receiving's px widths that were never measured.
+
+C · WHAT IT DID NOT READ, named with line counts. Every round that hid this
+    inherited a false conclusion.
+
+D · 2990's PAGE STRUCTURE, first-hand — NOT its DataGrid, which is finished and
+    must not be re-studied. How its pages COMPOSE: what leads, what sits beside,
+    what opens. `SalesOrderDetail.tsx` (3,699) has NEVER been opened by anyone
+    here, and ~100 of its pages are unread. That is where a page-structure
+    answer lives, and this programme has only ever read its grid.
+
+E · AutoCount's page structure. F50–F57 are first-hand OBSERVATIONS of screens
+    already on file (nested child grid · filled status cell · bottom-left filter
+    statement · every document type exposed permanently). It must say which it
+    ACCEPTS and which it doubts, and why — they are observations of a screen,
+    never of the code behind it.
+```
+
+**AND THE STANDING RULE BINDS THE WHOLE GATE:**
+```
+copy the POWERS, never the ASSUMPTIONS
+```
+**2990 and AutoCount are EVIDENCE, never specification** (`CLAUDE.md` DECISION GATE). 2990's
+Sales Order list has no owner, no queue and no next-action anywhere in 1,669 lines
+(grid-findings F22) — **it answers a different question than ours does. Read it to learn how it
+COMPOSES a page, not to inherit what it decided to show.**
+
 **THE ORDER OF WORK IS NOW FIXED, and it is the reverse of what was done:**
 ```
 1  study the WHOLE portal — every operator surface, how each is composed today
