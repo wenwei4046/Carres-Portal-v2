@@ -148,6 +148,74 @@ P 594 · Q 111 make the debt countable for the first time.
 
 ---
 
+# ⛔ §6.5 · PAGE STRUCTURE IS NOT DECIDED — study the PORTAL before any one page
+
+> **Loo, 2026-08-08:** *"study all portal and rearrange how to build every page structure —
+> then only start sales order page again."* **This block is the brief and the open-item list.**
+> Its sibling is `../orders/MASTER.md`'s own ⛔ START HERE block, which records why: ten cards
+> upgraded how a table is DRAWN and not one asked what the operator should SEE.
+
+**THE ORDER OF WORK IS NOW FIXED, and it is the reverse of what was done:**
+```
+1  study the WHOLE portal — every operator surface, how each is composed today
+2  agree ONE page-structure standard with Loo   ← consult, never propose-and-ship
+3  ONLY THEN re-do Sales Order against it
+```
+**Sales Order stops being an upgrade and becomes the first page BUILT to the standard.**
+
+### THE OPEN ITEMS — everything raised and NOT done, collected once
+
+**Scattered across ~15 commits and three files until now, which is the same as unrecorded.**
+
+```
+PORTAL-WIDE — the structural questions nobody has answered
+  · every page composes its own shell: Orders uses ListPageShell + a 9-group
+    facet rail; Purchasing uses a 200px rail + tabs; neither is ruled the standard
+  · §5 rules FOUR right-rail widgets (Calendar · Team · Tasks · Activity) on
+    "every main panel". Orders' right side is facets instead. Two shapes, one law
+  · the drawer REPLACES the list rather than sitting beside it (grid-findings F31,
+    OrderDetailDrawer 7,576 lines) — so opening one order costs you the list
+  · what is a QUEUE vs what is a FILTER — Orders' rail mixes 1 group of work with
+    8 of dimensions and calls them all facets
+
+ORDERS REGISTER — raised, measured, never carded
+  · Status pill reads the same word on 30 of 31 rows and costs 139px
+  · the three dots repeat what Stock, Delivery and Actions already say
+  · PIC is a constant for every non-manager (they default to their own orders)
+  · Deadline shows the ORDER's date; what actually expires is the ACTION's own
+    deadline, and the row never shows it
+
+KNOWN DEFECTS, filed and unfixed
+  · 🔴 the drawer's items table renders `PO` and `ITEM` on top of each other
+  · 🟡 D10 · D11 — dead surfaces still compiled into the bundle
+  · 🟡 an unrecognised SKU still LABELS as `Accessory` in the drawer (D9 fixed the
+    CLAIM, not the label — the fold survives while those files are frozen)
+  · 🟡 Receiving cannot raise `Confirm ready date` — half of P20.5, needs one hook
+    feeding both pages, which reaches the frozen Purchase Orders page
+  · 🟡 16 free-text SKUs need real names; the keyword list mirrors migration 0148
+    word for word, so both move together or neither does
+
+THE ONE THAT OUTRANKS ALL OF THEM
+  · NOBODY HAS WATCHED AN OPERATOR WORK. `../research/grid-findings.md` §6 has
+    carried this line through every round and ten cards were built past it.
+    Two days with Shasha and Yu Jun answers more than any further measurement.
+```
+
+**⛔ WHAT THE NEXT CHAT MAY NOT DO**
+```
+✗ start with Sales Order            the standard comes first
+✗ touch business logic              APIs · calculations · the action ladder ·
+                                    queues · PIC · stock · delivery · money ·
+                                    permissions · order records — all PRESERVED
+✗ re-measure widths, densities,     finished and recorded in grid-findings §4.7/§4.8
+  engines or row height
+✗ add grid capability               the foundation is DONE; S2.5 is STOPPED
+✗ derive a page structure from      the last programme did exactly this, and the
+  reading source                    two ⛔ blocks are the receipt
+```
+
+---
+
 # §7 · Approved Evolution
 
 | What | Why it is not built |
