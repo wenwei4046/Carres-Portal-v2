@@ -6,14 +6,17 @@
  * packages/shared/src/line-category.ts.
  */
 export {
+  lineClass,
   lineCategory,
   lineSize,
   stockMatchKey,
   accShort,
+  accessoryType,
   lineKind,
   lineSortRank,
   defaultLineLocation,
   STOCK_LOCATIONS,
   type CoreCat,
+  type LineClass,
   type ItemKind,
 } from "@carres/shared";

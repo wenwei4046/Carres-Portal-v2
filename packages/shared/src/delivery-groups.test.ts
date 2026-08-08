@@ -6,6 +6,9 @@ import {
   deliveryGroupOf,
   deliveryScopeSentence,
   orderDeliveryGroups,
+  isOutsideTheTrip,
+  isUnknownGood,
+  unknownGoodsSkus,
 } from "./delivery-groups";
 
 // T8 — Jess's ruling: mattress + bed frame together (HARD) · sofa may take a
@@ -91,5 +94,51 @@ describe("group definitions", () => {
     for (const banned of ["pod", "sku", "unscheduled", "not booked", "consignment"]) {
       expect(text).not.toContain(banned);
     }
+  });
+});
+
+/**
+ * D9 — `null` from `deliveryGroupOf` used to mean one thing and now means two.
+ * A pillow is groupless because we KNOW it cannot hold a truck; an
+ * unrecognised SKU is groupless because nobody can place it. Reading the
+ * second as the first is the whole defect.
+ */
+describe("groupless is not one thing (D9)", () => {
+  const UNKNOWN = "5539-CNR"; // a live Ohana sofa module, read off production
+
+  it("tells the two kinds of groupless line apart", () => {
+    expect(deliveryGroupOf("Memory Pillow")).toBeNull();
+    expect(deliveryGroupOf(UNKNOWN)).toBeNull();
+
+    expect(isOutsideTheTrip("Memory Pillow")).toBe(true);
+    expect(isUnknownGood("Memory Pillow")).toBe(false);
+
+    expect(isUnknownGood(UNKNOWN)).toBe(true);
+    expect(isOutsideTheTrip(UNKNOWN)).toBe(false);
+  });
+
+  it("a service charge is outside the trip, never unknown", () => {
+    expect(isOutsideTheTrip("Disposal of old mattress")).toBe(true);
+    expect(isUnknownGood("Disposal of old mattress")).toBe(false);
+  });
+
+  it("names every unplaceable line once, in the order it appears", () => {
+    expect(
+      unknownGoodsSkus([
+        { sku: "mattress:FirmCare-K" },
+        { sku: UNKNOWN },
+        { sku: "Memory Pillow" },
+        { sku: UNKNOWN },
+        { sku: "LYYAR-1A(LHF)" },
+      ]),
+    ).toEqual([UNKNOWN, "LYYAR-1A(LHF)"]);
+  });
+
+  it("an order of unrecognised lines has no groups AND is not therefore fine", () => {
+    // 12 live orders looked exactly like this. `orderDeliveryGroups` is empty
+    // either way — which is why the gate has to ask the second question.
+    const lines = [{ sku: UNKNOWN }, { sku: "5539-2A(RHF)" }];
+    expect(orderDeliveryGroups(lines)).toEqual([]);
+    expect(unknownGoodsSkus(lines)).toHaveLength(2);
   });
 });

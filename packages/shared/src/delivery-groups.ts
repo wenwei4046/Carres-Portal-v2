@@ -25,6 +25,15 @@
  * the gate skips `service` lines. This module makes the reason explicit rather
  * than leaving it as a happy accident two files away.)
  *
+ * D9 (2026-08-08) — an UNKNOWN line is groupless too, and for the OPPOSITE
+ * reason. A pillow is outside the question because we know what it is and know
+ * it cannot hold a truck. An unrecognised SKU is outside it because we cannot
+ * put it in either group — and "outside the question" must never be read as
+ * "passes". `unknownGoodsSkus` names them so the booking gate can refuse
+ * instead of quietly counting a groupless line as one more thing that never
+ * blocks. Until D9 that difference did not exist and every unknown line took
+ * the pillow's exit.
+ *
  * PURE — no I/O, no clock. The API gate and the drawer read THIS, so the
  * question "what is one delivery?" has one answer (the HR-P5 no-second-engine
  * lesson).
@@ -74,17 +83,44 @@ export function deliveryGroupLabel(key: DeliveryGroupKey): string {
 }
 
 /**
- * Which delivery group a line belongs to — or null when the line is not a
- * delivery-blocking good at all (accessory or service charge).
+ * Which delivery group a line belongs to — or null when the line cannot be
+ * placed in one. **`null` is not a pass.** Two very different lines answer
+ * null: a recognised accessory / service charge (`isOutsideTheTrip`), which is
+ * genuinely outside the question, and an unrecognised SKU (`isUnknownGood`),
+ * which nobody can place. Ask WHICH — never treat a bare null as harmless.
  *
  * Mattress AND bedframe both answer "bed": that single line IS the hard rule.
  */
 export function deliveryGroupOf(sku: string): DeliveryGroupKey | null {
-  if (lineKind(sku) !== "core") return null; // acc + service never block
   const cat = lineCategory(sku);
+  if (lineKind(sku) !== "core") return null; // acc + service + unknown
   if (cat === "mattress" || cat === "bedframe") return "bed";
   if (cat === "sofa") return "sofa";
   return null;
+}
+
+/** D9 — nothing recognised this SKU, so no group can hold it and no rule may
+ *  declare it safe. */
+export function isUnknownGood(sku: string): boolean {
+  return lineKind(sku) === "unknown";
+}
+
+/** D9 — a line that is groupless BECAUSE we know what it is: a recognised
+ *  accessory or a service charge. This is the only groupless line a delivery
+ *  is allowed to ignore. */
+export function isOutsideTheTrip(sku: string): boolean {
+  const kind = lineKind(sku);
+  return kind === "acc" || kind === "service";
+}
+
+/** Every line on the order that nothing recognised, de-duplicated, in the
+ *  order they appear — what a delivery gate must refuse on and what an
+ *  operator has to name before the goods question can be answered at all. */
+export function unknownGoodsSkus(lines: { sku: string }[]): string[] {
+  const out: string[] = [];
+  for (const l of lines)
+    if (isUnknownGood(l.sku) && !out.includes(l.sku)) out.push(l.sku);
+  return out;
 }
 
 /**

@@ -21,11 +21,65 @@ import { normalizeSkuKey } from "./sku-code";
 
 export type CoreCat = "mattress" | "bedframe" | "sofa";
 
-/** Core goods (Mattress / Bedframe / Sofa) need POs + stock; everything else is
- *  accessory ("acc"). Native SKUs carry a `mattress:` / `bedframe:` / `sofa:`
- *  prefix; AutoCount free-text SKUs use model keywords + `MS## / BF## / SF##`
- *  item codes. */
-export function lineCategory(sku: string): CoreCat | "acc" {
+/**
+ * D9 (2026-08-08) — the fourth answer, and the reason it had to exist.
+ *
+ * This function used to end in `return "acc"`. Two different facts therefore
+ * shared one word: *"this is an accessory"* and *"I do not recognise this"* —
+ * and §7 rules that **an accessory never blocks a delivery**. So "I cannot see
+ * what this is" silently became "this cannot stop a truck". Measured on
+ * production 2026-08-08: 36 lines across 17 orders were core goods reading as
+ * accessories, and 12 orders classified as accessories END TO END — they could
+ * never fail a stock check, so the ladder answered *goods secured* on zero
+ * units.
+ *
+ * The fix is NOT another keyword. Adding `5539` and `lyyar` would clear today's
+ * twelve orders and rebuild the same trap for the next model Ohana names. The
+ * defect is the SHAPE of the rule: a default that makes a safety claim.
+ *
+ * So `acc` is now EARNED — a line is an accessory because a known accessory
+ * word recognised it, never because nothing else did — and the fallthrough is
+ * `unknown`, which claims nothing. That is §2.5's discipline, already in this
+ * product: `photoOnFile` and `deliveryOrderIssued` are true / false / null,
+ * where null means *we cannot see* and neither raises nor reassures. Readiness
+ * was the one signal still guessing.
+ */
+export type LineClass = CoreCat | "acc" | "unknown";
+
+/**
+ * The accessory vocabulary — the ONE list, read by both the classifier (what a
+ * line IS) and `accShort` (what the operator is shown). Two copies of it would
+ * be two answers to one question (ownership Law D).
+ *
+ * Everything here is POSITIVE recognition. Nothing reaches this list by
+ * elimination, which is the whole of D9.
+ */
+const ACCESSORY_TYPES: readonly { name: string; test: RegExp }[] = [
+  { name: "Pillow", test: /pillow/ },
+  { name: "M.P", test: /protector|protect|\bm\.?p\b/ },
+  { name: "Disposal", test: /disposal|dispose/ },
+  { name: "Service", test: /floor|lift|stair|transport|delivery|charge|install/ },
+  { name: "Topper", test: /topper/ },
+  // "Carress Footrest-K/-Q" is a sofa footrest add-on — the TYPE is Footrest;
+  // the bare first-word fallback would grab the brand ("Carress") instead.
+  { name: "Footrest", test: /footrest|foot rest|ottoman/ },
+];
+
+/** The accessory TYPE a SKU is recognised as, or `null` — nothing is an
+ *  accessory by default. This is the positive half of D9. */
+export function accessoryType(sku: string): string | null {
+  const n = sku.toLowerCase();
+  return ACCESSORY_TYPES.find((a) => a.test.test(n))?.name ?? null;
+}
+
+/** Core goods (Mattress / Bedframe / Sofa) need POs + stock; a RECOGNISED
+ *  accessory is `acc`; anything nothing recognised is `unknown` — never `acc`
+ *  (D9). Native SKUs carry a `mattress:` / `bedframe:` / `sofa:` prefix;
+ *  AutoCount free-text SKUs use model keywords + `MS## / BF## / SF##` item
+ *  codes.
+ *
+ *  **This is the classifier. `lineCategory` is a narrower view of it.** */
+export function lineClass(sku: string): LineClass {
   const s = sku.trim();
   // Native canonical SKUs carry a `mattress:` / `bedframe:` / `sofa:` prefix.
   // Match ONLY that exact head — an AutoCount SKU often embeds a `COL:` colour
@@ -35,8 +89,9 @@ export function lineCategory(sku: string): CoreCat | "acc" {
   if (head === "mattress" || head === "bedframe" || head === "sofa")
     return head as CoreCat;
 
-  // Accessory / service keywords are tested FIRST so "Mattress Protector" stays
-  // an accessory, not a mattress.
+  // These accessory words are tested BEFORE the core lists so "Mattress
+  // Protector" stays an accessory, not a mattress. They are the only words
+  // allowed to outrank a core model name, which is why the list stays narrow.
   const n = s.toLowerCase();
   if (/disposal|transport fee|no lift|per floor|memory pillow|protector|microfiber/.test(n))
     return "acc";
@@ -48,7 +103,36 @@ export function lineCategory(sku: string): CoreCat | "acc" {
   if (/^ms[0-9]/.test(n)) return "mattress";
   if (/^bf[0-9]/.test(n)) return "bedframe";
   if (/^sf[0-9]/.test(n)) return "sofa";
-  return "acc";
+  // The rest of the accessory vocabulary runs AFTER the core lists: a broad
+  // word like "delivery" or "ottoman" must never outrank a model name.
+  if (accessoryType(s)) return "acc";
+  // D9 — the fallthrough admits it cannot see. It does not declare the line
+  // safe, and it does not declare it a problem either.
+  return "unknown";
+}
+
+/**
+ * ⚠️ DISPLAY GROUPING ONLY — **never ask this whether goods are safe to send.**
+ *
+ * The three-answer view of `lineClass`, kept because two screens group their
+ * rows by it and D9 was scoped to the shared rule, not to those screens
+ * (`OperationOrdersControl.tsx:1542` builds the items chip · the drawer's
+ * `groupCatOf`, `OrderDetailDrawer.tsx:3506`, builds the category headers).
+ * Both want a bucket to put a row in, and neither decides anything.
+ *
+ * It folds `unknown` into `acc`, so **the two cosmetic halves of D9 survive
+ * here on purpose**: an unrecognised sofa module still prints under the
+ * `Accessory` header. What does NOT survive is the claim — `lineKind`,
+ * `lineReadiness`, `deliveryGroupOf` and `bookingConfirmGate` all read
+ * `lineClass`, so nothing reachable from this fold can call goods ready.
+ *
+ * FOLLOW-UP: when those two files are free to edit, move both to `lineClass`,
+ * give `unknown` its own header and DELETE this function. It exists to keep one
+ * lie in one place with its address written on it, not to be lived with.
+ */
+export function lineCategory(sku: string): CoreCat | "acc" {
+  const c = lineClass(sku);
+  return c === "unknown" ? "acc" : c;
 }
 
 /** King / Queen / Single from a SKU, or null. */
@@ -103,25 +187,28 @@ export function stockMatchKey(sku: string): string {
  *  a generic "accessories" (Loo: show Pillow / M.P / Disposal by name). The
  *  drawer shows the full original name; this is the short form. */
 export function accShort(sku: string): string {
-  const s = sku.toLowerCase();
-  if (/pillow/.test(s)) return "Pillow";
-  if (/protector|protect|\bm\.?p\b/.test(s)) return "M.P";
-  if (/disposal|dispose/.test(s)) return "Disposal";
-  if (/floor|lift|stair|transport|delivery|charge|install/.test(s)) return "Service";
-  if (/topper/.test(s)) return "Topper";
-  // "Carress Footrest-K/-Q" is a sofa footrest add-on — the TYPE is Footrest;
-  // the bare first-word fallback would grab the brand ("Carress") instead.
-  if (/footrest|foot rest|ottoman/.test(s)) return "Footrest";
+  const named = accessoryType(sku);
+  if (named) return named;
   const w = sku.trim().split(/[\s/]+/)[0] ?? sku;
   return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
 }
 
-export type ItemKind = "core" | "acc" | "service";
+export type ItemKind = "core" | "acc" | "service" | "unknown";
 
-/** core furniture · accessory goods · service charge (Disposal / floor charge —
- *  not a physical unit, carries no stock location). */
+/**
+ * core furniture · accessory goods · service charge (Disposal / floor charge —
+ * not a physical unit, carries no stock location) · **unknown** — nothing
+ * recognised this SKU (D9).
+ *
+ * This is the SAFETY answer: `acc` and `service` both mean "cannot hold a
+ * delivery", so nothing may reach them by elimination. `unknown` is the fourth
+ * seat that used to be missing, and every reader must decide what to do with
+ * it rather than inherit a claim nobody made.
+ */
 export function lineKind(sku: string): ItemKind {
-  if (lineCategory(sku) !== "acc") return "core";
+  const cat = lineClass(sku);
+  if (cat === "unknown") return "unknown";
+  if (cat !== "acc") return "core";
   const name = accShort(sku);
   return name === "Disposal" || name === "Service" ? "service" : "acc";
 }
@@ -131,17 +218,22 @@ export function lineKind(sku: string): ItemKind {
  * order mattress → bedframe → sofa → pillow → M.P → service / others. Lower
  * sorts first; ties keep their original order (Array.sort is stable). Use as
  * `lines.sort((a, b) => lineSortRank(a.sku) - lineSortRank(b.sku))`.
+ *
+ * D9 — an UNKNOWN line sorts with the core goods, not with the accessories.
+ * It is a physical thing that has to be on the truck, and burying it under the
+ * pillows is how it stopped being looked at in the first place.
  */
 export function lineSortRank(sku: string): number {
-  const cat = lineCategory(sku);
+  const cat = lineClass(sku);
   if (cat === "mattress") return 0;
   if (cat === "bedframe") return 1;
   if (cat === "sofa") return 2;
+  if (cat === "unknown") return 3;
   const name = accShort(sku);
-  if (name === "Pillow") return 3;
-  if (name === "M.P") return 4;
-  if (name === "Disposal" || name === "Service") return 6; // service last
-  return 5; // other accessories (Topper / Footrest / …) before service
+  if (name === "Pillow") return 4;
+  if (name === "M.P") return 5;
+  if (name === "Disposal" || name === "Service") return 7; // service last
+  return 6; // other accessories (Topper / Footrest / …) before service
 }
 
 /**

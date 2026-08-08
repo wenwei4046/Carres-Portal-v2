@@ -605,8 +605,9 @@ offer the primary check-in, and the supplier name is asserted ABSENT rather than
 > `1/1 ready` on **zero units**, `allReceived` went true, and the drawer's ladder answered
 > `ready` — *goods secured* — for an order with no goods. **In a test that wasted a day; in
 > production that is an order told it can be delivered.** Filed as **D9 🔴** with its live
-> exposure named as the open question. **Not fixed here** — it reaches Stock and Purchasing, and
-> S2.0's mandate was the tests.
+> exposure named as the open question. **Not fixed by S2.0** — it reaches Stock and Purchasing,
+> and that card's mandate was the tests. **It is fixed now; the two blocks below are the
+> measurement and the build.**
 >
 > ### 🔴🔴 THE OPEN QUESTION IS ANSWERED. D9 IS LIVE, AND IT IS 1 IN 6 ORDERS.
 > **Measured on production 2026-08-08** by replaying `lineCategory()`'s exact branches in SQL
@@ -641,49 +642,90 @@ offer the primary check-in, and the supplier name is asserted ABSENT rather than
 > `return "acc"` — an unknown SKU is silently declared an accessory, and an accessory is
 > declared safe. **The default is the most dangerous of the four answers.** Adding `5539` and
 > `lyyar` to the keyword list fixes today's twelve orders and rebuilds the trap for the next
-> model Ohana names. **Whoever takes D9 must decide what an UNRECOGNISED sku is allowed to
-> claim** — and *"it does not block delivery"* cannot be it.
+> model Ohana names. **D9 had to decide what an UNRECOGNISED sku is allowed to claim** — and
+> *"it does not block delivery"* could not be it. **It now claims nothing.**
 >
 > **Bounded honestly:** `CLAUDE.md` §6 rules every live row is TEST data, so 12/77 is evidence
 > about the CODE, never about business volume. **It is not evidence about severity, which is
 > the same at any volume.** Re-run the query at go-live.
 >
-> ## ▶︎ D9 · APPROVED TO BUILD 2026-08-08 — ahead of S2.3
+> ## ✅ D9 · SHIPPED 2026-08-08 — an unrecognised SKU no longer claims it is safe to deliver
 >
-> **It runs in PARALLEL with S2 and cannot collide:** S2 owns
-> `pages/operation/OperationOrdersControl.tsx`; D9 owns
-> `packages/shared/src/line-category.ts` and whatever reads it. **Neither touches the other's
-> file. If D9 needs to edit the Orders page, STOP and wait.**
+> **The headline number, re-measured before the build and again after it:**
+> ```
+>                                                    before      after
+> live orders                                            77         77
+> orders that could NEVER fail a stock check             20   →       0
+> lines answering `acc` because nothing recognised them  45   →       0
+> lines re-classified into anything OTHER than unknown         →      0
+> ```
+> **The last row is the one that says the fix is safe.** Not one line was promoted into a new
+> category. Everything the rule already recognised answers exactly what it answered yesterday;
+> the ONLY thing that changed is that a line nothing recognised stopped calling itself an
+> accessory. The card's own 77 / 17 / 12 / 36 replicated to the digit — the counts were re-run,
+> not inherited.
 >
-> ```text
-> BUILD CARD · D9 · an unrecognised SKU may not claim it is safe to deliver.
-> git pull, then read CLAUDE.md + docs/orders/MASTER.md §12 (this block).
+> ### THE FIX IS A SHAPE, NOT A KEYWORD
+> `5539` and `lyyar` were deliberately **not** added. Adding them clears twelve orders and
+> rebuilds the same trap for the next model Ohana names — and the classifier mirrors the
+> server's `resolve_demand_category` (0148) verbatim, so a keyword may not move on one side
+> alone. The defect was never a missing entry. It was **one word carrying two facts**: `acc`
+> meant both *"this is an accessory"* and *"I do not recognise this"*, and §7 rules the first
+> one safe.
 >
-> THE DECISION FIRST, and it is the whole card:
->   `lineCategory()` ends in `return "acc"`, and §7 says an accessory never
->   blocks delivery. So "I do not recognise this" silently becomes "this
->   cannot stop a delivery". Adding `5539` + `lyyar` to the keyword list
->   fixes today's twelve orders and REBUILDS THE TRAP for the next model
->   Ohana names. Do not stop at the keyword list.
->
->   An unrecognised SKU must reach the operator as UNKNOWN, never as safe.
->   §2.5's own discipline already exists for exactly this — `photoOnFile`
->   and `deliveryOrderIssued` are THREE-WAY (`true` / `false` / `null` =
->   we cannot see), and null raises nothing and claims nothing. Readiness
->   is the one that guesses instead.
->
-> MEASURE FIRST, then build. The SQL that produced 77 / 17 / 12 / 36 is in
-> this block — re-run it, do not trust the number.
->
-> DO NOT TOUCH   the Orders page (S2 owns it) · the drawer · the api ·
->                any migration. This is a shared-rule card.
->
-> THEN  test → self-review → PR → merge → deploy → verify production.
+> ```
+> lineClass(sku)   mattress · bedframe · sofa · acc · UNKNOWN
+>                  `acc` is now EARNED by an accessory word. Nothing reaches it
+>                  by elimination. The fallthrough is `unknown`, which is
+>                  §2.5's third state — it raises nothing and claims nothing.
 > ```
 >
-> **WHY IT GOES AHEAD OF S2.3.** S2.3 is a totals strip — useful. D9 tells an operator to
-> deliver goods the warehouse does not have. **A wrong number on a footer costs a glance; a
-> wrong readiness costs a customer.**
+> **Where the third state actually bites, because a type nobody reads is not a fix:**
+> - `lineReadiness` — the `acc ⇒ always reserved` shortcut is now spent only on a RECOGNISED
+>   accessory. `unknown` is checked **last**, so it yields to every piece of real evidence
+>   (units reserved to the SO · free matching stock · an open PO) and only ever replaces the
+>   bare guess. It is deliberately **not** `no_po` — *"nobody ordered it"* is a claim about a
+>   thing you can name, and the action here is to say what the line is, not to raise a PO.
+> - `bookingConfirmGate` — a groupless line used to be walked past, and an unrecognised line
+>   WAS a groupless line. It now collects `unknownSkus`, `goodsReady` goes false while any
+>   survive, and they are repeated into `notReadySkus` so the 422 an operator already reads
+>   names them instead of going silent. **A fully-reserved bed set is held back by one
+>   unplaceable line riding along**, and `splitAvailable` goes false — there is no honest
+>   answer to *"which trip does this go on"* for a thing nobody can classify.
+> - `importAccessoryKind` — an unrecognised SKU is no longer forecast as a container of pillows.
+>
+> **Three ownership facts kept the blast radius honest.** `deliveryGroupOf` still returns `null`
+> for both a pillow and an unknown line, so `null` now means two different things — the module
+> exports `isOutsideTheTrip` and `isUnknownGood` to tell them apart, and a bare `null` may never
+> again be read as "harmless". `lineCategory` was NOT widened: two screens group their rows by
+> it, and both are files this card was forbidden to touch, so it survives as a documented
+> three-answer VIEW of `lineClass` that folds `unknown` into `acc`. Every SAFETY reader was moved
+> to `lineClass`.
+>
+> **What that fold still costs, stated rather than hidden:** an unrecognised sofa module still
+> prints under the `Accessory` header in the drawer and in the list's items chip. **The label is
+> still wrong. The claim is not** — nothing reachable from that fold can call goods ready.
+>
+> ### 🟡 THE TWO FOLLOW-UPS THIS CARD REFUSED TO FAKE
+> 1. **Delete `lineCategory`.** Move `OperationOrdersControl.tsx:1542` and the drawer's
+>    `groupCatOf` (`OrderDetailDrawer.tsx:3506`) onto `lineClass`, give `unknown` its own header
+>    and its own pill word. Today an unknown line renders `No PO` — true, but not the sentence
+>    the operator needs. **Blocked only by file ownership, not by design.**
+> 2. **Name the sixteen SKUs** — 10 Ohana sofa modules, 3 mattress-shaped, and the rest. This is
+>    a Purchasing/Stock card, not an Orders one: the keyword list and migration 0148 must move
+>    together, and until they do those lines correctly read `unknown` rather than incorrectly
+>    reading safe. **`M1401F-K` classifies and `M1201F-K` does not — one product family, one
+>    digit, two answers**, and that is the argument for a catalog lookup instead of a longer
+>    regex.
+>
+> **PROPOSAL, NOT LAW — and its falsifier.** *An unrecognised good must block, while unknown
+> MONEY does not* (§8: "unknown warns, never blocks"). The asymmetry is deliberate: unknown money
+> is a number nobody entered, and holding a customer's goods over our own missing data entry
+> punishes the customer for our gap. An unknown good is a physical object that has to be on the
+> truck. **This is overturned the day an operator is blocked on a line that turns out to be a
+> genuine accessory** — the observable event is an order stuck at `unknown` whose line, once
+> named, classifies as `acc`. Follow-up 2 is what closes that, and `Leg 4"` (1 live line) is the
+> candidate to watch.
 
 ### ✅ S2.1 · SHIPPED 2026-08-08 — the operator sorts, and the third click gives the risk order back
 
@@ -1386,6 +1428,6 @@ carrier's working days and capacity are not a fact about this customer's order.
 | **D6** 🟡 | **`Issues module coming — needs the ops_issues table`** is a live tooltip on the Actions menu. A promise about the product on an operator's screen. | panel titles |
 | **D7** 🟡 | **The `deliver_today` checklist is empty by ruling**, so an operator expanding the day's own action sees nothing. Correct by the rule (*nobody records "goods loaded"*), and worth knowing before somebody calls it a bug. | `order-action-checklist.ts` |
 | **D8** ⚪ | **`stockWindowDays` is still a flat 7 / 5** in `orderActionSignalsOf`, while Purchasing's real production numbers are 7 · 7 · **14** and manager-editable. The Orders ladder therefore turns the ready-date call red on a sofa **nine days later** than Purchasing's own window says it should. | read + Purchasing §2.3 |
-| **D9** 🔴 | **`lineCategory()` calls a sofa an ACCESSORY when its SKU is neither canonical nor a known keyword — and an accessory is ALWAYS READY.** `packages/shared/src/line-category.ts:28-51` resolves a `sofa:` head, then a keyword list, then `^sf[0-9]`, then falls through to `acc`. `SOFA-NORD-3S` matches none of the three. **The consequence is not cosmetic:** §7 rules that *"accessories never block a delivery"*, so a mis-read line reports ready with **zero units on hand**, `allReceived` goes true, and the drawer's ladder answers `ready` — goods-secured — for an order whose goods do not exist. Found 2026-08-08 by S2.0, which is how four tests had been passing against a fixture they thought was a sofa. **Live exposure is the open question and it is answerable in SQL** — canonical SKUs are safe; the risk is AutoCount free-text. **Nothing was changed: this reaches Stock and Purchasing, not just Orders.** | measured — the Items panel labels the line `Accessory` while the header reads `1/1 ready` on zero stock |
+| ~~**D9**~~ | ✅ **FIXED 2026-08-08** — `lineClass` answers `unknown` where it used to answer `acc`, and `acc` is now earned by an accessory word instead of by elimination. **20 orders that could never fail a stock check → 0**, with **zero** lines re-classified into anything else. Two follow-ups named and left open on purpose: delete the `lineCategory` display fold, and name the sixteen SKUs alongside migration 0148. See the D9 block above |
 | **D10** 🟡 | **Two dead surfaces are still compiled into the bundle, and both had live test suites.** `OperationOrders.tsx` (450 lines, the 6-column kanban) is imported by **nothing** — §3 records that the list merged it away — and `OrderCustomerCard` (in the drawer) is exported, rendered nowhere, and superseded by `CustomerIdentityCard` (Jess 2026-07-17 rev 4). **Purchasing's own C1 ruling applies to the second one:** its `startEditRef` door has no caller, so the safe-edit mode is unreachable, **and the `status === 'place'` gate that used to guard it is gone from the component** — whoever re-mounts it inherits an editor with no gate. | `grep` — the only non-test reference to each is its own declaration |
 | **D11** ⚪ | **`receive-po-<id>` names TWO different controls** in `ProcurementTabContent` — the primary `Check in` button and the always-available `Direct receive →` escape hatch. A test cannot tell them apart by handle, only by word. | read |

@@ -431,11 +431,25 @@ describe("OperationOrders — kanban", () => {
     //     ActionBar's sentence row and its buttons are gone.
     //   · the word is `Assign logistics` (COPY-STANDARD's own; the module says
     //     "logistic", never "delivery partner").
-    // The default fixture has the sofa in stock, so the drawer's ladder reads
-    // `ready` — and `ready` beats `scheduled` on purpose (Loo: 货齐 > 排物流).
+    // This test needs the ladder on `ready`, and `ready` beats `scheduled` on
+    // purpose (Loo: 货齐 > 排物流).
+    //
+    // D9 (2026-08-08) — it used to get there for the WRONG reason. The comment
+    // said "the default fixture has the sofa in stock", but under the strict
+    // Round-1A vocabulary free shelf stock is `to reserve`, never ready — the
+    // fixture's 5 units at wh-1 could not have made this pass. What made it
+    // pass was `SOFA-NORD-3S` falling through `lineCategory` to `acc`, and an
+    // accessory being always ready. The classifier now answers `unknown` there
+    // and the order is correctly NOT goods-secured, so the test states its own
+    // premise instead of borrowing a bug's: ONE recognised accessory line,
+    // which is genuinely ready by Jess's own ruling (Klang warehouse stock, no
+    // PO and no reserve step — `line-readiness.ts`).
     setLoaded([
       makeOrder({ id: "ord-1", so: 9001, customer_name: "Click Me", operation_stage: "ready_to_dispatch" }),
     ]);
+    setDetailStage("ready_to_dispatch", {
+      lines: [{ sku: "Memory Pillow", qty: 1, unit_price: 4500 }],
+    });
     render(wrap(<OperationOrders />));
     fireEvent.click(screen.getByText("Click Me"));
     openActionsMenu();

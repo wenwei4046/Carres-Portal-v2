@@ -327,6 +327,95 @@ describe("bookingConfirmGate — the storage fee is part of the ONE number", () 
   });
 });
 
+/**
+ * D9 — the gate learns to say "I cannot tell".
+ *
+ * Before this, an unrecognised SKU was just another groupless line, so the gate
+ * walked past it and answered `goodsReady: true`. Measured on production
+ * 2026-08-08: twelve live orders were made ENTIRELY of such lines, and not one
+ * of them could ever fail a stock check.
+ */
+describe("bookingConfirmGate — an unrecognised sku (D9)", () => {
+  const UNKNOWN = "5539-CNR"; // a live Ohana sofa module, read off production
+  const PAID = { lineSum: 2500, paid: 2500 };
+
+  it("refuses an order made entirely of lines nothing recognised", () => {
+    const r = bookingConfirmGate({
+      lines: [{ sku: UNKNOWN, qty: 1 }, { sku: "LYYAR-1A(LHF)", qty: 2 }],
+      lineReceived: null,
+      reservedQtyByKey: {},
+      money: PAID,
+    });
+    // Vacuously ready under the old rule: no groups, nothing to fail.
+    expect(r.groups).toEqual([]);
+    expect(r.ok).toBe(false);
+    expect(r.goodsReady).toBe(false);
+    expect(r.unknownSkus).toEqual([UNKNOWN, "LYYAR-1A(LHF)"]);
+  });
+
+  it("names them in notReadySkus too, so the 422 an operator reads is not silent", () => {
+    const r = bookingConfirmGate({
+      lines: [{ sku: MATTRESS, qty: 1 }, { sku: UNKNOWN, qty: 1 }],
+      lineReceived: { [MATTRESS]: 1 },
+      reservedQtyByKey: {},
+      money: PAID,
+    });
+    expect(r.notReadySkus).toContain(UNKNOWN);
+    expect(r.goodsReady).toBe(false);
+  });
+
+  it("holds a fully-reserved bed set back while an unplaceable line rides along", () => {
+    // The bed group itself passes. The order still cannot go, because
+    // something on the manifest cannot be identified.
+    const r = bookingConfirmGate({
+      lines: [{ sku: MATTRESS, qty: 1 }, { sku: UNKNOWN, qty: 1 }],
+      lineReceived: { [MATTRESS]: 1 },
+      reservedQtyByKey: {},
+      money: PAID,
+    });
+    expect(r.groups).toEqual([
+      { key: "bed", ready: true, notReadySkus: [] },
+    ]);
+    expect(r.ok).toBe(false);
+  });
+
+  it("does not offer a split it cannot scope", () => {
+    // Bed ready, sofa not — normally the moment to ask the customer. With an
+    // unplaceable line on the order there is no honest answer to "which trip
+    // does this go on", so the question is not asked.
+    const withUnknown = bookingConfirmGate({
+      lines: [
+        { sku: MATTRESS, qty: 1 },
+        { sku: "sofa:Nuvio", qty: 1 },
+        { sku: UNKNOWN, qty: 1 },
+      ],
+      lineReceived: { [MATTRESS]: 1 },
+      reservedQtyByKey: {},
+      money: PAID,
+    });
+    expect(withUnknown.splitAvailable).toBe(false);
+
+    const without = bookingConfirmGate({
+      lines: [{ sku: MATTRESS, qty: 1 }, { sku: "sofa:Nuvio", qty: 1 }],
+      lineReceived: { [MATTRESS]: 1 },
+      reservedQtyByKey: {},
+      money: PAID,
+    });
+    expect(without.splitAvailable).toBe(true);
+  });
+
+  it("a recognised accessory still passes — D9 narrowed the default, not the ruling", () => {
+    const r = bookingConfirmGate({
+      lines: [{ sku: MATTRESS, qty: 1 }, { sku: PILLOW, qty: 1 }, { sku: DISPOSAL, qty: 1 }],
+      lineReceived: { [MATTRESS]: 1 },
+      reservedQtyByKey: {},
+      money: PAID,
+    });
+    expect(r.unknownSkus).toEqual([]);
+    expect(r.ok).toBe(true);
+  });
+});
+
 describe("isSundayIso", () => {
   it("flags a Sunday and passes the rest of the week", () => {
     expect(isSundayIso("2026-08-23")).toBe(true); // Sun

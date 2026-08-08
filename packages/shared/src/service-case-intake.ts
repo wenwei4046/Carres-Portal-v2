@@ -20,7 +20,7 @@
  * Priority is DERIVED here and GENERATED in the database (0285): staff never
  * pick it, and no write path can disagree with the rule.
  */
-import { lineCategory } from "./line-category";
+import { lineClass } from "./line-category";
 
 // ── 1 · Who found it ─────────────────────────────────────────────────────────
 
@@ -72,15 +72,18 @@ export const CASE_PRODUCT_CATEGORY_KEYS = CASE_PRODUCT_CATEGORIES.map((c) => c.k
 ];
 
 /**
- * SKU → the wizard's category. Delegates to `lineCategory` — the one classifier
+ * SKU → the wizard's category. Delegates to `lineClass` — the one classifier
  * the orders grid, the drawer badge and the booking gate already share — so a
  * case can never call a sofa a mattress while the order screen calls it a sofa.
- * "acc" (accessories, delivery/service charges) lands in `other`.
+ * "acc" (accessories, delivery/service charges) lands in `other` — and since D9
+ * so does "unknown", because a complaint about a thing nobody can classify is
+ * still a complaint that must be openable. `other` is the wizard's honest
+ * bucket, not a claim about the product.
  */
 export function caseProductCategory(sku: string | null | undefined): CaseProductCategory {
   if (!sku) return "other";
-  const cat = lineCategory(sku);
-  return cat === "acc" ? "other" : cat;
+  const cat = lineClass(sku);
+  return cat === "acc" || cat === "unknown" ? "other" : cat;
 }
 
 export function caseProductCategoryLabel(cat: CaseProductCategory): string {

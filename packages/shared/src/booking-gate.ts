@@ -38,12 +38,23 @@
  * customer's answer in as `deliverGroups`. Omit it and the scope is the whole
  * order, byte-identical to the pre-T8 rule. That is what "never auto-split"
  * means in code: the split has no default.
+ *
+ * D9 (2026-08-08) — the gate learns to say "I cannot tell". It used to walk
+ * past every groupless line, and until D9 an unrecognised SKU WAS a groupless
+ * line, so the gate answered `goodsReady: true` for an order whose goods it
+ * could not identify. Now an unrecognised line is collected into
+ * `unknownSkus`, `goodsReady` goes false while any survive, and they are also
+ * listed in `notReadySkus` so the 422 an operator already reads names them by
+ * SKU instead of going silent. The gate does NOT say those goods are missing —
+ * it says it cannot answer the question, and refusing to move a truck on a
+ * question you cannot answer is the whole of this card.
  */
 import { lineKind, stockMatchKey } from "./line-category";
 import { lineReadiness } from "./line-readiness";
 import {
   deliveryGroupOf,
   orderDeliveryGroups,
+  unknownGoodsSkus,
   type DeliveryGroupKey,
 } from "./delivery-groups";
 import { orderMoney, type OrderMoneyInput } from "./order-money";
@@ -77,10 +88,19 @@ export interface BookingGroupState {
 }
 
 export interface BookingGateResult {
-  /** Every group IN SCOPE is ready (scope = the whole order unless narrowed). */
+  /** Every group IN SCOPE is ready (scope = the whole order unless narrowed)
+   *  AND nothing on the order is unrecognised. D9: an order carrying a SKU
+   *  nothing can classify is not "ready" — the question was never answered. */
   goodsReady: boolean;
-  /** In-scope goods lines still not reserved-to-this-SO (for the 422 message). */
+  /** In-scope goods lines still not reserved-to-this-SO (for the 422 message).
+   *  D9 — `unknownSkus` are included here too, so the message an operator
+   *  already gets names every line standing in the way. */
   notReadySkus: string[];
+  /** D9 — lines nothing recognised. Not "missing": UNIDENTIFIED. The fix is to
+   *  say what they are (catalog / keyword lists), not to raise a PO. Kept
+   *  separate from `notReadySkus` so a caller can eventually tell an operator
+   *  the true reason instead of "waiting for stock". */
+  unknownSkus: string[];
   balanceReady: boolean;
   /** Everything still owed — goods AND storage, released or not. This is the
    *  figure a message quotes, because the customer still owes it. */
@@ -157,14 +177,26 @@ export function bookingConfirmGate({
     : allGroups;
   const waitingGroups = allGroups.filter((g) => !scope.includes(g));
 
+  // D9 — the lines no group could hold BECAUSE nothing recognised them. These
+  // are order-wide, never scoped: a trip that carries only the bed set still
+  // leaves the warehouse with an item nobody can identify on the manifest.
+  const unknownSkus = unknownGoodsSkus(lines);
+
   const inScope = groups.filter((g) => scope.includes(g.key));
-  const notReadySkus = inScope.flatMap((g) => g.notReadySkus);
+  const notReadySkus = [
+    ...inScope.flatMap((g) => g.notReadySkus),
+    ...unknownSkus,
+  ];
   // A goods-free order (pure service visit) has no groups — vacuously ready.
   // (The drawer's allReceived reads false there, but that flag feeds the
   // "completed" pipeline word, not this gate; blocking a service-only booking
   // forever would be the real bug.)
   const goodsReady = scopeValid && notReadySkus.length === 0;
+  // A split needs both halves to be knowable. With an unplaceable line on the
+  // order there is no honest way to say which trip it belongs on, so the
+  // question is not put to the customer at all.
   const splitAvailable =
+    unknownSkus.length === 0 &&
     groups.length > 1 &&
     groups.some((g) => g.ready) &&
     groups.some((g) => !g.ready);
@@ -178,6 +210,7 @@ export function bookingConfirmGate({
   return {
     goodsReady,
     notReadySkus,
+    unknownSkus,
     balanceReady,
     outstanding,
     holding,
