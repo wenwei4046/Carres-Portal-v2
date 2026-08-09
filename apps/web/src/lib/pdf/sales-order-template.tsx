@@ -677,7 +677,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totalQty}</Text>
           <Text style={[styles.cellMoney, styles.colPrice]}> </Text>
           <Text style={[styles.cellMoney, styles.colDisc, totalDiscount > 0 ? { fontWeight: 700 } : {}]}>
-            {totalDiscount > 0 ? moneyDigits(totalDiscount) : dash}
+            {totalDiscount > 0 ? money(totalDiscount) : dash}
           </Text>
           <Text style={[styles.cellAmount, styles.colAmount]}>{money(totalAmount)}</Text>
         </View>
