@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   totalsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: mm(1.6),
+    paddingVertical: mm(1.1),
     paddingHorizontal: mm(3),
     borderBottomWidth: 0.4,
     borderBottomColor: HAIR,
@@ -255,11 +255,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: mm(2),
+    paddingVertical: mm(1.5),
     paddingHorizontal: mm(3),
   },
-  balanceLabel: { fontSize: 10.5, fontWeight: 700 },
-  balanceValue: { fontSize: 10.5, fontWeight: 700 },
+  balanceLabel: { fontSize: 8.5, fontWeight: 700 },
+  balanceValue: { fontSize: 8.5, fontWeight: 700 },
 
   // ── customer signature · legal sentence ──
   signZone: { flexDirection: "row", marginTop: mm(3.5), paddingHorizontal: mm(4), alignItems: "flex-start" },
@@ -672,14 +672,14 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           <Text style={styles.cellNo}> </Text>
           <Text style={styles.cellCode}> </Text>
           <View style={styles.desc}>
-            <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>TOTAL</Text>
+            <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>SUBTOTAL</Text>
           </View>
           <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totalQty}</Text>
           <Text style={[styles.cellMoney, styles.colPrice]}> </Text>
           <Text style={[styles.cellMoney, styles.colDisc, totalDiscount > 0 ? { fontWeight: 700 } : {}]}>
             {totalDiscount > 0 ? moneyDigits(totalDiscount) : dash}
           </Text>
-          <Text style={[styles.cellAmount, styles.colAmount]}>{moneyDigits(totalAmount)}</Text>
+          <Text style={[styles.cellAmount, styles.colAmount]}>{money(totalAmount)}</Text>
         </View>
         <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
 
@@ -701,7 +701,9 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             (pre-printed-form geometry). ── */}
         <View wrap={false} style={{ marginTop: "auto" }}>
         {payments.length > 0 ? (
-          <View style={{ marginTop: mm(5) }}>
+          /* frozen at four rows' height — 1 payment or 4, the geometry
+             never moves (owner round 28) */
+          <View style={{ marginTop: mm(5), minHeight: mm(40) }}>
             <View style={styles.payHead}>
               <Text style={[styles.th, styles.payColDate]}>Date</Text>
               <Text style={[styles.th, { flex: 1 }]}>Payment Received</Text>
