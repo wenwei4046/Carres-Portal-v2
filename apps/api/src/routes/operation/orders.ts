@@ -85,6 +85,50 @@ function mapPipelineV2Error(error: { code?: string; message?: string; details?: 
   return mapPgError(error);
 }
 
+/**
+ * sku → `Model · Variant`, the ONE human-readable product name in this module.
+ *
+ * **Extracted by SO-1, not written by it.** The detail route has resolved
+ * exactly this since 2026-07-16 so the drawer's Items table could show names
+ * instead of raw codes; the Sales Orders register needs the same names on the
+ * ROW, and the alternative was a second sku→name implementation in the browser.
+ * `ERP-ARCHITECTURE.md` Law D: *"If two surfaces must agree on a number they
+ * call ONE function — not two implementations that currently agree."* A product
+ * name is that kind of fact, so the list and the document call this.
+ *
+ * The query, the join and the `model · variant` spelling are byte-identical to
+ * what the detail route already ran. `order_lines.sku` has no FK to
+ * `product_skus`, so this is a separate query rather than a PostgREST embed.
+ *
+ * **A miss is normal and must stay silent.** Measured on production 2026-08-09:
+ * of the 84 distinct SKUs on live orders only 37 are in the catalog — every
+ * NATIVE line resolves (81 of 82), and every AutoCount line misses (0 of 94)
+ * because an imported "sku" IS free text like `1013Jager/Fab3-King/PC151-01`.
+ * There is no name to find, so the caller falls back to that text: it is what
+ * the salesperson actually wrote on the order.
+ */
+async function resolveSkuLabels(
+  sb: ReturnType<typeof userClient>,
+  skus: readonly (string | null | undefined)[],
+): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const wanted = [...new Set(skus.filter((s): s is string => !!s))];
+  if (wanted.length === 0) return out;
+  const { data, error } = await sb
+    .from("product_skus")
+    .select("sku, variant, product_models(name)")
+    .in("sku", wanted);
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (data ?? []) as any[]) {
+    const label = [r.product_models?.name ?? "", r.variant ?? ""]
+      .filter(Boolean)
+      .join(" · ");
+    if (label) out[r.sku] = label;
+  }
+  return out;
+}
+
 // ----- GET / list -----
 operationOrdersRouter.get("/", requireOperation, async (c) => {
   const parsed = ListOperationOrdersQuery.safeParse({
@@ -155,7 +199,15 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // shared `orderMoney`. The ladder's 🔒 used to read
       // `ops_order_control.balance`, which is NULL on every live row, so the
       // money hold had never once fired.
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, paid, dealers(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty, unit_price, source_po), order_addons(qty, unit_price), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
+      // 2026-08-09 (SO-1) — `salesperson_id` + the two NAME embeds. The Sales
+      // Orders register offers Salesperson and Outlet as hidden fact columns,
+      // and neither could be drawn before: the id was not on the wire and the
+      // name was nowhere. Both FKs are SINGLE (`orders_salesperson_id_fkey`,
+      // `orders_outlet_id_fkey` — checked against information_schema), so a
+      // bare embed is unambiguous and needs no hint, unlike delivery_partners.
+      // Purely additive: the old control table selects none of these and is
+      // unaffected.
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty, unit_price, source_po), order_addons(qty, unit_price), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -219,6 +271,35 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   // question, and it is the same shape the drawer already builds (`poSkus`).
   // A page with no covered orders adds `[]` to every row and nothing else.
   const orders = data ?? [];
+
+  // ── SO-1 · THE ROW SAYS WHAT THEY BOUGHT, IN WORDS ─────────────────────────
+  // The register's `Items` column may not print a SKU code. The detail route
+  // has resolved `Model · Variant` since 2026-07-16 and now both call
+  // `resolveSkuLabels`, so a product cannot be named one way on the row and
+  // another way in the document.
+  //
+  // ONE extra query for the whole page (every line SKU on it, de-duplicated),
+  // never one per order — the same batching rule the PO block below follows.
+  // A SKU with no catalog row simply gets no label and the caller falls back to
+  // the text the order carries.
+  try {
+    const labelBySku = await resolveSkuLabels(
+      sb,
+      orders.flatMap((o: { order_lines?: { sku?: string | null }[] | null }) =>
+        (o.order_lines ?? []).map((l) => l.sku),
+      ),
+    );
+    if (Object.keys(labelBySku).length > 0) {
+      for (const o of orders as { order_lines?: ({ sku?: string | null } & Record<string, unknown>)[] | null }[]) {
+        for (const l of o.order_lines ?? []) {
+          (l as Record<string, unknown>).label = l.sku ? (labelBySku[l.sku] ?? null) : null;
+        }
+      }
+    }
+  } catch (e_label) {
+    const m = mapPgError(e_label as { code?: string; message?: string });
+    return c.json(m.body, m.status);
+  }
   const soNumbers = [
     ...new Set(
       orders
@@ -301,7 +382,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
       // 2026-07-19 (Loo) — entry_data added: the POS wizard stores the
       // delivery-address building type in entry_data.fields.building_type;
       // the drawer's customer card shows it under the address.
-      "id, so, source_ref, source_system, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, customer_emergency, customer_billing, customer_billing_same, entry_data, delivery_date, delivery_date_tbd, proceed_date, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, dealers(name), outlets(name)",
+      "id, so, source_ref, source_system, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, customer_emergency, customer_billing, customer_billing_same, entry_data, delivery_date, delivery_date_tbd, proceed_date, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, salesperson_id, dealers(name), outlets(name), salespersons(name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -342,26 +423,18 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
 
   // 2026-07-16 (Loo) — resolve a human-readable product label per line
   // (model name · variant) so the drawer's Items table shows names, not just
-  // raw sku codes. Same separate-query pattern as print-do-data below:
-  // order_lines.sku has no FK to product_skus, so no PostgREST embed.
-  const labelBySku: Record<string, string> = {};
-  {
+  // raw sku codes. Body moved to `resolveSkuLabels` (top of file) by SO-1 so
+  // the LIST answers with the same names as the document; the query, the join
+  // and the `model · variant` spelling are unchanged.
+  let labelBySku: Record<string, string>;
+  try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const skus = [...new Set(rawLines.map((l: any) => l.sku))];
-    if (skus.length > 0) {
-      const { data: skuRows, error: e_sku } = await sb
-        .from("product_skus")
-        .select("sku, variant, product_models(name)")
-        .in("sku", skus);
-      if (e_sku) { const m = mapPgError(e_sku); return c.json(m.body, m.status); }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const r of (skuRows ?? []) as any[]) {
-        const model = r.product_models?.name ?? "";
-        const variant = r.variant ?? "";
-        const label = [model, variant].filter(Boolean).join(" · ");
-        if (label) labelBySku[r.sku] = label;
-      }
-    }
+    labelBySku = await resolveSkuLabels(sb, rawLines.map((l: any) => l.sku));
+  } catch (e_sku) {
+    // Same answer this route gave before the extraction: the PG error mapped,
+    // never a bare 500.
+    const m = mapPgError(e_sku as { code?: string; message?: string });
+    return c.json(m.body, m.status);
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lines = rawLines.map((l: any) => ({ ...l, label: labelBySku[l.sku] ?? null }));

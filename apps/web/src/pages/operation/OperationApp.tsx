@@ -17,6 +17,28 @@ import OperationDashboard from "./OperationDashboard";
 // table (merges the old kanban + Inbox + All-orders). The legacy kanban
 // `OperationOrders` is retained as a file (+ its test) but no longer routed.
 import OperationOrdersControl from "./OperationOrdersControl";
+// ⭐ SO-1 (Loo, 2026-08-08) — the Sales Orders register.
+//
+// `/operation/orders` mounts ONE page and the constant below says which. The
+// card's own words: *"Current implementation stays intact, restorable within
+// one minute, readable as migration evidence. Delete nothing."*
+//
+//   RESTORE THE OLD REGISTER = change ONE line:
+//       const OrdersPage = OperationOrdersControl;
+//
+// `OperationOrdersControl` is not deleted, not renamed and not edited by this
+// card. It stays compiled — `OperationDelivery` imports its ladder.
+//
+// The route still passes `onImport`. The register IGNORES it: SO-1 FINAL says
+// *"Remove Import from AutoCount"*, and a register has no actions. The prop
+// stays on the route because the OLD page needs it the moment the line above is
+// reverted — that is what makes the restore one identifier instead of three.
+// The `typeof` annotation is not decoration — it is what makes "restorable in
+// one minute" a fact the COMPILER keeps true. The day the register's props stop
+// matching the old page's, this line fails to build instead of the restore
+// failing at 9am on a Monday.
+import SalesOrdersRegister from "./SalesOrdersRegister";
+const OrdersPage: typeof OperationOrdersControl = SalesOrdersRegister;
 // T11 (2026-07-27) — the Delivery module: the ONE new sidebar item in the
 // build plan. Tab-state driven like Payments / Stock (only orders and
 // procurement are path-driven), so `?tab=delivery` deep-links it.
@@ -291,17 +313,13 @@ export default function OperationApp() {
             <Route
               path="orders"
               element={
-                <OperationOrdersControl
-                  onImport={() => changeTab("ops-import")}
-                />
+                <OrdersPage onImport={() => changeTab("ops-import")} />
               }
             />
             <Route
               path="orders/:stage"
               element={
-                <OperationOrdersControl
-                  onImport={() => changeTab("ops-import")}
-                />
+                <OrdersPage onImport={() => changeTab("ops-import")} />
               }
             />
           </Routes>
@@ -387,7 +405,16 @@ export default function OperationApp() {
         )}
         </div>
       </main>
-      <OperationRightRail />
+      {/* ⭐ SO-1 FINAL (Loo, 2026-08-09) — the execution rail is NOT MOUNTED on
+          the Sales Orders route, and the card states it is a PRODUCT rule
+          rather than a space preference: *"Team / Calendar / Activity / Calls
+          belong to other modules."*
+          Not `hidden`, not collapsed — absent. A rail that is merely hidden is
+          still mounted, still fetching, and still one prop away from coming
+          back; `ERP-ARCHITECTURE.md` §0's second lesson is exactly this drift —
+          *"a page that is allowed to SHOW cross-module work will, over months,
+          be asked to DO it."* Every other operation screen keeps it. */}
+      {!isOrdersUrl && <OperationRightRail />}
     </div>
   );
 }
