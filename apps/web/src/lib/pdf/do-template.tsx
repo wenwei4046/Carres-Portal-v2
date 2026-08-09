@@ -343,8 +343,8 @@ export function DoTemplate(data: DoTemplateData) {
             <View style={styles.tableHead} minPresenceAhead={40}>
               <Text style={[styles.th, styles.colNo]}>#</Text>
               <Text style={[styles.th, styles.colCode]}>Item Code</Text>
-              <Text style={[styles.th, { flex: 1 }]}>Description</Text>
               {hasUnits ? <Text style={[styles.th, styles.colUnit]}>Unit ID</Text> : null}
+              <Text style={[styles.th, { flex: 1 }]}>Description</Text>
               <Text style={[styles.th, styles.colPo]}>PO No</Text>
               <Text style={[styles.th, styles.colQty]}>Qty</Text>
             </View>
@@ -361,14 +361,14 @@ export function DoTemplate(data: DoTemplateData) {
                   <View key={`${line.sku}-${index}`} wrap={false} style={[styles.row, styles.rowHair]}>
                     <Text style={styles.cellNo}>{index + 1}</Text>
                     <Text style={styles.cellCode}>{line.sku}</Text>
-                    <View style={styles.desc}>
-                      <Text style={styles.descMain}>{line.description}</Text>
-                    </View>
                     {hasUnits ? (
                       <Text style={styles.cellUnit}>
                         {line.unit_codes && line.unit_codes.length > 0 ? line.unit_codes.join("\n") : "—"}
                       </Text>
                     ) : null}
+                    <View style={styles.desc}>
+                      <Text style={styles.descMain}>{line.description}</Text>
+                    </View>
                     <Text style={styles.cellPo}>
                       {line.source_po && line.source_po.length > 0 ? line.source_po.join("\n") : "—"}
                     </Text>
@@ -385,10 +385,10 @@ export function DoTemplate(data: DoTemplateData) {
             >
               <Text style={styles.cellNo}> </Text>
               <Text style={styles.cellCode}> </Text>
+              {hasUnits ? <Text style={styles.cellUnit}> </Text> : null}
               <View style={styles.desc}>
                 <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>TOTAL</Text>
               </View>
-              {hasUnits ? <Text style={styles.cellUnit}> </Text> : null}
               <Text style={styles.cellPo}> </Text>
               <Text style={[styles.cellQty, { fontWeight: 700 }]}>{otherQty}</Text>
             </View>
@@ -402,8 +402,8 @@ export function DoTemplate(data: DoTemplateData) {
             <View style={styles.tableHead} minPresenceAhead={40}>
               <Text style={[styles.th, styles.colNo]}>#</Text>
               <Text style={[styles.th, styles.colCode]}>Item Code</Text>
-              <Text style={[styles.th, { flex: 1 }]}>Description</Text>
               {hasUnits ? <Text style={[styles.th, styles.colUnit]}>Unit ID</Text> : null}
+              <Text style={[styles.th, { flex: 1 }]}>Description</Text>
               <Text style={[styles.th, styles.colPo]}>PO No</Text>
               <Text style={[styles.th, styles.colQty]}>Qty</Text>
             </View>
@@ -416,6 +416,11 @@ export function DoTemplate(data: DoTemplateData) {
             <View wrap={false} style={[styles.row, styles.rowHair]}>
               <Text style={styles.cellNo}>1</Text>
               <Text style={styles.cellCode}>{model}</Text>
+              {hasUnits ? (
+                <Text style={styles.cellUnit}>
+                  {modules.flatMap((m) => m.unit_codes ?? []).join("\n") || "—"}
+                </Text>
+              ) : null}
               <View style={styles.desc}>
                 <Text style={styles.descMain}>{setName(modules)} — 1 set · {modules.length} modules</Text>
                 {modules.map((m, mi) => (
@@ -424,11 +429,6 @@ export function DoTemplate(data: DoTemplateData) {
                   </Text>
                 ))}
               </View>
-              {hasUnits ? (
-                <Text style={styles.cellUnit}>
-                  {modules.flatMap((m) => m.unit_codes ?? []).join("\n") || "—"}
-                </Text>
-              ) : null}
               <Text style={styles.cellPo}>
                 {[...new Set(modules.flatMap((m) => m.source_po ?? []))].join("\n") || "—"}
               </Text>
