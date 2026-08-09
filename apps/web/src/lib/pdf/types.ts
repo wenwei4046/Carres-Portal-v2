@@ -40,6 +40,8 @@ export type DoTemplateData = {
     /** The PO(s) that supplied this line's goods (purchase_orders.id via
      *  the SO link) — the storekeeper's picking aid, 2990's Source PO. */
     source_po?: string[] | null;
+    /** Line attrs (fabric_name etc.) — feeds the sofa layout drawing. */
+    attrs?: Record<string, unknown> | null;
   }>;
   currency: string;
   /** 2026-08-09 DO reskin (SO-PDF-STANDARD chrome) — all optional so the

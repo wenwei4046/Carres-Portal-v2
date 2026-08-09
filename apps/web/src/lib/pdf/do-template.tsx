@@ -22,6 +22,11 @@
  *   uncopied — those really don't exist here.
  * - DELIVER TO carries the Emergency contact — who the driver calls when
  *   the customer is unreachable (sales portal collects it, 32/77).
+ * - ONE DO PER TRIP (owner, 2026-08-09; mirrors the frozen purchasing
+ *   bundle rule): mattress + bedframe travel as ONE DO, the sofa gets its
+ *   OWN DO — and the sofa DO carries the layout drawing (below) so the
+ *   crew never assembles it mirror-reversed. The SPLIT is the API's job
+ *   when cutting DOs; this template renders whatever one trip carries.
  *
  * Sizes and row pitches are SO-PDF-STANDARD §2.1/§8.5 verbatim (the
  * conversion law: 2990 nominal − 0.5pt, pitches in absolute mm).
@@ -115,6 +120,17 @@ const styles = StyleSheet.create({
   cellPo: { fontSize: 7, color: GREY, width: mm(24), lineHeight: 1.3 },
   cellQty: { fontSize: 7, width: mm(14), textAlign: "right", lineHeight: 1 },
 
+  // ── sofa layout drawing (ported from po-template — direction contract) ──
+  layout: { marginTop: mm(4), paddingHorizontal: mm(4) },
+  layoutCaption: { fontSize: 7, color: GREY, marginTop: mm(1) },
+  layoutRow: { flexDirection: "row", alignItems: "flex-start", marginTop: mm(2), justifyContent: "center" },
+  moduleBox: { alignItems: "center", marginRight: mm(2) },
+  moduleCode: { fontSize: 7.5, fontWeight: 600, marginTop: mm(1.5) },
+  moduleFabric: { fontSize: 7, color: GREY, marginTop: mm(0.5) },
+  tvLine: { width: 0.6, height: mm(4), backgroundColor: GREY, marginTop: mm(2), alignSelf: "center" },
+  tvBox: { backgroundColor: INK, paddingHorizontal: mm(3), paddingVertical: mm(0.8), marginTop: mm(0.5), alignSelf: "center" },
+  tvText: { fontSize: 7.5, color: "#FFFFFF", letterSpacing: 1.5 },
+
   // ── signing zone (bottom-anchored) ──
   signZone: { flexDirection: "row", justifyContent: "space-between", marginTop: mm(6), paddingHorizontal: mm(4) },
   signBox: {
@@ -146,7 +162,37 @@ const styles = StyleSheet.create({
   footerPage: { fontSize: 7.5, color: GREY, width: mm(45), textAlign: "right" },
 });
 
+const SEAT_BG = "#EDE8E0";
+const BACK_BG = "#D8D2C8";
+
 type DoLine = DoTemplateData["lines"][number];
+
+/** Sofa module lines carry a side marker in the SKU (`BOAAT-1A(LHF)`). */
+const SIDE_RE = /\((LHF|RHF)\)/;
+
+function sofaGroups(lines: DoLine[]): Array<{ model: string; modules: DoLine[] }> {
+  const models = new Set<string>();
+  for (const l of lines) {
+    if (SIDE_RE.test(l.sku)) {
+      const dash = l.sku.indexOf("-");
+      if (dash > 0) models.add(l.sku.slice(0, dash));
+    }
+  }
+  return [...models].map((model) => ({
+    model,
+    modules: lines.filter((l) => l.sku.startsWith(`${model}-`)),
+  }));
+}
+
+function moduleCodeOf(line: DoLine): string {
+  const dash = line.sku.indexOf("-");
+  return dash > 0 ? line.sku.slice(dash + 1) : line.sku;
+}
+
+/** Chaise modules read deeper toward the TV — `L(RHF)` / `CHL(LHF)` shapes. */
+function isChaise(code: string): boolean {
+  return /^L\(/.test(code) || code.includes("CHL");
+}
 
 /** Lines grouped into category bands, original order preserved (SO §5). */
 function bandedLines(lines: DoLine[]): Array<{ band: string | null; rows: Array<{ line: DoLine; index: number }> }> {
@@ -311,6 +357,42 @@ export function DoTemplate(data: DoTemplateData) {
           <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totalQty}</Text>
         </View>
         <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
+
+        {/* ── sofa layout drawings — one per model with module lines, so the
+            crew assembles on site exactly what the factory built ── */}
+        {sofaGroups(lines).map(({ model, modules }) => (
+          <View key={model} wrap={false} style={styles.layout}>
+            <Text style={styles.blockLabel}>Sofa Layout</Text>
+            <Text style={styles.layoutCaption}>Top view. Back at the top. TV in front.</Text>
+            <View style={styles.layoutRow}>
+              {modules.map((m, i) => {
+                const code = moduleCodeOf(m);
+                const fabric = (m.attrs as { fabric_name?: string } | null | undefined)?.fabric_name;
+                return (
+                  <View key={`${m.sku}-${i}`} style={styles.moduleBox}>
+                    <View
+                      style={{
+                        width: mm(30),
+                        height: isChaise(code) ? mm(42) : mm(24),
+                        backgroundColor: SEAT_BG,
+                        borderWidth: 0.6,
+                        borderColor: GREY,
+                      }}
+                    >
+                      <View style={{ height: mm(5), backgroundColor: BACK_BG }} />
+                    </View>
+                    <Text style={styles.moduleCode}>{Number(m.qty) > 1 ? `${code} ×${m.qty}` : code}</Text>
+                    {fabric ? <Text style={styles.moduleFabric}>{fabric}</Text> : null}
+                  </View>
+                );
+              })}
+            </View>
+            <View style={styles.tvLine} />
+            <View style={styles.tvBox}>
+              <Text style={styles.tvText}>TV</Text>
+            </View>
+          </View>
+        ))}
 
         {/* ── signing zone — pinned to the page bottom as one unit ── */}
         <View wrap={false} style={{ marginTop: "auto" }}>
