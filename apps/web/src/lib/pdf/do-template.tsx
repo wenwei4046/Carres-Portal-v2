@@ -118,6 +118,7 @@ const styles = StyleSheet.create({
   cellCode: { fontSize: 7.5, width: mm(30), paddingRight: mm(2), lineHeight: 1 },
   desc: { flex: 1, paddingRight: mm(3) },
   descMain: { fontSize: 7.5, fontWeight: 600, lineHeight: 1 },
+  descSub: { fontSize: 7, color: GREY, marginTop: mm(0.8), paddingLeft: mm(2), lineHeight: 1.2 },
   cellUnit: { fontSize: 7, color: GREY, width: mm(26), lineHeight: 1.3 },
   cellPo: { fontSize: 7, color: GREY, width: mm(22), lineHeight: 1.3 },
   cellQty: { fontSize: 7, width: mm(18), textAlign: "right", paddingRight: mm(5), lineHeight: 1 },
@@ -189,6 +190,20 @@ function sofaGroups(lines: DoLine[]): Array<{ model: string; modules: DoLine[] }
 function moduleCodeOf(line: DoLine): string {
   const dash = line.sku.indexOf("-");
   return dash > 0 ? line.sku.slice(dash + 1) : line.sku;
+}
+
+/** The set's display name — the module descriptions' shared prefix
+ *  ("Sofa Boaat 1A (LHF) — …" → "Sofa Boaat 1A"), model key as fallback. */
+function setName(modules: DoLine[]): string {
+  const first = modules[0]?.description ?? "";
+  const cut = first.search(/\s*\((LHF|RHF)/);
+  return cut > 0 ? first.slice(0, cut).trim() : first.split(" — ")[0] ?? first;
+}
+
+/** A module's spec tail — everything after the em-dash of its description. */
+function moduleSpec(m: DoLine): string {
+  const parts = m.description.split(" — ");
+  return parts.length > 1 ? parts.slice(1).join(" — ") : m.description;
 }
 
 /** Chaise modules read deeper toward the TV — `L(RHF)` / `CHL(LHF)` shapes. */
@@ -393,30 +408,32 @@ export function DoTemplate(data: DoTemplateData) {
               <Text style={[styles.th, styles.colQty]}>Qty</Text>
             </View>
             <View style={styles.bandRow}>
-              <Text style={styles.bandText}>
-                SOFA · SET {si + 1} · {modules.length} {modules.length > 1 ? "modules" : "module"}
-              </Text>
+              <Text style={styles.bandText}>SOFA · SET {si + 1}</Text>
             </View>
-            {modules.map((line, li) => (
-              <View key={`${line.sku}-${li}`} wrap={false} style={[styles.row, styles.rowHair]}>
-                <Text style={styles.cellNo}>{li + 1}</Text>
-                <Text style={styles.cellCode}>{line.sku}</Text>
-                <View style={styles.desc}>
-                  <Text style={styles.descMain}>{line.description}</Text>
-                </View>
-                {hasUnits ? (
-                  <Text style={styles.cellUnit}>
-                    {line.unit_codes && line.unit_codes.length > 0 ? line.unit_codes.join("\n") : "—"}
+            {/* One SET = one numbered item (owner: "1 set one layout") —
+                Qty 1, modules demoted to grey sub-lines; unit ids stack in
+                the UNIT ID column in module order. */}
+            <View wrap={false} style={[styles.row, styles.rowHair]}>
+              <Text style={styles.cellNo}>1</Text>
+              <Text style={styles.cellCode}>{model}</Text>
+              <View style={styles.desc}>
+                <Text style={styles.descMain}>{setName(modules)} — 1 set · {modules.length} modules</Text>
+                {modules.map((m, mi) => (
+                  <Text key={mi} style={styles.descSub}>
+                    · {moduleCodeOf(m)} — {moduleSpec(m)}
                   </Text>
-                ) : null}
-                <Text style={styles.cellPo}>
-                  {line.source_po && line.source_po.length > 0 ? line.source_po.join("\n") : "—"}
-                </Text>
-                <Text style={line.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>
-                  {line.qty}
-                </Text>
+                ))}
               </View>
-            ))}
+              {hasUnits ? (
+                <Text style={styles.cellUnit}>
+                  {modules.flatMap((m) => m.unit_codes ?? []).join("\n") || "—"}
+                </Text>
+              ) : null}
+              <Text style={styles.cellPo}>
+                {[...new Set(modules.flatMap((m) => m.source_po ?? []))].join("\n") || "—"}
+              </Text>
+              <Text style={styles.cellQty}>1</Text>
+            </View>
             <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
             <View style={styles.layout}>
               <Text style={styles.blockLabel}>Sofa Layout</Text>

@@ -40,6 +40,7 @@ const data = {
       category: "SOFA",
       source_po: ["PO-2051"],
       attrs: { fabric_name: "CG-004" },
+      unit_codes: ["id-aab120451"],
     },
     {
       sku: "BOAAT-1A(RHF)",
@@ -50,6 +51,7 @@ const data = {
       category: "SOFA",
       source_po: ["PO-2051"],
       attrs: { fabric_name: "CG-004" },
+      unit_codes: ["id-aab120452"],
     },
     {
       sku: "LUNA-L(RHF)",
@@ -60,6 +62,7 @@ const data = {
       category: "SOFA",
       source_po: ["PO-2052"],
       attrs: { fabric_name: "BF-201" },
+      unit_codes: ["id-aab120453"],
     },
     {
       sku: "LUNA-2A(LHF)",
@@ -70,6 +73,7 @@ const data = {
       category: "SOFA",
       source_po: ["PO-2052"],
       attrs: { fabric_name: "BF-201" },
+      unit_codes: ["id-aab120454"],
     },
   ],
   currency: "MYR",
