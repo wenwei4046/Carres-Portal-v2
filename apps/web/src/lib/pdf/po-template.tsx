@@ -229,14 +229,19 @@ export function PoTemplate(data: PoTemplateData) {
             when it's due — the supplier's 3-second sweep in one row. One PO,
             ONE destination (a line needing another address is another PO). ── */}
         <View style={styles.cards}>
-          <View style={{ width: mm(45), paddingRight: mm(5) }}>
+          {/* Content decides the widths: the two ADDRESS blocks flex and
+              wrap; only the details column (fixed facts) is fixed. The
+              supplier prints its FULL address — a formal document names
+              both parties completely (owner, 2026-08-09). */}
+          <View style={{ flex: 1, paddingRight: mm(5) }}>
             <Text style={styles.blockLabel}>Supplier</Text>
             <View style={{ marginTop: mm(1.5) }}>
               <Text style={[styles.stackValue, { fontWeight: 600 }]}>{supplier.name}</Text>
+              {supplier.address ? <Text style={styles.stackValue}>{supplier.address}</Text> : null}
               {supplier.contact ? <Text style={styles.stackValue}>{supplier.contact}</Text> : null}
             </View>
           </View>
-          <View style={{ flex: 1, paddingRight: mm(5) }}>
+          <View style={{ flex: 1.1, paddingRight: mm(5) }}>
             <Text style={styles.blockLabel}>Deliver To</Text>
             <View style={{ marginTop: mm(1.5) }}>
               <Text style={[styles.stackValue, { fontWeight: 600 }]}>{destination.name}</Text>
@@ -244,13 +249,13 @@ export function PoTemplate(data: PoTemplateData) {
               {delivery_instructions ? <Text style={styles.deliverNote}>{delivery_instructions}</Text> : null}
             </View>
           </View>
-          <View style={{ width: mm(58) }}>
+          <View style={{ width: mm(52) }}>
             <Text style={styles.blockLabel}>PO Details</Text>
             <View style={{ marginTop: mm(1.5) }}>
               {detailRows.map(([label, value, bold]) =>
                 value ? (
                   <View key={label} style={styles.pairRow}>
-                    <Text style={[styles.pairLabel, { width: mm(18) }]}>{label}</Text>
+                    <Text style={[styles.pairLabel, { width: mm(17) }]}>{label}</Text>
                     <Text style={bold ? [styles.pairValue, { fontWeight: 700 }] : styles.pairValue}>
                       :  {value}
                     </Text>
