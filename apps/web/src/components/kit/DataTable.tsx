@@ -136,10 +136,16 @@ const GUTTER_RULE = "border-l border-l-kit-slate-5";
 /**
  * A column's Excel filter (Jess, 2026-08-01 — the AutoCount workspace: every
  * column sorts by header click and filters by its ▼). The kit renders the
- * popover — a value checklist with an optional search — and NOTHING more: the
- * page owns which rows survive, exactly as it owns formatting. Option LABELS
- * are the caller's (COPY-STANDARD speaks business — `Yet to Order`, never
- * `(Blanks)`).
+ * popover — a value checklist with an optional search, or the date/number
+ * shapes below — and NOTHING more: the page owns which rows survive, exactly
+ * as it owns formatting. Option LABELS are the caller's (COPY-STANDARD speaks
+ * business — `Yet to Order`, never `(Blanks)`).
+ *
+ * **SO-4 widened the ▼ to 2990's three shapes** (its shipped
+ * `DataGrid.tsx:1422-1507`, measured and ported rather than invented): a text
+ * column gets the checklist, a DATE column gets preset chips + a from/to pair,
+ * a NUMBER column gets min/max bounds. `presets` and `number` are optional and
+ * unpassed change nothing — the three frozen pages emit what they emitted.
  */
 export interface ColumnFilter {
   options: readonly { value: string; label: string }[];
@@ -150,22 +156,64 @@ export interface ColumnFilter {
   label: string;
   /** The clear action's word — the CALLER's, this file spells nothing. */
   clearLabel: string;
+  /**
+   * What the clear action DOES when the column narrows by more than
+   * `selected` (a preset, a range, a bound — 2990 clears all four in one
+   * press, its `clearFilter`). Absent = `onChange(new Set())`, which is all a
+   * checklist-only column ever needed.
+   */
+  onClear?: () => void;
   /** Present = a search box above the checklist. The placeholder is the word. */
   searchPlaceholder?: string;
+  /**
+   * ▼ tells the header whether this filter is NARROWING when the narrowing
+   * lives outside `selected` (a preset, a range, a bound). The funnel icon and
+   * the caller's clear action both read it. Absent = `selected.size > 0`.
+   */
+  active?: boolean;
+  /**
+   * **SO-4 — a date column's quick presets** (2990's `DATE_PRESETS` row, its
+   * `DataGrid.tsx:1443-1460`). One may be lit; clicking the lit one clears it
+   * — the kit reports the toggle, the PAGE owns what a preset MEANS.
+   */
+  presets?: {
+    options: readonly { value: string; label: string }[];
+    selected: string | null;
+    onToggle: (value: string) => void;
+  };
+  /**
+   * **SO-4 — a number column's min/max bounds** (2990's `DataGrid.tsx:
+   * 1422-1439`). Live, no apply button — a bound narrows as it is typed, and
+   * an emptied field releases it. Both labels are the caller's.
+   */
+  number?: {
+    min: string;
+    max: string;
+    onMinChange: (next: string) => void;
+    onMaxChange: (next: string) => void;
+    minLabel: string;
+    maxLabel: string;
+  };
   /**
    * Excel's `Custom Date Range…` (Jess, 2026-08-02 — the PO Issued ▼). The kit
    * renders two date fields + an apply button under the checklist and reports
    * the pair; the PAGE owns what the pair means (it stores the range as one of
    * its own filter values, so chips and Clear keep working unchanged).
+   *
+   * SO-4 — `onApply`/`applyLabel` optional: absent, the pair is LIVE (2990's
+   * own shape, its `setDateBound`) and each field reports its bound as typed.
    */
   range?: {
     /** The section's word — the caller's (e.g. `Custom Date Range…`). */
     label: string;
     from: string | null;
     to: string | null;
-    onApply: (from: string, to: string) => void;
+    onApply?: (from: string, to: string) => void;
     /** The apply action's word — the caller's. */
-    applyLabel: string;
+    applyLabel?: string;
+    /** Live mode — absent `onApply`, each bound reports as it is typed. */
+    onFromChange?: (next: string) => void;
+    onToChange?: (next: string) => void;
   };
 }
 
@@ -211,31 +259,15 @@ export interface Column<Row> {
   headerContent?: ReactNode;
   /** Header click sorts (asc ⇄ desc). Needs the table's `sort`/`onSortChange`. */
   sortable?: boolean;
-  filter?: ColumnFilter;
-  /**
-   * **SO-3 power 1 — Excel's AUTO-FILTER ROW**, a typing box under this
-   * column's header. Its sibling `filter` is the ▼ checklist; the two answer
-   * different questions and a grid an operator has met has both.
-   *
-   *   `filter`      *which of these values do I want?*   — a closed list
-   *   `filterInput` *does this column contain this?*     — an open string
-   *
-   * The kit renders the box and reports the keystroke. **The page owns which
-   * rows survive**, exactly as it does for `filter` and for `sort` — this file
-   * has never filtered a row and does not start here.
-   *
-   * A second header row appears as soon as ONE column carries this, and every
-   * column without it renders an empty cell in that row, so the boxes stay
-   * under the columns they filter.
+  /*
+   * SO-3's `filterInput` — a PERMANENT typing box under every header — lived
+   * here for one day and was DELETED by SO-4 (Loo, 2026-08-09: *"the permanent
+   * per-column filter row was an invention — 2990's own DataGrid never had
+   * one"*). The open-string question it answered lives inside the ▼'s own
+   * search box, where 2990 always kept it. One register consumed it; nothing
+   * does now, and a kit power with no consumer is the drift Law 5 deletes.
    */
-  filterInput?: {
-    value: string;
-    onChange: (next: string) => void;
-    /** What the box is, for a screen reader — the CALLER's word. */
-    label: string;
-    /** Optional placeholder. The caller's word; this file spells none. */
-    placeholder?: string;
-  };
+  filter?: ColumnFilter;
   cell: (row: Row) => ReactNode;
 }
 
@@ -582,13 +614,30 @@ export interface DataTableProps<Row> {
    * 40px law. See `tokens.ts` `ROW_HEIGHT` for why 34 and not less: `ui/MASTER`
    * §4 puts the floor at ~32px, below which the kit's 24px in-row controls stop
    * fitting and a second token has to move.
+   *
+   * **SO-4 — `"dense"` is 28px rows at `text-meta`** (2990's shipped density:
+   * ~28px row, fs-12 body). It is below the ~32 floor KNOWINGLY, because a
+   * dense register carries no 24px in-row control — see `tokens.ts`.
    */
   density?: RowDensity;
+  /**
+   * **SO-4 — windowed rows** (2990's `DataGrid.tsx:965-982`, numbers copied:
+   * threshold 25 · overscan 14). Only FLAT lists window — a grouped or
+   * expandable table has variable row heights and renders in full, exactly
+   * 2990's own guard. Two spacer rows carry the off-screen height, so the
+   * scrollbar is honest while the DOM holds ~50 rows of 1,000.
+   *
+   * Absent = every row renders, byte-identical markup to before.
+   */
+  virtual?: boolean;
 }
 
 /**
- * One column's ▼ — an Excel AutoFilter as a checkbox popover. Lit blue while
- * it is narrowing, because a filter you cannot see is a lie the table tells.
+ * One column's ▼ — an Excel AutoFilter as a popover. Lit blue while it is
+ * narrowing, because a filter you cannot see is a lie the table tells.
+ *
+ * SO-4 — the popover takes 2990's three shapes (its `DataGrid.tsx:1422-1507`):
+ * `number` bounds win, then date `presets`+`range`, else the value checklist.
  */
 function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter }) {
   const [needle, setNeedle] = useState("");
@@ -597,7 +646,10 @@ function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter
   const shown = needle.trim()
     ? filter.options.filter((o) => o.label.toLowerCase().includes(needle.trim().toLowerCase()))
     : filter.options;
-  const active = filter.selected.size > 0;
+  const active = filter.active ?? filter.selected.size > 0;
+  const rangeLive = filter.range != null && filter.range.onApply == null;
+  const boundInput =
+    "h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9";
   return (
     <Popover
       label={filter.label}
@@ -618,76 +670,151 @@ function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter
       }
     >
       <div className="flex w-56 flex-col gap-2" data-kit="table-filter">
-        {filter.searchPlaceholder != null ? (
-          <SearchInput
-            id={`table-filter-search-${colKey}`}
-            value={needle}
-            onChange={(e) => setNeedle(e.target.value)}
-            placeholder={filter.searchPlaceholder}
-            aria-label={filter.label}
-          />
-        ) : null}
-        <div className="max-h-64 overflow-y-auto flex flex-col gap-1">
-          {shown.map((o) => (
-            <label key={o.value} className="flex items-center gap-2 text-body text-kit-slate-12">
-              <Checkbox
-                id={`table-filter-${colKey}-${o.value.replace(/[^\w-]/g, "_")}`}
-                ariaLabel={o.label}
-                checked={filter.selected.has(o.value)}
-                onCheckedChange={() => {
-                  const next = new Set(filter.selected);
-                  if (next.has(o.value)) next.delete(o.value);
-                  else next.add(o.value);
-                  filter.onChange(next);
-                }}
+        {filter.number ? (
+          /* ── A number column: two live bounds, nothing else (2990). ────── */
+          <div className="flex flex-col gap-1.5" data-kit="table-filter-number">
+            <label className="flex flex-col gap-1 text-label text-kit-slate-11">
+              {filter.number.minLabel}
+              <input
+                type="number"
+                inputMode="decimal"
+                value={filter.number.min}
+                onChange={(e) => filter.number!.onMinChange(e.target.value)}
+                aria-label={`${filter.label} — ${filter.number.minLabel}`}
+                data-testid={`table-filter-min-${colKey}`}
+                className={boundInput}
               />
-              <span className="truncate">{o.label}</span>
             </label>
-          ))}
-        </div>
-        {filter.range ? (
-          /* Excel's own tail item: presets first, the custom pair last. Native
-           * date fields on purpose — a DatePicker popover inside this popover
-           * would stack two floating layers for a two-field form. */
-          <div
-            className="flex flex-col gap-1.5 border-t border-kit-slate-5 pt-2"
-            data-kit="table-filter-range"
-          >
-            <span className="text-label text-kit-slate-11">{filter.range.label}</span>
-            <div className="flex items-center gap-1.5">
+            <label className="flex flex-col gap-1 text-label text-kit-slate-11">
+              {filter.number.maxLabel}
               <input
-                type="date"
-                value={rangeFrom}
-                onChange={(e) => setRangeFrom(e.target.value)}
-                aria-label={`${filter.range.label} from`}
-                data-testid={`table-filter-range-from-${colKey}`}
-                className="h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+                type="number"
+                inputMode="decimal"
+                value={filter.number.max}
+                onChange={(e) => filter.number!.onMaxChange(e.target.value)}
+                aria-label={`${filter.label} — ${filter.number.maxLabel}`}
+                data-testid={`table-filter-max-${colKey}`}
+                className={boundInput}
               />
-              <input
-                type="date"
-                value={rangeTo}
-                onChange={(e) => setRangeTo(e.target.value)}
-                aria-label={`${filter.range.label} to`}
-                data-testid={`table-filter-range-to-${colKey}`}
-                className="h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
-              />
-            </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={rangeFrom === "" || rangeTo === "" || rangeTo < rangeFrom}
-              onClick={() => filter.range?.onApply(rangeFrom, rangeTo)}
-              data-testid={`table-filter-range-apply-${colKey}`}
-            >
-              {filter.range.applyLabel}
-            </Button>
+            </label>
           </div>
-        ) : null}
+        ) : (
+          <>
+            {filter.presets ? (
+              /* ── A date column's quick presets — one lit at most (2990). ── */
+              <div className="flex flex-wrap gap-1" data-kit="table-filter-presets">
+                {filter.presets.options.map((p) => {
+                  const on = filter.presets!.selected === p.value;
+                  return (
+                    <button
+                      key={p.value}
+                      type="button"
+                      aria-pressed={on}
+                      data-testid={`table-filter-preset-${colKey}-${p.value}`}
+                      onClick={() => filter.presets!.onToggle(p.value)}
+                      className={`rounded-pill border px-2 py-0.5 text-label ${
+                        on
+                          ? "border-kit-blue-9 bg-kit-blue-3 text-kit-blue-11"
+                          : "border-kit-slate-5 bg-white text-kit-slate-11 hover:border-kit-slate-6"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+            {filter.searchPlaceholder != null ? (
+              <SearchInput
+                id={`table-filter-search-${colKey}`}
+                value={needle}
+                onChange={(e) => setNeedle(e.target.value)}
+                placeholder={filter.searchPlaceholder}
+                aria-label={filter.label}
+              />
+            ) : null}
+            {filter.options.length > 0 ? (
+              <div className="max-h-64 overflow-y-auto flex flex-col gap-1">
+                {shown.map((o) => (
+                  <label
+                    key={o.value}
+                    className="flex items-center gap-2 text-body text-kit-slate-12"
+                  >
+                    <Checkbox
+                      id={`table-filter-${colKey}-${o.value.replace(/[^\w-]/g, "_")}`}
+                      ariaLabel={o.label}
+                      checked={filter.selected.has(o.value)}
+                      onCheckedChange={() => {
+                        const next = new Set(filter.selected);
+                        if (next.has(o.value)) next.delete(o.value);
+                        else next.add(o.value);
+                        filter.onChange(next);
+                      }}
+                    />
+                    <span className="truncate">{o.label}</span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+            {filter.range ? (
+              /* Excel's own tail item: presets first, the custom pair last.
+               * Native date fields on purpose — a DatePicker popover inside
+               * this popover would stack two floating layers for a two-field
+               * form. Live when the caller passed no `onApply` (2990's own
+               * `setDateBound`), the SO-3 apply pair otherwise. */
+              <div
+                className="flex flex-col gap-1.5 border-t border-kit-slate-5 pt-2"
+                data-kit="table-filter-range"
+              >
+                <span className="text-label text-kit-slate-11">{filter.range.label}</span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="date"
+                    value={rangeLive ? (filter.range.from ?? "") : rangeFrom}
+                    onChange={(e) =>
+                      rangeLive
+                        ? filter.range!.onFromChange?.(e.target.value)
+                        : setRangeFrom(e.target.value)
+                    }
+                    aria-label={`${filter.range.label} from`}
+                    data-testid={`table-filter-range-from-${colKey}`}
+                    className={boundInput}
+                  />
+                  <input
+                    type="date"
+                    value={rangeLive ? (filter.range.to ?? "") : rangeTo}
+                    onChange={(e) =>
+                      rangeLive
+                        ? filter.range!.onToChange?.(e.target.value)
+                        : setRangeTo(e.target.value)
+                    }
+                    aria-label={`${filter.range.label} to`}
+                    data-testid={`table-filter-range-to-${colKey}`}
+                    className={boundInput}
+                  />
+                </div>
+                {!rangeLive && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={rangeFrom === "" || rangeTo === "" || rangeTo < rangeFrom}
+                    onClick={() => filter.range?.onApply?.(rangeFrom, rangeTo)}
+                    data-testid={`table-filter-range-apply-${colKey}`}
+                  >
+                    {filter.range.applyLabel}
+                  </Button>
+                )}
+              </div>
+            ) : null}
+          </>
+        )}
         {active ? (
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => filter.onChange(new Set())}
+            onClick={() =>
+              filter.onClear ? filter.onClear() : filter.onChange(new Set())
+            }
             data-testid={`table-filter-clear-${colKey}`}
           >
             {filter.clearLabel}
@@ -726,6 +853,7 @@ export default function DataTable<Row>({
   freeze,
   activeRow,
   density,
+  virtual,
 }: DataTableProps<Row>) {
   const selectableRows = selection
     ? rows.filter((r) => selection.selectable?.(r) ?? true)
@@ -751,13 +879,23 @@ export default function DataTable<Row>({
 
   const ordered = useMemo(() => applyColumnOrder(columns, order), [columns, order]);
 
-  /* ── SO-3 · density ───────────────────────────────────────────────────────
-   * Written as two whole literal class strings rather than composed from a
+  /* ── SO-3 · density (SO-4 added `dense`) ──────────────────────────────────
+   * Written as whole literal class strings rather than composed from a
    * number, because Tailwind's scanner reads SOURCE: a class built at runtime
-   * exists in the DOM and nowhere in the stylesheet. */
-  const rowPx = density === "compact" ? ROW_HEIGHT.compact : ROW_HEIGHT.default;
-  const cellHeight = density === "compact" ? "[&_td]:h-row-compact" : "[&_td]:h-row";
-  const headHeight = density === "compact" ? "h-row-compact" : "h-row";
+   * exists in the DOM and nowhere in the stylesheet. `dense` also drops the
+   * table's type one token, `text-body` → `text-meta` — 2990's fs-12 body. */
+  /* Indexed through a ternary, not `?? "default"` — guard §10.1 refuses a
+   * string fallback in kit source, and it is cheap to obey here. */
+  const rowPx = density != null ? ROW_HEIGHT[density] : ROW_HEIGHT.default;
+  const cellHeight =
+    density === "dense"
+      ? "[&_td]:h-row-dense"
+      : density === "compact"
+        ? "[&_td]:h-row-compact"
+        : "[&_td]:h-row";
+  const headHeight =
+    density === "dense" ? "h-row-dense" : density === "compact" ? "h-row-compact" : "h-row";
+  const tableType = density === "dense" ? "text-meta" : "text-body";
 
   /* ── SO-3 · freeze ────────────────────────────────────────────────────────
    * `left` is MEASURED off the rendered header, so a resize, a hidden column
@@ -839,17 +977,77 @@ export default function DataTable<Row>({
       }
     : undefined;
 
-  /* Keep the row an operator walked to inside the scroller. */
+  /* Keep the row an operator walked to inside the scroller. A windowed row
+   * (SO-4) may not be in the DOM at all — its place is index arithmetic, so
+   * the scroller is moved by arithmetic too, and the window follows. */
   useEffect(() => {
     if (!activeRow?.id) return;
     const el = scrollerRef.current?.querySelector<HTMLElement>(
       `tr[data-row-id="${CSS.escape(activeRow.id)}"]`,
     );
-    el?.scrollIntoView({ block: "nearest" });
+    if (el) {
+      el.scrollIntoView({ block: "nearest" });
+      return;
+    }
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const at = rows.findIndex((r) => rowId(r) === activeRow.id);
+    if (at < 0) return;
+    scroller.scrollTop = Math.max(0, at * rowPx - scroller.clientHeight / 2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRow?.id]);
 
-  /* The auto-filter row exists only while a column asks for one. */
-  const hasFilterRow = ordered.some((c) => c.filterInput != null);
+  /* ── SO-4 · windowed rows (2990's numbers: threshold 25 · overscan 14) ────
+   * Fixed row heights make the window EXACT, not estimated: every scanned row
+   * is `rowPx` tall by the row-height law, so index arithmetic replaces a
+   * measuring virtualizer. Grouped and expandable tables render in full —
+   * 2990's own guard, because their row heights vary. */
+  const VIRTUAL_THRESHOLD = 25;
+  const VIRTUAL_OVERSCAN = 14;
+  const [viewport, setViewport] = useState({ top: 0, height: 0 });
+  const canVirtualize =
+    virtual === true &&
+    !loading &&
+    group == null &&
+    expansion == null &&
+    rows.length > VIRTUAL_THRESHOLD;
+  useEffect(() => {
+    if (!canVirtualize) return;
+    const el = scrollerRef.current;
+    if (!el) return;
+    const read = () =>
+      setViewport((prev) =>
+        prev.top === el.scrollTop && prev.height === el.clientHeight
+          ? prev
+          : { top: el.scrollTop, height: el.clientHeight },
+      );
+    read();
+    el.addEventListener("scroll", read, { passive: true });
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(read);
+      ro.observe(el);
+      return () => {
+        el.removeEventListener("scroll", read);
+        ro.disconnect();
+      };
+    }
+    return () => el.removeEventListener("scroll", read);
+  }, [canVirtualize]);
+  /* The scroll offset is CLAMPED to the list before any index is cut from it.
+   * Without this, narrowing the rows while scrolled deep leaves a stale
+   * `viewport.top` pointing past the new list — the window goes empty, and
+   * its own top spacer then HOLDS the phantom height, so the browser never
+   * clamps the scroll and the grid stays blank. Found on the rendered page. */
+  const maxTop = Math.max(0, rows.length * rowPx - viewport.height);
+  const effTop = Math.min(viewport.top, maxTop);
+  const winStart = canVirtualize
+    ? Math.max(0, Math.floor(effTop / rowPx) - VIRTUAL_OVERSCAN)
+    : 0;
+  const winEnd = canVirtualize
+    ? Math.min(rows.length, Math.ceil((effTop + viewport.height) / rowPx) + VIRTUAL_OVERSCAN)
+    : rows.length;
+  const padTop = winStart * rowPx;
+  const padBottom = (rows.length - winEnd) * rowPx;
 
   /* P16 — the filler is a CELL in every row, so it counts here or a group
    * header and an expanded record would both stop short of the right edge. */
@@ -971,7 +1169,7 @@ export default function DataTable<Row>({
          * stop being scannable. The ONE cell allowed to wrap is a two-line
          * stack the caller composes inside a cell of its own — it still lands
          * inside the same fixed height, so every row is still one height. */
-        className={`w-full table-fixed border-separate border-spacing-0 text-body ${cellHeight} [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:align-middle`}
+        className={`w-full table-fixed border-separate border-spacing-0 ${tableType} ${cellHeight} [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:align-middle`}
       >
         {/* PERCENTAGE widths + `table-fixed` → the table is always exactly the
          *  container width, so it never scrolls sideways on a laptop. */}
@@ -1181,65 +1379,9 @@ export default function DataTable<Row>({
             )}
           </tr>
 
-          {/* SO-3 — EXCEL'S AUTO-FILTER ROW, under the header words it filters.
-           *  It sticks BELOW the header rather than with it, so scrolling the
-           *  sheet never takes the boxes away. `top` is the header's own
-           *  height, which is why the density literal is a number here. */}
-          {hasFilterRow && (
-            <tr
-              data-kit="table-filter-row"
-              className="sticky"
-              style={{ top: rowPx }}
-            >
-              {expansion && (
-                <th
-                  style={frozenStyle(0)}
-                  className={`bg-kit-slate-3 border-b border-b-kit-slate-5 ${frozenHead(0)}`}
-                />
-              )}
-              {selection && (
-                <th
-                  style={frozenStyle(expansion ? 1 : 0)}
-                  className={`bg-kit-slate-3 border-b border-b-kit-slate-5 ${frozenHead(
-                    expansion ? 1 : 0,
-                  )}`}
-                />
-              )}
-              {ordered.map((c, ci) => (
-                <th
-                  key={c.key}
-                  style={frozenStyle(ci + gutterCount)}
-                  className={`px-1 py-1 bg-kit-slate-3 border-b border-b-kit-slate-5 ${columnRule(
-                    ci,
-                  )} ${frozenHead(ci + gutterCount)}`}
-                >
-                  {c.filterInput ? (
-                    /* A bare input, exactly as `HeaderFilter`'s date pair is:
-                     * the kit's `Input` carries a 32px control's own padding
-                     * and a label slot, and neither fits a filter strip under a
-                     * column that may be 85px wide. */
-                    <input
-                      type="text"
-                      value={c.filterInput.value}
-                      onChange={(e) => c.filterInput!.onChange(e.target.value)}
-                      aria-label={c.filterInput.label}
-                      placeholder={c.filterInput.placeholder}
-                      data-testid={`table-filter-input-${c.key}`}
-                      data-active={c.filterInput.value !== "" || undefined}
-                      className="h-6 w-full min-w-0 rounded-control border border-kit-slate-5 bg-white px-1.5 text-meta text-kit-slate-12 placeholder:text-kit-slate-9 data-[active]:border-kit-blue-9 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
-                    />
-                  ) : null}
-                </th>
-              ))}
-              {fills && (
-                <th
-                  aria-hidden="true"
-                  data-kit="table-filler"
-                  className="bg-kit-slate-3 border-b border-b-kit-slate-5"
-                />
-              )}
-            </tr>
-          )}
+          {/* SO-3's auto-filter row rendered here for one day. SO-4 deleted it:
+           *  the permanent per-column typing strip was an invention — 2990's
+           *  own shipped grid filters through the header ▼ alone. */}
         </thead>
 
         <tbody>
@@ -1257,8 +1399,22 @@ export default function DataTable<Row>({
               </td>
             </tr>
           )}
+          {/* SO-4 — the top spacer carries the height of every row scrolled
+           *  past, so the scrollbar stays honest while the DOM holds only the
+           *  window. Height 0 renders nothing measurable and the non-virtual
+           *  path never emits either spacer. */}
+          {!loading && canVirtualize && padTop > 0 && (
+            <tr aria-hidden="true" data-kit="table-window-pad">
+              {/* NOT `!h-auto` — that is `!important`, which beats the inline height
+               * and collapses the spacer to the row height (found on the rendered
+               * page: 1,000 rows scrolled 1,204px). The inline style outranks the
+               * non-important `h-row-*` descendant rule by itself. */}
+              <td colSpan={colSpan} className="p-0" style={{ height: padTop }} />
+            </tr>
+          )}
           {!loading &&
-            rows.map((row, rowIndex) => {
+            rows.slice(winStart, winEnd).map((row, windowIndex) => {
+              const rowIndex = winStart + windowIndex;
               const id = rowId(row);
               const isSelected = selection?.selected.has(id) ?? false;
               const late = rowLate?.(row) ?? false;
@@ -1461,6 +1617,11 @@ export default function DataTable<Row>({
                 </Fragment>
               );
             })}
+          {!loading && canVirtualize && padBottom > 0 && (
+            <tr aria-hidden="true" data-kit="table-window-pad">
+              <td colSpan={colSpan} className="p-0" style={{ height: padBottom }} />
+            </tr>
+          )}
         </tbody>
 
         {/* TOTALS — pinned under the last row the way the head is pinned over

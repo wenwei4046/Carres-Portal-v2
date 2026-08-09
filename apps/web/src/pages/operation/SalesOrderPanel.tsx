@@ -94,11 +94,19 @@ function StripCell({
   value,
   second,
   testId,
+  loud,
 }: {
   label: string;
   value: React.ReactNode;
   second?: string;
   testId: string;
+  /**
+   * SO-4 — *"Outstanding visually dominant over Paid."* The one loud cell
+   * steps up a type token (`text-title`, 20/600 against the others' 15/600):
+   * the figure the phone call is ABOUT is the figure the eye lands on. Size,
+   * not colour — red means late in this portal, and money owed is not late.
+   */
+  loud?: boolean;
 }) {
   return (
     <div className="min-w-0 px-3 py-2" data-testid={testId}>
@@ -108,7 +116,11 @@ function StripCell({
           a taller strip — SO-1's own rule was that the Promised cell may NEVER
           truncate. It wraps instead, and all four cells grow together, so the
           strip still has one height. */}
-      <div className="text-strong break-words text-kit-slate-12">{value}</div>
+      <div
+        className={`${loud ? "text-title" : "text-strong"} break-words text-kit-slate-12`}
+      >
+        {value}
+      </div>
       {second ? (
         <div className="text-label text-kit-slate-11" data-testid={`${testId}-second`}>
           {second}
@@ -288,23 +300,35 @@ export default function SalesOrderPanel({
     }
   };
 
+  /* SO-4 — the header is ONE line: `SO-1300 · Hand · 016-238957893`. The SO
+     number keeps its weight; the name and phone follow at `text-meta`, dots
+     between, and the LINE truncates as one so the row never grows. */
+  const headerTail = [order?.customer_name, order?.customer_phone]
+    .filter((s): s is string => !!s && s.trim() !== "")
+    .join(" · ");
+
   return (
     <aside
       data-testid="sales-order-panel"
       aria-label="Sales Order"
-      className="flex h-full w-[420px] shrink-0 flex-col border-l border-kit-slate-5 bg-white"
+      /* The parent overlay owns the width (≤40% of the workspace, capped at
+         420px — SO-4); the panel fills whatever it is given. */
+      className="flex h-full w-full flex-col border-l border-kit-slate-5 bg-white"
     >
-      {/* ── The header: SO no · customer · ↑↓ · n of N · ⤢ · ✕ ───────────── */}
+      {/* ── The header: SO · customer · phone on ONE line · ↑↓ · n of N · ⤢ · ✕ */}
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-kit-slate-5 px-3">
-        <div className="min-w-0 flex-1">
-          <div className="text-strong truncate text-kit-slate-12" data-testid="panel-so">
+        <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
+          <span className="text-strong shrink-0 text-kit-slate-12" data-testid="panel-so">
             {order ? `SO-${order.so}` : "Sales Order"}
-          </div>
-          <div
-            className={`text-meta truncate text-kit-slate-11 ${cjkClassName(order?.customer_name ?? "")}`}
-          >
-            {order?.customer_name ?? ""}
-          </div>
+          </span>
+          {headerTail && (
+            <span
+              className={`text-meta truncate text-kit-slate-11 ${cjkClassName(order?.customer_name ?? "")}`}
+              data-testid="panel-header-customer"
+            >
+              · {headerTail}
+            </span>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
           <button
@@ -399,6 +423,7 @@ export default function SalesOrderPanel({
               <StripCell
                 label="Outstanding"
                 testId="fact-outstanding"
+                loud
                 value={<MoneyFact state={outstandingState(money)} />}
               />
               <StripCell

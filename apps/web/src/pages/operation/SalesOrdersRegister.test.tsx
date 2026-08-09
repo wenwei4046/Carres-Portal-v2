@@ -256,8 +256,9 @@ describe("THE REGISTER LAW · rental is not a customer order here", () => {
 
   it("does not count rental in the register total", () => {
     render(wrap(<SalesOrdersRegister />));
-    /* 4 orders in, 1 rental out, 1 delivered hidden by the default scope. */
-    expect(screen.getByTestId("register-count")).toHaveTextContent("2 of 3 orders");
+    /* 4 orders in, 1 rental out, 1 delivered hidden by the default scope —
+       the status bar is SO-4's `Record x of y` over the rows on screen. */
+    expect(screen.getByTestId("register-count")).toHaveTextContent("Record 1 of 2");
   });
 });
 
@@ -507,21 +508,74 @@ describe("SO-3 · THE SEVEN GRID CAPABILITIES", () => {
     expect(screen.getByTestId("panel-stub")).toHaveAttribute("data-order-id", "o-native");
   });
 
-  it("gives EVERY visible column a filter box under its header", () => {
+  it("gives EVERY visible column a header ▼, and NO permanent filter row exists (SO-4)", () => {
     render(wrap(<SalesOrdersRegister />));
     for (const key of ["so", "customer", "items", "value", "promised", "ordered"]) {
-      expect(screen.getByTestId(`table-filter-input-${key}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`table-filter-${key}`)).toBeInTheDocument();
     }
+    /* The invention SO-4 deletes: not hidden, NOT IN THE DOM. */
+    expect(document.querySelector('[data-kit="table-filter-row"]')).toBeNull();
+    expect(document.querySelectorAll("thead tr")).toHaveLength(1);
   });
 
-  it("filters on what the CELL prints, so the box can never disagree with the screen", () => {
+  it("the ▼ filters on the EXACT string the cell prints, and a chip appears", () => {
     render(wrap(<SalesOrdersRegister />));
     expect(rows().length).toBe(2);
-    fireEvent.change(screen.getByTestId("table-filter-input-customer"), {
-      target: { value: "myhouse" },
+    /* No chips row at all until a filter narrows — DOM-absent, not hidden. */
+    expect(screen.queryByTestId("register-chips")).toBeNull();
+    fireEvent.click(screen.getByTestId("table-filter-customer"));
+    fireEvent.click(screen.getByLabelText("MyHouse Management PLT · 012-345 6789"));
+    expect(rows().length).toBe(1);
+    expect(screen.getByTestId("register-count")).toHaveTextContent("Record 1 of 1");
+    expect(screen.getByTestId("register-chips")).toBeInTheDocument();
+    expect(screen.getByTestId("chip-customer")).toHaveTextContent(
+      "Customer: MyHouse Management PLT · 012-345 6789",
+    );
+  });
+
+  it("a chip's ✕ releases its column, and Clear all releases everything", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(screen.getByTestId("table-filter-customer"));
+    fireEvent.click(screen.getByLabelText("MyHouse Management PLT · 012-345 6789"));
+    expect(rows().length).toBe(1);
+    fireEvent.click(screen.getByTestId("chip-customer"));
+    expect(rows().length).toBe(2);
+    expect(screen.queryByTestId("register-chips")).toBeNull();
+  });
+
+  it("a date column's ▼ carries the presets, and one narrows the register", () => {
+    render(wrap(<SalesOrdersRegister />));
+    expect(rows().length).toBe(2);
+    fireEvent.click(screen.getByTestId("table-filter-ordered"));
+    /* Every fixture order was placed 2026-06-01 — long past. */
+    fireEvent.click(screen.getByTestId("table-filter-preset-ordered-overdue"));
+    expect(rows().length).toBe(2);
+    /* The popover is still open — switching preset re-narrows in place. */
+    fireEvent.click(screen.getByTestId("table-filter-preset-ordered-today"));
+    expect(rows().length).toBe(0);
+  });
+
+  it("a money column's ▼ carries min/max, on the RAW figure", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(screen.getByTestId("table-filter-value"));
+    fireEvent.change(screen.getByTestId("table-filter-min-value"), {
+      target: { value: "4000" },
     });
     expect(rows().length).toBe(1);
-    expect(screen.getByTestId("register-count")).toHaveTextContent("1 of 3 orders");
+    expect(screen.getByText("SO-1257")).toBeInTheDocument();
+  });
+
+  it("the toolbar's Clear filters releases every ▼ at once", () => {
+    render(wrap(<SalesOrdersRegister />));
+    expect(screen.getByTestId("clear-filters")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("table-filter-value"));
+    fireEvent.change(screen.getByTestId("table-filter-min-value"), {
+      target: { value: "4000" },
+    });
+    expect(rows().length).toBe(1);
+    fireEvent.click(screen.getByTestId("clear-filters"));
+    expect(rows().length).toBe(2);
+    expect(screen.queryByTestId("register-chips")).toBeNull();
   });
 
   it("makes EVERY visible column sortable", () => {
@@ -541,10 +595,11 @@ describe("SO-3 · THE SEVEN GRID CAPABILITIES", () => {
     expect(screen.getByTestId("table-resize-so")).toBeInTheDocument();
   });
 
-  it("runs the rows at the −15% density and every row is still ONE height", () => {
+  it("runs the rows at 2990's dense numbers and every row is still ONE height", () => {
     render(wrap(<SalesOrdersRegister />));
     const table = screen.getByTestId("sales-orders-table");
-    expect(table.querySelector("table")!.className).toContain("[&_td]:h-row-compact");
+    expect(table.querySelector("table")!.className).toContain("[&_td]:h-row-dense");
+    expect(table.querySelector("table")!.className).toContain("text-meta");
     const heights = new Set(
       rows().map((r) => (r.querySelector("td") as HTMLElement).className),
     );
@@ -586,14 +641,14 @@ describe("SO-3 · THE COLUMN CHOOSER", () => {
     expect(heads()).toEqual(["so", "customer", "items", "value", "promised", "ordered", "phone"]);
   });
 
-  it("Reset columns puts the six back and clears the filter boxes", () => {
+  it("Reset columns puts the six back and releases every ▼", () => {
     render(wrap(<SalesOrdersRegister />));
     fireEvent.click(screen.getByTestId("columns-button"));
     fireEvent.click(screen.getByLabelText("Phone"));
-    fireEvent.change(screen.getByTestId("table-filter-input-customer"), {
-      target: { value: "myhouse" },
-    });
+    fireEvent.click(screen.getByTestId("table-filter-customer"));
+    fireEvent.click(screen.getByLabelText("MyHouse Management PLT · 012-345 6789"));
     expect(rows().length).toBe(1);
+    fireEvent.click(screen.getByTestId("columns-button"));
     fireEvent.click(screen.getByTestId("columns-reset"));
     expect(
       screen.getByTestId("sales-orders-table").querySelectorAll("th[data-column]").length,
@@ -605,21 +660,81 @@ describe("SO-3 · THE COLUMN CHOOSER", () => {
   });
 });
 
-describe("SO-3 · THE CUSTOMER CELL AND EXPORT", () => {
-  it("stacks the phone under the name, inside ONE cell", () => {
+describe("SO-4 · ONE TOOLBAR ROW, AND WHAT IT REFUSES", () => {
+  it("has no Refresh — the query refetches itself", () => {
+    render(wrap(<SalesOrdersRegister />));
+    expect(screen.queryByText("Refresh")).toBeNull();
+  });
+
+  it("has no standalone date pickers — dates filter through their column's ▼", () => {
+    render(wrap(<SalesOrdersRegister />));
+    const toolbar = screen.getByTestId("register-toolbar");
+    expect(toolbar.querySelector('input[type="date"]')).toBeNull();
+    expect(screen.queryByPlaceholderText("From")).toBeNull();
+    expect(screen.queryByPlaceholderText("To")).toBeNull();
+  });
+
+  it("keeps the compact global search, the scope, Columns and Export on ONE row", () => {
+    render(wrap(<SalesOrdersRegister />));
+    const toolbar = screen.getByTestId("register-toolbar");
+    expect(within(toolbar).getByPlaceholderText(/SO number, customer/i)).toBeInTheDocument();
+    expect(within(toolbar).getByTestId("columns-button")).toBeInTheDocument();
+    expect(within(toolbar).getByTestId("export-button")).toBeInTheDocument();
+    expect(within(toolbar).getByTestId("clear-filters")).toBeInTheDocument();
+  });
+});
+
+describe("SO-4 · THE PANEL OVERLAYS, AND THE KEYS WORK FROM ANYWHERE", () => {
+  it("wraps the panel in an overlay capped at 40% of the workspace", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(rows()[0]);
+    const overlay = screen.getByTestId("panel-stub").parentElement!;
+    expect(overlay.className).toContain("absolute");
+    expect(overlay.className).toContain("w-[min(420px,40%)]");
+  });
+
+  it("Esc closes the panel from the page, ↑↓ walk the register", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(rows()[0]);
+    expect(screen.getByTestId("panel-stub")).toHaveAttribute("data-order-id", "o-native");
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+    expect(screen.getByTestId("panel-stub")).toHaveAttribute("data-order-id", "o-import");
+    fireEvent.keyDown(window, { key: "ArrowUp" });
+    expect(screen.getByTestId("panel-stub")).toHaveAttribute("data-order-id", "o-native");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByTestId("panel-stub")).toBeNull();
+  });
+
+  it("keeps its hands off an operator's typing — keys inside a form field pass through", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(rows()[0]);
+    const search = screen.getByPlaceholderText(/SO number, customer/i);
+    search.focus();
+    fireEvent.keyDown(search, { key: "Escape" });
+    /* The panel is still open: Escape inside a field is the field's. */
+    expect(screen.getByTestId("panel-stub")).toBeInTheDocument();
+  });
+});
+
+describe("SO-4 · THE CUSTOMER CELL AND EXPORT", () => {
+  it("carries the phone in the SAME one-line cell — 28px holds one line (SO-4)", () => {
     render(wrap(<SalesOrdersRegister />));
     const cell = rows()[0]!.querySelectorAll("td")[1]!;
     expect(cell).toHaveTextContent("MyHouse Management PLT");
     expect(cell).toHaveTextContent("012-345 6789");
+    /* SO-3's two-line stack died with the 34px row that held it. */
+    expect(cell.querySelector(".flex-col")).toBeNull();
     /* Still no card, table, chip or control smuggled into a cell. */
     expect(cell.querySelector("table, ul, ol, button, [data-kit='badge']")).toBeNull();
   });
 
-  it("says `Not given` when the customer never gave a phone", () => {
+  it("says `Not given` on the Phone column when the customer never gave one", () => {
     listHookState.data = {
       orders: [fixture()[0]!, { ...fixture()[1]!, customer_phone: null }],
     };
     render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(screen.getByTestId("columns-button"));
+    fireEvent.click(screen.getByLabelText("Phone"));
     expect(screen.getByText("Not given")).toBeInTheDocument();
   });
 

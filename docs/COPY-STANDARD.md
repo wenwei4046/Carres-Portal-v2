@@ -1128,6 +1128,27 @@ column, and `Not recorded` already says truthfully that nothing has been written
 *(Measured 2026-08-09: 0 of 77 live orders carry any of the five, and at go-live the database
 starts clean — `CLAUDE.md` §6 — so this is the state every column will be in on day one.)*
 
+### The register ▼'s own words (SO-4, Loo 2026-08-09)
+
+**The ▼ speaks 2990's shipped vocabulary**, ported with its mechanics
+(`2990s/apps/backend/src/components/DataGrid.tsx`), not invented:
+
+| Concept | Canonical word | Do NOT use |
+|---|---|---|
+| The six date presets, in order | **Today · Tomorrow · This week · This month · Last month · Overdue** | Next 7 days · Past · Expired — and on a FILTER, `This week` is the calendar week Mon–Sun (2990's matcher): a filter answers *which rows*, while the delivery calendar's `This week` (above) answers *what is still coming*, a different subject |
+| The custom pair under the presets | **Custom date range** | Between · Date from/to · Period |
+| A number column's two bounds | **At least** · **Up to** | Min · Max · From · To — the bound says what it DOES to the rows |
+| Release one column's ▼ | **Clear** | Reset · Remove filter |
+| Release every ▼ from the toolbar | **Clear filters** | Reset all · Remove all |
+| Release every ▼ from the chips row | **Clear all** | — (the chips row's own word; the toolbar's says *filters* because it sits among controls that are not filters) |
+| The status bar under the grid | **`Record {x} of {y}`** | rows · results · items — AutoCount's own word, and `x` is the row the operator is ON |
+
+**And `RM 0` in the PAID column is a figure, not an absence** (SO-4). The absence table above
+bans `RM 0` as a spelling of *Paid in full* and *No price yet* — both OUTSTANDING states. What
+has been RECEIVED is a different subject: an order nobody has paid a sen on has received
+exactly `RM 0`, and printing `Paid in full` there (as SO-3 briefly did) told the operator the
+opposite of the truth.
+
 ### The Sales Order panel's own words (SO-3, Loo 2026-08-09)
 
 **A change the operator RECORDS is never spelled like a change they MADE.** The panel's Level 2

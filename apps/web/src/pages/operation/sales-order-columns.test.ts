@@ -5,6 +5,8 @@ import {
   DEFAULT_COLUMNS,
   fieldByKey,
   FIELD_GROUPS,
+  filterChipText,
+  filterIsActive,
   passesColumnFilters,
   REGISTER_FIELDS,
   toCsv,
@@ -114,16 +116,117 @@ describe("one string: printed, filtered, sorted, exported", () => {
     expect(fieldByKey("customer")!.text(r)).toContain("012-345 6789");
   });
 
-  it("filters case-insensitively on the printed string", () => {
+  /* ── SO-4 · the ▼'s four shapes, 2990's model ported ─────────────────── */
+
+  it("a values filter matches the EXACT string the cell prints", () => {
     const r = buildRegisterRow(row());
-    expect(passesColumnFilters(r, new Map([["customer", "MYHOUSE"]]))).toBe(true);
-    expect(passesColumnFilters(r, new Map([["customer", "tan ah kow"]]))).toBe(false);
+    const name = fieldByKey("customer")!.text(r);
+    expect(passesColumnFilters(r, new Map([["customer", { values: new Set([name]) }]]))).toBe(
+      true,
+    );
+    expect(
+      passesColumnFilters(r, new Map([["customer", { values: new Set(["Tan Ah Kow"]) }]])),
+    ).toBe(false);
     /* Every filter must pass — they narrow, they never widen. */
     expect(
-      passesColumnFilters(r, new Map([["customer", "myhouse"], ["items", "sofa"]])),
+      passesColumnFilters(
+        r,
+        new Map([
+          ["customer", { values: new Set([name]) }],
+          ["items", { values: new Set(["a sofa it does not hold"]) }],
+        ]),
+      ),
     ).toBe(false);
-    /* An empty box is not a filter. */
-    expect(passesColumnFilters(r, new Map([["customer", "  "]]))).toBe(true);
+    /* An empty set is not a filter. */
+    expect(passesColumnFilters(r, new Map([["customer", { values: new Set<string>() }]]))).toBe(
+      true,
+    );
+  });
+
+  it("a date preset reads the RAW iso date, in MYT — 2990's matcher verbatim", () => {
+    /* 2026-08-09 12:00 MYT = 04:00 UTC. */
+    const now = Date.parse("2026-08-09T04:00:00Z");
+    const r = buildRegisterRow(row({ placed_at: "2026-08-09T01:00:00Z" }));
+    expect(passesColumnFilters(r, new Map([["ordered", { preset: "today" }]]), now)).toBe(true);
+    expect(passesColumnFilters(r, new Map([["ordered", { preset: "tomorrow" }]]), now)).toBe(
+      false,
+    );
+    expect(passesColumnFilters(r, new Map([["ordered", { preset: "thisMonth" }]]), now)).toBe(
+      true,
+    );
+    expect(passesColumnFilters(r, new Map([["ordered", { preset: "lastMonth" }]]), now)).toBe(
+      false,
+    );
+    const early = buildRegisterRow(row({ placed_at: "2026-07-15T01:00:00Z" }));
+    expect(passesColumnFilters(early, new Map([["ordered", { preset: "lastMonth" }]]), now)).toBe(
+      true,
+    );
+    expect(passesColumnFilters(early, new Map([["ordered", { preset: "overdue" }]]), now)).toBe(
+      true,
+    );
+  });
+
+  it("a date range is inclusive, a lone bound is half-open, and no date fails it", () => {
+    const r = buildRegisterRow(row({ placed_at: "2026-08-05T01:00:00Z" }));
+    expect(
+      passesColumnFilters(r, new Map([["ordered", { from: "2026-08-01", to: "2026-08-05" }]])),
+    ).toBe(true);
+    expect(passesColumnFilters(r, new Map([["ordered", { from: "2026-08-06" }]]))).toBe(false);
+    expect(passesColumnFilters(r, new Map([["ordered", { to: "2026-08-04" }]]))).toBe(false);
+    /* A promise with no day on it cannot be inside any range. */
+    const tbd = buildRegisterRow(row({ delivery_date_tbd: true }));
+    expect(passesColumnFilters(tbd, new Map([["promised", { from: "2026-01-01" }]]))).toBe(false);
+  });
+
+  it("a number filter reads the RAW figure — and a row with none is excluded", () => {
+    const r = buildRegisterRow(row()); // value 3,000 · paid 500 · outstanding 2,500
+    expect(passesColumnFilters(r, new Map([["outstanding", { min: "1000" }]]))).toBe(true);
+    expect(passesColumnFilters(r, new Map([["outstanding", { max: "1000" }]]))).toBe(false);
+    expect(
+      passesColumnFilters(r, new Map([["value", { min: "3000", max: "3000" }]])),
+    ).toBe(true);
+    /* `Paid in full` IS zero outstanding — min 0 catches it. */
+    const settled = buildRegisterRow(row({ paid: 3000 }));
+    expect(passesColumnFilters(settled, new Map([["outstanding", { min: "0" }]]))).toBe(true);
+    expect(passesColumnFilters(settled, new Map([["outstanding", { min: "1" }]]))).toBe(false);
+    /* An unpriced order has NO figure — excluded, as 2990 excludes a NaN. */
+    const unpriced = buildRegisterRow(row({ order_lines: [], order_addons: [] }));
+    expect(passesColumnFilters(unpriced, new Map([["value", { min: "0" }]]))).toBe(false);
+    /* Junk in a bound is not a filter. */
+    expect(passesColumnFilters(r, new Map([["value", { min: "abc" }]]))).toBe(true);
+  });
+
+  it("filterIsActive answers for every shape, and for none", () => {
+    expect(filterIsActive(undefined)).toBe(false);
+    expect(filterIsActive({})).toBe(false);
+    expect(filterIsActive({ values: new Set<string>() })).toBe(false);
+    expect(filterIsActive({ values: new Set(["x"]) })).toBe(true);
+    expect(filterIsActive({ preset: "today" })).toBe(true);
+    expect(filterIsActive({ from: "2026-08-01" })).toBe(true);
+    expect(filterIsActive({ min: "5" })).toBe(true);
+    expect(filterIsActive({ min: "abc" })).toBe(false);
+  });
+
+  it("a chip names the column and the narrowing, Gmail's shape", () => {
+    const customer = fieldByKey("customer")!;
+    expect(filterChipText(customer, { values: new Set(["Umi"]) })).toBe("Customer: Umi");
+    expect(filterChipText(customer, { values: new Set(["Umi", "Hand", "Ali"]) })).toBe(
+      "Customer: Ali +2",
+    );
+    const ordered = fieldByKey("ordered")!;
+    expect(filterChipText(ordered, { preset: "today" })).toBe("Ordered: Today");
+    expect(filterChipText(ordered, { from: "2026-08-01", to: "2026-08-05" })).toContain(
+      "Ordered: ",
+    );
+    const value = fieldByKey("value")!;
+    expect(filterChipText(value, { min: "100", max: "500" })).toBe("Value: 100 – 500");
+    expect(filterChipText(value, { min: "100" })).toBe("Value: 100 and above");
+  });
+
+  it("the Paid cell prints the figure, RM 0 included — never `Paid in full` (SO-4 fix)", () => {
+    const untouched = buildRegisterRow(row({ paid: 0 }));
+    expect(untouched.paid).toEqual({ kind: "amount", value: 0 });
+    expect(fieldByKey("paid")!.text(untouched)).toBe("0");
   });
 
   it("exports the columns on screen, quoted, header first", () => {

@@ -217,23 +217,28 @@ export default {
       maxHeight: {
         dialog: "85vh", // the surface never outgrows the screen; the body scrolls
       },
-      /* ⭐ THE TWO GRID ROW HEIGHTS (card SO-3, Loo 2026-08-09: *"row density
-       * −15%"*). Named config keys for the same reason the modal widths are:
-       * `h-[34px]` typed into `DataTable` is a number the next grid types
-       * differently, and `kit-source.test.ts` refuses an arbitrary height
-       * outright. `h-10` is Tailwind's own 40px and stays the default.
+      /* ⭐ THE THREE GRID ROW HEIGHTS. Named config keys for the same reason
+       * the modal widths are: `h-[34px]` typed into `DataTable` is a number the
+       * next grid types differently, and `kit-source.test.ts` refuses an
+       * arbitrary height outright. `h-10` is Tailwind's own 40px and stays the
+       * default.
        *
-       * Where 34 comes from: 40 × 0.85, and it clears the floor `ui/MASTER.md`
-       * §4 names — *"any density change below ~32px moves `badge-height` too"*,
-       * because the kit's in-row expand button is 24px at any row height. At 34
-       * it still has 5px either side and no second token moves. It is also
-       * exactly the Customer cell's two-line stack: `text-body` 18 + `text-meta`
-       * 16 = 34, which is why the card asks for the density and the stacked
-       * cell in one breath. Mirrored (never driven) by `kit/tokens.ts`
-       * `ROW_HEIGHT`. */
+       * Where 34 comes from (SO-3, Loo 2026-08-09: *"row density −15%"*):
+       * 40 × 0.85, and it clears the floor `ui/MASTER.md` §4 names — *"any
+       * density change below ~32px moves `badge-height` too"*, because the
+       * kit's in-row expand button is 24px at any row height. At 34 it still
+       * has 5px either side and no second token moves.
+       *
+       * Where 28 comes from (SO-4, Loo 2026-08-09: *"2990's numbers — do not
+       * invent new ones"*): 2990's shipped `DataGrid.module.css` names 28px as
+       * its density target. It sits BELOW the ~32 floor knowingly — a dense
+       * register carries no 24px in-row control at all (no expansion, no
+       * checkbox), so the floor's collision cannot occur. Mirrored (never
+       * driven) by `kit/tokens.ts` `ROW_HEIGHT`. */
       height: {
         row: "40px", // the 40px law — the rows an operator SCANS
         "row-compact": "34px", // −15%, and the floor is ~32
+        "row-dense": "28px", // 2990's register density — no in-row controls
       },
       borderRadius: {
         lg: "var(--radius)",
