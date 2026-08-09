@@ -32,6 +32,35 @@ FOOTER   8mm         — doc no · legal sentence · Page n of m  (fixed, repeat
 The bottom unit pins to the page bottom (`marginTop: auto`): BALANCE DUE and the
 signature sit at the same spot on every printed order.
 
+### 2.1 · THE MEASUREMENT SHEET (final, owner-approved round 24)
+
+```
+zone      element                        size/weight   pitch/height
+HEADER    company name                   14 / 700
+          SSM inline                     8 grey
+          address ×2                     8             4.0mm rows (lh 1.42)
+          SO number                      18 / 700
+          SALES ORDER whisper            9 grey caps
+          rule → BILL TO air             —             3.5mm
+PARTIES   titles                         8.5 / 700     4.6mm to first row
+          labels + values                8             4.0mm rows incl. wraps
+ITEMS     ink bar labels (white)         7.5 / 700     one line, always
+          body / code / description      7.5           6.8mm single-line rows
+          money + qty cells              7             (2mm pad top+bottom)
+          category bands                 7.5 / 700     grey #EDEDED
+          sub-lines                      7 grey        indent 2mm
+          TOTAL row                      700           between two ink rules
+PAYMENTS  bar labels                     7.5 / 700
+          body                           8             dates `9 Aug 26`
+MONEY     amount-in-words                7 grey        68mm column, top=Subtotal
+          Subtotal / Paid to date        8.5           4.0mm rows
+          BALANCE DUE                    10.5 / 700    one rule above
+          signature box                  22mm          caption 6.5 inside
+TERMS     title                          7.5 / 700     mixed case
+          body                           7 grey        3.2mm lines
+FOOTER    all three cells                7.5 grey      8mm zone
+```
+
 ## 3 · Header
 
 - Line 1: `CARRES SDN. BHD.` **14/700** + `SSM {reg}` **8pt grey inline**, bottom-aligned.
@@ -52,8 +81,9 @@ names, no caps labels, no size bouncing (round 8: "not like you up and down").
 
 - BILL TO: 20mm label gutter — `Name / Address / Tel / Email / Emergency`.
   Wrapped values return to the value X. Empty rows vanish.
-- ORDER DETAILS: colon-aligned — `Doc No · Showroom · Ordered · Delivery date ·
-  Proceed date · Salesperson · Access`. Body dates are mixed-case `Sun, 9 Aug 26`.
+- ORDER DETAILS: colon-aligned, the owner's order and words (round 23) —
+  `Doc No · Ordered · Sales Location · Proceed date · Delivery date ·
+  Salesperson · Access`. Body dates are mixed-case `Sun, 9 Aug 26`.
 - **Access** = `Floor 3 · No lift` (three-state; see §8). Floor/lift live HERE,
   not in a DELIVER TO block (owner, fixed-zone round).
 - DELIVER TO prints ONLY when the delivery address differs from billing —
@@ -79,6 +109,9 @@ names, no caps labels, no size bouncing (round 8: "not like you up and down").
 - `Qty > 1` prints **bold**.
 - Discount is data-driven: no schema field carries it today (verified 2026-08-09);
   cells print `—` until the portal sends figures. The column STAYS (owner ruling).
+- The table CLOSES with a `TOTAL` row between two ink rules (round 24):
+  qty sum (700) · discount sum (`—` when none) · amount sum (700), summed
+  from the rows the table itself printed.
 - An item never splits across pages. DEFERRED: header-bar repeat on overflow
   pages — do it with the 50-line stress pass, not blind.
 
@@ -167,3 +200,4 @@ Optional payload fields the template already renders when sent: `customer.email`
 | 2026-08-09 | §7 round 18: amount-in-words becomes 2990's inline one-liner (`Amount in words: …` 8pt grey) — caps block label and `(ITEMS TOTAL)` clarifier removed. | Loo |
 | 2026-08-09 | Rounds 19–21: §8.5 conversion law added — 2990 sizes −0.5pt, row pitches locked to 2990's mm; totals renamed to 2990's `Subtotal`; signature moved after BALANCE DUE with one-line caption. | Loo |
 | 2026-08-09 | Round 22: totals stay THREE rows (owner: 维持 3 行); signature box under BALANCE DUE with the caption inside; words column narrowed to 68mm/7pt top-aligned with Subtotal. | Loo |
+| 2026-08-09 | Rounds 23–24 (FINAL, owner: perfect): ORDER DETAILS order/words fixed (`Sales Location`); items TOTAL row; §2.1 measurement sheet added — the numbers every Carres customer document reuses. | Loo |
