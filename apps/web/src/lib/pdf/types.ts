@@ -133,6 +133,10 @@ export type PoTemplateData = {
 export type SalesOrderTemplateData = {
   so_number: string;
   issue_date: string;
+  /** Golden SO (STAGE 2) — raw ISO stamps for ORDER DETAILS; the template
+   *  formats them. Optional: older Workers don't send them. */
+  ordered_date?: string | null;
+  proceed_date?: string | null;
   order_id: string;
   order_code: string;
   status_label: string;
@@ -142,6 +146,9 @@ export type SalesOrderTemplateData = {
     name: string;
     address: string;
     phone: string | null;
+    /** Golden SO — BILL TO Email / Emergency rows. Optional: older Workers. */
+    email?: string | null;
+    emergency?: string | null;
   };
 
   dealer: {
@@ -176,6 +183,13 @@ export type SalesOrderTemplateData = {
     unit_price: number;
     line_total: number;
     attrs: Record<string, unknown> | null;
+    /** Golden SO — the category band this line sits under; null/absent → the
+     *  "ITEMS" band. */
+    category?: string | null;
+    /** Golden SO — per-line discount. No Carres column stores one today, so
+     *  this stays absent and the cell prints "—"; the slot exists so the day
+     *  a discount fact lands it prints without a template change. */
+    discount?: number | null;
   }>;
 
   addons: Array<{
@@ -192,7 +206,14 @@ export type SalesOrderTemplateData = {
    *  order_payments ledger for internal callers, else one synthesized row
    *  from orders.paid + payment_method. Optional: pre-parity API builds
    *  don't send it; the template then falls back to the paid amount. */
-  payments?: Array<{ label: string; reference: string | null; amount: number }>;
+  payments?: Array<{
+    label: string;
+    reference: string | null;
+    amount: number;
+    /** Golden SO — ledger date + collector name. Optional: older Workers. */
+    date?: string | null;
+    collected_by?: string | null;
+  }>;
 
   /** Voucher codes EARNED on this order (PWP carry-forward) — printed under
    *  their trigger line ("PWP voucher issued: … · not redeemed yet").

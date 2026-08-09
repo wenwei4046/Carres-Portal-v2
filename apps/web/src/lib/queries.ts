@@ -3059,6 +3059,9 @@ export interface operationOrderDetailOrder {
   salespersons?: { name: string } | null;
 }
 export interface operationOrderDetailLine {
+  /** STAGE 2 — the row's identity, so Save can diff lines in place. Optional:
+   *  absent on an older Worker. */
+  id?: string;
   sku: string;
   qty: number;
   unit_price: number;
@@ -4245,6 +4248,130 @@ export function useOperationOrder(
       apiFetch<operationOrderDetailResponse>(`/api/operation/orders/${id}`),
     enabled: !!id,
     staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * STAGE 2 · THE REVISION ENGINE — every write mints a revision (0327).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** One immutable snapshot: the agreement as it stood at that revision. */
+export interface SalesOrderSnapshotLine {
+  id?: string;
+  sku: string;
+  qty: number;
+  unit_price: number | string;
+  attrs?: Record<string, unknown> | null;
+  source_po?: string | null;
+  /** `Model name (Variant)` resolved AT MINT TIME, so an old revision's PDF
+   *  still prints the name the customer saw even if the catalog changes. */
+  description?: string | null;
+}
+export interface SalesOrderSnapshot {
+  header: Record<string, unknown>;
+  lines: SalesOrderSnapshotLine[];
+  addons: Array<{ addon_key: string; qty: number; unit_price: number | string }>;
+}
+export interface SalesOrderRevisionRow {
+  revision: number;
+  snapshot: SalesOrderSnapshot;
+  created_at: string;
+  created_by: string | null;
+}
+
+export function useSalesOrderRevisions(
+  orderId: string | null,
+  opts?: Partial<UseQueryOptions<{ revisions: SalesOrderRevisionRow[] }>>,
+) {
+  return useQuery({
+    queryKey: orderId
+      ? ([...qk.operation.order(orderId), "revisions"] as const)
+      : (["operation", "orders", "null", "revisions"] as const),
+    queryFn: () =>
+      apiFetch<{ revisions: SalesOrderRevisionRow[] }>(
+        `/api/operation/orders/${orderId}/revisions`,
+      ),
+    enabled: !!orderId,
+    ...opts,
+  });
+}
+
+export interface SaveRevisionLineInput {
+  id?: string;
+  sku: string;
+  qty: number;
+  unit_price: number;
+}
+export interface SaveRevisionInput {
+  header?: Record<string, unknown>;
+  lines?: SaveRevisionLineInput[];
+}
+
+/** POST /:id/save — the ONE edit door. The RPC whitelists the header, diffs
+ *  the lines and mints Rev N+1; a no-op save is refused server-side. */
+export function useSaveSalesOrderRevision(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<{ revision: number; changed: string[] }, ApiError, SaveRevisionInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ revision: number; changed: string[] }, ApiError, SaveRevisionInput>({
+    mutationFn: (input) =>
+      apiFetch<{ revision: number; changed: string[] }>(
+        `/api/operation/orders/${orderId}/save`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: qk.operation.order(orderId) }),
+        qc.invalidateQueries({ queryKey: ["operation", "orders"] }),
+      ]);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** POST / — the office birth door. Returns the new order id + SO number. */
+export function useCreateSalesOrder(
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; so: number; revision: number },
+      ApiError,
+      { header: Record<string, unknown>; lines: Omit<SaveRevisionLineInput, "id">[] }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { id: string; so: number; revision: number },
+    ApiError,
+    { header: Record<string, unknown>; lines: Omit<SaveRevisionLineInput, "id">[] }
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ id: string; so: number; revision: number }>("/api/operation/orders", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** GET /reference/dealers — the create form's dealer picker. */
+export function useOperationDealersRef(
+  opts?: Partial<UseQueryOptions<{ dealers: Array<{ id: string; name: string }> }>>,
+) {
+  return useQuery({
+    queryKey: ["operation", "orders", "reference", "dealers"] as const,
+    queryFn: () =>
+      apiFetch<{ dealers: Array<{ id: string; name: string }> }>(
+        "/api/operation/orders/reference/dealers",
+      ),
+    staleTime: 5 * 60_000,
     ...opts,
   });
 }

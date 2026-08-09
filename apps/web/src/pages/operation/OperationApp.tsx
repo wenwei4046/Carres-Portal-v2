@@ -311,10 +311,12 @@ export default function OperationApp() {
               path="orders"
               element={<OrdersPage onImport={() => changeTab("ops-import")} />}
             />
-            {/* STAGE 1 — the workspace VIEW route the register's rows open.
-                Declared before `orders/:stage` in source for the reader;
-                React Router ranks it higher anyway (static `so` segment
-                beats the `:stage` param). */}
+            {/* STAGE 1 — the workspace route the register's rows open.
+                STAGE 2 — `so/new` is the office birth door ([+ New Sales
+                Order]); static `new` outranks `:orderId`. Declared before
+                `orders/:stage` in source for the reader; React Router ranks
+                them higher anyway. */}
+            <Route path="orders/so/new" element={<SalesOrderWorkspace />} />
             <Route path="orders/so/:orderId" element={<SalesOrderWorkspace />} />
             <Route
               path="orders/:stage"
@@ -403,14 +405,11 @@ export default function OperationApp() {
         )}
         </div>
       </main>
-      {/* ⭐ SO-1 FINAL (Loo, 2026-08-09) — the execution rail is NOT MOUNTED on
-          the Sales Orders route, and it is a PRODUCT rule rather than a space
-          preference: *"Team / Calendar / Activity / Calls belong to other
-          modules."* Not `hidden`, not collapsed — absent. A rail that is
-          merely hidden is still mounted, still fetching, and still one prop
-          away from coming back; `ERP-ARCHITECTURE.md` §0's second lesson is
-          exactly this drift. Every other operation screen keeps it. */}
-      {!isOrdersUrl && <OperationRightRail />}
+      {/* STAGE 2 MODULE SHELL (owner, 2026-08-09) — the rail is RESTORED on
+          the Sales Orders routes, same as every other operation page. This
+          supersedes SO-1's "rail not mounted" ruling — later owner statement
+          wins (BUILD-QUEUE governance). */}
+      <OperationRightRail />
     </div>
   );
 }

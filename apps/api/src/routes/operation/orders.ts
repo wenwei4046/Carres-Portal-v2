@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import {
   abandonOrderInput,
   assignPartnerInput,
@@ -391,7 +392,11 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
       // the drawer's customer card shows it under the address.
       // 2026-08-09 (STAGE 1) — salesperson embed: the Sales Order workspace
       // names the salesperson on the customer commitment.
-      "id, so, source_ref, source_system, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, customer_emergency, customer_billing, customer_billing_same, entry_data, delivery_date, delivery_date_tbd, proceed_date, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, salesperson_id, dealers(name), outlets(name), salespersons(name)",
+      // 2026-08-09 (STAGE 2) — the workspace EDIT form seeds its draft from
+      // THIS payload; every whitelisted field must ride the wire or a Save
+      // would silently null what it never saw: customer_email, the five
+      // structured address parts (0230), delivery_floor, delivery_has_lift.
+      "id, so, source_ref, source_system, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_email, customer_address, customer_address_unknown, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, customer_emergency, customer_billing, customer_billing_same, entry_data, delivery_date, delivery_date_tbd, proceed_date, delivery_floor, delivery_has_lift, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, salesperson_id, dealers(name), outlets(name), salespersons(name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -412,7 +417,9 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     // 2026-05-10 (Loo) — also pull `attrs` so the OrderDetailDrawer's
     // "+ Issue POs" navigate-to-procurement flow can carry color/gap/fabric
     // into CreatePOModal's cascade picker without a second round-trip.
-    sb.from("order_lines").select("sku, qty, unit_price, attrs, source_po").eq("order_id", id),
+    // STAGE 2 — `id` rides along so the workspace's Save can diff lines
+    // by identity (update-in-place keeps attrs + source_po).
+    sb.from("order_lines").select("id, sku, qty, unit_price, attrs, source_po").eq("order_id", id),
     sb.from("order_addons").select("addon_key, qty, unit_price").eq("order_id", id),
     sb.from("order_history").select("text, by_role, occurred_at").eq("order_id", id).order("occurred_at", { ascending: true }),
     sb
@@ -552,6 +559,154 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     history: historyRes.data ?? [],
     threads: threadsRes.data ?? [],
   });
+});
+
+// ─────────────────────────────────────────────────────────────
+// STAGE 2 · THE REVISION ENGINE — every write mints a revision (0327).
+// The API layer here is a THIN door: validation + ONE RPC call. The RPC owns
+// the whitelist, the lines diff, Rev-1 minting and immutability; nothing in
+// this file writes orders/order_lines directly.
+// ─────────────────────────────────────────────────────────────
+
+const revisionLineInput = z.object({
+  /** Present = update this line in place (keeps attrs + source_po); absent =
+   *  a new line. */
+  id: z.string().uuid().optional(),
+  sku: z.string().trim().min(1, "A line needs a SKU"),
+  qty: z.number().int().min(1, "Qty must be at least 1"),
+  unit_price: z.number().min(0, "Unit price must be 0 or more"),
+});
+
+/** The editable header keys — mirrors the RPC whitelist verbatim. */
+const revisionHeaderInput = z
+  .object({
+    customer_name: z.string().trim().min(1).optional(),
+    customer_phone: z.string().nullable().optional(),
+    customer_email: z.string().nullable().optional(),
+    customer_address: z.string().nullable().optional(),
+    customer_address_line1: z.string().nullable().optional(),
+    customer_address_line2: z.string().nullable().optional(),
+    customer_address_city: z.string().nullable().optional(),
+    customer_address_state: z.string().nullable().optional(),
+    customer_address_postcode: z.string().nullable().optional(),
+    customer_emergency: z.string().nullable().optional(),
+    customer_billing: z.string().nullable().optional(),
+    delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    delivery_date_tbd: z.boolean().optional(),
+    proceed_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    delivery_floor: z.number().int().min(0).optional(),
+    delivery_has_lift: z.boolean().optional(),
+    salesperson_id: z.string().uuid().nullable().optional(),
+    outlet_id: z.string().uuid().nullable().optional(),
+  })
+  .strict();
+
+// GET /:id/revisions — the order's immutable snapshots, oldest first.
+operationOrdersRouter.get("/:id/revisions", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("sales_order_revisions")
+    .select("revision, snapshot, created_at, created_by")
+    .eq("order_id", id)
+    .order("revision", { ascending: true });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ revisions: data ?? [] });
+});
+
+// POST /:id/save — the ONE edit door. Stage 2: every change is Class B, no
+// approval. The RPC refuses an empty or no-op save.
+const saveRevisionInput = z
+  .object({
+    header: revisionHeaderInput.optional(),
+    lines: z.array(revisionLineInput).min(1).optional(),
+  })
+  .refine((v) => v.header !== undefined || v.lines !== undefined, {
+    message: "Nothing to save",
+  });
+
+operationOrdersRouter.post("/:id/save", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = saveRevisionInput.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: parsed.error.issues[0]?.message ?? "invalid input",
+      },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_save_revision", {
+    p_order_id: id,
+    p_header: parsed.data.header ?? {},
+    p_lines: parsed.data.lines ?? null,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data, 201);
+});
+
+// POST / — the office birth door ([+ New Sales Order]). Normal orders are
+// still born in the Sales Portal; this one inserts status='place' and mints
+// Rev 1 from the created state.
+const createOrderInput = z.object({
+  header: revisionHeaderInput
+    .extend({
+      customer_name: z.string().trim().min(1, "Customer name is required"),
+      dealer_id: z.string().uuid({ message: "A dealer is required" }),
+      // orders_salesperson_required (0296) — every portal-written order
+      // names who sold it; only the AutoCount archive importer is exempt.
+      salesperson_id: z.string().uuid({ message: "A salesperson is required" }),
+    })
+    .strict(),
+  lines: z.array(revisionLineInput.omit({ id: true })).min(1, "An order needs at least one item"),
+});
+
+operationOrdersRouter.post("/", requireOperation, async (c) => {
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = createOrderInput.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: parsed.error.issues[0]?.message ?? "invalid input",
+      },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_create", {
+    p_header: parsed.data.header,
+    p_lines: parsed.data.lines,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data, 201);
+});
+
+// GET /reference/dealers — id + name for the create form's dealer picker.
+// RLS-scoped read (internal roles read dealers — the same embed the list
+// already prints). A static segment outranks `/:id` in Hono's router.
+operationOrdersRouter.get("/reference/dealers", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.from("dealers").select("id, name").order("name");
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ dealers: data ?? [] });
 });
 
 // ----- GET /:id/print-do -----
