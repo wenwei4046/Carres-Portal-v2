@@ -247,7 +247,10 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     q = q.or(clauses.join(","));
   }
 
-  q = q.order("placed_at", { ascending: false }).limit(200);
+  // STAGE 1 FIX 1 — the 200-row trap removed; the agreed cap is 500. Server
+  // search (`?search=`, above) is what makes the cap safe: a match beyond the
+  // first page is FOUND by asking, never scrolled for.
+  q = q.order("placed_at", { ascending: false }).limit(500);
   const { data, error } = await q;
   if (error) {
     const m = mapPgError(error);

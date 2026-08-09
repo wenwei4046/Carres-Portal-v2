@@ -167,6 +167,14 @@ export type DataGridProps<T> = {
       (post-sort) — lets a parent print/export exactly what's filtered, no
       row-ticking. Pass a STABLE setter (e.g. a useState dispatch). (2026-06-16) */
   onFilteredRowsChange?: (rows: T[]) => void;
+  /**
+   * STAGE 1 FIX 1 — fires with the DEBOUNCED, TRIMMED search term whenever it
+   * changes, so the page can re-ask the SERVER with the same words the
+   * operator typed. The engine keeps filtering the rows it holds (instant
+   * feedback); the server narrows the population behind them. Pass a STABLE
+   * setter.
+   */
+  onSearchChange?: (q: string) => void;
   toolbar?: ReactNode;
   /** controlled focus for the "Find" button — bump to focus the search box */
   focusSearchNonce?: number;
@@ -339,6 +347,7 @@ function DataGridInner<T>({
   rowStyle,
   onSelectionChange,
   onFilteredRowsChange,
+  onSearchChange,
   toolbar,
   focusSearchNonce,
   collapseAllNonce,
@@ -752,6 +761,13 @@ function DataGridInner<T>({
      `search`, so typing is instant) — keeps large lists responsive while
      typing. Separate from the autocomplete debounce elsewhere. */
   const debouncedSearch = useDebouncedValue(search, 150);
+
+  /* STAGE 1 FIX 1 — hand the debounced trimmed term to the page so it can ask
+     the SERVER. Client filtering below is unchanged: it narrows the rows
+     already here while the server round-trip is in flight. */
+  useEffect(() => {
+    onSearchChange?.(debouncedSearch.trim());
+  }, [debouncedSearch, onSearchChange]);
 
   const filteredRows = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();

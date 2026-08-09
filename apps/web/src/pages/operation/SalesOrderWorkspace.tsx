@@ -23,9 +23,10 @@
 // design-standard: not-a-list-page — this is a DOCUMENT workspace, not a
 // register. Its `<table>` is the order's own line block: fixed rows, no sort,
 // no selection, never longer than the order.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ClipboardList, Printer } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
+import * as pdfjs from "pdfjs-dist";
 import { orderMoney } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import EmptyState from "@/components/kit/EmptyState";
@@ -56,15 +57,31 @@ function Fact({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+/* pdf.js paints the pane. Its worker ships inside the same package — the
+ * bundler serves it; nothing is fetched from a CDN. */
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url,
+).toString();
+
 /**
  * The embedded live PDF — one of the two approved Carres improvements over
- * 2990. Fetches the server-assembled data, renders the ONE Sales Order
- * template in the browser, and points the blob at the pane. The previous blob
- * URL is revoked on every render and on unmount.
+ * 2990. ONE render pipeline, two doors (FIX 3):
+ *
+ *   /sales-order-data → renderSalesOrderPdf → ONE Blob
+ *        ├── painted into the pane by pdf.js (a plain <canvas> per page —
+ *        │   visible in ANY capture, unlike the browser's PDF plugin, which
+ *        │   does not paint in headless screenshots)
+ *        └── the SAME Blob's object URL is what Print PDF opens
+ *
+ * There is no second PDF implementation: pdf.js only DISPLAYS the bytes the
+ * one renderer produced. The previous blob URL is revoked on every render
+ * and on unmount.
  */
-function usePdfUrl(orderId: string | undefined) {
+function usePdfPreview(orderId: string | undefined) {
   const [url, setUrl] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const paneRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!orderId) return;
     let cancelled = false;
@@ -80,6 +97,39 @@ function usePdfUrl(orderId: string | undefined) {
         if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);
         setUrl(objectUrl);
+        /* Paint the SAME bytes into the pane. */
+        const doc = await pdfjs.getDocument({ data: await blob.arrayBuffer() }).promise;
+        if (cancelled) return;
+        const pane = paneRef.current;
+        if (!pane) return;
+        pane.replaceChildren();
+        const paneWidth = Math.max(pane.clientWidth - 48, 320);
+        for (let n = 1; n <= doc.numPages; n++) {
+          const page = await doc.getPage(n);
+          if (cancelled) return;
+          const base = page.getViewport({ scale: 1 });
+          const scale = paneWidth / base.width;
+          const dpr = window.devicePixelRatio || 1;
+          const viewport = page.getViewport({ scale: scale * dpr });
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          canvas.style.width = `${Math.round(viewport.width / dpr)}px`;
+          canvas.style.height = `${Math.round(viewport.height / dpr)}px`;
+          canvas.style.display = "block";
+          canvas.style.margin = "0 auto 16px";
+          /* A PDF page is paper — white by definition, not a themed surface;
+             the kit's token classes style React markup, and this canvas is
+             imperative pdf.js output. */
+          canvas.style.boxShadow = "0 1px 4px rgba(0,0,0,0.18)";
+          canvas.style.background = "white";
+          canvas.setAttribute("data-testid", `pdf-page-${n}`);
+          pane.appendChild(canvas);
+          await page.render({
+            canvasContext: canvas.getContext("2d")!,
+            viewport,
+          }).promise;
+        }
       } catch (e) {
         if (!cancelled) setPdfError(e instanceof ApiError ? e.message : String(e));
       }
@@ -89,14 +139,14 @@ function usePdfUrl(orderId: string | undefined) {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [orderId]);
-  return { url, pdfError };
+  return { url, pdfError, paneRef };
 }
 
 export default function SalesOrderWorkspace() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const { data, isLoading, isError, error, refetch } = useOperationOrder(orderId ?? "");
-  const { url: pdfUrl, pdfError } = usePdfUrl(orderId);
+  const { url: pdfUrl, pdfError, paneRef } = usePdfPreview(orderId);
 
   const order = data?.order;
   const lines = data?.lines ?? [];
@@ -293,26 +343,25 @@ export default function SalesOrderWorkspace() {
           )}
         </div>
 
-        {/* ── RIGHT — the embedded PDF, the same output Print opens ───────── */}
-        <div className="min-h-0 min-w-0 flex-1 bg-base-100" data-testid="pdf-pane">
+        {/* ── RIGHT — the embedded PDF, the same output Print opens (FIX 3:
+            painted by pdf.js onto plain canvases, so the pane is visible in
+            any capture; Print opens the SAME blob). ─────────────────────── */}
+        <div
+          className="relative min-h-0 min-w-0 flex-1 overflow-auto bg-base-100 py-6"
+          data-testid="pdf-pane"
+        >
+          <div ref={paneRef} data-testid="pdf-canvas-pane" />
           {pdfError ? (
             <div className="flex h-full items-center justify-center px-6">
               <p className="text-body text-base-500">
                 The Sales Order PDF could not be rendered: {pdfError}
               </p>
             </div>
-          ) : pdfUrl ? (
-            <iframe
-              title={order ? `Sales Order SO-${order.so}` : "Sales Order"}
-              src={pdfUrl}
-              className="h-full w-full border-0"
-              data-testid="pdf-frame"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center">
+          ) : !pdfUrl ? (
+            <div className="absolute inset-0 flex items-center justify-center">
               <Loading label="Rendering the sales order" />
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

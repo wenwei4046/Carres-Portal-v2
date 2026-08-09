@@ -65,6 +65,13 @@ describe("the default row is Stage 1's nine, in Stage 1's order", () => {
   });
 });
 
+describe("FIX 2 · Current is a DOCUMENT pointer", () => {
+  it("the DOCUMENT group reads SO No · Customer reference · Current · DO No · Invoice No", () => {
+    const doc = REGISTER_FIELDS.filter((f) => f.group === "Document").map((f) => f.key);
+    expect(doc).toEqual(["so", "source_ref", "current", "do_number", "invoice_no"]);
+  });
+});
+
 describe("the chooser is grouped — Stage 1's eight, no field outside them", () => {
   it("every field carries one of the eight groups", () => {
     const groups = new Set(REGISTER_FIELDS.map((f) => f.group));

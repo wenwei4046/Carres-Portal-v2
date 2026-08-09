@@ -194,6 +194,11 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   /* ── DOCUMENT — the papers this order produced, and its references ──────── */
   { key: "source_ref", label: "Customer reference", width: "160px", group: "Document",
     text: (r) => (r.o.source_ref ?? []).filter(Boolean).join(" · ") || NOT_RECORDED },
+  /* FIX 2 (architect, Stage 1 FIX-LIST): `Current` is a document/lifecycle
+   * pointer, so it lives under DOCUMENT — between Customer reference and
+   * DO No, exactly the group's reading order. Semantics unchanged. */
+  { key: "current", label: "Current", width: "140px", group: "Document",
+    text: (r) => currentOf(r.o) },
   { key: "do_number", label: "DO No", width: "120px", group: "Document",
     text: (r) => r.o.do_number || NOT_RECORDED },
   { key: "invoice_no", label: "Invoice No", width: "130px", group: "Document",
@@ -269,9 +274,11 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   { key: "lift", label: "Lift", width: "80px", group: "Delivery",
     text: (r) => (r.o.delivery_has_lift == null ? NOT_RECORDED : r.o.delivery_has_lift ? "Yes" : "No") },
 
-  /* ── OPERATION — the derived lifecycle pointer, and nothing operational ─── */
-  { key: "current", label: "Current", width: "140px", group: "Operation",
-    text: (r) => currentOf(r.o) },
+  /* ── OPERATION — currently empty on purpose. `Current` moved to DOCUMENT
+   * (FIX 2): it points at a document/lifecycle, it does not command work.
+   * The group stays declared in the chooser order so the day a real
+   * operation-owned FACT earns a column it has its place — and nothing
+   * operational may enter through any other door. ─────────────────────────── */
 ] as const;
 
 /** Stage 1's nine, and the ONE place the register's default shape is stated. */

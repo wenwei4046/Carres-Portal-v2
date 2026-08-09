@@ -249,8 +249,16 @@ export default function SalesOrdersRegister() {
   const role = useAuth((s) => s.role);
   const [scope, setScope] = useState<"live" | "all">("live");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  /* FIX 1 — SERVER SEARCH. The engine emits its debounced trimmed term and
+     the SAME words go to the API (`?search=`), so a match beyond the loaded
+     page is found on the server, not missed in the browser. The engine still
+     filters the rows it holds for instant feedback; `keepPreviousData` in the
+     query hook keeps the list on screen while the server answers. */
+  const [serverSearch, setServerSearch] = useState("");
 
-  const { data, isLoading, isError, error, refetch } = useOperationOrders({});
+  const { data, isLoading, isError, error, refetch } = useOperationOrders(
+    serverSearch ? { search: serverSearch } : {},
+  );
 
   const all = useMemo<RegisterRow[]>(
     () => (data?.orders ?? []).filter((o) => !isRental(o)).map(buildRegisterRow),
@@ -374,6 +382,7 @@ export default function SalesOrdersRegister() {
               "Operation",
             ]}
             onRowDoubleClick={onRowDoubleClick}
+            onSearchChange={setServerSearch}
             contextMenu={contextMenu}
             expandable={expandable}
             selectable={{
