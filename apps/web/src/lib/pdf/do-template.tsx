@@ -16,8 +16,12 @@
  * - TWO dashed signature boxes pinned to the page bottom — customer
  *   received + driver delivered — over the good-order acknowledgment
  *   sentence. A captured POD eSign prints into the customer box.
- * - 2990's m³ / Source PO / Rack columns are NOT copied — Carres carries
- *   no such data, and empty fields do not reach paper.
+ * - The PO No column IS 2990's Source PO picking aid — Carres HAS the
+ *   data (24 POs, 23 linked to SOs, verified 2026-08-09); the owner
+ *   caught my earlier false "no such data" claim. m³ and Rack stay
+ *   uncopied — those really don't exist here.
+ * - DELIVER TO carries the Emergency contact — who the driver calls when
+ *   the customer is unreachable (sales portal collects it, 32/77).
  *
  * Sizes and row pitches are SO-PDF-STANDARD §2.1/§8.5 verbatim (the
  * conversion law: 2990 nominal − 0.5pt, pitches in absolute mm).
@@ -91,8 +95,9 @@ const styles = StyleSheet.create({
   },
   th: { fontSize: 7.5, fontWeight: 700, color: "#FFFFFF", letterSpacing: 0.2, textTransform: "uppercase" },
   colNo: { width: mm(7) },
-  colCode: { width: mm(32) },
-  colQty: { width: mm(16), textAlign: "right" },
+  colCode: { width: mm(30) },
+  colPo: { width: mm(24) },
+  colQty: { width: mm(14), textAlign: "right" },
   bandRow: {
     flexDirection: "row",
     backgroundColor: BAND_BG,
@@ -104,10 +109,11 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", paddingVertical: mm(2), paddingHorizontal: mm(2) },
   rowHair: { borderBottomWidth: 0.3, borderBottomColor: HAIR },
   cellNo: { fontSize: 7, color: GREY, width: mm(7), textAlign: "right", paddingRight: mm(1.5), lineHeight: 1 },
-  cellCode: { fontSize: 7.5, width: mm(32), paddingRight: mm(2), lineHeight: 1 },
+  cellCode: { fontSize: 7.5, width: mm(30), paddingRight: mm(2), lineHeight: 1 },
   desc: { flex: 1, paddingRight: mm(3) },
   descMain: { fontSize: 7.5, fontWeight: 600, lineHeight: 1 },
-  cellQty: { fontSize: 7, width: mm(16), textAlign: "right", lineHeight: 1 },
+  cellPo: { fontSize: 7, color: GREY, width: mm(24), lineHeight: 1.3 },
+  cellQty: { fontSize: 7, width: mm(14), textAlign: "right", lineHeight: 1 },
 
   // ── signing zone (bottom-anchored) ──
   signZone: { flexDirection: "row", justifyContent: "space-between", marginTop: mm(6), paddingHorizontal: mm(4) },
@@ -230,6 +236,8 @@ export function DoTemplate(data: DoTemplateData) {
                 ["Name", customer.name],
                 ["Address", deliveryAddress],
                 ["Tel", customer.phone],
+                /* who the driver calls when the customer is unreachable */
+                ["Emergency", customer.emergency ?? null],
               ] as Array<[string, string | null]>).map(([label, value]) =>
                 value ? (
                   <View key={label} style={styles.pairRow}>
@@ -260,6 +268,7 @@ export function DoTemplate(data: DoTemplateData) {
           <Text style={[styles.th, styles.colNo]}>#</Text>
           <Text style={[styles.th, styles.colCode]}>Item Code</Text>
           <Text style={[styles.th, { flex: 1 }]}>Description</Text>
+          <Text style={[styles.th, styles.colPo]}>PO No</Text>
           <Text style={[styles.th, styles.colQty]}>Qty</Text>
         </View>
         {groups.map((group, gi) => (
@@ -278,6 +287,9 @@ export function DoTemplate(data: DoTemplateData) {
                 <View style={styles.desc}>
                   <Text style={styles.descMain}>{line.description}</Text>
                 </View>
+                <Text style={styles.cellPo}>
+                  {line.source_po && line.source_po.length > 0 ? line.source_po.join("\n") : "—"}
+                </Text>
                 <Text style={line.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>
                   {line.qty}
                 </Text>
@@ -295,6 +307,7 @@ export function DoTemplate(data: DoTemplateData) {
           <View style={styles.desc}>
             <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>TOTAL</Text>
           </View>
+          <Text style={styles.cellPo}> </Text>
           <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totalQty}</Text>
         </View>
         <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />

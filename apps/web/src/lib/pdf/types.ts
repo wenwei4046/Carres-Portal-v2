@@ -17,7 +17,14 @@ export type DoTemplateData = {
   issue_date: string;
   order_id: string;
   order_code: string;
-  customer: { name: string; address: string; phone: string | null };
+  customer: {
+    name: string;
+    address: string;
+    phone: string | null;
+    /** Emergency contact — who the driver calls when the customer is
+     *  unreachable (sales portal collects it; 32/77 filled, 2026-08-09). */
+    emergency?: string | null;
+  };
   dealer: { name: string; contact: string | null };
   /** The logistic doing the trip (delivery_partners.name) — the driver
    *  side of the signature pair. */
@@ -30,6 +37,9 @@ export type DoTemplateData = {
     line_total: number;
     /** Category band (SOFA / MATTRESS …) — optional, same as the SO. */
     category?: string | null;
+    /** The PO(s) that supplied this line's goods (purchase_orders.id via
+     *  the SO link) — the storekeeper's picking aid, 2990's Source PO. */
+    source_po?: string[] | null;
   }>;
   currency: string;
   /** 2026-08-09 DO reskin (SO-PDF-STANDARD chrome) — all optional so the
