@@ -460,17 +460,22 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                       longer SO number can never touch the address (owner
                       round 11). Line 1: logo · legal name · SSM. Lines
                       2-3: the address, two lines, breathing. */}
+                  {/* Owner round 12: line 1 = logo + SSM (the wordmark IS
+                      the brand; repeating CARRES beside it was noise). The
+                      LEGAL NAME leads the address block instead. Lines
+                      breathe 1.5mm; the left column is width-bounded so the
+                      doc number can never touch it. */}
                   <View style={{ flex: 1, paddingRight: mm(10) }}>
                     <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
                       <Image style={styles.logo} src={LOGO_SRC} />
                       <Text style={[styles.legalLine, { marginTop: 0, marginLeft: mm(3) }]}>
-                        {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
+                        SSM {CARRES_COMPANY.regNo}
                       </Text>
                     </View>
                     <Text style={[styles.legalLine, { marginTop: mm(1.5) }]}>
-                      {CARRES_COMPANY.addressLines[0]}
+                      {CARRES_COMPANY.legalName} · {CARRES_COMPANY.addressLines[0]}
                     </Text>
-                    <Text style={[styles.legalLine, { marginTop: mm(0.8) }]}>
+                    <Text style={[styles.legalLine, { marginTop: mm(1.5) }]}>
                       {CARRES_COMPANY.addressLines[1]} {CARRES_COMPANY.addressLines[2]}
                     </Text>
                   </View>
