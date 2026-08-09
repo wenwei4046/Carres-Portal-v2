@@ -42,6 +42,10 @@ export type DoTemplateData = {
     source_po?: string[] | null;
     /** Line attrs (fabric_name etc.) — feeds the sofa layout drawing. */
     attrs?: Record<string, unknown> | null;
+    /** The physical units delivered (ops_stock_items.unit_code, 0153) —
+     *  scannable ids the warehouse checks off at loading; the paper then
+     *  records exactly WHICH units this customer received. */
+    unit_codes?: string[] | null;
   }>;
   currency: string;
   /** 2026-08-09 DO reskin (SO-PDF-STANDARD chrome) — all optional so the

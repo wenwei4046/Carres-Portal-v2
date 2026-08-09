@@ -101,7 +101,8 @@ const styles = StyleSheet.create({
   th: { fontSize: 7.5, fontWeight: 700, color: "#FFFFFF", letterSpacing: 0.2, textTransform: "uppercase" },
   colNo: { width: mm(7) },
   colCode: { width: mm(30) },
-  colPo: { width: mm(24) },
+  colUnit: { width: mm(26) },
+  colPo: { width: mm(22) },
   colQty: { width: mm(18), textAlign: "right", paddingRight: mm(5) },
   bandRow: {
     flexDirection: "row",
@@ -117,7 +118,8 @@ const styles = StyleSheet.create({
   cellCode: { fontSize: 7.5, width: mm(30), paddingRight: mm(2), lineHeight: 1 },
   desc: { flex: 1, paddingRight: mm(3) },
   descMain: { fontSize: 7.5, fontWeight: 600, lineHeight: 1 },
-  cellPo: { fontSize: 7, color: GREY, width: mm(24), lineHeight: 1.3 },
+  cellUnit: { fontSize: 7, color: GREY, width: mm(26), lineHeight: 1.3 },
+  cellPo: { fontSize: 7, color: GREY, width: mm(22), lineHeight: 1.3 },
   cellQty: { fontSize: 7, width: mm(18), textAlign: "right", paddingRight: mm(5), lineHeight: 1 },
 
   // ── sofa layout drawing (ported from po-template — direction contract) ──
@@ -234,6 +236,9 @@ export function DoTemplate(data: DoTemplateData) {
   const otherLines = lines.filter((l) => !setSkus.has(l.sku));
   const groups = bandedLines(otherLines);
   const otherQty = otherLines.reduce((n, l) => n + Number(l.qty), 0);
+  // UNIT ID prints only when the system minted codes (empty fields never
+  // reach paper) — the warehouse's scan checklist when it does.
+  const hasUnits = lines.some((l) => l.unit_codes && l.unit_codes.length > 0);
   const podSigned = Boolean(pod?.signature_url);
 
   return (
@@ -324,6 +329,7 @@ export function DoTemplate(data: DoTemplateData) {
               <Text style={[styles.th, styles.colNo]}>#</Text>
               <Text style={[styles.th, styles.colCode]}>Item Code</Text>
               <Text style={[styles.th, { flex: 1 }]}>Description</Text>
+              {hasUnits ? <Text style={[styles.th, styles.colUnit]}>Unit ID</Text> : null}
               <Text style={[styles.th, styles.colPo]}>PO No</Text>
               <Text style={[styles.th, styles.colQty]}>Qty</Text>
             </View>
@@ -343,6 +349,11 @@ export function DoTemplate(data: DoTemplateData) {
                     <View style={styles.desc}>
                       <Text style={styles.descMain}>{line.description}</Text>
                     </View>
+                    {hasUnits ? (
+                      <Text style={styles.cellUnit}>
+                        {line.unit_codes && line.unit_codes.length > 0 ? line.unit_codes.join("\n") : "—"}
+                      </Text>
+                    ) : null}
                     <Text style={styles.cellPo}>
                       {line.source_po && line.source_po.length > 0 ? line.source_po.join("\n") : "—"}
                     </Text>
@@ -362,6 +373,7 @@ export function DoTemplate(data: DoTemplateData) {
               <View style={styles.desc}>
                 <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>TOTAL</Text>
               </View>
+              {hasUnits ? <Text style={styles.cellUnit}> </Text> : null}
               <Text style={styles.cellPo}> </Text>
               <Text style={[styles.cellQty, { fontWeight: 700 }]}>{otherQty}</Text>
             </View>
@@ -376,6 +388,7 @@ export function DoTemplate(data: DoTemplateData) {
               <Text style={[styles.th, styles.colNo]}>#</Text>
               <Text style={[styles.th, styles.colCode]}>Item Code</Text>
               <Text style={[styles.th, { flex: 1 }]}>Description</Text>
+              {hasUnits ? <Text style={[styles.th, styles.colUnit]}>Unit ID</Text> : null}
               <Text style={[styles.th, styles.colPo]}>PO No</Text>
               <Text style={[styles.th, styles.colQty]}>Qty</Text>
             </View>
@@ -391,6 +404,11 @@ export function DoTemplate(data: DoTemplateData) {
                 <View style={styles.desc}>
                   <Text style={styles.descMain}>{line.description}</Text>
                 </View>
+                {hasUnits ? (
+                  <Text style={styles.cellUnit}>
+                    {line.unit_codes && line.unit_codes.length > 0 ? line.unit_codes.join("\n") : "—"}
+                  </Text>
+                ) : null}
                 <Text style={styles.cellPo}>
                   {line.source_po && line.source_po.length > 0 ? line.source_po.join("\n") : "—"}
                 </Text>
@@ -441,11 +459,6 @@ export function DoTemplate(data: DoTemplateData) {
             <View style={styles.signBox}>
               {podSigned ? <Image src={pod!.signature_url!} style={styles.signImage} /> : null}
               <Text style={styles.signCaption}>Customer Signature · {customer.name}</Text>
-            </View>
-            <View style={styles.signBox}>
-              <Text style={styles.signCaption}>
-                Driver / Logistic{partner?.name ? ` · ${partner.name}` : ""}
-              </Text>
             </View>
           </View>
           <Text style={styles.ackLine}>

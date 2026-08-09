@@ -39,6 +39,7 @@ const data = {
       line_total: 0,
       category: "MATTRESS",
       source_po: ["PO-2053"],
+      unit_codes: ["id-kfg204817", "id-kfg204818"],
     },
     {
       sku: "ELWOOD-K",
@@ -48,6 +49,7 @@ const data = {
       line_total: 0,
       category: "BEDFRAME",
       source_po: ["PO-2054"],
+      unit_codes: ["id-msh330121"],
     },
   ],
   currency: "MYR",
