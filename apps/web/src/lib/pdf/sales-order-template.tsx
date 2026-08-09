@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   //    references (Stripe / Shopify invoices) bold the section titles small
   //    and keep grey for genuinely secondary text only. ──
   cards: { flexDirection: "row", marginTop: mm(3.5), paddingHorizontal: mm(4), minHeight: mm(36) },
-  blockLabel: { fontSize: 8.5, fontWeight: 700, color: INK, letterSpacing: 0.8, textTransform: "uppercase" },
+  blockLabel: { fontSize: 8, fontWeight: 700, color: INK, letterSpacing: 0.8, textTransform: "uppercase" },
   partyName: { fontSize: 9.5, fontWeight: 600, marginTop: mm(1) },
   partyLine: { fontSize: 9, marginTop: mm(1) },
   pairRow: { flexDirection: "row", marginTop: mm(1.1) },
@@ -237,12 +237,12 @@ const styles = StyleSheet.create({
   // ── amount in words · totals ──
   totalsZone: { flexDirection: "row", marginTop: mm(5), paddingHorizontal: mm(4), alignItems: "flex-start" },
   wordsBlock: { flex: 1, paddingRight: mm(8) },
-  wordsText: { fontSize: 8, color: GREY, lineHeight: 1.4 },
+  wordsText: { fontSize: 7.5, color: GREY, lineHeight: 1.4 },
   depositLine: { fontSize: 8, color: GREY, marginTop: mm(1.2) },
   totalsBlock: { width: mm(70) },
   totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: mm(1.2) },
-  totalsLabel: { fontSize: 8, color: GREY, textTransform: "uppercase", letterSpacing: 0.6 },
-  totalsValue: { fontSize: 9, fontWeight: 600 },
+  totalsLabel: { fontSize: 7.5, color: GREY, textTransform: "uppercase", letterSpacing: 0.6 },
+  totalsValue: { fontSize: 8.5, fontWeight: 600 },
   balanceBox: {
     borderTopWidth: 0.5,
     borderTopColor: INK,
@@ -254,8 +254,8 @@ const styles = StyleSheet.create({
     paddingVertical: mm(2),
     marginTop: mm(1),
   },
-  balanceLabel: { fontSize: 9, fontWeight: 700, letterSpacing: 0.8 },
-  balanceValue: { fontSize: 12, fontWeight: 700 },
+  balanceLabel: { fontSize: 8.5, fontWeight: 700, letterSpacing: 0.8 },
+  balanceValue: { fontSize: 11, fontWeight: 700 },
 
   // ── customer signature · legal sentence ──
   signZone: { flexDirection: "row", marginTop: mm(3.5), paddingHorizontal: mm(4), alignItems: "flex-start" },
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
 
   // ── terms ──
   terms: { paddingTop: mm(4), paddingHorizontal: mm(4) },
-  termsLine: { fontSize: 8, color: GREY, lineHeight: 1.35, marginTop: mm(0.6) },
+  termsLine: { fontSize: 7.5, color: GREY, lineHeight: 1.35, marginTop: mm(0.6) },
 
   // ── footer (fixed, every page) ──
   footer: {
