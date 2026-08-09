@@ -78,6 +78,7 @@ const styles = StyleSheet.create({
   pairRow: { flexDirection: "row" },
   pairLabel: { fontSize: 8, color: GREY, width: mm(20), lineHeight: 1.42 },
   pairValue: { fontSize: 8, flex: 1, lineHeight: 1.42 },
+  stackValue: { fontSize: 8, lineHeight: 1.42 },
   deliverBlock: { marginTop: mm(2.5), paddingHorizontal: mm(4) },
   deliverNote: { fontSize: 7, color: GREY, marginTop: mm(0.8), lineHeight: 1.3 },
 
@@ -170,12 +171,13 @@ export function PoTemplate(data: PoTemplateData) {
   const totalQty = lines.reduce((s, l) => s + Number(l.qty), 0);
   const groups = sofaGroups(lines);
 
+  // No SO No row here — a bulk PO can carry dozens; the table's SO NO
+  // column is the one home (owner round, 2026-08-09). `Deliver by` is the
+  // frozen term's paper form: the reader IS the supplier, imperative.
   const detailRows: Array<[string, string | null, boolean?]> = [
     ["PO No", po_number],
-    // the supplier's 3-second fact — bold value
-    ["Delivery by", niceDate(eta_date), true],
+    ["Deliver by", niceDate(eta_date), true],
     ["Issued", niceDate(issue_date)],
-    ["SO No", so_refs && so_refs.length > 0 ? so_refs.map((r) => `SO-${r}`).join(" · ") : null],
   ];
 
   return (
@@ -222,31 +224,33 @@ export function PoTemplate(data: PoTemplateData) {
           }
         />
 
-        {/* ── SUPPLIER · PO DETAILS ── */}
+        {/* ── section 2, THREE columns (owner 2026-08-09, restoring the old
+            law's deliver-to-at-section-2): who supplies · where it goes ·
+            when it's due — the supplier's 3-second sweep in one row. One PO,
+            ONE destination (a line needing another address is another PO). ── */}
         <View style={styles.cards}>
-          <View style={{ flex: 1, paddingRight: mm(6) }}>
+          <View style={{ width: mm(45), paddingRight: mm(5) }}>
             <Text style={styles.blockLabel}>Supplier</Text>
             <View style={{ marginTop: mm(1.5) }}>
-              {([
-                ["Name", supplier.name],
-                ["Contact", supplier.contact],
-              ] as Array<[string, string | null]>).map(([label, value]) =>
-                value ? (
-                  <View key={label} style={styles.pairRow}>
-                    <Text style={styles.pairLabel}>{label}</Text>
-                    <Text style={styles.pairValue}>{value}</Text>
-                  </View>
-                ) : null,
-              )}
+              <Text style={[styles.stackValue, { fontWeight: 600 }]}>{supplier.name}</Text>
+              {supplier.contact ? <Text style={styles.stackValue}>{supplier.contact}</Text> : null}
             </View>
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, paddingRight: mm(5) }}>
+            <Text style={styles.blockLabel}>Deliver To</Text>
+            <View style={{ marginTop: mm(1.5) }}>
+              <Text style={[styles.stackValue, { fontWeight: 600 }]}>{destination.name}</Text>
+              <Text style={styles.stackValue}>{destination.address}</Text>
+              {delivery_instructions ? <Text style={styles.deliverNote}>{delivery_instructions}</Text> : null}
+            </View>
+          </View>
+          <View style={{ width: mm(58) }}>
             <Text style={styles.blockLabel}>PO Details</Text>
             <View style={{ marginTop: mm(1.5) }}>
               {detailRows.map(([label, value, bold]) =>
                 value ? (
                   <View key={label} style={styles.pairRow}>
-                    <Text style={[styles.pairLabel, { width: mm(24) }]}>{label}</Text>
+                    <Text style={[styles.pairLabel, { width: mm(18) }]}>{label}</Text>
                     <Text style={bold ? [styles.pairValue, { fontWeight: 700 }] : styles.pairValue}>
                       :  {value}
                     </Text>
@@ -255,23 +259,6 @@ export function PoTemplate(data: PoTemplateData) {
               )}
             </View>
           </View>
-        </View>
-
-        {/* ── DELIVER TO — one PO, ONE destination (a line needing another
-            address is another PO) ── */}
-        <View style={styles.deliverBlock}>
-          <Text style={styles.blockLabel}>Deliver To</Text>
-          <View style={{ marginTop: mm(1.5) }}>
-            <View style={styles.pairRow}>
-              <Text style={styles.pairLabel}>Name</Text>
-              <Text style={[styles.pairValue, { fontWeight: 600 }]}>{destination.name}</Text>
-            </View>
-            <View style={styles.pairRow}>
-              <Text style={styles.pairLabel}>Address</Text>
-              <Text style={styles.pairValue}>{destination.address}</Text>
-            </View>
-          </View>
-          {delivery_instructions ? <Text style={styles.deliverNote}>{delivery_instructions}</Text> : null}
         </View>
 
         {/* ── items — the supplier reads Description; nothing here is money ── */}
