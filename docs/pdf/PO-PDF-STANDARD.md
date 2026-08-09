@@ -39,8 +39,12 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   carry dozens; the table's SO NO column is the one home. Screens speak the
   Business Date Dictionary (`Goods Arrival`); this paper speaks to the
   supplier.
-- **Section 2 is THREE columns** — `SUPPLIER (45mm) · DELIVER TO (flex) ·
-  PO DETAILS (58mm)`: who supplies · where it goes · when it's due, the
+- **Section 2 is THREE columns** — `SUPPLIER (flex) · DELIVER TO (flex) ·
+  PO DETAILS (52mm fixed)`. The two ADDRESS blocks size by content
+  (Constitution: content decides column width); only the fixed-fact column
+  is fixed. **The supplier prints its FULL address** — a formal document
+  names both parties completely. Detail rows read in time order:
+  `PO No · Issued · Deliver by (bold, last)`. Three columns give who supplies · where it goes · when it's due, the
   supplier's 3-second sweep in one row (restores the old law's
   deliver-to-at-section-2). One PO = ONE destination — a line needing
   another address is another PO. Nice Future prints its fixed collection
@@ -91,4 +95,5 @@ itself never revises (a sent PO is never edited; more items = a new PO).
 | 2026-08-01/02 | Original baseline: header shape, naming, frameless cards, zero-grid table, Item Grammar, sofa one-set-per-page + drawing, quiet footer, no money, no signatures. (Visual spec since superseded; see below.) | Loo |
 | 2026-08-09 | PO DETAILS: SO No row removed (the table owns it); `Delivery by` → `Deliver by`. | Loo |
 | 2026-08-09 | Section 2 = three columns (SUPPLIER · DELIVER TO · PO DETAILS) — deliver-to returns to section 2. | Loo |
+| 2026-08-09 | FINAL (owner: ok): supplier full address; content-driven section-2 widths; detail rows PO No · Issued · Deliver by. | Loo |
 | 2026-08-09 | FAMILY REWRITE: chrome deferred to SO-PDF-STANDARD (§2.1/§8.5); logo-stamp header, 35mm label gutter, caps header dates and the zero-fill table DELETED per the Master Overwrite Law; `Sales Order` column → `SO No`; `TOTAL QUANTITY` → family `TOTAL` row; Item ID column goes LIVE with 0153 unit codes; `Delivery by` bold in PO DETAILS; footer keeps the Issued-by audit. Business rules (no money, consolidation, one destination, sofa drawing) unchanged. | Loo |
