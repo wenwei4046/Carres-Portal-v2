@@ -37,7 +37,7 @@ await render({
   ...base,
   po_number: "PO-2055",
   po_id: "PO-2055",
-  supplier: { name: "Ohana", address: null, contact: "Ms Lee · +60 12-388 1122" },
+  supplier: { name: "Ohana", address: "No 8, Jalan Perusahaan 3, Kawasan Perindustrian Balakong, 43300 Seri Kembangan, Selangor", contact: "Ms Lee · +60 12-388 1122" },
   destination: {
     name: "Carres Klang Warehouse",
     address: "Lot 12, Jalan Sungai Pinang 4/2, 42100 Klang, Selangor",
@@ -60,7 +60,7 @@ await render({
   ...base,
   po_number: "PO-2056",
   po_id: "PO-2056",
-  supplier: { name: "Carres Factory", address: null, contact: "En Farid · +60 13-220 8811" },
+  supplier: { name: "Carres Factory", address: "Lot 5, Jalan Sungai Buloh 27/101, 40400 Shah Alam, Selangor", contact: "En Farid · +60 13-220 8811" },
   destination: {
     name: "Carres Klang Warehouse",
     address: "Lot 12, Jalan Sungai Pinang 4/2, 42100 Klang, Selangor",
@@ -79,7 +79,7 @@ await render({
   ...base,
   po_number: "PO-2057",
   po_id: "PO-2057",
-  supplier: { name: "Ohana", address: null, contact: "Ms Lee · +60 12-388 1122" },
+  supplier: { name: "Ohana", address: "No 8, Jalan Perusahaan 3, Kawasan Perindustrian Balakong, 43300 Seri Kembangan, Selangor", contact: "Ms Lee · +60 12-388 1122" },
   destination: {
     name: "Carres Klang Warehouse",
     address: "Lot 12, Jalan Sungai Pinang 4/2, 42100 Klang, Selangor",
