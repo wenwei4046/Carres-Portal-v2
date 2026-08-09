@@ -235,8 +235,8 @@ const styles = StyleSheet.create({
   payCell: { fontSize: 8, lineHeight: 1 },
 
   // ── amount in words · totals ──
-  totalsZone: { flexDirection: "row", justifyContent: "space-between", marginTop: mm(5), paddingHorizontal: mm(4), alignItems: "flex-start" },
-  wordsBlock: { width: mm(90), paddingRight: mm(6) },
+  totalsZone: { flexDirection: "row", justifyContent: "space-between", marginTop: mm(2.5), paddingHorizontal: mm(4), alignItems: "stretch" },
+  wordsRow: { marginTop: mm(5), paddingHorizontal: mm(4) },
   wordsText: { fontSize: 7, color: GREY, lineHeight: 1.3 },
   depositLine: { fontSize: 8.5, color: GREY, marginTop: mm(2) },
   totalsBlock: { width: mm(70), borderWidth: 0.6, borderColor: HAIR },
@@ -268,8 +268,8 @@ const styles = StyleSheet.create({
     borderWidth: 0.6,
     borderColor: "#787878",
     borderStyle: "dashed",
-    height: mm(22),
-    marginTop: mm(3),
+    flex: 1,
+    marginRight: mm(6),
     paddingBottom: mm(1.2),
     alignItems: "center",
     justifyContent: "flex-end",
@@ -722,21 +722,22 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         ) : null}
 
         {/* amount in words + customer signature (left) · totals (right) */}
+        {/* words: one quiet full-width line ABOVE the two boxes */}
+        <View style={styles.wordsRow} wrap={false}>
+          <Text style={styles.wordsText}>Amount in words: {amountInWordsMyr(total)}</Text>
+          {/* Prints only while it still means something — once paid >=
+              the expected figure it reads as "give another 3,240". */}
+          {expected_deposit != null && expected_deposit > 0 && paid < expected_deposit ? (
+            <Text style={styles.depositLine}>Expected deposit: {money(expected_deposit)}</Text>
+          ) : null}
+        </View>
+
+        {/* the two boxes share TOP and BOTTOM lines: the row stretches the
+            dashed signature box to the totals card's exact height (round 27) */}
         <View style={styles.totalsZone} wrap={false}>
-          <View style={styles.wordsBlock}>
-            <Text style={styles.wordsText}>Amount in words: {amountInWordsMyr(total)}</Text>
-            {/* Prints only while it still means something — once paid >=
-                the expected figure it reads as "give another 3,240" (owner
-                review 2026-08-09). */}
-            {expected_deposit != null && expected_deposit > 0 && paid < expected_deposit ? (
-              <Text style={styles.depositLine}>Expected deposit: {money(expected_deposit)}</Text>
-            ) : null}
-            {/* Signature at LEFT beside the boxed totals (owner round 26) —
-                caption stays inside the box (round 22). */}
-            <View style={styles.signBox}>
-              {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
-              <Text style={styles.signCaption}>Customer Signature · {customer.name}</Text>
-            </View>
+          <View style={styles.signBox}>
+            {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
+            <Text style={styles.signCaption}>Customer Signature · {customer.name}</Text>
           </View>
           <View style={styles.totalsBlock}>
             <View style={styles.totalsRow}>
