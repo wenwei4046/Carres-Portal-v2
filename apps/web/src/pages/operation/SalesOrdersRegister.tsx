@@ -1,87 +1,69 @@
 /**
- * SalesOrdersRegister — SO-1, the Sales Orders register (Loo, 2026-08-08).
+ * SalesOrdersRegister — SO-1 FINAL, the Sales Orders register (Loo, 2026-08-09).
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * WHAT THIS PAGE IS, AND WHAT IT DELIBERATELY IS NOT
+ * ⭐ THE REGISTER LAW, AND EVERY DECISION IN THIS FILE COMES FROM IT
  *
- * `docs/orders/MASTER.md` §0 froze the charter: *"Sales Order is the operational
- * home of the customer order: find any order, see what needs attention,
- * understand the whole journey — while EXECUTION stays with the module that owns
- * it."* SO-1 builds the FIRST half of that and states plainly that it is the
- * first half:
+ *   "Forget web applications. Build this page as if you were building Microsoft
+ *    Excel. Every order is exactly ONE row. Every column is exactly ONE fact.
+ *    No cell may contain another layout, card, table, chip, icon, pill or
+ *    workflow. A row may NEVER be taller than another row. If information does
+ *    not fit in one row, it does not belong in the register. The register never
+ *    expands and never explains."
  *
- *   REGISTER          find any order, ever                        ← THIS FILE
- *   PROMISE MONITOR   is the promise still good, is anything          V2, and it
- *                     blocking it                                      arrives as
- *                                                                      ONE shared
- *                                                                      read model
+ *   "Every register answers only: what records exist?  Never: what should I do?"
  *
- * **THE RED LINE, and it is enforced by what this file imports.** Every column
- * reads a fact the CUSTOMER ORDER owns — the SO number, the customer, the lines
- * they bought, the date we promised, the money. There is no stock column, no
- * delivery column, no next-action column and no health dot, because every one of
- * those is another module's record and `../../../../docs/ERP-ARCHITECTURE.md`
- * Law B makes a cross-module display READ-ONLY forever. The cheapest way to keep
- * a boundary is to not import across it: this file imports NO stock, delivery,
- * purchasing, booking or action module.
- *
- * **`journey` is deliberately NOT passed to the drawer.** Its own prop doc says
- * absent means *"the journey strip renders nothing rather than run a second
- * derivation that could disagree with the row it came from"* — which is exactly
- * the behaviour a register wants. The drawer keeps every one of its own powers.
+ * **What that removed from the previous build, and it is most of it:**
+ * ```
+ * ✗ the row expansion       "the register never expands"  → the document lists every line
+ * ✗ rental orders            the Rental module owns them  → excluded at the source
+ * ✗ Import from AutoCount    an ACTION, and a register has none
+ * ✗ the drawer               a cockpit is workflow        → a Sales Order DOCUMENT
+ * ✗ the right rail           Team · Calendar · Activity   → NOT MOUNTED on this route
+ * ```
+ * No cell in this file renders an element with children of its own. Every cell
+ * returns one string, or one `Money`, and that is the whole vocabulary.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * TWO FUNCTIONS ARE IMPORTED FROM THE OLD PAGE, AND THAT IS LAW D, NOT LAZINESS
+ * THE COLUMNS ARE THE CARD'S SIX, AND MY EARLIER OBJECTION TO ONE OF THEM WAS WRONG
  *
- * `moneyOf` and `stageOf` are pure, already exported, and `OperationDelivery`
- * already imports exactly this way with the reason written above its import:
- * *"the same computed actions the Orders list shows, so the two pages can never
- * disagree"*. Re-composing `orderMoney` + `storageHold` here would be a SECOND
- * arithmetic for one number — `ERP-ARCHITECTURE.md` Law D's named failure. The
- * card also says the old implementation may not be touched, so the function
- * cannot move today. When `OperationOrdersControl` is finally retired, both move
- * to `@carres/shared` — recorded in `docs/MIGRATION-MAP.md`.
+ *     SO No · Customer · Items · Value · Promised · Ordered
  *
- * ─────────────────────────────────────────────────────────────────────────────
- * SEARCH IS CLIENT-SIDE ON PURPOSE, AND IT IS ONE DEBT, NOT TWO
- *
- * The card's first screen searches SO · customer · phone · item. The server
- * (`apps/api/src/routes/operation/orders.ts:184`) searches customer name, the
- * imported ref and the SO number — **not phone, not item.** Passing `search` to
- * the server would therefore make two of the four fields silently dead. So this
- * page passes no `search` and filters the fetched page itself: all four fields
- * work today, and they stop working at exactly the same row count as the
- * server's `.limit(200)` (`orders.ts:192`). ONE debt with one fix — a thin
- * server-paged list endpoint — instead of two that expire at different times.
- * Recorded in `docs/MIGRATION-MAP.md`.
+ * SO-1's first round proposed replacing `Value` with `Outstanding` and dropping
+ * `Ordered`. The card was re-issued with both kept and `Outstanding` moved to
+ * the hidden columns, so that is what ships — and one half of the objection was
+ * simply wrong on the law: I argued `Ordered` collided with `COPY-STANDARD.md`
+ * line 943, where it names a Purchasing QUANTITY column. Lines 872-873 of that
+ * same file answer it: *"A Purchase Order and a customer order are two different
+ * subjects; a word banned on one is not automatically banned on the other."*
+ * There is no collision. `Ordered` is the right word for the day the customer
+ * ordered.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * THE COLUMN CHOOSER DOES NOT PERSIST, AND THAT IS A RULING BEING HONOURED
+ * THE FACTS LIVE IN `sales-order-facts.ts`
  *
- * SO-1 asks for extra fact columns behind a picker. `docs/orders/MASTER.md` §3
- * records that `carres.orders.hiddenCols` — a localStorage store of column
- * visibility — was RULED AGAINST by Loo on 2026-08-04 (grid-findings F58 · F61)
- * and deleted in S1, and `docs/ui/MASTER.md` §7 carries *"Layout memory —
- * REFUSED, not deferred."* Both hold. This chooser is session state and nothing
- * else: a reload restores the company's shape, exactly as `DataTable`'s own
- * column drag already behaves. Whether a NAMED layout with a company default
- * (AutoCount's own answer, grid-findings F44) should exist is the owner's call
- * and is parked, not decided here.
+ * Rental exclusion, the item names, the money states and the search haystack
+ * are pure functions with their own tests. This file arranges them; it decides
+ * nothing. Money goes through `@carres/shared`'s `orderMoney` and nothing else.
+ *
+ * **A blank may never carry two meanings.** `Value` and `Outstanding` each
+ * print one of three sentences — the amount, `Paid in full`, or `No price yet`
+ * — so an empty-looking cell can never mean both "settled" and "nobody priced
+ * it". Measured 2026-08-09: 29 of 32 native orders are priced, and every one of
+ * the 37 AutoCount rows is not.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * WIDTHS ARE MEASURED, NOT CHOSEN
+ * SEARCH IS CLIENT-SIDE, AND IT IS ONE DEBT WITH THE 200-ROW CAP
  *
- * `docs/orders/MASTER.md` §10: *"Widths are MEASURED in a real browser. jsdom
- * has no widths. A guessed number is never written down."* Every number in
- * `W` below was read from `getBoundingClientRect()` in real Chromium at
- * 1440×900, with Inter and JetBrains Mono actually loaded (`document.fonts`
- * checked, not assumed), against each cell's own markup — and `+16` for the
- * kit's uniform `px-2`, the four-pixel-per-side loss S1 recorded and S3.1 paid.
- * The harness reproduced `CR0925 +2` at 70.2px, byte-for-byte the number S3.1
- * recorded, which is the control proving the conditions match.
+ * The server searches customer name, imported ref and SO number — not phone,
+ * not item (`apps/api/src/routes/operation/orders.ts`). Passing `search` would
+ * make two of the card's four fields silently dead, so this page filters the
+ * fetched page itself: all four work, and they expire at exactly the row count
+ * the server's `.limit(200)` already imposes. See `docs/MIGRATION-MAP.md`.
  */
 import { useMemo, useState } from "react";
 import { ClipboardList } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import DataTable, {
   type Column,
   type TableSort,
@@ -96,146 +78,122 @@ import DatePicker from "@/components/kit/DatePicker";
 import EmptyState from "@/components/kit/EmptyState";
 import Money from "@/components/Money";
 import { fmtDate } from "@/lib/fmt-date";
-import { cjkClassName } from "@/lib/cjk";
+/* `cjkClassName` is deliberately NOT imported here, and it is a decision rather
+   than an omission. It would wrap a cell's text in a `<span>` to switch to Noto
+   Sans SC, and the law says no cell may contain another layout. Measured
+   2026-08-09: **0 of 77 live customer names carry a CJK character** — Malaysian
+   Chinese customers are romanised in this data (`Tan Ah Kow`, `Chen Chee
+   Cheong`), so the exposure today is nil. If a CJK name ever arrives, the font
+   belongs on the kit's `<td>`, which is where every other cell would get it
+   too — not on a wrapper this page smuggles into one column. Recorded in
+   `docs/MIGRATION-MAP.md`. */
 import { useOperationOrders, type operationOrderListRow } from "@/lib/queries";
 import ModuleHeader from "./components/ModuleHeader";
-import OrderDetailDrawer from "./components/OrderDetailDrawer";
-import { moneyOf, stageOf } from "./OperationOrdersControl";
+import SalesOrderDocument from "./SalesOrderDocument";
+import {
+  digits,
+  isDelivered,
+  isRental,
+  itemsSummary,
+  moneyOfOrder,
+  outstandingState,
+  searchHaystack,
+  valueState,
+  type MoneyState,
+} from "./sales-order-facts";
 
 /* ── MEASURED COLUMN WIDTHS ────────────────────────────────────────────────────
  *
- * Every number is the INK width of the real cell, read with a `Range` over the
- * cell's contents in real Chromium at 1440×900 against this app's own built
- * stylesheet, with Inter and JetBrains Mono confirmed loaded. `+16` is the kit's
- * uniform `px-2`, measured as 16 on the rendered `<td>`, not assumed.
+ * Every number is the text's INK, canvas-measured against the cell's own
+ * computed font in real Chromium at 1440×900 with Inter and JetBrains Mono
+ * confirmed loaded, `+16` for the kit's uniform `px-2` (measured on the
+ * rendered `<td>`, not assumed).
  *
- *   column        cell ink   header ink   width   the string that sets it
- *   SO No             54.6         33.4      87   `SO-100257` (70.2 + 16)
- *   Customer         169.3         51.4     188   `MyHouse Management PLT`
- *   Items            440.5         28.9     459   two live lines, below
- *   Promised          96.4         49.5     113   `Wed, 19 Aug 26`
- *   Outstanding       61.6         64.3     109   `RM 1,234,567` (93 + 16)
+ *   column       ink    width   the string that sets it
+ *   SO No       68.9       85   `SO-100257` — six digits, not today's four
+ *   Customer   169.3      188   `MyHouse Management PLT`
+ *   Items      342.6      361   `Breeze FirmCare · King ×1 · Lyyar · 1A(LHF) ×1 · +2 more`
+ *   Value       92.8      109   `RM 1,234,567` (marker 18.6 + gap 4 + digits 70.2)
+ *   Promised    96.4      113   `Wed, 19 Aug 26` — this cell may NEVER truncate
+ *   Ordered     96.4      113   the same date family
  *
- * **A TRUNCATING COLUMN GETS +2, AND THAT IS NOT A FUDGE.** `ink + 16` is the
- * exact fit, and an exact fit still ellipsises: the browser rounds the content
- * box and the text run independently, so `MyHouse Management PLT` at 169.3 in a
- * 170.0 box drew as `MyHouse Management P…` on the first screenshot while every
- * arithmetic check said it fitted. `Customer` and `Items` are the two cells that
- * TRUNCATE, so both carry 2px over the measurement. `SO No`, `Promised` and
- * `Outstanding` do not truncate and take the measurement flat.
+ *   hidden
+ *   Phone       86.4      103   `012-345 6789`
+ *   Salesperson 150.5     167   `Nur Aisyah binti Rahman`
+ *   Outlet      109.8     126   `Carres Setia Alam`
+ *   Outstanding  96.3     109   the HEADER is the wider claim here, not the cell
  *
- * ⚠ **A STANDALONE HARNESS IS NOT THE REAL CELL, AND THIS CARD PROVED IT AGAIN.**
- * The first pass measured these strings in a hand-built page with the same
- * font-family, size and weight. Every MONO number came out identical to the real
- * cell to the tenth of a pixel (`SO-1272` 54.6 = 54.6, `CR0925 +2` 70.2 = 70.2,
- * which is also the number S3.1 recorded). Every INTER number came out 3–6px
- * NARROW — `MyHouse Management PLT` 165.6 against a real 169.3, `Wed, 22 Jul 26`
- * 90.8 against a real 96.4 — because the app's own base stylesheet tracks its
- * sans text and a bare `font-family: Inter` does not. Shipping the harness's
- * numbers would have clipped `Customer` on the widest live name and the MONTH
- * off every date. The numbers above are the rendered page's; the harness is kept
- * only for the strings that do not exist in the data yet.
+ * **A truncating column carries +2 over its measurement.** `ink + 16` is the
+ * exact fit and an exact fit still ellipsises: the browser rounds the content
+ * box and the text run independently. `Customer` and `Items` truncate; the
+ * other four do not and take the measurement flat.
  *
- * `SO No` is sized to **SO-100257**, not to today's `SO-1257`. At the 1,000
- * orders/month this card is designed for, six digits arrive inside a decade and
- * the sixth costs 16px once instead of a re-measure later.
+ * **`SO No` and `Value` are sized to a FUTURE string, on purpose.** S3.3's
+ * finding is why: sizing a composed cell to the widest value that happens to be
+ * in the database today is how the old `Actions` column was sized off nearly
+ * the narrowest string in its family. Six SO digits arrive inside a decade at
+ * 1,000 orders/month, and a money column's family is digits — 109 costs 16px
+ * once instead of a re-measure later.
  *
- * `Outstanding` is sized to **RM 1,234,567**, not to today's largest live order
- * (RM 11,246). S3.3's finding is the reason: sizing a composed cell to the widest
- * value that happens to be in the database today is how `Actions` was sized off
- * nearly the narrowest string in its family. A money column's family is digits.
- * Its HEADER is the wider claim here (92 + 16 = 108), which is why 109 holds both.
+ * **`Items` is the one column whose content is unbounded**, so it is sized to
+ * the widest LIVE two-name-plus-tail composition and truncates beyond it. That
+ * truncation is what the law asks for: *"if information does not fit in one
+ * row, it does not belong in the register"* — the document lists every line.
  *
- * `Promised` deliberately carries no `truncate`. §3 records why on the old
- * Deadline cell: an ellipsis costs the MONTH to signal something already
- * visible. So this column must never be short, and 113 is the measured date at
- * its widest month.
- *
- * `Items` is the one UNBOUNDED column and it is sized to the widest LIVE
- * two-line composition — `1× 1013Jager/Fab3-King/PC151-01 · 1× 1013Jager/Fab3-
- * Queen/PC151-01`, 440.5 + 16. Longer orders truncate, and that truncation is
- * ACCEPTED for one reason only: the row expansion holds every line in full, so
- * nothing is unreachable. (Those SKU strings are the 16 free-text SKUs
- * `docs/ui/MASTER.md` §6.5 still owes real names; when they get them this column
- * gets narrower, not wider.)
- *
- * Table total = 87 + 188 + 459 + 113 + 109 + 42 (the kit's expansion gutter at
- * `sizing="content"`) = **998px**. Verified on the rendered page: every column
- * holds its declared pixel and ZERO cells clip at BOTH 1440 and 1130 — the
- * ~1130px window where S1's regression was found. Above the sum the kit's FILLER
- * takes the slack and no column inflates: S3.1's rule, unchanged.
+ * Table 807px with the six defaults. Verified on the rendered page: every
+ * column holds its declared pixel and ZERO cells clip at 1440 AND at 1130.
  */
 const W = {
-  so: "87px",
+  so: "85px",
   customer: "188px",
-  items: "459px",
-  promised: "113px",
-  outstanding: "109px",
-  /* The chooser's columns, measured the same way and on the same day.
-     `phone` and `ref` are MONO, so the harness figure is exact (proved above);
-     `ordered` is the same Inter date as `promised`; `value` the same money. */
-  phone: "110px",
-  ordered: "113px",
-  ref: "87px",
+  items: "361px",
   value: "109px",
+  promised: "113px",
+  ordered: "113px",
+  /* The hidden fact columns, measured the same way and on the same day. */
+  phone: "103px",
+  salesperson: "167px",
+  outlet: "126px",
+  outstanding: "109px",
 } as const;
 
-/** The extra fact columns, hidden until the operator asks for one. */
+/** The hidden fact columns, in the order the card names them. */
 const EXTRA_COLUMNS = [
   { key: "phone", label: "Phone" },
-  { key: "ordered", label: "Ordered" },
-  { key: "ref", label: "Ref" },
-  { key: "value", label: "Value" },
+  { key: "salesperson", label: "Salesperson" },
+  { key: "outlet", label: "Outlet" },
+  { key: "outstanding", label: "Outstanding" },
 ] as const;
 type ExtraKey = (typeof EXTRA_COLUMNS)[number]["key"];
 
-/** Digits only, so `012-345 6789` and `0123456789` are one customer. */
-function digits(s: string): string {
-  return s.replace(/\D+/g, "");
+/** ONE cell, ONE fact. A money state is a number or a sentence, never both and
+ *  never nothing — SO-1: *"a blank may never carry two meanings."* */
+function moneyCell(state: MoneyState) {
+  if (state.kind === "amount") return <Money value={state.value} />;
+  return state.kind === "settled" ? "Paid in full" : "No price yet";
 }
 
-/** The order's lines as one line of text: `2× SKU · 1× SKU`. A FACT — no
- *  category, no catalog join, no classification. `lineCategory` is deliberately
- *  not called: "what kind of product is this" is Catalog's question and
- *  `ERP-ARCHITECTURE.md` §0 records it as the D9 defect. */
-function itemsLine(o: operationOrderListRow): string {
-  const lines = o.order_lines ?? [];
-  return lines
-    .map((l) => `${l.qty}× ${l.sku}`)
-    .join(" · ");
-}
-
-/** Delivered is the only completion fact the ORDER itself carries. It is not
- *  "settled" — `docs/orders/MASTER.md` §2.4: *"Delivered is not paid."* The
- *  filter says `Not delivered`, which is what it actually selects. */
-function isDelivered(o: operationOrderListRow): boolean {
-  return stageOf(o) === "delivered";
-}
-
-/** Everything one row of the register needs, computed once. */
 interface RegisterRow {
   o: operationOrderListRow;
   id: string;
   so: number;
   customer: string;
   phone: string;
+  salesperson: string;
+  outlet: string;
   items: string;
-  refs: string;
   promised: string | null;
   promisedLabel: string;
   ordered: string;
-  outstanding: number;
-  value: number | null;
-  /** Lowercased haystack for the four search fields. */
+  value: MoneyState;
+  outstanding: MoneyState;
+  sortValue: number;
+  sortOutstanding: number;
   needle: string;
   phoneDigits: string;
 }
 
-export default function SalesOrdersRegister({
-  onImport,
-}: {
-  onImport?: () => void;
-}) {
+export default function SalesOrdersRegister() {
   const [search, setSearch] = useState("");
   const [from, setFrom] = useState<string | null>(null);
   const [to, setTo] = useState<string | null>(null);
@@ -244,21 +202,27 @@ export default function SalesOrdersRegister({
     () => new Set<ExtraKey>(),
   );
   const [sort, setSort] = useState<TableSort | null>(null);
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(
-    () => new Set<string>(),
-  );
-  const [openOrderId, setOpenOrderId] = useState<string | null>(null);
 
-  /* No `search` param — see the file header. The server would answer for two of
-     the four fields and silently drop the other two. */
+  /* `?order=<id>` opens the document. The param is not decoration: Service
+     Cases already deep-link an order this way (J2), so the register keeps the
+     door that exists rather than minting a second one. */
+  const [params, setParams] = useSearchParams();
+  const openOrderId = params.get("order");
+  const openDocument = (id: string | null) => {
+    const next = new URLSearchParams(params);
+    if (id) next.set("order", id);
+    else next.delete("order");
+    setParams(next, { replace: true });
+  };
+
   const { data, isLoading, isError, error, refetch } = useOperationOrders({});
 
   const all = useMemo<RegisterRow[]>(() => {
     const orders = data?.orders ?? [];
-    return orders.map((o) => {
-      const money = moneyOf(o);
-      const items = itemsLine(o);
-      const refs = (o.source_ref ?? []).filter(Boolean).join(" ");
+    return orders.filter((o) => !isRental(o)).map((o) => {
+      const money = moneyOfOrder(o);
+      const value = valueState(money);
+      const outstanding = outstandingState(money);
       const phone = o.customer_phone ?? "";
       const promised = o.delivery_date_tbd ? null : (o.delivery_date ?? null);
       return {
@@ -267,19 +231,19 @@ export default function SalesOrdersRegister({
         so: o.so,
         customer: o.customer_name,
         phone,
-        items,
-        refs,
+        salesperson: o.salespersons?.name ?? "",
+        outlet: o.outlets?.name ?? "",
+        items: itemsSummary(o),
         promised,
-        /* `TBD` is a banned word (COPY-STANDARD §"no to-do word"; it is also
-           listed as a REJECTED spelling beside "No logistics picked"). The
-           approved shape for an unfixed date is "no date yet". */
+        /* `TBD` is a banned word (COPY-STANDARD: no to-do word; and it is
+           listed as a rejected spelling). `No date yet` is the approved shape. */
         promisedLabel: promised ? fmtDate(promised) : "No date yet",
         ordered: o.placed_at,
-        outstanding: money.outstanding,
-        value: money.known ? money.total : null,
-        needle: [`so-${o.so}`, String(o.so), o.customer_name, refs, items]
-          .join(" ")
-          .toLowerCase(),
+        value,
+        outstanding,
+        sortValue: value.kind === "amount" ? value.value : -1,
+        sortOutstanding: outstanding.kind === "amount" ? outstanding.value : -1,
+        needle: searchHaystack(o),
         phoneDigits: digits(phone),
       };
     });
@@ -290,16 +254,13 @@ export default function SalesOrdersRegister({
     const qDigits = digits(q);
     return all.filter((r) => {
       if (scope === "live" && isDelivered(r.o)) return false;
-      /* The date range reads the ORDERED date — the register's own spine. What
-         the promise does is the Promise Monitor's question, not the register's,
-         and filtering a register by a date it does not sort on hides orders for
-         a reason the operator cannot see. */
+      /* The range reads the ORDERED date — the register's own spine. What the
+         promise DOES is a question for the module that owns the promise. */
       const day = r.ordered.slice(0, 10);
       if (from && day < from) return false;
       if (to && day > to) return false;
       if (!q) return true;
       if (r.needle.includes(q)) return true;
-      /* A phone matches on digits, so `012-345 6789` answers `0123456789`. */
       if (qDigits.length >= 3 && r.phoneDigits.includes(qDigits)) return true;
       return false;
     });
@@ -311,16 +272,16 @@ export default function SalesOrdersRegister({
     const cmp: Record<string, (a: RegisterRow, b: RegisterRow) => number> = {
       so: (a, b) => a.so - b.so,
       customer: (a, b) => a.customer.localeCompare(b.customer),
+      items: (a, b) => a.items.localeCompare(b.items),
+      value: (a, b) => a.sortValue - b.sortValue,
       promised: (a, b) => (a.promised ?? "").localeCompare(b.promised ?? ""),
-      outstanding: (a, b) => a.outstanding - b.outstanding,
       ordered: (a, b) => a.ordered.localeCompare(b.ordered),
       phone: (a, b) => a.phone.localeCompare(b.phone),
-      ref: (a, b) => a.refs.localeCompare(b.refs),
-      value: (a, b) => (a.value ?? -1) - (b.value ?? -1),
+      salesperson: (a, b) => a.salesperson.localeCompare(b.salesperson),
+      outlet: (a, b) => a.outlet.localeCompare(b.outlet),
+      outstanding: (a, b) => a.sortOutstanding - b.sortOutstanding,
     };
     const by = sort ? cmp[sort.key] : undefined;
-    /* No sort, or a sort on a column with no comparator: the register's own
-       order — newest order first, the way a register reads. */
     if (!by) return out.sort((a, b) => b.ordered.localeCompare(a.ordered));
     return out.sort((a, b) => by(a, b) * dir);
   }, [filtered, sort]);
@@ -332,36 +293,30 @@ export default function SalesOrdersRegister({
         label: "SO No",
         width: W.so,
         sortable: true,
-        cell: (r) => (
-          <span className="font-mono tabular-nums font-semibold">
-            SO-{r.so}
-          </span>
-        ),
+        cell: (r) => `SO-${r.so}`,
       },
       {
         key: "customer",
         label: "Customer",
         width: W.customer,
         sortable: true,
-        cell: (r) => (
-          <span className={`block truncate ${cjkClassName(r.customer)}`} title={r.customer}>
-            {r.customer}
-          </span>
-        ),
+        cell: (r) => r.customer,
       },
       {
         key: "items",
         label: "Items",
         width: W.items,
-        /* Not sortable: a composed sentence has no order an operator means. */
-        cell: (r) =>
-          r.items ? (
-            <span className={`block truncate ${cjkClassName(r.items)}`} title={r.items}>
-              {r.items}
-            </span>
-          ) : (
-            "—"
-          ),
+        sortable: true,
+        cell: (r) => r.items,
+      },
+      {
+        key: "value",
+        label: "Value",
+        width: W.value,
+        align: "right",
+        numeric: true,
+        sortable: true,
+        cell: (r) => moneyCell(r.value),
       },
       {
         key: "promised",
@@ -371,67 +326,47 @@ export default function SalesOrdersRegister({
         cell: (r) => r.promisedLabel,
       },
       {
-        key: "outstanding",
-        label: "Outstanding",
-        width: W.outstanding,
-        align: "right",
-        numeric: true,
-        sortable: true,
-        /* `—` = nothing is owed. A BLANK cell = nobody has priced this order.
-           Two different facts, and the live page spells both as empty. */
-        cell: (r) =>
-          r.value == null ? (
-            <span aria-label="not priced" />
-          ) : r.outstanding > 0 ? (
-            <Money value={r.outstanding} />
-          ) : (
-            "—"
-          ),
-      },
-    ];
-
-    const extras: Record<ExtraKey, Column<RegisterRow>> = {
-      phone: {
-        key: "phone",
-        label: "Phone",
-        width: W.phone,
-        sortable: true,
-        cell: (r) =>
-          r.phone ? (
-            <span className="font-mono tabular-nums">{r.phone}</span>
-          ) : (
-            "—"
-          ),
-      },
-      ordered: {
         key: "ordered",
         label: "Ordered",
         width: W.ordered,
         sortable: true,
         cell: (r) => fmtDate(r.ordered),
       },
-      ref: {
-        key: "ref",
-        label: "Ref",
-        width: W.ref,
+    ];
+
+    const extras: Record<ExtraKey, Column<RegisterRow>> = {
+      /* `Not given` = the CUSTOMER did not provide it. `Not recorded` = WE never
+         captured it. Two different facts, and COPY-STANDARD keeps them apart:
+         one is chaseable and the other never was. */
+      phone: {
+        key: "phone",
+        label: "Phone",
+        width: W.phone,
         sortable: true,
-        cell: (r) =>
-          r.refs ? (
-            <span className="font-mono truncate block" title={r.refs}>
-              {r.refs}
-            </span>
-          ) : (
-            "—"
-          ),
+        cell: (r) => r.phone || "Not given",
       },
-      value: {
-        key: "value",
-        label: "Value",
-        width: W.value,
+      salesperson: {
+        key: "salesperson",
+        label: "Salesperson",
+        width: W.salesperson,
+        sortable: true,
+        cell: (r) => r.salesperson || "Not recorded",
+      },
+      outlet: {
+        key: "outlet",
+        label: "Outlet",
+        width: W.outlet,
+        sortable: true,
+        cell: (r) => r.outlet || "Not recorded",
+      },
+      outstanding: {
+        key: "outstanding",
+        label: "Outstanding",
+        width: W.outstanding,
         align: "right",
         numeric: true,
         sortable: true,
-        cell: (r) => (r.value == null ? <span aria-label="not priced" /> : <Money value={r.value} />),
+        cell: (r) => moneyCell(r.outstanding),
       },
     };
 
@@ -444,34 +379,20 @@ export default function SalesOrdersRegister({
   const chips: ActiveChip[] = [];
   if (search.trim())
     chips.push({ label: `Search: ${search.trim()}`, onClear: () => setSearch("") });
-  if (from) chips.push({ label: `Ordered from ${fmtDate(from)}`, onClear: () => setFrom(null) });
+  if (from)
+    chips.push({ label: `Ordered from ${fmtDate(from)}`, onClear: () => setFrom(null) });
   if (to) chips.push({ label: `Ordered to ${fmtDate(to)}`, onClear: () => setTo(null) });
   if (scope === "all")
     chips.push({ label: "All orders", onClear: () => setScope("live") });
 
-  /* §8.2 — the drawer REPLACES the register, which is what the live page does
-     today and what `grid-findings` F31 files as a structural question. SO-1's
-     instruction is to reuse the drawer as it stands, so the behaviour is
-     reused as it stands and the question is recorded, not answered here. */
+  /* The register hands over to the DOCUMENT and stops. It passes no signals,
+     no journey and no derivation — a register answers "what records exist",
+     and the document answers "what did this customer commit to". */
   if (openOrderId) {
-    const idx = rows.findIndex((r) => r.id === openOrderId);
     return (
-      <OrderDetailDrawer
+      <SalesOrderDocument
         orderId={openOrderId}
-        onClose={() => setOpenOrderId(null)}
-        nav={
-          idx >= 0
-            ? {
-                index: idx + 1,
-                total: rows.length,
-                onPrev: idx > 0 ? () => setOpenOrderId(rows[idx - 1].id) : undefined,
-                onNext:
-                  idx < rows.length - 1
-                    ? () => setOpenOrderId(rows[idx + 1].id)
-                    : undefined,
-              }
-            : undefined
-        }
+        onClose={() => openDocument(null)}
       />
     );
   }
@@ -480,8 +401,6 @@ export default function SalesOrdersRegister({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* The fixed header row. `word` is the sidebar's word and SO-1 names it:
-          the page is Sales Orders. */}
       <ModuleHeader
         testId="sales-orders-header"
         icon={ClipboardList}
@@ -500,7 +419,8 @@ export default function SalesOrdersRegister({
           chips={chips}
           toolbar={
             <>
-              <span className="w-72 shrink-0">
+              {/* Search is the primary element of the toolbar (SO-1 FINAL). */}
+              <span className="w-80 shrink-0">
                 <SearchInput
                   id="sales-orders-search"
                   pill
@@ -575,18 +495,11 @@ export default function SalesOrdersRegister({
             </Popover>
           }
           footer={
-            <>
-              <span data-testid="register-count">
-                {narrowed
-                  ? `${rows.length} of ${all.length} orders`
-                  : `${all.length} orders`}
-              </span>
-              {onImport && (
-                <Button size="sm" variant="ghost" onClick={onImport}>
-                  Import from AutoCount
-                </Button>
-              )}
-            </>
+            <span data-testid="register-count">
+              {narrowed
+                ? `${rows.length} of ${all.length} orders`
+                : `${all.length} orders`}
+            </span>
           }
         >
           {isError ? (
@@ -611,12 +524,12 @@ export default function SalesOrdersRegister({
                 rowTestId="sales-order-row"
                 label="Sales orders"
                 loading={isLoading}
-                /* S3.1's rule: every column is its measured pixel and the
-                   leftover goes to a filler that holds nothing. */
                 sizing="content"
                 sort={sort}
                 onSortChange={setSort}
-                onRowOpen={(r) => setOpenOrderId(r.id)}
+                /* The whole row opens the document. There is no second control
+                   on the row, because a register has no actions. */
+                onRowOpen={(r) => openDocument(r.id)}
                 empty={
                   <div className="w-[100cqi]">
                     <EmptyState
@@ -628,63 +541,11 @@ export default function SalesOrdersRegister({
                     />
                   </div>
                 }
-                /* Expand has exactly ONE job: the lines of THIS order, in full,
-                   because the Items column is the one column whose content is
-                   unbounded. Nothing else may move in here. */
-                expansion={{
-                  expanded,
-                  onToggle: (id) =>
-                    setExpanded((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(id)) next.delete(id);
-                      else next.add(id);
-                      return next;
-                    }),
-                  label: (r) =>
-                    expanded.has(r.id) ? "Hide items" : "Show items",
-                  expandable: (r) => (r.o.order_lines ?? []).length > 0,
-                  render: (r) => <OrderLines row={r} />,
-                }}
               />
             </div>
           )}
         </PageShell>
       </div>
-    </div>
-  );
-}
-
-/** The order's own lines, in full. Order-owned facts only: what was bought, how
- *  many, at what price. No stock state, no PO, no receiving — those are other
- *  modules' records and this panel may not grow one. */
-function OrderLines({ row }: { row: RegisterRow }) {
-  const lines = row.o.order_lines ?? [];
-  return (
-    <div className="px-3 py-2" data-testid="order-lines">
-      <table className="w-full text-body">
-        <thead>
-          <tr className="text-label text-base-500">
-            <th className="py-1 text-left font-medium">Item</th>
-            <th className="py-1 text-right font-medium">Qty</th>
-            <th className="py-1 text-right font-medium">Unit price</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((l, i) => (
-            <tr key={`${l.sku}-${i}`} className="border-t border-base-100">
-              <td className={`py-1 ${cjkClassName(l.sku)}`}>{l.sku}</td>
-              <td className="py-1 text-right tabular-nums">{l.qty}</td>
-              <td className="py-1 text-right">
-                {l.unit_price == null || Number(l.unit_price) === 0 ? (
-                  "—"
-                ) : (
-                  <Money value={Number(l.unit_price)} />
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }

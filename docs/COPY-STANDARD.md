@@ -1097,6 +1097,36 @@ meaning two different things.
   lead lines that render live — never in stored text.
 - **Currency**: `RM 1,250.00`. Never `$` or `MYR` in row text.
 
+### An EMPTY CELL is not a word — the four absence words (Loo, SO-1 FINAL, 2026-08-09)
+
+**The rule this settles, in the card's own words:** *"Wherever Outstanding appears it must show
+an EXPLICIT state — a blank may never carry two meanings (owed amount / settled / unpriced)."*
+It is not only about money. **A blank cell is the portal's most common lie**: it reads as zero,
+as "fine", and as "we never asked", and the reader picks whichever they expect.
+
+| The fact is absent because… | Canonical word | Do NOT use |
+|---|---|---|
+| the order is priced and nothing is left to collect | **Paid in full** | Settled · Cleared · Nil · `—` · RM 0 |
+| nobody has put a price on this order at all | **No price yet** | Unpriced · No value · TBC · `—` · RM 0 |
+| **WE** never captured it (salesperson, outlet) | **Not recorded** | Unknown · Missing · N/A · `—` |
+| the **CUSTOMER** did not give it (phone, address) | **Not given** | Unknown · Missing · N/A · `—` |
+
+**`Not recorded` and `Not given` are two different facts and may never be merged.** One is our
+gap and somebody can close it; the other is the customer's choice and nobody can. A screen that
+spells both `—` tells an operator to go chasing a thing that was never chaseable.
+
+**`No price yet` follows the shape already approved above** for a missing date — *"Promised this
+day, no date yet"*, *"No logistics picked"*. Name the thing that is absent; never reach for a
+to-do word (`needs`, `pending`, `TBC`), which this file bans everywhere.
+
+> 🟡 **AND THE ROUNDING RULE BELOW IS NOT MET BY THE MONEY COMPONENT — reported, not fixed.**
+> `apps/web/src/components/Money.tsx` renders `Math.round(n).toLocaleString()`, i.e. **whole
+> ringgit, no sen**, and the next rule says two decimals always. Measured on production
+> 2026-08-09: of 69 non-rental live orders, **0** carry sen in value, paid or outstanding — so
+> nothing on screen is wrong today and the first discount or part-payment with sen makes it
+> wrong. It is a SHARED component on every money surface in the portal, so it needs its own
+> card rather than a register's. Recorded in `docs/MIGRATION-MAP.md`.
+
 ### A money figure is never rounded to make a column tidy (Loo, 2026-07-28)
 
 **Two decimals, always, and the number on screen is the number owed.**

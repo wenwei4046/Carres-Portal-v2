@@ -27,10 +27,12 @@ import OperationOrdersControl from "./OperationOrdersControl";
 //       const OrdersPage = OperationOrdersControl;
 //
 // `OperationOrdersControl` is not deleted, not renamed and not edited by this
-// card. It stays compiled — `OperationDelivery` imports its ladder, and the new
-// register imports its `moneyOf` / `stageOf` so one arithmetic serves all three
-// (ERP-ARCHITECTURE Law D). Both pages take the same `onImport` prop, so the
-// swap is genuinely one identifier and the route below is untouched.
+// card. It stays compiled — `OperationDelivery` imports its ladder.
+//
+// The route still passes `onImport`. The register IGNORES it: SO-1 FINAL says
+// *"Remove Import from AutoCount"*, and a register has no actions. The prop
+// stays on the route because the OLD page needs it the moment the line above is
+// reverted — that is what makes the restore one identifier instead of three.
 // The `typeof` annotation is not decoration — it is what makes "restorable in
 // one minute" a fact the COMPILER keeps true. The day the register's props stop
 // matching the old page's, this line fails to build instead of the restore
@@ -403,7 +405,16 @@ export default function OperationApp() {
         )}
         </div>
       </main>
-      <OperationRightRail />
+      {/* ⭐ SO-1 FINAL (Loo, 2026-08-09) — the execution rail is NOT MOUNTED on
+          the Sales Orders route, and the card states it is a PRODUCT rule
+          rather than a space preference: *"Team / Calendar / Activity / Calls
+          belong to other modules."*
+          Not `hidden`, not collapsed — absent. A rail that is merely hidden is
+          still mounted, still fetching, and still one prop away from coming
+          back; `ERP-ARCHITECTURE.md` §0's second lesson is exactly this drift —
+          *"a page that is allowed to SHOW cross-module work will, over months,
+          be asked to DO it."* Every other operation screen keeps it. */}
+      {!isOrdersUrl && <OperationRightRail />}
     </div>
   );
 }

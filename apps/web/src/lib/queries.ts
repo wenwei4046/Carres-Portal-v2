@@ -2805,7 +2805,18 @@ export interface operationOrderListRow {
     qty: number;
     unit_price?: number | string | null;
     source_po?: string | null;
+    /** SO-1 — `Model · Variant`, resolved server-side by the SAME helper the
+     *  detail route uses, so a product is never named two ways. `null` = not in
+     *  the catalog (every AutoCount-imported line, whose "sku" is free text);
+     *  the caller then shows that text. Optional: a browser on this build
+     *  against an older Worker reads it as absent and falls back the same way. */
+    label?: string | null;
   }[];
+  /** SO-1 — the register's hidden Salesperson / Outlet fact columns. Both are
+   *  name embeds off a single FK. Optional for the same older-Worker reason. */
+  salesperson_id?: string | null;
+  salespersons?: { name: string } | null;
+  outlets?: { name: string } | null;
   /** C5 (2026-07-27) — the money truth. `orders.paid` is the only figure a
    *  live payment path writes; with the add-on sum below and the line prices
    *  above it feeds the shared `orderMoney`, so the row's 🔒, the drawer and
@@ -3015,6 +3026,11 @@ export interface operationOrderDetailOrder {
   paid: number;
   dealers: { name: string } | null;
   outlets: { name: string } | null;
+  /** SO-1 — who sold it. The Sales Order document names the salesperson on the
+   *  customer commitment; nothing else in the drawer ever needed it, so it was
+   *  not on the wire. Optional so existing detail fixtures keep typechecking. */
+  salesperson_id?: string | null;
+  salespersons?: { name: string } | null;
 }
 export interface operationOrderDetailLine {
   sku: string;

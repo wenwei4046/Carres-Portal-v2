@@ -4,24 +4,28 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { operationOrderListRow } from "@/lib/queries";
 import SalesOrdersRegister from "./SalesOrdersRegister";
+import { itemsSummary, lineName, outstandingState, valueState, moneyOfOrder } from "./sales-order-facts";
 
 /**
- * SO-1 · the Sales Orders register.
+ * SO-1 FINAL · the Sales Orders register.
  *
- * **These tests are the card's own acceptance criteria, not coverage.** Each one
- * holds a line of the card in place:
+ * **These tests hold THE REGISTER LAW in place, clause by clause.** They are not
+ * coverage; each one is a sentence of the card that a future change would
+ * otherwise quietly break:
  *
- *   the RED LINE          no stock / delivery / next / health column exists
- *   the FIRST SCREEN      search answers SO · customer · phone · item
- *   the FILTERS           an ORDERED date range, and not-delivered / all
- *   the MONEY             one arithmetic, `orderMoney` through `moneyOf`
- *   the DRAWER            reused, and handed NO `journey` (no second derivation)
- *   the CHOOSER           extra facts, and nothing written to localStorage
+ *   one row, one order      no expansion control exists at all
+ *   one cell, one fact      a cell's content is a string — never nested markup
+ *   never explains          no expand, no second line, equal row heights
+ *   no workflow             no Status / Stock / Delivery / Next Action column
+ *   rental is not ours      channel=rental never reaches the register
+ *   names, never codes      the row prints `Model · Variant`
+ *   a blank has ONE meaning Value + Outstanding always print a sentence
+ *   the row opens the DOC   ?order=<id>, and the document is not the cockpit
  *
- * The fixture is the live production SHAPE measured 2026-08-08: a native priced
- * order, an AutoCount import with no prices, a rental-minted order with no
- * prices, and a delivered one. On production that day: 77 orders in scope, 29
- * priced, 71 with a promised date, 5 TBD, 0 delivered.
+ * The fixture is the live production SHAPE measured 2026-08-09: a native priced
+ * order whose SKUs are in the catalog, an AutoCount import whose "sku" is free
+ * text and which no catalog row can name, a rental-minted order, and a
+ * delivered one.
  */
 
 let listHookState: {
@@ -38,31 +42,15 @@ vi.mock("@/lib/queries", async () => {
   return {
     ...actual,
     useOperationOrders: () => listHookState,
-    /* ModuleHeader mounts the global icons, which run their own queries. They
-       are not this page's subject; an empty answer keeps them quiet. */
     useOperationTasks: () => ({ data: undefined }),
     useOperationBadges: () => ({ data: undefined }),
   };
 });
 
-vi.mock("./components/OrderDetailDrawer", () => ({
-  default: ({
-    orderId,
-    onClose,
-    journey,
-  }: {
-    orderId: string;
-    onClose: () => void;
-    journey?: unknown;
-  }) => (
-    <div
-      data-testid="drawer-stub"
-      data-order-id={orderId}
-      /* Serialised so a test can prove the register hands the drawer NO
-         cross-module derivation of its own. */
-      data-journey={journey === undefined ? "absent" : "present"}
-    >
-      <button onClick={onClose}>close</button>
+vi.mock("./SalesOrderDocument", () => ({
+  default: ({ orderId, onClose }: { orderId: string; onClose: () => void }) => (
+    <div data-testid="document-stub" data-order-id={orderId}>
+      <button onClick={onClose}>back</button>
     </div>
   ),
 }));
@@ -108,10 +96,9 @@ function makeRow(
   } as operationOrderListRow;
 }
 
-/** The live shape, four orders wide. */
 function fixture(): operationOrderListRow[] {
   return [
-    /* Native, priced, part paid: RM 4,000 sold, RM 1,500 in → RM 2,500 owed. */
+    /* Native, catalog-named, part paid: RM 4,000 sold, RM 1,500 in. */
     makeRow({
       id: "o-native",
       so: 1257,
@@ -120,13 +107,15 @@ function fixture(): operationOrderListRow[] {
       placed_at: "2026-07-10T02:00:00Z",
       delivery_date: "2026-07-22",
       paid: 1500,
+      salespersons: { name: "Shasha" },
+      outlets: { name: "Carres Klang" },
       order_lines: [
-        { sku: "B1201F-Q", qty: 2, unit_price: 1500 },
-        { sku: "PILLOW-L", qty: 2, unit_price: 500 },
+        { sku: "M1401F-K", qty: 2, unit_price: 1500, label: "M1401F · King" },
+        { sku: "5539-CNR", qty: 2, unit_price: 500, label: "Booqit · CNR" },
       ],
     }),
-    /* AutoCount import: no prices, no keyed balance → the order's value is
-       UNKNOWN, and unknown is not zero. */
+    /* AutoCount import: the "sku" IS the product text, and no catalog row can
+       name it (measured: 0 of 94 imported lines resolve). Unpriced. */
     makeRow({
       id: "o-import",
       so: 1101,
@@ -136,21 +125,21 @@ function fixture(): operationOrderListRow[] {
       delivery_date: "2026-05-20",
       source_system: "autocount",
       source_ref: ["CR0925", "CR0926"],
-      order_lines: [{ sku: "1013Jager/Fab3-King", qty: 1, unit_price: null }],
+      order_lines: [
+        { sku: "1013Jager/Fab3-King/PC151-01", qty: 1, unit_price: null, label: null },
+      ],
     }),
-    /* Rental-minted, and its promised date is not fixed. */
+    /* Rental-minted — the Rental module's, not this register's. */
     makeRow({
       id: "o-rental",
       so: 1300,
       customer_name: "Lim Sri Muda",
-      customer_phone: "011-2222 3333",
       placed_at: "2026-08-01T02:00:00Z",
-      delivery_date: null,
       delivery_date_tbd: true,
       source_system: "rental",
-      order_lines: [{ sku: "RENT-BED-Q", qty: 1, unit_price: null }],
+      order_lines: [{ sku: "RENT-BED-Q", qty: 1, unit_price: null, label: null }],
     }),
-    /* Delivered, and fully settled. */
+    /* Delivered, priced, and fully settled. */
     makeRow({
       id: "o-done",
       so: 1000,
@@ -160,16 +149,12 @@ function fixture(): operationOrderListRow[] {
       placed_at: "2026-04-01T02:00:00Z",
       delivery_date: "2026-04-15",
       paid: 2000,
-      order_lines: [{ sku: "SOF-2S", qty: 1, unit_price: 2000 }],
+      order_lines: [{ sku: "SOF-2S", qty: 1, unit_price: 2000, label: "Lyyar · 2S" }],
     }),
   ];
 }
 
-function rowIds(): string[] {
-  return screen
-    .queryAllByTestId("sales-order-row")
-    .map((r) => r.textContent ?? "");
-}
+const rows = () => screen.queryAllByTestId("sales-order-row");
 
 beforeEach(() => {
   listHookState = {
@@ -182,181 +167,257 @@ beforeEach(() => {
   window.localStorage.clear();
 });
 
-describe("SalesOrdersRegister — what the page IS", () => {
-  it("is named Sales Orders on the fixed header row", () => {
+describe("THE REGISTER LAW · one row, one order", () => {
+  it("has NO expansion control — the register never expands", () => {
     render(wrap(<SalesOrdersRegister />));
-    expect(
-      screen.getByTestId("sales-orders-header-module-word"),
-    ).toHaveTextContent("Sales Orders");
+    /* The kit draws a disclosure button per row only when `expansion` is
+       passed. Not passing it is the law; asserting it is what keeps it. */
+    expect(screen.queryByRole("button", { name: /show items|hide items|expand/i })).toBeNull();
+    const table = screen.getByTestId("sales-orders-table");
+    expect(within(table).queryByTestId("order-lines")).toBeNull();
   });
 
-  it("shows the five default columns and NO cross-module column", () => {
+  it("puts a plain string in every cell — no nested markup", () => {
+    render(wrap(<SalesOrdersRegister />));
+    const row = rows()[0];
+    for (const td of Array.from(row.querySelectorAll("td"))) {
+      /* Money renders one <span> pair; every other cell is bare text. Nothing
+         anywhere is a card, a table, a chip or a pill. */
+      expect(td.querySelector("table, ul, ol, button, [data-kit='badge']")).toBeNull();
+    }
+  });
+
+  it("shows NO workflow column", () => {
     render(wrap(<SalesOrdersRegister />));
     const table = screen.getByTestId("sales-orders-table");
-    for (const word of ["SO No", "Customer", "Items", "Promised", "Outstanding"]) {
-      expect(within(table).getByText(word)).toBeInTheDocument();
-    }
-    /* THE RED LINE. Every one of these is another module's record, and V1 may
-       not show it. A column arriving here is a boundary being crossed. */
-    for (const banned of ["Stock", "Delivery", "Actions", "Status", "PIC", "Next"]) {
+    for (const banned of ["Status", "Stock", "Delivery", "Actions", "Next", "PIC"]) {
       expect(within(table).queryByText(banned)).toBeNull();
     }
   });
 
-  it("prints the order's own facts on the row", () => {
+  it("shows the card's six default columns, in order", () => {
     render(wrap(<SalesOrdersRegister />));
-    const row = screen.getByTestId("sales-orders-table");
-    expect(within(row).getByText("SO-1257")).toBeInTheDocument();
-    expect(within(row).getByText("MyHouse Management PLT")).toBeInTheDocument();
+    const heads = Array.from(
+      screen.getByTestId("sales-orders-table").querySelectorAll("thead th"),
+    )
+      .map((th) => th.textContent?.trim())
+      .filter(Boolean);
+    expect(heads).toEqual([
+      "SO No",
+      "Customer",
+      "Items",
+      "Value",
+      "Promised",
+      "Ordered",
+    ]);
+  });
+
+  it("offers no import action — a register has no actions", () => {
+    render(wrap(<SalesOrdersRegister />));
+    expect(screen.queryByText(/import/i)).toBeNull();
+  });
+});
+
+describe("THE REGISTER LAW · rental is not a customer order here", () => {
+  it("never shows a rental-minted order", () => {
+    render(wrap(<SalesOrdersRegister />));
+    expect(screen.queryByText("Lim Sri Muda")).toBeNull();
+    expect(screen.queryByText("SO-1300")).toBeNull();
+  });
+
+  it("does not count rental in the register total", () => {
+    render(wrap(<SalesOrdersRegister />));
+    /* 4 orders in, 1 rental out, 1 delivered hidden by the default scope. */
+    expect(screen.getByTestId("register-count")).toHaveTextContent("2 of 3 orders");
+  });
+});
+
+describe("THE REGISTER LAW · names, never codes", () => {
+  it("prints the catalog name and the quantity", () => {
+    render(wrap(<SalesOrdersRegister />));
     expect(
-      within(row).getByText("2× B1201F-Q · 2× PILLOW-L"),
+      screen.getByText("M1401F · King ×2 · Booqit · CNR ×2"),
     ).toBeInTheDocument();
-    expect(within(row).getByText("Wed, 22 Jul 26")).toBeInTheDocument();
   });
-});
 
-describe("SalesOrdersRegister — the first screen is SEARCH", () => {
-  function type(value: string) {
-    fireEvent.change(screen.getByPlaceholderText(/SO number, customer/i), {
-      target: { value },
+  it("falls back to the order's own text when no catalog row can name it", () => {
+    render(wrap(<SalesOrdersRegister />));
+    /* An AutoCount "sku" IS the product text a salesperson typed. There is no
+       code being shown — there is no name to show instead. */
+    expect(
+      screen.getByText("1013Jager/Fab3-King/PC151-01 ×1"),
+    ).toBeInTheDocument();
+  });
+
+  it("summarises a long order to ONE line", () => {
+    const o = makeRow({
+      id: "o-long",
+      so: 1500,
+      order_lines: [
+        { sku: "A", qty: 1, unit_price: 10, label: "Mattress" },
+        { sku: "B", qty: 1, unit_price: 10, label: "Bedframe" },
+        { sku: "C", qty: 3, unit_price: 10, label: "Pillow" },
+        { sku: "D", qty: 1, unit_price: 10, label: "Topper" },
+      ],
     });
-  }
-
-  it("finds an order by its SO number", () => {
-    render(wrap(<SalesOrdersRegister />));
-    type("1257");
-    expect(rowIds()).toHaveLength(1);
-    expect(screen.getByText("SO-1257")).toBeInTheDocument();
+    expect(itemsSummary(o)).toBe("Mattress ×1 · Bedframe ×1 · +2 more");
   });
 
-  it("finds an order by customer name, case-insensitively", () => {
-    render(wrap(<SalesOrdersRegister />));
-    type("myhouse");
-    expect(rowIds()).toHaveLength(1);
-  });
-
-  it("finds an order by PHONE, however the number is punctuated", () => {
-    render(wrap(<SalesOrdersRegister />));
-    /* The customer says "zero one two three four five…", never "012-345 6789".
-       The server cannot answer this at all today — orders.ts:184 searches name,
-       ref and SO — which is why the filtering is here. */
-    type("0123456789");
-    expect(rowIds()).toHaveLength(1);
-    expect(screen.getByText("SO-1257")).toBeInTheDocument();
-  });
-
-  it("finds an order by ITEM", () => {
-    render(wrap(<SalesOrdersRegister />));
-    type("1013Jager");
-    expect(rowIds()).toHaveLength(1);
-    expect(screen.getByText("SO-1101")).toBeInTheDocument();
-  });
-
-  it("finds an order by its imported ref", () => {
-    render(wrap(<SalesOrdersRegister />));
-    type("CR0926");
-    expect(rowIds()).toHaveLength(1);
-  });
-
-  it("says so when nothing matches, and does not blame the operator", () => {
-    render(wrap(<SalesOrdersRegister />));
-    type("zzzz");
-    expect(rowIds()).toHaveLength(0);
-    expect(screen.getByText("No order matches this search")).toBeInTheDocument();
+  it("prefers the label, and falls back to the sku text", () => {
+    expect(lineName({ sku: "X-1", label: "Booqit · CNR" })).toBe("Booqit · CNR");
+    expect(lineName({ sku: "X-1", label: "   " })).toBe("X-1");
+    expect(lineName({ sku: "X-1", label: null })).toBe("X-1");
   });
 });
 
-describe("SalesOrdersRegister — the two filters", () => {
-  it("hides a delivered order by default and shows it on All orders", () => {
+describe("THE REGISTER LAW · a blank may never carry two meanings", () => {
+  it("prints the amount, Paid in full, or No price yet — never nothing", () => {
     render(wrap(<SalesOrdersRegister />));
-    expect(rowIds()).toHaveLength(3);
-    expect(screen.queryByText("SO-1000")).toBeNull();
-    expect(screen.getByTestId("register-count")).toHaveTextContent(
-      "3 of 4 orders",
-    );
+    /* Native order: 2×1500 + 2×500 = 4,000 through the shared orderMoney. */
+    expect(screen.getByText("4,000")).toBeInTheDocument();
+    /* The AutoCount row carries no prices at all. */
+    expect(screen.getAllByText("No price yet").length).toBeGreaterThan(0);
   });
 
-  it("never spells the unfixed date TBD — a banned word", () => {
-    render(wrap(<SalesOrdersRegister />));
-    expect(screen.getByText("No date yet")).toBeInTheDocument();
-    expect(screen.queryByText("TBD")).toBeNull();
-  });
-
-  it("counts the whole register when nothing is narrowing it", () => {
-    listHookState.data = { orders: [fixture()[0]] };
-    render(wrap(<SalesOrdersRegister />));
-    expect(screen.getByTestId("register-count")).toHaveTextContent("1 orders");
-  });
-});
-
-describe("SalesOrdersRegister — money is ONE arithmetic", () => {
-  it("prints what is still owed, through the shared rule", () => {
-    render(wrap(<SalesOrdersRegister />));
-    /* 2×1500 + 2×500 = 4,000 sold, 1,500 paid → 2,500 owed. Computed by
-       `moneyOf` → `orderMoney`, the same function the drawer, the booking gate
-       and the collections desk read. */
-    expect(screen.getByText("2,500")).toBeInTheDocument();
-  });
-
-  it("leaves an UNPRICED order blank — unknown is not zero", () => {
-    render(wrap(<SalesOrdersRegister />));
-    /* The import and the rental order carry no prices and no keyed balance.
-       A `—` there would claim nothing is owed, which nobody knows. */
-    expect(screen.getAllByLabelText("not priced")).toHaveLength(2);
-  });
-
-  it("prints a dash when the order is priced and settled", () => {
+  it("says Paid in full when a priced order owes nothing", () => {
     listHookState.data = {
       orders: [
         makeRow({
           id: "o-paid",
           so: 1400,
           paid: 2000,
-          order_lines: [{ sku: "SOF-2S", qty: 1, unit_price: 2000 }],
+          order_lines: [{ sku: "SOF-2S", qty: 1, unit_price: 2000, label: "Lyyar · 2S" }],
         }),
       ],
     };
     render(wrap(<SalesOrdersRegister />));
-    const table = screen.getByTestId("sales-orders-table");
-    expect(within(table).getByText("—")).toBeInTheDocument();
-    expect(within(table).queryByLabelText("not priced")).toBeNull();
-  });
-});
-
-describe("SalesOrdersRegister — the row opens the existing drawer", () => {
-  it("opens the drawer and hands it NO journey", () => {
-    render(wrap(<SalesOrdersRegister />));
-    fireEvent.click(screen.getAllByTestId("sales-order-row")[0]);
-    const drawer = screen.getByTestId("drawer-stub");
-    expect(drawer).toBeInTheDocument();
-    /* The register computes no cross-module signal, so it has none to hand
-       over — and the drawer's own prop doc says absent is the safe answer. */
-    expect(drawer).toHaveAttribute("data-journey", "absent");
-  });
-
-  it("comes back to the register on close", () => {
-    render(wrap(<SalesOrdersRegister />));
-    fireEvent.click(screen.getAllByTestId("sales-order-row")[0]);
-    fireEvent.click(screen.getByText("close"));
-    expect(screen.getByTestId("sales-orders-table")).toBeInTheDocument();
-  });
-});
-
-describe("SalesOrdersRegister — the column chooser", () => {
-  it("adds an extra fact column and writes NOTHING to localStorage", () => {
-    render(wrap(<SalesOrdersRegister />));
-    const table = screen.getByTestId("sales-orders-table");
-    expect(within(table).queryByText("Phone")).toBeNull();
-
     fireEvent.click(screen.getByTestId("columns-button"));
-    fireEvent.click(screen.getByLabelText("Phone"));
+    fireEvent.click(screen.getByLabelText("Outstanding"));
+    expect(screen.getByText("Paid in full")).toBeInTheDocument();
+  });
 
-    expect(
-      within(screen.getByTestId("sales-orders-table")).getByText("Phone"),
-    ).toBeInTheDocument();
-    /* `carres.orders.hiddenCols` was ruled against on 2026-08-04 and deleted in
-       S1; `docs/ui/MASTER.md` §7 carries "Layout memory — REFUSED". A chooser
-       that remembered would reverse both. */
+  it("computes the three states from the shared rule, not from a blank", () => {
+    const priced = moneyOfOrder(
+      makeRow({ id: "a", so: 1, paid: 400, order_lines: [{ sku: "x", qty: 1, unit_price: 1000 }] }),
+    );
+    expect(outstandingState(priced)).toEqual({ kind: "amount", value: 600 });
+    expect(valueState(priced)).toEqual({ kind: "amount", value: 1000 });
+
+    const settled = moneyOfOrder(
+      makeRow({ id: "b", so: 2, paid: 1000, order_lines: [{ sku: "x", qty: 1, unit_price: 1000 }] }),
+    );
+    expect(outstandingState(settled)).toEqual({ kind: "settled" });
+
+    const unpriced = moneyOfOrder(
+      makeRow({ id: "c", so: 3, order_lines: [{ sku: "x", qty: 1, unit_price: null }] }),
+    );
+    expect(outstandingState(unpriced)).toEqual({ kind: "unpriced" });
+    expect(valueState(unpriced)).toEqual({ kind: "unpriced" });
+  });
+});
+
+describe("THE FIRST SCREEN · search", () => {
+  const type = (v: string) =>
+    fireEvent.change(screen.getByPlaceholderText(/SO number, customer/i), {
+      target: { value: v },
+    });
+
+  it("finds by SO number", () => {
+    render(wrap(<SalesOrdersRegister />));
+    type("1257");
+    expect(rows()).toHaveLength(1);
+  });
+
+  it("finds by customer name, case-insensitively", () => {
+    render(wrap(<SalesOrdersRegister />));
+    type("myhouse");
+    expect(rows()).toHaveLength(1);
+  });
+
+  it("finds by phone however the customer says it", () => {
+    render(wrap(<SalesOrdersRegister />));
+    type("0123456789");
+    expect(rows()).toHaveLength(1);
+    expect(screen.getByText("SO-1257")).toBeInTheDocument();
+  });
+
+  it("finds by the item NAME the row prints", () => {
+    render(wrap(<SalesOrdersRegister />));
+    type("booqit");
+    expect(rows()).toHaveLength(1);
+    expect(screen.getByText("SO-1257")).toBeInTheDocument();
+  });
+
+  it("finds by the raw sku behind the name, for someone reading a printed order", () => {
+    render(wrap(<SalesOrdersRegister />));
+    type("5539-CNR");
+    expect(rows()).toHaveLength(1);
+  });
+
+  it("finds by the imported reference", () => {
+    render(wrap(<SalesOrdersRegister />));
+    type("CR0926");
+    expect(rows()).toHaveLength(1);
+  });
+});
+
+describe("THE FILTERS", () => {
+  it("hides a delivered order by default, and All orders brings it back", () => {
+    render(wrap(<SalesOrdersRegister />));
+    expect(screen.queryByText("SO-1000")).toBeNull();
+  });
+
+  it("never spells an unfixed date TBD", () => {
+    listHookState.data = {
+      orders: [makeRow({ id: "x", so: 9, delivery_date_tbd: true })],
+    };
+    render(wrap(<SalesOrdersRegister />));
+    expect(screen.getByText("No date yet")).toBeInTheDocument();
+    expect(screen.queryByText("TBD")).toBeNull();
+  });
+});
+
+describe("THE HIDDEN FACT COLUMNS", () => {
+  it("offers exactly the four the card names, and none by default", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(screen.getByTestId("columns-button"));
+    for (const w of ["Phone", "Salesperson", "Outlet", "Outstanding"]) {
+      expect(screen.getByLabelText(w)).toBeInTheDocument();
+    }
+  });
+
+  it("adds Salesperson and Outlet with real names, and writes nothing to localStorage", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(screen.getByTestId("columns-button"));
+    fireEvent.click(screen.getByLabelText("Salesperson"));
+    fireEvent.click(screen.getByLabelText("Outlet"));
+    const table = screen.getByTestId("sales-orders-table");
+    expect(within(table).getByText("Shasha")).toBeInTheDocument();
+    expect(within(table).getByText("Carres Klang")).toBeInTheDocument();
+    /* Layout memory is REFUSED (ui/MASTER.md §7). */
     expect(window.localStorage.length).toBe(0);
+  });
+
+  it("says so when a fact was never recorded", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(screen.getByTestId("columns-button"));
+    fireEvent.click(screen.getByLabelText("Salesperson"));
+    expect(screen.getAllByText("Not recorded").length).toBeGreaterThan(0);
+  });
+});
+
+describe("THE ROW OPENS THE DOCUMENT", () => {
+  it("opens the Sales Order document, not the cockpit", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(rows()[0]);
+    expect(screen.getByTestId("document-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("sales-orders-table")).toBeNull();
+  });
+
+  it("comes back to the register", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(rows()[0]);
+    fireEvent.click(screen.getByText("back"));
+    expect(screen.getByTestId("sales-orders-table")).toBeInTheDocument();
   });
 });

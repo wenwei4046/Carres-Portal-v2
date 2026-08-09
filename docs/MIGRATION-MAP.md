@@ -50,14 +50,62 @@ file.**
 
 ---
 
+# §0.5 · SO-1 FINAL SUPERSEDED THE FIRST BUILD — what THE REGISTER LAW changed
+
+**Loo, 2026-08-09:** *"Forget web applications. Build this page as if you were building Microsoft
+Excel."* The card that followed is not a tweak of the first one; it deleted four things the
+first build shipped and added the document. **§1 below is rewritten to the final card; the list
+here is what MOVED, so the next chat does not re-propose any of it.**
+
+| Was | Now | Because |
+|---|---|---|
+| a row expansion holding every line | **gone** | *"The register never expands and never explains."* The document lists every line. |
+| rental orders on the register | **excluded at the source** | The Rental module owns a rent-to-own agreement; 0275's minted Sales Order is its shadow, not a sale. Measured: 8 live, **0 priced**. |
+| `Outstanding` as a default column | **`Value` is default; `Outstanding` is a hidden fact column** | The owner's re-issued card. My first-round argument for the swap was heard and overruled. |
+| `Ordered` dropped from the row | **restored** | And **half my objection was simply wrong**: I argued it collided with `COPY-STANDARD.md:943` (a Purchasing QUANTITY column); lines 872-873 of that same file answer it — *"a word banned on one is not automatically banned on the other."* No collision. |
+| SKU codes in `Items` | **product names** | `Booqit · CNR ×1`, resolved server-side. |
+| the old cockpit drawer on row click | **a Sales Order document** | A cockpit is workflow, and workflow is not the register's. |
+| `Import from AutoCount` in the footer | **gone** | A register has no actions. |
+| the execution right rail | **NOT MOUNTED on this route** | The card calls it a product rule, not a space preference. |
+
+---
+
 # §1 · WHAT SO-1 BUILT
 
 ```
 apps/web/src/pages/operation/SalesOrdersRegister.tsx        the register
-apps/web/src/pages/operation/SalesOrdersRegister.test.tsx   18 tests, the card's own criteria
-apps/web/src/pages/operation/OperationApp.tsx               ONE line: which page /operation/orders mounts
+apps/web/src/pages/operation/SalesOrderDocument.tsx         the Sales Order DOCUMENT
+apps/web/src/pages/operation/sales-order-facts.ts           the facts, pure and testable
+apps/web/src/pages/operation/SalesOrdersRegister.test.tsx   27 tests — THE REGISTER LAW, clause by clause
+apps/web/src/pages/operation/OperationApp.tsx               ONE line for the page + the rail is not mounted
+apps/api/src/routes/operation/orders.ts                     additive: product NAMES + salesperson/outlet
+apps/web/src/lib/queries.ts                                 the three new optional wire fields
+docs/COPY-STANDARD.md                                       the four absence words
 scripts/check-design-standard.mjs                           Rule B could not see the kit's own shell
 ```
+
+**THE API CHANGE IS ADDITIVE AND IT REMOVED AN IMPLEMENTATION RATHER THAN ADDING ONE.** The
+detail route has resolved `Model · Variant` per line since 2026-07-16 so the drawer could show
+names; the register needs the same names on the ROW, and the alternative was a second sku→name
+implementation in the browser. That body is now `resolveSkuLabels` at the top of the file and
+**both** handlers call it — `ERP-ARCHITECTURE.md` Law D. The list also gained
+`salesperson_id` + `salespersons(name)` + `outlets(name)`: the card asks for both as hidden
+columns and neither could be drawn before, because the id was not on the wire and the name was
+nowhere. Both FKs are single, so the embeds need no disambiguating hint. The old control table
+selects none of it and is unaffected.
+
+**THE ITEM NAMES, MEASURED 2026-08-09 — and this is why there is a fallback at all:**
+```
+                lines   named by the catalog
+native            82    81   (99%)
+AutoCount         94     0   (0%)   ← an imported "sku" IS free text: `1013Jager/Fab3-King/PC151-01`
+rental             8     8            excluded from the register
+distinct SKUs on live orders: 84, of which 37 are in the catalog
+```
+There is no code being hidden on an imported line — there is **no name to show instead**, and
+the text on the order is what the salesperson wrote. At go-live the import is gone
+(`CLAUDE.md` §6) and the fallback stops being reachable for anything but a genuinely new
+product.
 
 **ONE entry point.** `/operation/orders` and `/operation/orders/:stage` both mount the register.
 The nameplate reads **Sales Orders** (it read `Orders`).
@@ -73,17 +121,16 @@ const OrdersPage: typeof OperationOrdersControl = SalesOrdersRegister;
 The `typeof` annotation is load-bearing: the day the two pages' props diverge, **the build
 fails** instead of the restore failing when it is needed.
 
-### THE COLUMNS — five, and every one is a fact the ORDER owns
+### THE COLUMNS — the card's six, unchanged
 
 ```
-SO No · Customer · Items · Promised · Outstanding
+default   SO No · Customer · Items · Value · Promised · Ordered
+hidden    Phone · Salesperson · Outlet · Outstanding
 ```
 
-| Change from the card's draft | Why |
-|---|---|
-| `Value` → **`Outstanding`** | The customer does not phone to ask what the order cost. `orderMoney` returns both; [`COPY-STANDARD.md`](COPY-STANDARD.md) line 945 already rules Outstanding is **printed, never left as a subtraction**. `Value` stays in the chooser. |
-| `Ordered` **dropped from the row, kept as the default sort** | It answers nothing in a 60-second call, and `COPY-STANDARD.md` line 943 already spends the word `Ordered` on a Purchasing **quantity** column. Two meanings, one word. |
-| nothing added | |
+**No change was proposed and none was made.** SO-1's first round argued for swapping `Value` to
+`Outstanding` and dropping `Ordered`; the card was re-issued with both kept, so both ship. See
+§0.5 for the half of that objection that was wrong on the law rather than merely overruled.
 
 **Measured fill rates, production 2026-08-08, 77 orders in list scope:** SO 77/77 · Customer
 77/77 · Phone 77/77 · Items 77/77 (avg 2.4 lines, max 8) · Promised 71/77 (5 no date yet) ·
@@ -187,16 +234,27 @@ out.** Presence and pool enrolment are safe — `POST /heartbeat` is fired by th
 `OperationApp.tsx:98` — but the SWEEP is not. It must be carried before the old page is retired,
 and it does not belong in a register: **it is the Promise Monitor's, or the shell's.**
 
-### 🟡 D-G · The drawer replaces the list
-Opening one order costs you the register (`grid-findings.md` F31). Reused as instructed and
-recorded, not solved.
+### 🟡 D-G · The document replaces the register in place
+Opening one order costs you the list (`grid-findings.md` F31 filed this about the old drawer and
+it is equally true here). `?order=<id>` means the browser Back button works and a deep link
+opens the document, so nothing is lost — but the register is unmounted while a document is open,
+and at 1,000 orders/month re-fetching the list on every Back is the wrong shape. The fix is a
+real route with the register kept alive; it is not this card's.
 
-### 🟡 D-H · `moneyOf` and `stageOf` live in a page
-Both are pure and exported, and `OperationDelivery.tsx:51-59` already imports them the same way
-with the reason written above the import. Re-composing `orderMoney` + `storageHold` in the
-register would be a SECOND arithmetic — Law D's named failure. **They move to
-`@carres/shared` on the commit that retires `OperationOrdersControl`, not before**: the card
-says the old implementation may not be touched.
+### 🟡 D-H · A CJK customer name would render in the wrong font
+The register's cells are bare strings, because the law says no cell may contain another layout —
+so there is no `<span class="font-cjk">` to switch to Noto Sans SC. Measured 2026-08-09:
+**0 of 77 live customer names carry a CJK character** (Malaysian Chinese customers are romanised
+in this data). When one arrives, the font belongs on the kit's `<td>`, where every column gets
+it — never on a wrapper one page smuggles into one cell.
+
+### 🟡 D-L · `Money` rounds to whole ringgit, and COPY-STANDARD says never
+`apps/web/src/components/Money.tsx` renders `Math.round(n).toLocaleString()`;
+`COPY-STANDARD.md`'s *"a money figure is never rounded"* rule demands two decimals, because the
+figure is what an operator says out loud and what a receipt must match. Measured 2026-08-09: of
+69 non-rental live orders, **0** carry sen in value, paid or outstanding — so nothing on screen
+is wrong today, and the first part-payment with sen makes it wrong. It is a SHARED component on
+every money surface in the portal; it needs its own card, not a register's.
 
 ### ⚪ D-I · Salesperson and Outlet cannot be offered
 `orders.salesperson_id` is filled on 40/77 and `outlet_id` on 32/77, but **neither is on the
@@ -234,7 +292,7 @@ SO number or a customer name and stop talking.
 ①  FIND IT      type any one of: the SO number · the customer's name ·
                 their phone as they say it · a product they bought
 ②  READ IT      the row answers, without opening anything:
-                     what did I buy      → Items    (the chevron opens every line in full)
+                     what did I buy      → Items    (one line; the document has every line)
                      when did you promise→ Promised
                      what do I still owe → Outstanding
 ③  WHAT NOW     open the row → the existing drawer, unchanged
@@ -244,10 +302,16 @@ SO number or a customer name and stop talking.
 **FAIL** = change the UI. **Not a code debate, and no planning round** — the card pre-approved
 both outcomes.
 
-**The one question this test is expected to raise**, so it is not mistaken for a bug: on an
-order nobody has priced, `Outstanding` is **blank**, and blank can read as *nothing owed*. The
-alternative (`—`) is worse, because it claims a fact nobody knows. If the boss reads a blank as
-zero, that is a FAIL of ② and the fix is a word, not a colour.
+**The blank is gone, and that was SO-1 FINAL's own instruction.** `Value` and `Outstanding` now
+print one of three sentences — the amount, **`Paid in full`**, or **`No price yet`** — so an
+empty-looking cell can never mean both *settled* and *nobody priced it*. The four absence words
+(those two plus `Not recorded` and `Not given`) are entered in `COPY-STANDARD.md`, not invented
+on screen.
+
+**③ is one click and the document answers it whole:** customer, phone, address, salesperson,
+ordered, promised, every line with its price, total, paid, outstanding, and a read-only history.
+It has no `Issue PO`, no ETA, no stock, no delivery action and no journey widget — and it writes
+nothing at all, which is the property that keeps the boundary rather than a promise to keep it.
 
 ---
 
