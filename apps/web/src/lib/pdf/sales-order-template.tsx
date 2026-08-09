@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   // ── amount in words · totals ──
   totalsZone: { flexDirection: "row", marginTop: mm(5), paddingHorizontal: mm(4), alignItems: "flex-start" },
   wordsBlock: { flex: 1, paddingRight: mm(8) },
-  wordsText: { fontSize: 7.5, marginTop: mm(1.2), lineHeight: 1.4 },
+  wordsText: { fontSize: 8, color: GREY, lineHeight: 1.4 },
   depositLine: { fontSize: 8, color: GREY, marginTop: mm(1.2) },
   totalsBlock: { width: mm(70) },
   totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: mm(1.2) },
@@ -689,8 +689,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         {/* amount in words + customer signature (left) · totals (right) */}
         <View style={styles.totalsZone} wrap={false}>
           <View style={styles.wordsBlock}>
-            <Text style={styles.blockLabel}>Amount in words (Items total)</Text>
-            <Text style={styles.wordsText}>{amountInWordsMyr(total)}</Text>
+            <Text style={styles.wordsText}>Amount in words: {amountInWordsMyr(total)}</Text>
             {/* Prints only while it still means something — once paid >=
                 the expected figure it reads as "give another 3,240" (owner
                 review 2026-08-09). */}

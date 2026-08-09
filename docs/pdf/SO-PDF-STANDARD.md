@@ -90,8 +90,10 @@ names, no caps labels, no size bouncing (round 8: "not like you up and down").
 
 ## 7 · Money zone · signature · terms
 
-- Left: `AMOUNT IN WORDS (ITEMS TOTAL)` — the label NAMES its figure — words at
-  **7.5pt** (AutoCount convention, `RINGGIT MALAYSIA … ONLY`). `Expected deposit`
+- Left: one quiet inline line, 2990's exact form (round 18) —
+  `Amount in words: RINGGIT MALAYSIA … ONLY` at 8pt grey. No caps block label,
+  no `(ITEMS TOTAL)` clarifier — the international form is the inline sentence.
+  `Expected deposit`
   prints ONLY while `paid < expected` (round 5: otherwise it reads "give another
   3,240") — and no schema field carries it today.
 - Under the words: dashed signature box (POS eSign image when signed) ·
@@ -133,3 +135,4 @@ Optional payload fields the template already renders when sent: `customer.email`
 | Date | Change | Approved |
 |---|---|---|
 | 2026-08-09 | Initial law — codifies 17 owner review rounds on rendered PDFs (v1–v15): 2990 skeleton adopted verbatim then amended; fixed zones; bottom-anchored money; three-state lift gate; no-tax ruling; every rule above. | Loo |
+| 2026-08-09 | §7 round 18: amount-in-words becomes 2990's inline one-liner (`Amount in words: …` 8pt grey) — caps block label and `(ITEMS TOTAL)` clarifier removed. | Loo |
