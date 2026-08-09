@@ -236,21 +236,27 @@ const styles = StyleSheet.create({
 
   // ── amount in words · totals ──
   totalsZone: { flexDirection: "row", justifyContent: "space-between", marginTop: mm(5), paddingHorizontal: mm(4), alignItems: "flex-start" },
-  wordsBlock: { width: mm(68), paddingRight: mm(6) },
+  wordsBlock: { width: mm(90), paddingRight: mm(6) },
   wordsText: { fontSize: 7, color: GREY, lineHeight: 1.3 },
   depositLine: { fontSize: 8.5, color: GREY, marginTop: mm(2) },
-  totalsBlock: { width: mm(70) },
-  totalsRow: { flexDirection: "row", justifyContent: "space-between" },
+  totalsBlock: { width: mm(70), borderWidth: 0.6, borderColor: HAIR },
+  totalsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: mm(1.6),
+    paddingHorizontal: mm(3),
+    borderBottomWidth: 0.4,
+    borderBottomColor: HAIR,
+  },
   totalsLabel: { fontSize: 8.5, lineHeight: 1.33 },
   totalsValue: { fontSize: 8.5, lineHeight: 1.33 },
   balanceBox: {
-    borderTopWidth: 0.6,
-    borderTopColor: INK,
+    backgroundColor: BAND_BG,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: mm(1.8),
-    marginTop: mm(0.8),
+    paddingVertical: mm(2),
+    paddingHorizontal: mm(3),
   },
   balanceLabel: { fontSize: 10.5, fontWeight: 700 },
   balanceValue: { fontSize: 10.5, fontWeight: 700 },
@@ -725,6 +731,12 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             {expected_deposit != null && expected_deposit > 0 && paid < expected_deposit ? (
               <Text style={styles.depositLine}>Expected deposit: {money(expected_deposit)}</Text>
             ) : null}
+            {/* Signature at LEFT beside the boxed totals (owner round 26) —
+                caption stays inside the box (round 22). */}
+            <View style={styles.signBox}>
+              {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
+              <Text style={styles.signCaption}>Customer Signature · {customer.name}</Text>
+            </View>
           </View>
           <View style={styles.totalsBlock}>
             <View style={styles.totalsRow}>
@@ -738,14 +750,6 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             <View style={styles.balanceBox}>
               <Text style={styles.balanceLabel}>BALANCE DUE</Text>
               <Text style={styles.balanceValue}>{money(balance_due)}</Text>
-            </View>
-            {/* Signature directly UNDER BALANCE DUE; the caption prints
-                INSIDE the box (owner round 22). Company signs nothing. */}
-            <View style={styles.signBox}>
-              {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
-              <Text style={styles.signCaption}>
-                Customer Signature · {customer.name}
-              </Text>
             </View>
           </View>
         </View>
