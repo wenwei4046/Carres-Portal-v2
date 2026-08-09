@@ -48,7 +48,7 @@ const mm = (v: number) => v * 2.83465;
 const LIFT_THREE_STATE_READY = false;
 
 const MARGIN = mm(12);
-const HEADER_H = mm(30);
+const HEADER_H = mm(20);
 const FOOTER_H = mm(8);
 
 /** `2026-08-09` → `SUN, 9 AUG 26` (textual parse — timezone-proof). */
@@ -165,18 +165,19 @@ const styles = StyleSheet.create({
   // ── header (fixed, every page): wordmark + legal identity · doc hero ──
   header: { position: "absolute", top: MARGIN, left: MARGIN, right: MARGIN },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  companyName: { fontSize: 16, fontWeight: 700 },
-  legalLine: { fontSize: 9, marginTop: mm(1.3) },
+  companyName: { fontSize: 14, fontWeight: 700 },
+  ssmInline: { fontSize: 8, color: GREY, marginLeft: mm(2.5) },
+  legalLine: { fontSize: 8.5, marginTop: mm(1.2) },
   docBlock: { alignItems: "flex-end" },
   docTitle: { fontSize: 14, fontWeight: 700 },
-  docMeta: { fontSize: 10, marginTop: mm(1.8) },
+  docMeta: { fontSize: 9, marginTop: mm(1.6) },
   headerRule: { borderBottomWidth: 0.5, borderBottomColor: "#B4B4B4", marginTop: mm(3) },
 
   // ── frameless info blocks. Section anchors are INK — the owner's review
   //    (2026-08-09) found the all-grey voice hard to read; international
   //    references (Stripe / Shopify invoices) bold the section titles small
   //    and keep grey for genuinely secondary text only. ──
-  cards: { flexDirection: "row", marginTop: mm(2), paddingHorizontal: mm(4), minHeight: mm(36) },
+  cards: { flexDirection: "row", marginTop: mm(3.5), paddingHorizontal: mm(4), minHeight: mm(36) },
   blockLabel: { fontSize: 8.5, fontWeight: 700, color: INK, letterSpacing: 0.8, textTransform: "uppercase" },
   partyName: { fontSize: 9.5, fontWeight: 600, marginTop: mm(1) },
   partyLine: { fontSize: 9, marginTop: mm(1) },
@@ -211,7 +212,6 @@ const styles = StyleSheet.create({
   bandText: { fontSize: 8, fontWeight: 700, color: INK, letterSpacing: 0.3 },
   row: { flexDirection: "row", paddingVertical: mm(2), paddingHorizontal: mm(2) },
   rowHair: { borderBottomWidth: 0.3, borderBottomColor: HAIR },
-  rowStripe: { backgroundColor: "#F5F5F5" }, // 2990's striped theme
   cellNo: { fontSize: 7.5, color: GREY, width: mm(7), textAlign: "right", paddingRight: mm(1.5) },
   cellCode: { fontSize: 8, width: mm(29), paddingRight: mm(2) },
   desc: { flex: 1, paddingRight: mm(3) },
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   // ── amount in words · totals ──
   totalsZone: { flexDirection: "row", marginTop: mm(5), paddingHorizontal: mm(4), alignItems: "flex-start" },
   wordsBlock: { flex: 1, paddingRight: mm(8) },
-  wordsText: { fontSize: 9, marginTop: mm(1.2), lineHeight: 1.4 },
+  wordsText: { fontSize: 7.5, marginTop: mm(1.2), lineHeight: 1.4 },
   depositLine: { fontSize: 8, color: GREY, marginTop: mm(1.2) },
   totalsBlock: { width: mm(70) },
   totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: mm(1.2) },
@@ -458,15 +458,20 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                       longer SO number can never touch the address (owner
                       round 11). Line 1: logo · legal name · SSM. Lines
                       2-3: the address, two lines, breathing. */}
-                  {/* 2990's drawHeader, verbatim (owner round 13). */}
+                  {/* Carres amendment of 2990's drawHeader (owner round 15):
+                      name 14/700 with the SSM inline at 8pt grey, address in
+                      TWO 8.5pt lines. */}
                   <View style={{ flex: 1, paddingRight: mm(10) }}>
-                    <Text style={styles.companyName}>{CARRES_COMPANY.legalName}</Text>
-                    <Text style={styles.legalLine}>SSM {CARRES_COMPANY.regNo}</Text>
-                    {CARRES_COMPANY.addressLines.map((line, i) => (
-                      <Text key={i} style={styles.legalLine}>
-                        {line}
-                      </Text>
-                    ))}
+                    <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
+                      <Text style={styles.companyName}>{CARRES_COMPANY.legalName}</Text>
+                      <Text style={styles.ssmInline}>SSM {CARRES_COMPANY.regNo}</Text>
+                    </View>
+                    <Text style={[styles.legalLine, { marginTop: mm(1.8) }]}>
+                      {CARRES_COMPANY.addressLines[0]}
+                    </Text>
+                    <Text style={styles.legalLine}>
+                      {CARRES_COMPANY.addressLines[1]} {CARRES_COMPANY.addressLines[2]}
+                    </Text>
                   </View>
                   <View style={styles.docBlock}>
                     <Text style={styles.docTitle}>SALES ORDER</Text>
@@ -589,7 +594,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                 <View
                   key={`${line.sku}-${index}`}
                   wrap={false}
-                  style={index % 2 === 1 ? [styles.row, styles.rowStripe] : styles.row}
+                  style={[styles.row, styles.rowHair]}
                 >
                   <Text style={styles.cellNo}>{index + 1}</Text>
                   <Text style={styles.cellCode}>{line.sku}</Text>
@@ -628,11 +633,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         {addons.map((a, idx) => {
           const addonSub = addonAttrsDescription(a.attrs);
           return (
-            <View
-              key={`addon-${idx}`}
-              wrap={false}
-              style={(lines.length + idx) % 2 === 1 ? [styles.row, styles.rowStripe] : styles.row}
-            >
+            <View key={`addon-${idx}`} wrap={false} style={[styles.row, styles.rowHair]}>
               <Text style={styles.cellNo}>{lines.length + idx + 1}</Text>
               <Text style={styles.cellCode}>{a.sku ?? "ADD-ON"}</Text>
               <View style={styles.desc}>
@@ -701,10 +702,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
               {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
             </View>
             <Text style={styles.signLabel}>Customer Signature</Text>
-            <Text style={styles.signName}>
-              {customer.name}
-              {customer.phone ? ` · ${customer.phone}` : ""}
-            </Text>
+            <Text style={styles.signName}>{customer.name}</Text>
             {signed ? <Text style={styles.signMark}>Signed electronically at point of sale.</Text> : null}
           </View>
           <View style={styles.totalsBlock}>
