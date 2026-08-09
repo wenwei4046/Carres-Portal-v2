@@ -163,8 +163,8 @@ const styles = StyleSheet.create({
   ssmInline: { fontSize: 8, color: GREY, marginLeft: mm(2.5) },
   legalLine: { fontSize: 8.5, marginTop: mm(1.2) },
   docBlock: { alignItems: "flex-end" },
-  docTitle: { fontSize: 14, fontWeight: 700 },
-  docNumber: { fontSize: 18, fontWeight: 700, marginTop: mm(1.6) },
+  docTitle: { fontSize: 9, color: GREY, letterSpacing: 1.5, marginTop: mm(1) },
+  docNumber: { fontSize: 18, fontWeight: 700 },
   headerRule: { borderBottomWidth: 0.5, borderBottomColor: "#B4B4B4", marginTop: mm(3) },
 
   // ── frameless info blocks. Section anchors are INK — the owner's review
@@ -470,9 +470,12 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                   {/* Owner round 16: the number IS the identity — 18/700
                       hero, no "Doc No:" label, no Date (ORDER DETAILS'
                       `Ordered` already prints it once). */}
+                  {/* Round 17 (final): the NUMBER leads, the doc-type word
+                      whispers under it — grey caps, the PO header's own
+                      hierarchy. */}
                   <View style={styles.docBlock}>
-                    <Text style={styles.docTitle}>SALES ORDER</Text>
                     <Text style={styles.docNumber}>{so_number}</Text>
+                    <Text style={styles.docTitle}>SALES ORDER</Text>
                   </View>
                 </View>
                 <View style={styles.headerRule} />
