@@ -55,7 +55,7 @@ const LOGO_SRC =
 const LIFT_THREE_STATE_READY = false;
 
 const MARGIN = mm(12);
-const HEADER_H = mm(13);
+const HEADER_H = mm(16);
 const FOOTER_H = mm(8);
 
 /** `2026-08-09` → `SUN, 9 AUG 26` (textual parse — timezone-proof). */
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   docTitle: { fontSize: 10, color: GREY, letterSpacing: 1.5 },
   docNumber: { fontSize: 18, fontWeight: 700, marginTop: 2, lineHeight: 1 },
   docDate: { fontSize: 7, fontWeight: 700, letterSpacing: 0.8, marginTop: mm(1.2) },
-  headerRule: { borderBottomWidth: 0.8, borderBottomColor: INK, marginTop: mm(1.5) },
+  headerRule: { borderBottomWidth: 0.8, borderBottomColor: INK, marginTop: mm(2) },
 
   // ── frameless info blocks. Section anchors are INK — the owner's review
   //    (2026-08-09) found the all-grey voice hard to read; international
@@ -455,17 +455,23 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             pageNumber === 1 ? (
               <View>
                 <View style={styles.headerRow}>
-                  {/* One line: logo · legal name · SSM (owner round 5).
-                      No date here — ORDER DETAILS owns `Ordered`. */}
-                  <View>
+                  {/* Left column is WIDTH-BOUNDED (flex + padding) so the
+                      address and the doc number own separate ground — a
+                      longer SO number can never touch the address (owner
+                      round 11). Line 1: logo · legal name · SSM. Lines
+                      2-3: the address, two lines, breathing. */}
+                  <View style={{ flex: 1, paddingRight: mm(10) }}>
                     <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
                       <Image style={styles.logo} src={LOGO_SRC} />
                       <Text style={[styles.legalLine, { marginTop: 0, marginLeft: mm(3) }]}>
                         {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
                       </Text>
                     </View>
-                    <Text style={[styles.legalLine, { marginTop: mm(1.2), fontSize: 6 }]}>
-                      {CARRES_COMPANY.addressLines.join(" ")}
+                    <Text style={[styles.legalLine, { marginTop: mm(1.5) }]}>
+                      {CARRES_COMPANY.addressLines[0]}
+                    </Text>
+                    <Text style={[styles.legalLine, { marginTop: mm(0.8) }]}>
+                      {CARRES_COMPANY.addressLines[1]} {CARRES_COMPANY.addressLines[2]}
                     </Text>
                   </View>
                   <View style={styles.docBlock}>
