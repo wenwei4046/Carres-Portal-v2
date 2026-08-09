@@ -710,3 +710,163 @@ describe("P17 · a data grid carries column separators", () => {
     expect(withRule).toEqual(PX_COLUMNS.map((c) => String(c.width)).concat("auto"));
   });
 });
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * SO-3 — the four powers the Sales Orders register asked the KIT for
+ *
+ * A grid capability drawn inside one page is a capability the next register
+ * has to redraw. All four are OPTIONAL, and the licence block above still
+ * holds: pass none of them and the D0.5c markup comes back.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+describe("SO-3 · the auto-filter row", () => {
+  const FILTERED = (onChange: (v: string) => void): Column<Row>[] => [
+    { ...COLUMNS[0]!, filterInput: { value: "", onChange, label: "Filter Order" } },
+    COLUMNS[1]!,
+    COLUMNS[2]!,
+  ];
+
+  it("does not exist until a column asks for one", () => {
+    render(<DataTable {...base} />);
+    expect(document.querySelector('[data-kit="table-filter-row"]')).toBeNull();
+  });
+
+  it("appears as ONE extra head row, with a box only where the caller put one", () => {
+    render(<DataTable {...base} columns={FILTERED(vi.fn())} />);
+    const row = document.querySelector('[data-kit="table-filter-row"]')!;
+    expect(row).toBeTruthy();
+    expect(row.querySelectorAll("th")).toHaveLength(3);
+    expect(screen.getByTestId("table-filter-input-ref")).toBeInTheDocument();
+    expect(screen.queryByTestId("table-filter-input-qty")).toBeNull();
+  });
+
+  it("reports the keystroke and filters NOTHING itself — the page owns the rows", () => {
+    const onChange = vi.fn();
+    render(<DataTable {...base} columns={FILTERED(onChange)} />);
+    fireEvent.change(screen.getByTestId("table-filter-input-ref"), {
+      target: { value: "1256" },
+    });
+    expect(onChange).toHaveBeenCalledWith("1256");
+    /* Both rows are still rendered: the kit reported and did not act. */
+    expect(screen.getAllByRole("row").filter((r) => r.dataset.kit === "data-row")).toHaveLength(2);
+  });
+
+  it("spells no word — the box's name and placeholder are the caller's", () => {
+    render(
+      <DataTable
+        {...base}
+        columns={[
+          {
+            ...COLUMNS[0]!,
+            filterInput: {
+              value: "",
+              onChange: vi.fn(),
+              label: "Filter Order",
+              placeholder: "Any order",
+            },
+          },
+          COLUMNS[1]!,
+          COLUMNS[2]!,
+        ]}
+      />,
+    );
+    const box = screen.getByTestId("table-filter-input-ref");
+    expect(box).toHaveAttribute("aria-label", "Filter Order");
+    expect(box).toHaveAttribute("placeholder", "Any order");
+  });
+});
+
+describe("SO-3 · freeze", () => {
+  it("pins nothing until asked", () => {
+    render(<DataTable {...base} />);
+    for (const th of document.querySelectorAll("th[data-column]")) {
+      expect(th.className).not.toContain("sticky");
+    }
+  });
+
+  it("pins the first N data columns, in the head and in every row", () => {
+    render(<DataTable {...base} freeze={2} />);
+    const heads = [...document.querySelectorAll("th[data-column]")];
+    expect(heads[0]!.className).toContain("sticky");
+    expect(heads[1]!.className).toContain("sticky");
+    expect(heads[2]!.className).not.toContain("sticky");
+    const cells = [...document.querySelectorAll('[data-kit="data-row"]')[0]!.querySelectorAll("td")];
+    expect(cells[0]!.className).toContain("sticky");
+    expect(cells[2]!.className).not.toContain("sticky");
+  });
+
+  it("pins the kit's own gutters with them — a control never floats off its row", () => {
+    render(
+      <DataTable
+        {...base}
+        freeze={1}
+        selection={{ selected: new Set(), onToggleRow: vi.fn(), onToggleAll: vi.fn(), label: "All" }}
+      />,
+    );
+    const gutter = document.querySelector('th[data-kit="table-gutter"]')!;
+    expect(gutter.className).toContain("sticky");
+  });
+
+  it("takes NO z-index — §4.4's ladder stays closed at five", () => {
+    render(<DataTable {...base} freeze={2} />);
+    for (const el of document.querySelectorAll("th, td")) {
+      expect(el.className).not.toMatch(/\bz-\d/);
+    }
+  });
+});
+
+describe("SO-3 · the reading position", () => {
+  const ACTIVE = { id: "1", onChange: vi.fn(), label: "Orders" };
+
+  it("takes no focus and no key until a page wires it", () => {
+    render(<DataTable {...base} testId="t" />);
+    expect(screen.getByTestId("t")).not.toHaveAttribute("tabindex");
+  });
+
+  it("marks the row it is on, and ↑ ↓ walk from there", () => {
+    const onChange = vi.fn();
+    render(<DataTable {...base} testId="t" activeRow={{ ...ACTIVE, onChange }} />);
+    const grid = screen.getByTestId("t");
+    expect(grid).toHaveAttribute("tabindex", "0");
+    expect(document.querySelector('[data-row-id="1"]')!.getAttribute("data-active")).toBe("true");
+
+    fireEvent.keyDown(grid, { key: "ArrowDown" });
+    expect(onChange).toHaveBeenLastCalledWith("2");
+    fireEvent.keyDown(grid, { key: "ArrowUp" });
+    /* Already at the top: there is nowhere above row 1, so nothing is reported. */
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops at both ends rather than wrapping", () => {
+    const onChange = vi.fn();
+    render(<DataTable {...base} testId="t" activeRow={{ id: "2", onChange, label: "Orders" }} />);
+    fireEvent.keyDown(screen.getByTestId("t"), { key: "ArrowDown" });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("opens on Enter, and only when a page asked for that too", () => {
+    const onOpen = vi.fn();
+    render(<DataTable {...base} testId="t" activeRow={{ ...ACTIVE, onOpen }} />);
+    fireEvent.keyDown(screen.getByTestId("t"), { key: "Enter" });
+    expect(onOpen).toHaveBeenCalledWith("1");
+  });
+});
+
+describe("SO-3 · density", () => {
+  it("is 40px until a page asks for less", () => {
+    render(<DataTable {...base} />);
+    expect(document.querySelector("table")!.className).toContain("[&_td]:h-row");
+    expect(document.querySelector("table")!.className).not.toContain("h-row-compact");
+  });
+
+  it("runs at 34px on `compact`, and every row keeps ONE height", () => {
+    render(<DataTable {...base} density="compact" />);
+    expect(document.querySelector("table")!.className).toContain("[&_td]:h-row-compact");
+    const rowClasses = new Set(
+      [...document.querySelectorAll('[data-kit="data-row"] td')].map((td) => td.className),
+    );
+    /* Three columns, three class strings — and no FOURTH, which is what a
+     * per-row height would produce. */
+    expect(rowClasses.size).toBe(3);
+  });
+});

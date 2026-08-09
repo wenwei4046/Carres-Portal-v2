@@ -178,6 +178,129 @@ Outstanding  61.6      109    sized to `RM 1,234,567`, not today's largest live 
 
 ---
 
+# §1.5 · WHAT SO-3 BUILT — the register grew seven powers and gained a PANEL
+
+> **Loo, 2026-08-09:** *"KEEP the current foundation. DO NOT rebuild. Upgrade in place."*
+> Nothing in §1 was thrown away. Every file below is the SO-1 file, edited.
+
+```
+apps/web/src/components/kit/DataTable.tsx        4 new OPTIONAL powers (below)
+apps/web/src/components/kit/tokens.ts            ROW_HEIGHT — 40 and 34
+apps/web/tailwind.config.ts                      h-row · h-row-compact, named keys
+apps/web/src/pages/operation/sales-order-columns.ts   the FIELD CATALOG — 6 + 28
+apps/web/src/pages/operation/SalesOrderPanel.tsx      the Sales Order panel
+apps/web/src/pages/operation/SalesOrdersRegister.tsx  the register, upgraded
+apps/web/src/pages/operation/sales-order-facts.ts     `promiseHistory`
+apps/api/src/routes/operation/orders.ts          14 flat fields · history metadata ·
+                                                 changeRequests · POST /request-change
+supabase/migrations/0326_a_promise_is_never_moved_silently.sql
+docs/COPY-STANDARD.md                            the panel's words + the event-stamp rule
+```
+
+### THE SEVEN CAPABILITIES, AND FOUR OF THEM WENT INTO THE KIT
+
+| Capability | Where | Note |
+|---|---|---|
+| every column sortable | kit, existed | now driven off the catalog, so a new column cannot arrive unsortable |
+| **auto-filter row under the header** | **kit, NEW** — `Column.filterInput` | the kit renders the box; the PAGE owns which rows survive |
+| **freeze `SO No` + `Customer`** | **kit, NEW** — `DataTable.freeze` | `left` is MEASURED off the rendered header, so a resize keeps the pin correct |
+| resize | kit, existed | wired for the first time (`layout`) |
+| show / hide columns + Reset | page | one catalog, so the chooser cannot drift from the columns |
+| **keyboard ↑ ↓** | **kit, NEW** — `DataTable.activeRow` | one press moves the row AND the panel; there is no second press |
+| instant panel update | page | the panel reads the row the grid is ON |
+
+**Every one is an OPTIONAL prop and no signature moved** — the three frozen pages that render
+`DataTable` pass none of them and emit the markup they emitted before (`ui/MASTER.md` §4).
+A kit test asserts that licence.
+
+### ⭐ THE ONE CLAUSE OF THE REGISTER LAW THAT MOVED, AND WHO MOVED IT
+
+```
+SO-1  "no cell may contain another layout"   → one string per cell
+SO-3  "Customer cell: phone under the name"  → ONE cell, TWO lines
+```
+**The owner re-ruled his own law, and the clause the law is FOR still holds:** *a row may never
+be taller than another row.* `text-body` is 18px of line-height and `text-meta` is 16 — the
+stack is **34px**, which is exactly the row height the same card asks for (`density −15%`).
+The two halves of that instruction are ONE decision and they arrive in one row height.
+
+**34 is not a taste.** `ui/MASTER.md` §4 puts the floor at ~32px, because the kit's in-row
+expand button is 24px at any density and a change below that moves `badge-height` too. 40 × 0.85
+= 34, which clears it with 5px either side, and no second token moved. The number lives in
+`tailwind.config.ts` and is mirrored by `kit/tokens.ts` `ROW_HEIGHT`.
+
+### THE COLUMN CHOOSER — 6 on, 28 off, and NOT ONE of them computed
+
+**Fill rates, production 2026-08-09, all 77 orders:** phone 77 · channel 77 · floor 77 · lift 77
+· address 72 · promised 71 · salesperson 40 · source ref 37 · email 32 · outlet 32 · payment
+method 32 · race/gender/birthday 32 each · emergency 31 · address parts 27 · proceed date 27 ·
+approval code 24 · deposit paid 23 · instalments 2 · **DO no 0 · invoice no 0 · invoiced 0 ·
+dispatched 0 · delivered 0 · billing 0 · stair items 0**.
+
+**The zeroes are still offered, and that is `CLAUDE.md` §6 rather than an oversight**: every row
+in this database is TEST data and go-live starts CLEAN, so a live count is evidence about
+whether the CODE works and never about whether the FIELD matters. What it does decide is the
+absence word — five of the zeroes are event stamps, and `COPY-STANDARD` now rules them
+`Not recorded` rather than minting a sixth word.
+
+**`race`, `gender` and `birthday` are on `orders` and are deliberately NOT offered.** They are
+filled 32/77 and they are not facts about the ORDER — a register that offered them would be a
+customer database growing inside a sales-order page, and nobody asked for one.
+
+### THE PANEL — and it closes F31, which SO-1 filed against itself as D-G
+
+The register stays mounted. `?order=<id>` opens the panel beside the grid; `?view=document` is
+the full-page printable Sales Order, kept as its own screen because it is the thing you print.
+**Opening one order no longer costs you the list.**
+
+**THE THREE PERMISSION LEVELS, and the middle one is why 0326 exists:**
+```
+LEVEL 1  edit          phone · address · internal note
+                       PATCH /api/orders/:id (0222 already admits customer fields on a
+                       proceed-lane order) + POST /annotations. Both already existed.
+LEVEL 2  REQUEST       the customer's postpone · an item change
+                       0326: two new kinds on `order_change_requests`, one RPC, and
+                       `orders.delivery_date` is NEVER written.
+LEVEL 3  never         items · prices · discount · salesperson · Ordered ·
+                       the ORIGINAL promised date. No control, not a disabled one.
+```
+
+**`Original {date} · changed ×N` counts records and nothing else.** Measured 2026-08-09: ONE
+live `order_history` row records a `delivery_date` edit, and `update_order` stamps the payload
+it was SENT — which holds the NEW value only. **So a change is countable and the original is not
+recoverable from those rows**, and the cell prints the second line only when a record actually
+says what the date was before. Never `changed ×0`; never the current value dressed as the
+original. A test holds both.
+
+### ⭐ THREE DEFECTS THE TESTS PASSED AND THE SCREEN DID NOT — all found by looking
+
+**Every one shipped green.** They are recorded because the lesson is the same each time: a
+suite proves the rule it was given, and only the built page proves the rule was right.
+
+**1 · A REQUEST WAS BEING COUNTED AS A CHANGE.** The first `promiseHistory` counted 0326's
+`promise_change_requested` rows. Recorded a real postpone against SO-1299 on production and the
+strip printed **`Original Sat, 29 Aug 26 · changed ×1`** — while the order still promised Sat,
+29 Aug, so the "original" it named was the CURRENT date and the count claimed a move that had
+not happened. **`changed ×N` must mean the customer was told a different day N times.** It now
+counts `{kind:'edit', changed:['delivery_date']}` and `promise_change_applied` only; the
+undecided ask is reported once, by the panel's own *Waiting for a decision* line, which names
+old → new. *(Nothing writes `promise_change_applied` yet — that is D-M's card.)*
+
+**2 · THE STRIP'S MOST IMPORTANT LINE WAS ELLIPSISED.** Four cells across a 420px panel is
+~105px each, and `Sat, 29 Aug 26` alone is ~105px of ink at `text-strong`: the promised date
+drew as `Sat, 29 A…` and its second line as `Original Sat, …`. Widening the panel takes the
+width off the REGISTER, which is the thing that has to stay readable — so the four cells are
+**2 × 2**, which is still exactly four cells and gives each ~186px. Nothing truncates now, and
+SO-1's own rule (*the Promised cell may NEVER truncate*) is kept rather than quietly broken by
+a panel it was written before.
+
+**3 · THE TOOLBAR OVERFLOWED, TWICE.** At 1440 a 448px search pushed the scope Select UNDER the
+Columns button; fixing that at 1440 then broke again when the panel opened and took another
+420. The search is now `flex-1` capped at 384 — **it is the control that absorbs the squeeze**,
+because a date field that shrinks stops showing a date. One line at every width.
+
+---
+
 # §2 · WHAT SO-1 DELIBERATELY DID NOT BUILD
 
 | Not built | Why, and where it goes |
@@ -234,12 +357,13 @@ out.** Presence and pool enrolment are safe — `POST /heartbeat` is fired by th
 `OperationApp.tsx:98` — but the SWEEP is not. It must be carried before the old page is retired,
 and it does not belong in a register: **it is the Promise Monitor's, or the shell's.**
 
-### 🟡 D-G · The document replaces the register in place
-Opening one order costs you the list (`grid-findings.md` F31 filed this about the old drawer and
-it is equally true here). `?order=<id>` means the browser Back button works and a deep link
-opens the document, so nothing is lost — but the register is unmounted while a document is open,
-and at 1,000 orders/month re-fetching the list on every Back is the wrong shape. The fix is a
-real route with the register kept alive; it is not this card's.
+### 🟩 D-G · CLOSED BY SO-3 · The document replaced the register in place
+Opening one order cost you the list (`grid-findings.md` F31, filed about the old drawer and
+equally true of SO-1's document). **The row now opens the PANEL and the register stays mounted**
+— no unmount, no re-fetch on Back, and `↑`/`↓` keep working while an order is open. The
+printable document is still its own screen, reached by `⤢`, because it is the thing you print
+and printing a panel is not a thing. *Remaining: the document screen still unmounts the grid.
+That is correct for a document and is not a debt.*
 
 ### 🟡 D-H · A CJK customer name would render in the wrong font
 The register's cells are bare strings, because the law says no cell may contain another layout —
@@ -256,10 +380,40 @@ figure is what an operator says out loud and what a receipt must match. Measured
 is wrong today, and the first part-payment with sen makes it wrong. It is a SHARED component on
 every money surface in the portal; it needs its own card, not a register's.
 
-### ⚪ D-I · Salesperson and Outlet cannot be offered
-`orders.salesperson_id` is filled on 40/77 and `outlet_id` on 32/77, but **neither is on the
-list payload and neither has a name embedded** — the chooser would offer a column of UUIDs. It
-needs the list endpoint to carry the names (D-B's card).
+### 🟩 D-I · CLOSED BY SO-1 AND WIDENED BY SO-3 · the chooser has real names, not UUIDs
+SO-1 put `salespersons(name)` + `outlets(name)` on the list payload; **SO-3 added the other
+fourteen flat fields** the chooser offers (`channel`, `customer_email`, the five address parts,
+floor / lift, billing / emergency, `invoice_no` / `invoiced_at`, `payment_method`,
+`installment_months`). Both FKs are single, so neither embed needs a disambiguating hint. The
+entry stays here rather than being deleted, because it is the receipt for why a chooser and a
+list endpoint are one question.
+
+### 🟡 D-M · SO-3 · The two Level-2 requests have nowhere to be DECIDED
+A postpone and an item change are recorded as `pending` rows on `order_change_requests` and the
+panel shows what is waiting. **Nobody can approve or reject one from this page** — the existing
+decision doors (`/api/orders/:id/change-requests/:id/decide`) were built for the dealer's three
+PRODUCT kinds and are wired to the POS's approval queue, not to a register. That is deliberate
+for one card: a decision surface is a WORKLIST, and a register has none (`MIGRATION-MAP` §0's
+Promise Monitor is where a worklist goes). **Until it exists, a request waits and a human moves
+it by talking to somebody.** It needs its own card and it should be the next one after §6's
+step 2.
+
+### 🟡 D-N · SO-3 · Editing the address clears the structured address parts
+`update_order` (0230) treats a flat `customer_address` write with no parts in the payload as a
+stale-guard and NULLs `customer_address_line1/2/city/state/postcode`. The panel edits the
+composed address only, so an operator fixing a typo silently drops the parts. Measured
+2026-08-09: **27 of 77 orders carry parts**, and nothing on any screen reads them today except
+the chooser's own five columns. The fix is a structured address editor in the panel (five
+fields, sent together) — it is a form design, not a register's, and it is not urgent while
+nothing downstream consumes the parts.
+
+### 🟡 D-O · SO-3 · One order still holds ONE pending PRODUCT change
+0326 split `order_change_requests_one_pending` so an operator's postpone can never block a
+dealer's product change — the three product kinds keep the exact predicate they had, and the two
+new kinds get their own per-kind index. **But the dealer's own rule is unchanged**: an order
+with a pending `add_lines` still refuses a `replace_lines`. That was 0129's ruling and this card
+did not reopen it; it is recorded here because the next chat WILL find the two indexes and
+wonder which one is the intent. Both are.
 
 ### 🔴 D-K · FOUR API TESTS ARE ALREADY RED ON THIS BRANCH — found by SO-1, not caused by it
 ```
@@ -275,6 +429,14 @@ without this card. SO-1 touches no API file (`git status` = `apps/web` + `script
 **Left out of this commit on purpose** — three unrelated modules, and mixing them into a
 register card would hide both. It needs its own card and it needs one soon: a red suite stops
 being read.
+
+### 🟩 D-K · STILL FOUR, STILL NOT SO-3's — and now PROVED against an edited API file
+SO-3 edits `apps/api/src/routes/operation/orders.ts`, so "we touch no API file" is no longer
+the argument. The named four are unchanged and none is in this route:
+`@carres/api` reads **3 files failed / 103 passed · 4 tests failed of 2,141** before and after,
+and `src/routes/operation/orders.test.ts` is **82/82 green** including SO-3's six new door
+tests. The card is still owed. *(`@carres/web` **2,815/2,815** · `@carres/shared`
+**2,231/2,231** · typecheck clean · design-standard clean · `pnpm build` clean.)*
 
 ### ⚪ D-J · `check-design.mjs --report` is broken
 It reads `docs/UI-KIT.md`, which no longer exists (it is `docs/ui/MASTER.md`). Pre-existing,
@@ -295,8 +457,27 @@ SO number or a customer name and stop talking.
                      what did I buy      → Items    (one line; the document has every line)
                      when did you promise→ Promised
                      what do I still owe → Outstanding
-③  WHAT NOW     open the row → the existing drawer, unchanged
+③  WHAT NOW     open the row → the Sales Order PANEL, beside the register
+                (SO-3; SO-1 opened the printable document in its place)
 ```
+
+### THE 30-SECOND PHONE TEST, walked on the built page (SO-3, 2026-08-09)
+
+**The customer says a name or a number, and the operator answers three questions.**
+
+```
+"how much do I owe?"      register  → Outstanding (a hidden column, one tick)
+                          panel     → OUTSTANDING, second cell of four, always a
+                                      sentence: the amount · Paid in full · No price yet
+"when will it arrive?"    register  → Promised, a default column
+                          panel     → PROMISED, and `Original … · changed ×N` under it
+                                      when the promise has actually moved
+"what did I buy?"         register  → Items, product NAMES, `+2 more` past two
+                          panel     → ITEMS, every line with its qty and its money
+```
+**Every one is answered without leaving the register**, which is the change: the list is still
+on screen behind the panel, so the next call does not start with finding the page again.
+`⤢` is only for the printable document.
 
 **PASS** = ①②③ inside 30 seconds, no scrolling sideways, no asking what a column means.
 **FAIL** = change the UI. **Not a code debate, and no planning round** — the card pre-approved
@@ -321,9 +502,10 @@ nothing at all, which is the property that keeps the boundary rather than a prom
 
 | # | Raised | By whom, when |
 |---|---|---|
-| P1 | **`ui/MASTER.md:250` says `✗ start with Sales Order — the standard comes first`.** SO-1 goes straight there, so Sales Orders now DEFINES the page-structure standard by being built first instead of being the first page built TO it. The owner's newest instruction outranks the document; the line needs retiring or the card needs re-reading. | SO-1 review, 2026-08-08 |
+| P1 | ✅ **SETTLED BY SO-3.** `ui/MASTER.md` §6.5 said `✗ start with Sales Order` and `✗ add grid capability`. The owner then issued SO-1 and SO-3, which do both — twice, in writing, after that block was written. **A document nobody may contradict while the owner contradicts it is not a law, it is a stale note**, so §6.5's two lines are retired in this card rather than quietly worked around. Sales Order is now the page the standard is derived FROM. | SO-1 review 2026-08-08 · closed 2026-08-09 |
 | P2 | **A named layout with a company default** (AutoCount F44) versus no memory at all. `ui/MASTER.md` §7 hands this to the owner by name. | SO-1 review |
-| P3 | **The drawer as a full-page route rather than a replacement panel.** 2990's own Sales Order detail is a route (`SalesOrderDetail.tsx:2`); Carres' is a 7,717-line panel that costs you the list. | grid-findings F31 · SO-1 |
+| P3 | ✅ **ANSWERED BY SO-3, and neither of the two options won.** The record opens BESIDE the list, not as a route and not as a replacement panel — so the list is never lost and the URL still deep-links (`?order=`). The printable document keeps the full screen, which is the one case a route was right for. | grid-findings F31 · SO-1 · closed 2026-08-09 |
+| P7 | **A Level-2 request has nowhere to be DECIDED** (D-M). The panel records; nobody approves. The decision surface is a worklist, and this page has none. | SO-3, 2026-08-09 |
 | P4 | **Nobody has watched an operator work.** Outranks everything else in this file. | grid-findings §6, every round |
 | P5 | **16 free-text SKUs need real names.** They are what makes `Items` a 459px column; real names make it narrower. | `ui/MASTER.md` §6.5 |
 | P6 | **The footer shows a count and no money total.** S2.3 shipped a total on the live list; the register omits it because the card said *only facts, no business computation*. Worth re-asking after the acceptance test. | SO-1 |
@@ -335,12 +517,18 @@ nothing at all, which is the property that keeps the boundary rather than a prom
 **In this order, and the first one is not optional.**
 
 ```
-1  RUN THE ACCEPTANCE TEST (§4). It is 30 seconds and it decides the next card.
+1  RUN THE ACCEPTANCE TEST (§4) WITH THE BOSS. It is 30 seconds and it decides
+   the next card. SO-3 walked it on the built page and it passes; that is not
+   the same as an operator doing it, and P4 still outranks everything here.
 2  CARRY THE SWEEP (D-F). Unowned orders are not being dealt out today.
-3  THE LIST ENDPOINT (D-A · D-B · D-C · D-I). Thin, server-paged, server-searched
-   over SO · customer · phone · item, with the indexes to match. It retires four
-   debts at once and it is what 1,000 orders/month actually needs.
-4  ONLY THEN the Promise Monitor — ONE shared read model, never a new column.
+3  DECIDE A REQUEST (D-M · P7). Two kinds of request can now be RAISED and
+   neither can be answered. That gap is one card old today and it grows.
+4  THE LIST ENDPOINT (D-A · D-B · D-C). Thin, server-paged, server-searched
+   over SO · customer · phone · item, with the indexes to match. It retires three
+   debts at once and it is what 1,000 orders/month actually needs. **SO-3 raised
+   its urgency:** every column now filters IN THE BROWSER over the fetched page,
+   so the 200-row cap is now silently narrowing a filter as well as a search.
+5  ONLY THEN the Promise Monitor — ONE shared read model, never a new column.
 ```
 
 **Do not** add a column, a tab, a rail or a queue to the register before step 1 has been run.

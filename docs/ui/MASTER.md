@@ -113,6 +113,15 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
   before lazy-loading; `DataTable` has no cap of any kind** (F68). The cost is linear in rows
   and **flat in density** — 100ms is crossed at ~200–350 rows, so this is a WINDOWING question
   and never a row-height one.
+- **`DataTable` carries EIGHT optional powers, and SO-3 added four** (2026-08-09): the
+  auto-filter row under the header (`Column.filterInput`), frozen leading columns
+  (`freeze`, whose `left` is MEASURED off the rendered header so a resize keeps the pin
+  correct), the keyboard reading position (`activeRow` — `↑ ↓ Enter`), and `density`. A frozen
+  column takes **no `z-` class**: a `sticky` cell is positioned and every other `<td>` is not,
+  so painting order already answers it and §4.4's ladder stays closed at five.
+- **Row height is 40px, or 34 on `density="compact"`** — `tokens.ts` `ROW_HEIGHT`, mirrored by
+  `tailwind.config.ts`'s `h-row` / `h-row-compact`. 34 is 40 × 0.85 and clears the ~32px floor
+  below, so no second token moved.
 - **Every optional power is OPTIONAL and no signature moved** — that is the only reason a kit
   card can run while pages are frozen. **A page must justify wiring a power** (`§13.3` of the
   Constitution's design philosophy); an unwired power's ABSENCE is asserted by a test, because a
@@ -247,16 +256,33 @@ THE ONE THAT OUTRANKS ALL OF THEM
 
 **⛔ WHAT THE NEXT CHAT MAY NOT DO**
 ```
-✗ start with Sales Order            the standard comes first
 ✗ touch business logic              APIs · calculations · the action ladder ·
                                     queues · PIC · stock · delivery · money ·
                                     permissions · order records — all PRESERVED
-✗ re-measure widths, densities,     finished and recorded in grid-findings §4.7/§4.8
-  engines or row height
-✗ add grid capability               the foundation is DONE; S2.5 is STOPPED
+✗ re-measure widths or engines      finished and recorded in grid-findings §4.7/§4.8
 ✗ derive a page structure from      the last programme did exactly this, and the
   reading source                    two ⛔ blocks are the receipt
 ```
+
+> ### ✅ TWO OF THIS BLOCK'S LINES ARE RETIRED — by the owner, twice, in writing
+>
+> This block said `✗ start with Sales Order — the standard comes first` and `✗ add grid
+> capability — the foundation is DONE`. **The owner then issued SO-1 (2026-08-09) and SO-3
+> (2026-08-09), which do both**: the register was rebuilt to THE REGISTER LAW and then given
+> seven grid capabilities, four of them new kit powers.
+>
+> **`CLAUDE.md` Law 2 settles it — reality outranks documentation, and the owner's newest
+> instruction outranks a note he wrote the day before.** Leaving the lines standing while
+> shipping past them is the failure Law 4 exists to stop: a document nobody may contradict
+> while the owner contradicts it is not a law, it is a stale note that makes the next chat
+> argue with a ghost.
+>
+> **Sales Order is therefore the page the page-structure standard is derived FROM**, not the
+> first page built to one. The ROW-HEIGHT line above is now a live number rather than a frozen
+> one: `tokens.ts` `ROW_HEIGHT` carries **40 and 34**, and 34 is exactly the floor arithmetic
+> this section already stated (24px controls, ~32px floor). What SO-3 did NOT re-measure is
+> anything else — widths, engines and the 200-row cost stand as recorded.
+> *Receipt: `docs/MIGRATION-MAP.md` §1.5 and §5 P1.*
 
 ---
 

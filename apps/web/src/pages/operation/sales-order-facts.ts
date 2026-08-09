@@ -135,6 +135,77 @@ export function valueState(m: OrderMoney): MoneyState {
     : { kind: "unpriced" };
 }
 
+/**
+ * ⭐ THE PROMISE'S OWN HISTORY (SO-3, Loo 2026-08-09).
+ *
+ * The panel's PROMISED cell stacks a second line — `Original {date} · changed
+ * ×N` — and the card is exact about when: **ONLY when real promise-change
+ * records exist.** Never `changed ×0`, and never the current value dressed up
+ * as the original.
+ *
+ * **So this reads `order_history.metadata` and nothing else**, because that is
+ * the only place a promise change was ever stamped:
+ * ```
+ * update_order (0222)  {kind:'edit', changed:['delivery_date',…]}   ✅ counted
+ * a decided request    {kind:'promise_change_applied', from, to}    ✅ counted
+ * 0326's own record    {kind:'promise_change_requested', from, to}  ❌ NOT counted
+ * ```
+ *
+ * ⭐ **A REQUEST IS NOT A CHANGE, and this was caught by LOOKING at the built
+ * page rather than by a test.** The first draft counted 0326's request rows,
+ * so a postpone recorded against SO-1299 printed `Original Sat, 29 Aug 26 ·
+ * changed ×1` while the order still promised Sat, 29 Aug — the cell claimed a
+ * move that had not happened, and the "original" it named was the current date.
+ * **`changed ×N` must mean the customer was told a different day N times.** A
+ * request that nobody has decided is reported where it belongs: the panel's own
+ * *Waiting for a decision* line, which names old → new and says plainly that it
+ * is waiting.
+ *
+ * **Measured on production 2026-08-09:** ONE live history row records a
+ * `delivery_date` edit, and it carries no `from` — `update_order` stamps the
+ * payload it was SENT, which holds the new value only. So a change can be
+ * COUNTED from those rows and the original cannot be recovered from them, and
+ * that is not a gap to paper over: `originalPromised` stays `null` unless a row
+ * actually says what the date was before.
+ *
+ * The two are returned separately for exactly that reason. `changes` is what
+ * happened; `originalPromised` is what we can prove, and a cell prints the
+ * second line only when it has both.
+ */
+export interface PromiseHistory {
+  /** How many recorded changes to the promise — 0 means print nothing. */
+  changes: number;
+  /** The date the customer was FIRST promised, when a record says so. */
+  originalPromised: string | null;
+}
+
+export function promiseHistory(
+  history: readonly { metadata?: Record<string, unknown> | null }[],
+): PromiseHistory {
+  let changes = 0;
+  let originalPromised: string | null = null;
+  for (const h of history) {
+    const m = h.metadata;
+    if (!m || typeof m !== "object") continue;
+    const kind = m.kind;
+    /* MOVED, not merely asked about — see the header. `promise_change_applied`
+     * is written by whoever DECIDES a request; nothing writes it yet, and that
+     * gap is `MIGRATION-MAP.md` D-M rather than a reason to count the ask. */
+    const movedPromise =
+      kind === "promise_change_applied" ||
+      (kind === "edit" && Array.isArray(m.changed) && m.changed.includes("delivery_date"));
+    if (!movedPromise) continue;
+    changes += 1;
+    /* The EARLIEST `from` wins — history arrives oldest-first, so the first one
+     * seen is the promise as it was originally made. A later change's `from` is
+     * an intermediate date, never the original. */
+    if (originalPromised == null && typeof m.from === "string" && m.from !== "") {
+      originalPromised = m.from;
+    }
+  }
+  return { changes, originalPromised };
+}
+
 /** Digits only, so `012-345 6789` and `0123456789` are one customer. */
 export function digits(s: string): string {
   return s.replace(/\D+/g, "");

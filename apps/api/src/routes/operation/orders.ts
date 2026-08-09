@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import {
   abandonOrderInput,
   assignPartnerInput,
@@ -207,7 +208,16 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // bare embed is unambiguous and needs no hint, unlike delivery_partners.
       // Purely additive: the old control table selects none of these and is
       // unaffected.
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty, unit_price, source_po), order_addons(qty, unit_price), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
+      // 2026-08-09 (SO-3) — the register's COLUMN CHOOSER offers every flat
+      // fact the customer order itself owns, hidden by default. Fourteen of
+      // them were simply not on the wire, so the chooser could not have offered
+      // them: `channel`, `customer_email`, the five structured address parts,
+      // `delivery_floor` / `delivery_has_lift`, `customer_billing` /
+      // `customer_emergency`, `invoice_no` / `invoiced_at`, `payment_method`
+      // and `installment_months`. Every one is a column on `orders` — nothing
+      // here is another module's record, nothing here is computed. Additive:
+      // the old control table selects none of them.
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, delivery_floor, delivery_has_lift, channel, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty, unit_price, source_po), order_addons(qty, unit_price), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -399,24 +409,40 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   // `confirm_delivery_date`, `request_for_delivery_at`, `partner_accepted_at`,
   // `partner_rejected_at`) that previously lived on the PO. Drawer reads
   // `threads[].delivery_partner_id` for the partner-assignment hint.
-  const [linesRes, addonsRes, historyRes, threadsRes] = await Promise.all([
+  const [linesRes, addonsRes, historyRes, threadsRes, changesRes] = await Promise.all([
     // 2026-05-10 (Loo) — also pull `attrs` so the OrderDetailDrawer's
     // "+ Issue POs" navigate-to-procurement flow can carry color/gap/fabric
     // into CreatePOModal's cascade picker without a second round-trip.
     sb.from("order_lines").select("sku, qty, unit_price, attrs, source_po").eq("order_id", id),
     sb.from("order_addons").select("addon_key, qty, unit_price").eq("order_id", id),
-    sb.from("order_history").select("text, by_role, occurred_at").eq("order_id", id).order("occurred_at", { ascending: true }),
+    // 2026-08-09 (SO-3) — `metadata` joins the history select, and it is the
+    // ONLY way the panel's PROMISED cell can be honest. `update_order` and
+    // `operation_request_order_change` both stamp the promise's old and new
+    // value there; the `text` alone carries a sentence a browser would have to
+    // parse. Measured 2026-08-09: 1 live row records a delivery_date edit and
+    // it has no `from` — so an order with no recorded change shows NO second
+    // line, rather than the current value dressed up as the original.
+    sb.from("order_history").select("text, by_role, occurred_at, metadata").eq("order_id", id).order("occurred_at", { ascending: true }),
     sb
       .from("order_supplier_threads")
       .select(
         "id, supplier_id, category, operation_stage, po_id, delivery_partner_id, confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at",
       )
       .eq("order_id", id),
+    // What is WAITING on this order. The history says what happened; this says
+    // what has not been decided yet, which is what stops the panel offering to
+    // raise a second postpone on top of an undecided one.
+    sb
+      .from("order_change_requests")
+      .select("id, kind, payload, status, requested_at, decided_at")
+      .eq("order_id", id)
+      .order("requested_at", { ascending: false }),
   ]);
   if (linesRes.error) { const m = mapPgError(linesRes.error); return c.json(m.body, m.status); }
   if (addonsRes.error) { const m = mapPgError(addonsRes.error); return c.json(m.body, m.status); }
   if (historyRes.error) { const m = mapPgError(historyRes.error); return c.json(m.body, m.status); }
   if (threadsRes.error) { const m = mapPgError(threadsRes.error); return c.json(m.body, m.status); }
+  if (changesRes.error) { const m = mapPgError(changesRes.error); return c.json(m.body, m.status); }
 
   const rawLines = linesRes.data ?? [];
   const addons = addonsRes.data ?? [];
@@ -542,7 +568,71 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     pos: posWithLines,
     history: historyRes.data ?? [],
     threads: threadsRes.data ?? [],
+    changeRequests: changesRes.data ?? [],
   });
+});
+
+/**
+ * POST /:id/request-change — SO-3's LEVEL 2.
+ *
+ * **The panel has no Edit button for a promise or an item, and this is why.**
+ * A customer's postpone and an item swap are not the operator's to apply; they
+ * are the operator's to RECORD. The RPC writes a pending
+ * `order_change_requests` row plus an `order_history` entry and touches
+ * `orders.delivery_date` never — so the register keeps printing the promise
+ * that was actually made, and `Original {date} · changed ×N` has rows to count.
+ *
+ * The reason is required by the RPC, not only by the form: a recorded postpone
+ * with no reason on it is the thing the next person cannot act on.
+ */
+const requestChangeInput = z.union([
+  z.object({
+    kind: z.literal("promise_date"),
+    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "A new date is required"),
+    reason: z.string().trim().min(1, "A reason is required").max(500),
+  }),
+  z.object({
+    kind: z.literal("item_change"),
+    note: z.string().trim().min(1, "Say what should change").max(2000),
+    reason: z.string().trim().min(1, "A reason is required").max(500),
+  }),
+]);
+
+operationOrdersRouter.post("/:id/request-change", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = requestChangeInput.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: parsed.error.issues[0]?.message ?? "invalid input",
+      },
+      422,
+    );
+  }
+  const { kind, reason } = parsed.data;
+  const payload =
+    kind === "promise_date"
+      ? { to: parsed.data.to, reason }
+      : { note: parsed.data.note, reason };
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("operation_request_order_change", {
+    p_order_id: id,
+    p_kind: kind,
+    p_payload: payload,
+  });
+  if (error) {
+    /* `mapPipelineV2Error`, not `mapPgError`: every refusal this RPC raises is
+     * a 22023 with a DETAIL that names it (`pending_exists`, `same_date`,
+     * `reason_required`), and the plain mapper drops that detail on the floor —
+     * the panel would then have one code for six different answers. */
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data, 201);
 });
 
 // ----- GET /:id/print-do -----

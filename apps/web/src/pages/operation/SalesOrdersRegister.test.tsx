@@ -55,6 +55,35 @@ vi.mock("./SalesOrderDocument", () => ({
   ),
 }));
 
+/* SO-3 — the panel has its own suite (`SalesOrderPanel.test.tsx`). Here it is a
+   stub, so these tests hold what the REGISTER does: which order is open, where
+   the arrows land, and that the grid is still mounted beside it. */
+vi.mock("./SalesOrderPanel", () => ({
+  default: ({
+    orderId,
+    position,
+    total,
+    onStep,
+    onOpenDocument,
+    onClose,
+  }: {
+    orderId: string;
+    position: number;
+    total: number;
+    onStep: (d: -1 | 1) => void;
+    onOpenDocument: () => void;
+    onClose: () => void;
+  }) => (
+    <div data-testid="panel-stub" data-order-id={orderId}>
+      <span data-testid="panel-stub-position">{`${position} of ${total}`}</span>
+      <button onClick={() => onStep(1)}>next</button>
+      <button onClick={() => onStep(-1)}>prev</button>
+      <button onClick={onOpenDocument}>document</button>
+      <button onClick={onClose}>close</button>
+    </div>
+  ),
+}));
+
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
@@ -406,18 +435,196 @@ describe("THE HIDDEN FACT COLUMNS", () => {
   });
 });
 
-describe("THE ROW OPENS THE DOCUMENT", () => {
-  it("opens the Sales Order document, not the cockpit", () => {
+/**
+ * SO-3 REPLACED SO-1's "THE ROW OPENS THE DOCUMENT", and the replacement is a
+ * ruling rather than a regression.
+ *
+ * SO-1 shipped a row that opened the printable document IN PLACE OF the
+ * register, and filed its own cost as debt D-G (`grid-findings` F31: *opening
+ * one order costs you the list*). SO-3's card: *"Opens on row click, register
+ * stays visible"* — and the document is kept as the separate screen `⤢` opens.
+ * The two tests below are the old two, rewritten to the new ruling; the
+ * document's own screen is still asserted, because it did not go anywhere.
+ */
+describe("THE ROW OPENS THE PANEL, AND THE REGISTER STAYS", () => {
+  it("opens the Sales Order panel beside the grid — the list is not lost", () => {
     render(wrap(<SalesOrdersRegister />));
     fireEvent.click(rows()[0]);
-    expect(screen.getByTestId("document-stub")).toBeInTheDocument();
-    expect(screen.queryByTestId("sales-orders-table")).toBeNull();
+    expect(screen.getByTestId("panel-stub")).toHaveAttribute("data-order-id", "o-native");
+    /* The whole point: the register is STILL MOUNTED. */
+    expect(screen.getByTestId("sales-orders-table")).toBeInTheDocument();
+    expect(rows().length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("document-stub")).toBeNull();
   });
 
-  it("comes back to the register", () => {
+  it("⤢ opens the full printable document as its own screen, and Back returns to the panel", () => {
     render(wrap(<SalesOrdersRegister />));
     fireEvent.click(rows()[0]);
+    fireEvent.click(screen.getByText("document"));
+    expect(screen.getByTestId("document-stub")).toHaveAttribute("data-order-id", "o-native");
+    expect(screen.queryByTestId("sales-orders-table")).toBeNull();
+
     fireEvent.click(screen.getByText("back"));
     expect(screen.getByTestId("sales-orders-table")).toBeInTheDocument();
+    expect(screen.getByTestId("panel-stub")).toBeInTheDocument();
+  });
+
+  it("✕ closes the panel and leaves the register alone", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(rows()[0]);
+    fireEvent.click(screen.getByText("close"));
+    expect(screen.queryByTestId("panel-stub")).toBeNull();
+    expect(screen.getByTestId("sales-orders-table")).toBeInTheDocument();
+  });
+
+  it("tells the panel where it is in the list — `n of N`", () => {
+    render(wrap(<SalesOrdersRegister />));
+    /* Default scope hides the delivered order, and rental never reaches the
+       register at all: two rows survive, newest ordered first. */
+    fireEvent.click(rows()[0]);
+    expect(screen.getByTestId("panel-stub-position")).toHaveTextContent("1 of 2");
+  });
+});
+
+describe("SO-3 · THE SEVEN GRID CAPABILITIES", () => {
+  it("↑ ↓ walk the rows and the panel follows — no second press", () => {
+    render(wrap(<SalesOrdersRegister />));
+    const grid = screen.getByTestId("sales-orders-table");
+    fireEvent.keyDown(grid, { key: "ArrowDown" });
+    expect(screen.getByTestId("panel-stub")).toHaveAttribute("data-order-id", "o-native");
+    fireEvent.keyDown(grid, { key: "ArrowDown" });
+    expect(screen.getByTestId("panel-stub")).toHaveAttribute("data-order-id", "o-import");
+    fireEvent.keyDown(grid, { key: "ArrowUp" });
+    expect(screen.getByTestId("panel-stub")).toHaveAttribute("data-order-id", "o-native");
+  });
+
+  it("the panel's own arrows move through the same list", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(rows()[0]);
+    fireEvent.click(screen.getByText("next"));
+    expect(screen.getByTestId("panel-stub")).toHaveAttribute("data-order-id", "o-import");
+    fireEvent.click(screen.getByText("prev"));
+    expect(screen.getByTestId("panel-stub")).toHaveAttribute("data-order-id", "o-native");
+  });
+
+  it("gives EVERY visible column a filter box under its header", () => {
+    render(wrap(<SalesOrdersRegister />));
+    for (const key of ["so", "customer", "items", "value", "promised", "ordered"]) {
+      expect(screen.getByTestId(`table-filter-input-${key}`)).toBeInTheDocument();
+    }
+  });
+
+  it("filters on what the CELL prints, so the box can never disagree with the screen", () => {
+    render(wrap(<SalesOrdersRegister />));
+    expect(rows().length).toBe(2);
+    fireEvent.change(screen.getByTestId("table-filter-input-customer"), {
+      target: { value: "myhouse" },
+    });
+    expect(rows().length).toBe(1);
+    expect(screen.getByTestId("register-count")).toHaveTextContent("1 of 3 orders");
+  });
+
+  it("makes EVERY visible column sortable", () => {
+    render(wrap(<SalesOrdersRegister />));
+    for (const key of ["so", "customer", "items", "value", "promised", "ordered"]) {
+      expect(screen.getByTestId(`table-sort-${key}`)).toBeInTheDocument();
+    }
+  });
+
+  it("pins SO No and Customer, and hands the grid a resize handle", () => {
+    render(wrap(<SalesOrdersRegister />));
+    const table = screen.getByTestId("sales-orders-table");
+    const heads = Array.from(table.querySelectorAll("th[data-column]"));
+    expect(heads[0]!.className).toContain("sticky");
+    expect(heads[1]!.className).toContain("sticky");
+    expect(heads[2]!.className).not.toContain("sticky");
+    expect(screen.getByTestId("table-resize-so")).toBeInTheDocument();
+  });
+
+  it("runs the rows at the −15% density and every row is still ONE height", () => {
+    render(wrap(<SalesOrdersRegister />));
+    const table = screen.getByTestId("sales-orders-table");
+    expect(table.querySelector("table")!.className).toContain("[&_td]:h-row-compact");
+    const heights = new Set(
+      rows().map((r) => (r.querySelector("td") as HTMLElement).className),
+    );
+    expect(heights.size).toBe(1);
+  });
+});
+
+describe("SO-3 · THE COLUMN CHOOSER", () => {
+  it("offers every order-owned flat fact, and only six are on", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(screen.getByTestId("columns-button"));
+    for (const label of [
+      "Phone", "Email", "Address", "Postcode", "Floor", "Lift",
+      "DO No", "Invoice No", "Invoiced", "Delivered", "Paid", "Outstanding",
+      "Channel", "Customer reference", "Payment method",
+    ]) {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+    const table = screen.getByTestId("sales-orders-table");
+    expect(table.querySelectorAll("th[data-column]").length).toBe(6);
+  });
+
+  it("offers NO cross-module column — the chooser is not a back door", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(screen.getByTestId("columns-button"));
+    for (const banned of ["Stock", "Next action", "PIC", "Status", "Ready Stock", "On PO"]) {
+      expect(screen.queryByLabelText(banned)).toBeNull();
+    }
+  });
+
+  it("puts a re-ticked column back where the catalog keeps it, never at the end", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(screen.getByTestId("columns-button"));
+    fireEvent.click(screen.getByLabelText("Phone"));
+    const heads = () =>
+      Array.from(
+        screen.getByTestId("sales-orders-table").querySelectorAll("th[data-column]"),
+      ).map((th) => th.getAttribute("data-column"));
+    expect(heads()).toEqual(["so", "customer", "items", "value", "promised", "ordered", "phone"]);
+  });
+
+  it("Reset columns puts the six back and clears the filter boxes", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(screen.getByTestId("columns-button"));
+    fireEvent.click(screen.getByLabelText("Phone"));
+    fireEvent.change(screen.getByTestId("table-filter-input-customer"), {
+      target: { value: "myhouse" },
+    });
+    expect(rows().length).toBe(1);
+    fireEvent.click(screen.getByTestId("columns-reset"));
+    expect(
+      screen.getByTestId("sales-orders-table").querySelectorAll("th[data-column]").length,
+    ).toBe(6);
+    expect(rows().length).toBe(2);
+    /* Layout memory is still REFUSED (ui/MASTER.md §7) — the reset is a
+       control, and a reload is still the other one. */
+    expect(window.localStorage.length).toBe(0);
+  });
+});
+
+describe("SO-3 · THE CUSTOMER CELL AND EXPORT", () => {
+  it("stacks the phone under the name, inside ONE cell", () => {
+    render(wrap(<SalesOrdersRegister />));
+    const cell = rows()[0]!.querySelectorAll("td")[1]!;
+    expect(cell).toHaveTextContent("MyHouse Management PLT");
+    expect(cell).toHaveTextContent("012-345 6789");
+    /* Still no card, table, chip or control smuggled into a cell. */
+    expect(cell.querySelector("table, ul, ol, button, [data-kit='badge']")).toBeNull();
+  });
+
+  it("says `Not given` when the customer never gave a phone", () => {
+    listHookState.data = {
+      orders: [fixture()[0]!, { ...fixture()[1]!, customer_phone: null }],
+    };
+    render(wrap(<SalesOrdersRegister />));
+    expect(screen.getByText("Not given")).toBeInTheDocument();
+  });
+
+  it("keeps Export, and it writes the columns on screen", () => {
+    render(wrap(<SalesOrdersRegister />));
+    expect(screen.getByTestId("export-button")).toBeEnabled();
   });
 });

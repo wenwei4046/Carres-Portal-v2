@@ -1119,6 +1119,31 @@ spells both `—` tells an operator to go chasing a thing that was never chaseab
 day, no date yet"*, *"No logistics picked"*. Name the thing that is absent; never reach for a
 to-do word (`needs`, `pending`, `TBC`), which this file bans everywhere.
 
+**AN EVENT STAMP THAT HAS NOT HAPPENED READS `Not recorded` TOO** (SO-3, 2026-08-09). `DO No`,
+`Invoice No`, `Invoiced`, `Dispatched` and `Delivered` are all facts a document or an act
+produces, and until it happens there is nothing to print. It is OUR gap in the sense that
+matters — somebody in this company closes it — so it takes our word, not the customer's.
+A sixth word for *"has not happened yet"* was considered and refused: it would need an entry per
+column, and `Not recorded` already says truthfully that nothing has been written down.
+*(Measured 2026-08-09: 0 of 77 live orders carry any of the five, and at go-live the database
+starts clean — `CLAUDE.md` §6 — so this is the state every column will be in on day one.)*
+
+### The Sales Order panel's own words (SO-3, Loo 2026-08-09)
+
+**A change the operator RECORDS is never spelled like a change they MADE.** The panel's Level 2
+raises a request and writes nothing to the order, and the words have to say so, or an operator
+who pressed the button believes the date moved.
+
+| Concept | Canonical word | Do NOT use |
+|---|---|---|
+| The customer wants a different delivery day | **`Change promised date`** | Postpone · Reschedule · Delay · Push back · New ETA — `Delay planning` is already OUR delay (a factory slipping), and this is the CUSTOMER's request, a different subject |
+| The customer wants something else in the order | **`Change items`** | Amend · Swap · Edit order · Replace lines — `replace_lines` is the POS's own structured act, not a word on this screen |
+| The button that commits either request | **`Record the request`** | Submit · Send · Apply · Confirm — **`Send` is retired portal-wide** and `Apply` is a lie: nothing is applied |
+| What is on screen while nobody has decided | **`Waiting for a decision`** | Pending · Awaiting approval · In review — this file bans `pending` everywhere |
+| The operator's own note on an order | **`Internal note`** | Remark · Comment · Memo · Note (bare) — the word says who it is FOR, which is the whole point of it |
+| The promise as it was FIRST made | **`Original {date}`** | Was · Old date · Initial · Promised (old) |
+| How many times the promise moved | **`changed ×N`** | N changes · Revised N times · v2 — and **it is never printed as `changed ×0`**: no recorded change means no second line at all |
+
 > 🟡 **AND THE ROUNDING RULE BELOW IS NOT MET BY THE MONEY COMPONENT — reported, not fixed.**
 > `apps/web/src/components/Money.tsx` renders `Math.round(n).toLocaleString()`, i.e. **whole
 > ringgit, no sen**, and the next rule says two decimals always. Measured on production

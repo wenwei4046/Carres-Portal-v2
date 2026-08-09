@@ -118,6 +118,30 @@ export const SPACING_SCALE: readonly SpacingStep[] = [
 ] as const;
 
 /* ─────────────────────────────────────────────────────────────────────────
+ * §4.4 Grid row height — TWO, and the second is a measurement rather than a
+ * taste (SO-3, Loo 2026-08-09: *"row density −15%"*).
+ *
+ * `ui/MASTER.md` §4 rules 40px the default and names the floor precisely:
+ * *"any density change below ~32px therefore moves `badge-height` too"*,
+ * because the kit's expand button is 24px at any row height. 40 × 0.85 = **34**,
+ * which is above that floor — the 24px control still fits with 5px either side,
+ * and no second token moves.
+ *
+ * **34 is also exactly what the Customer cell needs**, which is why the card
+ * asks for both in one breath: `text-body` is 18px of line-height and
+ * `text-meta` is 16, so a name over a phone is 34px of ink and the row is 34px
+ * tall. The stacked cell and the density are one decision, not two.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+export type RowDensity = "default" | "compact";
+
+/** In px. Read by `DataTable` and by the tests that hold the 40px law. */
+export const ROW_HEIGHT: Record<RowDensity, number> = {
+  default: 40,
+  compact: 34,
+};
+
+/* ─────────────────────────────────────────────────────────────────────────
  * §5.1 Icons — exactly three sizes; stroke ✅ FROZEN Q4 = 2.
  * ──────────────────────────────────────────────────────────────────────── */
 

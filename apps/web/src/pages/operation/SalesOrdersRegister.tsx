@@ -1,67 +1,61 @@
 /**
- * SalesOrdersRegister — SO-1 FINAL, the Sales Orders register (Loo, 2026-08-09).
+ * SalesOrdersRegister — SO-1 FINAL, upgraded in place by SO-3 (Loo 2026-08-09).
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * ⭐ THE REGISTER LAW, AND EVERY DECISION IN THIS FILE COMES FROM IT
+ * ⭐ THE REGISTER LAW STILL RULES THE GRID, AND SO-3 CHANGES ONE CLAUSE OF IT
  *
  *   "Forget web applications. Build this page as if you were building Microsoft
  *    Excel. Every order is exactly ONE row. Every column is exactly ONE fact.
- *    No cell may contain another layout, card, table, chip, icon, pill or
- *    workflow. A row may NEVER be taller than another row. If information does
- *    not fit in one row, it does not belong in the register. The register never
- *    expands and never explains."
+ *    A row may NEVER be taller than another row. The register never expands and
+ *    never explains."
  *
- *   "Every register answers only: what records exist?  Never: what should I do?"
+ * Everything in that law still holds — no expansion, no workflow column, no
+ * action, rentals excluded at the source, one height for every row. **What
+ * SO-3 changes is the Customer cell**, which now carries the phone under the
+ * name, and that is the owner's newer ruling on his own law rather than a
+ * chat's exception:
  *
- * **What that removed from the previous build, and it is most of it:**
  * ```
- * ✗ the row expansion       "the register never expands"  → the document lists every line
- * ✗ rental orders            the Rental module owns them  → excluded at the source
- * ✗ Import from AutoCount    an ACTION, and a register has none
- * ✗ the drawer               a cockpit is workflow        → a Sales Order DOCUMENT
- * ✗ the right rail           Team · Calendar · Activity   → NOT MOUNTED on this route
+ * SO-1  "no cell may contain another layout"        → one string per cell
+ * SO-3  "Customer cell: phone under the name"       → ONE cell, TWO lines
  * ```
- * No cell in this file renders an element with children of its own. Every cell
- * returns one string, or one `Money`, and that is the whole vocabulary.
+ * It survives the clause the law is actually FOR: *a row may never be taller
+ * than another row.* `text-body` is 18px of line-height and `text-meta` is 16 —
+ * the stack is 34px, which is exactly the row height the same card asks for
+ * (`density: −15%`, `tokens.ts` `ROW_HEIGHT`). **The two halves of that
+ * instruction are one decision, and they arrive in one row height.**
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * THE COLUMNS ARE THE CARD'S SIX, AND MY EARLIER OBJECTION TO ONE OF THEM WAS WRONG
+ * ⭐ THE SEVEN GRID CAPABILITIES, AND WHERE EACH ONE LIVES
  *
- *     SO No · Customer · Items · Value · Promised · Ordered
- *
- * SO-1's first round proposed replacing `Value` with `Outstanding` and dropping
- * `Ordered`. The card was re-issued with both kept and `Outstanding` moved to
- * the hidden columns, so that is what ships — and one half of the objection was
- * simply wrong on the law: I argued `Ordered` collided with `COPY-STANDARD.md`
- * line 943, where it names a Purchasing QUANTITY column. Lines 872-873 of that
- * same file answer it: *"A Purchase Order and a customer order are two different
- * subjects; a word banned on one is not automatically banned on the other."*
- * There is no collision. `Ordered` is the right word for the day the customer
- * ordered.
- *
- * ─────────────────────────────────────────────────────────────────────────────
- * THE FACTS LIVE IN `sales-order-facts.ts`
- *
- * Rental exclusion, the item names, the money states and the search haystack
- * are pure functions with their own tests. This file arranges them; it decides
- * nothing. Money goes through `@carres/shared`'s `orderMoney` and nothing else.
- *
- * **A blank may never carry two meanings.** `Value` and `Outstanding` each
- * print one of three sentences — the amount, `Paid in full`, or `No price yet`
- * — so an empty-looking cell can never mean both "settled" and "nobody priced
- * it". Measured 2026-08-09: 29 of 32 native orders are priced, and every one of
- * the 37 AutoCount rows is not.
+ * ```
+ * sortable every column      kit  DataTable.sort            (SO-1 wired it)
+ * filter row under header    kit  Column.filterInput        SO-3, new to the kit
+ * freeze SO No + Customer    kit  DataTable.freeze          SO-3, new to the kit
+ * resize                     kit  DataTable.layout          existed, now wired
+ * show / hide columns        page the chooser + Reset
+ * keyboard ↑ ↓               kit  DataTable.activeRow       SO-3, new to the kit
+ * instant panel update       page the panel reads the row the grid is ON
+ * ```
+ * **Four are kit powers because a grid capability drawn inside one page is a
+ * capability the next register has to redraw.** Every one is an OPTIONAL prop:
+ * the three frozen pages that render `DataTable` pass none of them and emit the
+ * markup they emitted before (`ui/MASTER.md` §4).
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * SEARCH IS CLIENT-SIDE, AND IT IS ONE DEBT WITH THE 200-ROW CAP
+ * THE PANEL DOES NOT REPLACE THE REGISTER — and that is the F31 defect closed.
+ * `?order=<id>` opens the **Sales Order panel** beside the grid; the grid stays
+ * mounted, the arrows keep working, and `?view=document` is the full-page
+ * printable Sales Order, kept as its own screen because it is the thing you
+ * print. SO-1's debt D-G recorded exactly this.
  *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * SEARCH IS STILL CLIENT-SIDE, AND IT IS STILL ONE DEBT WITH THE 200-ROW CAP.
  * The server searches customer name, imported ref and SO number — not phone,
- * not item (`apps/api/src/routes/operation/orders.ts`). Passing `search` would
- * make two of the card's four fields silently dead, so this page filters the
- * fetched page itself: all four work, and they expire at exactly the row count
- * the server's `.limit(200)` already imposes. See `docs/MIGRATION-MAP.md`.
+ * not item. Passing `search` would make two of the four fields silently dead.
+ * See `docs/MIGRATION-MAP.md` D-A · D-B.
  */
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ClipboardList } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import DataTable, {
@@ -78,303 +72,158 @@ import DatePicker from "@/components/kit/DatePicker";
 import EmptyState from "@/components/kit/EmptyState";
 import Money from "@/components/Money";
 import { fmtDate } from "@/lib/fmt-date";
-/* `cjkClassName` is deliberately NOT imported here, and it is a decision rather
-   than an omission. It would wrap a cell's text in a `<span>` to switch to Noto
-   Sans SC, and the law says no cell may contain another layout. Measured
-   2026-08-09: **0 of 77 live customer names carry a CJK character** — Malaysian
-   Chinese customers are romanised in this data (`Tan Ah Kow`, `Chen Chee
-   Cheong`), so the exposure today is nil. If a CJK name ever arrives, the font
-   belongs on the kit's `<td>`, which is where every other cell would get it
-   too — not on a wrapper this page smuggles into one column. Recorded in
-   `docs/MIGRATION-MAP.md`. */
-import { useOperationOrders, type operationOrderListRow } from "@/lib/queries";
+/* `cjkClassName` is deliberately NOT imported for the CELLS, and it is a
+   decision rather than an omission — see `docs/MIGRATION-MAP.md` D-H. Measured
+   2026-08-09: 0 of 77 live customer names carry a CJK character. When one
+   arrives the font belongs on the kit's `<td>`, where every column gets it. */
+import { useOperationOrders } from "@/lib/queries";
 import ModuleHeader from "./components/ModuleHeader";
 import SalesOrderDocument from "./SalesOrderDocument";
+import SalesOrderPanel from "./SalesOrderPanel";
+import { digits, isDelivered, isRental, type MoneyState } from "./sales-order-facts";
 import {
-  digits,
-  isDelivered,
-  isRental,
-  itemsSummary,
-  moneyOfOrder,
-  outstandingState,
-  searchHaystack,
-  valueState,
-  type MoneyState,
-} from "./sales-order-facts";
+  buildRegisterRow,
+  DEFAULT_COLUMNS,
+  FIELD_GROUPS,
+  fieldByKey,
+  FROZEN_COLUMNS,
+  passesColumnFilters,
+  REGISTER_FIELDS,
+  toCsv,
+  type RegisterRow,
+} from "./sales-order-columns";
 
-/* ── MEASURED COLUMN WIDTHS ────────────────────────────────────────────────────
- *
- * Every number is the text's INK, canvas-measured against the cell's own
- * computed font in real Chromium at 1440×900 with Inter and JetBrains Mono
- * confirmed loaded, `+16` for the kit's uniform `px-2` (measured on the
- * rendered `<td>`, not assumed).
- *
- *   column       ink    width   the string that sets it
- *   SO No       68.9       85   `SO-100257` — six digits, not today's four
- *   Customer   169.3      188   `MyHouse Management PLT`
- *   Items      342.6      361   `Breeze FirmCare · King ×1 · Lyyar · 1A(LHF) ×1 · +2 more`
- *   Value       92.8      109   `RM 1,234,567` (marker 18.6 + gap 4 + digits 70.2)
- *   Promised    96.4      113   `Wed, 19 Aug 26` — this cell may NEVER truncate
- *   Ordered     96.4      113   the same date family
- *
- *   hidden
- *   Phone       86.4      103   `012-345 6789`
- *   Salesperson 150.5     167   `Nur Aisyah binti Rahman`
- *   Outlet      109.8     126   `Carres Setia Alam`
- *   Outstanding  96.3     109   the HEADER is the wider claim here, not the cell
- *
- * **A truncating column carries +2 over its measurement.** `ink + 16` is the
- * exact fit and an exact fit still ellipsises: the browser rounds the content
- * box and the text run independently. `Customer` and `Items` truncate; the
- * other four do not and take the measurement flat.
- *
- * **`SO No` and `Value` are sized to a FUTURE string, on purpose.** S3.3's
- * finding is why: sizing a composed cell to the widest value that happens to be
- * in the database today is how the old `Actions` column was sized off nearly
- * the narrowest string in its family. Six SO digits arrive inside a decade at
- * 1,000 orders/month, and a money column's family is digits — 109 costs 16px
- * once instead of a re-measure later.
- *
- * **`Items` is the one column whose content is unbounded**, so it is sized to
- * the widest LIVE two-name-plus-tail composition and truncates beyond it. That
- * truncation is what the law asks for: *"if information does not fit in one
- * row, it does not belong in the register"* — the document lists every line.
- *
- * Table 807px with the six defaults. Verified on the rendered page: every
- * column holds its declared pixel and ZERO cells clip at 1440 AND at 1130.
- */
-const W = {
-  so: "85px",
-  customer: "188px",
-  items: "361px",
-  value: "109px",
-  promised: "113px",
-  ordered: "113px",
-  /* The hidden fact columns, measured the same way and on the same day. */
-  phone: "103px",
-  salesperson: "167px",
-  outlet: "126px",
-  outstanding: "109px",
-} as const;
-
-/** The hidden fact columns, in the order the card names them. */
-const EXTRA_COLUMNS = [
-  { key: "phone", label: "Phone" },
-  { key: "salesperson", label: "Salesperson" },
-  { key: "outlet", label: "Outlet" },
-  { key: "outstanding", label: "Outstanding" },
-] as const;
-type ExtraKey = (typeof EXTRA_COLUMNS)[number]["key"];
-
-/** ONE cell, ONE fact. A money state is a number or a sentence, never both and
- *  never nothing — SO-1: *"a blank may never carry two meanings."* */
+/** ONE cell, ONE fact. A money state is a number or a sentence, never nothing. */
 function moneyCell(state: MoneyState) {
   if (state.kind === "amount") return <Money value={state.value} />;
   return state.kind === "settled" ? "Paid in full" : "No price yet";
 }
 
-interface RegisterRow {
-  o: operationOrderListRow;
-  id: string;
-  so: number;
-  customer: string;
-  phone: string;
-  salesperson: string;
-  outlet: string;
-  items: string;
-  promised: string | null;
-  promisedLabel: string;
-  ordered: string;
-  value: MoneyState;
-  outstanding: MoneyState;
-  sortValue: number;
-  sortOutstanding: number;
-  needle: string;
-  phoneDigits: string;
-}
+/**
+ * The only two cells that are not their own `text` string.
+ *
+ * `customer` is the card's stacked cell; the three money columns render
+ * `Money`, which owns the `RM ` and the grouping. Everything else prints the
+ * catalog's string, so a column's filter and its cell can never disagree.
+ */
+const CELL: Record<string, (r: RegisterRow) => React.ReactNode> = {
+  customer: (r) => (
+    /* TWO LINES, ONE ROW HEIGHT. `leading-none`-free on purpose: the two type
+       tokens already carry their line-heights, and 18 + 16 = the 34px row. */
+    <span className="flex flex-col justify-center">
+      <span className="text-body truncate text-kit-slate-12">{r.customer}</span>
+      <span className="text-meta truncate text-kit-slate-11">
+        {r.phone || "Not given"}
+      </span>
+    </span>
+  ),
+  value: (r) => moneyCell(r.value),
+  paid: (r) => moneyCell(r.paid),
+  outstanding: (r) => moneyCell(r.outstanding),
+};
 
 export default function SalesOrdersRegister() {
   const [search, setSearch] = useState("");
   const [from, setFrom] = useState<string | null>(null);
   const [to, setTo] = useState<string | null>(null);
   const [scope, setScope] = useState<"live" | "all">("live");
-  const [shown, setShown] = useState<ReadonlySet<ExtraKey>>(
-    () => new Set<ExtraKey>(),
-  );
+  const [shown, setShown] = useState<readonly string[]>(DEFAULT_COLUMNS);
+  const [filters, setFilters] = useState<ReadonlyMap<string, string>>(new Map());
   const [sort, setSort] = useState<TableSort | null>(null);
 
-  /* `?order=<id>` opens the document. The param is not decoration: Service
-     Cases already deep-link an order this way (J2), so the register keeps the
-     door that exists rather than minting a second one. */
+  /* `?order=<id>` opens the PANEL beside the register; `?view=document` swaps
+     to the full-page printable Sales Order. Both are on the URL, so Back works
+     and Service Cases' existing `?order=` deep link (J2) still lands on this
+     order — it now lands on the panel instead of replacing the page. */
   const [params, setParams] = useSearchParams();
   const openOrderId = params.get("order");
-  const openDocument = (id: string | null) => {
-    const next = new URLSearchParams(params);
-    if (id) next.set("order", id);
-    else next.delete("order");
-    setParams(next, { replace: true });
-  };
+  const documentMode = params.get("view") === "document";
+  const setOpen = useCallback(
+    (id: string | null, view?: "document") => {
+      const next = new URLSearchParams(params);
+      if (id) next.set("order", id);
+      else next.delete("order");
+      if (view) next.set("view", view);
+      else next.delete("view");
+      setParams(next, { replace: true });
+    },
+    [params, setParams],
+  );
 
   const { data, isLoading, isError, error, refetch } = useOperationOrders({});
 
-  const all = useMemo<RegisterRow[]>(() => {
-    const orders = data?.orders ?? [];
-    return orders.filter((o) => !isRental(o)).map((o) => {
-      const money = moneyOfOrder(o);
-      const value = valueState(money);
-      const outstanding = outstandingState(money);
-      const phone = o.customer_phone ?? "";
-      const promised = o.delivery_date_tbd ? null : (o.delivery_date ?? null);
-      return {
-        o,
-        id: o.id,
-        so: o.so,
-        customer: o.customer_name,
-        phone,
-        salesperson: o.salespersons?.name ?? "",
-        outlet: o.outlets?.name ?? "",
-        items: itemsSummary(o),
-        promised,
-        /* `TBD` is a banned word (COPY-STANDARD: no to-do word; and it is
-           listed as a rejected spelling). `No date yet` is the approved shape. */
-        promisedLabel: promised ? fmtDate(promised) : "No date yet",
-        ordered: o.placed_at,
-        value,
-        outstanding,
-        sortValue: value.kind === "amount" ? value.value : -1,
-        sortOutstanding: outstanding.kind === "amount" ? outstanding.value : -1,
-        needle: searchHaystack(o),
-        phoneDigits: digits(phone),
-      };
-    });
-  }, [data]);
+  const all = useMemo<RegisterRow[]>(
+    () => (data?.orders ?? []).filter((o) => !isRental(o)).map(buildRegisterRow),
+    [data],
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const qDigits = digits(q);
     return all.filter((r) => {
       if (scope === "live" && isDelivered(r.o)) return false;
-      /* The range reads the ORDERED date — the register's own spine. What the
-         promise DOES is a question for the module that owns the promise. */
+      /* The range reads the ORDERED date — the register's own spine. */
       const day = r.ordered.slice(0, 10);
       if (from && day < from) return false;
       if (to && day > to) return false;
+      if (!passesColumnFilters(r, filters)) return false;
       if (!q) return true;
       if (r.needle.includes(q)) return true;
       if (qDigits.length >= 3 && r.phoneDigits.includes(qDigits)) return true;
       return false;
     });
-  }, [all, search, from, to, scope]);
+  }, [all, search, from, to, scope, filters]);
 
   const rows = useMemo(() => {
     const out = [...filtered];
+    const field = sort ? fieldByKey(sort.key) : undefined;
+    if (!field) return out.sort((a, b) => b.ordered.localeCompare(a.ordered));
     const dir = sort?.dir === "asc" ? 1 : -1;
-    const cmp: Record<string, (a: RegisterRow, b: RegisterRow) => number> = {
-      so: (a, b) => a.so - b.so,
-      customer: (a, b) => a.customer.localeCompare(b.customer),
-      items: (a, b) => a.items.localeCompare(b.items),
-      value: (a, b) => a.sortValue - b.sortValue,
-      promised: (a, b) => (a.promised ?? "").localeCompare(b.promised ?? ""),
-      ordered: (a, b) => a.ordered.localeCompare(b.ordered),
-      phone: (a, b) => a.phone.localeCompare(b.phone),
-      salesperson: (a, b) => a.salesperson.localeCompare(b.salesperson),
-      outlet: (a, b) => a.outlet.localeCompare(b.outlet),
-      outstanding: (a, b) => a.sortOutstanding - b.sortOutstanding,
-    };
-    const by = sort ? cmp[sort.key] : undefined;
-    if (!by) return out.sort((a, b) => b.ordered.localeCompare(a.ordered));
-    return out.sort((a, b) => by(a, b) * dir);
+    const key = field.sortBy ?? field.text;
+    return out.sort((a, b) => {
+      const x = key(a);
+      const y = key(b);
+      const cmp =
+        typeof x === "number" && typeof y === "number"
+          ? x - y
+          : String(x).localeCompare(String(y));
+      return cmp * dir;
+    });
   }, [filtered, sort]);
 
-  const columns = useMemo<readonly Column<RegisterRow>[]>(() => {
-    const defaults: Column<RegisterRow>[] = [
-      {
-        key: "so",
-        label: "SO No",
-        width: W.so,
-        sortable: true,
-        cell: (r) => `SO-${r.so}`,
-      },
-      {
-        key: "customer",
-        label: "Customer",
-        width: W.customer,
-        sortable: true,
-        cell: (r) => r.customer,
-      },
-      {
-        key: "items",
-        label: "Items",
-        width: W.items,
-        sortable: true,
-        cell: (r) => r.items,
-      },
-      {
-        key: "value",
-        label: "Value",
-        width: W.value,
-        align: "right",
-        numeric: true,
-        sortable: true,
-        cell: (r) => moneyCell(r.value),
-      },
-      {
-        key: "promised",
-        label: "Promised",
-        width: W.promised,
-        sortable: true,
-        cell: (r) => r.promisedLabel,
-      },
-      {
-        key: "ordered",
-        label: "Ordered",
-        width: W.ordered,
-        sortable: true,
-        cell: (r) => fmtDate(r.ordered),
-      },
-    ];
+  const setFilter = useCallback((key: string, value: string) => {
+    setFilters((prev) => {
+      const next = new Map(prev);
+      if (value === "") next.delete(key);
+      else next.set(key, value);
+      return next;
+    });
+  }, []);
 
-    const extras: Record<ExtraKey, Column<RegisterRow>> = {
-      /* `Not given` = the CUSTOMER did not provide it. `Not recorded` = WE never
-         captured it. Two different facts, and COPY-STANDARD keeps them apart:
-         one is chaseable and the other never was. */
-      phone: {
-        key: "phone",
-        label: "Phone",
-        width: W.phone,
-        sortable: true,
-        cell: (r) => r.phone || "Not given",
-      },
-      salesperson: {
-        key: "salesperson",
-        label: "Salesperson",
-        width: W.salesperson,
-        sortable: true,
-        cell: (r) => r.salesperson || "Not recorded",
-      },
-      outlet: {
-        key: "outlet",
-        label: "Outlet",
-        width: W.outlet,
-        sortable: true,
-        cell: (r) => r.outlet || "Not recorded",
-      },
-      outstanding: {
-        key: "outstanding",
-        label: "Outstanding",
-        width: W.outstanding,
-        align: "right",
-        numeric: true,
-        sortable: true,
-        cell: (r) => moneyCell(r.outstanding),
-      },
-    };
-
-    return [
-      ...defaults,
-      ...EXTRA_COLUMNS.filter((c) => shown.has(c.key)).map((c) => extras[c.key]),
-    ];
-  }, [shown]);
+  const columns = useMemo<readonly Column<RegisterRow>[]>(
+    () =>
+      shown
+        .map(fieldByKey)
+        .filter((f): f is NonNullable<typeof f> => f != null)
+        .map((f) => ({
+          key: f.key,
+          label: f.label,
+          width: f.width,
+          align: f.align,
+          numeric: f.numeric,
+          /* EVERY column sorts and EVERY column filters — the card's first two
+             capabilities, and they are properties of the catalog rather than of
+             a hand-maintained list that can fall behind it. */
+          sortable: true,
+          filterInput: {
+            value: filters.get(f.key) ?? "",
+            onChange: (v: string) => setFilter(f.key, v),
+            label: `Filter ${f.label}`,
+          },
+          cell: CELL[f.key] ?? ((r: RegisterRow) => f.text(r)),
+        })),
+    [shown, filters, setFilter],
+  );
 
   const chips: ActiveChip[] = [];
   if (search.trim())
@@ -384,15 +233,40 @@ export default function SalesOrdersRegister() {
   if (to) chips.push({ label: `Ordered to ${fmtDate(to)}`, onClear: () => setTo(null) });
   if (scope === "all")
     chips.push({ label: "All orders", onClear: () => setScope("live") });
+  for (const [key, value] of filters) {
+    const f = fieldByKey(key);
+    if (f && value.trim())
+      chips.push({ label: `${f.label}: ${value}`, onClear: () => setFilter(key, "") });
+  }
 
-  /* The register hands over to the DOCUMENT and stops. It passes no signals,
-     no journey and no derivation — a register answers "what records exist",
-     and the document answers "what did this customer commit to". */
-  if (openOrderId) {
+  const position = openOrderId ? rows.findIndex((r) => r.id === openOrderId) : -1;
+  const step = useCallback(
+    (delta: -1 | 1) => {
+      if (position < 0) return;
+      const next = rows[position + delta];
+      if (next) setOpen(next.id);
+    },
+    [position, rows, setOpen],
+  );
+
+  const exportCsv = () => {
+    const csv = toCsv(shown, rows);
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sales-orders.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  /* THE FULL DOCUMENT IS ITS OWN SCREEN. It is the printable Sales Order and it
+     is what `⤢` opens; the register is unmounted while it is open, exactly as
+     SO-1 shipped it, because a document you print is not a panel. */
+  if (openOrderId && documentMode) {
     return (
       <SalesOrderDocument
         orderId={openOrderId}
-        onClose={() => openDocument(null)}
+        onClose={() => setOpen(openOrderId)}
       />
     );
   }
@@ -413,138 +287,216 @@ export default function SalesOrdersRegister() {
         }
       />
 
-      <div className="min-h-0 flex-1">
-        <PageShell
-          variant="list"
-          chips={chips}
-          toolbar={
-            <>
-              {/* Search is the primary element of the toolbar (SO-1 FINAL). */}
-              <span className="w-80 shrink-0">
-                <SearchInput
-                  id="sales-orders-search"
-                  pill
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="SO number, customer, phone or item…"
-                />
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="text-label text-base-500">Ordered</span>
-                <span className="w-36">
-                  <DatePicker
-                    id="sales-orders-from"
-                    value={from}
-                    onChange={setFrom}
-                    placeholder="From"
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <PageShell
+            variant="list"
+            chips={chips}
+            toolbar={
+              <>
+                {/* ⭐ SEARCH IS THE PAGE'S LOUDEST CONTROL (SO-3). It is the
+                    first thing an operator with a customer on the phone reaches
+                    for, so it is 384px against the 128 its neighbours get —
+                    three times the next widest control on the band.
+                    **The number is a measurement, not a preference.** Measured
+                    on the rendered page at 1440: the sidebar takes 288, the
+                    shell's own padding 48, and the right cluster (Columns +
+                    Export) 168. A 448px search overflowed that budget and the
+                    scope Select rendered UNDER the Columns button — caught by
+                    looking, not by a test. 384 + 56 + 128 + 128 + 144 + gaps
+                    lands inside it with room, and the search is still dominant.
+
+                    **AND IT IS THE CONTROL THAT ABSORBS THE SQUEEZE**, which is
+                    the second thing looking at it taught: with the panel open
+                    the band loses another 420px, and a `shrink-0` search pushed
+                    the scope Select back under the Columns button. So the
+                    search is `flex-1` up to its 384 cap — widest when there is
+                    room, narrowest when there is not — and the two date fields
+                    and the scope keep their size, because a date field that
+                    shrinks stops showing a date. One line, always. */}
+                <span className="min-w-0 max-w-96 flex-1">
+                  <SearchInput
+                    id="sales-orders-search"
+                    pill
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="SO number, customer, phone or item…"
                   />
                 </span>
-                <span className="w-36">
-                  <DatePicker
-                    id="sales-orders-to"
-                    value={to}
-                    onChange={setTo}
-                    placeholder="To"
-                  />
-                </span>
-              </span>
-              <span className="w-40">
-                <Select
-                  id="sales-orders-scope"
-                  value={scope}
-                  onValueChange={(v) => setScope(v as "live" | "all")}
-                  options={[
-                    { value: "live", label: "Not delivered" },
-                    { value: "all", label: "All orders" },
-                  ]}
-                />
-              </span>
-            </>
-          }
-          toolbarRight={
-            <Popover
-              label="Choose columns"
-              align="end"
-              trigger={
-                <Button size="sm" variant="neutral" data-testid="columns-button">
-                  Columns
-                </Button>
-              }
-            >
-              <div className="flex w-56 flex-col gap-3">
-                <p className="text-label text-base-500">
-                  Extra facts. Cleared on reload.
-                </p>
-                {EXTRA_COLUMNS.map((c) => (
-                  <Checkbox
-                    key={c.key}
-                    id={`column-${c.key}`}
-                    label={c.label}
-                    checked={shown.has(c.key)}
-                    onCheckedChange={(on) =>
-                      setShown((prev) => {
-                        const next = new Set(prev);
-                        if (on) next.add(c.key);
-                        else next.delete(c.key);
-                        return next;
-                      })
-                    }
-                  />
-                ))}
-              </div>
-            </Popover>
-          }
-          footer={
-            <span data-testid="register-count">
-              {narrowed
-                ? `${rows.length} of ${all.length} orders`
-                : `${all.length} orders`}
-            </span>
-          }
-        >
-          {isError ? (
-            <div className="flex min-h-0 flex-1 flex-col rounded-card border border-kit-slate-5 bg-white">
-              <EmptyState
-                title="The register could not be loaded"
-                detail={(error as Error | undefined)?.message}
-                action={
-                  <Button variant="neutral" onClick={() => void refetch()}>
-                    Try again
-                  </Button>
-                }
-              />
-            </div>
-          ) : (
-            <div className="flex min-h-0 flex-1 flex-col [container-type:inline-size]">
-              <DataTable
-                rows={rows}
-                columns={columns}
-                rowId={(r) => r.id}
-                testId="sales-orders-table"
-                rowTestId="sales-order-row"
-                label="Sales orders"
-                loading={isLoading}
-                sizing="content"
-                sort={sort}
-                onSortChange={setSort}
-                /* The whole row opens the document. There is no second control
-                   on the row, because a register has no actions. */
-                onRowOpen={(r) => openDocument(r.id)}
-                empty={
-                  <div className="w-[100cqi]">
-                    <EmptyState
-                      title={
-                        search.trim() || from || to
-                          ? "No order matches this search"
-                          : "No orders yet"
-                      }
+                <span className="flex shrink-0 items-center gap-1">
+                  <span className="text-label text-base-500">Ordered</span>
+                  <span className="w-32">
+                    <DatePicker
+                      id="sales-orders-from"
+                      value={from}
+                      onChange={setFrom}
+                      placeholder="From"
                     />
+                  </span>
+                  <span className="w-32">
+                    <DatePicker
+                      id="sales-orders-to"
+                      value={to}
+                      onChange={setTo}
+                      placeholder="To"
+                    />
+                  </span>
+                </span>
+                <span className="w-36 shrink-0">
+                  <Select
+                    id="sales-orders-scope"
+                    value={scope}
+                    onValueChange={(v) => setScope(v as "live" | "all")}
+                    options={[
+                      { value: "live", label: "Not delivered" },
+                      { value: "all", label: "All orders" },
+                    ]}
+                  />
+                </span>
+              </>
+            }
+            toolbarRight={
+              <>
+                <Popover
+                  label="Choose columns"
+                  align="end"
+                  trigger={
+                    <Button size="sm" variant="neutral" data-testid="columns-button">
+                      Columns
+                    </Button>
+                  }
+                >
+                  <div className="flex max-h-96 w-64 flex-col gap-3 overflow-y-auto">
+                    <p className="text-label text-base-500">
+                      Extra facts. Cleared on reload.
+                    </p>
+                    {FIELD_GROUPS.map((group) => (
+                      <div key={group} className="flex flex-col gap-1.5">
+                        <span className="text-label text-base-500">{group}</span>
+                        {REGISTER_FIELDS.filter((f) => f.group === group).map((f) => (
+                          <Checkbox
+                            key={f.key}
+                            id={`column-${f.key}`}
+                            label={f.label}
+                            checked={shown.includes(f.key)}
+                            onCheckedChange={(on) =>
+                              setShown((prev) => {
+                                if (on) {
+                                  /* A column re-appears where the CATALOG puts
+                                     it, never at the end — otherwise ticking
+                                     Phone twice moves it. */
+                                  const next = new Set([...prev, f.key]);
+                                  return REGISTER_FIELDS.filter((x) =>
+                                    next.has(x.key),
+                                  ).map((x) => x.key);
+                                }
+                                setFilter(f.key, "");
+                                return prev.filter((k) => k !== f.key);
+                              })
+                            }
+                          />
+                        ))}
+                      </div>
+                    ))}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      data-testid="columns-reset"
+                      onClick={() => {
+                        setShown(DEFAULT_COLUMNS);
+                        setFilters(new Map());
+                      }}
+                    >
+                      Reset columns
+                    </Button>
                   </div>
-                }
-              />
-            </div>
-          )}
-        </PageShell>
+                </Popover>
+                <Button
+                  size="sm"
+                  variant="neutral"
+                  data-testid="export-button"
+                  disabled={rows.length === 0}
+                  onClick={exportCsv}
+                >
+                  Export
+                </Button>
+              </>
+            }
+            footer={
+              <span data-testid="register-count">
+                {narrowed
+                  ? `${rows.length} of ${all.length} orders`
+                  : `${all.length} orders`}
+              </span>
+            }
+          >
+            {isError ? (
+              <div className="flex min-h-0 flex-1 flex-col rounded-card border border-kit-slate-5 bg-white">
+                <EmptyState
+                  title="The register could not be loaded"
+                  detail={(error as Error | undefined)?.message}
+                  action={
+                    <Button variant="neutral" onClick={() => void refetch()}>
+                      Try again
+                    </Button>
+                  }
+                />
+              </div>
+            ) : (
+              <div className="flex min-h-0 flex-1 flex-col [container-type:inline-size]">
+                <DataTable
+                  rows={rows}
+                  columns={columns}
+                  rowId={(r) => r.id}
+                  testId="sales-orders-table"
+                  rowTestId="sales-order-row"
+                  label="Sales orders"
+                  loading={isLoading}
+                  sizing="content"
+                  density="compact"
+                  freeze={FROZEN_COLUMNS}
+                  sort={sort}
+                  onSortChange={setSort}
+                  layout={{
+                    resizeLabel: "Drag to resize",
+                    reorderLabel: "Drag to reorder",
+                  }}
+                  activeRow={{
+                    id: openOrderId,
+                    label: "Sales orders",
+                    /* ↑ ↓ CHANGE THE PANEL. There is no second press: the row
+                       the operator is on IS the order the panel shows. */
+                    onChange: (id) => setOpen(id),
+                    onOpen: (id) => setOpen(id, "document"),
+                  }}
+                  onRowOpen={(r) => setOpen(r.id)}
+                  empty={
+                    <div className="w-[100cqi]">
+                      <EmptyState
+                        title={
+                          search.trim() || from || to || filters.size > 0
+                            ? "No order matches this search"
+                            : "No orders yet"
+                        }
+                      />
+                    </div>
+                  }
+                />
+              </div>
+            )}
+          </PageShell>
+        </div>
+
+        {openOrderId && (
+          <SalesOrderPanel
+            orderId={openOrderId}
+            position={position >= 0 ? position + 1 : 0}
+            total={rows.length}
+            onStep={step}
+            onOpenDocument={() => setOpen(openOrderId, "document")}
+            onClose={() => setOpen(null)}
+          />
+        )}
       </div>
     </div>
   );

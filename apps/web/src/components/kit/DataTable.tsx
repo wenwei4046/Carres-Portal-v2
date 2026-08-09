@@ -75,6 +75,7 @@ import Popover from "./Popover";
 import SearchInput from "./SearchInput";
 import { applyColumnOrder, moveColumnOrder, resizeColumnPair } from "./grid-layout";
 import { Z_TABLE_FOOTER, Z_TABLE_HEADER } from "./overlay-layer";
+import { ROW_HEIGHT, type RowDensity } from "./tokens";
 
 /** A column may not be dragged under this, as a percentage of the table. */
 const MIN_COLUMN_PCT = 4;
@@ -211,6 +212,30 @@ export interface Column<Row> {
   /** Header click sorts (asc ⇄ desc). Needs the table's `sort`/`onSortChange`. */
   sortable?: boolean;
   filter?: ColumnFilter;
+  /**
+   * **SO-3 power 1 — Excel's AUTO-FILTER ROW**, a typing box under this
+   * column's header. Its sibling `filter` is the ▼ checklist; the two answer
+   * different questions and a grid an operator has met has both.
+   *
+   *   `filter`      *which of these values do I want?*   — a closed list
+   *   `filterInput` *does this column contain this?*     — an open string
+   *
+   * The kit renders the box and reports the keystroke. **The page owns which
+   * rows survive**, exactly as it does for `filter` and for `sort` — this file
+   * has never filtered a row and does not start here.
+   *
+   * A second header row appears as soon as ONE column carries this, and every
+   * column without it renders an empty cell in that row, so the boxes stay
+   * under the columns they filter.
+   */
+  filterInput?: {
+    value: string;
+    onChange: (next: string) => void;
+    /** What the box is, for a screen reader — the CALLER's word. */
+    label: string;
+    /** Optional placeholder. The caller's word; this file spells none. */
+    placeholder?: string;
+  };
   cell: (row: Row) => ReactNode;
 }
 
@@ -514,6 +539,51 @@ export interface DataTableProps<Row> {
    * of a table that no longer stretches is a disclosure control in 20px.
    */
   sizing?: "fill" | "content";
+  /**
+   * **SO-3 power 2 — FREEZE the first N data columns.** They stay put while the
+   * rest of the grid scrolls sideways, which is the one thing that makes a wide
+   * register readable: the operator never loses which ORDER a cell belongs to.
+   *
+   * Counted over DATA columns only — the kit's own checkbox and disclosure
+   * gutters are always frozen with them, because a pinned column floating away
+   * from its own row control reads as two tables.
+   *
+   * **The offsets are MEASURED, never assumed.** A frozen column's `left` is
+   * read off the rendered header cell, so a resize (which rewrites every width
+   * as a percentage) and a hidden column both keep the pin correct. In jsdom
+   * every offset reads 0 and the cells still carry their sticky class — the
+   * test asserts the pin exists, and a browser asserts where it lands.
+   *
+   * Absent (or 0) = nothing is pinned and the markup is what it was.
+   */
+  freeze?: number;
+  /**
+   * **SO-3 power 3 — the row an operator is ON.** `↑` and `↓` move it, `Enter`
+   * opens it, `Escape` clears it. Controlled, like `selection` and `expansion`:
+   * the PAGE already knows which record is open beside the grid, and a
+   * component holding a second copy of that is a second source of truth.
+   *
+   * **It is not selection and it is not hover.** Selection is a set with a
+   * consequence, hover is a mouse position; this is the reading position, and
+   * on this register it is what the panel beside the grid is showing.
+   *
+   * Absent = the table takes no focus and no key, exactly as before.
+   */
+  activeRow?: {
+    id: string | null;
+    onChange: (id: string) => void;
+    /** Fired on `Enter`. Absent = `Enter` does nothing. */
+    onOpen?: (id: string) => void;
+    /** What the grid is, for a screen reader, once it takes keys. */
+    label: string;
+  };
+  /**
+   * **SO-3 power 4 — density.** `"compact"` is 34px rows (−15%); absent is the
+   * 40px law. See `tokens.ts` `ROW_HEIGHT` for why 34 and not less: `ui/MASTER`
+   * §4 puts the floor at ~32px, below which the kit's 24px in-row controls stop
+   * fitting and a second token has to move.
+   */
+  density?: RowDensity;
 }
 
 /**
@@ -653,6 +723,9 @@ export default function DataTable<Row>({
    * defaulting a prop to a string, and it is right to: the default must be
    * the ABSENCE of the caller's choice, never a copy of it. */
   sizing,
+  freeze,
+  activeRow,
+  density,
 }: DataTableProps<Row>) {
   const selectableRows = selection
     ? rows.filter((r) => selection.selectable?.(r) ?? true)
@@ -677,6 +750,107 @@ export default function DataTable<Row>({
   const headRef = useRef<HTMLTableRowElement | null>(null);
 
   const ordered = useMemo(() => applyColumnOrder(columns, order), [columns, order]);
+
+  /* ── SO-3 · density ───────────────────────────────────────────────────────
+   * Written as two whole literal class strings rather than composed from a
+   * number, because Tailwind's scanner reads SOURCE: a class built at runtime
+   * exists in the DOM and nowhere in the stylesheet. */
+  const rowPx = density === "compact" ? ROW_HEIGHT.compact : ROW_HEIGHT.default;
+  const cellHeight = density === "compact" ? "[&_td]:h-row-compact" : "[&_td]:h-row";
+  const headHeight = density === "compact" ? "h-row-compact" : "h-row";
+
+  /* ── SO-3 · freeze ────────────────────────────────────────────────────────
+   * `left` is MEASURED off the rendered header, so a resize, a hidden column
+   * and a different browser zoom all keep the pin correct — the alternative is
+   * summing the `Column.width` strings, which stops being true the moment
+   * anything is dragged (a resize rewrites every width as a percentage).
+   */
+  const frozenCount = Math.max(0, Math.min(freeze ?? 0, ordered.length));
+  const [frozenLeft, setFrozenLeft] = useState<number[]>([]);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (frozenCount === 0) {
+      if (frozenLeft.length > 0) setFrozenLeft([]);
+      return;
+    }
+    const measure = () => {
+      const headRow = headRef.current;
+      if (!headRow) return;
+      const cells = Array.from(
+        headRow.querySelectorAll<HTMLElement>("th[data-column], th[data-kit='table-gutter']"),
+      );
+      const next = cells.map((cell) => cell.offsetLeft);
+      setFrozenLeft((prev) =>
+        prev.length === next.length && prev.every((v, i) => v === next[i]) ? prev : next,
+      );
+    };
+    measure();
+    const el = scrollerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [frozenCount, ordered, widthPct, density, selection, expansion, frozenLeft]);
+
+  /* The gutters come first in the DOM, so a data column's index into the
+   * measured list is offset by however many the caller asked for. */
+  const gutterCount = (expansion ? 1 : 0) + (selection ? 1 : 0);
+  /* Every helper below takes the cell's DOM index — gutters included — because
+   * that is the index the measurement above walks. Nothing is sticky at all
+   * while `freeze` is absent. */
+  const isFrozen = (domIndex: number) =>
+    frozenCount > 0 && domIndex < frozenCount + gutterCount;
+  const frozenStyle = (domIndex: number): React.CSSProperties | undefined =>
+    isFrozen(domIndex) ? { left: frozenLeft[domIndex] ?? 0 } : undefined;
+  /* A frozen cell must be OPAQUE or the scrolled columns slide under its text.
+   * The wash follows the row's own state, so a pinned cell keeps hovering and
+   * keeps its selection blue instead of turning into a white island.
+   *
+   * **AND IT TAKES NO `z-` CLASS, WHICH IS NOT AN OVERSIGHT.** §4.4 keeps every
+   * layer in `overlay-layer.ts` and the closed set is five; a frozen column
+   * needs no sixth, because painting order already answers it. A `sticky` cell
+   * is POSITIONED and every other `<td>` is not, so it paints above them for
+   * free; and the whole `<thead>` is already `sticky` at layer 1, so the header
+   * still covers the frozen cells on a vertical scroll. Adding a rung here
+   * would have grown a closed set for a case CSS had already settled. */
+  const frozenCell = (domIndex: number) =>
+    isFrozen(domIndex)
+      ? "sticky bg-white group-hover:bg-kit-slate-3 group-data-[selected]:bg-kit-blue-3 group-data-[active]:bg-kit-blue-3"
+      : "";
+  const frozenHead = (domIndex: number) => (isFrozen(domIndex) ? "sticky" : "");
+
+  /* ── SO-3 · the reading position ──────────────────────────────────────────
+   * `↑` `↓` walk the rendered rows, `Enter` opens, `Escape` clears. The table
+   * only takes focus at all while `activeRow` is passed. */
+  const onGridKeyDown = activeRow
+    ? (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (rows.length === 0) return;
+        const at = rows.findIndex((r) => rowId(r) === activeRow.id);
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          const step = e.key === "ArrowDown" ? 1 : -1;
+          const next = at < 0 ? (step === 1 ? 0 : rows.length - 1) : at + step;
+          if (next < 0 || next >= rows.length) return;
+          activeRow.onChange(rowId(rows[next]!));
+        } else if (e.key === "Enter" && at >= 0) {
+          e.preventDefault();
+          activeRow.onOpen?.(rowId(rows[at]!));
+        }
+      }
+    : undefined;
+
+  /* Keep the row an operator walked to inside the scroller. */
+  useEffect(() => {
+    if (!activeRow?.id) return;
+    const el = scrollerRef.current?.querySelector<HTMLElement>(
+      `tr[data-row-id="${CSS.escape(activeRow.id)}"]`,
+    );
+    el?.scrollIntoView({ block: "nearest" });
+  }, [activeRow?.id]);
+
+  /* The auto-filter row exists only while a column asks for one. */
+  const hasFilterRow = ordered.some((c) => c.filterInput != null);
+
   /* P16 — the filler is a CELL in every row, so it counts here or a group
    * header and an expanded record would both stop short of the right edge. */
   const fills = sizing === "content";
@@ -768,23 +942,36 @@ export default function DataTable<Row>({
 
   return (
     <div
-      ref={rootRef}
+      ref={(node) => {
+        scrollerRef.current = node;
+        if (typeof rootRef === "function") rootRef(node);
+        else if (rootRef) (rootRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+      }}
       data-kit="data-table"
       data-testid={testId}
+      /* The grid takes focus ONLY while a page wired the reading position —
+       * a table nobody can steer should not be a tab stop. */
+      tabIndex={activeRow ? 0 : undefined}
+      role={activeRow ? "grid" : undefined}
+      aria-label={activeRow ? activeRow.label : undefined}
+      onKeyDown={onGridKeyDown}
       /* NO TOP RADIUS (card P16, Loo 2026-08-04). A rounded lip under a
        * square toolbar reads as a card floating on a page; a list grid is a
        * SHEET and meets what is above it flush. A page that wants a rounded
        * frame still gets one from its own wrapper — the kit stopped drawing a
        * corner nobody asked it for. Checked on all three pages that render
        * this file: To Order, Purchase Orders, Receiving. */
-      className="min-h-0 flex-1 overflow-auto border border-kit-slate-5 bg-white"
+      className="min-h-0 flex-1 overflow-auto border border-kit-slate-5 bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kit-blue-9"
     >
       <table
         aria-label={label}
-        /* 40px FIXED rows. `whitespace-nowrap` kills the silent row-growers —
-         * text WRAPPING inside a narrow fixed column is what makes one row
-         * taller than the rest and the whole list stop being scannable. */
-        className="w-full table-fixed border-separate border-spacing-0 text-body [&_td]:h-10 [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:align-middle"
+        /* FIXED rows — 40px, or 34 on `density="compact"`. `whitespace-nowrap`
+         * kills the silent row-growers: text WRAPPING inside a narrow fixed
+         * column is what makes one row taller than the rest and the whole list
+         * stop being scannable. The ONE cell allowed to wrap is a two-line
+         * stack the caller composes inside a cell of its own — it still lands
+         * inside the same fixed height, so every row is still one height. */
+        className={`w-full table-fixed border-separate border-spacing-0 text-body ${cellHeight} [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:align-middle`}
       >
         {/* PERCENTAGE widths + `table-fixed` → the table is always exactly the
          *  container width, so it never scrolls sideways on a laptop. */}
@@ -818,14 +1005,22 @@ export default function DataTable<Row>({
           {/* border-separate + cell-level wash: with border-collapse, Chrome
               refuses to stick a thead's backgrounds at all — the classic
               see-through header (Jess caught it live, 2026-08-01). */}
-          <tr className="h-10" ref={headRef}>
+          <tr className={headHeight} ref={headRef}>
             {/* Header wash = slate-3 (Jess, 2026-08-02 surface law): one step
                 above the near-white strip, always lighter than the data. */}
             {expansion && (
-              <th className="bg-kit-slate-3 border-b border-b-kit-slate-6" />
+              <th
+                data-kit="table-gutter"
+                style={frozenStyle(0)}
+                className={`bg-kit-slate-3 border-b border-b-kit-slate-6 ${frozenHead(0)}`}
+              />
             )}
             {selection && (
-              <th className="px-2 bg-kit-slate-3 border-b border-b-kit-slate-6">
+              <th
+                data-kit="table-gutter"
+                style={frozenStyle(expansion ? 1 : 0)}
+                className={`px-2 bg-kit-slate-3 border-b border-b-kit-slate-6 ${frozenHead(expansion ? 1 : 0)}`}
+              >
                 <Checkbox
                   id="kit-table-select-all"
                   ariaLabel={selection.label}
@@ -887,9 +1082,10 @@ export default function DataTable<Row>({
                  * header is `aria-roledescription`, never part of its name. */
                 aria-label={layout ? c.label : undefined}
                 aria-roledescription={layout?.reorderLabel}
+                style={frozenStyle(ci + gutterCount)}
                 className={`relative px-2 bg-kit-slate-3 border-b border-b-kit-slate-6 ${columnRule(
                   ci,
-                )} text-label font-medium text-kit-slate-12 ${
+                )} ${frozenHead(ci + gutterCount)} text-label font-medium text-kit-slate-12 ${
                   layout ? "cursor-grab" : ""
                 } ${c.align === "right" ? "text-right" : "text-left"}`}
               >
@@ -984,6 +1180,66 @@ export default function DataTable<Row>({
               />
             )}
           </tr>
+
+          {/* SO-3 — EXCEL'S AUTO-FILTER ROW, under the header words it filters.
+           *  It sticks BELOW the header rather than with it, so scrolling the
+           *  sheet never takes the boxes away. `top` is the header's own
+           *  height, which is why the density literal is a number here. */}
+          {hasFilterRow && (
+            <tr
+              data-kit="table-filter-row"
+              className="sticky"
+              style={{ top: rowPx }}
+            >
+              {expansion && (
+                <th
+                  style={frozenStyle(0)}
+                  className={`bg-kit-slate-3 border-b border-b-kit-slate-5 ${frozenHead(0)}`}
+                />
+              )}
+              {selection && (
+                <th
+                  style={frozenStyle(expansion ? 1 : 0)}
+                  className={`bg-kit-slate-3 border-b border-b-kit-slate-5 ${frozenHead(
+                    expansion ? 1 : 0,
+                  )}`}
+                />
+              )}
+              {ordered.map((c, ci) => (
+                <th
+                  key={c.key}
+                  style={frozenStyle(ci + gutterCount)}
+                  className={`px-1 py-1 bg-kit-slate-3 border-b border-b-kit-slate-5 ${columnRule(
+                    ci,
+                  )} ${frozenHead(ci + gutterCount)}`}
+                >
+                  {c.filterInput ? (
+                    /* A bare input, exactly as `HeaderFilter`'s date pair is:
+                     * the kit's `Input` carries a 32px control's own padding
+                     * and a label slot, and neither fits a filter strip under a
+                     * column that may be 85px wide. */
+                    <input
+                      type="text"
+                      value={c.filterInput.value}
+                      onChange={(e) => c.filterInput!.onChange(e.target.value)}
+                      aria-label={c.filterInput.label}
+                      placeholder={c.filterInput.placeholder}
+                      data-testid={`table-filter-input-${c.key}`}
+                      data-active={c.filterInput.value !== "" || undefined}
+                      className="h-6 w-full min-w-0 rounded-control border border-kit-slate-5 bg-white px-1.5 text-meta text-kit-slate-12 placeholder:text-kit-slate-9 data-[active]:border-kit-blue-9 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+                    />
+                  ) : null}
+                </th>
+              ))}
+              {fills && (
+                <th
+                  aria-hidden="true"
+                  data-kit="table-filler"
+                  className="bg-kit-slate-3 border-b border-b-kit-slate-5"
+                />
+              )}
+            </tr>
+          )}
         </thead>
 
         <tbody>
@@ -1094,6 +1350,12 @@ export default function DataTable<Row>({
                   data-kit="data-row"
                   data-testid={rowTestId}
                   data-selected={isSelected || undefined}
+                  /* SO-3 — the reading position. `data-row-id` is what the
+                   * scroll-into-view above finds; `data-active` is what a
+                   * frozen cell's wash follows. */
+                  data-row-id={id}
+                  data-active={activeRow?.id === id || undefined}
+                  aria-selected={activeRow ? activeRow.id === id : undefined}
                   onClick={onRowOpen ? () => onRowOpen(row) : undefined}
                   /* HOVER IS GREY, SELECTION IS BLUE (Loo, 2026-08-03).
                    * Hover says "the mouse is here" — one second long, no
@@ -1103,8 +1365,13 @@ export default function DataTable<Row>({
                    * because the sweep looked for blue-3 — found by reading
                    * this file, not by the lint.) */
                   data-muted={rowMuted?.(row) || undefined}
-                  className={`border-b border-kit-slate-5 ${
-                    isSelected ? "bg-kit-blue-3" : "hover:bg-kit-slate-3"
+                  /* `group` so a FROZEN cell can follow the row's own hover and
+                   * selection wash instead of sitting there as a white island
+                   * while the rest of the row lights up. */
+                  className={`group border-b border-kit-slate-5 ${
+                    isSelected || activeRow?.id === id
+                      ? "bg-kit-blue-3"
+                      : "hover:bg-kit-slate-3"
                   } ${onRowOpen ? "cursor-pointer" : ""} ${
                     rowMuted?.(row) ? "opacity-50 grayscale" : ""
                   }`}
@@ -1115,7 +1382,8 @@ export default function DataTable<Row>({
                      * the same reason: two different things happen on one
                      * click and only one of them was asked for. */
                     <td
-                      className={`px-2 border-l-2 ${lateBar}`}
+                      style={frozenStyle(0)}
+                      className={`px-2 border-l-2 ${lateBar} ${frozenCell(0)}`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       {(expansion.expandable?.(row) ?? true) ? (
@@ -1135,7 +1403,10 @@ export default function DataTable<Row>({
                   {selection && (
                     /* The checkbox must not open the record it is ticking. */
                     <td
-                      className={`px-2 ${expansion ? "" : `border-l-2 ${lateBar}`}`}
+                      style={frozenStyle(expansion ? 1 : 0)}
+                      className={`px-2 ${expansion ? "" : `border-l-2 ${lateBar}`} ${frozenCell(
+                        expansion ? 1 : 0,
+                      )}`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       {(selection.selectable?.(row) ?? true) ? (
@@ -1158,7 +1429,10 @@ export default function DataTable<Row>({
                   {ordered.map((c, i) => (
                     <td
                       key={c.key}
-                      className={`px-2 text-kit-slate-12 ${columnRule(i)} ${
+                      style={frozenStyle(i + gutterCount)}
+                      className={`px-2 text-kit-slate-12 ${columnRule(i)} ${frozenCell(
+                        i + gutterCount,
+                      )} ${
                         !selection && !expansion && i === 0 ? `border-l-2 ${lateBar}` : ""
                       } ${c.align === "right" ? "text-right" : ""} ${
                         c.numeric ? "tabular-nums" : ""
@@ -1194,7 +1468,7 @@ export default function DataTable<Row>({
          *  totals strip over no rows states a total of nothing. */}
         {totals && !loading && rows.length > 0 ? (
           <tfoot className={`sticky bottom-0 ${Z_TABLE_FOOTER}`}>
-            <tr className="h-10" aria-label={totals.label} data-kit="data-totals">
+            <tr className={headHeight} aria-label={totals.label} data-kit="data-totals">
               {expansion && (
                 <td className="bg-kit-slate-3 border-t border-t-kit-slate-6" />
               )}
