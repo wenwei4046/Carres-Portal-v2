@@ -176,8 +176,8 @@ export function PoTemplate(data: PoTemplateData) {
   // frozen term's paper form: the reader IS the supplier, imperative.
   const detailRows: Array<[string, string | null, boolean?]> = [
     ["PO No", po_number],
-    ["Deliver by", niceDate(eta_date), true],
     ["Issued", niceDate(issue_date)],
+    ["Deliver by", niceDate(eta_date), true],
   ];
 
   return (
