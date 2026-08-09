@@ -2805,7 +2805,45 @@ export interface operationOrderListRow {
     qty: number;
     unit_price?: number | string | null;
     source_po?: string | null;
+    /** SO-1 — `Model · Variant`, resolved server-side by the SAME helper the
+     *  detail route uses, so a product is never named two ways. `null` = not in
+     *  the catalog (every AutoCount-imported line, whose "sku" is free text);
+     *  the caller then shows that text. Optional: a browser on this build
+     *  against an older Worker reads it as absent and falls back the same way. */
+    label?: string | null;
   }[];
+  /** SO-1 — the register's hidden Salesperson / Outlet fact columns. Both are
+   *  name embeds off a single FK. Optional for the same older-Worker reason. */
+  salesperson_id?: string | null;
+  salespersons?: { name: string } | null;
+  outlets?: { name: string } | null;
+  /**
+   * SO-3 — the rest of the flat facts the CUSTOMER ORDER itself owns, so the
+   * column chooser can offer every one of them (hidden by default).
+   *
+   * **Every field here is a column on `orders`.** Nothing is another module's
+   * record and nothing is computed — that is the card's own boundary, and it is
+   * what keeps a chooser from becoming a back door for the cross-module columns
+   * `MIGRATION-MAP.md` §2 moved out.
+   *
+   * All optional: on a pre-SO-3 Worker they read as absent, the chooser's
+   * column prints its own absence word, and nothing crashes.
+   */
+  customer_email?: string | null;
+  customer_billing?: string | null;
+  customer_emergency?: string | null;
+  customer_address_line1?: string | null;
+  customer_address_line2?: string | null;
+  customer_address_city?: string | null;
+  customer_address_state?: string | null;
+  customer_address_postcode?: string | null;
+  delivery_floor?: number | null;
+  delivery_has_lift?: boolean | null;
+  channel?: string | null;
+  invoice_no?: string | null;
+  invoiced_at?: string | null;
+  payment_method?: string | null;
+  installment_months?: number | null;
   /** C5 (2026-07-27) — the money truth. `orders.paid` is the only figure a
    *  live payment path writes; with the add-on sum below and the line prices
    *  above it feeds the shared `orderMoney`, so the row's 🔒, the drawer and
@@ -3015,6 +3053,11 @@ export interface operationOrderDetailOrder {
   paid: number;
   dealers: { name: string } | null;
   outlets: { name: string } | null;
+  /** SO-1 — who sold it. The Sales Order document names the salesperson on the
+   *  customer commitment; nothing else in the drawer ever needed it, so it was
+   *  not on the wire. Optional so existing detail fixtures keep typechecking. */
+  salesperson_id?: string | null;
+  salespersons?: { name: string } | null;
 }
 export interface operationOrderDetailLine {
   sku: string;
@@ -3042,6 +3085,25 @@ export interface operationOrderDetailHistoryRow {
   text: string;
   by_role: string | null;
   occurred_at: string;
+  /** SO-3 — the stamped facts behind the sentence. `update_order` writes
+   *  `{kind:'edit', changed:[…], payload:{…}}`; `operation_request_order_change`
+   *  writes `{kind:'promise_change_requested', from, to, reason}`. The panel's
+   *  PROMISED cell reads THIS and nothing else, which is why an order with no
+   *  recorded change shows no second line rather than a guess. Optional: a
+   *  browser on this build against a pre-SO-3 Worker reads it as absent, and
+   *  absent means "no recorded change" — the same answer it gave before. */
+  metadata?: Record<string, unknown> | null;
+}
+
+/** SO-3 — what is WAITING on this order (`order_change_requests`, 0129 · 0326).
+ *  The history says what happened; this says what nobody has decided yet. */
+export interface operationOrderChangeRequestRow {
+  id: string;
+  kind: "add_lines" | "replace_lines" | "edit_addon" | "promise_date" | "item_change";
+  payload: Record<string, unknown>;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  requested_at: string;
+  decided_at: string | null;
 }
 export interface operationOrderDetailWarehouse {
   id: string;
@@ -3105,6 +3167,10 @@ export interface operationOrderDetailResponse {
    *  assignment instead of order-level `delivery_partner_id`, since per design
    *  spec §CQ1 option (b) the customer-leg LP lives on the thread now. */
   threads: operationOrderThreadRow[];
+  /** SO-3 — optional, so a browser on this build against a pre-SO-3 Worker
+   *  reads it as absent. Absent means "we do not know what is waiting", and the
+   *  panel then offers the request door rather than claiming nothing is open. */
+  changeRequests?: operationOrderChangeRequestRow[];
 }
 
 /** Row in GET /api/operation/pos. `purchase_order_lines(...)` is the embedded
@@ -4204,6 +4270,40 @@ export function useOperationOrder(
     enabled: !!id,
     staleTime: 10_000,
     ...opts,
+  });
+}
+
+/**
+ * SO-3 · LEVEL 2 — POST /api/operation/orders/:id/request-change.
+ *
+ * **It records a request; it never applies one.** The promised date and the
+ * items stay exactly as they are until somebody with the authority decides —
+ * that is the difference between this and an Edit button, and it is the reason
+ * the panel has no Edit button for either.
+ */
+export type OperationOrderChangeRequestInput =
+  | { kind: "promise_date"; to: string; reason: string }
+  | { kind: "item_change"; note: string; reason: string };
+
+export function useRequestOrderChange(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<{ id: string }, ApiError, OperationOrderChangeRequestInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ id: string }, ApiError, OperationOrderChangeRequestInput>({
+    mutationFn: (input) =>
+      apiFetch<{ id: string }>(`/api/operation/orders/${orderId}/request-change`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      /* The panel reads the request AND the history from the detail payload,
+         so one invalidation refreshes both — and the register's row is
+         untouched on purpose, because nothing about the order changed. */
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId) });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
   });
 }
 

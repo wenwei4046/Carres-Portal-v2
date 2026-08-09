@@ -1097,6 +1097,100 @@ meaning two different things.
   lead lines that render live — never in stored text.
 - **Currency**: `RM 1,250.00`. Never `$` or `MYR` in row text.
 
+### An EMPTY CELL is not a word — the four absence words (Loo, SO-1 FINAL, 2026-08-09)
+
+**The rule this settles, in the card's own words:** *"Wherever Outstanding appears it must show
+an EXPLICIT state — a blank may never carry two meanings (owed amount / settled / unpriced)."*
+It is not only about money. **A blank cell is the portal's most common lie**: it reads as zero,
+as "fine", and as "we never asked", and the reader picks whichever they expect.
+
+| The fact is absent because… | Canonical word | Do NOT use |
+|---|---|---|
+| the order is priced and nothing is left to collect | **Paid in full** | Settled · Cleared · Nil · `—` · RM 0 |
+| nobody has put a price on this order at all | **No price yet** | Unpriced · No value · TBC · `—` · RM 0 |
+| **WE** never captured it (salesperson, outlet) | **Not recorded** | Unknown · Missing · N/A · `—` |
+| the **CUSTOMER** did not give it (phone, address) | **Not given** | Unknown · Missing · N/A · `—` |
+
+**`Not recorded` and `Not given` are two different facts and may never be merged.** One is our
+gap and somebody can close it; the other is the customer's choice and nobody can. A screen that
+spells both `—` tells an operator to go chasing a thing that was never chaseable.
+
+**`No price yet` follows the shape already approved above** for a missing date — *"Promised this
+day, no date yet"*, *"No logistics picked"*. Name the thing that is absent; never reach for a
+to-do word (`needs`, `pending`, `TBC`), which this file bans everywhere.
+
+**AN EVENT STAMP THAT HAS NOT HAPPENED READS `Not recorded` TOO** (SO-3, 2026-08-09). `DO No`,
+`Invoice No`, `Invoiced`, `Dispatched` and `Delivered` are all facts a document or an act
+produces, and until it happens there is nothing to print. It is OUR gap in the sense that
+matters — somebody in this company closes it — so it takes our word, not the customer's.
+A sixth word for *"has not happened yet"* was considered and refused: it would need an entry per
+column, and `Not recorded` already says truthfully that nothing has been written down.
+*(Measured 2026-08-09: 0 of 77 live orders carry any of the five, and at go-live the database
+starts clean — `CLAUDE.md` §6 — so this is the state every column will be in on day one.)*
+
+### The register ▼'s own words (SO-4, Loo 2026-08-09)
+
+**The ▼ speaks 2990's shipped vocabulary**, ported with its mechanics
+(`2990s/apps/backend/src/components/DataGrid.tsx`), not invented:
+
+| Concept | Canonical word | Do NOT use |
+|---|---|---|
+| The six date presets, in order | **Today · Tomorrow · This week · This month · Last month · Overdue** | Next 7 days · Past · Expired — and on a FILTER, `This week` is the calendar week Mon–Sun (2990's matcher): a filter answers *which rows*, while the delivery calendar's `This week` (above) answers *what is still coming*, a different subject |
+| The custom pair under the presets | **Custom date range** | Between · Date from/to · Period |
+| A number column's two bounds | **At least** · **Up to** | Min · Max · From · To — the bound says what it DOES to the rows |
+| Release one column's ▼ | **Clear** | Reset · Remove filter |
+| Release every ▼ from the toolbar | **Clear filters** | Reset all · Remove all |
+| Release every ▼ from the chips row | **Clear all** | — (the chips row's own word; the toolbar's says *filters* because it sits among controls that are not filters) |
+| The status bar under the grid | **`{n} orders`** — and **`{x} of {n} · Filters active`** while the search or any ▼ narrows | `Record x of y` (SO-4's word, overwritten by SO-5) · rows · results · items — the bar states the REGISTER's size, and it must say when the list on screen is not the whole register |
+
+**And `RM 0` in the PAID column is a figure, not an absence** (SO-4). The absence table above
+bans `RM 0` as a spelling of *Paid in full* and *No price yet* — both OUTSTANDING states. What
+has been RECEIVED is a different subject: an order nobody has paid a sen on has received
+exactly `RM 0`, and printing `Paid in full` there (as SO-3 briefly did) told the operator the
+opposite of the truth.
+
+### The Sales Order date words (SO-5, Loo 2026-08-09 — the freeze card's dictionary)
+
+**A date on a Sales Order is named by WHAT was promised or done, never by a developer's field
+name.** These seven are the only date words the page may use:
+
+| Concept | Canonical word | Do NOT use |
+|---|---|---|
+| when the order was placed | **`Ordered`** | Created · Placed at · Order date · placed_at |
+| the delivery day the customer holds today | **`Promised Delivery`** | Promised (bare) · ETA · Delivery date · Deadline |
+| the promise as it was FIRST made | **`Original Promised Delivery`** | Original date · First promise — (`Original {date}` above remains the SHORT form where the panel's strip has no room for the full word) |
+| the promise after an approved change | **`Current Promised Delivery`** | New date · Revised date · Amended date |
+| the day the CUSTOMER asked for, not yet promised | **`Requested Delivery Date`** | Requested date · Wish date · Preferred date |
+| the day the goods went out and arrived | **`Delivered`** | Done · Shipped · Fulfilled |
+| the order is finished end to end | **`Completed`** | Closed · Finished · Archived |
+
+**No developer-speak string may appear anywhere on the page** — a column, a chip, a tooltip,
+an empty state and an export header are all "on the page".
+
+### The Sales Order panel's own words (SO-3, Loo 2026-08-09)
+
+**A change the operator RECORDS is never spelled like a change they MADE.** The panel's Level 2
+raises a request and writes nothing to the order, and the words have to say so, or an operator
+who pressed the button believes the date moved.
+
+| Concept | Canonical word | Do NOT use |
+|---|---|---|
+| The customer wants a different delivery day | **`Change promised date`** | Postpone · Reschedule · Delay · Push back · New ETA — `Delay planning` is already OUR delay (a factory slipping), and this is the CUSTOMER's request, a different subject |
+| The customer wants something else in the order | **`Change items`** | Amend · Swap · Edit order · Replace lines — `replace_lines` is the POS's own structured act, not a word on this screen |
+| The button that commits either request | **`Record the request`** | Submit · Send · Apply · Confirm — **`Send` is retired portal-wide** and `Apply` is a lie: nothing is applied |
+| What is on screen while nobody has decided | **`Waiting for a decision`** | Pending · Awaiting approval · In review — this file bans `pending` everywhere |
+| The operator's own note on an order | **`Internal note`** | Remark · Comment · Memo · Note (bare) — the word says who it is FOR, which is the whole point of it |
+| The promise as it was FIRST made | **`Original {date}`** | Was · Old date · Initial · Promised (old) |
+| How many times the promise moved | **`changed ×N`** | N changes · Revised N times · v2 — and **it is never printed as `changed ×0`**: no recorded change means no second line at all |
+
+> 🟡 **AND THE ROUNDING RULE BELOW IS NOT MET BY THE MONEY COMPONENT — reported, not fixed.**
+> `apps/web/src/components/Money.tsx` renders `Math.round(n).toLocaleString()`, i.e. **whole
+> ringgit, no sen**, and the next rule says two decimals always. Measured on production
+> 2026-08-09: of 69 non-rental live orders, **0** carry sen in value, paid or outstanding — so
+> nothing on screen is wrong today and the first discount or part-payment with sen makes it
+> wrong. It is a SHARED component on every money surface in the portal, so it needs its own
+> card rather than a register's. Recorded in `docs/MIGRATION-MAP.md`.
+
 ### A money figure is never rounded to make a column tidy (Loo, 2026-07-28)
 
 **Two decimals, always, and the number on screen is the number owed.**

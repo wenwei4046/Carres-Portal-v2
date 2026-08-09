@@ -710,3 +710,276 @@ describe("P17 · a data grid carries column separators", () => {
     expect(withRule).toEqual(PX_COLUMNS.map((c) => String(c.width)).concat("auto"));
   });
 });
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * SO-3 — the four powers the Sales Orders register asked the KIT for
+ *
+ * A grid capability drawn inside one page is a capability the next register
+ * has to redraw. All four are OPTIONAL, and the licence block above still
+ * holds: pass none of them and the D0.5c markup comes back.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+describe("SO-4 · the permanent filter row is DEAD — the ▼ is the only filter", () => {
+  it("renders no filter row for any caller — the row was an invention", () => {
+    render(<DataTable {...base} />);
+    expect(document.querySelector('[data-kit="table-filter-row"]')).toBeNull();
+    /* And the head is ONE row again, whatever the columns carry. */
+    expect(document.querySelectorAll("thead tr")).toHaveLength(1);
+  });
+});
+
+describe("SO-4 · the ▼'s three shapes (2990's DataGrid, ported)", () => {
+  const baseFilter = {
+    options: [] as { value: string; label: string }[],
+    selected: new Set<string>(),
+    onChange: vi.fn(),
+    label: "Filter Order",
+    clearLabel: "Clear",
+  };
+  const withFilter = (filter: Column<Row>["filter"]): Column<Row>[] => [
+    { ...COLUMNS[0]!, filter },
+    COLUMNS[1]!,
+    COLUMNS[2]!,
+  ];
+
+  it("a date column: preset chips toggle and report, the kit decides nothing", () => {
+    const onToggle = vi.fn();
+    render(
+      <DataTable
+        {...base}
+        columns={withFilter({
+          ...baseFilter,
+          presets: {
+            options: [
+              { value: "today", label: "Today" },
+              { value: "overdue", label: "Overdue" },
+            ],
+            selected: "today",
+            onToggle,
+          },
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("table-filter-ref"));
+    const lit = screen.getByTestId("table-filter-preset-ref-today");
+    expect(lit).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("table-filter-preset-ref-overdue")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    fireEvent.click(lit);
+    expect(onToggle).toHaveBeenCalledWith("today");
+    /* Both rows survive: the kit reported and did not act. */
+    expect(screen.getAllByRole("row").filter((r) => r.dataset.kit === "data-row")).toHaveLength(2);
+  });
+
+  it("a date column: the live range reports each bound as typed — no apply", () => {
+    const onFromChange = vi.fn();
+    render(
+      <DataTable
+        {...base}
+        columns={withFilter({
+          ...baseFilter,
+          range: { label: "Custom date range", from: null, to: null, onFromChange, onToChange: vi.fn() },
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("table-filter-ref"));
+    expect(screen.queryByTestId("table-filter-range-apply-ref")).toBeNull();
+    fireEvent.change(screen.getByTestId("table-filter-range-from-ref"), {
+      target: { value: "2026-08-01" },
+    });
+    expect(onFromChange).toHaveBeenCalledWith("2026-08-01");
+  });
+
+  it("a number column: min/max bounds report as typed, and no checklist renders", () => {
+    const onMinChange = vi.fn();
+    render(
+      <DataTable
+        {...base}
+        columns={withFilter({
+          ...baseFilter,
+          number: {
+            min: "",
+            max: "",
+            onMinChange,
+            onMaxChange: vi.fn(),
+            minLabel: "At least",
+            maxLabel: "Up to",
+          },
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("table-filter-ref"));
+    fireEvent.change(screen.getByTestId("table-filter-min-ref"), { target: { value: "100" } });
+    expect(onMinChange).toHaveBeenCalledWith("100");
+    expect(document.querySelector('[data-kit="table-filter"] [type="checkbox"]')).toBeNull();
+  });
+
+  it("`active` lights the funnel when the narrowing lives outside `selected`, and Clear runs `onClear`", () => {
+    const onClear = vi.fn();
+    render(
+      <DataTable
+        {...base}
+        columns={withFilter({
+          ...baseFilter,
+          active: true,
+          onClear,
+          number: {
+            min: "5",
+            max: "",
+            onMinChange: vi.fn(),
+            onMaxChange: vi.fn(),
+            minLabel: "At least",
+            maxLabel: "Up to",
+          },
+        })}
+      />,
+    );
+    expect(screen.getByTestId("table-filter-ref")).toHaveAttribute("data-active", "true");
+    fireEvent.click(screen.getByTestId("table-filter-ref"));
+    fireEvent.click(screen.getByTestId("table-filter-clear-ref"));
+    expect(onClear).toHaveBeenCalled();
+  });
+});
+
+describe("SO-4 · windowed rows", () => {
+  const MANY: Row[] = Array.from({ length: 200 }, (_, i) => ({
+    id: String(i + 1),
+    ref: `SO-${1000 + i}`,
+    qty: i,
+  }));
+
+  it("renders every row while the list is small or the caller never asked", () => {
+    render(<DataTable {...base} virtual />);
+    expect(document.querySelectorAll('[data-kit="data-row"]')).toHaveLength(2);
+    expect(document.querySelector('[data-kit="table-window-pad"]')).toBeNull();
+  });
+
+  /* jsdom has no layout — clientHeight is 0 — so the window is the overscan
+   * alone and the bottom spacer carries everything else. That is exactly the
+   * assertion that matters: the DOM holds a WINDOW, the spacer holds the
+   * height, and a browser check measures the real thing (SO-4's self-check). */
+  it("renders a window plus a spacer, never the whole list", () => {
+    render(<DataTable {...base} rows={MANY} virtual />);
+    const rendered = document.querySelectorAll('[data-kit="data-row"]').length;
+    expect(rendered).toBeLessThan(MANY.length);
+    expect(document.querySelector('[data-kit="table-window-pad"]')).not.toBeNull();
+  });
+
+  it("windows nothing when the table is grouped — variable heights render in full", () => {
+    render(
+      <DataTable
+        {...base}
+        rows={MANY}
+        virtual
+        group={{ keyOf: (r) => r.ref.slice(0, 5), header: (r) => r.ref }}
+      />,
+    );
+    expect(document.querySelectorAll('[data-kit="data-row"]')).toHaveLength(MANY.length);
+    expect(document.querySelector('[data-kit="table-window-pad"]')).toBeNull();
+  });
+});
+
+describe("SO-3 · freeze", () => {
+  it("pins nothing until asked", () => {
+    render(<DataTable {...base} />);
+    for (const th of document.querySelectorAll("th[data-column]")) {
+      expect(th.className).not.toContain("sticky");
+    }
+  });
+
+  it("pins the first N data columns, in the head and in every row", () => {
+    render(<DataTable {...base} freeze={2} />);
+    const heads = [...document.querySelectorAll("th[data-column]")];
+    expect(heads[0]!.className).toContain("sticky");
+    expect(heads[1]!.className).toContain("sticky");
+    expect(heads[2]!.className).not.toContain("sticky");
+    const cells = [...document.querySelectorAll('[data-kit="data-row"]')[0]!.querySelectorAll("td")];
+    expect(cells[0]!.className).toContain("sticky");
+    expect(cells[2]!.className).not.toContain("sticky");
+  });
+
+  it("pins the kit's own gutters with them — a control never floats off its row", () => {
+    render(
+      <DataTable
+        {...base}
+        freeze={1}
+        selection={{ selected: new Set(), onToggleRow: vi.fn(), onToggleAll: vi.fn(), label: "All" }}
+      />,
+    );
+    const gutter = document.querySelector('th[data-kit="table-gutter"]')!;
+    expect(gutter.className).toContain("sticky");
+  });
+
+  it("takes NO z-index — §4.4's ladder stays closed at five", () => {
+    render(<DataTable {...base} freeze={2} />);
+    for (const el of document.querySelectorAll("th, td")) {
+      expect(el.className).not.toMatch(/\bz-\d/);
+    }
+  });
+});
+
+describe("SO-3 · the reading position", () => {
+  const ACTIVE = { id: "1", onChange: vi.fn(), label: "Orders" };
+
+  it("takes no focus and no key until a page wires it", () => {
+    render(<DataTable {...base} testId="t" />);
+    expect(screen.getByTestId("t")).not.toHaveAttribute("tabindex");
+  });
+
+  it("marks the row it is on, and ↑ ↓ walk from there", () => {
+    const onChange = vi.fn();
+    render(<DataTable {...base} testId="t" activeRow={{ ...ACTIVE, onChange }} />);
+    const grid = screen.getByTestId("t");
+    expect(grid).toHaveAttribute("tabindex", "0");
+    expect(document.querySelector('[data-row-id="1"]')!.getAttribute("data-active")).toBe("true");
+
+    fireEvent.keyDown(grid, { key: "ArrowDown" });
+    expect(onChange).toHaveBeenLastCalledWith("2");
+    fireEvent.keyDown(grid, { key: "ArrowUp" });
+    /* Already at the top: there is nowhere above row 1, so nothing is reported. */
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops at both ends rather than wrapping", () => {
+    const onChange = vi.fn();
+    render(<DataTable {...base} testId="t" activeRow={{ id: "2", onChange, label: "Orders" }} />);
+    fireEvent.keyDown(screen.getByTestId("t"), { key: "ArrowDown" });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("opens on Enter, and only when a page asked for that too", () => {
+    const onOpen = vi.fn();
+    render(<DataTable {...base} testId="t" activeRow={{ ...ACTIVE, onOpen }} />);
+    fireEvent.keyDown(screen.getByTestId("t"), { key: "Enter" });
+    expect(onOpen).toHaveBeenCalledWith("1");
+  });
+});
+
+describe("SO-3 · density", () => {
+  it("is 40px until a page asks for less", () => {
+    render(<DataTable {...base} />);
+    expect(document.querySelector("table")!.className).toContain("[&_td]:h-row");
+    expect(document.querySelector("table")!.className).not.toContain("h-row-compact");
+  });
+
+  it("runs at 34px on `compact`, and every row keeps ONE height", () => {
+    render(<DataTable {...base} density="compact" />);
+    expect(document.querySelector("table")!.className).toContain("[&_td]:h-row-compact");
+    const rowClasses = new Set(
+      [...document.querySelectorAll('[data-kit="data-row"] td')].map((td) => td.className),
+    );
+    /* Three columns, three class strings — and no FOURTH, which is what a
+     * per-row height would produce. */
+    expect(rowClasses.size).toBe(3);
+  });
+
+  it("runs at 28px + text-meta on `dense` — 2990's register numbers (SO-4)", () => {
+    render(<DataTable {...base} density="dense" />);
+    const table = document.querySelector("table")!;
+    expect(table.className).toContain("[&_td]:h-row-dense");
+    expect(table.className).toContain("text-meta");
+    expect(table.className).not.toContain("text-body");
+  });
+});

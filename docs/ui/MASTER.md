@@ -107,12 +107,34 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
   token. *(Evidence: `docs/research/grid-findings.md` F64 · F69 · F70. What a synthetic
   harness could NOT measure — readability, scan speed, click accuracy — stays UNKNOWN, so the
   live question is whether in-row controls stay 24px, not "40 or 28".)*
-- **The grid renders every row it is given, and the cost is now measured.** At 1,500 rows a
-  header-click sort costs **~900ms** and one keystroke **~640ms**; the DOM holds 2,095 `<tr>`
-  and 24,854 cells (F64 · F65). **AG Grid caps rendered rows at 500 and SAP Fiori at ~200
-  before lazy-loading; `DataTable` has no cap of any kind** (F68). The cost is linear in rows
-  and **flat in density** — 100ms is crossed at ~200–350 rows, so this is a WINDOWING question
-  and never a row-height one.
+- **The windowing question is ANSWERED — `virtual` (SO-4, 2026-08-09).** The measured costs
+  stand as history (at 1,500 fully-rendered rows a sort cost ~900ms and a keystroke ~640ms —
+  F64 · F65 · F68); a `virtual` flat list now renders a WINDOW (2990's numbers: threshold 25,
+  overscan 14) with two spacer rows carrying the off-screen height, so the DOM holds ~50 rows
+  of 1,000 and a full-list scroll step measures **<1ms** on the rendered register. Grouped and
+  expandable tables still render in full — variable row heights, 2990's own guard. Two defects
+  were found ON THE RENDERED PAGE and are held by the fix, not by memory: a spacer's `!h-auto`
+  out-important-ed its own inline height (the list scrolled 1,204px of 28,028), and a list
+  narrowed while scrolled deep left a stale offset whose own spacer held the phantom height —
+  the offset is clamped to the list before any index is cut from it.
+- **`DataTable`'s optional powers: SO-3 added four, SO-4 deleted one and widened two**
+  (2026-08-09): frozen leading columns (`freeze`, whose `left` is MEASURED off the rendered
+  header so a resize keeps the pin correct), the keyboard reading position (`activeRow` —
+  `↑ ↓ Enter`), `density`, and `virtual`. **`Column.filterInput` — SO-3's permanent auto-filter
+  row — is DELETED** (SO-4: *"the permanent per-column filter row was an invention — 2990's own
+  DataGrid never had one"*); the open-string question lives inside the ▼'s search box, where
+  2990 always kept it. The ▼ itself (`Column.filter`) now carries 2990's three shapes: the
+  value checklist, date preset chips + a live from/to pair, and number min/max bounds — the kit
+  renders and reports, the page owns which rows survive. A frozen column takes **no `z-`
+  class**: a `sticky` cell is positioned and every other `<td>` is not, so painting order
+  already answers it and §4.4's ladder stays closed at five.
+- **Row height is 40px, 34 on `density="compact"`, 28 on `density="dense"`** — `tokens.ts`
+  `ROW_HEIGHT`, mirrored by `tailwind.config.ts`'s `h-row` / `h-row-compact` / `h-row-dense`.
+  34 is 40 × 0.85 and clears the ~32px floor below. **28 is 2990's own shipped density target
+  and sits BELOW that floor knowingly**: the floor is set by 24px in-row CONTROLS, and a dense
+  register carries none — no expansion, no checkbox — so nothing has to fit but one 12px line
+  (`dense` also drops the table's type to `text-meta`). A page wanting `dense` plus a control
+  gutter is asking for the collision the floor names.
 - **Every optional power is OPTIONAL and no signature moved** — that is the only reason a kit
   card can run while pages are frozen. **A page must justify wiring a power** (`§13.3` of the
   Constitution's design philosophy); an unwired power's ABSENCE is asserted by a test, because a
@@ -317,16 +339,35 @@ THE ONE THAT OUTRANKS ALL OF THEM
 
 **⛔ WHAT THE NEXT CHAT MAY NOT DO**
 ```
-✗ start with Sales Order            the standard comes first
 ✗ touch business logic              APIs · calculations · the action ladder ·
                                     queues · PIC · stock · delivery · money ·
                                     permissions · order records — all PRESERVED
-✗ re-measure widths, densities,     finished and recorded in grid-findings §4.7/§4.8
-  engines or row height
-✗ add grid capability               the foundation is DONE; S2.5 is STOPPED
+✗ re-measure widths or engines      finished and recorded in grid-findings §4.7/§4.8
 ✗ derive a page structure from      the last programme did exactly this, and the
   reading source                    two ⛔ blocks are the receipt
 ```
+
+> ### ✅ TWO OF THIS BLOCK'S LINES ARE RETIRED — by the owner, twice, in writing
+>
+> This block said `✗ start with Sales Order — the standard comes first` and `✗ add grid
+> capability — the foundation is DONE`. **The owner then issued SO-1 (2026-08-09) and SO-3
+> (2026-08-09), which do both**: the register was rebuilt to THE REGISTER LAW and then given
+> seven grid capabilities, four of them new kit powers.
+>
+> **`CLAUDE.md` Law 2 settles it — reality outranks documentation, and the owner's newest
+> instruction outranks a note he wrote the day before.** Leaving the lines standing while
+> shipping past them is the failure Law 4 exists to stop: a document nobody may contradict
+> while the owner contradicts it is not a law, it is a stale note that makes the next chat
+> argue with a ghost.
+>
+> **Sales Order is therefore the page the page-structure standard is derived FROM**, not the
+> first page built to one. The ROW-HEIGHT line above is now a live number rather than a frozen
+> one: `tokens.ts` `ROW_HEIGHT` carries **40, 34 and 28** — 34 is exactly the floor arithmetic
+> this section already stated (24px controls, ~32px floor), and 28 (SO-4) steps under that
+> floor only because a dense register carries no in-row control at all. The 200-row cost is no
+> longer the live constraint either: SO-4's `virtual` windows the flat list (§4 above). Widths
+> and engines stand as recorded.
+> *Receipt: `docs/MIGRATION-MAP.md` §1.5 and §5 P1.*
 
 ---
 

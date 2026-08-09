@@ -1883,3 +1883,148 @@ describe("POST /api/operation/orders/:id/revert-dispatch", () => {
     expect(body.code).toBe("no_dispatched_threads");
   });
 });
+
+/**
+ * SO-3 · LEVEL 2 — POST /:id/request-change.
+ *
+ * The one property worth a test more than any other: **this door records a
+ * request and never writes the order.** Everything else it does — the reason
+ * gate, the two kinds — is there to keep that true.
+ */
+describe("POST /api/operation/orders/:id/request-change", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+
+  it("records a postpone as a REQUEST, and calls no update path", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { id: "cr-1" }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const from = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/request-change`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "promise_date",
+          to: "2026-08-30",
+          reason: "customer is renovating",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("operation_request_order_change", {
+      p_order_id: ORDER_ID,
+      p_kind: "promise_date",
+      p_payload: { to: "2026-08-30", reason: "customer is renovating" },
+    });
+    /* NOTHING was written directly. The promise still says what it said. */
+    expect(from).not.toHaveBeenCalled();
+    assertRpcCallShape(rpc, "operation_request_order_change", [
+      "p_order_id",
+      "p_kind",
+      "p_payload",
+    ]);
+  });
+
+  it("records an item change with its note and its reason", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { id: "cr-2" }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/request-change`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "item_change",
+          note: "King to Queen",
+          reason: "room is too small",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("operation_request_order_change", {
+      p_order_id: ORDER_ID,
+      p_kind: "item_change",
+      p_payload: { note: "King to Queen", reason: "room is too small" },
+    });
+  });
+
+  it("refuses a postpone with no reason — the record is useless without one", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/request-change`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "promise_date", to: "2026-08-30", reason: "  " }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a kind it does not own", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/request-change`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "replace_lines", reason: "x" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the one-pending rule as the message the RPC raised", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "22023",
+        message: "This order already has a change waiting",
+        details: "pending_exists",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/request-change`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "promise_date", to: "2026-08-30", reason: "renovating" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("pending_exists");
+  });
+
+  it("is internal-only — a dealer never reaches it", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/request-change`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "promise_date", to: "2026-08-30", reason: "x" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
