@@ -54,7 +54,7 @@ const LOGO_SRC =
 const LIFT_THREE_STATE_READY = false;
 
 const MARGIN = mm(12);
-const HEADER_H = mm(13);
+const HEADER_H = mm(12);
 const FOOTER_H = mm(11);
 
 /** `2026-08-09` → `SUN, 9 AUG 26` (textual parse — timezone-proof). */
@@ -217,14 +217,19 @@ const styles = StyleSheet.create({
   voucherLine: { fontSize: 8, color: GREY, marginTop: mm(0.5) },
 
   // ── payments received ──
+  payBox: {
+    borderWidth: 0.6,
+    borderColor: HAIR,
+    paddingHorizontal: mm(3),
+    paddingTop: mm(2),
+    paddingBottom: mm(1),
+  },
   payHead: {
-    borderTopWidth: 0.5,
-    borderTopColor: INK,
     borderBottomWidth: 0.5,
     borderBottomColor: INK,
     flexDirection: "row",
-    paddingVertical: mm(1.5),
-    marginTop: mm(1.2),
+    paddingVertical: mm(1.2),
+    marginTop: mm(1),
   },
   payColDate: { width: mm(24) },
   payColCode: { width: mm(30) },
@@ -274,7 +279,7 @@ const styles = StyleSheet.create({
   legalSentence: { fontSize: 7.5, color: GREY, lineHeight: 1.5 },
 
   // ── terms ──
-  terms: { marginTop: "auto", paddingTop: mm(4), paddingHorizontal: mm(4) },
+  terms: { paddingTop: mm(4), paddingHorizontal: mm(4) },
   termsLine: { fontSize: 6.8, color: GREY, lineHeight: 1.35, marginTop: mm(0.5) },
 
   // ── footer (fixed, every page) ──
@@ -446,14 +451,14 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             pageNumber === 1 ? (
               <View>
                 <View style={styles.headerRow}>
-                  <View>
+                  {/* One line: logo · legal name · SSM (owner round 5).
+                      No date here — ORDER DETAILS owns `Ordered`. */}
+                  <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "flex-end", paddingBottom: mm(1) }}>
                     <Image style={styles.logo} src={LOGO_SRC} />
-                    <Text style={[styles.legalLine, styles.legalFirst]}>
+                    <Text style={[styles.legalLine, { marginTop: 0, marginLeft: mm(3) }]}>
                       {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
                     </Text>
                   </View>
-                  {/* No date here — ORDER DETAILS owns `Ordered`; the header
-                      printed the same date twice (owner review). */}
                   <View style={styles.docBlock}>
                     <Text style={styles.docTitle}>SALES ORDER</Text>
                     <Text style={styles.docNumber}>{so_number}</Text>
@@ -646,12 +651,15 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           </View>
         ) : null}
 
-        {/* ── PAYMENTS RECEIVED ── */}
+        {/* ── THE MONEY ZONE — payments box (option A, owner round 5) +
+            words/signature/totals + terms all pin to the PAGE BOTTOM as one
+            unit: the items table is the only flexible zone, so BALANCE DUE
+            and the signature sit at the same spot on every printed order
+            (pre-printed-form geometry). ── */}
+        <View wrap={false} style={{ marginTop: "auto" }}>
         {payments.length > 0 ? (
-          <View wrap={false} style={{ marginTop: mm(5) }}>
-            <View style={{ paddingHorizontal: mm(4) }}>
-              <Text style={styles.blockLabel}>Payments Received</Text>
-            </View>
+          <View style={[styles.payBox, { marginHorizontal: mm(4), marginTop: mm(5) }]}>
+            <Text style={styles.blockLabel}>Payments Received</Text>
             <View style={styles.payHead}>
               <Text style={[styles.th, styles.payColDate]}>Date</Text>
               <Text style={[styles.th, { flex: 1 }]}>Method</Text>
@@ -668,13 +676,10 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                 <Text style={[styles.payCell, styles.payColAmount, { textAlign: "right", fontWeight: 600 }]}>{money(p.amount)}</Text>
               </View>
             ))}
-            <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
           </View>
         ) : null}
 
-        {/* ── amount in words + customer signature (left) · totals (right) —
-            the 2990 arrangement: the signature sits BESIDE the money, so a
-            normal order closes on one page. The company signs nothing. ── */}
+        {/* amount in words + customer signature (left) · totals (right) */}
         <View style={styles.totalsZone} wrap={false}>
           <View style={styles.wordsBlock}>
             <Text style={styles.blockLabel}>Amount in words (Items total)</Text>
@@ -729,6 +734,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
               {i + 1}. {t}
             </Text>
           ))}
+        </View>
         </View>
 
         {/* ── footer — fixed on every page: the quiet row + the registered
