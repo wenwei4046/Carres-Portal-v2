@@ -227,8 +227,13 @@ export function DoTemplate(data: DoTemplateData) {
     ["Access", accessText],
   ];
 
-  const groups = bandedLines(lines);
-  const totalQty = lines.reduce((n, l) => n + Number(l.qty), 0);
+  // ONE SET PER PAGE: sofa sets each own a page (rows + drawing); every
+  // other line renders on the first table. A pure bed trip has no sets.
+  const sets = sofaGroups(lines);
+  const setSkus = new Set(sets.flatMap((g) => g.modules.map((m) => m.sku)));
+  const otherLines = lines.filter((l) => !setSkus.has(l.sku));
+  const groups = bandedLines(otherLines);
+  const otherQty = otherLines.reduce((n, l) => n + Number(l.qty), 0);
   const podSigned = Boolean(pod?.signature_url);
 
   return (
@@ -310,27 +315,78 @@ export function DoTemplate(data: DoTemplateData) {
             </View>
           </View>
         </View>
-
-        {/* ── items — quantity only; a delivery doc never talks money ── */}
-        <View style={styles.tableHead} minPresenceAhead={40}>
-          <Text style={[styles.th, styles.colNo]}>#</Text>
-          <Text style={[styles.th, styles.colCode]}>Item Code</Text>
-          <Text style={[styles.th, { flex: 1 }]}>Description</Text>
-          <Text style={[styles.th, styles.colPo]}>PO No</Text>
-          <Text style={[styles.th, styles.colQty]}>Qty</Text>
-        </View>
-        {groups.map((group, gi) => (
-          <View key={`band-${gi}`}>
-            {group.band ? (
-              <View style={styles.bandRow} minPresenceAhead={30}>
-                <Text style={styles.bandText}>
-                  {group.band} · {group.rows.length} {group.rows.length > 1 ? "items" : "item"}
-                </Text>
+        {/* ── items — quantity only; a delivery doc never talks money.
+            Non-sofa lines share ONE table; each sofa SET gets its own page
+            below — rows + drawing together, the PO law's one-set-per-page. ── */}
+        {otherLines.length > 0 ? (
+          <View>
+            <View style={styles.tableHead} minPresenceAhead={40}>
+              <Text style={[styles.th, styles.colNo]}>#</Text>
+              <Text style={[styles.th, styles.colCode]}>Item Code</Text>
+              <Text style={[styles.th, { flex: 1 }]}>Description</Text>
+              <Text style={[styles.th, styles.colPo]}>PO No</Text>
+              <Text style={[styles.th, styles.colQty]}>Qty</Text>
+            </View>
+            {groups.map((group, gi) => (
+              <View key={`band-${gi}`}>
+                {group.band ? (
+                  <View style={styles.bandRow} minPresenceAhead={30}>
+                    <Text style={styles.bandText}>
+                      {group.band} · {group.rows.length} {group.rows.length > 1 ? "items" : "item"}
+                    </Text>
+                  </View>
+                ) : null}
+                {group.rows.map(({ line, index }) => (
+                  <View key={`${line.sku}-${index}`} wrap={false} style={[styles.row, styles.rowHair]}>
+                    <Text style={styles.cellNo}>{index + 1}</Text>
+                    <Text style={styles.cellCode}>{line.sku}</Text>
+                    <View style={styles.desc}>
+                      <Text style={styles.descMain}>{line.description}</Text>
+                    </View>
+                    <Text style={styles.cellPo}>
+                      {line.source_po && line.source_po.length > 0 ? line.source_po.join("\n") : "—"}
+                    </Text>
+                    <Text style={line.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>
+                      {line.qty}
+                    </Text>
+                  </View>
+                ))}
               </View>
-            ) : null}
-            {group.rows.map(({ line, index }) => (
-              <View key={`${line.sku}-${index}`} wrap={false} style={[styles.row, styles.rowHair]}>
-                <Text style={styles.cellNo}>{index + 1}</Text>
+            ))}
+            <View
+              wrap={false}
+              style={[styles.row, { borderTopWidth: 0.5, borderTopColor: INK, paddingVertical: mm(1.8) }]}
+            >
+              <Text style={styles.cellNo}> </Text>
+              <Text style={styles.cellCode}> </Text>
+              <View style={styles.desc}>
+                <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>TOTAL</Text>
+              </View>
+              <Text style={styles.cellPo}> </Text>
+              <Text style={[styles.cellQty, { fontWeight: 700 }]}>{otherQty}</Text>
+            </View>
+            <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
+          </View>
+        ) : null}
+
+        {/* ── sofa sets — ONE SET PER PAGE: the set's rows + its drawing ── */}
+        {sets.map(({ model, modules }, si) => (
+          <View key={model} break={otherLines.length > 0 || si > 0}>
+            <View style={styles.tableHead} minPresenceAhead={40}>
+              <Text style={[styles.th, styles.colNo]}>#</Text>
+              <Text style={[styles.th, styles.colCode]}>Item Code</Text>
+              <Text style={[styles.th, { flex: 1 }]}>Description</Text>
+              <Text style={[styles.th, styles.colPo]}>PO No</Text>
+              <Text style={[styles.th, styles.colQty]}>Qty</Text>
+            </View>
+            <View style={styles.bandRow}>
+              <Text style={styles.bandText}>
+                SOFA · SET {si + 1} · {modules.length} {modules.length > 1 ? "modules" : "module"}
+              </Text>
+            </View>
+            {modules.map((line, li) => (
+              <View key={`${line.sku}-${li}`} wrap={false} style={[styles.row, styles.rowHair]}>
+                <Text style={styles.cellNo}>{li + 1}</Text>
                 <Text style={styles.cellCode}>{line.sku}</Text>
                 <View style={styles.desc}>
                   <Text style={styles.descMain}>{line.description}</Text>
@@ -343,58 +399,41 @@ export function DoTemplate(data: DoTemplateData) {
                 </Text>
               </View>
             ))}
-          </View>
-        ))}
-        {/* TOTAL row between two ink rules (SO §5) */}
-        <View
-          wrap={false}
-          style={[styles.row, { borderTopWidth: 0.5, borderTopColor: INK, paddingVertical: mm(1.8) }]}
-        >
-          <Text style={styles.cellNo}> </Text>
-          <Text style={styles.cellCode}> </Text>
-          <View style={styles.desc}>
-            <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>TOTAL</Text>
-          </View>
-          <Text style={styles.cellPo}> </Text>
-          <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totalQty}</Text>
-        </View>
-        <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
-
-        {/* ── sofa layout drawings — one per model with module lines, so the
-            crew assembles on site exactly what the factory built ── */}
-        {sofaGroups(lines).map(({ model, modules }) => (
-          <View key={model} wrap={false} style={styles.layout}>
-            <Text style={styles.blockLabel}>Sofa Layout</Text>
-            <Text style={styles.layoutCaption}>Top view. Back at the top. TV in front.</Text>
-            <View style={styles.layoutRow}>
-              {modules.map((m, i) => {
-                const code = moduleCodeOf(m);
-                const fabric = (m.attrs as { fabric_name?: string } | null | undefined)?.fabric_name;
-                return (
-                  <View key={`${m.sku}-${i}`} style={styles.moduleBox}>
-                    <View
-                      style={{
-                        width: mm(30),
-                        height: isChaise(code) ? mm(42) : mm(24),
-                        backgroundColor: SEAT_BG,
-                        borderWidth: 0.6,
-                        borderColor: GREY,
-                      }}
-                    >
-                      <View style={{ height: mm(5), backgroundColor: BACK_BG }} />
+            <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
+            <View style={styles.layout}>
+              <Text style={styles.blockLabel}>Sofa Layout</Text>
+              <Text style={styles.layoutCaption}>Top view. Back at the top. TV in front.</Text>
+              <View style={styles.layoutRow}>
+                {modules.map((m, i) => {
+                  const code = moduleCodeOf(m);
+                  const fabric = (m.attrs as { fabric_name?: string } | null | undefined)?.fabric_name;
+                  return (
+                    <View key={`${m.sku}-${i}`} style={styles.moduleBox}>
+                      <View
+                        style={{
+                          width: mm(30),
+                          height: isChaise(code) ? mm(42) : mm(24),
+                          backgroundColor: SEAT_BG,
+                          borderWidth: 0.6,
+                          borderColor: GREY,
+                        }}
+                      >
+                        <View style={{ height: mm(5), backgroundColor: BACK_BG }} />
+                      </View>
+                      <Text style={styles.moduleCode}>{Number(m.qty) > 1 ? `${code} ×${m.qty}` : code}</Text>
+                      {fabric ? <Text style={styles.moduleFabric}>{fabric}</Text> : null}
                     </View>
-                    <Text style={styles.moduleCode}>{Number(m.qty) > 1 ? `${code} ×${m.qty}` : code}</Text>
-                    {fabric ? <Text style={styles.moduleFabric}>{fabric}</Text> : null}
-                  </View>
-                );
-              })}
-            </View>
-            <View style={styles.tvLine} />
-            <View style={styles.tvBox}>
-              <Text style={styles.tvText}>TV</Text>
+                  );
+                })}
+              </View>
+              <View style={styles.tvLine} />
+              <View style={styles.tvBox}>
+                <Text style={styles.tvText}>TV</Text>
+              </View>
             </View>
           </View>
         ))}
+
 
         {/* ── signing zone — pinned to the page bottom as one unit ── */}
         <View wrap={false} style={{ marginTop: "auto" }}>

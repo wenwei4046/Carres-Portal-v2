@@ -18,7 +18,7 @@ const { registerNotoSansSC } = await import("../src/lib/pdf/fonts/noto.ts");
 registerNotoSansSC();
 
 const data = {
-  do_number: "DO-240826",
+  do_number: "DO-240825",
   issue_date: "2026-08-23",
   order_id: "preview",
   order_code: "SO-1256",
@@ -32,44 +32,22 @@ const data = {
   partner: { name: "NETS" },
   lines: [
     {
-      sku: "BOAAT-1A(LHF)",
-      description: "Sofa Boaat 1A (LHF) — CG-004 (KN390-4) · Wood · Seat 32 · Leg 2\"",
-      qty: 1,
+      sku: "B1201F-K",
+      description: "Forte Mattress — King",
+      qty: 2,
       unit: "pc",
       line_total: 0,
-      category: "SOFA",
-      source_po: ["PO-2051"],
-      attrs: { fabric_name: "CG-004" },
+      category: "MATTRESS",
+      source_po: ["PO-2053"],
     },
     {
-      sku: "BOAAT-1A(RHF)",
-      description: "Sofa Boaat 1A (RHF) — CG-004 (KN390-4) · Wood · Seat 32 · Leg 2\"",
+      sku: "ELWOOD-K",
+      description: "Elwood Bedframe — King · Walnut · Gap 14\"",
       qty: 1,
       unit: "pc",
       line_total: 0,
-      category: "SOFA",
-      source_po: ["PO-2051"],
-      attrs: { fabric_name: "CG-004" },
-    },
-    {
-      sku: "LUNA-L(RHF)",
-      description: "Sofa Luna Chaise (RHF) — BF-201 · Fabric · Seat 30",
-      qty: 1,
-      unit: "pc",
-      line_total: 0,
-      category: "SOFA",
-      source_po: ["PO-2052"],
-      attrs: { fabric_name: "BF-201" },
-    },
-    {
-      sku: "LUNA-2A(LHF)",
-      description: "Sofa Luna 2A (LHF) — BF-201 · Fabric · Seat 30",
-      qty: 1,
-      unit: "pc",
-      line_total: 0,
-      category: "SOFA",
-      source_po: ["PO-2052"],
-      attrs: { fabric_name: "BF-201" },
+      category: "BEDFRAME",
+      source_po: ["PO-2054"],
     },
   ],
   currency: "MYR",
@@ -81,6 +59,6 @@ const data = {
 const element = React.createElement(DoTemplate, data);
 const blob = await pdf(element).toBlob();
 const buffer = Buffer.from(await blob.arrayBuffer());
-const out = path.join(__dirname, "DO-preview.pdf");
+const out = path.join(__dirname, "DO-bed-preview.pdf");
 writeFileSync(out, buffer);
 console.log(`PDF written: ${out} (${buffer.length} bytes)`);
