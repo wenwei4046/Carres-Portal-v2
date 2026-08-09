@@ -40,13 +40,6 @@ const BAR_BG = INK; // table header bar — white text on ink (2990)
 
 const mm = (v: number) => v * 2.83465;
 
-// Same wordmark stamp as the PO template (browser fetches the served asset;
-// node harnesses read the file from disk).
-const LOGO_SRC =
-  typeof window !== "undefined" && window.location
-    ? `${window.location.origin}/carres-wordmark.png`
-    : "public/carres-wordmark.png";
-
 /** B ruling (Loo, 2026-08-09): the DB's delivery_has_lift is a NOT-NULL
  * boolean today, so an order nobody asked about prints `LIFT No` — that may
  * NOT feed a charge sentence the customer signs. Until the nullable-columns
@@ -55,7 +48,7 @@ const LOGO_SRC =
 const LIFT_THREE_STATE_READY = false;
 
 const MARGIN = mm(12);
-const HEADER_H = mm(16);
+const HEADER_H = mm(30);
 const FOOTER_H = mm(8);
 
 /** `2026-08-09` → `SUN, 9 AUG 26` (textual parse — timezone-proof). */
@@ -69,6 +62,12 @@ function capsDate(iso: string | null | undefined): string | null {
   ];
   const mon = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][mo - 1];
   return `${dow}, ${d} ${mon} ${String(y).slice(2)}`;
+}
+
+/** 2990's header date form — `09/08/2026`. */
+function slashDate(iso: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? ""));
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(iso ?? "");
 }
 
 /** Body dates read mixed-case — `9 Aug 26`, or `Mon, 24 Aug 26` with the
@@ -165,15 +164,13 @@ const styles = StyleSheet.create({
 
   // ── header (fixed, every page): wordmark + legal identity · doc hero ──
   header: { position: "absolute", top: MARGIN, left: MARGIN, right: MARGIN },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
-  logo: { height: mm(6), width: mm(25.3) },
-  legalLine: { fontSize: 6.5, color: GREY, marginTop: mm(0.5), lineHeight: 1 },
-  legalFirst: { marginTop: mm(1.5) },
-  docBlock: { alignItems: "flex-end", alignSelf: "flex-end" },
-  docTitle: { fontSize: 10, color: GREY, letterSpacing: 1.5 },
-  docNumber: { fontSize: 18, fontWeight: 700, marginTop: 2, lineHeight: 1 },
-  docDate: { fontSize: 7, fontWeight: 700, letterSpacing: 0.8, marginTop: mm(1.2) },
-  headerRule: { borderBottomWidth: 0.8, borderBottomColor: INK, marginTop: mm(2) },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  companyName: { fontSize: 16, fontWeight: 700 },
+  legalLine: { fontSize: 9, marginTop: mm(1.3) },
+  docBlock: { alignItems: "flex-end" },
+  docTitle: { fontSize: 14, fontWeight: 700 },
+  docMeta: { fontSize: 10, marginTop: mm(1.8) },
+  headerRule: { borderBottomWidth: 0.5, borderBottomColor: "#B4B4B4", marginTop: mm(3) },
 
   // ── frameless info blocks. Section anchors are INK — the owner's review
   //    (2026-08-09) found the all-grey voice hard to read; international
@@ -197,7 +194,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: mm(2),
     marginTop: mm(2.5),
   },
-  th: { fontSize: 7, fontWeight: 600, color: "#FFFFFF", letterSpacing: 0.4, textTransform: "uppercase" },
+  th: { fontSize: 8, fontWeight: 700, color: "#FFFFFF", letterSpacing: 0.2, textTransform: "uppercase" },
   colNo: { width: mm(7) },
   colCode: { width: mm(29) },
   colQty: { width: mm(10), textAlign: "right" },
@@ -212,18 +209,19 @@ const styles = StyleSheet.create({
     marginTop: mm(1),
   },
   bandText: { fontSize: 8, fontWeight: 700, color: INK, letterSpacing: 0.3 },
-  row: { flexDirection: "row", paddingVertical: mm(1.4), paddingHorizontal: mm(2) },
+  row: { flexDirection: "row", paddingVertical: mm(2), paddingHorizontal: mm(2) },
   rowHair: { borderBottomWidth: 0.3, borderBottomColor: HAIR },
-  cellNo: { fontSize: 8.5, color: GREY, width: mm(7) },
-  cellCode: { fontSize: 8.5, width: mm(29), paddingRight: mm(2) },
+  rowStripe: { backgroundColor: "#F5F5F5" }, // 2990's striped theme
+  cellNo: { fontSize: 7.5, color: GREY, width: mm(7), textAlign: "right", paddingRight: mm(1.5) },
+  cellCode: { fontSize: 8, width: mm(29), paddingRight: mm(2) },
   desc: { flex: 1, paddingRight: mm(3) },
-  descMain: { fontSize: 8.5, fontWeight: 600 },
+  descMain: { fontSize: 8, fontWeight: 600 },
   descSub: { fontSize: 7.5, color: GREY, marginTop: mm(0.5), paddingLeft: mm(2) },
-  cellQty: { fontSize: 8.5, width: mm(10), textAlign: "right" },
-  cellMoney: { fontSize: 8.5, textAlign: "right" },
+  cellQty: { fontSize: 7.5, width: mm(10), textAlign: "right" },
+  cellMoney: { fontSize: 7.5, textAlign: "right" },
   // The line's own amount anchors the row (international convention: the
   // rightmost figure is the one the reader scans down).
-  cellAmount: { fontSize: 8.5, fontWeight: 600, textAlign: "right" },
+  cellAmount: { fontSize: 7.5, fontWeight: 700, textAlign: "right" },
 
   voucherBlock: { marginTop: mm(1), paddingHorizontal: mm(4) },
   voucherLine: { fontSize: 8, color: GREY, marginTop: mm(0.5) },
@@ -240,12 +238,12 @@ const styles = StyleSheet.create({
   payColCode: { width: mm(30) },
   payColBy: { width: mm(30) },
   payColAmount: { width: mm(23), textAlign: "right" },
-  payCell: { fontSize: 8.5 },
+  payCell: { fontSize: 8.5 }, // 2990's payments table body is 8.5
 
   // ── amount in words · totals ──
   totalsZone: { flexDirection: "row", marginTop: mm(5), paddingHorizontal: mm(4), alignItems: "flex-start" },
   wordsBlock: { flex: 1, paddingRight: mm(8) },
-  wordsText: { fontSize: 8, marginTop: mm(1.2), lineHeight: 1.4 },
+  wordsText: { fontSize: 9, marginTop: mm(1.2), lineHeight: 1.4 },
   depositLine: { fontSize: 8, color: GREY, marginTop: mm(1.2) },
   totalsBlock: { width: mm(70) },
   totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: mm(1.2) },
@@ -285,7 +283,7 @@ const styles = StyleSheet.create({
 
   // ── terms ──
   terms: { paddingTop: mm(4), paddingHorizontal: mm(4) },
-  termsLine: { fontSize: 6.8, color: GREY, lineHeight: 1.35, marginTop: mm(0.5) },
+  termsLine: { fontSize: 8, color: GREY, lineHeight: 1.35, marginTop: mm(0.6) },
 
   // ── footer (fixed, every page) ──
   footer: {
@@ -460,28 +458,20 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                       longer SO number can never touch the address (owner
                       round 11). Line 1: logo · legal name · SSM. Lines
                       2-3: the address, two lines, breathing. */}
-                  {/* Owner round 12: line 1 = logo + SSM (the wordmark IS
-                      the brand; repeating CARRES beside it was noise). The
-                      LEGAL NAME leads the address block instead. Lines
-                      breathe 1.5mm; the left column is width-bounded so the
-                      doc number can never touch it. */}
+                  {/* 2990's drawHeader, verbatim (owner round 13). */}
                   <View style={{ flex: 1, paddingRight: mm(10) }}>
-                    <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
-                      <Image style={styles.logo} src={LOGO_SRC} />
-                      <Text style={[styles.legalLine, { marginTop: 0, marginLeft: mm(3) }]}>
-                        SSM {CARRES_COMPANY.regNo}
+                    <Text style={styles.companyName}>{CARRES_COMPANY.legalName}</Text>
+                    <Text style={styles.legalLine}>SSM {CARRES_COMPANY.regNo}</Text>
+                    {CARRES_COMPANY.addressLines.map((line, i) => (
+                      <Text key={i} style={styles.legalLine}>
+                        {line}
                       </Text>
-                    </View>
-                    <Text style={[styles.legalLine, { marginTop: mm(1.5) }]}>
-                      {CARRES_COMPANY.legalName} · {CARRES_COMPANY.addressLines[0]}
-                    </Text>
-                    <Text style={[styles.legalLine, { marginTop: mm(1.5) }]}>
-                      {CARRES_COMPANY.addressLines[1]} {CARRES_COMPANY.addressLines[2]}
-                    </Text>
+                    ))}
                   </View>
                   <View style={styles.docBlock}>
                     <Text style={styles.docTitle}>SALES ORDER</Text>
-                    <Text style={styles.docNumber}>{so_number}</Text>
+                    <Text style={styles.docMeta}>Doc No: {so_number}</Text>
+                    <Text style={styles.docMeta}>Date: {slashDate(issue_date)}</Text>
                   </View>
                 </View>
                 <View style={styles.headerRule} />
@@ -572,8 +562,8 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           <Text style={[styles.th, styles.colCode]}>Item Code</Text>
           <Text style={[styles.th, { flex: 1 }]}>Description</Text>
           <Text style={[styles.th, styles.colQty]}>Qty</Text>
-          <Text style={[styles.th, styles.colPrice]}>Unit Price (RM)</Text>
-          <Text style={[styles.th, styles.colDisc]}>Discount (RM)</Text>
+          <Text style={[styles.th, styles.colPrice]}>Unit Price</Text>
+          <Text style={[styles.th, styles.colDisc]}>Discount</Text>
           <Text style={[styles.th, styles.colAmount]}>Amount (RM)</Text>
         </View>
         {groups.map((group, gi) => (
@@ -586,7 +576,6 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
               </View>
             ) : null}
             {group.rows.map(({ line, index }) => {
-              const isLastRow = gi === groups.length - 1 && index === lines.length - 1 && !hasAddons;
               const sofaSub = sofaSpecLine(line.attrs);
               const configSub = configLine(line.attrs);
               const pwpSub = pwpMarkerLine(line.attrs);
@@ -600,7 +589,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                 <View
                   key={`${line.sku}-${index}`}
                   wrap={false}
-                  style={isLastRow ? styles.row : [styles.row, styles.rowHair]}
+                  style={index % 2 === 1 ? [styles.row, styles.rowStripe] : styles.row}
                 >
                   <Text style={styles.cellNo}>{index + 1}</Text>
                   <Text style={styles.cellCode}>{line.sku}</Text>
@@ -637,10 +626,13 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           </View>
         ) : null}
         {addons.map((a, idx) => {
-          const isLast = idx === addons.length - 1;
           const addonSub = addonAttrsDescription(a.attrs);
           return (
-            <View key={`addon-${idx}`} wrap={false} style={isLast ? styles.row : [styles.row, styles.rowHair]}>
+            <View
+              key={`addon-${idx}`}
+              wrap={false}
+              style={(lines.length + idx) % 2 === 1 ? [styles.row, styles.rowStripe] : styles.row}
+            >
               <Text style={styles.cellNo}>{lines.length + idx + 1}</Text>
               <Text style={styles.cellCode}>{a.sku ?? "ADD-ON"}</Text>
               <View style={styles.desc}>
