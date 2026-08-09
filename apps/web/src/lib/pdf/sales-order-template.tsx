@@ -35,7 +35,7 @@ import type { SalesOrderTemplateData } from "./types";
 const INK = "#1A1714";
 const GREY = "#7A7268";
 const HAIR = "#CFC9C0";
-const BAND_BG = "#ECE8E1"; // category band (2990's grey band, Carres-warm)
+const BAND_BG = "#EDEDED"; // category band — 2990's neutral grey (beige rejected, owner round 9)
 const BAR_BG = INK; // table header bar — white text on ink (2990)
 
 const mm = (v: number) => v * 2.83465;
@@ -55,7 +55,7 @@ const LOGO_SRC =
 const LIFT_THREE_STATE_READY = false;
 
 const MARGIN = mm(12);
-const HEADER_H = mm(15);
+const HEADER_H = mm(13);
 const FOOTER_H = mm(8);
 
 /** `2026-08-09` → `SUN, 9 AUG 26` (textual parse — timezone-proof). */
@@ -197,13 +197,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: mm(2),
     marginTop: mm(2.5),
   },
-  th: { fontSize: 7.5, fontWeight: 600, color: "#FFFFFF", letterSpacing: 0.8, textTransform: "uppercase" },
+  th: { fontSize: 7, fontWeight: 600, color: "#FFFFFF", letterSpacing: 0.4, textTransform: "uppercase" },
   colNo: { width: mm(7) },
   colCode: { width: mm(29) },
-  colQty: { width: mm(11), textAlign: "right" },
-  colPrice: { width: mm(22), textAlign: "right" },
-  colDisc: { width: mm(19), textAlign: "right" },
-  colAmount: { width: mm(23), textAlign: "right" },
+  colQty: { width: mm(10), textAlign: "right" },
+  colPrice: { width: mm(25), textAlign: "right" },
+  colDisc: { width: mm(22), textAlign: "right" },
+  colAmount: { width: mm(25), textAlign: "right" },
   bandRow: {
     flexDirection: "row",
     backgroundColor: BAND_BG,
@@ -211,19 +211,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: mm(2),
     marginTop: mm(1),
   },
-  bandText: { fontSize: 7.5, fontWeight: 700, color: INK, letterSpacing: 1 },
+  bandText: { fontSize: 8, fontWeight: 700, color: INK, letterSpacing: 0.3 },
   row: { flexDirection: "row", paddingVertical: mm(1.4), paddingHorizontal: mm(2) },
   rowHair: { borderBottomWidth: 0.3, borderBottomColor: HAIR },
-  cellNo: { fontSize: 9, color: GREY, width: mm(7) },
+  cellNo: { fontSize: 8.5, color: GREY, width: mm(7) },
   cellCode: { fontSize: 8.5, width: mm(29), paddingRight: mm(2) },
   desc: { flex: 1, paddingRight: mm(3) },
-  descMain: { fontSize: 9, fontWeight: 600 },
+  descMain: { fontSize: 8.5, fontWeight: 600 },
   descSub: { fontSize: 7.5, color: GREY, marginTop: mm(0.5), paddingLeft: mm(2) },
-  cellQty: { fontSize: 9, width: mm(11), textAlign: "right" },
-  cellMoney: { fontSize: 9, textAlign: "right" },
+  cellQty: { fontSize: 8.5, width: mm(10), textAlign: "right" },
+  cellMoney: { fontSize: 8.5, textAlign: "right" },
   // The line's own amount anchors the row (international convention: the
   // rightmost figure is the one the reader scans down).
-  cellAmount: { fontSize: 9, fontWeight: 600, textAlign: "right" },
+  cellAmount: { fontSize: 8.5, fontWeight: 600, textAlign: "right" },
 
   voucherBlock: { marginTop: mm(1), paddingHorizontal: mm(4) },
   voucherLine: { fontSize: 8, color: GREY, marginTop: mm(0.5) },
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   payColCode: { width: mm(30) },
   payColBy: { width: mm(30) },
   payColAmount: { width: mm(23), textAlign: "right" },
-  payCell: { fontSize: 9 },
+  payCell: { fontSize: 8.5 },
 
   // ── amount in words · totals ──
   totalsZone: { flexDirection: "row", marginTop: mm(5), paddingHorizontal: mm(4), alignItems: "flex-start" },
@@ -458,17 +458,14 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                   {/* One line: logo · legal name · SSM (owner round 5).
                       No date here — ORDER DETAILS owns `Ordered`. */}
                   <View>
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
                       <Image style={styles.logo} src={LOGO_SRC} />
                       <Text style={[styles.legalLine, { marginTop: 0, marginLeft: mm(3) }]}>
                         {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
                       </Text>
                     </View>
-                    <Text style={[styles.legalLine, { marginTop: mm(1.2) }]}>
-                      {CARRES_COMPANY.addressLines[0]}
-                    </Text>
-                    <Text style={styles.legalLine}>
-                      {CARRES_COMPANY.addressLines[1]} {CARRES_COMPANY.addressLines[2]}
+                    <Text style={[styles.legalLine, { marginTop: mm(1.2), fontSize: 6 }]}>
+                      {CARRES_COMPANY.addressLines.join(" ")}
                     </Text>
                   </View>
                   <View style={styles.docBlock}>
