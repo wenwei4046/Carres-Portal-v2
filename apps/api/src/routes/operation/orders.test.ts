@@ -104,7 +104,8 @@ describe("GET /api/operation/orders", () => {
     // can render the "Placed" column.
     expect(inFn).toHaveBeenCalledWith("status", ["place", "proceed_order", "delivered"]);
     expect(order).toHaveBeenCalledWith("placed_at", { ascending: false });
-    expect(limit).toHaveBeenCalledWith(200);
+    // STAGE 1 FIX 1 — the 200-row trap removed; the agreed cap is 500.
+    expect(limit).toHaveBeenCalledWith(500);
   });
 
   // ── D1 · the list carries the SKUs a real purchase order covers ───────────
@@ -1881,5 +1882,157 @@ describe("POST /api/operation/orders/:id/revert-dispatch", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
     expect(body.code).toBe("no_dispatched_threads");
+  });
+});
+
+/**
+ * STAGE 2 · THE REVISION ENGINE — the API is a THIN door: validation + ONE
+ * RPC. The property held hardest: **no route here writes orders or
+ * order_lines directly** — every write goes through the 0327 RPCs, which own
+ * Rev-1 minting and immutability.
+ */
+describe("POST /api/operation/orders/:id/save", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000b01";
+
+  it("calls sales_order_save_revision with header + lines, writes nothing directly", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { revision: 2, changed: ["delivery_date", "items"] },
+      error: null,
+    });
+    const from = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          header: { delivery_date: "2026-09-05" },
+          lines: [{ sku: "B1201S-K", qty: 2, unit_price: 2499 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("sales_order_save_revision", {
+      p_order_id: ORDER_ID,
+      p_header: { delivery_date: "2026-09-05" },
+      p_lines: [{ sku: "B1201S-K", qty: 2, unit_price: 2499 }],
+    });
+    /* NOTHING was written directly — the RPC owns every write. */
+    expect(from).not.toHaveBeenCalled();
+    assertRpcCallShape(rpc, "sales_order_save_revision", ["p_order_id", "p_header", "p_lines"]);
+  });
+
+  it("refuses an empty save without calling the database", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the RPC's own refusal (22023 detail) instead of a bare 500", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "22023", message: "Nothing changed", details: "invalid_param" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ header: { delivery_date: "2026-09-05" } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.message).toBe("Nothing changed");
+  });
+});
+
+describe("POST /api/operation/orders (create)", () => {
+  it("calls sales_order_create; a missing dealer is refused before the database", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { id: "00000000-0000-0000-0000-000000000b02", so: 1400, revision: 1 },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const good = await app.fetch(
+      new Request("http://t/api/operation/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          header: {
+            customer_name: "Walk-in",
+            dealer_id: "00000000-0000-0000-0000-0000000000d1",
+            // orders_salesperson_required (0296) — the door demands it too.
+            salesperson_id: "00000000-0000-0000-0000-0000000000a1",
+          },
+          lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499 }],
+        }),
+      }),
+      env,
+    );
+    expect(good.status).toBe(201);
+    assertRpcCallShape(rpc, "sales_order_create", ["p_header", "p_lines"]);
+
+    rpc.mockClear();
+    const bad = await app.fetch(
+      new Request("http://t/api/operation/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          header: { customer_name: "Walk-in" },
+          lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499 }],
+        }),
+      }),
+      env,
+    );
+    expect(bad.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/operation/orders/:id/revisions", () => {
+  it("reads the immutable store oldest-first", async () => {
+    const order = vi.fn().mockResolvedValue({
+      data: [{ revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: null }],
+      error: null,
+    });
+    const eq = vi.fn(() => ({ order }));
+    const select = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ select }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000b01/revisions", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(from).toHaveBeenCalledWith("sales_order_revisions");
+    expect(order).toHaveBeenCalledWith("revision", { ascending: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.revisions).toHaveLength(1);
   });
 });

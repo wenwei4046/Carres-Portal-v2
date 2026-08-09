@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import {
   abandonOrderInput,
   assignPartnerInput,
@@ -85,6 +86,52 @@ function mapPipelineV2Error(error: { code?: string; message?: string; details?: 
   return mapPgError(error);
 }
 
+/**
+ * sku → `Model · Variant`, the ONE human-readable product name in this module.
+ *
+ * **Extracted by STAGE 1, not written by it.** The detail route has resolved
+ * exactly this since 2026-07-16 so the drawer's Items table could show names
+ * instead of raw codes; the Sales Orders register needs the same names on the
+ * ROW, and the alternative was a second sku→name implementation in the
+ * browser. `ERP-ARCHITECTURE.md` Law D: *"If two surfaces must agree on a
+ * number they call ONE function — not two implementations that currently
+ * agree."* A product name is that kind of fact, so the list and the document
+ * call this.
+ *
+ * The query, the join and the `model · variant` spelling are byte-identical to
+ * what the detail route already ran. `order_lines.sku` has no FK to
+ * `product_skus`, so this is a separate batched query (`ONE .in("sku", […])`
+ * per page), never a PostgREST embed and never one query per order.
+ *
+ * **A miss is normal and must stay silent.** Measured on production
+ * 2026-08-09: of 84 distinct SKUs on live orders only 37 are in the catalog —
+ * every NATIVE line resolves, and every AutoCount line misses because an
+ * imported "sku" IS free text like `1013Jager/Fab3-King/PC151-01`. There is no
+ * name to find, so the caller falls back to that text: it is what the
+ * salesperson actually wrote on the order.
+ */
+async function resolveSkuLabels(
+  sb: ReturnType<typeof userClient>,
+  skus: readonly (string | null | undefined)[],
+): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const wanted = [...new Set(skus.filter((s): s is string => !!s))];
+  if (wanted.length === 0) return out;
+  const { data, error } = await sb
+    .from("product_skus")
+    .select("sku, variant, product_models(name)")
+    .in("sku", wanted);
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (data ?? []) as any[]) {
+    const label = [r.product_models?.name ?? "", r.variant ?? ""]
+      .filter(Boolean)
+      .join(" · ");
+    if (label) out[r.sku] = label;
+  }
+  return out;
+}
+
 // ----- GET / list -----
 operationOrdersRouter.get("/", requireOperation, async (c) => {
   const parsed = ListOperationOrdersQuery.safeParse({
@@ -155,7 +202,19 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // shared `orderMoney`. The ladder's 🔒 used to read
       // `ops_order_control.balance`, which is NULL on every live row, so the
       // money hold had never once fired.
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, paid, dealers(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty, unit_price, source_po), order_addons(qty, unit_price), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
+      // 2026-08-09 (STAGE 1) — the Sales Orders register's fact columns.
+      // `salesperson_id` + the two NAME embeds (both FKs are SINGLE —
+      // `orders_salesperson_id_fkey`, `orders_outlet_id_fkey` — so a bare
+      // embed is unambiguous, unlike delivery_partners). Then every flat fact
+      // the customer order itself owns that was not yet on the wire:
+      // `channel`, `customer_email`, the five structured address parts (0230),
+      // `building_type` (the Sales Portal writes it into the order's own
+      // `entry_data.fields`), `delivery_floor` / `delivery_has_lift`,
+      // `customer_billing` / `customer_emergency`, `invoice_no` /
+      // `invoiced_at`, `payment_method` and `installment_months`. Nothing here
+      // is another module's record, nothing is computed. Purely additive: the
+      // old control table selects none of these and is unaffected.
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, delivery_floor, delivery_has_lift, channel, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty, unit_price, source_po), order_addons(qty, unit_price), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -189,7 +248,10 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     q = q.or(clauses.join(","));
   }
 
-  q = q.order("placed_at", { ascending: false }).limit(200);
+  // STAGE 1 FIX 1 — the 200-row trap removed; the agreed cap is 500. Server
+  // search (`?search=`, above) is what makes the cap safe: a match beyond the
+  // first page is FOUND by asking, never scrolled for.
+  q = q.order("placed_at", { ascending: false }).limit(500);
   const { data, error } = await q;
   if (error) {
     const m = mapPgError(error);
@@ -219,6 +281,33 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   // question, and it is the same shape the drawer already builds (`poSkus`).
   // A page with no covered orders adds `[]` to every row and nothing else.
   const orders = data ?? [];
+
+  // ── STAGE 1 · THE ROW SAYS WHAT THEY BOUGHT, IN WORDS ─────────────────────
+  // The register's `Items` column may not print a SKU code. The detail route
+  // has resolved `Model · Variant` since 2026-07-16 and now both call
+  // `resolveSkuLabels`, so a product cannot be named one way on the row and
+  // another way in the document (Law D).
+  //
+  // ONE extra query for the whole page (every line SKU on it, de-duplicated),
+  // never one per order — the same batching rule the PO block below follows.
+  // A SKU with no catalog row simply gets no label and the caller falls back
+  // to the text the order carries.
+  try {
+    const labelBySku = await resolveSkuLabels(
+      sb,
+      orders.flatMap((o: { order_lines?: { sku?: string | null }[] | null }) =>
+        (o.order_lines ?? []).map((l) => l.sku),
+      ),
+    );
+    for (const o of orders as { order_lines?: ({ sku?: string | null } & Record<string, unknown>)[] | null }[]) {
+      for (const l of o.order_lines ?? []) {
+        (l as Record<string, unknown>).label = l.sku ? (labelBySku[l.sku] ?? null) : null;
+      }
+    }
+  } catch (e_label) {
+    const m = mapPgError(e_label as { code?: string; message?: string });
+    return c.json(m.body, m.status);
+  }
   const soNumbers = [
     ...new Set(
       orders
@@ -301,7 +390,13 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
       // 2026-07-19 (Loo) — entry_data added: the POS wizard stores the
       // delivery-address building type in entry_data.fields.building_type;
       // the drawer's customer card shows it under the address.
-      "id, so, source_ref, source_system, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, customer_emergency, customer_billing, customer_billing_same, entry_data, delivery_date, delivery_date_tbd, proceed_date, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, dealers(name), outlets(name)",
+      // 2026-08-09 (STAGE 1) — salesperson embed: the Sales Order workspace
+      // names the salesperson on the customer commitment.
+      // 2026-08-09 (STAGE 2) — the workspace EDIT form seeds its draft from
+      // THIS payload; every whitelisted field must ride the wire or a Save
+      // would silently null what it never saw: customer_email, the five
+      // structured address parts (0230), delivery_floor, delivery_has_lift.
+      "id, so, source_ref, source_system, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_email, customer_address, customer_address_unknown, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, customer_emergency, customer_billing, customer_billing_same, entry_data, delivery_date, delivery_date_tbd, proceed_date, delivery_floor, delivery_has_lift, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, salesperson_id, dealers(name), outlets(name), salespersons(name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -322,7 +417,9 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     // 2026-05-10 (Loo) — also pull `attrs` so the OrderDetailDrawer's
     // "+ Issue POs" navigate-to-procurement flow can carry color/gap/fabric
     // into CreatePOModal's cascade picker without a second round-trip.
-    sb.from("order_lines").select("sku, qty, unit_price, attrs, source_po").eq("order_id", id),
+    // STAGE 2 — `id` rides along so the workspace's Save can diff lines
+    // by identity (update-in-place keeps attrs + source_po).
+    sb.from("order_lines").select("id, sku, qty, unit_price, attrs, source_po").eq("order_id", id),
     sb.from("order_addons").select("addon_key, qty, unit_price").eq("order_id", id),
     sb.from("order_history").select("text, by_role, occurred_at").eq("order_id", id).order("occurred_at", { ascending: true }),
     sb
@@ -342,26 +439,18 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
 
   // 2026-07-16 (Loo) — resolve a human-readable product label per line
   // (model name · variant) so the drawer's Items table shows names, not just
-  // raw sku codes. Same separate-query pattern as print-do-data below:
-  // order_lines.sku has no FK to product_skus, so no PostgREST embed.
-  const labelBySku: Record<string, string> = {};
-  {
+  // raw sku codes. Body moved to `resolveSkuLabels` (top of file) by STAGE 1
+  // so the LIST answers with the same names as the document (Law D); the
+  // query, the join and the `model · variant` spelling are unchanged.
+  let labelBySku: Record<string, string>;
+  try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const skus = [...new Set(rawLines.map((l: any) => l.sku))];
-    if (skus.length > 0) {
-      const { data: skuRows, error: e_sku } = await sb
-        .from("product_skus")
-        .select("sku, variant, product_models(name)")
-        .in("sku", skus);
-      if (e_sku) { const m = mapPgError(e_sku); return c.json(m.body, m.status); }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const r of (skuRows ?? []) as any[]) {
-        const model = r.product_models?.name ?? "";
-        const variant = r.variant ?? "";
-        const label = [model, variant].filter(Boolean).join(" · ");
-        if (label) labelBySku[r.sku] = label;
-      }
-    }
+    labelBySku = await resolveSkuLabels(sb, rawLines.map((l: any) => l.sku));
+  } catch (e_sku) {
+    // Same answer this route gave before the extraction: the PG error mapped,
+    // never a bare 500.
+    const m = mapPgError(e_sku as { code?: string; message?: string });
+    return c.json(m.body, m.status);
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lines = rawLines.map((l: any) => ({ ...l, label: labelBySku[l.sku] ?? null }));
@@ -470,6 +559,154 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     history: historyRes.data ?? [],
     threads: threadsRes.data ?? [],
   });
+});
+
+// ─────────────────────────────────────────────────────────────
+// STAGE 2 · THE REVISION ENGINE — every write mints a revision (0327).
+// The API layer here is a THIN door: validation + ONE RPC call. The RPC owns
+// the whitelist, the lines diff, Rev-1 minting and immutability; nothing in
+// this file writes orders/order_lines directly.
+// ─────────────────────────────────────────────────────────────
+
+const revisionLineInput = z.object({
+  /** Present = update this line in place (keeps attrs + source_po); absent =
+   *  a new line. */
+  id: z.string().uuid().optional(),
+  sku: z.string().trim().min(1, "A line needs a SKU"),
+  qty: z.number().int().min(1, "Qty must be at least 1"),
+  unit_price: z.number().min(0, "Unit price must be 0 or more"),
+});
+
+/** The editable header keys — mirrors the RPC whitelist verbatim. */
+const revisionHeaderInput = z
+  .object({
+    customer_name: z.string().trim().min(1).optional(),
+    customer_phone: z.string().nullable().optional(),
+    customer_email: z.string().nullable().optional(),
+    customer_address: z.string().nullable().optional(),
+    customer_address_line1: z.string().nullable().optional(),
+    customer_address_line2: z.string().nullable().optional(),
+    customer_address_city: z.string().nullable().optional(),
+    customer_address_state: z.string().nullable().optional(),
+    customer_address_postcode: z.string().nullable().optional(),
+    customer_emergency: z.string().nullable().optional(),
+    customer_billing: z.string().nullable().optional(),
+    delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    delivery_date_tbd: z.boolean().optional(),
+    proceed_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    delivery_floor: z.number().int().min(0).optional(),
+    delivery_has_lift: z.boolean().optional(),
+    salesperson_id: z.string().uuid().nullable().optional(),
+    outlet_id: z.string().uuid().nullable().optional(),
+  })
+  .strict();
+
+// GET /:id/revisions — the order's immutable snapshots, oldest first.
+operationOrdersRouter.get("/:id/revisions", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("sales_order_revisions")
+    .select("revision, snapshot, created_at, created_by")
+    .eq("order_id", id)
+    .order("revision", { ascending: true });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ revisions: data ?? [] });
+});
+
+// POST /:id/save — the ONE edit door. Stage 2: every change is Class B, no
+// approval. The RPC refuses an empty or no-op save.
+const saveRevisionInput = z
+  .object({
+    header: revisionHeaderInput.optional(),
+    lines: z.array(revisionLineInput).min(1).optional(),
+  })
+  .refine((v) => v.header !== undefined || v.lines !== undefined, {
+    message: "Nothing to save",
+  });
+
+operationOrdersRouter.post("/:id/save", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = saveRevisionInput.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: parsed.error.issues[0]?.message ?? "invalid input",
+      },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_save_revision", {
+    p_order_id: id,
+    p_header: parsed.data.header ?? {},
+    p_lines: parsed.data.lines ?? null,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data, 201);
+});
+
+// POST / — the office birth door ([+ New Sales Order]). Normal orders are
+// still born in the Sales Portal; this one inserts status='place' and mints
+// Rev 1 from the created state.
+const createOrderInput = z.object({
+  header: revisionHeaderInput
+    .extend({
+      customer_name: z.string().trim().min(1, "Customer name is required"),
+      dealer_id: z.string().uuid({ message: "A dealer is required" }),
+      // orders_salesperson_required (0296) — every portal-written order
+      // names who sold it; only the AutoCount archive importer is exempt.
+      salesperson_id: z.string().uuid({ message: "A salesperson is required" }),
+    })
+    .strict(),
+  lines: z.array(revisionLineInput.omit({ id: true })).min(1, "An order needs at least one item"),
+});
+
+operationOrdersRouter.post("/", requireOperation, async (c) => {
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = createOrderInput.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: parsed.error.issues[0]?.message ?? "invalid input",
+      },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_create", {
+    p_header: parsed.data.header,
+    p_lines: parsed.data.lines,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data, 201);
+});
+
+// GET /reference/dealers — id + name for the create form's dealer picker.
+// RLS-scoped read (internal roles read dealers — the same embed the list
+// already prints). A static segment outranks `/:id` in Hono's router.
+operationOrdersRouter.get("/reference/dealers", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.from("dealers").select("id, name").order("name");
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ dealers: data ?? [] });
 });
 
 // ----- GET /:id/print-do -----

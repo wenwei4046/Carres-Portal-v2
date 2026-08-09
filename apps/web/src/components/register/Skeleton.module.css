@@ -1,0 +1,23 @@
+/* Shimmer skeleton for the Register Engine's loading rows. Copied from
+   2990s (RG-2), trimmed to the block the engine uses. */
+
+@keyframes skel-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.block {
+  display: inline-block;
+  background: rgba(26, 26, 26, 0.08);
+  border-radius: 4px;
+  animation: skel-pulse 1.4s ease-in-out infinite;
+}
+
+.blockRounded {
+  border-radius: var(--radius-sm, 6px);
+}

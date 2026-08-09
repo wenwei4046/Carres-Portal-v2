@@ -117,8 +117,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
     items: [
       { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
       {
+        // SO-5 (Loo, 2026-08-09) — the page is Sales Orders and the door says so.
         key: "orders",
-        label: "Orders",
+        label: "Sales Orders",
         icon: ClipboardList,
         path: "/operation/orders",
         badge: "orders",
@@ -312,7 +313,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "pos", label: "Catalog", icon: LayoutGrid },
       // The principal trace-only Orders page is gone (Loo 2026-07-16) — Admin
       // "Orders" jumps straight to the Operations order control grid.
-      { key: "orders", label: "Orders", icon: ClipboardList, path: "/operation/orders" },
+      { key: "orders", label: "Sales Orders", icon: ClipboardList, path: "/operation/orders" },
       // Loo 2026-07-19 — two separate doors: "Dealers" = external resellers,
       // "Showrooms" = the stores Carres owns. Same page, filtered by
       // `dealers.channel`.
