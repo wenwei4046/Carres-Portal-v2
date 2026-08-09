@@ -157,6 +157,9 @@ export type PoTemplateData = {
     qty: number;
     unit: string;
     attrs?: Record<string, unknown> | null;
+    /** ops_stock_items.unit_code (0153) — minted at PO-open; the Item ID
+     *  column the old law RESERVED is now fed by this. */
+    unit_codes?: string[] | null;
   }>;
   terms: string | null;
 };

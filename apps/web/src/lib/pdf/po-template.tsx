@@ -1,145 +1,121 @@
 /**
- * Purchase Order PDF template — built to docs/pdf/PO-PDF-STANDARD.md (the Law,
- * Loo 2026-08-01/02). That file is the single source of truth for every rule
- * here; change the Law first, the template second.
+ * Purchase Order PDF template — built to docs/pdf/PO-PDF-STANDARD.md (the Law).
+ * Change the Law first, the template second.
  *
- * The payload is the money-free `purchasing_po_document` RPC (migration 0307):
- * no RM figure ever reaches this component, so nothing here can print one.
+ * 2026-08-09 (Loo) — the PO joins the FAMILY CHROME (SO-PDF-STANDARD §2.1
+ * measurement sheet + §8.5 conversion law): typeset company header with the
+ * hero number, ink bar table, conversion-law sizes, quiet footer. The old
+ * logo-stamp header and zero-fill table are DELETED from the law, not kept
+ * beside it (Master Overwrite Law).
  *
- * Header  — logo stamp + 35mm label-gutter (SUPPLIER DELIVERY BY / PO ISSUED
- *           DATE, dates ALL CAPS 7pt/700 on one X) · right: PURCHASE ORDER
- *           over the PO number (18pt, the page's only bold-black hero).
- *           Fixed — repeats on every page.
- * Cards   — frameless SUPPLIER + DELIVER TO, inset 4mm (first page only).
- * Table   — # · Sales Order · Item ID · Description · Qty. Zero grid lines;
- *           hairline rhythm between items; an item never splits across pages
- *           (wrap={false}); Qty inset 10mm from the table edge.
- * Sofa    — a plan-view layout drawing per model when the PO carries module
- *           lines (…(LHF)/…(RHF)), so the factory never builds mirror-reversed.
- * Footer  — one 8mm row: Issued by · legal sentence · page — fixed, every page.
- *
- * Known v1 gaps (recorded in the Law, not hidden):
- * - Per-line Sales Order attribution does not exist in the schema
- *   (purchase_order_lines carries no SO). The column prints only when the PO
- *   covers exactly ONE sales order; a merged PO leaves the cells blank until
- *   the allocation work (P5) lands.
- * - Item ID is the per-unit id the system will mint at Issue; no such system
- *   exists yet, so the reserved column prints blank (never the SKU).
+ * What stays the PO's own (unchanged business):
+ * - MONEY-FREE, structurally: the payload is the `purchasing_po_document`
+ *   RPC (0307) — no RM figure ever reaches this component.
+ * - `Delivery by` is the supplier's 3-second fact — first row of PO DETAILS,
+ *   bold value.
+ * - Item ID = ops_stock_items.unit_code (0153), minted at PO-open — the
+ *   column the old law reserved is now LIVE: supplier labels each unit by
+ *   id, the warehouse scans on receive. Prints `—` until codes arrive.
+ * - Sofa plan-view layout drawing per model (direction contract).
+ * - `Issued by {name}` audit in the footer; no signatures anywhere.
  */
 
-import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
+import { CARRES_COMPANY } from "./letterhead";
 import type { PoTemplateData } from "./types";
 
 const INK = "#1A1714";
 const GREY = "#7A7268";
-const LIGHT = "#9A9288";
 const HAIR = "#CFC9C0";
+const BAR_BG = INK;
 const SEAT_BG = "#EDE8E0";
 const BACK_BG = "#D8D2C8";
 
 const mm = (v: number) => v * 2.83465;
 
-// The wordmark asset the app serves. In the browser @react-pdf fetches the
-// absolute URL; under node (tests/harnesses) it reads the file from disk, so
-// the path form keeps both worlds rendering the same stamp.
-const LOGO_SRC =
-  typeof window !== "undefined" && window.location
-    ? `${window.location.origin}/carres-wordmark.png`
-    : "public/carres-wordmark.png";
-
 const MARGIN = mm(12);
 const HEADER_H = mm(20);
 const FOOTER_H = mm(8);
 
-/** `2026-08-12` → `WED, 12 AUG 26`. Textual parse — timezone-proof. */
-function capsDate(iso: string | null | undefined): string | null {
+/** `2026-08-12` → `Wed, 12 Aug 26` (family body-date form). */
+function niceDate(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
-  if (!m) return null;
+  if (!m) return String(iso);
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  const dow = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][
+  const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
     new Date(Date.UTC(y, mo - 1, d)).getUTCDay()
   ];
-  const mon = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][mo - 1];
+  const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][mo - 1];
   return `${dow}, ${d} ${mon} ${String(y).slice(2)}`;
 }
 
 const styles = StyleSheet.create({
   page: {
     fontFamily: NOTO_SANS_SC_FAMILY,
-    fontSize: 9,
+    fontSize: 8,
     color: INK,
     paddingTop: MARGIN + HEADER_H + mm(2),
     paddingBottom: MARGIN + FOOTER_H + mm(4),
     paddingHorizontal: MARGIN,
   },
-  // ── header (fixed) ─────────────────────────────────────────────────────────
+
+  // ── header (fixed) — family chrome ──
   header: { position: "absolute", top: MARGIN, left: MARGIN, right: MARGIN },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  logo: { height: mm(6), width: mm(25.3) },
-  wlabel: { fontSize: 6, color: LIGHT, letterSpacing: 1.2, width: mm(35) },
-  wdate: { fontSize: 7, fontWeight: 700, letterSpacing: 0.8, color: INK },
-  metaRow: { flexDirection: "row", alignItems: "flex-end" },
-  docBlock: { alignItems: "flex-end", alignSelf: "flex-end" },
-  docTitle: { fontSize: 10, color: GREY, letterSpacing: 1.5 },
-  docNumber: { fontSize: 18, fontWeight: 700, marginTop: 2 },
-  headerRule: { borderBottomWidth: 0.8, borderBottomColor: INK, marginTop: mm(1.5) },
-  // ── cards ──────────────────────────────────────────────────────────────────
-  cards: { flexDirection: "row", marginTop: mm(2), paddingHorizontal: mm(4) },
-  cardLabel: { fontSize: 7.5, color: GREY, letterSpacing: 0.8, textTransform: "uppercase" },
-  cardName: { fontSize: 9.5, fontWeight: 600, marginTop: mm(1.5) },
-  cardLine: { fontSize: 9, marginTop: mm(1) },
-  cardNote: { fontSize: 7.5, color: GREY, marginTop: mm(1) },
-  // ── table ──────────────────────────────────────────────────────────────────
+  companyName: { fontSize: 14, fontWeight: 700 },
+  ssmInline: { fontSize: 8, color: GREY, marginLeft: mm(2.5) },
+  legalLine: { fontSize: 8, lineHeight: 1.42 },
+  docBlock: { alignItems: "flex-end" },
+  docNumber: { fontSize: 18, fontWeight: 700 },
+  docTitle: { fontSize: 9, color: GREY, letterSpacing: 1.5, marginTop: mm(1) },
+  headerRule: { borderBottomWidth: 0.5, borderBottomColor: "#B4B4B4", marginTop: mm(3) },
+
+  // ── parties — family voice ──
+  cards: { flexDirection: "row", marginTop: mm(3.5), paddingHorizontal: mm(4), minHeight: mm(26) },
+  blockLabel: { fontSize: 8.5, fontWeight: 700, color: INK, letterSpacing: 0.5, textTransform: "uppercase", lineHeight: 1 },
+  pairRow: { flexDirection: "row" },
+  pairLabel: { fontSize: 8, color: GREY, width: mm(20), lineHeight: 1.42 },
+  pairValue: { fontSize: 8, flex: 1, lineHeight: 1.42 },
+  deliverBlock: { marginTop: mm(2.5), paddingHorizontal: mm(4) },
+  deliverNote: { fontSize: 7, color: GREY, marginTop: mm(0.8), lineHeight: 1.3 },
+
+  // ── items table — ink bar, hairline rows, NO money columns ──
   tableHead: {
-    borderTopWidth: 0.5,
-    borderTopColor: INK,
-    borderBottomWidth: 0.5,
-    borderBottomColor: INK,
+    backgroundColor: BAR_BG,
     flexDirection: "row",
-    paddingVertical: mm(1.5),
-    marginTop: mm(3),
+    paddingVertical: mm(1.8),
+    paddingHorizontal: mm(2),
+    marginTop: mm(2.5),
   },
-  th: { fontSize: 7.5, color: GREY, letterSpacing: 0.8, textTransform: "uppercase" },
-  colNo: { width: mm(8) },
-  colSo: { width: mm(24) },
-  colId: { width: mm(22) },
-  colQty: { width: mm(24), textAlign: "right", paddingRight: mm(10) },
-  row: { flexDirection: "row", paddingVertical: mm(2.2) },
+  th: { fontSize: 7.5, fontWeight: 700, color: "#FFFFFF", letterSpacing: 0.2, textTransform: "uppercase" },
+  colNo: { width: mm(7) },
+  colSo: { width: mm(20) },
+  colUnit: { width: mm(26) },
+  colQty: { width: mm(16), textAlign: "right", paddingRight: mm(5) },
+  row: { flexDirection: "row", paddingVertical: mm(2), paddingHorizontal: mm(2) },
   rowHair: { borderBottomWidth: 0.3, borderBottomColor: HAIR },
-  cellNo: { fontSize: 9, color: GREY, width: mm(8) },
-  cellSo: { fontSize: 8.5, width: mm(24) },
-  cellId: { fontSize: 8.5, color: LIGHT, width: mm(22) },
-  desc: { flex: 1, paddingRight: mm(4) },
-  descSku: { fontSize: 9.5, fontWeight: 700 },
-  descVariant: { fontSize: 9.5, color: GREY },
-  descLine: { fontSize: 9, marginTop: mm(0.8) },
-  pairRow: { flexDirection: "row", marginTop: mm(0.8) },
-  pairLabel: { fontSize: 7.5, color: GREY, width: mm(22) },
-  pairValue: { fontSize: 9, flex: 1 },
-  cellQty: { fontSize: 10, fontWeight: 700, width: mm(24), textAlign: "right", paddingRight: mm(10) },
-  totalRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderTopWidth: 0.5,
-    borderTopColor: INK,
-    borderBottomWidth: 0.5,
-    borderBottomColor: INK,
-    paddingVertical: mm(1.5),
-  },
-  totalLabel: { fontSize: 7.5, color: GREY, letterSpacing: 0.8, flex: 1 },
-  // ── sofa layout drawing ────────────────────────────────────────────────────
-  layout: { marginTop: mm(4) },
-  layoutCaption: { fontSize: 8, color: GREY, marginTop: mm(1) },
+  cellNo: { fontSize: 7, color: GREY, width: mm(7), textAlign: "right", paddingRight: mm(1.5), lineHeight: 1 },
+  cellSo: { fontSize: 7.5, width: mm(20), lineHeight: 1 },
+  cellUnit: { fontSize: 7, color: GREY, width: mm(26), lineHeight: 1.3 },
+  desc: { flex: 1, paddingRight: mm(3) },
+  descMain: { fontSize: 7.5, fontWeight: 600, lineHeight: 1 },
+  descSub: { fontSize: 7, color: GREY, marginTop: mm(0.8), paddingLeft: mm(2), lineHeight: 1.2 },
+  cellQty: { fontSize: 7.5, width: mm(16), textAlign: "right", paddingRight: mm(5), lineHeight: 1 },
+
+  // ── sofa layout drawing (direction contract, unchanged) ──
+  layout: { marginTop: mm(4), paddingHorizontal: mm(4) },
+  layoutCaption: { fontSize: 7, color: GREY, marginTop: mm(1) },
   layoutRow: { flexDirection: "row", alignItems: "flex-start", marginTop: mm(2), justifyContent: "center" },
   moduleBox: { alignItems: "center", marginRight: mm(2) },
-  moduleCode: { fontSize: 8.5, fontWeight: 600, marginTop: mm(1.5) },
-  moduleFabric: { fontSize: 8, color: GREY, marginTop: mm(0.5) },
+  moduleCode: { fontSize: 7.5, fontWeight: 600, marginTop: mm(1.5) },
+  moduleFabric: { fontSize: 7, color: GREY, marginTop: mm(0.5) },
   tvLine: { width: 0.6, height: mm(4), backgroundColor: GREY, marginTop: mm(2), alignSelf: "center" },
   tvBox: { backgroundColor: INK, paddingHorizontal: mm(3), paddingVertical: mm(0.8), marginTop: mm(0.5), alignSelf: "center" },
-  tvText: { fontSize: 8, color: "#FFFFFF", letterSpacing: 1.5 },
-  // ── footer (fixed) ─────────────────────────────────────────────────────────
+  tvText: { fontSize: 7.5, color: "#FFFFFF", letterSpacing: 1.5 },
+
+  // ── footer (fixed) — family chrome + the PO's audit cell ──
   footer: {
     position: "absolute",
     left: MARGIN,
@@ -148,12 +124,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 0.5,
     borderTopColor: HAIR,
     paddingTop: mm(2),
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
   },
-  footerCell: { fontSize: 7.5, color: GREY, width: mm(45) },
-  footerLegal: { fontSize: 7.5, color: GREY, textAlign: "center", flex: 1 },
+  footerCell: { fontSize: 7.5, color: GREY, width: mm(58) },
+  footerCenter: { fontSize: 7.5, color: GREY, textAlign: "center", flex: 1 },
   footerPage: { fontSize: 7.5, color: GREY, width: mm(45), textAlign: "right" },
 });
 
@@ -189,111 +162,173 @@ function isChaise(code: string): boolean {
 export function PoTemplate(data: PoTemplateData) {
   const { po_number, issue_date, supplier, destination, delivery_instructions, eta_date, so_refs, issued_by, lines } = data;
 
-  const deliveryBy = capsDate(eta_date);
-  const issuedOn = capsDate(issue_date);
-
   // Per-line SO attribution exists only when the PO covers ONE sales order.
   const soLabel = so_refs && so_refs.length === 1 ? `SO-${so_refs[0]}` : "";
-  // Bulk PO (several sales orders) closes with a TOTAL QUANTITY summary row;
-  // a one-customer PO does not (PO-PDF-STANDARD §6.1 / §6.2).
+  // Bulk PO (several sales orders) closes with a TOTAL row; a one-customer
+  // PO does not (one set per page makes a total meaningless).
   const isBulk = (so_refs?.length ?? 0) > 1;
   const totalQty = lines.reduce((s, l) => s + Number(l.qty), 0);
-
   const groups = sofaGroups(lines);
+
+  const detailRows: Array<[string, string | null, boolean?]> = [
+    ["PO No", po_number],
+    // the supplier's 3-second fact — bold value
+    ["Delivery by", niceDate(eta_date), true],
+    ["Issued", niceDate(issue_date)],
+    ["SO No", so_refs && so_refs.length > 0 ? so_refs.map((r) => `SO-${r}`).join(" · ") : null],
+  ];
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* header — fixed, repeats on every page */}
-        <View style={styles.header} fixed>
-          <View style={styles.headerRow}>
-            <View>
-              <Image style={styles.logo} src={LOGO_SRC} />
-              {deliveryBy ? (
-                <View style={[styles.metaRow, { marginTop: mm(2.2) }]}>
-                  <Text style={styles.wlabel}>SUPPLIER DELIVERY BY</Text>
-                  <Text style={styles.wdate}>{deliveryBy}</Text>
+        {/* ── header — family chrome; continuation pages get one line ── */}
+        <View
+          style={styles.header}
+          fixed
+          render={({ pageNumber }) =>
+            pageNumber === 1 ? (
+              <View>
+                <View style={styles.headerRow}>
+                  <View style={{ flex: 1, paddingRight: mm(10) }}>
+                    <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
+                      <Text style={styles.companyName}>{CARRES_COMPANY.legalName}</Text>
+                      <Text style={styles.ssmInline}>SSM {CARRES_COMPANY.regNo}</Text>
+                    </View>
+                    <Text style={[styles.legalLine, { marginTop: mm(1.8) }]}>
+                      {CARRES_COMPANY.addressLines[0]}
+                    </Text>
+                    <Text style={styles.legalLine}>
+                      {CARRES_COMPANY.addressLines[1]} {CARRES_COMPANY.addressLines[2]}
+                    </Text>
+                  </View>
+                  <View style={styles.docBlock}>
+                    <Text style={styles.docNumber}>{po_number}</Text>
+                    <Text style={styles.docTitle}>PURCHASE ORDER</Text>
+                  </View>
                 </View>
-              ) : null}
-              {issuedOn ? (
-                <View style={[styles.metaRow, { marginTop: mm(1) }]}>
-                  <Text style={styles.wlabel}>PO ISSUED DATE</Text>
-                  <Text style={styles.wdate}>{issuedOn}</Text>
+                <View style={styles.headerRule} />
+              </View>
+            ) : (
+              <View>
+                <View style={[styles.headerRow, { alignItems: "flex-end" }]}>
+                  <Text style={styles.legalLine}>
+                    {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
+                  </Text>
+                  <Text style={{ fontSize: 9, fontWeight: 700 }}>PURCHASE ORDER · {po_number}</Text>
                 </View>
-              ) : null}
-            </View>
-            <View style={styles.docBlock}>
-              <Text style={styles.docTitle}>PURCHASE ORDER</Text>
-              <Text style={styles.docNumber}>{po_number}</Text>
-            </View>
-          </View>
-          <View style={styles.headerRule} />
-        </View>
+                <View style={styles.headerRule} />
+              </View>
+            )
+          }
+        />
 
-        {/* cards — first page only (they flow) */}
+        {/* ── SUPPLIER · PO DETAILS ── */}
         <View style={styles.cards}>
-          <View style={{ flex: 2, paddingRight: mm(6) }}>
-            <Text style={styles.cardLabel}>Supplier</Text>
-            <Text style={styles.cardName}>{supplier.name}</Text>
-            {supplier.contact ? <Text style={styles.cardLine}>{supplier.contact}</Text> : null}
+          <View style={{ flex: 1, paddingRight: mm(6) }}>
+            <Text style={styles.blockLabel}>Supplier</Text>
+            <View style={{ marginTop: mm(1.5) }}>
+              {([
+                ["Name", supplier.name],
+                ["Contact", supplier.contact],
+              ] as Array<[string, string | null]>).map(([label, value]) =>
+                value ? (
+                  <View key={label} style={styles.pairRow}>
+                    <Text style={styles.pairLabel}>{label}</Text>
+                    <Text style={styles.pairValue}>{value}</Text>
+                  </View>
+                ) : null,
+              )}
+            </View>
           </View>
-          <View style={{ flex: 4 }}>
-            <Text style={styles.cardLabel}>Deliver To</Text>
-            <Text style={styles.cardName}>{destination.name}</Text>
-            <Text style={styles.cardLine}>{destination.address}</Text>
-            {delivery_instructions ? <Text style={styles.cardNote}>{delivery_instructions}</Text> : null}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.blockLabel}>PO Details</Text>
+            <View style={{ marginTop: mm(1.5) }}>
+              {detailRows.map(([label, value, bold]) =>
+                value ? (
+                  <View key={label} style={styles.pairRow}>
+                    <Text style={[styles.pairLabel, { width: mm(24) }]}>{label}</Text>
+                    <Text style={bold ? [styles.pairValue, { fontWeight: 700 }] : styles.pairValue}>
+                      :  {value}
+                    </Text>
+                  </View>
+                ) : null,
+              )}
+            </View>
           </View>
         </View>
 
-        {/* table */}
-        <View style={styles.tableHead}>
+        {/* ── DELIVER TO — one PO, ONE destination (a line needing another
+            address is another PO) ── */}
+        <View style={styles.deliverBlock}>
+          <Text style={styles.blockLabel}>Deliver To</Text>
+          <View style={{ marginTop: mm(1.5) }}>
+            <View style={styles.pairRow}>
+              <Text style={styles.pairLabel}>Name</Text>
+              <Text style={[styles.pairValue, { fontWeight: 600 }]}>{destination.name}</Text>
+            </View>
+            <View style={styles.pairRow}>
+              <Text style={styles.pairLabel}>Address</Text>
+              <Text style={styles.pairValue}>{destination.address}</Text>
+            </View>
+          </View>
+          {delivery_instructions ? <Text style={styles.deliverNote}>{delivery_instructions}</Text> : null}
+        </View>
+
+        {/* ── items — the supplier reads Description; nothing here is money ── */}
+        <View style={styles.tableHead} minPresenceAhead={40}>
           <Text style={[styles.th, styles.colNo]}>#</Text>
-          <Text style={[styles.th, styles.colSo]}>Sales Order</Text>
-          <Text style={[styles.th, styles.colId]}>Item ID</Text>
+          <Text style={[styles.th, styles.colSo]}>SO No</Text>
+          <Text style={[styles.th, styles.colUnit]}>Item ID</Text>
           <Text style={[styles.th, { flex: 1 }]}>Description</Text>
           <Text style={[styles.th, styles.colQty]}>Qty</Text>
         </View>
         {lines.map((line, idx) => {
-          const isLast = idx === lines.length - 1;
           const a = (line.attrs ?? {}) as { color?: string; gap?: string; fabric_name?: string };
-          const pairs: Array<[string, string]> = [];
-          if (a.gap) pairs.push(["Gap", a.gap]);
-          if (a.fabric_name) pairs.push(["Fabric", a.fabric_name]);
+          const bits: string[] = [];
+          if (a.color) bits.push(a.color);
+          if (a.gap) bits.push(`Gap ${a.gap}`);
+          if (a.fabric_name) bits.push(`Fabric ${a.fabric_name}`);
           const showVariant = line.description && line.description !== line.sku;
           return (
-            <View key={`${line.sku}-${idx}`} wrap={false} style={isLast ? styles.row : [styles.row, styles.rowHair]}>
+            <View key={`${line.sku}-${idx}`} wrap={false} style={[styles.row, styles.rowHair]}>
               <Text style={styles.cellNo}>{idx + 1}</Text>
               <Text style={styles.cellSo}>{soLabel}</Text>
-              <Text style={styles.cellId}> </Text>
+              <Text style={styles.cellUnit}>
+                {line.unit_codes && line.unit_codes.length > 0 ? line.unit_codes.join("\n") : "—"}
+              </Text>
               <View style={styles.desc}>
-                <Text>
-                  <Text style={styles.descSku}>{line.sku}</Text>
-                  {showVariant ? <Text style={styles.descVariant}>{` — ${line.description}`}</Text> : null}
+                <Text style={styles.descMain}>
+                  {line.sku}
+                  {showVariant ? ` — ${line.description}` : ""}
                 </Text>
-                {a.color ? <Text style={styles.descLine}>{a.color}</Text> : null}
-                {pairs.map(([pl, pv]) => (
-                  <View key={pl} style={styles.pairRow}>
-                    <Text style={styles.pairLabel}>{pl}</Text>
-                    <Text style={styles.pairValue}>{pv}</Text>
-                  </View>
-                ))}
+                {bits.length > 0 ? <Text style={styles.descSub}>{bits.join(" · ")}</Text> : null}
               </View>
-              <Text style={styles.cellQty}>{line.qty}</Text>
+              <Text style={line.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>
+                {line.qty}
+              </Text>
             </View>
           );
         })}
         {isBulk ? (
-          <View style={styles.totalRow}>
-            <View style={{ width: mm(8 + 24 + 22) }} />
-            <Text style={styles.totalLabel}>TOTAL QUANTITY</Text>
-            <Text style={styles.cellQty}>{totalQty}</Text>
+          <View
+            wrap={false}
+            style={[styles.row, { borderTopWidth: 0.5, borderTopColor: INK, paddingVertical: mm(1.8) }]}
+          >
+            <Text style={styles.cellNo}> </Text>
+            <Text style={styles.cellSo}> </Text>
+            <Text style={styles.cellUnit}> </Text>
+            <View style={styles.desc}>
+              <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>TOTAL</Text>
+            </View>
+            <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totalQty}</Text>
           </View>
         ) : null}
+        <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
 
-        {/* sofa layout drawings — one per model with module lines */}
+        {/* ── sofa layout drawings — one per model with module lines ── */}
         {groups.map(({ model, modules }) => (
           <View key={model} wrap={false} style={styles.layout}>
-            <Text style={styles.cardLabel}>Sofa Layout</Text>
+            <Text style={styles.blockLabel}>Sofa Layout</Text>
             <Text style={styles.layoutCaption}>Top view. Back at the top. TV in front.</Text>
             <View style={styles.layoutRow}>
               {modules.map((m, i) => {
@@ -325,14 +360,19 @@ export function PoTemplate(data: PoTemplateData) {
           </View>
         ))}
 
-        {/* footer — one quiet 8mm row, fixed on every page */}
+        {/* ── footer — fixed, every page: audit · legal · page ── */}
         <View style={styles.footer} fixed>
-          <Text style={styles.footerCell}>{issued_by ? `Issued by ${issued_by}` : " "}</Text>
-          <Text style={styles.footerLegal}>Computer-generated document · No signature required.</Text>
-          <Text
-            style={styles.footerPage}
-            render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
-          />
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={styles.footerCell}>
+              {po_number}
+              {issued_by ? ` · Issued by ${issued_by}` : ""}
+            </Text>
+            <Text style={styles.footerCenter}>Computer-generated document · No signature required.</Text>
+            <Text
+              style={styles.footerPage}
+              render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+            />
+          </View>
         </View>
       </Page>
     </Document>
