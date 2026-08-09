@@ -64,12 +64,6 @@ function capsDate(iso: string | null | undefined): string | null {
   return `${dow}, ${d} ${mon} ${String(y).slice(2)}`;
 }
 
-/** 2990's header date form — `09/08/2026`. */
-function slashDate(iso: string | null | undefined): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? ""));
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(iso ?? "");
-}
-
 /** Body dates read mixed-case — `9 Aug 26`, or `Mon, 24 Aug 26` with the
  *  weekday. ALL-CAPS dates live in the header only; inside tables they were
  *  noise (owner review 2026-08-09: "payment received part messy"). */
@@ -170,7 +164,7 @@ const styles = StyleSheet.create({
   legalLine: { fontSize: 8.5, marginTop: mm(1.2) },
   docBlock: { alignItems: "flex-end" },
   docTitle: { fontSize: 14, fontWeight: 700 },
-  docMeta: { fontSize: 9, marginTop: mm(1.6) },
+  docNumber: { fontSize: 18, fontWeight: 700, marginTop: mm(1.6) },
   headerRule: { borderBottomWidth: 0.5, borderBottomColor: "#B4B4B4", marginTop: mm(3) },
 
   // ── frameless info blocks. Section anchors are INK — the owner's review
@@ -197,10 +191,10 @@ const styles = StyleSheet.create({
   },
   th: { fontSize: 8, fontWeight: 700, color: "#FFFFFF", letterSpacing: 0.2, textTransform: "uppercase" },
   colNo: { width: mm(7) },
-  colCode: { width: mm(29) },
+  colCode: { width: mm(27) },
   colQty: { width: mm(10), textAlign: "right" },
   colPrice: { width: mm(25), textAlign: "right" },
-  colDisc: { width: mm(22), textAlign: "right" },
+  colDisc: { width: mm(24), textAlign: "right" },
   colAmount: { width: mm(25), textAlign: "right" },
   bandRow: {
     flexDirection: "row",
@@ -213,7 +207,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", paddingVertical: mm(2), paddingHorizontal: mm(2) },
   rowHair: { borderBottomWidth: 0.3, borderBottomColor: HAIR },
   cellNo: { fontSize: 7.5, color: GREY, width: mm(7), textAlign: "right", paddingRight: mm(1.5) },
-  cellCode: { fontSize: 8, width: mm(29), paddingRight: mm(2) },
+  cellCode: { fontSize: 8, width: mm(27), paddingRight: mm(2) },
   desc: { flex: 1, paddingRight: mm(3) },
   descMain: { fontSize: 8, fontWeight: 600 },
   descSub: { fontSize: 7.5, color: GREY, marginTop: mm(0.5), paddingLeft: mm(2) },
@@ -473,10 +467,12 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                       {CARRES_COMPANY.addressLines[1]} {CARRES_COMPANY.addressLines[2]}
                     </Text>
                   </View>
+                  {/* Owner round 16: the number IS the identity — 18/700
+                      hero, no "Doc No:" label, no Date (ORDER DETAILS'
+                      `Ordered` already prints it once). */}
                   <View style={styles.docBlock}>
                     <Text style={styles.docTitle}>SALES ORDER</Text>
-                    <Text style={styles.docMeta}>Doc No: {so_number}</Text>
-                    <Text style={styles.docMeta}>Date: {slashDate(issue_date)}</Text>
+                    <Text style={styles.docNumber}>{so_number}</Text>
                   </View>
                 </View>
                 <View style={styles.headerRule} />
@@ -567,8 +563,8 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           <Text style={[styles.th, styles.colCode]}>Item Code</Text>
           <Text style={[styles.th, { flex: 1 }]}>Description</Text>
           <Text style={[styles.th, styles.colQty]}>Qty</Text>
-          <Text style={[styles.th, styles.colPrice]}>Unit Price</Text>
-          <Text style={[styles.th, styles.colDisc]}>Discount</Text>
+          <Text style={[styles.th, styles.colPrice]}>Unit (RM)</Text>
+          <Text style={[styles.th, styles.colDisc]}>Discount (RM)</Text>
           <Text style={[styles.th, styles.colAmount]}>Amount (RM)</Text>
         </View>
         {groups.map((group, gi) => (
