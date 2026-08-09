@@ -142,6 +142,11 @@ export type SalesOrderTemplateData = {
     name: string;
     address: string;
     phone: string | null;
+    /** 2026-08-09 (Muji reskin) — optional: pre-reskin API builds don't send
+     *  them; the template skips the line when absent. */
+    email?: string | null;
+    /** Emergency contact as one line ("Mona Doal · +60 17-339 8639"). */
+    emergency?: string | null;
   };
 
   dealer: {
@@ -159,9 +164,20 @@ export type SalesOrderTemplateData = {
 
   delivery: {
     date: string;
-    floor: number;
-    has_lift: boolean;
+    /** 2026-08-09 three-state ruling: `null` = never asked ("Not recorded").
+     *  The stair-carry note prints ONLY when floor AND lift are both
+     *  recorded — a charge line may not rest on a default. The DB columns
+     *  are NOT NULL today (0001), so `null` arrives only after the
+     *  nullable-columns migration; the template is ready either way. */
+    floor: number | null;
+    has_lift: boolean | null;
+    /** Delivery address when it differs from billing. Absent/equal →
+     *  "Same as billing address" (Carres orders carry ONE address today). */
+    address?: string | null;
   };
+
+  /** orders.proceed_date (0165) — optional; row skipped when absent. */
+  proceed_date?: string | null;
 
   lines: Array<{
     sku: string;
@@ -176,6 +192,13 @@ export type SalesOrderTemplateData = {
     unit_price: number;
     line_total: number;
     attrs: Record<string, unknown> | null;
+    /** Category band the row prints under (SOFA / MATTRESS / BEDFRAME …).
+     *  Optional — rows without one group under no band. */
+    category?: string | null;
+    /** Per-line discount amount. No schema column carries this today
+     *  (verified 2026-08-09: order_lines has no discount, attrs has no
+     *  discount key) — the column prints "—" until the portal records one. */
+    discount?: number | null;
   }>;
 
   addons: Array<{
@@ -192,7 +215,17 @@ export type SalesOrderTemplateData = {
    *  order_payments ledger for internal callers, else one synthesized row
    *  from orders.paid + payment_method. Optional: pre-parity API builds
    *  don't send it; the template then falls back to the paid amount. */
-  payments?: Array<{ label: string; reference: string | null; amount: number }>;
+  payments?: Array<{
+    label: string;
+    reference: string | null;
+    amount: number;
+    /** 2026-08-09 (2990 parity) — payments.paid_at, orders.approval_code /
+     *  payments.reference, app_users.name of recorded_by. All optional:
+     *  the table prints "—" for what a row doesn't carry. */
+    date?: string | null;
+    approval_code?: string | null;
+    collected_by?: string | null;
+  }>;
 
   /** Voucher codes EARNED on this order (PWP carry-forward) — printed under
    *  their trigger line ("PWP voucher issued: … · not redeemed yet").
@@ -210,6 +243,10 @@ export type SalesOrderTemplateData = {
   paid: number;
   balance_due: number;
   currency: string;
+  /** Deposit the customer committed to at point of sale. No schema field
+   *  carries this today (verified 2026-08-09) — the line prints only when
+   *  a figure arrives. */
+  expected_deposit?: number | null;
 
   signed: boolean;
   /** 2026-05-22 (Loo) — signed URL to the customer's eSign PNG captured at
