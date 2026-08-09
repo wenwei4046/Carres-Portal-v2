@@ -426,12 +426,23 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
   const dash = "—";
   const money = (v: number) => formatMoney(v, currency);
 
+  // The table's own footer sums the rows it printed (round 24).
+  const totalQty =
+    lines.reduce((n, l) => n + Number(l.qty), 0) + addons.reduce((n, a) => n + Number(a.qty), 0);
+  const totalDiscount = lines.reduce((n, l) => n + (l.discount && l.discount > 0 ? l.discount : 0), 0);
+  const totalAmount =
+    lines.reduce((n, l) => n + Number(l.line_total), 0) +
+    addons.reduce((n, a) => n + Number(a.line_total), 0);
+
+  // Row order + words fixed by the owner (round 23): Doc No · Ordered ·
+  // Sales Location (2990's word; was Showroom) · Proceed date · Delivery
+  // date · Salesperson · Access.
   const orderDetailRows: Array<[string, string | null]> = [
     ["Doc No", so_number],
-    ["Showroom", outletName],
     ["Ordered", niceDate(issue_date, true)],
-    ["Delivery date", niceDate(delivery.date, true) ?? delivery.date],
+    ["Sales Location", outletName],
     ["Proceed date", proceed_date ? niceDate(proceed_date, true) : null],
+    ["Delivery date", niceDate(delivery.date, true) ?? delivery.date],
   ];
   const accessText = `${floorText} · ${liftText}`;
 
@@ -647,6 +658,23 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             </View>
           );
         })}
+        {/* TOTAL row closes the table: qty · discount · amount sums (round 24) */}
+        <View
+          wrap={false}
+          style={[styles.row, { borderTopWidth: 0.5, borderTopColor: INK, paddingVertical: mm(1.8) }]}
+        >
+          <Text style={styles.cellNo}> </Text>
+          <Text style={styles.cellCode}> </Text>
+          <View style={styles.desc}>
+            <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>TOTAL</Text>
+          </View>
+          <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totalQty}</Text>
+          <Text style={[styles.cellMoney, styles.colPrice]}> </Text>
+          <Text style={[styles.cellMoney, styles.colDisc, totalDiscount > 0 ? { fontWeight: 700 } : {}]}>
+            {totalDiscount > 0 ? moneyDigits(totalDiscount) : dash}
+          </Text>
+          <Text style={[styles.cellAmount, styles.colAmount]}>{moneyDigits(totalAmount)}</Text>
+        </View>
         <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
 
         {/* Vouchers whose trigger line isn't on the doc (defensive) */}
