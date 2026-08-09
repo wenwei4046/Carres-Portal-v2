@@ -93,59 +93,6 @@ function formatMoney(value: number, currency: string): string {
   })}`;
 }
 
-/* ── Amount in words (AutoCount footer convention, ported from 2990's
-      pdf-common.ts) — "RINGGIT MALAYSIA THREE THOUSAND TWO HUNDRED FORTY
-      AND SEN FIFTY ONLY". ─────────────────────────────────────────────── */
-const ONES = [
-  "ZERO", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE",
-  "TEN", "ELEVEN", "TWELVE", "THIRTEEN", "FOURTEEN", "FIFTEEN", "SIXTEEN",
-  "SEVENTEEN", "EIGHTEEN", "NINETEEN",
-] as const;
-const TENS = ["", "", "TWENTY", "THIRTY", "FORTY", "FIFTY", "SIXTY", "SEVENTY", "EIGHTY", "NINETY"] as const;
-
-function below1000ToWords(n: number): string {
-  const parts: string[] = [];
-  const h = Math.floor(n / 100);
-  const r = n % 100;
-  if (h > 0) parts.push(`${ONES[h]} HUNDRED`);
-  if (r >= 20) {
-    const t = TENS[Math.floor(r / 10)];
-    const o = r % 10;
-    parts.push(o > 0 ? `${t}-${ONES[o]}` : t);
-  } else if (r > 0) {
-    parts.push(ONES[r]);
-  }
-  return parts.join(" ");
-}
-
-function intToWords(n: number): string {
-  const v = Math.max(0, Math.floor(n));
-  if (v === 0) return "ZERO";
-  const scales: Array<[number, string]> = [
-    [1_000_000_000, "BILLION"],
-    [1_000_000, "MILLION"],
-    [1_000, "THOUSAND"],
-  ];
-  const parts: string[] = [];
-  let rest = v;
-  for (const [div, label] of scales) {
-    if (rest >= div) {
-      parts.push(`${below1000ToWords(Math.floor(rest / div))} ${label}`);
-      rest %= div;
-    }
-  }
-  if (rest > 0) parts.push(below1000ToWords(rest));
-  return parts.join(" ");
-}
-
-export function amountInWordsMyr(amount: number): string {
-  const centi = Math.max(0, Math.round(amount * 100));
-  const rm = Math.floor(centi / 100);
-  const sen = centi % 100;
-  const senPart = sen > 0 ? ` AND SEN ${intToWords(sen)}` : "";
-  return `RINGGIT MALAYSIA ${intToWords(rm)}${senPart} ONLY`;
-}
-
 const styles = StyleSheet.create({
   page: {
     fontFamily: NOTO_SANS_SC_FAMILY,
@@ -237,7 +184,6 @@ const styles = StyleSheet.create({
   // ── amount in words · totals ──
   totalsZone: { flexDirection: "row", justifyContent: "space-between", marginTop: mm(2.5), paddingHorizontal: mm(4), alignItems: "stretch" },
   wordsRow: { marginTop: mm(5), paddingHorizontal: mm(4) },
-  wordsText: { fontSize: 7, color: GREY, lineHeight: 1.3 },
   depositLine: { fontSize: 8.5, color: GREY, marginTop: mm(2) },
   totalsBlock: { width: mm(70), borderWidth: 0.6, borderColor: HAIR },
   totalsRow: {
@@ -723,15 +669,14 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         ) : null}
 
         {/* amount in words + customer signature (left) · totals (right) */}
-        {/* words: one quiet full-width line ABOVE the two boxes */}
-        <View style={styles.wordsRow} wrap={false}>
-          <Text style={styles.wordsText}>Amount in words: {amountInWordsMyr(total)}</Text>
-          {/* Prints only while it still means something — once paid >=
-              the expected figure it reads as "give another 3,240". */}
-          {expected_deposit != null && expected_deposit > 0 && paid < expected_deposit ? (
+        {/* Amount-in-words REMOVED (owner, 2026-08-09): a computer-generated
+            document needs no anti-tamper words — that was the handwritten-
+            cheque era. The deposit line keeps its slot, data-driven. */}
+        {expected_deposit != null && expected_deposit > 0 && paid < expected_deposit ? (
+          <View style={styles.wordsRow} wrap={false}>
             <Text style={styles.depositLine}>Expected deposit: {money(expected_deposit)}</Text>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
 
         {/* the two boxes share TOP and BOTTOM lines: the row stretches the
             dashed signature box to the totals card's exact height (round 27) */}

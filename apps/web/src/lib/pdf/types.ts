@@ -116,6 +116,9 @@ export type InvoiceTemplateData = {
     unit: string;
     unit_price: number;
     line_total: number;
+    /** Family table parity (2026-08-09) — optional; older callers omit. */
+    category?: string | null;
+    discount?: number | null;
   }>;
   subtotal: number;
   tax_amount: number;

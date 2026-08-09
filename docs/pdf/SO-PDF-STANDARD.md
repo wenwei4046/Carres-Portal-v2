@@ -142,9 +142,8 @@ Amount in words: RINGGIT MALAYSIA …            ← one full-width 7pt grey lin
 
 ### 7.1 · Legacy notes
 
-- Left: one quiet inline line, 2990's exact form (round 18) —
-  `Amount in words: RINGGIT MALAYSIA … ONLY` at 8pt grey. No caps block label,
-  no `(ITEMS TOTAL)` clarifier — the international form is the inline sentence.
+- **Amount-in-words: REMOVED** (owner, 2026-08-09) — a computer-generated
+  document needs no anti-tamper words; that was the handwritten-cheque era.
   `Expected deposit`
   prints ONLY while `paid < expected` (round 5: otherwise it reads "give another
   3,240") — and no schema field carries it today.
@@ -218,6 +217,7 @@ Optional payload fields the template already renders when sent: `customer.email`
 | 2026-08-09 | Initial law — codifies 17 owner review rounds on rendered PDFs (v1–v15): 2990 skeleton adopted verbatim then amended; fixed zones; bottom-anchored money; three-state lift gate; no-tax ruling; every rule above. | Loo |
 | 2026-08-09 | §7 round 18: amount-in-words becomes 2990's inline one-liner (`Amount in words: …` 8pt grey) — caps block label and `(ITEMS TOTAL)` clarifier removed. | Loo |
 | 2026-08-09 | Rounds 19–21: §8.5 conversion law added — 2990 sizes −0.5pt, row pitches locked to 2990's mm; totals renamed to 2990's `Subtotal`; signature moved after BALANCE DUE with one-line caption. | Loo |
+| 2026-08-09 | Round 31: the amount-in-words line is REMOVED family-wide — computer documents need no anti-tamper words. | Loo |
 | 2026-08-09 | Round 22: totals stay THREE rows (owner: 维持 3 行); signature box under BALANCE DUE with the caption inside; words column narrowed to 68mm/7pt top-aligned with Subtotal. | Loo |
 | 2026-08-09 | Rounds 23–24 (FINAL, owner: perfect): ORDER DETAILS order/words fixed (`Sales Location`); items TOTAL row; §2.1 measurement sheet added — the numbers every Carres customer document reuses. | Loo |
 | 2026-08-09 | Rounds 25–30, SO 定稿: number labels say WHICH number (SO No); words line full-width above the money pair; totals in a hairline card, BALANCE DUE grey-banded at the SAME 8.5 size; signature box 80mm, stretched to the card's height, caption inside; items closing row renamed SUBTOTAL with RM on its sums; payments zone frozen at 4 rows. | Loo |
