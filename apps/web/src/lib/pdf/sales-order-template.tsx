@@ -34,7 +34,6 @@ import type { SalesOrderTemplateData } from "./types";
 
 const INK = "#1A1714";
 const GREY = "#7A7268";
-const LIGHT = "#9A9288";
 const HAIR = "#CFC9C0";
 const BAND_BG = "#ECE8E1"; // category band (2990's grey band, Carres-warm)
 const BAR_BG = INK; // table header bar — white text on ink (2990)
@@ -609,7 +608,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                       </Text>
                     ))}
                   </View>
-                  <Text style={[styles.cellQty, line.qty > 1 ? { fontWeight: 700 } : null]}>
+                  <Text style={line.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>
                     {line.qty}
                   </Text>
                   <Text style={[styles.cellMoney, styles.colPrice]}>{moneyDigits(line.unit_price)}</Text>
@@ -640,7 +639,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                 <Text style={styles.descMain}>{a.label}</Text>
                 {addonSub ? <Text style={styles.descSub}>{addonSub}</Text> : null}
               </View>
-              <Text style={[styles.cellQty, a.qty > 1 ? { fontWeight: 700 } : null]}>{a.qty}</Text>
+              <Text style={a.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>{a.qty}</Text>
               <Text style={[styles.cellMoney, styles.colPrice]}>{moneyDigits(a.unit_price)}</Text>
               <Text style={[styles.cellMoney, styles.colDisc]}>{dash}</Text>
               <Text style={[styles.cellAmount, styles.colAmount]}>{moneyDigits(a.line_total)}</Text>
