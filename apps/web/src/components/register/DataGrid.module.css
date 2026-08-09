@@ -1,0 +1,633 @@
+/* DataGrid — THE REGISTER ENGINE's stylesheet, copied from
+   2990s/apps/backend/src/components/DataGrid.module.css (RG-2).
+   Density target: ~28px row height, fs-12 body, fs-10 uppercase header.
+
+   ADAPTED ONLY per the card: the token block below aliases 2990's variable
+   names to Carres' design-token VALUES (docs/01-design-tokens.md /
+   index.css), so every rule beneath stays byte-close to the 2990 original
+   and future engine syncs diff cleanly. The accent rgba() literals were
+   re-based from 2990 orange (232,107,58) to Carres flame (196,77,43), and
+   2990 ink (34,31,32) to Carres near-black (26,26,26). */
+
+.root {
+  /* ── Carres token aliases — the ONE styling adaptation ── */
+  --c-paper: #ffffff; /* white surface (card) */
+  --c-cream: #f9fafb; /* base-50 band */
+  --c-ink: #1a1a1a; /* text primary */
+  --c-burnt: #9a3d22; /* flame-dark */
+  --c-orange: #c44d2b; /* flame */
+  --c-festive-b: #dc2626; /* destructive red-600 */
+  --line: #e5e7eb; /* base-200 border */
+  --fg-muted: #6b7280; /* base-500 */
+  --fg-soft: #9ca3af; /* base-400 */
+  --font-sans: "Inter", "DM Sans", system-ui, sans-serif;
+  --font-button: "Inter", "DM Sans", system-ui, sans-serif;
+  /* Figures: Carres sets numerals with Inter + tabular-nums (no mono face). */
+  --font-mono: "Inter", "DM Sans", system-ui, sans-serif;
+  --fs-10: 10px;
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-7: 28px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-pill: 999px;
+  --shadow-3: 0 8px 24px rgba(0, 0, 0, 0.16);
+
+  /* De-boxed (Wei Siang 2026-06-04): a flat, full-width table surface — NOT a
+     floating brochure card. No border, no radius — the grid is a flat
+     full-bleed panel that flows with the page instead of sitting in a "框框".
+     The toolbar's band + the header rule give all the structure needed. */
+  display: flex;
+  flex-direction: column;
+  background: var(--c-paper);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  /* Carres shell adaptation: the engine fills the flex column its page gives
+     it (ModuleHeader above, nothing below) instead of 2990's
+     calc(100vh − 150px) viewport math. */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Embedded (drill-down) mode — no card chrome. The grid sits inside a
+   parent expansion row and must read as a plain inline nested table that
+   flows with the whole page. Strip the border/shadow/radius/background so
+   there is no "外框", and let it grow to its natural height. */
+.rootEmbedded {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+  flex: none;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+  background: var(--c-cream);
+  flex-wrap: wrap;
+}
+.toolbarSpacer {
+  flex: 1;
+}
+.searchWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--c-paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 4px 8px;
+  /* REGISTER LAW 2 — search always left, compact ~200px (2990 gave it 240 on
+     the right; the width is the laws', the control is the engine's). */
+  width: 200px;
+}
+.searchInput {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--fs-12);
+  color: var(--c-ink);
+  width: 100%;
+}
+.searchInput::placeholder {
+  color: var(--fg-muted);
+}
+
+/* HOUZS-parity Columns popover button + dropdown
+   ────────────────────────────────────────────────
+   Commander 2026-05-27: "为什么不是跟houzs的一样" — the right-click header
+   menu was undiscoverable. This adds a visible pill in the toolbar matching
+   the houzs-erp pattern (Columns3 icon + label + N/M badge + popover with a
+   checkbox per column + Reset link). */
+.columnsAnchor {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.toolbarPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-button);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--c-ink);
+  background: var(--c-paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 6px);
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  height: 28px;
+}
+.toolbarPill:hover:not(:disabled) {
+  background: var(--c-cream);
+}
+.toolbarPill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.toolbarPillOn {
+  background: var(--c-ink);
+  color: var(--c-paper);
+  border-color: var(--c-ink);
+}
+.toolbarPillOn:hover {
+  background: var(--c-ink);
+}
+.toolbarPillBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--c-cream);
+  color: var(--fg-muted);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.toolbarPillOn .toolbarPillBadge {
+  background: rgba(255, 255, 255, 0.25);
+  color: var(--c-paper);
+}
+.columnsMenuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: rgba(0, 0, 0, 0.08);
+}
+.columnsMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  width: 220px;
+  max-height: 320px;
+  background: var(--c-paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-3, 0 8px 24px rgba(0, 0, 0, 0.16));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.columnsMenuHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--c-cream);
+  font-family: var(--font-button);
+  font-size: var(--fs-11);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-ink);
+}
+.columnsMenuReset {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 0;
+  padding: 2px 4px;
+  cursor: pointer;
+  font-family: var(--font-button);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-burnt);
+}
+.columnsMenuReset:hover {
+  text-decoration: underline;
+}
+.columnsMenuBody {
+  overflow-y: auto;
+  max-height: 320px;
+  padding: 4px 0;
+}
+.columnsMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-12);
+  color: var(--c-ink);
+  cursor: pointer;
+}
+.columnsMenuItem:hover {
+  background: var(--c-cream);
+}
+.columnsMenuItem input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--c-burnt);
+  cursor: pointer;
+}
+
+.tbarBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-button);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--c-ink);
+  background: var(--c-paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 4px);
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tbarBtn:hover:not(:disabled) {
+  background: var(--c-cream);
+}
+.tbarBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.tbarBtnDanger {
+  color: var(--c-festive-b, #dc2626);
+}
+
+/* ── Selection bar (RG-2 engine extension, Law 13) ──────────────────
+   Exists only while ticked rows are visible under the current filters:
+   "N selected · Clear · Export Excel (N)". Same band language as the
+   toolbar so it reads as the grid's own chrome, not a page banner. */
+.selectionBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px var(--space-3);
+  border-bottom: 1px solid var(--line);
+  background: rgba(196, 77, 43, 0.06);
+}
+.selectionCount {
+  font-family: var(--font-button);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--c-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Group-by zone ───────────────────────────────────────────────── */
+.groupZone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px var(--space-3);
+  background: rgba(26, 26, 26, 0.04);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-sans);
+  font-size: var(--fs-11);
+  color: var(--fg-muted);
+  min-height: 28px;
+}
+.groupZoneActive {
+  background: rgba(196, 77, 43, 0.08);
+  color: var(--c-burnt);
+}
+.groupChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--c-paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 2px 6px 2px 8px;
+  font-size: var(--fs-11);
+  color: var(--c-ink);
+}
+.groupChipRemove {
+  background: transparent;
+  border: 0;
+  color: var(--fg-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+.groupChipRemove:hover {
+  color: var(--c-festive-b, #dc2626);
+}
+
+/* ── Table ───────────────────────────────────────────────────────── */
+/* Issue #2 fix (so-list-pixel-perfect-houzs) — force the horizontal
+   scrollbar to be always visible (overflow-x: scroll vs auto) and make
+   the WebKit scrollbar track thicker so the operator can grab it. */
+.scroll {
+  overflow-x: scroll;
+  overflow-y: auto;
+  /* Carres shell adaptation — the scroller fills the engine's flex column
+     (2990 reserved topbar+header with a 100vh calc; Carres pages hand the
+     engine an already-bounded flex box). */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Embedded (drill-down) mode — no independent scrollbar, no height cap.
+   The drill-down must scroll with the whole page, not trap a separate
+   horizontal/vertical scrollbar inside a card. */
+.scrollEmbedded {
+  overflow: visible;
+  flex: none;
+}
+.scroll::-webkit-scrollbar {
+  height: 12px;
+  width: 12px;
+}
+.scroll::-webkit-scrollbar-track {
+  background: var(--c-cream);
+  border-top: 1px solid var(--line);
+}
+.scroll::-webkit-scrollbar-thumb {
+  background: rgba(26, 26, 26, 0.32);
+  border-radius: 6px;
+  border: 2px solid var(--c-cream);
+}
+.scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--c-burnt);
+}
+.scroll {
+  /* Firefox */
+  scrollbar-width: auto;
+  scrollbar-color: rgba(26, 26, 26, 0.32) var(--c-cream);
+}
+.table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: var(--fs-12);
+  font-variant-numeric: tabular-nums;
+}
+.thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--c-cream);
+}
+/* Embedded (drill-down) mode — the grid flows with the page, so there is
+   no inner scroll container for a sticky header to anchor to. Make the
+   header a plain non-sticky row like the Daily Breakdown view. */
+.theadEmbedded {
+  position: static;
+}
+.th {
+  font-family: var(--font-button);
+  font-size: var(--fs-10, 10px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  background: var(--c-cream);
+  position: relative;
+  user-select: none;
+  white-space: nowrap;
+  cursor: grab;
+}
+.th:last-child {
+  border-right: 0;
+}
+.thAlignRight {
+  text-align: right;
+}
+.thDragOver {
+  background: rgba(196, 77, 43, 0.12);
+}
+.thInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sortBtn {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+}
+.sortArrow {
+  font-size: 10px;
+  color: var(--c-burnt);
+  margin-left: 2px;
+}
+.resizeHandle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 3;
+}
+.resizeHandle:hover {
+  background: var(--c-orange);
+  opacity: 0.4;
+}
+
+.tbody {
+  background: var(--c-paper);
+}
+
+.tr {
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.tr:hover {
+  background: var(--c-cream);
+}
+.trSelected {
+  background: rgba(196, 77, 43, 0.1) !important;
+  font-weight: 600;
+}
+.tr:last-child {
+  border-bottom: 0;
+}
+
+.td {
+  padding: 4px 8px;
+  border-right: 1px solid rgba(26, 26, 26, 0.04);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--c-ink);
+  height: 28px;
+  vertical-align: middle;
+}
+.td:last-child {
+  border-right: 0;
+}
+/* Figures = one font system-wide. Carres sets numerals in Inter; the table
+   already sets tabular-nums, so numeric columns line up regardless of which
+   page renders them. */
+.tdAlignRight {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+.tdMuted {
+  color: var(--fg-muted);
+}
+.tdNumeric {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Group rows ──────────────────────────────────────────────────── */
+.groupRow {
+  background: rgba(26, 26, 26, 0.06);
+  font-weight: 600;
+  cursor: pointer;
+}
+.groupRow:hover {
+  background: rgba(26, 26, 26, 0.1);
+}
+.groupRowCell {
+  padding: 4px 8px;
+  font-family: var(--font-button);
+  font-size: var(--fs-11);
+  letter-spacing: 0.04em;
+  color: var(--c-ink);
+}
+.groupCaret {
+  display: inline-block;
+  width: 12px;
+  color: var(--c-burnt);
+}
+.groupCount {
+  margin-left: 8px;
+  color: var(--fg-muted);
+  font-weight: 400;
+}
+
+/* ── Empty + loading ─────────────────────────────────────────────── */
+.empty {
+  padding: var(--space-7) var(--space-4);
+  text-align: center;
+  color: var(--fg-muted);
+  font-size: var(--fs-13);
+}
+
+/* ── Context menu ────────────────────────────────────────────────── */
+.ctxMenu {
+  position: fixed;
+  z-index: 999;
+  background: var(--c-paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-3, 0 8px 24px rgba(0, 0, 0, 0.16));
+  padding: 4px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-12);
+  min-width: 160px;
+}
+.ctxItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--c-ink);
+  border-radius: var(--radius-sm, 4px);
+}
+.ctxItem:hover {
+  background: var(--c-cream);
+}
+.ctxDivider {
+  height: 1px;
+  background: var(--line);
+  margin: 4px 0;
+}
+
+/* ── Row context menu (right-click) ─────────────────────────────────
+   AutoCount-style. z-index sits above sticky <thead> and the header ctx
+   menu so the floating menu always clears chrome. */
+.contextMenu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--c-paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-3, 0 8px 24px rgba(0, 0, 0, 0.16));
+  padding: 4px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-12);
+  min-width: 200px;
+}
+.contextMenuItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--c-ink);
+  border-radius: var(--radius-sm, 4px);
+  font-family: inherit;
+  font-size: inherit;
+}
+.contextMenuItem:hover {
+  background: var(--c-cream);
+}
+.contextMenuDivider {
+  height: 1px;
+  background: var(--line);
+  margin: 4px 6px;
+}
+.contextMenuDanger {
+  color: var(--c-festive-b, #dc2626);
+}
+.contextMenuDanger:hover {
+  background: rgba(220, 38, 38, 0.06);
+}
+
+/* ── Footer / status line ────────────────────────────────────────── */
+.statusLine {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--c-cream);
+  font-family: var(--font-button);
+  font-size: var(--fs-10, 10px);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  min-height: 22px;
+}

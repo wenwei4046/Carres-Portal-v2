@@ -27,11 +27,14 @@ Bulk selection may only be used for view-oriented actions
 right pane is the **Detail Panel**. Users only ever see **"Sales Orders"** — the sidebar door,
 the tab title and the page header all say it, and no user-facing surface says "register".
 
-# ⛔ SALES ORDERS UI IS FROZEN — SO-5 (Loo, 2026-08-09)
+# ⛔ SALES ORDERS UI IS FROZEN — SO-5 (Loo, 2026-08-09), re-based by RG-2 the same day
 
-**SO-5 passed acceptance and the Sales Orders Blueprint is FROZEN: no UI redesign is accepted;
-bug fixes and minor usability only.** A chat that wants to move a column, a band, a pane or a
-word on this page is asking to reverse an owner ruling and must say so out loud.
+**SO-5 froze the Sales Orders Blueprint; RG-2 (the owner's own card, same day) re-based the
+frozen page onto THE REGISTER ENGINE — 2990's DataGrid copied per Law 13 — and set the Detail
+Panel at a FIXED 480px (owner ruling A). The freeze stands: no UI redesign is accepted; bug
+fixes and minor usability only.** A chat that wants to move a column, a band, a pane or a
+word on this page is asking to reverse an owner ruling and must say so out loud. §1.7 below
+is the current frozen shape.
 
 ---
 
@@ -337,48 +340,65 @@ the query refetches itself. The permanent filter-input row and the standalone da
 inventions 2990 never had — were deleted. The Customer cell went back to ONE line, and `paid`
 stopped printing `Paid in full` on an order nobody had paid a sen on (`RM 0` is a figure).
 
-# §1.7 · WHAT SO-5 BUILT — the freeze card, walked clause by clause
+# §1.7 · WHAT RG-2 BUILT — the Register Engine card, walked clause by clause
 
-**SO-5 is the last UI card. Everything below is the frozen shape** (the freeze notice is at the
-top of this file):
+**RG-2 (2026-08-09) re-based the frozen SO-5 page onto THE REGISTER ENGINE — 2990's shipped
+DataGrid, COPIED not re-implemented (Law 13: one engine for every register, never forked).
+Everything below is the current frozen shape:**
 
 ```
+ENGINE     apps/web/src/components/register/DataGrid.tsx (+ its CSS module,
+           DateField, Skeleton) = 2990's DataGrid.tsx, 1,551 lines verified
+           generic on copy day. Adapted ONLY: import paths · Carres token
+           values · storage-key namespace · search moved LEFT at 200px
+           (REGISTER LAW 2) · ONE extension for all registers — the selection
+           bar `N selected · Clear · Export Excel (N)` with selection-scoped
+           export. The engine owns: global search · header ▼ (checklist with
+           Find / Select all / Select invert · date presets + range · number
+           min/max) · sort · resize · reorder · pin · group-by · Columns n/m
+           chooser + Reset · layout persistence (localStorage
+           `carres.salesOrders.grid.v1`) · windowed rows · Export Excel
+           (.xlsx, current view = visible columns + filters + sort) · the
+           status line with `Reset layout`.
 NAMING     the sidebar door says Sales Orders (operation AND principal areas) ·
            Register / Detail Panel are the internal words, never shown to users
-LAYOUT     the Detail Panel is a SIDE PANE at a FIXED 35% — a flex sibling,
-           never an overlay. Opening it REFLOWS the grid: every column kept,
-           proportionally narrowed (`fill` sizing), SO No + Customer frozen,
-           Items ellipsising. No resizing — deferred by owner ruling.
-           The dead white zone is gone: SO-4's `content` sizing + trailing
-           filler was the dead zone, and `fill` retires it in both pane states.
-REGISTER   five default columns: SO No · Customer · Items · Promised Delivery ·
-           Ordered. Value moved to the chooser, default off. Customer cell is
-           the NAME ONLY, one line; Phone is its own optional column. Selection
-           checkboxes serve Export ONLY (THE REGISTER LAW's clause); the Export
-           button says `Export CSV · current view` / `Export CSV · N selected` —
-           the format joined the card's scope words on Loo's same-day review
-           ("Export 什么？" — 2990's `Export Excel` names its format, ours names
-           CSV; `Export ▾` waits for a real second format). There is NO Actions
-           menu. The Columns button carries 2990's own count — `Columns · 5/34`
-           — same review. Search is fixed at 200px. Filter state (every ▼ + the
-           search + the scope) persists on the URL — a narrowed register is a
-           shareable link. The empty state is `No matching sales orders.` with
-           one `Clear filters` button — never a blank table. The status bar
-           says `{n} orders`, and `{x} of {n} · Filters active` while narrowed.
-COLUMNS    the chooser is remembered per user (localStorage, auto-remember —
-           NOT a layout manager: no widths, no order, no filters in the store),
-           lists EVERY column in four groups (Order · Customer · Money ·
-           Dates), and carries `Reset columns`. The "Extra facts. Cleared on
-           reload." line is deleted — it stopped being true. The menu lives in
-           the register column's toolbar, so it can never overlap the open pane.
-PANEL      header unchanged (SO no · customer · phone, one line); facts strip
-           on top with Outstanding visually dominant over Paid; section order
-           strip → Customer → Items → History. The strip's date fact is
-           `Promised Delivery`, per the dictionary below.
-WORDS      COPY-STANDARD gained the Sales Order date dictionary — Ordered ·
-           Promised Delivery · Original Promised Delivery · Current Promised
-           Delivery · Requested Delivery Date · Delivered · Completed — and the
-           status bar's words were overwritten there (`Record x of y` retired).
+LAYOUT     the Detail Panel is a FIXED 480px SIDE PANE (owner ruling A — not
+           resizable; below a 1200px viewport it clamps to max(400px, 40% of
+           the register area)) — a flex sibling, never an overlay. The grid
+           keeps every column; columns shrink, ellipsize, and the engine's own
+           horizontal scroll carries the rest. Measured 2026-08-09: pane
+           480px at 1440 · 400px at 1100 · grid = container closed (1208px).
+REGISTER   the card's six: ☐ select · SO No · Customer · Items · Promised
+           Delivery · Ordered. Value stays in the chooser, default off. The
+           Customer cell is `name (ink) · phone (gray)` on ONE line — RG-2's
+           own clause; the catalog STRING stays the name alone so ▼/sort/group
+           still work on it, and export writes `Name · phone` explicitly.
+           Selection checkboxes serve Export ONLY (THE REGISTER LAW's clause);
+           the toolbar button says `Export Excel — current view`, the
+           selection bar `Export Excel (N)` — .xlsx, real format, verified by
+           reading the downloaded file back (5 visible columns · N rows).
+           There is NO Actions menu, no KPI cards, no New/Scan, no breadcrumb,
+           no permanent filter row. The page owns only: the scope Select
+           (`Not delivered` / `All orders`), the rows, the columns, the panel.
+           URL carries the PANEL alone (`?order=<id>` · `?view=document`);
+           filter state lives in the engine — SO-5's URL-filter machinery and
+           the chips row are DELETED with their tests, per Law D (the engine
+           already holds one implementation of filtering).
+PANEL      unchanged from SO-5 (the accepted panel): header SO no · customer ·
+           phone one line + ↑↓ `n of N` + ⤢ + ✕; facts strip with Outstanding
+           dominant; Customer direct-edit (phone/address, writes history) ·
+           internal note · [Change promised date] request flow · Items
+           read-only · [Change items] request · History · sticky Cancel/Save.
+           Row click opens it; double-click opens the printable DOCUMENT.
+WORDS      COPY-STANDARD's Sales Order date dictionary stands — Ordered ·
+           Promised Delivery · Original/Current Promised Delivery · Requested
+           Delivery Date · Delivered · Completed. The engine's own status line
+           reads `{x} of {n} rows` (engine text, shared by every register).
+KIT        SO-4/SO-5's register-only DataTable powers (+623 lines: the ▼
+           shapes, virtualization, freeze, activeRow) are REVERTED to main's
+           version — the register was their only consumer, and a kit power
+           with no consumer is the drift Law 5 removes. To Order / Purchase
+           Orders keep the DataTable they always had.
 ```
 
 **What 2990's own Sales Orders screen has that this register deliberately does NOT copy** (its

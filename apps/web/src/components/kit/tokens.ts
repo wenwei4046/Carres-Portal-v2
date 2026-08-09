@@ -118,34 +118,6 @@ export const SPACING_SCALE: readonly SpacingStep[] = [
 ] as const;
 
 /* ─────────────────────────────────────────────────────────────────────────
- * §4.4 Grid row height — THREE, and each new one is a measurement rather than
- * a taste.
- *
- * `ui/MASTER.md` §4 rules 40px the default. `compact` (SO-3, Loo 2026-08-09:
- * *"row density −15%"*) is 40 × 0.85 = **34**, above the ~32px floor at which
- * the kit's 24px in-row controls stop fitting.
- *
- * `dense` (SO-4, Loo 2026-08-09: *"Density: row ≈28px · body fs-12 · header
- * fs-10 · 2990's numbers — do not invent new ones"*) is **28**, copied from
- * 2990's shipped `DataGrid.module.css` (`height: 28px`, its stated density
- * target). It is BELOW the ~32px floor on purpose, and the trade the floor
- * warned about is taken knowingly: a dense register carries NO in-row 24px
- * control — no expansion, no checkbox — so nothing has to fit but one 12px
- * line of text (16px of `text-meta` line-height inside 28 leaves 6px either
- * side). A page that wants `dense` AND an expansion gutter is asking for the
- * collision the floor names, which is why the register passes neither.
- * ──────────────────────────────────────────────────────────────────────── */
-
-export type RowDensity = "default" | "compact" | "dense";
-
-/** In px. Read by `DataTable` and by the tests that hold the 40px law. */
-export const ROW_HEIGHT: Record<RowDensity, number> = {
-  default: 40,
-  compact: 34,
-  dense: 28,
-};
-
-/* ─────────────────────────────────────────────────────────────────────────
  * §5.1 Icons — exactly three sizes; stroke ✅ FROZEN Q4 = 2.
  * ──────────────────────────────────────────────────────────────────────── */
 
