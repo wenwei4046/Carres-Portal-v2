@@ -19,6 +19,8 @@ export type DoTemplateData = {
   order_code: string;
   customer: { name: string; address: string; phone: string | null };
   dealer: { name: string; contact: string | null };
+  /** The logistic doing the trip (delivery_partners.name) — the driver
+   *  side of the signature pair. */
   partner: { name: string } | null;
   lines: Array<{
     sku: string;
@@ -26,8 +28,21 @@ export type DoTemplateData = {
     qty: number;
     unit: string;
     line_total: number;
+    /** Category band (SOFA / MATTRESS …) — optional, same as the SO. */
+    category?: string | null;
   }>;
   currency: string;
+  /** 2026-08-09 DO reskin (SO-PDF-STANDARD chrome) — all optional so the
+   *  existing /print-do caller keeps working; the template skips absentees. */
+  delivery_date?: string | null;
+  delivery?: {
+    floor: number | null;
+    has_lift: boolean | null;
+    address?: string | null;
+  };
+  /** Proof-of-delivery already captured digitally (orders.pod_*): the
+   *  customer box prints the signature image when present. */
+  pod?: { signature_url?: string | null; signed_at?: string | null };
 };
 
 export type ReceiptTemplateData = {
