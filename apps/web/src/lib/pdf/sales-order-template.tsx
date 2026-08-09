@@ -46,8 +46,15 @@ const LOGO_SRC =
     ? `${window.location.origin}/carres-wordmark.png`
     : "public/carres-wordmark.png";
 
+/** B ruling (Loo, 2026-08-09): the DB's delivery_has_lift is a NOT-NULL
+ * boolean today, so an order nobody asked about prints `LIFT No` — that may
+ * NOT feed a charge sentence the customer signs. Until the nullable-columns
+ * migration + POS form land, the stair-carry sentence and its T&C clause
+ * stay OFF. Flip this to true in the migration's PR, nowhere else. */
+const LIFT_THREE_STATE_READY = false;
+
 const MARGIN = mm(12);
-const HEADER_H = mm(24);
+const HEADER_H = mm(20);
 const FOOTER_H = mm(8);
 
 /** `2026-08-09` → `SUN, 9 AUG 26` (textual parse — timezone-proof). */
@@ -61,6 +68,18 @@ function capsDate(iso: string | null | undefined): string | null {
   ];
   const mon = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][mo - 1];
   return `${dow}, ${d} ${mon} ${String(y).slice(2)}`;
+}
+
+/** Body dates read mixed-case — `9 Aug 26`, or `Mon, 24 Aug 26` with the
+ *  weekday. ALL-CAPS dates live in the header only; inside tables they were
+ *  noise (owner review 2026-08-09: "payment received part messy"). */
+function niceDate(iso: string | null | undefined, withDow = false): string | null {
+  const caps = capsDate(iso);
+  if (!caps) return null;
+  const pretty = caps
+    .toLowerCase()
+    .replace(/\b([a-z])/g, (c) => c.toUpperCase());
+  return withDow ? pretty : pretty.replace(/^[A-Za-z]{3}, /, "");
 }
 
 /** Customer-facing money: `RM 1,495.00` (MYR prints as RM — the word the
@@ -140,24 +159,27 @@ const styles = StyleSheet.create({
   header: { position: "absolute", top: MARGIN, left: MARGIN, right: MARGIN },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   logo: { height: mm(6), width: mm(25.3) },
-  legalLine: { fontSize: 7, color: GREY, marginTop: mm(0.8) },
-  legalFirst: { marginTop: mm(2) },
+  legalLine: { fontSize: 6.5, color: GREY, marginTop: mm(0.5) },
+  legalFirst: { marginTop: mm(1.5) },
   docBlock: { alignItems: "flex-end", alignSelf: "flex-end" },
   docTitle: { fontSize: 10, color: GREY, letterSpacing: 1.5 },
   docNumber: { fontSize: 18, fontWeight: 700, marginTop: 2 },
   docDate: { fontSize: 7, fontWeight: 700, letterSpacing: 0.8, marginTop: mm(1.2) },
   headerRule: { borderBottomWidth: 0.8, borderBottomColor: INK, marginTop: mm(1.5) },
 
-  // ── frameless info blocks (Muji: labels whisper, values print) ──
+  // ── frameless info blocks. Section anchors are INK — the owner's review
+  //    (2026-08-09) found the all-grey voice hard to read; international
+  //    references (Stripe / Shopify invoices) bold the section titles small
+  //    and keep grey for genuinely secondary text only. ──
   cards: { flexDirection: "row", marginTop: mm(2), paddingHorizontal: mm(4) },
-  blockLabel: { fontSize: 7.5, color: GREY, letterSpacing: 0.8, textTransform: "uppercase" },
-  partyName: { fontSize: 9.5, fontWeight: 600, marginTop: mm(1.5) },
+  blockLabel: { fontSize: 7.5, fontWeight: 600, color: INK, letterSpacing: 0.8, textTransform: "uppercase" },
+  partyName: { fontSize: 9.5, fontWeight: 600, marginTop: mm(1) },
   partyLine: { fontSize: 9, marginTop: mm(1) },
-  pairRow: { flexDirection: "row", marginTop: mm(1) },
+  pairRow: { flexDirection: "row", marginTop: mm(0.8) },
   pairLabel: { fontSize: 7.5, color: GREY, width: mm(24), textTransform: "uppercase", letterSpacing: 0.5, paddingTop: 1 },
   pairValue: { fontSize: 9, flex: 1 },
-  deliverBlock: { marginTop: mm(3.5), paddingHorizontal: mm(4) },
-  accessNote: { fontSize: 7.5, color: GREY, marginTop: mm(1) },
+  deliverBlock: { marginTop: mm(2), paddingHorizontal: mm(4) },
+  accessNote: { fontSize: 7.5, color: GREY, marginTop: mm(0.8) },
 
   // ── items table: zero grid lines, hairline rhythm, category bands ──
   tableHead: {
@@ -167,26 +189,29 @@ const styles = StyleSheet.create({
     borderBottomColor: INK,
     flexDirection: "row",
     paddingVertical: mm(1.5),
-    marginTop: mm(4),
+    marginTop: mm(2.5),
   },
-  th: { fontSize: 7.5, color: GREY, letterSpacing: 0.8, textTransform: "uppercase" },
+  th: { fontSize: 7.5, fontWeight: 600, color: INK, letterSpacing: 0.8, textTransform: "uppercase" },
   colNo: { width: mm(7) },
   colCode: { width: mm(29) },
   colQty: { width: mm(11), textAlign: "right" },
   colPrice: { width: mm(22), textAlign: "right" },
   colDisc: { width: mm(19), textAlign: "right" },
   colAmount: { width: mm(23), textAlign: "right" },
-  bandRow: { flexDirection: "row", paddingTop: mm(2.2), paddingBottom: mm(0.6) },
+  bandRow: { flexDirection: "row", paddingTop: mm(1.8), paddingBottom: mm(0.5) },
   bandText: { fontSize: 7.5, fontWeight: 600, color: LIGHT, letterSpacing: 1 },
-  row: { flexDirection: "row", paddingVertical: mm(2) },
+  row: { flexDirection: "row", paddingVertical: mm(1.4) },
   rowHair: { borderBottomWidth: 0.3, borderBottomColor: HAIR },
   cellNo: { fontSize: 9, color: GREY, width: mm(7) },
   cellCode: { fontSize: 8.5, width: mm(29), paddingRight: mm(2) },
   desc: { flex: 1, paddingRight: mm(3) },
-  descMain: { fontSize: 9, fontWeight: 500 },
+  descMain: { fontSize: 9, fontWeight: 600 },
   descSub: { fontSize: 8, color: GREY, marginTop: mm(0.8) },
   cellQty: { fontSize: 9, width: mm(11), textAlign: "right" },
   cellMoney: { fontSize: 9, textAlign: "right" },
+  // The line's own amount anchors the row (international convention: the
+  // rightmost figure is the one the reader scans down).
+  cellAmount: { fontSize: 9, fontWeight: 600, textAlign: "right" },
 
   voucherBlock: { marginTop: mm(1), paddingHorizontal: mm(4) },
   voucherLine: { fontSize: 8, color: GREY, marginTop: mm(0.5) },
@@ -199,7 +224,7 @@ const styles = StyleSheet.create({
     borderBottomColor: INK,
     flexDirection: "row",
     paddingVertical: mm(1.5),
-    marginTop: mm(1.5),
+    marginTop: mm(1.2),
   },
   payColDate: { width: mm(24) },
   payColCode: { width: mm(30) },
@@ -208,10 +233,10 @@ const styles = StyleSheet.create({
   payCell: { fontSize: 9 },
 
   // ── amount in words · totals ──
-  totalsZone: { flexDirection: "row", marginTop: mm(4), paddingHorizontal: mm(4), alignItems: "flex-start" },
+  totalsZone: { flexDirection: "row", marginTop: mm(2), paddingHorizontal: mm(4), alignItems: "flex-start" },
   wordsBlock: { flex: 1, paddingRight: mm(8) },
-  wordsText: { fontSize: 8, marginTop: mm(1.5), lineHeight: 1.5 },
-  depositLine: { fontSize: 8, color: GREY, marginTop: mm(2) },
+  wordsText: { fontSize: 8, marginTop: mm(1.2), lineHeight: 1.4 },
+  depositLine: { fontSize: 8, color: GREY, marginTop: mm(1.2) },
   totalsBlock: { width: mm(70) },
   totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: mm(1.2) },
   totalsLabel: { fontSize: 8, color: GREY, textTransform: "uppercase", letterSpacing: 0.6 },
@@ -231,26 +256,26 @@ const styles = StyleSheet.create({
   balanceValue: { fontSize: 12, fontWeight: 700 },
 
   // ── customer signature · legal sentence ──
-  signZone: { flexDirection: "row", marginTop: mm(5), paddingHorizontal: mm(4), alignItems: "flex-start" },
+  signZone: { flexDirection: "row", marginTop: mm(3.5), paddingHorizontal: mm(4), alignItems: "flex-start" },
   signBlock: { width: mm(90) },
   signBox: {
     borderWidth: 0.6,
     borderColor: HAIR,
     borderStyle: "dashed",
-    height: mm(22),
+    height: mm(12),
     alignItems: "center",
     justifyContent: "center",
   },
   signImage: { width: mm(60), height: mm(18), objectFit: "contain" },
-  signLabel: { fontSize: 7.5, color: GREY, letterSpacing: 0.8, textTransform: "uppercase", marginTop: mm(1.5) },
-  signName: { fontSize: 8.5, marginTop: mm(0.8) },
+  signLabel: { fontSize: 7.5, color: GREY, letterSpacing: 0.8, textTransform: "uppercase", marginTop: mm(1) },
+  signName: { fontSize: 8.5, marginTop: mm(0.6) },
   signMark: { fontSize: 7.5, color: GREY, marginTop: mm(0.5) },
   legalBlock: { flex: 1, paddingLeft: mm(8), paddingTop: mm(6) },
   legalSentence: { fontSize: 7.5, color: GREY, lineHeight: 1.5 },
 
   // ── terms ──
-  terms: { marginTop: mm(5), paddingHorizontal: mm(4) },
-  termsLine: { fontSize: 7.5, color: GREY, lineHeight: 1.5, marginTop: mm(0.8) },
+  terms: { marginTop: mm(2), paddingHorizontal: mm(4) },
+  termsLine: { fontSize: 6.8, color: GREY, lineHeight: 1.35, marginTop: mm(0.5) },
 
   // ── footer (fixed, every page) ──
   footer: {
@@ -378,7 +403,8 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
   const accessKnown = delivery.floor != null && delivery.has_lift != null;
   // The charge sentence prints only on a RECORDED walk-up; an unknown access
   // prints the to-be-checked sentence instead. Never a charge on a default.
-  const stairCarry = accessKnown && delivery.floor! > 1 && delivery.has_lift === false;
+  const stairCarry =
+    LIFT_THREE_STATE_READY && accessKnown && delivery.floor! > 1 && delivery.has_lift === false;
 
   // Vouchers print under the FIRST table line matching their trigger sku;
   // the rest fall to a block below the table (defensive).
@@ -402,36 +428,58 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
   const orderDetailRows: Array<[string, string | null]> = [
     ["Doc No", so_number],
     ["Showroom", outletName],
-    ["Ordered", capsDate(issue_date)],
-    ["Delivery date", capsDate(delivery.date) ?? delivery.date],
-    ["Proceed date", proceed_date ? capsDate(proceed_date) : null],
+    ["Ordered", niceDate(issue_date, true)],
+    ["Delivery date", niceDate(delivery.date, true) ?? delivery.date],
+    ["Proceed date", proceed_date ? niceDate(proceed_date, true) : null],
   ];
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* ── header: wordmark stamp + legal identity · SALES ORDER hero ── */}
-        <View style={styles.header} fixed>
-          <View style={styles.headerRow}>
-            <View>
-              <Image style={styles.logo} src={LOGO_SRC} />
-              <Text style={[styles.legalLine, styles.legalFirst]}>
-                {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
-              </Text>
-              {CARRES_COMPANY.addressLines.map((line, i) => (
-                <Text key={i} style={styles.legalLine}>
-                  {line}
-                </Text>
-              ))}
-            </View>
-            <View style={styles.docBlock}>
-              <Text style={styles.docTitle}>SALES ORDER</Text>
-              <Text style={styles.docNumber}>{so_number}</Text>
-              <Text style={styles.docDate}>{capsDate(issue_date)}</Text>
-            </View>
-          </View>
-          <View style={styles.headerRule} />
-        </View>
+        {/* ── header, fixed: full identity on page 1; continuation pages get
+            ONE quiet line (a repeated four-line letterhead on an overflow
+            page is wasted paper — owner review 2026-08-09). ── */}
+        <View
+          style={styles.header}
+          fixed
+          render={({ pageNumber }) =>
+            pageNumber === 1 ? (
+              <View>
+                <View style={styles.headerRow}>
+                  <View>
+                    <Image style={styles.logo} src={LOGO_SRC} />
+                    <Text style={[styles.legalLine, styles.legalFirst]}>
+                      {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
+                    </Text>
+                    {CARRES_COMPANY.addressLines.map((line, i) => (
+                      <Text key={i} style={styles.legalLine}>
+                        {line}
+                      </Text>
+                    ))}
+                  </View>
+                  <View style={styles.docBlock}>
+                    <Text style={styles.docTitle}>SALES ORDER</Text>
+                    <Text style={styles.docNumber}>{so_number}</Text>
+                    <Text style={styles.docDate}>{capsDate(issue_date)}</Text>
+                  </View>
+                </View>
+                <View style={styles.headerRule} />
+              </View>
+            ) : (
+              <View>
+                <View style={[styles.headerRow, { alignItems: "flex-end" }]}>
+                  <Text style={styles.legalLine}>
+                    {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
+                  </Text>
+                  <Text style={{ fontSize: 9, fontWeight: 700 }}>
+                    SALES ORDER · {so_number}
+                  </Text>
+                </View>
+                <View style={styles.headerRule} />
+              </View>
+            )
+          }
+        />
 
         {/* ── BILL TO · ORDER DETAILS (frameless, first page only) ── */}
         <View style={styles.cards}>
@@ -562,7 +610,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                   <Text style={[styles.cellMoney, styles.colDisc]}>
                     {line.discount && line.discount > 0 ? money(line.discount) : dash}
                   </Text>
-                  <Text style={[styles.cellMoney, styles.colAmount]}>{money(line.line_total)}</Text>
+                  <Text style={[styles.cellAmount, styles.colAmount]}>{money(line.line_total)}</Text>
                 </View>
               );
             })}
@@ -579,7 +627,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           return (
             <View key={`addon-${idx}`} wrap={false} style={isLast ? styles.row : [styles.row, styles.rowHair]}>
               <Text style={styles.cellNo}>{lines.length + idx + 1}</Text>
-              <Text style={styles.cellCode}> </Text>
+              <Text style={styles.cellCode}>{a.sku ?? "ADD-ON"}</Text>
               <View style={styles.desc}>
                 <Text style={styles.descMain}>{a.label}</Text>
                 {addonSub ? <Text style={styles.descSub}>{addonSub}</Text> : null}
@@ -587,7 +635,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
               <Text style={styles.cellQty}>{a.qty}</Text>
               <Text style={[styles.cellMoney, styles.colPrice]}>{money(a.unit_price)}</Text>
               <Text style={[styles.cellMoney, styles.colDisc]}>{dash}</Text>
-              <Text style={[styles.cellMoney, styles.colAmount]}>{money(a.line_total)}</Text>
+              <Text style={[styles.cellAmount, styles.colAmount]}>{money(a.line_total)}</Text>
             </View>
           );
         })}
@@ -606,7 +654,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
 
         {/* ── PAYMENTS RECEIVED ── */}
         {payments.length > 0 ? (
-          <View wrap={false} style={{ marginTop: mm(4) }}>
+          <View wrap={false} style={{ marginTop: mm(2) }}>
             <View style={{ paddingHorizontal: mm(4) }}>
               <Text style={styles.blockLabel}>Payments Received</Text>
             </View>
@@ -619,25 +667,39 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             </View>
             {payments.map((p, i) => (
               <View key={i} style={i === payments.length - 1 ? styles.row : [styles.row, styles.rowHair]}>
-                <Text style={[styles.payCell, styles.payColDate]}>{p.date ? (capsDate(p.date) ?? p.date) : dash}</Text>
+                <Text style={[styles.payCell, styles.payColDate]}>{p.date ? (niceDate(p.date) ?? p.date) : dash}</Text>
                 <Text style={[styles.payCell, { flex: 1 }]}>{p.label}</Text>
                 <Text style={[styles.payCell, styles.payColCode]}>{p.approval_code ?? p.reference ?? dash}</Text>
                 <Text style={[styles.payCell, styles.payColBy]}>{p.collected_by ?? dash}</Text>
-                <Text style={[styles.payCell, styles.payColAmount, { textAlign: "right" }]}>{money(p.amount)}</Text>
+                <Text style={[styles.payCell, styles.payColAmount, { textAlign: "right", fontWeight: 600 }]}>{money(p.amount)}</Text>
               </View>
             ))}
             <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
           </View>
         ) : null}
 
-        {/* ── amount in words · totals (the SO does not talk tax) ── */}
+        {/* ── amount in words + customer signature (left) · totals (right) —
+            the 2990 arrangement: the signature sits BESIDE the money, so a
+            normal order closes on one page. The company signs nothing. ── */}
         <View style={styles.totalsZone} wrap={false}>
           <View style={styles.wordsBlock}>
-            <Text style={styles.blockLabel}>Amount in words</Text>
+            <Text style={styles.blockLabel}>Amount in words (Items total)</Text>
             <Text style={styles.wordsText}>{amountInWordsMyr(total)}</Text>
-            {expected_deposit != null && expected_deposit > 0 ? (
+            {/* Prints only while it still means something — once paid >=
+                the expected figure it reads as "give another 3,240" (owner
+                review 2026-08-09). */}
+            {expected_deposit != null && expected_deposit > 0 && paid < expected_deposit ? (
               <Text style={styles.depositLine}>Expected deposit: {money(expected_deposit)}</Text>
             ) : null}
+            <View style={[styles.signBox, { marginTop: mm(2) }]}>
+              {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
+            </View>
+            <Text style={styles.signLabel}>Customer Signature</Text>
+            <Text style={styles.signName}>
+              {customer.name}
+              {customer.phone ? ` · ${customer.phone}` : ""}
+            </Text>
+            {signed ? <Text style={styles.signMark}>Signed electronically at point of sale.</Text> : null}
           </View>
           <View style={styles.totalsBlock}>
             <View style={styles.totalsRow}>
@@ -655,50 +717,30 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           </View>
         </View>
 
-        {/* ── customer signature · the company signs nothing ── */}
-        <View style={styles.signZone} wrap={false}>
-          <View style={styles.signBlock}>
-            <View style={styles.signBox}>
-              {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
-            </View>
-            <Text style={styles.signLabel}>Customer Signature</Text>
-            <Text style={styles.signName}>
-              {customer.name}
-              {customer.phone ? ` · ${customer.phone}` : ""}
-            </Text>
-            {signed ? <Text style={styles.signMark}>Signed electronically at point of sale.</Text> : null}
-          </View>
-          <View style={styles.legalBlock}>
-            <Text style={styles.legalSentence}>
-              Computer-generated document. No company signature required.
-            </Text>
-          </View>
-        </View>
-
-        {/* ── terms — wording is the owner's; numbered, quiet ── */}
-        <View style={styles.terms}>
+        {/* ── terms — wording is the owner's; numbered, quiet. The stair-
+            carry clause rides the same gate as the DELIVER TO sentence: a
+            signed charge basis may not rest on an unasked default. ── */}
+        <View style={styles.terms} wrap={false}>
           <Text style={styles.blockLabel}>Terms & Conditions</Text>
-          <Text style={styles.termsLine}>
-            1. This sales order becomes a binding tax invoice once goods are delivered and full payment is reconciled.
-          </Text>
-          <Text style={styles.termsLine}>
-            2. Balance due is payable in full on or before delivery. Cash, bank transfer, DuitNow QR, and cheque accepted.
-          </Text>
-          <Text style={styles.termsLine}>
-            3. Delivery date is best-effort and may shift ±3 working days subject to operation confirmation.
-          </Text>
-          <Text style={styles.termsLine}>
-            4. Stair-carry surcharges (if any) follow the floor and lift access recorded above and are billed on this sales order, not on the delivery order.
-          </Text>
-          <Text style={styles.termsLine}>
-            5. Once the delivery date has been confirmed, any subsequent request to change or extend the date will incur a rescheduling surcharge.
-          </Text>
+          {[
+            "This sales order becomes a binding tax invoice once goods are delivered and full payment is reconciled.",
+            "Balance due is payable in full on or before delivery. Cash, bank transfer, DuitNow QR, and cheque accepted.",
+            "Delivery date is best-effort and may shift ±3 working days subject to operation confirmation.",
+            ...(LIFT_THREE_STATE_READY
+              ? ["Stair-carry surcharges (if any) follow the floor and lift access recorded above and are billed on this sales order, not on the delivery order."]
+              : []),
+            "Once the delivery date has been confirmed, any subsequent request to change or extend the date will incur a rescheduling surcharge.",
+          ].map((t, i) => (
+            <Text key={i} style={styles.termsLine}>
+              {i + 1}. {t}
+            </Text>
+          ))}
         </View>
 
         {/* ── footer — one quiet row, fixed on every page ── */}
         <View style={styles.footer} fixed>
           <Text style={styles.footerCell}>{order_code}</Text>
-          <Text style={styles.footerCenter}>Carres Portal · {capsDate(issue_date)}</Text>
+          <Text style={styles.footerCenter}>Computer-generated document · No company signature required.</Text>
           <Text
             style={styles.footerPage}
             render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}

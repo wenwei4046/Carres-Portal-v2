@@ -87,6 +87,7 @@ const data = {
   addons: [
     {
       label: "Delivery fee",
+      sku: "SVC-DELIVERY",
       qty: 1,
       unit_price: 250,
       line_total: 250,

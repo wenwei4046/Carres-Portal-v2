@@ -203,6 +203,9 @@ export type SalesOrderTemplateData = {
 
   addons: Array<{
     label: string;
+    /** The addon's real code (`SVC-DELIVERY`) — an empty Item Code cell is
+     *  a defect (owner review 2026-08-09); absent prints `ADD-ON`. */
+    sku?: string | null;
     qty: number;
     unit_price: number;
     line_total: number;
