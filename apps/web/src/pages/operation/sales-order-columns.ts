@@ -103,8 +103,13 @@ export function moneyText(state: MoneyState): string {
   return state.kind === "settled" ? "Paid in full" : "No price yet";
 }
 
-/** The five groups the chooser stacks its checkboxes under. */
-export type FieldGroup = "Order" | "Customer" | "Delivery" | "Money" | "Documents";
+/**
+ * The four groups the chooser stacks its checkboxes under — SO-5's own list
+ * (*"grouped: Order / Customer / Money / Dates"*). Every date stamp lives under
+ * `Dates` regardless of which act produced it; the documents an order cut
+ * (`DO No`, `Invoice No`) are the ORDER's facts and sit under `Order`.
+ */
+export type FieldGroup = "Order" | "Customer" | "Money" | "Dates";
 
 export interface RegisterField {
   key: string;
@@ -146,27 +151,32 @@ const date = (v: string | null | undefined, absent: string) =>
  * the sheet an operator did not ask to widen.
  */
 export const REGISTER_FIELDS: readonly RegisterField[] = [
-  /* ── The six the card names ─────────────────────────────────────────────── */
+  /* ── SO-5's five defaults ────────────────────────────────────────────────
+   * `Value` left the default row on the owner's SO-5 card and lives in the
+   * chooser under Money. The Customer cell is the NAME ALONE, one line — the
+   * phone is its own optional column, the global search still matches it, and
+   * the panel header says it out loud. */
   { key: "so", label: "SO No", width: "85px", group: "Order", on: true,
     text: (r) => `SO-${r.so}`, sortBy: (r) => r.so },
-  /* 188 → 200: SO-3 stacks the phone under the name, and `012-345 6789` at
-     `text-meta` is 86.4px of ink — comfortably inside the name's own width, so
-     the column grows only by the 12px the two-line block wants for breathing. */
   { key: "customer", label: "Customer", width: "200px", group: "Customer", on: true,
-    text: (r) => (r.phone ? `${r.customer} · ${r.phone}` : r.customer),
-    sortBy: (r) => r.customer },
+    text: (r) => r.customer, sortBy: (r) => r.customer },
   { key: "items", label: "Items", width: "361px", group: "Order", on: true,
     text: (r) => r.items },
-  { key: "value", label: "Value", width: "109px", align: "right", numeric: true,
-    group: "Money", on: true, text: (r) => moneyText(r.value),
-    sortBy: (r) => (r.value.kind === "amount" ? r.value.value : -1),
-    kind: "number", num: (r) => (r.value.kind === "amount" ? r.value.value : null) },
-  { key: "promised", label: "Promised", width: "113px", group: "Delivery", on: true,
+  /* SO-5's dictionary: the column is `Promised Delivery`, never bare
+   * `Promised` — the word says WHAT was promised. Width carries the header,
+   * which is now the widest thing in the column (118.8px of ink + px-2). */
+  { key: "promised", label: "Promised Delivery", width: "137px", group: "Dates", on: true,
     text: (r) => date(r.promised, NO_DATE_YET), sortBy: (r) => r.promised ?? "",
     kind: "date", iso: (r) => r.promised },
-  { key: "ordered", label: "Ordered", width: "113px", group: "Order", on: true,
+  { key: "ordered", label: "Ordered", width: "113px", group: "Dates", on: true,
     text: (r) => fmtDate(r.ordered), sortBy: (r) => r.ordered,
     kind: "date", iso: (r) => r.ordered },
+
+  /* ── The money the order carries (chooser, default off) ─────────────────── */
+  { key: "value", label: "Value", width: "109px", align: "right", numeric: true,
+    group: "Money", text: (r) => moneyText(r.value),
+    sortBy: (r) => (r.value.kind === "amount" ? r.value.value : -1),
+    kind: "number", num: (r) => (r.value.kind === "amount" ? r.value.value : null) },
 
   /* ── The customer's own facts ───────────────────────────────────────────── */
   { key: "phone", label: "Phone", width: "103px", group: "Customer",
@@ -204,34 +214,36 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   { key: "source_ref", label: "Customer reference", width: "160px", group: "Order",
     text: (r) => (r.o.source_ref ?? []).filter(Boolean).join(" · ") || NOT_RECORDED },
 
-  /* ── What the delivery has to cope with ─────────────────────────────────── */
+  /* ── What the delivery has to cope with — the customer's building ───────── */
   { key: "floor", label: "Floor", width: "80px", align: "right", numeric: true,
-    group: "Delivery",
+    group: "Customer",
     text: (r) => (r.o.delivery_floor == null ? NOT_RECORDED : String(r.o.delivery_floor)),
     sortBy: (r) => r.o.delivery_floor ?? -1,
     kind: "number", num: (r) => r.o.delivery_floor ?? null },
-  { key: "lift", label: "Lift", width: "80px", group: "Delivery",
+  { key: "lift", label: "Lift", width: "80px", group: "Customer",
     text: (r) => (r.o.delivery_has_lift == null ? NOT_RECORDED : r.o.delivery_has_lift ? "Yes" : "No") },
-  { key: "proceed_date", label: "Proceed date", width: "113px", group: "Delivery",
+
+  /* ── The date stamps — every one under `Dates`, whatever act produced it ── */
+  { key: "proceed_date", label: "Proceed date", width: "113px", group: "Dates",
     text: (r) => date(r.o.proceed_date, NOT_RECORDED), sortBy: (r) => r.o.proceed_date ?? "",
     kind: "date", iso: (r) => r.o.proceed_date ?? null },
-  { key: "dispatched", label: "Dispatched", width: "113px", group: "Delivery",
+  { key: "dispatched", label: "Dispatched", width: "113px", group: "Dates",
     text: (r) => date(r.o.dispatched_at, NOT_RECORDED), sortBy: (r) => r.o.dispatched_at ?? "",
     kind: "date", iso: (r) => r.o.dispatched_at ?? null },
-  { key: "delivered", label: "Delivered", width: "113px", group: "Delivery",
+  { key: "delivered", label: "Delivered", width: "113px", group: "Dates",
     text: (r) => date(r.o.delivered_at, NOT_RECORDED), sortBy: (r) => r.o.delivered_at ?? "",
     kind: "date", iso: (r) => r.o.delivered_at ?? null },
-
-  /* ── The documents the order produced ───────────────────────────────────── */
-  { key: "do_number", label: "DO No", width: "120px", group: "Documents",
-    text: (r) => r.o.do_number || NOT_RECORDED },
-  { key: "invoice_no", label: "Invoice No", width: "130px", group: "Documents",
-    text: (r) => r.o.invoice_no || NOT_RECORDED },
-  { key: "invoiced", label: "Invoiced", width: "113px", group: "Documents",
+  { key: "invoiced", label: "Invoiced", width: "113px", group: "Dates",
     text: (r) => date(r.o.invoiced_at, NOT_RECORDED), sortBy: (r) => r.o.invoiced_at ?? "",
     kind: "date", iso: (r) => r.o.invoiced_at ?? null },
 
-  /* ── The money the order carries ────────────────────────────────────────── */
+  /* ── The documents the order produced — the ORDER's own facts ───────────── */
+  { key: "do_number", label: "DO No", width: "120px", group: "Order",
+    text: (r) => r.o.do_number || NOT_RECORDED },
+  { key: "invoice_no", label: "Invoice No", width: "130px", group: "Order",
+    text: (r) => r.o.invoice_no || NOT_RECORDED },
+
+  /* ── The rest of the money ──────────────────────────────────────────────── */
   { key: "paid", label: "Paid", width: "109px", align: "right", numeric: true,
     group: "Money", text: (r) => moneyText(r.paid),
     sortBy: (r) => (r.paid.kind === "amount" ? r.paid.value : 0),
@@ -256,20 +268,19 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     kind: "number", num: (r) => r.o.installment_months ?? null },
 ] as const;
 
-/** The card's six, and the ONE place the register's default shape is stated. */
+/** SO-5's five, and the ONE place the register's default shape is stated. */
 export const DEFAULT_COLUMNS: readonly string[] = REGISTER_FIELDS.filter((f) => f.on).map(
   (f) => f.key,
 );
 
-/** The two the card pins: an operator scrolling right never loses WHOSE row. */
+/** The two the card pins: SO No + Customer keep every row named. */
 export const FROZEN_COLUMNS = 2;
 
 export const FIELD_GROUPS: readonly FieldGroup[] = [
   "Order",
   "Customer",
-  "Delivery",
   "Money",
-  "Documents",
+  "Dates",
 ];
 
 export function fieldByKey(key: string): RegisterField | undefined {
@@ -438,6 +449,94 @@ export function filterChipText(field: RegisterField, f: ColumnFilterState): stri
   else if (min != null) parts.push(`${min} and above`);
   else if (max != null) parts.push(`up to ${max}`);
   return `${field.label}: ${parts.join(" · ")}`;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * SO-5 · FILTER STATE LIVES ON THE URL — a narrowed register is a SHAREABLE
+ * VIEW. One param per narrowing column, `f_<key>`, so a pasted link re-opens
+ * exactly this view and Back releases the last ▼. Segments are `;`-joined,
+ * checklist values `|`-joined and URI-encoded, because a customer's name may
+ * carry either separator.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const FILTER_PARAM_PREFIX = "f_";
+
+/** One column's ▼ state as one URL param value. `null` = nothing to say. */
+export function filterToParam(f: ColumnFilterState): string | null {
+  const parts: string[] = [];
+  if (f.values != null && f.values.size > 0) {
+    parts.push(`v:${[...f.values].sort().map(encodeURIComponent).join("|")}`);
+  }
+  if (f.preset != null) parts.push(`p:${f.preset}`);
+  if (f.from) parts.push(`from:${f.from}`);
+  if (f.to) parts.push(`to:${f.to}`);
+  if (f.min != null && f.min.trim() !== "") parts.push(`min:${encodeURIComponent(f.min)}`);
+  if (f.max != null && f.max.trim() !== "") parts.push(`max:${encodeURIComponent(f.max)}`);
+  return parts.length > 0 ? parts.join(";") : null;
+}
+
+/** The reverse walk. Unknown segments are dropped, never thrown on. */
+export function filterFromParam(value: string): ColumnFilterState {
+  const f: ColumnFilterState = {};
+  for (const part of value.split(";")) {
+    const at = part.indexOf(":");
+    if (at < 0) continue;
+    const kind = part.slice(0, at);
+    const rest = part.slice(at + 1);
+    if (kind === "v" && rest) {
+      f.values = new Set(rest.split("|").map(decodeURIComponent));
+    } else if (kind === "p" && DATE_PRESETS.some((p) => p.value === rest)) {
+      f.preset = rest as DatePreset;
+    } else if (kind === "from" && rest) f.from = rest;
+    else if (kind === "to" && rest) f.to = rest;
+    else if (kind === "min" && rest) f.min = decodeURIComponent(rest);
+    else if (kind === "max" && rest) f.max = decodeURIComponent(rest);
+  }
+  return f;
+}
+
+/** Every active ▼ written onto `params`; every stale `f_*` param removed. */
+export function writeFiltersToParams(
+  filters: ReadonlyMap<string, ColumnFilterState>,
+  params: URLSearchParams,
+): void {
+  for (const key of [...params.keys()]) {
+    if (key.startsWith(FILTER_PARAM_PREFIX)) params.delete(key);
+  }
+  for (const [key, f] of filters) {
+    if (!fieldByKey(key)) continue;
+    const value = filterToParam(f);
+    if (value != null) params.set(FILTER_PARAM_PREFIX + key, value);
+  }
+}
+
+/** The URL's `f_*` params as filter state. Unknown columns are dropped. */
+export function readFiltersFromParams(
+  params: URLSearchParams,
+): Map<string, ColumnFilterState> {
+  const out = new Map<string, ColumnFilterState>();
+  for (const [key, value] of params) {
+    if (!key.startsWith(FILTER_PARAM_PREFIX)) continue;
+    const column = key.slice(FILTER_PARAM_PREFIX.length);
+    if (!fieldByKey(column)) continue;
+    const f = filterFromParam(value);
+    if (filterIsActive(f)) out.set(column, f);
+  }
+  return out;
+}
+
+/**
+ * SO-5 — the chooser is REMEMBERED per user (*"auto-remember; NOT a layout
+ * manager"*). What was stored is never trusted as-is: unknown keys are
+ * dropped (a column that left the catalog must not crash the register that
+ * remembered it), order is the CATALOG's, and an empty result falls back to
+ * the defaults — a register with zero columns is not a view anyone asked for.
+ */
+export function sanitizeShownColumns(stored: unknown): readonly string[] {
+  if (!Array.isArray(stored)) return DEFAULT_COLUMNS;
+  const wanted = new Set(stored.filter((k): k is string => typeof k === "string"));
+  const known = REGISTER_FIELDS.filter((f) => wanted.has(f.key)).map((f) => f.key);
+  return known.length > 0 ? known : DEFAULT_COLUMNS;
 }
 
 /**

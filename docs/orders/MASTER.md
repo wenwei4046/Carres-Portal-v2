@@ -108,6 +108,15 @@ Nothing survives merely because it is already there.**
 
 ---
 
+# ⛔ SALES ORDERS UI IS FROZEN — SO-5 (Loo, 2026-08-09)
+
+**The SO-1 → SO-5 rebuild is complete and its UI is FROZEN: no redesign accepted, bug fixes
+and minor usability only.** The page is `SalesOrdersRegister` (Register + fixed 35% Detail
+Panel + printable document); its blueprint, THE REGISTER LAW and the freeze record live in
+[`../MIGRATION-MAP.md`](../MIGRATION-MAP.md). The block below is the HISTORY of how the old
+`OperationOrdersControl` programme stopped — kept because its correction ("start from the
+operator, not the code") still binds every future card.
+
 # ⛔ START HERE — SALES ORDER IS NOT FINISHED, AND THE LAST PROGRAMME MISSED WHY
 
 > **Loo, 2026-08-08, on the live page:** *"my page now all messy and don't know how to work —

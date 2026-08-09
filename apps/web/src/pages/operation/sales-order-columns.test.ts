@@ -8,8 +8,11 @@ import {
   filterChipText,
   filterIsActive,
   passesColumnFilters,
+  readFiltersFromParams,
   REGISTER_FIELDS,
+  sanitizeShownColumns,
   toCsv,
+  writeFiltersToParams,
 } from "./sales-order-columns";
 
 /**
@@ -54,16 +57,24 @@ function row(over: Partial<operationOrderListRow> = {}): operationOrderListRow {
 }
 
 describe("the catalog is the chooser", () => {
-  it("offers ~28 hidden facts on top of the card's six defaults", () => {
+  it("offers every hidden fact on top of SO-5's five defaults — Value is chooser-only", () => {
     expect(DEFAULT_COLUMNS).toEqual([
       "so",
       "customer",
       "items",
-      "value",
       "promised",
       "ordered",
     ]);
-    expect(REGISTER_FIELDS.length - DEFAULT_COLUMNS.length).toBe(28);
+    expect(REGISTER_FIELDS.length - DEFAULT_COLUMNS.length).toBe(29);
+    /* SO-5 moved `Value` off the register; it stays a real chooser column. */
+    expect(fieldByKey("value")).toBeDefined();
+    expect(fieldByKey("value")!.on).toBeUndefined();
+  });
+
+  it("names the promise by WHAT was promised — SO-5's dictionary", () => {
+    expect(fieldByKey("promised")!.label).toBe("Promised Delivery");
+    expect(fieldByKey("ordered")!.label).toBe("Ordered");
+    expect(fieldByKey("delivered")!.label).toBe("Delivered");
   });
 
   it("names the flat facts the card lists by name", () => {
@@ -88,8 +99,13 @@ describe("the catalog is the chooser", () => {
     }
   });
 
-  it("puts every field in one of the five groups", () => {
+  it("puts every field in one of SO-5's four groups — Order · Customer · Money · Dates", () => {
+    expect(FIELD_GROUPS).toEqual(["Order", "Customer", "Money", "Dates"]);
     for (const f of REGISTER_FIELDS) expect(FIELD_GROUPS).toContain(f.group);
+    /* Every date stamp lives under Dates, whatever act produced it. */
+    for (const key of ["ordered", "promised", "proceed_date", "dispatched", "delivered", "invoiced"]) {
+      expect(fieldByKey(key)!.group, key).toBe("Dates");
+    }
   });
 
   it("gives every field a width in px — a column is never a share of the window", () => {
@@ -110,10 +126,13 @@ describe("one string: printed, filtered, sorted, exported", () => {
     expect(fieldByKey("promised")!.text(r)).toBe("No date yet");
   });
 
-  it("stacks the phone into the Customer column's own string, so search finds it", () => {
+  it("the Customer cell is the NAME ALONE — one line, no phone (SO-5)", () => {
     const r = buildRegisterRow(row());
-    expect(fieldByKey("customer")!.text(r)).toContain("MyHouse Management PLT");
-    expect(fieldByKey("customer")!.text(r)).toContain("012-345 6789");
+    expect(fieldByKey("customer")!.text(r)).toBe("MyHouse Management PLT");
+    /* The phone is not lost: its own optional column, and the search still
+       matches it through the row's needle/digits. */
+    expect(fieldByKey("phone")!.text(r)).toBe("012-345 6789");
+    expect(r.phoneDigits).toBe("0123456789");
   });
 
   /* ── SO-4 · the ▼'s four shapes, 2990's model ported ─────────────────── */
@@ -232,12 +251,58 @@ describe("one string: printed, filtered, sorted, exported", () => {
   it("exports the columns on screen, quoted, header first", () => {
     const csv = toCsv(["so", "customer"], [buildRegisterRow(row())]);
     expect(csv.split("\r\n")[0]).toBe('"SO No","Customer"');
-    expect(csv.split("\r\n")[1]).toBe('"SO-1257","MyHouse Management PLT · 012-345 6789"');
+    expect(csv.split("\r\n")[1]).toBe('"SO-1257","MyHouse Management PLT"');
   });
 
   it("escapes a quote rather than breaking the file", () => {
     const csv = toCsv(["customer"], [buildRegisterRow(row({ customer_name: 'The "Big" Shop' }))]);
     expect(csv).toContain('"The ""Big"" Shop');
+  });
+});
+
+describe("SO-5 · filter state on the URL — a narrowed register is a shareable link", () => {
+  it("round-trips every ▼ shape through one param per column", () => {
+    const filters = new Map<string, import("./sales-order-columns").ColumnFilterState>([
+      ["customer", { values: new Set(["Umi", "Tan; Ah | Kow"]) }],
+      ["promised", { preset: "thisWeek", from: "2026-08-01", to: "2026-08-31" }],
+      ["value", { min: "100", max: "500" }],
+    ]);
+    const params = new URLSearchParams("order=o-1");
+    writeFiltersToParams(filters, params);
+    /* The unrelated params survive; one `f_` param per narrowing column. */
+    expect(params.get("order")).toBe("o-1");
+    expect([...params.keys()].filter((k) => k.startsWith("f_")).sort()).toEqual([
+      "f_customer",
+      "f_promised",
+      "f_value",
+    ]);
+    const back = readFiltersFromParams(params);
+    expect(back.get("customer")?.values).toEqual(new Set(["Umi", "Tan; Ah | Kow"]));
+    expect(back.get("promised")).toMatchObject({
+      preset: "thisWeek",
+      from: "2026-08-01",
+      to: "2026-08-31",
+    });
+    expect(back.get("value")).toMatchObject({ min: "100", max: "500" });
+  });
+
+  it("removes a released column's param, and drops unknown columns on read", () => {
+    const params = new URLSearchParams();
+    writeFiltersToParams(new Map([["customer", { values: new Set(["Umi"]) }]]), params);
+    writeFiltersToParams(new Map(), params);
+    expect([...params.keys()]).toEqual([]);
+    params.set("f_not_a_column", "v:x");
+    params.set("f_promised", "p:not_a_preset");
+    expect(readFiltersFromParams(params).size).toBe(0);
+  });
+});
+
+describe("SO-5 · the remembered chooser is sanitised, never trusted", () => {
+  it("keeps catalog order, drops unknown keys, and never yields zero columns", () => {
+    expect(sanitizeShownColumns(["ordered", "so", "ghost_column"])).toEqual(["so", "ordered"]);
+    expect(sanitizeShownColumns(["ghost_column"])).toEqual(DEFAULT_COLUMNS);
+    expect(sanitizeShownColumns("not an array")).toEqual(DEFAULT_COLUMNS);
+    expect(sanitizeShownColumns(null)).toEqual(DEFAULT_COLUMNS);
   });
 });
 

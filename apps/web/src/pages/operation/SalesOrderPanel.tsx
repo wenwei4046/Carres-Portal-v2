@@ -311,8 +311,8 @@ export default function SalesOrderPanel({
     <aside
       data-testid="sales-order-panel"
       aria-label="Sales Order"
-      /* The parent overlay owns the width (≤40% of the workspace, capped at
-         420px — SO-4); the panel fills whatever it is given. */
+      /* The parent pane owns the width (a FIXED 35% of the workspace — SO-5,
+         no resizing by owner ruling); the panel fills whatever it is given. */
       className="flex h-full w-full flex-col border-l border-kit-slate-5 bg-white"
     >
       {/* ── The header: SO · customer · phone on ONE line · ↑↓ · n of N · ⤢ · ✕ */}
@@ -426,8 +426,10 @@ export default function SalesOrderPanel({
                 loud
                 value={<MoneyFact state={outstandingState(money)} />}
               />
+              {/* SO-5's dictionary: the fact is `Promised Delivery`, never a
+                  bare `Promised` — the word says WHAT was promised. */}
               <StripCell
-                label="Promised"
+                label="Promised Delivery"
                 testId="fact-promised"
                 value={promisedLabel}
                 second={promisedSecond}

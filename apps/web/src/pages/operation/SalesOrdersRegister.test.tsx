@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { operationOrderListRow } from "@/lib/queries";
 import SalesOrdersRegister from "./SalesOrdersRegister";
@@ -84,11 +84,23 @@ vi.mock("./SalesOrderPanel", () => ({
   ),
 }));
 
-function wrap(node: React.ReactNode) {
+/* SO-5 — the view lives on the URL, and MemoryRouter's location is not
+   `window.location`: this probe records what the register wrote so a test can
+   read it. */
+let lastSearch = "";
+function LocationProbe() {
+  lastSearch = useLocation().search;
+  return null;
+}
+
+function wrap(node: React.ReactNode, initialEntries: string[] = ["/"]) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
-    <MemoryRouter>
-      <QueryClientProvider client={qc}>{node}</QueryClientProvider>
+    <MemoryRouter initialEntries={initialEntries}>
+      <QueryClientProvider client={qc}>
+        {node}
+        <LocationProbe />
+      </QueryClientProvider>
     </MemoryRouter>
   );
 }
@@ -206,12 +218,12 @@ describe("THE REGISTER LAW · one row, one order", () => {
     expect(within(table).queryByTestId("order-lines")).toBeNull();
   });
 
-  it("puts a plain string in every cell — no nested markup", () => {
+  it("puts a plain string in every DATA cell — no nested markup", () => {
     render(wrap(<SalesOrdersRegister />));
     const row = rows()[0];
-    for (const td of Array.from(row.querySelectorAll("td"))) {
-      /* Money renders one <span> pair; every other cell is bare text. Nothing
-         anywhere is a card, a table, a chip or a pill. */
+    /* td[0] is the kit's selection gutter and holds its checkbox — SO-5's one
+       lawful control (Export-only). Every DATA cell after it stays a string. */
+    for (const td of Array.from(row.querySelectorAll("td")).slice(1)) {
       expect(td.querySelector("table, ul, ol, button, [data-kit='badge']")).toBeNull();
     }
   });
@@ -224,7 +236,7 @@ describe("THE REGISTER LAW · one row, one order", () => {
     }
   });
 
-  it("shows the card's six default columns, in order", () => {
+  it("shows SO-5's five default columns, in order — Value lives in the chooser", () => {
     render(wrap(<SalesOrdersRegister />));
     const heads = Array.from(
       screen.getByTestId("sales-orders-table").querySelectorAll("thead th"),
@@ -235,8 +247,7 @@ describe("THE REGISTER LAW · one row, one order", () => {
       "SO No",
       "Customer",
       "Items",
-      "Value",
-      "Promised",
+      "Promised Delivery",
       "Ordered",
     ]);
   });
@@ -257,8 +268,9 @@ describe("THE REGISTER LAW · rental is not a customer order here", () => {
   it("does not count rental in the register total", () => {
     render(wrap(<SalesOrdersRegister />));
     /* 4 orders in, 1 rental out, 1 delivered hidden by the default scope —
-       the status bar is SO-4's `Record x of y` over the rows on screen. */
-    expect(screen.getByTestId("register-count")).toHaveTextContent("Record 1 of 2");
+       SO-5's status bar states the register's size, plain while nothing
+       narrows. */
+    expect(screen.getByTestId("register-count")).toHaveTextContent("2 orders");
   });
 });
 
@@ -303,6 +315,9 @@ describe("THE REGISTER LAW · names, never codes", () => {
 describe("THE REGISTER LAW · a blank may never carry two meanings", () => {
   it("prints the amount, Paid in full, or No price yet — never nothing", () => {
     render(wrap(<SalesOrdersRegister />));
+    /* Value is a chooser column since SO-5 — put it on to read the figure. */
+    fireEvent.click(screen.getByTestId("columns-button"));
+    fireEvent.click(screen.getByLabelText("Value"));
     /* Native order: 2×1500 + 2×500 = 4,000 through the shared orderMoney. */
     expect(screen.getByText("4,000")).toBeInTheDocument();
     /* The AutoCount row carries no prices at all. */
@@ -416,7 +431,7 @@ describe("THE HIDDEN FACT COLUMNS", () => {
     }
   });
 
-  it("adds Salesperson and Outlet with real names, and writes nothing to localStorage", () => {
+  it("adds Salesperson and Outlet with real names, and REMEMBERS the choice (SO-5)", () => {
     render(wrap(<SalesOrdersRegister />));
     fireEvent.click(screen.getByTestId("columns-button"));
     fireEvent.click(screen.getByLabelText("Salesperson"));
@@ -424,8 +439,31 @@ describe("THE HIDDEN FACT COLUMNS", () => {
     const table = screen.getByTestId("sales-orders-table");
     expect(within(table).getByText("Shasha")).toBeInTheDocument();
     expect(within(table).getByText("Carres Klang")).toBeInTheDocument();
-    /* Layout memory is REFUSED (ui/MASTER.md §7). */
-    expect(window.localStorage.length).toBe(0);
+    /* SO-5 — auto-remember, NOT a layout manager: the store holds WHICH
+       columns are on and nothing else (no widths, no order, no filters). */
+    expect(
+      JSON.parse(window.localStorage.getItem("carres.salesOrders.columns")!),
+    ).toContain("salesperson");
+  });
+
+  it("a reload keeps the chosen columns — the store round-trips (SO-5)", () => {
+    window.localStorage.setItem(
+      "carres.salesOrders.columns",
+      JSON.stringify(["so", "customer", "items", "promised", "ordered", "phone"]),
+    );
+    render(wrap(<SalesOrdersRegister />));
+    const heads = Array.from(
+      screen.getByTestId("sales-orders-table").querySelectorAll("th[data-column]"),
+    ).map((th) => th.getAttribute("data-column"));
+    expect(heads).toEqual(["so", "customer", "items", "promised", "ordered", "phone"]);
+  });
+
+  it("a corrupt or stale store falls back to the defaults, never a broken grid", () => {
+    window.localStorage.setItem("carres.salesOrders.columns", "not json at all");
+    render(wrap(<SalesOrdersRegister />));
+    expect(
+      screen.getByTestId("sales-orders-table").querySelectorAll("th[data-column]").length,
+    ).toBe(5);
   });
 
   it("says so when a fact was never recorded", () => {
@@ -510,7 +548,7 @@ describe("SO-3 · THE SEVEN GRID CAPABILITIES", () => {
 
   it("gives EVERY visible column a header ▼, and NO permanent filter row exists (SO-4)", () => {
     render(wrap(<SalesOrdersRegister />));
-    for (const key of ["so", "customer", "items", "value", "promised", "ordered"]) {
+    for (const key of ["so", "customer", "items", "promised", "ordered"]) {
       expect(screen.getByTestId(`table-filter-${key}`)).toBeInTheDocument();
     }
     /* The invention SO-4 deletes: not hidden, NOT IN THE DOM. */
@@ -524,19 +562,22 @@ describe("SO-3 · THE SEVEN GRID CAPABILITIES", () => {
     /* No chips row at all until a filter narrows — DOM-absent, not hidden. */
     expect(screen.queryByTestId("register-chips")).toBeNull();
     fireEvent.click(screen.getByTestId("table-filter-customer"));
-    fireEvent.click(screen.getByLabelText("MyHouse Management PLT · 012-345 6789"));
+    fireEvent.click(screen.getByLabelText("MyHouse Management PLT"));
     expect(rows().length).toBe(1);
-    expect(screen.getByTestId("register-count")).toHaveTextContent("Record 1 of 1");
+    /* SO-5's status bar names the narrowing out loud. */
+    expect(screen.getByTestId("register-count")).toHaveTextContent(
+      "1 of 2 · Filters active",
+    );
     expect(screen.getByTestId("register-chips")).toBeInTheDocument();
     expect(screen.getByTestId("chip-customer")).toHaveTextContent(
-      "Customer: MyHouse Management PLT · 012-345 6789",
+      "Customer: MyHouse Management PLT",
     );
   });
 
   it("a chip's ✕ releases its column, and Clear all releases everything", () => {
     render(wrap(<SalesOrdersRegister />));
     fireEvent.click(screen.getByTestId("table-filter-customer"));
-    fireEvent.click(screen.getByLabelText("MyHouse Management PLT · 012-345 6789"));
+    fireEvent.click(screen.getByLabelText("MyHouse Management PLT"));
     expect(rows().length).toBe(1);
     fireEvent.click(screen.getByTestId("chip-customer"));
     expect(rows().length).toBe(2);
@@ -557,6 +598,9 @@ describe("SO-3 · THE SEVEN GRID CAPABILITIES", () => {
 
   it("a money column's ▼ carries min/max, on the RAW figure", () => {
     render(wrap(<SalesOrdersRegister />));
+    /* Value is a chooser column since SO-5 — put it on first. */
+    fireEvent.click(screen.getByTestId("columns-button"));
+    fireEvent.click(screen.getByLabelText("Value"));
     fireEvent.click(screen.getByTestId("table-filter-value"));
     fireEvent.change(screen.getByTestId("table-filter-min-value"), {
       target: { value: "4000" },
@@ -568,6 +612,8 @@ describe("SO-3 · THE SEVEN GRID CAPABILITIES", () => {
   it("the toolbar's Clear filters releases every ▼ at once", () => {
     render(wrap(<SalesOrdersRegister />));
     expect(screen.getByTestId("clear-filters")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("columns-button"));
+    fireEvent.click(screen.getByLabelText("Value"));
     fireEvent.click(screen.getByTestId("table-filter-value"));
     fireEvent.change(screen.getByTestId("table-filter-min-value"), {
       target: { value: "4000" },
@@ -580,7 +626,7 @@ describe("SO-3 · THE SEVEN GRID CAPABILITIES", () => {
 
   it("makes EVERY visible column sortable", () => {
     render(wrap(<SalesOrdersRegister />));
-    for (const key of ["so", "customer", "items", "value", "promised", "ordered"]) {
+    for (const key of ["so", "customer", "items", "promised", "ordered"]) {
       expect(screen.getByTestId(`table-sort-${key}`)).toBeInTheDocument();
     }
   });
@@ -608,7 +654,7 @@ describe("SO-3 · THE SEVEN GRID CAPABILITIES", () => {
 });
 
 describe("SO-3 · THE COLUMN CHOOSER", () => {
-  it("offers every order-owned flat fact, and only six are on", () => {
+  it("offers every order-owned flat fact, and only five are on", () => {
     render(wrap(<SalesOrdersRegister />));
     fireEvent.click(screen.getByTestId("columns-button"));
     for (const label of [
@@ -619,7 +665,7 @@ describe("SO-3 · THE COLUMN CHOOSER", () => {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
     const table = screen.getByTestId("sales-orders-table");
-    expect(table.querySelectorAll("th[data-column]").length).toBe(6);
+    expect(table.querySelectorAll("th[data-column]").length).toBe(5);
   });
 
   it("offers NO cross-module column — the chooser is not a back door", () => {
@@ -638,25 +684,36 @@ describe("SO-3 · THE COLUMN CHOOSER", () => {
       Array.from(
         screen.getByTestId("sales-orders-table").querySelectorAll("th[data-column]"),
       ).map((th) => th.getAttribute("data-column"));
-    expect(heads()).toEqual(["so", "customer", "items", "value", "promised", "ordered", "phone"]);
+    expect(heads()).toEqual(["so", "customer", "items", "promised", "ordered", "phone"]);
   });
 
-  it("Reset columns puts the six back and releases every ▼", () => {
+  it("Reset columns puts the five back, releases every ▼, and resets the store", () => {
     render(wrap(<SalesOrdersRegister />));
     fireEvent.click(screen.getByTestId("columns-button"));
     fireEvent.click(screen.getByLabelText("Phone"));
     fireEvent.click(screen.getByTestId("table-filter-customer"));
-    fireEvent.click(screen.getByLabelText("MyHouse Management PLT · 012-345 6789"));
+    fireEvent.click(screen.getByLabelText("MyHouse Management PLT"));
     expect(rows().length).toBe(1);
     fireEvent.click(screen.getByTestId("columns-button"));
     fireEvent.click(screen.getByTestId("columns-reset"));
     expect(
       screen.getByTestId("sales-orders-table").querySelectorAll("th[data-column]").length,
-    ).toBe(6);
+    ).toBe(5);
     expect(rows().length).toBe(2);
-    /* Layout memory is still REFUSED (ui/MASTER.md §7) — the reset is a
-       control, and a reload is still the other one. */
-    expect(window.localStorage.length).toBe(0);
+    expect(
+      JSON.parse(window.localStorage.getItem("carres.salesOrders.columns")!),
+    ).toEqual(["so", "customer", "items", "promised", "ordered"]);
+  });
+
+  it("the button itself says how much of the catalog is on — 2990's own count", () => {
+    render(wrap(<SalesOrdersRegister />));
+    expect(screen.getByTestId("columns-button")).toHaveTextContent("Columns · 5/34");
+  });
+
+  it("deletes the stale chooser caption — the choice is no longer cleared on reload", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(screen.getByTestId("columns-button"));
+    expect(screen.queryByText(/Cleared on reload/i)).toBeNull();
   });
 });
 
@@ -684,13 +741,16 @@ describe("SO-4 · ONE TOOLBAR ROW, AND WHAT IT REFUSES", () => {
   });
 });
 
-describe("SO-4 · THE PANEL OVERLAYS, AND THE KEYS WORK FROM ANYWHERE", () => {
-  it("wraps the panel in an overlay capped at 40% of the workspace", () => {
+describe("SO-5 · THE DETAIL PANE IS A SIDE PANE, AND THE KEYS WORK FROM ANYWHERE", () => {
+  it("gives the pane a FIXED 35% as a flex sibling — reflow, never an overlay", () => {
     render(wrap(<SalesOrdersRegister />));
     fireEvent.click(rows()[0]);
-    const overlay = screen.getByTestId("panel-stub").parentElement!;
-    expect(overlay.className).toContain("absolute");
-    expect(overlay.className).toContain("w-[min(420px,40%)]");
+    const pane = screen.getByTestId("detail-pane");
+    expect(pane.className).toContain("w-[35%]");
+    expect(pane.className).not.toContain("absolute");
+    /* The register column is the pane's flex SIBLING, so opening the pane
+       reflows the grid instead of covering it. */
+    expect(pane.parentElement).toContainElement(screen.getByTestId("sales-orders-table"));
   });
 
   it("Esc closes the panel from the page, ↑↓ walk the register", () => {
@@ -716,15 +776,14 @@ describe("SO-4 · THE PANEL OVERLAYS, AND THE KEYS WORK FROM ANYWHERE", () => {
   });
 });
 
-describe("SO-4 · THE CUSTOMER CELL AND EXPORT", () => {
-  it("carries the phone in the SAME one-line cell — 28px holds one line (SO-4)", () => {
+describe("SO-5 · THE CUSTOMER CELL, SELECTION AND EXPORT", () => {
+  it("the Customer cell is the NAME ALONE, one line — the phone left the cell (SO-5)", () => {
     render(wrap(<SalesOrdersRegister />));
-    const cell = rows()[0]!.querySelectorAll("td")[1]!;
+    /* td[0] is the selection gutter; td[1] SO No; td[2] Customer. */
+    const cell = rows()[0]!.querySelectorAll("td")[2]!;
     expect(cell).toHaveTextContent("MyHouse Management PLT");
-    expect(cell).toHaveTextContent("012-345 6789");
-    /* SO-3's two-line stack died with the 34px row that held it. */
+    expect(cell).not.toHaveTextContent("012-345 6789");
     expect(cell.querySelector(".flex-col")).toBeNull();
-    /* Still no card, table, chip or control smuggled into a cell. */
     expect(cell.querySelector("table, ul, ol, button, [data-kit='badge']")).toBeNull();
   });
 
@@ -738,8 +797,81 @@ describe("SO-4 · THE CUSTOMER CELL AND EXPORT", () => {
     expect(screen.getByText("Not given")).toBeInTheDocument();
   });
 
-  it("keeps Export, and it writes the columns on screen", () => {
+  it("says WHAT it exports and OF WHAT — format + scope, no bare Export", () => {
     render(wrap(<SalesOrdersRegister />));
     expect(screen.getByTestId("export-button")).toBeEnabled();
+    expect(screen.getByTestId("export-button")).toHaveTextContent(
+      "Export CSV · current view",
+    );
+  });
+
+  it("ticked rows flip the label to the selection — Export CSV · N selected", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(screen.getByLabelText("Select SO-1257"));
+    expect(screen.getByTestId("export-button")).toHaveTextContent(
+      "Export CSV · 1 selected",
+    );
+    fireEvent.click(screen.getByLabelText("Select SO-1101"));
+    expect(screen.getByTestId("export-button")).toHaveTextContent(
+      "Export CSV · 2 selected",
+    );
+    /* Both rows are ticked = ALL are ticked, so one press of select-all
+       CLEARS — and the label speaks for the view again. */
+    fireEvent.click(screen.getByLabelText("Select all sales orders"));
+    expect(screen.getByTestId("export-button")).toHaveTextContent(
+      "Export CSV · current view",
+    );
+  });
+
+  it("a tick a later filter hid does not count — the label never over-claims", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.click(screen.getByLabelText("Select SO-1101"));
+    expect(screen.getByTestId("export-button")).toHaveTextContent("1 selected");
+    fireEvent.change(screen.getByPlaceholderText(/SO number, customer/i), {
+      target: { value: "myhouse" },
+    });
+    /* SO-1101 is filtered out of the view, so nothing is "selected" to export. */
+    expect(screen.getByTestId("export-button")).toHaveTextContent(
+      "Export CSV · current view",
+    );
+  });
+});
+
+describe("SO-5 · THE VIEW LIVES ON THE URL", () => {
+  it("a pasted filter link opens already narrowed", () => {
+    render(
+      wrap(<SalesOrdersRegister />, [
+        `/?f_customer=${encodeURIComponent("v:MyHouse%20Management%20PLT")}`,
+      ]),
+    );
+    expect(rows().length).toBe(1);
+    expect(screen.getByTestId("register-count")).toHaveTextContent(
+      "1 of 2 · Filters active",
+    );
+  });
+
+  it("narrowing writes the URL — the view is shareable", async () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.change(screen.getByPlaceholderText(/SO number, customer/i), {
+      target: { value: "myhouse" },
+    });
+    fireEvent.click(screen.getByTestId("table-filter-customer"));
+    fireEvent.click(screen.getByLabelText("MyHouse Management PLT"));
+    await screen.findByTestId("register-chips");
+    expect(lastSearch).toContain("q=myhouse");
+    expect(lastSearch).toContain("f_customer=");
+  });
+});
+
+describe("SO-5 · NEVER A BLANK TABLE", () => {
+  it("an impossible search says so and hands back Clear filters", () => {
+    render(wrap(<SalesOrdersRegister />));
+    fireEvent.change(screen.getByPlaceholderText(/SO number, customer/i), {
+      target: { value: "zzz-no-such-order-zzz" },
+    });
+    expect(rows().length).toBe(0);
+    expect(screen.getByText("No matching sales orders.")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("empty-clear-filters"));
+    expect(rows().length).toBe(2);
   });
 });

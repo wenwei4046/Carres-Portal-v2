@@ -132,7 +132,7 @@ describe("THE FACTS STRIP — exactly four cells, order facts only", () => {
     expect(within(strip).getByText("Total")).toBeInTheDocument();
     expect(within(strip).getByText("Paid")).toBeInTheDocument();
     expect(within(strip).getByText("Outstanding")).toBeInTheDocument();
-    expect(within(strip).getByText("Promised")).toBeInTheDocument();
+    expect(within(strip).getByText("Promised Delivery")).toBeInTheDocument();
   });
 
   it("computes the money through the ONE shared rule — 4,000 sold, 1,500 in, 2,500 owed", () => {

@@ -917,7 +917,21 @@ export default function DataTable<Row>({
       const cells = Array.from(
         headRow.querySelectorAll<HTMLElement>("th[data-column], th[data-kit='table-gutter']"),
       );
-      const next = cells.map((cell) => cell.offsetLeft);
+      /* SO-5 defect repair — SUM THE WIDTHS, never read `offsetLeft`.
+       * A frozen cell is itself `sticky`: once displaced by a stale threshold,
+       * its `offsetLeft` reports the DISPLACED position, so re-measuring off it
+       * ratchets the pin rightwards and can never converge back. Found the
+       * first time the container SHRANK under a frozen grid (SO-5's reflowing
+       * detail pane) — every earlier freeze lived in a container whose width
+       * never changed. A cell's WIDTH is untouched by sticky displacement, so
+       * the running sum of the widths before it is the true natural left. */
+      const widths = cells.map((cell) => cell.getBoundingClientRect().width);
+      const next: number[] = [];
+      let acc = 0;
+      for (const w of widths) {
+        next.push(acc);
+        acc += w;
+      }
       setFrozenLeft((prev) =>
         prev.length === next.length && prev.every((v, i) => v === next[i]) ? prev : next,
       );

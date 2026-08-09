@@ -10,6 +10,31 @@
 
 ---
 
+# ⭐ THE REGISTER LAW — SO-5 (Loo, 2026-08-09), VERBATIM
+
+> **It applies to every future register: PO / Receiving / Payments / Claims.**
+
+```
+The register never owns workflow.
+A register may: Search · Filter · Sort · Select · Inspect.
+A register never executes business workflow.
+Workflow always belongs to its owning module.
+Bulk selection may only be used for view-oriented actions
+(print / export / copy), never operational workflow.
+```
+
+**And the internal vocabulary is fixed with it (SO-5):** the left grid is the **Register**, the
+right pane is the **Detail Panel**. Users only ever see **"Sales Orders"** — the sidebar door,
+the tab title and the page header all say it, and no user-facing surface says "register".
+
+# ⛔ SALES ORDERS UI IS FROZEN — SO-5 (Loo, 2026-08-09)
+
+**SO-5 passed acceptance and the Sales Orders Blueprint is FROZEN: no UI redesign is accepted;
+bug fixes and minor usability only.** A chat that wants to move a column, a band, a pane or a
+word on this page is asking to reverse an owner ruling and must say so out loud.
+
+---
+
 # §0 · THE MODEL — approved by SO-1, and it is NOT "Customer Order Register"
 
 SO-1 asked whether *Customer Order Register* is the right long-term model. **It is not, and the
@@ -298,6 +323,100 @@ a panel it was written before.
 Columns button; fixing that at 1440 then broke again when the panel opened and took another
 420. The search is now `flex-1` capped at 384 — **it is the control that absorbs the squeeze**,
 because a date field that shrinks stops showing a date. One line at every width.
+
+---
+
+# §1.6 · WHAT SO-4 BUILT — the register runs 2990's grid engine, full-bleed
+
+**Recorded here by SO-5, because SO-4 shipped without writing itself into this file.** The
+register was re-based on 2990's own shipped mechanics
+(`2990s/apps/backend/src/components/DataGrid.tsx`): header ▼ per column (checklist · date
+presets + range · min/max), Gmail-style chips that exist only while a ▼ narrows, `dense` 28px
+rows at fs-12, windowed (virtual) rows, full-bleed (no card, no `PageShell`), and no Refresh —
+the query refetches itself. The permanent filter-input row and the standalone date pickers —
+inventions 2990 never had — were deleted. The Customer cell went back to ONE line, and `paid`
+stopped printing `Paid in full` on an order nobody had paid a sen on (`RM 0` is a figure).
+
+# §1.7 · WHAT SO-5 BUILT — the freeze card, walked clause by clause
+
+**SO-5 is the last UI card. Everything below is the frozen shape** (the freeze notice is at the
+top of this file):
+
+```
+NAMING     the sidebar door says Sales Orders (operation AND principal areas) ·
+           Register / Detail Panel are the internal words, never shown to users
+LAYOUT     the Detail Panel is a SIDE PANE at a FIXED 35% — a flex sibling,
+           never an overlay. Opening it REFLOWS the grid: every column kept,
+           proportionally narrowed (`fill` sizing), SO No + Customer frozen,
+           Items ellipsising. No resizing — deferred by owner ruling.
+           The dead white zone is gone: SO-4's `content` sizing + trailing
+           filler was the dead zone, and `fill` retires it in both pane states.
+REGISTER   five default columns: SO No · Customer · Items · Promised Delivery ·
+           Ordered. Value moved to the chooser, default off. Customer cell is
+           the NAME ONLY, one line; Phone is its own optional column. Selection
+           checkboxes serve Export ONLY (THE REGISTER LAW's clause); the Export
+           button says `Export CSV · current view` / `Export CSV · N selected` —
+           the format joined the card's scope words on Loo's same-day review
+           ("Export 什么？" — 2990's `Export Excel` names its format, ours names
+           CSV; `Export ▾` waits for a real second format). There is NO Actions
+           menu. The Columns button carries 2990's own count — `Columns · 5/34`
+           — same review. Search is fixed at 200px. Filter state (every ▼ + the
+           search + the scope) persists on the URL — a narrowed register is a
+           shareable link. The empty state is `No matching sales orders.` with
+           one `Clear filters` button — never a blank table. The status bar
+           says `{n} orders`, and `{x} of {n} · Filters active` while narrowed.
+COLUMNS    the chooser is remembered per user (localStorage, auto-remember —
+           NOT a layout manager: no widths, no order, no filters in the store),
+           lists EVERY column in four groups (Order · Customer · Money ·
+           Dates), and carries `Reset columns`. The "Extra facts. Cleared on
+           reload." line is deleted — it stopped being true. The menu lives in
+           the register column's toolbar, so it can never overlap the open pane.
+PANEL      header unchanged (SO no · customer · phone, one line); facts strip
+           on top with Outstanding visually dominant over Paid; section order
+           strip → Customer → Items → History. The strip's date fact is
+           `Promised Delivery`, per the dictionary below.
+WORDS      COPY-STANDARD gained the Sales Order date dictionary — Ordered ·
+           Promised Delivery · Original Promised Delivery · Current Promised
+           Delivery · Requested Delivery Date · Delivered · Completed — and the
+           status bar's words were overwritten there (`Record x of y` retired).
+```
+
+**What 2990's own Sales Orders screen has that this register deliberately does NOT copy** (its
+screenshots were supplied during the build, and Loo walked them point by point the same day):
+`New Sales Order`, `Scan Order` and `SO Maintenance` are workflow/configuration doors ON its
+register — THE REGISTER LAW forbids exactly that here, and order creation stays with the
+POS/sales portal. Its KPI strip (Revenue / Outstanding / Paid) is a boss's band, not an
+operator's — *"Operator 第一眼不会想 Revenue，而是今天要处理什么"* — and its breadcrumb
+duplicates a sidebar Carres already has. Its long scrolling New SO form loses to the Detail
+Panel. **What WAS taken:** the Excel-style header ▼ (already in since SO-4), the named export
+format, and the `22/42` columns count.
+
+# §1.8 · THE SALES DOMAIN — Loo's direction, 2026-08-09 (recorded so it does not die in chat)
+
+**Stated on 2990's screenshots during SO-5, and it is DIRECTION for the next IA card, not a
+change to this frozen page:**
+
+```
+Sales Orders is not a PAGE. It is a DOMAIN — 2990/SAP shape:
+
+Sales
+├── Sales Orders      ← the Register (THIS page, frozen)
+├── Delivery
+├── Payments
+├── Returns
+├── Amendments
+└── Settings          ← every configuration fact (venue, dropdowns, country,
+                        building type…) moves HERE. The Register stays clean,
+                        exactly as 2990's `SO Maintenance` is its own door.
+```
+
+- **The Register never grows a Settings section, ever** — configuration is a sibling page of
+  the domain. Purchasing follows the same shape later.
+- **The standing question for every future button on ANY register** (his words): *"这是
+  Register 应该拥有的吗？还是它属于这个 Domain 的其他页面？"*
+- **And the frame he named:** this page is the **Carres Register Blueprint** — Sales Orders ·
+  Purchase Orders · Receiving · Claims · Payments · Deliveries · Inventory will all wear this
+  shape. THE REGISTER LAW at the top of this file is that blueprint's first law.
 
 ---
 

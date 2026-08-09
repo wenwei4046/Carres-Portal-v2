@@ -1141,13 +1141,31 @@ starts clean — `CLAUDE.md` §6 — so this is the state every column will be i
 | Release one column's ▼ | **Clear** | Reset · Remove filter |
 | Release every ▼ from the toolbar | **Clear filters** | Reset all · Remove all |
 | Release every ▼ from the chips row | **Clear all** | — (the chips row's own word; the toolbar's says *filters* because it sits among controls that are not filters) |
-| The status bar under the grid | **`Record {x} of {y}`** | rows · results · items — AutoCount's own word, and `x` is the row the operator is ON |
+| The status bar under the grid | **`{n} orders`** — and **`{x} of {n} · Filters active`** while the search or any ▼ narrows | `Record x of y` (SO-4's word, overwritten by SO-5) · rows · results · items — the bar states the REGISTER's size, and it must say when the list on screen is not the whole register |
 
 **And `RM 0` in the PAID column is a figure, not an absence** (SO-4). The absence table above
 bans `RM 0` as a spelling of *Paid in full* and *No price yet* — both OUTSTANDING states. What
 has been RECEIVED is a different subject: an order nobody has paid a sen on has received
 exactly `RM 0`, and printing `Paid in full` there (as SO-3 briefly did) told the operator the
 opposite of the truth.
+
+### The Sales Order date words (SO-5, Loo 2026-08-09 — the freeze card's dictionary)
+
+**A date on a Sales Order is named by WHAT was promised or done, never by a developer's field
+name.** These seven are the only date words the page may use:
+
+| Concept | Canonical word | Do NOT use |
+|---|---|---|
+| when the order was placed | **`Ordered`** | Created · Placed at · Order date · placed_at |
+| the delivery day the customer holds today | **`Promised Delivery`** | Promised (bare) · ETA · Delivery date · Deadline |
+| the promise as it was FIRST made | **`Original Promised Delivery`** | Original date · First promise — (`Original {date}` above remains the SHORT form where the panel's strip has no room for the full word) |
+| the promise after an approved change | **`Current Promised Delivery`** | New date · Revised date · Amended date |
+| the day the CUSTOMER asked for, not yet promised | **`Requested Delivery Date`** | Requested date · Wish date · Preferred date |
+| the day the goods went out and arrived | **`Delivered`** | Done · Shipped · Fulfilled |
+| the order is finished end to end | **`Completed`** | Closed · Finished · Archived |
+
+**No developer-speak string may appear anywhere on the page** — a column, a chip, a tooltip,
+an empty state and an export header are all "on the page".
 
 ### The Sales Order panel's own words (SO-3, Loo 2026-08-09)
 
