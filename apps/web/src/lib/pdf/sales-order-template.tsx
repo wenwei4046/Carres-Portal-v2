@@ -36,6 +36,8 @@ const INK = "#1A1714";
 const GREY = "#7A7268";
 const LIGHT = "#9A9288";
 const HAIR = "#CFC9C0";
+const BAND_BG = "#ECE8E1"; // category band (2990's grey band, Carres-warm)
+const BAR_BG = INK; // table header bar — white text on ink (2990)
 
 const mm = (v: number) => v * 2.83465;
 
@@ -54,8 +56,8 @@ const LOGO_SRC =
 const LIFT_THREE_STATE_READY = false;
 
 const MARGIN = mm(12);
-const HEADER_H = mm(12);
-const FOOTER_H = mm(11);
+const HEADER_H = mm(15);
+const FOOTER_H = mm(8);
 
 /** `2026-08-09` → `SUN, 9 AUG 26` (textual parse — timezone-proof). */
 function capsDate(iso: string | null | undefined): string | null {
@@ -80,6 +82,13 @@ function niceDate(iso: string | null | undefined, withDow = false): string | nul
     .toLowerCase()
     .replace(/\b([a-z])/g, (c) => c.toUpperCase());
   return withDow ? pretty : pretty.replace(/^[A-Za-z]{3}, /, "");
+}
+
+/** Table cells print DIGITS only — the column header carries `(RM)` once
+ *  (owner round 7: a dozen repeated "RM" was noise; Stripe/IKEA print the
+ *  currency once). The money zone keeps the full `RM x` form. */
+function moneyDigits(value: number): string {
+  return value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /** Customer-facing money: `RM 1,495.00` (MYR prints as RM — the word the
@@ -172,41 +181,45 @@ const styles = StyleSheet.create({
   //    references (Stripe / Shopify invoices) bold the section titles small
   //    and keep grey for genuinely secondary text only. ──
   cards: { flexDirection: "row", marginTop: mm(2), paddingHorizontal: mm(4), minHeight: mm(36) },
-  blockLabel: { fontSize: 7.5, fontWeight: 600, color: INK, letterSpacing: 0.8, textTransform: "uppercase" },
+  blockLabel: { fontSize: 8.5, fontWeight: 700, color: INK, letterSpacing: 0.8, textTransform: "uppercase" },
   partyName: { fontSize: 9.5, fontWeight: 600, marginTop: mm(1) },
   partyLine: { fontSize: 9, marginTop: mm(1) },
-  pairRow: { flexDirection: "row", marginTop: mm(0.8) },
-  pairLabel: { fontSize: 7.5, color: GREY, width: mm(24), textTransform: "uppercase", letterSpacing: 0.5, paddingTop: 1 },
-  pairValue: { fontSize: 9, flex: 1 },
+  pairRow: { flexDirection: "row", marginTop: mm(1.1) },
+  pairLabel: { fontSize: 8.5, color: GREY, width: mm(20) },
+  pairValue: { fontSize: 8.5, flex: 1 },
   deliverBlock: { marginTop: mm(2), paddingHorizontal: mm(4) },
   accessNote: { fontSize: 7.5, color: GREY, marginTop: mm(0.8) },
 
   // ── items table: zero grid lines, hairline rhythm, category bands ──
   tableHead: {
-    borderTopWidth: 0.5,
-    borderTopColor: INK,
-    borderBottomWidth: 0.5,
-    borderBottomColor: INK,
+    backgroundColor: BAR_BG,
     flexDirection: "row",
-    paddingVertical: mm(1.5),
+    paddingVertical: mm(1.8),
+    paddingHorizontal: mm(2),
     marginTop: mm(2.5),
   },
-  th: { fontSize: 7.5, fontWeight: 600, color: INK, letterSpacing: 0.8, textTransform: "uppercase" },
+  th: { fontSize: 7.5, fontWeight: 600, color: "#FFFFFF", letterSpacing: 0.8, textTransform: "uppercase" },
   colNo: { width: mm(7) },
   colCode: { width: mm(29) },
   colQty: { width: mm(11), textAlign: "right" },
   colPrice: { width: mm(22), textAlign: "right" },
   colDisc: { width: mm(19), textAlign: "right" },
   colAmount: { width: mm(23), textAlign: "right" },
-  bandRow: { flexDirection: "row", paddingTop: mm(1.8), paddingBottom: mm(0.5) },
-  bandText: { fontSize: 7.5, fontWeight: 600, color: LIGHT, letterSpacing: 1 },
-  row: { flexDirection: "row", paddingVertical: mm(1.4) },
+  bandRow: {
+    flexDirection: "row",
+    backgroundColor: BAND_BG,
+    paddingVertical: mm(1.2),
+    paddingHorizontal: mm(2),
+    marginTop: mm(1),
+  },
+  bandText: { fontSize: 7.5, fontWeight: 700, color: INK, letterSpacing: 1 },
+  row: { flexDirection: "row", paddingVertical: mm(1.4), paddingHorizontal: mm(2) },
   rowHair: { borderBottomWidth: 0.3, borderBottomColor: HAIR },
   cellNo: { fontSize: 9, color: GREY, width: mm(7) },
   cellCode: { fontSize: 8.5, width: mm(29), paddingRight: mm(2) },
   desc: { flex: 1, paddingRight: mm(3) },
   descMain: { fontSize: 9, fontWeight: 600 },
-  descSub: { fontSize: 8, color: GREY, marginTop: mm(0.8) },
+  descSub: { fontSize: 7.5, color: GREY, marginTop: mm(0.5), paddingLeft: mm(2) },
   cellQty: { fontSize: 9, width: mm(11), textAlign: "right" },
   cellMoney: { fontSize: 9, textAlign: "right" },
   // The line's own amount anchors the row (international convention: the
@@ -217,19 +230,12 @@ const styles = StyleSheet.create({
   voucherLine: { fontSize: 8, color: GREY, marginTop: mm(0.5) },
 
   // ── payments received ──
-  payBox: {
-    borderWidth: 0.6,
-    borderColor: HAIR,
-    paddingHorizontal: mm(3),
-    paddingTop: mm(2),
-    paddingBottom: mm(1),
-  },
   payHead: {
-    borderBottomWidth: 0.5,
-    borderBottomColor: INK,
+    backgroundColor: BAR_BG,
     flexDirection: "row",
-    paddingVertical: mm(1.2),
-    marginTop: mm(1),
+    paddingVertical: mm(1.8),
+    paddingHorizontal: mm(2),
+    marginTop: mm(1.2),
   },
   payColDate: { width: mm(24) },
   payColCode: { width: mm(30) },
@@ -295,7 +301,6 @@ const styles = StyleSheet.create({
   footerCell: { fontSize: 7.5, color: GREY, width: mm(45) },
   footerCenter: { fontSize: 7.5, color: GREY, textAlign: "center", flex: 1 },
   footerPage: { fontSize: 7.5, color: GREY, width: mm(45), textAlign: "right" },
-  footerAddress: { fontSize: 6, color: LIGHT, textAlign: "center", marginTop: mm(1) },
 });
 
 /** The item configuration as ONE muted line — the SAME formula the POS
@@ -453,10 +458,18 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                 <View style={styles.headerRow}>
                   {/* One line: logo · legal name · SSM (owner round 5).
                       No date here — ORDER DETAILS owns `Ordered`. */}
-                  <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "flex-end", paddingBottom: mm(1) }}>
-                    <Image style={styles.logo} src={LOGO_SRC} />
-                    <Text style={[styles.legalLine, { marginTop: 0, marginLeft: mm(3) }]}>
-                      {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
+                  <View>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Image style={styles.logo} src={LOGO_SRC} />
+                      <Text style={[styles.legalLine, { marginTop: 0, marginLeft: mm(3) }]}>
+                        {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
+                      </Text>
+                    </View>
+                    <Text style={[styles.legalLine, { marginTop: mm(1.2) }]}>
+                      {CARRES_COMPANY.addressLines[0]}
+                    </Text>
+                    <Text style={styles.legalLine}>
+                      {CARRES_COMPANY.addressLines[1]} {CARRES_COMPANY.addressLines[2]}
                     </Text>
                   </View>
                   <View style={styles.docBlock}>
@@ -486,56 +499,41 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         <View style={styles.cards}>
           <View style={{ flex: 1, paddingRight: mm(6) }}>
             <Text style={styles.blockLabel}>Bill To</Text>
-            <Text style={styles.partyName}>{customer.name}</Text>
-            <Text style={styles.partyLine}>{customer.address}</Text>
-            {customer.phone ? (
-              <View style={styles.pairRow}>
-                <Text style={styles.pairLabel}>Tel</Text>
-                <Text style={styles.pairValue}>{customer.phone}</Text>
-              </View>
-            ) : null}
-            {customer.email ? (
-              <View style={styles.pairRow}>
-                <Text style={styles.pairLabel}>Email</Text>
-                <Text style={styles.pairValue}>{customer.email}</Text>
-              </View>
-            ) : null}
-            {customer.emergency ? (
-              <View style={styles.pairRow}>
-                <Text style={styles.pairLabel}>Emergency</Text>
-                <Text style={styles.pairValue}>{customer.emergency}</Text>
-              </View>
-            ) : null}
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.blockLabel}>Order Details</Text>
-            <View style={{ marginTop: mm(1) }}>
-              {orderDetailRows.map(([label, value]) =>
+            <View style={{ marginTop: mm(0.5) }}>
+              {([
+                ["Name", customer.name],
+                ["Address", customer.address],
+                ["Tel", customer.phone],
+                ["Email", customer.email],
+                ["Emergency", customer.emergency],
+              ] as Array<[string, string | null | undefined]>).map(([label, value]) =>
                 value ? (
                   <View key={label} style={styles.pairRow}>
-                    <Text style={[styles.pairLabel, { width: mm(28) }]}>{label}</Text>
+                    <Text style={styles.pairLabel}>{label}</Text>
                     <Text style={styles.pairValue}>{value}</Text>
                   </View>
                 ) : null,
               )}
-              {/* Showroom already names the outlet — this row carries only
-                  what is NEW: the salesperson, or the dealer when no outlet. */}
-              {dealer.salesperson_name ? (
-                <View style={styles.pairRow}>
-                  <Text style={[styles.pairLabel, { width: mm(28) }]}>Salesperson</Text>
-                  <Text style={styles.pairValue}>{dealer.salesperson_name}</Text>
-                </View>
-              ) : null}
-              {!outletName ? (
-                <View style={styles.pairRow}>
-                  <Text style={[styles.pairLabel, { width: mm(28) }]}>Sold by</Text>
-                  <Text style={styles.pairValue}>{sellerName}</Text>
-                </View>
-              ) : null}
-              <View style={styles.pairRow}>
-                <Text style={[styles.pairLabel, { width: mm(28) }]}>Access</Text>
-                <Text style={styles.pairValue}>{accessText}</Text>
-              </View>
+            </View>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.blockLabel}>Order Details</Text>
+            <View style={{ marginTop: mm(0.5) }}>
+              {[
+                ...orderDetailRows,
+                /* Showroom already names the outlet — this row carries only
+                   what is NEW: the salesperson, or the dealer when no outlet. */
+                ["Salesperson", dealer.salesperson_name] as [string, string | null],
+                ["Sold by", outletName ? null : sellerName] as [string, string | null],
+                ["Access", accessText] as [string, string | null],
+              ].map(([label, value]) =>
+                value ? (
+                  <View key={label} style={styles.pairRow}>
+                    <Text style={[styles.pairLabel, { width: mm(26) }]}>{label}</Text>
+                    <Text style={styles.pairValue}>:  {value}</Text>
+                  </View>
+                ) : null,
+              )}
               {stairCarry ? (
                 <Text style={styles.accessNote}>Stair-carry charge applies — see Terms & Conditions.</Text>
               ) : null}
@@ -556,21 +554,28 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           </View>
         ) : null}
 
-        {/* ── items table — banded, zero grid lines, hairline rhythm ── */}
+        {/* ── items table — banded, ink header bar, hairline rhythm.
+            DEFERRED (cut 5, owner round 7): repeating the header bar on
+            overflow pages needs the long-order stress pass — production's
+            biggest order is 4 lines today, and @react-pdf's `fixed` would
+            also stamp the bar on a money-zone-only last page. Do it with
+            the 50-line stress test, not blind. ── */}
         <View style={styles.tableHead} minPresenceAhead={40}>
           <Text style={[styles.th, styles.colNo]}>#</Text>
           <Text style={[styles.th, styles.colCode]}>Item Code</Text>
           <Text style={[styles.th, { flex: 1 }]}>Description</Text>
           <Text style={[styles.th, styles.colQty]}>Qty</Text>
-          <Text style={[styles.th, styles.colPrice]}>Unit Price</Text>
-          <Text style={[styles.th, styles.colDisc]}>Discount</Text>
-          <Text style={[styles.th, styles.colAmount]}>Amount</Text>
+          <Text style={[styles.th, styles.colPrice]}>Unit Price (RM)</Text>
+          <Text style={[styles.th, styles.colDisc]}>Discount (RM)</Text>
+          <Text style={[styles.th, styles.colAmount]}>Amount (RM)</Text>
         </View>
         {groups.map((group, gi) => (
           <View key={`band-${gi}`}>
             {group.band ? (
               <View style={styles.bandRow} minPresenceAhead={30}>
-                <Text style={styles.bandText}>{group.band}</Text>
+                <Text style={styles.bandText}>
+                  {group.band} · {group.rows.length} {group.rows.length > 1 ? "items" : "item"}
+                </Text>
               </View>
             ) : null}
             {group.rows.map(({ line, index }) => {
@@ -604,12 +609,14 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                       </Text>
                     ))}
                   </View>
-                  <Text style={styles.cellQty}>{line.qty}</Text>
-                  <Text style={[styles.cellMoney, styles.colPrice]}>{money(line.unit_price)}</Text>
-                  <Text style={[styles.cellMoney, styles.colDisc]}>
-                    {line.discount && line.discount > 0 ? money(line.discount) : dash}
+                  <Text style={[styles.cellQty, line.qty > 1 ? { fontWeight: 700 } : null]}>
+                    {line.qty}
                   </Text>
-                  <Text style={[styles.cellAmount, styles.colAmount]}>{money(line.line_total)}</Text>
+                  <Text style={[styles.cellMoney, styles.colPrice]}>{moneyDigits(line.unit_price)}</Text>
+                  <Text style={[styles.cellMoney, styles.colDisc]}>
+                    {line.discount && line.discount > 0 ? moneyDigits(line.discount) : dash}
+                  </Text>
+                  <Text style={[styles.cellAmount, styles.colAmount]}>{moneyDigits(line.line_total)}</Text>
                 </View>
               );
             })}
@@ -617,7 +624,9 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         ))}
         {hasAddons ? (
           <View style={styles.bandRow} minPresenceAhead={30}>
-            <Text style={styles.bandText}>SERVICE</Text>
+            <Text style={styles.bandText}>
+              SERVICE · {addons.length} {addons.length > 1 ? "items" : "item"}
+            </Text>
           </View>
         ) : null}
         {addons.map((a, idx) => {
@@ -631,10 +640,10 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                 <Text style={styles.descMain}>{a.label}</Text>
                 {addonSub ? <Text style={styles.descSub}>{addonSub}</Text> : null}
               </View>
-              <Text style={styles.cellQty}>{a.qty}</Text>
-              <Text style={[styles.cellMoney, styles.colPrice]}>{money(a.unit_price)}</Text>
+              <Text style={[styles.cellQty, a.qty > 1 ? { fontWeight: 700 } : null]}>{a.qty}</Text>
+              <Text style={[styles.cellMoney, styles.colPrice]}>{moneyDigits(a.unit_price)}</Text>
               <Text style={[styles.cellMoney, styles.colDisc]}>{dash}</Text>
-              <Text style={[styles.cellAmount, styles.colAmount]}>{money(a.line_total)}</Text>
+              <Text style={[styles.cellAmount, styles.colAmount]}>{moneyDigits(a.line_total)}</Text>
             </View>
           );
         })}
@@ -658,14 +667,16 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             (pre-printed-form geometry). ── */}
         <View wrap={false} style={{ marginTop: "auto" }}>
         {payments.length > 0 ? (
-          <View style={[styles.payBox, { marginHorizontal: mm(4), marginTop: mm(5) }]}>
-            <Text style={styles.blockLabel}>Payments Received</Text>
+          <View style={{ marginTop: mm(5) }}>
+            <View style={{ paddingHorizontal: mm(2) }}>
+              <Text style={styles.blockLabel}>Payments Received</Text>
+            </View>
             <View style={styles.payHead}>
               <Text style={[styles.th, styles.payColDate]}>Date</Text>
               <Text style={[styles.th, { flex: 1 }]}>Method</Text>
               <Text style={[styles.th, styles.payColCode]}>Approval Code</Text>
               <Text style={[styles.th, styles.payColBy]}>Collected By</Text>
-              <Text style={[styles.th, styles.payColAmount]}>Amount</Text>
+              <Text style={[styles.th, styles.payColAmount]}>Amount (RM)</Text>
             </View>
             {payments.map((p, i) => (
               <View key={i} style={i === payments.length - 1 ? styles.row : [styles.row, styles.rowHair]}>
@@ -673,7 +684,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                 <Text style={[styles.payCell, { flex: 1 }]}>{p.label}</Text>
                 <Text style={[styles.payCell, styles.payColCode]}>{p.approval_code ?? p.reference ?? dash}</Text>
                 <Text style={[styles.payCell, styles.payColBy]}>{p.collected_by ?? dash}</Text>
-                <Text style={[styles.payCell, styles.payColAmount, { textAlign: "right", fontWeight: 600 }]}>{money(p.amount)}</Text>
+                <Text style={[styles.payCell, styles.payColAmount, { textAlign: "right", fontWeight: 600 }]}>{moneyDigits(p.amount)}</Text>
               </View>
             ))}
           </View>
@@ -749,9 +760,6 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
               render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
             />
           </View>
-          <Text style={styles.footerAddress}>
-            {CARRES_COMPANY.legalName} · {CARRES_COMPANY.addressLines.join(" ")}
-          </Text>
         </View>
       </Page>
     </Document>

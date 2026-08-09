@@ -75,9 +75,9 @@ const data = {
     {
       sku: "B1201F-K",
       description: "Forte Mattress — King",
-      qty: 1,
+      qty: 2,
       unit_price: 2890,
-      line_total: 2890,
+      line_total: 5780,
       attrs: { remark: "Deliver together with sofa" },
       category: "MATTRESS",
       discount: null,
@@ -124,10 +124,10 @@ const data = {
     },
   ],
 
-  subtotal: 6030,
-  total: 6030,
+  subtotal: 8920,
+  total: 8920,
   paid: 3740,
-  balance_due: 2290,
+  balance_due: 5180,
   currency: "MYR",
   expected_deposit: 3240,
 
