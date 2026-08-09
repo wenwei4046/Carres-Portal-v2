@@ -32,11 +32,19 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
 
 - **Money is ABSENT, structurally.** The payload (0307) carries no RM figure;
   the template cannot print one. The source-scan test enforces it.
-- **PO DETAILS**: `PO No · Delivery by (bold value — the supplier's 3-second
-  fact) · Issued · SO No`. Number labels say WHICH number.
-- **DELIVER TO**: one PO = ONE destination — a line needing another address is
-  another PO. Nice Future prints its fixed collection sentence via
-  `delivery_instructions`.
+- **PO DETAILS**: `PO No · Deliver by (bold value — the supplier's 3-second
+  fact; imperative, the reader IS the supplier — lineage: "Required
+  Delivery" rejected 2026-08-01, "Supplier Delivery By" frozen, "Supplier"
+  dropped on paper 2026-08-09) · Issued`. **No SO No row** — a bulk PO can
+  carry dozens; the table's SO NO column is the one home. Screens speak the
+  Business Date Dictionary (`Goods Arrival`); this paper speaks to the
+  supplier.
+- **Section 2 is THREE columns** — `SUPPLIER (45mm) · DELIVER TO (flex) ·
+  PO DETAILS (58mm)`: who supplies · where it goes · when it's due, the
+  supplier's 3-second sweep in one row (restores the old law's
+  deliver-to-at-section-2). One PO = ONE destination — a line needing
+  another address is another PO. Nice Future prints its fixed collection
+  sentence via `delivery_instructions`.
 - **Items table**: `# · SO NO · ITEM ID · DESCRIPTION · QTY`.
   - **Item ID = `ops_stock_items.unit_code` (0153)** — minted at PO-open, one
     scannable id per physical unit. The column the 2026-08-01 law reserved is
@@ -81,4 +89,6 @@ itself never revises (a sent PO is never edited; more items = a new PO).
 | Date | Change | Approved |
 |---|---|---|
 | 2026-08-01/02 | Original baseline: header shape, naming, frameless cards, zero-grid table, Item Grammar, sofa one-set-per-page + drawing, quiet footer, no money, no signatures. (Visual spec since superseded; see below.) | Loo |
+| 2026-08-09 | PO DETAILS: SO No row removed (the table owns it); `Delivery by` → `Deliver by`. | Loo |
+| 2026-08-09 | Section 2 = three columns (SUPPLIER · DELIVER TO · PO DETAILS) — deliver-to returns to section 2. | Loo |
 | 2026-08-09 | FAMILY REWRITE: chrome deferred to SO-PDF-STANDARD (§2.1/§8.5); logo-stamp header, 35mm label gutter, caps header dates and the zero-fill table DELETED per the Master Overwrite Law; `Sales Order` column → `SO No`; `TOTAL QUANTITY` → family `TOTAL` row; Item ID column goes LIVE with 0153 unit codes; `Delivery by` bold in PO DETAILS; footer keeps the Issued-by audit. Business rules (no money, consolidation, one destination, sofa drawing) unchanged. | Loo |

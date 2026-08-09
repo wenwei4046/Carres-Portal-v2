@@ -29,7 +29,7 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
 
   it("carries the Law's fixed strings", () => {
     for (const s of [
-      "Delivery by",
+      "Deliver by",
       "PURCHASE ORDER",
       "Computer-generated document · No signature required.",
       "SO No",
