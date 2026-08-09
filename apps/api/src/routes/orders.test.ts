@@ -815,7 +815,8 @@ describe("GET /api/orders/:id/sales-order-data", () => {
     expect(res.headers.get("content-type")).toMatch(/application\/json/);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
-    expect(body.so_number).toBe("SO-001001");
+    // Golden SO (STAGE 2): SO-1001 everywhere — no zero-padding, no second format.
+    expect(body.so_number).toBe("SO-1001");
     expect(body.order_code).toBe("SO-1001");
     expect(body.customer.name).toBe("Tan Mei Ling");
     expect(body.lines).toHaveLength(1);
@@ -1008,7 +1009,11 @@ describe("GET /api/orders/:id/sales-order-data", () => {
         one: makeJoinedRow({ paid: "750", payment_method: "credit", approval_code: "123123" }),
       }),
     );
-    expect(body.payments).toEqual([{ label: "Card", reference: "123123", amount: 750 }]);
+    expect(body.payments).toEqual([
+      // Golden SO (STAGE 2): the synthesized row carries the order date; the
+      // collector is the salesperson when the embed is present (absent here).
+      { label: "Card", reference: "123123", amount: 750, date: "2026-05-12", collected_by: null },
+    ]);
   });
 
   it("returns no payments rows for an unpaid order", async () => {
@@ -1043,8 +1048,10 @@ describe("GET /api/orders/:id/sales-order-data", () => {
       }),
     );
     expect(body.payments).toEqual([
-      { label: "Deposit · Bank transfer", reference: "R-1", amount: 500 },
-      { label: "Cash", reference: "RC-9", amount: 250 },
+      // Golden SO (STAGE 2): each ledger row carries its own date; the
+      // collector resolves from app_users (unreadable in this mock → null).
+      { label: "Deposit · Bank transfer", reference: "R-1", amount: 500, date: "2026-07-01", collected_by: null },
+      { label: "Cash", reference: "RC-9", amount: 250, date: "2026-07-08", collected_by: null },
     ]);
   });
 

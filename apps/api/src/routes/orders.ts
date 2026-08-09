@@ -65,11 +65,21 @@ import type { AppEnv } from "../types";
 type SalesOrderData = {
   so_number: string;
   issue_date: string;
+  /** Golden SO (STAGE 2) — raw ISO stamps for ORDER DETAILS; the template
+   *  formats them. */
+  ordered_date: string | null;
+  proceed_date: string | null;
   order_id: string;
   order_code: string;
   status_label: string;
   channel: "dealer" | "showroom";
-  customer: { name: string; address: string; phone: string | null };
+  customer: {
+    name: string;
+    address: string;
+    phone: string | null;
+    email: string | null;
+    emergency: string | null;
+  };
   dealer: {
     name: string;
     contact: string | null;
@@ -93,6 +103,9 @@ type SalesOrderData = {
     unit_price: number;
     line_total: number;
     attrs: Record<string, unknown> | null;
+    /** Golden SO — the category band this line sits under (catalog word,
+     *  e.g. "mattress" / "sofa"); null → the template's "ITEMS" band. */
+    category: string | null;
   }>;
   addons: Array<{
     label: string;
@@ -107,7 +120,14 @@ type SalesOrderData = {
    *  callers see the order_payments ledger; dealers (ledger is internal-only
    *  RLS) + ledger-less orders fall back to ONE row synthesized from
    *  orders.paid + payment_method + approval_code. Empty when nothing paid. */
-  payments: Array<{ label: string; reference: string | null; amount: number }>;
+  payments: Array<{
+    label: string;
+    reference: string | null;
+    amount: number;
+    /** Golden SO — ledger date + collector name for the payments table. */
+    date: string | null;
+    collected_by: string | null;
+  }>;
   /** PWP/promo voucher codes EARNED on this order (pwp_codes carry-forward,
    *  source_order_id = this order) — printed under their trigger line like the
    *  2990s SO ("PWP voucher issued: … · not redeemed yet"). RLS-scoped read;
@@ -3906,6 +3926,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     .from("orders")
     .select(
       "id, so, status, channel, customer_name, customer_phone, customer_address, " +
+        "customer_email, customer_emergency, proceed_date, " +
         "delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift, " +
         "paid, payment_method, approval_code, signature_url, placed_at, " +
         "order_lines(sku, qty, unit_price, attrs), " +
@@ -3948,12 +3969,16 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   // Bare model identity per sku — the sofa-build regroup rows print the MODEL
   // (name + model_key), not the compartment sku's composed description.
   const modelBySku = new Map<string, { name: string; modelKey: string | null }>();
+  // Golden SO (STAGE 2) — the items table groups under CATEGORY BANDS
+  // (SOFA · MATTRESS · SERVICE …); the band word is the catalog's own
+  // product_models.category. Unknown sku → null → the template's "ITEMS" band.
+  const categoryBySku = new Map<string, string>();
   try {
     const skuList = [...new Set(lines.map((l) => String(l.sku)))];
     if (skuList.length > 0) {
       const { data: skuRows } = await sb
         .from("product_skus")
-        .select("sku, variant, product_models(name, model_key)")
+        .select("sku, variant, product_models(name, model_key, category)")
         .in("sku", skuList);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const r of (skuRows ?? []) as any[]) {
@@ -3971,6 +3996,9 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
             ? r.product_models.model_key.trim()
             : null;
         modelBySku.set(String(r.sku), { name: modelName, modelKey });
+        if (typeof r.product_models?.category === "string" && r.product_models.category.trim().length > 0) {
+          categoryBySku.set(String(r.sku), r.product_models.category.trim());
+        }
       }
     }
   } catch {
@@ -4035,6 +4063,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
         unit_price: unitPrice,
         line_total: qty * unitPrice,
         attrs: l.attrs ?? null,
+        category: categoryBySku.get(String(l.sku)) ?? null,
       };
     }
     const first = u.group[0]!;
@@ -4057,6 +4086,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
         // "Promo · FREE" / "PWP price" on a sofa-as-reward build.
         ...(pwp && typeof pwp === "object" ? { pwp } : {}),
       },
+      category: categoryBySku.get(String(first.sku)) ?? "sofa",
     };
   });
   const addonRows = addons.map((a) => {
@@ -4085,9 +4115,23 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   try {
     const { data: payRows } = await sb
       .from("order_payments")
-      .select("amount, paid_on, method, kind, reference, receipt_no")
+      .select("amount, paid_on, method, kind, reference, receipt_no, recorded_by")
       .eq("order_id", id)
       .order("paid_on", { ascending: true });
+    // Golden SO (STAGE 2) — COLLECTED BY prints the recorder's name. Resolved
+    // fail-soft from app_users; an unreadable/missing row prints "—".
+    const collectorById = new Map<string, string>();
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ids = [...new Set(((payRows ?? []) as any[]).map((p) => p.recorded_by).filter(Boolean))];
+      if (ids.length > 0) {
+        const { data: users } = await sb.from("app_users").select("id, name").in("id", ids);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const u of (users ?? []) as any[]) collectorById.set(String(u.id), String(u.name));
+      }
+    } catch {
+      /* names stay unresolved */
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     payments = ((payRows ?? []) as any[]).map((p) => {
       const method = paymentMethodLabel(p.method == null ? null : String(p.method));
@@ -4096,6 +4140,8 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
         label: kind ? `${kind} · ${method}` : method,
         reference: (p.reference ?? p.receipt_no ?? null) as string | null,
         amount: Number(p.amount ?? 0),
+        date: p.paid_on == null ? null : String(p.paid_on),
+        collected_by: p.recorded_by ? (collectorById.get(String(p.recorded_by)) ?? null) : null,
       };
     });
   } catch {
@@ -4107,6 +4153,8 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
         label: paymentMethodLabel(o.payment_method == null ? null : String(o.payment_method)),
         reference: o.approval_code == null ? null : String(o.approval_code),
         amount: paid,
+        date: (o.placed_at as string | null)?.slice(0, 10) ?? null,
+        collected_by: o.salespersons?.name ?? null,
       },
     ];
   }
@@ -4132,8 +4180,9 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     /* vouchers stay [] */
   }
 
-  // proto `soNumber` → "SO-001001" (6-digit zero-padded so).
-  const so_number = `SO-${String(o.so).padStart(6, "0")}`;
+  // Golden SO (STAGE 2, BUILD-QUEUE): the canonical format is `SO-1256` —
+  // NO zero-padding, no second format, header · ORDER DETAILS · footer alike.
+  const so_number = `SO-${o.so}`;
   const issue_date = (o.placed_at as string | null)?.slice(0, 10) ?? "—";
   const statusLabel =
     o.status === "place"
@@ -4157,6 +4206,8 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   const payload: SalesOrderData = {
     so_number,
     issue_date,
+    ordered_date: (o.placed_at as string | null) ?? null,
+    proceed_date: o.proceed_date ?? null,
     order_id: id,
     order_code: `SO-${o.so}`,
     status_label: statusLabel,
@@ -4165,6 +4216,8 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
       name: String(o.customer_name ?? "—"),
       address: String(o.customer_address ?? "—"),
       phone: o.customer_phone ?? null,
+      email: o.customer_email ?? null,
+      emergency: o.customer_emergency ?? null,
     },
     dealer: {
       name: String(o.dealers?.name ?? "Carres"),
