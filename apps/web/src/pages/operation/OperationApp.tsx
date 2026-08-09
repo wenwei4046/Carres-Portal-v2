@@ -17,6 +17,25 @@ import OperationDashboard from "./OperationDashboard";
 // table (merges the old kanban + Inbox + All-orders). The legacy kanban
 // `OperationOrders` is retained as a file (+ its test) but no longer routed.
 import OperationOrdersControl from "./OperationOrdersControl";
+// ⭐ STAGE 1 (BUILD-QUEUE, 2026-08-09) — the Sales Orders register.
+//
+// `/operation/orders` mounts ONE page and the constant below says which — the
+// swap is ONE identifier, exactly as the card demands.
+//
+//   RESTORE THE OLD REGISTER = change ONE line:
+//       const OrdersPage: typeof OperationOrdersControl = OperationOrdersControl;
+//
+// `OperationOrdersControl` is not deleted, not renamed and not edited by this
+// card. It stays compiled — `OperationDelivery` imports its ladder.
+//
+// The route still passes `onImport`. The register IGNORES it (a register has
+// no actions); the prop stays on the route because the OLD page needs it the
+// moment the line above is reverted. The `typeof` annotation is what makes
+// "restorable in one minute" a fact the COMPILER keeps true: the day the
+// register's props stop matching the old page's, this line fails to build.
+import SalesOrdersRegister from "./SalesOrdersRegister";
+import SalesOrderWorkspace from "./SalesOrderWorkspace";
+const OrdersPage: typeof OperationOrdersControl = SalesOrdersRegister;
 // T11 (2026-07-27) — the Delivery module: the ONE new sidebar item in the
 // build plan. Tab-state driven like Payments / Stock (only orders and
 // procurement are path-driven), so `?tab=delivery` deep-links it.
@@ -290,19 +309,16 @@ export default function OperationApp() {
             />
             <Route
               path="orders"
-              element={
-                <OperationOrdersControl
-                  onImport={() => changeTab("ops-import")}
-                />
-              }
+              element={<OrdersPage onImport={() => changeTab("ops-import")} />}
             />
+            {/* STAGE 1 — the workspace VIEW route the register's rows open.
+                Declared before `orders/:stage` in source for the reader;
+                React Router ranks it higher anyway (static `so` segment
+                beats the `:stage` param). */}
+            <Route path="orders/so/:orderId" element={<SalesOrderWorkspace />} />
             <Route
               path="orders/:stage"
-              element={
-                <OperationOrdersControl
-                  onImport={() => changeTab("ops-import")}
-                />
-              }
+              element={<OrdersPage onImport={() => changeTab("ops-import")} />}
             />
           </Routes>
         ) : (
@@ -387,7 +403,14 @@ export default function OperationApp() {
         )}
         </div>
       </main>
-      <OperationRightRail />
+      {/* ⭐ SO-1 FINAL (Loo, 2026-08-09) — the execution rail is NOT MOUNTED on
+          the Sales Orders route, and it is a PRODUCT rule rather than a space
+          preference: *"Team / Calendar / Activity / Calls belong to other
+          modules."* Not `hidden`, not collapsed — absent. A rail that is
+          merely hidden is still mounted, still fetching, and still one prop
+          away from coming back; `ERP-ARCHITECTURE.md` §0's second lesson is
+          exactly this drift. Every other operation screen keeps it. */}
+      {!isOrdersUrl && <OperationRightRail />}
     </div>
   );
 }

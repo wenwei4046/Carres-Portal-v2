@@ -2805,6 +2805,13 @@ export interface operationOrderListRow {
     qty: number;
     unit_price?: number | string | null;
     source_po?: string | null;
+    /** STAGE 1 — `Model · Variant`, resolved server-side by the SAME helper
+     *  the detail route uses (Law D), so a product is never named two ways.
+     *  `null` = not in the catalog (every AutoCount-imported line, whose
+     *  "sku" is free text); the caller then shows that text. Optional: a
+     *  browser on this build against an older Worker reads it as absent and
+     *  falls back the same way. */
+    label?: string | null;
   }[];
   /** C5 (2026-07-27) — the money truth. `orders.paid` is the only figure a
    *  live payment path writes; with the add-on sum below and the line prices
@@ -2847,6 +2854,36 @@ export interface operationOrderListRow {
   outlet_id: string | null;
   dealer_id: string;
   dealers: { name: string } | null;
+  /** STAGE 1 — the register's Salesperson / Showroom fact columns. Both are
+   *  name embeds off a single FK. Optional: absent on an older Worker. */
+  salesperson_id?: string | null;
+  salespersons?: { name: string } | null;
+  outlets?: { name: string } | null;
+  /**
+   * STAGE 1 — the rest of the flat facts the CUSTOMER ORDER itself owns, so
+   * the register's grouped column chooser can offer every one of them
+   * (hidden by default). **Every field here is a column on `orders`** (or,
+   * for `building_type`, a value the Sales Portal wrote into the order's own
+   * `entry_data`) — nothing is another module's record, nothing is computed.
+   * All optional: on an older Worker they read as absent, the column prints
+   * its absence word, and nothing crashes.
+   */
+  customer_email?: string | null;
+  customer_billing?: string | null;
+  customer_emergency?: string | null;
+  customer_address_line1?: string | null;
+  customer_address_line2?: string | null;
+  customer_address_city?: string | null;
+  customer_address_state?: string | null;
+  customer_address_postcode?: string | null;
+  building_type?: string | null;
+  delivery_floor?: number | null;
+  delivery_has_lift?: boolean | null;
+  channel?: string | null;
+  invoice_no?: string | null;
+  invoiced_at?: string | null;
+  payment_method?: string | null;
+  installment_months?: number | null;
   /** Phase 4.5 Chunk 2 (T9) embedded customer-leg LP per thread. PostgREST
    *  nested fetches always return an array shape — never `null` — so this
    *  field is non-nullable. An empty array means no threads have been spawned
@@ -3015,6 +3052,11 @@ export interface operationOrderDetailOrder {
   paid: number;
   dealers: { name: string } | null;
   outlets: { name: string } | null;
+  /** STAGE 1 — who sold it. The Sales Order workspace names the salesperson on
+   *  the customer commitment. Optional so existing detail fixtures keep
+   *  typechecking. */
+  salesperson_id?: string | null;
+  salespersons?: { name: string } | null;
 }
 export interface operationOrderDetailLine {
   sku: string;
