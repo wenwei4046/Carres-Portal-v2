@@ -165,13 +165,13 @@ const styles = StyleSheet.create({
 
   // ── header (fixed, every page): wordmark + legal identity · doc hero ──
   header: { position: "absolute", top: MARGIN, left: MARGIN, right: MARGIN },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
   logo: { height: mm(6), width: mm(25.3) },
-  legalLine: { fontSize: 6.5, color: GREY, marginTop: mm(0.5) },
+  legalLine: { fontSize: 6.5, color: GREY, marginTop: mm(0.5), lineHeight: 1 },
   legalFirst: { marginTop: mm(1.5) },
   docBlock: { alignItems: "flex-end", alignSelf: "flex-end" },
   docTitle: { fontSize: 10, color: GREY, letterSpacing: 1.5 },
-  docNumber: { fontSize: 18, fontWeight: 700, marginTop: 2 },
+  docNumber: { fontSize: 18, fontWeight: 700, marginTop: 2, lineHeight: 1 },
   docDate: { fontSize: 7, fontWeight: 700, letterSpacing: 0.8, marginTop: mm(1.2) },
   headerRule: { borderBottomWidth: 0.8, borderBottomColor: INK, marginTop: mm(1.5) },
 
@@ -664,12 +664,9 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         <View wrap={false} style={{ marginTop: "auto" }}>
         {payments.length > 0 ? (
           <View style={{ marginTop: mm(5) }}>
-            <View style={{ paddingHorizontal: mm(2) }}>
-              <Text style={styles.blockLabel}>Payments Received</Text>
-            </View>
             <View style={styles.payHead}>
               <Text style={[styles.th, styles.payColDate]}>Date</Text>
-              <Text style={[styles.th, { flex: 1 }]}>Method</Text>
+              <Text style={[styles.th, { flex: 1 }]}>Payment Received</Text>
               <Text style={[styles.th, styles.payColCode]}>Approval Code</Text>
               <Text style={[styles.th, styles.payColBy]}>Collected By</Text>
               <Text style={[styles.th, styles.payColAmount]}>Amount (RM)</Text>
