@@ -297,7 +297,12 @@ Never create an empty master for symmetry.
 - **One question at a time.** Wait for the answer before asking the next.
 - **Options with a named recommendation, never a bare menu**, and never the same question twice.
 - **Cite how mature products solve it**, then land the conclusion in Carres reality.
-- **A screenshot means: list every problem top to bottom**, marked 🔴 / 🟡, without being asked.
+- **⭐ EVERY REVIEW IS TOP-TO-TOE, CRITICAL, AND CARRIES ITS FIX — ALWAYS, WITHOUT BEING ASKED**
+  (Loo, 2026-08-08). A screenshot, a page, a plan, a card, another chat's report, your OWN
+  work: go top to bottom, mark every problem 🔴 / 🟡, and **no problem is written without its
+  concrete fix.** *"Looks good"* is not a review. **Agreeing with everything is the tell that
+  nothing was read** — Law 4 already requires the challenge; this rule says it is not optional
+  and it is not on request.
 - **She agrees, then you build.** A settled decision is not reopened unless she reopens it.
 - **Count before you propose UI.** Measure fill rates with SQL; empty fields do not reach the
   screen.
