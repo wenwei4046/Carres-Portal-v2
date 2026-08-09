@@ -438,7 +438,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
   // Sales Location (2990's word; was Showroom) · Proceed date · Delivery
   // date · Salesperson · Access.
   const orderDetailRows: Array<[string, string | null]> = [
-    ["Doc No", so_number],
+    ["SO No", so_number],
     ["Ordered", niceDate(issue_date, true)],
     ["Sales Location", outletName],
     ["Proceed date", proceed_date ? niceDate(proceed_date, true) : null],

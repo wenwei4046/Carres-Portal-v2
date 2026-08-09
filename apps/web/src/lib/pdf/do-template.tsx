@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
   colNo: { width: mm(7) },
   colCode: { width: mm(30) },
   colPo: { width: mm(24) },
-  colQty: { width: mm(14), textAlign: "right" },
+  colQty: { width: mm(18), textAlign: "right", paddingRight: mm(5) },
   bandRow: {
     flexDirection: "row",
     backgroundColor: BAND_BG,
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   desc: { flex: 1, paddingRight: mm(3) },
   descMain: { fontSize: 7.5, fontWeight: 600, lineHeight: 1 },
   cellPo: { fontSize: 7, color: GREY, width: mm(24), lineHeight: 1.3 },
-  cellQty: { fontSize: 7, width: mm(14), textAlign: "right", lineHeight: 1 },
+  cellQty: { fontSize: 7, width: mm(18), textAlign: "right", paddingRight: mm(5), lineHeight: 1 },
 
   // ── sofa layout drawing (ported from po-template — direction contract) ──
   layout: { marginTop: mm(4), paddingHorizontal: mm(4) },
@@ -207,7 +207,7 @@ function bandedLines(lines: DoLine[]): Array<{ band: string | null; rows: Array<
 }
 
 export function DoTemplate(data: DoTemplateData) {
-  const { do_number, issue_date, order_code, customer, partner, lines, delivery_date, delivery, pod } = data;
+  const { do_number, order_code, customer, partner, lines, delivery_date, delivery, pod } = data;
 
   const deliveryAddress =
     delivery?.address && delivery.address.trim().length > 0 ? delivery.address.trim() : customer.address;
@@ -216,10 +216,12 @@ export function DoTemplate(data: DoTemplateData) {
     delivery == null || delivery.has_lift == null ? null : delivery.has_lift ? "Lift available" : "No lift";
   const accessText = [floorText, liftText].filter(Boolean).join(" · ") || null;
 
+  // Labels unified with the SO (owner round: "all same format"): the
+  // number rows say WHICH number — DO No / SO No, never "Doc No"/"SO Ref".
+  // No Issued row: the delivery date is the date this paper works by.
   const detailRows: Array<[string, string | null]> = [
-    ["Doc No", do_number],
-    ["SO Ref", order_code],
-    ["Issued", niceDate(issue_date)],
+    ["DO No", do_number],
+    ["SO No", order_code],
     ["Delivery date", delivery_date ? niceDate(delivery_date) : null],
     ["Logistic", partner?.name ?? null],
     ["Access", accessText],
