@@ -113,6 +113,28 @@ an unasked order prints `No lift` — **a signed charge basis may not rest on a
 default.** Flip the flag ONLY in the nullable-columns migration PR (+ POS form).
 Until then the Access row prints facts, never a charge.
 
+## 8.5 · The conversion law (owner, round 21)
+
+2990's numbers are the reference, but Noto's x-height exceeds Helvetica's:
+**every 2990 nominal size prints HALF A POINT smaller here; every row pitch
+copies 2990's absolute millimetres and is LOCKED with an explicit lineHeight**
+(react-pdf's default line height is what made rows drift).
+
+```
+2990 (Helvetica)   Carres (Noto)     row pitch (absolute)
+9 / 700            8.5 / 700         section titles
+9                  8.5               totals rows        4.0mm
+8.5                8                 parties · payments 4.0mm
+8                  7.5               items body · bar · words · sig line
+7.5                7                 money cells · terms      (items row 6.8mm)
+11 / 700           10.5 / 700        BALANCE DUE        (terms pitch 3.2mm)
+```
+
+Totals labels are 2990's WORDS in ink mixed-case — `Subtotal` (never an
+invented "Items total") · `Paid to date` · one rule · `BALANCE DUE`.
+The signature sits AFTER the money (2990's order): dashed 90×22mm box,
+then ONE line `Customer Signature · {name}`.
+
 ## 9 · Typography & footer
 
 - **Noto Sans SC** (weights 400/500/600/700) — deliberately NOT 2990's Helvetica,
@@ -136,3 +158,4 @@ Optional payload fields the template already renders when sent: `customer.email`
 |---|---|---|
 | 2026-08-09 | Initial law — codifies 17 owner review rounds on rendered PDFs (v1–v15): 2990 skeleton adopted verbatim then amended; fixed zones; bottom-anchored money; three-state lift gate; no-tax ruling; every rule above. | Loo |
 | 2026-08-09 | §7 round 18: amount-in-words becomes 2990's inline one-liner (`Amount in words: …` 8pt grey) — caps block label and `(ITEMS TOTAL)` clarifier removed. | Loo |
+| 2026-08-09 | Rounds 19–21: §8.5 conversion law added — 2990 sizes −0.5pt, row pitches locked to 2990's mm; totals renamed to 2990's `Subtotal`; signature moved after BALANCE DUE with one-line caption. | Loo |

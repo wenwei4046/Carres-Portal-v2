@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   companyName: { fontSize: 14, fontWeight: 700 },
   ssmInline: { fontSize: 8, color: GREY, marginLeft: mm(2.5) },
-  legalLine: { fontSize: 8.5, marginTop: mm(1.2) },
+  legalLine: { fontSize: 8, lineHeight: 1.42 },
   docBlock: { alignItems: "flex-end" },
   docTitle: { fontSize: 9, color: GREY, letterSpacing: 1.5, marginTop: mm(1) },
   docNumber: { fontSize: 18, fontWeight: 700 },
@@ -172,12 +172,12 @@ const styles = StyleSheet.create({
   //    references (Stripe / Shopify invoices) bold the section titles small
   //    and keep grey for genuinely secondary text only. ──
   cards: { flexDirection: "row", marginTop: mm(3.5), paddingHorizontal: mm(4), minHeight: mm(36) },
-  blockLabel: { fontSize: 8, fontWeight: 700, color: INK, letterSpacing: 0.8, textTransform: "uppercase" },
+  blockLabel: { fontSize: 8.5, fontWeight: 700, color: INK, letterSpacing: 0.5, textTransform: "uppercase", lineHeight: 1 },
   partyName: { fontSize: 9.5, fontWeight: 600, marginTop: mm(1) },
   partyLine: { fontSize: 9, marginTop: mm(1) },
-  pairRow: { flexDirection: "row", marginTop: mm(1.1) },
-  pairLabel: { fontSize: 8.5, color: GREY, width: mm(20) },
-  pairValue: { fontSize: 8.5, flex: 1 },
+  pairRow: { flexDirection: "row" },
+  pairLabel: { fontSize: 8, color: GREY, width: mm(20), lineHeight: 1.42 },
+  pairValue: { fontSize: 8, flex: 1, lineHeight: 1.42 },
   deliverBlock: { marginTop: mm(2), paddingHorizontal: mm(4) },
   accessNote: { fontSize: 7.5, color: GREY, marginTop: mm(0.8) },
 
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: mm(2),
     marginTop: mm(2.5),
   },
-  th: { fontSize: 8, fontWeight: 700, color: "#FFFFFF", letterSpacing: 0.2, textTransform: "uppercase" },
+  th: { fontSize: 7.5, fontWeight: 700, color: "#FFFFFF", letterSpacing: 0.2, textTransform: "uppercase" },
   colNo: { width: mm(7) },
   colCode: { width: mm(27) },
   colQty: { width: mm(10), textAlign: "right" },
@@ -203,19 +203,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: mm(2),
     marginTop: mm(1),
   },
-  bandText: { fontSize: 8, fontWeight: 700, color: INK, letterSpacing: 0.3 },
+  bandText: { fontSize: 7.5, fontWeight: 700, color: INK, letterSpacing: 0.3 },
   row: { flexDirection: "row", paddingVertical: mm(2), paddingHorizontal: mm(2) },
   rowHair: { borderBottomWidth: 0.3, borderBottomColor: HAIR },
-  cellNo: { fontSize: 7.5, color: GREY, width: mm(7), textAlign: "right", paddingRight: mm(1.5) },
-  cellCode: { fontSize: 8, width: mm(27), paddingRight: mm(2) },
+  cellNo: { fontSize: 7, color: GREY, width: mm(7), textAlign: "right", paddingRight: mm(1.5), lineHeight: 1 },
+  cellCode: { fontSize: 7.5, width: mm(27), paddingRight: mm(2), lineHeight: 1 },
   desc: { flex: 1, paddingRight: mm(3) },
-  descMain: { fontSize: 8, fontWeight: 600 },
-  descSub: { fontSize: 7.5, color: GREY, marginTop: mm(0.5), paddingLeft: mm(2) },
-  cellQty: { fontSize: 7.5, width: mm(10), textAlign: "right" },
-  cellMoney: { fontSize: 7.5, textAlign: "right" },
+  descMain: { fontSize: 7.5, fontWeight: 600, lineHeight: 1 },
+  descSub: { fontSize: 7, color: GREY, marginTop: mm(0.8), paddingLeft: mm(2), lineHeight: 1.2 },
+  cellQty: { fontSize: 7, width: mm(10), textAlign: "right", lineHeight: 1 },
+  cellMoney: { fontSize: 7, textAlign: "right", lineHeight: 1 },
   // The line's own amount anchors the row (international convention: the
   // rightmost figure is the one the reader scans down).
-  cellAmount: { fontSize: 7.5, fontWeight: 700, textAlign: "right" },
+  cellAmount: { fontSize: 7, fontWeight: 700, textAlign: "right", lineHeight: 1 },
 
   voucherBlock: { marginTop: mm(1), paddingHorizontal: mm(4) },
   voucherLine: { fontSize: 8, color: GREY, marginTop: mm(0.5) },
@@ -232,42 +232,42 @@ const styles = StyleSheet.create({
   payColCode: { width: mm(30) },
   payColBy: { width: mm(30) },
   payColAmount: { width: mm(23), textAlign: "right" },
-  payCell: { fontSize: 8.5 }, // 2990's payments table body is 8.5
+  payCell: { fontSize: 8, lineHeight: 1 },
 
   // ── amount in words · totals ──
   totalsZone: { flexDirection: "row", marginTop: mm(5), paddingHorizontal: mm(4), alignItems: "flex-start" },
   wordsBlock: { flex: 1, paddingRight: mm(8) },
-  wordsText: { fontSize: 7.5, color: GREY, lineHeight: 1.4 },
-  depositLine: { fontSize: 8, color: GREY, marginTop: mm(1.2) },
+  wordsText: { fontSize: 7.5, color: GREY, lineHeight: 1.3 },
+  depositLine: { fontSize: 8.5, color: GREY, marginTop: mm(2) },
   totalsBlock: { width: mm(70) },
-  totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: mm(1.2) },
-  totalsLabel: { fontSize: 7.5, color: GREY, textTransform: "uppercase", letterSpacing: 0.6 },
-  totalsValue: { fontSize: 8.5, fontWeight: 600 },
+  totalsRow: { flexDirection: "row", justifyContent: "space-between" },
+  totalsLabel: { fontSize: 8.5, lineHeight: 1.33 },
+  totalsValue: { fontSize: 8.5, lineHeight: 1.33 },
   balanceBox: {
-    borderTopWidth: 0.5,
+    borderTopWidth: 0.6,
     borderTopColor: INK,
-    borderBottomWidth: 0.5,
-    borderBottomColor: INK,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: mm(2),
-    marginTop: mm(1),
+    paddingTop: mm(1.8),
+    marginTop: mm(0.8),
   },
-  balanceLabel: { fontSize: 8.5, fontWeight: 700, letterSpacing: 0.8 },
-  balanceValue: { fontSize: 11, fontWeight: 700 },
+  balanceLabel: { fontSize: 10.5, fontWeight: 700 },
+  balanceValue: { fontSize: 10.5, fontWeight: 700 },
 
   // ── customer signature · legal sentence ──
   signZone: { flexDirection: "row", marginTop: mm(3.5), paddingHorizontal: mm(4), alignItems: "flex-start" },
   signBlock: { width: mm(90) },
   signBox: {
     borderWidth: 0.6,
-    borderColor: HAIR,
+    borderColor: "#787878",
     borderStyle: "dashed",
-    height: mm(12),
+    width: mm(90),
+    height: mm(22),
     alignItems: "center",
     justifyContent: "center",
   },
+  signLine: { fontSize: 7.5, color: GREY, marginTop: mm(1.5), lineHeight: 1 },
   signImage: { width: mm(60), height: mm(18), objectFit: "contain" },
   signLabel: { fontSize: 7.5, color: GREY, letterSpacing: 0.8, textTransform: "uppercase", marginTop: mm(1) },
   signName: { fontSize: 8.5, marginTop: mm(0.6) },
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
 
   // ── terms ──
   terms: { paddingTop: mm(4), paddingHorizontal: mm(4) },
-  termsLine: { fontSize: 7.5, color: GREY, lineHeight: 1.35, marginTop: mm(0.6) },
+  termsLine: { fontSize: 7, color: GREY, lineHeight: 1.3, marginTop: mm(0.8) },
 
   // ── footer (fixed, every page) ──
   footer: {
@@ -500,7 +500,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         <View style={styles.cards}>
           <View style={{ flex: 1, paddingRight: mm(6) }}>
             <Text style={styles.blockLabel}>Bill To</Text>
-            <View style={{ marginTop: mm(0.5) }}>
+            <View style={{ marginTop: mm(1.5) }}>
               {([
                 ["Name", customer.name],
                 ["Address", customer.address],
@@ -519,7 +519,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.blockLabel}>Order Details</Text>
-            <View style={{ marginTop: mm(0.5) }}>
+            <View style={{ marginTop: mm(1.5) }}>
               {[
                 ...orderDetailRows,
                 /* Showroom already names the outlet — this row carries only
@@ -696,16 +696,10 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             {expected_deposit != null && expected_deposit > 0 && paid < expected_deposit ? (
               <Text style={styles.depositLine}>Expected deposit: {money(expected_deposit)}</Text>
             ) : null}
-            <View style={[styles.signBox, { marginTop: mm(2) }]}>
-              {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
-            </View>
-            <Text style={styles.signLabel}>Customer Signature</Text>
-            <Text style={styles.signName}>{customer.name}</Text>
-            {signed ? <Text style={styles.signMark}>Signed electronically at point of sale.</Text> : null}
           </View>
           <View style={styles.totalsBlock}>
             <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>Items total</Text>
+              <Text style={styles.totalsLabel}>Subtotal</Text>
               <Text style={styles.totalsValue}>{money(total)}</Text>
             </View>
             <View style={styles.totalsRow}>
@@ -719,11 +713,24 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           </View>
         </View>
 
+        {/* ── customer signature AFTER the money (2990's order); label and
+            name share ONE line under the box — saves a line (owner). The
+            company signs nothing (footer sentence). ── */}
+        <View style={{ paddingHorizontal: mm(4), marginTop: mm(3) }}>
+          <View style={styles.signBox}>
+            {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
+          </View>
+          <Text style={styles.signLine}>
+            <Text style={{ fontWeight: 700 }}>Customer Signature</Text> · {customer.name}
+            {signed ? "  ·  Signed electronically at point of sale" : ""}
+          </Text>
+        </View>
+
         {/* ── terms — wording is the owner's; numbered, quiet. The stair-
             carry clause rides the same gate as the DELIVER TO sentence: a
             signed charge basis may not rest on an unasked default. ── */}
         <View style={styles.terms} wrap={false}>
-          <Text style={styles.blockLabel}>Terms & Conditions</Text>
+          <Text style={{ fontSize: 7.5, fontWeight: 700, lineHeight: 1 }}>Terms & Conditions</Text>
           {[
             "This sales order becomes a binding tax invoice once goods are delivered and full payment is reconciled.",
             "Balance due is payable in full on or before delivery. Cash, bank transfer, DuitNow QR, and cheque accepted.",
