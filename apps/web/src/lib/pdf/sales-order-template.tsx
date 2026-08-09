@@ -54,22 +54,8 @@ const LOGO_SRC =
 const LIFT_THREE_STATE_READY = false;
 
 const MARGIN = mm(12);
-const HEADER_H = mm(18);
-const FOOTER_H = mm(8);
-
-/** The registered address folded to TWO lines (owner: "header make it
- *  compact — address can become 2 lines"). Greedy split at the comma
- *  nearest the midpoint, so a future address change re-balances itself. */
-function twoLineAddress(lines: readonly string[]): [string, string] {
-  const full = lines.join(" ").replace(/\s+/g, " ").trim();
-  const mid = full.length / 2;
-  let best = -1;
-  for (let i = 0; i < full.length; i++) {
-    if (full[i] === "," && (best === -1 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
-  }
-  if (best === -1) return [full, ""];
-  return [full.slice(0, best + 1), full.slice(best + 1).trim()];
-}
+const HEADER_H = mm(13);
+const FOOTER_H = mm(11);
 
 /** `2026-08-09` → `SUN, 9 AUG 26` (textual parse — timezone-proof). */
 function capsDate(iso: string | null | undefined): string | null {
@@ -300,13 +286,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 0.5,
     borderTopColor: HAIR,
     paddingTop: mm(2),
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
   },
   footerCell: { fontSize: 7.5, color: GREY, width: mm(45) },
   footerCenter: { fontSize: 7.5, color: GREY, textAlign: "center", flex: 1 },
   footerPage: { fontSize: 7.5, color: GREY, width: mm(45), textAlign: "right" },
+  footerAddress: { fontSize: 6, color: LIGHT, textAlign: "center", marginTop: mm(1) },
 });
 
 /** The item configuration as ONE muted line — the SAME formula the POS
@@ -467,11 +451,6 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                     <Text style={[styles.legalLine, styles.legalFirst]}>
                       {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
                     </Text>
-                    {twoLineAddress(CARRES_COMPANY.addressLines).map((line, i) => (
-                      <Text key={i} style={styles.legalLine}>
-                        {line}
-                      </Text>
-                    ))}
                   </View>
                   {/* No date here — ORDER DETAILS owns `Ordered`; the header
                       printed the same date twice (owner review). */}
@@ -752,14 +731,21 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           ))}
         </View>
 
-        {/* ── footer — one quiet row, fixed on every page ── */}
+        {/* ── footer — fixed on every page: the quiet row + the registered
+            address in one whisper line (moved out of the header; owner:
+            "carres address make it compact"). ── */}
         <View style={styles.footer} fixed>
-          <Text style={styles.footerCell}>{order_code}</Text>
-          <Text style={styles.footerCenter}>Computer-generated document · No company signature required.</Text>
-          <Text
-            style={styles.footerPage}
-            render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
-          />
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={styles.footerCell}>{order_code}</Text>
+            <Text style={styles.footerCenter}>Computer-generated document · No company signature required.</Text>
+            <Text
+              style={styles.footerPage}
+              render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+            />
+          </View>
+          <Text style={styles.footerAddress}>
+            {CARRES_COMPANY.legalName} · {CARRES_COMPANY.addressLines.join(" ")}
+          </Text>
         </View>
       </Page>
     </Document>
