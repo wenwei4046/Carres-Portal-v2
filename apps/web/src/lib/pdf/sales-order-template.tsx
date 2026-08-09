@@ -54,8 +54,22 @@ const LOGO_SRC =
 const LIFT_THREE_STATE_READY = false;
 
 const MARGIN = mm(12);
-const HEADER_H = mm(20);
+const HEADER_H = mm(18);
 const FOOTER_H = mm(8);
+
+/** The registered address folded to TWO lines (owner: "header make it
+ *  compact — address can become 2 lines"). Greedy split at the comma
+ *  nearest the midpoint, so a future address change re-balances itself. */
+function twoLineAddress(lines: readonly string[]): [string, string] {
+  const full = lines.join(" ").replace(/\s+/g, " ").trim();
+  const mid = full.length / 2;
+  let best = -1;
+  for (let i = 0; i < full.length; i++) {
+    if (full[i] === "," && (best === -1 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
+  }
+  if (best === -1) return [full, ""];
+  return [full.slice(0, best + 1), full.slice(best + 1).trim()];
+}
 
 /** `2026-08-09` → `SUN, 9 AUG 26` (textual parse — timezone-proof). */
 function capsDate(iso: string | null | undefined): string | null {
@@ -171,7 +185,7 @@ const styles = StyleSheet.create({
   //    (2026-08-09) found the all-grey voice hard to read; international
   //    references (Stripe / Shopify invoices) bold the section titles small
   //    and keep grey for genuinely secondary text only. ──
-  cards: { flexDirection: "row", marginTop: mm(2), paddingHorizontal: mm(4) },
+  cards: { flexDirection: "row", marginTop: mm(2), paddingHorizontal: mm(4), minHeight: mm(36) },
   blockLabel: { fontSize: 7.5, fontWeight: 600, color: INK, letterSpacing: 0.8, textTransform: "uppercase" },
   partyName: { fontSize: 9.5, fontWeight: 600, marginTop: mm(1) },
   partyLine: { fontSize: 9, marginTop: mm(1) },
@@ -233,7 +247,7 @@ const styles = StyleSheet.create({
   payCell: { fontSize: 9 },
 
   // ── amount in words · totals ──
-  totalsZone: { flexDirection: "row", marginTop: mm(2), paddingHorizontal: mm(4), alignItems: "flex-start" },
+  totalsZone: { flexDirection: "row", marginTop: mm(5), paddingHorizontal: mm(4), alignItems: "flex-start" },
   wordsBlock: { flex: 1, paddingRight: mm(8) },
   wordsText: { fontSize: 8, marginTop: mm(1.2), lineHeight: 1.4 },
   depositLine: { fontSize: 8, color: GREY, marginTop: mm(1.2) },
@@ -274,7 +288,7 @@ const styles = StyleSheet.create({
   legalSentence: { fontSize: 7.5, color: GREY, lineHeight: 1.5 },
 
   // ── terms ──
-  terms: { marginTop: mm(2), paddingHorizontal: mm(4) },
+  terms: { marginTop: "auto", paddingTop: mm(4), paddingHorizontal: mm(4) },
   termsLine: { fontSize: 6.8, color: GREY, lineHeight: 1.35, marginTop: mm(0.5) },
 
   // ── footer (fixed, every page) ──
@@ -398,8 +412,9 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
     delivery.address && delivery.address.trim().length > 0 && delivery.address.trim() !== customer.address.trim()
       ? delivery.address.trim()
       : null;
-  const floorText = delivery.floor == null ? "Not recorded" : String(delivery.floor);
-  const liftText = delivery.has_lift == null ? "Not recorded" : delivery.has_lift ? "Yes" : "No";
+  const floorText = delivery.floor == null ? "Floor not recorded" : `Floor ${delivery.floor}`;
+  const liftText =
+    delivery.has_lift == null ? "Lift not recorded" : delivery.has_lift ? "Lift available" : "No lift";
   const accessKnown = delivery.floor != null && delivery.has_lift != null;
   // The charge sentence prints only on a RECORDED walk-up; an unknown access
   // prints the to-be-checked sentence instead. Never a charge on a default.
@@ -432,6 +447,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
     ["Delivery date", niceDate(delivery.date, true) ?? delivery.date],
     ["Proceed date", proceed_date ? niceDate(proceed_date, true) : null],
   ];
+  const accessText = `${floorText} · ${liftText}`;
 
   return (
     <Document>
@@ -451,16 +467,17 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                     <Text style={[styles.legalLine, styles.legalFirst]}>
                       {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
                     </Text>
-                    {CARRES_COMPANY.addressLines.map((line, i) => (
+                    {twoLineAddress(CARRES_COMPANY.addressLines).map((line, i) => (
                       <Text key={i} style={styles.legalLine}>
                         {line}
                       </Text>
                     ))}
                   </View>
+                  {/* No date here — ORDER DETAILS owns `Ordered`; the header
+                      printed the same date twice (owner review). */}
                   <View style={styles.docBlock}>
                     <Text style={styles.docTitle}>SALES ORDER</Text>
                     <Text style={styles.docNumber}>{so_number}</Text>
-                    <Text style={styles.docDate}>{capsDate(issue_date)}</Text>
                   </View>
                 </View>
                 <View style={styles.headerRule} />
@@ -531,31 +548,29 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                   <Text style={styles.pairValue}>{sellerName}</Text>
                 </View>
               ) : null}
+              <View style={styles.pairRow}>
+                <Text style={[styles.pairLabel, { width: mm(28) }]}>Access</Text>
+                <Text style={styles.pairValue}>{accessText}</Text>
+              </View>
+              {stairCarry ? (
+                <Text style={styles.accessNote}>Stair-carry charge applies — see Terms & Conditions.</Text>
+              ) : null}
+              {!accessKnown ? (
+                <Text style={styles.accessNote}>Access not confirmed — to be checked before delivery.</Text>
+              ) : null}
             </View>
           </View>
         </View>
 
-        {/* ── DELIVER TO — the delivery facts the charge rests on ── */}
-        <View style={styles.deliverBlock}>
-          <Text style={styles.blockLabel}>Deliver To</Text>
-          <Text style={styles.partyLine}>{deliveryAddress ?? "Same as billing address"}</Text>
-          <View style={styles.pairRow}>
-            <Text style={styles.pairLabel}>Floor</Text>
-            <Text style={styles.pairValue}>
-              {floorText}
-              {"      "}
-              <Text style={styles.pairLabel}>Lift</Text>
-              {"  "}
-              {liftText}
-            </Text>
+        {/* ── DELIVER TO — prints ONLY when the delivery address differs
+            from billing ("Same as billing address" was a wasted line;
+            floor/lift live in ORDER DETAILS' Access row now). ── */}
+        {deliveryAddress ? (
+          <View style={styles.deliverBlock}>
+            <Text style={styles.blockLabel}>Deliver To</Text>
+            <Text style={styles.partyLine}>{deliveryAddress}</Text>
           </View>
-          {stairCarry ? (
-            <Text style={styles.accessNote}>Stair-carry charge applies — see Terms & Conditions.</Text>
-          ) : null}
-          {!accessKnown ? (
-            <Text style={styles.accessNote}>Access not confirmed — to be checked before delivery.</Text>
-          ) : null}
-        </View>
+        ) : null}
 
         {/* ── items table — banded, zero grid lines, hairline rhythm ── */}
         <View style={styles.tableHead} minPresenceAhead={40}>
@@ -654,7 +669,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
 
         {/* ── PAYMENTS RECEIVED ── */}
         {payments.length > 0 ? (
-          <View wrap={false} style={{ marginTop: mm(2) }}>
+          <View wrap={false} style={{ marginTop: mm(5) }}>
             <View style={{ paddingHorizontal: mm(4) }}>
               <Text style={styles.blockLabel}>Payments Received</Text>
             </View>
