@@ -17,8 +17,17 @@ export type DoTemplateData = {
   issue_date: string;
   order_id: string;
   order_code: string;
-  customer: { name: string; address: string; phone: string | null };
+  customer: {
+    name: string;
+    address: string;
+    phone: string | null;
+    /** Emergency contact — who the driver calls when the customer is
+     *  unreachable (sales portal collects it; 32/77 filled, 2026-08-09). */
+    emergency?: string | null;
+  };
   dealer: { name: string; contact: string | null };
+  /** The logistic doing the trip (delivery_partners.name) — the driver
+   *  side of the signature pair. */
   partner: { name: string } | null;
   lines: Array<{
     sku: string;
@@ -26,8 +35,30 @@ export type DoTemplateData = {
     qty: number;
     unit: string;
     line_total: number;
+    /** Category band (SOFA / MATTRESS …) — optional, same as the SO. */
+    category?: string | null;
+    /** The PO(s) that supplied this line's goods (purchase_orders.id via
+     *  the SO link) — the storekeeper's picking aid, 2990's Source PO. */
+    source_po?: string[] | null;
+    /** Line attrs (fabric_name etc.) — feeds the sofa layout drawing. */
+    attrs?: Record<string, unknown> | null;
+    /** The physical units delivered (ops_stock_items.unit_code, 0153) —
+     *  scannable ids the warehouse checks off at loading; the paper then
+     *  records exactly WHICH units this customer received. */
+    unit_codes?: string[] | null;
   }>;
   currency: string;
+  /** 2026-08-09 DO reskin (SO-PDF-STANDARD chrome) — all optional so the
+   *  existing /print-do caller keeps working; the template skips absentees. */
+  delivery_date?: string | null;
+  delivery?: {
+    floor: number | null;
+    has_lift: boolean | null;
+    address?: string | null;
+  };
+  /** Proof-of-delivery already captured digitally (orders.pod_*): the
+   *  customer box prints the signature image when present. */
+  pod?: { signature_url?: string | null; signed_at?: string | null };
 };
 
 export type ReceiptTemplateData = {
@@ -126,6 +157,9 @@ export type PoTemplateData = {
     qty: number;
     unit: string;
     attrs?: Record<string, unknown> | null;
+    /** ops_stock_items.unit_code (0153) — minted at PO-open; the Item ID
+     *  column the old law RESERVED is now fed by this. */
+    unit_codes?: string[] | null;
   }>;
   terms: string | null;
 };
@@ -142,6 +176,11 @@ export type SalesOrderTemplateData = {
     name: string;
     address: string;
     phone: string | null;
+    /** 2026-08-09 (Muji reskin) — optional: pre-reskin API builds don't send
+     *  them; the template skips the line when absent. */
+    email?: string | null;
+    /** Emergency contact as one line ("Mona Doal · +60 17-339 8639"). */
+    emergency?: string | null;
   };
 
   dealer: {
@@ -159,9 +198,20 @@ export type SalesOrderTemplateData = {
 
   delivery: {
     date: string;
-    floor: number;
-    has_lift: boolean;
+    /** 2026-08-09 three-state ruling: `null` = never asked ("Not recorded").
+     *  The stair-carry note prints ONLY when floor AND lift are both
+     *  recorded — a charge line may not rest on a default. The DB columns
+     *  are NOT NULL today (0001), so `null` arrives only after the
+     *  nullable-columns migration; the template is ready either way. */
+    floor: number | null;
+    has_lift: boolean | null;
+    /** Delivery address when it differs from billing. Absent/equal →
+     *  "Same as billing address" (Carres orders carry ONE address today). */
+    address?: string | null;
   };
+
+  /** orders.proceed_date (0165) — optional; row skipped when absent. */
+  proceed_date?: string | null;
 
   lines: Array<{
     sku: string;
@@ -176,10 +226,20 @@ export type SalesOrderTemplateData = {
     unit_price: number;
     line_total: number;
     attrs: Record<string, unknown> | null;
+    /** Category band the row prints under (SOFA / MATTRESS / BEDFRAME …).
+     *  Optional — rows without one group under no band. */
+    category?: string | null;
+    /** Per-line discount amount. No schema column carries this today
+     *  (verified 2026-08-09: order_lines has no discount, attrs has no
+     *  discount key) — the column prints "—" until the portal records one. */
+    discount?: number | null;
   }>;
 
   addons: Array<{
     label: string;
+    /** The addon's real code (`SVC-DELIVERY`) — an empty Item Code cell is
+     *  a defect (owner review 2026-08-09); absent prints `ADD-ON`. */
+    sku?: string | null;
     qty: number;
     unit_price: number;
     line_total: number;
@@ -192,7 +252,17 @@ export type SalesOrderTemplateData = {
    *  order_payments ledger for internal callers, else one synthesized row
    *  from orders.paid + payment_method. Optional: pre-parity API builds
    *  don't send it; the template then falls back to the paid amount. */
-  payments?: Array<{ label: string; reference: string | null; amount: number }>;
+  payments?: Array<{
+    label: string;
+    reference: string | null;
+    amount: number;
+    /** 2026-08-09 (2990 parity) — payments.paid_at, orders.approval_code /
+     *  payments.reference, app_users.name of recorded_by. All optional:
+     *  the table prints "—" for what a row doesn't carry. */
+    date?: string | null;
+    approval_code?: string | null;
+    collected_by?: string | null;
+  }>;
 
   /** Voucher codes EARNED on this order (PWP carry-forward) — printed under
    *  their trigger line ("PWP voucher issued: … · not redeemed yet").
@@ -210,6 +280,10 @@ export type SalesOrderTemplateData = {
   paid: number;
   balance_due: number;
   currency: string;
+  /** Deposit the customer committed to at point of sale. No schema field
+   *  carries this today (verified 2026-08-09) — the line prints only when
+   *  a figure arrives. */
+  expected_deposit?: number | null;
 
   signed: boolean;
   /** 2026-05-22 (Loo) — signed URL to the customer's eSign PNG captured at

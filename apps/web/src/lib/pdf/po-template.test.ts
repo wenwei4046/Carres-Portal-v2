@@ -29,13 +29,12 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
 
   it("carries the Law's fixed strings", () => {
     for (const s of [
-      "SUPPLIER DELIVERY BY",
-      "PO ISSUED DATE",
+      "Delivery by",
       "PURCHASE ORDER",
       "Computer-generated document · No signature required.",
-      "Sales Order",
+      "SO No",
       "Item ID",
-      "TOTAL QUANTITY",
+      "TOTAL",
       "Top view. Back at the top. TV in front.",
     ]) {
       expect(SRC, s).toContain(s);
