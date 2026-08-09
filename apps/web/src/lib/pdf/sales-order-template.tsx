@@ -235,9 +235,9 @@ const styles = StyleSheet.create({
   payCell: { fontSize: 8, lineHeight: 1 },
 
   // ── amount in words · totals ──
-  totalsZone: { flexDirection: "row", marginTop: mm(5), paddingHorizontal: mm(4), alignItems: "flex-start" },
-  wordsBlock: { flex: 1, paddingRight: mm(8) },
-  wordsText: { fontSize: 7.5, color: GREY, lineHeight: 1.3 },
+  totalsZone: { flexDirection: "row", justifyContent: "space-between", marginTop: mm(5), paddingHorizontal: mm(4), alignItems: "flex-start" },
+  wordsBlock: { width: mm(68), paddingRight: mm(6) },
+  wordsText: { fontSize: 7, color: GREY, lineHeight: 1.3 },
   depositLine: { fontSize: 8.5, color: GREY, marginTop: mm(2) },
   totalsBlock: { width: mm(70) },
   totalsRow: { flexDirection: "row", justifyContent: "space-between" },
@@ -262,13 +262,14 @@ const styles = StyleSheet.create({
     borderWidth: 0.6,
     borderColor: "#787878",
     borderStyle: "dashed",
-    width: mm(90),
     height: mm(22),
+    marginTop: mm(3),
+    paddingBottom: mm(1.2),
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-end",
   },
-  signLine: { fontSize: 7.5, color: GREY, marginTop: mm(1.5), lineHeight: 1 },
-  signImage: { width: mm(60), height: mm(18), objectFit: "contain" },
+  signCaption: { fontSize: 6.5, color: GREY, lineHeight: 1 },
+  signImage: { width: mm(55), height: mm(14), objectFit: "contain" },
   signLabel: { fontSize: 7.5, color: GREY, letterSpacing: 0.8, textTransform: "uppercase", marginTop: mm(1) },
   signName: { fontSize: 8.5, marginTop: mm(0.6) },
   signMark: { fontSize: 7.5, color: GREY, marginTop: mm(0.5) },
@@ -710,20 +711,15 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
               <Text style={styles.balanceLabel}>BALANCE DUE</Text>
               <Text style={styles.balanceValue}>{money(balance_due)}</Text>
             </View>
+            {/* Signature directly UNDER BALANCE DUE; the caption prints
+                INSIDE the box (owner round 22). Company signs nothing. */}
+            <View style={styles.signBox}>
+              {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
+              <Text style={styles.signCaption}>
+                Customer Signature · {customer.name}
+              </Text>
+            </View>
           </View>
-        </View>
-
-        {/* ── customer signature AFTER the money (2990's order); label and
-            name share ONE line under the box — saves a line (owner). The
-            company signs nothing (footer sentence). ── */}
-        <View style={{ paddingHorizontal: mm(4), marginTop: mm(3) }}>
-          <View style={styles.signBox}>
-            {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
-          </View>
-          <Text style={styles.signLine}>
-            <Text style={{ fontWeight: 700 }}>Customer Signature</Text> · {customer.name}
-            {signed ? "  ·  Signed electronically at point of sale" : ""}
-          </Text>
         </View>
 
         {/* ── terms — wording is the owner's; numbered, quiet. The stair-

@@ -132,8 +132,15 @@ copies 2990's absolute millimetres and is LOCKED with an explicit lineHeight**
 
 Totals labels are 2990's WORDS in ink mixed-case — `Subtotal` (never an
 invented "Items total") · `Paid to date` · one rule · `BALANCE DUE`.
-The signature sits AFTER the money (2990's order): dashed 90×22mm box,
-then ONE line `Customer Signature · {name}`.
+Owner ruling (round 22): the totals stay THREE rows — 2990's `Tax —` and
+`Total` rows are information-free duplicates that would contradict the
+invoice's SST split; they never return.
+The signature box (dashed, 22mm) sits in the totals column DIRECTLY UNDER
+BALANCE DUE; the caption `Customer Signature · {name}` prints INSIDE the
+box at its foot (6.5pt grey). The amount-in-words line is a NARROW 68mm ·
+7pt grey column, top-aligned with `Subtotal` — its adjacency is what says
+which figure it spells (always the Subtotal; a receipt's words spell the
+payment — not this document's job).
 
 ## 9 · Typography & footer
 
@@ -159,3 +166,4 @@ Optional payload fields the template already renders when sent: `customer.email`
 | 2026-08-09 | Initial law — codifies 17 owner review rounds on rendered PDFs (v1–v15): 2990 skeleton adopted verbatim then amended; fixed zones; bottom-anchored money; three-state lift gate; no-tax ruling; every rule above. | Loo |
 | 2026-08-09 | §7 round 18: amount-in-words becomes 2990's inline one-liner (`Amount in words: …` 8pt grey) — caps block label and `(ITEMS TOTAL)` clarifier removed. | Loo |
 | 2026-08-09 | Rounds 19–21: §8.5 conversion law added — 2990 sizes −0.5pt, row pitches locked to 2990's mm; totals renamed to 2990's `Subtotal`; signature moved after BALANCE DUE with one-line caption. | Loo |
+| 2026-08-09 | Round 22: totals stay THREE rows (owner: 维持 3 行); signature box under BALANCE DUE with the caption inside; words column narrowed to 68mm/7pt top-aligned with Subtotal. | Loo |
