@@ -139,7 +139,11 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
   }));
 
   return (
-    <div className="flex flex-col gap-6 max-w-[1120px]">
+    // PrincipalApp's <main> supplies no padding — each tab owns its own, and
+    // this one never got any, so the page sat flush against the sidebar.
+    // `px-9 py-8 pb-14` is the value its sibling tabs already use
+    // (ProductMaintenancePage:82), not a new number.
+    <div className="px-9 py-8 pb-14 flex flex-col gap-6 max-w-[1120px]">
       <div className="flex justify-between items-end gap-4 flex-wrap">
         <div>
           <div className="kicker">Rental</div>
@@ -471,6 +475,11 @@ function OfferRow({
           {sync.isPending ? "Syncing…" : "Sync"}
         </button>
       )}
+      {/* An offer with NO priced row reaches no store however it is switched:
+          `rental_plans_pos` is `WHERE rp.active`, and with zero plans there is
+          nothing for it to return. `On sale` alone is then a promise the offer
+          cannot keep — so the switched-on state says WHY it is not selling,
+          reusing `feeLabel`'s own words rather than inventing a new one. */}
       {isPrincipal ? (
         <label className="flex items-center gap-1.5 text-meta text-base-500">
           <input
@@ -481,11 +490,19 @@ function OfferRow({
             aria-label={`${model?.name ?? "offer"} on sale`}
             data-testid={`offer-active-${offer.id}`}
           />
-          On sale
+          {offer.active && fees.length === 0 ? "On sale · no monthly price yet" : "On sale"}
         </label>
       ) : (
-        <span className={`pill ${offer.active ? "pill-confirmed" : "pill-neutral"}`}>
-          {offer.active ? "On sale" : "Draft"}
+        <span
+          className={`pill ${
+            offer.active ? (fees.length === 0 ? "pill-warning" : "pill-confirmed") : "pill-neutral"
+          }`}
+        >
+          {offer.active
+            ? fees.length === 0
+              ? "On sale · no monthly price yet"
+              : "On sale"
+            : "Draft"}
         </span>
       )}
       <button

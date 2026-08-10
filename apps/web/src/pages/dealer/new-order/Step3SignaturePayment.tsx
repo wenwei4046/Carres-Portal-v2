@@ -8,6 +8,7 @@ import {
 import { draftTotals } from "@/lib/order-totals";
 import { newWizardSessionId } from "@/lib/storage";
 import { previewDefaultGifts } from "../pos/free-line";
+import { cartModeOf } from "../pos/rental-cart";
 import {
   composeEmergency,
   type DraftPayment,
@@ -423,7 +424,20 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
           <div className="mt-2.5 px-3 py-2.5 rounded text-xs leading-relaxed text-base-800 border border-success bg-success-soft">
             ✓ After you complete the order, a <strong>QR / payment link</strong> for RM{" "}
             {draft.paid.toLocaleString()} opens — the customer pays there and the payment
-            records itself. The order sits in <strong>Place</strong> until the payment lands.
+            records itself.{" "}
+            {/* A RENTAL leaves Place when FINANCE APPROVES it, not when money
+                lands (0275 replaced the deposit gate with the credit-approval
+                gate). Telling an operator to watch for the payment sends them
+                watching the wrong thing — nobody would think to chase finance. */}
+            {cartModeOf(draft.lines) === "rental" ? (
+              <>
+                The order sits in <strong>Place</strong> until finance approves the rental.
+              </>
+            ) : (
+              <>
+                The order sits in <strong>Place</strong> until the payment lands.
+              </>
+            )}
           </div>
         )}
         {draft.paid > 0 && !isStripe && (
