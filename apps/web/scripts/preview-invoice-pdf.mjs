@@ -53,6 +53,7 @@ const base = {
 await render({
   ...base,
   invoice_no: "INV-240826-0001",
+  issued_by: "Li Ching",
   subtotal: 8259.26,
   tax_amount: 660.74,
   total: 8920,
@@ -75,6 +76,7 @@ await render({
   ...base,
   doc_title: "PAYMENT REQUEST",
   invoice_no: "PR-240826-0001",
+  issued_by: "Li Ching",
   subtotal: 8920,
   tax_amount: 0,
   total: 5180,
