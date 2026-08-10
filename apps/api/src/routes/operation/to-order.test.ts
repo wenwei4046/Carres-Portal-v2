@@ -300,9 +300,9 @@ afterAll(() => _setJwksForTesting(null));
 const READ = "http://t/api/operation/purchase/to-order";
 const ISSUE = "http://t/api/operation/purchase/to-order/issue";
 
-async function get() {
+async function get(query = "") {
   const jwt = await makeJwt("operation");
-  return app.fetch(new Request(READ, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+  return app.fetch(new Request(`${READ}${query}`, { headers: { Authorization: `Bearer ${jwt}` } }), env);
 }
 
 /** The arrangement the browser would post untouched: one doc per sofa order. */
@@ -360,6 +360,50 @@ describe("GET /api/operation/purchase/to-order", () => {
       "Carres Klang",
       "AL Sungai Buloh",
     ]);
+  });
+
+  it("scopes only after the full server recomputation and returns an explanatory summary", async () => {
+    const t = TABLES();
+    const todayIsoStr = new Date().toISOString().slice(0, 10);
+    t.purchase_orders = {
+      data: [
+        {
+          id: "PO-1900",
+          supplier_id: OHANA,
+          placed_at: "2025-01-01T09:00:00Z",
+          so_refs: [1207],
+        },
+      ],
+      error: null,
+    };
+    t.purchase_order_lines = {
+      data: [{ po_id: "PO-1900", sku: "5539-1B(LHF)", qty: 1, received_qty: 1 }],
+      error: null,
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await get("?so=1207");
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+
+    expect(body.proposals.flatMap((p: any) => p.rows).every((r: any) => r.so === 1207)).toBe(true);
+    expect(body.unresolved).toEqual([]);
+    expect(body.ordered).toEqual([
+      expect.objectContaining({ poId: "PO-1900", so: 1207 }),
+    ]);
+    expect(body.scope).toMatchObject({
+      so: 1207,
+      orderFound: true,
+      alreadyIssued: 1,
+    });
+    expect(todayIsoStr).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("rejects an invalid Sales Order scope without running the engine", async () => {
+    const res = await get("?so=not-a-number");
+    expect(res.status).toBe(400);
+    expect(userClient).not.toHaveBeenCalled();
   });
 
   /**
@@ -2136,7 +2180,7 @@ describe("P18 · the proceed date rides the To Order wire", () => {
     const selects = [
       ...src.matchAll(/\.from\(\s*"orders"\s*\)\s*\n?\s*\.select\(\s*([\s\S]*?)\)\s*\n?\s*\./g),
     ].map((m) => m[1]!);
-    expect(selects).toHaveLength(2);
+    expect(selects).toHaveLength(3);
     for (const s of selects) expect(s).toContain("proceed_date");
   });
 });

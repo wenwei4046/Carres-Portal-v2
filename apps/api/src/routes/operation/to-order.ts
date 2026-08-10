@@ -103,6 +103,8 @@ type Loaded = {
   poDays: readonly number[];
   /** Demand the catalog could not answer for. Empty is the only healthy value. */
   unresolved: Unresolved[];
+  /** Existing production-days refusal, retained for an explanatory SO lens. */
+  blocked: Unresolved[];
   /** The whole catalog, read once — the ordered read reuses it. */
   catalog: Map<string, CatalogFact>;
   /**
@@ -269,6 +271,7 @@ async function loadToOrder(
         today: todayIso(),
         poDays: settings.poDays,
         unresolved: [],
+        blocked: [],
         catalog: new Map(),
         settings,
         stockWarehouse: null,
@@ -344,6 +347,8 @@ async function loadToOrder(
   const seenMissing = new Set<string>();
   /** Demand the catalog could not answer for. Never dropped in silence. */
   const unresolved: { sku: string; orderId: string; so: number | null }[] = [];
+  /** Existing engine refusal: this supplier × category has no production days. */
+  const blocked: { sku: string; orderId: string; so: number | null }[] = [];
   /** P10 — a typed demand's own `issued_qty`, the ceiling on what the ledger
    *  may be read as having taken for it. */
   const issuedByLine = new Map<string, number>();
@@ -392,6 +397,11 @@ async function loadToOrder(
         seenMissing.add(k);
         missingProductionDays.push({ supplierId, category });
       }
+      blocked.push({
+        sku: l.sku as string,
+        orderId: l.order_id as string,
+        so: order.so != null ? Number(order.so) : null,
+      });
       continue;
     }
 
@@ -703,6 +713,7 @@ async function loadToOrder(
       today,
       poDays: settings.poDays,
       unresolved,
+      blocked,
       catalog: cat,
       settings,
       stockWarehouse,
@@ -733,16 +744,28 @@ async function loadOrderedRows(
   today: string,
   catalog: Map<string, CatalogFact>,
   supplierNames: ReadonlyMap<string, string>,
+  scopeSo: number | null = null,
 ): Promise<ToOrderOrderedRow[]> {
   const since = new Date(`${today}T00:00:00Z`);
   since.setUTCDate(since.getUTCDate() - ORDERED_WINDOW_DAYS);
   const sinceIso = since.toISOString().slice(0, 10);
 
-  const { data: poRows, error: poErr } = await sb
+  let poQuery = sb
     .from("purchase_orders")
-    .select("id, supplier_id, placed_at, so_refs")
-    .gte("placed_at", sinceIso)
-    .order("placed_at", { ascending: false });
+    .select("id, supplier_id, placed_at, so_refs");
+  // A scoped entrance must explain an older PO too. The ordinary workspace
+  // deliberately keeps its 14-day receipt window; only the explicit SO lens
+  // asks history for that one order.
+  if (scopeSo == null) poQuery = poQuery.gte("placed_at", sinceIso);
+  const { data: allPoRows, error: poErr } = await poQuery.order("placed_at", {
+    ascending: false,
+  });
+  const poRows =
+    scopeSo == null
+      ? allPoRows
+      : (allPoRows ?? []).filter((p) =>
+          ((p.so_refs as number[] | null) ?? []).some((so) => Number(so) === scopeSo),
+        );
   if (poErr || !poRows || poRows.length === 0) return [];
 
   // The catalog arrives from loadToOrder — but its no-open-orders early
@@ -908,6 +931,11 @@ async function loadOrderedRows(
 }
 
 toOrderRouter.get("/", requireOperation, async (c) => {
+  const rawSo = c.req.query("so");
+  const scopeSo = rawSo == null || rawSo === "" ? null : Number(rawSo);
+  if (scopeSo != null && (!Number.isInteger(scopeSo) || scopeSo <= 0)) {
+    return c.json({ error: "invalid_so", code: "invalid_param" }, 400);
+  }
   const sb = userClient(c.env, c.var.auth.jwt);
 
   const res = await loadToOrder(sb);
@@ -936,14 +964,81 @@ toOrderRouter.get("/", requireOperation, async (c) => {
     (supRows ?? []).map((s) => [s.id as string, (s.name as string) ?? ""]),
   );
 
-  const ordered = await loadOrderedRows(sb, res.data.today, res.data.catalog, supplierNames);
+  const ordered = await loadOrderedRows(
+    sb,
+    res.data.today,
+    res.data.catalog,
+    supplierNames,
+    scopeSo,
+  );
+
+  // Scope AFTER the full recomputation. Stock and open-PO allocation therefore
+  // stay global and authoritative; `?so=` is only a lens over that answer.
+  const proposals =
+    scopeSo == null
+      ? res.data.proposals
+      : res.data.proposals
+          .map((proposal) => ({
+            ...proposal,
+            rows: proposal.rows.filter((row) => row.so === scopeSo),
+          }))
+          .filter((proposal) => proposal.rows.length > 0);
+  const unresolved =
+    scopeSo == null
+      ? res.data.unresolved
+      : res.data.unresolved.filter((row) => row.so === scopeSo);
+  const scopedOrdered =
+    scopeSo == null ? ordered : ordered.filter((row) => row.so === scopeSo);
+
+  let scope: null | {
+    so: number;
+    orderFound: boolean;
+    issuable: number;
+    blockedProductionDays: number;
+    blockedDeliveryDate: number;
+    unresolved: number;
+    alreadyCovered: number;
+    alreadyIssued: number;
+  } = null;
+  if (scopeSo != null) {
+    const { data: order } = await sb
+      .from("orders")
+      .select("id, proceed_date")
+      .eq("so", scopeSo)
+      .maybeSingle();
+    let issuable = 0;
+    let blockedProductionDays = res.data.blocked.filter((row) => row.so === scopeSo).length;
+    let blockedDeliveryDate = 0;
+    let alreadyCovered = 0;
+    for (const proposal of proposals) {
+      for (const row of proposal.rows) {
+        for (const build of row.builds) {
+          if (build.fullyOnPo) alreadyCovered += 1;
+          else if (proposal.blocked === "production_days") blockedProductionDays += 1;
+          else if (row.delivery == null) blockedDeliveryDate += 1;
+          else issuable += 1;
+        }
+      }
+    }
+    scope = {
+      so: scopeSo,
+      orderFound: order != null,
+      issuable,
+      blockedProductionDays,
+      blockedDeliveryDate,
+      unresolved: unresolved.length,
+      alreadyCovered,
+      alreadyIssued: scopedOrdered.length,
+    };
+  }
 
   return c.json({
     today: res.data.today,
     poDays: res.data.poDays,
-    proposals: res.data.proposals,
-    unresolved: res.data.unresolved,
-    ordered,
+    proposals,
+    unresolved,
+    ordered: scopedOrdered,
+    ...(scope ? { scope } : {}),
     // P10 — the warehouse the offer was counted at, by its own name. The page
     // states WHERE the stock is, and it may not invent the word `Klang`: a
     // second warehouse is a rename away, and a sentence naming the wrong shed
