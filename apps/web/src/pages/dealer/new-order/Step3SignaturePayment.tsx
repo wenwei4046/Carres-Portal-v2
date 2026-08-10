@@ -625,8 +625,16 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
         <div className="rounded border border-base-200 bg-white p-3.5 text-[11px] leading-relaxed text-base-700 max-h-[140px] overflow-auto">
           <p className="text-base-900 font-semibold mb-1.5">Carres Group Sdn Bhd · Order Terms</p>
           <p>
-            1. This sales order becomes a binding tax invoice once goods are delivered and full
-            payment is reconciled.
+            {/* THE OWNER-CORRECTED WORDING (2026-08-09), law in
+                docs/pdf/SO-PDF-STANDARD.md §T&C. Card 3.0-FIX applied it to the
+                PDF and MISSED THIS SCREEN, so the customer was signing "becomes
+                a binding tax invoice" while receiving "the sales invoice is a
+                separate document". The comment above this Section predicted
+                exactly that — "any future edit must touch both files together" —
+                and prose cannot enforce it, so sales-order-terms.test.tsx now
+                does. */}
+            1. This sales order records your purchase agreement with Carres. The sales invoice is a
+            separate document issued upon delivery.
           </p>
           <p>
             2. Balance due is payable in full on or before delivery. Cash, bank transfer, DuitNow

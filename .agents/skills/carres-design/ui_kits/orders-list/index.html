@@ -1,0 +1,244 @@
+<!-- @dsCard group="Operations" viewport="1440x820" name="Orders — list" subtitle="The canonical List page: nav · facet · toolbar · 44px table" -->
+<!-- @startingPoint section="Operations" subtitle="Orders list — the canonical list page" viewport="1440x900" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<title>Carres · Orders</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--canvas);font-family:var(--font-sans);color:var(--text-primary);display:grid;grid-template-columns:60px 1fr 52px;height:100vh;overflow:hidden}
+  .icon{width:18px;height:18px;stroke-width:2}
+
+  /* ---- Sidebar (collapsed icon rail) ---- */
+  .rail{background:#fff;border-right:1px solid var(--hairline);display:flex;flex-direction:column;align-items:center;padding:18px 0}
+  .rail .logo{width:26px;height:26px;margin-bottom:20px}
+  .rail nav{display:flex;flex-direction:column;gap:4px;flex:1}
+  .rail a{width:38px;height:38px;display:grid;place-items:center;border-radius:8px;color:var(--base-400);position:relative}
+  .rail a:hover{background:var(--base-50);color:var(--base-700)}
+  .rail a.on{background:var(--flame-light);color:var(--flame)}
+  .rail a.on::before{content:"";position:absolute;left:-11px;top:9px;bottom:9px;width:3px;background:var(--flame);border-radius:2px}
+  .rail .me{width:34px;height:34px;border-radius:50%;background:var(--base-900);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:600}
+
+  /* ---- Main ---- */
+  .main{display:flex;flex-direction:column;min-width:0}
+  .hdr{background:#fff;border-bottom:1px solid var(--hairline);padding:10px 24px 0}
+  .crumb{font-size:12px;color:var(--base-400);display:flex;align-items:center;gap:6px}
+  .hdr-row{height:56px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .title-wrap{display:flex;align-items:baseline;gap:12px}
+  .title{font-size:24px;font-weight:600;letter-spacing:-.01em}
+  .sync{font-size:12px;color:var(--base-400);display:flex;align-items:center;gap:5px}
+  .hdr-actions{display:flex;align-items:center;gap:14px}
+  .search{display:flex;align-items:center;gap:8px;width:250px;background:#fff;border:1px solid var(--base-200);border-radius:9999px;padding:7px 14px;color:var(--text-muted);font-size:13px}
+  .hdr-actions .ic{color:var(--base-500);position:relative;display:grid;place-items:center;cursor:pointer;width:36px;height:36px;border-radius:9px;border:1px solid var(--hairline);background:#fff}
+  .hdr-actions .ic:hover{background:var(--base-50)}
+  .badge{position:absolute;top:-6px;right:-8px;background:var(--flame);color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;padding:0 3px;border-radius:9999px;display:grid;place-items:center;font-family:var(--font-mono)}
+
+  .body{flex:1;display:flex;gap:16px;padding:16px 24px 20px;min-height:0}
+
+  /* ---- Facet ---- */
+  .facet{width:240px;flex:0 0 240px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+  .facet::-webkit-scrollbar{display:none}
+  .fgroup{background:#fff;border:1px solid var(--hairline);border-radius:12px;overflow:hidden}
+  .fbar{display:flex;align-items:center;justify-content:space-between;background:#F1EFE8;padding:7px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6F6960}
+  .fbar.danger{color:var(--overdue-ink)}
+  .fbar .tot{font-family:var(--font-mono);font-size:11px}
+  .frow{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;font-size:13px;color:var(--base-700);cursor:pointer}
+  .frow:hover{background:var(--base-50)}
+  .frow .c{font-family:var(--font-mono);font-size:12px;color:var(--base-500)}
+  .frow .c.warn{color:var(--waiting-ink);font-weight:600}
+  .frow .c.hot{color:var(--overdue-ink);font-weight:700}
+  .frow .money{color:var(--flame);font-weight:700}
+  .frow .ok{color:var(--ready-ink);font-weight:600}
+
+  /* ---- Right column ---- */
+  .col{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+  .toolbar{background:#fff;border:1px solid var(--hairline);border-radius:14px;box-shadow:var(--shadow-card);padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .tab{font-size:12.5px;padding:5px 12px;border-radius:9999px;background:transparent;color:var(--base-600);display:flex;gap:6px;align-items:center;cursor:pointer}
+  .tab .n{font-family:var(--font-mono);font-size:11px;color:var(--base-400)}
+  .tab.on{background:var(--base-900);color:#fff}
+  .tab.on .n{color:rgba(255,255,255,.7)}
+  .tright{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--base-500);white-space:nowrap}
+  .tcount{font-family:var(--font-mono);font-size:12px}
+
+  /* ---- Table ---- */
+  .iconbtn{width:34px;height:34px;border:1px solid var(--hairline);background:#fff;border-radius:9px;display:grid;place-items:center;color:var(--base-500);cursor:pointer}
+  .iconbtn:hover{background:var(--base-50)}
+  .tablebox{flex:1;background:#fff;border:1px solid var(--hairline);border-radius:14px 14px 0 0;overflow:auto;min-height:0}
+  .tablebox::-webkit-scrollbar{width:8px}
+  .tablebox::-webkit-scrollbar-thumb{background:var(--base-200);border-radius:4px}
+  table{width:100%;border-collapse:collapse;table-layout:fixed}
+  thead th{position:sticky;top:0;background:#fff;height:38px;text-align:left;padding:0 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--hairline);z-index:1}
+  tbody td{height:44px;padding:0 14px;border-top:1px solid rgba(17,24,39,.06);font-size:12.5px;vertical-align:middle;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  tbody tr:hover{background:var(--base-50)}
+  .cb{width:36px}
+  .oid{font-size:13px;font-weight:600;color:var(--base-900);font-family:var(--font-mono)}
+  .ref-main{font-size:12.5px;font-weight:600;color:var(--base-900);font-family:var(--font-mono)}
+  .ref-sub{font-size:10px;color:var(--base-400)}
+  .cust{font-size:13px;font-weight:500;color:var(--base-900)}
+  .cust-sub{font-size:10.5px;color:var(--base-400);font-family:var(--font-mono)}
+  .muted{color:var(--base-600)}
+  .log{font-size:12.5px;color:var(--base-700);font-weight:500}
+  .callnow{font-size:11px;color:var(--overdue-ink);font-weight:600}
+  .dl{font-size:12.5px;font-weight:600;color:var(--base-900)}
+  .over{display:inline-block;background:var(--overdue-fill);color:var(--overdue-ink);font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-right:5px}
+  .eta{font-size:10.5px;color:var(--base-400);margin-top:2px}
+  .foot{background:#fff;border:1px solid var(--hairline);border-top:0;border-radius:0 0 14px 14px;height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:12px;color:var(--base-500)}
+  .pill i{width:13px;height:13px}
+
+  /* ---- Right rail ---- */
+  .side2{background:#fff;border-left:1px solid var(--hairline);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:6px}
+  .side2 button{width:36px;height:36px;border:0;background:transparent;border-radius:9999px;display:grid;place-items:center;color:var(--base-500);cursor:pointer;position:relative}
+  .side2 button:hover{background:var(--base-100)}
+</style></head>
+<body>
+  <!-- Sidebar -->
+  <aside class="rail">
+    <img class="logo" src="../../assets/carres-logo.png" alt="Carres">
+    <nav>
+      <a title="Dashboard"><i data-lucide="layout-grid" class="icon"></i></a>
+      <a class="on" title="Orders"><i data-lucide="clipboard-list" class="icon"></i></a>
+      <a title="POS"><i data-lucide="shopping-cart" class="icon"></i></a>
+      <a title="Procurement"><i data-lucide="package-check" class="icon"></i></a>
+      <a title="Stock"><i data-lucide="boxes" class="icon"></i></a>
+      <a title="Transfers"><i data-lucide="arrow-left-right" class="icon"></i></a>
+      <a title="Payments"><i data-lucide="wallet" class="icon"></i></a>
+      <a title="Accounts"><i data-lucide="calculator" class="icon"></i></a>
+      <a title="Logistics"><i data-lucide="truck" class="icon"></i></a>
+      <a title="Support"><i data-lucide="life-buoy" class="icon"></i></a>
+    </nav>
+    <div class="me">OP</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="hdr">
+      <div class="crumb"><span>Operations</span><i data-lucide="chevron-right" style="width:13px;height:13px"></i><span>Orders</span></div>
+      <div class="hdr-row">
+        <div class="title-wrap">
+          <span class="title">Orders</span>
+          <span class="sync">Synced 16 Jul 26 <i data-lucide="refresh-cw" style="width:13px;height:13px"></i></span>
+        </div>
+        <div class="hdr-actions">
+          <div class="search"><i data-lucide="search" style="width:15px;height:15px"></i><span>SO number or customer…</span></div>
+          <span class="ic"><i data-lucide="bell" class="icon"></i><span class="badge">34</span></span>
+          <span class="ic"><i data-lucide="help-circle" class="icon"></i></span>
+          <span class="ic"><i data-lucide="settings" class="icon"></i></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="body">
+      <!-- Facet -->
+      <div class="facet">
+        <div class="fgroup">
+          <div class="fbar"><span>« Summary</span></div>
+          <div class="frow"><span>Outstanding</span><span class="c money">RM 55,758</span></div>
+          <div class="frow"><span>At-risk</span><span class="c hot">33</span></div>
+          <div class="frow"><span>On-time</span><span class="c ok">39</span></div>
+        </div>
+        <div class="fgroup">
+          <div class="fbar danger"><span>Chase now</span><span class="tot">55</span></div>
+          <div class="frow"><span>No ETA</span><span class="c">34</span></div>
+          <div class="frow"><span>No PO</span><span class="c">4</span></div>
+          <div class="frow"><span>Unassigned</span><span class="c">10</span></div>
+          <div class="frow"><span>No region</span><span class="c">3</span></div>
+          <div class="frow"><span>Urgent</span><span class="c">3</span></div>
+          <div class="frow"><span>Follow-up</span><span class="c">1</span></div>
+          <div class="frow"><span>For Jess</span><span class="c">0</span></div>
+        </div>
+        <div class="fgroup">
+          <div class="fbar"><span>Stock</span><span class="tot">172</span></div>
+          <div class="frow"><span>Ready</span><span class="c ok">104</span></div>
+          <div class="frow"><span>Waiting</span><span class="c warn">68</span></div>
+        </div>
+        <div class="fgroup">
+          <div class="fbar"><span>Logistic</span><span class="tot">166</span></div>
+          <div class="frow"><span>NETS</span><span class="c">162</span></div>
+          <div class="frow"><span>TEOW</span><span class="c">1</span></div>
+          <div class="frow"><span>AL</span><span class="c">1</span></div>
+        </div>
+      </div>
+
+      <!-- Right column -->
+      <div class="col">
+        <div class="toolbar">
+          <div class="tabs">
+            <span class="tab on">All <span class="n">176</span></span>
+            <span class="tab">Placed <span class="n">7</span></span>
+            <span class="tab">Proceed <span class="n">65</span></span>
+            <span class="tab">Pending <span class="n">0</span></span>
+            <span class="tab">Scheduled <span class="n">0</span></span>
+            <span class="tab">Delivered <span class="n">104</span></span>
+          </div>
+          <div class="tright">
+            <span class="tcount">30 of 176</span>
+            <button class="btn-secondary" style="padding:7px 14px">+ Master</button>
+            <button class="btn-hero" style="padding:7px 14px">+ AutoCount</button>
+            <button class="iconbtn"><i data-lucide="more-vertical" style="width:18px;height:18px"></i></button>
+          </div>
+        </div>
+
+        <div class="tablebox">
+          <table>
+            <colgroup><col style="width:36px"><col style="width:12%"><col style="width:11%"><col style="width:18%"><col style="width:10%"><col style="width:11%"><col style="width:13%"><col style="width:13%"><col style="width:12%"></colgroup>
+            <thead><tr>
+              <th class="cb"></th><th>Order ID</th><th>Ref No</th><th>Customer</th><th>Region</th><th>Logistic</th><th>Deadline</th><th>Stock</th><th>Next</th>
+            </tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="foot"><span>176 orders</span><span style="color:var(--base-400);display:flex;align-items:center;gap:5px"><i data-lucide="rotate-ccw" style="width:12px;height:12px"></i>Reset filters</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right rail -->
+  <aside class="side2">
+    <button title="Calendar"><i data-lucide="calendar-days" class="icon"></i></button>
+    <button title="Notes"><i data-lucide="lightbulb" class="icon"></i></button>
+    <button title="Follow-ups"><i data-lucide="flag" class="icon"></i></button>
+    <button title="Activity"><i data-lucide="scroll-text" class="icon"></i></button>
+  </aside>
+
+<script>
+const DATA = [
+  {id:"SO-1101",ref:"2012 SO",cust:"BIG MATTRESS B…",phone:"016-2827353",region:"Cheras",dl:"9 Jul 26",over:true,stock:{t:"waiting",l:"Waiting 0/2"},eta:"ETA 5 Jul 26",next:{t:"overdue",l:"Chase logistic"}},
+  {id:"SO-1152",ref:"CR1196",cust:"Chuah Jie Hong",phone:"012-3603085",region:"Selang…",dl:"6 Jul 26",over:true,stock:{t:"ready",l:"Ready 1/1"},eta:"",next:{t:"overdue",l:"Chase logistic"}},
+  {id:"SO-1153",ref:"CR0902",cust:"LEE WEI YANG",phone:"011-31873191",region:"Pucho…",dl:"6 Jul 26",over:true,stock:{t:"ready",l:"Ready 1/1"},eta:"",next:{t:"overdue",l:"Chase logistic"}},
+  {id:"SO-1154",ref:"OP1011",cust:"Fong",phone:"016-9478599",region:"Nilai",dl:"7 Jul 26",over:true,stock:{t:"overdue",l:"No PO 0/1"},eta:"",next:{t:"overdue",l:"Order PO"}},
+  {id:"SO-1128",ref:"2011 SO",cust:"Mr Ng",phone:"012-4955022",region:"Seber…",dl:"12 Jul 26",over:true,stock:{t:"waiting",l:"Waiting 0/16"},eta:"ETA 14 Jul 26",next:{t:"overdue",l:"Chase logistic"}},
+  {id:"SO-1155",ref:"CR1202",cust:"Ben Wong Koey C…",phone:"017-3208113",region:"Serem…",dl:"13 Jul 26",over:true,stock:{t:"waiting",l:"Waiting 0/1"},eta:"ETA 14 Jul 26",next:{t:"overdue",l:"Chase logistic"}},
+  {id:"SO-1149",ref:"TCF0475",cust:"Wong Young Huu",phone:"013-7188868",region:"Kuala…",dl:"13 Jul 26",over:true,stock:{t:"waiting",l:"Waiting 0/1"},eta:"ETA 7 Jul 26",next:{t:"overdue",l:"Chase logistic"}},
+  {id:"SO-1112",ref:"TCF0475",extra:2,cust:"Wong Young Huu",phone:"013-7188868",region:"Kuala…",dl:"13 Jul 26",over:true,stock:{t:"waiting",l:"Waiting 0/3"},eta:"ETA 7 Jul 26",next:{t:"overdue",l:"Chase logistic"}},
+  {id:"SO-1113",ref:"TCF0538",extra:2,cust:"Wong Young Huu",phone:"013-7188868",region:"Kuala…",dl:"13 Jul 26",over:true,stock:{t:"waiting",l:"Waiting 0/1"},eta:"ETA 2 Jul 26",next:{t:"overdue",l:"Chase logistic"}},
+  {id:"SO-1106",ref:"CR1182",cust:"GAN KWI ENG",phone:"016-6634185",region:"Kuala…",dl:"13 Jul 26",over:true,stock:{t:"waiting",l:"Waiting 0/2"},eta:"ETA 7 Jul 26",next:{t:"overdue",l:"Chase logistic"}},
+  {id:"SO-1107",ref:"CR1179",cust:"MACO",phone:"016-5772786",region:"Shah …",dl:"13 Jul 26",over:true,stock:{t:"waiting",l:"Waiting 0/2"},eta:"ETA 8 Jul 26",next:{t:"overdue",l:"Chase logistic"}},
+  {id:"SO-1160",ref:"CR1210",cust:"Tan Sri Lim",phone:"012-8890021",region:"Klang",dl:"18 Jul 26",over:false,stock:{t:"ready",l:"Ready 2/2"},eta:"",next:{t:"ready",l:"Book logistic"}},
+  {id:"SO-1161",ref:"CR1211",cust:"Sunway Resort",phone:"03-74928000",region:"PJ",dl:"20 Jul 26",over:false,stock:{t:"waiting",l:"Waiting 1/4"},eta:"ETA 17 Jul 26",next:{t:"waiting",l:"Chase supplier"}},
+  {id:"SO-1162",ref:"CR1212",cust:"Ong Bee Choo",phone:"019-2231884",region:"Kajang",dl:"21 Jul 26",over:false,stock:{t:"ready",l:"Ready 1/1"},eta:"",next:{t:"ready",l:"Confirm"}},
+];
+function rowHTML(o){
+  const ic = {ready:'check',waiting:'clock',overdue:'alert-triangle'}[o.stock.t];
+  const stockPill = `<span class="pill pill-${o.stock.t}"><i data-lucide="${ic}" style="width:13px;height:13px"></i>${o.stock.l}</span>`;
+  const nextPill  = `<span class="pill pill-${o.next.t}">${o.next.l}</span>`;
+  const refExtra  = o.extra?` <span class="ref-sub">+${o.extra}</span>`:'';
+  const dlLine = o.over?`<span class="over">over</span><span class="dl">${o.dl}</span>`:`<span class="dl">${o.dl}</span>`;
+  const eta = o.eta?`<div class="eta">${o.eta}</div>`:'';
+  return `<tr>
+    <td class="cb"><input type="checkbox" class="checkbox is-select"></td>
+    <td><span class="oid">${o.id}</span></td>
+    <td><div class="ref-main">${o.ref}${refExtra}</div></td>
+    <td><div class="cust">${o.cust}</div><div class="cust-sub">${o.phone}</div></td>
+    <td class="muted">${o.region}</td>
+    <td><div class="log">NETS</div><div class="callnow">call now</div></td>
+    <td>${dlLine}</td>
+    <td>${stockPill}${eta}</td>
+    <td>${nextPill}</td>
+  </tr>`;
+}
+document.getElementById('rows').innerHTML = DATA.map(rowHTML).join('');
+lucide.createIcons({ attrs: { 'stroke-width': 2.5 } });
+</script>
+</body></html>
