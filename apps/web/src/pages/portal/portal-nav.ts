@@ -28,6 +28,7 @@ import {
   ShieldCheck,
   HandCoins,
   UserCheck,
+  History,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -118,11 +119,33 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
       {
         // SO-5 (Loo, 2026-08-09) — the page is Sales Orders and the door says so.
+        // ⭐ PRODUCTION CUTOVER (owner, 2026-08-10) — this door is now the NEW
+        // Sales Order register (`SalesOrdersRegister`), and it is the OFFICIAL
+        // Sales Orders entry. The old control table moved out to its own
+        // temporary door below.
         key: "orders",
         label: "Sales Orders",
         icon: ClipboardList,
         path: "/operation/orders",
         badge: "orders",
+      },
+      // ⭐ THE TEMPORARY DOOR (SALES-ORDER-CUTOVER, owner 2026-08-10).
+      //
+      // The old Orders control table is NOT deleted and NOT hidden — it keeps
+      // its own separate route because it still carries the Delivery, Payment
+      // and Purchasing work that has not been migrated yet, plus the AutoCount
+      // import (today the ONLY import surface, which is what blocks the final
+      // delete).
+      //
+      // The label says `(temporary)` on purpose: a legacy surface that looks
+      // permanent BECOMES permanent. This item is deleted, not renamed, when
+      // the last box on the cutover map is empty. Its icon is deliberately NOT
+      // ClipboardList — two doors sharing one icon read as the same page.
+      {
+        key: "old-orders",
+        label: "Old Orders (temporary)",
+        icon: History,
+        path: "/operation/old-orders",
       },
       // Purchasing (2026-07-21) — the THREE procurement rails (To Order / the
       // Purchase Order register / Receiving) collapsed into ONE sidebar item.

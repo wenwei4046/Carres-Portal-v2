@@ -103,7 +103,10 @@ import {
   RefreshCw,
   ChevronRight,
   ChevronsLeft,
-  ClipboardList,
+  // Cutover 2026-08-10 — the nameplate icon moved ClipboardList → History.
+  // ClipboardList is the NEW Sales Order register's face now, and two doors
+  // wearing one icon read as the same page.
+  History,
   Clock,
   Inbox,
   LayoutGrid,
@@ -3745,11 +3748,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
        fixed 44px ModuleHeader, the list below is the only scroll area.
        Search moved to the toolbar row (it searches THIS page's data). */
     <div className="h-full min-h-0 flex flex-col">
+      {/* ⭐ SALES ORDER PRODUCTION CUTOVER (owner, 2026-08-10) — the ONLY
+          change this card makes to this page, and it is a LABEL, not a
+          feature: the nameplate must say what the sidebar door says, and both
+          must read TEMPORARY. Sales Order work lives on the new register now;
+          what is left here is the Delivery / Payment / Purchasing work and the
+          AutoCount import that have not been migrated. The page stays frozen
+          otherwise — see `docs/SALES-ORDER-CUTOVER.md`. */}
       <ModuleHeader
         testId="orders-header"
-        icon={ClipboardList}
-        word="Orders"
-        docTitle="Orders — Carres"
+        icon={History}
+        word="Old Orders (temporary)"
+        docTitle="Old Orders (temporary) — Carres"
         right={
           /* The sync SENTENCE is read once a week; the FACT rides the ⟳'s
              hover instead of spending header width on it (Loo 2026-08-02:

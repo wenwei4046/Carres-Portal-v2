@@ -184,3 +184,59 @@ describe("PortalSidebar — Commission is ONE HR entry (Loo 2026-07-27)", () => 
     expect(commissionLink().className).not.toContain("font-semibold");
   });
 });
+
+/**
+ * ⭐ SALES ORDER PRODUCTION CUTOVER (owner, 2026-08-10 —
+ * `docs/SALES-ORDER-CUTOVER.md`).
+ *
+ * The rail carries TWO Orders doors, and the difference between them must be
+ * legible from the rail alone:
+ *   - `Sales Orders`           → `/operation/orders`      the OFFICIAL page
+ *   - `Old Orders (temporary)` → `/operation/old-orders`  the door being closed
+ *
+ * The word `(temporary)` is load-bearing, not decoration: a legacy surface
+ * that looks permanent becomes permanent. And exactly ONE item may be lit at a
+ * time — the reason the temporary door is `/operation/old-orders` and not a
+ * `/operation/orders/...` sub-path, which `startsWith` would light twice.
+ */
+describe("PortalSidebar — the Sales Order cutover's two doors", () => {
+  beforeEach(() => {
+    mockRole = "operation";
+  });
+
+  const salesLink = () =>
+    screen.getByText("Sales Orders").closest("a") as HTMLAnchorElement;
+  const oldLink = () =>
+    screen
+      .getByText("Old Orders (temporary)")
+      .closest("a") as HTMLAnchorElement;
+
+  it("both doors are in the rail, each pointing at its own route", () => {
+    renderAt("/operation/orders");
+    expect(salesLink()).toHaveAttribute("href", "/operation/orders");
+    expect(oldLink()).toHaveAttribute("href", "/operation/old-orders");
+  });
+
+  it("the old door says it is temporary", () => {
+    renderAt("/operation/orders");
+    expect(screen.getByText("Old Orders (temporary)")).toBeInTheDocument();
+  });
+
+  it("on /operation/orders only Sales Orders is lit", () => {
+    renderAt("/operation/orders");
+    expect(salesLink().className).toContain("font-semibold");
+    expect(oldLink().className).not.toContain("font-semibold");
+  });
+
+  it("on /operation/old-orders only the old door is lit", () => {
+    renderAt("/operation/old-orders");
+    expect(oldLink().className).toContain("font-semibold");
+    expect(salesLink().className).not.toContain("font-semibold");
+  });
+
+  it("the old door stays lit on a carried-over kanban slug", () => {
+    renderAt("/operation/old-orders/in_production");
+    expect(oldLink().className).toContain("font-semibold");
+    expect(salesLink().className).not.toContain("font-semibold");
+  });
+});

@@ -160,12 +160,38 @@ what belongs in the right context      what is duplicated
 
 **⛔ WHAT THE NEXT CHAT MAY NOT DO**
 ```
-✗ create a new Orders page          the route stays /operation/orders
+✗ create a new Orders page          the two routes are FIXED, see §0.1 below
 ✗ touch any business logic          the list above is PRESERVED
 ✗ add another grid capability       S2.5 is STOPPED; the foundation is done
 ✗ re-run the width / density work   it is finished and recorded
 ✗ propose a hierarchy from CODE     the last one did, and this block is why
 ```
+
+## §0.1 · TWO DOORS — the production cutover, owner ruling 2026-08-10
+
+**The Orders module has TWO routes, and neither may serve the other's page.**
+Ruled in [`docs/SALES-ORDER-CUTOVER.md`](../SALES-ORDER-CUTOVER.md), which is the
+authority for the dismantling; this section only records what is wired.
+
+```
+/operation/orders[/:stage]      SalesOrdersRegister      OFFICIAL "Sales Orders"
+/operation/orders/so/new|:id    SalesOrderWorkspace      the order itself
+/operation/old-orders[/:stage]  OperationOrdersControl   "Old Orders (temporary)"
+```
+
+**The old page is NOT deleted and NOT hidden.** It still carries every Delivery,
+Payment and Purchasing signal there is, plus the AutoCount import — and that
+import, being the only import surface, is what blocks the final delete. It is
+FROZEN: blocker and data-defect fixes only, no new features, no UI changes.
+
+**The word `(temporary)` is load-bearing**, in the sidebar and on the nameplate
+both. A legacy surface that looks permanent becomes permanent. When the last box
+on the cutover map is empty, that nav item and that route are DELETED — never
+renamed into something that sounds permanent.
+
+**The temporary door is `/operation/old-orders`, never `/operation/orders/old`.**
+The sidebar decides its highlight with `pathname.startsWith(item.path)`, so a
+sub-path of the register would light BOTH items at once.
 
 **A REGISTER-ONLY IA RECOMMENDATION WAS DRAFTED 2026-08-08 AND NOT APPROVED.** It is
 deliberately NOT recorded here: it was reasoned from the source and the measurements, which is
@@ -383,7 +409,8 @@ All · Placed · Proceed · To book · Customer confirmed · Delivered
 
 ### WHAT IS ON SCREEN TODAY
 `apps/web/src/pages/operation/OperationOrdersControl.tsx`, **5,152 lines** ·
-route `/operation/orders` · ***measured 2026-08-06 — every line of logic read end to end;
+route **`/operation/old-orders`** since the cutover (§0.1) — it was `/operation/orders`
+when this was measured · ***measured 2026-08-06 — every line of logic read end to end;
 the JSX read structurally.*** It merges three legacy surfaces — the 6-column kanban, the
 AutoCount triage Inbox and the flat read-only feed — into one table.
 
