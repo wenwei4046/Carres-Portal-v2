@@ -696,6 +696,40 @@ operationOrdersRouter.post("/", requireOperation, async (c) => {
   return c.json(data, 201);
 });
 
+// POST /:id/floors — 3.2's read-only consequence evaluator. A POST for the
+// body's sake only: it calls ONE read-only definer function
+// (sales_order_floors, 0328) and writes nothing. The 3.3 APPLY RPC calls the
+// SAME function pre-mutation — one floor implementation (Law D).
+const floorsInput = z.object({
+  fields: z.array(z.string().trim().min(1)).min(1),
+  proposedLines: z
+    .array(z.object({ sku: z.string().trim().min(1), qty: z.number().min(0) }))
+    .optional(),
+});
+
+operationOrdersRouter.post("/:id/floors", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = floorsInput.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_floors", {
+    p_order_id: id,
+    p_changed: parsed.data.fields,
+    p_proposed_lines: parsed.data.proposedLines ?? null,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
 // GET /reference/dealers — id + name for the create form's dealer picker.
 // RLS-scoped read (internal roles read dealers — the same embed the list
 // already prints). A static segment outranks `/:id` in Hono's router.
