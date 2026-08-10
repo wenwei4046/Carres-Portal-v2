@@ -91,6 +91,18 @@ gone, and its thinking would survive inside four new places.
 
 ## ☑ CARD · SALES ORDER PRODUCTION CUTOVER — DONE. Now STOP.
 
+**OWNER ACCEPTED. This card is CLOSED.** The route separation is proven and
+remains the operating rule:
+
+```
+/operation/orders      = Sales Orders reference destination
+/operation/old-orders  = Old Orders (temporary) legacy execution destination
+```
+
+**Old Orders stays fully operational until every remaining responsibility has
+moved to its owning destination.** It receives no closing date yet. Delivery,
+Payments and Purchasing migration are separate cards.
+
 **Scope — exactly this, nothing else:**
 ```
 1. The NEW Sales Order register becomes the OFFICIAL Sales Orders entry
@@ -279,13 +291,11 @@ import     "+ AutoCount" still opens the import page
    cutover regression and it is not this card's to fix (Stage 1–3 are closed).
 🟡 the repo's e2e login helpers look for a "Sign in" button that no longer
    exists — the login page's submit says "Enter portal".
-🟡 ENGINEERING.md §9's "Live web bundle" and "Live Worker" rows were both
-   stale before this card. Updated in the same PR.
 ```
 
 ---
 
-## AFTER THIS CARD PASSES
+## AFTER THIS CLOSED CARD
 
 Only then does module-by-module dismantling begin, and each one starts from
 that module's operator journey — never from the old page's widget.

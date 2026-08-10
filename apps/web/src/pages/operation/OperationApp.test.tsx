@@ -139,6 +139,8 @@ describe("OperationApp — the Sales Order cutover's two doors", () => {
     renderApp("/operation/orders");
     expect(screen.getByTestId("register-stub")).toBeInTheDocument();
     expect(screen.queryByTestId("old-orders-stub")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sales-orders-work-surface")).toHaveClass("overflow-hidden");
+    expect(screen.getByTestId("sales-orders-work-surface")).not.toHaveClass("overflow-auto");
   });
 
   it("/operation/orders/:stage still mounts the NEW register", () => {
@@ -170,5 +172,6 @@ describe("OperationApp — the Sales Order cutover's two doors", () => {
   it("the workspace route is unshadowed by the old door", () => {
     renderApp("/operation/orders/so/new");
     expect(screen.getByTestId("workspace-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("sales-orders-work-surface")).not.toBeInTheDocument();
   });
 });

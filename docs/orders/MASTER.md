@@ -108,64 +108,34 @@ Nothing survives merely because it is already there.**
 
 ---
 
-# ⛔ START HERE — SALES ORDER IS NOT FINISHED, AND THE LAST PROGRAMME MISSED WHY
+# ✅ SALES ORDERS REFERENCE IMPLEMENTATION — STAGE A SHIPPED 2026-08-10
 
-> **Loo, 2026-08-08, on the live page:** *"my page now all messy and don't know how to work —
-> you fail advise me."* **He is right, and this block exists so the next chat does not repeat it.**
-
-**WHAT WENT WRONG.** Ten cards shipped between 2026-08-07 and 2026-08-08 — S1 · S2.0 · S2.1 ·
-S2.2 · S2.3 · S3.1 · S3.2 · S3.3 · P20 · D9. **Every one of them upgraded HOW THE TABLE IS
-DRAWN. Not one of them asked what the operator should SEE.** The engine is now correct, tested
-and measured to the pixel; the page is not easier to work. **A grid programme was run where a
-product question was owed.**
-
-**The tell was there the whole time and nobody acted on it.** `../research/grid-findings.md` §6
-has carried this line through every round: *"What the operator actually does with the list.
-Nobody in this investigation has watched one work."* Ten cards were built past it.
-
-**WHAT IS SAFE — do not rebuild any of it.** All of it is live and covered by 2,715 passing
-tests:
-```
-the APIs · every calculation · the action ladder (§2.1) · the queue logic ·
-PIC / ownership (§2.2) · stock · delivery · money · permissions ·
-every order record · D9's readiness fix · the whole §2 engine
-```
-**And the grid foundation is DONE.** Sorting, per-column filters, footer totals, content-sized
-columns that no longer squeeze, the flag column back to 30px. **None of that is in question.**
-
-**WHAT IS NOT DECIDED, and is the whole of the next phase:**
-```
-what the operator sees FIRST          the information hierarchy
-which columns stay / merge / go        the queue hierarchy
-what belongs in the row expansion      what belongs in the detail workspace
-what belongs in the right context      what is duplicated
-```
-
-### HOW THE NEXT CHAT MUST WORK — and this is the correction, not a preference
+The official Sales Orders destination now follows the approved UI Constitution. This card
+changed composition and the reference-grid visual baseline only; it did not reopen the
+business engine or the route cutover.
 
 ```
-1  STUDY FIRST.   Read this file + CLAUDE.md. Open the LIVE page.
-                  Read `../research/grid-findings.md` (the measurements are done —
-                  do NOT re-measure widths, densities or engines).
-
-2  CONSULT, DO NOT PROPOSE-AND-SHIP.  Ask Loo what the page is FOR before
-                  recommending what it shows. He is the operator's proxy and he
-                  has said plainly he cannot judge a technical table.
-                  ONE question at a time. Conclusion first. Simple Chinese.
-                  ASCII shapes, never a wall of numbers.
-
-3  ONLY THEN CARD IT.  He approves the information hierarchy → write it HERE →
-                  commit immediately → then layout → then build.
+DestinationHeader  44px  one Sales Orders identity; no duplicate tab/title
+Work Toolbar       45px  Not delivered / All orders · Search · Filters · Export ·
+                          Columns · New Sales Order; one governed row
+Work Surface             DataGrid owns both scroll axes; route wrapper does not scroll
 ```
 
-**⛔ WHAT THE NEXT CHAT MAY NOT DO**
-```
-✗ create a new Orders page          the two routes are FIXED, see §0.1 below
-✗ touch any business logic          the list above is PRESERVED
-✗ add another grid capability       S2.5 is STOPPED; the foundation is done
-✗ re-run the width / density work   it is finished and recorded
-✗ propose a hierarchy from CODE     the last one did, and this block is why
-```
+The DataGrid reference appearance is local to Sales Orders: rendered 31px header, 10px bold
+uppercase header type, rendered 33px single-line parent rows, 11px cell type, 8px horizontal
+cell padding, rendered 22px footer, flat grid, faint dividers and no zebra. It preserves
+server Search, typed column filters, Columns, Excel Export, resize, reorder, the existing
+browser layout key and expanded order lines.
+
+**Measured against the production bundle shape at 1920 · 1440 · 1130:** every target rendered
+exactly; one destination identity, Search and Work Toolbar; zero Sales Orders tabs; no outer
+scroll. At 1130 the 846px toolbar fit one row with no clipped child, while the 1,152px grid
+kept its own 306px horizontal overflow. Search returned the matching orders; a Customer filter
+reduced 74 rows to 1 and Clear restored 74; Phone remained visible after reload; expansion
+opened one line-item disclosure; Export downloaded an XLSX file; browser console errors: zero.
+
+**Stage B is not started.** Expansion + virtualization remains its own engine card. Sales
+Order Workspace, Old Orders execution, Delivery, Payments and Purchasing are unchanged.
 
 ## §0.1 · TWO DOORS — the production cutover, owner ruling 2026-08-10
 

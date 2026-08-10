@@ -34,6 +34,7 @@ export default function ModuleHeader({
   docTitle,
   right,
   children,
+  renderedHeight44 = false,
 }: {
   testId: string;
   /** The module's one face — the same Lucide icon as its sidebar item. */
@@ -46,6 +47,9 @@ export default function ModuleHeader({
   right?: ReactNode;
   /** The module's tab strip, when it has sibling pages. */
   children?: ReactNode;
+  /** DestinationHeader's measured 44px includes the bottom rule. Existing
+      module headers retain their original 44px content row + rule. */
+  renderedHeight44?: boolean;
 }) {
   useEffect(() => {
     document.title = docTitle;
@@ -56,10 +60,12 @@ export default function ModuleHeader({
 
   return (
     <div
-      className="shrink-0 bg-white border-b border-base-200 px-6"
+      className={`shrink-0 bg-white border-b border-base-200 px-6 ${
+        renderedHeight44 ? "box-border h-11" : ""
+      }`}
       data-testid={testId}
     >
-      <div className="flex items-center gap-4 h-11">
+      <div className={`flex items-center gap-4 ${renderedHeight44 ? "h-full" : "h-11"}`}>
         <span
           className="shrink-0 flex items-center gap-1.5 text-body font-semibold text-base-900 select-none cursor-default"
           data-testid={`${testId}-module-word`}
