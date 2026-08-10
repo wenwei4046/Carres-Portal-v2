@@ -15,7 +15,7 @@
 | Web UI | **Radix primitives** (behaviour) + the Carres kit (appearance) + `lucide-react` + `sonner` + `react-day-picker`. **NOT shadcn/ui** |
 | API | Hono v4 on Cloudflare Workers (Wrangler) |
 | Shared | zod schemas + db-types + domain types + adapters in `packages/shared` |
-| DB | Supabase Postgres + RLS + RPCs + Auth + Storage |
+| DB | Supabase Postgres + RLS + RPCs + Auth + Storage — project `kfprgpjpaffedghytstl` |
 | Deploy | Cloudflare Pages (web) + Cloudflare Workers (api) |
 | Packages | pnpm v9 + workspaces + Turborepo |
 
@@ -154,24 +154,31 @@ SPA fallback lives in `apps/web/public/_redirects`: `/*  /index.html  200`.
 - **Measure the baseline on a detached worktree at `origin/main` before quoting a delta.** The
   documented number is a starting point, not a substitute for running it.
 
-### Known pre-existing failures — the baseline, not regressions
+### Known pre-existing failures — the WEB baseline is now ZERO
 
 ```
-api 3   supplier/pos ×2 · partner/pickups ×1
-web 17  OperationOrders ×7 · OrderCustomerCard ×4 · OhanaSofaTab ×4 ·
-        NiceFutureMattressTab ×1 · OperationPurchaseOrders ×1
+api 3   supplier/pos ×2 · partner/pickups ×1        ← still open
+web 0   231 files · 2,707 tests · 0 failures        ← Orders S2.0, 2026-08-08
 ```
 
-Measured 2026-08-05 on `origin/main`: **web 17 failed / 2,484 passed of 2,501.**
-`OperationPurchaseOrders.test.tsx` and two others also flake under full-suite load and pass in
-isolation — **run twice before calling one a regression.**
+**The 16 web failures this section used to list are FIXED** (`OperationOrders` ×7 ·
+`OrderCustomerCard` ×4 · `OhanaSofaTab` ×4 · `NiceFutureMattressTab` ×1). Every one was a stale
+TEST asserting UI a ruling had removed — no component changed. `OperationPurchaseOrders` ×1 was
+already gone by then. **Orders MASTER §3 records which ruling killed which assertion**, which is
+the part worth keeping: nine of the sixteen died to one ruling (Jess 2026-07-11, actions move
+into each panel's ⋮), and one file in that same suite had already followed the move a card
+earlier while its siblings did not.
 
-**Re-measured 2026-08-06 (T5), and the flake is now sized.** The five files above run
-together: **16 failed / 151 passed of 167**, byte-identical with and without that card's
-change. The SAME tree under FULL-suite load: **26 failed / 2,638 passed of 2,664** — ten more
-failures that are load, not code, and `OperationPurchaseOrders.test.tsx` passes **123/123**
-alone. **A full-suite number is not a baseline; compare the same files at the same
-concurrency, or you will chase somebody else's timeout.**
+**A green web baseline is the point, not the tidiness.** While it was red, no card could tell
+its own failures from the inherited ones — S2.0 was only able to prove it had broken nothing by
+re-running the same 16 on a detached checkout of `origin/main` and matching the set exactly.
+
+**The load-flake finding still stands and still binds.** Measured 2026-08-06 (T5): the same five
+files run together gave **16 failed / 151 passed**, while the SAME tree under full-suite load
+gave **26 failed / 2,638 passed** — ten extra failures that were concurrency, not code, and
+`OperationPurchaseOrders.test.tsx` passed **123/123** alone. **A full-suite number is not a
+baseline; compare the same files at the same concurrency, or you will chase somebody else's
+timeout.** Run twice before calling anything a regression.
 
 ---
 
@@ -203,8 +210,8 @@ concurrency, or you will chase somebody else's timeout.**
 | API | `https://carres-portal-v2-api.wwch.workers.dev` + `api.carresofficial.com` |
 | DB | Supabase `kfprgpjpaffedghytstl` — staging IS production |
 | Migration tail | `0325`. **Verify against the tracker before numbering.** |
-| Live web bundle | **`index-fPWjYV-6.js`** from main tip `d07bc3c1` (2026-08-07) — carres-portal `91630c27` + carres-pos `e97622e0`, both deployed before polling, all four canonicals converged on the second poll. Live md5 == local build (`aa5a2726…`), `SERVICE_ROLE` **0**. Verified in a real browser on live data before shipping: **60 bought rows → 0 red bars, 60 muted; 27 work rows → 9 red, 0 muted**, and every item row carries the `↳` marker. |
-| Live Worker | **version `88516ff6-1b80-445d-9bb8-71d5187818b5`** from main tip `b93d652b` (T6, 2026-08-06) — still current and **nothing owed**: the last two changes touched `apps/web` only and the dry-run bundle is byte-identical (`4bb2fac8…`). `/health` **200 `{"ok":true}`**. Predecessor `9402d994` |
+| Live web bundle | **`index-GJ7-CZe6.js`** from main tip `ff539f99` (Orders S2.5 · Expansion, 2026-08-08) — carres-portal `d47b5806` + carres-pos `64ce03ff`, both canonicals converged on the FIRST poll. **Live md5 == local build byte for byte** (`71cbb0be…`), `SERVICE_ROLE` **0**. Verified in BOTH directions with a control: S2.5's `Show items in SO-` **0 → 1** and `order-items-panel` **0 → 1**, while S3.3's `w:331` stays **1** and the retired `w:253` stays **0** — so the deploy carries the new card WITHOUT having quietly re-shipped an older width. **No Worker deploy owed:** every file since `21b7e38e` is `apps/web` + docs. **NOT verified with eyes: the authenticated Orders screen** — there is no `apps/web/.env.local` in any worktree, so a signed-in local page cannot be reached, and the 42px gutter + the eight unchanged widths were measured instead in real Chromium at 1130px against the kit's own colgroup (recorded in `orders/MASTER.md` §3 · S2.5). |
+| Live Worker | **version `fa58a642-6003-4497-8529-1d7a4d38f8f5`** from main tip `a7daf937` (Orders D9, 2026-08-08) — **owed and paid**: D9 changed no `apps/api` file, but `apps/api/src/routes/operation/order-control.ts:11` imports `bookingConfirmGate`, whose answer changed, which is exactly the case §6 warns about. Deployed `--env production`; `/health` **200 `{"ok":true}`**, `api.carresofficial.com` custom domain and the `0 1 * * *` cron both re-bound. Predecessor `88516ff6-1b80-445d-9bb8-71d5187818b5` |
 
 
 > **⚠️ `0318` and `0319` are IN THE REPOSITORY AND ABSENT FROM THE TRACKER**, measured

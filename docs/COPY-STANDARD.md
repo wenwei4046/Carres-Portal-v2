@@ -817,6 +817,9 @@ checklist — never a second list of ticks beside it.
 Use these words EVERYWHERE. Never a synonym in a different page. When in
 doubt, grep the codebase and match what already ships.
 
+**These rows name RECORDS, documents, buttons and statuses. MODULE and PAGE names are
+Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md) §2.1.**
+
 | Concept | Canonical word | Do NOT use |
 |---------|---------------|------------|
 | Raise a purchase order to a factory — **it is ONE act, never two** | **`Issue PO`** (the formal PO exists) | **Send PO** · **Prepare PO** · **Draft PO** — all retired · Place · Raise · Push · Submit · Create |

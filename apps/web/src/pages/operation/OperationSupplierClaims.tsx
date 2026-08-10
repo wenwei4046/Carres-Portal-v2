@@ -24,6 +24,7 @@ import DataTable, {
   type Column,
   type TableSort,
 } from "@/components/kit/DataTable";
+import EmptyState from "@/components/kit/EmptyState";
 import { SectionCard, SectionBand } from "@/components/SectionPanel";
 // R8 — UI-KIT §6.1: P2's Receiving half already extracted this row, and this
 // page shipped a third hand-written copy of it one import away from the
@@ -436,10 +437,28 @@ export default function OperationSupplierClaims() {
     setCollapsedGroups((p) => toggleInSet(p, key));
   }
 
+  /**
+   * ⭐ AN EMPTY STATE IS AN ANSWER, SO IT MAY NOT ASSERT WHAT THE DATA DENIES
+   * (card P20.6).
+   *
+   * `No open claims — every delivery so far arrived complete and on time.` is
+   * true only while NO claim has ever been filed. The moment one has been —
+   * production 2026-08-08 holds exactly that: one claim, closed — the second
+   * half is false, and it is the half that reassures. A closed claim IS a
+   * delivery that did not arrive complete; saying otherwise on the module's own
+   * front door is worse than saying nothing, because §9's whole point is that
+   * the sentence must tell the operator something TRUE they did not know.
+   *
+   * So the reassurance is kept for the case it describes and dropped for the
+   * case it does not. No word is invented: the short line is the long line's
+   * own first clause, and the rail beside it already states `Closed` and `All`.
+   */
   const emptyLine = queueOnly
     ? QUEUE_EMPTY
     : tab === "open"
-      ? "No open claims — every delivery so far arrived complete and on time."
+      ? counts.all === 0
+        ? "No open claims — every delivery so far arrived complete and on time."
+        : "No open claims."
       : "Nothing in this tab.";
 
   /**
@@ -801,6 +820,23 @@ export default function OperationSupplierClaims() {
           )}
 
           {!isLoading && !isError && (
+            /* ⭐ THE EMPTY STATE SITS IN THE VISIBLE WIDTH (card P20.6).
+               The kit renders `empty` inside a `<td colSpan>`, so its
+               `justify-center` centres on the TABLE — and under
+               `sizing="content"` this table is 1,439px whether or not it holds
+               a row. Measured in a browser: the sentence's centre is pinned at
+               721px at EVERY pane width, so at a 700px pane it is 21px past the
+               right edge and at 560px it is 161px off-screen — the operator
+               lands on Claims and sees a blank grid.
+
+               `container-type: inline-size` here gives the cell a handle on
+               what is actually visible, exactly as `po-listing` does for
+               Purchase Orders' expanded record. `sticky left-0` is NOT the
+               answer and that is measured, not assumed: card Q10 probed it
+               inside this kit's `<td>` and it scrolled straight off, because a
+               sticky element whose containing block is a table cell does not
+               hold horizontally. */
+            <div className="flex-1 min-h-0 flex flex-col [container-type:inline-size]">
             <DataTable
               rows={rows}
               columns={columns}
@@ -814,7 +850,17 @@ export default function OperationSupplierClaims() {
                  measured and the leftover goes to a filler holding nothing. */
               sizing="content"
               label="Claims"
-              empty={emptyLine}
+              /* `w-[100cqi]` = the visible pane, so the kit's own centred
+                 EmptyState lands in the middle of what the operator can see
+                 instead of the middle of a 1,439px sheet. The kit's box has a
+                 1px border each side; a 1px shift of a centred sentence is
+                 below the threshold that made this a defect, so it is not
+                 chased here the way `PoWorkArea`'s hard ceiling chases it. */
+              empty={
+                <div className="w-[100cqi]">
+                  <EmptyState title={emptyLine} />
+                </div>
+              }
               sort={sort}
               onSortChange={setSort}
               /* §8.2 — the whole row opens the claim. */
@@ -837,6 +883,7 @@ export default function OperationSupplierClaims() {
                 ),
               }}
             />
+            </div>
           )}
 
         </ListPageShell>

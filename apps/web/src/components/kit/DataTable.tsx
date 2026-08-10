@@ -185,6 +185,29 @@ export interface Column<Row> {
   numeric?: boolean;
   /** A tooltip on the header only — never the only copy of a rule. */
   headerTitle?: string;
+  /**
+   * **What the HEADER draws, when a word is the wrong shape for it** (card
+   * S3.2, Orders 2026-08-08). `label` stays required and stays the column's
+   * NAME — this only changes what is painted.
+   *
+   * **The defect it exists to fix, measured.** `label` is a `string`, so a
+   * column holding one 15px icon still had to put a WORD in its head, and
+   * `Follow-up` is 52.4px of it: Orders' flag column cost **72px to draw 15**,
+   * and on a narrow window it kept that 72 while the business columns
+   * collapsed to `S(` and `W. K.` (Orders MASTER, `8340b0f0`).
+   *
+   * **The word is not lost and may not be** — §10.1 says the kit spells
+   * nothing, and COPY-STANDARD says the word is typed once. `label` is still
+   * the accessible name (the sort button's `aria-label`, and the `th`'s own
+   * when there is no button) and still the `title`. A screen reader and a
+   * hover both read exactly what they read before; only the pixels change.
+   *
+   * **OPTIONAL, because the alternative was impossible.** Widening `label` to
+   * `ReactNode` reaches three FROZEN pages. A new optional prop cannot: a
+   * caller passing nothing emits byte-identical markup, which is the same rule
+   * S1 used to add `selection.rowLabel`.
+   */
+  headerContent?: ReactNode;
   /** Header click sorts (asc ⇄ desc). Needs the table's `sort`/`onSortChange`. */
   sortable?: boolean;
   filter?: ColumnFilter;
@@ -250,6 +273,23 @@ export interface DataTableProps<Row> {
     onToggleAll: () => void;
     /** What the select-all box is called for a screen reader. */
     label: string;
+    /**
+     * **What ONE row's box is called** — added by S1 (Sales Orders), and it is
+     * a defect repair rather than a convenience.
+     *
+     * Without it the box is named off `rowId`, which is this file's one
+     * surviving spelled word (`Select {id}`) and is only readable while the
+     * page's row identity happens to be readable. Orders keys its rows by the
+     * database uuid — every other surface on that page does — so migrating it
+     * would have had a screen reader announce
+     * `Select 0f3a…-…-…` on all thirty rows, and the operator's own name for
+     * the row (`Select SO-1221`) would have been lost to the move.
+     *
+     * OPTIONAL, and unpassed it changes nothing: the three pages that render
+     * this file today key their rows by a word a human reads, and emit
+     * byte-identical markup.
+     */
+    rowLabel?: (row: Row) => string;
     /**
      * Rows that can be picked at all. A row failing this renders an EMPTY
      * cell (not a disabled box) and leaves the select-all arithmetic — a
@@ -907,7 +947,7 @@ export default function DataTable<Row>({
                       data-testid={`table-sort-${c.key}`}
                       className="group inline-flex items-center gap-0.5"
                     >
-                      {c.label}
+                      {c.headerContent ?? c.label}
                       {sort?.key === c.key ? (
                         <Icon name={sort.dir === "asc" ? "collapse" : "expand"} size={14} />
                       ) : (
@@ -918,6 +958,14 @@ export default function DataTable<Row>({
                         </span>
                       )}
                     </button>
+                  ) : c.headerContent ? (
+                    /* The word survives as the accessible name and the tooltip
+                     * — a header that draws a picture must still ANSWER to its
+                     * name, or the column becomes unnameable to a screen
+                     * reader and to anyone hovering it. */
+                    <span role="img" aria-label={c.label} title={c.label}>
+                      {c.headerContent}
+                    </span>
                   ) : (
                     c.label
                   )}
@@ -1118,7 +1166,14 @@ export default function DataTable<Row>({
                       {(selection.selectable?.(row) ?? true) ? (
                         <Checkbox
                           id={`kit-table-row-${id}`}
-                          ariaLabel={`Select ${id}`}
+                          /* A TERNARY, not `??`: guard §10.1 forbids a `??`
+                           * fallback to a string, and it is right to — a
+                           * fallback is how a word reaches the screen without
+                           * a caller. This is the same shape `selectable` and
+                           * `expandable` already use for the same reason. */
+                          ariaLabel={
+                            selection.rowLabel ? selection.rowLabel(row) : `Select ${id}`
+                          }
                           checked={isSelected}
                           onCheckedChange={() => selection.onToggleRow(id)}
                         />

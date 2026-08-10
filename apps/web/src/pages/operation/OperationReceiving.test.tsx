@@ -760,3 +760,82 @@ describe("OperationReceiving — a late truck looks late (T5)", () => {
     expect(src).not.toMatch(/eta_date\s*(!=|!==|==|===)\s*null/);
   });
 });
+
+/**
+ * ⭐ P20.5 — `Current Action` STOPPED READING `Check in` ON EVERY ROW.
+ *
+ * Loo's screenshot showed one word on all 24 rows, and a column identical on
+ * every row carries no information. The cause was NOT the data. Re-measured
+ * against production 2026-08-08: 22 open POs, and **21 of them have no arrival
+ * promise from any factory at all**. The one thing an operator cannot do to
+ * those 21 is check them in — and the column was telling them to.
+ *
+ * The rule was a SECOND ARITHMETIC: the page answered its own question (`Check
+ * in` whenever a PO still owed a unit, true of every open PO from the minute it
+ * is issued) while Purchase Orders read the shared `poCurrentActionOf` — *"ONE
+ * Current Action per PO"*, Law 7. Two tabs, one PO, two answers.
+ *
+ * `Check in` is not deleted: it is the act performed on THIS tab and no other,
+ * so it is offered where it is true — a factory has named a day, or goods are
+ * already partly in.
+ */
+describe("P20.5 · Current Action reads the ONE shared source", () => {
+  /** Production's own shape, in miniature: a PO nobody has dated, beside one a
+   *  factory HAS given a van day for. Under the old rule both said `Check in`. */
+  async function openActions() {
+    posOverride = [
+      // 21 of production's 22 look like this — issued, waiting, no promise.
+      arrivalPo("PO-4001", null, false),
+      // Our own computed arrival is NOT a factory's word, so this is the same
+      // case as above however confident the date column looks.
+      arrivalPo("PO-4002", isoFromToday(12), false),
+      // The factory named the day — now `Check in` is the real next act here.
+      arrivalPo("PO-4003", isoFromToday(12), true),
+    ];
+    wrap();
+    await ready();
+    // The column sits outside the reading-pane's compact set, so the pane goes
+    // away first — exactly what an operator scanning the queue does.
+    fireEvent.click(screen.getByTestId("receiving-workspace-toggle"));
+    await waitFor(() =>
+      expect(listing().getByText("Current Action")).toBeInTheDocument(),
+    );
+  }
+
+  const actionOf = (poId: string) => {
+    const cells = [
+      ...listing().getByText(poId).closest("tr")!.querySelectorAll("td"),
+    ].filter((td) => td.dataset.kit !== "table-filler");
+    return cells.pop()!.textContent;
+  };
+
+  it("a PO no factory has dated asks for the date, and does NOT say `Check in`", async () => {
+    await openActions();
+    // The REGISTER's short spelling — Loo's own word for this slot (Q8), and
+    // exactly what Purchase Orders prints in the identical column. A listing
+    // never carries the workspace hero's full `Confirm Goods Arrival Date`.
+    expect(actionOf("PO-4001")).toBe("Check Expected Arrival");
+    expect(actionOf("PO-4001")).not.toBe("Check in");
+  });
+
+  it("OUR OWN arrival estimate is not a factory's word, and does not unlock `Check in`", async () => {
+    await openActions();
+    // This is the row that made the old column wrong 21 times out of 22: the
+    // date column shows a day, so the row LOOKS answered, but nobody promised
+    // it. `poWorkStateOf` reads the promise ledger, never `eta_date`.
+    expect(actionOf("PO-4002")).toBe("Check Expected Arrival");
+  });
+
+  it("`Check in` survives where it is TRUE — a factory has named the day", async () => {
+    await openActions();
+    expect(actionOf("PO-4003")).toBe("Check in");
+  });
+
+  it("the column is no longer one word repeated", async () => {
+    await openActions();
+    const words = new Set(
+      ["PO-4001", "PO-4002", "PO-4003"].map((id) => actionOf(id)),
+    );
+    expect(words.size).toBeGreaterThan(1);
+  });
+});

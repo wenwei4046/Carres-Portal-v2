@@ -350,3 +350,36 @@ primitive fixes it in the same move.
   reached by different people doing different jobs. **What is NOT allowed is a chat "tidying"
   Purchasing back to `Add line item`** — that would re-introduce the within-module split the
   ruling paid a new word to avoid.
+
+
+- `orders-drawer-items-keyed-by-sku` — **A React duplicate-key bug, found by S2.5 while
+  building the LIST's expansion, and left alone deliberately.** `OrderDetailDrawer.tsx:3327`
+  renders its Items panel with `<Fragment key={l.sku}>`, and **a sku is not unique within an
+  order** — one live order carries `Essential Memory Pillow(L)` on two separate lines, so two
+  real lines collapse into one React child.
+
+  **Why S2.5 recorded it instead of fixing it.** The S2 card names the drawer DO-NOT-TOUCH for
+  every capability in the queue, and a one-word repair inside a 7,717-line file that another
+  lane may be holding is not worth breaking that. **The fix is `key={i}`**, which is what the
+  list's own `OrderItemsPanel` does and for exactly this reason. Whoever next owns that file
+  takes it in passing.
+
+- `api-suite-red-on-main-four-stale-route-mocks` — **`apps/api` has been red for a long time
+  and no card has owned it.** Measured 2026-08-08 on a clean `f32ed152`: **4 failures in 3
+  files**, all in Partner / Supplier / Purchasing routes —
+  `partner/pickups.test.ts` · `supplier/pos.test.ts` (×2) · `operation/to-order.test.ts`.
+
+  **The cause is one class, not four bugs.** They are the defect S2.0 named on the web side:
+  *a test asserting a shape the route already changed*. `partner/pickups.ts` deliberately
+  dropped its `.eq("procurement_partner_id", …)` (the comment says so), but the test still
+  mocks `from → select → eq → order`, so `.order()` lands on `undefined` and the route answers
+  **500 where the test expects 200**.
+
+  **Why this matters more than four red lines.** `apps/web` is green at 231 files / 2,724
+  tests and `packages/shared` at 2,231, so the API suite is the one place a real regression
+  could hide inside standing noise — which is the exact condition S2.0 existed to remove.
+  There is **no CI in this repo** (no `.github/`), so nothing else will catch it.
+
+  **It is a Purchasing-lane card, not an Orders one**, which is why S2.5 reported it rather
+  than widening its own diff to three unrelated route-test repairs. It looks small — the fix
+  is the mock chain, not the routes.

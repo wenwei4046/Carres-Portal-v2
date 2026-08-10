@@ -14,7 +14,7 @@
 
 Carres sells furniture. This portal runs the business end to end — a customer order is taken,
 the goods are bought from a factory, they arrive, they are delivered, the money is collected.
-Nine roles use it. **Loo is the Chairman and has no coding background; Jess is the COO.**
+Nine roles use it. **Jess is the boss and has no coding background.**
 
 **The operator is the design target.** Low English, low computer literacy, switching between
 states all day. The portal must lead a new hire step by step: *what to do today*, with the
@@ -46,8 +46,13 @@ On a conflict, Business wins.
 
 ## 3 · The five documentation laws
 
+**Rules exist to build a better product.** If following one produces a worse product, STOP —
+study, measure, challenge, then improve the rule. A better product beats an older rule; better
+evidence beats older documentation.
+
 ### Law 1 · One Project Constitution, one MASTER per module
 `CLAUDE.md` + `docs/<module>/MASTER.md`. **Two files to start work. Never eight.**
+Old queues and checkpoints live in `docs/archive/` — **no chat reads them.**
 
 ### Law 2 · Build first. Freeze after validation. Then overwrite the MASTER
 ```
@@ -56,6 +61,16 @@ Build  →  Reality  →  Architecture review  →  If approved  →  Overwrite 
 **Documentation is not the source of truth. The repository is.** Business rules freeze before
 implementation; **UI layout does not freeze before operators have used it.** A design that is
 worse in practice is CHANGED, not defended — *"we decided that before"* is not a reason.
+**Reality outranks documentation.** If observation and the document disagree, measure again,
+then update the document. Never defend an outdated document.
+
+Hypothesis —validate→ Finding —survive→ Principle. A HYPOTHESIS is an idea not yet checked and
+may never be written as a Finding. A FINDING is checked and carries its evidence. A PRINCIPLE is
+a Finding that SURVIVED — challenge, other projects, real operation. It is admitted only when
+the evidence is strong enough AND its boundary is explicit: a Principle must be falsifiable.
+Every Principle names the Findings it rests on; if one is overwritten it returns to review in
+the same change. **Principles guide research; they never replace research.** No Principle is
+permanent — it holds only until better evidence replaces it.
 
 ### Law 3 · Override Law — a MASTER is never permanent, and it holds ONE truth
 **A better architecture always wins.** When one is approved, **overwrite** the MASTER.
@@ -63,7 +78,7 @@ Never create `MASTER-v2` · `MASTER-final` · `MASTER-revised` · a checkpoint �
 queue · a planning queue. **There is only `MASTER`, continuously overwritten. Git history is
 the archive; documents do not carry history.**
 
-**THE MASTER OVERWRITE LAW (Loo, 2026-08-06).** When an approved workflow, operator
+**THE MASTER OVERWRITE LAW (Jess, 2026-08-06).** When an approved workflow, operator
 journey, ownership or business rule changes: **delete the obsolete version completely and
 rewrite with the approved one.** Never append beside it, never keep legacy text, never keep
 an alternative version, never cite a superseded document as if it still ruled. **Git is the
@@ -76,6 +91,9 @@ If I joined Carres today, would I still design it this way?
 If the answer is **no**, you must state: **Current → Problem → Better design → Trade-off →
 Recommendation.** *"The MASTER says so, therefore I follow"* is the failure this law exists to
 stop. **A chat that saw a problem and said nothing has failed, even if it shipped perfectly.**
+**Be a critical product architect.** Challenge assumptions, challenge documentation, challenge
+previous decisions. Never defend the repository, never defend documentation, never defend a
+previous decision — defend the product, and build something better.
 
 ### Law 5 · Simplicity Law — the default action is REDUCE
 Before touching any document, ask: **can the project have one file fewer?**
@@ -92,28 +110,53 @@ not a new guideline  →  fold the rule into this Constitution
 ```
 0  Say which kind of chat you are.  PLAN writes no code.  BUILD ships one thing.
 1  Read this file + the module MASTER.  Nothing else first.
-2  Look at the REAL page and measure REAL numbers.  A guessed number is never written down.
+2  Measure.  Every proposal runs the DECISION GATE below — no exception.
 3  Challenge (Law 4).  Problems get 🔴/🟡 and a fix, never a complaint alone.
 4  Ask ONE decision at a time — 2-3 options, each with its cost, recommendation first.
 5  Approved → build → test → PR → merge → deploy → verify production.  Do not come back.
 6  Overwrite the MASTER in the same PR.
 ```
 
-**TWO CHATS PER MODULE IS THE CEILING** (Loo, 2026-08-05 — restored here because it lived in
-the Purchasing queue file the migration archived). On 2026-08-05 four lanes touched Purchasing:
-the card number Q12 was claimed twice and Q13 twice, each lane renumbering around the other
-without knowing, and Loo received a stale report about a defect already fixed. **Past two, the
-manager spends the day de-duplicating instead of deciding.** A chat that only CLAIMS and writes
-nothing still occupies a slot — three lanes sat claimed-and-empty that day.
+**A DECISION THAT STAYS IN THE CHAT IS A DECISION THAT DIES.** The moment the owner agrees to
+something, it is written to its file and committed **before the conversation moves on** — not
+at the end, not in the next card. A plan nobody wrote down gets re-derived weaker by the next
+chat; a plan written as LAW gets obeyed instead of challenged. **So every line written wears
+its own label:**
+
+```
+FACT      measured, cited      →  the research file.  Binds nobody.
+RULING    the OWNER's word     →  the MASTER.  Binds until the owner changes it.
+PROPOSAL  YOURS                →  the MASTER, marked NOT LAW, carrying its own
+                                  falsifier.  Must be CHALLENGED, never obeyed.
+```
+
+**PROVE THE CAPABILITY BEFORE DESIGNING THE ENGINE.** *"Can X move onto Y?"* is answered by
+mapping what each side already does — one table, no solutions — and the answer is READY or NOT
+READY. Only NOT READY licenses an engine card, and only for the capabilities the mapping named.
+**Redesigning a thing that already supports the case is the most expensive way to be wrong.**
+
+**AND THE MAPPING HAS THREE OUTCOMES, NEVER TWO** (Loo, 2026-08-07). *Another repo has it* is
+**not** *we have it* — the question is what moves TODAY, and copying and inventing are not the
+same work:
+
+```
+🟢 READY          ours supports it today — migrate, change nothing
+🟡 COPY REQUIRED  ours does not; a proven implementation elsewhere does.
+                  STILL NOT READY TODAY, but it needs no invention.
+🔴 ENGINE GAP     nobody has solved it. Design · research · validate · build.
+```
+
+**A NOT READY verdict must keep 🟡 and 🔴 apart.** Merged, they cost the same on paper and an
+order of magnitude apart in reality, and the next card cannot be prioritised.
+
+**TWO CHATS PER MODULE IS THE CEILING.** Past that point, coordination cost grows faster than
+delivery. A chat that has claimed a lane still occupies a lane, even if no code has been written.
 
 **Only ONE thing may interrupt the owner: a business rule.** Technical problems, bugs, wording
 conflicts, deploys, rebases, test failures — **solve them yourself. Finding another bug is not
 a reason to stop; it is an instruction to fix it and continue.**
 
-**THE TEST, applied before you type a question to Loo** (his words, 2026-08-05: *"stop asking
-me technical — why i write repo and you all ignore my request, i want you write into master
-file"*). **The rule above was already written and a manager chat broke it the same day**, which
-is why it now carries a test instead of only a principle:
+**THE TEST, applied before you type a question to the owner:**
 
 ```
 Can this be answered by reading the code, the docs, the database, or by measuring?
@@ -133,7 +176,7 @@ worse than silence because it looks like diligence.
 **A card is handed over TAB FIRST** — `【TAB】 — 【id】 · 【one line】`, and the paste block says
 which tab it owns and which it may not touch. The queue letters are the build line, not the
 screen, and they do not match: `R9` · `R11` · `R12` are all **Claims** and touch no Receiving
-file, while Receiving is the closed page. Loo was misled by exactly this.
+file, while Receiving is the closed page.
 
 **Engineer-Owned Delivery.** After approval, engineering owns delivery until production is
 verified: implementation · testing · self-review · fixing what it finds · merge · deploy ·
@@ -141,17 +184,25 @@ production verification. **Never return routine engineering as an approval reque
 The four reasons to interrupt: a new business rule · an approved UI/workflow/word must change ·
 production data must be modified irreversibly · long-term architecture must change.
 
-**Measuring is not optional.** Widths are measured in a real browser (jsdom has no widths, so a
-page test structurally cannot catch a truncated cell). Counts are measured with SQL. **`grep`
-answers only "is the word I already thought of present?" — it cannot inventory a page. Read the
-file.**
+⛔ DECISION GATE — before PROPOSING or freezing any architecture, workflow, business
+   rule, information model or shared behaviour:
+   ① Name the decision in one line.
+   ② List the primary evidence it needs, and what is EXCLUDED and why. Study only that.
+      If something excluded turns out to matter, STOP and re-list before continuing.
+   ③ Label every statement FACT · INFERENCE · RECOMMENDATION · UNKNOWN. Every FACT
+      points to primary evidence — file:line, SQL, schema, measurement, observation.
+   ④ Every recommendation states what would OVERTURN it; the falsifier must name a
+      file, a measurement, a schema or an observable event.
+   Do not freeze a decision that still depends on an UNKNOWN. External systems are
+   EVIDENCE, never specification. Freeze concepts; implementation choices are decided
+   by building, not by reading.
 
 ---
 
 ## 5 · Red lines — never, in any circumstance
 
-1. **Never DROP / TRUNCATE / DELETE** without Loo's explicit confirmation **in the current
-   conversation**. *"He said OK before"* is not permission.
+1. **Never DROP / TRUNCATE / DELETE** without the owner's explicit confirmation **in the current
+   conversation**. *"She said OK before"* is not permission.
 2. **Never modify RLS** without explaining what changes and why.
 3. **Never write a secret in code.** `SUPABASE_SERVICE_ROLE_KEY` lives only in Cloudflare
    Workers secrets — never in source, never in `apps/web`, never in a log or a response.
@@ -187,10 +238,9 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 
 > ### ⭐⭐ [`docs/ERP-ARCHITECTURE.md`](docs/ERP-ARCHITECTURE.md) — **the blueprint. Read it before any cross-module design.**
 >
-> **Loo, 2026-08-06: Orders V1 is FROZEN as the reference implementation.** It is not polished
-> further unless a production-critical defect appears. Nine engineering-debt items were found by
-> reading it end to end and measuring production, and **every one of them was the same defect —
-> an unowned record**, not a missing feature.
+> **Implementations provide evidence; they do not define architecture.** Nine engineering-debt
+> items were found by studying Orders V1 end to end and measuring production, and **every one of
+> them was the same defect — an unowned record**, not a missing feature.
 >
 > The architecture answers four questions and only four: **what each module OWNS · what ACTIONS
 > belong to it · what it only SUMMARISES · what it LINKS to instead of owning.** Its four
@@ -220,16 +270,9 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 | **HR** | people, commission, targets, cost | [`docs/hr/MASTER.md`](docs/hr/MASTER.md) |
 | **Rental** | rent-to-own agreements, billing and buyout | [`docs/rental/MASTER.md`](docs/rental/MASTER.md) |
 
-**Two module boundaries were MEASURED rather than assumed, and both follow the rule *use the
-business objects the repository already has*:**
-
-- **Portal Core is not a module.** Its fourteen cards were all Orders-list and Orders-drawer
-  work, so its rules live in the Orders MASTER.
-- **Inventory and Ready Stock are ONE module.** The portal has a single `Stock` door with three
-  tabs; two masters would be two names for one screen.
-
 **A module gets a folder only when it is a real operator surface with measured reality.**
 Never create an empty master for symmetry.
+**Architectural reasoning belongs in ADRs, not in the Constitution.**
 
 ## 9 · The four laws that outrank anything pasted into a chat
 
@@ -244,42 +287,38 @@ Never create an empty master for symmetry.
 
 ---
 
-## 10 · How to talk to Loo and Jess
+## 10 · How to talk to the owner
 
-**Loo** — Chairman, no coding background.
+**Jess** — the boss, and no coding background.
 - **Conclusion first**, reasoning after. **Simple Chinese, short sentences.** English technical
   terms are kept (`Supabase`, `RLS`, `migration`, `PO`, `SKU`).
-- **Steps 1 2 3.** If he says he does not understand, **rewrite — do not repeat.**
-- **ASCII sketch before code**, every time, even when he says "just do it".
+- **Steps 1 2 3.** If she says she does not understand, **rewrite — do not repeat.**
+- **ASCII sketch before code**, every time, even when she says "just do it".
 - **One question at a time.** Wait for the answer before asking the next.
 - **Options with a named recommendation, never a bare menu**, and never the same question twice.
-- Anything he must paste elsewhere is written in **English**.
-
-**Jess** — COO, and the boss of the Operation portal.
-- Be a **critical advisor, not a yes-man.** Think the solution through before speaking; cite how
-  mature products solve it, but land the conclusion in Carres reality.
-- **A screenshot from her means: list every problem top to bottom**, marked 🔴 / 🟡, without
-  being asked.
+- **Cite how mature products solve it**, then land the conclusion in Carres reality.
+- **⭐ EVERY REVIEW IS TOP-TO-TOE, CRITICAL, AND CARRIES ITS FIX — ALWAYS, WITHOUT BEING ASKED**
+  (Loo, 2026-08-08). A screenshot, a page, a plan, a card, another chat's report, your OWN
+  work: go top to bottom, mark every problem 🔴 / 🟡, and **no problem is written without its
+  concrete fix.** *"Looks good"* is not a review. **Agreeing with everything is the tell that
+  nothing was read** — Law 4 already requires the challenge; this rule says it is not optional
+  and it is not on request.
 - **She agrees, then you build.** A settled decision is not reopened unless she reopens it.
 - **Count before you propose UI.** Measure fill rates with SQL; empty fields do not reach the
   screen.
+- Anything she must paste elsewhere is written in **English**.
 
-**Both:** never hand back a menu of engineering choices; never ask five things at once; never
+**Never** hand back a menu of engineering choices; never ask five things at once; never
 criticise without a fix; **never say "I read the document" without a `Read` call in the
 transcript.**
 
 ---
 
-## 11 · Current freeze
+## 11 · Where current state lives
 
-| | |
-|---|---|
-| **Phase** | 10 — post-launch, per-module architecture |
-| **Purchasing** | six tabs live. Claims is the active lane: the claim model was frozen 2026-08-05 (two decisions — Customer Resolution and Item Outcome), **Customer Resolution shipped 2026-08-06 (0324)**, and the Workspace layer — including the `Next Action` region that would tell anyone to pick one — is still unbuilt |
-| **Documentation** | Constitution + one MASTER per **every** module since 2026-08-05 (the full migration, PR #637). Old queues and checkpoints live in `docs/archive/` — no chat reads them |
-| **Architecture** | [`docs/ERP-ARCHITECTURE.md`](docs/ERP-ARCHITECTURE.md) is the blueprint (2026-08-06). **Orders V1 is FROZEN as the reference implementation** — touched only for a production-critical defect (D1 · D2 cleared that bar and shipped; D3 · D4 · D5 · D8 · D9 do not, and are held for the architecture, not for fixing). **§6 decisions: ① storage OWNERSHIP FROZEN (§6.1, the reference pattern) · ② delivery trip FROZEN (§6.2 — a DERIVED VIEW over confirmed bookings, never a record) · ③ goods ownership before receipt · ④ claim entrances · ⑤ migrate-vs-replace — ③–⑤ OPEN, and ③ is next when Loo says so.** |
-| **Production** | web + api live on Cloudflare; Supabase `kfprgpjpaffedghytstl`. Bundle hashes, the migration tail and test baselines live in [`docs/ENGINEERING.md`](docs/ENGINEERING.md) — **read them from there, never from memory, and re-measure with `wrangler` before quoting.** |
-| **Open risks** | [`docs/carry-forwards.md`](docs/carry-forwards.md). Two passwords still on `111` (principal + 9 alpha users) — rotate before any external sharing. |
+**The Constitution holds no project state.** A module's status lives in that module's
+MASTER · production and environment facts in [`ENGINEERING.md`](docs/ENGINEERING.md) ·
+open risks in [`carry-forwards.md`](docs/carry-forwards.md). **Re-measure before quoting any of them.**
 
 ---
 

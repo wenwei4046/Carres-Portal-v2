@@ -429,19 +429,85 @@ export const WEEKDAYS: readonly { day: number; label: string }[] = [
  *  factory is closed) even though no picker ever offers it. */
 export const SUNDAY = 0;
 
+/**
+ * A LIST OF WEEKDAYS, AS DAYS — `[1,3,5]` → `Mon Wed Fri`, `[1,2,3,4,5]` →
+ * `Mon–Fri`.
+ *
+ * Extracted from `workWeekLabel` by card P20.4 rather than written fresh, and
+ * that is the point: the work week stores the days a factory is OFF and PO days
+ * stores the days the office SENDS, so the two arrive as opposite lists — but
+ * they must READ the same, or `Mon–Fri` means one thing in one row of Settings
+ * and something else in the next. Architecture law D: a derived fact has ONE
+ * arithmetic.
+ */
+export function weekdayListLabel(days: readonly number[]): string {
+  const on = WEEKDAYS.filter((w) => days.includes(w.day));
+  if (on.length === 0) return "—";
+  // Contiguous Mon-first runs read as a range; anything else is listed.
+  const labels = on.map((w) => w.label);
+  const isMonRun =
+    on.every((w, i) => (i === 0 ? w.day === 1 : w.day === on[i - 1]!.day + 1)) && on[0]!.day === 1;
+  return isMonRun && on.length > 2
+    ? `${labels[0]}–${labels[labels.length - 1]}`
+    : labels.join(" ");
+}
+
 /** `{0,6}` → `Mon–Fri`. The work week stated as the days it WORKS, because
  *  that is how a factory answers the phone. */
 export function workWeekLabel(offDays: readonly number[] | null | undefined): string {
   const off = new Set(offDays ?? DEFAULT_OFF_DAYS);
   // Sunday is never in WEEKDAYS, so it can never show as a working day here
   // even if a row somehow failed to store it as off.
-  const on = WEEKDAYS.filter((w) => !off.has(w.day));
-  if (on.length === 0) return "—";
-  // Contiguous Mon-first runs read as a range; anything else is listed.
-  const labels = on.map((w) => w.label);
-  const isMonRun =
-    on.every((w, i) => (i === 0 ? w.day === 1 : w.day === on[i - 1].day + 1)) && on[0].day === 1;
-  return isMonRun && on.length > 2
-    ? `${labels[0]}–${labels[labels.length - 1]}`
-    : labels.join(" ");
+  return weekdayListLabel(WEEKDAYS.filter((w) => !off.has(w.day)).map((w) => w.day));
+}
+
+/**
+ * A Postgres `int[]` as it comes back in the audit trail — `"{0,6}"` → `[0, 6]`.
+ *
+ * `purchasing_setting_changes.old_value` / `.new_value` are plain `text`, and
+ * the two array-valued keys are written with `v_old::text`, so the history
+ * carries the DATABASE's spelling of an array. A screen that prints it raw
+ * prints `{0}`, which is what card P20.4 found on the live page.
+ *
+ * `null`, `""` and `"{}"` all mean *nothing recorded* and return `[]`, so a
+ * caller never has to tell three empties apart. Anything that is not an integer
+ * is dropped rather than becoming `NaN` — a history line is not worth a crash.
+ */
+export function parsePgIntArray(value: string | null | undefined): number[] {
+  const inner = (value ?? "").trim().replace(/^\{/, "").replace(/\}$/, "").trim();
+  if (inner === "") return [];
+  return inner
+    .split(",")
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isInteger(n));
+}
+
+/**
+ * WHAT ONE AUDITED SETTING VALUE READS AS ON SCREEN (card P20.4).
+ *
+ * Every key but two stores a single number and prints as itself. The two that
+ * do not are the reason this function exists:
+ *
+ *   `supplier_work_week`  stores the days a factory is OFF   → `workWeekLabel`
+ *   `po_days`             stores the days the office SENDS   → `weekdayListLabel`
+ *
+ * Both were reaching the screen as the raw Postgres array literal. Measured in
+ * production 2026-08-08: the whole audit trail was two rows, both
+ * `supplier_work_week`, so the Settings page printed `· was {0}` and
+ * `· was {0,6}` — a work week stated in a syntax nobody at Carres reads, on the
+ * one screen whose job is to say what a number USED to be. `po_days` had no
+ * history yet and had the identical defect waiting for the first change.
+ *
+ * It returns `null` for a value that says nothing, so the caller renders no
+ * fragment at all rather than `was —`.
+ */
+export function settingValueLabel(
+  settingKey: string,
+  value: string | null | undefined,
+): string | null {
+  const raw = (value ?? "").trim();
+  if (raw === "") return null;
+  if (settingKey === "supplier_work_week") return workWeekLabel(parsePgIntArray(raw));
+  if (settingKey === "po_days") return weekdayListLabel(parsePgIntArray(raw));
+  return raw;
 }

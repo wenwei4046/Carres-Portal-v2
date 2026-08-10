@@ -1066,3 +1066,68 @@ describe("Customer Resolution — the second decision", () => {
     expect(screen.getByTestId("claim-close")).not.toBeDisabled();
   });
 });
+
+/**
+ * ⭐ P20.6 — LANDING ON AN EMPTY `Open` QUEUE MUST STILL ANSWER THE QUESTION.
+ *
+ * PRODUCTION, 2026-08-08: one claim, and it is CLOSED. So the front door of
+ * this tab opens on `Open 0` while `All` holds 1 — which is the RIGHT default
+ * (a work queue opens on the work, and a queue is never hidden at zero), but it
+ * made two things visible that were not right.
+ *
+ * ① The sentence asserted something the data denies. ② It was centred on the
+ * 1,439px TABLE rather than on what the operator can see — measured in a
+ * browser, its centre is pinned at 721px at every pane width, so below a ~700px
+ * pane it is off-screen entirely and the operator lands on a blank grid.
+ */
+describe("P20.6 · the empty Open queue", () => {
+  it("does NOT claim every delivery was fine when a claim has been filed", () => {
+    // Production's own shape: nothing open, one closed.
+    claimsQuery.mockReturnValue(
+      ok({ claims: [], counts: { open: 0, closed: 1, all: 1 } }),
+    );
+    render(wrap(<OperationSupplierClaims />));
+    expect(screen.getByText("No open claims.")).toBeInTheDocument();
+    // A closed claim IS a delivery that did not arrive complete. The
+    // reassurance is the half that is false, and it is the half that reassures.
+    expect(
+      screen.queryByText(/every delivery so far arrived complete and on time/i),
+    ).toBeNull();
+  });
+
+  it("keeps the reassurance for the case it actually describes", () => {
+    claimsQuery.mockReturnValue(
+      ok({ claims: [], counts: { open: 0, closed: 0, all: 0 } }),
+    );
+    render(wrap(<OperationSupplierClaims />));
+    expect(
+      screen.getByText(/every delivery so far arrived complete and on time/i),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * jsdom has no layout, so this pins the STRUCTURE the browser then centres
+   * on — the same recipe `po-listing` uses for Purchase Orders' expanded
+   * record. `sticky left-0` is NOT the alternative and that is measured: card
+   * Q10 probed it inside this kit's `<td>` and it scrolled straight off,
+   * because a sticky element whose containing block is a table cell does not
+   * hold horizontally.
+   */
+  it("the empty state is sized to the VISIBLE pane, not to the 1,439px table", () => {
+    claimsQuery.mockReturnValue(
+      ok({ claims: [], counts: { open: 0, closed: 1, all: 1 } }),
+    );
+    const { container } = render(wrap(<OperationSupplierClaims />));
+
+    const empty = container.querySelector('[data-kit="empty-state"]');
+    expect(empty).not.toBeNull();
+    // Its box is the visible width…
+    const box = empty!.parentElement!;
+    expect(box.className).toContain("w-[100cqi]");
+    // …and `100cqi` only means anything if an ancestor is a query container.
+    const host = box.closest('[class*="container-type:inline-size"]');
+    expect(host).not.toBeNull();
+    // A promise the kit cannot keep: a table cell cannot hold a sticky child.
+    expect(box.className).not.toContain("sticky");
+  });
+});

@@ -16,7 +16,7 @@
 | I am working on | Read |
 |---|---|
 | anything | **§1 · §2 first — they are short and they bind every tab** |
-| Batch Purchase · Manual Purchase (today: To Order) | **§3** |
+| SO Batch Purchase · Manual Purchase (today: To Order) | **§3** |
 | Purchase Orders | **§4** |
 | Receiving | **§5** |
 | Claims | **§6** |
@@ -45,24 +45,26 @@ ruling. **APPROVED, NOT YET BUILT**; today's screens are §3–§8's measured
 blocks):
 
 ```
-SALES                    PURCHASING
-Sales Orders  ····read···▶ Batch Purchase  ─┐
-                                            ├─▶ Purchase Orders ─▶ Receiving ─▶ Claims
-                           Manual Purchase ─┘
-                                                Report (read-only) · Settings (manager)
+SALES                       PURCHASING
+Sales Order  ····read···▶ SO Batch Purchase ─┐
+                                             ├─▶ Purchase Order ─▶ Receiving ─▶ Supplier Claim
+                          Manual Purchase   ─┘
 ```
 
 ```
-Sales             Sales Orders      every customer order. SALES owns it.
+Sales        Sales Order         every customer order. SALES owns it.
 
-Purchasing        Batch Purchase    only the customer orders PURCHASING still
-                                    has to act on — a filtered purchasing
-                                    workspace, never a second Sales Orders page
-                  Manual Purchase   purchases nobody's customer asked for:
-                                    Ready Stock · Display · Office · Warranty ·
-                                    Spare Parts · and whatever is added next
-                  Purchase Orders   every issued PO, whichever lane bore it
-                  Receiving · Claims · Report · Settings
+Purchasing   SO Batch Purchase   only the customer orders PURCHASING still has
+                                 to act on — a filtered purchasing workspace,
+                                 never a second Sales Order page
+             Manual Purchase     purchases nobody's customer asked for:
+                                 Ready Stock · Display · Office · Warranty ·
+                                 Spare Parts · and whatever is added next
+             Purchase Order      every issued PO, whichever lane bore it
+             Receiving · Supplier Claim
+
+Reports and Settings are PORTAL pages, not Purchasing pages
+(`../ERP-ARCHITECTURE.md` §2.1).
 ```
 
 **SALES ORDERS IS NOT A PURCHASING TAB** (Loo, 2026-08-06 — his refinement of
@@ -70,16 +72,18 @@ the same day's ruling). Purchasing READS the sales orders; it does not carry
 them. The two answer different questions and the difference is the whole
 point: *what did the customer buy?* is every order, while *which orders need
 buying today?* is a filtered few — an order already covered by stock never
-reaches Batch Purchase at all.
+reaches SO Batch Purchase at all.
 
-> **THIS MAP NEEDS A MODULE-LEVEL MENU AND THE PORTAL HAS NONE ON A WORKING
-> PAGE** (measured 2026-08-06): `GlobalTopBar` is suppressed on the Orders and
-> Purchasing routes (`OperationApp.tsx:254-260`) and carries no module entries
-> anyway — only 🔔 ❓ ⚙. So an operator inside Purchasing has no way to reach
-> Sales, which is the original complaint this whole ruling started from. **The
-> menu is the first thing this map owes**, and it is what AutoCount gets right:
-> its sidebar never disappears (`2990s/apps/backend/src/lib/nav-items.ts` keeps
-> `Sales Order` and `Procurement` as permanent groups).
+> **`PortalSidebar` is available on every operation screen**
+> (`OperationApp.tsx:243`) and provides navigation between Orders and
+> Purchasing. `GlobalTopBar` is suppressed on working pages
+> (`OperationApp.tsx:254-260`), but it is not responsible for module navigation.
+>
+> **The navigation difference from AutoCount is not reachability — it is
+> information architecture.** AutoCount exposes all business documents
+> permanently in the navigation; Carres exposes modules first, then reveals
+> documents inside the module. **Navigation decisions are based on operator
+> workflow, not on implementation history or another ERP.**
 
 **THE SPLIT IS BY JOB, NEVER BY TABLE.** Both lanes may store their demand in
 `purchase_demands`; what differs is the OPERATOR'S INTENT, and that is what a
@@ -229,13 +233,13 @@ It cannot tell you about a button you have not imagined. **Read the file.**
 
 ---
 
-# §3 · Batch Purchase *(on screen today as `To Order`)*
+# §3 · SO Batch Purchase *(on screen today as `To Order`)*
 
 ### MISSION
 Review, consolidate and issue purchase orders for **demand the engine generated from
 customer orders**. Purchase Orders MANAGES the documents once they exist.
 
-> **APPROVED, NOT YET BUILT (Loo, 2026-08-06):** this tab becomes **`Batch Purchase`**,
+> **APPROVED, NOT YET BUILT (Jess, 2026-08-07):** this tab becomes **`SO Batch Purchase`**,
 > and the hand-typed purposes (Ready Stock · Display · Office · Warranty · Spare Parts)
 > leave it for their own tab, **`Manual Purchase`** — with a FULL-PAGE create workspace,
 > never the 600px dialog. **Both lanes issue their own POs** (§1). Everything below
@@ -820,7 +824,7 @@ writing an untraceable receive, and a guard asserts exactly that.
 
 ---
 
-# §6 · Claims
+# §6 · Supplier Claim
 
 ### MISSION
 Resolve the exception a receiving produced — and Claims owns the defective item's whole life.
@@ -1067,6 +1071,9 @@ that records it as NOT ruled**, so its absence cannot be read as an oversight.
 
 # §7 · Report
 
+> **This page belongs to the PORTAL layer, not to Purchasing**
+> (`../ERP-ARCHITECTURE.md` §2.1). It lives here until it moves.
+
 ### MISSION
 How many did we buy this month — and every number is a door.
 
@@ -1122,6 +1129,7 @@ blanks. Every row carries **who changed it, when, and what it was before**.
 
 | Decision | Ruling |
 |---|---|
+| **Navigation never defines ownership** | Architecture decisions are justified by business ownership. Navigation may support those decisions, but navigation never defines ownership. |
 | **Where an action lives** | The tab that owns the WORK owns the door AND its queue. **CLOSED by T2 (2026-08-06): the CALLS calendar on Purchase Orders is the queue for all three supplier calls** — each call's due files under its day, `Overdue` holds the late ones, and the door (the expand) sits on the same tab. |
 | **Two status axes, never merged** | `purchase_orders.status` is a 3-value stored enum. The 5-word Operation Status is derived and never stored. A reader who confuses them will "fix" one to match the other. |
 | **A quantity means exactly one thing** | No column is ever reused for a second meaning — that is how `ops_order_control.balance` became a lock reading a column nobody wrote. |
@@ -1130,6 +1138,79 @@ blanks. Every row carries **who changed it, when, and what it was before**.
 | **A held unit is not "on the way"** | `on_hold` stops counting as future supply (0299), or the planner keeps believing goods are coming that never will. |
 | **Widths are MEASURED in a real browser** | jsdom has no widths, so a page test structurally cannot catch a truncated cell. **A guessed number may never be written down.** |
 | **The map must not go stale** | A guard that FAILS when a PR changes a Purchasing page file and does not change this document's `WHAT IS ON SCREEN TODAY`. **A rule in a document gets skipped; a failing test does not.** Not built. |
+
+---
+
+# ▶︎ P20 · SHIPPED 2026-08-08 — ONE width mechanism across the five tabs
+
+> **The card is DONE and this block is the record of what it changed.** Six commits, one per
+> item, page-side only. **`kit/DataTable.tsx` was never touched** — `sizing` is an existing
+> prop, so nothing here needed the kit and nothing waited on S2.
+
+**THE DEFECT WAS: three width mechanisms and TWO different scrollbars in one module, so a
+gesture learned on one tab did not work on the next.** All five tabs now run one mechanism.
+
+```
+tab               sizing      declares    renders    who scrolls
+To Order          "content"   1,252px     1,252px    the KIT's box     (unchanged)
+Supplier Claims   "content"   1,439px     1,439px    the KIT's box     (unchanged)
+Purchase Orders   "content"   1,172px     1,172px    the KIT's box     <- was "fill", PAGE pane
+Receiving         "content"     826px       826px    the KIT's box     <- was "fill", 2 wrappers
+Report            "content"     352px       352px    the KIT's box     <- was 37/15/15/15/15 %
+```
+
+**EVERY WIDTH IS NOW EXACT, NOT A MINIMUM.** `"fill"` (the absence of the prop) spends a
+declared pixel as a SHARE, so a browser measurement became a ratio the moment the pane was
+wider than the sum. Under `"content"` a column gets what its def asks for and the slack goes
+to the kit's filler, which holds no word and no figure.
+
+## What each item found — and the findings are worth more than the fixes
+
+| Item | What was actually wrong |
+|---|---|
+| **P20.1** | Purchase Orders' `action` needed **192 -> 193**: `"content"` puts a filler after the last column, so it now carries P17's rule, which takes 1px of the BOX — Q13's pixel arriving one column later. **Receiving's widths had never had to carry their own content**: `arriving` 104 -> 105 · `received` 72 -> 82 · `grn` 132 -> 142 · two `auto` columns -> 193 / 61. `fill` had been topping them up out of the pane's slack — 160px of make-up. |
+| **P20.2** | The kit's `<thead>` is `sticky top-0` **against the KIT's box**, so while a page-owned pane was the scroller the column headers scrolled away with the rows. Receiving's min-width was CONDITIONAL on the workspace being closed — which element scrolled changed with a record being open. |
+| **P20.3** | 37% of a ~1,040px pane is 385px of column for the word `Mattress`, and the hole GREW with the monitor. Measured: 83 · 60 · 61 · 66 · 82, with a **stated** five-digit guard on the number columns — an allowance, not a measurement, and said so. |
+| **P20.4** 🔴 | The entire audit trail in production is TWO rows, both `supplier_work_week` — so the only two history lines this page had ever shown read `was {0}` and `was {0,6}`. `po_days` held the identical defect, waiting for a manager's first change. |
+| **P20.5** | **The cause was not the data.** 22 open POs and **21 have no arrival promise from any factory** — the one thing an operator cannot do to those 21 is check them in. Receiving was answering its own question (`Check in` whenever a PO owed a unit, true of every open PO from issue) while Purchase Orders read the shared `poCurrentActionOf` — **two tabs, one PO, two answers.** |
+| **P20.6** | The empty sentence asserted *"every delivery so far arrived complete and on time"* while a closed claim sat in the table. And it centred on the 1,439px TABLE: measured, its centre is pinned at **721px at every pane width**, so below a ~700px pane it is off-screen and the operator lands on a blank grid. |
+
+## Rulings this card is now evidence for
+
+- **A width measured under `"fill"` was never really tested.** Five of Receiving's and Report's
+  numbers only worked because the browser was topping them up. **A page that declares pixels
+  must pass `sizing="content"`, or the pixels are decoration.**
+- **`container-type: inline-size` belongs on the PANE, not on a scroller.** A page cannot style
+  the kit's box, so the pane is the only handle on the visible width. It is **2px wider than
+  the scrollport** (the kit's 1px borders), which `PoWorkArea`'s ceiling now pays for
+  explicitly and the empty state deliberately does not.
+- **`sticky left-0` inside a `<td>` does not hold horizontally.** Measured by Q10, re-used here
+  rather than re-probed. It is never left in as a class that does nothing.
+- **A second arithmetic hides as a page convenience.** P20.5's `Check in` and P20.4's raw
+  `oldValue` were both a page answering a question a shared module already owns.
+
+## Left open, deliberately — NOT LAW, and each names what would close it
+
+- 🟡 **Receiving cannot ask `Confirm ready date`.** Purchase Orders passes the ready-date facts
+  (`expected_ready_date` + the production/buffer arithmetic, which need the settings and catalog
+  queries); Receiving does not, so it gets the state word `Check Expected Arrival` where that
+  tab gets the dated call. That is the degradation `poCurrentActionOf` documents by name.
+  **Passing HALF the facts would be worse** — the call would fire with no due and could never be
+  late, so one word would mean two urgencies on two tabs (T7 · T5). *Closes when: one extracted
+  hook feeds both pages. It touches the frozen Purchase Orders page, so it is its own card.*
+- 🔴 **Sticky columns — still nobody's.** F72 stands: no engine here has them, it is the obvious
+  fix for a 1,439px grid, and it needs the kit.
+- 🟡 **Report's number columns carry a five-digit guard, not a measurement.** Every row today is
+  TEST data (§6), so nothing on screen can size them honestly. *Closes when: real volume exists
+  and the widest figure can be measured.*
+- **Whether `Open` should stay Claims' landing tab when it is empty is the OWNER'S**, and it was
+  NOT changed. A work queue opening on the work, with a rail stating `Closed` and `All` beside
+  it, is a true screen; only what it said was wrong.
+
+**WHY THE LAST COLUMN MATTERED AND THIS WAS NOT COSMETIC.** On four of the six screenshots the
+column that fell off the right edge was the one answering the tab's own question — `On PO` /
+`PO No.` (*did I buy it*), `Customer Delivery` (*when do they want it*), `Next move` (*what do
+I do*). **The operator's answer was the thing that went missing.**
 
 ---
 

@@ -40,6 +40,12 @@ import ModuleHeader from "./components/ModuleHeader";
 import FollowUpForm from "./components/FollowUpForm";
 import ImportStockEtaDialog from "./components/ImportStockEtaDialog";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
+import DataTable, {
+  type Column,
+  type ColumnFilter,
+  type TableSort,
+} from "@/components/kit/DataTable";
+import KitIcon from "@/components/kit/Icon";
 import { SectionBand, SectionCard } from "@/components/SectionPanel";
 import { TASKS_KEY } from "./components/rail/TasksPanel";
 import {
@@ -1155,6 +1161,296 @@ export function logisticStateOf(
   return { key: "need_booking", partner, date: null, slot: null };
 }
 
+// ─── S2.1 · HEADER SORT ──────────────────────────────────────────────────────
+/**
+ * **The operator reorders the list, and the third click gives it back.**
+ *
+ * Copied from 2990's grid, which is the behaviour the team already has in its
+ * hands — the comparator from `DataGrid.tsx:689-699`, the click cycle from
+ * `:946-950`:
+ *
+ * ```
+ * click 1  asc        click 2  desc        click 3  OFF
+ * ```
+ *
+ * **The third click is why §2.3 survives sorting by construction.** `null` is
+ * not "no sort", it is `compareBySlack` — risk to the customer's promise — so
+ * the page's own answer to *what is most urgent* is one click away and is
+ * never something an operator has to reconstruct by hand.
+ *
+ * **The division of labour differs from 2990's and that is not a defect.**
+ * 2990 sorts INSIDE its grid (`sortedRows`); `kit/DataTable` rules that *"the
+ * PAGE sorts the rows; the kit only shows the arrow"*, and it already spells
+ * the three-click cycle in its header button. So what lives here is 2990's
+ * COMPARATOR plus one sort value per column, and nothing about sorting moved
+ * into the kit.
+ *
+ * **THE SORT RUNS ON `visible`, NEVER ON THE 30 RENDERED ROWS.** Sorting a
+ * window sorts nothing — it shuffles the same 30 rows the operator can already
+ * see and silently claims to have ordered 65. The window is taken after.
+ *
+ * **THREE RULES, AND EVERY COLUMN BELOW OBEYS ONE OF THEM.**
+ * ```
+ * a WORD   sorts A → Z            Order · Customer · PIC · Actions
+ * a STATE  sorts WORST FIRST      Status · Deadline · Stock · Delivery
+ *          — ascending therefore means on a sorted column exactly what it
+ *            means in the default order, so the FIRST click never buries
+ *            the work at the bottom of the list.
+ * a BLANK  sorts LAST, in BOTH directions — Excel's rule, and 2990 already
+ *          spells it in its own filter list (`(a || '~')`, `:682`). Without
+ *          it, ascending `Deadline` opens on every undated order there is.
+ * ```
+ * A rank is never typed twice: the stage rank IS `TABS` and the stock rank IS
+ * `STOCK_BUCKETS` (Law D — a derived fact has ONE arithmetic).
+ *
+ * ### ⛔ AND ⚑ `Follow-up` DOES NOT SORT, BECAUSE ITS HEADER WRAPS
+ *
+ * **Measured in Chromium against the kit's own header markup, in BOTH nav
+ * states and with the arrow actually in the DOM** — a sortable header renders
+ * the chevron only on hover or once sorted, so the measurement is taken with
+ * the column SORTED, which is the same markup the hover branch emits. The
+ * harness renders the real `kit/DataTable` at the two live table widths, and
+ * it reproduces C14's columns to the digit at 1022px (`Status 134.7 · Order
+ * 75.4 · Deadline 150.8 · Stock 53.9 · PIC 59.3 · Actions 210.1`).
+ *
+ * ```
+ * column      content box          label      verdict, at 850 / 1022
+ *             850px    1022px    + arrow
+ * Follow-up    56.0      56.6      68.4    WRAPS "Follow-" / "up", BOTH widths
+ * Stock        28.1      37.9      46.0    arrow spills 17.9 / 8.1 past the
+ *                                          content box — cut off at 850,
+ *                                          flush against the rule at 1022
+ * PIC          32.5      43.3      34.0    spills 1.6 at 850 — into the th's
+ *                                          own 8px padding, so still whole
+ * Order        45.8      59.4      46.0    spills 0.2 at 850, same
+ * Status       94.3     118.7      49      fits
+ * Customer     71.2      90.5      67      fits
+ * Deadline    107.5     134.8      62      fits
+ * Delivery     79.0     100.0      59      fits
+ * Actions     156.1     194.1      72      fits
+ * ```
+ *
+ * **`Follow-up` is the one label on this table with a HYPHEN, and a hyphen is
+ * a break opportunity.** That is why it is the ONLY one that wraps, and why
+ * being over the content box is not on its own the test: `Stock`, `PIC` and
+ * `Order` are all over it at 850px and every one of them stays on one line,
+ * because a single word with no break opportunity can only overflow. S1
+ * shipped the wrap once and pinned 72px to stop it; making the column sortable
+ * would hand back the pixel S1 paid for.
+ *
+ * **Nothing is lost, and that is the reason this is a decision rather than a
+ * concession.** The QUEUES rail already carries `Follow-up` and
+ * `For manager review` as FILTERS, and a filter beats a sort for *show me my
+ * flags* — it removes the other rows instead of stacking them underneath.
+ * Widening the column is the other answer, and it is not this card's: the
+ * MASTER already records the flag column's width as an OPEN question whose
+ * two answers (an icon header in the kit, or the flag stops being a column)
+ * both reach beyond Orders.
+ *
+ * > 🟡 **REPORTED, NOT FIXED — `Stock` loses its arrow at ONE of the two nav
+ * > widths.** `Stock` + the chevron need 46px against a 28.1px content box
+ * > with the nav EXPANDED, so the arrow runs 9.9px past the column's own
+ * > border and is painted over by `Delivery`'s header background. With the
+ * > nav COLLAPSED the content box is 37.9px and the arrow lands flush against
+ * > the column rule — tight, but whole. **It is kept sortable on purpose:**
+ * > the rows visibly reorder, `aria-sort` is correct for a screen reader, and
+ * > the alternative is losing the worst-first stock ordering over 9 pixels at
+ * > one window size. There is no cheap width to take them from — C14 sized
+ * > every column to its CELLS, which are wider than any header here.
+ */
+// ─── S2.2 · HEADER FILTER DROPDOWNS ──────────────────────────────────────────
+/**
+ * **The ▼ Excel put on every header, on the four columns where it is not a
+ * second home for a filter that already has one.**
+ *
+ * 2990 gives EVERY column a funnel (`DataGrid.tsx:342-345`, Commander
+ * 2026-05-29 — *"没有 drop-down 菜单让我去做选择"*), and `kit/DataTable` already
+ * renders the popover Jess approved on 2026-08-01. What could not be copied
+ * wholesale is WHICH columns, and the reason is this module's own frozen rule:
+ *
+ * > **Nothing on the list says the same thing twice.** … `Overdue` has exactly
+ * > ONE home (the QUEUES rail).
+ *
+ * **Almost every column on this table already has a rail facet.** So the test
+ * is not *does 2990 have a ▼* — it is *does this ▼ create a SECOND filter, or
+ * a second DOOR onto the one that exists*:
+ *
+ * ```
+ * order      no rail facet           →  ▼ owns its own state       WIRED
+ * customer   no rail facet           →  ▼ owns its own state       WIRED
+ * deadline   DEADLINE  Set<DueBucket>→  ▼ WRITES THE RAIL'S SET    WIRED
+ * delivery   LOGISTICS Set<string>   →  ▼ WRITES THE RAIL'S SET    WIRED
+ * ────────────────────────────────────────────────────────────────────────
+ * dots       the stage TABS          →  a THIRD home for the stage  NOT WIRED
+ * stock      stockFilter  — SINGLE   →  the ▼ is a checklist, and
+ * pic        staffFilter  — SINGLE       binding it means widening
+ * next       nextFilter   — SINGLE       the RAIL to multi-select   NOT WIRED
+ * ```
+ *
+ * > ### ⛔ AND THE LAST THREE ARE A CARD BOUNDARY, NOT A JUDGEMENT
+ * >
+ * > `stockFilter` · `staffFilter` · `nextFilter` are `T | null` — clicking a
+ * > second PIC in the rail REPLACES the first. The kit's ▼ is a multi-select
+ * > checklist, so wiring it to those three means widening them to sets, and
+ * > that changes what the RAIL does. **The S2 card is explicit:** *"DO NOT
+ * > TOUCH Queues … Only rendering behaviour INSIDE the grid changes.
+ * > Everything outside the grid stays OperationOrdersControl's."* Widening a
+ * > rail facet from single to multi-select is not rendering behaviour inside
+ * > the grid — it is the rail's own contract, and three of the four are
+ * > QUEUES rows by name.
+ * >
+ * > **So it is reported, not decided.** Whether an operator may hold two PICs
+ * > or two stock states at once is a real question with a real answer, and it
+ * > belongs to whichever card owns the rail — not to a grid-wiring card that
+ * > would answer it as a side effect.
+ *
+ * **The cascade is Excel's and To Order already ships it** — each ▼ lists the
+ * values that survive every OTHER narrowing on the page, so the options a menu
+ * offers are the options that can actually return a row.
+ */
+export const ORDER_FILTER_COLUMNS: ReadonlySet<string> = new Set([
+  "order",
+  "customer",
+  "deadline",
+  "delivery",
+]);
+
+/** A row with no value in a filtered column still has to be selectable —
+ *  Excel's `(Blanks)`, in this portal's words (COPY-STANDARD: never a code). */
+export const F_NO_VALUE = " none";
+
+export type OrderSortValue = string | number;
+
+/** 2990's comparator: numeric when both sides really are numbers, else
+ *  `localeCompare`. The BLANK branch is deliberately not multiplied by the
+ *  direction — that is what keeps empties at the bottom either way. */
+export function compareOrderSortValues(
+  a: OrderSortValue,
+  b: OrderSortValue,
+  dir: "asc" | "desc",
+): number {
+  const ea = a === "";
+  const eb = b === "";
+  if (ea || eb) return ea && eb ? 0 : ea ? 1 : -1;
+  const sign = dir === "asc" ? 1 : -1;
+  const na = Number(a);
+  const nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return (na - nb) * sign;
+  return String(a).localeCompare(String(b)) * sign;
+}
+
+/** The pipeline's own order, read off `TABS` so the sorted column and the
+ *  stage tabs cannot drift apart. */
+const STAGE_ORDER: SettledTab[] = TABS.filter((t) => t.key !== "all").map(
+  (t) => t.key as SettledTab,
+);
+/** Best → worst, exactly as `LogisticStateKey` declares them. The sort value
+ *  counts from the WORST end, so ascending opens on the orders nobody has
+ *  arranged yet. */
+const LOGISTIC_BEST_FIRST: readonly LogisticStateKey[] = [
+  "delivered",
+  "confirmed",
+  "provisional",
+  "need_booking",
+  "unassigned",
+];
+/** Index counted from the worst end of a best-first ladder. */
+function worstFirst(ladder: readonly string[], key: string): number {
+  return ladder.length - 1 - ladder.indexOf(key);
+}
+
+/**
+ * **The columns that sort — the ONE list, read by the column defs AND by the
+ * sort itself.** A header that offers an arrow the list cannot honour is worse
+ * than a header with no arrow: the operator clicks, nothing moves, and they
+ * stop trusting the whole row of them.
+ */
+export const ORDER_SORTABLE_COLUMNS: ReadonlySet<string> = new Set([
+  /* `follow_up` is deliberately ABSENT — its header wraps under the arrow.
+     The measurement is in the block above. */
+  "dots",
+  "order",
+  "customer",
+  "deadline",
+  "stock",
+  "delivery",
+  "pic",
+  "next",
+]);
+
+/** What a sort value needs that an order row does not carry by itself. */
+export interface OrderSortContext {
+  availableBySku?: Map<string, number>;
+  partnerName: Map<string, string>;
+  staffById: Map<string, OpsStaffMember>;
+  nextVerbOf: (o: operationOrderListRow) => string;
+}
+
+/**
+ * One column's sort value. `null` = that column does not sort, and the header
+ * gets no control at all — a dead arrow is a promise the grid cannot keep.
+ *
+ * Every value below is read from the SAME helper the cell renders from, so a
+ * sorted column can never disagree with what it is showing.
+ */
+export function orderSortValueOf(
+  key: string,
+  o: operationOrderListRow,
+  ctx: OrderSortContext,
+): OrderSortValue | null {
+  switch (key) {
+    case "dots":
+      return STAGE_ORDER.indexOf(controlTabOf(o, ctx.availableBySku));
+    case "order":
+      return o.so;
+    case "customer":
+      return o.customer_name ?? "";
+    /* A TBD date is not a late date — it is no date, and it sorts with the
+       blanks rather than pretending to be the soonest or the furthest. */
+    case "deadline":
+      return o.delivery_date_tbd ? "" : (o.delivery_date ?? "");
+    case "stock":
+      return worstFirst(STOCK_BUCKETS, stockBucketOf(o, ctx.availableBySku));
+    case "delivery":
+      return worstFirst(
+        LOGISTIC_BEST_FIRST,
+        logisticStateOf(o, ctx.partnerName).key,
+      );
+    /* The PERSON's name, not their user id — the column shows a name and a
+       sort must order what the eye is reading. */
+    case "pic": {
+      const u = ownerOf(o);
+      if (!u) return "";
+      const m = ctx.staffById.get(u);
+      return m ? staffLabel(m) : u;
+    }
+    /* The verb the row is already showing. Sorting the instruction column
+       GROUPS identical work together — `Issue PO` beside `Issue PO` — which is
+       what a word column is for; which action is most urgent is the QUEUES
+       rail's job and stays there. */
+    case "next":
+      return ctx.nextVerbOf(o);
+    default:
+      return null;
+  }
+}
+
+/**
+ * The value a ▼ lists and matches on, for the two columns that own their own
+ * filter state. **It is read from the same place the CELL is**, so a menu can
+ * never offer a value the column does not show.
+ */
+export function orderColFilterValueOf(key: string, o: operationOrderListRow): string {
+  switch (key) {
+    case "order":
+      return String(o.so);
+    case "customer":
+      return o.customer_name?.trim() || F_NO_VALUE;
+    default:
+      return F_NO_VALUE;
+  }
+}
+
 /** Item category short-form (Master Sheet model): core goods Mattress / Bedframe
  *  / Sofa need POs + stock; everything else is accessory/service. Native SKUs
  *  carry a `mattress:` / `bedframe:` / `sofa:` prefix; AutoCount free-text SKUs
@@ -1227,6 +1523,83 @@ function unitTotal(lines: { sku: string; qty: number }[]): number {
   for (const l of lines)
     if (lineKind(l.sku) !== "service") t += Number(l.qty || 0);
   return t;
+}
+
+/**
+ * ⭐ S2.5 — WHAT NAMES AN ORDER LINE, and the card's own candidate was the
+ * wrong column.
+ *
+ * §3's S2.5 block flagged one thing to settle before building: `order_lines`
+ * carries `{ sku, qty, unit_price }` with **no description**, R4 requires
+ * *"human words, not codes"*, and it named the catalog's `variant` as the
+ * human label. **Measured on production 2026-08-08, `variant` does not carry
+ * a human word at all** — it is a SIZE or a MODULE CODE:
+ *
+ * ```
+ *   sku            variant      product_skus.description
+ *   B1201S-K       King         Mattress B1201S 183X190CM
+ *   5539-CNR       CNR          Sofa Booqit CNR
+ *   5539-2A(RHF)   2A(RHF)      Sofa Booqit 2A(RHF)
+ *   CODY-Q         Queen        Bedframe Cody 152X190CM
+ * ```
+ *
+ * **`description` is the label, and it is already on the wire.** It is
+ * 209/209 filled, it equals neither the sku nor `name + variant` on any row,
+ * and it is the ONE field carrying R4's three parts at once — the noun (what
+ * it is), the model, and the spec (the physical size). The API generates it
+ * for bed sizes and the catalog admin may type it (`catalog.ts:754`), it
+ * rides `GET /api/catalog` through `productSkuFromRow`, and this page ALREADY
+ * calls `useCatalog()` for the SUPPLIER facet. **So the label costs no fetch,
+ * no route, no migration — it costs three fields on a map that exists.**
+ *
+ * **THE FALLBACK IS NOT AN EDGE, IT IS A WHOLE POPULATION — and it is also
+ * not a degradation.** Measured 2026-08-08 over 184 live lines:
+ *
+ * ```
+ *   source              orders   lines   matched a catalog row
+ *   autocount              37      94      0        ← none, ever
+ *   native (POS)           32      82     81
+ *   rental                  8       8      8
+ * ```
+ *
+ * Zero of 94 AutoCount lines have a catalog row, so a fallback that shrugged
+ * would blank half the list. It does not have to: **the AutoCount "SKU" IS
+ * free text a human typed** — `Breeze FirmCare-B1201F-Q` · `Essential Memory
+ * Pillow(L)` · `Mattress Disposal` · `No Lift Per Floor Charge` — and on that
+ * population it is frequently MORE human than the catalog's own label would
+ * be. So the fallback prints it verbatim.
+ *
+ * **`fromCatalog` is kept because the two are not the same claim.** A
+ * catalogued line is named by OUR record; a free-text line is named by
+ * whatever AutoCount was given. The panel spends no pixels on the difference
+ * today — nothing on screen turns on it — but the caller can tell them apart
+ * without re-deriving the join, which is what stops the next card guessing.
+ *
+ * **What this deliberately does NOT do: invent a name.** No composing a title
+ * out of `lineClass` + `lineSize` when the record has none — that would put a
+ * word on screen that no one entered, which is the failure the card named.
+ * When nothing is known the SKU string is what there is, and it is shown.
+ *
+ * **FALSIFIER:** a NATIVE order line whose sku has no catalog row — then this
+ * prints a bare code with no human word in it. Live today: 1 of 82
+ * (`M1201F-K`, and no `M1201F%` sku exists at all, so it is a deleted-catalog
+ * artefact of the trial data §6 says is thrown away at go-live). If a second
+ * appears from the POS path, the fallback stops being cosmetic and
+ * `order_lines` needs to store the description AT SALE — a line must not be
+ * renamed by a later catalog edit anyway.
+ */
+export function orderItemLines(
+  lines: { sku: string; qty: number }[],
+  skuMeta: Map<string, { label?: string | null }>,
+): { qty: number; label: string; fromCatalog: boolean }[] {
+  return lines.map((l) => {
+    const label = skuMeta.get(l.sku)?.label?.trim();
+    return {
+      qty: Number(l.qty || 0),
+      label: label || l.sku,
+      fromCatalog: !!label,
+    };
+  });
 }
 
 /** Roll a line list up into boxed TAGS, one per category, ordered core →
@@ -1439,13 +1812,21 @@ function openPrint(html: string) {
   setTimeout(() => w.print(), 200);
 }
 
-// ─── Column show/hide (locked spec §4 "control strip: tabs + count + Columns") ──
-// Reuses the SO Maintenance control pattern (btn + N/M + popover of checkboxes)
-// over the hand-rolled table. The 2 structural columns (select, flag) always
-// show; these 8 DATA columns toggle. Base widths sum to 94% (select+flag = 3%+3%);
-// when some are hidden the visible widths scale up so the table stays exactly
-// full-width. The preference persists per-browser in localStorage (client-only —
-// no server config; Saved Views deferred per Jess).
+/* ─── The eight business columns ───────────────────────────────────────────────
+ *
+ * S1 (2026-08-07) — **the column CHOOSER is gone, and it is a ruling being
+ * obeyed rather than a feature being dropped.** This block used to end in a
+ * `localStorage` key (`carres.orders.hiddenCols`) and a popover of checkboxes,
+ * which is a per-user store of UI shape: `docs/ui/MASTER.md` §0.4 forbids one
+ * and Loo ruled the question closed on 2026-08-04 — *"no page may persist
+ * column order, width or visibility"* (`docs/research/grid-findings.md` F58 ·
+ * F61). It was the last page in the portal still doing it, the kit's own guard
+ * scans only the kit (F59), and `kit/DataTable` has nowhere to put it. The
+ * eight columns below are the company's, and every operator sees the same tool.
+ *
+ * The units stay UNITS. `colScale` turns them into percentages, so every
+ * measurement in the comments below is still literally true.
+ */
 interface OrderColDef {
   key: string;
   label: string;
@@ -1495,66 +1876,188 @@ interface OrderColDef {
  * another's expense — the sum moved 88 → 89 and 1 unit is now 10.69px.
  */
 const ORDER_COL_DEFS: OrderColDef[] = [
-  // Status holds the STAGE pill + C10's three dots. C10 sized it 14 for the
-  // widest pill it could ever hold (`Customer confirmed`, 135px) against a
-  // 1448px table. At the real 1012px that reservation cost 18px it was not
-  // using: live, 30 of 31 rows read `To book` (64px) and `Customer confirmed`
-  // is 0 on the stage tabs. 14 → 12.5 = 134px, which holds the LIVE worst
-  // exactly. If that stage ever fills up, this is the first column to re-check.
-  { key: "dots", label: "Status", w: 12.5 },
-  // `SO-1221` over `CR0925 +2` — two short mono lines, 65px of content in
-  // 97px. 9 → 7 = 75px.
-  { key: "order", label: "Order", w: 7 },
-  // The one column C14 leaves clipped, deliberately — see the header note.
-  // 11 → 11.5 = 123px against 185px of worst-case content, so the 2 rows that
-  // truncated before still truncate (with their `title`). It is the least-cost
-  // place to put a deficit the table genuinely does not have the pixels for.
-  { key: "customer", label: "Customer", w: 11.5 },
-  // Deadline was the LOUDEST silent failure on this page and no card had
-  // noticed: the overdue pill + `Wed, 22 Jul 26` needs 147px and the column
-  // had 119, so **all 30 rows clipped the customer's own promised date** —
-  // at the cell level, which is why a leaf-only scan missed it. 11 → 14.
-  { key: "deadline", label: "Deadline", w: 14 },
-  // `0/3` over `ETA —`: 50px of content. C10 called this "its measured floor"
-  // at 9 units, but that was 159px on a 1448px table — at 1012px it was still
-  // holding 97px for 50px of content. 9 → 5 = 53px.
-  { key: "stock", label: "Stock", w: 5 },
-  // Delivery does NOT shrink, and C14's own card expected it to. Removing the
-  // duplicated action sentence leaves the carrier name (46px) — but the widest
-  // thing this column can EVER hold is now a DATE, and a date is what the
-  // column is for: `logistics said Mon, 20 Jul` is 135px + 12 padding = 147px.
-  // (Confirmed `Mon, 20 Jul · 12pm–3pm` is 129px; the slot vocabulary is the
-  // bounded DELIVERY_TIME_SLOTS list, longest `12pm–3pm`.) Neither date line
-  // carries `truncate`, so under-sizing this column does not ellipsise — it
-  // OVERFLOWS into PIC. 13 → 14 = 150px. Live exposure today is zero (0 of 65
-  // orders carry a provisional or confirmed booking), which is exactly why it
-  // has to be sized off the reachable string rather than off today's rows.
-  { key: "delivery", label: "Delivery", w: 14 },
-  { key: "pic", label: "PIC", w: 5.5 },
-  // ACTIONS — C3 accepted this column's truncation as "not conceded" on the
-  // 1448px premise. On the real table it was 173px holding 191px of sentence,
-  // clipped on 30 of 30 rows, and the instruction is the one thing on the row
-  // a human acts on. 16 → 19.5 = 208px, which holds the live worst whole.
-  // The `+N` and the drawer still carry what a longer line would lose.
-  { key: "next", label: "Actions", w: 19.5 },
+  /* ⭐ S3.1 — EVERY WIDTH IS `measured cell + the kit's own px-2 (16px)`,
+     RE-MEASURED IN CHROMIUM 2026-08-08 in each cell's real markup.
+     C14's table above is kept because its METHOD is right and its strings are
+     still the right strings — but three of its numbers were short, and all
+     three for one reason: **C14 budgeted 8–12px of cell padding and the kit's
+     uniform `px-2` is 16.** S1 already recorded that ("the kit's uniform px-2
+     costs every column 4px of content box"); S3.1 is where it is paid.
+       Order     74 → 87   (`CR0925 +2` measures 70.2, not 65)
+       Delivery 147 → 160  (`logistics said Mon, 20 Jul` measures 143.9)
+       Stock     50 → 54   (`ETA —` 37.6 + 16)
+     Nothing here is a share any more, so raising one costs no other column
+     anything — the grid scrolls instead. */
+  // The stage pill + gap 6 + C10's three 14px dots = 122.3 measured, on the
+  // LIVE worst pill (`To book`). `Customer confirmed` composes to 192.7 and is
+  // 0 rows live; the pill truncates and the dots never do, which is C10's own
+  // design. **If that stage fills up this is still the first column to
+  // re-check** — and now re-checking costs one number, not a redistribution.
+  { key: "dots", label: "Status", w: 139 },
+  // `CR0925 +2`, mono 13/600 — the wider of the cell's two lines.
+  { key: "order", label: "Order", w: 87 },
+  // `MyHouse Management PLT` 172.5. C14 could only afford 123 and S1 cut it to
+  // 105: this is the column the old arithmetic robbed hardest, and the first
+  // it pays back in full.
+  { key: "customer", label: "Customer", w: 189 },
+  // The heat badge + gap-1.5 + `Wed, 22 Jul 26` composes to 137.9. §3 records
+  // that this cell deliberately carries NO `truncate` (an ellipsis costs the
+  // MONTH to signal something already visible) — so under-sizing it clipped a
+  // real date. At 154 it no longer can.
+  { key: "deadline", label: "Deadline", w: 154 },
+  // `ETA —` 37.6 + 16. Also the width that ends S2.1's reported 🟡: the sort
+  // arrow needed 46px against a 37.9px content box and was painted over by
+  // `Delivery`. It fits now.
+  { key: "stock", label: "Stock", w: 54 },
+  // `logistics said Mon, 20 Jul` 143.9 — the widest string this column can
+  // EVER hold, not the widest it holds today (live exposure is 0 of 65).
+  { key: "delivery", label: "Delivery", w: 160 },
+  // The initials chip. C14's 58 is kept: the chip measures 24 and the header
+  // plus its sort arrow needs 34, so 58 covers both with room and no column
+  // pays for the slack.
+  { key: "pic", label: "PIC", w: 58 },
+  /* ⭐ S3.3 — 331, AND C14's STRING WAS NEARLY THE NARROWEST OF ITS FAMILY.
+     §3 marked this column's 30-of-30 truncation ACCEPTED on the premise that
+     all eight columns must fit at once. S3.1 removed that premise, so S3.3
+     re-measured — and found the number every card has sized against was the
+     wrong one. Measured 2026-08-08, `+N` chip included, + the kit's px-2:
+
+       Collect RM 1,234,567.00 from MyHouse Management PLT   397.9  UNBOUNDED
+       Call Nice Future Bedding — confirm ready date         330.1  ← the
+       Call HOUZS — arrange new delivery date                293.4    widest
+       Collect RM 2,250.00 from Tan Ah Kow                   275.8    BOUNDED
+       Delivering Mon, 20 Jul · 12pm–3pm                     256.4
+       Check in from Nice Future Bedding                     255.1
+       Call NETS — confirm delivery date                     252.2  ← C14's
+       Issue PO to Nice Future Bedding                       238.3
+
+     **The width is a function of the PARTY, not of the template**, and C14
+     measured on a day whose live party was `NETS` — four characters. Seven of
+     the eleven reachable lines are wider than the 253 S3.1 derived from it.
+
+     331 HOLDS EVERY BOUNDED LINE WHOLE. Logistics and suppliers are
+     CONFIGURATION (`CLAUDE.md` §6) — a short, known, slow-changing list — so
+     every action naming one of them now fits.
+
+     THE ONE THAT STILL TRUNCATES IS `Collect … from {customer}`, and it is the
+     right one to accept: a customer name is UNBOUNDED, so no number retires
+     this, and **it is the only action line whose information is fully repeated
+     on the same row** — the customer is two columns left, and the money is in
+     the footer total and the `Owing` rail. Every other line names a party that
+     appears nowhere else on the row. */
+  { key: "next", label: "Actions", w: 331 },
 ];
-const HIDDEN_COLS_KEY = "carres.orders.hiddenCols";
-function loadHiddenCols(): Set<string> {
-  if (typeof localStorage === "undefined") return new Set();
-  try {
-    const raw = localStorage.getItem(HIDDEN_COLS_KEY);
-    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
-  } catch {
-    return new Set();
-  }
-}
-function saveHiddenCols(s: Set<string>) {
-  try {
-    localStorage.setItem(HIDDEN_COLS_KEY, JSON.stringify([...s]));
-  } catch {
-    /* ignore quota / private-mode errors */
-  }
-}
+/**
+ * ⭐ THE WIDTH BUDGET, AND THE ONE COLUMN S1 HAD TO MOVE.
+ *
+ * The hand-written table spent `☐ 3% · ⚑ 3% · data 94%`. Two things in the
+ * migration are not negotiable and both land on the gutters:
+ *
+ *   · `kit/DataTable` OWNS the select column and fixes it at **4%** — there is
+ *     no prop for it, and inventing one would put a per-page width override
+ *     into the shared grid.
+ *   · `Column.label` is a `string` in BOTH engines, so the ⚑ header takes a
+ *     WORD. The module's word for it is `Follow-up` (the QUEUES rail row, §3),
+ *     and a second word for one thing is the C1 defect the kit exists to stop.
+ *
+ * ⭐ **AND THAT COLUMN IS SIZED IN PIXELS, NOT PERCENT — a real browser is why.**
+ * `Follow-up` measures **54.4px** at the `th`'s own `text-label` (11px/500) and
+ * the kit pads `px-2`, so the column needs **70.4px — a FIXED number, at every
+ * table width.** A `th` carries neither `truncate` nor `whitespace-nowrap`, so
+ * an under-sized one does not ellipsise: it WRAPS, "Follow-" over "up".
+ *
+ * This card first shipped it as a percentage (7.25%, tuned to the 1012px table
+ * C14 measured) and **the header wrapped the moment it was opened in a real
+ * browser** — at 1440×900 with the nav EXPANDED the table is 850px, and 7.25%
+ * of that is 61.6px. jsdom has no layout and every unit test passed. **A
+ * percentage cannot protect a fixed-width word; only a pixel can.** The kit
+ * documents exactly this (`Column.width`: *"a string = raw CSS width — fixed
+ * interior columns … the international recipe"*), and now the word survives
+ * every window size instead of one.
+ *
+ * At C14's 1012px reference table, 72px is 7.11%, so `4 + 7.11 = 11.11%` where
+ * the two control columns cost `6%`: **5.11% has to come out of the eight**,
+ * and the only question a build card gets to answer is WHICH. It was answered
+ * by measuring, in Chromium at the real 1012px, on C14's own worst-case
+ * strings — before and after, same harness:
+ *
+ * ```
+ * ALL OF IT ON `customer`, per C14's "the deficit goes out of customer"
+ *     customer 123px → 77px  and  `Tan Ah Kow` starts truncating.
+ *     REJECTED. An ordinary human name is not an edge case, and a rule
+ *     written to absorb 50px does not survive being asked for 95px.
+ *
+ * EVEN SPLIT, customer + delivery
+ *     customer 123px → 96px  and  `Tan Ah Kow` still loses 5px.
+ *     REJECTED for the same reason: a symmetrical number is not an
+ *     argument, and the two columns do not carry equally.
+ *
+ * 1.75 / 3.5 — `delivery` pays TWICE what `customer` pays   ← SHIPPED
+ *     customer 123 → 105px · delivery 150 → 114px
+ *     every human customer name fits; `No logistics picked` ellipsises.
+ *     Actions, Deadline, Status, Order, Stock and PIC keep C14's width
+ *     to the digit.
+ * ```
+ *
+ * **`delivery` pays the larger share because it carries the least, and this
+ * module already ruled why.** Its longest string is `No logistics picked`, and
+ * §3's frozen rule is that *"the `Delivery` cell never repeats the sentence
+ * `Actions` already carries"* — the row states what to DO about missing
+ * logistics one column to the right, in the Actions pill, every time. C14's
+ * own note adds the rest: this column is sized for `logistics said Mon, 20
+ * Jul` against a live exposure of **zero of 65 orders**. A customer's name is
+ * read on every row, by contrast, and nothing else on the row says it.
+ *
+ * The reason C14 could not squeeze it was a hazard the kit REMOVES: *"neither
+ * date line carries `truncate`, so under-sizing this column does not
+ * ellipsise — it OVERFLOWS into PIC."* `kit/DataTable` clips every cell
+ * (`[&_td]:overflow-hidden`), so nothing can bleed into PIC any more, and all
+ * three of the cell's lines now carry `truncate` + a `title` so the clip shows
+ * an ellipsis instead of half a glyph. The hazard is gone; the width it bought
+ * is spendable.
+ *
+ * 🟡 REPORTED, NOT FIXED — TWO THINGS, and both are measurements the next card
+ * that re-tabulates this page should start from rather than re-derive.
+ *
+ * ① `customer` falls 123px → 96px, so a long COMPANY name (`MyHouse
+ *    Management PLT`) truncates harder than it did. The name stays in the
+ *    cell's `title`, in the drawer and in search — C14's trade, kept.
+ *
+ * ② **A 15px flag icon now occupies 73px, because its HEADER needs the
+ *    word.** `Follow-up` is the widest thing that column will ever hold, and
+ *    it is in the head, not the data: the cell is one tooltipped icon whose
+ *    colour is the whole state. 7.25% is more than `Stock` (5.28) and `PIC`
+ *    (5.81) get, on the page where C14 measured the table 50px SHORT of its
+ *    own content. **This is worth challenging, and the card that owns the
+ *    next re-tabulation should:** either the kit learns an icon header
+ *    (`Column.label` would have to stop being a `string`, which reaches three
+ *    frozen pages), or the flag stops being a column. S1 does not decide it —
+ *    the migration was approved with the word, and a build card does not
+ *    reopen an approved rule. It reports the price.
+ */
+/** ⭐ S3.2 — 30px, and it used to be 72.
+ *
+ *  The cell is ONE 15px flag. It cost 72 because `Column.label` was a `string`
+ *  and the head therefore needed the WORD `Follow-up` (52.4px + the kit's 16).
+ *  `8340b0f0` is what that bought: on a ~1130px window this column kept its 72
+ *  while `Order` collapsed to `S(` — **the column that survived was the one
+ *  answering nothing.**
+ *
+ *  S3.2 adds `Column.headerContent` to the kit — OPTIONAL and additive, so the
+ *  three FROZEN pages that pass nothing emit byte-identical markup — and the
+ *  head draws the flag instead of spelling it. **The word is not lost:** it is
+ *  still `label`, still the accessible name, still the tooltip. Only the pixels
+ *  changed: 14px icon + the kit's `px-2` 16 = 30.
+ *
+ *  **42px back to the eight business columns**, which is what S2.5's expansion
+ *  gutter costs at 1198px table width — with room to spare. */
+const FOLLOW_UP_WIDTH = "30px";
+/* S3.1 DELETED `REFERENCE_TABLE_PX` · `GUTTER_DEFICIT_PCT` · `DEFICIT_SHARE`.
+   All three existed to answer ONE question — which business column pays for the
+   two gutters when the table is narrower than its content — and Loo's later
+   ruling (To Order, 2026-08-06) says nobody does: "deleting a business column,
+   or shrinking one below its measured content, to avoid a scrollbar is
+   FORBIDDEN". The grid scrolls instead, so there is no deficit to share. */
 
 export default function OperationOrdersControl({ onImport }: Props) {
   const params = useParams<{ stage?: string }>();
@@ -1601,6 +2104,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // (only ~30 <tr> in the DOM until the user scrolls).
   const ROWS_PER_BATCH = 30;
   const [renderCount, setRenderCount] = useState(ROWS_PER_BATCH);
+  /* S2.1 — the column the operator sorted by, or `null` for the page's own
+     risk order. Session-only, like every other list control here: §0.4 rules
+     out a per-user store of UI shape, and a sort an operator cannot remember
+     setting is a list that lies to them tomorrow morning. */
+  const [sort, setSort] = useState<TableSort | null>(null);
+  /* S2.5 — which rows are unfolded. Controlled, like `selected`, and
+     session-only for the same §0.4 reason as `sort`: an unfold an operator
+     cannot remember making is a list that looks different tomorrow morning
+     for no reason they can name. */
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkMenu, setBulkMenu] = useState<
@@ -1647,34 +2160,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [supplierLateOnly, setSupplierLateOnly] = useState(false);
   // Import stock ETA from the Master "Ops" sheet (fills each line's Stock ETA).
   const [etaImportOpen, setEtaImportOpen] = useState(false);
-  // Column show/hide (locked §4) — hidden data-column keys (localStorage-persisted)
-  // + the popover open state; the popover closes on an outside click.
-  const [hiddenCols, setHiddenCols] = useState<Set<string>>(loadHiddenCols);
-  const [columnsOpen, setColumnsOpen] = useState(false);
-  const columnsRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!columnsOpen) return;
-    const onDoc = (e: MouseEvent) => {
-      if (columnsRef.current && !columnsRef.current.contains(e.target as Node))
-        setColumnsOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [columnsOpen]);
-  const toggleCol = (key: string) =>
-    setHiddenCols((prev) => {
-      const n = new Set(prev);
-      if (n.has(key)) n.delete(key);
-      else n.add(key);
-      saveHiddenCols(n);
-      return n;
-    });
-  const showCol = (key: string) => !hiddenCols.has(key);
-  const visibleColDefs = ORDER_COL_DEFS.filter((d) => showCol(d.key));
-  // Scale visible data widths to fill 94% (select+flag keep 3%+3%) so the table
-  // stays exactly full-width no matter how many columns are hidden.
-  const colScale = 94 / (visibleColDefs.reduce((s, d) => s + d.w, 0) || 94);
-  const visibleColSpan = 2 + visibleColDefs.length; // select + flag + visible data
+  // C14's unit → percentage scale, unchanged: the eight columns share 94% of
+  // the table and Σw is 89, so one unit is 1.0562%. What changed in S1 is who
+  // pays for the two control columns — see GUTTER_DEFICIT_PCT.
 
   // Server applies the search; we always fetch the full list and bucket
   // client-side so every tab shows its true count.
@@ -1709,11 +2197,31 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const modelCat = new Map(
       (catalogQ.data?.models ?? []).map((m) => [m.id, m.category as string]),
     );
-    const m = new Map<string, { supplierId: string | null; category: string | null }>();
+    /* S2.5 — the model's NAME joins the map beside its category, for the one
+       case `description` cannot cover: a SKU whose description was never
+       written. `Booqit · CNR` still says which product; `CNR` alone does not. */
+    const modelName = new Map(
+      (catalogQ.data?.models ?? []).map((m) => [m.id, m.name]),
+    );
+    const m = new Map<
+      string,
+      { supplierId: string | null; category: string | null; label: string | null }
+    >();
     for (const s of catalogQ.data?.skus ?? []) {
+      /* THE LABEL, in the order the evidence ranks it (see `orderItemLines`):
+         `description` first — it is 209/209 filled and the only field that
+         carries noun + model + spec at once. Then `{model} · {variant}`, which
+         is what the card originally proposed and what remains true when a
+         description is missing. Then NOTHING — `null` hands the decision back
+         to the caller, which prints the sku verbatim rather than inventing a
+         name out of the classifier. */
+      const model = modelName.get(s.modelId)?.trim() ?? "";
+      const variant = s.variant?.trim() ?? "";
+      const composed = model && variant ? `${model} · ${variant}` : model || variant;
       m.set(s.sku, {
         supplierId: s.supplierId ?? null,
         category: modelCat.get(s.modelId) ?? null,
+        label: s.description?.trim() || composed || null,
       });
     }
     return m;
@@ -1818,6 +2326,22 @@ export default function OperationOrdersControl({ onImport }: Props) {
         }
       : null);
   const [staffFilter, setStaffFilter] = useState<string | null>(null);
+  /**
+   * ─── S2.2 · THE COLUMN ▼ ────────────────────────────────────────────────
+   *
+   * **Only the two columns that have NO rail home carry their own state.**
+   * `Deadline` and `Delivery` get a ▼ too, and it writes the SET THE RAIL
+   * ALREADY OWNS (`dueFilter` · `logisticFilter`) rather than a second one —
+   * so clicking `Due ≤3d` in the rail lights the `Deadline` ▼ and clearing
+   * either clears both. **One truth, two doors** (the architecture's Law C is
+   * about two RECORDS, not two surfaces onto one).
+   *
+   * That is also why the other four columns are NOT wired, and it is a
+   * measurement rather than a preference — see `ORDER_FILTER_COLUMNS`.
+   */
+  const [colFilters, setColFilters] = useState<ReadonlyMap<string, ReadonlySet<string>>>(
+    new Map(),
+  );
   // Owing queue filter (B rebuild) — orders with money outstanding, closed
   // ones included (§7: owing survives Delivered).
   const [owingOnly, setOwingOnly] = useState(false);
@@ -1964,6 +2488,19 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // so queue numbers equal the NEXT column by construction.
   const nextVerbOf = (o: operationOrderListRow) =>
     nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []).label;
+  /* S2.1 — everything a sort value needs that the order row does not carry.
+     Each entry is the SAME helper the matching cell renders from, so a sorted
+     column can never disagree with what it is showing. */
+  const sortCtx: OrderSortContext = useMemo(
+    () => ({
+      availableBySku,
+      partnerName,
+      staffById,
+      nextVerbOf: (o) =>
+        nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []).label,
+    }),
+    [availableBySku, partnerName, staffById],
+  );
   /** J3 — the drawer's journey strip, computed HERE and handed down.
    *
    *  The card's DONE WHEN is "the strip agrees with the ladder/queues for the
@@ -2434,9 +2971,70 @@ export default function OperationOrdersControl({ onImport }: Props) {
       const opts = CATEGORY_OPTS.filter((c) => categoryFilter.has(c.key));
       r = r.filter((o) => opts.some((c) => c.match(o)));
     }
-    return [...r].sort(compareBySlack);
+    /* S2.2 — the column ▼, applied LAST of the narrowings and BEFORE the sort.
+       `Deadline` and `Delivery` are already applied above, because their ▼
+       writes the rail's own set; only the two columns that own their state
+       are left to apply here. */
+    for (const [k, sel] of colFilters) {
+      if (sel.size === 0) continue;
+      r = r.filter((o) => sel.has(orderColFilterValueOf(k, o)));
+    }
+    /* S2.1 — the DEFAULT order first, always. A column sort is then applied on
+       top of it, and `Array.prototype.sort` is stable, so two rows the operator
+       sorted to the same value keep `compareBySlack`'s order between them: the
+       risk order survives INSIDE every tie instead of being replaced by
+       whatever order the server happened to send. (2990 sorts its own default
+       order the same way — `DataGrid.tsx:701`, `[...filteredRows].sort`.) */
+    const ordered = [...r].sort(compareBySlack);
+    if (!sort || !ORDER_SORTABLE_COLUMNS.has(sort.key)) return ordered;
+    return ordered.sort((a, b) =>
+      compareOrderSortValues(
+        orderSortValueOf(sort.key, a, sortCtx) ?? "",
+        orderSortValueOf(sort.key, b, sortCtx) ?? "",
+        sort.dir,
+      ),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, supplierFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, skuMeta, suppliers, tasksByOrder]);
+  }, [tabFiltered, flaggedOnly, escalateOnly, nextFilter, supplierLateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, supplierFilter, staffFilter, owingOnly, categoryFilter, availableBySku, partnerName, skuMeta, suppliers, tasksByOrder, sort, sortCtx, colFilters]);
+
+  /**
+   * ─── S2.3 · THE FOOTER TOTAL ─────────────────────────────────────────────
+   *
+   * **Computed over `visible` — the WHOLE filtered list — and never over the
+   * rows the kit hands back.** The kit's `totals.cells(rows)` is given exactly
+   * what it rendered, and this page renders a **30-row window**. Summing that
+   * callback's argument would print the total of thirty orders under a footer
+   * band that says `30 of 65` one line below, and it would CHANGE as the
+   * operator scrolls. **That is the same defect S2.1 had to design around for
+   * the sort**, arriving through a different door, so the argument is
+   * deliberately ignored and a test pins it.
+   *
+   * **WHAT IT STATES, and each half is a decision.**
+   *
+   * · **The money, not the count.** The footer band already prints
+   *   `{total} orders` two lines down; §3's frozen rule is that nothing on
+   *   this list says the same thing twice. **Nothing on screen states the
+   *   money for the CURRENT view** — the `Owing` rail row carries a total, but
+   *   that is one fixed queue over every order, not what these filters left.
+   *   Money is also what a footer totals in the tool the team already uses.
+   *
+   * · **What it could NOT price, out loud.** `orderMoney` answers `unknown`
+   *   when an order has neither priced lines nor a keyed balance, and §4's
+   *   rule is *"not priced", never RM 0*. A sum that silently skipped those
+   *   would be a smaller number wearing a complete number's clothes.
+   *
+   * **`fmtMoney` spells the figure, as every money figure on this page does.**
+   */
+  const viewTotal = useMemo(() => {
+    let outstanding = 0;
+    let unpriced = 0;
+    for (const o of visible) {
+      const m = moneyOf(o);
+      if (!m.known) unpriced += 1;
+      else outstanding += m.outstanding;
+    }
+    return { outstanding, unpriced };
+  }, [visible]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -2454,24 +3052,24 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const total = visible.length;
   const shown = useMemo(() => visible.slice(0, renderCount), [visible, renderCount]);
 
-  // The list is the only scroll area. An IntersectionObserver sentinel at the
-  // bottom appends the next batch as it scrolls into view (guarded for jsdom).
+  // The list is the only scroll area, and after S1 it is the KIT's div — handed
+  // back by `DataTable.rootRef`, which exists for exactly this.
+  //
+  // The trigger used to be an IntersectionObserver on a sentinel `<tr>` inside
+  // `<tbody>`. The kit owns `<tbody>` now and there is no prop for a row that
+  // is not a row, so the append listens to the SCROLLER instead: within 240px
+  // of the bottom — the same margin the observer used — take the next batch.
+  // Same 30, same threshold, one fewer element in the table.
   const listBoxRef = useRef<HTMLDivElement>(null);
-  const sentinelRef = useRef<HTMLTableRowElement>(null);
   useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const el = sentinelRef.current;
     const root = listBoxRef.current;
-    if (!el || !root) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting)
-          setRenderCount((c) => Math.min(visible.length, c + ROWS_PER_BATCH));
-      },
-      { root, rootMargin: "240px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
+    if (!root) return;
+    const onScroll = () => {
+      if (root.scrollTop + root.clientHeight >= root.scrollHeight - 240)
+        setRenderCount((c) => Math.min(visible.length, c + ROWS_PER_BATCH));
+    };
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => root.removeEventListener("scroll", onScroll);
   }, [visible.length]);
 
   // ── Bulk select (Gmail-style) ──────────────────────────────────────────────
@@ -2481,6 +3079,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Partial tick → the header checkbox shows an indeterminate dash (Gmail).
   const somePagedSelected =
     !allPagedSelected && pagedIds.some((id) => selected.has(id));
+  function toggleExpanded(id: string) {
+    setExpandedRows((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }
   function toggleOne(id: string) {
     setSelected((s) => {
       const n = new Set(s);
@@ -2859,6 +3465,280 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // above but no longer mounted; `void` keeps the vars referenced (no churn).
   void poDutyTitleChips;
 
+  /* ── S1 · THE GRID ────────────────────────────────────────────────────────
+   *
+   * The 30 rows already windowed, each carrying the facts its cells share.
+   * `OrderRow` computed these once per ROW; a `Column.cell` runs once per
+   * CELL, so without this the five derived values below would be recomputed
+   * up to five times each. Same numbers, same order, computed in the same
+   * place they were before — the row's own scope.
+   */
+  const gridRows: OrdersGridRow[] = shown.map((o) => {
+    const lines = o.order_lines ?? [];
+    return {
+      o,
+      lines,
+      tasks: orderTasks(o),
+      stock: stockReadiness(o, availableBySku),
+      se: stockEtaOf(o),
+      logi: logisticStateOf(o, partnerName),
+      completed: controlTabOf(o) === "completed",
+      coreTotal:
+        catQty(lines, "mattress") + catQty(lines, "bedframe") + catQty(lines, "sofa"),
+      hasPendingChange: pendingCROrders.has(o.id),
+      /* C1 — the row line names the real supplier, so the row needs the same
+         resolution the SUPPLIER facet uses. Null = we cannot prove which
+         supplier, and the line falls back to the role word, not to a blank. */
+      supplierName: (() => {
+        const sid = primarySupplierId(o, skuMeta, suppliers);
+        return sid ? supplierNameById.get(sid) ?? null : null;
+      })(),
+    };
+  });
+
+  /**
+   * The columns, as DATA — which is the whole point of the move. The header
+   * word is typed ONCE, here, and the width comes from `ORDER_COL_DEFS` so
+   * C14's measured units stay the single source of both.
+   *
+   * **S2.1 answered S1's open question and every column now sorts.** S1 passed
+   * `sortable` on nothing and said why: reordering rows away from
+   * `compareBySlack` is a decision, not a prop. The decision is made — the
+   * third click returns the risk order, so nothing is reordered AWAY from it
+   * for longer than the operator wants — and the rule for each column's
+   * direction is one block, at `orderSortValueOf`. `filter` is still passed
+   * nowhere; that is S2.2's.
+   */
+  /* S3.1 — a px string, straight from the def. No scale, no deficit: the
+     column asks for the width its content was MEASURED at and `sizing="content"`
+     gives it exactly that, handing the slack to the kit's filler. */
+  const dataWidth = (key: string) =>
+    `${ORDER_COL_DEFS.find((c) => c.key === key)!.w}px`;
+  const dataLabel = (key: string) => ORDER_COL_DEFS.find((c) => c.key === key)!.label;
+
+  /* ── S2.2 · the ▼ ──────────────────────────────────────────────────────────
+     THE CASCADE, and it is the whole reason these lists are computed rather
+     than taken from `visible`: each menu offers the values that survive every
+     OTHER narrowing on the page, so an option a menu shows is an option that
+     can actually return a row. To Order ships the same rule (`filteredExcept`)
+     and the portal's facet law (§8.2) is the same sentence for the rail.
+
+     `visible` already has this column's own filter applied, so listing from it
+     would leave a menu holding only what is already ticked — no way back. */
+  const optionBase = (except: string) =>
+    visible.filter((o) =>
+      [...colFilters.entries()].every(
+        ([k, sel]) => k === except || sel.size === 0 || sel.has(orderColFilterValueOf(k, o)),
+      ),
+    );
+  /** Every row the ▼'s own filter is hiding, so its list can offer them back. */
+  const withOwnFilterLifted = (key: string) => {
+    const sel = colFilters.get(key);
+    if (!sel || sel.size === 0) return optionBase(key);
+    const shown = new Set(optionBase(key).map((o) => o.id));
+    return [
+      ...optionBase(key),
+      ...tabFiltered.filter(
+        (o) =>
+          !shown.has(o.id) &&
+          [...colFilters.entries()].every(
+            ([k, s]) => k === key || s.size === 0 || s.has(orderColFilterValueOf(k, o)),
+          ),
+      ),
+    ];
+  };
+
+  const setColFilter = (key: string) => (next: ReadonlySet<string>) =>
+    setColFilters((m) => {
+      const n = new Map(m);
+      if (next.size === 0) n.delete(key);
+      else n.set(key, next);
+      return n;
+    });
+
+  /** A ▼ for a column that owns its own state. */
+  const ownFilterFor = (
+    key: string,
+    label: string,
+    toLabel: (v: string) => string,
+    opts: { searchable?: boolean; compare?: (a: string, b: string) => number } = {},
+  ): ColumnFilter => {
+    const values = [...new Set(withOwnFilterLifted(key).map((o) => orderColFilterValueOf(key, o)))];
+    values.sort(
+      opts.compare ??
+        ((a, b) => (a === F_NO_VALUE ? 1 : b === F_NO_VALUE ? -1 : a.localeCompare(b))),
+    );
+    return {
+      options: values.map((v) => ({ value: v, label: v === F_NO_VALUE ? "—" : toLabel(v) })),
+      selected: colFilters.get(key) ?? new Set<string>(),
+      onChange: setColFilter(key),
+      label: `Filter ${label}`,
+      clearLabel: "Clear",
+      ...(opts.searchable ? { searchPlaceholder: `Search ${label.toLowerCase()}` } : {}),
+    };
+  };
+
+  /** A ▼ that writes a set the RAIL already owns — one truth, two doors. */
+  const railFilterFor = (
+    label: string,
+    options: ColumnFilter["options"],
+    selected: ReadonlySet<string>,
+    onChange: (next: ReadonlySet<string>) => void,
+    searchable = false,
+  ): ColumnFilter => ({
+    options,
+    selected,
+    onChange,
+    label: `Filter ${label}`,
+    clearLabel: "Clear",
+    ...(searchable ? { searchPlaceholder: `Search ${label.toLowerCase()}` } : {}),
+  });
+
+  const columnFilterFor = (key: string): ColumnFilter | undefined => {
+    switch (key) {
+      case "order":
+        return ownFilterFor("order", "Order", (v) => `SO-${v}`, {
+          searchable: true,
+          compare: (a, b) => Number(a) - Number(b),
+        });
+      case "customer":
+        return ownFilterFor("customer", "Customer", (v) => v, { searchable: true });
+      /* The rail's own DEADLINE group, in the header. The words come from
+         `DUE_BUCKETS` — the ONE list the rail rows also read — so the header
+         and the rail structurally cannot spell a bucket two ways. */
+      case "deadline":
+        return railFilterFor(
+          "Deadline",
+          dueEntries.map((d) => ({ value: d.bucket, label: d.bucket })),
+          dueFilter as ReadonlySet<string>,
+          (next) => setDueFilter(new Set(next as ReadonlySet<DueBucket>)),
+        );
+      /* The rail's LOGISTICS group, and its option list is the RAIL's own
+         (`logisticEntries`) — including the 0-count partners Jess ruled must
+         stay pickable, so the ▼ and the rail offer exactly the same companies. */
+      case "delivery":
+        return railFilterFor(
+          "Delivery",
+          logisticEntries.map((l) => ({ value: l.carrier, label: l.carrier })),
+          logisticFilter,
+          (next) => setLogisticFilter(new Set(next)),
+          true,
+        );
+      default:
+        return undefined;
+    }
+  };
+  const baseColumns: readonly Column<OrdersGridRow>[] = [
+    {
+      /* ⚑ FOLLOW-UP — the one column S1 changes, and only its HEAD.
+         `Column.label` is a `string` in both engines, so no grid the portal
+         has can carry an icon-only header. The word is the QUEUES rail's own
+         (`Follow-up`, §3): the rail row and the column now say one thing
+         once, where before the rail had a word and the column had a picture
+         with the word hidden in a `title`. The CELL is unchanged — the flag's
+         colour is still the whole state. */
+      key: "follow_up",
+      /* The WORD stays here — COPY-STANDARD's, the QUEUES rail's own — and it
+         is what a screen reader and a hover still get. `headerContent` only
+         changes what is PAINTED. */
+      label: "Follow-up",
+      headerContent: <KitIcon name="flag" size={14} />,
+      width: FOLLOW_UP_WIDTH,
+      headerTitle: "Flag an order for follow-up — amber while open, red once overdue",
+      cell: (r) => <FollowUpFlag order={r.o} tasks={r.tasks} onFlag={openFollowUp} />,
+    },
+    {
+      key: "dots",
+      label: dataLabel("dots"),
+      width: dataWidth("dots"),
+      headerTitle:
+        "Where the order sits: Placed → Proceed → To book → Customer confirmed → Delivered. Beside it, three checks: goods, delivery, money.",
+      cell: (r) => <StatusCell row={r} availableBySku={availableBySku} />,
+    },
+    {
+      key: "order",
+      label: dataLabel("order"),
+      width: dataWidth("order"),
+      cell: (r) => <OrderCell row={r} />,
+    },
+    {
+      key: "customer",
+      label: dataLabel("customer"),
+      width: dataWidth("customer"),
+      cell: (r) => <CustomerCell o={r.o} />,
+    },
+    {
+      key: "deadline",
+      label: dataLabel("deadline"),
+      width: dataWidth("deadline"),
+      headerTitle:
+        "Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before.",
+      cell: (r) => <DeadlineCell o={r.o} completed={r.completed} />,
+    },
+    {
+      key: "stock",
+      label: dataLabel("stock"),
+      width: dataWidth("stock"),
+      cell: (r) => <StockDot info={r.stock} coreTotal={r.coreTotal} se={r.se} />,
+    },
+    {
+      key: "delivery",
+      label: dataLabel("delivery"),
+      width: dataWidth("delivery"),
+      cell: (r) => <DeliveryCell logi={r.logi} />,
+    },
+    {
+      key: "pic",
+      label: dataLabel("pic"),
+      width: dataWidth("pic"),
+      headerTitle: "Person in charge — who's watching this order",
+      cell: (r) => (
+        <OwnerChip
+          o={r.o}
+          staffById={staffById}
+          poolStaff={poolStaff}
+          onAssignStaff={(orderId, staff) => assignStaffMut.mutate({ orderId, staff })}
+          canEdit={isManager}
+        />
+      ),
+    },
+    {
+      key: "next",
+      label: dataLabel("next"),
+      width: dataWidth("next"),
+      cell: (r) => (
+        <NextActionCell
+          row={r}
+          onOpen={() => setOpenOrderId(r.o.id)}
+          onNextAction={(verb) => {
+            // `Issue PO` opens the raise-PO flow, which is the only write path
+            // the portal has for creating a purchase order.
+            if (verb === orderActionQueue("issue_po")) setRaisePoOrders([r.o]);
+            else if (verb === orderActionQueue("confirm_ready_date")) {
+              setChaseSupplierScope(null);
+              setChaseOrders([r.o]);
+            } else setOpenOrderId(r.o.id);
+          }}
+        />
+      ),
+    },
+  ];
+  /* S2.1 — which columns sort is read off `ORDER_SORTABLE_COLUMNS`, never
+     typed a second time here: the set and the sort value are the same list, so
+     a header cannot grow an arrow the comparator has no answer for. */
+  const columns: readonly Column<OrdersGridRow>[] = baseColumns.map((c) => {
+    const next: Column<OrdersGridRow> = ORDER_SORTABLE_COLUMNS.has(c.key)
+      ? { ...c, sortable: true }
+      : { ...c };
+    /* S2.2 — same discipline as the sort: the set and the builder are the one
+       list, so a header cannot grow a ▼ the page has no menu for. */
+    if (ORDER_FILTER_COLUMNS.has(c.key)) {
+      const f = columnFilterFor(c.key);
+      if (f) next.filter = f;
+    }
+    return next;
+  });
+
   return (
     /* Shell pattern (Loo 2026-08-02, applied to Orders on his order — this
        replaces Jess's 2026-07-18 two-row header, recorded in the PR): ONE
@@ -2938,47 +3818,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 + AutoCount
               </button>
             )}
-            {hiddenCols.size > 0 && (
-              <span
-                className="text-meta text-base-500 tabular-nums"
-                title="Some columns are hidden"
-              >
-                {visibleColDefs.length}/{ORDER_COL_DEFS.length}
-              </span>
-            )}
-            <div className="relative" ref={columnsRef}>
-              <button
-                type="button"
-                onClick={() => setColumnsOpen((o) => !o)}
-                aria-label="Table options"
-                title="Table options"
-                aria-haspopup="menu"
-                aria-expanded={columnsOpen}
-                className="p-1 rounded-md border border-base-200 text-base-500 hover:text-base-800 hover:bg-hovertint transition-colors"
-              >
-                <MoreVertical size={15} />
-              </button>
-              {columnsOpen && (
-                <div className="absolute z-30 mt-1 right-0 w-56 max-h-80 overflow-auto bg-card text-card-foreground border border-base-200 rounded-md shadow-lg py-1">
-                  <div className="text-label uppercase tracking-[0.05em] text-base-500 px-3 pt-1 pb-1.5">Show columns</div>
-                  <div className="px-1.5 pb-1">
-                    {ORDER_COL_DEFS.map((d) => (
-                      <label
-                        key={d.key}
-                        className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-hovertint cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={showCol(d.key)}
-                          onChange={() => toggleCol(d.key)}
-                        />
-                        <span className="text-body text-base-700 truncate">{d.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* S1 — the `⋮ Show columns` popover and its `N/M` chip are GONE
+                with the store behind them (F58 · F61, and the block comment on
+                ORDER_COL_DEFS). The ⋮ held nothing else, so it went with its
+                one item rather than staying as a button that opens an empty
+                menu. */}
           </>
         }
         /* C14 (Loo 2026-08-04) — the PIC row is GONE from the toolbar; the
@@ -3053,6 +3897,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <span className="tabular-nums shrink-0">
                 {total} {total === 1 ? "order" : "orders"}
               </span>
+              {/* S1 — the load-more statement, moved off the sentinel `<tr>`
+                  the kit's `<tbody>` no longer has room for. The WORDS are
+                  unchanged (no new copy was invented for a mechanical move)
+                  and it still appears only while rows are outstanding. The
+                  count band is where a count statement belongs: it sits
+                  beside the number it qualifies instead of at the end of a
+                  scroll nobody has reached yet. */}
+              {shown.length < total && (
+                <span className="tabular-nums shrink-0">
+                  Loading more… ({shown.length} of {total})
+                </span>
+              )}
               {/* C13 — the queues state what they left out. The wording is
                   0265's own, live on the HR Overview since 2026-07-26: it
                   states a fact, asks for nothing, and disappears by itself the
@@ -3604,152 +4460,99 @@ export default function OperationOrdersControl({ onImport }: Props) {
         }
       >
           {/* Listing — the ONLY scroll area (the page stays put, only the rows
-              scroll). table-fixed + a colgroup → columns keep their width. */}
-      <div
-        ref={listBoxRef}
-        className="flex-1 min-h-0 bg-white border border-base-200 rounded-t-[12px] rounded-b-none shadow-sm overflow-auto"
-      >
-        <table
-          /* SIZING LAW §3 (2026-07-18): list rows are 40px FIXED (44 deleted) —
-             content adapts to the row, never the reverse. whitespace-nowrap
-             kills the silent row-growers (text WRAPPING inside narrow fixed
-             columns); the two-line cells (Order / Customer / Stock / Delivery)
-             stack at 15px line-height, each line just ellipsises. */
-          className="w-full border-collapse text-body table-fixed [&_td]:h-[40px] [&_td]:py-1 [&_td]:align-middle [&_td]:overflow-hidden [&_td]:whitespace-nowrap"
-        >
-          {/* PERCENTAGE colgroup (Loo 2026-07-09) — table-fixed + w-full + % widths
-              so the table is ALWAYS exactly the container width → it NEVER
-              horizontally scrolls on any screen; long content ellipsis-truncates.
-              Order (C rebuild §14): ☐ · ⚑ · Status dots · Order · Customer ·
-              Stock · Delivery · Deadline · Next. */}
-          <colgroup>
-            <col style={{ width: "3%" }} />
-            <col style={{ width: "3%" }} />
-            {visibleColDefs.map((d) => (
-              <col key={d.key} style={{ width: `${(d.w * colScale).toFixed(2)}%` }} />
-            ))}
-          </colgroup>
-          {/* Wireframe header band (P11) — the old solid black #221F20 band is
-              gone: a light warm surface + a 0.5px hairline, dark micro-uppercase
-              labels. When rows are selected the SAME row (same height) fills grey
-              with the bulk actions (BulkHeadRow) — Gmail-style, so the table
-              never jumps. sticky so the header stays put as the list scrolls. */}
-          <thead className="sticky top-0 z-10">
-            {/* One header row (the bulk actions live in the top bar now, so the
-                table never swaps its head). The select-all shows Gmail's
-                indeterminate dash on a partial tick. */}
-            <tr
-              className="border-b h-10"
-              /* v4 §11a cool header band (warm #F8F6F1 retired with the C rebuild).
-                 h-10 = same 40px as the data rows (SIZING LAW §3) so the header
-                 never reads thinner than the listing. */
-              style={{ backgroundColor: "#E5E7EB", borderBottomColor: "#D1D5DB" }}
-            >
-              <th className="px-2 py-1.5">
-                <input
-                  type="checkbox"
-                  checked={allPagedSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = somePagedSelected;
-                  }}
-                  onChange={toggleAllPaged}
-                  aria-label="Select all on this page"
-                  className="cursor-pointer accent-base-900 align-middle w-[17px] h-[17px]"
-                />
-              </th>
-              <th className="px-1 py-1.5 text-center" title="Follow-up">
-                <Flag size={13} strokeWidth={2} className="inline text-base-400" aria-label="Follow-up" />
-              </th>
-              {showCol("dots") && (
-                <Th>
-                  {/* The word heads the STAGE PILL only. The three dots beside
-                      it need no header of their own (Jess 2026-07-27) — each is
-                      labelled by its own icon and carries its own tooltip. */}
-                  <span title="Where the order sits: Placed → Proceed → To book → Customer confirmed → Delivered. Beside it, three checks: goods, delivery, money.">
-                    Status
-                  </span>
-                </Th>
-              )}
-              {showCol("order") && <Th>Order</Th>}
-              {showCol("customer") && <Th>Customer</Th>}
-              {showCol("deadline") && <Th>Deadline</Th>}
-              {showCol("stock") && <Th>Stock</Th>}
-              {showCol("delivery") && <Th>Delivery</Th>}
-              {showCol("pic") && (
-                <Th>
-                  <span title="Person in charge — who's watching this order">PIC</span>
-                </Th>
-              )}
-              {/* The header word lives in ORDER_COL_DEFS too (the Columns
-                  popover reads it) — take it from there so the two cannot
-                  disagree, which is exactly how "Manage" survived here. */}
-              {showCol("next") && (
-                <Th>{ORDER_COL_DEFS.find((d) => d.key === "next")!.label}</Th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {total === 0 && (
-              <tr>
-                <td
-                  colSpan={visibleColSpan}
-                  className="p-12 text-center text-meta text-base-500"
-                >
-                  No orders in this tab.
-                </td>
-              </tr>
-            )}
-            {shown.map((o) => (
-              <OrderRow
-                key={o.id}
-                o={o}
-                partnerName={partnerName}
-                availableBySku={availableBySku}
-                tasks={orderTasks(o)}
-                selected={selected.has(o.id)}
-                onToggle={() => toggleOne(o.id)}
-                onOpen={() => setOpenOrderId(o.id)}
-                onFlag={openFollowUp}
-                showCol={showCol}
-                staffById={staffById}
-                poolStaff={poolStaff}
-                onAssignStaff={(orderId, staff) =>
-                  assignStaffMut.mutate({ orderId, staff })
-                }
-                canAssign={isManager}
-                hasPendingChange={pendingCROrders.has(o.id)}
-                /* C1 — the row line names the real supplier, so the row needs
-                   the same resolution the SUPPLIER facet uses. Null = we cannot
-                   prove which supplier, and the line falls back to the role
-                   word rather than to a blank. */
-                supplierName={(() => {
-                  const sid = primarySupplierId(o, skuMeta, suppliers);
-                  return sid ? supplierNameById.get(sid) ?? null : null;
-                })()}
-                onNextAction={(verb) => {
-                  // `Issue PO` opens the raise-PO flow, which is the only write
-                  // path the portal has for creating a purchase order.
-                  if (verb === orderActionQueue("issue_po"))
-                    setRaisePoOrders([o]);
-                  else if (verb === orderActionQueue("confirm_ready_date")) {
-                    setChaseSupplierScope(null);
-                    setChaseOrders([o]);
-                  }
-                  else setOpenOrderId(o.id);
-                }}
-              />
-            ))}
-            {/* Infinite-scroll sentinel — appends the next 30 as it nears view. */}
-            {shown.length < total && (
-              <tr ref={sentinelRef} aria-hidden>
-                <td colSpan={visibleColSpan} className="text-center text-label text-base-400">
-                  Loading more… ({shown.length} of {total})
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-          </div>
+              scroll), and after S1 that scroller is the KIT's own div. The
+              wrapper this page used to draw around the table is gone with the
+              table: `kit/DataTable` already renders `min-h-0 flex-1
+              overflow-auto` + the `slate-5` border, and P16 deliberately took
+              the top radius off a list grid ("a list grid is a SHEET and meets
+              what is above it flush"). Nothing here re-draws a frame the kit
+              stopped drawing. */}
+      <DataTable
+        rows={gridRows}
+        columns={columns}
+        /* S3.1 — the LATER, MORE SPECIFIC of Loo's two width rulings (To Order,
+           2026-08-06): below its own width the grid SCROLLS SIDEWAYS and never
+           shrinks a business column below its measured content. The 2026-07-09
+           "never scrolls sideways" rule produced exactly the failure this one
+           forbids — `Order` reading `S(` on a 1130px window. */
+        sizing="content"
+        rowId={(r) => r.o.id}
+        rowTestId="order-row"
+        rootRef={listBoxRef}
+        label="Orders"
+        empty="No orders in this tab."
+        onRowOpen={(r) => setOpenOrderId(r.o.id)}
+        /* S2.1 — the kit paints the arrow, the PAGE reorders the rows. The
+           third click hands `null` back, which is `compareBySlack`. */
+        sort={sort}
+        onSortChange={setSort}
+        /* S2.3 — ONE spanned sentence, not a digit marooned under a column:
+           this table has no money column for a per-column aggregate to land
+           under. The callback's `rows` argument is the 30-row WINDOW and is
+           deliberately unused — see `viewTotal`. */
+        totals={{
+          label: "Total for this view",
+          cells: () => [
+            {
+              span: ORDER_COL_DEFS.length + 1,
+              content: (
+                <span className="tabular-nums" data-testid="orders-view-total">
+                  {`Total · ${fmtMoney(viewTotal.outstanding)} outstanding`}
+                  {viewTotal.unpriced > 0
+                    ? ` · ${viewTotal.unpriced} not priced`
+                    : ""}
+                </span>
+              ),
+            },
+          ],
+        }}
+        /* ⭐ S2.5 — EXPANSION. The one grid power that buys something the
+           drawer structurally cannot: the drawer renders IN PLACE of the list,
+           so until now the only way to see what an order CONTAINS was to lose
+           the list you were reading — and the Items column was removed from
+           this table entirely (`itemRollup` survives only in the CSV/print
+           export). This is §4's R4 · Contents, and R4's whole contract is
+           `what · how many · which spec`.
+
+           WHAT IS DELIBERATELY NOT IN HERE. 2990's drill-down carries `UNIT
+           COST · LINE COST · MARGIN`; §4 R5 rules **never cost, never
+           margin**, so the SHAPE is copied and those three columns are not.
+           Nor is stock, PO or GRN state: R4 *"proves nothing"*, the row's own
+           `Stock` cell and `Actions` cell already answer that, and a second
+           home for one fact is ownership Law C.
+
+           IT COSTS NO BUSINESS COLUMN ANYTHING, and that is why this card
+           could finally run. #692 measured the chevron at 3% of a
+           percentage-sized table — −24 to −28px off the eight columns,
+           `Actions` worst. Orders is `sizing="content"` since S3.1, where the
+           kit fixes the gutter at a flat **42px**, and S3.2 freed **42px** off
+           the ⚑ column. Paid to the pixel; the width test below asserts it. */
+        expansion={{
+          expanded: expandedRows,
+          onToggle: toggleExpanded,
+          /* `aria-expanded` carries open/closed, so the word never flips —
+             it only has to name the object, by the operator's own name for
+             the row (the same reason `selection.rowLabel` exists). */
+          label: (r) => `Show items in SO-${r.o.so}`,
+          /* The kit's own rule: "a row with nothing to open gets no control,
+             not a dead one." An order with no lines simply has no chevron. */
+          expandable: (r) => (r.o.order_lines ?? []).length > 0,
+          render: (r) => (
+            <OrderItemsPanel lines={r.o.order_lines ?? []} skuMeta={skuMeta} />
+          ),
+        }}
+        selection={{
+          selected,
+          onToggleRow: toggleOne,
+          onToggleAll: toggleAllPaged,
+          label: "Select all on this page",
+          /* The row is keyed by the database uuid — every write on this page
+             is — so without this the box would be announced as
+             `Select 0f3a…`. The operator's own name for the row is its SO
+             number, and that is what a screen reader gets. */
+          rowLabel: (r) => `Select SO-${r.o.so}`,
+        }}
+      />
       </ListPageShell>
       </div>
 
@@ -4564,445 +5367,468 @@ function OwnerChip({
   );
 }
 
-function OrderRow({
-  o,
-  partnerName,
-  availableBySku,
-  tasks,
-  selected,
-  onToggle,
-  onOpen,
-  onFlag,
-  showCol,
-  staffById,
-  poolStaff,
-  onAssignStaff,
-  canAssign,
-  hasPendingChange,
-  supplierName,
-  onNextAction,
-}: {
+/**
+ * ONE row of the grid, with the facts its cells share computed once.
+ *
+ * S1 replaced `OrderRow` — a component that owned the `<tr>`, the eight
+ * `<td>`s and the column-visibility predicate — with one `Column.cell` per
+ * column. The `<tr>`, the widths, the 40px, the washes and the select box are
+ * `kit/DataTable`'s now; what is left below is what this page actually knows:
+ * what to put INSIDE a cell.
+ */
+interface OrdersGridRow {
   o: operationOrderListRow;
-  partnerName: Map<string, string>;
-  availableBySku?: Map<string, number>;
-  /** Open follow-up ops_tasks for this order (#2) — drives the flag + Action cell. */
+  lines: { sku: string; qty: number }[];
+  /** Open follow-up ops_tasks for this order (#2) — drives the ⚑ cell. */
   tasks: OpsTask[];
-  selected: boolean;
-  onToggle: () => void;
-  onOpen: () => void;
-  /** Open the side follow-up form for this order (#2). */
-  onFlag: (o: operationOrderListRow) => void;
-  /** Column visibility predicate (Columns show/hide) — gates the 8 data cells. */
-  showCol: (key: string) => boolean;
-  /** Staff pool (0232) — owner-chip lookup + the reassign popover options. */
-  staffById: Map<string, OpsStaffMember>;
-  poolStaff: OpsStaffMember[];
-  onAssignStaff: (orderId: string, staff: string | null) => void;
-  /** Management-only manual assignment (Jess 2026-07-18). */
-  canAssign: boolean;
+  stock: StockInfo;
+  se: StockEta;
+  logi: LogisticState;
+  completed: boolean;
+  /** Mattress + Bedframe + Sofa units — the Stock ratio's denominator. */
+  coreTotal: number;
   /** 0234 (add-product P3.1) — a dealer product change awaits approval. */
-  hasPendingChange?: boolean;
+  hasPendingChange: boolean;
   /** C1 — the order's primary supplier NAME, so the action line can say
    *  "Call Ohana — confirm ready date". Null → the role word "supplier". */
-  supplierName?: string | null;
-  /** One-click action (2026-07-19) — the row's action QUEUE word, clicked = act
-   *  on it. The queue word, not the row line: the handler branches on it. */
-  onNextAction: (verb: string) => void;
+  supplierName: string | null;
+}
+
+/**
+ * ⭐ S2.5 · THE EXPANSION — R4 · Contents, and nothing else.
+ *
+ * **The SHAPE is 2990's** (`MfgSalesOrdersList.tsx:574` — the expand is the
+ * record's line items, every caller, no exceptions). **Three things it has and
+ * this does not, each for a stated reason:**
+ *
+ * 1. **`UNIT COST · LINE COST · MARGIN`** — §4 R5: *never cost, never margin*.
+ * 2. **A fetch, with loading and error states.** 2990's drill-down calls
+ *    `useMfgSalesOrderDetail(docNo)` when you open it. Carres does not need
+ *    to: `order_lines` is already embedded in the list response the row was
+ *    drawn from. **A state that cannot occur does not get a branch.**
+ * 3. **A grid — sortable, groupable, resizable, with a persisted layout.**
+ *    Measured on production 2026-08-08: **77 orders hold 1–8 lines, median 2**,
+ *    and only 3 orders carry more than five. A configurable grid over two rows
+ *    is furniture, and F61 forbids persisting a layout anyway.
+ *
+ * So it is a plain list: `qty` right-aligned against the label, in the order
+ * the order records them. **No de-duplication and no rollup** — two lines of
+ * the same SKU is what AutoCount booked (one live order carries `Essential
+ * Memory Pillow(L)` twice), and merging them would show a record that does not
+ * exist. `itemTags` stays where it is: it answers *what kind of goods* in one
+ * line for the CSV, and it cannot answer *which mattress*, which is the whole
+ * question R4 opens on.
+ *
+ * The `×` is `tagLabel`'s own glyph, so the export and the panel count the
+ * same way.
+ */
+function OrderItemsPanel({
+  lines,
+  skuMeta,
+}: {
+  lines: { sku: string; qty: number }[];
+  skuMeta: Map<string, { label?: string | null }>;
 }) {
-  const ref = (o.source_ref ?? []).filter(Boolean);
-  const lines = o.order_lines ?? [];
-  const stock = stockReadiness(o, availableBySku);
-  const se = stockEtaOf(o);
-  const loc = locationForAddress(o.customer_address ?? null);
-  const msQty = catQty(lines, "mattress");
-  const bfQty = catQty(lines, "bedframe");
-  const sofaQty = catQty(lines, "sofa");
-
-  const logi = logisticStateOf(o, partnerName);
-  const completed = controlTabOf(o) === "completed";
-
+  const items = orderItemLines(lines, skuMeta);
   return (
-    <tr
-      onClick={onOpen}
-      className={`group border-t border-[rgba(34,31,32,0.06)] cursor-pointer align-middle ${
-        selected ? "bg-[#e6f1fb]" : "bg-white hover:bg-hovertint"
-      }`}
-      data-testid="order-row"
-    >
-      <td className="pl-3 pr-0.5 py-2" onClick={(e) => e.stopPropagation()}>
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={onToggle}
-          aria-label={`Select SO-${o.so}`}
-          /* v4 §8b — 17px checkbox: registers by shape before reading. */
-          className="cursor-pointer accent-base-900 align-middle w-[17px] h-[17px]"
-        />
-      </td>
-      {/* Follow-up — the order's STATUS flag (#2), 2nd column (Jess: left, not a
-          separate empty column). Click opens the side form. */}
-      <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
-      {/* Status (Jess 2026-07-19): the pipeline STAGE in words — same vocabulary
-          as the tabs (Placed → Proceed → To book → Customer confirmed →
-          Delivered), read from TAB_LABEL so the two can never drift. A quiet
-          .pill for the live stages; a muted "Delivered" (no pill) once done. */}
-      {showCol("dots") && (
-      <td className="pl-2 pr-1">
-        {/* C10 (Jess 2026-07-27): the stage pill and the three dots SIDE BY
-            SIDE — they answer different questions and neither replaces the
-            other. The pill is byte-identical to before this card; the dots are
-            new. The pill takes the slack and truncates on a narrow screen; the
-            dots are fixed-width and never squeezed out. */}
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="min-w-0 truncate">
-            {completed ? (
-              <span className="text-meta text-base-400">Delivered</span>
-            ) : (
-              (() => {
-                const label = TAB_LABEL[controlTabOf(o, availableBySku)];
-                // ONE shared status→pill map (no per-surface hand-roll).
-                return <span className={`pill ${orderStatusPill(label)}`}>{label}</span>;
-              })()
-            )}
-          </span>
-          <RowDots o={o} stock={stock} se={se} logi={logi} />
-        </div>
-      </td>
-      )}
-      {/* Order — SO number (emphasis line) + the day-to-day Ref(s) on the
-          caption line ("+N" folds extras; full list in the tooltip). Phone
-          tooltip kept on the cell. */}
-      {showCol("order") && (
-      <td className="pl-1 pr-1" title={o.customer_phone ?? undefined}>
-        <div style={{ lineHeight: "15px" }}>
-          <div
-            className="font-mono tabular-nums truncate"
-            style={{ fontSize: "13px", fontWeight: 600, color: "#1A1A1A" }}
-          >
-            SO-{o.so}
-            {/* 0234 (merged from main) — a dealer product change awaits
-                approval; open the order → the approval card tops the drawer. */}
-            {hasPendingChange && (
-              <span
-                className="ml-1 inline-block align-middle rounded-full px-1.5 py-0.5 text-label font-semibold bg-warning-soft text-base-800 border border-warning"
-                title="Product change awaiting approval — open the order to decide"
-                data-testid="oc-change-badge"
-              >
-                Change
-              </span>
-            )}
-          </div>
-          {ref.length > 0 && (
-            <div
-              className="font-mono tabular-nums truncate t4-caption"
-              title={ref.join("\n")}
-            >
-              {ref[0]}
-              {ref.length > 1 ? ` +${ref.length - 1}` : ""}
-            </div>
-          )}
-        </div>
-      </td>
-      )}
-      {/* Customer — name (emphasis) + region on the caption line; the
-          outstation warning survives in the tooltip. */}
-      {showCol("customer") && (
-      <td className="pl-1 pr-2">
-        <div style={{ lineHeight: "15px" }}>
-          {o.customer_name ? (
-            <div
-              className={`${cjkClassName(o.customer_name)} t4-row-strong truncate`}
-              title={o.customer_name}
-            >
-              {o.customer_name}
-            </div>
-          ) : (
-            <div className="text-base-300">—</div>
-          )}
-          <div
-            className="t4-caption truncate"
-            title={
-              loc.area === "Outstation"
-                ? "Outstation — no warehouse buffer; call the customer to confirm the ETA before ordering stock (do it in the order drawer)."
-                : loc.label ?? undefined
-            }
-          >
-            {loc.label ?? "—"}
-          </div>
-        </div>
-      </td>
-      )}
-      {/* Deadline — date + days-left heat pill, OPEN orders only. A delivered
-          order NEVER alarms (guardrail #2): muted date, no pill. */}
-      {showCol("deadline") && (
-      <td
-        className="pl-1 pr-2 leading-[1.2]"
-        title="Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
-      >
-        {completed ? (
-          o.delivery_date ? (
-            <span className="tabular-nums" style={{ fontSize: "12px", color: "#A8A8A8" }}>
-              {fmtDate(o.delivery_date)}
+    <div data-testid="order-items-panel">
+      <div className="text-label uppercase tracking-[0.04em] text-base-500 mb-1.5">
+        Items
+      </div>
+      <ul className="flex flex-col gap-1">
+        {items.map((it, i) => (
+          /* KEYED BY INDEX ON PURPOSE — the sku is NOT unique within an order
+             (production carries a repeated pillow line), so keying by it would
+             collapse two real lines into one React child. */
+          <li key={i} className="flex items-baseline gap-2 text-body">
+            <span className="tabular-nums text-base-500 w-10 shrink-0 text-right">
+              {it.qty}×
             </span>
-          ) : (
-            <span className="text-base-300">—</span>
-          )
-        ) : o.delivery_date_tbd ? (
-          <span className="text-label font-medium" style={{ color: "#A8A8A8" }}>TBD</span>
-        ) : o.delivery_date ? (
-          (() => {
-            const datePart = fmtDate(o.delivery_date);
-            // Reuse the SAME DUE bucket as the top filter header so they can never
-            // drift: the date turns red on the two hottest tiers (Overdue / Urgent).
-            const dd = daysToDue(o);
-            const pillText =
-              dd == null ? null : dd < 0 ? "over" : dd === 0 ? "today" : `${dd}d`;
-            // Countdown heat (Loo 2026-07-09): a 4-level ramp by days-left so 2–6d
-            // read as orange / yellow urgency; only 7d+ goes grey. The DATE text
-            // stays clear black — only this pill carries the heat.
-            // v4 hues (ramp SEMANTICS unchanged — Loo-locked 4 tiers; only the
-            // fills moved onto the kit's red/amber family + neutral grey).
-            const heat =
-              dd == null || dd <= 1
-                ? { bg: "#FCEBEB", fg: "#A32D2D" } // overdue / today / 1d — red
-                : dd <= 3
-                  ? { bg: "#FAEEDA", fg: "#854F0B" } // 2–3d — amber
-                  : dd <= 6
-                    ? { bg: "#FEF7CD", fg: "#854D0E" } // 4–6d — light amber
-                    : { bg: "#F3F4F6", fg: "#6B7280" }; // 7d+ — neutral grey
-            return (
-              <div className="flex items-center gap-1.5">
-                {/* Badge FIRST (Loo round 3), fixed min-width so today/1d/2d/over
-                    are all the same width → the dates after them line up. */}
-                {pillText && (
-                  <span
-                    className="tabular-nums shrink-0 text-center"
-                    style={{
-                      fontSize: "11px",
-                      color: heat.fg,
-                      background: heat.bg,
-                      padding: "0 4px",
-                      borderRadius: "999px",
-                      minWidth: "34px",
-                      display: "inline-block",
-                    }}
-                  >
-                    {pillText}
-                  </span>
-                )}
-                {/* Closed set: the date is row EMPHASIS — clear dark ink. */}
-                <span className="tabular-nums t4-row-strong">{datePart}</span>
-              </div>
-            );
-          })()
-        ) : (
-          <span className="text-base-300">—</span>
-        )}
-      </td>
-      )}
-      {/* Stock — facts only (n/m ratio + sub word / supplier ETA); the 货 dot
-          carries the colour. */}
-      {showCol("stock") && (
-      <td className="pl-1 pr-2">
-        <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} se={se} />
-      </td>
-      )}
-      {/* Delivery — the logistics company + the T1 booking truth (0277).
-          The cell answers ONE question: what do we know about the truck?
-          Line 1 is the carrier. Line 2 is a DATE and only ever a date —
-          green `27 Jul · 12pm–3pm` on the customer's confirmation, amber
-          `logistics said 27 Jul` while only their provisional day exists,
-          green `Delivered ✓` once it has gone. When there is no date yet
-          there is no line 2 (C14): what to DO about that is the Actions
-          cell's sentence, and it may not be said twice.
-          C1's gap-FACT (`{logistics} — confirm delivery date`) still exists
-          and still replaces the banned `need booking` — in the drawer badge,
-          which is where a fact slot has no Actions column beside it. */}
-      {showCol("delivery") && (
-      <td className="pl-1 pr-2">
-        {logi.key === "unassigned" ? (
-          <span className="t4-caption">No logistics picked</span>
-        ) : (
-          <div style={{ lineHeight: "15px" }}>
-            <div className="t4-row-strong truncate">{logi.partner}</div>
-            {logi.key === "delivered" ? (
-              <div style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}>
-                Delivered ✓
-              </div>
-            ) : logi.key === "confirmed" && logi.date ? (
-              <div
-                className="tabular-nums"
-                style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}
-              >
-                {dayMon(logi.date)}
-                {logi.slot ? ` · ${shortSlot(logi.slot)}` : ""}
-              </div>
-            ) : logi.key === "provisional" && logi.date ? (
-              <div
-                className="tabular-nums text-warning"
-                style={{ fontSize: "11px", fontWeight: 600 }}
-              >
-                logistics said {dayMon(logi.date)}
-              </div>
-            ) : null
-            /* C14 (Loo 2026-08-04) — nothing says the same thing twice.
-               This branch used to render `deliveryDateGapFact(logi.partner)`
-               = `NETS — confirm delivery date`, and the Actions cell one
-               column over already said `Call NETS — confirm delivery date`.
-               MEASURED on production 2026-08-05, 1440×900: the two cells
-               carried the same fact on 30 of 30 data rows, and BOTH truncated
-               (Delivery 171px of text in 129px; Actions 191px in 114px), so
-               the duplicate was paid for twice and legible neither time.
-               C1 was right that a gap needs a FACT rather than `need booking`
-               — the point stands, and the fact now has ONE home: the drawer
-               badge, where `deliveryDateGapFact` is still called and where no
-               Actions column sits beside it. Here the carrier's NAME is the
-               fact this cell owns; the verb belongs to Actions. */
-            }
-          </div>
-        )}
-      </td>
-      )}
-      {/* PIC — the staff owner, own column (Jess 2026-07-18): initials chip,
-          click = reassign. Word law: PIC (the team's Issue-Tracker word). */}
-      {showCol("pic") && (
-      <td className="pl-1 pr-1">
-        <OwnerChip
-          o={o}
-          staffById={staffById}
-          poolStaff={poolStaff}
-          onAssignStaff={onAssignStaff}
-          canEdit={canAssign}
-        />
-      </td>
-      )}
-      {/* ACTIONS — the whole truth (C3, Jess 2026-07-27): the top action from
-          Layer 2, with the party NAMED (C1), plus `+N` when more are open. The
-          pill reads the row LINE (`Call NETS — confirm delivery date`); the
-          QUEUE word behind it (`Confirm delivery date`) is what the facet rail
-          and the counts use, and `data-next-action` keeps carrying that stable
-          word. One-click act (2026-07-19): the whole row opens the drawer, so
-          the pill itself is the button that acts on the order. */}
-      {showCol("next") && (
-      <td className="pl-2 pr-2">
-        {(() => {
-          // Delivered = closed → Actions is a next-action column, and a closed
-          // order has no action, so the cell is BLANK (Jess 2026-07-19: STATUS
-          // already says "Delivered"; a "Done" pill is redundant — and would be
-          // wrong if a 2nd delivery were still outstanding, which keeps the
-          // order in-pipeline, not Delivered).
-          // TWO exceptions, and both are actions a delivered order genuinely
-          // still owes, so their pill DOES show — only "Done" blanks the cell:
-          // T7's "Upload delivery photo" (no photo on file) and, since C2,
-          // "Collect RM …" — money is its own track and it SURVIVES delivery
-          // (ORDERS-WORKING-FLOW §3). Delivered is not paid.
-          const na = nextActionOf(o, stock, lines);
-          if (!na.label) return null;
-          if (completed && na.key === "done") return null;
-          const m = moneyOf(o);
-          const parties = {
-            supplier: supplierName,
-            logistics: logi.partner,
-            customer: o.customer_name,
-            // C11 — the RAW number; the words module spells it (see above).
-            amount: m.known ? m.outstanding : null,
-            // C3 — the fact's own two values, already formatted; the words
-            // module owns the sentence and never a date (see below: this cell
-            // prints the SHORT form, so they only reach the tooltip).
-            deliveryDate: logi.date ? dayMon(logi.date) : null,
-            deliverySlot: logi.slot ? shortSlot(logi.slot) : null,
-          };
-          // C3 — the FACT that replaced `Confirm delivery with {customer}`:
-          // everything is arranged and the day has not come, so there is
-          // nothing to do and nothing to click. Quiet grey, never a pill: a
-          // pill in this column is a button, and a fact is not one.
-          //
-          // WHICH FORM: the short one. The Delivery cell immediately to the
-          // left already prints `27 Jul · 12pm–3pm`, so the full
-          // `Delivering 27 Jul · 12pm–3pm` would say the same thing twice in
-          // adjacent columns — the trap C1 hit in the delivery badge and solved
-          // by dropping the verb. Here the duplicated half is the DATE, so the
-          // cell keeps the word and the tooltip carries the day. The full
-          // sentence still ships, in the drawer's journey strip, where nothing
-          // else on screen says it.
-          if (na.key === "delivering") {
-            const full = orderActionLine("delivering", parties);
-            return (
-              <span
-                className="t4-caption truncate block"
-                data-next-action={na.label}
-                title={
-                  full === "Delivering"
-                    ? "Goods in, logistics booked, the customer confirmed the day. Nothing to do until then."
-                    : `Goods in, logistics booked. Nothing to do until ${full.replace(/^Delivering /, "")}.`
-                }
-              >
-                {na.label}
-              </span>
-            );
-          }
-          // C2/C3: money is its own track, so `collect` can BE the headline —
-          // on a delivered order that still owes, or on one whose delivery is
-          // held for the balance, it is the only action left. The amount rides
-          // the line then, or the pill reads "Collect from John Tan" and names
-          // no figure. C5: the figure comes from the shared money rule, so the
-          // pill, the 🔒 and the Owing facet can never disagree.
-          const line = orderActionLine(na.key, parties);
-          // C3 — everything else that is open, folded into ONE `+N`. It
-          // replaces the old secondary `Collect RM …` pill: a cell may have
-          // exactly one way of saying "there is more", and the `+N` covers all
-          // three tracks where the money pill covered one (and, since Law 4,
-          // money is the one that displays LAST). The count is
-          // `open.length − 1` by construction, so the drawer opened by this row
-          // shows exactly `1 + N` rows — it is the same computation.
-          const open = openActionsOf(o, stock, lines);
-          const more = open.slice(1);
-          return (
-            <div className="flex items-center gap-1.5 max-w-full">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onNextAction(na.label);
-                }}
-                className={`pill ${NEXT_PILL_CLASS[na.tone]} inline-flex items-center gap-1 min-w-0 hover:brightness-95`}
-                data-next-action={na.label}
-                title={`${line} — click to act`}
-              >
-                {na.locked && <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />}
-                <span className="truncate min-w-0">{line}</span>
-              </button>
-              {more.length > 0 && (
-                <button
-                  type="button"
-                  data-testid="next-more"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpen();
-                  }}
-                  className="shrink-0 tabular-nums text-meta font-semibold text-base-500 hover:text-base-900"
-                  title={`Also open: ${more
-                    .map((a) => orderActionLine(a.key, parties))
-                    .join(" · ")} — click to see them all`}
-                >
-                  +{more.length}
-                </button>
-              )}
-            </div>
-          );
-        })()}
-      </td>
-      )}
-    </tr>
+            {/* The expanded cell is the ONE cell the kit lets wrap, so a long
+                AutoCount string reads whole instead of ending in an ellipsis
+                — which is the entire point of unfolding it. */}
+            <span className="min-w-0">{it.label}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
-/** Action cell (#2) — the order's follow-up FLAG, STATUS ONLY (no name, Jess
- *  2026-06-26). Empty → faint "Flag". Open + on time → amber flag, no word.
- *  Overdue → red flag + "Late" (the one short word — colour-blind safe). Click →
- *  opens the side follow-up form. Who / what / Take-it / Done live in the form +
- *  the right-rail Tasks board (the side menu everyone sees). */
-function ActionCell({
+/* Status (Jess 2026-07-19): the pipeline STAGE in words — same vocabulary as
+   the tabs (Placed → Proceed → To book → Customer confirmed → Delivered), read
+   from TAB_LABEL so the two can never drift. A quiet .pill for the live stages;
+   a muted "Delivered" (no pill) once done. */
+function StatusCell({
+  row,
+  availableBySku,
+}: {
+  row: OrdersGridRow;
+  availableBySku?: Map<string, number>;
+}) {
+  /* C10 (Jess 2026-07-27): the stage pill and the three dots SIDE BY SIDE —
+     they answer different questions and neither replaces the other. The pill
+     takes the slack and truncates on a narrow screen; the dots are fixed-width
+     and never squeezed out. */
+  return (
+    <div className="flex items-center gap-1.5 min-w-0">
+      <span className="min-w-0 truncate">
+        {row.completed ? (
+          <span className="text-meta text-base-400">Delivered</span>
+        ) : (
+          (() => {
+            const label = TAB_LABEL[controlTabOf(row.o, availableBySku)];
+            // ONE shared status→pill map (no per-surface hand-roll).
+            return <span className={`pill ${orderStatusPill(label)}`}>{label}</span>;
+          })()
+        )}
+      </span>
+      <RowDots o={row.o} stock={row.stock} se={row.se} logi={row.logi} />
+    </div>
+  );
+}
+
+/* Order — SO number (emphasis line) + the day-to-day Ref(s) on the caption
+   line ("+N" folds extras; full list in the tooltip).
+
+   ⚠ THE PHONE TOOLTIP MOVED FROM THE `<td>` ONTO THIS `<div>` (S1). The kit
+   owns the cell and offers no per-cell `title`, and that is the right shape:
+   a tooltip belongs to the thing it describes. The hover target is now the
+   two lines rather than the padding around them — the same reach an operator
+   actually aims at. */
+function OrderCell({ row }: { row: OrdersGridRow }) {
+  const ref = (row.o.source_ref ?? []).filter(Boolean);
+  return (
+    <div style={{ lineHeight: "15px" }} title={row.o.customer_phone ?? undefined}>
+      <div
+        className="font-mono tabular-nums truncate"
+        style={{ fontSize: "13px", fontWeight: 600, color: "#1A1A1A" }}
+      >
+        SO-{row.o.so}
+        {/* 0234 — a dealer product change awaits approval; open the order →
+            the approval card tops the drawer. */}
+        {row.hasPendingChange && (
+          <span
+            className="ml-1 inline-block align-middle rounded-full px-1.5 py-0.5 text-label font-semibold bg-warning-soft text-base-800 border border-warning"
+            title="Product change awaiting approval — open the order to decide"
+            data-testid="oc-change-badge"
+          >
+            Change
+          </span>
+        )}
+      </div>
+      {ref.length > 0 && (
+        <div className="font-mono tabular-nums truncate t4-caption" title={ref.join("\n")}>
+          {ref[0]}
+          {ref.length > 1 ? ` +${ref.length - 1}` : ""}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Customer — name (emphasis) + region on the caption line; the outstation
+   warning survives in the tooltip. BOTH lines truncate and BOTH carry a
+   `title`, which is why this is the column S1's width deficit lands on
+   (see GUTTER_DEFICIT_PCT). */
+function CustomerCell({ o }: { o: operationOrderListRow }) {
+  const loc = locationForAddress(o.customer_address ?? null);
+  return (
+    <div style={{ lineHeight: "15px" }}>
+      {o.customer_name ? (
+        <div
+          className={`${cjkClassName(o.customer_name)} t4-row-strong truncate`}
+          title={o.customer_name}
+        >
+          {o.customer_name}
+        </div>
+      ) : (
+        <div className="text-base-300">—</div>
+      )}
+      <div
+        className="t4-caption truncate"
+        title={
+          loc.area === "Outstation"
+            ? "Outstation — no warehouse buffer; call the customer to confirm the ETA before ordering stock (do it in the order drawer)."
+            : loc.label ?? undefined
+        }
+      >
+        {loc.label ?? "—"}
+      </div>
+    </div>
+  );
+}
+
+/* Deadline — date + days-left heat pill, OPEN orders only. A delivered order
+   NEVER alarms (guardrail #2): muted date, no pill. */
+function DeadlineCell({
+  o,
+  completed,
+}: {
+  o: operationOrderListRow;
+  completed: boolean;
+}) {
+  if (completed)
+    return o.delivery_date ? (
+      <span className="tabular-nums" style={{ fontSize: "12px", color: "#A8A8A8" }}>
+        {fmtDate(o.delivery_date)}
+      </span>
+    ) : (
+      <span className="text-base-300">—</span>
+    );
+  if (o.delivery_date_tbd)
+    return (
+      <span className="text-label font-medium" style={{ color: "#A8A8A8" }}>
+        TBD
+      </span>
+    );
+  if (!o.delivery_date) return <span className="text-base-300">—</span>;
+
+  const datePart = fmtDate(o.delivery_date);
+  // Reuse the SAME DUE bucket as the top filter header so they can never
+  // drift: the date turns red on the two hottest tiers (Overdue / Urgent).
+  const dd = daysToDue(o);
+  const pillText = dd == null ? null : dd < 0 ? "over" : dd === 0 ? "today" : `${dd}d`;
+  // Countdown heat (Loo 2026-07-09): a 4-level ramp by days-left so 2–6d read
+  // as orange / yellow urgency; only 7d+ goes grey. The DATE text stays clear
+  // black — only this pill carries the heat.
+  const heat =
+    dd == null || dd <= 1
+      ? { bg: "#FCEBEB", fg: "#A32D2D" } // overdue / today / 1d — red
+      : dd <= 3
+        ? { bg: "#FAEEDA", fg: "#854F0B" } // 2–3d — amber
+        : dd <= 6
+          ? { bg: "#FEF7CD", fg: "#854D0E" } // 4–6d — light amber
+          : { bg: "#F3F4F6", fg: "#6B7280" }; // 7d+ — neutral grey
+  return (
+    <div className="flex items-center gap-1.5">
+      {/* Badge FIRST (Loo round 3), fixed min-width so today/1d/2d/over are all
+          the same width → the dates after them line up. */}
+      {pillText && (
+        <span
+          className="tabular-nums shrink-0 text-center"
+          style={{
+            fontSize: "11px",
+            color: heat.fg,
+            background: heat.bg,
+            padding: "0 4px",
+            borderRadius: "999px",
+            minWidth: "34px",
+            display: "inline-block",
+          }}
+        >
+          {pillText}
+        </span>
+      )}
+      {/* Closed set: the date is row EMPHASIS — clear dark ink.
+          NO `truncate`, DELIBERATELY, and S1 tried it and took it back out.
+          This column keeps C14's exact width but loses 4px of content box to
+          the kit's uniform `px-2`, so a long date (`Wed, 22 Jul 26`) is clipped
+          by the cell — 8→12px, measured. `truncate` was the obvious repair and
+          it makes the cell WORSE: the ellipsis reserves its own width, so
+          `Wed, 22 Jul 2` becomes `Wed, 22 Ju…` and the operator loses the
+          MONTH to gain a signal they can already see. A date is read
+          left-to-right and its tail is the year — the least load-bearing part.
+          Re-measure before reaching for this again. */}
+      <span className="tabular-nums t4-row-strong">{datePart}</span>
+    </div>
+  );
+}
+
+/* Delivery — the logistics company + the T1 booking truth (0277). The cell
+   answers ONE question: what do we know about the truck? Line 1 is the
+   carrier. Line 2 is a DATE and only ever a date — green `27 Jul · 12pm–3pm`
+   on the customer's confirmation, amber `logistics said 27 Jul` while only
+   their provisional day exists, green `Delivered ✓` once it has gone. When
+   there is no date yet there is no line 2 (C14): what to DO about that is the
+   Actions cell's sentence, and it may not be said twice.
+   C1's gap-FACT (`{logistics} — confirm delivery date`) still exists and still
+   replaces the banned `need booking` — in the drawer badge, which is where a
+   fact slot has no Actions column beside it. */
+function DeliveryCell({ logi }: { logi: LogisticState }) {
+  if (logi.key === "unassigned")
+    return (
+      /* `truncate` + `title` for the same reason as the date lines below: this
+         column pays the larger half of S1's gutter deficit, and §3's frozen
+         rule is that the Actions cell one column right already says what to DO
+         about it. An ellipsis here costs a reader nothing they cannot read on
+         the same row. */
+      <span className="t4-caption truncate block" title="No logistics picked">
+        No logistics picked
+      </span>
+    );
+  return (
+    <div style={{ lineHeight: "15px" }}>
+      <div className="t4-row-strong truncate">{logi.partner}</div>
+      {/* S1 — the two date lines now `truncate`. C14 sized this column off its
+          longest reachable string BECAUSE they did not: without it, an
+          over-long line "does not ellipsise — it OVERFLOWS into PIC". The kit
+          clips every cell, so the bleed is impossible now, and this turns the
+          clip into an ellipsis rather than half a glyph. That is what lets
+          this column pay half of S1's gutter deficit — see
+          GUTTER_DEFICIT_PCT. */}
+      {logi.key === "delivered" ? (
+        <div style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}>
+          Delivered ✓
+        </div>
+      ) : logi.key === "confirmed" && logi.date ? (
+        <div
+          className="tabular-nums truncate"
+          title={`${dayMon(logi.date)}${logi.slot ? ` · ${shortSlot(logi.slot)}` : ""}`}
+          style={{ fontSize: "11px", fontWeight: 600, color: "#3B6D11" }}
+        >
+          {dayMon(logi.date)}
+          {logi.slot ? ` · ${shortSlot(logi.slot)}` : ""}
+        </div>
+      ) : logi.key === "provisional" && logi.date ? (
+        <div
+          className="tabular-nums truncate text-warning"
+          title={`logistics said ${dayMon(logi.date)}`}
+          style={{ fontSize: "11px", fontWeight: 600 }}
+        >
+          logistics said {dayMon(logi.date)}
+        </div>
+      ) : null
+      /* C14 (Loo 2026-08-04) — nothing says the same thing twice. This branch
+         used to render `deliveryDateGapFact(logi.partner)` = `NETS — confirm
+         delivery date`, and the Actions cell one column over already said
+         `Call NETS — confirm delivery date`. MEASURED on production
+         2026-08-05, 1440×900: the two cells carried the same fact on 30 of 30
+         data rows, and BOTH truncated, so the duplicate was paid for twice and
+         legible neither time. C1 was right that a gap needs a FACT rather than
+         `need booking` — the point stands, and the fact now has ONE home: the
+         drawer badge, where no Actions column sits beside it. */
+      }
+    </div>
+  );
+}
+
+/* ACTIONS — the whole truth (C3, Jess 2026-07-27): the top action from Layer
+   2, with the party NAMED (C1), plus `+N` when more are open. The pill reads
+   the row LINE (`Call NETS — confirm delivery date`); the QUEUE word behind it
+   (`Confirm delivery date`) is what the facet rail and the counts use, and
+   `data-next-action` keeps carrying that stable word. One-click act
+   (2026-07-19): the whole row opens the drawer, so the pill itself is the
+   button that acts on the order. */
+function NextActionCell({
+  row,
+  onOpen,
+  onNextAction,
+}: {
+  row: OrdersGridRow;
+  onOpen: () => void;
+  /** One-click action — the row's action QUEUE word, clicked = act on it. The
+   *  queue word, not the row line: the handler branches on it. */
+  onNextAction: (verb: string) => void;
+}) {
+  const { o, stock, lines, logi, completed, supplierName } = row;
+  // Delivered = closed → Actions is a next-action column, and a closed order
+  // has no action, so the cell is BLANK (Jess 2026-07-19: STATUS already says
+  // "Delivered"; a "Done" pill is redundant — and would be wrong if a 2nd
+  // delivery were still outstanding, which keeps the order in-pipeline).
+  // TWO exceptions, and both are actions a delivered order genuinely still
+  // owes, so their pill DOES show — only "Done" blanks the cell: T7's "Upload
+  // delivery photo" (no photo on file) and, since C2, "Collect RM …" — money
+  // is its own track and it SURVIVES delivery (ORDERS-WORKING-FLOW §3).
+  const na = nextActionOf(o, stock, lines);
+  if (!na.label) return null;
+  if (completed && na.key === "done") return null;
+  const m = moneyOf(o);
+  const parties = {
+    supplier: supplierName,
+    logistics: logi.partner,
+    customer: o.customer_name,
+    // C11 — the RAW number; the words module spells it.
+    amount: m.known ? m.outstanding : null,
+    // C3 — the fact's own two values, already formatted; the words module owns
+    // the sentence and never a date (this cell prints the SHORT form, so they
+    // only reach the tooltip).
+    deliveryDate: logi.date ? dayMon(logi.date) : null,
+    deliverySlot: logi.slot ? shortSlot(logi.slot) : null,
+  };
+  // C3 — the FACT that replaced `Confirm delivery with {customer}`: everything
+  // is arranged and the day has not come, so there is nothing to do and
+  // nothing to click. Quiet grey, never a pill: a pill in this column is a
+  // button, and a fact is not one.
+  //
+  // WHICH FORM: the short one. The Delivery cell immediately to the left
+  // already prints `27 Jul · 12pm–3pm`, so the full `Delivering 27 Jul ·
+  // 12pm–3pm` would say the same thing twice in adjacent columns. Here the
+  // duplicated half is the DATE, so the cell keeps the word and the tooltip
+  // carries the day. The full sentence still ships, in the drawer's journey
+  // strip, where nothing else on screen says it.
+  if (na.key === "delivering") {
+    const full = orderActionLine("delivering", parties);
+    return (
+      <span
+        className="t4-caption truncate block"
+        data-next-action={na.label}
+        title={
+          full === "Delivering"
+            ? "Goods in, logistics booked, the customer confirmed the day. Nothing to do until then."
+            : `Goods in, logistics booked. Nothing to do until ${full.replace(/^Delivering /, "")}.`
+        }
+      >
+        {na.label}
+      </span>
+    );
+  }
+  // C2/C3: money is its own track, so `collect` can BE the headline — on a
+  // delivered order that still owes, or on one whose delivery is held for the
+  // balance, it is the only action left. C5: the figure comes from the shared
+  // money rule, so the pill, the 🔒 and the Owing facet can never disagree.
+  const line = orderActionLine(na.key, parties);
+  // C3 — everything else that is open, folded into ONE `+N`. A cell may have
+  // exactly one way of saying "there is more". The count is `open.length − 1`
+  // by construction, so the drawer opened by this row shows exactly `1 + N`
+  // rows — it is the same computation.
+  const open = openActionsOf(o, stock, lines);
+  const more = open.slice(1);
+  return (
+    <div className="flex items-center gap-1.5 max-w-full">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onNextAction(na.label);
+        }}
+        className={`pill ${NEXT_PILL_CLASS[na.tone]} inline-flex items-center gap-1 min-w-0 hover:brightness-95`}
+        data-next-action={na.label}
+        title={`${line} — click to act`}
+      >
+        {na.locked && (
+          <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />
+        )}
+        <span className="truncate min-w-0">{line}</span>
+      </button>
+      {more.length > 0 && (
+        <button
+          type="button"
+          data-testid="next-more"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen();
+          }}
+          className="shrink-0 tabular-nums text-meta font-semibold text-base-500 hover:text-base-900"
+          title={`Also open: ${more
+            .map((a) => orderActionLine(a.key, parties))
+            .join(" · ")} — click to see them all`}
+        >
+          +{more.length}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** The ⚑ cell (#2) — the order's follow-up FLAG, STATUS ONLY (no name, Jess
+ *  2026-06-26). Empty → faint flag. Open → amber. Overdue → red. Click → opens
+ *  the side follow-up form.  Who / what / Take-it / Done live in the form + the
+ *  right-rail Tasks board (the side menu everyone sees).
+ *
+ *  S1 — the `<td>` is the kit's; this returns the button. The click still
+ *  stops propagating, or flagging an order would also open it. */
+function FollowUpFlag({
   order,
   tasks,
   onFlag,
@@ -5013,34 +5839,36 @@ function ActionCell({
 }) {
   const lead = openTaskOf(tasks);
   const u = lead ? taskUrgency(lead) : null;
+  const word = !lead
+    ? "Flag for follow-up"
+    : u === "overdue"
+      ? "Follow-up overdue"
+      : "Follow-up open";
   return (
-    <td className="px-0.5 py-2 align-middle text-center" onClick={(e) => e.stopPropagation()}>
-      {/* Icon-only follow-up flag (Jess 2026-06-29): no "Flag" / "Late" text — the
-          colour carries the state so the column stays narrow + scannable.
-          faint = none · amber = open · red = overdue. */}
-      <button
-        type="button"
-        onClick={() => onFlag(order)}
-        title={
-          !lead
-            ? "Flag for follow-up"
-            : u === "overdue"
-              ? "Follow-up overdue"
-              : "Follow-up open"
-        }
-        aria-label={!lead ? "Flag for follow-up" : u === "overdue" ? "Follow-up overdue" : "Follow-up open"}
-        className="inline-flex"
-      >
-        {!lead ? (
-          <Flag size={15} strokeWidth={2} className="text-base-300 hover:text-base-800" />
-        ) : u === "overdue" ? (
-          <Flag size={15} strokeWidth={2.5} className="fill-current text-danger" />
-        ) : (
-          /* Open follow-up = amber STATUS — v4 amber ink. */
-          <Flag size={15} strokeWidth={2} className="fill-current" style={{ color: "#854F0B" }} />
-        )}
-      </button>
-    </td>
+    /* Icon-only in the CELL (Jess 2026-06-29): no "Flag" / "Late" text — the
+       colour carries the state so the row stays scannable. The column's HEAD
+       now carries the word, which is what S1 changed and all it changed:
+       `Column.label` is a `string` and no grid in the portal can head a column
+       with a picture. */
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onFlag(order);
+      }}
+      title={word}
+      aria-label={word}
+      className="inline-flex"
+    >
+      {!lead ? (
+        <Flag size={15} strokeWidth={2} className="text-base-300 hover:text-base-800" />
+      ) : u === "overdue" ? (
+        <Flag size={15} strokeWidth={2.5} className="fill-current text-danger" />
+      ) : (
+        /* Open follow-up = amber STATUS — v4 amber ink. */
+        <Flag size={15} strokeWidth={2} className="fill-current" style={{ color: "#854F0B" }} />
+      )}
+    </button>
   );
 }
 
@@ -5119,25 +5947,6 @@ function StockDot({
         {sub.text}
       </div>
     </div>
-  );
-}
-
-function Th({
-  children,
-  center,
-}: {
-  children: React.ReactNode;
-  /** Center-align the header (the narrow MS / BF / Sofa count columns). */
-  center?: boolean;
-}) {
-  return (
-    <th
-      className={`px-2 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
-      /* v4 header: DARK 12/600 cool ink (warm #4A4335 retired). */
-      style={{ color: "#374151", fontSize: "12px", letterSpacing: "0.04em" }}
-    >
-      {children}
-    </th>
   );
 }
 

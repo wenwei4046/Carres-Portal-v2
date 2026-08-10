@@ -6,12 +6,15 @@ import {
   isPurchasingCategory,
   isPurchasingNumberKey,
   lastChangeFor,
+  parsePgIntArray,
   productionWorkingDaysFor,
   purchasingSetNumberInput,
   purchasingSetProductionDaysInput,
   purchasingSetWorkWeekInput,
   purchasingUrgentWindowDays,
+  settingValueLabel,
   unratedPairs,
+  weekdayListLabel,
   workWeekLabel,
   workWeekOffDaysFor,
   type PurchasingSettings,
@@ -310,5 +313,67 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
         holidays: NO_HOLIDAYS,
       }),
     ).toBe("2026-08-12");
+  });
+});
+
+/**
+ * 🔴 P20.4 — A WORK WEEK MUST READ AS DAYS, NOT AS A POSTGRES ARRAY.
+ *
+ * `purchasing_setting_changes.old_value` is a plain `text` column and the two
+ * array-valued keys are recorded with `v_old::text`, so the history carries the
+ * DATABASE's spelling of an array. The Settings page printed it raw.
+ *
+ * The two rows below are PRODUCTION's entire audit trail, read 2026-08-08 — so
+ * these are the exact two strings the live page was rendering, not invented
+ * fixtures.
+ */
+describe("P20.4 · an audited setting value reads as business, never as SQL", () => {
+  it("the two rows production actually holds stop printing `{0}`", () => {
+    // `{0}` = off Sunday only → the factory works Monday to Saturday.
+    expect(settingValueLabel("supplier_work_week", "{0}")).toBe("Mon–Sat");
+    // `{0,6}` = off Sunday and Saturday → Monday to Friday.
+    expect(settingValueLabel("supplier_work_week", "{0,6}")).toBe("Mon–Fri");
+  });
+
+  it("`po_days` had the identical defect waiting, and reads the same way", () => {
+    // Stored the other way round from a work week — these are the days the
+    // office SENDS — and it must still read as days.
+    expect(settingValueLabel("po_days", "{1,3,5}")).toBe("Mon Wed Fri");
+    expect(settingValueLabel("po_days", "{1,2,3,4,5}")).toBe("Mon–Fri");
+  });
+
+  it("every other key stores one number and prints as itself", () => {
+    expect(settingValueLabel("order_by_buffer_days", "7")).toBe("7");
+    expect(settingValueLabel("production_days", "10")).toBe("10");
+  });
+
+  it("nothing recorded says nothing — never `was —`", () => {
+    for (const empty of [null, undefined, "", "  "]) {
+      expect(settingValueLabel("supplier_work_week", empty)).toBeNull();
+      expect(settingValueLabel("order_by_buffer_days", empty)).toBeNull();
+    }
+    // `{}` is a recorded EMPTY array, which is a different fact from nothing
+    // recorded — it reads as the glyph, not as a blank.
+    expect(settingValueLabel("supplier_work_week", "{}")).toBe("Mon–Sat");
+    expect(settingValueLabel("po_days", "{}")).toBe("—");
+  });
+
+  it("the parser survives what a text column can hold", () => {
+    expect(parsePgIntArray("{0,6}")).toEqual([0, 6]);
+    expect(parsePgIntArray("{ 1 , 3 , 5 }")).toEqual([1, 3, 5]);
+    expect(parsePgIntArray("{}")).toEqual([]);
+    expect(parsePgIntArray(null)).toEqual([]);
+    // A non-integer is DROPPED, never turned into NaN — a history line is not
+    // worth a crash on the one screen that explains the numbers.
+    expect(parsePgIntArray("{1,x,3}")).toEqual([1, 3]);
+  });
+
+  /** Architecture law D — a derived fact has ONE arithmetic. The work week and
+   *  PO days arrive as opposite lists and must still read the same. */
+  it("`workWeekLabel` and `weekdayListLabel` are the same labeller", () => {
+    expect(workWeekLabel([0, 6])).toBe(weekdayListLabel([1, 2, 3, 4, 5]));
+    expect(workWeekLabel([0])).toBe(weekdayListLabel([1, 2, 3, 4, 5, 6]));
+    // Two working days do not collapse into a range — `Mon Tue`, never `Mon–Tue`.
+    expect(weekdayListLabel([1, 2])).toBe("Mon Tue");
   });
 });
