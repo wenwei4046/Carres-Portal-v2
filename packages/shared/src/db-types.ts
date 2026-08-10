@@ -924,6 +924,9 @@ export interface PurchaseOrderLineRow {
   // Migration 0055. cost_source_enum — which heuristic produced the cost
   // value above (see `CostSource` definition for label semantics).
   cost_source: CostSource | null;
+  /** NULL on pre-0337/legacy lines; governed Batch Purchase lines always set it. */
+  commercial_treatment: "normal" | "free_of_charge" | null;
+  commercial_reason: string | null;
 }
 
 export interface POHistoryRow {

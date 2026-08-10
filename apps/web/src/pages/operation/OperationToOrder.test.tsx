@@ -44,7 +44,7 @@ const KLANG = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
 function build(key: string, model: string, codes: string, qty = 1, size: string | null = null) {
   return {
     key, title: model, spec: "", codes, qty, size, model, ordinal: null,
-    lines: [{ lineId: `${key}-l1`, sku: codes, qty, cost: null }],
+    lines: [{ lineId: `${key}-l1`, sku: codes, qty, cost: 100 }],
   };
 }
 
@@ -64,11 +64,13 @@ const TO_ORDER = {
       proceedDate: "2026-07-28",
     },
   ],
+  procurementPartners: [{ id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", name: "NETS" }],
   proposals: [
     {
       key: `${OHANA}::sofa`,
       supplierId: OHANA,
       supplierName: "Ohana",
+      supplierKind: "own_logistics",
       category: "sofa",
       label: "Ohana · Sofa",
       orderBy: "2026-07-15",
@@ -141,6 +143,7 @@ const TO_ORDER = {
       key: `${NF}::mattress`,
       supplierId: NF,
       supplierName: "Nice Future",
+      supplierKind: "own_logistics",
       category: "mattress",
       label: "Nice Future · Mattress",
       orderBy: "2026-08-03",
@@ -453,8 +456,9 @@ describe("the grid — business language only", () => {
     // ella's delivery is past → red overdue, sorted to the very top.
     const cells = screen.getAllByText(fmtDate("2026-07-20"));
     expect(cells[0]!.className).toContain("text-kit-red-11");
-    // A TBD order is not listed at all — no dateless row to sink.
-    expect(screen.queryByText("SO-1257")).toBeNull();
+    // A TBD order stays visible as blocked work and cannot be selected.
+    expect(screen.getByText("SO-1257")).toBeInTheDocument();
+    expect(screen.getAllByText("No delivery date")).toHaveLength(2);
     // The engine's own dates never render.
     expect(screen.queryByText(fmtDate("2026-07-15"))).toBeNull(); // sofa orderBy
     expect(screen.queryByText(fmtDate("2026-08-06"))).toBeNull(); // bedframe stockReady
@@ -666,7 +670,9 @@ describe("an overdue row says so on the row", () => {
     // P17 spells the bar's colour PER SIDE (`border-l-…`): an all-sides
     // `border-kit-red-9` also painted the cell's new column rule red, and its
     // `border-transparent` twin painted it invisible. Same bar, same red.
-    for (const b of bars) expect(b.className).toContain("border-l-kit-red-9");
+    expect(bars.some((b) => b.className.includes("border-l-kit-red-9"))).toBe(true);
+    // Missing-date work is blocked, not late against a date nobody promised.
+    expect(bars.some((b) => b.className.includes("border-l-transparent"))).toBe(true);
 
     // Swap to the first upcoming run — NOT overdue, same table, no red.
     fireEvent.click(screen.getByTestId("to-order-overdue"));
@@ -701,11 +707,57 @@ describe("ordered rows — the receipt stays on the sheet", () => {
 });
 
 describe("Issue — the grid is the receipt, the bar is the report", () => {
+  it("blocks unknown cost until a transaction cost is entered and marks it hand-entered", async () => {
+    const payload = structuredClone(TO_ORDER);
+    payload.proposals[0].rows[0].builds[0].lines[0].cost = null;
+    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+      if (path === "/api/operation/purchase/to-order") return Promise.resolve(payload);
+      return route(path, init?.body ? JSON.parse(String(init.body)) : undefined);
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    fireEvent.click(screen.getByTestId("to-order-issue"));
+
+    const confirm = screen.getByTestId("to-order-issue-confirm");
+    expect(confirm).toBeDisabled();
+    const cost = [...screen.getByTestId("to-order-issue-review").querySelectorAll('input[type="number"]')]
+      .find((field) => (field as HTMLInputElement).value === "") as HTMLInputElement | undefined;
+    expect(cost).toBeDefined();
+    fireEvent.change(cost!, { target: { value: "880" } });
+    expect(confirm).not.toBeDisabled();
+    fireEvent.click(confirm);
+
+    await screen.findByTestId("to-order-created-line");
+    const issue = apiFetch.mock.calls.find(([path]) => String(path).endsWith("/issue"))!;
+    const body = JSON.parse(String((issue[1] as RequestInit).body));
+    expect(JSON.stringify(body)).toContain(
+      '"unitCost":880,"costSource":"hand_entered"',
+    );
+  });
+
+  it("asks for procurement partner once per factory-pickup Issue document", async () => {
+    const payload = structuredClone(TO_ORDER);
+    payload.proposals[0].supplierKind = "factory_pickup";
+    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
+      if (path === "/api/operation/purchase/to-order") return Promise.resolve(payload);
+      return route(path, init?.body ? JSON.parse(String(init.body)) : undefined);
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    fireEvent.click(screen.getByTestId("to-order-issue"));
+
+    // The default overdue selection constructs two Ohana customer documents.
+    // Partner is asked on each document section, never attached to a demand row.
+    expect(screen.getAllByText(W.procurementPartner)).toHaveLength(2);
+    expect(screen.getByTestId("to-order-issue-confirm")).toBeDisabled();
+  });
+
   it("posts one ARRANGEMENT per group and updates rows in place — nothing vanishes", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.click(rowBox(`${OHANA}::sofa`, "o2", "bk-e")); // leave ella out
     fireEvent.click(screen.getByTestId("to-order-issue"));
+    fireEvent.click(screen.getByTestId("to-order-issue-confirm"));
 
     await screen.findByTestId("to-order-created-line");
     const calls = apiFetch.mock.calls.filter(([p]) => String(p).endsWith("/issue"));
@@ -719,7 +771,15 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
         "supplierId",
       ]);
       expect(body.destinationId).toBe(KLANG); // the engine's default, silently
-      expect(JSON.stringify(body)).not.toMatch(/sku|qty|cost|price/);
+      // Demand membership remains build-key based. The only commercial facts
+      // sent are the operator-reviewed transaction decisions; quantity is
+      // still recomputed and cannot be supplied by the browser.
+      expect(JSON.stringify(body)).not.toMatch(/"qty"|"price"/);
+      expect(
+        body.purchaseOrders.flatMap(
+          (document: { lineDecisions: { treatment: string }[] }) => document.lineDecisions,
+        ),
+      ).toEqual(expect.arrayContaining([expect.objectContaining({ treatment: "normal" })]));
     }
     // ella's untick reached the wire.
     const sofaBody = JSON.parse(
@@ -754,6 +814,7 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
     fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.click(rowBox(`${OHANA}::sofa`, "o2", "bk-e")); // leave ella out
     fireEvent.click(screen.getByTestId("to-order-issue"));
+    fireEvent.click(screen.getByTestId("to-order-issue-confirm"));
     await screen.findByTestId("to-order-created-line");
     fireEvent.click(screen.getByTestId(`row-po-${OHANA}::bedframe:o9:l1`));
     expect(navigate).toHaveBeenCalledWith(
@@ -766,6 +827,7 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.click(screen.getByTestId("to-order-issue"));
+    fireEvent.click(screen.getByTestId("to-order-issue-confirm"));
     await screen.findByTestId("to-order-failed-line");
     // Sofa succeeded beside it; the failure does not evaporate.
     expect(screen.getByTestId(`row-po-${OHANA}::sofa:o2:bk-e`)).toBeInTheDocument();
@@ -782,7 +844,7 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
     expect(screen.queryByTestId("to-order-failed-line")).toBeNull();
   });
 
-  it("demand the catalog could not read blocks the pill, by name", async () => {
+  it("unresolved supplier demand is named without globally blocking valid Issue", async () => {
     apiFetch.mockImplementation((path: string, init?: RequestInit) =>
       path.endsWith("/to-order")
         ? Promise.resolve({
@@ -796,7 +858,8 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
       "1 item could not be read",
     );
     fireEvent.click(screen.getByTestId("to-order-overdue"));
-    expect(screen.getByTestId("to-order-issue")).toBeDisabled();
+    expect(screen.getByTestId("to-order-issue")).not.toBeDisabled();
+    expect(screen.getByText(/SO-1290 · M1401F-K/)).toBeInTheDocument();
   });
 
   it("an empty To Order is an answer, not a blank sheet", async () => {
@@ -1325,6 +1388,7 @@ describe("the seven fixes — Excel completeness", () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.click(screen.getByTestId("to-order-issue"));
+    fireEvent.click(screen.getByTestId("to-order-issue-confirm"));
     expect(await screen.findByTestId("to-order-creating")).toHaveTextContent(W.creatingPos);
     expect(screen.queryByTestId("to-order-issue")).toBeNull();
     expect(release).not.toBeNull();
@@ -1362,6 +1426,7 @@ describe("Supplier on the row", () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.click(screen.getByTestId("to-order-issue"));
+    fireEvent.click(screen.getByTestId("to-order-issue-confirm"));
 
     const line = await screen.findByTestId("to-order-created-line");
     // The tick is an <svg data-icon>, so it renders identically on every OS —
