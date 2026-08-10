@@ -1,0 +1,54 @@
+<!-- @dsCard group="Icons" viewport="700x400" name="Icon standard (Lucide)" subtitle="Same meaning ⇒ same glyph. Stroke 2. No emoji, no brand logos." -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body{margin:0;padding:18px 20px;background:var(--surface);font-family:var(--font-sans);color:var(--text-primary)}
+  .cap{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin:0 0 10px}
+  .grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px 8px;margin-bottom:18px}
+  .ic{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+  .box{width:38px;height:38px;border:1px solid var(--hairline);border-radius:9px;display:grid;place-items:center;color:var(--base-600)}
+  .box i{width:19px;height:19px}
+  .lb{font-size:10px;color:var(--text-secondary);line-height:1.2}
+  .pillrow{display:flex;gap:8px;flex-wrap:wrap}
+</style></head>
+<body>
+<p class="cap">Actions</p>
+<div class="grid">
+  <div class="ic"><span class="box"><i data-lucide="plus"></i></span><span class="lb">Add</span></div>
+  <div class="ic"><span class="box"><i data-lucide="pencil"></i></span><span class="lb">Edit</span></div>
+  <div class="ic"><span class="box"><i data-lucide="trash-2"></i></span><span class="lb">Delete</span></div>
+  <div class="ic"><span class="box"><i data-lucide="eye"></i></span><span class="lb">View</span></div>
+  <div class="ic"><span class="box"><i data-lucide="more-horizontal"></i></span><span class="lb">More</span></div>
+  <div class="ic"><span class="box"><i data-lucide="search"></i></span><span class="lb">Search</span></div>
+  <div class="ic"><span class="box"><i data-lucide="sliders-horizontal"></i></span><span class="lb">Filter</span></div>
+  <div class="ic"><span class="box"><i data-lucide="refresh-cw"></i></span><span class="lb">Sync</span></div>
+  <div class="ic"><span class="box"><i data-lucide="bell"></i></span><span class="lb">Reminder</span></div>
+  <div class="ic"><span class="box" style="color:var(--flame)"><i data-lucide="message-circle"></i></span><span class="lb">Chase (WA)</span></div>
+  <div class="ic"><span class="box"><i data-lucide="plus-circle"></i></span><span class="lb">Record pay</span></div>
+  <div class="ic"><span class="box"><i data-lucide="wand-2"></i></span><span class="lb">Auto-match</span></div>
+</div>
+<p class="cap">Entities</p>
+<div class="grid">
+  <div class="ic"><span class="box"><i data-lucide="layout-grid"></i></span><span class="lb">Dashboard</span></div>
+  <div class="ic"><span class="box"><i data-lucide="clipboard-list"></i></span><span class="lb">Orders</span></div>
+  <div class="ic"><span class="box"><i data-lucide="shopping-cart"></i></span><span class="lb">POS</span></div>
+  <div class="ic"><span class="box"><i data-lucide="boxes"></i></span><span class="lb">Stock</span></div>
+  <div class="ic"><span class="box"><i data-lucide="warehouse"></i></span><span class="lb">Warehouse</span></div>
+  <div class="ic"><span class="box"><i data-lucide="truck"></i></span><span class="lb">Logistic</span></div>
+  <div class="ic"><span class="box"><i data-lucide="wallet"></i></span><span class="lb">Money</span></div>
+  <div class="ic"><span class="box"><i data-lucide="user"></i></span><span class="lb">Customer</span></div>
+  <div class="ic"><span class="box"><i data-lucide="calendar-days"></i></span><span class="lb">Calendar</span></div>
+  <div class="ic"><span class="box"><i data-lucide="lightbulb"></i></span><span class="lb">Notes</span></div>
+  <div class="ic"><span class="box"><i data-lucide="flag"></i></span><span class="lb">Follow-up</span></div>
+  <div class="ic"><span class="box"><i data-lucide="scroll-text"></i></span><span class="lb">Activity</span></div>
+</div>
+<p class="cap">Status — icon + word pill</p>
+<div class="pillrow">
+  <span class="pill pill-ready"><i data-lucide="check"></i>Ready</span>
+  <span class="pill pill-waiting"><i data-lucide="clock"></i>Waiting</span>
+  <span class="pill pill-overdue"><i data-lucide="alert-circle"></i>Overdue</span>
+  <span class="pill pill-waiting"><i data-lucide="pause-circle"></i>On hold</span>
+  <span class="pill pill-ready"><i data-lucide="sparkle"></i>New</span>
+</div>
+<script>lucide.createIcons({ attrs: { 'stroke-width': 2 } });</script>
+</body></html>

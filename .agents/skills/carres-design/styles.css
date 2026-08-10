@@ -1,0 +1,10 @@
+/* ============================================================================
+ * Carres ERP — UI-KIT v4 · global entry point
+ * Consumers link THIS one file. It only @imports; all values live in the
+ * files below (single source of truth mirrored from the Carres Portal repo).
+ * ==========================================================================*/
+@import "./tokens/fonts.css";
+@import "./tokens/colors.css";
+@import "./tokens/typography.css";
+@import "./tokens/layout.css";
+@import "./components.css";

@@ -1,0 +1,13 @@
+<!-- @dsCard group="Colors" viewport="700x160" name="Status semantics" subtitle="Three tones only — always rendered as a pill (soft tint + dark ink)" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<style>body{margin:0;padding:20px;background:var(--surface);font-family:var(--font-sans)}
+.grid{display:flex;gap:14px}
+.card2{flex:1;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.hexes{font-size:10px;font-family:var(--font-mono)}</style></head>
+<body>
+<div class="grid">
+<div class="card2" style="background:#EAF3DE"><span class="pill pill-ready">Ready</span><span class="hexes" style="color:#3B6D11">ink #3B6D11 · fill #EAF3DE</span><span style="font-size:11px;color:#3B6D11">ready · paid · on-time</span></div>
+<div class="card2" style="background:#FAEEDA"><span class="pill pill-waiting">Waiting</span><span class="hexes" style="color:#854F0B">ink #854F0B · fill #FAEEDA</span><span style="font-size:11px;color:#854F0B">waiting · chasing</span></div>
+<div class="card2" style="background:#FCEBEB"><span class="pill pill-overdue">Overdue</span><span class="hexes" style="color:#A32D2D">ink #A32D2D · fill #FCEBEB</span><span style="font-size:11px;color:#A32D2D">problem · No PO · overdue</span></div>
+</div>
+</body></html>
