@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   cellAmount: { fontSize: 7, fontWeight: 700, textAlign: "right", lineHeight: 1 },
 
   // ── totals card (right) — the invoice's own arithmetic ──
-  totalsZone: { flexDirection: "row", justifyContent: "flex-end", marginTop: mm(5), paddingHorizontal: mm(4) },
+  totalsZone: { flexDirection: "row", alignItems: "stretch", marginTop: mm(5), paddingHorizontal: mm(4) },
   totalsBlock: { width: mm(70), borderWidth: 0.6, borderColor: HAIR },
   totalsRow: {
     flexDirection: "row",
@@ -149,13 +149,12 @@ const styles = StyleSheet.create({
   grandValue: { fontSize: 8.5, fontWeight: 700 },
 
   // ── guarantees — the customer's cover, in writing ──
-  guarantees: { marginTop: mm(4), paddingHorizontal: mm(4) },
   guaranteeRow: { marginTop: mm(2) },
   guaranteeTitle: { fontSize: 8, fontWeight: 600, lineHeight: 1.2 },
   guaranteeLine: { fontSize: 7.5, color: GREY, marginTop: mm(0.6), lineHeight: 1.3 },
 
   // ── disclaimer + footer ──
-  disclaimer: { fontSize: 7, color: GREY, lineHeight: 1.3, marginTop: mm(4), paddingHorizontal: mm(4) },
+  disclaimer: { fontSize: 7, color: GREY, lineHeight: 1.3, marginTop: mm(2.5), paddingHorizontal: mm(4), textAlign: "right" },
   footer: {
     position: "absolute",
     left: MARGIN,
@@ -351,9 +350,36 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
         </View>
         <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
 
-        {/* ── bottom unit: totals card · guarantees · disclaimer — pinned ── */}
+        {/* ── bottom unit, pinned: GUARANTEES left | TOTALS right on ONE
+            top line (the SO's pair law — nothing floats alone), then the
+            short disclaimer right-aligned with the money column. ── */}
         <View wrap={false} style={{ marginTop: "auto" }}>
           <View style={styles.totalsZone}>
+            <View style={{ flex: 1, paddingRight: mm(6) }}>
+              {guarantees.length > 0 ? (
+                <View>
+                  <Text style={styles.blockLabel}>Guarantee Cover On This Order</Text>
+                  {guarantees.map((g, idx) => (
+                    <View key={`g-${idx}`} style={styles.guaranteeRow}>
+                      <Text style={styles.guaranteeTitle}>
+                        {g.label}
+                        {g.guarantee_id ? `  ·  Guarantee ID: ${g.guarantee_id}` : ""}
+                      </Text>
+                      <Text style={styles.guaranteeLine}>
+                        Covers {g.covers} · {g.coverage_years} years ·{" "}
+                        {g.remedy === "replace" ? "one-for-one replacement (not repair)" : "repair"}
+                      </Text>
+                      <Text style={styles.guaranteeLine}>
+                        {g.expires_on
+                          ? `Valid ${g.starts_on ?? ""} to ${g.expires_on}`
+                          : "Cover starts on the delivery date"}
+                      </Text>
+                      {g.terms_text ? <Text style={styles.guaranteeLine}>{g.terms_text}</Text> : null}
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
             <View style={styles.totalsBlock}>
               {isTaxInvoice ? (
                 <View style={styles.totalsRow}>
@@ -374,41 +400,21 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
             </View>
           </View>
 
-          {guarantees.length > 0 ? (
-            <View style={styles.guarantees}>
-              <Text style={styles.blockLabel}>Guarantee Cover On This Order</Text>
-              {guarantees.map((g, idx) => (
-                <View key={`g-${idx}`} style={styles.guaranteeRow}>
-                  <Text style={styles.guaranteeTitle}>
-                    {g.label}
-                    {g.guarantee_id ? `  ·  Guarantee ID: ${g.guarantee_id}` : ""}
-                  </Text>
-                  <Text style={styles.guaranteeLine}>
-                    Covers {g.covers} · {g.coverage_years} years ·{" "}
-                    {g.remedy === "replace" ? "one-for-one replacement (not repair)" : "repair"}
-                  </Text>
-                  <Text style={styles.guaranteeLine}>
-                    {g.expires_on
-                      ? `Valid ${g.starts_on ?? ""} to ${g.expires_on}`
-                      : "Cover starts on the delivery date"}
-                  </Text>
-                  {g.terms_text ? <Text style={styles.guaranteeLine}>{g.terms_text}</Text> : null}
-                </View>
-              ))}
-            </View>
-          ) : null}
-
+          {/* short, right-aligned with the money column (owner: annotation
+              words align right; the old sentence was a paragraph) */}
           <Text style={styles.disclaimer}>
             {isTaxInvoice
-              ? "This is a tax invoice. Please retain for your records. SST 8% is included in unit prices per LHDN inclusive convention."
-              : "This is a statement of balance / payment request — not a tax invoice. The tax invoice for this order is issued separately."}
+              ? "Tax invoice · SST 8% included in unit prices (LHDN inclusive)."
+              : "Payment request — not a tax invoice."}
           </Text>
         </View>
 
         {/* ── footer — fixed, every page ── */}
         <View style={styles.footer} fixed>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text style={styles.footerCell}>{invoice_no}</Text>
+            <Text style={styles.footerCell}>
+              {data.issued_by ? `Issued by ${data.issued_by}` : invoice_no}
+            </Text>
             <Text style={styles.footerCenter}>Computer-generated document · No signature required.</Text>
             <Text
               style={styles.footerPage}
