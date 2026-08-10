@@ -345,3 +345,29 @@ describe("WITHDRAW — the door back out of approved", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("a row that is not there is 404, not 500", () => {
+  /* Found by running WITHDRAW against PRODUCTION with a uuid that does not
+   * exist: HTTP 500 "Attribution request not found". P0002 is what this
+   * codebase's RPCs raise for not-found — 20+ live functions — and mapPgError
+   * had no case for it, so every one of them 500'd. */
+  const NOT_FOUND = { data: null, error: { code: "P0002", message: "Attribution request not found" } };
+
+  for (const [verb, path] of [
+    ["withdraw", `/attribution/${REQ_ID}/withdraw`],
+    ["decide", `/attribution/${REQ_ID}/decide`],
+    ["apply", `/attribution/${REQ_ID}/apply`],
+  ] as const) {
+    it(`${verb} answers 404 when the request does not exist`, async () => {
+      const body =
+        verb === "withdraw" ? { reason: "x" } : verb === "decide" ? { decision: "approved" } : {};
+      const { res } = await call(path, "principal", body, NOT_FOUND);
+      expect(res.status).toBe(404);
+      const b = (await res.json()) as { code: string; message: string };
+      expect(b.code).toBe("not_found");
+      /* The RPC's own sentence survives the mapping — the operator learns WHICH
+       * thing was missing, not just that something was. */
+      expect(b.message).toBe("Attribution request not found");
+    });
+  }
+});
