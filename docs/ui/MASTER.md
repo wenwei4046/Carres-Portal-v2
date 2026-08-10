@@ -220,7 +220,8 @@ own decision and its own card.**
 
 # §6.5 · SALES ORDERS REFERENCE STRUCTURE — ruled by Loo 2026-08-10
 
-Sales Orders is the first destination using the approved reference composition. This ruling is
+**Stage A is owner-accepted and CLOSED.** Sales Orders is the first production reference
+implementation of the approved Carres destination/listing architecture. This ruling is
 page-scoped; it does not reopen Purchase Orders, To Order, Sidebar, Utility Rail or any other
 surface.
 
@@ -230,10 +231,10 @@ Work Toolbar       45px  scope · one Search · Filters · Export · Columns · 
 Work Surface             one DataGrid; loading · empty · error remain inside it
 ```
 
-**The structure is one truth:** there is no duplicate Sales Orders tab/title and no second
-toolbar or status band. The outer Sales Orders route owns no scroll root. DestinationHeader
-and Work Toolbar remain fixed; the grid owns vertical scrolling and genuine-wide horizontal
-scrolling.
+**Proven in authenticated production at 1920 · 1440 · 1130:** one destination identity · one
+Work Toolbar · one general Search · no duplicate destination tab/title · no outer-page scroll ·
+DataGrid-owned genuine-wide horizontal overflow · 1130 without another toolbar band · Search ·
+Filters · Export · Columns · persistence · expansion all survive the migration.
 
 **The Sales Orders reference appearance is deliberately page-scoped:** 10px bold uppercase
 header in a rendered 31px row; 11px single-line parent cells in rendered 33px rows; 8px
@@ -250,8 +251,10 @@ not fit. It may not invent a responsive law. The 2026-08-10 production-like meas
 all controls in 846px with no clipping; the grid itself retained 306px of grid-owned
 horizontal overflow.
 
-**Stage boundary:** expansion + virtualization is Stage B engine work and is not solved here.
-The Sales Order Workspace and Old Orders execution surface are unchanged.
+**Stage boundary:** expansion + virtualization is acknowledged DataGrid engine debt and Stage B
+is not started. It does not block continuation of the ERP UI migration unless measured real
+production scale or performance proves otherwise. The Sales Order Workspace and Old Orders
+execution surface are unchanged.
 
 # §7 · Approved Evolution
 

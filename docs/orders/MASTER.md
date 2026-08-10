@@ -108,7 +108,7 @@ Nothing survives merely because it is already there.**
 
 ---
 
-# ✅ SALES ORDERS REFERENCE IMPLEMENTATION — STAGE A SHIPPED 2026-08-10
+# ✅ SALES ORDERS REFERENCE IMPLEMENTATION — STAGE A CLOSED 2026-08-10
 
 The official Sales Orders destination now follows the approved UI Constitution. This card
 changed composition and the reference-grid visual baseline only; it did not reopen the
@@ -134,8 +134,11 @@ kept its own 306px horizontal overflow. Search returned the matching orders; a C
 reduced 74 rows to 1 and Clear restored 74; Phone remained visible after reload; expansion
 opened one line-item disclosure; Export downloaded an XLSX file; browser console errors: zero.
 
-**Stage B is not started.** Expansion + virtualization remains its own engine card. Sales
-Order Workspace, Old Orders execution, Delivery, Payments and Purchasing are unchanged.
+**Owner accepted this as the first production reference implementation of the approved Carres
+destination/listing architecture. Stage B is not started.** Expansion + virtualization is an
+acknowledged DataGrid engine debt; it does not block the ERP UI migration unless measured
+production scale or performance proves otherwise. Sales Order Workspace, Old Orders execution,
+Delivery, Payments and Purchasing are unchanged.
 
 ## §0.1 · TWO DOORS — the production cutover, owner ruling 2026-08-10
 
