@@ -709,7 +709,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           {[
             /* T&C #1 — the OWNER-CORRECTED wording (2026-08-09, BUILD-QUEUE
                "GOLDEN BASELINE": the ONLY outstanding copy correction). A
-               Sales Order never claims to become a tax invoice — SO / DO /
+               Sales Order never claims to convert into the finance document — SO / DO /
                Sales Invoice are SEPARATE lifecycle documents, and "the SO
                does not talk tax" is this file's own header rule. The exact
                sentence is LAW in docs/pdf/SO-PDF-STANDARD.md §T&C. */

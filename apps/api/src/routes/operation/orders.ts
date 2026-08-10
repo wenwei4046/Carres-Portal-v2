@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import {
   abandonOrderInput,
@@ -577,7 +579,15 @@ const revisionLineInput = z.object({
   unit_price: z.number().min(0, "Unit price must be 0 or more"),
 });
 
-/** The editable header keys — mirrors the RPC whitelist verbatim. */
+/**
+ * The editable header keys — mirrors the SAVE RPC whitelist verbatim.
+ *
+ * STAGE 3 · 0329: `salesperson_id` · `outlet_id` · `dealer_id` · `channel` are
+ * NOT here. They moved to the attribution request lane (SUBMIT → APPROVE →
+ * APPLY) because they move money between parties (GATES.md GATE 2b, Test 3),
+ * and `sales_order_save_revision` now RAISES when a save carries one. CREATE
+ * still names them — see `createOrderInput`, which is a birth, not an edit.
+ */
 const revisionHeaderInput = z
   .object({
     customer_name: z.string().trim().min(1).optional(),
@@ -596,8 +606,6 @@ const revisionHeaderInput = z
     proceed_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
     delivery_floor: z.number().int().min(0).optional(),
     delivery_has_lift: z.boolean().optional(),
-    salesperson_id: z.string().uuid().nullable().optional(),
-    outlet_id: z.string().uuid().nullable().optional(),
   })
   .strict();
 
@@ -666,6 +674,9 @@ const createOrderInput = z.object({
       // orders_salesperson_required (0296) — every portal-written order
       // names who sold it; only the AutoCount archive importer is exempt.
       salesperson_id: z.string().uuid({ message: "A salesperson is required" }),
+      // A birth NAMES the parties; `sales_order_create` derives channel from
+      // whether an outlet is given. Only the EDIT door lost these to 0329.
+      outlet_id: z.string().uuid().nullable().optional(),
     })
     .strict(),
   lines: z.array(revisionLineInput.omit({ id: true })).min(1, "An order needs at least one item"),
@@ -722,6 +733,124 @@ operationOrdersRouter.post("/:id/floors", requireOperation, async (c) => {
     p_order_id: id,
     p_changed: parsed.data.fields,
     p_proposed_lines: parsed.data.proposedLines ?? null,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+// ─────────────────────────────────────────────────────────────
+// STAGE 3 · card 3.3 — CLASS B + TEST 3: the attribution request lane.
+//
+// FOUR doors, three verbs, and they never share a button:
+//   GET  /:id/attribution          the ONE live request (0330, definer read)
+//   POST /:id/attribution          SUBMIT   — writes a request, never the order
+//   POST /attribution/:rid/decide  APPROVE  — writes request.status, nothing else
+//   POST /attribution/:rid/apply   APPLY    — the only verb that moves the order
+//
+// Every gate lives in the RPC, not here (GATES.md GATE 3: "a UI-only approval
+// is not a control for the exact roles that can bypass it"). These handlers
+// validate shape and forward. `requireAttributionLane` admits HR because HR
+// approves salesperson / showroom moves — the RPC still refuses HR on a
+// dealer or channel move, and refuses everyone on the wrong verb.
+// ─────────────────────────────────────────────────────────────
+
+const requireAttributionLane: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const role = c.var.auth?.role;
+  if (role !== "operation" && role !== "hr" && role !== "principal") {
+    throw new HTTPException(403, { message: "Operation, HR or Principal only" });
+  }
+  await next();
+};
+
+const ATTRIBUTION_FIELDS = ["salesperson_id", "dealer_id", "outlet_id", "channel"] as const;
+
+const attributionSubmitInput = z.object({
+  changes: z
+    .object({
+      salesperson_id: z.string().uuid().nullable().optional(),
+      dealer_id: z.string().uuid().optional(),
+      outlet_id: z.string().uuid().nullable().optional(),
+      channel: z.enum(["dealer", "showroom"]).optional(),
+    })
+    .strict()
+    .refine((v) => ATTRIBUTION_FIELDS.some((f) => f in v), {
+      message: "Name at least one attribution field to change",
+    }),
+  reason: z.string().trim().min(1, "A reason is required"),
+});
+
+operationOrdersRouter.get("/:id/attribution", requireAttributionLane, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_attribution_live", {
+    p_order_id: c.req.param("id"),
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+operationOrdersRouter.post("/:id/attribution", requireOperation, async (c) => {
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = attributionSubmitInput.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_submit_attribution", {
+    p_order_id: c.req.param("id"),
+    p_changes: parsed.data.changes,
+    p_reason: parsed.data.reason,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data, 201);
+});
+
+const attributionDecideInput = z.object({
+  decision: z.enum(["approved", "rejected"]),
+  note: z.string().trim().max(500).optional(),
+});
+
+operationOrdersRouter.post(
+  "/attribution/:requestId/decide",
+  requireAttributionLane,
+  async (c) => {
+    const raw = await c.req.json().catch(() => ({}));
+    const parsed = attributionDecideInput.safeParse(raw);
+    if (!parsed.success) {
+      return c.json(
+        { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+        422,
+      );
+    }
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const { data, error } = await sb.rpc("sales_order_decide_attribution", {
+      p_request_id: c.req.param("requestId"),
+      p_decision: parsed.data.decision,
+      p_note: parsed.data.note ?? null,
+    });
+    if (error) {
+      const m = mapPipelineV2Error(error);
+      return c.json(m.body, m.status);
+    }
+    return c.json(data);
+  },
+);
+
+operationOrdersRouter.post("/attribution/:requestId/apply", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_apply_attribution", {
+    p_request_id: c.req.param("requestId"),
   });
   if (error) {
     const m = mapPipelineV2Error(error);

@@ -4297,6 +4297,157 @@ export function useSalesOrderRevisions(
   });
 }
 
+/* ─── STAGE 3 · card 3.3 — the attribution request lane ─────────────────────
+ *
+ * Four hooks, and the split between them IS the law: SUBMIT writes a request,
+ * APPROVE writes only that request's status, APPLY is the only one that moves
+ * the order (GATES.md GATE 4). They never collapse into one mutation, because
+ * one hook would be one button, and one button is how two verbs become one act.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/** A from → to pair, in NAMES. An approver never decides between two UUIDs. */
+export interface AttributionMove {
+  from: string | null;
+  to: string | null;
+}
+export interface AttributionRequest {
+  id: string;
+  status: "pending" | "approved";
+  reason: string | null;
+  created_at: string;
+  decided_at: string | null;
+  decision_note: string | null;
+  applied_at: string | null;
+  fields: string[];
+  /** Who GATE 3 lets decide this exact request. */
+  approver: "principal" | "hr_or_principal";
+  salesperson?: AttributionMove;
+  dealer?: AttributionMove;
+  outlet?: AttributionMove;
+  channel?: AttributionMove;
+}
+
+const attributionKey = (orderId: string) =>
+  [...qk.operation.order(orderId), "attribution"] as const;
+
+/** The ONE live request on an order — pending, or approved and not yet applied. */
+export function useSalesOrderAttribution(
+  orderId: string | null,
+  opts?: Partial<UseQueryOptions<{ request: AttributionRequest | null }>>,
+) {
+  return useQuery({
+    queryKey: orderId
+      ? attributionKey(orderId)
+      : (["operation", "orders", "null", "attribution"] as const),
+    queryFn: () =>
+      apiFetch<{ request: AttributionRequest | null }>(
+        `/api/operation/orders/${orderId}/attribution`,
+      ),
+    enabled: !!orderId,
+    ...opts,
+  });
+}
+
+export interface AttributionChanges {
+  salesperson_id?: string | null;
+  dealer_id?: string;
+  outlet_id?: string | null;
+  channel?: "dealer" | "showroom";
+}
+
+/** SUBMIT — records a request. The order is not touched. */
+export function useSubmitAttributionChange(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; fields: string[] },
+      ApiError,
+      { changes: AttributionChanges; reason: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { id: string; fields: string[] },
+    ApiError,
+    { changes: AttributionChanges; reason: string }
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ id: string; fields: string[] }>(
+        `/api/operation/orders/${orderId}/attribution`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: attributionKey(orderId) });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** APPROVE / REJECT — writes the REQUEST's status. Writes nothing else. */
+export function useDecideAttributionChange(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; status: string },
+      ApiError,
+      { requestId: string; decision: "approved" | "rejected"; note?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { id: string; status: string },
+    ApiError,
+    { requestId: string; decision: "approved" | "rejected"; note?: string }
+  >({
+    mutationFn: ({ requestId, decision, note }) =>
+      apiFetch<{ id: string; status: string }>(
+        `/api/operation/orders/attribution/${requestId}/decide`,
+        { method: "POST", body: JSON.stringify({ decision, ...(note ? { note } : {}) }) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: attributionKey(orderId) });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * APPLY — the only verb that moves the order. Re-runs every floor first, so it
+ * can still refuse here even though APPROVE succeeded. A second call is a
+ * no-op and says so (`already_applied`).
+ */
+export interface AttributionApplyResult {
+  id: string;
+  revision?: number;
+  changed?: string[];
+  already_applied?: boolean;
+}
+export function useApplyAttributionChange(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<AttributionApplyResult, ApiError, { requestId: string }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<AttributionApplyResult, ApiError, { requestId: string }>({
+    mutationFn: ({ requestId }) =>
+      apiFetch<AttributionApplyResult>(
+        `/api/operation/orders/attribution/${requestId}/apply`,
+        { method: "POST" },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: qk.operation.order(orderId) }),
+        qc.invalidateQueries({ queryKey: ["operation", "orders"] }),
+      ]);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
 export interface SaveRevisionLineInput {
   id?: string;
   sku: string;

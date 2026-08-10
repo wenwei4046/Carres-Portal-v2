@@ -58,6 +58,7 @@ import {
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
 } from "@/lib/queries";
+import SalesOrderAttribution from "./SalesOrderAttribution";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { describeRevisionChanges } from "./sales-order-revisions";
 import { lineName } from "./sales-order-facts";
@@ -537,8 +538,6 @@ export default function SalesOrderWorkspace() {
     proceed_date: draft.proceed_date,
     delivery_floor: draft.delivery_floor,
     delivery_has_lift: draft.delivery_has_lift,
-    salesperson_id: draft.salesperson_id,
-    outlet_id: draft.outlet_id,
   });
 
   const draftLinesPayload = () =>
@@ -570,8 +569,14 @@ export default function SalesOrderWorkspace() {
   const onCreate = () => {
     const err = validateDraft(true);
     if (err) return void toast.error(err);
+    /* A BIRTH names the parties — only the EDIT door lost them to 0329. */
     createMut.mutate({
-      header: { ...draftHeaderPayload(), dealer_id: draft.dealer_id },
+      header: {
+        ...draftHeaderPayload(),
+        dealer_id: draft.dealer_id,
+        salesperson_id: draft.salesperson_id,
+        outlet_id: draft.outlet_id,
+      },
       lines: draftLinesPayload(),
     });
   };
@@ -639,19 +644,24 @@ export default function SalesOrderWorkspace() {
     });
   }, [editing, mode, draft.lines, base, viewedRevision, detailQ.data, order]);
 
-  const spOptions = useMemo(
-    () => [
-      { value: "none", label: "Not recorded" },
-      ...(salespersonsQ.data?.salespersons ?? []).map((s) => ({ value: s.id, label: s.name })),
-    ],
+  /* The real parties, with no placeholder — the attribution form supplies its
+   * own "Keep …" and "Not recorded" entries, and two placeholders in one list
+   * is how a picker ends up offering "Not recorded" twice. */
+  const realSpOptions = useMemo(
+    () => (salespersonsQ.data?.salespersons ?? []).map((s) => ({ value: s.id, label: s.name })),
     [salespersonsQ.data],
   );
-  const outletOptions = useMemo(
-    () => [
-      { value: "none", label: "Not recorded" },
-      ...(outletsQ.data?.outlets ?? []).map((o) => ({ value: o.id, label: o.name })),
-    ],
+  const realOutletOptions = useMemo(
+    () => (outletsQ.data?.outlets ?? []).map((o) => ({ value: o.id, label: o.name })),
     [outletsQ.data],
+  );
+  const spOptions = useMemo(
+    () => [{ value: "none", label: "Not recorded" }, ...realSpOptions],
+    [realSpOptions],
+  );
+  const outletOptions = useMemo(
+    () => [{ value: "none", label: "Not recorded" }, ...realOutletOptions],
+    [realOutletOptions],
   );
   const dealerOptions = useMemo(
     () => (dealersQ.data?.dealers ?? []).map((d) => ({ value: d.id, label: d.name })),
@@ -806,18 +816,19 @@ export default function SalesOrderWorkspace() {
                 )}
               </Section>
 
-              {/* ② SOURCE */}
+              {/* ② SOURCE — a BIRTH names the parties; an EDIT may not move
+                  them. STAGE 3 (0329): salesperson · showroom · dealer decide
+                  who gets paid, so they leave the direct-edit lane and travel
+                  by request (GATES.md Test 3). The save RPC now REFUSES a
+                  header carrying one, so leaving the pickers here would have
+                  been a form that cannot save. */}
               <Section title="Source">
-                {editing ? (
+                {mode === "create" ? (
                   <div className="grid grid-cols-2 gap-3">
-                    {isNew ? (
-                      <Select id="ws-dealer" label="Dealer"
-                        value={draft.dealer_id ?? ""}
-                        onValueChange={(v) => setField("dealer_id", v || null)}
-                        options={dealerOptions} placeholder="Pick a dealer" />
-                    ) : (
-                      <Fact label="Dealer" value={refs.dealerName(draft.dealer_id) ?? order?.dealers?.name ?? "Not recorded"} />
-                    )}
+                    <Select id="ws-dealer" label="Dealer"
+                      value={draft.dealer_id ?? ""}
+                      onValueChange={(v) => setField("dealer_id", v || null)}
+                      options={dealerOptions} placeholder="Pick a dealer" />
                     <Select id="ws-outlet" label="Showroom"
                       value={draft.outlet_id ?? "none"}
                       onValueChange={(v) => setField("outlet_id", v === "none" ? null : v)}
@@ -828,11 +839,32 @@ export default function SalesOrderWorkspace() {
                       options={spOptions} />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-x-5 gap-y-3">
-                    <Fact label="Dealer" value={sourceName(mode, viewedRevision, order, "dealer") || "Not recorded"} />
-                    <Fact label="Showroom" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
-                    <Fact label="Salesperson" value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
-                  </div>
+                  <>
+                    <div className="grid grid-cols-3 gap-x-5 gap-y-3">
+                      <Fact label="Dealer" value={sourceName(mode, viewedRevision, order, "dealer") || "Not recorded"} />
+                      <Fact label="Showroom" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
+                      <Fact label="Salesperson" value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
+                    </div>
+                    {/* An OLD revision is a photograph — it carries no lane. */}
+                    {mode !== "oldrev" && orderId && order && (
+                      <SalesOrderAttribution
+                        orderId={orderId}
+                        current={{
+                          salesperson_id: order.salesperson_id ?? null,
+                          outlet_id: order.outlet_id ?? null,
+                          dealer_id: order.dealer_id ?? null,
+                        }}
+                        salespersonOptions={realSpOptions}
+                        outletOptions={realOutletOptions}
+                        dealerOptions={dealerOptions}
+                        onApplied={() => {
+                          void revisionsQ.refetch();
+                          void baseQ.refetch();
+                          void detailQ.refetch();
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </Section>
 

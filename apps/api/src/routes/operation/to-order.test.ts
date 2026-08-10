@@ -1777,7 +1777,7 @@ describe("POST /api/operation/purchase/to-order/demand/:id/cancel", () => {
       error: { code: "P0001", details: "already_cancelled", message: "already cancelled" },
     });
     expect(res.status).toBe(422);
-    expect((await res.json()).code).toBe("already_cancelled");
+    expect(((await res.json()) as any).code).toBe("already_cancelled");
   });
 
   it("hands back `nothing_to_cancel` by name", async () => {
@@ -1792,7 +1792,7 @@ describe("POST /api/operation/purchase/to-order/demand/:id/cancel", () => {
     expect(res.status).toBe(422);
     // The two refusals must not read alike: one means it already happened, the
     // other that there is nothing left to do it to.
-    expect((await res.json()).code).toBe("nothing_to_cancel");
+    expect(((await res.json()) as any).code).toBe("nothing_to_cancel");
   });
 
   it("is not open to a supplier login", async () => {
