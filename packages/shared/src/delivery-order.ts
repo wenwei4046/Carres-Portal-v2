@@ -30,6 +30,7 @@
  */
 
 import { isSundayIso, type BookingGateResult } from "./booking-gate";
+import { fmtMoney } from "./money-format";
 
 export interface DeliveryOrderIssueInput {
   /** D1/0277 — the CUSTOMER confirmed (not the logistics company's word). */
@@ -63,11 +64,6 @@ function has(
   return holidays instanceof Set
     ? holidays.has(day)
     : Array.from(holidays as readonly string[]).includes(day);
-}
-
-/** Money as a plain sentence. RM with two decimals, as every other gate here. */
-function rm(amount: number): string {
-  return `RM ${amount.toFixed(2)}`;
 }
 
 /**
@@ -112,10 +108,10 @@ export function deliveryOrderIssueGate({
     const goods = gate.holding - gate.storageOwing;
     reasons.push(
       goods > 0 && gate.storageOwing > 0
-        ? `${rm(goods)} outstanding and ${rm(gate.storageOwing)} of storage fee not collected — collect both before the delivery order is issued.`
+        ? `${fmtMoney(goods)} outstanding and ${fmtMoney(gate.storageOwing)} of storage fee not collected — collect both before the delivery order is issued.`
         : gate.storageOwing > 0
-          ? `Storage fee of ${rm(gate.storageOwing)} not collected — collect it, or a manager releases the delivery.`
-          : `${rm(gate.holding)} outstanding — collect it before the delivery order is issued.`,
+          ? `Storage fee of ${fmtMoney(gate.storageOwing)} not collected — collect it, or a manager releases the delivery.`
+          : `${fmtMoney(gate.holding)} outstanding — collect it before the delivery order is issued.`,
     );
   }
 

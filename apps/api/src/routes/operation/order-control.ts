@@ -1692,12 +1692,27 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     .select("id, order_id, item_id, do_number, status, loaned_at, returned_at, notes")
     .single();
   if (loanErr) {
-    // Best-effort rollback of the claim so the unit isn't stranded reserved.
-    await sb
+    // Rollback of the claim so the unit isn't left reserved behind a LOAN
+    // marker with nothing behind it. Its result is CHECKED: postgrest-js
+    // resolves `{ error }` instead of throwing, so an unread result meant a
+    // failed rollback was invisible — and there is no sweeper (three crons,
+    // none touches ops_stock_items), so the only thing that frees the unit is
+    // a person who has to be told.
+    const { error: rollbackErr } = await sb
       .from("ops_stock_items")
       .update({ status: "free", reserved_ref: null, updated_at: new Date().toISOString() })
       .eq("id", itemId);
     const m = mapPgError(loanErr);
+    if (rollbackErr) {
+      return c.json(
+        {
+          ...(m.body as object),
+          strandedItemId: itemId,
+          message: `The loan could not be recorded and the sofa is still held for this order. Release it on Stock → Reserved before trying again.`,
+        },
+        m.status,
+      );
+    }
     return c.json(m.body, m.status);
   }
   const dto: SofaLoanDto = {

@@ -353,21 +353,6 @@ export interface DataTableProps<Row> {
    */
   group?: {
     keyOf: (row: Row) => string;
-    /** Rendered inside one full-width cell. The caller owns every word. */
-    header?: (row: Row) => ReactNode;
-    /**
-     * **T1 — the group line as ALIGNED CELLS** (Loo's approved mock,
-     * 2026-08-06: *every fact in a column; order facts on their own aligned
-     * row*). When present, `header` is ignored and the group line renders one
-     * `<td>` per entry, walking the data columns left to right with `span`
-     * merging neighbours — so an order's SO number, customer and date sit
-     * UNDER the headers that name them, AutoCount's own shape, instead of in
-     * a free-text sentence a reader must parse.
-     *
-     * Optional, like every D0.5d power, and for the same reason: a page that
-     * passes `header` alone renders byte-identical markup to what it did.
-     */
-    cells?: (row: Row) => readonly GroupRowCell[];
     /**
      * ⭐ HOW THE GROUP LINE SEPARATES ITSELF (Loo, 2026-08-06, on the live
      * page — *"every customer is grey too — i confused"*).
@@ -403,7 +388,37 @@ export interface DataTableProps<Row> {
       /** The box's accessible name — the caller's words. */
       label: (row: Row) => string;
     };
-  };
+  } & (
+    /**
+     * **A GROUP LINE IS A HEADER OR IT IS CELLS — never both, never neither.**
+     * Both were optional until this union, so `group={{ keyOf }}` typechecked
+     * and rendered a 40px `slate-3` band with nothing inside it, once per
+     * group. A band that says nothing is worse than no band: the reader stops
+     * to work out what it means. `SectionHeader` already settles this shape for
+     * the kit — *"Collapsing is a TYPE, not an optional prop"* (02-components).
+     */
+    | {
+        /** Rendered inside one full-width cell. The caller owns every word. */
+        header: (row: Row) => ReactNode;
+        cells?: never;
+      }
+    | {
+        /**
+         * **T1 — the group line as ALIGNED CELLS** (Loo's approved mock,
+         * 2026-08-06: *every fact in a column; order facts on their own
+         * aligned row*). The group line renders one `<td>` per entry, walking
+         * the data columns left to right with `span` merging neighbours — so
+         * an order's SO number, customer and date sit UNDER the headers that
+         * name them, AutoCount's own shape, instead of in a free-text sentence
+         * a reader must parse.
+         *
+         * The alternative to `header`, never a companion to it: a page that
+         * passes `header` alone renders byte-identical markup to what it did.
+         */
+        cells: (row: Row) => readonly GroupRowCell[];
+        header?: never;
+      }
+  );
   /**
    * **D0.5d power 3 — a row opens.** AutoCount's `SO Batch Posting` ⊞: the row
    * is the record and its detail unfolds underneath, in place, without leaving
@@ -465,16 +480,26 @@ export interface DataTableProps<Row> {
   totals?: {
     /** What the strip is, for a screen reader — the caller's word. */
     label: string;
-    cell?: (column: Column<Row>, rows: readonly Row[]) => ReactNode;
-    /**
-     * **T1 — the strip as SPANNED cells** instead of one per column, for a
-     * total that reads as a sentence (`Total · 21 units`) rather than a digit
-     * marooned under one column. Same shape as `group.cells`; when present,
-     * `cell` is ignored. Optional — a page passing `cell` alone renders
-     * byte-identical markup.
-     */
-    cells?: (rows: readonly Row[]) => readonly GroupRowCell[];
-  };
+  } & (
+    /* Per-column or spanned — one of the two, the same law as `group` above.
+     * A `totals` carrying neither drew a sticky grey strip of empty cells that
+     * still announced itself to a screen reader as the totals row. */
+    | {
+        cell: (column: Column<Row>, rows: readonly Row[]) => ReactNode;
+        cells?: never;
+      }
+    | {
+        /**
+         * **T1 — the strip as SPANNED cells** instead of one per column, for a
+         * total that reads as a sentence (`Total · 21 units`) rather than a
+         * digit marooned under one column. Same shape as `group.cells`. The
+         * alternative to `cell`, never a companion to it — a page passing
+         * `cell` alone renders byte-identical markup.
+         */
+        cells: (rows: readonly Row[]) => readonly GroupRowCell[];
+        cell?: never;
+      }
+  );
   /*
    * **D0.5d power 5 — the record bar — is NOT here, because it already
    * exists.** Measured 2026-08-04 before a line was written: `PageShell` ships
