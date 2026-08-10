@@ -4533,6 +4533,84 @@ export function useCloseCorrectionWork(
   });
 }
 
+/* ─── STAGE 3 · card 3.5 — the amendment spine ──────────────────────────────
+ *
+ * SUBMIT and READ only. There is no issue hook, no accept hook and no apply
+ * hook that can succeed: the signing mechanism and the amendment document's
+ * form are the owner's wall, and a hook here would be the first step toward
+ * inventing one.
+ *
+ * `stale` is DERIVED by the server on every read, never stored — a stored flag
+ * needs something to notice the change and write it, and whatever failed to
+ * run would leave a stale document reading as valid.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+export interface SalesOrderAmendment {
+  id: string;
+  status: "draft" | "submitted" | "issued" | "accepted";
+  reason: string | null;
+  base_revision: number;
+  base_contractual_hash: string;
+  current_contractual_hash: string;
+  /** The contract moved since this was written. Re-propose from the new one. */
+  stale: boolean;
+  proposed_snapshot: Record<string, unknown>;
+  submitted_at: string;
+}
+
+export function useSalesOrderAmendment(
+  orderId: string | null,
+  opts?: Partial<UseQueryOptions<{ amendment: SalesOrderAmendment | null }>>,
+) {
+  return useQuery({
+    queryKey: orderId
+      ? ([...qk.operation.order(orderId), "amendment"] as const)
+      : (["operation", "orders", "null", "amendment"] as const),
+    queryFn: () =>
+      apiFetch<{ amendment: SalesOrderAmendment | null }>(
+        `/api/operation/orders/${orderId}/amendment`,
+      ),
+    enabled: !!orderId,
+    ...opts,
+  });
+}
+
+export interface AmendmentProposal {
+  lines?: Array<{ sku: string; qty: number; unit_price: number }>;
+  delivery_date?: string | null;
+  delivery_date_tbd?: boolean;
+  installment_months?: number | null;
+}
+
+export function useSubmitSalesOrderAmendment(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; base_revision: number; base_contractual_hash: string },
+      ApiError,
+      { proposed: AmendmentProposal; reason?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { id: string; base_revision: number; base_contractual_hash: string },
+    ApiError,
+    { proposed: AmendmentProposal; reason?: string }
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ id: string; base_revision: number; base_contractual_hash: string }>(
+        `/api/operation/orders/${orderId}/amendment`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: [...qk.operation.order(orderId), "amendment"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
 export interface SaveRevisionLineInput {
   id?: string;
   sku: string;

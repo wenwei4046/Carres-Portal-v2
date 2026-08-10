@@ -859,6 +859,100 @@ operationOrdersRouter.post("/attribution/:requestId/apply", requireOperation, as
   return c.json(data);
 });
 
+// ─────────────────────────────────────────────────────────────
+// STAGE 3 · card 3.5 — THE AMENDMENT SPINE, and only the spine.
+//
+//   GET  /:id/amendment          the live amendment + whether it is STALE
+//   POST /:id/amendment          SUBMIT
+//   POST /amendment/:aid/apply   the REFUSAL — and that refusal is the point
+//
+// There is no ISSUE door and no ACCEPT door here, deliberately: the signing
+// mechanism and the amendment document's visual form are the owner's wall
+// (BUILD-QUEUE — "inventing either is the single worst failure available in
+// this stage"). The apply route exists so the boundary is reachable and
+// therefore testable; it can only ever answer 422 `accept_not_built`.
+// ─────────────────────────────────────────────────────────────
+
+const amendmentSubmitInput = z.object({
+  /**
+   * What the sales order BECOMES if accepted. A proposal, never a fact.
+   *
+   * `.strict()` is the whole guard, and it is not decoration: without it a
+   * Class B field rides in and lands in `proposed_snapshot`, which would mean
+   * a customer being asked to accept their own phone number. The CLASS A list
+   * (packages/shared sales-order-classification.ts) is what an amendment may
+   * carry, and this is that list.
+   */
+  proposed: z
+    .object({
+      lines: z
+        .array(
+          z
+            .object({
+              sku: z.string().trim().min(1),
+              qty: z.number().int().min(1),
+              unit_price: z.number().min(0),
+            })
+            .strict(),
+        )
+        .optional(),
+      delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+      delivery_date_tbd: z.boolean().optional(),
+      installment_months: z.number().int().min(0).nullable().optional(),
+    })
+    .strict(),
+  reason: z.string().trim().max(500).optional(),
+});
+
+operationOrdersRouter.get("/:id/amendment", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_amendment_live", {
+    p_order_id: c.req.param("id"),
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+operationOrdersRouter.post("/:id/amendment", requireOperation, async (c) => {
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = amendmentSubmitInput.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_submit_amendment", {
+    p_order_id: c.req.param("id"),
+    p_proposed: parsed.data.proposed,
+    p_reason: parsed.data.reason ?? null,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data, 201);
+});
+
+operationOrdersRouter.post("/amendment/:amendmentId/apply", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_apply_amendment", {
+    p_amendment_id: c.req.param("amendmentId"),
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  /* Unreachable while ACCEPT is unbuilt — the RPC raises unconditionally. Kept
+   * rather than omitted so the day 3.7 lands, the caller already knows the
+   * shape of the answer. */
+  return c.json(data);
+});
+
 // GET /reference/dealers — id + name for the create form's dealer picker.
 // RLS-scoped read (internal roles read dealers — the same embed the list
 // already prints). A static segment outranks `/:id` in Hono's router.

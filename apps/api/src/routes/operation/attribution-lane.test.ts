@@ -242,3 +242,47 @@ describe("STAGE 3 · 3.3 — the SAVE door lost the attribution fields", () => {
     expect(calls.map((c) => c.name)).toEqual(["sales_order_save_revision"]);
   });
 });
+
+describe("STAGE 3 · 3.5 — the amendment spine, and the wall past it", () => {
+  it("SUBMIT forwards a proposal and touches no other RPC", async () => {
+    const { res, calls } = await call(`/${ORDER_ID}/amendment`, "operation", {
+      proposed: { lines: [{ sku: "B1201S-K", qty: 3, unit_price: 2499 }] },
+      reason: "Customer wants one more",
+    });
+    expect(res.status).toBe(201);
+    expect(calls.map((c) => c.name)).toEqual(["sales_order_submit_amendment"]);
+  });
+
+  it("refuses a proposal carrying a CLASS B field — corrections are not amendments", async () => {
+    const { res, calls } = await call(`/${ORDER_ID}/amendment`, "operation", {
+      proposed: { customer_phone: "0123" },
+      reason: "wrong lane",
+    });
+    expect(res.status).toBe(422);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("APPLY exists, and can only ever refuse — that refusal IS the deliverable", async () => {
+    const { res } = await call(`/amendment/${REQ_ID}/apply`, "operation", {}, {
+      data: null,
+      error: {
+        code: "22023",
+        details: "accept_not_built",
+        message: "Class A amendment cannot be applied - ACCEPT is not built yet",
+      },
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("accept_not_built");
+    expect(body.message).toMatch(/ACCEPT is not built yet/);
+  });
+
+  it("has NO issue door and NO accept door at all", async () => {
+    for (const path of [`/amendment/${REQ_ID}/issue`, `/amendment/${REQ_ID}/accept`]) {
+      const { res } = await call(path, "operation", {});
+      /* 404 is the assertion: the route does not exist. A 403 or a 422 would
+       * mean someone built the door and then guarded it. */
+      expect(res.status).toBe(404);
+    }
+  });
+});

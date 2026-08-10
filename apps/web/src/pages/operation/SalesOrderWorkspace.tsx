@@ -60,6 +60,7 @@ import {
   type SalesOrderSnapshot,
 } from "@/lib/queries";
 import CorrectionWorkList from "./CorrectionWorkList";
+import SalesOrderAmendment from "./SalesOrderAmendment";
 import SalesOrderAttribution from "./SalesOrderAttribution";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { describeRevisionChanges } from "./sales-order-revisions";
@@ -986,6 +987,23 @@ export default function SalesOrderWorkspace() {
                       ))}
                     </tbody>
                   </table>
+                )}
+
+                {/* 3.5 · the amendment lane lives WITH the items, because
+                    items are the contractual thing it proposes to change. It
+                    locks nothing beside it — a phone fix stays free while a
+                    proposal waits (`LOCK THE CONSEQUENCE`). */}
+                {!isNew && mode === "view" && orderId && (
+                  <div className="mt-3 border-t border-kit-slate-5 pt-3">
+                    <SalesOrderAmendment
+                      orderId={orderId}
+                      currentLines={(detailQ.data?.lines ?? []).map((l) => ({
+                        sku: l.sku,
+                        qty: l.qty,
+                        unit_price: Number(l.unit_price),
+                      }))}
+                    />
+                  </div>
                 )}
               </Section>
 
