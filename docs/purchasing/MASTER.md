@@ -338,6 +338,10 @@ explain an empty scope. The unscoped response keeps its ordinary 14-day Ordered 
 `POST /api/operation/purchase/to-order/issue` is unchanged. The scoped browser still posts
 only the document arrangement; the server recomputes the full plan and applies the same
 validation and atomic `operation_create_pos_batch` write.
+
+The browser route is `/operation/to-order?so={SO number}`. It mounts the same
+`OperationToOrder` component as the existing `/operation?tab=purchase` entrance; the latter
+remains the normal Purchasing-tab route.
 `GET /operation/purchase/to-order` · `GET …/demand/pick-items` · `POST …/demand` ·
 `POST …/demand/:id/cancel` · `POST …/issue` · `POST …/take-stock`
 Tables: `purchase_demands` (**2 rows**) — one row per SKU; `issued_qty` is writable only

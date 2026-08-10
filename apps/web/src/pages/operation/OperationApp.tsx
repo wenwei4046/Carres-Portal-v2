@@ -135,6 +135,7 @@ export default function OperationApp() {
   const isProcurementUrl = location.pathname.startsWith(
     "/operation/procurement",
   );
+  const isToOrderUrl = location.pathname === "/operation/to-order";
   const isOrdersUrl = location.pathname.startsWith("/operation/orders");
   // Stage A: only the REFERENCE DESTINATION gives scroll ownership to its
   // grid. The Sales Order Workspace keeps its existing page-owned layout.
@@ -144,7 +145,7 @@ export default function OperationApp() {
   // sub-path: `startsWith` would then light BOTH sidebar items at once, and a
   // door that shares the new register's prefix reads as part of it.
   const isOldOrdersUrl = location.pathname.startsWith("/operation/old-orders");
-  const isUrlDriven = isProcurementUrl || isOrdersUrl || isOldOrdersUrl;
+  const isUrlDriven = isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
   // Sidebar collapse moved into PortalSidebar (Unified Internal Portal,
@@ -175,12 +176,12 @@ export default function OperationApp() {
   // (`?section=promo`) survives the hop to the Admin door.
   const catalogSection = searchParams.get(CATALOG_TAB_PARAM);
   useEffect(() => {
-    if (!urlTab || isProcurementUrl || isOrdersUrl || isOldOrdersUrl) return;
+    if (!urlTab || isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl) return;
     setMovementsPrefill((p) => (urlTab === "movements" ? p : undefined));
     setWarehousePrefill((p) => (urlTab === "warehouse" ? p : undefined));
     setTab(urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlTab, isProcurementUrl, isOrdersUrl, isOldOrdersUrl]);
+  }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl]);
 
   // When the URL leaves a URL-driven section (e.g. user navigated via Back
   // to `/operation`), make sure the local tab state has a sensible value so
@@ -277,6 +278,7 @@ export default function OperationApp() {
         {!isOrdersUrl &&
           !isOldOrdersUrl &&
           !isProcurementUrl &&
+          !isToOrderUrl &&
           tab !== "purchase" &&
           tab !== "receiving" &&
           tab !== "claims" &&
@@ -314,6 +316,10 @@ export default function OperationApp() {
           // fail to match here even though the URL string is identical — the
           // result is the main area renders nothing while the URL stays put.
           <Routes>
+            {/* Card 1 — the Sales Order entrance is an alias onto the SAME
+                Batch Purchase component. Query params (`?so=` plus its rail
+                filters) remain component-owned; no second mode or engine. */}
+            <Route path="to-order" element={<OperationToOrder />} />
             <Route path="procurement" element={<OperationPurchaseOrders />} />
             <Route
               path="procurement/:slug"

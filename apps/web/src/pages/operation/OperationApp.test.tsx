@@ -54,6 +54,9 @@ vi.mock("./OperationPurchaseOrders", () => ({
     <div data-testid="purchase-orders-workspace-stub">po-workspace</div>
   ),
 }));
+vi.mock("./OperationToOrder", () => ({
+  default: () => <div data-testid="to-order-stub">to-order</div>,
+}));
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
@@ -98,6 +101,13 @@ function renderApp(initialPath: string) {
 }
 
 describe("OperationApp — procurement descendant routing", () => {
+  it("URL /operation/to-order?so=1204 mounts the same Batch Purchase page", () => {
+    renderApp("/operation/to-order?so=1204");
+    expect(screen.getByTestId("to-order-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
   it("URL /operation/procurement mounts the Purchase Execution Workspace via descendant Routes", () => {
     renderApp("/operation/procurement");
     expect(
