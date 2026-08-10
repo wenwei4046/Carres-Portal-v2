@@ -63,7 +63,7 @@ describe("deliveryOrderIssueGate — when the document may exist", () => {
       gate: { ...OK_GATE, balanceReady: false, holding: 2455 },
     });
     expect(r.ok).toBe(false);
-    expect(r.reasons[0]).toContain("RM 2455.00");
+    expect(r.reasons[0]).toContain("RM 2,455.00");
   });
 
   it("names an uncollected STORAGE fee as storage, not as a balance (C9)", () => {
@@ -78,7 +78,7 @@ describe("deliveryOrderIssueGate — when the document may exist", () => {
     const r = run({
       gate: { ...OK_GATE, balanceReady: false, holding: 2605, storageOwing: 150 },
     });
-    expect(r.reasons[0]).toContain("RM 2455.00 outstanding");
+    expect(r.reasons[0]).toContain("RM 2,455.00 outstanding");
     expect(r.reasons[0]).toContain("RM 150.00 of storage fee");
   });
 

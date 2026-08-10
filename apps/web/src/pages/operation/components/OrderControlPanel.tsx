@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ChevronDown,
@@ -226,7 +226,31 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
   }, [data]);
 
   const [draft, setDraft] = useState<Draft>(EMPTY);
-  useEffect(() => setDraft(loaded), [loaded]);
+  // The server row the draft was last synced FROM.
+  //
+  // Every instant save in the drawer — quickSave, the silent chaseStamp behind
+  // a WhatsApp Remind/Call, booking confirm, the storage actions — invalidates
+  // THIS query, and `updated_at` is in CONTROL_COLUMNS, so the refetched body
+  // is never deep-equal and `loaded` always gets a new reference. An
+  // unconditional `setDraft(loaded)` therefore threw away the WHOLE unsaved
+  // draft — warehouse remark, keyed total, per-line ETAs and stock statuses —
+  // and `dirty` went false with it, so the Save bar vanished and the operator
+  // was never told. Resync field by field instead: a field touched since the
+  // last sync keeps the operator's value, every other field takes the server's.
+  const syncedRef = useRef<Draft>(EMPTY);
+  useEffect(() => {
+    const base = syncedRef.current;
+    syncedRef.current = loaded;
+    setDraft((d) => {
+      const merged = { ...loaded };
+      for (const k of Object.keys(loaded) as (keyof Draft)[]) {
+        if (JSON.stringify(d[k]) !== JSON.stringify(base[k])) {
+          (merged as Record<string, unknown>)[k] = d[k];
+        }
+      }
+      return merged;
+    });
+  }, [loaded]);
 
   const dirty = useMemo(
     () => JSON.stringify(draft) !== JSON.stringify(loaded),

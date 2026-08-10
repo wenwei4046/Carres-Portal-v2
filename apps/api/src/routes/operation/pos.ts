@@ -1114,8 +1114,21 @@ operationPosRouter.post("/", requireOperation, async (c) => {
       .update({ eta_date: parsed.data.etaDate })
       .eq("id", poId);
     if (etaErr) {
+      // THE PURCHASE ORDER ALREADY EXISTS. `operation_create_po` is not
+      // idempotent — it mints `PO-<max+1>` (0079:99-113) — and CreatePOModal
+      // catches, toasts and leaves the modal open with the draft intact, so an
+      // operator who reads a bare failure presses Issue again and gets a second
+      // PO for the same goods. Same shape as to-order.ts's `issued: ids`, plus
+      // the id in `message`, because the toast renders only that field.
       const m = mapPgError(etaErr);
-      return c.json(m.body, m.status);
+      return c.json(
+        {
+          ...(m.body as object),
+          po: data,
+          message: `${poId} was created — its expected arrival could not be saved. Set the arrival date on the PO; do NOT issue it again.`,
+        },
+        m.status,
+      );
     }
   }
   return c.json({ po: data });

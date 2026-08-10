@@ -4367,6 +4367,13 @@ function DrawerBody({
                           The server enforces the gates; hints here assist. */}
                       {!deliveredDone && (
                         <BookingBlock
+                          // S4 keeps the DRAWER mounted across ‹prev/next› so
+                          // the tab carries — deliberate, see :1988. The
+                          // booking panel must NOT carry: its date, slot and
+                          // trip split are one order's answer, and Confirm
+                          // posts them to whichever orderId is current. Keyed
+                          // here and not on the drawer, so S4 survives.
+                          key={order.id}
                           orderId={order.id}
                           control={form.control}
                           doNumber={order.do_number ?? null}
