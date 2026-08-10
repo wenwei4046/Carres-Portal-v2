@@ -42,3 +42,32 @@ export const SALES_ORDER_WRITABLE_COLUMNS: Readonly<Record<string, readonly stri
   ],
   order_addons: ["id", "order_id", "addon_key", "qty", "unit_price", "attrs"],
 };
+
+/**
+ * 3.3/3.5 · `order_change_requests` — the amendment-request table's columns.
+ *
+ * Captured from the LIVE Carres Supabase on 2026-08-10 with the same query as
+ * above. Separate from `SALES_ORDER_WRITABLE_COLUMNS` on purpose: that list
+ * feeds GATE 1's exhaustiveness test, which demands every column it names be
+ * classified A / B / EXECUTION. These columns are the REQUEST's own plumbing,
+ * not fields of the sales order, so classifying them would be a category error.
+ *
+ * What this list is for: `sales-order-request-columns.test.ts` checks that the
+ * Stage 3 functions only read columns that exist. It was written after
+ * `sales_order_attribution_live` shipped reading `created_at` — a column this
+ * table has never had — and 500'd on every real order while its API test,
+ * which mocks the RPC, stayed green.
+ */
+export const ORDER_CHANGE_REQUEST_COLUMNS: readonly string[] = [
+  "id",
+  "order_id",
+  "kind",
+  "payload",
+  "status",
+  "requested_by",
+  "requested_at",
+  "decided_by",
+  "decided_at",
+  "decision_note",
+  "applied_at",
+];

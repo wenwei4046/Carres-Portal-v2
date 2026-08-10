@@ -445,6 +445,22 @@ Cards 3.0–3.2 have no UI. For them the evidence is **pasted SQL / test output*
 not screenshots. From 3.3 onward the normal law applies: running URL + 1440 and
 1130 screenshots. A card without its evidence form is NOT done.
 
+**EVERY DEFINER FUNCTION A CARD ADDS OWES ONE LIVE CALL — per FUNCTION, not per
+verb** (added 2026-08-10, after 3.3 shipped a read that 500'd on every order).
+`sales_order_attribution_live` ordered by `order_change_requests.created_at`, a
+column that table has never had. plpgsql only parses a body at creation, so an
+unknown column surfaces at RUN time; the API test mocked `rpc`, so it proved
+which function the door calls and could not execute a line of it; and the card's
+live evidence exercised SUBMIT / APPROVE / APPLY and never called the READ.
+Three green signals, one broken endpoint.
+
+```
+a card adds N definer functions  →  N live calls in the evidence, minimum
+a function with states           →  one call per state it can answer
+```
+A door test that mocks the RPC is still worth writing — it holds the roles, the
+payload shape and the error mapping. It is not evidence that the function runs.
+
 ---
 
 ## ☑ 3.0 · PRE-FLIGHT — three blockers, no feature

@@ -72,10 +72,13 @@ SO-1308 Rev 1 仍重放自己的快照     → qty 1 · 无承诺日
 approve → apply),不是直接 UPDATE —— 直接改就正是 0329 关掉的那扇侧门。Rev 10 是
 它的记录。
 
-取证途中撞到一件真事:**Rev 9 是别人在 05:58 改的**(`operation@carres.com`,把电话
-改成 `012-0000123`)。共享生产库上有人在同时工作,所以那个电话我没有碰。顺带这成了
-GATE 5「显式列白名单」的一次现实旁证 —— 我的 APPLY 在他改完之后跑,只写了
-salesperson,他的电话原封不动。
+取证途中 Rev 9 的归属,**上一版报告写错了,这里更正**:Rev 9 是**架构师那个 session**
+在 13:58 MYT(= 05:58 UTC)跑 SAVE 冒烟测试时写的,用的是 owner 已登录的
+`operation@carres.com` Chrome session。是**另一个 SESSION,不是另一个人**。
+
+结论本身不变,而且值得留着:我的 APPLY 在那次写入之后跑,只写了 salesperson,
+那通电话号码原封不动 —— GATE 5「显式列白名单、绝不 payload spread」被一次真实的
+并发写入验证过,不只是被我的测试验证过。
 
 **② 1440 / 1130 截图已交**,存在 `docs/evidence/stage3/`。
 用一个 **dev-only 的独立 vite entry**(`apps/web/stage3-preview.html`)渲染真组件、
@@ -93,8 +96,50 @@ docs/evidence/stage3/stage3-surfaces-1130.png
 **它证明的是界面长什么样;它不证明连线** —— 连线是直接对生产库证的(每个动词、
 每道地板、每次拒绝),比截图更硬。
 
-## ⚠ 还没做、也不该由我做的一件事
+## FIX-LIST 第二轮(架构师,2026-08-10)— 三条
 
-`SO-1312 / SO-1313 / SO-1314` 和那条 July 2026 commission run 是 3.2 建的 fixture,
-按计划「Stage 3 全部验收后清掉」。**我没有删。** Constitution 红线 1:未经 owner 在
-当前对话里明确确认,不做 DELETE。要清的时候说一声。
+**① dev server 指向生产 —— 已在仓库层面堵死。** 实测:这台机器上 **19 个 worktree
+有 18 个** 的 `.env.local` 把 `vite dev` 指向 `carres-portal-v2-api.wwch.workers.dev`。
+`.env.local` 是 gitignored 的,所以仓库里任何东西都看不见它 —— 改文件也没用,下一次
+`git worktree add` 又会重来。守卫写进了浏览器真正跑的代码:
+
+```
+DEV build + 不是本机的 base  →  app 拒绝启动,ApiBaseMisconfigured
+刻意要连远端                  →  VITE_ALLOW_REMOTE_API=1 pnpm --filter @carres/web dev
+```
+`apps/web/src/lib/api-base.ts`,7 条测试。**在真浏览器上双向验证过**:指生产时 root
+是空的、控制台抛出点名了文件的错误;指本机时正常渲染。生产构建不受影响
+(`.env.production` 本来就该指 Worker)。
+
+**② `GET /:id/attribution` 500 —— 已修(0335),并补了机械守卫。**
+`sales_order_attribution_live` 排序用了 `order_change_requests.created_at`,
+**那张表从来没有这个列**(真名是 `requested_at`)。plpgsql 只在创建时解析函数体,
+未知列要到运行时才炸;而 API 测试 mock 掉了 `rpc`,所以它证明了「门调用了哪个函数」
+却一行函数体都没执行过;3.3 的实证跑了 SUBMIT/APPROVE/APPLY,唯独没跑这个 READ。
+三个绿灯,一个坏接口。
+
+修完之后**真的调了**:无请求 / 从没有过请求 / pending(名字解析正确、approver 路线
+正确)/ approved。守卫在 `packages/shared/src/sales-order-request-columns.test.ts`,
+只检查**当前生效的那份定义**(0330 已被 0335 取代,而已提交的 migration 不能改)。
+它覆盖两种写法 —— `v_req.<列>` 和裸列;**第一版只抓到前者,把 bug 放回去时没咬,
+所以补了后者**,现在重放真 bug 会失败并点名 `created_at`。
+
+**③ SO-1206 的两条 correction work —— 已关**,note 一律
+`STAGE-3 EVIDENCE — not real work`。库里现在没有任何 open 的 correction work。
+
+## ⚠ 三件需要你一句话的事
+
+1. **`SO-1312 / SO-1313 / SO-1314` + July 2026 commission run 仍在。** item 1 已修,
+   但清理需要你在对话里明说(红线 1)。
+2. **SO-1206 最早那条 closed 的 note 是我取证时写的**,内容是
+   「PO-2036 checked — the extra pillow is covered by the existing quantity」——
+   它**读起来像一个真实的采购决定**。建议连同 fixture 一起改掉或清掉。
+3. **SO-1307 上有一条 approved、未 apply 的 attribution request**(id
+   `c42b07f6`),是 item 2 为了跑通 READ 而建的。它会让 SO-1307 的文档页出现一颗
+   「Apply the change」。我没有删(红线 1)。
+
+## ⚠ GATE 3 的 HR 半边,在这个库上无法端到端验证
+
+`select * from app_users where role='hr'` → **零行**。0330 就是为了让 HR 能读到
+request 才写的,但库里没有任何 HR 账号,所以那半条 lane 只在代码和门测试里成立,
+没有真人跑过。我不会去建账号。

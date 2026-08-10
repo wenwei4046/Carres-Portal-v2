@@ -1,8 +1,9 @@
 import { STAFF_SESSION_REQUIRED, STAFF_TOKEN_HEADER } from "@carres/shared";
 import { useAuth } from "./auth";
 import { useStaffSession } from "./staff";
+import { resolveApiBase } from "./api-base";
 
-const baseUrl = import.meta.env.VITE_API_BASE_URL;
+const baseUrl = resolveApiBase(import.meta.env);
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public body: unknown) {
