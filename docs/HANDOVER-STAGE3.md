@@ -66,15 +66,35 @@ register search 仍走 server        → Stage 1 回归测试
 SO-1308 Rev 1 仍重放自己的快照     → qty 1 · 无承诺日
 ```
 
-## 唯一没交的东西:1440 / 1130 截图
+## FIX-LIST — 两条都已收(2026-08-10)
 
-代码全部跑通并在生产库上取了证,但**登录要输密码,这一步不是我能代做的动作**。
-Owner 在浏览器里登录一次之后,截图即可补上。页面在:
+**① SO-1308 的 salesperson 已还原成 `ahsihas`,走的是完整 lane**(submit →
+approve → apply),不是直接 UPDATE —— 直接改就正是 0329 关掉的那扇侧门。Rev 10 是
+它的记录。
+
+取证途中撞到一件真事:**Rev 9 是别人在 05:58 改的**(`operation@carres.com`,把电话
+改成 `012-0000123`)。共享生产库上有人在同时工作,所以那个电话我没有碰。顺带这成了
+GATE 5「显式列白名单」的一次现实旁证 —— 我的 APPLY 在他改完之后跑,只写了
+salesperson,他的电话原封不动。
+
+**② 1440 / 1130 截图已交**,存在 `docs/evidence/stage3/`。
+用一个 **dev-only 的独立 vite entry**(`apps/web/stage3-preview.html`)渲染真组件、
+真样式表,数据用 seeded cache 而不是 fetch —— 因为登录要输密码,那一步不是我做的
+动作。`vite build` 只产出 `index.html` 的依赖图,已实测:生产 bundle 里没有它。
 
 ```
-http://localhost:5191/operation/orders     (stage3-web · API 8891)
+docs/evidence/stage3/stage3-surfaces-1440.png
+docs/evidence/stage3/stage3-surfaces-1130.png
 ```
+六块面板:① 没有请求在等 · ② 等批准(有 Approve/Reject,没有 Apply)· ③ 已批准未
+应用(有 Apply,没有 Approve)· ④ amendment 在等 / 已失效 · ⑤ Purchasing 侧的活
+(唯一有关闭按钮的界面)· ⑥ Sales Order 侧的同一批活(只读,并写明谁来关)。
 
-要看的三处:Sales Order 文档页的 Source 区(who this order belongs to)、Items 区
-下方(propose a change)、Purchase Orders 页顶部(Sales order changes to check —
-只在有活时出现)。
+**它证明的是界面长什么样;它不证明连线** —— 连线是直接对生产库证的(每个动词、
+每道地板、每次拒绝),比截图更硬。
+
+## ⚠ 还没做、也不该由我做的一件事
+
+`SO-1312 / SO-1313 / SO-1314` 和那条 July 2026 commission run 是 3.2 建的 fixture,
+按计划「Stage 3 全部验收后清掉」。**我没有删。** Constitution 红线 1:未经 owner 在
+当前对话里明确确认,不做 DELETE。要清的时候说一声。
