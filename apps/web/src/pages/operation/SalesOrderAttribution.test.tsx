@@ -25,6 +25,7 @@ import SalesOrderAttribution from "./SalesOrderAttribution";
 const submitMutate = vi.fn();
 const decideMutate = vi.fn();
 const applyMutate = vi.fn();
+const withdrawMutate = vi.fn();
 
 let liveRequest: AttributionRequest | null = null;
 
@@ -36,6 +37,7 @@ vi.mock("@/lib/queries", async () => {
     useSubmitAttributionChange: () => ({ mutate: submitMutate, isPending: false }),
     useDecideAttributionChange: () => ({ mutate: decideMutate, isPending: false }),
     useApplyAttributionChange: () => ({ mutate: applyMutate, isPending: false }),
+    useWithdrawAttributionChange: () => ({ mutate: withdrawMutate, isPending: false }),
   };
 });
 
@@ -77,6 +79,7 @@ beforeEach(() => {
   submitMutate.mockReset();
   decideMutate.mockReset();
   applyMutate.mockReset();
+  withdrawMutate.mockReset();
 });
 
 describe("no live request — one way in, and it is a request", () => {
@@ -174,5 +177,57 @@ describe("an approved request — apply, and the approval cannot be repeated", (
     liveRequest = { ...pending, approver: "principal", dealer: { from: "Carres House", to: "BedHouse KL" } };
     draw();
     expect(screen.getByText(/The principal approves this/)).toBeTruthy();
+  });
+});
+
+describe("WITHDRAW — the way back out of an approval", () => {
+  beforeEach(() => {
+    liveRequest = { ...pending, status: "approved", decided_at: "2026-08-10T03:05:00.000Z" };
+  });
+
+  it("is offered only once the request is APPROVED", () => {
+    draw();
+    expect(screen.getByTestId("attribution-withdraw")).toBeTruthy();
+  });
+
+  it("is NOT offered while it is still pending — there is a reject for that", () => {
+    liveRequest = pending;
+    draw();
+    expect(screen.queryByTestId("attribution-withdraw")).toBeNull();
+  });
+
+  it("will not send without a reason — the same rule as SUBMIT", () => {
+    draw();
+    fireEvent.click(screen.getByTestId("attribution-withdraw"));
+    const confirm = screen.getByTestId("attribution-withdraw-confirm") as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+
+    fireEvent.change(screen.getByTestId("attribution-withdraw-reason"), {
+      target: { value: "approved by mistake" },
+    });
+    expect((screen.getByTestId("attribution-withdraw-confirm") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+
+  it("calls ONLY the withdraw mutation, carrying the reason", () => {
+    draw();
+    fireEvent.click(screen.getByTestId("attribution-withdraw"));
+    fireEvent.change(screen.getByTestId("attribution-withdraw-reason"), {
+      target: { value: "approved by mistake" },
+    });
+    fireEvent.click(screen.getByTestId("attribution-withdraw-confirm"));
+    expect(withdrawMutate).toHaveBeenCalledWith({
+      requestId: "req-1",
+      reason: "approved by mistake",
+    });
+    /* Taking an approval back must never be able to perform it. */
+    expect(applyMutate).not.toHaveBeenCalled();
+    expect(decideMutate).not.toHaveBeenCalled();
+  });
+
+  it("leaves Apply standing — withdrawing is a choice beside it, not instead of it", () => {
+    draw();
+    expect(screen.getByTestId("attribution-apply")).toBeTruthy();
   });
 });

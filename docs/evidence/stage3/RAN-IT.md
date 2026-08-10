@@ -95,3 +95,67 @@ test arrived in the SAME commit (53bf3b85), so it had never passed here; it can
 only pass on a Node whose ICU data drops the separator. Now asserted THROUGH
 fmtMoney, so it cannot drift from the money law or from the runtime's ICU.
 ```
+
+
+---
+
+# CARD · WITHDRAW — I RAN IT
+
+`sales_order_withdraw_attribution` (0336). Every branch called for real; the
+success path driven from the page, not from curl.
+
+## THE FUNCTION — every branch, against the live database
+
+```
+no reason (spaces)          22023 reason_required      "A reason is required"
+as `operation`              42501 approver_hr_or_principal
+                            "Salesperson/showroom attribution is approved by HR
+                             or the principal"
+an APPLIED request          22023 already_applied
+                            "This change was already applied - it is history
+                             now, not a decision to take back"
+approved + principal        {"id":"c42b07f6…","status":"cancelled"}   ← from the PAGE
+withdrawn, then apply       22023 not_approved  "Only an approved request can be applied"
+withdrawn, then withdraw    22023 not_approved  "Only an approved request can be withdrawn"
+```
+
+## THE DOOR — real HTTP, real auth
+
+```
+POST /attribution/:id/withdraw   reason "  "        422  "A reason is required"   (db never asked)
+POST /attribution/:id/withdraw   as operation       403  approver_hr_or_principal
+POST /attribution/:id/revoke                        404  the second verb does not exist
+POST /attribution/:id/apply      after withdraw     422  not_approved
+POST /orders/:id/attribution     after withdraw     201  the lane is unblocked again
+```
+
+## THE SCREEN — SO-1307, 1440 and 1130, console read
+
+The live evidence the owner named: `c42b07f6`, approved and unappliable, was
+withdrawn **through the page**.
+
+1. the approved card showed `Apply the change` **and** `Take the approval back`
+2. clicked → an inline "Why is it being taken back?" appeared and the confirm
+   button was **disabled** with an empty reason (read off the DOM, not assumed)
+3. typed the reason → confirm enabled → toast **`Approval taken back`**
+4. the card is GONE. `Apply the change` is gone. SOURCE is back to its resting
+   sentence, salesperson still `ahsihas` — the order never moved.
+5. 1130: same, no layout break. Clean load console: **zero errors**.
+
+## WHAT THE DATABASE SAYS AFTERWARDS
+
+```
+order_change_requests   status cancelled · decided_by = the withdrawer ·
+                        decision_note = the reason · applied_at still NULL
+order_history           requested → approved → withdrawn, three lines.
+                        THE APPROVAL IS NOT ERASED — the row says what is true
+                        now, the ledger says what happened.
+SO-1307                 1 revision, salesperson ahsihas. Untouched throughout.
+```
+
+## THE BOUNDARY THIS CARD DECIDED, THEN EXERCISED
+
+WITHDRAW takes `approved` only. A fresh PENDING request was submitted (W6) and
+cleared with 0233's pre-existing `cancel_order_change_request` — pending always
+had a way out. Had WITHDRAW claimed pending too it would have raised that exit
+to GATE 3's approvers, which is the one thing the ruling forbids.

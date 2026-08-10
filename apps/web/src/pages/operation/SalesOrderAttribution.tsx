@@ -39,6 +39,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import {
   useApplyAttributionChange,
   useDecideAttributionChange,
+  useWithdrawAttributionChange,
   useSalesOrderAttribution,
   useSubmitAttributionChange,
   type AttributionChanges,
@@ -92,6 +93,8 @@ export default function SalesOrderAttribution({
   const request = liveQ.data?.request ?? null;
 
   const [formOpen, setFormOpen] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawReason, setWithdrawReason] = useState("");
   const [salesperson, setSalesperson] = useState<string>("keep");
   const [outlet, setOutlet] = useState<string>("keep");
   const [dealer, setDealer] = useState<string>("keep");
@@ -114,6 +117,16 @@ export default function SalesOrderAttribution({
   });
   const decideMut = useDecideAttributionChange(orderId, {
     onSuccess: (r) => toast.success(r.status === "approved" ? "Approved" : "Rejected"),
+    onError: (e) => toast.error(e.message),
+  });
+  const withdrawMut = useWithdrawAttributionChange(orderId, {
+    onSuccess: () => {
+      toast.success("Approval taken back");
+      setWithdrawing(false);
+      setWithdrawReason("");
+    },
+    /* A GATE 3 refusal arrives naming the approver lane, not as a login
+     * problem — the same sentence the approval itself would have shown. */
     onError: (e) => toast.error(e.message),
   });
   const applyMut = useApplyAttributionChange(orderId, {
@@ -192,15 +205,59 @@ export default function SalesOrderAttribution({
                 </Button>
               </>
             ) : (
-              <Button
-                size="sm"
-                variant="primary"
-                loading={applyMut.isPending}
-                onClick={() => applyMut.mutate({ requestId: request.id })}
-                data-testid="attribution-apply"
-              >
-                Apply the change
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  loading={applyMut.isPending}
+                  onClick={() => applyMut.mutate({ requestId: request.id })}
+                  data-testid="attribution-apply"
+                >
+                  Apply the change
+                </Button>
+                {/* The way back out. Before 0336 an approval could only be
+                    cleared by carrying it out — the one thing GATE 4 says an
+                    approval is not. */}
+                {withdrawing ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    <input
+                      aria-label="Why is it being taken back?"
+                      placeholder="Why is it being taken back?"
+                      value={withdrawReason}
+                      onChange={(e) => setWithdrawReason(e.target.value)}
+                      className="h-8 min-w-[18rem] rounded-control border border-base-200 px-2 text-body"
+                      data-testid="attribution-withdraw-reason"
+                    />
+                    <Button
+                      size="sm"
+                      variant="neutral"
+                      disabled={withdrawReason.trim().length === 0}
+                      loading={withdrawMut.isPending}
+                      onClick={() =>
+                        withdrawMut.mutate({
+                          requestId: request.id,
+                          reason: withdrawReason.trim(),
+                        })
+                      }
+                      data-testid="attribution-withdraw-confirm"
+                    >
+                      Take the approval back
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setWithdrawing(false)}>
+                      Cancel
+                    </Button>
+                  </span>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setWithdrawing(true)}
+                    data-testid="attribution-withdraw"
+                  >
+                    Take the approval back
+                  </Button>
+                )}
+              </>
             )}
           </div>
 

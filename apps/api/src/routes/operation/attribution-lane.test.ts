@@ -286,3 +286,62 @@ describe("STAGE 3 · 3.5 — the amendment spine, and the wall past it", () => {
     }
   });
 });
+
+describe("WITHDRAW — the door back out of approved", () => {
+  it("forwards to the withdraw RPC and nothing else, carrying the reason", async () => {
+    const { res, calls } = await call(`/attribution/${REQ_ID}/withdraw`, "principal", {
+      reason: "approved by mistake",
+    });
+    expect(res.status).toBe(200);
+    expect(calls.map((c) => c.name)).toEqual(["sales_order_withdraw_attribution"]);
+    expect(calls[0]!.args).toMatchObject({
+      p_request_id: REQ_ID,
+      p_reason: "approved by mistake",
+    });
+    /* It must not be able to perform the verb it undoes. */
+    expect(calls.map((c) => c.name)).not.toContain("sales_order_apply_attribution");
+  });
+
+  it("refuses an empty reason before the database is asked — SUBMIT's rule", async () => {
+    for (const body of [{}, { reason: "" }, { reason: "   " }]) {
+      const { res, calls } = await call(`/attribution/${REQ_ID}/withdraw`, "principal", body);
+      expect(res.status).toBe(422);
+      expect(calls).toHaveLength(0);
+    }
+  });
+
+  it("admits HR — the bar to take back is never higher than the bar to grant", async () => {
+    const { res, calls } = await call(`/attribution/${REQ_ID}/withdraw`, "hr", { reason: "x" });
+    expect(res.status).toBe(200);
+    expect(calls.map((c) => c.name)).toEqual(["sales_order_withdraw_attribution"]);
+  });
+
+  it("surfaces GATE 3's refusal as the RULE, naming the lane", async () => {
+    const { res } = await call(`/attribution/${REQ_ID}/withdraw`, "hr", { reason: "x" }, {
+      data: null,
+      error: {
+        code: "42501",
+        details: "approver_principal_only",
+        message: "Dealer/channel attribution is approved by the principal only",
+      },
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("approver_principal_only");
+    expect(body.message).toMatch(/principal only/);
+  });
+
+  it("is not open to a dealer or a supplier", async () => {
+    for (const role of ["dealer", "supplier"]) {
+      const { res } = await call(`/attribution/${REQ_ID}/withdraw`, role, { reason: "x" });
+      expect(res.status).toBe(403);
+    }
+  });
+
+  it("there is NO second verb for this transition — /revoke does not exist", async () => {
+    /* One state change, one verb name. A `revoke` door would be a fork the
+     * ruling forbids by name. */
+    const { res } = await call(`/attribution/${REQ_ID}/revoke`, "principal", { reason: "x" });
+    expect(res.status).toBe(404);
+  });
+});

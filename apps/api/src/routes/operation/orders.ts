@@ -859,6 +859,56 @@ operationOrdersRouter.post("/attribution/:requestId/apply", requireOperation, as
   return c.json(data);
 });
 
+/**
+ * WITHDRAW — the door back out of `approved` (0336).
+ *
+ * It sits on `requireAttributionLane`, not `requireOperation`, for the ruling's
+ * reason: whoever may approve may take back, and HR approves a salesperson
+ * move. The RPC re-checks GATE 3 with the same routing as the approval, so an
+ * admitted HR is still refused on a dealer change.
+ *
+ * A reason is REQUIRED here as well as in the RPC — refusing an empty one
+ * before the database is asked keeps the rule visible at the door, where the
+ * caller can read it.
+ */
+const attributionWithdrawInput = z.object({
+  reason: z.string().trim().min(1, "A reason is required").max(500),
+});
+
+operationOrdersRouter.post(
+  "/attribution/:requestId/withdraw",
+  requireAttributionLane,
+  async (c) => {
+    const raw = await c.req.json().catch(() => ({}));
+    const parsed = attributionWithdrawInput.safeParse(raw);
+    if (!parsed.success) {
+      return c.json(
+        { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+        422,
+      );
+    }
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const { data, error } = await sb.rpc("sales_order_withdraw_attribution", {
+      p_request_id: c.req.param("requestId"),
+      p_reason: parsed.data.reason,
+    });
+    if (error) {
+      /* A GATE 3 refusal is not a login problem — it reaches the screen as the
+       * rule, with the approver lane named, exactly as `decide` does. */
+      const e = error as { code?: string; details?: string; message?: string };
+      if (e.code === "42501") {
+        return c.json(
+          { error: "forbidden", code: e.details ?? "forbidden", message: e.message ?? "not permitted" },
+          403,
+        );
+      }
+      const m = mapPipelineV2Error(error);
+      return c.json(m.body, m.status);
+    }
+    return c.json(data);
+  },
+);
+
 // ─────────────────────────────────────────────────────────────
 // STAGE 3 · card 3.5 — THE AMENDMENT SPINE, and only the spine.
 //

@@ -4416,6 +4416,35 @@ export function useDecideAttributionChange(
 }
 
 /**
+ * WITHDRAW — the door back out of `approved` (0336).
+ *
+ * `'cancelled'` was legal since 0231 and unreachable from `approved`, so a
+ * wrong approval could only be cleared by carrying it out. One verb, a
+ * required reason, and the approver's own GATE 3 lane: the bar to take back is
+ * never higher than the bar to grant.
+ */
+export function useWithdrawAttributionChange(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<{ id: string; status: string }, ApiError, { requestId: string; reason: string }>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ id: string; status: string }, ApiError, { requestId: string; reason: string }>({
+    mutationFn: ({ requestId, reason }) =>
+      apiFetch<{ id: string; status: string }>(
+        `/api/operation/orders/attribution/${requestId}/withdraw`,
+        { method: "POST", body: JSON.stringify({ reason }) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: attributionKey(orderId) });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
  * APPLY — the only verb that moves the order. Re-runs every floor first, so it
  * can still refuse here even though APPROVE succeeded. A second call is a
  * no-op and says so (`already_applied`).
