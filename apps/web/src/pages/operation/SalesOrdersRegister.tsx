@@ -57,7 +57,7 @@ import { useAuth } from "@/lib/auth";
 import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 import { useOperationOrders } from "@/lib/queries";
-import SalesOrderTabs from "./SalesOrderTabs";
+import DestinationHeader from "./DestinationHeader";
 import { isDelivered, isRental, lineName, type MoneyState } from "./sales-order-facts";
 import {
   buildRegisterRow,
@@ -338,9 +338,7 @@ export default function SalesOrdersRegister() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* STAGE 2 MODULE SHELL — the shell draws the header; this page draws
-          none of its own. Module word `Sales Order`, tab `[Sales Orders]`. */}
-      <SalesOrderTabs />
+      <DestinationHeader />
 
       <div className="flex min-h-0 flex-1 flex-col" data-testid="register-column">
         {isError ? (
@@ -359,6 +357,7 @@ export default function SalesOrdersRegister() {
           </div>
         ) : (
           <DataGrid<RegisterRow>
+            appearance="reference"
             rows={rows}
             columns={columns}
             storageKey={storageKey}
@@ -387,19 +386,7 @@ export default function SalesOrdersRegister() {
               onToggle: toggleRow,
               onToggleAll: toggleAll,
             }}
-            toolbar={
-              <>
-                {/* STAGE 2 — the office birth door. Everyone who can open this
-                    page (operation / principal) may use it; normal orders are
-                    still born in the Sales Portal. */}
-                <button
-                  type="button"
-                  data-testid="new-sales-order"
-                  onClick={() => navigate("/operation/orders/so/new")}
-                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-control bg-base-900 px-3 text-meta font-semibold text-white hover:bg-base-700"
-                >
-                  <Plus size={14} strokeWidth={2.25} /> New Sales Order
-                </button>
+            toolbarStart={
                 <span className="w-36 shrink-0">
                 <Select
                   id="sales-orders-scope"
@@ -411,7 +398,19 @@ export default function SalesOrdersRegister() {
                   ]}
                 />
                 </span>
-              </>
+            }
+            toolbarEnd={
+              /* STAGE 2 — the office birth door. Everyone who can open this
+                 page (operation / principal) may use it; normal orders are
+                 still born in the Sales Portal. */
+              <button
+                type="button"
+                data-testid="new-sales-order"
+                onClick={() => navigate("/operation/orders/so/new")}
+                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-control bg-base-900 px-3 text-meta font-semibold text-white hover:bg-base-700"
+              >
+                <Plus size={14} strokeWidth={2.25} /> New Sales Order
+              </button>
             }
           />
         )}

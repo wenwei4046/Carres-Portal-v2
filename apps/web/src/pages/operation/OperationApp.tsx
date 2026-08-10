@@ -136,6 +136,10 @@ export default function OperationApp() {
     "/operation/procurement",
   );
   const isOrdersUrl = location.pathname.startsWith("/operation/orders");
+  // Stage A: only the REFERENCE DESTINATION gives scroll ownership to its
+  // grid. The Sales Order Workspace keeps its existing page-owned layout.
+  const isSalesOrdersRegisterUrl =
+    isOrdersUrl && !location.pathname.startsWith("/operation/orders/so/");
   // The cutover's temporary door. Deliberately NOT a `/operation/orders/…`
   // sub-path: `startsWith` would then light BOTH sidebar items at once, and a
   // door that shares the new register's prefix reads as part of it.
@@ -278,7 +282,12 @@ export default function OperationApp() {
           tab !== "claims" &&
           tab !== "purchasing-report" &&
           tab !== "purchasing-settings" && <GlobalTopBar />}
-        <div className="flex-1 min-h-0 overflow-auto">
+        <div
+          className={`flex-1 min-h-0 ${
+            isSalesOrdersRegisterUrl ? "overflow-hidden" : "overflow-auto"
+          }`}
+          data-testid={isSalesOrdersRegisterUrl ? "sales-orders-work-surface" : undefined}
+        >
         {isUrlDriven ? (
           // Nested route table for the URL-driven sections.
           //

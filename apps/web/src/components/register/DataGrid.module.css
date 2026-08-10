@@ -69,6 +69,41 @@
   flex: none;
 }
 
+/* Sales Orders Reference Implementation · Stage A. Geometry only: the
+   engine and every capability remain shared. This opt-in keeps the serious
+   register baseline off frozen callers and does not create a global 32px law. */
+.rootReference {
+  --fs-12: 11px;
+}
+.rootReference .toolbar {
+  box-sizing: border-box;
+  height: 45px;
+  min-height: 45px;
+  padding: 6px 12px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.rootReference .th {
+  box-sizing: border-box;
+  height: 31px;
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.rootReference .td {
+  box-sizing: border-box;
+  height: 33px;
+  padding: 0 8px;
+  font-size: 11px;
+  line-height: 16px;
+}
+.rootReference .statusLine {
+  box-sizing: border-box;
+  height: 22px;
+  min-height: 22px;
+  padding: 0 12px;
+}
+
 /* ── Toolbar ─────────────────────────────────────────────────────── */
 .toolbar {
   display: flex;
@@ -241,6 +276,30 @@
 }
 .columnsMenuItem:hover {
   background: var(--c-cream);
+}
+.filterLauncherItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--c-ink);
+  font-family: var(--font-sans);
+  font-size: var(--fs-12);
+  text-align: left;
+  cursor: pointer;
+}
+.filterLauncherItem:hover {
+  background: var(--c-cream);
+}
+.filterLauncherItem > span:last-child {
+  color: var(--c-burnt);
+  font-size: var(--fs-10);
+  font-weight: 600;
+  text-transform: uppercase;
 }
 .columnsMenuItem input[type="checkbox"] {
   width: 14px;

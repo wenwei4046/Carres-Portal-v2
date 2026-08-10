@@ -133,3 +133,37 @@ describe("FIX 1 · the register asks the SERVER", () => {
     });
   });
 });
+
+describe("Stage A · one destination identity and one governed work toolbar", () => {
+  it("renders one Sales Orders identity with no duplicate tab/title", () => {
+    mount();
+    expect(screen.getAllByText("Sales Orders")).toHaveLength(1);
+    expect(screen.getByTestId("sales-orders-destination-header")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Sales Orders" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Sales Order")).not.toBeInTheDocument();
+  });
+
+  it("renders exactly one work toolbar and one Search", () => {
+    mount();
+    expect(screen.getAllByTestId("work-toolbar")).toHaveLength(1);
+    expect(screen.getAllByRole("searchbox")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Filters" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Export Excel/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Columns/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New Sales Order" })).toBeInTheDocument();
+  });
+
+  it("keeps loading inside the work surface instead of adding an outer band", () => {
+    listHookState = {
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    mount();
+    expect(screen.getByTestId("sales-orders-grid")).toBeInTheDocument();
+    expect(screen.getByTestId("work-toolbar")).toBeInTheDocument();
+    expect(screen.getByTestId("grid-scroll")).toBeInTheDocument();
+  });
+});
