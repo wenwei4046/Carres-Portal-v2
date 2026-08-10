@@ -9,8 +9,8 @@
 ## TARGET — where every part of the old page ends up
 
 ```
-OLD ORDERS
-├─ Sales Order facts ─────→ Sales Order       ✅ Stage 1/2/3, built
+OLD ORDERS  (now "Old Orders (temporary)", /operation/old-orders)
+├─ Sales Order facts ─────→ Sales Order       ✅ Stage 1/2/3, built + CUT OVER
 ├─ Delivery work ─────────→ Delivery          ☐
 ├─ Payment work ──────────→ Payments          ☐
 ├─ Purchasing signals ────→ Purchasing        ☐
@@ -18,6 +18,10 @@ OLD ORDERS
                           ↓ 全部搬完
 OLD ORDERS  →  HIDE  →  DELETE
 ```
+
+**The cutover moved the FIRST box only.** Sales Order work now lives on the
+new register at `/operation/orders`; the old page kept everything else and
+moved to its own temporary door. The four remaining boxes have not started.
 
 **The AutoCount / archive box is the only one with no owner yet.** It also
 blocks the final DELETE: the old page is currently the ONLY import surface, so
@@ -85,7 +89,7 @@ gone, and its thinking would survive inside four new places.
 
 ---
 
-## ☐ CARD · SALES ORDER PRODUCTION CUTOVER — do this one, then STOP
+## ☑ CARD · SALES ORDER PRODUCTION CUTOVER — DONE. Now STOP.
 
 **Scope — exactly this, nothing else:**
 ```
@@ -106,14 +110,50 @@ gone, and its thinking would survive inside four new places.
 ✗ "improve" the old page while you are in there
 ```
 
-**ROLLBACK — required, and it must be EXERCISED, not described**
+### WHAT IS WIRED — the whole cutover, in code
+
 ```
-Name the exact rollback path (revert commit + redeploy, or the host's
-instant rollback to the previous deployment).
-Then DO IT ONCE on production and roll forward again.
-A rollback that has never been run is a guess, and the guard law applies:
-prove it bites before you trust it.
+/operation/orders[/:stage]      SalesOrdersRegister      "Sales Orders"
+/operation/old-orders[/:stage]  OperationOrdersControl   "Old Orders (temporary)"
 ```
+
+`OperationApp.tsx` declares both, and the Stage-1 swap-one-identifier alias
+(`const OrdersPage: typeof OperationOrdersControl = …`) is retired with it —
+two pages on two routes need no alias, and rollback is now the deployment
+rollback below, not an identifier edit.
+
+`portal-nav.ts` carries TWO Operations doors. The old one is labelled
+**`Old Orders (temporary)`** and wears `History`, deliberately not the
+register's `ClipboardList`: two doors in one icon read as one page. The old
+page's own nameplate says the identical words — **the only line this card
+changed inside the frozen file, and it is a LABEL, not a feature.**
+
+**The temporary door is `/operation/old-orders`, never `/operation/orders/old`.**
+`PortalSidebar` lights an item with `pathname.startsWith(item.path)`, so a
+sub-path of the register would light BOTH doors at once.
+
+**One live break was repaired on the way through.** `CaseOrderLink` sends
+Service Cases to `?order=<id>`; that param is read by the OLD table (it opens
+the order drawer) and by nothing else, so from Stage 1 until now the link
+landed on a register that silently ignored it. It now points at the temporary
+door and moves again when Service's own journey is migrated.
+
+### ROLLBACK — the exact path, and it was EXERCISED on production
+
+**There is no `wrangler pages rollback` command** (`wrangler pages deployment`
+offers `list · create · tail · delete` only, wrangler 4.120.0). So the path is
+the card's first option, and it is the one that was run:
+
+```
+1  git revert the cutover commit  (or check out the previous main tip)
+2  pnpm --filter @carres/web build
+3  wrangler pages deploy dist --project-name carres-portal --branch main
+   wrangler pages deploy dist --project-name carres-pos   --branch main
+4  poll all four canonical URLs until the bundle hash is the OLD one again
+```
+
+Roll forward = the same four steps from the cutover tip. Evidence for the real
+run is in §EVIDENCE below.
 
 **SMOKE TEST — on PRODUCTION, and the point is the OLD page**
 ```

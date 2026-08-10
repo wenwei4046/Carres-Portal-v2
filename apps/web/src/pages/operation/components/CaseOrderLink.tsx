@@ -48,7 +48,12 @@ export default function CaseOrderLink({
       onClick={(e) => {
         // The list row itself opens the case modal — this link must beat it.
         e.stopPropagation();
-        navigate(`/operation/orders?order=${encodeURIComponent(orderId)}`);
+        // ⭐ CUTOVER 2026-08-10 — `?order=` is read by the OLD control table
+        // (it opens the order drawer); the new register has no drawer and no
+        // such param, so from Stage 1 until now this link landed on a page
+        // that silently ignored it. It follows the drawer to the temporary
+        // door, and it moves again when Service's own journey is migrated.
+        navigate(`/operation/old-orders?order=${encodeURIComponent(orderId)}`);
       }}
       className={`inline-flex items-center gap-1 text-info hover:underline ${
         compact ? "text-meta" : "text-body"
