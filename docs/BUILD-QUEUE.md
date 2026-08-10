@@ -47,6 +47,78 @@ neither. **You may not build past 3.5.**
 fixtures. SO-1308 carries a real Rev 1/2/3 history chain. Nothing deletes them
 until Stage 3 is fully verified.
 
+## ⛔ DONE MEANS I RAN IT — the highest law on this card
+*Owner ruling, 2026-08-10. This outranks every other definition of "done"
+in this file. A card that is green and unrun is NOT done.*
+
+```
+GREEN CI IS THE FLOOR, NOT THE FINISH LINE.
+You do not hand work over. You run it, you break it, you fix what
+breaks, and THEN you hand it over.
+```
+
+**WHAT "I RAN IT" MEANS — per artefact, no exceptions**
+
+```
+A ROUTE       called against the real running server, real auth, real data.
+              Paste the status code and the body. Not a test — the route.
+
+A DB FUNCTION invoked for real, ONCE PER FUNCTION and once per branch
+              (each status · each role · each floor). plpgsql resolves
+              columns at RUN time, not at CREATE time — a function that was
+              never called was never checked, and `create function` succeeding
+              means nothing.
+
+A SCREEN      opened in a browser at 1440 AND 1130. Clicked through every
+              state the card names. Console read, not assumed.
+
+A GUARD       proven to BITE: put the exact bug back, in the exact SHAPE that
+              caused it, and watch the guard fail and NAME the thing. A guard
+              that passes on a broken tree is worse than no guard — it sells
+              confidence it has not earned.
+
+A MIGRATION   applied, then the thing it enables exercised end to end.
+```
+
+**WHAT DOES NOT COUNT AS RUNNING IT**
+
+```
+✗ tsc / vitest / lint green            — three green lights let a 500 ship
+✗ a test that MOCKS the thing under    — mocking `rpc` proves WHICH function
+  test                                    was called and executes zero lines
+                                          of it
+✗ a component test instead of an       — render tests cannot see a broken
+  opened page                             API base, a 500, or a frozen layout
+✗ "it should work" / "the code is      — the two sentences that precede
+  correct"                                every incident in this project
+✗ a screenshot promised for later      — a stage without its evidence is not
+                                          a stage
+```
+
+**WHEN RUNNING IT REVEALS A BUG — the part that matters most**
+
+```
+FIX IT IN THE SAME CARD. Do not report it. Do not defer it. Do not add it
+to a list for the owner to read. Finding it and leaving it is not honesty,
+it is handing the owner your job.
+
+Report ONLY what you could not fix, and say exactly why you could not.
+```
+
+**THIS LAW EXISTS BECAUSE OF WHAT ACTUALLY HAPPENED HERE**
+
+```
+· 3.3 shipped a 500. tsc green, vitest green, design-standard green — and the
+  function body had never executed once, because the test mocked `rpc`.
+· A schema guard matched `v_req.<col>` while the line that actually threw was
+  a bare `order by created_at`. The bug was put back and the guard did not
+  bite. A guard that only catches the shape it was written for is a lie.
+· 18 of 19 worktrees pointed `vite dev` at the PRODUCTION Worker. Every local
+  save wrote real business data. Nobody saw it because nobody opened the page.
+· A stage was reported complete with a URL and zero screenshots, on a dev
+  server that lived inside a sandbox the owner could never reach.
+```
+
 ## GOVERNANCE — DECIDE BY DEFAULT
 ```
 RUNNING CODE                     → law. A conflict escalates.
@@ -444,67 +516,6 @@ stage.
 Cards 3.0–3.2 have no UI. For them the evidence is **pasted SQL / test output**,
 not screenshots. From 3.3 onward the normal law applies: running URL + 1440 and
 1130 screenshots. A card without its evidence form is NOT done.
-
-## ⚖ STANDING LAW — two rules bought with defects, 2026-08-10
-
-These are not Stage 3 notes. They bind every card in every module.
-
-### LAW · N DEFINER FUNCTIONS = N REAL CALLS, COUNTED BY FUNCTION NOT BY VERB
-
-plpgsql parses a body when the function is created and resolves its COLUMNS at
-run time, so a migration can apply cleanly and still be broken on every call.
-`sales_order_attribution_live` shipped ordering by
-`order_change_requests.created_at` — a column that table has never had — and
-answered 500 on every real order.
-
-Three signals were green while it was broken:
-```
-the migration applied          plpgsql never resolved the column
-the API test passed            it mocks `rpc`; it proved which function the
-                               door calls and executed no line of it
-the card's live evidence       ran SUBMIT · APPROVE · APPLY — three VERBS —
-                               and never called the READ
-```
-```
-a card adds N definer functions  →  N live calls in its evidence, minimum
-a function with states           →  one call per state it can answer
-```
-A door test that mocks the RPC is still worth writing: it holds the roles, the
-payload shape and the error mapping. **It is not evidence that the function
-runs.**
-
-### LAW · A GUARD MUST BE MADE TO FAIL BEFORE IT IS BELIEVED
-
-The guard written to catch the bug above understood `v_req.<column>`. The
-statement that actually raised 42703 was `order by created_at desc` — a BARE
-column — so when the defect was put back, the guard passed. It was reported
-green, and it was worthless for the exact thing it existed to catch.
-
-```
-write the guard  →  RE-INTRODUCE THE DEFECT  →  watch it fail, and read the
-                                                message it prints
-                 →  restore  →  only now is it a guard
-```
-**A guard that has never failed is a guess.** It is worse than no guard,
-because it is believed. Every guard ships with the shape of the failure it
-catches asserted in its own tests — that is what turned the second draft from
-a false negative into a real one.
-
-**EVERY DEFINER FUNCTION A CARD ADDS OWES ONE LIVE CALL — per FUNCTION, not per
-verb** (added 2026-08-10, after 3.3 shipped a read that 500'd on every order).
-`sales_order_attribution_live` ordered by `order_change_requests.created_at`, a
-column that table has never had. plpgsql only parses a body at creation, so an
-unknown column surfaces at RUN time; the API test mocked `rpc`, so it proved
-which function the door calls and could not execute a line of it; and the card's
-live evidence exercised SUBMIT / APPROVE / APPLY and never called the READ.
-Three green signals, one broken endpoint.
-
-```
-a card adds N definer functions  →  N live calls in the evidence, minimum
-a function with states           →  one call per state it can answer
-```
-A door test that mocks the RPC is still worth writing — it holds the roles, the
-payload shape and the error mapping. It is not evidence that the function runs.
 
 ---
 
