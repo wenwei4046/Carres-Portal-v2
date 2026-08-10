@@ -124,6 +124,9 @@ export type InvoiceTemplateData = {
   tax_amount: number;
   total: number;
   currency: string;
+  /** Audit name for the footer's left cell (owner 2026-08-09) — who at
+   *  Carres issued this invoice. Falls back to the invoice number. */
+  issued_by?: string | null;
   /** 0261-0263 — guarantee packages bought on this order. Rendered as its own
    *  block under the totals so the customer's copy states, in writing, exactly
    *  which item is covered and until when. Absent / empty = no block. */
