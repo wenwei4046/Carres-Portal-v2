@@ -18,6 +18,7 @@ import {
   type operationOrderListRow,
 } from "@/lib/queries";
 import { useActiveOrder } from "@/lib/active-order";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { orderStatusPill } from "@/lib/status-pill";
 import { cjkClassName } from "@/lib/cjk";
@@ -1684,8 +1685,15 @@ export default function OperationOrdersControl({ onImport }: Props) {
     [pendingCRQ.data],
   );
 
+  // The search value the SERVER sees. `search` itself stays raw so the box and
+  // its chip react to every keystroke; only the query key waits, because the
+  // filter object is part of that key and a fresh key is a fresh request —
+  // typing "SO-1146" was eight round trips against the orders table.
+  // Same hook, same reason, as OperationGuarantees.
+  const debouncedSearch = useDebouncedValue(search, 250);
+
   const { data, isLoading, isError, error, refetch } = useOperationOrders({
-    search: search.trim() || undefined,
+    search: debouncedSearch.trim() || undefined,
   });
   const partnersQ = useDeliveryPartners();
   // Catalog + suppliers → the SUPPLIER facet. skuMeta mirrors ChaseSupplierReview:
@@ -1906,7 +1914,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
       tab === "all"
         ? orders
         : orders.filter((o) => controlTabOf(o, availableBySku) === tab),
-    [orders, tab],
+    // `availableBySku` belongs here for the same reason it is in `counts` two
+    // memos above: `controlTabOf` READS it to split To book / Customer
+    // confirmed, and it arrives from useOperationStock AFTER the first paint.
+    // Without it the badges recomputed when stock landed and the rows under
+    // them did not — the count and the list disagreed until a refetch.
+    [orders, tab, availableBySku],
   );
   // LIVE scope (B rebuild, Jess 2026-07-18): every facet count runs over OPEN
   // orders only — the 104 delivered stopped inflating Ready/NETS/KV etc.
