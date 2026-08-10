@@ -445,6 +445,51 @@ Cards 3.0–3.2 have no UI. For them the evidence is **pasted SQL / test output*
 not screenshots. From 3.3 onward the normal law applies: running URL + 1440 and
 1130 screenshots. A card without its evidence form is NOT done.
 
+## ⚖ STANDING LAW — two rules bought with defects, 2026-08-10
+
+These are not Stage 3 notes. They bind every card in every module.
+
+### LAW · N DEFINER FUNCTIONS = N REAL CALLS, COUNTED BY FUNCTION NOT BY VERB
+
+plpgsql parses a body when the function is created and resolves its COLUMNS at
+run time, so a migration can apply cleanly and still be broken on every call.
+`sales_order_attribution_live` shipped ordering by
+`order_change_requests.created_at` — a column that table has never had — and
+answered 500 on every real order.
+
+Three signals were green while it was broken:
+```
+the migration applied          plpgsql never resolved the column
+the API test passed            it mocks `rpc`; it proved which function the
+                               door calls and executed no line of it
+the card's live evidence       ran SUBMIT · APPROVE · APPLY — three VERBS —
+                               and never called the READ
+```
+```
+a card adds N definer functions  →  N live calls in its evidence, minimum
+a function with states           →  one call per state it can answer
+```
+A door test that mocks the RPC is still worth writing: it holds the roles, the
+payload shape and the error mapping. **It is not evidence that the function
+runs.**
+
+### LAW · A GUARD MUST BE MADE TO FAIL BEFORE IT IS BELIEVED
+
+The guard written to catch the bug above understood `v_req.<column>`. The
+statement that actually raised 42703 was `order by created_at desc` — a BARE
+column — so when the defect was put back, the guard passed. It was reported
+green, and it was worthless for the exact thing it existed to catch.
+
+```
+write the guard  →  RE-INTRODUCE THE DEFECT  →  watch it fail, and read the
+                                                message it prints
+                 →  restore  →  only now is it a guard
+```
+**A guard that has never failed is a guess.** It is worse than no guard,
+because it is believed. Every guard ships with the shape of the failure it
+catches asserted in its own tests — that is what turned the second draft from
+a false negative into a real one.
+
 **EVERY DEFINER FUNCTION A CARD ADDS OWES ONE LIVE CALL — per FUNCTION, not per
 verb** (added 2026-08-10, after 3.3 shipped a read that 500'd on every order).
 `sales_order_attribution_live` ordered by `order_change_requests.created_at`, a
@@ -994,6 +1039,40 @@ RECORD ONLY
   USING doubles as WITH CHECK (PostgreSQL docs, verbatim). Internal-role exposure
   is handled by GATE 3's server-side RPC.
 ```
+
+## 🔴 GATE 4 GAP — AN APPROVED REQUEST HAS NO WITHDRAWAL PATH (found 2026-08-10)
+
+GATES.md GATE 4: *"Approval is permission to try. Acceptance is the customer's
+agreement to a specific document. **Neither is a completed fact.**"*
+
+The database does not agree. Every function that writes
+`order_change_requests.status` gates on `pending` — PROVEN BY ATTEMPT on the
+live database, not by reading:
+
+```
+cancel_order_change_request       'Only a pending change can be cancelled'
+reject_order_change_request       'Only a pending change can be rejected'
+sales_order_decide_attribution    'This request was already decided'
+sales_order_apply_attribution     requires 'approved'   ← the only exit
+```
+
+`'cancelled'` IS an allowed status value. Nothing can reach it from `approved`.
+
+**So an approved request has exactly two futures: it is applied, or it sits
+there forever.** A wrong approval cannot be withdrawn — the only way to clear
+it is to carry it out. That inverts the gate: approval stops being permission
+to try and becomes a commitment, which is the one thing GATE 4 says it is not.
+
+Live example, left in place deliberately as the evidence: request `c42b07f6`
+on SO-1307, approved and unappliable, putting a live **Apply the change** on
+that document.
+
+**THIS IS A BUSINESS RULE, NOT A CLEANUP TASK, AND IT IS NOT ENGINEERING'S TO
+INVENT.** A withdrawal verb is an eighth verb; THE SEVEN VERBS are frozen law.
+The owner decides whether it is `WITHDRAW` (the requester takes it back),
+`REVOKE` (the approver undoes their own decision), or an expiry. Whoever opens
+that card: it is one status transition plus one history row — the cost is in
+naming it, not in building it.
 
 ## PARKING LOT
 cost / margin (supplier cost belongs to Purchasing) · Amendments register page

@@ -127,19 +127,48 @@ DEV build + 不是本机的 base  →  app 拒绝启动,ApiBaseMisconfigured
 **③ SO-1206 的两条 correction work —— 已关**,note 一律
 `STAGE-3 EVIDENCE — not real work`。库里现在没有任何 open 的 correction work。
 
-## ⚠ 三件需要你一句话的事
+## 三条裁定的执行结果(2026-08-10)
 
-1. **`SO-1312 / SO-1313 / SO-1314` + July 2026 commission run 仍在。** item 1 已修,
-   但清理需要你在对话里明说(红线 1)。
-2. **SO-1206 最早那条 closed 的 note 是我取证时写的**,内容是
-   「PO-2036 checked — the extra pillow is covered by the existing quantity」——
-   它**读起来像一个真实的采购决定**。建议连同 fixture 一起改掉或清掉。
-3. **SO-1307 上有一条 approved、未 apply 的 attribution request**(id
-   `c42b07f6`),是 item 2 为了跑通 READ 而建的。它会让 SO-1307 的文档页出现一颗
-   「Apply the change」。我没有删(红线 1)。
+**① 7 月 commission run 已 reopen。** 先验了再动:2026-07 有 **64 张单,其中 63 张是
+真单**(全库 80 张的近八成),每一次 attribution 更正都被一句读起来像财务决定的话拒掉。
+走 0272 自己的 `commission_reopen_run`(principal-only,`approved → draft`,写
+audit_log)—— 没有删任何东西,run 还在。
 
-## ⚠ GATE 3 的 HR 半边,在这个库上无法端到端验证
+验证不是看状态字段,是重跑真单的地板:
+```
+SO-1206 / 1213 / 1216  →  BLOCK  变成  NONE
+                          "Commission month open — attribution may move."
+```
+**三张 fixture 单(SO-1312 / 1313 / 1314)留着** —— 3.6/3.7/3.8 需要 delivered /
+invoiced / 锁月三种状态,库里没有别的行到得了。
 
-`select * from app_users where role='hr'` → **零行**。0330 就是为了让 HR 能读到
-request 才写的,但库里没有任何 HR 账号,所以那半条 lane 只在代码和门测试里成立,
-没有真人跑过。我不会去建账号。
+**② 捏造的 note 已改写,不是抹掉。** 行的 id、关闭人、关闭时间全部保留,只换句子,
+而新句子把「上一句是编的」这件事写进了记录本身。
+
+**③ SO-1307 的 approved request —— 停下,没有执行。** 见下。
+
+## 🔴 GATE 4 缺口:被批准的请求没有撤回路径
+
+**不是读出来的,是试出来的**:在真库上调 `cancel_order_change_request`,得到
+`Only a pending change can be cancelled`。所有会写 status 的函数都只认 `pending`,
+唯一接受 `approved` 的是 apply。`'cancelled'` 是合法状态值,但**没有任何东西能从
+`approved` 到达它**。
+
+```
+一条被批准的请求,只有两个出口:应用它,或者永远留着。
+```
+
+这把 GATE 4 反过来了 —— 「批准是允许尝试,不是既成事实」,可实际上错误的批准清不掉,
+唯一的清除方式就是把它执行掉。
+
+**这是业务规则,不是清理任务,也不该由工程发明。** 撤回是第八个动词,而 THE SEVEN
+VERBS 是冻结法。叫 `WITHDRAW`(申请人收回)还是 `REVOKE`(批准人撤销)还是设过期,
+是 owner 的裁定。技术上是一个状态迁移加一行历史 —— 成本在命名,不在实现。
+
+`c42b07f6`(SO-1307)**故意留在原地当证据**,它会让那张单出现一颗活的
+「Apply the change」。
+
+## ⚠ GATE 3 的 HR 半边,在这个库上从未跑过
+
+`select * from app_users where role='hr'` → 零行。已记录为 owner 裁定:**不要建账号。**
+有账号那天,把 0330 的读和 `sales_order_decide_attribution` 用 HR 身份各跑一次即可。
