@@ -105,6 +105,47 @@ it is handing the owner your job.
 Report ONLY what you could not fix, and say exactly why you could not.
 ```
 
+### ⏱ THE STOP RULE — the ceiling on "fix it in the same card"
+*Owner ruling, 2026-08-10. "Fix it yourself" is not "grind on it forever."*
+
+```
+20 ATTEMPTS or 30 MINUTES on the SAME problem, whichever comes first
+                        →  STOP. Come back and say it failed.
+```
+
+**How to count.** Attempts on ONE problem, not attempts in total. Writing the
+same fix five different ways is five attempts, not one. The 30 minutes is
+wall-clock spent on that one problem — not on the card.
+
+**When you stop, report EXACTLY this and nothing more:**
+```
+1. What you were trying to make work — one sentence.
+2. The DISTINCT approaches you tried. Not the repeats. If you tried the same
+   idea eight ways, that is one approach, and say so.
+3. The exact error text. Verbatim, not paraphrased, not "some error about X".
+4. What you now believe the cause is, and how confident you are.
+5. What you would need in order to continue — a decision, an account, a
+   permission, a piece of knowledge you do not have.
+```
+
+**FORBIDDEN when you hit the ceiling:**
+```
+✗ keep trying variations of the thing that already failed
+✗ quietly switch to a workaround and not say you did
+✗ mark it done with a TODO or a comment explaining the gap
+✗ ship it broken and put it in a fix-list for the owner to discover
+✗ report "it's tricky" or "something's wrong" without items 3 and 4 above
+```
+
+**A half-fix you did not report is the worst outcome available.** It becomes a
+second answer living beside the first, and nobody knows it is there. Stopping
+loudly at minute 30 costs half an hour. A silent workaround costs whoever finds
+it in three months, and by then nobody remembers why it exists.
+
+**Stopping at the ceiling is not failure — it is the deliverable.** You are not
+paid to be stuck. You are paid to find out fast that you are stuck, and to hand
+back a diagnosis sharp enough that the next person does not start from zero.
+
 **THIS LAW EXISTS BECAUSE OF WHAT ACTUALLY HAPPENED HERE**
 
 ```
