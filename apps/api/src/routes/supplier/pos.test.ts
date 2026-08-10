@@ -777,46 +777,40 @@ describe("GET /api/supplier/pos/:poId/threads", () => {
     expect(res.status).toBe(403);
   });
 
-  it("returns threads with per-order sku_lines flattened", async () => {
-    // Two threads on this PO — one with pending readiness, one already
-    // marked ready. Each thread's parent order has its own line items
-    // pulled in a separate query and re-joined by order_id.
-    const eqFn = vi.fn().mockResolvedValue({
+  /* THE ROUTE IS ONE RPC NOW, and these two tests were still describing the
+   * shape it left behind. On 2026-05-15 the two-query table path (threads,
+   * then order_lines, re-joined by order_id in TypeScript) was replaced by
+   * the SECURITY DEFINER RPC `supplier_threads_for_po`, because the nested
+   * orders+order_lines join under supplier RLS recursed (orders → threads →
+   * POs). The mocks kept serving `from("order_supplier_threads")`, the route
+   * never called it, and every request 500'd inside the test.
+   *
+   * Rewritten to assert what the route actually does. The flattening the old
+   * test checked now happens INSIDE the RPC — asserting it here would only
+   * be asserting the mock's own literal, which is why the shape assertions
+   * are gone rather than moved. */
+
+  it("returns exactly what supplier_threads_for_po hands back, for this PO", async () => {
+    const rpc = vi.fn().mockResolvedValue({
       data: [
         {
           id: "t1",
           order_id: "o1",
+          order_dl: 1001,
+          customer_name: "Tan",
+          customer_delivery_date: "2026-05-20",
           supplier_ready_at: null,
           pickup_event_id: null,
-          orders: { so: 1001, customer_name: "Tan", delivery_date: "2026-05-20" },
+          sku_lines: [{ sku: "mattress:King", qty: 2 }],
         },
-        {
-          id: "t2",
-          order_id: "o2",
-          supplier_ready_at: "2026-05-15T10:00:00Z",
-          pickup_event_id: null,
-          orders: { so: 1002, customer_name: "Lim", delivery_date: "2026-05-28" },
-        },
-      ],
-      error: null,
-    });
-    const inFn = vi.fn().mockResolvedValue({
-      data: [
-        { order_id: "o1", sku: "mattress:King", qty: 2 },
-        { order_id: "o2", sku: "mattress:Queen", qty: 1 },
       ],
       error: null,
     });
     const sb = {
-      from: vi.fn((table: string) => {
-        if (table === "order_supplier_threads") {
-          return { select: vi.fn().mockReturnValue({ eq: eqFn }) };
-        }
-        if (table === "order_lines") {
-          return { select: vi.fn().mockReturnValue({ in: inFn }) };
-        }
-        throw new Error(`unexpected table ${table}`);
+      from: vi.fn(() => {
+        throw new Error("this route reads through the RPC, never a table");
       }),
+      rpc,
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
@@ -829,46 +823,16 @@ describe("GET /api/supplier/pos/:poId/threads", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(eqFn).toHaveBeenCalledWith("po_id", PO_ID);
-    expect(inFn).toHaveBeenCalledWith("order_id", ["o1", "o2"]);
-    const rows = (await res.json()) as Array<Record<string, unknown>>;
-    expect(rows).toEqual([
-      {
-        id: "t1",
-        order_id: "o1",
-        order_dl: 1001,
-        customer_name: "Tan",
-        customer_delivery_date: "2026-05-20",
-        supplier_ready_at: null,
-        pickup_event_id: null,
-        sku_lines: [{ sku: "mattress:King", qty: 2 }],
-      },
-      {
-        id: "t2",
-        order_id: "o2",
-        order_dl: 1002,
-        customer_name: "Lim",
-        customer_delivery_date: "2026-05-28",
-        supplier_ready_at: "2026-05-15T10:00:00Z",
-        pickup_event_id: null,
-        sku_lines: [{ sku: "mattress:Queen", qty: 1 }],
-      },
-    ]);
+    expect(rpc).toHaveBeenCalledWith("supplier_threads_for_po", { p_po_id: PO_ID });
+    expect((await res.json()) as unknown[]).toHaveLength(1);
   });
 
-  it("returns empty array (no second query) when PO has no threads", async () => {
-    const eqFn = vi.fn().mockResolvedValue({ data: [], error: null });
-    const inFn = vi.fn();
+  it("returns an empty array when the PO has no threads", async () => {
     const sb = {
-      from: vi.fn((table: string) => {
-        if (table === "order_supplier_threads") {
-          return { select: vi.fn().mockReturnValue({ eq: eqFn }) };
-        }
-        if (table === "order_lines") {
-          return { select: vi.fn().mockReturnValue({ in: inFn }) };
-        }
-        throw new Error(`unexpected table ${table}`);
+      from: vi.fn(() => {
+        throw new Error("this route reads through the RPC, never a table");
       }),
+      rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
@@ -882,7 +846,5 @@ describe("GET /api/supplier/pos/:poId/threads", () => {
     );
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBe(0);
-    // No order_ids → skip the second query entirely.
-    expect(inFn).not.toHaveBeenCalled();
   });
 });

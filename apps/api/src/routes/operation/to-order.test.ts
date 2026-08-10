@@ -14,7 +14,7 @@ import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
-import { addWorkingDays } from "@carres/shared";
+import { addWorkingDays, myHolidaySet } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
 
 /**
@@ -983,10 +983,18 @@ describe("a purchase order is born with its expected arrival", () => {
 
     // 14 production days on Ohana's week (Sunday off) + 1 transit day on the
     // OFFICE week — arranging the movement is our work, not the factory's.
+    //
+    // THE HOLIDAY SET IS PART OF THE ARITHMETIC, not a detail. `expectedArrivalOf`
+    // defaults to `myHolidaySet()`, so a naive recomputation here is only equal on
+    // the days no Malaysian public holiday falls inside the window — which is why
+    // this line passed for a week and then failed on 2026-08-10, when Maulidur
+    // Rasul (2026-08-25, my-holidays.ts:41) landed in the 14-day production leg.
+    // The route was right and the expectation was short by exactly that day.
+    const holidays = myHolidaySet();
     const expected = addWorkingDays(
-      addWorkingDays(new Date().toISOString().slice(0, 10), 14, { offDays: [0] }),
+      addWorkingDays(new Date().toISOString().slice(0, 10), 14, { offDays: [0], holidays }),
       1,
-      { offDays: [0, 6] },
+      { offDays: [0, 6], holidays },
     );
     expect(patch.eta_date).toBe(expected);
   });
