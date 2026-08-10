@@ -107,6 +107,7 @@ type Loaded = {
   blocked: Unresolved[];
   /** The whole catalog, read once — the ordered read reuses it. */
   catalog: Map<string, CatalogFact>;
+  supplierKinds: Map<string, "own_logistics" | "factory_pickup">;
   /**
    * The numbers, read ONCE. The issue path needs them for the PO's birth
    * certificate; reading them a second time there costs a query AND lets the
@@ -273,6 +274,7 @@ async function loadToOrder(
         unresolved: [],
         blocked: [],
         catalog: new Map(),
+        supplierKinds: new Map(),
         settings,
         stockWarehouse: null,
         stockQtyById: new Map(),
@@ -336,7 +338,7 @@ async function loadToOrder(
     });
   }
 
-  const { data: supRows, error: supErr } = await sb.from("suppliers").select("id, name");
+  const { data: supRows, error: supErr } = await sb.from("suppliers").select("id, name, kind");
   if (supErr) {
     const m = mapPgError(supErr);
     return { ok: false, status: m.status, body: m.body };
@@ -684,6 +686,12 @@ async function loadToOrder(
   }
 
   const today = todayIso();
+  const supplierKinds = new Map<string, "own_logistics" | "factory_pickup">(
+    (supRows ?? []).map((s) => [
+      s.id as string,
+      s.kind as "own_logistics" | "factory_pickup",
+    ]),
+  );
   const proposals = buildToOrder({
     lines: planned,
     suppliers: (supRows ?? []).map((s) => ({
@@ -704,7 +712,10 @@ async function loadToOrder(
       reviewDaysBySupplier: {},
     },
     missingProductionDays,
-  });
+  }).map((proposal) => ({
+    ...proposal,
+    supplierKind: supplierKinds.get(proposal.supplierId) ?? "own_logistics",
+  }));
 
   return {
     ok: true,
@@ -715,6 +726,7 @@ async function loadToOrder(
       unresolved,
       blocked,
       catalog: cat,
+      supplierKinds,
       settings,
       stockWarehouse,
       stockQtyById,
@@ -955,7 +967,7 @@ toOrderRouter.get("/", requireOperation, async (c) => {
   // The factory names, read here rather than threaded out of loadToOrder: its
   // no-live-orders early return never reads `suppliers`, and an ordered row's
   // supplier is exactly the one that may have no demand today. 10 rows.
-  const { data: supRows, error: supErr } = await sb.from("suppliers").select("id, name");
+  const { data: supRows, error: supErr } = await sb.from("suppliers").select("id, name, kind");
   if (supErr) {
     const m = mapPgError(supErr);
     return c.json(m.body, m.status);
@@ -963,6 +975,14 @@ toOrderRouter.get("/", requireOperation, async (c) => {
   const supplierNames = new Map<string, string>(
     (supRows ?? []).map((s) => [s.id as string, (s.name as string) ?? ""]),
   );
+  const { data: partnerRows, error: partnerErr } = await sb
+    .from("delivery_partners")
+    .select("id, name")
+    .order("name");
+  if (partnerErr) {
+    const m = mapPgError(partnerErr);
+    return c.json(m.body, m.status);
+  }
 
   const ordered = await loadOrderedRows(
     sb,
@@ -989,6 +1009,41 @@ toOrderRouter.get("/", requireOperation, async (c) => {
       : res.data.unresolved.filter((row) => row.so === scopeSo);
   const scopedOrdered =
     scopeSo == null ? ordered : ordered.filter((row) => row.so === scopeSo);
+
+  // Card 2's blocked-demand read model is deliberately demand-local. Pickup
+  // partner is NOT represented here: it is a fact of the governed Issue
+  // document after supplier/document construction.
+  const blockedDemand: {
+    code: "blocked_delivery_date" | "unresolved_supplier" | "cost_required";
+    orderId: string;
+    so: number | null;
+    sku: string;
+  }[] = unresolved.map((row) => ({ code: "unresolved_supplier", ...row }));
+  for (const proposal of proposals) {
+    for (const row of proposal.rows) {
+      for (const build of row.builds) {
+        if (build.fullyOnPo) continue;
+        for (const line of build.lines) {
+          if (!row.readyStock && row.delivery == null) {
+            blockedDemand.push({
+              code: "blocked_delivery_date",
+              orderId: row.orderId,
+              so: row.so,
+              sku: line.sku,
+            });
+          }
+          if (line.cost == null || line.cost <= 0) {
+            blockedDemand.push({
+              code: "cost_required",
+              orderId: row.orderId,
+              so: row.so,
+              sku: line.sku,
+            });
+          }
+        }
+      }
+    }
+  }
 
   let scope: null | {
     so: number;
@@ -1037,6 +1092,7 @@ toOrderRouter.get("/", requireOperation, async (c) => {
     poDays: res.data.poDays,
     proposals,
     unresolved,
+    blockedDemand,
     ordered: scopedOrdered,
     ...(scope ? { scope } : {}),
     // P10 — the warehouse the offer was counted at, by its own name. The page
@@ -1049,16 +1105,21 @@ toOrderRouter.get("/", requireOperation, async (c) => {
       name: d.name as string,
       isDefault: Boolean(d.is_default),
     })),
+    procurementPartners: (partnerRows ?? []).map((p) => ({
+      id: p.id as string,
+      name: p.name as string,
+    })),
   });
 });
 
 /**
  * The issue contract.
  *
- * The client posts an ARRANGEMENT — which builds go on which document — and
- * nothing else. Quantities, SKUs and prices are never sent: the server reads
- * them from its own recomputation, so a browser cannot invent a line, change a
- * quantity or price a purchase order.
+ * The client posts an ARRANGEMENT plus governed transaction-cost/commercial
+ * decisions and, for factory-pickup documents, one procurement partner.
+ * Quantities and demand lines still come only from server recomputation. A
+ * posted SKU must belong to that recomputed document, catalog-seeded prices
+ * must still match, and the creation RPC repeats the commercial/partner laws.
  */
 const issueBody = z.object({
   supplierId: z.string().uuid(),
@@ -1070,6 +1131,25 @@ const issueBody = z.object({
         key: z.string().min(1),
         include: z.boolean(),
         buildKeys: z.array(z.string().min(1)),
+        procurementPartnerId: z.string().uuid().optional(),
+        lineDecisions: z
+          .array(
+            z.discriminatedUnion("treatment", [
+              z.object({
+                sku: z.string().min(1),
+                treatment: z.literal("normal"),
+                unitCost: z.number().positive(),
+                costSource: z.enum(["catalog", "hand_entered"]),
+              }),
+              z.object({
+                sku: z.string().min(1),
+                treatment: z.literal("free_of_charge"),
+                reason: z.string().trim().min(1).max(500),
+              }),
+            ]),
+          )
+          .max(500)
+          .optional(),
       }),
     )
     .min(1)
@@ -1095,23 +1175,6 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
   // the server's own reading, so a stale tab cannot order last hour's demand.
   const res = await loadToOrder(sb);
   if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
-
-  // A requirement the catalog could not answer for could belong to ANY supplier
-  // — nothing about it is known, including whose it is. So it stops every
-  // issue, not just this supplier's: a purchase order that quietly omits a
-  // customer's goods is worse than one that was never raised, because from that
-  // point on nothing downstream is looking for them.
-  if (res.data.unresolved.length > 0) {
-    return c.json(
-      {
-        error: "demand_unresolved",
-        code: "demand_unresolved",
-        message: `${res.data.unresolved.length} customer requirement(s) could not be read from the catalog. Nothing was issued.`,
-        unresolved: res.data.unresolved,
-      },
-      409,
-    );
-  }
 
   const proposal = res.data.proposals.find(
     (p) => p.supplierId === supplierId && p.category === category,
@@ -1139,6 +1202,28 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
     include: d.include,
     buildKeys: d.buildKeys,
   }));
+
+  // An undated Customer Order remains visible, but cannot enter an Issue
+  // document. Ready Stock is deliberately exempt.
+  const blockedDateBuilds = new Set(
+    proposal.rows
+      .filter((row) => row.delivery == null && !row.readyStock)
+      .flatMap((row) => row.builds.map((build) => build.key)),
+  );
+  if (
+    purchaseOrders.some(
+      (doc) => doc.include && doc.buildKeys.some((key) => blockedDateBuilds.has(key)),
+    )
+  ) {
+    return c.json(
+      {
+        error: "blocked_delivery_date",
+        code: "blocked_delivery_date",
+        message: "Customer delivery date must be confirmed before Issue PO.",
+      },
+      422,
+    );
+  }
   const check = validateIssuePlan(proposal, docs);
   if (!check.ok) {
     return c.json({ error: check.code, code: check.code, message: check.message }, 422);
@@ -1175,24 +1260,138 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
 
   const plan = planFromDocuments(proposal, docs);
 
-  // ONE transaction. `operation_create_pos_batch` is a single plpgsql function,
-  // so a failure on the seventh document rolls the first six back — there is no
-  // state where half an issue exists and nothing says so.
-  const { data: batch, error: batchErr } = await sb.rpc("operation_create_pos_batch", {
-    p_pos: plan.map((po) => ({
+  const supplierKind = res.data.supplierKinds.get(supplierId) ?? null;
+  if (!supplierKind) {
+    return c.json({ error: "unresolved_supplier", code: "unresolved_supplier" }, 422);
+  }
+  const needsPartner = supplierKind === "factory_pickup";
+  let validPartners = new Set<string>();
+  if (needsPartner) {
+    const { data: partners, error: partnersErr } = await sb
+      .from("delivery_partners")
+      .select("id");
+    if (partnersErr) {
+      const m = mapPgError(partnersErr);
+      return c.json(m.body, m.status);
+    }
+    validPartners = new Set((partners ?? []).map((p) => p.id as string));
+  }
+
+  // Same frozen ETA arithmetic as before Card 2. It is now passed into the
+  // governed transaction so PO creation, destination and ETA converge or roll
+  // back together; neither the rule nor its inputs changed.
+  const etaDate = expectedArrivalOf(res.data.settings, {
+    supplierId,
+    category,
+    fromIso: todayIso(),
+  });
+
+  const governedPos: Record<string, unknown>[] = [];
+  const activeDocs = purchaseOrders.filter((doc) => doc.include);
+  for (let index = 0; index < plan.length; index += 1) {
+    const po = plan[index];
+    const doc = activeDocs[index];
+    const partnerId = doc?.procurementPartnerId ?? null;
+    if (needsPartner && (!partnerId || !validPartners.has(partnerId))) {
+      return c.json(
+        {
+          error: "pickup_partner_required",
+          code: "pickup_partner_required",
+          documentKey: doc?.key,
+          message: "Select a procurement partner for this factory-pickup PO.",
+        },
+        422,
+      );
+    }
+    if (!needsPartner && partnerId) {
+      return c.json(
+        { error: "pickup_partner_not_allowed", code: "pickup_partner_not_allowed" },
+        422,
+      );
+    }
+
+    type LineDecision = NonNullable<(typeof purchaseOrders)[number]["lineDecisions"]>[number];
+    const decisions = new Map<string, LineDecision>();
+    for (const decision of doc?.lineDecisions ?? []) {
+      if (decisions.has(decision.sku)) {
+        return c.json({ error: "duplicate_cost_decision", code: "duplicate_cost_decision" }, 422);
+      }
+      decisions.set(decision.sku, decision);
+    }
+    const lineSkus = new Set(po.lines.map((line) => line.sku));
+    if ([...decisions.keys()].some((sku) => !lineSkus.has(sku))) {
+      return c.json({ error: "stale_cost_decision", code: "stale_cost_decision" }, 409);
+    }
+
+    const lines: Record<string, unknown>[] = [];
+    for (const line of po.lines) {
+      const decision = decisions.get(line.sku);
+      if (decision?.treatment === "free_of_charge") {
+        lines.push({
+          sku: line.sku,
+          qty: line.qty,
+          cost: 0,
+          cost_source: "hand_entered",
+          commercial_treatment: "free_of_charge",
+          commercial_reason: decision.reason.trim(),
+        });
+        continue;
+      }
+      if (decision?.treatment === "normal") {
+        const liveCost = res.data.catalog.get(line.sku)?.cost ?? null;
+        if (decision.costSource === "catalog" && liveCost !== decision.unitCost) {
+          return c.json(
+            { error: "stale_catalog_cost", code: "stale_catalog_cost", sku: line.sku },
+            409,
+          );
+        }
+        lines.push({
+          sku: line.sku,
+          qty: line.qty,
+          cost: decision.unitCost,
+          cost_source: decision.costSource,
+          commercial_treatment: "normal",
+          commercial_reason: null,
+        });
+        continue;
+      }
+      const liveCost = res.data.catalog.get(line.sku)?.cost ?? null;
+      if (liveCost == null || liveCost <= 0) {
+        return c.json(
+          {
+            error: "cost_required",
+            code: "cost_required",
+            documentKey: doc?.key,
+            sku: line.sku,
+            message: "Transaction cost or Free of Charge is required before Issue PO.",
+          },
+          422,
+        );
+      }
+      lines.push({
+        sku: line.sku,
+        qty: line.qty,
+        cost: liveCost,
+        cost_source: "catalog",
+        commercial_treatment: "normal",
+        commercial_reason: null,
+      });
+    }
+    governedPos.push({
       supplier_id: po.supplierId,
       warehouse_id: warehouse.id as string,
+      destination_id: destinationId,
+      eta_date: etaDate,
+      procurement_partner_id: partnerId,
       so_refs: po.soRefs,
-      lines: po.lines.map((l) => ({
-        sku: l.sku,
-        qty: l.qty,
-        // The purchase price is resolved from the catalog and never shown here
-        // (Loo, 2026-07-30: the supplier has an agreed rate). The RPC requires
-        // one, so an unpriced SKU writes 0 rather than blocking the purchase.
-        cost: l.cost ?? 0,
-        cost_source: "catalog",
-      })),
-    })),
+      lines,
+    });
+  }
+
+  // ONE transaction. A failure on the seventh document rolls back the first
+  // six, including commercial decisions, destination, ETA and audit history.
+  const { data: batch, error: batchErr } = await sb.rpc("purchasing_issue_pos_batch", {
+    p_pos: governedPos,
   });
   if (batchErr) {
     const m = mapPgError(batchErr);
@@ -1243,24 +1442,6 @@ toOrderRouter.post("/issue", requireOperation, async (c) => {
    * one (P1's law), and the purchase order is still raised — the goods matter
    * more than the estimate, and the gap is visible as an empty arrival.
    */
-  const etaDate = expectedArrivalOf(res.data.settings, {
-    supplierId,
-    category,
-    fromIso: todayIso(),
-  });
-
-  // Where the goods go, in ONE statement over every document the batch made. A
-  // fresh purchase order has received nothing, so the destination guard permits
-  // it; it freezes on first receipt.
-  const { error: upErr } = await sb
-    .from("purchase_orders")
-    .update({ destination_id: destinationId, ...(etaDate ? { eta_date: etaDate } : {}) })
-    .in("id", ids);
-  if (upErr) {
-    const m = mapPgError(upErr);
-    return c.json({ ...(m.body as object), issued: ids }, m.status);
-  }
-
   /**
    * A READY STOCK DEMAND THAT JUST BECAME A PURCHASE ORDER STOPS BEING DEMAND —
    * BY THE QUANTITY THAT WAS ORDERED, not all of it (0320, Loo 2026-08-04).
