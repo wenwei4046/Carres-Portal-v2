@@ -211,10 +211,10 @@ function rowBox(proposalKey: string, orderId: string, buildKey: string) {
   return document.getElementById(`kit-table-row-${proposalKey}:${orderId}:${buildKey}`)!;
 }
 
-function wrap() {
+function wrap(path = "/operation/to-order") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <QueryClientProvider client={qc}>
         <OperationToOrder />
       </QueryClientProvider>
@@ -240,6 +240,75 @@ async function loaded() {
 }
 
 describe("the PO Schedule — a purchase calendar, not a menu", () => {
+  it("keeps an SO deep-link in the one toolbar and clearing it restores normal Batch Purchase", async () => {
+    apiFetch.mockImplementation((path: string) => {
+      if (path === "/api/operation/purchase/to-order?so=1204") {
+        return Promise.resolve({
+          ...TO_ORDER,
+          proposals: TO_ORDER.proposals.map((p) => ({
+            ...p,
+            rows: p.rows.filter((r) => r.so === 1204),
+          })).filter((p) => p.rows.length > 0),
+          ordered: [],
+          unresolved: [],
+          scope: {
+            so: 1204,
+            orderFound: true,
+            issuable: 1,
+            blockedProductionDays: 0,
+            blockedDeliveryDate: 0,
+            unresolved: 0,
+            alreadyCovered: 0,
+            alreadyIssued: 0,
+          },
+        });
+      }
+      return route(path);
+    });
+    render(wrap("/operation/to-order?so=1204&view=overdue"));
+
+    expect(await screen.findByTestId("to-order-so-scope")).toHaveTextContent(
+      `${W.salesOrderScope} · SO-1204`,
+    );
+    expect(apiFetch).toHaveBeenCalledWith("/api/operation/purchase/to-order?so=1204");
+    expect(screen.getAllByTestId("to-order-so-scope")).toHaveLength(1);
+    expect(screen.queryByText("SO-1300")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("to-order-so-scope-clear"));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith("/api/operation/purchase/to-order"),
+    );
+    expect(screen.queryByTestId("to-order-so-scope")).toBeNull();
+    expect(screen.getByTestId("to-order-overdue")).toHaveAttribute("aria-current", "true");
+  });
+
+  it("explains an existing blocked scope inside the Work Surface", async () => {
+    apiFetch.mockImplementation((path: string) =>
+      path.includes("?so=1257")
+        ? Promise.resolve({
+            ...TO_ORDER,
+            proposals: [],
+            ordered: [],
+            unresolved: [],
+            scope: {
+              so: 1257,
+              orderFound: true,
+              issuable: 0,
+              blockedProductionDays: 0,
+              blockedDeliveryDate: 1,
+              unresolved: 0,
+              alreadyCovered: 0,
+              alreadyIssued: 0,
+            },
+          })
+        : route(path),
+    );
+    render(wrap("/operation/to-order?so=1257"));
+    expect(await screen.findByTestId("to-order-scope-status")).toHaveTextContent(
+      W.scopeBlockedDeliveryDate,
+    );
+    expect(screen.getByTestId("to-order-empty")).toBeInTheDocument();
+  });
   it("rolling upcoming PO days + a red Overdue on top; CATEGORY stays wordless", async () => {
     await loaded();
     const nav = screen.getByTestId("to-order-nav");

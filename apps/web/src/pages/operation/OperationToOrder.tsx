@@ -130,6 +130,16 @@ interface ToOrderResponse {
   /** P10 — the warehouse the free-stock offer was counted at, by its own
    *  name. `null` = there is no offer to make and no sentence to print. */
   stockWarehouse?: string | null;
+  scope?: {
+    so: number;
+    orderFound: boolean;
+    issuable: number;
+    blockedProductionDays: number;
+    blockedDeliveryDate: number;
+    unresolved: number;
+    alreadyCovered: number;
+    alreadyIssued: number;
+  };
 }
 
 /** P10 — what `Reserve` answers with. The number is the SERVER's. The wire key
@@ -290,10 +300,16 @@ const F_NOT_ORDERED = "__not_ordered__";
 
 export default function OperationToOrder() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawScopeSo = searchParams.get("so");
+  const scopeSo = rawScopeSo && /^\d+$/.test(rawScopeSo) ? Number(rawScopeSo) : null;
 
   const q = useQuery<ToOrderResponse>({
-    queryKey: qk.operation.toOrder(),
-    queryFn: () => apiFetch<ToOrderResponse>("/api/operation/purchase/to-order"),
+    queryKey: [...qk.operation.toOrder(), { so: scopeSo }],
+    queryFn: () =>
+      apiFetch<ToOrderResponse>(
+        `/api/operation/purchase/to-order${scopeSo == null ? "" : `?so=${scopeSo}`}`,
+      ),
     refetchOnWindowFocus: true,
   });
 
@@ -312,7 +328,6 @@ export default function OperationToOrder() {
    * The Work Queue's two picks live in the URL, so a refresh or a shared
    * link keeps the view (the 2990 habit). The engine still opens Today.
    */
-  const [searchParams, setSearchParams] = useSearchParams();
   /** The purchase calendar — one row per upcoming configured PO day. */
   const scheduleDays = useMemo(
     () => (today ? poScheduleDays(poDays, today) : []),
@@ -327,12 +342,16 @@ export default function OperationToOrder() {
     // at all — the second way to place (Jess, 2026-08-01: browse by
     // category alone; nothing forces a run to stay lit).
     if (rawView == null) {
+      // A Sales Order entrance must explain the whole order, not whichever PO
+      // day the normal workspace opens on. Explicit rail choices still narrow
+      // it, and the unscoped opening remains byte-for-byte unchanged.
+      if (scopeSo != null) return new Set() as ReadonlySet<string>;
       return new Set(scheduleDays[0] ? [scheduleDays[0]] : []) as ReadonlySet<string>;
     }
     return new Set(
       rawView.split(",").filter((v) => v === "overdue" || scheduleDays.includes(v)),
     ) as ReadonlySet<string>;
-  }, [rawView, scheduleDays]);
+  }, [rawView, scheduleDays, scopeSo]);
   const rawCat = searchParams.get("cat");
   const catSet = useMemo(
     () =>
@@ -363,6 +382,15 @@ export default function OperationToOrder() {
     setParam("cat", [...n].join(","));
   };
   const clearCats = () => setParam("cat", "");
+  const clearSoScope = () =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("so");
+        return next;
+      },
+      { replace: true },
+    );
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<TableSort | null>(null);
   /** Per-column Excel filters. An absent key = no filter. */
@@ -1725,6 +1753,26 @@ export default function OperationToOrder() {
   };
 
   const updatedMs = q.dataUpdatedAt;
+  const scope = q.data?.scope ?? null;
+  const scopeMessages = scope
+    ? [
+        !scope.orderFound ? W.scopeNotFound : null,
+        scope.blockedProductionDays > 0 ? W.scopeBlockedProductionDays : null,
+        scope.blockedDeliveryDate > 0 ? W.scopeBlockedDeliveryDate : null,
+        scope.unresolved > 0 ? W.scopeUnresolved : null,
+        scope.alreadyCovered > 0 ? W.scopeAlreadyCovered : null,
+        scope.alreadyIssued > 0 ? W.scopeAlreadyIssued : null,
+      ].filter((message) => message != null) as string[]
+    : [];
+  const scopedNothingToBuy =
+    scope != null &&
+    scope.orderFound &&
+    scope.issuable === 0 &&
+    scope.blockedProductionDays === 0 &&
+    scope.blockedDeliveryDate === 0 &&
+    scope.unresolved === 0 &&
+    scope.alreadyCovered === 0 &&
+    scope.alreadyIssued === 0;
 
   return (
     /* h-full, not flex-1: the app wrapper is overflow-auto, so a page that
@@ -1855,7 +1903,24 @@ export default function OperationToOrder() {
              * screen the problem it fixed does not exist. A UX problem that
              * has not been observed is not a problem. */
             right={
-              creating ? (
+              <>
+                {scopeSo != null ? (
+                  <span
+                    className="flex items-center gap-2 rounded-control border border-kit-slate-6 bg-white px-2 h-8 text-body text-kit-slate-12 whitespace-nowrap"
+                    data-testid="to-order-so-scope"
+                  >
+                    <span>{`${W.salesOrderScope} · SO-${scopeSo}`}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon="close"
+                      aria-label={W.clearSalesOrderScope}
+                      onClick={clearSoScope}
+                      data-testid="to-order-so-scope-clear"
+                    />
+                  </span>
+                ) : null}
+                {creating ? (
                 <span className="text-meta text-kit-slate-11" data-testid="to-order-creating">
                   {W.creatingPos}
                 </span>
@@ -1883,7 +1948,8 @@ export default function OperationToOrder() {
                     {batch.poCount > 0 ? issuePosShort(batch.poCount) : W.issuePos}
                   </Button>
                 </span>
-              ) : null
+                ) : null}
+              </>
             }
             meta={
               updatedMs > 0 ? (
@@ -1955,6 +2021,15 @@ export default function OperationToOrder() {
                   </span>
                 </div>
               ) : null}
+            </div>
+          ) : null}
+
+          {scope && (scopeMessages.length > 0 || scopedNothingToBuy) ? (
+            <div
+              className="shrink-0 border-y border-kit-slate-5 bg-white px-3 py-2 text-body text-kit-slate-11"
+              data-testid="to-order-scope-status"
+            >
+              {(scopedNothingToBuy ? [W.scopeNothingToBuy] : scopeMessages).join(" · ")}
             </div>
           ) : null}
 

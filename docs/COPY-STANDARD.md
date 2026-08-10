@@ -345,6 +345,22 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Confirm balance delivery date` | `Call {supplier} — confirm balance delivery date` | `Record balance date` | `Balance date recorded` | `Nothing short today.` |
 | `Confirm what happens next` | `Call {supplier} — confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
 
+**SO-scoped Batch Purchase entrance** (2026-08-10):
+
+| Context | Words |
+|---|---|
+| Toolbar scope | `Sales Order · SO-{number}` · aria: `Clear Sales Order scope` |
+| Unknown SO | `Sales Order not found.` |
+| Production-days block | `Set a number before this demand can be issued.` |
+| Delivery-date block | `No delivery date — this demand cannot be issued.` |
+| Catalog resolution block | `Purchasing cannot resolve this demand from the catalog.` |
+| Open-PO cover | `Demand is already covered by an open Purchase Order.` |
+| Issued history | `Purchase Order already issued.` |
+| No remainder | `Nothing remains to buy for this Sales Order.` |
+
+These are explanations, never actions. They cannot acquire a form or resolve a Purchasing
+rule from the Sales Order entrance.
+
 **THIS TABLE IS THE CANONICAL HOME FOR EVERY PURCHASING ACTION, INCLUDING THE ONES THE ORDERS
 LADDER DISPLAYS.** The Orders row and the Purchasing row show the same work, so `Issue PO`
 and `Confirm ready date` are defined **once, here**. The ORDERS table above points
