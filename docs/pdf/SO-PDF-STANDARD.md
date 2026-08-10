@@ -156,6 +156,33 @@ Amount in words: RINGGIT MALAYSIA …            ← one full-width 7pt grey lin
 - Company signs nothing — the footer sentence says so.
 - Terms 8pt grey, numbered from an array so gated clauses renumber themselves.
 
+### 7.1 · T&C WORDING — LAW (owner, 2026-08-09; restored 2026-08-10)
+
+**The sentences are law, not template copy.** T&C #1 regressed once already —
+the family template shipped the REJECTED "binding tax invoice" sentence because
+this standard held the layout but never the words. It contradicts both this
+file's own no-tax ruling (§7) and the separate Sales Invoice of #706. Never
+again: any change to a sentence below is an OWNER decision, recorded here first.
+
+```
+1. This sales order records your purchase agreement with Carres. The sales
+   invoice is a separate document issued upon delivery.
+2. Balance due is payable in full on or before delivery. Cash, bank transfer,
+   DuitNow QR, and cheque accepted.
+3. Delivery date is best-effort and may shift ±3 working days subject to
+   operation confirmation.
+   [gated by LIFT_THREE_STATE_READY, renumbers itself:]
+   Stair-carry surcharges (if any) follow the floor and lift access recorded
+   above and are billed on this sales order, not on the delivery order.
+4. Once the delivery date has been confirmed, any subsequent request to change
+   or extend the date will incur a rescheduling surcharge.
+```
+
+**Why #1 reads this way (owner, 2026-08-09 — the Golden's ONE outstanding copy
+correction):** a Sales Order never claims to become a tax invoice. Sales Order
+(customer agreement) · Delivery Order (delivery document) · Sales Invoice
+(finance document) are SEPARATE lifecycle documents.
+
 ## 8 · The lift gate (charge basis law)
 
 `LIFT_THREE_STATE_READY = false` in the template gates BOTH the stair-carry
@@ -221,3 +248,4 @@ Optional payload fields the template already renders when sent: `customer.email`
 | 2026-08-09 | Round 22: totals stay THREE rows (owner: 维持 3 行); signature box under BALANCE DUE with the caption inside; words column narrowed to 68mm/7pt top-aligned with Subtotal. | Loo |
 | 2026-08-09 | Rounds 23–24 (FINAL, owner: perfect): ORDER DETAILS order/words fixed (`Sales Location`); items TOTAL row; §2.1 measurement sheet added — the numbers every Carres customer document reuses. | Loo |
 | 2026-08-09 | Rounds 25–30, SO 定稿: number labels say WHICH number (SO No); words line full-width above the money pair; totals in a hairline card, BALANCE DUE grey-banded at the SAME 8.5 size; signature box 80mm, stretched to the card's height, caption inside; items closing row renamed SUBTOTAL with RM on its sums; payments zone frozen at 4 rows. | Loo |
+| 2026-08-10 | §7.1 added — the T&C SENTENCES become law here (they regressed once: the rejected "binding tax invoice" #1 shipped because the standard held layout, not words). #1 = the owner's 2026-08-09 correction: SO · DO · Sales Invoice are separate lifecycle documents. | 3.0-FIX (architect) |

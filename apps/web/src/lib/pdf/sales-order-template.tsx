@@ -707,7 +707,13 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         <View style={styles.terms} wrap={false}>
           <Text style={{ fontSize: 7.5, fontWeight: 700, lineHeight: 1 }}>Terms & Conditions</Text>
           {[
-            "This sales order becomes a binding tax invoice once goods are delivered and full payment is reconciled.",
+            /* T&C #1 — the OWNER-CORRECTED wording (2026-08-09, BUILD-QUEUE
+               "GOLDEN BASELINE": the ONLY outstanding copy correction). A
+               Sales Order never claims to become a tax invoice — SO / DO /
+               Sales Invoice are SEPARATE lifecycle documents, and "the SO
+               does not talk tax" is this file's own header rule. The exact
+               sentence is LAW in docs/pdf/SO-PDF-STANDARD.md §T&C. */
+            "This sales order records your purchase agreement with Carres. The sales invoice is a separate document issued upon delivery.",
             "Balance due is payable in full on or before delivery. Cash, bank transfer, DuitNow QR, and cheque accepted.",
             "Delivery date is best-effort and may shift ±3 working days subject to operation confirmation.",
             ...(LIFT_THREE_STATE_READY
