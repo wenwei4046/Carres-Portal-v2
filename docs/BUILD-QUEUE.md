@@ -47,6 +47,78 @@ neither. **You may not build past 3.5.**
 fixtures. SO-1308 carries a real Rev 1/2/3 history chain. Nothing deletes them
 until Stage 3 is fully verified.
 
+## ⛔ DONE MEANS I RAN IT — the highest law on this card
+*Owner ruling, 2026-08-10. This outranks every other definition of "done"
+in this file. A card that is green and unrun is NOT done.*
+
+```
+GREEN CI IS THE FLOOR, NOT THE FINISH LINE.
+You do not hand work over. You run it, you break it, you fix what
+breaks, and THEN you hand it over.
+```
+
+**WHAT "I RAN IT" MEANS — per artefact, no exceptions**
+
+```
+A ROUTE       called against the real running server, real auth, real data.
+              Paste the status code and the body. Not a test — the route.
+
+A DB FUNCTION invoked for real, ONCE PER FUNCTION and once per branch
+              (each status · each role · each floor). plpgsql resolves
+              columns at RUN time, not at CREATE time — a function that was
+              never called was never checked, and `create function` succeeding
+              means nothing.
+
+A SCREEN      opened in a browser at 1440 AND 1130. Clicked through every
+              state the card names. Console read, not assumed.
+
+A GUARD       proven to BITE: put the exact bug back, in the exact SHAPE that
+              caused it, and watch the guard fail and NAME the thing. A guard
+              that passes on a broken tree is worse than no guard — it sells
+              confidence it has not earned.
+
+A MIGRATION   applied, then the thing it enables exercised end to end.
+```
+
+**WHAT DOES NOT COUNT AS RUNNING IT**
+
+```
+✗ tsc / vitest / lint green            — three green lights let a 500 ship
+✗ a test that MOCKS the thing under    — mocking `rpc` proves WHICH function
+  test                                    was called and executes zero lines
+                                          of it
+✗ a component test instead of an       — render tests cannot see a broken
+  opened page                             API base, a 500, or a frozen layout
+✗ "it should work" / "the code is      — the two sentences that precede
+  correct"                                every incident in this project
+✗ a screenshot promised for later      — a stage without its evidence is not
+                                          a stage
+```
+
+**WHEN RUNNING IT REVEALS A BUG — the part that matters most**
+
+```
+FIX IT IN THE SAME CARD. Do not report it. Do not defer it. Do not add it
+to a list for the owner to read. Finding it and leaving it is not honesty,
+it is handing the owner your job.
+
+Report ONLY what you could not fix, and say exactly why you could not.
+```
+
+**THIS LAW EXISTS BECAUSE OF WHAT ACTUALLY HAPPENED HERE**
+
+```
+· 3.3 shipped a 500. tsc green, vitest green, design-standard green — and the
+  function body had never executed once, because the test mocked `rpc`.
+· A schema guard matched `v_req.<col>` while the line that actually threw was
+  a bare `order by created_at`. The bug was put back and the guard did not
+  bite. A guard that only catches the shape it was written for is a lie.
+· 18 of 19 worktrees pointed `vite dev` at the PRODUCTION Worker. Every local
+  save wrote real business data. Nobody saw it because nobody opened the page.
+· A stage was reported complete with a URL and zero screenshots, on a dev
+  server that lived inside a sandbox the owner could never reach.
+```
+
 ## GOVERNANCE — DECIDE BY DEFAULT
 ```
 RUNNING CODE                     → law. A conflict escalates.
