@@ -21,6 +21,15 @@ export const PROCEED_BLOCKER_CODES = [
   "payment_below_50",
   // State blockers — the order can't be proceeded because of its current state.
   "wrong_status",
+  // RENTAL state blockers (0275). A rental order skips the four gates above
+  // that assume an outright sale — its guarantee is the signed agreement plus
+  // finance's credit approval, not a 50% deposit — and answers to these two
+  // instead. They were raised by the RPC from the day 0275 shipped but never
+  // added here, so `isProceedBlockerCode` rejected them and the route relayed
+  // `code: null`: the operator got the right sentence with no code behind it,
+  // and any UI keyed on the code matched nothing.
+  "rental_not_approved",
+  "rental_rejected",
   // Authz blockers — caller doesn't own this order or it doesn't exist.
   "forbidden",
   "order_not_found",
@@ -51,6 +60,8 @@ export const PROCEED_BLOCKER_LABEL: Record<ProceedBlockerCode, string> = {
   total_amount_missing: "Order pricing",
   payment_below_50: "Payment ≥ 50%",
   wrong_status: "Order is not in Place status",
+  rental_not_approved: "Rental awaiting finance approval",
+  rental_rejected: "Rental was rejected",
   forbidden: "Not allowed for this order",
   order_not_found: "Order not found",
 };

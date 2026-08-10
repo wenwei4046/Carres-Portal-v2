@@ -2036,3 +2036,35 @@ describe("GET /api/operation/orders/:id/revisions", () => {
     expect(body.revisions).toHaveLength(1);
   });
 });
+
+/**
+ * 3.2 · the consequence-floor endpoint is a THIN read-only door: one RPC,
+ * no writes, findings passed through verbatim.
+ */
+describe("POST /api/operation/orders/:id/floors", () => {
+  it("calls sales_order_floors and writes nothing", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { order_id: "x", so: 1308, findings: [] },
+      error: null,
+    });
+    const from = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000c01/floors", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ fields: ["order_lines"], proposedLines: [{ sku: "A", qty: 0 }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("sales_order_floors", {
+      p_order_id: "00000000-0000-0000-0000-000000000c01",
+      p_changed: ["order_lines"],
+      p_proposed_lines: [{ sku: "A", qty: 0 }],
+    });
+    expect(from).not.toHaveBeenCalled();
+  });
+});

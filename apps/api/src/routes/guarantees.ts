@@ -197,13 +197,23 @@ guaranteesRouter.get("/", async (c) => {
       // PostgREST cannot OR across an embedded resource, so axis 1 (the SO
       // number) runs as its own read below and the two sets are merged.
       const digits = q.replace(/\D/g, "");
+      // Escape ilike wildcards (a literal %/_ must not widen the match; PostgREST
+      // also treats * as %) and drop .or() syntax characters — a comma or paren
+      // reaching the filter splits the clause, so `TAN, AH KOW` and
+      // `CARRES (M) SDN BHD` returned a 400 instead of a customer. Same guard as
+      // rental.ts's /customers search. It applies to `gid` too:
+      // normalizeGuaranteeId only strips whitespace and dashes.
+      const forOr = (s: string) => s.replace(/[,()*]/g, " ").replace(/[\\%_]/g, (m) => "\\" + m);
+      const qSafe = forOr(q);
+      const gidSafe = forOr(gid);
       const ors = [
-        `customer_name.ilike.%${q}%`,
-        `covers_sku.ilike.%${q}%`,
+        `customer_name.ilike.%${qSafe}%`,
+        `covers_sku.ilike.%${qSafe}%`,
         // a partially-typed ID still narrows, live or retired
-        `guarantee_id.ilike.%${gid}%`,
-        `claimed_guarantee_id.ilike.%${gid}%`,
+        `guarantee_id.ilike.%${gidSafe}%`,
+        `claimed_guarantee_id.ilike.%${gidSafe}%`,
       ];
+      // `digits` is already \D-stripped, so nothing there needs escaping.
       if (digits.length >= 4) ors.push(`phone_key.ilike.%${digits}%`);
       query = query.or(ors.join(","));
     }

@@ -43,17 +43,23 @@ afterAll(() => _setJwksForTesting(null));
 
 describe("GET /api/partner/pickups", () => {
   it("returns LP's POs", async () => {
+    /* The chain is `select → order`, with NO `.eq`. Migration 0090 let a
+     * partner own a PO through either procurement_partner_id OR the
+     * warehouse's owning_partner_id, so the route deliberately dropped the
+     * narrow `.eq("procurement_partner_id", …)` and leans on the RLS policy
+     * `partner_sees_own_po`, which admits both paths (pickups.ts:48-53). The
+     * mock kept the old level, so `.order` was undefined and this route 500'd
+     * inside the test — a stale fixture reporting a bug the route does not
+     * have. */
     const sb = {
       from: vi.fn(() => ({
         select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({
-              data: [
-                { id: "po1", so: 1, sup_status: "pickup_assigned" },
-                { id: "po2", so: 2, sup_status: "delivered" },
-              ],
-              error: null,
-            }),
+          order: vi.fn().mockResolvedValue({
+            data: [
+              { id: "po1", so: 1, sup_status: "pickup_assigned" },
+              { id: "po2", so: 2, sup_status: "delivered" },
+            ],
+            error: null,
           }),
         }),
       })),

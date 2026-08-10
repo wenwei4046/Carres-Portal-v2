@@ -560,7 +560,7 @@ not screenshots. From 3.3 onward the normal law applies: running URL + 1440 and
 
 ---
 
-## ☐ 3.0 · PRE-FLIGHT — three blockers, no feature
+## ☑ 3.0 · PRE-FLIGHT — three blockers, no feature
 Nothing in Stage 3 may be built before these three are closed and reported.
 ```
 ① MERGE 0326 + 0327 into main. They are applied to the shared Supabase but not
@@ -691,7 +691,7 @@ verified against live data. 3.2 and 3.3 must ship CONSTRUCTED FIXTURES for
 those states, planned at card start, not discovered at demo time.
 Also confirm the count ran against the Carres project, not a scratch one.
 
-## ☐ 3.1 · CLASSIFICATION REGISTRY — two allowlists, no residue
+## ☑ 3.1 · CLASSIFICATION REGISTRY — CLOSED `6924aa8f` — two allowlists, no residue
 GATES.md GATE 1 is the spec. Copy the two lists from it verbatim.
 ```
 A       = explicit allowlist
@@ -718,7 +718,7 @@ test FAILING and naming that column, restore it. Paste both runs.
 
 ---
 
-## ☐ 3.2 · CONSEQUENCE FLOOR EVALUATOR — read-only, blocks nothing
+## ☑ 3.2 · CONSEQUENCE FLOOR EVALUATOR — CLOSED `d9ba78fe` — read-only, blocks nothing
 GATES.md GATE 6 table is the spec, row by row. Reuse existing code; do NOT write
 a second engine for anything already implemented.
 ```
@@ -755,7 +755,7 @@ that have a live PO and a receipt. Paste the Finding[] output for each.
 
 ---
 
-## ☐ 3.3 · CLASS B + TEST 3 — the full SUBMIT → APPROVE → APPLY rehearsal
+## ☑ 3.3 · CLASS B + TEST 3 — CLOSED `c781af60` + `95a11a84`
 The safe half of the machine. **No ACCEPT anywhere in this card** — Class B never
 touches the customer's agreement. This is the rehearsal that proves the verbs are
 separate before contract law arrives.
@@ -793,7 +793,7 @@ apply (revision minted) · apply again (no-op) · a locked-month attempt showing
 
 ---
 
-## ☐ 3.4 · DOWNSTREAM — durable work, owned by the receiving module
+## ☑ 3.4 · DOWNSTREAM — CLOSED `c1a6fdb6`
 Consumes 3.2's findings. Independent of ACCEPT — build it while the owner decides.
 ```
 DOWNSTREAM = PERSISTED correction work with a state and an owner, that survives
@@ -820,7 +820,7 @@ Permanence is the whole point — prove it survives, don't assert it.
 
 ---
 
-## ☐ 3.5 · AMENDMENT RECORD + SUBMIT + base_contractual_hash — NO ISSUE
+## ☑ 3.5 · AMENDMENT RECORD + SUBMIT + base_contractual_hash — CLOSED `8e8224dd`
 The spine, built without the two undecided things.
 ```
 amendment
@@ -1091,6 +1091,40 @@ RECORD ONLY
   USING doubles as WITH CHECK (PostgreSQL docs, verbatim). Internal-role exposure
   is handled by GATE 3's server-side RPC.
 ```
+
+## 🔴 GATE 4 GAP — AN APPROVED REQUEST HAS NO WITHDRAWAL PATH (found 2026-08-10)
+
+GATES.md GATE 4: *"Approval is permission to try. Acceptance is the customer's
+agreement to a specific document. **Neither is a completed fact.**"*
+
+The database does not agree. Every function that writes
+`order_change_requests.status` gates on `pending` — PROVEN BY ATTEMPT on the
+live database, not by reading:
+
+```
+cancel_order_change_request       'Only a pending change can be cancelled'
+reject_order_change_request       'Only a pending change can be rejected'
+sales_order_decide_attribution    'This request was already decided'
+sales_order_apply_attribution     requires 'approved'   ← the only exit
+```
+
+`'cancelled'` IS an allowed status value. Nothing can reach it from `approved`.
+
+**So an approved request has exactly two futures: it is applied, or it sits
+there forever.** A wrong approval cannot be withdrawn — the only way to clear
+it is to carry it out. That inverts the gate: approval stops being permission
+to try and becomes a commitment, which is the one thing GATE 4 says it is not.
+
+Live example, left in place deliberately as the evidence: request `c42b07f6`
+on SO-1307, approved and unappliable, putting a live **Apply the change** on
+that document.
+
+**THIS IS A BUSINESS RULE, NOT A CLEANUP TASK, AND IT IS NOT ENGINEERING'S TO
+INVENT.** A withdrawal verb is an eighth verb; THE SEVEN VERBS are frozen law.
+The owner decides whether it is `WITHDRAW` (the requester takes it back),
+`REVOKE` (the approver undoes their own decision), or an expiry. Whoever opens
+that card: it is one status transition plus one history row — the cost is in
+naming it, not in building it.
 
 ## PARKING LOT
 cost / margin (supplier cost belongs to Purchasing) · Amendments register page

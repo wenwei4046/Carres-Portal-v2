@@ -15,7 +15,7 @@ import {
   type JWK,
   type KeyLike,
 } from "jose";
-import { docNumber } from "@carres/shared";
+import { docNumber, fmtMoney } from "@carres/shared";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -269,7 +269,14 @@ describe("POST /api/operation/orders/:id/delivery-order", () => {
     vi.mocked(userClient).mockReturnValue(makeSb(t) as any);
     const res = await post(await makeJwt("operation"));
     expect(res.status).toBe(422);
-    expect(((await res.json()) as { message: string }).message).toContain("1500.00");
+    /* Asserted THROUGH `fmtMoney`, not against a hand-typed number. The gate
+     * builds its sentence with that function (packages/shared delivery-order.ts
+     * :114), so a literal here is a second spelling of the money law — and it
+     * was already a wrong one: the message reads "RM 1,500.00" on any Node with
+     * full ICU, so this line had never passed on this machine. Through the
+     * formatter it cannot drift from the law, and it cannot depend on which
+     * ICU data the runtime shipped with. */
+    expect(((await res.json()) as { message: string }).message).toContain(fmtMoney(1500));
     expect(t.orders.update).not.toHaveBeenCalled();
   });
 

@@ -51,6 +51,7 @@ import {
   useCreateSalesOrder,
   useOperationDealersRef,
   useOperationOrder,
+  useOrderCorrectionWork,
   useOutlets,
   useSalesOrderRevisions,
   useSalespersons,
@@ -58,6 +59,9 @@ import {
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
 } from "@/lib/queries";
+import CorrectionWorkList from "./CorrectionWorkList";
+import SalesOrderAmendment from "./SalesOrderAmendment";
+import SalesOrderAttribution from "./SalesOrderAttribution";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { describeRevisionChanges } from "./sales-order-revisions";
 import { lineName } from "./sales-order-facts";
@@ -250,8 +254,8 @@ function draftTemplateData(
   return {
     /* An unsaved draft has NO number — never invent one (Golden rule). */
     so_number: base?.so_number ?? "DRAFT",
+    /* The family template prints `Ordered` from issue_date. */
     issue_date: base?.issue_date ?? new Date().toISOString().slice(0, 10),
-    ordered_date: base?.ordered_date ?? new Date().toISOString(),
     proceed_date: draft.proceed_date,
     order_id: base?.order_id ?? "draft",
     order_code: base?.order_code ?? "DRAFT",
@@ -325,7 +329,6 @@ function snapshotTemplateData(
   return {
     so_number: h["so"] != null ? `SO-${h["so"]}` : (base?.so_number ?? "—"),
     issue_date: (str("placed_at") ?? base?.issue_date ?? "").slice(0, 10),
-    ordered_date: str("placed_at") ?? base?.ordered_date ?? null,
     proceed_date: str("proceed_date"),
     order_id: base?.order_id ?? "snapshot",
     order_code: h["so"] != null ? `SO-${h["so"]}` : (base?.order_code ?? "—"),
@@ -398,6 +401,10 @@ export default function SalesOrderWorkspace() {
 
   const detailQ = useOperationOrder(isNew ? null : (orderId ?? null));
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
+  /* 3.4 · what this sales order's changes have raised for other modules. The
+   * workspace SHOWS it and cannot close it — the module that raised the work
+   * does not tick it off. */
+  const correctionWorkQ = useOrderCorrectionWork(isNew ? null : (orderId ?? null));
   const baseQ = useQuery({
     queryKey: ["orders", "sales-order-data", orderId ?? "new"],
     queryFn: () =>
@@ -538,8 +545,6 @@ export default function SalesOrderWorkspace() {
     proceed_date: draft.proceed_date,
     delivery_floor: draft.delivery_floor,
     delivery_has_lift: draft.delivery_has_lift,
-    salesperson_id: draft.salesperson_id,
-    outlet_id: draft.outlet_id,
   });
 
   const draftLinesPayload = () =>
@@ -571,8 +576,14 @@ export default function SalesOrderWorkspace() {
   const onCreate = () => {
     const err = validateDraft(true);
     if (err) return void toast.error(err);
+    /* A BIRTH names the parties — only the EDIT door lost them to 0329. */
     createMut.mutate({
-      header: { ...draftHeaderPayload(), dealer_id: draft.dealer_id },
+      header: {
+        ...draftHeaderPayload(),
+        dealer_id: draft.dealer_id,
+        salesperson_id: draft.salesperson_id,
+        outlet_id: draft.outlet_id,
+      },
       lines: draftLinesPayload(),
     });
   };
@@ -640,19 +651,24 @@ export default function SalesOrderWorkspace() {
     });
   }, [editing, mode, draft.lines, base, viewedRevision, detailQ.data, order]);
 
-  const spOptions = useMemo(
-    () => [
-      { value: "none", label: "Not recorded" },
-      ...(salespersonsQ.data?.salespersons ?? []).map((s) => ({ value: s.id, label: s.name })),
-    ],
+  /* The real parties, with no placeholder — the attribution form supplies its
+   * own "Keep …" and "Not recorded" entries, and two placeholders in one list
+   * is how a picker ends up offering "Not recorded" twice. */
+  const realSpOptions = useMemo(
+    () => (salespersonsQ.data?.salespersons ?? []).map((s) => ({ value: s.id, label: s.name })),
     [salespersonsQ.data],
   );
-  const outletOptions = useMemo(
-    () => [
-      { value: "none", label: "Not recorded" },
-      ...(outletsQ.data?.outlets ?? []).map((o) => ({ value: o.id, label: o.name })),
-    ],
+  const realOutletOptions = useMemo(
+    () => (outletsQ.data?.outlets ?? []).map((o) => ({ value: o.id, label: o.name })),
     [outletsQ.data],
+  );
+  const spOptions = useMemo(
+    () => [{ value: "none", label: "Not recorded" }, ...realSpOptions],
+    [realSpOptions],
+  );
+  const outletOptions = useMemo(
+    () => [{ value: "none", label: "Not recorded" }, ...realOutletOptions],
+    [realOutletOptions],
   );
   const dealerOptions = useMemo(
     () => (dealersQ.data?.dealers ?? []).map((d) => ({ value: d.id, label: d.name })),
@@ -807,18 +823,19 @@ export default function SalesOrderWorkspace() {
                 )}
               </Section>
 
-              {/* ② SOURCE */}
+              {/* ② SOURCE — a BIRTH names the parties; an EDIT may not move
+                  them. STAGE 3 (0329): salesperson · showroom · dealer decide
+                  who gets paid, so they leave the direct-edit lane and travel
+                  by request (GATES.md Test 3). The save RPC now REFUSES a
+                  header carrying one, so leaving the pickers here would have
+                  been a form that cannot save. */}
               <Section title="Source">
-                {editing ? (
+                {mode === "create" ? (
                   <div className="grid grid-cols-2 gap-3">
-                    {isNew ? (
-                      <Select id="ws-dealer" label="Dealer"
-                        value={draft.dealer_id ?? ""}
-                        onValueChange={(v) => setField("dealer_id", v || null)}
-                        options={dealerOptions} placeholder="Pick a dealer" />
-                    ) : (
-                      <Fact label="Dealer" value={refs.dealerName(draft.dealer_id) ?? order?.dealers?.name ?? "Not recorded"} />
-                    )}
+                    <Select id="ws-dealer" label="Dealer"
+                      value={draft.dealer_id ?? ""}
+                      onValueChange={(v) => setField("dealer_id", v || null)}
+                      options={dealerOptions} placeholder="Pick a dealer" />
                     <Select id="ws-outlet" label="Showroom"
                       value={draft.outlet_id ?? "none"}
                       onValueChange={(v) => setField("outlet_id", v === "none" ? null : v)}
@@ -829,11 +846,32 @@ export default function SalesOrderWorkspace() {
                       options={spOptions} />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-x-5 gap-y-3">
-                    <Fact label="Dealer" value={sourceName(mode, viewedRevision, order, "dealer") || "Not recorded"} />
-                    <Fact label="Showroom" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
-                    <Fact label="Salesperson" value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
-                  </div>
+                  <>
+                    <div className="grid grid-cols-3 gap-x-5 gap-y-3">
+                      <Fact label="Dealer" value={sourceName(mode, viewedRevision, order, "dealer") || "Not recorded"} />
+                      <Fact label="Showroom" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
+                      <Fact label="Salesperson" value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
+                    </div>
+                    {/* An OLD revision is a photograph — it carries no lane. */}
+                    {mode !== "oldrev" && orderId && order && (
+                      <SalesOrderAttribution
+                        orderId={orderId}
+                        current={{
+                          salesperson_id: order.salesperson_id ?? null,
+                          outlet_id: order.outlet_id ?? null,
+                          dealer_id: order.dealer_id ?? null,
+                        }}
+                        salespersonOptions={realSpOptions}
+                        outletOptions={realOutletOptions}
+                        dealerOptions={dealerOptions}
+                        onApplied={() => {
+                          void revisionsQ.refetch();
+                          void baseQ.refetch();
+                          void detailQ.refetch();
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </Section>
 
@@ -950,6 +988,23 @@ export default function SalesOrderWorkspace() {
                     </tbody>
                   </table>
                 )}
+
+                {/* 3.5 · the amendment lane lives WITH the items, because
+                    items are the contractual thing it proposes to change. It
+                    locks nothing beside it — a phone fix stays free while a
+                    proposal waits (`LOCK THE CONSEQUENCE`). */}
+                {!isNew && mode === "view" && orderId && (
+                  <div className="mt-3 border-t border-kit-slate-5 pt-3">
+                    <SalesOrderAmendment
+                      orderId={orderId}
+                      currentLines={(detailQ.data?.lines ?? []).map((l) => ({
+                        sku: l.sku,
+                        qty: l.qty,
+                        unit_price: Number(l.unit_price),
+                      }))}
+                    />
+                  </div>
+                )}
               </Section>
 
               {/* ⑥ MONEY */}
@@ -966,7 +1021,20 @@ export default function SalesOrderWorkspace() {
                 </div>
               </Section>
 
-              {/* ⑦ HISTORY / REVISION */}
+              {/* ⑦ WHAT THIS CHANGE STARTED ELSEWHERE — 3.4.
+                  Shown only when there IS work: a section that says "nothing"
+                  on every order is a section the operator learns to skip. */}
+              {!isNew && mode !== "oldrev" && (correctionWorkQ.data?.work ?? []).length > 0 && (
+                <Section title="What this change started elsewhere">
+                  <CorrectionWorkList
+                    work={correctionWorkQ.data?.work ?? []}
+                    canClose={false}
+                    emptyWord=""
+                  />
+                </Section>
+              )}
+
+              {/* ⑧ HISTORY / REVISION */}
               {!isNew && (
                 <Section title="History / Revision">
                   {revisions.length === 0 ? (

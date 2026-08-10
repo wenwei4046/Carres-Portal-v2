@@ -67,9 +67,11 @@ import {
   useSetMessageTemplate,
   useOperationWarehouse,
   usePurchasingSettings,
+  useCorrectionWork,
   type operationPoListRow,
   type SupplierRow,
 } from "@/lib/queries";
+import CorrectionWorkList from "./CorrectionWorkList";
 
 /**
  * OperationPurchaseOrders — the Supplier Execution Workspace
@@ -373,6 +375,9 @@ export default function OperationPurchaseOrders() {
   const warehouseQ = useOperationWarehouse();
   const catalogQ = useCatalog();
   const settingsQ = usePurchasingSettings();
+  /* 3.4 · correction work this module OWNS. Open only — closed work is
+   * history, and history does not belong above a working register. */
+  const purchasingWorkQ = useCorrectionWork({ module: "purchasing", state: "open" });
   const [params, setParams] = useSearchParams();
 
   const [search, setSearch] = useState("");
@@ -1449,6 +1454,23 @@ export default function OperationPurchaseOrders() {
           </div>
         }
       />
+
+      {/* ── STAGE 3 · card 3.4 — what a sales order change started HERE.
+           This page is FROZEN (Jess, 2026-08-03: stop polishing), so this is
+           purely additive and INVISIBLE until there is work: no rail group, no
+           column, nothing moved in the register. A shared PO whose sales order
+           changed is the one thing purchasing must not learn from a toast that
+           has already gone. ── */}
+      {(purchasingWorkQ.data?.work ?? []).length > 0 && (
+        <div className="shrink-0 border-b border-kit-slate-5 bg-white px-4 py-3">
+          <div className="text-label font-semibold tracking-wide text-base-500 uppercase">
+            Sales order changes to check
+          </div>
+          <div className="mt-2">
+            <CorrectionWorkList work={purchasingWorkQ.data?.work ?? []} canClose emptyWord="" />
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* ── NAVIGATION · 200px — the Register's business filter (Jess:

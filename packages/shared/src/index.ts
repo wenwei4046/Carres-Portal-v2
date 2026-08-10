@@ -2495,3 +2495,4 @@ export {
   type SetMilestonesInput,
 } from "./schemas/hr";
 export * from "./schemas/hr-team";
+export * from "./sales-order-classification";

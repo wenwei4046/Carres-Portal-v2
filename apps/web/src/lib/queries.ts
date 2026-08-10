@@ -4297,6 +4297,349 @@ export function useSalesOrderRevisions(
   });
 }
 
+/* ─── STAGE 3 · card 3.3 — the attribution request lane ─────────────────────
+ *
+ * Four hooks, and the split between them IS the law: SUBMIT writes a request,
+ * APPROVE writes only that request's status, APPLY is the only one that moves
+ * the order (GATES.md GATE 4). They never collapse into one mutation, because
+ * one hook would be one button, and one button is how two verbs become one act.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/** A from → to pair, in NAMES. An approver never decides between two UUIDs. */
+export interface AttributionMove {
+  from: string | null;
+  to: string | null;
+}
+export interface AttributionRequest {
+  id: string;
+  status: "pending" | "approved";
+  reason: string | null;
+  created_at: string;
+  decided_at: string | null;
+  decision_note: string | null;
+  applied_at: string | null;
+  fields: string[];
+  /** Who GATE 3 lets decide this exact request. */
+  approver: "principal" | "hr_or_principal";
+  salesperson?: AttributionMove;
+  dealer?: AttributionMove;
+  outlet?: AttributionMove;
+  channel?: AttributionMove;
+}
+
+const attributionKey = (orderId: string) =>
+  [...qk.operation.order(orderId), "attribution"] as const;
+
+/** The ONE live request on an order — pending, or approved and not yet applied. */
+export function useSalesOrderAttribution(
+  orderId: string | null,
+  opts?: Partial<UseQueryOptions<{ request: AttributionRequest | null }>>,
+) {
+  return useQuery({
+    queryKey: orderId
+      ? attributionKey(orderId)
+      : (["operation", "orders", "null", "attribution"] as const),
+    queryFn: () =>
+      apiFetch<{ request: AttributionRequest | null }>(
+        `/api/operation/orders/${orderId}/attribution`,
+      ),
+    enabled: !!orderId,
+    ...opts,
+  });
+}
+
+export interface AttributionChanges {
+  salesperson_id?: string | null;
+  dealer_id?: string;
+  outlet_id?: string | null;
+  channel?: "dealer" | "showroom";
+}
+
+/** SUBMIT — records a request. The order is not touched. */
+export function useSubmitAttributionChange(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; fields: string[] },
+      ApiError,
+      { changes: AttributionChanges; reason: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { id: string; fields: string[] },
+    ApiError,
+    { changes: AttributionChanges; reason: string }
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ id: string; fields: string[] }>(
+        `/api/operation/orders/${orderId}/attribution`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: attributionKey(orderId) });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** APPROVE / REJECT — writes the REQUEST's status. Writes nothing else. */
+export function useDecideAttributionChange(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; status: string },
+      ApiError,
+      { requestId: string; decision: "approved" | "rejected"; note?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { id: string; status: string },
+    ApiError,
+    { requestId: string; decision: "approved" | "rejected"; note?: string }
+  >({
+    mutationFn: ({ requestId, decision, note }) =>
+      apiFetch<{ id: string; status: string }>(
+        `/api/operation/orders/attribution/${requestId}/decide`,
+        { method: "POST", body: JSON.stringify({ decision, ...(note ? { note } : {}) }) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: attributionKey(orderId) });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * WITHDRAW — the door back out of `approved` (0336).
+ *
+ * `'cancelled'` was legal since 0231 and unreachable from `approved`, so a
+ * wrong approval could only be cleared by carrying it out. One verb, a
+ * required reason, and the approver's own GATE 3 lane: the bar to take back is
+ * never higher than the bar to grant.
+ */
+export function useWithdrawAttributionChange(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<{ id: string; status: string }, ApiError, { requestId: string; reason: string }>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ id: string; status: string }, ApiError, { requestId: string; reason: string }>({
+    mutationFn: ({ requestId, reason }) =>
+      apiFetch<{ id: string; status: string }>(
+        `/api/operation/orders/attribution/${requestId}/withdraw`,
+        { method: "POST", body: JSON.stringify({ reason }) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: attributionKey(orderId) });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * APPLY — the only verb that moves the order. Re-runs every floor first, so it
+ * can still refuse here even though APPROVE succeeded. A second call is a
+ * no-op and says so (`already_applied`).
+ */
+export interface AttributionApplyResult {
+  id: string;
+  revision?: number;
+  changed?: string[];
+  already_applied?: boolean;
+}
+export function useApplyAttributionChange(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<AttributionApplyResult, ApiError, { requestId: string }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<AttributionApplyResult, ApiError, { requestId: string }>({
+    mutationFn: ({ requestId }) =>
+      apiFetch<AttributionApplyResult>(
+        `/api/operation/orders/attribution/${requestId}/apply`,
+        { method: "POST" },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: qk.operation.order(orderId) }),
+        qc.invalidateQueries({ queryKey: ["operation", "orders"] }),
+      ]);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/* ─── STAGE 3 · card 3.4 — durable correction work ──────────────────────────
+ *
+ * Raised BY a sales order change, owned BY the receiving module. There is no
+ * "raise" hook: raising happens in the database at revision-mint time, because
+ * a consequence follows from the document changing, not from a screen deciding
+ * to report it. The browser only READS the work and CLOSES it — and the two
+ * surfaces differ on purpose: the Sales Order shows what it caused and offers
+ * no close, the receiving module's page offers it.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+export interface CorrectionWorkRow {
+  id: string;
+  order_id: string;
+  revision: number;
+  module: "purchasing" | "operation" | "delivery" | "finance";
+  consequence: string;
+  fields_changed: string[];
+  classification: "A" | "B";
+  potentially_affected: { po_id?: string; state?: string };
+  shared: boolean;
+  /** The floor evaluator's OWN sentence, stored as raised. */
+  evidence: string;
+  state: "open" | "closed";
+  raised_at: string;
+  closed_at: string | null;
+  closed_note: string | null;
+  orders?: { so: number; customer_name: string | null } | null;
+}
+
+export function useCorrectionWork(
+  args: { module?: CorrectionWorkRow["module"]; state?: "open" | "closed" | "all" } = {},
+  opts?: Partial<UseQueryOptions<{ work: CorrectionWorkRow[] }>>,
+) {
+  const q = new URLSearchParams();
+  if (args.module) q.set("module", args.module);
+  if (args.state) q.set("state", args.state);
+  const qs = q.toString();
+  return useQuery({
+    queryKey: ["operation", "correction-work", args.module ?? "all", args.state ?? "open"] as const,
+    queryFn: () =>
+      apiFetch<{ work: CorrectionWorkRow[] }>(
+        `/api/operation/correction-work${qs ? `?${qs}` : ""}`,
+      ),
+    ...opts,
+  });
+}
+
+/** What ONE sales order has raised — the read-only side of the handover. */
+export function useOrderCorrectionWork(
+  orderId: string | null,
+  opts?: Partial<UseQueryOptions<{ work: CorrectionWorkRow[] }>>,
+) {
+  return useQuery({
+    queryKey: orderId
+      ? ([...qk.operation.order(orderId), "correction-work"] as const)
+      : (["operation", "orders", "null", "correction-work"] as const),
+    queryFn: () =>
+      apiFetch<{ work: CorrectionWorkRow[] }>(
+        `/api/operation/correction-work/order/${orderId}`,
+      ),
+    enabled: !!orderId,
+    ...opts,
+  });
+}
+
+export function useCloseCorrectionWork(
+  opts?: Partial<
+    UseMutationOptions<{ id: string; state?: string; already_closed?: boolean }, ApiError, { id: string; note?: string }>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ id: string; state?: string; already_closed?: boolean }, ApiError, { id: string; note?: string }>({
+    mutationFn: ({ id, note }) =>
+      apiFetch<{ id: string; state?: string; already_closed?: boolean }>(
+        `/api/operation/correction-work/${id}/close`,
+        { method: "POST", body: JSON.stringify(note ? { note } : {}) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "correction-work"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/* ─── STAGE 3 · card 3.5 — the amendment spine ──────────────────────────────
+ *
+ * SUBMIT and READ only. There is no issue hook, no accept hook and no apply
+ * hook that can succeed: the signing mechanism and the amendment document's
+ * form are the owner's wall, and a hook here would be the first step toward
+ * inventing one.
+ *
+ * `stale` is DERIVED by the server on every read, never stored — a stored flag
+ * needs something to notice the change and write it, and whatever failed to
+ * run would leave a stale document reading as valid.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+export interface SalesOrderAmendment {
+  id: string;
+  status: "draft" | "submitted" | "issued" | "accepted";
+  reason: string | null;
+  base_revision: number;
+  base_contractual_hash: string;
+  current_contractual_hash: string;
+  /** The contract moved since this was written. Re-propose from the new one. */
+  stale: boolean;
+  proposed_snapshot: Record<string, unknown>;
+  submitted_at: string;
+}
+
+export function useSalesOrderAmendment(
+  orderId: string | null,
+  opts?: Partial<UseQueryOptions<{ amendment: SalesOrderAmendment | null }>>,
+) {
+  return useQuery({
+    queryKey: orderId
+      ? ([...qk.operation.order(orderId), "amendment"] as const)
+      : (["operation", "orders", "null", "amendment"] as const),
+    queryFn: () =>
+      apiFetch<{ amendment: SalesOrderAmendment | null }>(
+        `/api/operation/orders/${orderId}/amendment`,
+      ),
+    enabled: !!orderId,
+    ...opts,
+  });
+}
+
+export interface AmendmentProposal {
+  lines?: Array<{ sku: string; qty: number; unit_price: number }>;
+  delivery_date?: string | null;
+  delivery_date_tbd?: boolean;
+  installment_months?: number | null;
+}
+
+export function useSubmitSalesOrderAmendment(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; base_revision: number; base_contractual_hash: string },
+      ApiError,
+      { proposed: AmendmentProposal; reason?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { id: string; base_revision: number; base_contractual_hash: string },
+    ApiError,
+    { proposed: AmendmentProposal; reason?: string }
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ id: string; base_revision: number; base_contractual_hash: string }>(
+        `/api/operation/orders/${orderId}/amendment`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: [...qk.operation.order(orderId), "amendment"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
 export interface SaveRevisionLineInput {
   id?: string;
   sku: string;

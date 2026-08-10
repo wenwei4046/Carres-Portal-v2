@@ -148,6 +148,76 @@ P 594 · Q 111 make the debt countable for the first time.
 
 ---
 
+# §6.4 · THE ERP REGISTER BLUEPRINT — ruled by Loo 2026-08-08 on the live Sales Orders build
+
+> **THE TABLE IS THE APPLICATION.** A register is not a web page with a table on it. Chrome
+> that exists because "pages have headers" is deleted. Scored 9.4/10 on review; these are the
+> corrections that must land before it is reused.
+
+```
+Sales Orders                                        Columns  Export
+───────────────────────────────────────────────────────────────────
+SO ▼ │ Customer ▼ │ Items ▼ │ Value ▼ │ Promised ▼ │ …
+[flt]│[flt]       │[flt]    │[flt]    │[date ▼]    │        ← typed per column
+───────────────────────────────────────────────────────────────────
+rows …                          ┌──────────────────────┐
+                                │ SO-1300           ×  │  ← CLOSE, never Back
+                                │ ‹  4 of 69  ›        │     (Outlook preview)
+                                │ Customer · Money ·   │
+                                │ Promise · Request ·  │
+                                │ Items · History      │
+                                │                Save  │  ← disabled until dirty
+                                └──────────────────────┘
+```
+
+**THE RULINGS**
+```
+① FREEZE `SO No` + `Customer` on the left. Everything else scrolls. (AutoCount's own shape.)
+② EVERY FILTER MATCHES ITS COLUMN — a date column gets This week · Next week · No date ·
+   Between…, never a textbox.
+③ ITEMS READ AS HUMAN WORDS — `King Mattress`, not `B1201S-K`. The SKU rides the hover.
+④ THE PANEL IS CALM — no box around every field. Notion, not a form. Sections, not borders.
+⑤ THE MONEY STRIP IS THE MOST-READ REGION — Total large · Paid medium · Outstanding loud.
+⑥ SAVE IS DISABLED UNTIL SOMETHING CHANGED.
+⑦ HISTORY GROUPS BY Today · Yesterday · Earlier, never a flat list of dates.
+⑧ ⭐ RECORD WHY THE PROMISE CHANGED. `The customer asks for {date}` + `Reason` → history.
+   Six months later nobody can otherwise answer WHY the promise moved.
+⑨ ⭐ `Request Item Change`, NEVER `Change Items`. Changing an item moves the quotation, the
+   payment, the purchasing plan and the delivery. **This is §0's Charter enforced in a button
+   word: Sales Order may REQUEST what four other modules must execute.**
+⑩ DELETE: the Refresh button (auto) · the Back button (it is a close, not a navigation) ·
+   the page header's spare height.
+```
+
+### 🔴 THREE CHALLENGES — recorded with the ruling, not after it
+
+**🔴 C1 · `Promised` MAY NOT BE BLUE.** `../01-design-tokens.md:101` is frozen: *"blue marks
+the current thing and the primary action, and nothing else"* — line 109 says blue marks
+**exactly two things on any screen.** A date in blue makes it a third. **The money strip gets
+its emphasis from SIZE and WEIGHT, which the ruling already uses for Total and Paid.**
+`Outstanding` may take the amber/red family only when it is genuinely late — §2.2 gives red one
+job. **This is the one item of the ten that cannot ship as written.**
+
+**🟡 C2 · DELETING SEARCH ENTIRELY CONTRADICTS THE CHARTER, and AutoCount does not do it.**
+§0 froze *"a customer phones and the operator must find that order"*. **A per-column filter
+requires knowing WHICH column first** — a caller says "I'm Umi" and the operator does not know
+if that is a name or a phone. **AutoCount's own window carries `Enter text to search… [Find]`
+in its top-right AND per-column filters** — both, in Loo's own screenshots. **Recommendation:
+keep ONE search box over SO · customer · phone · item, and add the per-column filters beside
+it.** Excel's filters are an addition, never a replacement.
+
+**🟡 C3 · AUTO-REFRESH MUST NEVER CLOBBER AN OPEN EDIT.** The panel has a dirty state and a
+Save. A refetch that lands mid-typing loses the operator's words. **Auto-refresh pauses while
+the panel is dirty.**
+
+### SCOPE — approved as a BLUEPRINT, not as a rollout
+**Purchase Orders (Phase 2, frozen 2026-08-03) and To Order (frozen by Jess 2026-08-01 —
+*"再继续改只会开始进入无限微调"*) are FROZEN pages with approved layouts.** Reusing this
+blueprint on them REOPENS two freezes. **The pattern is approved; each page's migration is its
+own decision and its own card.**
+
+---
+
 # ⛔ §6.5 · PAGE STRUCTURE IS NOT DECIDED — study the PORTAL before any one page
 
 > **Loo, 2026-08-08:** *"study all portal and rearrange how to build every page structure —
