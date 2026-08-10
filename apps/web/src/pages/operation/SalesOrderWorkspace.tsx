@@ -51,6 +51,7 @@ import {
   useCreateSalesOrder,
   useOperationDealersRef,
   useOperationOrder,
+  useOrderCorrectionWork,
   useOutlets,
   useSalesOrderRevisions,
   useSalespersons,
@@ -58,6 +59,7 @@ import {
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
 } from "@/lib/queries";
+import CorrectionWorkList from "./CorrectionWorkList";
 import SalesOrderAttribution from "./SalesOrderAttribution";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { describeRevisionChanges } from "./sales-order-revisions";
@@ -398,6 +400,10 @@ export default function SalesOrderWorkspace() {
 
   const detailQ = useOperationOrder(isNew ? null : (orderId ?? null));
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
+  /* 3.4 · what this sales order's changes have raised for other modules. The
+   * workspace SHOWS it and cannot close it — the module that raised the work
+   * does not tick it off. */
+  const correctionWorkQ = useOrderCorrectionWork(isNew ? null : (orderId ?? null));
   const baseQ = useQuery({
     queryKey: ["orders", "sales-order-data", orderId ?? "new"],
     queryFn: () =>
@@ -997,7 +1003,20 @@ export default function SalesOrderWorkspace() {
                 </div>
               </Section>
 
-              {/* ⑦ HISTORY / REVISION */}
+              {/* ⑦ WHAT THIS CHANGE STARTED ELSEWHERE — 3.4.
+                  Shown only when there IS work: a section that says "nothing"
+                  on every order is a section the operator learns to skip. */}
+              {!isNew && mode !== "oldrev" && (correctionWorkQ.data?.work ?? []).length > 0 && (
+                <Section title="What this change started elsewhere">
+                  <CorrectionWorkList
+                    work={correctionWorkQ.data?.work ?? []}
+                    canClose={false}
+                    emptyWord=""
+                  />
+                </Section>
+              )}
+
+              {/* ⑧ HISTORY / REVISION */}
               {!isNew && (
                 <Section title="History / Revision">
                   {revisions.length === 0 ? (

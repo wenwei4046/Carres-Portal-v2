@@ -21,6 +21,7 @@ import operationSuppliersOverviewRouter from "./routes/operation/suppliers-overv
 import operationBadgesRouter from "./routes/operation/badges";
 import operationDashboardRouter from "./routes/operation/dashboard";
 import operationMovementsRouter from "./routes/operation/movements";
+import correctionWorkRouter from "./routes/operation/correction-work";
 import operationOrdersRouter from "./routes/operation/orders";
 import operationPartnersRouter from "./routes/operation/partners";
 import operationPosRouter from "./routes/operation/pos";
@@ -176,6 +177,8 @@ api.route("/operation/badges", operationBadgesRouter);
 api.route("/operation/dashboard", operationDashboardRouter);
 api.route("/operation/movements", operationMovementsRouter);
 api.route("/operation/orders", operationOrdersRouter);
+// STAGE 3 card 3.4 — durable correction work, read by the RECEIVING module.
+api.route("/operation/correction-work", correctionWorkRouter);
 api.route("/operation/orders", resumeDispatchRouter);
 // 0156 γ multi-leg — PUT /:id/delivery-chain + PATCH /:id/delivery-stops/:leg
 api.route("/operation/orders", deliveryChainRouter);

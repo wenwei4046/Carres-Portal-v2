@@ -4448,6 +4448,91 @@ export function useApplyAttributionChange(
   });
 }
 
+/* ─── STAGE 3 · card 3.4 — durable correction work ──────────────────────────
+ *
+ * Raised BY a sales order change, owned BY the receiving module. There is no
+ * "raise" hook: raising happens in the database at revision-mint time, because
+ * a consequence follows from the document changing, not from a screen deciding
+ * to report it. The browser only READS the work and CLOSES it — and the two
+ * surfaces differ on purpose: the Sales Order shows what it caused and offers
+ * no close, the receiving module's page offers it.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+export interface CorrectionWorkRow {
+  id: string;
+  order_id: string;
+  revision: number;
+  module: "purchasing" | "operation" | "delivery" | "finance";
+  consequence: string;
+  fields_changed: string[];
+  classification: "A" | "B";
+  potentially_affected: { po_id?: string; state?: string };
+  shared: boolean;
+  /** The floor evaluator's OWN sentence, stored as raised. */
+  evidence: string;
+  state: "open" | "closed";
+  raised_at: string;
+  closed_at: string | null;
+  closed_note: string | null;
+  orders?: { so: number; customer_name: string | null } | null;
+}
+
+export function useCorrectionWork(
+  args: { module?: CorrectionWorkRow["module"]; state?: "open" | "closed" | "all" } = {},
+  opts?: Partial<UseQueryOptions<{ work: CorrectionWorkRow[] }>>,
+) {
+  const q = new URLSearchParams();
+  if (args.module) q.set("module", args.module);
+  if (args.state) q.set("state", args.state);
+  const qs = q.toString();
+  return useQuery({
+    queryKey: ["operation", "correction-work", args.module ?? "all", args.state ?? "open"] as const,
+    queryFn: () =>
+      apiFetch<{ work: CorrectionWorkRow[] }>(
+        `/api/operation/correction-work${qs ? `?${qs}` : ""}`,
+      ),
+    ...opts,
+  });
+}
+
+/** What ONE sales order has raised — the read-only side of the handover. */
+export function useOrderCorrectionWork(
+  orderId: string | null,
+  opts?: Partial<UseQueryOptions<{ work: CorrectionWorkRow[] }>>,
+) {
+  return useQuery({
+    queryKey: orderId
+      ? ([...qk.operation.order(orderId), "correction-work"] as const)
+      : (["operation", "orders", "null", "correction-work"] as const),
+    queryFn: () =>
+      apiFetch<{ work: CorrectionWorkRow[] }>(
+        `/api/operation/correction-work/order/${orderId}`,
+      ),
+    enabled: !!orderId,
+    ...opts,
+  });
+}
+
+export function useCloseCorrectionWork(
+  opts?: Partial<
+    UseMutationOptions<{ id: string; state?: string; already_closed?: boolean }, ApiError, { id: string; note?: string }>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ id: string; state?: string; already_closed?: boolean }, ApiError, { id: string; note?: string }>({
+    mutationFn: ({ id, note }) =>
+      apiFetch<{ id: string; state?: string; already_closed?: boolean }>(
+        `/api/operation/correction-work/${id}/close`,
+        { method: "POST", body: JSON.stringify(note ? { note } : {}) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "correction-work"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
 export interface SaveRevisionLineInput {
   id?: string;
   sku: string;
