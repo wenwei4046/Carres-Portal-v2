@@ -236,8 +236,14 @@ export default function OperationDelivery() {
         }),
         tone: next.tone,
         locked: !!next.locked,
-        dueIso: def ? deliveryStepDueIso(def.key, anchor, holidayOpts) : null,
-        overdue: def ? deliveryStepOverdue(def.key, anchor, today, holidayOpts) : false,
+        // CARD 3 (2026-08-11): `queueLeads` was computed above and never
+        // passed, so this page called the chase step late on the SEED while
+        // the Orders list read the setting — two surfaces, one step, two
+        // answers, invisible only while the setting equalled the seed.
+        dueIso: def ? deliveryStepDueIso(def.key, anchor, holidayOpts, queueLeads) : null,
+        overdue: def
+          ? deliveryStepOverdue(def.key, anchor, today, holidayOpts, queueLeads)
+          : false,
         bookingIso: orderBookingDay(o).date,
         promisedIso: o.delivery_date_tbd ? null : o.delivery_date,
         so: o.so,

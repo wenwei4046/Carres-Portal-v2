@@ -366,6 +366,68 @@ from `incoming` at Receiving; the claimless inspection hold enters only from
 
 ---
 
+# ✅ EARLY LOGISTICS ASSIGNMENT + CUSTOMER BOOKING — SO V2 CARD 3, SHIPPED 2026-08-11
+
+**The question this card installed:** logistics are assigned the moment the
+PO is placed, the Stock ETA is watched as its own fact, and the customer's
+booking call opens **three actual working days** before delivery on the
+working calendar with public holidays.
+
+**THE TRACE CAME FIRST, AND THE APPROVED FLOW WAS ALREADY UNBLOCKED:**
+
+```
+Assign logistics    opens from order birth with NO stock gate — the engine's
+                    delivery track "runs whether or not the goods are in"
+                    (order-actions.ts deliveryAction). Nothing anywhere blocks
+                    early assignment; the drawer and the bulk bar both assign
+                    on an order still in production.
+Three facts         stored independently, none inferred from another:
+                    assigned logistics (orders.delivery_partners /
+                    ops_assigned_logistic) · Stock ETA
+                    (ops_order_control.line_etas, the delay radar's input) ·
+                    customer-confirmed date + slot (0277's two-stage booking,
+                    server-gated, evidence-carrying).
+Booking call        opens the moment a company is assigned — before goods
+                    arrive. Its window has been a SETTING since 0303
+                    (logistics_call_working_days).
+Calendars           both due call sites already inject myHolidaySet() on the
+                    Mon–Sat delivery week.
+```
+
+**What the card changed — one ruled number and one measured drift:**
+
+- **Migration 0342**: `logistics_call_working_days` **1 → 3** (the owner's
+  *"three actual working days before delivery"*), recorded through the same
+  ledger + audit sentence the Settings door writes. The seed in
+  `delivery-queue.ts` moved with it.
+- 🔴→✅ **The Delivery page computed `queueLeads` from the setting and never
+  passed it** (`OperationDelivery.tsx` due/overdue calls) — so it called the
+  chase step late on the hard-coded seed while the Orders list read the
+  setting. Two surfaces, one step, two lateness answers — invisible only
+  while the setting equalled the seed, and Card 3's 3 would have exposed it
+  on day one. Fixed; both pages now read the setting.
+
+**Deliberately NOT changed, with the falsifier named:**
+- The **display ranking** (Law 4) still puts an open goods call above
+  `Assign logistics`, so the delivery QUEUE tile carries an order only once
+  its goods track is quiet — the assign ACTION itself is open from birth and
+  visible in the drawer list and the row's `+N`. If the owner wants early
+  assignment to LEAD the row over goods work, that is a display-priority
+  re-ruling of ACTION-FLOW-STANDARD Law 4 — one sentence, not this card.
+- The assign step's **late backstop** stays `promised date − 3 working days`;
+  "assign immediately" is the flow (nothing gates it), not a new deadline
+  anchored to PO-placement day, which would mark every order late on day two.
+  If the owner means it as a deadline, the anchor is one line in
+  `delivery-queue.ts`.
+
+**Production evidence:** 0342 applied — live `logistics_call_working_days`
+= 3, ledger row recorded, audit sentence written. Tests: shared 2245 ·
+api 2171 · web OperationDelivery 16 · web tsc clean. Seed + Merdeka holiday
+tests re-pinned to the 3-day window; a leads-override test proves the setting
+drives the window, not the seed.
+
+---
+
 # SALES ORDER V2 — CURRENT APPROVED TARGET AND BUILD CHECKPOINT
 
 > **OWNER RULING, 2026-08-11. This is current target truth under the MASTER OVERWRITE LAW.**
@@ -379,8 +441,8 @@ from `incoming` at Receiving; the claimless inspection hold enters only from
 |---|---|---|
 | **1** | Customer Obligation Truth | **COMPLETE** — `dae94301`, migration `0340`, production verified 2026-08-11; exact implementation record immediately above |
 | **2** | Unit / Stock Allocation Truth | **COMPLETE** — migration `0341`, production verified 2026-08-11 (nine rolled-back probes); exact implementation record above. The spine (unit birth at PO · receiving flips · governed draw) was measured ALREADY LIVE; the card closed the four violations of the approved law |
-| **3** | Early Logistics Assignment + Customer Booking | **NOT BUILT — NEXT CARD** |
-| **4** | Money Truth + Collection Gate | **NOT BUILT** |
+| **3** | Early Logistics Assignment + Customer Booking | **COMPLETE** — migration `0342`, production verified 2026-08-11; record above. The flow was measured already unblocked; the card moved the ruled call window to 3 working days and closed the two-surface lateness drift |
+| **4** | Money Truth + Collection Gate | **NOT BUILT — NEXT CARD** |
 | **5** | Delivery Attempt + Delivery Exception | **NOT BUILT** |
 | **6** | Loan Mattress / Loan Sofa Obligations | **NOT BUILT** |
 | **7** | Change / Cancel / Refund Lineage | **NOT BUILT** |
@@ -445,7 +507,7 @@ whether to allocate it. Never silently auto-allocate or reallocate. A wrong, sur
 customer-rejected Unit returns through location + inspection to **Available or Hold**; it does not
 disappear with the old SO. The original SO continues to owe the correct commitment.
 
-## Card 3 · Early Logistics Assignment + Customer Booking — approved target, not built
+## Card 3 · Early Logistics Assignment + Customer Booking — approved and built
 
 ```
 PO placed → assign logistics immediately → watch Stock ETA → contact customer early
@@ -605,17 +667,18 @@ Payment remain the authority for what operationally happened.
 
 1. Read root `CLAUDE.md` / `AGENTS.md` for the Constitution and MASTER OVERWRITE LAW.
 2. Read [`../ERP-ARCHITECTURE.md`](../ERP-ARCHITECTURE.md) for cross-module ownership.
-3. Read this section and the Card 1 + Card 2 shipped records immediately above it.
-4. Read only the MASTER(s) of modules Card 3 touches: [`../delivery/MASTER.md`](../delivery/MASTER.md)
-   and §7 of this file; the working-calendar law lives in
-   [`../purchasing/MASTER.md`](../purchasing/MASTER.md) §10 (`myHolidaySet()` until built).
+3. Read this section and the Card 1 · 2 · 3 shipped records immediately above it.
+4. Read only what Card 4 touches: §8 of this file (the money gate and the one number),
+   [`../payment/MASTER.md`](../payment/MASTER.md), and `packages/shared/src/order-money.ts` —
+   the ONE money arithmetic every reader must converge on.
 5. Re-measure current code and production before quoting implementation state. Preserve unrelated
    dirty work. Do not reopen the approved business flow merely from preference; raise only a real
    repo/production contradiction or implementation impossibility.
-6. Build **Card 3 — Early Logistics Assignment + Customer Booking** next. Trace every existing
-   logistics-assignment, Stock-ETA and booking door (assign logistics · booking_stage ·
-   confirmed_date · the booking gate) before implementation. Stop after Card 3 proof and update
-   this status table. **Do not start Card 4 automatically.**
+6. Build **Card 4 — Money Truth + Collection Gate** next. Trace every existing money write door
+   (`orders.paid` · `order_payments` · `ops_order_control.balance` / `paid_amount` /
+   `payment_status`) and every reader before implementation — the card's own text demands they
+   converge on ONE authoritative write and calculation. Stop after Card 4 proof and update this
+   status table. **Do not start Card 5 automatically.**
 
 ---
 
