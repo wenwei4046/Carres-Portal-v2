@@ -1864,10 +1864,64 @@ describe("POST /api/operation/orders/:id/save", () => {
       p_order_id: ORDER_ID,
       p_header: { delivery_date: "2026-09-05" },
       p_lines: [{ sku: "B1201S-K", qty: 2, unit_price: 2499 }],
+      p_change: null,
     });
     /* NOTHING was written directly — the RPC owns every write. */
     expect(from).not.toHaveBeenCalled();
-    assertRpcCallShape(rpc, "sales_order_save_revision", ["p_order_id", "p_header", "p_lines"]);
+    assertRpcCallShape(rpc, "sales_order_save_revision", [
+      "p_order_id",
+      "p_header",
+      "p_lines",
+      "p_change",
+    ]);
+  });
+
+  it("CARD 1 — forwards the cause: change.type/note → p_change", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { revision: 3, changed: ["items"], change_type: "customer_change" },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lines: [{ sku: "MODEL-B", qty: 1, unit_price: 2799 }],
+          change: { type: "customer_change", note: "Customer phoned - wants Model B" },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("sales_order_save_revision", {
+      p_order_id: ORDER_ID,
+      p_header: {},
+      p_lines: [{ sku: "MODEL-B", qty: 1, unit_price: 2799 }],
+      p_change: { change_type: "customer_change", note: "Customer phoned - wants Model B" },
+    });
+  });
+
+  it("CARD 1 — refuses an unknown change type without calling the database", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lines: [{ sku: "MODEL-B", qty: 1, unit_price: 2799 }],
+          change: { type: "fulfilment_replacement" },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("refuses an empty save without calling the database", async () => {
@@ -1952,6 +2006,56 @@ describe("POST /api/operation/orders (create)", () => {
     );
     expect(bad.status).toBe(422);
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * CARD 1 — CUSTOMER OBLIGATION TRUTH. The route is a thin door: ONE definer
+ * read (sales_order_commitment_bundle, 0340) + the shared resolver. The
+ * resolver itself is proven case-by-case in
+ * packages/shared/src/sales-order-commitment.test.ts (CASES 1–7); here we
+ * prove the wiring and that the answer carries lineage + cause.
+ */
+describe("GET /api/operation/orders/:id/commitment", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000b01";
+  const SNAP = (sku: string) => ({
+    header: { customer_name: "Tan Ah Kow", delivery_date: "2026-09-01", delivery_date_tbd: false },
+    lines: [{ id: "00000000-0000-0000-0000-0000000000l1", sku, qty: 1, unit_price: 2499 }],
+    addons: [],
+  });
+
+  it("answers current commitment + lineage from the bundle RPC alone", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: {
+        order_id: ORDER_ID,
+        current: SNAP("MODEL-A"),
+        revisions: [
+          { revision: 1, created_at: "2026-08-01", created_by: "u1", change_type: null, note: null, snapshot: SNAP("MODEL-B") },
+          { revision: 2, created_at: "2026-08-02", created_by: "u2", change_type: "staff_correction", note: null, snapshot: SNAP("MODEL-A") },
+        ],
+        requests: [],
+      },
+      error: null,
+    });
+    const from = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/commitment`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("sales_order_commitment_bundle", { p_order_id: ORDER_ID });
+    /* The door read NOTHING else — no PO, no units, no drawer stages. */
+    expect(from).not.toHaveBeenCalled();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.commitment.lines[0].sku).toBe("MODEL-A");
+    expect(body.commitment.lineage[1].changeType).toBe("staff_correction");
+    expect(body.commitment.lineage[1].changes.length).toBeGreaterThan(0);
   });
 });
 

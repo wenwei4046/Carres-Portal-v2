@@ -10,8 +10,10 @@ import {
   ListOperationOrdersQuery,
   recheckStockInput,
   reselectPartnerInput,
+  resolveCurrentCustomerCommitment,
   transferReadyInputSchema,
   warehousePickInput,
+  type CommitmentBundle,
 } from "@carres/shared";
 // renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { DoTemplateData } from "../../lib/pdf/types";
@@ -611,7 +613,7 @@ operationOrdersRouter.get("/:id/revisions", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
     .from("sales_order_revisions")
-    .select("revision, snapshot, created_at, created_by")
+    .select("revision, snapshot, created_at, created_by, change_type, note")
     .eq("order_id", id)
     .order("revision", { ascending: true });
   if (error) {
@@ -621,12 +623,47 @@ operationOrdersRouter.get("/:id/revisions", requireOperation, async (c) => {
   return c.json({ revisions: data ?? [] });
 });
 
-// POST /:id/save — the ONE edit door. Stage 2: every change is Class B, no
-// approval. The RPC refuses an empty or no-op save.
+// GET /:id/commitment — CARD 1's one authoritative read: what is the
+// customer's CURRENT committed order, and how did it become this? The RPC
+// (sales_order_commitment_bundle, 0340) reads orders/order_lines/addons via
+// the snapshot arithmetic, the revision ledger and the change requests —
+// and NOTHING from purchasing, units, receiving, booking or legacy stages.
+// The shared resolver shapes the answer; Law D — one resolver, everywhere.
+operationOrdersRouter.get("/:id/commitment", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_commitment_bundle", {
+    p_order_id: id,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({
+    commitment: resolveCurrentCustomerCommitment(data as unknown as CommitmentBundle),
+  });
+});
+
+// POST /:id/save — the ONE edit door. CARD 1: a save that moves the
+// CONTRACTUAL fields (items · promised date) must state its cause —
+// `staff_correction` (the record was wrong) or `customer_change` (the
+// customer asked for something different). The RPC (0340) enforces the
+// requirement AFTER the diff — a save that only fixes contact data needs no
+// cause and defaults to staff_correction. The RPC also refuses an empty or
+// no-op save, refuses on any floor BLOCK, and refuses removing/re-SKUing a
+// line in production.
+const saveChangeInput = z
+  .object({
+    type: z.enum(["staff_correction", "customer_change"]),
+    note: z.string().trim().max(2000).optional(),
+  })
+  .strict();
+
 const saveRevisionInput = z
   .object({
     header: revisionHeaderInput.optional(),
     lines: z.array(revisionLineInput).min(1).optional(),
+    change: saveChangeInput.optional(),
   })
   .refine((v) => v.header !== undefined || v.lines !== undefined, {
     message: "Nothing to save",
@@ -651,6 +688,9 @@ operationOrdersRouter.post("/:id/save", requireOperation, async (c) => {
     p_order_id: id,
     p_header: parsed.data.header ?? {},
     p_lines: parsed.data.lines ?? null,
+    p_change: parsed.data.change
+      ? { change_type: parsed.data.change.type, note: parsed.data.change.note ?? null }
+      : null,
   });
   if (error) {
     const m = mapPipelineV2Error(error);

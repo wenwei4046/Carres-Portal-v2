@@ -2488,3 +2488,4 @@ export {
 } from "./schemas/hr";
 export * from "./schemas/hr-team";
 export * from "./sales-order-classification";
+export * from "./sales-order-commitment";

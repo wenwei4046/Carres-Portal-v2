@@ -59,6 +59,8 @@ import {
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
 } from "@/lib/queries";
+import { COMMITMENT_CHANGE_WORDS } from "@carres/shared";
+import { Modal, ModalActions } from "./components/Modal";
 import CorrectionWorkList from "./CorrectionWorkList";
 import SalesOrderAmendment from "./SalesOrderAmendment";
 import SalesOrderAttribution from "./SalesOrderAttribution";
@@ -568,10 +570,60 @@ export default function SalesOrderWorkspace() {
     return null;
   };
 
+  /* ── CARD 1 · a contractual save states its cause. ────────────────────────
+   * A save that moves the ITEMS or the PROMISED DATE must say who asked:
+   * Staff correction (the record was wrong — the customer's agreement never
+   * changed) or Customer change (the customer asked for something
+   * different). The RPC (0340) refuses a contractual save without it; this
+   * chooser is the structured entrance. Contact/address-only fixes pass
+   * straight through — the server records them as staff corrections. */
+  const [changeAsk, setChangeAsk] = useState<null | {
+    header: Record<string, unknown>;
+    lines: ReturnType<typeof draftLinesPayload>;
+  }>(null);
+  const [changeType, setChangeType] = useState<"staff_correction" | "customer_change" | null>(
+    null,
+  );
+  const [changeNote, setChangeNote] = useState("");
+
+  const contractualChanged = (): boolean => {
+    if (!order) return false;
+    if ((draft.delivery_date ?? null) !== (order.delivery_date ?? null)) return true;
+    if (Boolean(draft.delivery_date_tbd) !== Boolean(order.delivery_date_tbd)) return true;
+    const next = draftLinesPayload();
+    const prev = detailLines;
+    if (next.length !== prev.length) return true;
+    const prevById = new Map(prev.map((l) => [l.id, l]));
+    for (const l of next) {
+      if (!l.id) return true; // an added line
+      const p = prevById.get(l.id);
+      if (!p) return true;
+      if (p.sku !== l.sku || Number(p.qty) !== Number(l.qty)) return true;
+      if (Number(p.unit_price) !== Number(l.unit_price)) return true;
+    }
+    return false;
+  };
+
   const onSave = () => {
     const err = validateDraft(false);
     if (err) return void toast.error(err);
-    saveMut.mutate({ header: draftHeaderPayload(), lines: draftLinesPayload() });
+    const payload = { header: draftHeaderPayload(), lines: draftLinesPayload() };
+    if (contractualChanged()) {
+      setChangeType(null);
+      setChangeNote("");
+      setChangeAsk(payload);
+      return;
+    }
+    saveMut.mutate(payload);
+  };
+
+  const onConfirmChange = () => {
+    if (!changeAsk || !changeType) return;
+    saveMut.mutate({
+      ...changeAsk,
+      change: { type: changeType, ...(changeNote.trim() ? { note: changeNote.trim() } : {}) },
+    });
+    setChangeAsk(null);
   };
   const onCreate = () => {
     const err = validateDraft(true);
@@ -733,6 +785,70 @@ export default function SalesOrderWorkspace() {
         docTitle={isNew ? "New Sales Order — Carres" : order ? `SO-${order.so} — Carres` : undefined}
         right={headerRight}
       />
+
+      {/* CARD 1 — the structured entrance: a contractual save states its cause. */}
+      {changeAsk && (
+        <Modal title="Who asked for this change?" onClose={() => setChangeAsk(null)}>
+          <div className="flex flex-col gap-2" data-testid="change-type-chooser">
+            <p className="text-body text-base-700">
+              This save changes the items or the promised date. The record must say who asked.
+            </p>
+            <label className="flex items-start gap-2 rounded-card border border-kit-slate-5 bg-white px-3 py-2">
+              <input
+                type="radio"
+                name="change-type"
+                className="mt-1"
+                checked={changeType === "staff_correction"}
+                onChange={() => setChangeType("staff_correction")}
+                data-testid="change-type-staff"
+              />
+              <span>
+                <span className="text-body font-semibold text-base-900">
+                  {COMMITMENT_CHANGE_WORDS.staff_correction}
+                </span>
+                <span className="block text-meta text-base-500">
+                  The record was wrong — the customer's agreement never changed.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 rounded-card border border-kit-slate-5 bg-white px-3 py-2">
+              <input
+                type="radio"
+                name="change-type"
+                className="mt-1"
+                checked={changeType === "customer_change"}
+                onChange={() => setChangeType("customer_change")}
+                data-testid="change-type-customer"
+              />
+              <span>
+                <span className="text-body font-semibold text-base-900">
+                  {COMMITMENT_CHANGE_WORDS.customer_change}
+                </span>
+                <span className="block text-meta text-base-500">
+                  The customer asked for something different.
+                </span>
+              </span>
+            </label>
+            <label className="mt-1 flex flex-col gap-1">
+              <span className="text-label text-base-500">Note (optional)</span>
+              <textarea
+                className="min-h-[64px] rounded-[6px] border border-base-200 bg-white px-2 py-1 text-body outline-none focus:border-primary"
+                value={changeNote}
+                maxLength={2000}
+                onChange={(e) => setChangeNote(e.target.value)}
+                data-testid="change-note"
+              />
+            </label>
+            <ModalActions
+              onCancel={() => setChangeAsk(null)}
+              onPrimary={onConfirmChange}
+              primary="Save"
+              primaryDisabled={!changeType}
+              primaryPending={saveMut.isPending}
+            />
+          </div>
+        </Modal>
+      )}
 
       <div className="flex min-h-0 flex-1">
         {/* ── LEFT 55% — the seven sections ─────────────────────────────── */}
@@ -1078,6 +1194,18 @@ export default function SalesOrderWorkspace() {
                               <span className="text-meta text-base-500">
                                 {" "}· {fmtDate(r.created_at, { time: true })}
                               </span>
+                              {/* CARD 1 — who asked. Rev 1 and pre-0340 rows carry no cause. */}
+                              {r.change_type && (
+                                <span
+                                  className="ml-1.5 rounded-pill border border-base-200 bg-base-50 px-1.5 py-px text-label text-base-700"
+                                  data-testid={`rev-${r.revision}-cause`}
+                                >
+                                  {COMMITMENT_CHANGE_WORDS[r.change_type]}
+                                </span>
+                              )}
+                              {r.note && (
+                                <span className="ml-1.5 text-meta text-base-500">“{r.note}”</span>
+                              )}
                               <ul className="mt-0.5 flex flex-col gap-0.5 pl-3">
                                 {changes.map((chg, i) => (
                                   <li key={i} className="text-meta text-base-700">
