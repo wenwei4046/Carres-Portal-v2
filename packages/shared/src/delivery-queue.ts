@@ -79,10 +79,12 @@ export const DELIVERY_QUEUES: readonly DeliveryQueueDef[] = [
     label: orderActionQueue("confirm_delivery_date"),
     anchor: "delivery_date",
     // P1: this ONE step's lead is a setting (`logistics_call_working_days`,
-    // Purchasing → Settings — Jess may set 5). The number here is the seed the
-    // migration wrote, used only where no settings row is supplied (tests).
+    // Purchasing → Settings). The number here is the seed, used only where no
+    // settings row is supplied (tests). SO V2 CARD 3 (owner ruling 2026-08-11)
+    // set the target call window to THREE actual working days before delivery
+    // — migration 0342 moved the live setting and this seed together.
     // The three other steps are not settings: they are the shape of the work.
-    leadWorkingDays: 1,
+    leadWorkingDays: 3,
     description:
       "Logistics assigned but the customer has not confirmed a date + slot — late once the promised date is the configured number of working days away",
   },

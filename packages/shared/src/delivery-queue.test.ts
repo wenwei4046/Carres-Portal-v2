@@ -64,9 +64,16 @@ describe("deliveryStepDueIso — each step's own deadline", () => {
     expect(deliveryStepDueIso("assign", "2026-08-06", HOLS)).toBe("2026-08-03");
   });
 
-  it("chase = 1 working day before the customer's date", () => {
-    // Mon 2026-08-03 − 1 working day → Sat 2026-08-01 (Saturday IS a working day).
-    expect(deliveryStepDueIso("chase", "2026-08-03", HOLS)).toBe("2026-08-01");
+  it("chase seed = 3 working days before the customer's date (SO V2 Card 3, 0342)", () => {
+    // Mon 2026-08-03 − 3 working days → Sat 01, Fri 31 Jul, Thu 30 Jul.
+    expect(deliveryStepDueIso("chase", "2026-08-03", HOLS)).toBe("2026-07-30");
+  });
+
+  it("chase reads the SETTING when leads are supplied — the seed is only a fallback", () => {
+    // A settings row still holding 1 reproduces the pre-Card-3 window.
+    expect(deliveryStepDueIso("chase", "2026-08-03", HOLS, { chase: 1 })).toBe(
+      "2026-08-01",
+    );
   });
 
   it("deliver today = the confirmed date itself, no offset", () => {
@@ -83,8 +90,9 @@ describe("deliveryStepDueIso — each step's own deadline", () => {
   });
 
   it("skips a public holiday, not just the Sunday", () => {
-    // 2026-08-31 Merdeka (Monday). Tue 2026-09-01 − 1 working day → Sat 2026-08-29.
-    expect(deliveryStepDueIso("chase", "2026-09-01", HOLS)).toBe("2026-08-29");
+    // 2026-08-31 Merdeka (Monday). Tue 2026-09-01 − 3 working days →
+    // Sat 08-29 (Merdeka Monday skipped) · Fri 08-28 · Thu 08-27.
+    expect(deliveryStepDueIso("chase", "2026-09-01", HOLS)).toBe("2026-08-27");
   });
 
   it("no anchor → no deadline (a TBD date can never be late)", () => {
@@ -125,9 +133,9 @@ describe("deliveryStepOverdue — the queue turns late by itself", () => {
   });
 
   it("holidays are injected, not baked in — an empty calendar gives a different answer", () => {
-    // With Merdeka injected, chase for Tue 09-01 is due Sat 08-29; without any
-    // holidays it is due Mon 08-31.
-    expect(deliveryStepDueIso("chase", "2026-09-01")).toBe("2026-08-31");
-    expect(deliveryStepDueIso("chase", "2026-09-01", HOLS)).toBe("2026-08-29");
+    // With Merdeka injected, chase for Tue 09-01 is due Thu 08-27; without any
+    // holidays the Monday counts and it is due Fri 08-28.
+    expect(deliveryStepDueIso("chase", "2026-09-01")).toBe("2026-08-28");
+    expect(deliveryStepDueIso("chase", "2026-09-01", HOLS)).toBe("2026-08-27");
   });
 });
