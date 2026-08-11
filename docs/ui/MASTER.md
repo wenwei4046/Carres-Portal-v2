@@ -267,9 +267,16 @@ into a module tab strip. Purchasing is the explicit reference: SO Batch Purchase
 Purchase · Purchase Orders · Receiving · Supplier Claim are individual destinations, with no
 Purchasing tabs and no substitute second navigation row.
 
-A tab row is not a standard Register layer. Its admission remains **UNRESOLVED** and must be
-decided only for a concrete page by scoped research under `CLAUDE.md`. A proposed tab may not
-be introduced merely to group related pages, imitate another product, or fill a second header.
+**TAB ADMISSION LAW — APPROVED / LOCKED.** A tab row is not a standard Register layer. Tabs
+are admitted only when every tab remains inside the same owned business object, the same
+operator responsibility and the same primary work, and switching tabs changes only the view
+or partition of that one work surface. If the owned record, operator job, primary action or
+page purpose changes, the destination must be separate navigation instead.
+
+A proposed tab may not be introduced merely to group related pages, imitate another product,
+or fill a second header. Therefore the default Register stack has no tab row: Destination
+Header → page Work Toolbar when required → Work Surface. Any exception is a new page-scoped
+design decision and must demonstrate that it passes every admission condition above.
 
 # §6.6 · SALES ORDERS REFERENCE STRUCTURE — ruled by Loo 2026-08-10
 
