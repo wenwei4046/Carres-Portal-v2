@@ -261,6 +261,20 @@ own decision and its own card.**
 
 # §6.5 · REGISTER NAVIGATION AND HEADER ADMISSION — ruled by Loo 2026-08-11
 
+**LOCKED CONSTRAINTS PREFLIGHT — APPROVED / LOCKED (Loo, 2026-08-11).** Before every UI
+proposal or mockup, Plan chat must first build a short preflight from this MASTER, frozen
+`../01-design-tokens.md`, and the relevant module MASTER. It must verify, at minimum: Sidebar
+active/current treatment · page header law · toolbar law · typography · row/header/footer
+density · pill/button treatment · spacing · Register width/scroll law · locked column order ·
+existing capabilities that must survive · retired/banned patterns. A mockup may not be shown
+until it passes. If the authorities conflict, report the conflict and stop the mockup; do not
+silently choose one.
+
+Reference products may inform only a genuinely unresolved surface after this preflight. Linear,
+2990, Shopify, AutoCount and every other reference may never overwrite a Carres field, token,
+locked decision or preserved capability. A proposal that needs to change locked truth must first
+name that reopening and receive an owner ruling; visual convenience is not authority.
+
 **TABS ARE AVOIDED BY DEFAULT — APPROVED / LOCKED.** Separate business jobs, owned records
 or destinations are separate portal-navigation entries and pages; they are never compressed
 into a module tab strip. Purchasing is the explicit reference: SO Batch Purchase · Manual
