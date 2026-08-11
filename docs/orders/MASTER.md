@@ -116,14 +116,14 @@ business engine or the route cutover.
 
 ```
 DestinationHeader  44px  one Sales Orders identity; no duplicate tab/title
-Work Toolbar       45px  Not delivered / All orders · Search · Filters · Export ·
-                          Columns · New Sales Order; one governed row
-Work Surface             DataGrid owns both scroll axes; route wrapper does not scroll
+Work Toolbar       45px  View · Search · Export · Columns · Scan · New · overflow;
+                          selection replaces this same governed row
+Work Surface             DataGrid owns both scroll axes + one fixed status footer
 ```
 
-The DataGrid reference appearance is local to Sales Orders: rendered 31px header, 10px bold
-uppercase header type, rendered 33px single-line parent rows, 11px cell type, 8px horizontal
-cell padding, rendered 22px footer, flat grid, faint dividers and no zebra. It preserves
+The DataGrid follows the current Register Template: rendered 36px header, 38px single-line parent
+rows, 32px fixed status footer and 8px outer frame gaps, with frozen Carres typography, a flat
+grid, faint dividers and no zebra. It preserves
 server Search, typed column filters, Columns, Excel Export, resize, reorder, the existing
 browser layout key and expanded order lines.
 
@@ -2239,72 +2239,28 @@ chevron. Nothing is remembered across a remount (§0.4).
 > card**, so it is recorded rather than taken; it is one word (`key={i}`) whenever a card owns
 > that file.
 
-### ✅ S2.3 · SHIPPED 2026-08-08 — the footer total, and it counts the LIST, not the window
+### SALES ORDERS STATUS FOOTER — APPROVED / LOCKED (Loo, 2026-08-11)
 
-**The strip states the money this view is owed** — one spanned sentence pinned under the last
-row the way the head is pinned over the first:
-
-```
-Total · RM 1,234,567.00 outstanding · 12 not priced
-```
-
-**THE CARD WAS RIGHT THAT 2990 HAS NOTHING TO COPY, and the source change needed no approval.**
-Re-verified: `tfoot` · `totalRow` · `footerTotal` · `sumRow` return two hits in 1,551 lines and
-both are `totalRows`, a GROUP's row count. So this is **Carres' own kit** (`DataTable.totals`,
-D0.5d power 4) **and To Order's live usage of it** (T1, 2026-08-06) — the spanned-`cells` shape,
-because *"a total that reads as a sentence rather than a digit marooned under one column"* is
-exactly this table's problem: **Orders has no money column** for a per-column aggregate to land
-under.
-
-### ⛔ THE DEFECT THIS CAPABILITY INVITES, AND THE ONE THING THAT HAD TO BE DESIGNED AROUND
-
-**The kit hands `totals.cells(rows)` exactly what it RENDERED, and this page renders a 30-row
-window.** Summing that argument prints the total of thirty orders under a footer band that says
-`30 of 65` one line below — **and the number climbs as the operator scrolls.**
-
-**The argument is therefore deliberately unused**; the sum closes over `visible`, the whole
-filtered list. **This is the same defect S2.1 had to design around for the sort, arriving
-through a different door** — and it is the second time on this card that the kit's convenience
-argument was the wrong set of rows.
-
-**Proved by a NEGATIVE CONTROL, not by assertion.** With the implementation switched to sum the
-callback's argument, the test reports `RM 3,000.00` where the truth is `RM 3,500.00` — 30 rows
-of a 35-row list. Restored, it reads 3,500.
-
-### WHAT IT STATES, AND EACH HALF IS A DECISION
-
-- **The money, not the count.** The footer band already prints `{total} orders` two lines down,
-  and §3's frozen rule is that nothing on this list says the same thing twice. **Nothing on
-  screen states the money for the CURRENT view** — the `Owing` rail row carries a total, but
-  that is one fixed queue over every order, not what these filters left. Money is also what a
-  footer totals in the tool the team already uses.
-- **What it could NOT price, out loud.** `orderMoney` answers `unknown` when an order has
-  neither priced lines nor a keyed balance, and §4's rule is ***"not priced", never RM 0***. A
-  sum that silently skipped those would be a smaller number wearing a complete number's
-  clothes. The caveat renders only when there is one.
-- **`fmtMoney` spells the figure**, asserted by identity — never a hand-rolled `RM ${n}` that
-  would pass every other test and diverge the day the shared format changes.
-- **It does not draw over an empty view.** The kit already withholds it while loading or empty:
-  a totals strip over no rows states a total of nothing.
-
-**MEASURED IN CHROMIUM AT FOUR WIDTHS**, on the longest sentence the strip can ever hold (a
-seven-figure sum plus the caveat, 320px):
+Sales Orders uses the Register Template's one rendered 32px fixed status footer inside the table
+frame. It combines orientation and the page-owned business summary in one sentence; there is no
+second count strip. Its three states are:
 
 ```
-table width          1022      890      850      700
-td content box      963.2    836.9    798.6    655.0
-sentence                320      320      320      320   ← one line at every width
-spare                +643     +517     +479     +335
+RESTING    75 orders · RM 48,101.50 outstanding · 12 not priced
+FILTERED   2 of 75 orders · RM 1,680.00 outstanding · 0 not priced
+SELECTED   2 selected orders · RM 480.00 selected outstanding · 0 not priced
 ```
 
-`colspan` **9**, the foot's cells sum to the table width to the pixel at every width, the row is
-**40px** — the head's own height — and it is `position: sticky`. **No wrap, no horizontal
-scroll.**
+The figures are shapes, not fixture values. Resting and filtered money closes over the whole
+current filtered list, never the virtualised/rendered window, so scrolling cannot change the
+answer. Selected money closes over the selected Sales Orders. `orderMoney` unknown remains
+`not priced`, never RM 0; the caveat stays explicit even when its count is zero. `fmtMoney`
+remains the single currency formatter.
 
-> 🟡 **REPORTED — the strip costs 40px of PERMANENT height**, so §3's measured *"16 fully
-> visible rows"* at 1440×900 becomes 15. That is the honest price of an always-on total, and
-> AutoCount pays it too. Recorded here so the next card that counts visible rows starts from 15
-> rather than re-deriving 16 from a stale line.
+The footer is one line and does not wrap or own horizontal scroll. The table frame preserves the
+Register Template's 8px bottom gap outside the footer. Rows remain consecutive while more results
+exist; genuine empty data space appears only when the complete result set is shorter than the
+viewport. The footer never contains Reset layout or any action.
 
 ### ✅ S2.2 · SHIPPED 2026-08-08 — the header ▼, on the four columns where it is a DOOR and not a second home
 

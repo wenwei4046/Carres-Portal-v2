@@ -404,10 +404,10 @@ table header using `text-label` (11px / 14px); rendered 38px single-line parent 
 row's checkbox included in the measured height. Expanded content takes its
 natural governed child-row height and is not forced into 38px. Carres gains visible rows by
 removing tall page chrome, breadcrumbs, KPI bands and redundant headings — never by squeezing
-the parent row below this readable baseline. Footer existence, contents and height remain a
-separate decision from row density.
+the parent row below this readable baseline. Footer geometry and contents are governed separately
+below and do not alter row density.
 
-**REGISTER STATUS FOOTER — APPROVED / LOCKED.** Every Register table ends in one compact,
+**REGISTER STATUS FOOTER — APPROVED / LOCKED (Loo, 2026-08-11).** Every Register table ends in one rendered 32px,
 always-present status footer fixed to the table frame; it never scrolls with the rows. The
 footer keeps the operator oriented without spending a full data-row height. In its resting
 state it states the current listing's total summary. When rows are selected it immediately
@@ -420,8 +420,15 @@ layout or duplicated filter controls may enter it. **Every actionable control st
 table** in the page Work Toolbar, selection bar or the relevant top popover; `Reset layout`
 belongs to Columns and never to the footer. Each Register MASTER owns its truthful summary
 vocabulary and arithmetic; the global template may not invent a KPI, status or unit.
-The exact compact height and the page-by-page summary mapping remain the next unresolved
-footer decision.
+
+The table frame has an 8px outer gap above and an 8px outer gap below. The bottom gap is page
+breathing room outside the frame; the 32px footer remains inside it and never touches the browser
+edge. Available vertical space is filled with consecutive complete parent rows. There is no
+designed blank data region while more results exist; genuine empty space is allowed only when the
+complete current result set is shorter than the viewport. When another full governed row does not
+fit, show one fewer complete row rather than compressing the locked 38px parent-row height. This
+compact chrome must allow a Register to show more complete rows than the 2990 reference at the same
+viewport height without copying its visual treatment.
 
 # §6.6 · SALES ORDERS REFERENCE STRUCTURE — ruled by Loo 2026-08-10
 
@@ -432,24 +439,25 @@ surface.
 
 ```
 DestinationHeader  44px  Sales Orders identity + genuine global utilities only
-Work Toolbar       45px  scope · one Search · Filters · Export · Columns · New Sales Order
-Work Surface             one DataGrid; loading · empty · error remain inside it
+Work Toolbar       45px  View · one Search · Export · Columns · actions · overflow
+Work Surface             one DataGrid + fixed status footer; loading · empty · error remain inside it
 ```
 
 **Proven in authenticated production at 1920 · 1440 · 1130:** one destination identity · one
 Work Toolbar · one general Search · no duplicate destination tab/title · no outer-page scroll ·
 DataGrid-owned genuine-wide horizontal overflow · 1130 without another toolbar band · Search ·
-Filters · Export · Columns · persistence · expansion all survive the migration.
+column filters · Export · Columns · persistence · expansion all survive the migration.
 
-**The Sales Orders reference appearance is deliberately page-scoped:** 10px bold uppercase
-header in a rendered 31px row; 11px single-line parent cells in rendered 33px rows; 8px
-horizontal cell padding; rendered 22px footer; flat zero-radius grid; faint structural
-dividers; no zebra. This is not a global 32px law and does not alter kit/DataTable defaults.
+**The Sales Orders reference appearance follows the current Register Template:** 36px table
+header · 38px single-line parent rows · 32px fixed status footer · 8px outer frame gaps · flat
+zero-radius grid · faint structural dividers · no zebra. Frozen Carres typography tokens and
+the Register density law above own the text; older page-scoped 31/33/22px measurements no longer
+author this destination.
 
 **Preserved engine powers:** server Search · typed column filters · Columns · Excel Export ·
 resize · reorder · browser layout persistence under the existing Sales Orders storage key ·
-expanded order lines. The Work Toolbar's Filters control is a second door into the same
-per-column filter state, not a second filter engine.
+expanded order lines. Each column header remains the direct filter door; the Work Toolbar does
+not duplicate it with a generic Filters control.
 
 **1130 ruling:** Stage A must attempt one toolbar row and show a measured failure if it does
 not fit. It may not invent a responsive law. The 2026-08-10 production-like measurement fit
