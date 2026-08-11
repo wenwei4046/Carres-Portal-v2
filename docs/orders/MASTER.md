@@ -2982,21 +2982,35 @@ excluded them merely because they were not already implemented.
 - **The contextual bar follows the 2990 interaction pattern, not its appearance.** Carres
   frozen tokens/components govern colour, typography, radius and spacing. It occupies or
   replaces governed toolbar space where possible; it must not create a permanent empty band.
-- **Customer Document Relationship Map / `View Flow` is approved.** From a Sales Order, one
-  view answers both *what documents are related to this customer order?* and *which customer
-  documents has the customer actually received?* The Sales Order is the anchor. Its customer
-  branch shows Sales Order PDF · accepted amendment(s) · Delivery Order · Sales Invoice ·
-  receipt/payment evidence when each exists; its operational branch links the already-governed
-  Purchasing flow SO → PO → Receiving → Claim without moving ownership into Orders. Every node
-  shows document number, owner, current lifecycle fact and dates/evidence for Generated · Sent ·
-  Signed/Accepted · Superseded/Cancelled as applicable. **Generated is never presented as Sent
-  or received by the customer.** Until Carres owns a canonical customer entity, the map is
-  anchored to the selected order and may use the order's normalised customer phone only to offer
-  a clearly separate `Other orders for this customer` lane; it must not silently merge people
-  on name alone. `View Flow` is a row/context and order-workspace document action, not a permanent
-  Header button, tab, default table column or workflow executor. AutoCount's Document Flow and
-  2990's Relationship Map are behavioural references only; Carres document ownership, evidence
-  and visual tokens remain authoritative.
+- **`Order Journey` / `View Flow` is approved.** It is one map, not separate duplicate Document
+  and Journey maps. From a Sales Order it lets every authorised reader understand where the
+  customer's order has reached, what obligation is next and which real document/unit number
+  proves every completed leg. The governed route is Customer Order / what was bought → supply
+  decision (new goods through Purchasing OR suitable existing Warehouse stock, system offers and
+  human decides) → PO and Unit ID when buying → Receiving → Warehouse location → Delivery planning
+  from stock ETA + capacity + customer preference → Money due → actual Delivery attempt → optional
+  Loan and Issue branches → No Action Required only when all obligations clear. The map is a
+  directed graph, not a false single timeline: supply is a branch; Money and Delivery may proceed
+  in parallel; Loan and Issue are conditional.
+
+  The Sales Order is the anchor. Nodes show the real SO · PO · Unit ID · GRN · warehouse/bin · DO ·
+  Invoice · receipt/payment evidence · Loan · Case numbers, their owning module, governing dates
+  and truthful lifecycle evidence such as Generated · Sent · Signed/Accepted · Superseded/Cancelled.
+  **Generated is never presented as Sent or received by the customer.** Completed/current-frontier/
+  blocked/future/not-required presentation is derived from the owning modules' existing completion
+  facts; it never mints a Sales Order `status` or `Current` field. Every document number opens its
+  owner; the map summarises and links but never executes another module's work.
+
+  The primary discoverable entry is the contextual selection bar immediately above the table:
+  selecting exactly one row replaces the normal toolbar in that same height with
+  `1 selected · Clear · View Flow · Export Excel · Export PDF`. Right-click → `View Flow` is a
+  desktop shortcut to the same map, not the only door. The order Workspace Documents area is the
+  third durable door. Multiple-row selection hides `View Flow` because one map has one Sales Order
+  anchor. It is not a Page Header action, tab or default table column. Until Carres owns a canonical
+  customer entity, the map may use the selected order's normalised customer phone only for a
+  clearly separate `Other orders for this customer` lane and never merge people on name alone.
+  AutoCount's Document Flow and 2990's Relationship Map are behavioural references only; Carres
+  ownership, evidence and visual tokens remain authoritative.
 
 The normal Sales Orders toolbar composition is now **UNRESOLVED** and must be re-ruled item by
 item. The Stage A toolbar remains implementation evidence until the owner approves its
