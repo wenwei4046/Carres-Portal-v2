@@ -86,28 +86,43 @@ unruled placement/presentation and potentially useful missing capabilities as un
 researches only the declared decision surface. It must not infer either “keep this exact UI” from
 an existing capability or “do not propose it” from repository absence.
 
-**UI PROPOSAL PREFLIGHT — APPROVED / LOCKED (Loo, 2026-08-11).** Before presenting **ANY** UI
-proposal, mockup or layout recommendation, a new or restarted Plan/Design chat must first extract
-a brief **LOCKED CONSTRAINTS** checklist appropriate to that decision surface from this MASTER,
-the current/frozen design-token authority and the target module MASTER, then validate the proposal
-against every item. When relevant, the checklist includes: Sidebar active/current treatment · page
-header law · toolbar law · typography (size, weight and line-height) · table header/body/footer
-density and row heights · pill/button treatment · spacing · Register width/scroll law · locked
-target-module column order and field semantics · existing capabilities that must be preserved ·
-retired/banned patterns. The preflight may be internal or briefly visible, but the validation is
-mandatory. A proposal that conflicts with an **APPROVED / LOCKED** constraint is **INVALID** and
-must be corrected before Jess sees it. If the authorities themselves conflict, report that
-conflict and stop the proposal; never silently choose one. Preflight protects the capability and
-every explicitly locked placement/presentation; it must not promote the current implementation's
-unruled location, control type or styling into law, and it must not reject a justified new
-capability merely because Carres does not yet contain it.
+**UI ARCHITECT RESPONSIBILITY + DICTIONARY / IA PREFLIGHT — APPROVED / LOCKED (Jess,
+2026-08-11).** A new or restarted Plan/Design chat is not merely repository police or a visual
+checker. Jess is the business owner and final decision-maker; she is not expected to enumerate
+every UI/ERP implication. The chat must proactively act as Carres UI architect and plan ahead.
+Before presenting **ANY** UI proposal, mockup or layout recommendation, it must inspect the
+authoritative UI Dictionary/copy vocabulary, ERP navigation and information architecture, module
+ownership, this MASTER, frozen design tokens, cross-module patterns and the target module MASTER.
+
+For every proposed **button · tab · menu · destination · page · action · Settings/Maintenance
+entry**, name the existing Carres terminology, owner and destination **before** proposing it. Check
+for duplicate destinations or terminology, inconsistent control/interaction language, incorrect
+module placement, future cross-module consequences, scalability problems and materially useful
+missing capabilities. Distinguish business/capability truth from placement/presentation truth. The
+architect must surface important consequences and gaps Jess did not explicitly ask about and, where
+useful, recommend **KEEP · IMPROVE · RELOCATE · RETIRE · BUILD**, with the reason and the modules
+that would inherit the decision.
+
+Then extract a brief **LOCKED CONSTRAINTS** checklist appropriate to the decision surface and
+validate the proposal against every item. When relevant, it includes: Sidebar active/current
+treatment · page header law · toolbar law · typography · table density and row heights · pill,
+button, tab, filter, dropdown and overflow-button admission · spacing · Register width/scroll law ·
+locked target-module column order and field semantics · existing capabilities that must be
+preserved · retired/banned patterns. A conflict with **APPROVED / LOCKED** truth makes the proposal
+**INVALID** and it is corrected before Jess sees it. If authorities conflict, report the conflict
+and stop the proposal; never silently choose one. Preflight protects locked truth without turning
+unruled presentation or repository absence into a veto. **Governance protects truth; it does not
+freeze innovation.**
 
 For a genuinely **UNRESOLVED** UI decision, proactively research only that declared surface. Use
 the relevant governed references — including Linear, Shopify, AutoCount, 2990, current Carres UI
 and other mature ERP patterns when useful — and exclude unrelated history and pages. Derive the
 common patterns and real trade-offs, then give **one evidence-based Carres recommendation**, not
-arbitrary A/B/C options. Reference products may inform only that unresolved surface; they **NEVER**
-override Carres-governed tokens, fields, semantics, column order, capabilities or locked decisions.
+arbitrary A/B/C options. **Carres semantics, ownership and destination come first.** Linear,
+Shopify, AutoCount, 2990 and other mature ERP references provide principles and interactions only;
+translate them into Carres architecture and never blindly copy their terminology, IA, colours,
+tokens, fields or placement. They **NEVER** override Carres-governed tokens, fields, semantics,
+column order, capabilities or locked decisions.
 Current and legacy screenshots are evidence of implementation, not authority over frozen target
 truth or over unresolved placement/presentation. For example, `Not delivered / All orders` may be
 an existing scope capability that must be preserved; that fact alone does not make permanent header

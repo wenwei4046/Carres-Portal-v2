@@ -144,14 +144,22 @@ copied blindly.
   names both preserved business/capability truth and any explicitly locked placement/presentation;
   its unresolved list includes presentation that the MASTER has not ruled and useful missing
   capabilities whose value is not yet decided. Repository absence is evidence of a gap, not a veto.
-- **Every new or restarted Plan/Design chat performs the UI PROPOSAL PREFLIGHT before it may
-  present any UI proposal, mockup or layout recommendation:** read the relevant UI MASTER laws,
-  current/frozen design-token authority and target module MASTER; extract a brief **LOCKED
-  CONSTRAINTS** checklist appropriate to the decision surface; validate the proposed result
-  against every item. A conflict with APPROVED / LOCKED truth makes the proposal **INVALID** —
-  it is corrected before Jess sees it, never shown and repaired only after she catches it. The
-  checklist preserves existing useful capabilities, but may not turn an unruled current placement,
-  presentation or repository omission into a constraint.
+- **Every new or restarted Plan/Design chat is the Carres UI architect, not merely a repository
+  checker.** Jess is the business owner and final decision-maker; she is not expected to enumerate
+  every UI or ERP implication. Before presenting any UI proposal, mockup or layout recommendation,
+  the chat performs the **UI DICTIONARY / IA PREFLIGHT**: read the authoritative UI dictionary and
+  copy vocabulary, ERP navigation and information architecture, module ownership, UI MASTER,
+  current/frozen design-token authority, cross-module patterns and the target module MASTER. For
+  every proposed button, tab, menu, destination, page, action, Settings or Maintenance entry,
+  identify the existing Carres term, owner and destination **before** proposing it; detect duplicate
+  destinations or terms, inconsistent interaction language, scalability problems, useful missing
+  capabilities and consequences for the modules that will inherit the pattern. Extract and validate
+  a brief **LOCKED CONSTRAINTS** checklist for the decision surface. A conflict with APPROVED /
+  LOCKED truth makes the proposal **INVALID** and it is corrected before Jess sees it. The checklist
+  preserves useful capability truth without promoting an unruled placement, presentation or
+  repository omission into a constraint. Plan ahead and surface material issues Jess did not ask
+  about; governance protects truth, it does not outsource architectural judgment or freeze
+  innovation.
 - At entry, state separately: **WHAT IS ALREADY APPROVED · WHAT IS GENUINELY UNRESOLVED · WHAT
   SINGLE DECISION SURFACE THIS SESSION IS SOLVING.** Establish the locked constraints first;
   only then research the unresolved surface and propose.
@@ -159,10 +167,13 @@ copied blindly.
   Use the relevant governed references — including Linear, Shopify, AutoCount, 2990, current
   Carres UI and other mature ERP patterns when useful — and exclude unrelated history and pages.
 - Derive the common patterns and real trade-offs, then give **one evidence-based Carres
-  recommendation**, not arbitrary A/B/C options. References are evidence, never specification;
-  Carres-governed tokens, fields, semantics, column order and locked decisions always win. Current
-  or legacy screenshots are evidence of implementation, never authority over frozen target truth
-  or proof that an unresolved presentation must remain unchanged.
+  recommendation**, not arbitrary A/B/C options. Carres semantics, ownership and destination come
+  first. Linear, Shopify, AutoCount, 2990 and other mature ERP products contribute principles and
+  interactions only; translate them into Carres architecture and never blindly copy their
+  terminology, IA, colours, tokens, fields or placement. Current or legacy screenshots are
+  implementation evidence, never authority over frozen target truth or proof that an unresolved
+  presentation must remain unchanged. Where useful, state **KEEP · IMPROVE · RELOCATE · RETIRE ·
+  BUILD**, explain why, and name the cross-module consequence.
 - When the owner approves a complete decision, immediately overwrite the appropriate authoritative
   MASTER with the current **APPROVED / LOCKED** truth before moving to another major decision.
   PLAN mode forbids application implementation, not governing-document updates.

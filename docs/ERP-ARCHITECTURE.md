@@ -49,11 +49,14 @@ WORK          = ACTION
 ISSUE TRACKER = ACCOUNTABILITY + MEMORY + LEARNING
 ```
 
-Modules own and preserve the transactional facts. Work reads those facts and derives **WHO +
-ACTION + actual working day**; it never creates a second operational status or writes another
-module's completion fact. The Issue Tracker does not replace SO, PO, Unit, Delivery or Payment
-truth. It preserves what happened, accountability, financial consequence, recovery and the
-learning that survives into meeting, training and SOP.
+Modules own and preserve the transactional facts. Work reads those facts and presents the
+actionable layer as **WHO + ACTION + OBJECT + WHEN (actual working weekday/date)**, using the
+authoritative wording in `COPY-STANDARD.md` and calendar in `ACTION-FLOW-STANDARD.md`; it never
+creates a second operational status or writes another module's completion fact. Truth is not
+forced into action wording: if nobody must do anything, it remains a fact in its owning module.
+The Issue Tracker does not replace SO, PO, Unit, Delivery or Payment truth. It preserves what
+happened, accountability, financial consequence, recovery and the learning that survives into
+meeting, training and SOP.
 
 The approved end-to-end Sales Order V2 target, its implementation state and its restart order
 live once in [`orders/MASTER.md`](orders/MASTER.md), immediately after the Card 1 production
