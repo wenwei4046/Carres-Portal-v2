@@ -41,6 +41,25 @@ work will, over months, be asked to DO it — because the operator is already th
 became the portal's control surface and then quietly became its write surface. **Showing is
 free. Writing is ownership.**
 
+## §0.1 · The ERP V2 separation law — owner ruling 2026-08-11
+
+```
+MODULES       = TRUTH
+WORK          = ACTION
+ISSUE TRACKER = ACCOUNTABILITY + MEMORY + LEARNING
+```
+
+Modules own and preserve the transactional facts. Work reads those facts and derives **WHO +
+ACTION + actual working day**; it never creates a second operational status or writes another
+module's completion fact. The Issue Tracker does not replace SO, PO, Unit, Delivery or Payment
+truth. It preserves what happened, accountability, financial consequence, recovery and the
+learning that survives into meeting, training and SOP.
+
+The approved end-to-end Sales Order V2 target, its implementation state and its restart order
+live once in [`orders/MASTER.md`](orders/MASTER.md), immediately after the Card 1 production
+record. Architecture owns this boundary; the Orders MASTER owns the build sequence and business
+flow.
+
 ---
 
 # §1 · The four ownership laws

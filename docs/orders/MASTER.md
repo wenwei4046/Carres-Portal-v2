@@ -240,6 +240,257 @@ cleaned with the other fixtures.
 
 ---
 
+# SALES ORDER V2 — CURRENT APPROVED TARGET AND BUILD CHECKPOINT
+
+> **OWNER RULING, 2026-08-11. This is current target truth under the MASTER OVERWRITE LAW.**
+> It records the approved business destination, not a claim that every capability exists.
+> Do not append an alternative blueprint beside it. When the owner changes a ruling, overwrite
+> the obsolete rule here; Git is the history.
+
+## Status — TARGET is not BUILT
+
+| Card | Approved target | Built / verified |
+|---|---|---|
+| **1** | Customer Obligation Truth | **COMPLETE** — `dae94301`, migration `0340`, production verified 2026-08-11; exact implementation record immediately above |
+| **2** | Unit / Stock Allocation Truth | **NOT BUILT — NEXT CARD** |
+| **3** | Early Logistics Assignment + Customer Booking | **NOT BUILT** |
+| **4** | Money Truth + Collection Gate | **NOT BUILT** |
+| **5** | Delivery Attempt + Delivery Exception | **NOT BUILT** |
+| **6** | Loan Mattress / Loan Sofa Obligations | **NOT BUILT** |
+| **7** | Change / Cancel / Refund Lineage | **NOT BUILT** |
+| **8** | Derived Completion — No Action Required | **NOT BUILT** |
+| **9** | Unified Work Engine | **NOT BUILT** |
+| **10** | My Work / Team Work | **NOT BUILT** |
+
+Build truth before work. **Cards 2–10 are approved business rules, not permission to describe
+their screens, schema, RPCs or production state as implemented.** Each card first traces the
+existing read/write doors, reuses proven authority, then builds only its boundary and records
+production proof here. A card must stop at its boundary; completing one does not authorise the
+next.
+
+## The three-system law
+
+```
+MODULES       = TRUTH
+WORK          = ACTION
+ISSUE TRACKER = ACCOUNTABILITY + MEMORY + LEARNING
+```
+
+- Sales Order, PO, Receiving, Unit, Delivery, Money and Loan preserve what is true.
+- Work translates authoritative facts into **WHO + ACTION + actual working day**. It owns no
+  duplicate transaction form or free-standing completion status.
+- Issue Tracker records the incident, accountability, financial consequence, recovery and
+  learning. It never substitutes for operational transaction truth.
+
+## Card 1 · Customer Obligation Truth — approved and built
+
+For every SO, answer: **What did the customer CURRENTLY commit to buy? How did it become this?**
+Authority flows customer commitment → purchasing / fulfilment → PO → Unit → delivery, never
+backwards from PO, stock, booking or a legacy delivered word.
+
+```
+Staff correction        the record was wrong; the customer agreement did not change
+Customer change         the customer later requested a different commitment
+Fulfilment replacement  the commitment stayed correct; an attempt to satisfy it failed
+```
+
+These are never collapsed. A fulfilment failure does not revise the SO. Physical fulfilled and
+remaining quantity must not be guessed from `orders.status='delivered'`; authoritative fulfilment
+waits for Card 2 Unit truth and Card 5 Delivery Attempt truth. The shipped implementation and
+known door boundaries are preserved in the Card 1 record immediately above.
+
+## Card 2 · Unit / Stock Allocation Truth — approved target, next, not built
+
+The physical spine is:
+
+```
+PO placed → Unit ID born → supplier can label it → Receiving confirms arrival
+→ Warehouse location / condition → system offers suitable stock → human decides
+→ reserve to SO or keep purchasing demand → out for delivery → delivered / returned
+```
+
+Unit ID is born when the PO is placed, before receiving, and the same identity follows the
+physical item through supplier labelling, Receiving, Warehouse, reservation, Delivery, return,
+inspection and reuse. The register answers which real Unit exists, where it is, its condition,
+which SO it is reserved for and the PO it came from.
+
+**Ready Stock law:** the system may offer compatible existing warehouse stock; a human decides
+whether to allocate it. Never silently auto-allocate or reallocate. A wrong, surplus, released or
+customer-rejected Unit returns through location + inspection to **Available or Hold**; it does not
+disappear with the old SO. The original SO continues to owe the correct commitment.
+
+## Card 3 · Early Logistics Assignment + Customer Booking — approved target, not built
+
+```
+PO placed → assign logistics immediately → watch Stock ETA → contact customer early
+→ Stock ETA + logistics capacity + customer preference → confirmed appointment
+```
+
+Do not wait for stock to be ready before assigning logistics. Keep three independent facts:
+**assigned logistics** (who is responsible), **Stock ETA** (when goods are expected) and
+**customer-confirmed date + slot** (what was actually agreed). Early visibility lets logistics
+plan capacity while Operations knows the ETA. Booking begins as the delivery becomes credible;
+the target call window is three actual working days before delivery, calculated with the
+applicable working calendar and public holidays.
+
+## Card 4 · Money Truth + Collection Gate — approved target, not built
+
+Payment is recorded once, changes money truth once, and every reader derives the same answer.
+Money is bilateral: customer → Carres outstanding, or Carres → customer refund.
+
+```
+delivery becomes real / Stock ETA usable
+→ begin balance collection
+→ T−3 and T−2 working-day attention
+→ T−1 final deadline
+→ unpaid: hold delivery and refuse DO
+→ paid: delivery / DO gate may proceed
+```
+
+Use actual dates and the working calendar, not calendar-day subtraction. The T−1 deadline exists
+because logistics commonly requests the DO the day before delivery. Delivered does not mean paid;
+an unpaid delivered order remains open. The current split among `orders.paid`, `order_payments`,
+`ops_order_control.balance`, `paid_amount` and `payment_status` must converge on one authoritative
+write and calculation before any reader or gate claims completion.
+
+## Card 5 · Delivery Attempt + Delivery Exception — approved target, not built
+
+Every vehicle trip is a Delivery Attempt with a result. Success records the specific obligation
+and Unit delivered. A non-completed attempt records one Delivery Exception and must answer:
+
+```
+1  What happened?
+2  Where are the goods now?
+3  What does Carres still owe the customer?
+4  Who does what next?
+```
+
+The Unit must move with reality: Out for delivery → Delivered, or Returning → Warehouse received
+→ Inspection → Available / Hold. A failure cannot leave the Unit falsely reserved or in transit.
+Bed delivered while sofa remains is partial fulfilment, not a whole-order delivered conclusion.
+Issue Tracker may record the same incident for accountability and learning, but cannot replace
+the attempt, Unit movement or remaining customer obligation.
+
+## Card 6 · Loan Mattress / Loan Sofa Obligations — approved target, not built
+
+A temporary item is an independent obligation. The customer receiving real goods does not close
+the loan; the temporary item must be recovered. Distinguish:
+
+- **Carres stock loan:** identified Unit → customer → recovered → Warehouse inspection →
+  Available / Hold.
+- **Supplier loan:** identified temporary item → customer → recovered → returned to supplier →
+  supplier return confirmed.
+
+Customer recovery and supplier return are separate facts. The system may suggest considering a
+loan when the real goods will miss the commitment; a human decides whether and which loan to use.
+Once created, the obligation is structured, never inferred from notes or a free-text return date.
+Final delivery should state both **deliver real Unit** and **recover loan Unit**; failure of the
+second leaves Loan open even when Goods and Money are clear.
+
+## Card 7 · Change / Cancel / Refund Lineage — approved target, not built
+
+Preserve the complete chain: original customer order → governed revision / cancellation → every
+fulfilment attempt and Unit consequence → replacement or released stock → financial consequence.
+Never delete a historical PO, Unit or commercial commitment merely because the current SO changed.
+
+A cancelled or changed goods obligation may become a money obligation. Goods no longer owed does
+not mean the SO is clear: an approved but unpaid refund means **Carres still owes the customer**.
+Structured actor, reason, approval and server time survive; Issue Tracker may hold the story but
+is never required to make transaction lineage true.
+
+## Card 8 · Derived Completion — approved target, not built
+
+Do not create or press a new `completed` status. Derive completion:
+
+```
+Goods clear
++ Money clear in both directions
++ Loan clear, including supplier return
++ every refund / replacement / collection / other explicit commitment clear
+= No Action Required
+```
+
+**Delivered ≠ Complete. Cancelled ≠ Complete.** `Delivered` is a physical fulfilment fact;
+`No Action Required` is the derived whole-SO result. If any track remains open, show that truth and
+let Work derive the next action. Sales Orders lists truth; it does not become the work queue.
+
+## Card 9 · Unified Work Engine — approved target, not built
+
+Work reads module facts and produces one open work set. Every system rule must define exactly:
+**Trigger · Owner · Action · Due rule · Completion fact**. If it cannot name an authoritative
+completion fact, it does not enter the engine.
+
+```
+WHO + ACTION + ACTUAL WORKING DAY
+```
+
+Show a named person when the roster/PIC determines one; use a shared station such as Warehouse
+only when the work genuinely belongs there. Deadlines come from approved business rules and the
+applicable working calendar, including public holidays. Staff see weekday + date, never only
+`Today`, `Tomorrow` or `T−2`. Late work remains on its original due date with working days late;
+do not manufacture `follow up`, `check`, `monitor` or escalation duplicates.
+
+System work is completed only when its owning module records the completion fact; there is no
+Done button. A separate **Human follow-up** may exist when a person explicitly promises an action
+whose completion has no structured business fact. It is labelled as human-created and may be
+completed explicitly; it never becomes module truth.
+
+## Card 10 · My Work / Team Work — approved target, not built
+
+`My Work` and `Team Work` are two filters over the same open work set, never two datasets and
+never another dashboard:
+
+```
+My Work    owner = current user
+Team Work  all open work, filterable by actual owner
+```
+
+Rows are grouped by actual working date and state the owner, concrete verb, counterparty/amount
+where relevant, and SO / PO / Unit context. Opening a row goes to the owning module's existing
+workspace: PO work → Purchasing; Receiving → Receiving; Unit → Warehouse; customer commitment →
+Sales Order; collection/refund → Money; loan → its obligation surface. Work never copies those
+forms. Team Work makes responsibility visible without reducing people to KPI cards; My Work tells
+one operator exactly what to do.
+
+## Issue Tracker · accountability and cost-recovery boundary — approved target, not built here
+
+Issue Tracker preserves **incident + accountability + financial consequence + recovery +
+learning**. Never collapse these identities into one `Owner`:
+
+| Identity | Question |
+|---|---|
+| **Fault Owner** | Who or which party caused it? |
+| **Action Owner** | Who must solve it now? |
+| **Cost Bearer** | Who should ultimately pay? |
+| **Service Provider** | Who actually performed the extra work? |
+
+If NETS performs an RM80 extra trip caused by a supplier, preserve two transactions: Carres owes
+NETS RM80 incurred cost; the supplier owes Carres RM80 recoverable. **Never net them off.** Track
+cost incurred, amount recoverable and amount recovered separately, including dates and links to
+the originating incident and financial records.
+
+The tracker must remain exportable/analyzable by supplier / logistics / internal / other fault,
+exact fault owner, action owner, cost bearer, service provider, issue type, incurred cost,
+recoverable amount and recovered amount. Internal staff mistakes are named, not hidden. Repeated
+cases become Wednesday-meeting evidence, training and eventually SOP. SO / PO / Unit / Delivery /
+Payment remain the authority for what operationally happened.
+
+## Restart / read order — the next chat starts here
+
+1. Read root `CLAUDE.md` / `AGENTS.md` for the Constitution and MASTER OVERWRITE LAW.
+2. Read [`../ERP-ARCHITECTURE.md`](../ERP-ARCHITECTURE.md) for cross-module ownership.
+3. Read this section and the Card 1 shipped record immediately above it.
+4. Read only the MASTER(s) of modules Card 2 touches: [`../stock/MASTER.md`](../stock/MASTER.md)
+   and, when tracing PO/Receiving doors, [`../purchasing/MASTER.md`](../purchasing/MASTER.md).
+5. Re-measure current code and production before quoting implementation state. Preserve unrelated
+   dirty work. Do not reopen the approved business flow merely from preference; raise only a real
+   repo/production contradiction or implementation impossibility.
+6. Build **Card 2 — Unit / Stock Allocation Truth** next. Trace every existing Unit birth,
+   Receiving, reservation, release, return and goods-readiness door before implementation. Stop
+   after Card 2 proof and update this status table. **Do not start Card 3 automatically.**
+
+---
+
 # §1 · Overview
 
 **One table. One row = one customer order.** Every order in the business lands here; a click
