@@ -184,6 +184,63 @@ built next to this one. If a flow needs a Purchase Order, it produces a
 `purchase_demand` and Batch Purchase issues it. *"This case is special"* is the
 sentence that produced the four authorities Card 4B had to close.
 
+### PRODUCTION EVIDENCE — Card 4B, 2026-08-11, run not described
+
+**Deploy.** main `32af7b46` · bundle `index-DUNp7gpt.js` → **`index-AP7_jhKp.js`**, live
+SHA-256 `a38fccbd8bc6…` == local build, `SERVICE_ROLE` **0**, all four canonicals converged
+on the first poll (carres-portal `b9bb8dd6` · carres-pos `89a1c8e5`). Worker **owed and
+paid** — `apps/api/src/routes/operation/pos.ts` and `packages/shared` both changed —
+version `47a24dfd-baec-4ac3-8413-cbef29f7f6aa`, `/health` **200 `{"ok":true}`**.
+
+Bundle proven in BOTH directions against the predecessor, with two controls:
+
+```
+new-po-button              1 -> 0     purchase/to-order/issue   1 -> 1  CONTROL
++ New PO                   1 -> 0     procurement-tab-strip     1 -> 1  CONTROL
+/api/operation/pos/batch   1 -> 0
+po-lines-table             1 -> 0     bytes  5,283,581 -> 5,257,683  (-25,898)
+Raise PO for shortages     1 -> 0
+allowIssuePO               6 -> 0
+```
+
+**A · UI and B · API — signed in on production at 1440 and 1130, 26 checks, 0 failures.**
+
+```
+A1  Purchase Orders channel page loads · no + New PO · no CreatePOModal reachable
+A2  Delivery still opens the order drawer; 4 overflow menus opened, no Issue PO
+    and no Raise PO for shortages in any of them
+A3  Old Orders loads, 30 rows, no Issue PO (Card 3 still true)
+A4  Batch Purchase still carries the governed `Issue 1 PO`, and `+ Create Purchase`
+    (the DEMAND door, never a PO) survives
+B   POST /api/operation/pos        404  with a live operation session token
+    POST /api/operation/pos/batch  404  with the same token
+    GET  /api/operation/pos        200  — the read door on the same prefix answers
+```
+
+**C · D · E — every denial proven by ATTEMPTING THE WRITE as the `authenticated`
+operation user (`app_role()` = `operation`), never by reading a grant.** The whole probe
+ran inside a transaction that was then aborted.
+
+```
+operation_create_po                      NO   42501 permission denied
+operation_create_pos_batch               NO   42501 permission denied
+_operation_create_po_inner  (direct)     NO   42501 permission denied
+direct purchase_orders INSERT            NO   42501 permission denied
+direct purchase_order_lines INSERT       NO   42501 permission denied
+Old Orders order-level Issue RPC         NO   42501 permission denied   (Card 3 holds)
+purchasing_issue_pos_batch               YES  reached — own rule 22023, not permission
+  · invalid governed flow                REJECTED by its own rules ("supplier not found")
+  · VALID governed flow                  minted PO-2055, 24 -> 25 POs / 38 -> 39 lines,
+                                         then ROLLED BACK
+```
+
+**F · Regression.** `purchase_orders` **24** and `purchase_order_lines` **38** — identical
+before and after; newest PO still 2026-08-05; **zero probe rows left behind.** INSERT
+policies on the two tables: **NONE**. SELECT/UPDATE policies preserved: **7**.
+
+**VERDICT — PASS.** `purchasing_issue_pos_batch(jsonb)` is the sole reachable Purchase
+Order creation authority.
+
 ## 2.0.1 · 🔴 GAP — Emergency has no governed continuation. NOT SOLVED HERE.
 
 **Recorded under Card 4B §7, deliberately unsolved: it needs a business decision.**
