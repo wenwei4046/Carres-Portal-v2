@@ -60,7 +60,7 @@ infer or reopen a Card's approved business rules.
 - The final Card may run an end-to-end consistency and polish pass; it is never the first operator
   UI.
 
-## §1.2 · PLAN / DESIGN CHAT ENTRY LAW — owner ruling 2026-08-11
+## §1.2 · PLAN / DESIGN CHAT ENTRY LAW — APPROVED / LOCKED, owner ruling 2026-08-11
 
 This governs **PLAN / DESIGN** work. A new chat continues from the current approved truth instead
 of reconstructing the thinking that produced it.
@@ -74,11 +74,14 @@ RESEARCH   only that unresolved surface
 PROCEED    from the approved baseline; never from a blank sheet
 ```
 
-- Do not re-study the whole UI/business history, 2990, Old Orders or current pages by default.
-  Consult history or research only for an explicit **UNKNOWN**, a genuine conflict between current
-  governing laws, or evidence the unresolved decision needs and the MASTERs do not yet capture.
-- Do not reopen approved architecture, ask Jess again, or offer broad A/B/C alternatives for a
-  settled decision. If the answer is in governing docs, use it and continue.
+- **APPROVED / LOCKED decisions are not re-researched, reopened or offered for re-approval.** If
+  the answer is in governing docs, use it and continue.
+- For a genuinely **UNRESOLVED** design decision, proactively research only the declared decision
+  surface. Use the relevant governed references — including Linear, Shopify, AutoCount, 2990,
+  current Carres UI and other mature ERP patterns when useful — and exclude unrelated history and
+  pages. Derive the common patterns and real trade-offs, then give **one evidence-based Carres
+  recommendation**, not arbitrary A/B/C options. References are evidence, never specification;
+  Carres business truth and governing architecture still win.
 - Current code and screens are implementation evidence. Inspect them for gaps, density and
   usability when relevant, but they cannot override the approved target.
 - Challenge an approved ruling only with a genuine contradiction, demonstrated impossibility, or
@@ -316,12 +319,14 @@ If the chat is told **“Register Template — continue from repo governance”*
 
 1. Read `CLAUDE.md` → `docs/ERP-ARCHITECTURE.md` → this UI MASTER → the target module MASTER.
 2. State **ALREADY APPROVED · GENUINELY UNRESOLVED · THIS SESSION'S SINGLE DECISION SURFACE**.
-3. Preserve settled architecture and the §6.4 rulings. Research only the missing Register-template
-   decision named in step 2; use current screens and code only as implementation/usability evidence.
-4. Consult `grid-findings`, 2990, AutoCount, Old Orders or other history only when §1.2's evidence
-   exceptions are met, and say which exception triggered the lookup.
-5. Present the smallest missing decision for Jess's approval. Do not restart with a portal-wide
-   survey, broad A/B/C layouts, a new status model, or implementation.
+3. Preserve settled architecture and the §6.4 rulings without re-researching or reopening them.
+4. For the missing Register-template decision named in step 2, proactively conduct scoped research
+   using the relevant governed references — `grid-findings`, Linear, Shopify, AutoCount, 2990,
+   current Carres UI and other mature ERP patterns when useful. Exclude unrelated pages and history;
+   derive the common patterns and real trade-offs from the evidence.
+5. Present the smallest missing decision as **one evidence-based Carres recommendation** for Jess's
+   approval, not arbitrary A/B/C layouts. Do not restart with a portal-wide survey, a new status
+   model or implementation.
 
 **Current unresolved Register-template surface:** reusable filter/overflow behaviour beyond the
 locked §6.4 width law. Default-column hierarchy and whether selection is permanent remain

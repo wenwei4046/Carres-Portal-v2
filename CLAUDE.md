@@ -128,7 +128,7 @@ Before planning, changing code, or declaring the state of any ERP module:
 7. After an approved implementation is production-verified, overwrite the module MASTER's current
    implementation record in the same change. Never append a competing checkpoint.
 
-### PLAN / DESIGN CHAT ENTRY LAW — owner ruling 2026-08-11
+### PLAN / DESIGN CHAT ENTRY LAW — APPROVED / LOCKED, owner ruling 2026-08-11
 
 **A PLAN / DESIGN chat continues from approved truth; it does not rediscover it.** At entry it must:
 
@@ -136,12 +136,14 @@ Before planning, changing code, or declaring the state of any ERP module:
    the baseline, not a hypothesis to reconstruct from chat history, old screens or old commits.
 2. State exactly three things: **WHAT IS ALREADY APPROVED · WHAT IS GENUINELY UNRESOLVED · WHAT
    SINGLE DECISION / DECISION SURFACE THIS SESSION IS SOLVING.**
-3. Research only that unresolved surface. Do not reconstruct the full UI/business history or
-   re-study 2990, Old Orders or current pages by default. Consult history or external evidence only
-   when current governing truth marks an **UNKNOWN**, two governing laws genuinely conflict, or the
-   decision needs evidence not yet captured.
-4. Never reopen approved architecture, ask Jess to repeat an answer already in governing docs, or
-   offer broad A/B/C alternatives for settled decisions. Continue from the recorded answer.
+3. **APPROVED / LOCKED decisions are not re-researched, reopened or offered for re-approval.**
+   Continue from the recorded answer.
+4. For a genuinely **UNRESOLVED** design decision, proactively research only that declared decision
+   surface. Use the relevant governed references — including Linear, Shopify, AutoCount, 2990,
+   current Carres UI and other mature ERP patterns when useful — and exclude unrelated history and
+   pages. Derive the common patterns and real trade-offs, then give **one evidence-based Carres
+   recommendation**, not arbitrary A/B/C options. References are evidence, never specification;
+   Carres business truth and governing architecture still win.
 5. Treat current code and screens as implementation evidence: study them for gaps and usability,
    but never let them override approved target truth.
 6. Challenge approved truth only for a genuine contradiction, demonstrated impossibility, or new
@@ -172,7 +174,8 @@ the task was explicitly placed behind a PLAN MODE / Layout Approved gate.
 1  Read this file + the module MASTER.  Nothing else first.
 2  Measure.  Every proposal runs the DECISION GATE below — no exception.
 3  Challenge (Law 4).  Problems get 🔴/🟡 and a fix, never a complaint alone.
-4  Ask ONE decision at a time — 2-3 options, each with its cost, recommendation first.
+4  Ask ONE decision at a time — one evidence-based Carres recommendation, with its trade-off and
+   falsifier. Alternatives appear only when the evidence leaves a genuine business choice.
 5  Approved → build → test → PR → merge → deploy → verify production.  Do not come back.
 6  Overwrite the MASTER in the same PR.
 ```
