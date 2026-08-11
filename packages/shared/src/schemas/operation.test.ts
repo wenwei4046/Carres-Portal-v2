@@ -5,8 +5,6 @@ import {
   receivePoWithDoInput,
   adjustStockInput,
   abandonOrderInput,
-  createPoInput,
-  createPosBatchInput,
   warehousePickInput,
   recheckStockInput,
   assignPickupPartnerInput,
@@ -180,203 +178,16 @@ describe('abandonOrderInput', () => {
   });
 });
 
-describe('createPoInput', () => {
-  // Phase 4.5 Chunk 2 Sprint E (T25, migration 0055) — every line carries
-  // cost (>= 0) + costSource ('hand_entered'|'prev_po'|'system_suggested').
-  const VALID_LINE = {
-    sku: 'SOFA-OAK-3S',
-    qty: 1,
-    cost: 1500,
-    costSource: 'hand_entered' as const,
-  };
-  // 0083 (Loo 2026-05-10) — etaDate is now required (ISO date).
-  const ETA = '2026-06-01';
-  it('accepts supplier + warehouse + at least one line with cost+costSource', () => {
-    expect(
-      createPoInput.safeParse({
-        supplierId: UUID,
-        warehouseId: UUID2,
-        lines: [VALID_LINE],
-        etaDate: ETA,
-      }).success,
-    ).toBe(true);
-  });
-  it('rejects an empty lines array', () => {
-    expect(
-      createPoInput.safeParse({
-        supplierId: UUID,
-        warehouseId: UUID2,
-        lines: [],
-        etaDate: ETA,
-      }).success,
-    ).toBe(false);
-  });
-  it('rejects extra keys (strict mode)', () => {
-    expect(
-      createPoInput.safeParse({
-        supplierId: UUID,
-        warehouseId: UUID2,
-        lines: [VALID_LINE],
-        etaDate: ETA,
-        extraField: 'x',
-      }).success,
-    ).toBe(false);
-  });
-  it('rejects a line missing cost (T25 — required for new POs)', () => {
-    expect(
-      createPoInput.safeParse({
-        supplierId: UUID,
-        warehouseId: UUID2,
-        lines: [{ sku: 'SOFA-OAK-3S', qty: 1, costSource: 'hand_entered' }],
-        etaDate: ETA,
-      }).success,
-    ).toBe(false);
-  });
-  it('rejects a line missing costSource (T25 — required for new POs)', () => {
-    expect(
-      createPoInput.safeParse({
-        supplierId: UUID,
-        warehouseId: UUID2,
-        lines: [{ sku: 'SOFA-OAK-3S', qty: 1, cost: 1500 }],
-        etaDate: ETA,
-      }).success,
-    ).toBe(false);
-  });
-  it('rejects a negative cost (mirrors DB CHECK cost >= 0)', () => {
-    expect(
-      createPoInput.safeParse({
-        supplierId: UUID,
-        warehouseId: UUID2,
-        lines: [{ ...VALID_LINE, cost: -1 }],
-        etaDate: ETA,
-      }).success,
-    ).toBe(false);
-  });
-  it('accepts cost = 0 (zero is non-negative)', () => {
-    expect(
-      createPoInput.safeParse({
-        supplierId: UUID,
-        warehouseId: UUID2,
-        lines: [{ ...VALID_LINE, cost: 0 }],
-        etaDate: ETA,
-      }).success,
-    ).toBe(true);
-  });
-  it('rejects an unknown costSource label', () => {
-    expect(
-      createPoInput.safeParse({
-        supplierId: UUID,
-        warehouseId: UUID2,
-        lines: [{ ...VALID_LINE, costSource: 'made_up' }],
-        etaDate: ETA,
-      }).success,
-    ).toBe(false);
-  });
-  it('accepts each known costSource label', () => {
-    for (const cs of ['hand_entered', 'prev_po', 'system_suggested'] as const) {
-      expect(
-        createPoInput.safeParse({
-          supplierId: UUID,
-          warehouseId: UUID2,
-          lines: [{ ...VALID_LINE, costSource: cs }],
-          etaDate: ETA,
-        }).success,
-      ).toBe(true);
-    }
-  });
-  // 0083 (Loo 2026-05-10) — etaDate required + must be ISO date.
-  it('rejects when etaDate is missing (0083)', () => {
-    expect(
-      createPoInput.safeParse({
-        supplierId: UUID,
-        warehouseId: UUID2,
-        lines: [VALID_LINE],
-      }).success,
-    ).toBe(false);
-  });
-  it('rejects empty etaDate (0083)', () => {
-    expect(
-      createPoInput.safeParse({
-        supplierId: UUID,
-        warehouseId: UUID2,
-        lines: [VALID_LINE],
-        etaDate: '',
-      }).success,
-    ).toBe(false);
-  });
-  it('rejects malformed etaDate (0083)', () => {
-    expect(
-      createPoInput.safeParse({
-        supplierId: UUID,
-        warehouseId: UUID2,
-        lines: [VALID_LINE],
-        etaDate: '01/06/2026',
-      }).success,
-    ).toBe(false);
-  });
-});
-
-describe('createPosBatchInput', () => {
-  const VALID_PO = {
-    supplierId: UUID,
-    warehouseId: UUID2,
-    lines: [
-      {
-        sku: 'SOFA-OAK-3S',
-        qty: 1,
-        cost: 1500,
-        costSource: 'hand_entered' as const,
-      },
-    ],
-    // 0083 (Loo 2026-05-10) — etaDate now required on each PO entry.
-    etaDate: '2026-06-01',
-  };
-  it('accepts an array with one valid PO entry', () => {
-    expect(
-      createPosBatchInput.safeParse({ pos: [VALID_PO] }).success,
-    ).toBe(true);
-  });
-  it('accepts an array with 20 entries (cap)', () => {
-    const pos = Array.from({ length: 20 }, () => VALID_PO);
-    expect(createPosBatchInput.safeParse({ pos }).success).toBe(true);
-  });
-  it('rejects an empty pos array', () => {
-    expect(createPosBatchInput.safeParse({ pos: [] }).success).toBe(false);
-  });
-  it('rejects 21 entries (over cap)', () => {
-    const pos = Array.from({ length: 21 }, () => VALID_PO);
-    expect(createPosBatchInput.safeParse({ pos }).success).toBe(false);
-  });
-  it('rejects when one entry has empty lines', () => {
-    expect(
-      createPosBatchInput.safeParse({
-        pos: [VALID_PO, { ...VALID_PO, lines: [] }],
-      }).success,
-    ).toBe(false);
-  });
-  it('rejects when warehouseId is not uuid in any entry', () => {
-    expect(
-      createPosBatchInput.safeParse({
-        pos: [VALID_PO, { ...VALID_PO, warehouseId: 'nope' }],
-      }).success,
-    ).toBe(false);
-  });
-  it('rejects when one entry has a line missing cost (T25 propagation)', () => {
-    expect(
-      createPosBatchInput.safeParse({
-        pos: [
-          VALID_PO,
-          {
-            ...VALID_PO,
-            lines: [
-              { sku: 'BED-PINE-K', qty: 2, costSource: 'hand_entered' },
-            ],
-          },
-        ],
-      }).success,
-    ).toBe(false);
-  });
-});
+/* ⭐ CARD 4B · SINGLE PO CREATION AUTHORITY (2026-08-11).
+ *
+ * The `createPoInput` and `createPosBatchInput` suites were deleted with the
+ * schemas they covered. Those two contracts belonged to `POST /api/operation/pos`
+ * and `POST /api/operation/pos/batch`, the application's last two ungoverned
+ * Purchase Order creation doors; both routes are retired and both RPCs behind
+ * them are revoked from every browser role (migration 0339).
+ *
+ * Purchase Order creation has ONE wire contract now — Batch Purchase's issue
+ * payload, covered by `apps/api/src/routes/operation/to-order.test.ts`. */
 
 describe('warehousePickInput', () => {
   it('accepts a valid warehouse uuid', () => {

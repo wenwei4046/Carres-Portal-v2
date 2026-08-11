@@ -25,7 +25,13 @@ import { AlertTriangle } from "lucide-react";
  *
  * Pre-flight: client-side shortage check at the chosen warehouse. If any
  * line is short, the RPC will reject with `insufficient_stock_for_reserve`,
- * so we block submit and tell the user to use Issue POs instead.
+ * so we block submit and point the user at To Order instead.
+
+ * CARD 4B (2026-08-11) — that pointer used to read "use Issue POs", the words
+ * of the deleted `+ Issue POs` door on this drawer. `Issue PO` on the To Order
+ * page is the ONE governed door now, so the copy names the page rather than a
+ * button that no longer exists. This is prose, not a shortcut: no control here
+ * creates a Purchase Order.
  */
 interface Props {
   order: operationOrderDetailOrder;
@@ -104,7 +110,7 @@ export default function TransferReadyDialog({
         } else if (body.code === "insufficient_stock_for_reserve") {
           // Race-condition: stock changed between pre-flight and submit.
           toast.error(
-            "Stock changed under us — re-check and use Issue POs instead",
+            "Stock changed under us — re-check, then Issue PO on To Order",
           );
         } else {
           toast.error(e.message || "Transfer to ready failed");
@@ -200,7 +206,7 @@ export default function TransferReadyDialog({
             <>
               <strong><AlertTriangle size={13} strokeWidth={2} className="inline -mt-px mr-1" />Some lines short</strong> — RPC will reject with{" "}
               <code className="font-mono">insufficient_stock_for_reserve</code>.
-              Use <strong>Issue POs</strong> instead.
+              Use <strong>Issue PO</strong> on <strong>To Order</strong> instead.
               <div className="font-mono text-label mt-1">
                 {preflight.shortages
                   .map((s) => `${s.sku}: need ${s.need}, have ${s.have}`)

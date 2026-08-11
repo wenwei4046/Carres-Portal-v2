@@ -307,86 +307,15 @@ export const abandonOrderInput = z.object({
 }).strict();
 export type AbandonOrderInput = z.infer<typeof abandonOrderInput>;
 
-/**
- * `createPoInput` — POST /api/operation/pos.
- * Maps to `operation_create_po(supplier_id, warehouse_id, lines, so, so_refs)`
- * RPC. Used by NewPODialog for both single-order POs (`so` set) and combined
- * cross-order bundles (`soRefs` array, per A7). At least one line required;
- * each line's qty must be a positive integer.
+/* ⭐ CARD 4B · SINGLE PO CREATION AUTHORITY (2026-08-11).
  *
- * Phase 4.5 Chunk 2 Sprint E (T25) migration 0055 — each line carries
- * `cost` (per-unit numeric, non-negative) + `costSource` (enum) that get
- * persisted to `purchase_order_lines.cost` + `.cost_source`. Required on input
- * even though the DB columns are nullable, because:
- *   - Legacy rows pre-0055 are NULL (CQ3 backfill).
- *   - New PO creates MUST capture the cost — RPC validation (T26) raises
- *     ERRCODE 22023 DETAIL 'cost_required' if either is NULL on insert.
- *   - The frontend (T28 CogsLineEditor) drives a value into both fields
- *     before the user can submit, so the input edge contract enforces
- *     non-NULL too.
- */
-export const createPoInput = z.object({
-  supplierId: z.string().uuid(),
-  warehouseId: z.string().uuid(),
-  // 0079 (Loo 2026-05-10) — procurement-leg LP assigned at PO creation so
-  // the partner sees the upcoming pickup the moment operation issues the
-  // PO (instead of after Mark Ready). Optional: own_logistics suppliers
-  // omit it; factory_pickup suppliers must include it (modal enforces).
-  procurementPartnerId: z.string().uuid().optional(),
-  lines: z.array(z.object({
-    sku: z.string().min(1),
-    qty: z.number().int().positive(),
-    // Migration 0055. Per-unit cost; CHECK on the column enforces >= 0 — we
-    // mirror that here so 422 surfaces at the API edge rather than 500ing on
-    // SQLSTATE 23514 from Postgres.
-    cost: z.number().nonnegative(),
-    // Migration 0055 + 0074. Enum labels mirror `cost_source_enum` minus the
-    // server-only 'auto_issued'. Post-0074 (Loo 2026-05-09 Q5=a) Create-PO
-    // always emits 'catalog' since cost auto-reads from product_skus.cost;
-    // the legacy 3 values stay accepted for any backfill / migration path.
-    costSource: z.enum(['hand_entered', 'prev_po', 'system_suggested', 'catalog']),
-    // Migration 0073 cascade picker (Loo 2026-05-09). Optional jsonb payload
-    // per-line: bedframe={color, gap}, sofa={fabric_id, fabric_name,
-    // fabric_surcharge}, mattress=null. Server is a dumb persister; client
-    // (CreatePOModal) refuses submit when bedframe lacks color/gap or sofa
-    // lacks fabric, so the API edge accepts any record shape.
-    attrs: z.record(z.unknown()).nullable().optional(),
-  })).min(1),
-  so: z.number().int().positive().optional(),
-  soRefs: z.array(z.number().int().positive()).optional(),
-  // 0083 (Loo 2026-05-10) — required ISO date string. Pre-0083 rows had this
-  // field captured by the modal but never sent (input-shape carry-forward
-  // closed). Supplier/Finance AP-aging both read `purchase_orders.eta_date`;
-  // null was silently corrupting both surfaces.
-  etaDate: z.string().date(),
-}).strict();
-export type CreatePoInput = z.infer<typeof createPoInput>;
-
-/**
- * `createPosBatchInput` — POST /api/operation/pos/batch (C5.2).
- * Maps to `operation_create_pos_batch(p_pos jsonb)` RPC. `pos` is the array
- * of per-PO objects, each shaped exactly like `createPoInput`. The batch RPC
- * is atomic: any helper failure rolls back the whole batch (default plpgsql
- * function-as-tx semantics). Cap of 20 mirrors the RPC's sanity guard
- * (22023 invalid_batch_size). Min of 1 enforces the same cap on the empty
- * end. Frontend submits this from CreatePOModal when supplier groups > 1
- * (per-supplier-group warehouse picker, blank required).
- */
-export const createPosBatchInput = z.object({
-  pos: z.array(createPoInput).min(1).max(20),
-}).strict();
-export type CreatePosBatchInput = z.infer<typeof createPosBatchInput>;
-
-/**
- * `createPosBatchResponse` — RPC returns `{po_ids: [text, ...]}` where each
- * id is a generated 'PO-NNNN' text id (NOT a uuid — the project's PO PK is
- * text, see 0001_init.sql line 323). Surfaced to the UI for the success
- * toast ("Issued N POs").
- */
-export const createPosBatchResponse = z.object({
-  poIds: z.array(z.string().min(1)),
-});
-export type CreatePosBatchResponse = z.infer<typeof createPosBatchResponse>;
+ * `createPoInput`, `createPosBatchInput` and `createPosBatchResponse` were the
+ * wire contracts of `POST /api/operation/pos` and `POST /api/operation/pos/batch`.
+ * Both routes are retired and the RPCs behind them are revoked from every browser
+ * role (migration 0339), so the schemas describe doors that no longer exist.
+ *
+ * Purchase Order creation has ONE wire contract now — Batch Purchase's issue
+ * payload — and ONE authority behind it, `purchasing_issue_pos_batch(jsonb)`. */
 
 /**
  * `warehousePickInput` — POST /api/operation/orders/:id/warehouse.

@@ -456,231 +456,99 @@ describe("GET /api/operation/pos/:id/source-orders", () => {
   });
 });
 
-describe("POST /api/operation/pos", () => {
-  const SUPPLIER_ID = "00000000-0000-0000-0000-000000000a01";
-  const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000b01";
-  // T25/T26 (migration 0055/0055b): every PO line now requires cost +
-  // costSource on input — zod schema enforces non-NULL at the api edge,
-  // RPC validates again for defense-in-depth (raises 22023
-  // DETAIL='cost_required' if missing).
-  const VALID = {
-    supplierId: SUPPLIER_ID,
-    warehouseId: WAREHOUSE_ID,
-    lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, costSource: "hand_entered" as const }],
-    so: 4001,
-    // 0083 (Loo 2026-05-10) — etaDate now required (ISO date).
-    etaDate: "2026-06-01",
-  };
-
-  // 0083: success-path tests need a chained `.from().update().eq()` mock
-  // for the post-RPC eta_date UPDATE. Helper builds the chain inline so we
-  // don't have to add it to every error-path test (those return before
-  // reaching the UPDATE).
-  function makeFromMock(updateError: unknown = null) {
-    const eq = vi.fn().mockResolvedValue({ error: updateError });
-    const update = vi.fn().mockReturnValue({ eq });
-    const from = vi.fn().mockReturnValue({ update });
-    return { from, update, eq };
+/**
+ * ⭐ CARD 4B · SINGLE PO CREATION AUTHORITY (2026-08-11).
+ *
+ * `POST /api/operation/pos` and `POST /api/operation/pos/batch` were the
+ * application's two Purchase Order creation doors. They called
+ * `operation_create_po` and `operation_create_pos_batch` — two of the four extra
+ * creation authorities the Card 4 audit found reachable from the browser.
+ *
+ * Their suites are replaced by their inverse. The assertion that matters is
+ * **404, not 403**: a route that answers 403 still exists, and this card's whole
+ * point is that no compatibility write door is left behind for a stale bundle or
+ * a curl to find. Nothing may reach a `create` RPC from here — proven by the
+ * mock client, which fails the test if any RPC is called at all.
+ */
+describe("the two legacy Purchase Order creation routes are RETIRED", () => {
+  /** A client that turns any DB touch into a test failure. */
+  function noDbClient() {
+    const rpc = vi.fn(() => {
+      throw new Error("a retired create route reached the database");
+    });
+    const from = vi.fn(() => {
+      throw new Error("a retired create route reached a table");
+    });
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as never);
+    return { rpc, from };
   }
 
-  it("returns 200 on success and calls RPC with snake_case args", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: { id: "PO-2050", supplier_id: SUPPLIER_ID, warehouse_id: WAREHOUSE_ID, status: "open", sup_status: "pending", so: 4001, so_refs: null }, error: null,
-    });
-    const fromMock = makeFromMock();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc, from: fromMock.from } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/pos", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(VALID),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("operation_create_po", {
-      p_supplier_id: SUPPLIER_ID,
-      p_warehouse_id: WAREHOUSE_ID,
-      // T29: per-line `costSource` is reshaped to snake_case `cost_source` at
-      // the API edge before handing to the RPC (matches DB JSONB convention).
-      // 0073 cascade picker: each line carries an `attrs` jsonb (NULL for
-      // mattress + legacy callers; bedframe/sofa get filled by the FE).
-      p_lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, cost_source: "hand_entered", attrs: null }],
-      p_so: 4001,
-      p_so_refs: null,
-      // 0079 (Loo 2026-05-10) — procurement-leg LP pre-assigned at PO
-      // creation. Null when caller omits (own_logistics suppliers).
-      p_procurement_partner_id: null,
-    });
-    assertRpcCallShape(rpc, "operation_create_po", [
-      "p_supplier_id",
-      "p_warehouse_id",
-      "p_lines",
-      "p_so",
-      "p_so_refs",
-      "p_procurement_partner_id",
-    ]);
-    // 0083 (Loo 2026-05-10) — post-RPC UPDATE persists eta_date on the
-    // returned PO id (RPC public signature doesn't accept p_eta_date).
-    expect(fromMock.from).toHaveBeenCalledWith("purchase_orders");
-    expect(fromMock.update).toHaveBeenCalledWith({ eta_date: "2026-06-01" });
-    expect(fromMock.eq).toHaveBeenCalledWith("id", "PO-2050");
-  });
+  const BODY = {
+    supplierId: "00000000-0000-0000-0000-000000000a01",
+    warehouseId: "00000000-0000-0000-0000-000000000b01",
+    lines: [{ sku: "mattress:m1:k", qty: 2, cost: 100, costSource: "catalog" }],
+    etaDate: "2026-09-01",
+  };
 
-  it("supports combined PO with soRefs[] (and no so)", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: { id: "PO-2051" }, error: null });
-    const fromMock = makeFromMock();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc, from: fromMock.from } as any);
-    const jwt = await makeJwt("operation");
-    await app.fetch(
-      new Request("http://t/api/operation/pos", {
+  async function post(path: string, body: unknown, role = "operation") {
+    return app.fetch(
+      new Request(`http://t${path}`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          supplierId: SUPPLIER_ID,
-          warehouseId: WAREHOUSE_ID,
-          lines: [{ sku: "MAT-K-001", qty: 5, cost: 1500, costSource: "hand_entered" }],
-          soRefs: [4001, 4002, 4003],
-          // 0083: required.
-          etaDate: "2026-07-15",
-        }),
+        headers: {
+          authorization: `Bearer ${await makeJwt(role)}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
       }),
       env,
     );
-    expect(rpc).toHaveBeenCalledWith("operation_create_po", {
-      p_supplier_id: SUPPLIER_ID,
-      p_warehouse_id: WAREHOUSE_ID,
-      // T29: per-line `costSource` reshaped to snake_case `cost_source` at API edge.
-      // 0073 cascade picker: attrs jsonb (NULL for mattress + legacy lines).
-      p_lines: [{ sku: "MAT-K-001", qty: 5, cost: 1500, cost_source: "hand_entered", attrs: null }],
-      p_so: null,
-      p_so_refs: [4001, 4002, 4003],
-      // 0079 (Loo 2026-05-10) — see prior test for rationale.
-      p_procurement_partner_id: null,
-    });
-    assertRpcCallShape(rpc, "operation_create_po", [
-      "p_supplier_id",
-      "p_warehouse_id",
-      "p_lines",
-      "p_so",
-      "p_so_refs",
-      "p_procurement_partner_id",
-    ]);
-  });
+  }
 
-  it("returns 422 when lines is empty", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/pos", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ ...VALID, lines: [] }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("returns 422 when supplierId is not uuid", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/pos", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ ...VALID, supplierId: "not-a-uuid" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("maps P0001 supplier_not_found → 422 with code", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "P0001", message: "supplier missing", details: "supplier_not_found" } });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/pos", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(VALID),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("supplier_not_found");
-  });
-
-  // v3-active.1 (migration 0037): operation_create_po now calls
-  // _v3_claim_threads_for_po after the PO insert. If a concurrent transaction
-  // already claimed one of the matching threads, the helper raises 40001
-  // (serialization_failure). mapPgError surfaces it as 409 Conflict.
-  it("maps 40001 concurrent_claim → 409 conflict", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: {
-        code: "40001",
-        message: "concurrent_claim: 1 thread(s) already claimed",
-        details: "concurrent_claim",
-        hint:
-          "Another operation user has already issued a PO for these threads. Refresh and try again.",
-      },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/pos", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(VALID),
-      }),
-      env,
-    );
-    expect(res.status).toBe(409);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("concurrent_claim");
-  });
-
-  it("returns 403 for non-operation", async () => {
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/pos", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(VALID),
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
+  it("POST /api/operation/pos is gone — 404, not a 403 compatibility door", async () => {
+    const { rpc, from } = noDbClient();
+    const res = await post("/api/operation/pos", BODY);
+    expect(res.status).toBe(404);
     expect(rpc).not.toHaveBeenCalled();
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/operation/pos/batch is gone — 404, not a 403 compatibility door", async () => {
+    const { rpc, from } = noDbClient();
+    const res = await post("/api/operation/pos/batch", { pos: [BODY] });
+    expect(res.status).toBe(404);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("a principal cannot reach them either — the door is gone, not gated", async () => {
+    noDbClient();
+    expect((await post("/api/operation/pos", BODY, "principal")).status).toBe(404);
+    expect((await post("/api/operation/pos/batch", { pos: [BODY] }, "principal")).status).toBe(404);
+  });
+
+  it("the surviving read door on the same prefix still answers", async () => {
+    // Proof this is a targeted retirement and not a broken router: the GET that
+    // shares the `/api/operation/pos` path still resolves.
+    vi.mocked(userClient).mockReturnValue({
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          order: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          in: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          eq: vi.fn(() => Promise.resolve({ data: [], error: null })),
+        })),
+      })),
+      rpc: vi.fn(() => Promise.resolve({ data: null, error: null })),
+    } as never);
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { authorization: `Bearer ${await makeJwt("operation")}` },
+      }),
+      env,
+    );
+    expect(res.status).not.toBe(404);
   });
 });
 
-/**
- * The Office's legacy receiving door — RETIRED 2026-08-03 (Card C1, Jess).
- *
- * `POST /:id/receive` called `operation_receive_po_with_do` directly, so stock
- * moved and the delivery left NO Receiving Session, no event and no GRN. Jess
- * framed the card as **Data Integrity, not UX**, and required proof that no
- * Office path can move `received_qty` without opening a Session.
- *
- * These are that proof, as a guard rather than a paragraph: the route is gone,
- * and the ONE Office door left goes through `office_receive_post` (0315).
- */
 describe("the Office has exactly ONE receiving door", () => {
   const LINE = "11111111-1111-4111-8111-111111111111";
 
@@ -2185,260 +2053,6 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
 // ---------------------------------------------------------------------------
 // C5.2 — POST /api/operation/pos/batch (batch-create with per-PO warehouse)
 // ---------------------------------------------------------------------------
-describe("POST /api/operation/pos/batch", () => {
-  const SUPPLIER_A = "00000000-0000-0000-0000-000000000a01";
-  const SUPPLIER_B = "00000000-0000-0000-0000-000000000a02";
-  const WH_KLANG = "00000000-0000-0000-0000-000000000b01";
-  const WH_PJ = "00000000-0000-0000-0000-000000000b02";
-
-  // T25/T26 (migration 0055/0055b): every PO line now requires cost +
-  // costSource on input — see POST /api/operation/pos block above for the
-  // full rationale.
-  const TWO_POS = {
-    pos: [
-      {
-        supplierId: SUPPLIER_A,
-        warehouseId: WH_KLANG,
-        lines: [{ sku: "mattress:carres-cloud:King", qty: 2, cost: 1500, costSource: "hand_entered" as const }],
-        // 0083 (Loo 2026-05-10) — etaDate now required on each PO entry.
-        etaDate: "2026-06-01",
-      },
-      {
-        supplierId: SUPPLIER_B,
-        warehouseId: WH_PJ,
-        lines: [{ sku: "sofa:oak:3-seater", qty: 1, cost: 2200, costSource: "prev_po" as const }],
-        etaDate: "2026-06-15",
-      },
-    ],
-  };
-
-  it("happy path: 2 POs different suppliers + warehouses → returns poIds[]", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: { po_ids: ["PO-2031", "PO-2032"] },
-      error: null,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/pos/batch", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(TWO_POS),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { poIds: string[] };
-    expect(body.poIds).toEqual(["PO-2031", "PO-2032"]);
-    expect(rpc).toHaveBeenCalledTimes(1);
-    expect(rpc).toHaveBeenCalledWith("operation_create_pos_batch", {
-      p_pos: [
-        {
-          supplier_id: SUPPLIER_A,
-          warehouse_id: WH_KLANG,
-          // 0079 (Loo 2026-05-10) — procurement-leg LP per PO. null for
-          // own_logistics suppliers or when caller omits.
-          procurement_partner_id: null,
-          // T29: per-line `costSource` reshaped to snake_case `cost_source` at API edge.
-          // 0073: attrs jsonb forwarded too (NULL for mattress + legacy callers).
-          lines: [{ sku: "mattress:carres-cloud:King", qty: 2, cost: 1500, cost_source: "hand_entered", attrs: null }],
-          // 0083 (Loo 2026-05-10) — etaDate now propagated from caller into
-          // RPC's JSONB input, no longer hard-coded null.
-          eta_date: "2026-06-01",
-          so_refs: null,
-          note: null,
-        },
-        {
-          supplier_id: SUPPLIER_B,
-          warehouse_id: WH_PJ,
-          procurement_partner_id: null,
-          lines: [{ sku: "sofa:oak:3-seater", qty: 1, cost: 2200, cost_source: "prev_po", attrs: null }],
-          eta_date: "2026-06-15",
-          so_refs: null,
-          note: null,
-        },
-      ],
-    });
-    assertRpcCallShape(rpc, "operation_create_pos_batch", ["p_pos"]);
-  });
-
-  it("atomicity: helper failure on one PO returns 422; the RPC's single-call shape guarantees no partial inserts", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: { code: "P0001", message: "invalid sku/qty", details: "invalid_qty", hint: "pos_index=1" },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/pos/batch", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(TWO_POS),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("invalid_qty");
-    // Single RPC call — atomicity is enforced inside Postgres, not here.
-    expect(rpc).toHaveBeenCalledTimes(1);
-  });
-
-  it("returns 422 for empty pos array (zod min(1))", async () => {
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/pos/batch", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ pos: [] }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("returns 422 for 21 entries (zod max(20))", async () => {
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const onePo = {
-      supplierId: SUPPLIER_A,
-      warehouseId: WH_KLANG,
-      lines: [{ sku: "mattress:carres-cloud:King", qty: 1, cost: 1500, costSource: "hand_entered" as const }],
-      etaDate: "2026-06-01",
-    };
-    const res = await app.fetch(
-      new Request("http://t/api/operation/pos/batch", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ pos: Array.from({ length: 21 }, () => onePo) }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("maps 22023 invalid_batch_size from RPC → 422 with code='invalid_batch_size'", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: { code: "22023", message: "batch size", details: "invalid_batch_size" },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/pos/batch", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(TWO_POS),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("invalid_batch_size");
-  });
-
-  it("maps 22023 warehouse_required → 422 with pos_index parsed from RPC hint", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: {
-        code: "22023",
-        message: "warehouse is required",
-        details: "warehouse_required",
-        hint: "pos_index=1",
-      },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/pos/batch", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(TWO_POS),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("warehouse_required");
-    expect(body.pos_index).toBe(1);
-  });
-
-  // v3-active.1 (migration 0037): operation_create_pos_batch now calls
-  // _v3_claim_threads_for_po after each helper insert inside the loop. If a
-  // concurrent transaction already claimed one of the matching threads, the
-  // helper raises 40001 (serialization_failure). mapPgError surfaces it as
-  // 409 Conflict so the FE can show "Refresh and try again" — distinct from
-  // 422 validation failures (warehouse_required, invalid_batch_size).
-  it("maps 40001 concurrent_claim from RPC → 409 conflict", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: {
-        code: "40001",
-        message: "concurrent_claim: 2 thread(s) already claimed",
-        details: "concurrent_claim",
-        hint:
-          "Another operation user has already issued a PO for these threads. Refresh and try again.",
-      },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/pos/batch", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(TWO_POS),
-      }),
-      env,
-    );
-    expect(res.status).toBe(409);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("concurrent_claim");
-    expect(body.message).toContain("concurrent_claim");
-  });
-
-  it("returns 403 for dealer caller (no rpc)", async () => {
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("dealer");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/pos/batch", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(TWO_POS),
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
-    expect(rpc).not.toHaveBeenCalled();
-  });
-});
-
-/**
- * Q5 · POST /api/operation/pos/:id/ready-date — THE DOOR THAT HAD NO HANDLE.
- *
- * `purchasing_record_ready_date` shipped with migration 0318 on 2026-08-03 and
- * nothing in the portal ever called it, so `Confirm ready date` — an action the
- * purchasing flow has defined since it was written — could not be closed from
- * any screen. These tests pin the HTTP half: the RPC name, its exact argument
- * shape, the readable 422s, and the role gate.
- */
 describe("POST /api/operation/pos/:id/ready-date", () => {
   const PO_ID = "PO-2032";
 

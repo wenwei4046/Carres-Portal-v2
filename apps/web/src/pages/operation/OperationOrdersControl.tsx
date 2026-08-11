@@ -3186,7 +3186,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
       <OrderDetailDrawer
         orderId={openOrderId}
         journey={journeySignalsFor(openOrderId)}
-        allowIssuePO={false}
+        /* Card 3 pinned `allowIssuePO={false}` here. Card 4B removed the whole
+           capability from the drawer, so there is no longer a flag to pin —
+           no surface that mounts this drawer can create a Purchase Order. */
         onClose={() => setOpenOrderId(null)}
         nav={
           navIdx >= 0

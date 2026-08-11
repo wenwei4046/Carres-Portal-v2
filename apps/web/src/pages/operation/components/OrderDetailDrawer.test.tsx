@@ -96,11 +96,45 @@ describe("OrderDetailDrawer — Information Hierarchy (UI-KIT §1.4)", () => {
   });
 });
 
-describe("OrderDetailDrawer — legacy Purchasing door", () => {
-  it("gates every PO action behind the explicit allowIssuePO capability", () => {
-    expect(SRC).toContain("allowIssuePO={allowIssuePO}");
-    expect(SRC).toContain("...(allowIssuePO");
-    expect(SRC).toContain("{allowIssuePO &&");
+/**
+ * ⭐ CARD 4B · SINGLE PO CREATION AUTHORITY (2026-08-11).
+ *
+ * Card 3 asserted that every PO action here sat behind an explicit
+ * `allowIssuePO` capability. That guard is SUPERSEDED, and by something
+ * stronger: the capability itself is gone. The drawer no longer has a Purchase
+ * Order creation door to gate — not on Delivery, not anywhere — and the flag
+ * that used to gate it does not exist to be flipped back on.
+ *
+ * A capability that can be re-enabled with `allowIssuePO` is not the same
+ * safety as a capability that is not in the file.
+ */
+describe("OrderDetailDrawer — no Purchase Order creation door", () => {
+  /* Scan CODE, not comments. The removal notes left in the file name the things
+     they removed — that is the record — and a guard a reworded comment can trip
+     is a guard that gets worked around instead of obeyed. */
+  const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  it("carries no PO creation capability, not even a disabled one", () => {
+    expect(CODE).not.toContain("allowIssuePO");
+    expect(CODE).not.toContain("onIssuePOsClick");
+    expect(CODE).not.toContain("gotoProcurementWithPrefill");
+  });
+
+  it("offers no menu item that creates a Purchase Order", () => {
+    // These were the two live doors: the ⋮ stage action and the stock panel's
+    // overflow item. Both label strings must be gone from the JSX.
+    expect(CODE).not.toMatch(/label=\{?"Issue PO"/);
+    expect(CODE).not.toMatch(/label:\s*"Raise PO for shortages"/);
+  });
+
+  it("never reaches a legacy creation path", () => {
+    expect(CODE).not.toContain("CreatePOModal");
+    expect(CODE).not.toContain("CreatePoPrefill");
+    // The prefill hand-off to /operation/procurement is what made this drawer a
+    // creation surface without owning a form.
+    expect(CODE).not.toMatch(/state:\s*\{\s*\n?\s*prefill/);
+    expect(CODE).not.toContain("/api/operation/pos/batch");
+    expect(CODE).not.toMatch(/apiFetch<[^>]*>\("\/api\/operation\/pos"/);
   });
 });
 

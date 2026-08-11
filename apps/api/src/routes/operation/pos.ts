@@ -4,8 +4,6 @@ import {
   assignPickupPartnerInput,
   cancelPoInput,
   chasePoEventInput,
-  createPoInput,
-  createPosBatchInput,
   listPurchaseOrdersQuery,
   normalizeSkuKey,
   reassignPoWarehouseInput,
@@ -22,10 +20,8 @@ import {
   type PoReportLine,
   type PoReportResponse,
 } from "@carres/shared";
-import { resolveCurrentPoDuty } from "./po-duty";
 // renderPoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import { requireOperation } from "../../lib/auth-guards";
-import { hasDuty } from "../../lib/duties";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -56,44 +52,11 @@ import type { AppEnv } from "../../types";
  */
 const operationPosRouter = new Hono<AppEnv>();
 
-/** PO duty gate (0236, Jess 2026-07-18): while a duty holder exists for the
- *  current MYT month, only that holder + management may CREATE POs (web hides
- *  the button; this is the API layer of the same rule — two layers, one
- *  rule). Dormant DB / empty pool → no gate (a missing feature must never
- *  block procurement). Read-only PO routes are untouched. */
-async function poDutyGate(c: Context<AppEnv>): Promise<Response | null> {
-  const auth = c.var.auth;
-  const sb = userClient(c.env, auth.jwt);
+/* `poDutyGate` was deleted with the two create routes above (Card 4B). It
+   guarded PO creation against the PO-duty roster, and those were its only two
+   callers. Batch Purchase carries its own server-side gate inside
+   `purchasing_issue_pos_batch`. */
 
-  // Cheapest question first. HR-P2 (0260) turned the management bypass into a
-  // duty read (a DB round-trip), so asking it up front would bill EVERY PO
-  // create for a permission we usually don't need: when the duty layer is
-  // dormant, or the caller IS this month's holder, management status is
-  // irrelevant to the outcome. Resolve the holder first and only ask about
-  // `ops_manager` in the one case where it can change the answer.
-  const duty = await resolveCurrentPoDuty(sb);
-  if (!duty || duty.user_id === auth.id) return null;
-
-  // Someone ELSE holds this month — management may still override.
-  if (await hasDuty(c, "ops_manager")) return null;
-  const holder = await sb
-    .from("app_users")
-    .select("name, email")
-    .eq("id", duty.user_id)
-    .maybeSingle();
-  const label =
-    (holder.data?.name as string | null) ??
-    (holder.data?.email as string | null) ??
-    "the duty holder";
-  return c.json(
-    {
-      error: "forbidden",
-      code: "po_duty",
-      message: `PO duty: this month is ${label}'s — only the duty holder and management can raise POs.`,
-    },
-    403,
-  );
-}
 
 // ----- GET / list -----
 operationPosRouter.get("/", requireOperation, async (c) => {
@@ -1069,162 +1032,26 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
 // transform pattern as POST /batch below — the wire contract stays
 // camelCase (parity with every other route), and the snake_case translation
 // happens once at the DB edge.
-operationPosRouter.post("/", requireOperation, async (c) => {
-  const gated = await poDutyGate(c);
-  if (gated) return gated;
-  const parsed = await parseJsonBody(c, createPoInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const linesForRpc = parsed.data.lines.map((l) => ({
-    sku: l.sku,
-    qty: l.qty,
-    cost: l.cost,
-    cost_source: l.costSource,
-    attrs: l.attrs ?? null,
-  }));
-  const { data, error } = await sb.rpc("operation_create_po", {
-    p_supplier_id: parsed.data.supplierId,
-    p_warehouse_id: parsed.data.warehouseId,
-    p_lines: linesForRpc,
-    // p_so / p_so_refs MUST match the DB function param names (renamed from
-    // p_dl / p_dl_refs by migration 0123). The 0123 code sweep's \bdl\b regex
-    // missed `p_dl` (no word boundary after `_`), so this call site shipped
-    // stale → PostgREST 500 "Could not find the function ... in the schema cache".
-    p_so: parsed.data.so ?? null,
-    p_so_refs: parsed.data.soRefs ?? null,
-    // 0079 (Loo 2026-05-10) — pre-assign the procurement-leg LP at PO
-    // creation. Modal already validates that factory_pickup suppliers have
-    // a partner picked; own_logistics suppliers omit the field and the RPC
-    // accepts null.
-    p_procurement_partner_id: parsed.data.procurementPartnerId ?? null,
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  // 0083 (Loo 2026-05-10) — `operation_create_po(uuid,uuid,jsonb,int,int[])`
-  // hard-codes `p_eta_date := null` at 0055b:222 and adding a 6th param
-  // would need a DROP+CREATE migration. Cheaper: post-RPC UPDATE. operation
-  // role passes RLS `po_scoped_update` (0002:249); LP whitelist trigger
-  // (0068) early-returns for non-partner roles, so this is safe.
-  const poId = (data as { id?: string } | null)?.id;
-  if (poId) {
-    const { error: etaErr } = await sb
-      .from("purchase_orders")
-      .update({ eta_date: parsed.data.etaDate })
-      .eq("id", poId);
-    if (etaErr) {
-      // THE PURCHASE ORDER ALREADY EXISTS. `operation_create_po` is not
-      // idempotent — it mints `PO-<max+1>` (0079:99-113) — and CreatePOModal
-      // catches, toasts and leaves the modal open with the draft intact, so an
-      // operator who reads a bare failure presses Issue again and gets a second
-      // PO for the same goods. Same shape as to-order.ts's `issued: ids`, plus
-      // the id in `message`, because the toast renders only that field.
-      const m = mapPgError(etaErr);
-      return c.json(
-        {
-          ...(m.body as object),
-          po: data,
-          message: `${poId} was created — its expected arrival could not be saved. Set the arrival date on the PO; do NOT issue it again.`,
-        },
-        m.status,
-      );
-    }
-  }
-  return c.json({ po: data });
-});
-
-// ----- POST /batch create -----
-// C5.2: per-PO warehouse picker. When the modal's supplier-grouping yields >1
-// supplier, the FE submits a single batch payload here instead of N parallel
-// POSTs to POST /. The RPC `operation_create_pos_batch` is atomic — any
-// helper-raised error rolls back the whole batch.
+// ----- POST / and POST /batch — RETIRED 2026-08-11 (Card 4B) -----
 //
-// Error mapping (extends generic mapPgError so the FE can surface the
-// pos_index for per-row UI feedback):
-//   • 22023 + detail='invalid_batch_size'  → 422 code 'invalid_batch_size'
-//   • 22023 + detail='warehouse_required'  → 422 code 'warehouse_required',
-//                                            includes pos_index parsed from
-//                                            the RPC's hint ("pos_index=N")
-//   • 42501                                → 403
-//   • Other PG errors                      → mapPgError fallback
-operationPosRouter.post("/batch", requireOperation, async (c) => {
-  const gated = await poDutyGate(c);
-  if (gated) return gated;
-  const parsed = await parseJsonBody(c, createPosBatchInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-
-  // Reshape camelCase pos[] entries into the snake_case shape expected by the
-  // RPC's JSONB array argument. Done at the boundary, not in shared schemas,
-  // so the wire contract stays camelCase like every other route. T29: each
-  // line's `costSource` (camelCase wire) → `cost_source` (snake_case DB) per
-  // migration 0055b RPC contract.
-  const payload = parsed.data.pos.map((p) => ({
-    supplier_id: p.supplierId,
-    warehouse_id: p.warehouseId,
-    // 0079 (Loo 2026-05-10) — per-PO procurement-leg LP. RPC reads
-    // `procurement_partner_id` off each jsonb entry and forwards to inner.
-    procurement_partner_id: p.procurementPartnerId ?? null,
-    lines: p.lines.map((l) => ({
-      sku: l.sku,
-      qty: l.qty,
-      cost: l.cost,
-      cost_source: l.costSource,
-      attrs: l.attrs ?? null,
-    })),
-    // 0083 (Loo 2026-05-10) — was hard-coded null. RPC reads `eta_date`
-    // off each JSONB entry and casts to date (0055b:300-303); empty string
-    // falls back to null but our zod (.date()) blocks empty.
-    eta_date: p.etaDate,
-    so_refs: p.soRefs ?? null,
-    note: null as string | null,
-  }));
-
-  const { data, error } = await sb.rpc("operation_create_pos_batch", {
-    p_pos: payload,
-  });
-  if (error) {
-    const e = error as { code?: string; message?: string; details?: string; hint?: string };
-
-    // 22023 invalid_batch_size — surface the detail code unchanged.
-    if (e.code === "22023" && e.details === "invalid_batch_size") {
-      return c.json(
-        {
-          error: "rule_violation",
-          code: "invalid_batch_size",
-          message: e.message ?? "invalid batch size",
-        },
-        422,
-      );
-    }
-
-    // 22023 warehouse_required — annotate the offending entry index. RPC's
-    // hint is "pos_index=N" (0-based); parse it for the FE so a single PO
-    // group can be highlighted without string-matching on the UI side.
-    if (e.code === "22023" && e.details === "warehouse_required") {
-      const m = /pos_index=(\d+)/.exec(e.hint ?? "");
-      const posIndex = m ? Number.parseInt(m[1], 10) : null;
-      return c.json(
-        {
-          error: "rule_violation",
-          code: "warehouse_required",
-          message: e.message ?? "warehouse is required",
-          pos_index: posIndex,
-        },
-        422,
-      );
-    }
-
-    const mapped = mapPgError(e);
-    return c.json(mapped.body, mapped.status);
-  }
-
-  // RPC returns { po_ids: ['PO-2031', ...] } — adapt to camelCase poIds for
-  // wire consistency with the rest of the route surface.
-  const out = data as { po_ids?: string[] } | null;
-  return c.json({ poIds: out?.po_ids ?? [] });
-});
+// These were the application's single-create and batch-create Purchase Order
+// doors. They called `operation_create_po` and `operation_create_pos_batch`,
+// two of the four extra creation authorities the Card 4 audit found still
+// reachable from the browser.
+//
+// `purchasing_issue_pos_batch(jsonb)` is now the ONLY authority that may create
+// a Purchase Order, and Batch Purchase's `POST /api/operation/purchase/to-order/issue`
+// is its only caller.
+//
+// DELETED rather than left standing as a 403, for the reason the `/receive`
+// retirement below already states in this file: a live route with no caller is
+// a bypass one curl away, and a compatibility write door is exactly the hidden
+// authority this card exists to remove. A browser still holding an old bundle
+// now meets a loud 404 instead of quietly minting a PO nobody governed.
+//
+// The RPCs themselves are NOT dropped — they are the construction history of
+// every PO on file — but migration 0339 revokes EXECUTE from `public`, `anon`
+// and `authenticated`, so this route could not reach them even if it returned.
 
 // ----- POST /:id/receive — RETIRED 2026-08-03 (Card C1, Jess) -----
 //
