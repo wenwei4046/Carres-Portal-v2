@@ -11,9 +11,11 @@ import {
   recheckStockInput,
   reselectPartnerInput,
   resolveCurrentCustomerCommitment,
+  resolveSalesOrderUnits,
   transferReadyInputSchema,
   warehousePickInput,
   type CommitmentBundle,
+  type SalesOrderUnitBundle,
 } from "@carres/shared";
 // renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { DoTemplateData } from "../../lib/pdf/types";
@@ -642,6 +644,38 @@ operationOrdersRouter.get("/:id/commitment", requireOperation, async (c) => {
   return c.json({
     commitment: resolveCurrentCustomerCommitment(data as unknown as CommitmentBundle),
   });
+});
+
+// Card 2's one read. The Unit register remains the physical authority; this
+// endpoint only shapes its SO view and suitable-stock offer.
+operationOrdersRouter.get("/:id/units", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_unit_bundle", {
+    p_order_id: c.req.param("id"),
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ units: resolveSalesOrderUnits(data as unknown as SalesOrderUnitBundle) });
+});
+
+operationOrdersRouter.post("/:id/units/:unitId/reserve", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_allocate_unit", {
+    p_order_id: c.req.param("id"), p_unit_id: c.req.param("unitId"),
+  });
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  return c.json({ unitId: data });
+});
+
+operationOrdersRouter.post("/:id/units/:unitId/release", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_release_unit", {
+    p_order_id: c.req.param("id"), p_unit_id: c.req.param("unitId"),
+  });
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  return c.json({ unitId: data });
 });
 
 // POST /:id/save — the ONE edit door. CARD 1: a save that moves the

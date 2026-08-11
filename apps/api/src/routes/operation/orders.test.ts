@@ -2059,6 +2059,41 @@ describe("GET /api/operation/orders/:id/commitment", () => {
   });
 });
 
+describe("SO V2 Card 2 — Unit truth and explicit allocation", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000b01";
+  const UNIT_ID = "00000000-0000-0000-0000-000000000c01";
+
+  it("offers suitable free Units without allocating them", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: {
+      so: 42, lines: [{ sku: "Cloud King", qty: 1 }], events: [],
+      units: [{ id: UNIT_ID, unit_code: "id-abc123456", sku: "cloud-king", status: "free", condition: "new", reserved_ref: null, warehouse_id: "w1", po_no: "PO-2100", needs_repair: false }],
+    }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}/units`, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("sales_order_unit_bundle", { p_order_id: ORDER_ID });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = await res.json() as any;
+    expect(body.units.offered).toHaveLength(1);
+    expect(body.units.allocated).toHaveLength(0);
+  });
+
+  it.each([
+    ["reserve", "sales_order_allocate_unit"],
+    ["release", "sales_order_release_unit"],
+  ])("%s is one explicit RPC", async (action, rpcName) => {
+    const rpc = vi.fn().mockResolvedValue({ data: UNIT_ID, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}/units/${UNIT_ID}/${action}`, { method: "POST", headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith(rpcName, { p_order_id: ORDER_ID, p_unit_id: UNIT_ID });
+  });
+});
+
 describe("GET /api/operation/orders/:id/revisions", () => {
   it("reads the immutable store oldest-first", async () => {
     const order = vi.fn().mockResolvedValue({
