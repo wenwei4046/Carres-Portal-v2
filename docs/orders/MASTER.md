@@ -664,6 +664,82 @@ inspection RPC call), tsc clean.
 
 ---
 
+# ✅ CHANGE / CANCEL / REFUND LINEAGE — SO V2 CARD 7, SHIPPED 2026-08-11
+
+**The question this card installed:** the whole chain survives — original
+order → governed revision/cancellation → fulfilment consequences →
+replacement/released stock → financial consequence — and a cancelled goods
+obligation can become a MONEY obligation with its own record.
+
+**THE TRACE MEASURED THE LINEAGE LARGELY ALREADY TRUE**, built by the six
+cards before it:
+
+```
+Change lineage     the immutable revision ledger (0327) + change_type (0340)
+                   + the order_change_requests lane (Card 1's boundary)
+Cancel             cancel_order stamps actor + reason + server time, deletes
+                   nothing — and it structurally refuses a proceeded order
+                   (only 'place' cancels), which IS §3.14's "cancel is not
+                   allowed by default". operation_cancel_po cancels the
+                   document, voids only never-arrived units, keeps every row.
+Fulfilment chain   delivery_attempts append-only (0344) · unit ref_history
+                   survives every move · a committed unit cannot be deleted
+                   (0341) · GATE 7 (0340) freezes a cancelled order's
+                   contractual fields.
+```
+
+**What did not exist anywhere: THE REFUND RECORD** — bilateral money's
+second direction, deferred here by Card 4 by name. Migration `0345`:
+
+```
+order_refunds        requested → approved | rejected → paid. Amount + reason
+                     required at birth; decision stamps (who · when · note,
+                     note MANDATORY on reject); payout stamps (method ·
+                     reference · who · when). CHECK constraints make a
+                     stage without its stamps unrepresentable. Rows are
+                     NEVER deleted (trigger) — a wrong ask is rejected.
+refund_request       operation/principal.
+refund_decide        THE PRINCIPAL ONLY — releasing money is a manager
+                     decision (the storage-waiver law, applied again).
+refund_mark_paid     approved → paid only. The payout never touches
+                     orders.paid — that column is money IN against goods;
+                     the refund is its own record, and an APPROVED, UNPAID
+                     row is exactly "Carres still owes the customer",
+                     which Card 8's derived completion reads.
+API                  GET/POST /:id/refunds · POST /:id/refunds/:rid/decide ·
+                     POST /:id/refunds/:rid/paid. No UI — a truth card.
+```
+
+**Production evidence — run 2026-08-11.** 0345 applied; eight probes as the
+real operation/principal users in one aborted transaction — `order_refunds`
+0 rows after:
+
+```
+P1 operation requests (requested)                              PASS
+P2 operation cannot decide (42501)                             PASS
+P3 an undecided refund cannot be paid                          PASS
+P4 principal approves; approved+unpaid = open obligation       PASS
+P5 payout: approved → paid, method recorded                    PASS
+P6 a rejection without a note refused                          PASS
+P7 a refund row can never be deleted                           PASS
+P8 direct INSERT as authenticated refused (42501)              PASS
+```
+
+**Known boundaries, reported not hidden:**
+- The Issue Tracker may hold the story of a cancellation or refund; it is
+  never required to make the transaction lineage true (three-system law).
+- §3.14's full cancel flow for a PROCEEDED order (approved cancel → the PO
+  finishes → GRN into stockpile → the engine reassigns) has no dedicated
+  door — today a proceeded order simply cannot be cancelled through
+  `cancel_order`, which fails SAFE. When the business needs the governed
+  proceeded-cancel, it arrives as an approval lane on `order_change_requests`
+  (the same pattern the POS change lane uses), not as a loosened RPC.
+- Refund money does not yet appear in the collections desk's figures — the
+  desk shows money IN; the refund obligation is read by Card 8's completion
+  and surfaced by Card 9's work engine.
+
+---
+
 # SALES ORDER V2 — CURRENT APPROVED TARGET AND BUILD CHECKPOINT
 
 > **OWNER RULING, 2026-08-11. This is current target truth under the MASTER OVERWRITE LAW.**
@@ -681,8 +757,8 @@ inspection RPC call), tsc clean.
 | **4** | Money Truth + Collection Gate | **COMPLETE** — migration `0343`, production verified 2026-08-11 (seven rolled-back probes); record above. The gates and the one calculation were measured already live; the card converged the write (one payment writer, void as a stamp) and shipped the T−3/T−2/T−1 collection clock |
 | **5** | Delivery Attempt + Delivery Exception | **COMPLETE** — migration `0344`, production verified 2026-08-11 (seven rolled-back probes); record above. The first genuine engine gap of the programme: attempt + exception stores built, units move through Card 2's doors in the same transaction |
 | **6** | Loan Mattress / Loan Sofa Obligations | **COMPLETE** — no migration (Card 2 built the doors; Card 6 made the lane use them); production verified 2026-08-11; record above |
-| **7** | Change / Cancel / Refund Lineage | **NOT BUILT — NEXT CARD** |
-| **8** | Derived Completion — No Action Required | **NOT BUILT** |
+| **7** | Change / Cancel / Refund Lineage | **COMPLETE** — migration `0345` (the refund record), production verified 2026-08-11 (eight rolled-back probes); the rest of the lineage was measured already true; record above |
+| **8** | Derived Completion — No Action Required | **NOT BUILT — NEXT CARD** |
 | **9** | Unified Work Engine | **NOT BUILT** |
 | **10** | My Work / Team Work | **NOT BUILT** |
 
@@ -811,7 +887,7 @@ Once created, the obligation is structured, never inferred from notes or a free-
 Final delivery should state both **deliver real Unit** and **recover loan Unit**; failure of the
 second leaves Loan open even when Goods and Money are clear.
 
-## Card 7 · Change / Cancel / Refund Lineage — approved target, not built
+## Card 7 · Change / Cancel / Refund Lineage — approved and built
 
 Preserve the complete chain: original customer order → governed revision / cancellation → every
 fulfilment attempt and Unit consequence → replacement or released stock → financial consequence.
@@ -903,22 +979,19 @@ Payment remain the authority for what operationally happened.
 
 1. Read root `CLAUDE.md` / `AGENTS.md` for the Constitution and MASTER OVERWRITE LAW.
 2. Read [`../ERP-ARCHITECTURE.md`](../ERP-ARCHITECTURE.md) for cross-module ownership.
-3. Read this section and the Card 1–6 shipped records immediately above it.
-4. Read only what Card 7 touches: Card 1's revision ledger (`sales_order_revisions` +
-   `change_type`, 0327/0340) and its reported POS-door boundary (`order_change_requests` lane),
-   the cancel doors (`cancel_order` RPC · the owner's §3.14 lock: SO cancel needs approval, the
-   PO finishes, GRN into stockpile, the engine reassigns), `operation_cancel_po` (units void),
-   and Card 4's reported refund boundary — *an approved but unpaid refund means Carres still
-   owes the customer*, the record this card mints.
+3. Read this section and the Card 1–7 shipped records immediately above it.
+4. Read only what Card 8 touches — the four tracks its derivation reads, each already owned:
+   **Goods** = Card 1's commitment − Card 2's allocation (`resolveUnitAllocation` /
+   `GET /:id/allocation`) · **Money in** = `orderMoney` (orders.paid + storage) · **Money out**
+   = `order_refunds` open rows (0345) · **Loan** = `ops_sofa_loans` open rows, including the
+   supplier-return half. Card 8 derives; it may not mint a status column or press one.
 5. Re-measure current code and production before quoting implementation state. Preserve unrelated
    dirty work. Do not reopen the approved business flow merely from preference; raise only a real
    repo/production contradiction or implementation impossibility.
-6. Build **Card 7 — Change / Cancel / Refund Lineage** next. Trace every cancel/refund door
-   before implementation: the chain original order → governed revision/cancellation → fulfilment
-   consequences → replacement/released stock → financial consequence must survive; a cancelled
-   goods obligation may become a money obligation (the refund record, bilateral money's second
-   direction). Stop after Card 7 proof and update this status table.
-   **Do not start Card 8 automatically.**
+6. Build **Card 8 — Derived Completion (No Action Required)** next: ONE shared arithmetic
+   composing the four tracks, `Delivered ≠ Complete`, `Cancelled ≠ Complete`, no new stored
+   status anywhere. Stop after Card 8 proof and update this status table.
+   **Do not start Card 9 automatically.**
 
 ---
 

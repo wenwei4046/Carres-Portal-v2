@@ -1400,6 +1400,15 @@ export {
   recordPaymentInputSchema,
   collectStorageInput,
   summarizePayments,
+  // CARD 7 (0345) — the refund lifecycle: an approved, unpaid refund means
+  // Carres still owes the customer.
+  refundRequestInputSchema,
+  refundDecideInputSchema,
+  refundMarkPaidInputSchema,
+  type RefundRequestInput,
+  type RefundDecideInput,
+  type RefundMarkPaidInput,
+  type OrderRefundRow,
   type OrderPaymentMethod,
   type PaymentKind,
   type RecordPaymentInput,

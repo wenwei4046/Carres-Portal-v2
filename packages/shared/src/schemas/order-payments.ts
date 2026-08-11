@@ -52,6 +52,56 @@ export type RecordPaymentInput = z.infer<typeof recordPaymentInputSchema>;
 export const collectStorageInput = recordPaymentInputSchema.omit({ kind: true });
 export type CollectStorageInput = z.infer<typeof collectStorageInput>;
 
+/**
+ * SO V2 CARD 7 (0345) — the refund lifecycle: requested → approved | rejected
+ * (principal) → paid. An APPROVED, UNPAID refund means Carres still owes the
+ * customer — the SO is not clear.
+ */
+export const refundRequestInputSchema = z.object({
+  amount: z.number().positive("amount must be greater than 0"),
+  reason: z.string().trim().min(1, "a refund states its reason").max(500),
+});
+export type RefundRequestInput = z.infer<typeof refundRequestInputSchema>;
+
+export const refundDecideInputSchema = z
+  .object({
+    decision: z.enum(["approve", "reject"]),
+    note: z.string().trim().max(500).nullish(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.decision === "reject" && !v.note?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["note"],
+        message: "A rejection says why",
+      });
+    }
+  });
+export type RefundDecideInput = z.infer<typeof refundDecideInputSchema>;
+
+export const refundMarkPaidInputSchema = z.object({
+  method: z.enum(PAYMENT_METHODS),
+  reference: z.string().trim().max(120).nullish(),
+});
+export type RefundMarkPaidInput = z.infer<typeof refundMarkPaidInputSchema>;
+
+export interface OrderRefundRow {
+  id: string;
+  order_id: string;
+  amount: number;
+  reason: string;
+  status: "requested" | "approved" | "rejected" | "paid";
+  requested_by: string | null;
+  requested_at: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  decide_note: string | null;
+  paid_at: string | null;
+  paid_by: string | null;
+  paid_method: OrderPaymentMethod | null;
+  paid_reference: string | null;
+}
+
 /** One ledger row as the API returns it (snake_case DB shape from `order_payments`). */
 export interface OrderPaymentRow {
   id: string;
