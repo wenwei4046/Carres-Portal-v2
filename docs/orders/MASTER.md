@@ -2956,6 +2956,37 @@ carrier's working days and capacity are not a fact about this customer's order.
 
 # §11 · Approved Evolution — decided, deliberately not implemented
 
+## Sales Orders post–Card 10 capabilities — APPROVED / LOCKED (Loo, 2026-08-11)
+
+The owner explicitly reopened the Sales Orders header/action surface after reviewing the
+2990 reference. The absence of a capability in the current repository is not a reason to
+refuse it: governance prevents an agent from inventing product scope; it does not prevent the
+owner from approving useful new scope. These decisions supersede any earlier proposal that
+excluded them merely because they were not already implemented.
+
+- **Scan Order is approved as a new capability after Card 10.** It receives its own scoped
+  product/build card before implementation. The Sales Orders page exposes `Scan Order` as a
+  top action; the card must define the accepted source, extraction/validation, duplicate
+  handling, operator review and the final write boundary. A reference product proves the door,
+  not Carres business rules or visual styling.
+- **SO Maintenance is required and follows the same ownership principle as Purchasing
+  Settings.** It is a configuration destination for Sales Order-controlled option pools and
+  display/configuration facts, not an edit door into historical orders. It is planned after
+  Card 10 and is reachable from the Sales Orders top actions; the maintenance page itself is a
+  separate destination/surface, not a Sales Orders tab.
+- **Selected-order PDF export is approved.** Selecting one or more rows reveals a contextual
+  selection action bar above the table containing the truthful selected count, `Clear` and
+  `Export PDF (N)`. It uses the existing governed Sales Order PDF renderer/output per order;
+  the implementation card must define multi-order download packaging and failure reporting.
+  It is a view/document action and therefore remains within the Register boundary.
+- **The contextual bar follows the 2990 interaction pattern, not its appearance.** Carres
+  frozen tokens/components govern colour, typography, radius and spacing. It occupies or
+  replaces governed toolbar space where possible; it must not create a permanent empty band.
+
+The normal Sales Orders toolbar composition is now **UNRESOLVED** and must be re-ruled item by
+item. The Stage A toolbar remains implementation evidence until the owner approves its
+replacement; it is not authority for keeping redundant controls.
+
 | What | Why it is not built |
 |---|---|
 | **The follow-up action after a FAILED delivery** | `Deliver today` completes on delivered OR a Delivery Exception with its reason, and **nothing yet turns that exception into the next action.** Approved shape: one Exception plus a Reason, then the next action. Belongs to whichever card next touches the delivery day. |
