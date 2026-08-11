@@ -354,6 +354,28 @@ filter, export, Columns, selection state or page-specific action. New/create, Sc
 SO Settings and every other page-owned action belong to the next Work Toolbar layer. Toasts
 anchor below the header's right utility cluster as overlays and do not add header height.
 
+**REGISTER WORK TOOLBAR / SECOND HEADER — APPROVED / LOCKED (Loo, 2026-08-11).** Immediately
+below the Page Header, a Register may own one rendered 45px Work Toolbar; it is one row and never
+scrolls horizontally. Normal state spends the left side on the current View control and current-
+Register Search, and the right side on page-owned Export/display controls, frequent actions, one
+primary create action and a low-frequency overflow when needed. `View: {current view}` is explicit;
+scope capabilities such as All orders / Not delivered are saved/reusable Views, never a permanent
+row of pills. Header-column filters remain the direct per-column filter door; the Toolbar does not
+add a duplicate generic Filters button. `Reset layout` remains inside Columns.
+
+Selecting rows **replaces** the normal Toolbar within the same 45px height; it never adds a third
+permanent band. Left = truthful selected count + Clear. Right = only actions valid for that exact
+selection. A one-record action disappears for multi-selection rather than pretending to apply to
+many. Normal and selection states preserve the table's position and width.
+
+**TOOLBAR SHAPE LANGUAGE — APPROVED / LOCKED.** A control that changes/chooses/configures a view
+uses the governed 6px `rounded-control`: View dropdown · Search · Export dropdown · Columns ·
+overflow. A visible verb that immediately performs an action uses the UI Kit pill button: New ·
+Scan · Clear · View Flow · explicit Export Excel/PDF selection actions. Mixing the two shapes is
+required when both interaction kinds coexist; arbitrary per-button shape variation is invalid.
+There is at most one primary blue action in a Toolbar state. Page-owned controls vary by module;
+the 45px one-row structure, state replacement and shape semantics are Register Template law.
+
 **REFERENCE PRODUCTS NEVER AUTHOR CARRES VISUAL TOKENS — APPROVED / LOCKED.** Linear, 2990,
 GitHub, Shopify, AutoCount and every other reference may supply a proven structure, behaviour
 or trade-off; they never supply Carres colour, typography, radius, elevation, icon treatment or

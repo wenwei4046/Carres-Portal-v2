@@ -2974,8 +2974,9 @@ excluded them merely because they were not already implemented.
   to `Purchasing Settings` and distinct from portal-wide `System Settings`. It owns Sales
   Order-controlled option pools, Order Entry fields, payment-method choices and Register
   display/column configuration; it is never an edit door into historical Sales Orders. It is
-  planned after Card 10, reachable from the Sales Orders top actions and remains a separate
-  destination/surface, not a Sales Orders tab.
+  planned after Card 10, reachable through portal navigation and the Sales Orders Toolbar's
+  low-frequency overflow shortcut, and remains a separate destination/surface, not a Sales
+  Orders tab or permanent Toolbar button.
 - **Register `Edit` opens the full Sales Order Workspace — APPROVED / LOCKED.** It never edits
   inside the grid and never opens a small generic modal. The row context menu's `Edit` navigates
   to that Sales Order's owned full-page Workspace in edit intent. The Workspace header keeps the
@@ -3024,9 +3025,28 @@ excluded them merely because they were not already implemented.
   AutoCount's Document Flow and 2990's Relationship Map are behavioural references only; Carres
   ownership, evidence and visual tokens remain authoritative.
 
-The normal Sales Orders toolbar composition is now **UNRESOLVED** and must be re-ruled item by
-item. The Stage A toolbar remains implementation evidence until the owner approves its
-replacement; it is not authority for keeping redundant controls.
+**SALES ORDERS WORK TOOLBAR — APPROVED / LOCKED (Loo, 2026-08-11).** This is the Sales Orders
+specialisation of UI MASTER's 45px Register Work Toolbar law:
+
+```
+NORMAL      View: All orders ▾ · Search SO/customer/phone · Export ▾ · Columns ·
+            Scan Order · + New Sales Order · …
+ONE         1 selected · Clear                         View Flow · Export Excel (1) · Export PDF (1)
+MANY        N selected · Clear                                      Export Excel (N) · Export PDF (N)
+```
+
+The View dropdown owns All orders · Not delivered · My orders · personal/team Saved Views ·
+Save current view. This preserves the scope capabilities without permanent scope pills. Every
+column keeps its direct header filter, so the duplicate generic Filters button is retired. The
+normal Export dropdown contains current-view exports; explicit selected Excel/PDF actions are
+immediate pill buttons. `…` contains low-frequency Sales Order actions including the `SO Settings`
+shortcut; it is not a dumping ground for daily work. Scan Order and New Sales Order are Sales
+Orders business exceptions; View/Search/Export/Columns structure, same-height selection
+replacement and action-vs-control shape language are reusable Register Template law.
+
+At the measured narrow target, the Toolbar must show every normal-state control without clipping,
+shrinking frozen typography or moving the toolbar itself into horizontal scroll. The wide DataGrid
+continues to own its own horizontal overflow independently.
 
 | What | Why it is not built |
 |---|---|
