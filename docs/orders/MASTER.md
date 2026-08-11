@@ -2982,6 +2982,21 @@ excluded them merely because they were not already implemented.
 - **The contextual bar follows the 2990 interaction pattern, not its appearance.** Carres
   frozen tokens/components govern colour, typography, radius and spacing. It occupies or
   replaces governed toolbar space where possible; it must not create a permanent empty band.
+- **Customer Document Relationship Map / `View Flow` is approved.** From a Sales Order, one
+  view answers both *what documents are related to this customer order?* and *which customer
+  documents has the customer actually received?* The Sales Order is the anchor. Its customer
+  branch shows Sales Order PDF · accepted amendment(s) · Delivery Order · Sales Invoice ·
+  receipt/payment evidence when each exists; its operational branch links the already-governed
+  Purchasing flow SO → PO → Receiving → Claim without moving ownership into Orders. Every node
+  shows document number, owner, current lifecycle fact and dates/evidence for Generated · Sent ·
+  Signed/Accepted · Superseded/Cancelled as applicable. **Generated is never presented as Sent
+  or received by the customer.** Until Carres owns a canonical customer entity, the map is
+  anchored to the selected order and may use the order's normalised customer phone only to offer
+  a clearly separate `Other orders for this customer` lane; it must not silently merge people
+  on name alone. `View Flow` is a row/context and order-workspace document action, not a permanent
+  Header button, tab, default table column or workflow executor. AutoCount's Document Flow and
+  2990's Relationship Map are behavioural references only; Carres document ownership, evidence
+  and visual tokens remain authoritative.
 
 The normal Sales Orders toolbar composition is now **UNRESOLVED** and must be re-ruled item by
 item. The Stage A toolbar remains implementation evidence until the owner approves its
