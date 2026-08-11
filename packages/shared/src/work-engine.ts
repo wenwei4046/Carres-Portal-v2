@@ -244,6 +244,60 @@ export function workDayLabel(iso: IsoDate | null): string | null {
   return `${wd} ${day} ${mon}`;
 }
 
+// ─── Card 10 — the surface's grouping, one rule ──────────────────────────────
+
+export interface WorkDayGroup<T extends WorkItem = WorkItem> {
+  /** ISO day, or null for the no-anchor group (always LAST). */
+  dayIso: IsoDate | null;
+  /** `Mon 17 Aug`, or the ruled words `No date` for anchorless work. */
+  label: string;
+  items: T[];
+  late: number;
+}
+
+/**
+ * Group a composed work set by ACTUAL WORKING DATE — the shape both My Work
+ * and Team Work render (they are two FILTERS over one set, so the grouping
+ * lives here, once). Days ascend; within a day, broken first, then locked,
+ * then by SO. Anchorless items close the list under `No date` — a step with
+ * no anchor can never be late, and it must not hide among dated work.
+ */
+export function groupWorkItemsByDay<T extends WorkItem>(
+  items: readonly T[],
+): WorkDayGroup<T>[] {
+  const byDay = new Map<string, T[]>();
+  const dateless: T[] = [];
+  for (const i of items) {
+    if (!i.dueIso) {
+      dateless.push(i);
+      continue;
+    }
+    const arr = byDay.get(i.dueIso) ?? byDay.set(i.dueIso, []).get(i.dueIso)!;
+    arr.push(i);
+  }
+  const rank = (i: T) => (i.broken ? 0 : i.locked ? 1 : 2);
+  const sortItems = (arr: T[]) =>
+    [...arr].sort((a, b) => rank(a) - rank(b) || a.soRef.localeCompare(b.soRef));
+  const groups: WorkDayGroup<T>[] = [...byDay.keys()].sort().map((day) => {
+    const arr = sortItems(byDay.get(day)!);
+    return {
+      dayIso: day,
+      label: workDayLabel(day) ?? day,
+      items: arr,
+      late: arr.filter((i) => i.workingDaysLate > 0).length,
+    };
+  });
+  if (dateless.length > 0) {
+    groups.push({
+      dayIso: null,
+      label: "No date",
+      items: sortItems(dateless),
+      late: 0,
+    });
+  }
+  return groups;
+}
+
 export interface OrderWorkContext {
   orderId: string;
   so: number;

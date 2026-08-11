@@ -1121,6 +1121,25 @@ meaning two different things.
 
 ---
 
+## The Work module words (SO V2 Card 10, owner ruling 2026-08-11)
+
+The Work page adds **no new action vocabulary** — every row line is the same
+`orderActionLine` the Orders list prints, and every due date is the ruled
+weekday+date spelling (`Thu 6 Aug`). Only these strings are the page's own:
+
+| Concept | Canonical word | Do NOT use |
+|---|---|---|
+| The sidebar door / page | **Work** | Tasks · To-do · Queue · Dashboard |
+| The two filters over the one set | **My Work · Team Work** | My tasks · Everyone · All work |
+| Work with no anchor date yet | **No date** | Unscheduled · Someday · TBD |
+| The open/late tally | **{n} open · {n} late** | Total · Outstanding |
+| The clear state | **No open work — every track is clear.** | All done · Empty |
+| Late work | **{n} working days late** (the original due stays printed) | Overdue by · Delayed |
+
+**System work has NO Done button** — an item leaves when its owning module
+records the completion fact. A human follow-up stays `ops_tasks`, labelled
+human, and is the only explicitly completable thing.
+
 ## Numbers, dates, money
 
 - **Numbers**: tabular-nums font (`tabular-nums` class). `3 units` / `12 orders`.

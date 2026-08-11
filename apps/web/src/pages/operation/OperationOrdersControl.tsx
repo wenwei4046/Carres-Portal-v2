@@ -872,7 +872,7 @@ function RowDots({
 // One soft owner per order (ops_order_control.assigned_staff). NEVER a
 // visibility wall: everyone sees every row; the owner is who's watching it.
 const NO_STAFF = "__none" as const;
-function ownerOf(o: operationOrderListRow): string | null {
+export function ownerOf(o: operationOrderListRow): string | null {
   return ovlOf(o)?.assigned_staff ?? null;
 }
 /** Identity label/initials/colour — shared with the right-rail Team panel
@@ -884,7 +884,7 @@ function staffInitials(m: OpsStaffMember): string {
   return personInitials(m.name, m.email);
 }
 
-function ovlOf(o: operationOrderListRow) {
+export function ovlOf(o: operationOrderListRow) {
   return orderControlOf(o);
 }
 

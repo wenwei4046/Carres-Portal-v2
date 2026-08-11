@@ -293,7 +293,9 @@ Never create an empty master for symmetry.
 - **Conclusion first**, reasoning after. **Simple Chinese, short sentences.** English technical
   terms are kept (`Supabase`, `RLS`, `migration`, `PO`, `SKU`).
 - **Steps 1 2 3.** If she says she does not understand, **rewrite — do not repeat.**
-- **ASCII sketch before code**, every time, even when she says "just do it".
+- **ASCII sketch before code when she is in the conversation choosing.** Autonomous
+  production UI execution runs under [`docs/ui/MASTER.md`](docs/ui/MASTER.md) §1.1
+  (owner ruling 2026-08-11): proactive design judgment, asynchronous review.
 - **One question at a time.** Wait for the answer before asking the next.
 - **Options with a named recommendation, never a bare menu**, and never the same question twice.
 - **Cite how mature products solve it**, then land the conclusion in Carres reality.

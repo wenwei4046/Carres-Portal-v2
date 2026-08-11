@@ -855,6 +855,68 @@ DB change — nothing to deploy; Card 10 wires the surface.
 
 ---
 
+# ✅ MY WORK / TEAM WORK — SO V2 CARD 10, SHIPPED 2026-08-11
+
+**The question this card installed:** one operator opens the portal and sees
+exactly what to do — **WHO + ACTION + actual working day** — and a manager
+sees the same set with responsibility visible.
+
+**Built under the Production UI Execution Law** (owner ruling 2026-08-11,
+[`../ui/MASTER.md`](../ui/MASTER.md) §1.1): proactive design judgment inside
+the locked tokens/kit/COPY laws, asynchronous owner review of the live
+surface. The prior synchronous gates ("ASCII mock first, wait for yes" · the
+localhost "Layout Approved" hold) were overwritten in their own governing
+files in the same PR — MASTER OVERWRITE LAW, no new document. *(The ruling
+arrived in-session; a referenced commit `6084aeba` does not exist in this
+repository, and that is recorded rather than cited.)*
+
+**What shipped — `OperationWork.tsx` (`/operation?tab=work`, sidebar `Work`
+directly under Sales Orders):**
+
+```
+TWO FILTERS, ONE SET   My Work · Team Work over the SAME composed items —
+                       never two datasets, never another dashboard. §2.2's
+                       starting-view law verbatim: a non-manager lands on
+                       My Work, a manager on Team Work, both can switch.
+WHAT is open           the same openActionsOf the Orders list runs — one
+                       signal mapping, two surfaces that cannot disagree
+                       (the Delivery page's own assembly law, applied again).
+WHO + WHEN             Card 9's workItemsForOrder: the PIC's name · each
+                       key's ONE shipped clock · groupWorkItemsByDay (days
+                       ascend · broken first · `No date` last).
+THE ROW                the party-named orderActionLine (identical words to
+                       the Orders row), SO ref + customer, the 🔒 on held
+                       money, owner name in Team view, `{n} working days
+                       late` against a due that never moves.
+WRITES NOTHING         no Done button exists structurally; a row is a DOOR to
+                       the Sales Order Workspace. Human follow-ups stay
+                       ops_tasks and are not on this page.
+WORDS                  COPY-STANDARD gained "The Work module words" — Work ·
+                       My Work · Team Work · No date · the clear sentence —
+                       cited to the 2026-08-11 ruling.
+```
+
+**Evidence:** five page tests (starting-view law by role · one-set/two-filters
+with owner scoping · weekday+date grouping — never a bare Today · the row is
+a door (navigate spy) · the quiet clear sentence) + the Card 9 engine's 11.
+Full web build + design guard pass. shared 2274 · web 2717 passed (the 10
+web failures on this machine are a pre-existing Windows path-separator
+artifact in the file-scan tests — `\` vs `/` — my files appear in none of
+their caller lists). Deploy + bundle verification below.
+
+**Asynchronous review owed:** this surface is live for Jess/Loo to review in
+production; their verdicts land as ordinary re-rulings on the next commit.
+
+**Known boundaries, reported not hidden:**
+- The set covers the ORDER track (the SO V2 programme's own scope). The
+  purchasing / receiving / claims items keep their own surfaces and join
+  this feed when their server feeds are wired — the Card 9 registry is the
+  contract.
+- `Completed` orders contribute exactly what their engines still hold open
+  (the photo · money that survives delivery) — nothing else re-enters.
+
+---
+
 # SALES ORDER V2 — CURRENT APPROVED TARGET AND BUILD CHECKPOINT
 
 > **OWNER RULING, 2026-08-11. This is current target truth under the MASTER OVERWRITE LAW.**
@@ -875,7 +937,7 @@ DB change — nothing to deploy; Card 10 wires the surface.
 | **7** | Change / Cancel / Refund Lineage | **COMPLETE** — migration `0345` (the refund record), production verified 2026-08-11 (eight rolled-back probes); the rest of the lineage was measured already true; record above |
 | **8** | Derived Completion — No Action Required | **COMPLETE** — code only (no migration): `resolveOrderCompletion` + `GET /:id/completion`, 2026-08-11; record above |
 | **9** | Unified Work Engine | **COMPLETE** — shared code only: the five-part WORK_RULES registry + workItemsForOrder composition, 2026-08-11; record above |
-| **10** | My Work / Team Work | **NOT BUILT — NEXT CARD** |
+| **10** | My Work / Team Work | **COMPLETE** — `OperationWork` (`?tab=work`), built under the Production UI Execution Law with asynchronous owner review owed; record above. 2026-08-11 |
 
 Build truth before work. **Cards 2–10 are approved business rules, not permission to describe
 their screens, schema, RPCs or production state as implemented.** Each card first traces the
@@ -1094,22 +1156,20 @@ Payment remain the authority for what operationally happened.
 
 1. Read root `CLAUDE.md` / `AGENTS.md` for the Constitution and MASTER OVERWRITE LAW.
 2. Read [`../ERP-ARCHITECTURE.md`](../ERP-ARCHITECTURE.md) for cross-module ownership.
-3. Read this section and the Card 1–9 shipped records immediately above it.
-4. Read only what Card 10 touches: the Card 9 engine (`work-engine.ts` — the registry is the
-   contract the surface renders) · §2.2 OWNER SCOPE (a non-manager defaults to My Orders — the
-   IDENTICAL starting-view law applies to My Work) · the Sales Orders Register / Stage A record
-   (the approved destination architecture any new surface must follow) · `docs/UI-KIT.md` and
-   `COPY-STANDARD.md` before ANY word or component reaches a screen.
+3. Read this section and the Card 1–10 shipped records immediately above it.
+4. **ALL TEN CARDS ARE COMPLETE.** What remains of Sales Order V2 is not a card — it is the
+   owed follow-through, in this order: ① Jess/Loo's ASYNCHRONOUS REVIEW of the Card 10 Work
+   surface (§1.1 of the UI MASTER — verdicts land as ordinary re-rulings) · ② wiring the
+   purchasing / receiving / claims feeds into the one composed work set (the Card 9 registry is
+   the contract) · ③ the deferred items each card's own record names (supplier labelling
+   surface · loan-claim atomicity · the proceeded-cancel approval lane · refunds on the desk ·
+   the Settings working calendar).
 5. Re-measure current code and production before quoting implementation state. Preserve unrelated
    dirty work. Do not reopen the approved business flow merely from preference; raise only a real
    repo/production contradiction or implementation impossibility.
-6. Build **Card 10 — My Work / Team Work** next: TWO FILTERS over the ONE open work set (never
-   two datasets, never another dashboard); rows grouped by actual working date stating owner ·
-   verb · counterparty/amount · SO/PO/Unit context; opening a row goes to the owning module's
-   existing workspace, never a copied form. ⚠️ Card 10 is the programme's first OPERATOR-FACING
-   SURFACE: unlike Cards 2–9 it needs the owner's layout approval before build (the LAYOUT
-   ITERATION LOOP — real page, small steps, localhost review, nothing merged until "Layout
-   Approved"). Stop after Card 10 proof and update this status table.
+6. **Do not start new architecture from this section.** The next structural work (Issue
+   Tracker's four identities · the cross-module work feeds) gets its own owner-approved card
+   first.
 
 ---
 

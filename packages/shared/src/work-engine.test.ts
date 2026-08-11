@@ -5,8 +5,10 @@ import {
   MODULE_WORK_RULES,
   ORDER_WORK_RULES,
   WORK_RULES,
+  groupWorkItemsByDay,
   workDayLabel,
   workItemsForOrder,
+  type WorkItem,
 } from "./work-engine";
 
 const HOLS = { holidays: myHolidaySet() };
@@ -135,6 +137,35 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
       expect(i.dueIso).toBeNull();
       expect(i.workingDaysLate).toBe(0);
     }
+  });
+
+  it("groups by actual working day — days ascend, broken first, No date last", () => {
+    const mk = (over: Partial<WorkItem>): WorkItem => ({
+      ruleKey: "assign_logistics",
+      module: "orders",
+      soRef: "SO-1",
+      orderId: "o",
+      action: "Assign logistics",
+      ownerName: "Shasha",
+      tone: "info",
+      locked: false,
+      broken: false,
+      dueIso: "2026-08-17",
+      dueLabel: "Mon 17 Aug",
+      workingDaysLate: 0,
+      ...over,
+    });
+    const groups = groupWorkItemsByDay([
+      mk({ soRef: "SO-3", dueIso: "2026-08-18", dueLabel: "Tue 18 Aug" }),
+      mk({ soRef: "SO-2", dueIso: null, dueLabel: null }),
+      mk({ soRef: "SO-1", workingDaysLate: 2 }),
+      mk({ soRef: "SO-9", broken: true }),
+    ]);
+    expect(groups.map((g) => g.label)).toEqual(["Mon 17 Aug", "Tue 18 Aug", "No date"]);
+    // Within Mon 17: the broken commitment leads.
+    expect(groups[0].items.map((i) => i.soRef)).toEqual(["SO-9", "SO-1"]);
+    expect(groups[0].late).toBe(1);
+    expect(groups[2].dayIso).toBeNull();
   });
 
   it("purchasing-owned clocks are NOT respelt here — issue_po carries no due", () => {

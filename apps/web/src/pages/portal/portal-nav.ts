@@ -29,6 +29,7 @@ import {
   HandCoins,
   UserCheck,
   History,
+  ListTodo,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -129,6 +130,13 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         path: "/operation/orders",
         badge: "orders",
       },
+      // Work (SO V2 CARD 10, owner ruling 2026-08-11) — My Work / Team Work:
+      // two filters over the ONE open work set the Card 9 engine composes.
+      // Sits directly under the register on the Constitution's own mission —
+      // *what to do today, with the number, the party and the date already
+      // worked out*. The page writes nothing; a row opens the owning module's
+      // workspace.
+      { key: "work", label: "Work", icon: ListTodo },
       // ⭐ THE TEMPORARY DOOR (SALES-ORDER-CUTOVER, owner 2026-08-10).
       //
       // The old Orders control table is NOT deleted and NOT hidden — it keeps
