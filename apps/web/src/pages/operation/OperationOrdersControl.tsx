@@ -55,11 +55,6 @@ import {
   isOpsManager,
   isOpsManagerRow,
   isOpsGenericAccount,
-  canRaisePo,
-  isPoDayMYT,
-  nextPoDayMYT,
-  poUrgentBypass,
-  purchasingUrgentWindowDays,
   DELIVERY_QUEUES,
   deliveryQueueByKey,
   deliveryQueueForLabel,
@@ -90,8 +85,6 @@ import {
   type OpsTasksListResponse,
   type OpsStaffMember,
 } from "@carres/shared";
-import RaisePoReview from "./components/RaisePoReview";
-import type { RaisePoOrder } from "./components/raise-po-plan";
 import ChaseSupplierReview from "./components/ChaseSupplierReview";
 import type { ChaseOrder } from "./components/chase-supplier-plan";
 import ChasePartnerReview, {
@@ -123,7 +116,6 @@ import {
   MoreHorizontal,
   Bell,
   Users,
-  PackagePlus,
   MessageCircle,
   // C10 — the three dots' glyphs (UI-KIT §A4 canonical mapping:
   // stock `package` · logistic `truck` · money `wallet`).
@@ -417,21 +409,6 @@ function openTaskOf(tasks: OpsTask[]): OpsTask | null {
 
 /** Days from today to the customer deadline (negative = overdue); null when the
  *  order carries no actionable date (TBD / undated). */
-/** Row → the pure Raise-PO plan input (0236 consolidated PO review). */
-function toRaisePoOrder(o: operationOrderListRow): RaisePoOrder {
-  return {
-    id: o.id,
-    so: o.so ?? null,
-    deliveryDate: o.delivery_date_tbd ? null : (o.delivery_date ?? null),
-    lines: (o.order_lines ?? []).map((l) => ({
-      sku: l.sku,
-      qty: Number(l.qty || 0),
-      sourcePo: (l as { source_po?: string | null }).source_po ?? null,
-      attrs: (l as { attrs?: Record<string, unknown> | null }).attrs ?? null,
-    })),
-  };
-}
-
 /** Row → the pure supplier follow-up plan input. Suppliers speak the ORIGINAL
  *  CR/TCF ref (source_ref[0]), never the SO number. */
 function toChaseOrder(o: operationOrderListRow): ChaseOrder {
@@ -645,15 +622,12 @@ function bookingConfirmedOf(o: operationOrderListRow): boolean {
 // above it in Law 4).
 // Display priority is the engine's DISPLAY_RANK and is not this list's job.
 const STOCK_QUEUE_KEYS = [
-  "issue_po",
   "confirm_ready_date",
   "delay_planning",
   "arrange_new_delivery_date",
 ] as const satisfies readonly OrderActionKey[];
 const NEXT_QUEUE_VERBS = STOCK_QUEUE_KEYS.map(orderActionQueue);
 const NEXT_QUEUE_DESC: Record<string, string> = {
-  [orderActionQueue("issue_po")]:
-    "Nothing ordered and no purchase order covers these goods — issue one, which mints the PO number and the document the supplier receives",
   [orderActionQueue("confirm_ready_date")]:
     "PO issued but goods not in yet — call the supplier for the ready date (red once inside the stock window)",
   // C8 — this tooltip used to read "call the customer now", which is the exact
@@ -1077,6 +1051,26 @@ export function nextActionOf(
   return top.locked
     ? act(top.key, top.tone, true)
     : act(top.key, top.tone);
+}
+
+/** Old Orders retains cross-module Purchasing facts but no Purchasing action. */
+function oldOrdersOpenActionsOf(
+  o: operationOrderListRow,
+  stock: StockInfo,
+  lines: { sku: string; qty: number }[],
+): OrderOpenAction[] {
+  return openActionsOf(o, stock, lines).filter((action) => action.key !== "issue_po");
+}
+
+function oldOrdersNextActionOf(
+  o: operationOrderListRow,
+  stock: StockInfo,
+  lines: { sku: string; qty: number }[],
+): NextAction {
+  const top = displayOrderAction(oldOrdersOpenActionsOf(o, stock, lines));
+  if (top) return top.locked ? act(top.key, top.tone, true) : act(top.key, top.tone);
+  const signals = orderActionSignalsOf(o, stock, lines);
+  return act(orderIsDelivering(signals) ? "delivering" : "done", "neutral");
 }
 
 /** Sort by SLACK ascending (Jess spec §5) — the most dangerous order (least
@@ -2260,20 +2254,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // bulk-bar Raise PO (holder + management only), badges the TEAM row, and
   // powers the Mon/Thu PO-day banner. Fails soft: old Worker / pre-0236 DB →
   // holder null → no gate, no badge, no banner.
-  const authUserId = useAuth((s) => s.user?.id ?? null);
   const dutyQ = useOperationPoDuty();
   const poDutyHolder = dutyQ.data?.holder ?? null;
-  const canRaise = canRaisePo(
-    poDutyHolder?.userId ?? null,
-    authUserId,
-    authRole,
-    authEmail,
-    // Close over the caller's duties — canRaisePo takes the manager test as a
-    // function precisely so the duty source can vary by surface.
-    (r, e) => isOpsManager(r, e, myDuties),
-  );
-  // The consolidated Raise-PO review (Option A cards); null = closed.
-  const [raisePoOrders, setRaisePoOrders] = useState<operationOrderListRow[] | null>(null);
   const [chaseOrders, setChaseOrders] = useState<operationOrderListRow[] | null>(null);
   // Logistics ⋮ → Remind/Call over the selection (company-grouped review).
   const [chasePartnerOrders, setChasePartnerOrders] = useState<
@@ -2490,7 +2472,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // NEXT-verb counts over OPEN orders — the C-vocab QUEUES rows read these,
   // so queue numbers equal the NEXT column by construction.
   const nextVerbOf = (o: operationOrderListRow) =>
-    nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []).label;
+    oldOrdersNextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []).label;
   /* S2.1 — everything a sort value needs that the order row does not carry.
      Each entry is the SAME helper the matching cell renders from, so a sorted
      column can never disagree with what it is showing. */
@@ -2500,7 +2482,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       partnerName,
       staffById,
       nextVerbOf: (o) =>
-        nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []).label,
+        oldOrdersNextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []).label,
     }),
     [availableBySku, partnerName, staffById],
   );
@@ -2530,7 +2512,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     // order is worth — that is "we do not know", never "settled".
     const money = moneyOf(o);
     const holdAmount = money.known ? money.outstanding : null;
-    const na = nextActionOf(o, stock, o.order_lines ?? []);
+    const na = oldOrdersNextActionOf(o, stock, o.order_lines ?? []);
     // ONE signals object for the whole strip: the open actions AND their C6
     // checklists read it, so a step can never be measured against a different
     // reading of the order than the action it belongs to.
@@ -2604,7 +2586,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
       // re-derives, so a step and the action above it cannot come from two
       // different readings of the order. The step's word is the dictionary's
       // BUTTON string — this file spells no verb.
-      openActions: orderActionsInDisplayOrder(actionSignals).map((a) => ({
+      openActions: orderActionsInDisplayOrder(actionSignals)
+        .filter((a) => a.key !== "issue_po")
+        .map((a) => ({
         key: a.key,
         line: orderActionLine(a.key, actionParties),
         tone: a.tone,
@@ -2614,7 +2598,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           label: orderActionButton(st.key) ?? orderActionQueue(st.key),
           done: st.state === "done",
         })),
-      })),
+        })),
     };
   };
   const nextCounts = useMemo(() => {
@@ -2744,26 +2728,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
       count: m.get(b) ?? 0,
     }));
   }, [liveScope, availableBySku]);
-
-  // URGENT BYPASS (PO duty spec, Jess 2026-07-18): open orders whose deadline
-  // sits inside the production window with stock NOT secured — flagged red
-  // ANY day, must not wait for a PO day. The window is the configured
-  // production working days (P1); with no settings loaded, or no number set
-  // for those categories, nothing is called urgent — an unrated category may
-  // not claim to know better.
-  const urgentPoCount = useMemo(
-    () =>
-      liveScope.filter((o) => {
-        if (stockBucketOf(o, availableBySku) === "Ready") return false;
-        if (!purchasingSettings) return false;
-        const cats = CORE_ORDER.filter((c) => orderHasCore(o, c));
-        return poUrgentBypass(
-          o.delivery_date_tbd ? null : o.delivery_date,
-          purchasingUrgentWindowDays(purchasingSettings, cats),
-        );
-      }).length,
-    [liveScope, availableBySku, purchasingSettings],
-  );
 
   // No-logistics queue (Jess 2026-07-19): open orders with NO logistics company
   // yet, regardless of stock — the whole "nobody is carrying this" list. Via
@@ -3222,6 +3186,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       <OrderDetailDrawer
         orderId={openOrderId}
         journey={journeySignalsFor(openOrderId)}
+        allowIssuePO={false}
         onClose={() => setOpenOrderId(null)}
         nav={
           navIdx >= 0
@@ -3360,28 +3325,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
         }),
     });
 
-  // PO-day banner (Mon/Thu) + urgent bypass (any day) — shown to the WHOLE
-  // operation team (Jess 2026-07-19: the duty roster is a notice board, not a
-  // private message — everyone must see whose month it is and that today is
-  // PO day). Only the ACTION is gated: the Raise PO button renders for the
-  // holder + management. Speaks the C-vocab queue words, same as QUEUES+NEXT.
-  // A number printed under a queue word must be a number that queue's own click
-  // can produce, so each count is read from its own queue and never summed.
-  const issuePoCount = nextCounts.get(orderActionQueue("issue_po")) ?? 0;
-  const chaseSupplierCount =
-    nextCounts.get(orderActionQueue("confirm_ready_date")) ?? 0;
-  // Quiet chip = every day (whole team, zero clicks): holder avatar + next PO
-  // day. Hot state = Mon/Thu, urgent, or ?poday preview: the SAME slot grows
-  // the action chip (+ Raise PO for holder/management). One announce home.
-  const poDays = purchasingSettings?.poDays ?? [];
-  const isPoDayToday = poDays.length > 0 && isPoDayMYT(new Date(), poDays);
-  const poHot = poDayPreview || isPoDayToday || urgentPoCount > 0;
-  const nextPoIso = nextPoDayMYT(new Date(), poDays);
-  // No PO day configured (or the settings have not landed yet) → no date to
-  // print. Better a blank than a made-up "next Monday".
-  const nextPoLabel = nextPoIso
-    ? `${new Date(`${nextPoIso}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" })} ${fmtDateShort(nextPoIso)}`
-    : "—";
   // Queue-row owner adornments (B+C): goods queues carry the duty holder's
   // avatar, PIC queues a grey tag. Every QUEUES/TEAM row gets the SAME
   // fixed-width leading slot — mixed chip widths broke label alignment
@@ -3413,61 +3356,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
       PIC
     </span>,
   );
-  const poDutyTitleChips = poDutyHolderShown ? (
-    <div className="flex items-center gap-1.5" data-testid="po-duty-strip">
-      <span
-        className="inline-flex items-center gap-1.5 h-[26px] rounded-full border border-base-200 bg-white px-2 text-label text-base-500 whitespace-nowrap"
-        title={`PO duty this month: ${poDutyHolderShown.name ?? poDutyHolderShown.email}${poDutyHolder ? "" : " (demo)"} — controls ${orderActionQueue("issue_po")} + ${orderActionQueue("confirm_ready_date")} (the one voice to suppliers). Full roster: right rail → Team.`}
-      >
-        <span
-          className="w-4 h-4 rounded-full flex items-center justify-center text-label font-semibold leading-none shrink-0"
-          style={{
-            background: avatarColor(poDutyHolderShown.userId).bg,
-            color: avatarColor(poDutyHolderShown.userId).fg,
-          }}
-        >
-          {personInitials(poDutyHolderShown.name, poDutyHolderShown.email)}
-        </span>
-        PO duty{!poDutyHolder && " · demo"} · next {nextPoLabel}
-      </span>
-      {poHot && (
-        <span
-          className={`inline-flex items-center gap-1 h-[26px] rounded-full px-2 text-label font-semibold whitespace-nowrap ${
-            urgentPoCount > 0 && !(poDayPreview || isPoDayToday)
-              ? "bg-destructive/10 text-destructive"
-              : "bg-warning-soft text-warning"
-          }`}
-          data-testid="po-day-chip"
-        >
-          <PackagePlus size={14} strokeWidth={2} />
-          {poDayPreview || isPoDayToday
-            ? `PO day — ${orderActionQueue("issue_po")} ${issuePoCount} · ${orderActionQueue("confirm_ready_date")} ${chaseSupplierCount}`
-            : `${urgentPoCount} urgent — inside the stock window`}
-          {(poDayPreview || isPoDayToday) && urgentPoCount > 0 && (
-            <span className="text-destructive">· {urgentPoCount} urgent</span>
-          )}
-        </span>
-      )}
-      {poHot && canRaise && (
-        <button
-          type="button"
-          onClick={() =>
-            setRaisePoOrders(
-              liveScope.filter((o) => stockBucketOf(o, availableBySku) !== "Ready"),
-            )
-          }
-          className="btn-secondary text-label h-[26px] py-0 px-2 whitespace-nowrap inline-flex items-center"
-        >
-          Raise PO
-        </button>
-      )}
-    </div>
-  ) : undefined;
-  // Header PO-duty strip REMOVED (Jess 2026-07-19: "useless") — the duty holder
-  // lives in the right-rail Team board; Raise PO stays in the bulk bar. Built
-  // above but no longer mounted; `void` keeps the vars referenced (no churn).
-  void poDutyTitleChips;
-
   /* ── S1 · THE GRID ────────────────────────────────────────────────────────
    *
    * The 30 rows already windowed, each carrying the facts its cells share.
@@ -3714,10 +3602,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           row={r}
           onOpen={() => setOpenOrderId(r.o.id)}
           onNextAction={(verb) => {
-            // `Issue PO` opens the raise-PO flow, which is the only write path
-            // the portal has for creating a purchase order.
-            if (verb === orderActionQueue("issue_po")) setRaisePoOrders([r.o]);
-            else if (verb === orderActionQueue("confirm_ready_date")) {
+            if (verb === orderActionQueue("confirm_ready_date")) {
               setChaseSupplierScope(null);
               setChaseOrders([r.o]);
             } else setOpenOrderId(r.o.id);
@@ -3865,13 +3750,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
               setMenu={setBulkMenu}
               partners={partnersQ.data?.partners ?? []}
               onAssign={bulkAssignLogistic}
-              onRaisePo={() => setRaisePoOrders(selectedOrders)}
-              canRaisePo={canRaise}
-              raisePoTitle={
-                canRaise
-                  ? "Raise consolidated POs — one per supplier — for the selection"
-                  : `${poDutyHolder?.name ?? poDutyHolder?.email ?? "The duty holder"}'s PO month — only the duty holder and management can raise POs`
-              }
               onChaseSupplier={(mode) => {
                 setChaseInitialMode(mode);
                 // If exactly one supplier is filtered, scope the review to it so a
@@ -4566,19 +4444,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
       </ListPageShell>
       </div>
 
-      {/* Consolidated Raise-PO review (Option A cards, 0236) — from the bulk
-          bar's selection or the PO-day banner's waiting set. */}
-      {raisePoOrders && (
-        <RaisePoReview
-          orders={raisePoOrders.map(toRaisePoOrder)}
-          availableBySku={availableBySku}
-          onClose={() => {
-            setRaisePoOrders(null);
-            clearSel();
-            void refetch();
-          }}
-        />
-      )}
 
       {/* Confirm ready date — one WhatsApp message per supplier group over the
           selection (Remind / Call). Open to all operation (no PO-duty gate). */}
@@ -4632,10 +4497,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
 /**
  * Bulk bar — Option B (Jess 2026-07-19): grouped by COUNTERPARTY, not by verb.
  * Three chips — [📦 Supplier ⋮] [🚚 Logistics ⋮] [More] — and the two
- * counterparty menus each hold that party's actions incl. Remind / Call. The
- * gated Raise PO sits INSIDE the Supplier menu (locked for non-duty), so the bar
- * never shows a dead primary button; the shape stays 3 chips regardless of
- * permission or selection.
+ * counterparty menus each hold that party's follow-up actions.
  */
 function OrdersBulkBar({
   count,
@@ -4648,9 +4510,6 @@ function OrdersBulkBar({
   setMenu,
   partners,
   onAssign,
-  onRaisePo,
-  canRaisePo,
-  raisePoTitle,
   onChaseSupplier,
   onChasePartner,
   onFlag,
@@ -4671,9 +4530,6 @@ function OrdersBulkBar({
   setMenu: (m: null | "supplier" | "logistic" | "assign" | "more") => void;
   partners: { id: string; name: string }[];
   onAssign: (partnerId: string) => void;
-  onRaisePo: () => void;
-  canRaisePo: boolean;
-  raisePoTitle: string;
   /** Open the supplier follow-up review on the given tone (Remind / Call). */
   onChaseSupplier: (mode: "remind" | "chase") => void;
   /** Open the logistics follow-up review on the given tone (Remind / Call). */
@@ -4720,8 +4576,7 @@ function OrdersBulkBar({
       )}
       <span className="mx-1 h-4 w-px bg-signature-100" aria-hidden />
 
-      {/* — SUPPLIER ⋮ — the goods counterparty. Raise PO (gated) + Remind +
-          Call all live here; one voice per supplier. */}
+      {/* — SUPPLIER ⋮ — follow-up only; Purchasing owns PO creation. */}
       <div className="relative">
         <button
           type="button"
@@ -4736,15 +4591,6 @@ function OrdersBulkBar({
         </button>
         {menu === "supplier" && (
           <div className={pop} role="menu">
-            <BulkMenuItem
-              icon={PackagePlus}
-              label="Raise PO"
-              onClick={onRaisePo}
-              disabled={!canRaisePo}
-              title={raisePoTitle}
-              right={canRaisePo ? undefined : <Lock size={11} className="text-base-400" />}
-            />
-            <div className="h-px bg-base-200 my-1 mx-1.5" />
             <BulkMenuItem
               icon={Bell}
               label="Remind suppliers"
@@ -5740,7 +5586,10 @@ function NextActionCell({
   // owes, so their pill DOES show — only "Done" blanks the cell: T7's "Upload
   // delivery photo" (no photo on file) and, since C2, "Collect RM …" — money
   // is its own track and it SURVIVES delivery (ORDERS-WORKING-FLOW §3).
-  const na = nextActionOf(o, stock, lines);
+  // Old Orders may still show Purchasing facts, but it no longer presents a
+  // Purchasing action. Choose the first remaining action from the same engine.
+  const visibleOpen = oldOrdersOpenActionsOf(o, stock, lines);
+  const na = oldOrdersNextActionOf(o, stock, lines);
   if (!na.label) return null;
   if (completed && na.key === "done") return null;
   const m = moneyOf(o);
@@ -5792,8 +5641,7 @@ function NextActionCell({
   // exactly one way of saying "there is more". The count is `open.length − 1`
   // by construction, so the drawer opened by this row shows exactly `1 + N`
   // rows — it is the same computation.
-  const open = openActionsOf(o, stock, lines);
-  const more = open.slice(1);
+  const more = visibleOpen.slice(1);
   return (
     <div className="flex items-center gap-1.5 max-w-full">
       <button

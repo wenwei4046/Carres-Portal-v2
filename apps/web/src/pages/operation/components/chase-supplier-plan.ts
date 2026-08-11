@@ -7,7 +7,7 @@ import { lineCategory, type CoreCat } from "@/lib/line-category";
  * WhatsApp group with ONE message listing all its orders' refs.
  *
  * PURE — no fetching — so the grouping is unit-testable. Mirrors the supplier
- * resolution of `raise-po-plan.ts` (catalog `product_skus.supplier_id`, else the
+ * resolution used by Purchasing (catalog `product_skus.supplier_id`, else the
  * UNIQUE supplier covering the category) but WITHOUT the stock/PO subtraction:
  * chasing is about pushing on made-to-order goods, so every core line counts.
  *  · only core goods (Mattress/Bedframe/Sofa) chase a supplier; acc/service skip;

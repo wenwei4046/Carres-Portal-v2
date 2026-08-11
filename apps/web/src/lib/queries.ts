@@ -3339,9 +3339,6 @@ export interface operationRecheckStockResponse {
   warehouseId: string | null;
   shortages: { sku: string; short: number }[];
 }
-export interface operationIssuePosResponse {
-  pos_created: { po_id: string; supplier_id: string; lines: number }[];
-}
 export interface operationAdjustStockResponse {
   sku: string;
   warehouse_id: string;
@@ -6028,31 +6025,6 @@ export function useRecheckStockMutation(
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-/** Auto-issue POs for an in_production order's shortages. Body empty. */
-export function useIssuePosForOrderMutation(
-  orderId: string,
-  opts?: Partial<
-    UseMutationOptions<operationIssuePosResponse, ApiError, void>
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<operationIssuePosResponse, ApiError, void>({
-    mutationFn: () =>
-      apiFetch<operationIssuePosResponse>(
-        `/api/operation/orders/${orderId}/issue-pos`,
-        { method: "POST", body: JSON.stringify({}) },
-      ),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

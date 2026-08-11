@@ -97,17 +97,20 @@ vi.mock("./components/OrderDetailDrawer", () => ({
     orderId,
     onClose,
     journey,
+    allowIssuePO,
   }: {
     orderId: string;
     onClose: () => void;
     // J3 — serialised onto the stub so a test can prove the list hands the
     // drawer the LADDER's own answer rather than a second derivation.
     journey?: unknown;
+    allowIssuePO?: boolean;
   }) => (
     <div
       data-testid="drawer-stub"
       data-order-id={orderId}
       data-journey={journey ? JSON.stringify(journey) : ""}
+      data-allow-issue-po={String(allowIssuePO)}
     >
       <button onClick={onClose}>close</button>
     </div>
@@ -1987,6 +1990,16 @@ describe("orders export", () => {
     expect(screen.getByTestId("chase-supplier-review")).toBeInTheDocument();
   });
 
+  it("bulk Supplier menu has no Purchase Order creation action", () => {
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(screen.getByLabelText("Select all on this page"));
+    fireEvent.click(screen.getByRole("button", { name: "Supplier" }));
+    expect(screen.queryByRole("menuitem", { name: /Raise PO|Issue PO/i })).toBeNull();
+    expect(
+      screen.getByRole("menuitem", { name: /Call suppliers — confirm ready date/ }),
+    ).toBeInTheDocument();
+  });
+
   it("DEADLINE band is multi-select — two buckets can be active at once (B redesign)", () => {
     wrap(<OperationOrdersControl />);
     const grp = within(screen.getByTestId("filter-deadline"));
@@ -3233,11 +3246,11 @@ describe("Actions column · +N and the delivering FACT (C3)", () => {
       .find((r) => r.textContent?.includes(`SO-${so}`))!;
   }
 
-  it("an order with three open actions leads with one and counts the rest", () => {
+  it("keeps Purchasing facts but removes Issue PO from the Old Orders action cell", () => {
     wrap(<OperationOrdersControl />);
     const cell = row(3001);
-    expect(within(cell).getByText("Issue PO to supplier")).toBeInTheDocument();
-    expect(within(cell).getByTestId("next-more")).toHaveTextContent("+2");
+    expect(within(cell).queryByText("Issue PO to supplier")).toBeNull();
+    expect(within(cell).getByTestId("next-more")).toHaveTextContent("+1");
   });
 
   it("a row with one action shows no +N", () => {
@@ -3258,7 +3271,13 @@ describe("Actions column · +N and the delivering FACT (C3)", () => {
       const journey = JSON.parse(
         screen.getByTestId("drawer-stub").getAttribute("data-journey") || "null",
       );
-      expect(journey.openActions).toHaveLength(claimed);
+      expect(
+        journey.openActions.filter((action: { key: string }) => action.key !== "issue_po"),
+      ).toHaveLength(claimed);
+      expect(screen.getByTestId("drawer-stub")).toHaveAttribute(
+        "data-allow-issue-po",
+        "false",
+      );
       fireEvent.click(screen.getByText("close"));
     }
   });
