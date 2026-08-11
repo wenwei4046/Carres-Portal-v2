@@ -293,7 +293,21 @@ with the row's 20px checkbox included in the measured height. Expanded content t
 natural governed child-row height and is not forced into 38px. Carres gains visible rows by
 removing tall page chrome, breadcrumbs, KPI bands and redundant headings — never by squeezing
 the parent row below this readable baseline. Footer existence, contents and height remain a
-separate unresolved decision; this density ruling does not invent one.
+separate decision from row density.
+
+**REGISTER STATUS FOOTER — APPROVED / LOCKED.** Every Register table ends in one compact,
+always-present status footer fixed to the table frame; it never scrolls with the rows. The
+footer keeps the operator oriented without spending a full data-row height. In its resting
+state it states the current listing's total summary. When rows are selected it immediately
+states the selected business summary in the page's owned unit — for example To Order's
+`Mattress 5` — rather than replacing that consequence with a generic checkbox count. When a
+filter narrows the listing, the footer must make the narrowed-versus-total state explicit.
+
+The status footer is information, not a second toolbar: no primary action, Columns, Reset
+layout or duplicated filter controls may enter it. Each Register MASTER owns its truthful
+summary vocabulary and arithmetic; the global template may not invent a KPI, status or unit.
+The exact compact height and the page-by-page summary mapping remain the next unresolved
+footer decision.
 
 # §6.6 · SALES ORDERS REFERENCE STRUCTURE — ruled by Loo 2026-08-10
 
