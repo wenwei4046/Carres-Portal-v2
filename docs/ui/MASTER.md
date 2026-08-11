@@ -92,6 +92,17 @@ Current and legacy screenshots are evidence of implementation, not authority ove
 truth. The order is mandatory: establish locked constraints → research only the unresolved surface
 → propose.
 
+**GOVERNANCE IS NOT A FEATURE FREEZE — APPROVED / LOCKED (Loo, 2026-08-11).** Every Register
+decision separates two questions: **(1) business/capability truth** — does the capability exist
+today or should Carres add it? **(2) placement/presentation** — where and how does it appear in
+the new template? `Not in the repo` means *new capability requiring an owned card*, never
+*forbidden to propose*. `Existing capability` means its business value and downstream behaviour
+must be preserved unless explicitly retired; it does **not** freeze today's control, band, pill,
+tab or location unless the authoritative MASTER explicitly locks that presentation. When a
+governed reference reveals a materially useful missing capability, Plan chat researches the
+capability and may recommend it with a Carres-owned boundary; it never copies the reference's
+business semantics or visual treatment blindly.
+
 When the owner approves a complete UI or layout decision, immediately overwrite this MASTER or the
 owning module MASTER with the current **APPROVED / LOCKED** truth before moving to another major
 decision. PLAN mode forbids application implementation, not governing-document updates.
