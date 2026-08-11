@@ -3052,6 +3052,34 @@ At the measured narrow target, the Toolbar must show every normal-state control 
 shrinking frozen typography or moving the toolbar itself into horizontal scroll. The wide DataGrid
 continues to own its own horizontal overflow independently.
 
+**SALES ORDERS ROW CONTEXT MENU — APPROVED / LOCKED (Loo, 2026-08-11).** The desktop
+right-click menu follows the approved 2990 Sales Orders action set and order exactly:
+
+```
+Edit
+View
+Preview
+Print
+────────
+Issue Delivery Order
+Copy to new Sales Order
+────────
+Cancel SO
+```
+
+This is a Sales Orders module exception, not a Register Template requirement for every module.
+The menu copies the reference action inventory and ordering; Carres frozen tokens, typography,
+spacing, hover/current treatment, permissions and confirmation components still govern its visual
+and interaction treatment. Each item routes to the Carres-owned capability rather than executing
+foreign business rules inside the grid: `Edit` opens the full Sales Order Workspace in edit intent;
+`View` opens the owned read view; `Preview` opens the governed document preview; `Print` uses the
+governed Sales Order document output; `Issue Delivery Order` hands off to the Delivery-owned issue
+flow; `Copy to new Sales Order` starts a new draft from the governed copy boundary; and `Cancel SO`
+uses the owned cancellation gate and destructive confirmation. The implementation cards must
+define the unresolved permission, eligibility, copy-boundary and cancellation rules before those
+new capabilities can write business data. Right-click is a desktop shortcut: it does not remove
+the normal discoverable doors already governed for Edit, output or View Flow.
+
 | What | Why it is not built |
 |---|---|
 | **The follow-up action after a FAILED delivery** | `Deliver today` completes on delivered OR a Delivery Exception with its reason, and **nothing yet turns that exception into the next action.** Approved shape: one Exception plus a Reason, then the next action. Belongs to whichever card next touches the delivery day. |
