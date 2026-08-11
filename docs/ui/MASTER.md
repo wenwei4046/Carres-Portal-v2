@@ -354,6 +354,28 @@ filter, export, Columns, selection state or page-specific action. New/create, Sc
 SO Settings and every other page-owned action belong to the next Work Toolbar layer. Toasts
 anchor below the header's right utility cluster as overlays and do not add header height.
 
+**`JUMP TO…` INTERACTION — APPROVED / LOCKED (Loo, 2026-08-11).** `Jump to…` is the one global
+navigate-only command surface across the ERP; modules must not grow their own competing jump
+search. The Page Header trigger shows its keyboard hint and opens from click or `⌘K`. Desktop uses
+one centred overlay; small screens use the same surface full-screen. Opening with no query shows at
+most five permitted recent destinations followed by permitted destinations. Typing searches only:
+
+1. governed module / destination names; and
+2. exact or partial governed document numbers such as SO · PO · GRN · INV.
+
+Document results show the document number, its type and the smallest useful identifying party
+(customer or supplier) without exposing unauthorised data. Results are permission-filtered before
+display. `↑` / `↓` moves the active result, `Enter` navigates and `Esc` closes. No result renders
+the plain empty state `No results`; it never offers a create action. Selecting a result only opens
+its owning destination/document and never approves, receives, pays, edits or performs any other
+workflow.
+
+Register Search remains page-owned and searches that Register's governed fields. `Jump to…` does
+not replace it and does not search arbitrary table-cell contents, customer phone, product text or
+every ERP field. Expanding beyond destination + document-number + recents requires a governed
+cross-module search index and a new architecture decision; individual modules may not expand the
+global result contract locally.
+
 **REGISTER WORK TOOLBAR / SECOND HEADER — APPROVED / LOCKED (Loo, 2026-08-11).** Immediately
 below the Page Header, a Register may own one rendered 45px Work Toolbar; it is one row and never
 scrolls horizontally. Normal state spends the left side on the current View control and current-
