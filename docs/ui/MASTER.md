@@ -351,8 +351,18 @@ global-navigation capability: it finds permitted modules/destinations and exact 
 offers recent destinations, and only navigates; it never performs workflow. The header contains
 no breadcrumb, `Backend` label, duplicate title, KPI, tab, scope/view, current-Register Search,
 filter, export, Columns, selection state or page-specific action. New/create, Scan Order,
-SO Settings and every other page-owned action belong to the next Work Toolbar layer. Toasts
-anchor below the header's right utility cluster as overlays and do not add header height.
+SO Settings and every other page-owned action belong to the next Work Toolbar layer.
+
+**REGISTER TOAST PLACEMENT — APPROVED / LOCKED (Loo, 2026-08-11).** Toasts use the proven 2990
+behaviour translated into Carres components: one fixed overlay tray at the viewport's bottom-right,
+stacking additional messages upward. A toast never occupies document flow and never moves, resizes
+or adds height to the Page Header, Work Toolbar, Register table or status footer. It uses the
+governed Carres Toast component, frozen semantic colours and governed icons — never 2990 visual
+tokens. Each message provides its truthful semantic state, compact text, close door and a slim
+remaining-time indicator; ordinary success/information feedback auto-dismisses after five seconds,
+while accessibility live announcement follows the message severity. Persistent business blockers
+remain an in-page message near the affected work surface, and field validation remains inline
+beside its field; neither is misrepresented as an ephemeral Toast.
 
 **`JUMP TO…` INTERACTION — APPROVED / LOCKED (Loo, 2026-08-11).** `Jump to…` is the one global
 navigate-only command surface across the ERP; modules must not grow their own competing jump
