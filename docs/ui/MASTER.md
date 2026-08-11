@@ -82,6 +82,36 @@ mandatory. A proposal that conflicts with an **APPROVED / LOCKED** constraint is
 must be corrected before Jess sees it. If the authorities themselves conflict, report that
 conflict and stop the proposal; never silently choose one.
 
+**EIGHT-LENS DESIGN REVIEW — APPROVED / LOCKED (Loo, 2026-08-11).** The preflight is not only
+a visual compliance check. Before every UI recommendation, the decision surface is reviewed
+through all eight lenses below; none may be skipped because the current repository lacks the
+answer:
+
+1. **UI Dictionary** — one meaning has one Carres word. Check Settings / Maintenance / Manage /
+   Edit and every action against the governed vocabulary; retire overlapping concepts.
+2. **Information Architecture** — name the true owning module and the correct home: Navigation ·
+   Page · Settings · Toolbar · Row action · Workspace. Do not create a second door unless the
+   second door is an explicitly justified shortcut to the same owned action.
+3. **Cross-module Consistency** — state what is reusable Register Template law and what is a
+   page-owned exception. Test whether Purchase Orders, Receiving, Claims and Payments could
+   inherit the rule coherently; never force them to inherit Sales Orders business content.
+4. **Component / Interaction Language** — justify Tabs · pills · filters · dropdown · button ·
+   overflow by their governed jobs. A component seen in a reference is not permission to copy it.
+5. **Capability Gap** — proactively identify mature, materially useful missing capabilities that
+   improve the operator journey and bring them to Jess; do not wait for the owner to discover
+   them. Research and define a Carres-owned boundary before recommending BUILD.
+6. **Future Consequence** — project the decision across the ERP: prevent Maintenance/Settings
+   duplication, uncontrolled header growth, duplicate entry points and module-by-module drift.
+7. **Reference Translation** — learn principle and interaction from Linear · Shopify · AutoCount ·
+   2990, then translate them into Carres architecture. Never copy their terminology, information
+   architecture or visual treatment as authority.
+8. **Recommendation** — conclude with one or more explicit dispositions: **KEEP · IMPROVE ·
+   RELOCATE · RETIRE · BUILD**, each with the business and architecture reason. Reporting only
+   what the repository currently has is incomplete design work.
+
+A mockup or recommendation that has not passed these eight lenses is **INVALID**, even when its
+tokens and spacing are correct.
+
 For a genuinely **UNRESOLVED** UI decision, proactively research only that declared surface. Use
 the relevant governed references — including Linear, Shopify, AutoCount, 2990, current Carres UI
 and other mature ERP patterns when useful — and exclude unrelated history and pages. Derive the
