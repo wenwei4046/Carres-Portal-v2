@@ -4272,6 +4272,10 @@ export interface SalesOrderRevisionRow {
   snapshot: SalesOrderSnapshot;
   created_at: string;
   created_by: string | null;
+  /** CARD 1 (0340) — who asked: staff_correction | customer_change. NULL on
+   *  Rev 1 (the original) and on pre-0340 rows — history is never guessed. */
+  change_type?: "staff_correction" | "customer_change" | null;
+  note?: string | null;
 }
 
 export function useSalesOrderRevisions(
@@ -4643,6 +4647,9 @@ export interface SaveRevisionLineInput {
 export interface SaveRevisionInput {
   header?: Record<string, unknown>;
   lines?: SaveRevisionLineInput[];
+  /** CARD 1 — required by the RPC when the save moves the CONTRACTUAL fields
+   *  (items · promised date): who asked for this change. */
+  change?: { type: "staff_correction" | "customer_change"; note?: string };
 }
 
 /** POST /:id/save — the ONE edit door. The RPC whitelists the header, diffs

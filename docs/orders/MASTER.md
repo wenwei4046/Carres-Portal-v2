@@ -172,6 +172,74 @@ exactly the method that produced this checkpoint. **The next chat starts from th
 
 ---
 
+# ✅ CUSTOMER OBLIGATION TRUTH — SO V2 CARD 1, SHIPPED 2026-08-11
+
+**The question this card installed:** for any Sales Order, *what is the
+customer's CURRENT committed order, and how did it become this?* — answered
+without reading a PO, warehouse notes, the Issue Tracker, `operation_stage`
+or the drawer PipelineStatus.
+
+```
+CUSTOMER COMMITMENT  =  orders + order_lines + order_addons  (the live rows)
+LINEAGE              =  sales_order_revisions  (immutable, 0327)  + change_type (0340)
+THE ONE READ         =  sales_order_commitment_bundle → resolveCurrentCustomerCommitment
+                        (packages/shared/src/sales-order-commitment.ts ·
+                         GET /api/operation/orders/:id/commitment)
+```
+
+**Authority flows DOWN — commitment → purchasing/fulfilment → PO/unit/delivery.
+It is NEVER inferred backwards.** The bundle reads nothing from
+`purchase_orders`, units, receiving, booking, stages or `status='delivered'`,
+and the negative control proves it: forcing legacy status words on an order
+changes nothing in the answer (run live 2026-08-11, `bundle_identical = true`).
+
+**A contractual change now states its cause** (`sales_order_revisions.change_type`):
+
+```
+Staff correction   the RECORD was wrong — the customer's agreement never changed
+Customer change    the customer asked for something different
+```
+
+A save that moves items or the promised date REFUSES without one
+(`change_type_required`); a contact/address-only fix defaults to Staff
+correction. A FULFILMENT REPLACEMENT is deliberately NOT a cause — a failed
+delivery never revises the customer's order (that truth is Card 2/Card 5's).
+
+**The SAVE door got the floors it always claimed** (0340): GATE 7
+(delivered/cancelled → contractual fields frozen), the received floor and the
+invoice floor now BLOCK at `sales_order_save_revision`, with the evaluator's
+own sentence — they were previously a read-only advisory the write ignored.
+And the 0257 `line_in_production` gate now guards this door too: removing or
+re-SKUing a line that carries an `order_supplier_threads` row refuses — the
+thread, born at ops confirm, is the only production-commitment fact there is,
+and no new one was invented.
+
+**Legacy authority retired from this decision (spec §11):** `operation_stage`
+· drawer PipelineStatus · `Done` · `orders.status='delivered'` · booking stage
+· PO existence · receiving status · `line_stock_status` — none of these may
+determine current customer commitment. The columns remain; their AUTHORITY
+over this question is gone.
+
+**Known boundaries, reported not hidden:**
+- POS doors (`add_order_lines` · `replace_order_lines` · `edit_order_addon` ·
+  `update_order`) still mint NO revision — their lineage lives in
+  `order_history` + `order_change_requests`. An approved+applied change
+  request IS the customer-change record on that lane. Unifying them onto the
+  revision ledger is a later card.
+- The Stage-3 amendment lane (ISSUE/ACCEPT/APPLY, 3.6–3.8) stays walled; until
+  it lands, the governed path for a customer change is the SAVE door with
+  `change_type='customer_change'`, exactly as Stage 2 shipped it — Card 1
+  labels the act, it does not open a new one.
+- Cannot answer "how much is physically fulfilled" — that is Card 2 (units)
+  + Card 5 (delivery attempts), on purpose.
+
+**Evidence order SO-1318** (`CARD-1 EVIDENCE`) carries the proven chain: Rev 1
+original → Rev 2 Staff correction → Rev 3 Customer change → Rev 4 contact fix
+(auto Staff correction). Keep until Card 1 is owner-accepted, then it may be
+cleaned with the other fixtures.
+
+---
+
 # §1 · Overview
 
 **One table. One row = one customer order.** Every order in the business lands here; a click
