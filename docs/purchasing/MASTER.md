@@ -15,14 +15,14 @@
 
 | I am working on | Read |
 |---|---|
-| anything | **§1 · §2 first — they are short and they bind every tab** |
+| anything | **§1 · §2 first — they are short and they bind every Purchasing page** |
 | SO Batch Purchase · Manual Purchase (today: To Order) | **§3** |
 | Purchase Orders | **§4** |
 | Receiving | **§5** |
 | Claims | **§6** |
 | Report | **§7** |
 | Settings | **§8** |
-| a decision that crosses tabs | **§9** |
+| a decision that crosses Purchasing pages | **§9** |
 | something already approved and deliberately not built | **§10 Approved Evolution** |
 
 **Every object section has the same six blocks:** `MISSION · WORKFLOW · WHAT IS ON SCREEN
@@ -66,6 +66,13 @@ Purchasing   SO Batch Purchase   only the customer orders PURCHASING still has
 Reports and Settings are PORTAL pages, not Purchasing pages
 (`../ERP-ARCHITECTURE.md` §2.1).
 ```
+
+**PURCHASING HAS NO MODULE TABS** (Loo, 2026-08-11 — **APPROVED / LOCKED**).
+`SO Batch Purchase` · `Manual Purchase` · `Purchase Orders` · `Receiving` ·
+`Supplier Claim` are separate operator jobs and separate destinations. They are not sibling
+views of one record or one work surface, so they must not be placed in a shared tab strip.
+Purchasing navigation exposes each destination individually through the governed portal
+navigation. A page may not recreate the old `PurchasingTabs` strip as a second navigation.
 
 **SALES ORDERS IS NOT A PURCHASING TAB** (Loo, 2026-08-06 — his refinement of
 the same day's ruling). Purchasing READS the sales orders; it does not carry
@@ -272,9 +279,9 @@ not an engineering one.
 
 ## 2.1 · The shell
 
-ONE white 44px header row (`PurchasingTabs.tsx`). **Pages draw no header of their own** — no
-breadcrumb, no `<h1>`, no page-level icons. A page structurally cannot forget the header
-because it never draws one.
+Each Purchasing destination uses the governed Register destination header. **There is no
+shared Purchasing tab header.** Page identity is drawn once; a page may not add a duplicate
+breadcrumb, title, icon row or module-tab strip.
 
 **One Workspace template**: 200px navigation rail → kit `DataTable` listing (for FINDING —
 sort, filter, search) → 400px workspace pane (where the WORK happens). Receiving, Purchase
@@ -1316,12 +1323,12 @@ blanks. Every row carries **who changed it, when, and what it was before**.
 
 ---
 
-# §9 · Architecture decisions that cross tabs
+# §9 · Architecture decisions that cross Purchasing pages
 
 | Decision | Ruling |
 |---|---|
 | **Navigation never defines ownership** | Architecture decisions are justified by business ownership. Navigation may support those decisions, but navigation never defines ownership. |
-| **Where an action lives** | The tab that owns the WORK owns the door AND its queue. **CLOSED by T2 (2026-08-06): the CALLS calendar on Purchase Orders is the queue for all three supplier calls** — each call's due files under its day, `Overdue` holds the late ones, and the door (the expand) sits on the same tab. |
+| **Where an action lives** | The destination that owns the WORK owns the door AND its queue. **CLOSED by T2 (2026-08-06): the CALLS calendar on Purchase Orders is the queue for all three supplier calls** — each call's due files under its day, `Overdue` holds the late ones, and the door (the expand) sits on the same page. |
 | **Two status axes, never merged** | `purchase_orders.status` is a 3-value stored enum. The 5-word Operation Status is derived and never stored. A reader who confuses them will "fix" one to match the other. |
 | **A quantity means exactly one thing** | No column is ever reused for a second meaning — that is how `ops_order_control.balance` became a lock reading a column nobody wrote. |
 | **Deliberately not stored** | `in_transit_qty` · `ready_for_collection_qty` · `supplier_confirmed_qty`. **A column nobody writes is worse than a missing one.** |

@@ -259,7 +259,19 @@ own decision and its own card.**
 
 ---
 
-# §6.5 · SALES ORDERS REFERENCE STRUCTURE — ruled by Loo 2026-08-10
+# §6.5 · REGISTER NAVIGATION AND HEADER ADMISSION — ruled by Loo 2026-08-11
+
+**TABS ARE AVOIDED BY DEFAULT — APPROVED / LOCKED.** Separate business jobs, owned records
+or destinations are separate portal-navigation entries and pages; they are never compressed
+into a module tab strip. Purchasing is the explicit reference: SO Batch Purchase · Manual
+Purchase · Purchase Orders · Receiving · Supplier Claim are individual destinations, with no
+Purchasing tabs and no substitute second navigation row.
+
+A tab row is not a standard Register layer. Its admission remains **UNRESOLVED** and must be
+decided only for a concrete page by scoped research under `CLAUDE.md`. A proposed tab may not
+be introduced merely to group related pages, imitate another product, or fill a second header.
+
+# §6.6 · SALES ORDERS REFERENCE STRUCTURE — ruled by Loo 2026-08-10
 
 **Stage A is owner-accepted and CLOSED.** Sales Orders is the first production reference
 implementation of the approved Carres destination/listing architecture. This ruling is
