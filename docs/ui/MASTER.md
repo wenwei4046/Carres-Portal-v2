@@ -39,6 +39,64 @@ STOP and ask             a component that does not exist. Never draw one inline 
 **A rule that exists only as documentation is temporary and incomplete.** Every UI rule must
 eventually become a structure the code can enforce — a type, a lint rule, or a failing test.
 
+## §1.1 · PRODUCTION UI EXECUTION LAW — owner ruling 2026-08-11
+
+This is the authoritative UI execution law for Sales Order V2 continuous Card builds. It governs
+**when and how** required UI ships; the Orders MASTER continues to own business truth. It does not
+redesign, infer or reopen a Card's approved business rules.
+
+### A CARD IS A PRODUCTION VERTICAL SLICE
+
+- Every Card that requires human interaction ships the required **production operator UI in the
+  same vertical slice** as its truth/schema/API/history/tests/deploy work. A functional backend
+  without the operator surface needed to use it is **NOT Card complete**.
+- UI may not be deferred to Card 10 and the implementer must not ask whether to do the required UI.
+  If a Card has no human interaction, it needs no invented surface.
+- Each complete Card is deployed, production-verified and recorded in the governing module MASTER;
+  continuous build then advances without waiting for Jess's UI approval. Jess reviews production
+  asynchronously while later Cards continue.
+- Stop for Jess only when a UI choice would change how Carres operates or exposes a genuine
+  contradiction in approved business truth. Layout, component choice, responsive behaviour,
+  engineering, testing and polish are implementer-owned decisions.
+- Card 10 is **not first UI**. After Cards 1–10 are operational, Card 10 includes an end-to-end,
+  top-to-toe consistency and polish pass across the complete journey.
+
+### REQUIRED UI PREFLIGHT AND JUDGMENT
+
+Before changing UI, read this UI MASTER, the relevant sections of
+[`../01-design-tokens.md`](../01-design-tokens.md),
+[`../02-components.md`](../02-components.md) and
+[`../03-page-patterns.md`](../03-page-patterns.md), plus the approved existing production surfaces
+relevant to the Card. Inspect the Card's real operator journey and realistic data density before
+choosing a pattern.
+
+The Carres UI Kit is a **design language and reference, not a blind template**. Reuse approved
+tokens, components and proven interaction laws before inventing new ones, but do not copy a page
+whose layout is wrong for the job. The implementer must proactively choose and adapt the clearest
+pattern, challenge poor existing layout, and—where useful—research mature ERP/product patterns as
+evidence. Do not wait for Jess to identify each improvement. External products supply evidence,
+never Carres business rules.
+
+### APPROVED CARRES LAWS TO PRESERVE — APPLY BY PURPOSE, NOT RITUAL
+
+- **Nav | Queue | Workspace | Context** is the approved information architecture where those four
+  regions serve the journey; it is never forced onto a page that does not need them.
+- **Form is master.** The authoritative action/form has one home; summaries and context link to it
+  rather than creating a competing write surface.
+- **Search belongs to Workspace**, beside the records it searches—not in global Nav or Context.
+- Scroll independent working regions. Do not create a giant scrolling page or unnecessary
+  horizontal scrolling. A genuinely wide data grid may own its own measured horizontal overflow;
+  the page must not acquire it accidentally.
+- Preserve clear information hierarchy and use rounded pills—not square badges—where status/category
+  pills are the approved component.
+- One merged **Timeline/history** tells the record's chronology; do not split competing histories.
+- **Sales Orders is truth/listing/lookup, not an operations work queue. Work is action.** `My Work`
+  and `Team Work` are action surfaces derived as **WHO + ACTION + actual working day** and return the
+  operator to the owning action door.
+- Reuse the approved design system and components before proposing a new component. When a needed
+  component truly does not exist, follow the kit admission rule rather than drawing an inline
+  exception.
+
 ---
 
 # §2 · Shared architecture

@@ -129,10 +129,14 @@ Before planning, changing code, or declaring the state of any ERP module:
    build table and current implementation record in the same change. Do not append a competing
    checkpoint. One MASTER contains one current target and one current built state.
 
-**Concise restart contract.** If a new chat is told only *“Sales Order — continue next Card”*, it
-must read this Constitution → ERP Architecture → Orders MASTER → the built/verified table and next
-Card → referenced module sections → current implementation. It then builds only that next Card,
-proves it, overwrites built state, and stops before the following Card.
+**Concise restart contract.** If a new chat is told *“Sales Order — continue next Card”* or to run
+Sales Order V2 in continuous Card-build mode, it must read this Constitution → ERP Architecture →
+Orders MASTER → the built/verified table and next Card → **UI MASTER §1.1** → referenced module and
+UI/design-standard sections → relevant approved production surfaces → current implementation. A
+single-Card instruction builds, proves and records only that Card. A continuous-build instruction
+repeats that complete production vertical slice Card by Card without waiting for UI approval. In
+both modes, required operator UI ships with its Card under [`docs/ui/MASTER.md`](docs/ui/MASTER.md),
+never as deferred Card 10 work.
 
 ```
 0  Say which kind of chat you are.  PLAN writes no code.  BUILD ships one thing.
