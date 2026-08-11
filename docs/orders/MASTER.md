@@ -2925,14 +2925,15 @@ excluded them merely because they were not already implemented.
   top action; the card must define the accepted source, extraction/validation, duplicate
   handling, operator review and the final write boundary. A reference product proves the door,
   not Carres business rules or visual styling.
-- **`Sales Order Settings` is required — APPROVED / LOCKED naming.** `SO Maintenance` is retired.
-  The short top-action label is `SO Settings`; the page title is `Sales Order Settings`, parallel
-  to `Purchasing Settings` and distinct from portal-wide `System Settings`. It owns Sales
-  Order-controlled option pools, Order Entry fields, payment-method choices and Register
-  display/column configuration; it is never an edit door into historical Sales Orders. It is
-  planned after Card 10, reachable through portal navigation and the Sales Orders Toolbar's
-  low-frequency overflow shortcut, and remains a separate destination/surface, not a Sales
-  Orders tab or permanent Toolbar button.
+- **`Sales Order Settings` is required — APPROVED / LOCKED naming and placement.** `SO
+  Maintenance` is retired. The short top-action label is `SO Settings`; the page title is `Sales
+  Order Settings`, parallel to `Purchasing Settings` and distinct from portal-wide `System
+  Settings`. It owns Sales Order-controlled option pools, Order Entry fields, payment-method
+  choices and Register display/column configuration; it is never an edit door into historical
+  Sales Orders. It is planned after Card 10 and remains a separate destination/surface, not a
+  Sales Orders tab. On the Sales Orders Register it is a permanently visible top action beside
+  `Scan Order`, following the approved 2990 action placement translated into Carres naming,
+  tokens and UI Kit components; it is not hidden in `…`.
 - **Register `Edit` opens the full Sales Order Workspace — APPROVED / LOCKED.** It never edits
   inside the grid and never opens a small generic modal. The row context menu's `Edit` navigates
   to that Sales Order's owned full-page Workspace in edit intent. The Workspace header keeps the
@@ -3030,7 +3031,7 @@ specialisation of UI MASTER's 45px Register Work Toolbar law:
 
 ```
 NORMAL      View: All orders ▾ · Search SO/customer/phone · Export ▾ · Columns ·
-            Scan Order · + New Sales Order · …
+            + New Sales Order · Scan Order · SO Settings · …
 ONE         1 selected · Clear                         View Flow · Export Excel (1) · Export PDF (1)
 MANY        N selected · Clear                                      Export Excel (N) · Export PDF (N)
 ```
@@ -3039,10 +3040,13 @@ The View dropdown owns All orders · Not delivered · My orders · personal/team
 Save current view. This preserves the scope capabilities without permanent scope pills. Every
 column keeps its direct header filter, so the duplicate generic Filters button is retired. The
 normal Export dropdown contains current-view exports; explicit selected Excel/PDF actions are
-immediate pill buttons. `…` contains low-frequency Sales Order actions including the `SO Settings`
-shortcut; it is not a dumping ground for daily work. Scan Order and New Sales Order are Sales
-Orders business exceptions; View/Search/Export/Columns structure, same-height selection
-replacement and action-vs-control shape language are reusable Register Template law.
+immediate pill buttons. `…` contains only the remaining low-frequency Sales Order actions; it is
+not a dumping ground for daily work. `New Sales Order` · `Scan Order` · `SO Settings` remain
+visible together as the Sales Orders top-action group in that order. Their placement follows the
+approved 2990 action pattern, while Carres naming, frozen tokens, governed icons and UI Kit button
+components remain authoritative. These three are Sales Orders business exceptions;
+View/Search/Export/Columns structure, same-height selection replacement and action-vs-control
+shape language are reusable Register Template law.
 
 At the measured narrow target, the Toolbar must show every normal-state control without clipping,
 shrinking frozen typography or moving the toolbar itself into horizontal scroll. The wide DataGrid
