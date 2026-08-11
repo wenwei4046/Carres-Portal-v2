@@ -2989,6 +2989,19 @@ excluded them merely because they were not already implemented.
   Generating a DO or booking a date never proves delivery. The append-only internal
   `delivery_attempts` / exception model remains authoritative and is not renamed by this UI law.
 
+  **Guarantee is an APPROVED optional Sales Orders Register column (Loo, 2026-08-11).** It is
+  available through `Columns`, participates in the existing saved column layout and keeps the
+  locked default eleven-column order unchanged. It summarises the guarantees actually purchased
+  on that Sales Order; it never invents cover from the currently available offer catalogue.
+  No purchase renders `—`; sold but not delivered renders `{years}y · Starts on delivery`;
+  delivered cover renders its derived lifecycle word plus `starts_on–expires_on`; an expired
+  entitlement therefore changes automatically to `Expired` on read and keeps both dates visible.
+  Multiple entitlements render a truthful count in the compact parent row, with their individual
+  covered lines, Guarantee IDs and dates available through the owned detail/Order Journey surface.
+  The column filter supports With guarantee · Without guarantee · Starts on delivery · Active ·
+  Expired · Claimed. Selecting the cell opens the order's owned Guarantee detail; Guarantee remains
+  line/unit-level truth even though the Register cell is an order-level summary.
+
 **SALES ORDERS WORK TOOLBAR — APPROVED / LOCKED (Loo, 2026-08-11).** This is the Sales Orders
 specialisation of UI MASTER's 45px Register Work Toolbar law:
 
