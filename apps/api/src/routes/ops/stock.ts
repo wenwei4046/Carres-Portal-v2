@@ -6,6 +6,8 @@ import {
   opsStockReleaseInputSchema,
   opsStockReassignInputSchema,
   opsStockTakeoutInputSchema,
+  opsStockHoldUnitInputSchema,
+  opsStockResolveUnitHoldInputSchema,
   opsStockFlagRepairInputSchema,
   opsStockRefurbishInputSchema,
   opsStockRefurbishCompleteInputSchema,
@@ -565,6 +567,36 @@ opsStockRouter.post("/release", requireOperationOrPrincipal, async (c) => {
     });
   }
   return c.json({ itemId: data });
+});
+
+// CARD 2 (0341) — the inspection ENTRY door. A wrong / surplus / released /
+// customer-rejected unit goes free|reserved → on_hold with a reason and NO
+// supplier claim (claims are still born only at receiving). A reserved unit's
+// ref moves into ref_history; the SO keeps owing through Card 1's truth.
+opsStockRouter.post("/hold", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseBody(c, opsStockHoldUnitInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("ops_stock_hold_unit", {
+    p_item_id: parsed.itemId,
+    p_reason: parsed.reason,
+    p_note: parsed.note ?? null,
+  });
+  if (error) throw mapErr(error);
+  return c.json(data);
+});
+
+// CARD 2 (0341) — the inspection EXIT door. A claimless hold ends
+// back_to_stock (Available) or written_off; `returned` needs the claim door.
+opsStockRouter.post("/hold-resolve", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseBody(c, opsStockResolveUnitHoldInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("ops_stock_resolve_unit_hold", {
+    p_item_id: parsed.itemId,
+    p_outcome: parsed.outcome,
+    p_note: parsed.note ?? null,
+  });
+  if (error) throw mapErr(error);
+  return c.json(data);
 });
 
 opsStockRouter.post("/reassign", requireOperationOrPrincipal, async (c) => {

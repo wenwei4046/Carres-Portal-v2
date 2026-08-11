@@ -114,14 +114,28 @@ A damaged or wrong unit stops counting as future supply, under the claim that is
   blanket internal write policy and three live PostgREST paths write `status`, so a rule inside
   one RPC is a rule one call walks around.
 - **`on_hold` may reach `free`, `returned_to_supplier` or `written_off`, and can NEVER reach
-  `reserved`, `sold` or `transferred`** (0299).
+  `reserved`, `sold` or `transferred`** (0299). **A CLAIMLESS hold can never reach
+  `returned_to_supplier`** (0341) — a supplier return walks only with its claim, so the claims
+  engine keeps its single Receiving entrance.
 - **A held unit is not "on the way."** Before this, a broken unit stayed `incoming` forever and
   both the reorder engine and the ready-stock plan read `incoming` as *coming*, inflating
   future supply with goods that will never arrive.
-- **Entry is from `incoming` only.** A unit already in the free pool that is later found faulty
-  goes through `needs_repair` instead. **Consequence, and it is deliberate: a supplier claim can
-  only ever be raised at receiving.** Changing that means settling the entry rule and the
-  refurbish door in the SAME change.
+- **TWO entries, decided by the REASON** (0341, Sales Order V2 Card 2 — the owner's 2026-08-11
+  ruling that a wrong / surplus / released / customer-rejected unit *returns through inspection
+  to Available or Hold*; it overwrote the old `incoming`-only rule, and the entry rule and the
+  way out moved in the SAME change as this section always demanded):
+  - **Claim quarantine** (`damaged` · `wrong_item`) enters from `incoming` only, at Receiving,
+    with its auto-claim — 0299's law, unchanged. **A supplier claim is still only ever raised
+    at receiving.**
+  - **Inspection hold** (`customer_return` · `inspection`) enters from `free` or `reserved`
+    only, through `ops_stock_hold_unit` (claimless; a reserved unit's ref moves into
+    `ref_history`), and exits ONLY through `ops_stock_resolve_unit_hold` —
+    `back_to_stock` or `written_off` (write-off note mandatory).
+  `needs_repair` remains the flag for a pool unit awaiting refurbish, with `refurbish-complete`
+  grading it back.
+- **A committed unit is resolved, never deleted** (0341): the register's delete guard admits a
+  hard delete only for `incoming` · `free` · `voided` rows — the mis-key fix. A reserved, sold,
+  transferred, held or terminally-resolved unit structurally cannot leave the register.
 - **Every draw off the shared pool names a REASON, in the same transaction as the draw.**
   Six reasons, and the draw and the reason cannot come apart, because a failed stamp used to
   leave an unexplained unit.

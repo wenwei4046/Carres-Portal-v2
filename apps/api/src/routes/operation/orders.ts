@@ -11,8 +11,10 @@ import {
   recheckStockInput,
   reselectPartnerInput,
   resolveCurrentCustomerCommitment,
+  resolveUnitAllocation,
   transferReadyInputSchema,
   warehousePickInput,
+  type AllocationUnit,
   type CommitmentBundle,
 } from "@carres/shared";
 // renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
@@ -641,6 +643,92 @@ operationOrdersRouter.get("/:id/commitment", requireOperation, async (c) => {
   }
   return c.json({
     commitment: resolveCurrentCustomerCommitment(data as unknown as CommitmentBundle),
+  });
+});
+
+// GET /:id/allocation — CARD 2's one authoritative read: which real Units are
+// reserved / sold to this SO, and how much of the current commitment is still
+// unallocated. Authority flows DOWN: committed quantities come from Card 1's
+// commitment resolver; the physical side comes from the per-unit register
+// (`ops_stock_items` — the register is the authority, never a rollup). The
+// read touches NO stage, booking state or legacy status word. A loan
+// reservation (`LOAN SO-…`) is a different obligation and the exact ref match
+// excludes it by construction.
+operationOrdersRouter.get("/:id/allocation", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: bundle, error: bundleErr } = await sb.rpc(
+    "sales_order_commitment_bundle",
+    { p_order_id: id },
+  );
+  if (bundleErr) {
+    const m = mapPgError(bundleErr);
+    return c.json(m.body, m.status);
+  }
+  const commitment = resolveCurrentCustomerCommitment(
+    bundle as unknown as CommitmentBundle,
+  );
+
+  const { data: ord, error: ordErr } = await sb
+    .from("orders")
+    .select("so")
+    .eq("id", id)
+    .maybeSingle();
+  if (ordErr) {
+    const m = mapPgError(ordErr);
+    return c.json(m.body, m.status);
+  }
+  if (!ord) return c.json({ error: "Order not found" }, 404);
+  const soRef = `SO-${ord.so}`;
+
+  const { data: unitRows, error: unitsErr } = await sb
+    .from("ops_stock_items")
+    .select(
+      "id, unit_code, sku, status, condition, warehouse_id, po_no, qty, date_in, sold_at, reserved_ref, sold_order_id",
+    )
+    .or(
+      `and(status.eq.reserved,reserved_ref.eq.${soRef}),and(status.eq.sold,sold_order_id.eq.${id})`,
+    );
+  if (unitsErr) {
+    const m = mapPgError(unitsErr);
+    return c.json(m.body, m.status);
+  }
+
+  const units: AllocationUnit[] = ((unitRows ?? []) as Array<{
+    id: string;
+    unit_code: string | null;
+    sku: string;
+    status: string;
+    condition: string;
+    warehouse_id: string | null;
+    po_no: string | null;
+    qty: number | null;
+    date_in: string | null;
+    sold_at: string | null;
+  }>).map((r) => ({
+    id: r.id,
+    unitCode: r.unit_code,
+    sku: r.sku,
+    status: r.status as AllocationUnit["status"],
+    condition: r.condition,
+    warehouseId: r.warehouse_id,
+    poNo: r.po_no,
+    qty: r.qty ?? 1,
+    dateIn: r.date_in,
+    soldAt: r.sold_at,
+  }));
+
+  return c.json({
+    allocation: resolveUnitAllocation({
+      orderId: id,
+      soRef,
+      commitmentLines: commitment.lines.map((l) => ({
+        sku: l.sku,
+        qty: Number(l.qty) || 0,
+      })),
+      units,
+    }),
   });
 });
 

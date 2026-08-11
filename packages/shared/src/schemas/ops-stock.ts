@@ -65,6 +65,28 @@ export const opsStockReleaseInputSchema = z.object({
 });
 export type OpsStockReleaseInput = z.infer<typeof opsStockReleaseInputSchema>;
 
+/** POST /api/ops/stock/hold — CARD 2 (0341): the inspection ENTRY door.
+ *  A wrong / surplus / released / customer-rejected unit leaves the pool or a
+ *  reservation for quarantine, with a reason and NO supplier claim. */
+export const opsStockHoldUnitInputSchema = z.object({
+  itemId: z.string().uuid(),
+  reason: z.enum(["customer_return", "inspection"]),
+  note: z.string().trim().max(POOL_USE_NOTE_MAX).nullish(),
+});
+export type OpsStockHoldUnitInput = z.infer<typeof opsStockHoldUnitInputSchema>;
+
+/** POST /api/ops/stock/hold-resolve — CARD 2 (0341): the inspection EXIT door.
+ *  A claimless hold ends exactly two ways; `returned` belongs to the supplier
+ *  claim's own resolve and is refused here. */
+export const opsStockResolveUnitHoldInputSchema = z.object({
+  itemId: z.string().uuid(),
+  outcome: z.enum(["back_to_stock", "written_off"]),
+  note: z.string().trim().max(POOL_USE_NOTE_MAX).nullish(),
+});
+export type OpsStockResolveUnitHoldInput = z.infer<
+  typeof opsStockResolveUnitHoldInputSchema
+>;
+
 /** POST /api/ops/stock/reassign */
 export const opsStockReassignInputSchema = z.object({
   itemId: z.string().uuid(),

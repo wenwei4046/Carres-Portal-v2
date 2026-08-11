@@ -1200,14 +1200,24 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
 });
 
 /**
- * Reserve free warehouse units to the PO's source order after a receive.
+ * Label THIS PO's just-received units to the PO's source order.
+ *
+ * CARD 2 (2026-08-11): the pick is scoped to `po_no = poId` — the units this
+ * PO minted at Issue and Receiving just flipped free. Labelling the goods
+ * bought FOR an order to that order honours the purchase intent (§3.13:
+ * goods are labelled per order). What this function may NEVER do again is
+ * draw the WHOLE free pool: reserving pre-existing ready stock is an
+ * allocation decision, and Card 2's law is "the system may OFFER compatible
+ * stock; a human decides. Never silently auto-allocate or reallocate."
+ * The general pool stays reachable only through the human doors
+ * (`/reserve`, `/reserve-item`, To Order's Reserve — all via
+ * `ops_stock_pool_draw` with its reason ledger).
  *
  * Matching uses normalizeSkuKey because the catalog is empty — order_lines.sku
  * and ops_stock_items.sku both carry the product NAME with cosmetic drift (see
- * project-catalog-empty-sku-naming). For each product the source order still
- * needs, we reserve that many free units (oldest first); we cap at need MINUS
- * what is already reserved to this SO, so a partial / repeat receive can never
- * over-reserve. The operator can release any of it from On Hand.
+ * project-catalog-empty-sku-naming). We cap at need MINUS what is already
+ * reserved to this SO, so a partial / repeat receive can never over-reserve.
+ * The operator can release any of it from On Hand.
  */
 async function autoReserveReceivedToSourceOrder(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1257,12 +1267,14 @@ async function autoReserveReceivedToSourceOrder(
     if (needByKey.has(k)) needByKey.set(k, needByKey.get(k)! - 1);
   }
 
-  // Free units to draw from (scope to the PO's warehouse when set).
+  // CARD 2: ONLY this PO's own units — the goods bought for this order.
+  // The whole-pool draw this once was is a silent allocation and is closed.
   let freeQ = sb
     .from("ops_stock_items")
     .select("id, sku")
     .eq("status", "free")
     .eq("needs_repair", false)
+    .eq("po_no", poId)
     .order("date_in", { ascending: true, nullsFirst: false });
   if (po.warehouse_id) freeQ = freeQ.eq("warehouse_id", po.warehouse_id);
   const { data: freeUnits } = await freeQ;

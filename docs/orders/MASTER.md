@@ -240,6 +240,126 @@ cleaned with the other fixtures.
 
 ---
 
+# ✅ UNIT / STOCK ALLOCATION TRUTH — SO V2 CARD 2, SHIPPED 2026-08-11
+
+**The question this card installed:** for any Sales Order, *which real Units
+exist for it, where are they, in what condition, which SO holds them, which PO
+bore them — and how much of the current commitment is still unallocated?*
+
+**THE TRACE CAME FIRST, AND IT CHANGED THE BUILD.** Every Unit door was read
+before a line was written, and the measured answer is that **the approved
+physical spine already runs on production**:
+
+```
+PO placed        _operation_create_po_inner mints one unit_code per physical
+                 piece (id-abc123456), status incoming — 0153/0154, live body
+                 verified 2026-08-11; 47 live po_mint units. The governed
+                 purchasing_issue_pos_batch (0337/0339) reaches this same helper,
+                 so every governed Issue births its units.
+Receiving        office_receive_post / warehouse_receipt_check_in both call
+                 operation_receive_po_with_do (live-verified): incoming→free,
+                 damaged/wrong→on_hold + auto supplier claim (0288/0299),
+                 replacement shortfall re-minted (R4).
+Cancel           operation_cancel_po: incoming→voided.
+Location         warehouse_id + condition per unit; 0307's trigger moves
+                 incoming units when the PO destination moves.
+Offer → human    the drawer's Ready picker and To Order's Reserve both end in
+                 ops_stock_pool_draw — ONE governed draw door: ref required,
+                 six locked reasons, pool-usage ledger + audit + order activity
+                 in the same transaction (0292/0322).
+Release          ops_stock_release: reserved→free, ref → ref_history.
+```
+
+**What the trace found BROKEN against the approved law — four defects, all
+closed this card:**
+
+```
+①  operation_attach_do_and_deliver picked sold units FIFO from
+   ('incoming','free','reserved') with NO ref filter — a delivery could
+   silently sell a unit reserved to a DIFFERENT customer.       → 0341: the
+   pick takes THIS order's reserved units FIRST and never touches any other
+   ref (another SO, a LOAN).
+②  autoReserveReceivedToSourceOrder silently reserved WHOLE-POOL free units
+   to a PO's source order on every receive — no human, no ledger.
+   → scoped to po_no = this PO: labelling the goods bought FOR the order is
+   the purchase intent honoured; allocating EXISTING stock stays human-only.
+③  A wrong / surplus / released / customer-rejected unit had NO route to
+   Hold (0299: entry from incoming only, exit claim-keyed only).
+   → 0341: the INSPECTION doors — ops_stock_hold_unit (free|reserved →
+   on_hold, reasons customer_return · inspection, NO claim; the old ref moves
+   into ref_history) and ops_stock_resolve_unit_hold (back_to_stock ·
+   written_off). A claimless hold can NEVER leave as returned_to_supplier —
+   supplier returns walk only with a claim, so the claims engine keeps its
+   single Receiving entrance.
+④  DELETE /ops/stock/:itemId hard-deleted ANY non-held unit, reserved or
+   sold included. → 0341's guard: only incoming | free | voided rows (mis-key
+   fixes) may leave the register; a committed unit is resolved, never deleted.
+```
+
+**THE ONE READ** (the half Card 1 deliberately could not answer):
+
+```
+UNIT ALLOCATION  =  resolveUnitAllocation
+                    (packages/shared/src/sales-order-allocation.ts ·
+                     GET /api/operation/orders/:id/allocation)
+```
+
+Committed quantities come from Card 1's commitment resolver; the physical side
+comes from the per-unit register — **the register is the authority, never a
+rollup**. Matching runs under `normalizeSkuKey` (the same rule the picker and
+the labelling use); a bulk row (0218) counts its `qty`; a unit reserved/sold to
+this SO that matches no committed line is **surfaced in `unmatchedUnits`,
+never hidden**. The read touches no stage, booking state or legacy status
+word, and the reservation match is the EXACT ref `SO-{n}` — `LOAN SO-{n}` is a
+different obligation and is excluded by construction.
+
+**PRODUCTION EVIDENCE — run 2026-08-11, not described.** Migration 0341
+applied; nine probes as the real `authenticated` operation user inside one
+transaction, aborted at the end — register identical before and after
+(91 free · 43 incoming · 1 returned_to_supplier, zero probe rows):
+
+```
+P1 free → on_hold (customer_return), claimless, held_at stamped     PASS
+P2 resolve back_to_stock → free, hold_released_at stamped           PASS
+P3 governed draw → hold: old ref into ref_history, ref cleared      PASS
+P4 incoming refused the inspection door (P0001)                     PASS
+P5 claimless hold → returned_to_supplier refused by the guard       PASS
+P6 reserved unit hard-delete refused (unit_committed_not_deletable) PASS
+P7 'returned' refused as a claimless outcome                        PASS
+P8 delivery pick: this SO's reserved unit FIRST, other SO's
+   reserved unit EXCLUDED                                           PASS
+P9 negative control: forcing legacy delivered words on the order
+   changed NOTHING in the register answer                           PASS
+```
+
+**Known boundaries, reported not hidden:**
+- The loan flow still reserves/releases by direct PostgREST update
+  (`order-control.ts:1666/1703/1929`, ref `LOAN SO-{n}`) — human-decided and
+  guard-protected, but outside the pool ledger. Card 6's lane.
+- `transferred` has no writer anywhere — multi-hop warehouse transfer is
+  unbuilt (Stock's future movement door).
+- **Supplier labelling surface is owed**: unit codes exist from PO placement
+  and `GET /operation/pos/:id/units` returns them, but no supplier-facing
+  document prints them. The PO PDF is frozen; this belongs to a PO-document
+  card, not here.
+- Reservation identity remains the exact text ref `SO-{n}` (the booking gate
+  and every reader key on it). A governed FK was considered and dropped —
+  the resolver `_activity_log_order_id_from_ref` already maps ref → order,
+  and a second identity column nobody reads is the defect, not the fix.
+- Splitting a bulk row on partial reserve stays Stock MASTER §8 evolution.
+- Out-for-delivery / delivered / returned movement states are Card 5's.
+- No UI was added: Card 2 is a truth card. The Work engine (Card 9) and the
+  register surfaces decide what the operator sees; the doors are governed
+  RPCs behind `POST /api/ops/stock/hold` · `/hold-resolve`.
+
+**Stock MASTER §6's "entry from incoming only" was overwritten in this same
+PR** — the entry rule and the way out moved in the SAME change, exactly as
+that rule demanded: claim quarantine (damaged · wrong_item) still enters only
+from `incoming` at Receiving; the claimless inspection hold enters only from
+`free`/`reserved` and exits only back_to_stock / written_off.
+
+---
+
 # SALES ORDER V2 — CURRENT APPROVED TARGET AND BUILD CHECKPOINT
 
 > **OWNER RULING, 2026-08-11. This is current target truth under the MASTER OVERWRITE LAW.**
@@ -252,8 +372,8 @@ cleaned with the other fixtures.
 | Card | Approved target | Built / verified |
 |---|---|---|
 | **1** | Customer Obligation Truth | **COMPLETE** — `dae94301`, migration `0340`, production verified 2026-08-11; exact implementation record immediately above |
-| **2** | Unit / Stock Allocation Truth | **NOT BUILT — NEXT CARD** |
-| **3** | Early Logistics Assignment + Customer Booking | **NOT BUILT** |
+| **2** | Unit / Stock Allocation Truth | **COMPLETE** — migration `0341`, production verified 2026-08-11 (nine rolled-back probes); exact implementation record above. The spine (unit birth at PO · receiving flips · governed draw) was measured ALREADY LIVE; the card closed the four violations of the approved law |
+| **3** | Early Logistics Assignment + Customer Booking | **NOT BUILT — NEXT CARD** |
 | **4** | Money Truth + Collection Gate | **NOT BUILT** |
 | **5** | Delivery Attempt + Delivery Exception | **NOT BUILT** |
 | **6** | Loan Mattress / Loan Sofa Obligations | **NOT BUILT** |
@@ -299,7 +419,7 @@ remaining quantity must not be guessed from `orders.status='delivered'`; authori
 waits for Card 2 Unit truth and Card 5 Delivery Attempt truth. The shipped implementation and
 known door boundaries are preserved in the Card 1 record immediately above.
 
-## Card 2 · Unit / Stock Allocation Truth — approved target, next, not built
+## Card 2 · Unit / Stock Allocation Truth — approved and built
 
 The physical spine is:
 
@@ -479,15 +599,17 @@ Payment remain the authority for what operationally happened.
 
 1. Read root `CLAUDE.md` / `AGENTS.md` for the Constitution and MASTER OVERWRITE LAW.
 2. Read [`../ERP-ARCHITECTURE.md`](../ERP-ARCHITECTURE.md) for cross-module ownership.
-3. Read this section and the Card 1 shipped record immediately above it.
-4. Read only the MASTER(s) of modules Card 2 touches: [`../stock/MASTER.md`](../stock/MASTER.md)
-   and, when tracing PO/Receiving doors, [`../purchasing/MASTER.md`](../purchasing/MASTER.md).
+3. Read this section and the Card 1 + Card 2 shipped records immediately above it.
+4. Read only the MASTER(s) of modules Card 3 touches: [`../delivery/MASTER.md`](../delivery/MASTER.md)
+   and §7 of this file; the working-calendar law lives in
+   [`../purchasing/MASTER.md`](../purchasing/MASTER.md) §10 (`myHolidaySet()` until built).
 5. Re-measure current code and production before quoting implementation state. Preserve unrelated
    dirty work. Do not reopen the approved business flow merely from preference; raise only a real
    repo/production contradiction or implementation impossibility.
-6. Build **Card 2 — Unit / Stock Allocation Truth** next. Trace every existing Unit birth,
-   Receiving, reservation, release, return and goods-readiness door before implementation. Stop
-   after Card 2 proof and update this status table. **Do not start Card 3 automatically.**
+6. Build **Card 3 — Early Logistics Assignment + Customer Booking** next. Trace every existing
+   logistics-assignment, Stock-ETA and booking door (assign logistics · booking_stage ·
+   confirmed_date · the booking gate) before implementation. Stop after Card 3 proof and update
+   this status table. **Do not start Card 4 automatically.**
 
 ---
 

@@ -571,6 +571,9 @@ export {
   opsStockReassignInputSchema,
   opsStockReserveItemInputSchema,
   opsStockTakeoutInputSchema,
+  // CARD 2 (0341) — the inspection hold doors.
+  opsStockHoldUnitInputSchema,
+  opsStockResolveUnitHoldInputSchema,
   opsStockFlagRepairInputSchema,
   opsStockRefurbishInputSchema,
   opsStockRefurbishCompleteInputSchema,
@@ -615,6 +618,8 @@ export {
   type OpsStockReassignInput,
   type OpsStockReserveItemInput,
   type OpsStockTakeoutInput,
+  type OpsStockHoldUnitInput,
+  type OpsStockResolveUnitHoldInput,
   type OpsStockFlagRepairInput,
   type OpsStockRefurbishInput,
   type OpsStockRefurbishCompleteInput,
@@ -2489,3 +2494,6 @@ export {
 export * from "./schemas/hr-team";
 export * from "./sales-order-classification";
 export * from "./sales-order-commitment";
+// CARD 2 — unit/stock allocation truth: the one arithmetic for "which real
+// Units are reserved/sold to this SO, and what is still unallocated".
+export * from "./sales-order-allocation";
