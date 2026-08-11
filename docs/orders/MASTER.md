@@ -609,6 +609,61 @@ P7 direct INSERT as authenticated refused (42501)                   PASS
 
 ---
 
+# ✅ LOAN MATTRESS / LOAN SOFA OBLIGATIONS — SO V2 CARD 6, SHIPPED 2026-08-11
+
+**The question this card installed:** a temporary item is an INDEPENDENT
+obligation — the real goods arriving does not close it — and a recovered
+Carres loan unit reaches the sellable pool only through inspection.
+
+**THE TRACE FOUND THE LANE ALREADY STRUCTURED — nearly all of Card 6's
+approved rule was measured live** (`ops_sofa_loans`, 0209 generalised by
+0217/0242):
+
+```
+Two loan kinds, distinct  source warehouse (identified unit, item_id) ·
+                          source supplier (borrowed_sku/label + supplier_id)
+Separate facts            returned_at (customer recovery) is NOT
+                          returned_to_supplier_at (supplier return, its own
+                          door, source-guarded, with supplier_return_due /
+                          supplier_return_ref) — the exact split the card
+                          demands, already enforced with 409s
+Structured, never notes   the obligation is a row with its doc (loan_note_no
+                          + signed stamp), out-leg routing and dates — no
+                          free-text return date anywhere
+Human decides             every door is an explicit operator act
+```
+
+**The ONE violation, fixed:** `POST /:id/loan-return` freed the recovered
+unit STRAIGHT back to the sellable pool (a direct `status='free'` write).
+The rule is *recovered → Warehouse inspection → Available / Hold* — a used
+loan mattress must be looked at before it can be sold again. The route now
+walks 0341's governed inspection door (`ops_stock_hold_unit`, reason
+`inspection`; the LOAN ref moves into `ref_history`), and the unit reaches
+Available only through `ops_stock_resolve_unit_hold` — or is written off.
+**No migration: Card 2 built the doors; Card 6 made the lane use them.**
+
+**Production evidence — run 2026-08-11.** Two rolled-back probes as the real
+operation user: free → LOAN-reserved → inspection hold (ref in history, ref
+cleared) → back_to_stock → free. Both PASS; zero residue. Tests: api 2171
+(the loan-return test now asserts NO direct `ops_stock_items` write and the
+inspection RPC call), tsc clean.
+
+**Known boundaries, reported not hidden:**
+- The loan CLAIM (`loan-sofa`) is still a two-write client sequence (direct
+  reserve + loan insert with a manual rollback) — human-decided and
+  transition-guarded, but non-atomic; its own comment documents the stranded-
+  unit failure mode. Folding claim+record into one RPC is a later hardening,
+  not a business rule.
+- "The system may SUGGEST a loan when the real goods will miss the
+  commitment" is the Work engine's (Card 9) — the delay radar already
+  computes the miss; the suggestion is a derived work item, never an
+  auto-loan.
+- "Final delivery states both deliver + recover" is DERIVED: an open
+  `ops_sofa_loans` row on a delivered order keeps the Loan track open —
+  Card 8's completion reads it; no second status is minted.
+
+---
+
 # SALES ORDER V2 — CURRENT APPROVED TARGET AND BUILD CHECKPOINT
 
 > **OWNER RULING, 2026-08-11. This is current target truth under the MASTER OVERWRITE LAW.**
@@ -625,8 +680,8 @@ P7 direct INSERT as authenticated refused (42501)                   PASS
 | **3** | Early Logistics Assignment + Customer Booking | **COMPLETE** — migration `0342`, production verified 2026-08-11; record above. The flow was measured already unblocked; the card moved the ruled call window to 3 working days and closed the two-surface lateness drift |
 | **4** | Money Truth + Collection Gate | **COMPLETE** — migration `0343`, production verified 2026-08-11 (seven rolled-back probes); record above. The gates and the one calculation were measured already live; the card converged the write (one payment writer, void as a stamp) and shipped the T−3/T−2/T−1 collection clock |
 | **5** | Delivery Attempt + Delivery Exception | **COMPLETE** — migration `0344`, production verified 2026-08-11 (seven rolled-back probes); record above. The first genuine engine gap of the programme: attempt + exception stores built, units move through Card 2's doors in the same transaction |
-| **6** | Loan Mattress / Loan Sofa Obligations | **NOT BUILT — NEXT CARD** |
-| **7** | Change / Cancel / Refund Lineage | **NOT BUILT** |
+| **6** | Loan Mattress / Loan Sofa Obligations | **COMPLETE** — no migration (Card 2 built the doors; Card 6 made the lane use them); production verified 2026-08-11; record above |
+| **7** | Change / Cancel / Refund Lineage | **NOT BUILT — NEXT CARD** |
 | **8** | Derived Completion — No Action Required | **NOT BUILT** |
 | **9** | Unified Work Engine | **NOT BUILT** |
 | **10** | My Work / Team Work | **NOT BUILT** |
@@ -740,7 +795,7 @@ Bed delivered while sofa remains is partial fulfilment, not a whole-order delive
 Issue Tracker may record the same incident for accountability and learning, but cannot replace
 the attempt, Unit movement or remaining customer obligation.
 
-## Card 6 · Loan Mattress / Loan Sofa Obligations — approved target, not built
+## Card 6 · Loan Mattress / Loan Sofa Obligations — approved and built
 
 A temporary item is an independent obligation. The customer receiving real goods does not close
 the loan; the temporary item must be recovered. Distinguish:
@@ -848,20 +903,22 @@ Payment remain the authority for what operationally happened.
 
 1. Read root `CLAUDE.md` / `AGENTS.md` for the Constitution and MASTER OVERWRITE LAW.
 2. Read [`../ERP-ARCHITECTURE.md`](../ERP-ARCHITECTURE.md) for cross-module ownership.
-3. Read this section and the Card 1–5 shipped records immediately above it.
-4. Read only what Card 6 touches: the existing LOAN lane end to end —
-   `ops_loans` (0217 generalised it), `order-control.ts`'s loan endpoints (reserve
-   `LOAN SO-{n}` · return · return-to-supplier, the direct writes Card 2 reported), the
-   drawer's loan panel, and the Card 2 + Card 5 records (a recovered Carres loan unit walks
-   Warehouse → Inspection → Available/Hold through 0341's doors).
+3. Read this section and the Card 1–6 shipped records immediately above it.
+4. Read only what Card 7 touches: Card 1's revision ledger (`sales_order_revisions` +
+   `change_type`, 0327/0340) and its reported POS-door boundary (`order_change_requests` lane),
+   the cancel doors (`cancel_order` RPC · the owner's §3.14 lock: SO cancel needs approval, the
+   PO finishes, GRN into stockpile, the engine reassigns), `operation_cancel_po` (units void),
+   and Card 4's reported refund boundary — *an approved but unpaid refund means Carres still
+   owes the customer*, the record this card mints.
 5. Re-measure current code and production before quoting implementation state. Preserve unrelated
    dirty work. Do not reopen the approved business flow merely from preference; raise only a real
    repo/production contradiction or implementation impossibility.
-6. Build **Card 6 — Loan Mattress / Loan Sofa Obligations** next. Trace the whole loan lane
-   before implementation: a loan is an independent obligation that outlives the real delivery;
-   Carres-stock loans and supplier loans are distinct; customer recovery and supplier return are
-   separate facts. Stop after Card 6 proof and update this status table.
-   **Do not start Card 7 automatically.**
+6. Build **Card 7 — Change / Cancel / Refund Lineage** next. Trace every cancel/refund door
+   before implementation: the chain original order → governed revision/cancellation → fulfilment
+   consequences → replacement/released stock → financial consequence must survive; a cancelled
+   goods obligation may become a money obligation (the refund record, bilateral money's second
+   direction). Stop after Card 7 proof and update this status table.
+   **Do not start Card 8 automatically.**
 
 ---
 

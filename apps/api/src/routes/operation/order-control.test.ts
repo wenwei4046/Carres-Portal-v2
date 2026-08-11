@@ -326,7 +326,12 @@ function tableSb(tables: Record<string, { data?: unknown; error?: unknown }>) {
     };
     return builder;
   });
-  return { from, captured };
+  const rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
+  const rpc = vi.fn((name: string, args: Record<string, unknown>) => {
+    rpcCalls.push({ name, args });
+    return Promise.resolve({ data: null, error: null });
+  });
+  return { from, rpc, captured, rpcCalls };
 }
 
 describe("D2 — receiving has ONE door", () => {
@@ -435,7 +440,7 @@ describe("POST /api/operation/orders/:id/loan-return", () => {
   const URL = `http://t/api/operation/orders/${ORDER_ID}/loan-return`;
   const LOAN = "00000000-0000-0000-0000-0000000000f2";
 
-  it("200 — marks the loan returned + frees the unit", async () => {
+  it("200 — marks the loan returned + the unit goes to the INSPECTION hold (CARD 6)", async () => {
     const sb = tableSb({
       ops_sofa_loans: { data: { id: LOAN, item_id: "unit1", status: "on_loan" } },
       ops_stock_items: {},
@@ -452,11 +457,14 @@ describe("POST /api/operation/orders/:id/loan-return", () => {
       env,
     );
     expect(res.status).toBe(200);
-    // loan → returned, unit → free.
+    // loan → returned; the unit walks 0341's inspection door — NEVER a direct
+    // status='free' write (recovered → Warehouse inspection → Available/Hold).
     const loanUpd = sb.captured.updates.find((u) => u.table === "ops_sofa_loans");
     expect((loanUpd!.patch as Record<string, unknown>).status).toBe("returned");
-    const freeUpd = sb.captured.updates.find((u) => u.table === "ops_stock_items");
-    expect((freeUpd!.patch as Record<string, unknown>).status).toBe("free");
+    expect(sb.captured.updates.find((u) => u.table === "ops_stock_items")).toBeUndefined();
+    const hold = sb.rpcCalls.find((r) => r.name === "ops_stock_hold_unit");
+    expect(hold).toBeTruthy();
+    expect(hold!.args).toMatchObject({ p_item_id: "unit1", p_reason: "inspection" });
   });
 
   it("404 when the loan isn't found on the order", async () => {

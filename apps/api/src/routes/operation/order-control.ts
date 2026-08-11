@@ -1949,8 +1949,14 @@ orderControlRouter.post("/:id/loan-update", async (c) => {
   return c.json({ loan: mapLoanRow(loan) });
 });
 
-// POST /:id/loan-return — the swap at final delivery: mark the loan returned +
-// free the loaned unit back to stock.
+// POST /:id/loan-return — the swap at final delivery: mark the loan returned.
+// CARD 6 (2026-08-11): a recovered WAREHOUSE loan unit goes to the INSPECTION
+// hold (0341's door), never straight back to the sellable pool — the owner's
+// rule is recovered → Warehouse inspection → Available / Hold, and a used
+// loan mattress must be looked at before it can be sold again. The existing
+// resolve door (`ops_stock_resolve_unit_hold`) then sends it back_to_stock or
+// writes it off. A supplier borrow has no own unit; its piece goes back via
+// /loan-return-supplier — a SEPARATE fact, deliberately.
 orderControlRouter.post("/:id/loan-return", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
@@ -2002,15 +2008,19 @@ orderControlRouter.post("/:id/loan-return", async (c) => {
     const m = mapPgError(upErr);
     return c.json(m.body, m.status);
   }
-  // Only a WAREHOUSE loan has an own-stock unit to free back; a supplier borrow
+  // Only a WAREHOUSE loan has an own-stock unit to recover; a supplier borrow
   // has item_id = null (the piece goes back to the supplier via a separate step).
+  // CARD 6: the recovered unit enters the inspection hold through the governed
+  // 0341 door — its LOAN ref moves into ref_history, and it reaches Available
+  // only through `ops_stock_resolve_unit_hold` after somebody looked at it.
   if (loan.item_id) {
-    const { error: freeErr } = await sb
-      .from("ops_stock_items")
-      .update({ status: "free", reserved_ref: null, updated_at: now })
-      .eq("id", loan.item_id as string);
-    if (freeErr) {
-      const m = mapPgError(freeErr);
+    const { error: holdErr } = await sb.rpc("ops_stock_hold_unit", {
+      p_item_id: loan.item_id as string,
+      p_reason: "inspection",
+      p_note: "Loan recovered from customer — inspect before resale",
+    });
+    if (holdErr) {
+      const m = mapPgError(holdErr);
       return c.json(m.body, m.status);
     }
   }
