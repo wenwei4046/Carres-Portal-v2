@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 /**
@@ -54,6 +54,9 @@ vi.mock("./OperationPurchaseOrders", () => ({
     <div data-testid="purchase-orders-workspace-stub">po-workspace</div>
   ),
 }));
+vi.mock("./OperationToOrder", () => ({
+  default: () => <div data-testid="to-order-stub">to-order</div>,
+}));
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
@@ -61,6 +64,28 @@ vi.mock("./components/OperationRightRail", () => ({
 // The global top bar self-fetches (orders/tasks for Alerts) — stub it too.
 vi.mock("./components/GlobalTopBar", () => ({
   default: () => <div data-testid="global-topbar-stub">topbar</div>,
+}));
+// ⭐ SALES ORDER PRODUCTION CUTOVER (2026-08-10) — the two Orders doors. Both
+// self-fetch, so both are stubbed; this suite tests WHICH ROUTE MOUNTS WHICH,
+// which is the whole of the cutover in code.
+vi.mock("./SalesOrdersRegister", () => ({
+  default: () => <div data-testid="register-stub">register</div>,
+}));
+vi.mock("./OperationOrdersControl", () => ({
+  default: ({ onImport }: { onImport?: () => void }) => (
+    <div data-testid="old-orders-stub">
+      old-orders
+      <button type="button" onClick={onImport}>
+        import
+      </button>
+    </div>
+  ),
+}));
+vi.mock("./SalesOrderWorkspace", () => ({
+  default: () => <div data-testid="workspace-stub">workspace</div>,
+}));
+vi.mock("./OperationImport", () => ({
+  default: () => <div data-testid="import-stub">import-page</div>,
 }));
 
 import OperationApp from "./OperationApp";
@@ -76,6 +101,13 @@ function renderApp(initialPath: string) {
 }
 
 describe("OperationApp — procurement descendant routing", () => {
+  it("URL /operation/to-order?so=1204 mounts the same Batch Purchase page", () => {
+    renderApp("/operation/to-order?so=1204");
+    expect(screen.getByTestId("to-order-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
   it("URL /operation/procurement mounts the Purchase Execution Workspace via descendant Routes", () => {
     renderApp("/operation/procurement");
     expect(
@@ -97,5 +129,59 @@ describe("OperationApp — procurement descendant routing", () => {
     expect(
       screen.queryByTestId("procurement-shell-stub"),
     ).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * ⭐ SALES ORDER PRODUCTION CUTOVER — `docs/SALES-ORDER-CUTOVER.md`.
+ *
+ * The card's whole risk is that the cutover breaks the page 83 live orders are
+ * being worked on today. Two doors, and NEITHER may serve the other's page:
+ *
+ *   /operation/orders      → the NEW Sales Order register  (official)
+ *   /operation/old-orders  → the OLD control table         (temporary)
+ *
+ * The old door must also still reach the AutoCount import — it is the only
+ * import surface there is, which is exactly what blocks the final delete.
+ */
+describe("OperationApp — the Sales Order cutover's two doors", () => {
+  it("/operation/orders mounts the NEW register and never the old table", () => {
+    renderApp("/operation/orders");
+    expect(screen.getByTestId("register-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("old-orders-stub")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sales-orders-work-surface")).toHaveClass("overflow-hidden");
+    expect(screen.getByTestId("sales-orders-work-surface")).not.toHaveClass("overflow-auto");
+  });
+
+  it("/operation/orders/:stage still mounts the NEW register", () => {
+    renderApp("/operation/orders/in_production");
+    expect(screen.getByTestId("register-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("old-orders-stub")).not.toBeInTheDocument();
+  });
+
+  it("/operation/old-orders mounts the OLD table and never the register", () => {
+    renderApp("/operation/old-orders");
+    expect(screen.getByTestId("old-orders-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("register-stub")).not.toBeInTheDocument();
+    // The old door is a URL-driven section too — the dashboard must not paint
+    // underneath it.
+    expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
+  });
+
+  it("/operation/old-orders/:stage carries the kanban slug across", () => {
+    renderApp("/operation/old-orders/in_production");
+    expect(screen.getByTestId("old-orders-stub")).toBeInTheDocument();
+  });
+
+  it("the OLD door still reaches the AutoCount import", async () => {
+    renderApp("/operation/old-orders");
+    fireEvent.click(screen.getByRole("button", { name: "import" }));
+    expect(await screen.findByTestId("import-stub")).toBeInTheDocument();
+  });
+
+  it("the workspace route is unshadowed by the old door", () => {
+    renderApp("/operation/orders/so/new");
+    expect(screen.getByTestId("workspace-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("sales-orders-work-surface")).not.toBeInTheDocument();
   });
 });

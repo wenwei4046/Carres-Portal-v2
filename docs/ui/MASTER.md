@@ -93,11 +93,11 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
 - **A list table never scrolls sideways by growing.** A column RESIZE takes width from its RIGHT
   NEIGHBOUR, never from the table — AutoCount lets a column grow and hands the operator a
   horizontal scrollbar.
-- **Grid layout is NOT remembered across a reload.** There is no `storageKey` anywhere: a
-  per-user store of UI shape is refused by the guard rule, and moving that store into the kit
-  would satisfy the guard while breaking the law it serves. **A reload is the reset.**
-- **The 40px row law binds the rows you SCAN.** The expanded cell is the ONE cell allowed to be
-  tall and to wrap.
+- **Kit `DataTable` layout is NOT remembered across a reload.** Sales Orders uses the existing
+  `register/DataGrid` engine instead; Loo explicitly ruled that Stage A preserves that engine's
+  browser layout persistence. This is a page-scoped exception, not a new kit default.
+- **The 40px row law remains the kit `DataTable` default.** Sales Orders reference rows are the
+  approved page-scoped 33px exception in §6.5. The expanded cell is allowed to be tall and wrap.
 - **40px is the international default, measured 2026-08-07 — not merely our own habit.**
   AG Grid's Quartz theme ships **42px**; the two denser references anyone cites are a Windows
   desktop control (AutoCount ~17px) and another repo (2990s 28px), neither a web-grid standard.
@@ -218,117 +218,43 @@ own decision and its own card.**
 
 ---
 
-# ⛔ §6.5 · PAGE STRUCTURE IS NOT DECIDED — study the PORTAL before any one page
+# §6.5 · SALES ORDERS REFERENCE STRUCTURE — ruled by Loo 2026-08-10
 
-> **Loo, 2026-08-08:** *"study all portal and rearrange how to build every page structure —
-> then only start sales order page again."* **This block is the brief and the open-item list.**
-> Its sibling is `../orders/MASTER.md`'s own ⛔ START HERE block, which records why: ten cards
-> upgraded how a table is DRAWN and not one asked what the operator should SEE.
-
-### ⛔⛔ THE ENTRY GATE — the chat produces these BEFORE it advises anything
-
-> **A promise to read has already been tried here and it failed.**
-> `../research/grid-findings.md` TRAPS: *"A Study Receipt does not prove the conclusions came
-> from the reading. One was produced at the start of this investigation and four false claims
-> followed it."* **So this gate asks for no receipt. It asks for five things that cannot be
-> produced without reading, and that are worth having on their own.**
+**Stage A is owner-accepted and CLOSED.** Sales Orders is the first production reference
+implementation of the approved Carres destination/listing architecture. This ruling is
+page-scoped; it does not reopen Purchase Orders, To Order, Sidebar, Utility Rail or any other
+surface.
 
 ```
-A · THREE VERBATIM LINES, each with file:line — one from a module MASTER, one
-    from grid-findings, one from 2990's own source. THE LINE, not a summary.
-
-B · ONE THING IN THIS RECORD IT DISAGREES WITH, with its evidence.
-    Law 4 is not optional. A chat that agrees with everything has not read it —
-    and every good finding of the last programme came from a contradiction:
-    the PRIOR ART path that did not exist · "measured in Chromium" that had
-    measured a header with no arrow in it · C14 sizing `Actions` off nearly the
-    NARROWEST party-named line · Receiving's px widths that were never measured.
-
-C · WHAT IT DID NOT READ, named with line counts. Every round that hid this
-    inherited a false conclusion.
-
-D · 2990's PAGE STRUCTURE, first-hand — NOT its DataGrid, which is finished and
-    must not be re-studied. How its pages COMPOSE: what leads, what sits beside,
-    what opens. `SalesOrderDetail.tsx` (3,699) has NEVER been opened by anyone
-    here, and ~100 of its pages are unread. That is where a page-structure
-    answer lives, and this programme has only ever read its grid.
-
-E · AutoCount's page structure. F50–F57 are first-hand OBSERVATIONS of screens
-    already on file (nested child grid · filled status cell · bottom-left filter
-    statement · every document type exposed permanently). It must say which it
-    ACCEPTS and which it doubts, and why — they are observations of a screen,
-    never of the code behind it.
+DestinationHeader  44px  Sales Orders identity + genuine global utilities only
+Work Toolbar       45px  scope · one Search · Filters · Export · Columns · New Sales Order
+Work Surface             one DataGrid; loading · empty · error remain inside it
 ```
 
-**AND THE STANDING RULE BINDS THE WHOLE GATE:**
-```
-copy the POWERS, never the ASSUMPTIONS
-```
-**2990 and AutoCount are EVIDENCE, never specification** (`CLAUDE.md` DECISION GATE). 2990's
-Sales Order list has no owner, no queue and no next-action anywhere in 1,669 lines
-(grid-findings F22) — **it answers a different question than ours does. Read it to learn how it
-COMPOSES a page, not to inherit what it decided to show.**
+**Proven in authenticated production at 1920 · 1440 · 1130:** one destination identity · one
+Work Toolbar · one general Search · no duplicate destination tab/title · no outer-page scroll ·
+DataGrid-owned genuine-wide horizontal overflow · 1130 without another toolbar band · Search ·
+Filters · Export · Columns · persistence · expansion all survive the migration.
 
-**THE ORDER OF WORK IS NOW FIXED, and it is the reverse of what was done:**
-```
-1  study the WHOLE portal — every operator surface, how each is composed today
-2  agree ONE page-structure standard with Loo   ← consult, never propose-and-ship
-3  ONLY THEN re-do Sales Order against it
-```
-**Sales Order stops being an upgrade and becomes the first page BUILT to the standard.**
+**The Sales Orders reference appearance is deliberately page-scoped:** 10px bold uppercase
+header in a rendered 31px row; 11px single-line parent cells in rendered 33px rows; 8px
+horizontal cell padding; rendered 22px footer; flat zero-radius grid; faint structural
+dividers; no zebra. This is not a global 32px law and does not alter kit/DataTable defaults.
 
-### THE OPEN ITEMS — everything raised and NOT done, collected once
+**Preserved engine powers:** server Search · typed column filters · Columns · Excel Export ·
+resize · reorder · browser layout persistence under the existing Sales Orders storage key ·
+expanded order lines. The Work Toolbar's Filters control is a second door into the same
+per-column filter state, not a second filter engine.
 
-**Scattered across ~15 commits and three files until now, which is the same as unrecorded.**
+**1130 ruling:** Stage A must attempt one toolbar row and show a measured failure if it does
+not fit. It may not invent a responsive law. The 2026-08-10 production-like measurement fit
+all controls in 846px with no clipping; the grid itself retained 306px of grid-owned
+horizontal overflow.
 
-```
-PORTAL-WIDE — the structural questions nobody has answered
-  · every page composes its own shell: Orders uses ListPageShell + a 9-group
-    facet rail; Purchasing uses a 200px rail + tabs; neither is ruled the standard
-  · §5 rules FOUR right-rail widgets (Calendar · Team · Tasks · Activity) on
-    "every main panel". Orders' right side is facets instead. Two shapes, one law
-  · the drawer REPLACES the list rather than sitting beside it (grid-findings F31,
-    OrderDetailDrawer 7,576 lines) — so opening one order costs you the list
-  · what is a QUEUE vs what is a FILTER — Orders' rail mixes 1 group of work with
-    8 of dimensions and calls them all facets
-
-ORDERS REGISTER — raised, measured, never carded
-  · Status pill reads the same word on 30 of 31 rows and costs 139px
-  · the three dots repeat what Stock, Delivery and Actions already say
-  · PIC is a constant for every non-manager (they default to their own orders)
-  · Deadline shows the ORDER's date; what actually expires is the ACTION's own
-    deadline, and the row never shows it
-
-KNOWN DEFECTS, filed and unfixed
-  · 🔴 the drawer's items table renders `PO` and `ITEM` on top of each other
-  · 🟡 D10 · D11 — dead surfaces still compiled into the bundle
-  · 🟡 an unrecognised SKU still LABELS as `Accessory` in the drawer (D9 fixed the
-    CLAIM, not the label — the fold survives while those files are frozen)
-  · 🟡 Receiving cannot raise `Confirm ready date` — half of P20.5, needs one hook
-    feeding both pages, which reaches the frozen Purchase Orders page
-  · 🟡 16 free-text SKUs need real names; the keyword list mirrors migration 0148
-    word for word, so both move together or neither does
-
-THE ONE THAT OUTRANKS ALL OF THEM
-  · NOBODY HAS WATCHED AN OPERATOR WORK. `../research/grid-findings.md` §6 has
-    carried this line through every round and ten cards were built past it.
-    Two days with Shasha and Yu Jun answers more than any further measurement.
-```
-
-**⛔ WHAT THE NEXT CHAT MAY NOT DO**
-```
-✗ start with Sales Order            the standard comes first
-✗ touch business logic              APIs · calculations · the action ladder ·
-                                    queues · PIC · stock · delivery · money ·
-                                    permissions · order records — all PRESERVED
-✗ re-measure widths, densities,     finished and recorded in grid-findings §4.7/§4.8
-  engines or row height
-✗ add grid capability               the foundation is DONE; S2.5 is STOPPED
-✗ derive a page structure from      the last programme did exactly this, and the
-  reading source                    two ⛔ blocks are the receipt
-```
-
----
+**Stage boundary:** expansion + virtualization is acknowledged DataGrid engine debt and Stage B
+is not started. It does not block continuation of the ERP UI migration unless measured real
+production scale or performance proves otherwise. The Sales Order Workspace and Old Orders
+execution surface are unchanged.
 
 # §7 · Approved Evolution
 
@@ -339,4 +265,4 @@ THE ONE THAT OUTRANKS ALL OF THEM
 | **Real pages rendering through `PageShell` / `DataTable` / `DetailShell`** | Approved. Components-only was the ruling, not a shortfall. The order drawer specifically is BLOCKED: L4 needs a persistent-facts 4-tuple that does not exist on it, and creating one reverses a frozen ruling. |
 | **A picker inside a dialog renders UNDER it** | A real P1 defect, scoped and approved, not yet built. |
 | **Splitting the grid's `layout` prop** | `resize` and `reorder` arrive through ONE prop, so **no page can justify one power without the other.** The day a page wants one and not the other, this is the kit's card. |
-| **Layout memory** | **REFUSED, not deferred** — a per-user store of UI shape breaks a standing rule. Whether that rule bends for a grid is the owner's call, and it is the one thing this module hands back. |
+| **Layout memory** | Refused as a kit-wide default. Sales Orders preserves its existing role-scoped browser layout key by owner ruling; no other page inherits that exception. |

@@ -84,7 +84,11 @@ const TABLES = (): Tbl => ({
     error: null,
   },
   purchasing_setting_changes: { data: [], error: null },
-  suppliers: { data: [{ id: OHANA, name: "Ohana" }], error: null },
+  suppliers: { data: [{ id: OHANA, name: "Ohana", kind: "own_logistics" }], error: null },
+  delivery_partners: {
+    data: [{ id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", name: "NETS" }],
+    error: null,
+  },
   orders: {
     data: [
       {
@@ -117,11 +121,11 @@ const TABLES = (): Tbl => ({
   },
   product_skus: {
     data: [
-      { sku: "5539-1B(LHF)", supplier_id: OHANA, cost: null, variant: "1B(LHF)",
+      { sku: "5539-1B(LHF)", supplier_id: OHANA, cost: 100, variant: "1B(LHF)",
         product_models: { category: "sofa", name: "Booqit" } },
-      { sku: "5539-CNR", supplier_id: OHANA, cost: null, variant: "CNR",
+      { sku: "5539-CNR", supplier_id: OHANA, cost: 100, variant: "CNR",
         product_models: { category: "sofa", name: "Booqit" } },
-      { sku: "5539-2A(RHF)", supplier_id: OHANA, cost: null, variant: "2A(RHF)",
+      { sku: "5539-2A(RHF)", supplier_id: OHANA, cost: 100, variant: "2A(RHF)",
         product_models: { category: "sofa", name: "Booqit" } },
       { sku: "5539-1A(LHF)", supplier_id: OHANA, cost: 120, variant: "1A(LHF)",
         product_models: { category: "sofa", name: "Booqit" } },
@@ -269,7 +273,7 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
 
   const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
     rpcCalls.push({ fn, args });
-    if (fn === "operation_create_pos_batch") {
+    if (fn === "purchasing_issue_pos_batch") {
       const pos = (args.p_pos as unknown[]) ?? [];
       const ids = pos.map(() => `PO-${(poSeq += 1)}`);
       return { data: { po_ids: ids }, error: null };
@@ -300,9 +304,9 @@ afterAll(() => _setJwksForTesting(null));
 const READ = "http://t/api/operation/purchase/to-order";
 const ISSUE = "http://t/api/operation/purchase/to-order/issue";
 
-async function get() {
+async function get(query = "") {
   const jwt = await makeJwt("operation");
-  return app.fetch(new Request(READ, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+  return app.fetch(new Request(`${READ}${query}`, { headers: { Authorization: `Bearer ${jwt}` } }), env);
 }
 
 /** The arrangement the browser would post untouched: one doc per sofa order. */
@@ -360,6 +364,80 @@ describe("GET /api/operation/purchase/to-order", () => {
       "Carres Klang",
       "AL Sungai Buloh",
     ]);
+  });
+
+  it("scopes only after the full server recomputation and returns an explanatory summary", async () => {
+    const t = TABLES();
+    const todayIsoStr = new Date().toISOString().slice(0, 10);
+    t.purchase_orders = {
+      data: [
+        {
+          id: "PO-1900",
+          supplier_id: OHANA,
+          placed_at: "2025-01-01T09:00:00Z",
+          so_refs: [1207],
+        },
+      ],
+      error: null,
+    };
+    t.purchase_order_lines = {
+      data: [{ po_id: "PO-1900", sku: "5539-1B(LHF)", qty: 1, received_qty: 1 }],
+      error: null,
+    };
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await get("?so=1207");
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+
+    expect(body.proposals.flatMap((p: any) => p.rows).every((r: any) => r.so === 1207)).toBe(true);
+    expect(body.unresolved).toEqual([]);
+    expect(body.ordered).toEqual([
+      expect.objectContaining({ poId: "PO-1900", so: 1207 }),
+    ]);
+    expect(body.scope).toMatchObject({
+      so: 1207,
+      orderFound: true,
+      alreadyIssued: 1,
+    });
+    expect(todayIsoStr).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("returns only the three demand-local blocker kinds; pickup remains document-level", async () => {
+    const t = TABLES();
+    (t.product_skus.data as { sku: string; supplier_id: string | null; cost: number | null }[])
+      .find((row) => row.sku === "5539-CNR")!.supplier_id = null;
+    (t.product_skus.data as { sku: string; cost: number | null }[])
+      .find((row) => row.sku === "5539-1A(LHF)")!.cost = null;
+    const undated = (t.orders.data as { id: string; delivery_date: string | null; delivery_date_tbd: boolean }[])
+      .find((order) => order.id === "o2")!;
+    undated.delivery_date = null;
+    undated.delivery_date_tbd = true;
+    (t.suppliers.data as { kind: string }[])[0].kind = "factory_pickup";
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const body = (await (await get()).json()) as {
+      blockedDemand: { code: string; sku: string; so: number | null }[];
+    };
+    expect(new Set(body.blockedDemand.map((blocker) => blocker.code))).toEqual(
+      new Set(["blocked_delivery_date", "unresolved_supplier", "cost_required"]),
+    );
+    expect(body.blockedDemand).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "unresolved_supplier", sku: "5539-CNR", so: 1207 }),
+        expect.objectContaining({ code: "blocked_delivery_date", sku: "5539-1A(LHF)", so: 1204 }),
+        expect.objectContaining({ code: "cost_required", sku: "5539-1A(LHF)", so: 1204 }),
+      ]),
+    );
+    expect(body.blockedDemand.some((blocker) => blocker.code.includes("partner"))).toBe(false);
+  });
+
+  it("rejects an invalid Sales Order scope without running the engine", async () => {
+    const res = await get("?so=not-a-number");
+    expect(res.status).toBe(400);
+    expect(userClient).not.toHaveBeenCalled();
   });
 
   /**
@@ -496,7 +574,7 @@ describe("POST …/to-order/issue", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
 
-    expect(sb.rpcCalls.filter((c) => c.fn === "operation_create_pos_batch")).toHaveLength(1);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
     expect(body.pos).toHaveLength(2);
     expect(body.pos.map((p: { id: string }) => p.id)).toEqual(["PO-2031", "PO-2032"]);
     expect(body.pos.map((p: { customer: string }) => p.customer).sort()).toEqual([
@@ -511,7 +589,7 @@ describe("POST …/to-order/issue", () => {
     vi.mocked(userClient).mockReturnValue(sb as never);
     await post({ supplierId: OHANA, category: "sofa", destinationId: KLANG, purchaseOrders: await defaultPlan(sb) });
 
-    const batch = sb.rpcCalls.find((c) => c.fn === "operation_create_pos_batch")!;
+    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
     const pos = batch.args.p_pos as { so_refs: number[]; lines: { sku: string; qty: number }[] }[];
     const peter = pos.find((po) => po.so_refs.includes(1207))!;
     const lines = peter.lines;
@@ -529,31 +607,278 @@ describe("POST …/to-order/issue", () => {
     vi.mocked(userClient).mockReturnValue(sb as never);
     await post({ supplierId: OHANA, category: "sofa", destinationId: AL, purchaseOrders: await defaultPlan(sb) });
 
-    // ONE statement over every document the batch made.
-    const destWrites = sb.updates.filter((u) => u.table === "purchase_orders");
-    expect(destWrites).toHaveLength(1);
-    // Destination AND the expected arrival ride the SAME statement (2026-08-03):
-    // a fresh PO has received nothing so the destination guard permits both,
-    // and one statement means the two can never land out of step.
-    expect(destWrites[0].patch).toMatchObject({ destination_id: AL });
-    expect((destWrites[0].patch as { eta_date?: string }).eta_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(destWrites[0].id).toEqual(["PO-2031", "PO-2032"]);
+    // Destination AND expected arrival ride every document into the same RPC
+    // transaction that creates it. No post-create partial state exists.
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args.p_pos as {
+      destination_id: string;
+      eta_date: string;
+    }[];
+    expect(pos).toHaveLength(2);
+    expect(pos.every((po) => po.destination_id === AL)).toBe(true);
+    expect(pos.every((po) => /^\d{4}-\d{2}-\d{2}$/.test(po.eta_date))).toBe(true);
+    expect(sb.updates.filter((u) => u.table === "purchase_orders")).toHaveLength(0);
   });
 
-  it("carries a price without ever asking for one — an unpriced SKU writes 0", async () => {
-    const sb = makeSb(TABLES());
+  it("blocks only the affected document when catalog cost is unknown", async () => {
+    const t = TABLES();
+    (t.product_skus.data as { sku: string; cost: number | null }[]).find(
+      (row) => row.sku === "5539-CNR",
+    )!.cost = null;
+    const sb = makeSb(t);
     vi.mocked(userClient).mockReturnValue(sb as never);
-    await post({ supplierId: OHANA, category: "sofa", destinationId: KLANG, purchaseOrders: await defaultPlan(sb) });
+    const plan = await defaultPlan(sb);
+    const res = await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: plan,
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ code: "cost_required", sku: "5539-CNR" });
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("records an explicit Free of Charge decision; unknown cost never becomes RM0", async () => {
+    const t = TABLES();
+    (t.product_skus.data as { sku: string; cost: number | null }[]).find(
+      (row) => row.sku === "5539-CNR",
+    )!.cost = null;
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const plan = await defaultPlan(sb);
+    const res = await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: plan.map((doc) =>
+        doc.buildKeys.length > 1
+          ? {
+              ...doc,
+              lineDecisions: [
+                { sku: "5539-CNR", treatment: "free_of_charge", reason: "Warranty replacement" },
+              ],
+            }
+          : doc,
+      ),
+    });
+    expect(res.status).toBe(200);
 
     const lines = (
-      sb.rpcCalls.find((c) => c.fn === "operation_create_pos_batch")!.args.p_pos as {
+      sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args.p_pos as {
+        lines: {
+          sku: string;
+          cost: number;
+          cost_source: string;
+          commercial_treatment: string;
+          commercial_reason: string | null;
+        }[];
+      }[]
+    ).flatMap((po) => po.lines);
+    expect(lines.find((l) => l.sku === "5539-CNR")).toMatchObject({
+      cost: 0,
+      cost_source: "hand_entered",
+      commercial_treatment: "free_of_charge",
+      commercial_reason: "Warranty replacement",
+    });
+    expect(lines.find((l) => l.sku === "5539-1A(LHF)")!.commercial_treatment).toBe("normal");
+  });
+
+  it("records a hand-entered transaction cost without changing Catalog", async () => {
+    const t = TABLES();
+    (t.product_skus.data as { sku: string; cost: number | null }[]).find(
+      (row) => row.sku === "5539-CNR",
+    )!.cost = null;
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const plan = await defaultPlan(sb);
+    const res = await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: plan.map((doc) =>
+        doc.buildKeys.length > 1
+          ? {
+              ...doc,
+              lineDecisions: [
+                {
+                  sku: "5539-CNR",
+                  treatment: "normal",
+                  unitCost: 880,
+                  costSource: "hand_entered",
+                },
+              ],
+            }
+          : doc,
+      ),
+    });
+    expect(res.status).toBe(200);
+    const lines = (
+      sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args.p_pos as {
         lines: { sku: string; cost: number; cost_source: string }[];
       }[]
     ).flatMap((po) => po.lines);
-    expect(lines.every((l) => typeof l.cost === "number")).toBe(true);
-    expect(lines.every((l) => l.cost_source === "catalog")).toBe(true);
-    expect(lines.find((l) => l.sku === "5539-CNR")!.cost).toBe(0);
-    expect(lines.find((l) => l.sku === "5539-1A(LHF)")!.cost).toBe(120);
+    expect(lines.find((line) => line.sku === "5539-CNR")).toMatchObject({
+      cost: 880,
+      cost_source: "hand_entered",
+    });
+    expect(sb.updates.filter((update) => update.table === "product_skus")).toHaveLength(0);
+  });
+
+  it("rejects a stale catalog-seeded cost before the creation RPC", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const plan = await defaultPlan(sb);
+    const target = plan.find((doc) => doc.buildKeys.length > 1)!;
+    const res = await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: [
+        {
+          ...target,
+          lineDecisions: [
+            {
+              sku: "5539-CNR",
+              treatment: "normal",
+              unitCost: 999,
+              costSource: "catalog",
+            },
+          ],
+        },
+      ],
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "stale_catalog_cost", sku: "5539-CNR" });
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("rejects Free of Charge without an explicit reason at the request boundary", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const plan = await defaultPlan(sb);
+    const res = await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: [
+        {
+          ...plan[0],
+          lineDecisions: [
+            { sku: "5539-CNR", treatment: "free_of_charge", reason: "" },
+          ],
+        },
+      ],
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: "invalid_param" });
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("an unrelated valid document remains issuable when another document needs cost", async () => {
+    const t = TABLES();
+    (t.product_skus.data as { sku: string; cost: number | null }[]).find(
+      (row) => row.sku === "5539-CNR",
+    )!.cost = null;
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const plan = await defaultPlan(sb);
+    const unaffected = plan.find((doc) => doc.buildKeys.length === 1)!;
+    const res = await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: [unaffected],
+    });
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as unknown[];
+    expect(pos).toHaveLength(1);
+  });
+
+  it("factory pickup requires one valid procurement partner on every Issue document", async () => {
+    const t = TABLES();
+    (t.suppliers.data as { kind: string }[])[0].kind = "factory_pickup";
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const plan = await defaultPlan(sb);
+    const blocked = await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: plan,
+    });
+    expect(blocked.status).toBe(422);
+    expect(await blocked.json()).toMatchObject({ code: "pickup_partner_required" });
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+
+    const partnerId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const issued = await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: plan.map((doc) => ({ ...doc, procurementPartnerId: partnerId })),
+    });
+    expect(issued.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { procurement_partner_id: string }[];
+    expect(pos.every((po) => po.procurement_partner_id === partnerId)).toBe(true);
+  });
+
+  it("own-logistics documents cannot smuggle a procurement partner", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const plan = await defaultPlan(sb);
+    const res = await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: plan.map((doc) => ({
+        ...doc,
+        procurementPartnerId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      })),
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ code: "pickup_partner_not_allowed" });
+  });
+
+  it("an undated Customer Order is visible but crafted Issue is blocked server-side", async () => {
+    const t = TABLES();
+    const ella = (t.orders.data as { id: string; delivery_date_tbd: boolean; delivery_date: string | null }[])
+      .find((order) => order.id === "o2")!;
+    ella.delivery_date_tbd = true;
+    ella.delivery_date = null;
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const plan = await defaultPlan(sb);
+    const undated = plan.find((doc) => doc.buildKeys.length === 1)!;
+    const res = await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: [undated],
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ code: "blocked_delivery_date" });
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("unresolved supplier demand does not globally block an unrelated valid document", async () => {
+    const t = TABLES();
+    (t.product_skus.data as { sku: string; supplier_id: string | null }[]).find(
+      (row) => row.sku === "5539-CNR",
+    )!.supplier_id = null;
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const plan = await defaultPlan(sb);
+    const unaffected = plan.find((doc) => doc.buildKeys.length === 1)!;
+    const res = await post({
+      supplierId: OHANA,
+      category: "sofa",
+      destinationId: KLANG,
+      purchaseOrders: [unaffected],
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
   });
 
   it("refuses a pair with no production days, and writes nothing", async () => {
@@ -859,7 +1184,7 @@ describe("POST …/issue — server validation", () => {
     expect(res.status).toBe(422);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(((await res.json()) as any).code).toBe("unknown_build");
-    expect(sb.rpcCalls.filter((c) => c.fn === "operation_create_pos_batch")).toHaveLength(0);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
     expect(sb.updates).toHaveLength(0);
   });
 
@@ -876,7 +1201,7 @@ describe("POST …/issue — server validation", () => {
     expect(res.status).toBe(422);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(((await res.json()) as any).code).toBe("duplicate_build");
-    expect(sb.rpcCalls.filter((c) => c.fn === "operation_create_pos_batch")).toHaveLength(0);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
 
   it("refuses an empty purchase order", async () => {
@@ -901,7 +1226,7 @@ describe("POST …/issue — server validation", () => {
     expect(res.status).toBe(422);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(((await res.json()) as any).code).toBe("sofa_merge");
-    expect(sb.rpcCalls.filter((c) => c.fn === "operation_create_pos_batch")).toHaveLength(0);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
 
   it("refuses when nothing is selected to issue", async () => {
@@ -922,7 +1247,7 @@ describe("POST …/issue — server validation", () => {
       purchaseOrders: [plan[0], { ...plan[1], include: false }],
     });
     expect(res.status).toBe(200);
-    const batch = sb.rpcCalls.find((c) => c.fn === "operation_create_pos_batch")!;
+    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
     expect((batch.args.p_pos as unknown[]).length).toBe(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(((await res.json()) as any).pos).toHaveLength(1);
@@ -932,7 +1257,7 @@ describe("POST …/issue — server validation", () => {
     const sb = makeSb(TABLES());
     const plan = await planFor(sb);
     await issue({ purchaseOrders: plan });
-    expect(sb.rpcCalls.filter((c) => c.fn === "operation_create_pos_batch")).toHaveLength(1);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
     expect(sb.rpcCalls.filter((c) => c.fn === "operation_create_po")).toHaveLength(0);
   });
 
@@ -946,7 +1271,7 @@ describe("POST …/issue — server validation", () => {
         lines: [{ sku: "MADE-UP", qty: 999, cost: 1 }],
       })),
     });
-    const batch = sb.rpcCalls.find((c) => c.fn === "operation_create_pos_batch")!;
+    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
     const skus = (batch.args.p_pos as { lines: { sku: string }[] }[]).flatMap((po) =>
       po.lines.map((l) => l.sku),
     );
@@ -975,11 +1300,13 @@ describe("a purchase order is born with its expected arrival", () => {
       purchaseOrders: await defaultPlan(sb),
     });
 
-    const write = sb.updates.filter((u) => u.table === "purchase_orders");
-    expect(write).toHaveLength(1); // ONE statement over every document
-    const patch = write[0].patch as { destination_id: string; eta_date?: string };
-    expect(patch.destination_id).toBe(KLANG);
-    expect(patch.eta_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args.p_pos as {
+      destination_id: string;
+      eta_date: string;
+    }[];
+    expect(pos).toHaveLength(2);
+    expect(pos.every((po) => po.destination_id === KLANG)).toBe(true);
+    expect(pos.every((po) => /^\d{4}-\d{2}-\d{2}$/.test(po.eta_date))).toBe(true);
 
     // 14 production days on Ohana's week (Sunday off) + 1 transit day on the
     // OFFICE week — arranging the movement is our work, not the factory's.
@@ -996,7 +1323,7 @@ describe("a purchase order is born with its expected arrival", () => {
       1,
       { offDays: [0, 6], holidays },
     );
-    expect(patch.eta_date).toBe(expected);
+    expect(pos.every((po) => po.eta_date === expected)).toBe(true);
   });
 
   it("NEVER writes expected_ready_date — that column is the factory's promise", async () => {
@@ -1033,11 +1360,11 @@ describe("a purchase order is born with its expected arrival", () => {
 
     // The goods matter more than the estimate: the PO is still raised.
     expect(res.status).toBe(200);
-    const patch = sb.updates.find((u) => u.table === "purchase_orders")!.patch as {
-      eta_date?: string;
-    };
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args.p_pos as {
+      eta_date: string | null;
+    }[];
     // A guessed arrival would be read downstream as a measurement (P1's law).
-    expect(patch.eta_date).toBeUndefined();
+    expect(pos.every((po) => po.eta_date === null)).toBe(true);
   });
 
   it("records who raised it — po_history, the table that has existed since 0001", async () => {
@@ -1050,7 +1377,7 @@ describe("a purchase order is born with its expected arrival", () => {
       purchaseOrders: await defaultPlan(sb),
     });
 
-    // Measured 2026-08-01: `operation_create_pos_batch` writes no audit row of
+    // Measured 2026-08-01: `purchasing_issue_pos_batch` writes no audit row of
     // any kind, so a purchase order could not say who raised it or when.
     const hist = sb.inserts.filter((i) => i.table === "po_history");
     expect(hist).toHaveLength(1);
@@ -1316,7 +1643,7 @@ describe("a partly satisfied demand keeps its remainder", () => {
     // The purchase order and the credit are the SAME number. They are computed
     // from two different places — the line, and the build — so a disagreement
     // orders 5 and records 1, and the other 4 come back to be bought again.
-    const batch = sb.rpcCalls.find((c) => c.fn === "operation_create_pos_batch")!;
+    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
     const pos = batch.args.p_pos as { lines: { sku: string; qty: number }[] }[];
     expect(pos).toHaveLength(1);
     expect(pos[0].lines.map((l) => l.qty)).toEqual([5]);
@@ -2136,7 +2463,7 @@ describe("P18 · the proceed date rides the To Order wire", () => {
     const selects = [
       ...src.matchAll(/\.from\(\s*"orders"\s*\)\s*\n?\s*\.select\(\s*([\s\S]*?)\)\s*\n?\s*\./g),
     ].map((m) => m[1]!);
-    expect(selects).toHaveLength(2);
+    expect(selects).toHaveLength(3);
     for (const s of selects) expect(s).toContain("proceed_date");
   });
 });

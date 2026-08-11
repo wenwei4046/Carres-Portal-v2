@@ -96,6 +96,14 @@ describe("OrderDetailDrawer — Information Hierarchy (UI-KIT §1.4)", () => {
   });
 });
 
+describe("OrderDetailDrawer — legacy Purchasing door", () => {
+  it("gates every PO action behind the explicit allowIssuePO capability", () => {
+    expect(SRC).toContain("allowIssuePO={allowIssuePO}");
+    expect(SRC).toContain("...(allowIssuePO");
+    expect(SRC).toContain("{allowIssuePO &&");
+  });
+});
+
 /**
  * C7 — the delivery order issues itself, and the gate moves onto issuing.
  *

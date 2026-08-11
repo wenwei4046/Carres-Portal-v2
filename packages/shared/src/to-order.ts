@@ -71,6 +71,14 @@ export const TO_ORDER_WORDS = {
   /** Voiced in the Issue region when no destination is configured at all. */
   destinationRequired: "Destination not selected.",
   issue: "Issue Purchase Order",
+  issueReview: "Review Purchase Orders",
+  transactionCost: "Transaction Cost",
+  commercialTreatment: "Commercial Treatment",
+  normalPurchase: "Normal Purchase",
+  freeOfCharge: "Free of Charge",
+  freeOfChargeReason: "Free of Charge Reason",
+  procurementPartner: "Procurement Partner",
+  costRequired: "Cost required",
 
   // ── The Excel grid — Loo's final freeze, 2026-08-01: To Order DECIDES
   //    which customer orders become purchase orders today; Purchase Orders
@@ -184,6 +192,15 @@ export const TO_ORDER_WORDS = {
    */
   filtersEmpty: "No rows match the filters.",
   clearFilters: "Clear filters",
+  salesOrderScope: "Sales Order",
+  clearSalesOrderScope: "Clear Sales Order scope",
+  scopeNotFound: "Sales Order not found.",
+  scopeBlockedProductionDays: "Set a number before this demand can be issued.",
+  scopeBlockedDeliveryDate: "No delivery date — this demand cannot be issued.",
+  scopeUnresolved: "Purchasing cannot resolve this demand from the catalog.",
+  scopeAlreadyCovered: "Demand is already covered by an open Purchase Order.",
+  scopeAlreadyIssued: "Purchase Order already issued.",
+  scopeNothingToBuy: "Nothing remains to buy for this Sales Order.",
   /** The ☑'s aria word — picking rows for THIS batch, nothing more. */
   select: "Select",
   /** The pill (`+ …`); appears only when something is selected. */
@@ -413,7 +430,7 @@ export const TO_ORDER_WORDS = {
   // not answer for used to be skipped in silence; it now stops the button and
   // names itself, because a purchase order that quietly omits a customer's
   // goods is worse than one that was never raised.
-  unresolvedHelp: "Nothing can be issued until every item resolves.",
+  unresolvedHelp: "Affected items stay blocked until supplier setup is corrected.",
 
   nextStep: "Next: confirm the ready date in Purchase Orders",
   openPurchaseOrders: "Open Purchase Orders",
@@ -1276,6 +1293,8 @@ export interface ToOrderProposal {
   key: string;
   supplierId: string;
   supplierName: string;
+  /** Governs whether an Issue document needs a procurement partner. */
+  supplierKind?: "own_logistics" | "factory_pickup";
   category: ProductCategory;
   /** `Ohana · Sofa` */
   label: string;

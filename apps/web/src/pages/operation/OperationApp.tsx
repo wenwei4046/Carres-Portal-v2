@@ -13,29 +13,25 @@ import PortalSidebar from "@/pages/portal/PortalSidebar";
 import { useAuth } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
 import OperationDashboard from "./OperationDashboard";
-// Jess redesign step 2 (2026-06-08) — the Orders tab is now the unified control
-// table (merges the old kanban + Inbox + All-orders). The legacy kanban
-// `OperationOrders` is retained as a file (+ its test) but no longer routed.
+// ⭐ SALES ORDER PRODUCTION CUTOVER (owner ruling, 2026-08-10 —
+// `docs/SALES-ORDER-CUTOVER.md`). The two Orders pages now live at TWO
+// SEPARATE ROUTES, and the swap-one-identifier trick that Stage 1 used is
+// retired with it:
+//
+//   /operation/orders      →  SalesOrdersRegister    the OFFICIAL Sales Orders
+//   /operation/old-orders  →  OperationOrdersControl the TEMPORARY door
+//
+// The old page is NOT deleted and NOT hidden — the cutover is a strangler
+// migration, and it still carries the only Delivery / Payment / Purchasing
+// work there is, plus the AutoCount import. `onImport` therefore stays wired
+// on the OLD route (it flips to the import tab) and is gone from the new one:
+// a register has no actions.
+//
+// ROLLBACK is no longer an identifier swap. It is the deployment rollback
+// named in the cutover card — revert + redeploy the previous Pages build.
 import OperationOrdersControl from "./OperationOrdersControl";
-// ⭐ STAGE 1 (BUILD-QUEUE, 2026-08-09) — the Sales Orders register.
-//
-// `/operation/orders` mounts ONE page and the constant below says which — the
-// swap is ONE identifier, exactly as the card demands.
-//
-//   RESTORE THE OLD REGISTER = change ONE line:
-//       const OrdersPage: typeof OperationOrdersControl = OperationOrdersControl;
-//
-// `OperationOrdersControl` is not deleted, not renamed and not edited by this
-// card. It stays compiled — `OperationDelivery` imports its ladder.
-//
-// The route still passes `onImport`. The register IGNORES it (a register has
-// no actions); the prop stays on the route because the OLD page needs it the
-// moment the line above is reverted. The `typeof` annotation is what makes
-// "restorable in one minute" a fact the COMPILER keeps true: the day the
-// register's props stop matching the old page's, this line fails to build.
 import SalesOrdersRegister from "./SalesOrdersRegister";
 import SalesOrderWorkspace from "./SalesOrderWorkspace";
-const OrdersPage: typeof OperationOrdersControl = SalesOrdersRegister;
 // T11 (2026-07-27) — the Delivery module: the ONE new sidebar item in the
 // build plan. Tab-state driven like Payments / Stock (only orders and
 // procurement are path-driven), so `?tab=delivery` deep-links it.
@@ -139,8 +135,17 @@ export default function OperationApp() {
   const isProcurementUrl = location.pathname.startsWith(
     "/operation/procurement",
   );
+  const isToOrderUrl = location.pathname === "/operation/to-order";
   const isOrdersUrl = location.pathname.startsWith("/operation/orders");
-  const isUrlDriven = isProcurementUrl || isOrdersUrl;
+  // Stage A: only the REFERENCE DESTINATION gives scroll ownership to its
+  // grid. The Sales Order Workspace keeps its existing page-owned layout.
+  const isSalesOrdersRegisterUrl =
+    isOrdersUrl && !location.pathname.startsWith("/operation/orders/so/");
+  // The cutover's temporary door. Deliberately NOT a `/operation/orders/…`
+  // sub-path: `startsWith` would then light BOTH sidebar items at once, and a
+  // door that shares the new register's prefix reads as part of it.
+  const isOldOrdersUrl = location.pathname.startsWith("/operation/old-orders");
+  const isUrlDriven = isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
   // Sidebar collapse moved into PortalSidebar (Unified Internal Portal,
@@ -171,12 +176,12 @@ export default function OperationApp() {
   // (`?section=promo`) survives the hop to the Admin door.
   const catalogSection = searchParams.get(CATALOG_TAB_PARAM);
   useEffect(() => {
-    if (!urlTab || isProcurementUrl || isOrdersUrl) return;
+    if (!urlTab || isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl) return;
     setMovementsPrefill((p) => (urlTab === "movements" ? p : undefined));
     setWarehousePrefill((p) => (urlTab === "warehouse" ? p : undefined));
     setTab(urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlTab, isProcurementUrl, isOrdersUrl]);
+  }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl]);
 
   // When the URL leaves a URL-driven section (e.g. user navigated via Back
   // to `/operation`), make sure the local tab state has a sensible value so
@@ -271,13 +276,20 @@ export default function OperationApp() {
             Receiving — Jess 2026-07-22, Q9 Option B — one clean top row, not
             two, so the module tab bar is the only chrome). */}
         {!isOrdersUrl &&
+          !isOldOrdersUrl &&
           !isProcurementUrl &&
+          !isToOrderUrl &&
           tab !== "purchase" &&
           tab !== "receiving" &&
           tab !== "claims" &&
           tab !== "purchasing-report" &&
           tab !== "purchasing-settings" && <GlobalTopBar />}
-        <div className="flex-1 min-h-0 overflow-auto">
+        <div
+          className={`flex-1 min-h-0 ${
+            isSalesOrdersRegisterUrl ? "overflow-hidden" : "overflow-auto"
+          }`}
+          data-testid={isSalesOrdersRegisterUrl ? "sales-orders-work-surface" : undefined}
+        >
         {isUrlDriven ? (
           // Nested route table for the URL-driven sections.
           //
@@ -287,13 +299,15 @@ export default function OperationApp() {
           // every existing `?po=` deep link from To Order still opens the
           // document it names.
           //
-          // Orders (`/operation/orders[/:stage]`) — both paths mount the
-          // unified `OperationOrdersControl` table (Jess redesign step 2). The
-          // optional `:stage` preselects the matching status tab so legacy
-          // hand-typed kanban-stage URLs still land sensibly; unknown slugs
-          // fall back to the "All" tab (tabFromStageParam guard inside the
-          // component). The "+ Import" header button calls back into
-          // `changeTab("ops-import")` to flip to the AutoCount import page.
+          // Orders — TWO doors since the production cutover (2026-08-10):
+          // `/operation/orders[/:stage]` is the new Sales Order register and
+          // `/operation/old-orders[/:stage]` is the temporary old control
+          // table. The optional `:stage` on the old door preselects the
+          // matching status tab so hand-typed kanban-stage URLs still land
+          // sensibly; unknown slugs fall back to the "All" tab
+          // (tabFromStageParam guard inside the component). The "+ Import"
+          // header button calls back into `changeTab("ops-import")` to flip to
+          // the AutoCount import page.
           //
           // Paths are RELATIVE because this is a descendant `<Routes>`
           // mounted inside App.tsx's `<Route path="/operation/*">`. React
@@ -302,15 +316,16 @@ export default function OperationApp() {
           // fail to match here even though the URL string is identical — the
           // result is the main area renders nothing while the URL stays put.
           <Routes>
+            {/* Card 1 — the Sales Order entrance is an alias onto the SAME
+                Batch Purchase component. Query params (`?so=` plus its rail
+                filters) remain component-owned; no second mode or engine. */}
+            <Route path="to-order" element={<OperationToOrder />} />
             <Route path="procurement" element={<OperationPurchaseOrders />} />
             <Route
               path="procurement/:slug"
               element={<TabbedProcurementShell />}
             />
-            <Route
-              path="orders"
-              element={<OrdersPage onImport={() => changeTab("ops-import")} />}
-            />
+            <Route path="orders" element={<SalesOrdersRegister />} />
             {/* STAGE 1 — the workspace route the register's rows open.
                 STAGE 2 — `so/new` is the office birth door ([+ New Sales
                 Order]); static `new` outranks `:orderId`. Declared before
@@ -318,9 +333,23 @@ export default function OperationApp() {
                 them higher anyway. */}
             <Route path="orders/so/new" element={<SalesOrderWorkspace />} />
             <Route path="orders/so/:orderId" element={<SalesOrderWorkspace />} />
+            <Route path="orders/:stage" element={<SalesOrdersRegister />} />
+            {/* ⭐ THE TEMPORARY DOOR — the old control table, on its own route.
+                `:stage` is carried across unchanged so every hand-typed kanban
+                slug the old page still understands keeps landing on the same
+                tab; the page reads it from `useParams<{ stage }>()` and an
+                unknown slug already falls back to "All". */}
             <Route
-              path="orders/:stage"
-              element={<OrdersPage onImport={() => changeTab("ops-import")} />}
+              path="old-orders"
+              element={
+                <OperationOrdersControl onImport={() => changeTab("ops-import")} />
+              }
+            />
+            <Route
+              path="old-orders/:stage"
+              element={
+                <OperationOrdersControl onImport={() => changeTab("ops-import")} />
+              }
             />
           </Routes>
         ) : (

@@ -7,7 +7,6 @@ import {
   assignPartnerInput,
   attachDoInput,
   confirmProceedRequestInputSchema,
-  issuePosForOrderInput,
   ListOperationOrdersQuery,
   recheckStockInput,
   reselectPartnerInput,
@@ -33,9 +32,6 @@ import type { AppEnv } from "../../types";
  *   POST   /:id/abandon            — A6 post-proceed cancel
  *   POST   /:id/warehouse          — warehouse pick
  *   POST   /:id/recheck-stock      — E1 re-check stock
- *
- * M3 endpoint:
- *   POST   /:id/issue-pos          — auto-issue POs for shortages
  *
  * M4 endpoint:
  *   GET    /:id/print-do           — server-side DO PDF (E2 / spec §17.3)
@@ -1338,21 +1334,6 @@ operationOrdersRouter.post("/:id/recheck-stock", requireOperation, async (c) => 
     return c.json(m.body, m.status);
   }
   return c.json({ warehouseId: wh, shortages: shortages ?? [] });
-});
-
-// ----- POST /:id/issue-pos -----
-operationOrdersRouter.post("/:id/issue-pos", requireOperation, async (c) => {
-  const parsed = await parseJsonBody(c, issuePosForOrderInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("operation_issue_pos_for_order", {
-    p_order_id: c.req.param("id"),
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json(data);
 });
 
 // ----- POST /:id/revert-proceed -----

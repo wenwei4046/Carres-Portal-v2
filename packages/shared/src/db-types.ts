@@ -68,7 +68,7 @@ export type WarehouseKind     = "own" | "operation_partner";
 //                         same SKU (operation_recent_po_cost RPC, T27).
 //   - 'system_suggested'  heuristic suggestion (e.g. 110% of prev_po).
 //   - 'auto_issued'       sentinel for system-issued PO lines from
-//                         operation_issue_pos_for_order when no historical cost
+//                         historical auto-issue paths when no cost was recorded
 //                         existed (migration 0057 — T42 codex C1 fix). When a
 //                         recent received-PO cost IS found, the auto-issue RPC
 //                         persists 'prev_po' instead. 'auto_issued' rows always
@@ -924,6 +924,9 @@ export interface PurchaseOrderLineRow {
   // Migration 0055. cost_source_enum — which heuristic produced the cost
   // value above (see `CostSource` definition for label semantics).
   cost_source: CostSource | null;
+  /** NULL on pre-0337/legacy lines; governed Batch Purchase lines always set it. */
+  commercial_treatment: "normal" | "free_of_charge" | null;
+  commercial_reason: string | null;
 }
 
 export interface POHistoryRow {

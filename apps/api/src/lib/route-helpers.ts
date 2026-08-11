@@ -28,6 +28,19 @@ export function mapPgError(error: { code?: string; message?: string; details?: s
       return { status: 403 as const, body: { error: "forbidden", code: "forbidden", message: error.message ?? "forbidden" } };
     case "42P01":
       return { status: 404 as const, body: { error: "not_found", code: "not_found", message: error.message ?? "not found" } };
+    /* P0002 is Postgres's `no_data_found`, and it is what THIS CODEBASE's RPCs
+     * raise for "that row is not there" — measured 2026-08-10, more than twenty
+     * live functions across finance, guarantees, orders, purchasing and the
+     * catalog. Every one of them reached the browser as a 500 `rpc_failed`,
+     * because the switch fell through to `default`.
+     *
+     * Found by running WITHDRAW against PRODUCTION with a uuid that does not
+     * exist: HTTP 500, "Attribution request not found". The sentence was right
+     * and the status was a lie — a missing row is the caller's mistake, not the
+     * system breaking. A 500 sends an operator hunting for an outage that is not
+     * there, and buries the real 500s in the noise. */
+    case "P0002":
+      return { status: 404 as const, body: { error: "not_found", code: "not_found", message: error.message ?? "not found" } };
     case "22023":
       return { status: 422 as const, body: { error: "invalid_param", code: "invalid_param", message: error.message ?? "invalid param" } };
     case "P0001":

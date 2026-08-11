@@ -37,7 +37,7 @@ describe("<CaseOrderLink>", () => {
     expect(link).toHaveTextContent("SO-1258");
 
     fireEvent.click(link);
-    expect(navigate).toHaveBeenCalledWith("/operation/orders?order=ord-1");
+    expect(navigate).toHaveBeenCalledWith("/operation/old-orders?order=ord-1");
   });
 
   it("says plainly when the case has no order — no dead link", () => {
@@ -56,7 +56,7 @@ describe("<CaseOrderLink>", () => {
     expect(link).not.toHaveTextContent("undefined");
 
     fireEvent.click(link);
-    expect(navigate).toHaveBeenCalledWith("/operation/orders?order=ord-2");
+    expect(navigate).toHaveBeenCalledWith("/operation/old-orders?order=ord-2");
   });
 
   it("does not let the click reach the row underneath", () => {
@@ -80,6 +80,6 @@ describe("<CaseOrderLink>", () => {
   it("escapes an order id so it cannot break out of the query string", () => {
     renderLink({ orderId: "a&b=c", so: 7 });
     fireEvent.click(screen.getByTestId("case-order-link"));
-    expect(navigate).toHaveBeenCalledWith("/operation/orders?order=a%26b%3Dc");
+    expect(navigate).toHaveBeenCalledWith("/operation/old-orders?order=a%26b%3Dc");
   });
 });

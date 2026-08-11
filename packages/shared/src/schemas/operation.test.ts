@@ -8,7 +8,6 @@ import {
   createPoInput,
   createPosBatchInput,
   warehousePickInput,
-  issuePosForOrderInput,
   recheckStockInput,
   assignPickupPartnerInput,
   reassignPoWarehouseInput,
@@ -390,15 +389,6 @@ describe('warehousePickInput', () => {
     expect(
       warehousePickInput.safeParse({ warehouseId: UUID, extraField: 'x' }).success,
     ).toBe(false);
-  });
-});
-
-describe('issuePosForOrderInput', () => {
-  it('accepts an empty body', () => {
-    expect(issuePosForOrderInput.safeParse({}).success).toBe(true);
-  });
-  it('rejects extra keys (strict mode)', () => {
-    expect(issuePosForOrderInput.safeParse({ orderId: UUID }).success).toBe(false);
   });
 });
 

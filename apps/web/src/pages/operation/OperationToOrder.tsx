@@ -46,10 +46,10 @@
  * is a link that lands on Purchase Orders with that PO opened: the receipt is
  * the door to the next step. Real history belongs to Purchase Orders.
  *
- * On Issue: zero popups, zero toasts — the pill goes `Creating…`, one POST
- * per supplier×category group (ARRANGEMENT only), rows update IN PLACE, the
- * left counts fall, the bottom bar reports and a partial failure stays with
- * Retry until it succeeds.
+ * On Issue: one governed review captures transaction cost / Free of Charge and
+ * a factory-pickup document's procurement partner. One POST still uses the
+ * authoritative engine; rows update IN PLACE, the left counts fall, the
+ * bottom bar reports and a partial failure stays with Retry until it succeeds.
  */
 import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -66,6 +66,7 @@ import {
   railItemLabel,
   selectedShort,
   issuePosShort,
+  planFromDocuments,
   toOrderBuilds,
   unitsHeadline,
   unresolvedHeadline,
@@ -89,9 +90,11 @@ import DataTable, {
 import EmptyState from "@/components/kit/EmptyState";
 import GridToolbar from "@/components/kit/GridToolbar";
 import Icon from "@/components/kit/Icon";
+import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
 import SearchInput from "@/components/kit/SearchInput";
+import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
 import { apiFetch } from "@/lib/api";
 // The Excel date ▼ machinery lives in ONE lib (`excel-date-filter.ts`) so this
@@ -123,6 +126,7 @@ interface ToOrderResponse {
   poDays?: number[];
   proposals: ToOrderProposal[];
   destinations: Destination[];
+  procurementPartners?: { id: string; name: string }[];
   /** Recent POs read back — the grid's `Ordered` answer. */
   ordered?: ToOrderOrderedRow[];
   /** Demand the catalog could not answer for. Empty is the only healthy value. */
@@ -130,6 +134,16 @@ interface ToOrderResponse {
   /** P10 — the warehouse the free-stock offer was counted at, by its own
    *  name. `null` = there is no offer to make and no sentence to print. */
   stockWarehouse?: string | null;
+  scope?: {
+    so: number;
+    orderFound: boolean;
+    issuable: number;
+    blockedProductionDays: number;
+    blockedDeliveryDate: number;
+    unresolved: number;
+    alreadyCovered: number;
+    alreadyIssued: number;
+  };
 }
 
 /** P10 — what `Reserve` answers with. The number is the SERVER's. The wire key
@@ -148,9 +162,13 @@ interface IssueResponse {
 
 /** One group's batch outcome — the grid and the bar are the progress report. */
 type GroupResult =
-  | { status: "pending" }
+  | { status: "queued" }
   | { status: "done"; pos: string[] }
   | { status: "failed"; message: string };
+
+type CommercialDecision =
+  | { treatment: "normal"; unitCost: string; costSource: "catalog" | "hand_entered" }
+  | { treatment: "free_of_charge"; reason: string };
 
 /** One grid row = one BUILD (a thing with a MODEL NAME — `2 items` is
  *  banned from the Model column, Jess 2026-08-01) within one
@@ -219,6 +237,8 @@ interface GridRow {
   /** T3 — the purchase orders behind it, for the cell's hover. Empty = no
    *  title; a reference is never invented. */
   coveredByOpenPoPos: string[];
+  /** Customer demand remains visible, but cannot enter an Issue document. */
+  blocker: "blocked_delivery_date" | null;
 }
 
 /**
@@ -290,10 +310,16 @@ const F_NOT_ORDERED = "__not_ordered__";
 
 export default function OperationToOrder() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawScopeSo = searchParams.get("so");
+  const scopeSo = rawScopeSo && /^\d+$/.test(rawScopeSo) ? Number(rawScopeSo) : null;
 
   const q = useQuery<ToOrderResponse>({
-    queryKey: qk.operation.toOrder(),
-    queryFn: () => apiFetch<ToOrderResponse>("/api/operation/purchase/to-order"),
+    queryKey: [...qk.operation.toOrder(), { so: scopeSo }],
+    queryFn: () =>
+      apiFetch<ToOrderResponse>(
+        `/api/operation/purchase/to-order${scopeSo == null ? "" : `?so=${scopeSo}`}`,
+      ),
     refetchOnWindowFocus: true,
   });
 
@@ -301,6 +327,10 @@ export default function OperationToOrder() {
   const poDays = useMemo(() => q.data?.poDays ?? [], [q.data]);
   const orderedRows = useMemo(() => q.data?.ordered ?? [], [q.data]);
   const destinations = useMemo(() => q.data?.destinations ?? [], [q.data]);
+  const procurementPartners = useMemo(
+    () => q.data?.procurementPartners ?? [],
+    [q.data],
+  );
   const unresolved = useMemo(() => q.data?.unresolved ?? [], [q.data]);
   const today = q.data?.today ?? null;
   /** P10 — the warehouse the offer was counted at. The page NEVER types the
@@ -312,7 +342,6 @@ export default function OperationToOrder() {
    * The Work Queue's two picks live in the URL, so a refresh or a shared
    * link keeps the view (the 2990 habit). The engine still opens Today.
    */
-  const [searchParams, setSearchParams] = useSearchParams();
   /** The purchase calendar — one row per upcoming configured PO day. */
   const scheduleDays = useMemo(
     () => (today ? poScheduleDays(poDays, today) : []),
@@ -327,12 +356,16 @@ export default function OperationToOrder() {
     // at all — the second way to place (Jess, 2026-08-01: browse by
     // category alone; nothing forces a run to stay lit).
     if (rawView == null) {
+      // A Sales Order entrance must explain the whole order, not whichever PO
+      // day the normal workspace opens on. Explicit rail choices still narrow
+      // it, and the unscoped opening remains byte-for-byte unchanged.
+      if (scopeSo != null) return new Set() as ReadonlySet<string>;
       return new Set(scheduleDays[0] ? [scheduleDays[0]] : []) as ReadonlySet<string>;
     }
     return new Set(
       rawView.split(",").filter((v) => v === "overdue" || scheduleDays.includes(v)),
     ) as ReadonlySet<string>;
-  }, [rawView, scheduleDays]);
+  }, [rawView, scheduleDays, scopeSo]);
   const rawCat = searchParams.get("cat");
   const catSet = useMemo(
     () =>
@@ -363,6 +396,15 @@ export default function OperationToOrder() {
     setParam("cat", [...n].join(","));
   };
   const clearCats = () => setParam("cat", "");
+  const clearSoScope = () =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("so");
+        return next;
+      },
+      { replace: true },
+    );
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<TableSort | null>(null);
   /** Per-column Excel filters. An absent key = no filter. */
@@ -382,6 +424,13 @@ export default function OperationToOrder() {
   const [results, setResults] = useState<ReadonlyMap<string, GroupResult>>(new Map());
   const [creating, setCreating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [issueReviewOpen, setIssueReviewOpen] = useState(false);
+  const [commercialDecisions, setCommercialDecisions] = useState<
+    ReadonlyMap<string, CommercialDecision>
+  >(new Map());
+  const [documentPartners, setDocumentPartners] = useState<ReadonlyMap<string, string>>(
+    new Map(),
+  );
   /**
    * P10 — which rows are open, and which one is mid-take.
    *
@@ -424,9 +473,10 @@ export default function OperationToOrder() {
         // will: an empty `Required By` is not "unconfirmed", it is the frozen
         // meaning *buy it on the next run*. Applying the customer rule to it
         // swallowed every typed demand silently — saved, stored, invisible.
-        if (r.delivery == null && !r.readyStock) continue;
-        const bucket =
-          today == null
+        const blocker = r.delivery == null && !r.readyStock ? "blocked_delivery_date" : null;
+        const bucket = blocker
+          ? "overdue"
+          : today == null
             ? "overdue"
             : (() => {
                 const b = poScheduleBucket(r.orderBy ?? null, poDays, today);
@@ -479,6 +529,7 @@ export default function OperationToOrder() {
             takenFromStock: b.takenFromStock ?? 0,
             coveredByOpenPo: b.coveredByOpenPo ?? 0,
             coveredByOpenPoPos: b.coveredByOpenPoPos ?? [],
+            blocker,
           });
         }
       }
@@ -532,6 +583,7 @@ export default function OperationToOrder() {
         // document covers itself.
         coveredByOpenPo: 0,
         coveredByOpenPoPos: [],
+        blocker: null,
       });
     });
     return rows;
@@ -545,7 +597,7 @@ export default function OperationToOrder() {
   const timeCounts = useMemo(() => {
     const m = new Map<string, Set<string>>();
     for (const r of allRows) {
-      if (poOf(r)) continue;
+      if (poOf(r) || r.blocker != null) continue;
       const s = m.get(r.bucket) ?? new Set<string>();
       s.add(r.orderId ?? r.key);
       m.set(r.bucket, s);
@@ -647,7 +699,7 @@ export default function OperationToOrder() {
     const byCategory = new Map<string, number>();
     let all = 0;
     for (const r of allRows) {
-      if (poOf(r)) continue;
+      if (poOf(r) || r.blocker != null) continue;
       // Everything `inView` applies except the category picks — see above.
       if (viewSet.size > 0 && !viewSet.has(r.bucket)) continue;
       const q = search.trim().toLowerCase();
@@ -748,11 +800,15 @@ export default function OperationToOrder() {
   // ── Selection: the engine pre-ticks ITS plan, a human ticks the rest ──────
 
   const defaultOn = (r: GridRow) =>
-    (r.bucket === "overdue" || r.bucket === scheduleDays[0]) && !poOf(r);
+    r.blocker == null &&
+    (r.bucket === "overdue" || r.bucket === scheduleDays[0]) &&
+    !poOf(r);
   const isSelected = (r: GridRow) =>
-    !poOf(r) && (defaultOn(r) ? !userOff.has(r.key) : userOn.has(r.key));
+    r.blocker == null &&
+    !poOf(r) &&
+    (defaultOn(r) ? !userOff.has(r.key) : userOn.has(r.key));
   const toggleRow = (r: GridRow) => {
-    if (poOf(r)) return;
+    if (poOf(r) || r.blocker != null) return;
     if (defaultOn(r)) {
       setUserOff((s) => {
         const n = new Set(s);
@@ -781,7 +837,7 @@ export default function OperationToOrder() {
 
   /** Header select-all — over the rows the operator can SEE, Excel's rule. */
   const toggleAllVisible = () => {
-    const vis = visibleRows.filter((r) => !poOf(r));
+    const vis = visibleRows.filter((r) => !poOf(r) && r.blocker == null);
     if (vis.length === 0) return;
     const allSel = vis.every(isSelected);
     setUserOff((s) => {
@@ -892,14 +948,64 @@ export default function OperationToOrder() {
 
   const defaultDest = destinations.find((d) => d.isDefault) ?? destinations[0] ?? null;
 
+  const decisionKey = (proposalKey: string, documentKey: string, sku: string) =>
+    `${proposalKey}::${documentKey}::${sku}`;
+  const documentKey = (proposalKey: string, key: string) => `${proposalKey}::${key}`;
+
+  function openIssueReview() {
+    const next = new Map<string, CommercialDecision>();
+    for (const target of batch.targets) {
+      const plans = planFromDocuments(target.proposal, target.docs);
+      plans.forEach((po, index) => {
+        const doc = target.docs[index];
+        for (const line of po.lines) {
+          const cost = line.cost != null && line.cost > 0 ? String(line.cost) : "";
+          next.set(decisionKey(target.proposal.key, doc.key, line.sku), {
+            treatment: "normal",
+            unitCost: cost,
+            costSource: cost ? "catalog" : "hand_entered",
+          });
+        }
+      });
+    }
+    setCommercialDecisions(next);
+    setDocumentPartners(new Map());
+    setIssueReviewOpen(true);
+  }
+
+  const reviewCanIssue = useMemo(() => {
+    if (!issueReviewOpen || batch.targets.length === 0) return false;
+    for (const target of batch.targets) {
+      const plans = planFromDocuments(target.proposal, target.docs);
+      for (let index = 0; index < plans.length; index += 1) {
+        const doc = target.docs[index];
+        if (
+          target.proposal.supplierKind === "factory_pickup" &&
+          !documentPartners.get(documentKey(target.proposal.key, doc.key))
+        ) return false;
+        for (const line of plans[index].lines) {
+          const decision = commercialDecisions.get(
+            decisionKey(target.proposal.key, doc.key, line.sku),
+          );
+          if (!decision) return false;
+          if (decision.treatment === "normal" && !(Number(decision.unitCost) > 0)) return false;
+          if (decision.treatment === "free_of_charge" && decision.reason.trim() === "") return false;
+        }
+      }
+    }
+    return true;
+  }, [batch, commercialDecisions, documentPartners, issueReviewOpen]);
+
   // ── The batch — one POST per group; grid and bar report in place ─────────
-  async function issueAll(only?: ReadonlySet<string>) {
+  async function issueAll(only?: ReadonlySet<string>, reviewed = false) {
     const targets = batch.targets.filter((t) => !only || only.has(t.proposal.key));
     if (targets.length === 0 || !defaultDest) return;
+    if (reviewed && issueReviewOpen && !reviewCanIssue) return;
+    if (reviewed) setIssueReviewOpen(false);
     setCreating(true);
     setResults((m) => {
       const n = new Map(m);
-      for (const t of targets) n.set(t.proposal.key, { status: "pending" });
+      for (const t of targets) n.set(t.proposal.key, { status: "queued" });
       return n;
     });
     for (const t of targets) {
@@ -914,8 +1020,39 @@ export default function OperationToOrder() {
               // The engine's default — per-PO confirmation lives on the
               // generated documents, not here (Loo, 2026-08-01).
               destinationId: defaultDest.id,
-              // The ARRANGEMENT only. No SKU, no quantity, no price.
-              purchaseOrders: t.docs,
+              // Demand membership remains an ARRANGEMENT. The governed review
+              // adds commercial/partner decisions; quantity stays server-owned.
+              purchaseOrders: t.docs.map((doc, index) => {
+                if (!reviewed) return doc;
+                const po = planFromDocuments(t.proposal, t.docs)[index];
+                return {
+                  ...doc,
+                  ...(t.proposal.supplierKind === "factory_pickup"
+                    ? {
+                        procurementPartnerId: documentPartners.get(
+                          documentKey(t.proposal.key, doc.key),
+                        ),
+                      }
+                    : {}),
+                  lineDecisions: po.lines.map((line) => {
+                    const decision = commercialDecisions.get(
+                      decisionKey(t.proposal.key, doc.key, line.sku),
+                    )!;
+                    return decision.treatment === "free_of_charge"
+                      ? {
+                          sku: line.sku,
+                          treatment: "free_of_charge" as const,
+                          reason: decision.reason.trim(),
+                        }
+                      : {
+                          sku: line.sku,
+                          treatment: "normal" as const,
+                          unitCost: Number(decision.unitCost),
+                          costSource: decision.costSource,
+                        };
+                  }),
+                };
+              }),
             }),
           },
         );
@@ -1580,7 +1717,11 @@ export default function OperationToOrder() {
         // DO to a row now live in one place — and this cell went back to
         // answering one question.
         if (!po) {
-          return <span className="text-kit-slate-11 truncate">{W.yetToOrder}</span>;
+          return (
+            <span className="text-kit-slate-11 truncate">
+              {r.blocker === "blocked_delivery_date" ? W.noDeliveryDate : W.yetToOrder}
+            </span>
+          );
         }
         // The number is the receipt AND the door to the next step: it lands
         // on Purchase Orders with THIS document opened.
@@ -1725,6 +1866,26 @@ export default function OperationToOrder() {
   };
 
   const updatedMs = q.dataUpdatedAt;
+  const scope = q.data?.scope ?? null;
+  const scopeMessages = scope
+    ? [
+        !scope.orderFound ? W.scopeNotFound : null,
+        scope.blockedProductionDays > 0 ? W.scopeBlockedProductionDays : null,
+        scope.blockedDeliveryDate > 0 ? W.scopeBlockedDeliveryDate : null,
+        scope.unresolved > 0 ? W.scopeUnresolved : null,
+        scope.alreadyCovered > 0 ? W.scopeAlreadyCovered : null,
+        scope.alreadyIssued > 0 ? W.scopeAlreadyIssued : null,
+      ].filter((message) => message != null) as string[]
+    : [];
+  const scopedNothingToBuy =
+    scope != null &&
+    scope.orderFound &&
+    scope.issuable === 0 &&
+    scope.blockedProductionDays === 0 &&
+    scope.blockedDeliveryDate === 0 &&
+    scope.unresolved === 0 &&
+    scope.alreadyCovered === 0 &&
+    scope.alreadyIssued === 0;
 
   return (
     /* h-full, not flex-1: the app wrapper is overflow-auto, so a page that
@@ -1855,7 +2016,24 @@ export default function OperationToOrder() {
              * screen the problem it fixed does not exist. A UX problem that
              * has not been observed is not a problem. */
             right={
-              creating ? (
+              <>
+                {scopeSo != null ? (
+                  <span
+                    className="flex items-center gap-2 rounded-control border border-kit-slate-6 bg-white px-2 h-8 text-body text-kit-slate-12 whitespace-nowrap"
+                    data-testid="to-order-so-scope"
+                  >
+                    <span>{`${W.salesOrderScope} · SO-${scopeSo}`}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon="close"
+                      aria-label={W.clearSalesOrderScope}
+                      onClick={clearSoScope}
+                      data-testid="to-order-so-scope-clear"
+                    />
+                  </span>
+                ) : null}
+                {creating ? (
                 <span className="text-meta text-kit-slate-11" data-testid="to-order-creating">
                   {W.creatingPos}
                 </span>
@@ -1870,8 +2048,8 @@ export default function OperationToOrder() {
                   <Button
                     variant="primary"
                     shape="pill"
-                    onClick={() => void issueAll()}
-                    disabled={unread || batch.poCount === 0 || !defaultDest}
+                    onClick={openIssueReview}
+                    disabled={batch.poCount === 0 || !defaultDest}
                     /* Why N POs? One per factory × category (sofa one per
                        customer). The hover names the split — the click's
                        result is still the real receipt. */
@@ -1883,7 +2061,8 @@ export default function OperationToOrder() {
                     {batch.poCount > 0 ? issuePosShort(batch.poCount) : W.issuePos}
                   </Button>
                 </span>
-              ) : null
+                ) : null}
+              </>
             }
             meta={
               updatedMs > 0 ? (
@@ -1908,6 +2087,12 @@ export default function OperationToOrder() {
                   <Icon name="flag" size={14} />
                   <span data-testid="to-order-unresolved">
                     {`${unresolvedHeadline(unresolved.length)} — ${W.unresolvedHelp}`}
+                  </span>
+                  <span className="ml-auto text-meta tabular-nums">
+                    {unresolved
+                      .slice(0, 3)
+                      .map((item) => `${item.so != null ? `SO-${item.so} · ` : ""}${item.sku}`)
+                      .join(" · ")}
                   </span>
                 </div>
               ) : null}
@@ -1947,7 +2132,7 @@ export default function OperationToOrder() {
                   <span className="ml-auto">
                     <Button
                       variant="neutral"
-                      onClick={() => void issueAll(failedKeys)}
+                      onClick={() => void issueAll(failedKeys, true)}
                       data-testid="to-order-retry"
                     >
                       {W.retry}
@@ -1955,6 +2140,15 @@ export default function OperationToOrder() {
                   </span>
                 </div>
               ) : null}
+            </div>
+          ) : null}
+
+          {scope && (scopeMessages.length > 0 || scopedNothingToBuy) ? (
+            <div
+              className="shrink-0 border-y border-kit-slate-5 bg-white px-3 py-2 text-body text-kit-slate-11"
+              data-testid="to-order-scope-status"
+            >
+              {(scopedNothingToBuy ? [W.scopeNothingToBuy] : scopeMessages).join(" · ")}
             </div>
           ) : null}
 
@@ -2021,7 +2215,7 @@ export default function OperationToOrder() {
                    * one job in this portal; a row with a purchase order has no
                    * claim on it.
                    */
-                  rowLate={(r) => !poOf(r) && r.bucket === "overdue"}
+                  rowLate={(r) => !poOf(r) && r.blocker == null && r.bucket === "overdue"}
                   /**
                    * ⭐ AND A BOUGHT ROW MUST READ AS DONE FROM THE LEFT EDGE.
                    *
@@ -2203,7 +2397,10 @@ export default function OperationToOrder() {
                                 rows since P9; this makes the two agree instead
                                 of contradicting each other 200px apart. */}
                             {`${W.total} · ${unitsHeadline(
-                              rows.reduce((n, r) => (poOf(r) ? n : n + r.qty), 0),
+                              rows.reduce(
+                                (n, r) => (poOf(r) || r.blocker != null ? n : n + r.qty),
+                                0,
+                              ),
                             )}`}
                           </span>
                         ),
@@ -2218,7 +2415,7 @@ export default function OperationToOrder() {
                     },
                     onToggleAll: toggleAllVisible,
                     label: W.select,
-                    selectable: (r) => !poOf(r),
+                    selectable: (r) => !poOf(r) && r.blocker == null,
                   }}
                 />
                 {/* q1 (Loo, 2026-08-03). The footer counted customer ORDERS
@@ -2291,6 +2488,151 @@ export default function OperationToOrder() {
 
         </div>
       </div>
+
+      <Modal
+        open={issueReviewOpen}
+        onOpenChange={setIssueReviewOpen}
+        title={W.issueReview}
+        width="wide"
+        footer={
+          <Button
+            variant="primary"
+            disabled={!reviewCanIssue}
+            onClick={() => void issueAll(undefined, true)}
+            data-testid="to-order-issue-confirm"
+          >
+            {batch.poCount > 0 ? issuePosShort(batch.poCount) : W.issuePos}
+          </Button>
+        }
+      >
+        <div className="flex flex-col gap-4" data-testid="to-order-issue-review">
+          {batch.targets.flatMap((target) => {
+            const plans = planFromDocuments(target.proposal, target.docs);
+            return plans.map((po, index) => {
+              const doc = target.docs[index];
+              const docKey = documentKey(target.proposal.key, doc.key);
+              return (
+                <section key={docKey} className="border border-kit-slate-5 bg-white">
+                  <div className="flex items-center justify-between border-b border-kit-slate-5 bg-kit-slate-3 px-3 py-2 text-body">
+                    <span className="font-semibold text-kit-slate-12">{target.proposal.supplierName}</span>
+                    <span className="tabular-nums text-kit-slate-11">
+                      {po.soRefs.map((so) => `SO-${so}`).join(" · ")}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-3 p-3">
+                    {target.proposal.supplierKind === "factory_pickup" ? (
+                      <Select
+                        id={`partner-${docKey}`}
+                        label={W.procurementPartner}
+                        required
+                        value={documentPartners.get(docKey)}
+                        onValueChange={(value) =>
+                          setDocumentPartners((current) => {
+                            const next = new Map(current);
+                            next.set(docKey, value);
+                            return next;
+                          })
+                        }
+                        options={procurementPartners.map((partner) => ({
+                          value: partner.id,
+                          label: partner.name,
+                        }))}
+                      />
+                    ) : null}
+                    {po.lines.map((line) => {
+                      const key = decisionKey(target.proposal.key, doc.key, line.sku);
+                      const decision = commercialDecisions.get(key);
+                      if (!decision) return null;
+                      return (
+                        <div
+                          key={key}
+                          className="grid grid-cols-[minmax(180px,1fr)_180px_220px] items-start gap-3 border-t border-kit-slate-4 pt-3 first:border-t-0 first:pt-0"
+                        >
+                          <div className="text-body text-kit-slate-12">
+                            <div className="font-semibold">{line.sku}</div>
+                            <div className="text-meta text-kit-slate-11 tabular-nums">{`${W.colQty} · ${line.qty}`}</div>
+                          </div>
+                          <Select
+                            id={`treatment-${key}`}
+                            label={W.commercialTreatment}
+                            value={decision.treatment}
+                            onValueChange={(value) =>
+                              setCommercialDecisions((current) => {
+                                const next = new Map(current);
+                                next.set(
+                                  key,
+                                  value === "free_of_charge"
+                                    ? { treatment: "free_of_charge", reason: "" }
+                                    : {
+                                        treatment: "normal",
+                                        unitCost: line.cost != null && line.cost > 0 ? String(line.cost) : "",
+                                        costSource:
+                                          line.cost != null && line.cost > 0
+                                            ? "catalog"
+                                            : "hand_entered",
+                                      },
+                                );
+                                return next;
+                              })
+                            }
+                            options={[
+                              { value: "normal", label: W.normalPurchase },
+                              { value: "free_of_charge", label: W.freeOfCharge },
+                            ]}
+                          />
+                          {decision.treatment === "normal" ? (
+                            <Input
+                              id={`cost-${key}`}
+                              label={W.transactionCost}
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              required
+                              value={decision.unitCost}
+                              error={Number(decision.unitCost) > 0 ? undefined : W.costRequired}
+                              onChange={(event) =>
+                                setCommercialDecisions((current) => {
+                                  const next = new Map(current);
+                                  next.set(key, {
+                                    treatment: "normal",
+                                    unitCost: event.target.value,
+                                    costSource:
+                                      line.cost != null && Number(event.target.value) === line.cost
+                                        ? "catalog"
+                                        : "hand_entered",
+                                  });
+                                  return next;
+                                })
+                              }
+                            />
+                          ) : (
+                            <Input
+                              id={`foc-reason-${key}`}
+                              label={W.freeOfChargeReason}
+                              required
+                              value={decision.reason}
+                              onChange={(event) =>
+                                setCommercialDecisions((current) => {
+                                  const next = new Map(current);
+                                  next.set(key, {
+                                    treatment: "free_of_charge",
+                                    reason: event.target.value,
+                                  });
+                                  return next;
+                                })
+                              }
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            });
+          })}
+        </div>
+      </Modal>
 
       <CreatePurchaseDialog
         open={dialogOpen}
