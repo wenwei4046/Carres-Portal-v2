@@ -286,6 +286,15 @@ readability follow the governed 2990 reference: its listing engine, controls, co
 row disclosure and table hierarchy are the reference. GitHub is evidence for tab admission,
 not the Carres Register shell. Carres business ownership remains authoritative over all three.
 
+**REGISTER TABLE DENSITY LAW — APPROVED / LOCKED.** The readable 2990 parent-list geometry is
+the Register baseline: rendered 36px table header; rendered 38px single-line parent row; 11px
+body type on 16px line-height; approximately 8px vertical cell breathing room above and below,
+with the row's 20px checkbox included in the measured height. Expanded content takes its
+natural governed child-row height and is not forced into 38px. Carres gains visible rows by
+removing tall page chrome, breadcrumbs, KPI bands and redundant headings — never by squeezing
+the parent row below this readable baseline. Footer existence, contents and height remain a
+separate unresolved decision; this density ruling does not invent one.
+
 # §6.6 · SALES ORDERS REFERENCE STRUCTURE — ruled by Loo 2026-08-10
 
 **Stage A is owner-accepted and CLOSED.** Sales Orders is the first production reference
